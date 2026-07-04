@@ -11,7 +11,7 @@ import {
   createRepoBranch as branch,
   installGoblinTestBridge,
   resetReposStore,
-  seedRepoState,
+  seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import {
   preferredWorkspacePaneTabForTarget,
@@ -38,7 +38,7 @@ function seedRepo(options: {
   branches?: BranchSnapshotInfo[]
 }) {
   const selectedBranch = options.selectedBranch === undefined ? 'feature/plain' : options.selectedBranch
-  seedRepoState({
+  seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches: options.branches ?? [
       branch('main', { worktree: { path: '/repo' } }),
@@ -188,7 +188,7 @@ describe('setBranchViewMode', () => {
   })
 
   test('uses the React Query snapshot read model when changing branch view mode', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       selectedBranch: 'feature/plain',
@@ -300,7 +300,7 @@ describe('selectBranch', () => {
   })
 
   test('uses the React Query snapshot read model to validate selected branches', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       selectedBranch: 'main',
@@ -408,7 +408,7 @@ describe('setWorkspacePaneTab', () => {
   })
 
   test('uses the React Query snapshot read model to resolve workspace pane tab targets', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       selectedBranch: 'feature/query',

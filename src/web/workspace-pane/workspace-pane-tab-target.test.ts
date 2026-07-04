@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
-import { resetReposStore, seedRepoState, createRepoBranch } from '#/web/test-utils/bridge.ts'
+import { resetReposStore, seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
   resolveWorkspacePaneTabTargetForBranch,
@@ -36,7 +36,7 @@ describe('workspace pane tab target read model', () => {
   })
 
   test('resolves branch targets from the React Query snapshot cache when store branches are stale', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       selectedBranch: 'feature/query',
@@ -55,7 +55,7 @@ describe('workspace pane tab target read model', () => {
   })
 
   test('records tab openers from the React Query snapshot cache when store branches are stale', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       selectedBranch: 'feature/query',

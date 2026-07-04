@@ -3,7 +3,7 @@ import { normalizeRemoteTarget, remoteRepoSessionEntry } from '#/shared/remote-r
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
-import { createRepoBranch, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import { removeRepoRuntimeInstanceFromCache, repoRuntimeInstancesQueryKey } from '#/web/repo-runtime-query.ts'
@@ -322,10 +322,10 @@ describe('repo lifecycle', () => {
   })
 
   test('closeRepo clears recorded tab openers scoped to that repo, but leaves other repos untouched', () => {
-    // seedRepoState replaces the whole `repos` map, so seed both repos
+    // seedRepoWithReadModelForTest replaces the whole `repos` map, so seed both repos
     // before merging them back together into one multi-repo store state.
-    const repoA = seedRepoState({ id: REPO_A, branches: [createRepoBranch('feature/a')], selectedBranch: 'feature/a' })
-    const repoB = seedRepoState({ id: REPO_B, branches: [createRepoBranch('feature/b')], selectedBranch: 'feature/b' })
+    const repoA = seedRepoWithReadModelForTest({ id: REPO_A, branches: [createRepoBranch('feature/a')], selectedBranch: 'feature/a' })
+    const repoB = seedRepoWithReadModelForTest({ id: REPO_B, branches: [createRepoBranch('feature/b')], selectedBranch: 'feature/b' })
     useReposStore.setState({
       repos: { [REPO_A]: repoA, [REPO_B]: repoB },
       order: [REPO_A, REPO_B],

@@ -4,7 +4,7 @@ import { terminalLog } from '#/web/logger.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { repoOperation } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { branch, REPO_ID, resetRefreshTest, ipcHandlers, seedRepo } from '#/web/stores/repos/refresh-test-utils.ts'
-import { seedRepoState } from '#/web/test-utils/bridge.ts'
+import { seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
 import {
   preferredWorkspacePaneTabForTarget,
@@ -79,7 +79,7 @@ describe('remote fetch timestamps', () => {
   })
 
   test('manual refresh skips repo.fetch for local-only repositories and refreshes local state', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [branch('feature/a')],
       remote: {

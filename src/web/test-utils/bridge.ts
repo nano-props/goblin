@@ -12,14 +12,14 @@
 //   - The bridge mock composes the same `goblinNative` shape the real
 //     client bridge exposes, including `host`, `terminal`, `invokeIpc`,
 //     and `onEvent`.
-//   - `seedRepoState` / `resetReposStore` interact with the live
-//     `useReposStore` (Zustand) — they do not mock the store; they
-//     drive it. Tests that need a fresh store call `resetReposStore`
-//     in `beforeEach`.
+//   - `seedRepoShellForTest`, `seedRepoWithReadModelForTest`, and
+//     `resetReposStore` interact with the live `useReposStore`
+//     (Zustand) — they do not mock the store; they drive it. Tests
+//     that need a fresh store call `resetReposStore` in `beforeEach`.
 
-import type { RepoState, RepoBranchState, RepoWorktreeState } from '#/web/stores/repos/types.ts'
+import type { RepoState, RepoBranchState } from '#/web/stores/repos/types.ts'
 import { readRepoBranchQueryProjection, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
-import { stripBranchWorktreeMetadata, worktreeStatesFromBranches } from '#/web/stores/repos/worktree-state.ts'
+import { stripBranchWorktreeMetadata } from '#/web/stores/repos/worktree-state.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { disposeAllRepoOperationSchedulers } from '#/web/stores/repos/repo-operation-scheduler.ts'
@@ -76,6 +76,42 @@ export function repoPresentationFromQueryForTest(repo: RepoState): RepoPresentat
     ...repo,
     branchModel: readModel,
   }
+}
+
+export function seedRepoShellForTest(options: {
+  id: string
+  name?: string
+  selectedBranch?: string | null
+  preferredWorkspacePaneTabByTarget?: Record<string, WorkspacePaneTabType>
+  instanceId?: string
+  remote?: Partial<RepoState['remote']>
+}): RepoState {
+  const base = emptyRepo(options.id, options.name ?? 'repo', options.instanceId ?? createOpaqueId('repo-instance'))
+  const repo: RepoState = {
+    ...base,
+    ui: {
+      ...base.ui,
+      selectedBranch: options.selectedBranch ?? base.ui.selectedBranch,
+      preferredWorkspacePaneTabByTarget:
+        options.preferredWorkspacePaneTabByTarget ?? base.ui.preferredWorkspacePaneTabByTarget,
+    },
+    remote: {
+      ...base.remote,
+      ...options.remote,
+    },
+  }
+  useReposStore.setState({
+    repos: { [options.id]: repo },
+    repoSnapshotCache: {},
+    order: [options.id],
+    activeId: options.id,
+    sessionReady: true,
+    sessionPersistenceReady: true,
+    sessionRestoreError: null,
+    zenMode: DEFAULT_ZEN_MODE,
+    workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
+  })
+  return repo
 }
 
 interface TerminalClientTestOutputs {
@@ -739,7 +775,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
   setClientBridgeForTests(null)
 }
 
-export function seedRepoState(options: {
+export function seedRepoWithReadModelForTest(options: {
   id: string
   name?: string
   branches?: RepoBranchState[]
@@ -751,16 +787,12 @@ export function seedRepoState(options: {
   workspacePaneTabsByBranch?: Record<string, WorkspacePaneTabEntry[]>
   instanceId?: string
   status?: WorktreeStatus[]
-  worktreesByPath?: Record<string, RepoWorktreeState>
   remote?: Partial<RepoState['remote']>
 }): RepoState {
-  const base = emptyRepo(options.id, options.name ?? 'repo', options.instanceId ?? createOpaqueId('repo-instance'))
   const branchesWithSnapshotWorktreeMetadata = options.branchSnapshots ?? options.branches ?? []
   const branches = options.branches ?? stripBranchWorktreeMetadata(branchesWithSnapshotWorktreeMetadata)
   const status = options.status ?? []
-  const worktreesByPath =
-    options.worktreesByPath ?? worktreeStatesFromBranches(branchesWithSnapshotWorktreeMetadata, {}, status)
-  const selectedBranch = options.selectedBranch ?? base.ui.selectedBranch
+  const selectedBranch = options.selectedBranch ?? null
   const preferredWorkspacePaneTabByTarget =
     options.preferredWorkspacePaneTabByTarget ??
     (selectedBranch && options.preferredWorkspacePaneTab !== undefined
@@ -771,30 +803,14 @@ export function seedRepoState(options: {
             worktreePath: branches.find((branch) => branch.name === selectedBranch)?.worktree?.path ?? null,
           })]: options.preferredWorkspacePaneTab,
         }
-      : base.ui.preferredWorkspacePaneTabByTarget)
-  const repo: RepoState = {
-    ...base,
-    instanceId: base.instanceId,
-    ui: {
-      ...base.ui,
-      selectedBranch,
-      preferredWorkspacePaneTabByTarget,
-    },
-    remote: {
-      ...base.remote,
-      ...options.remote,
-    },
-  }
-  useReposStore.setState({
-    repos: { [options.id]: repo },
-    repoSnapshotCache: {},
-    order: [options.id],
-    activeId: options.id,
-    sessionReady: true,
-    sessionPersistenceReady: true,
-    sessionRestoreError: null,
-    zenMode: DEFAULT_ZEN_MODE,
-    workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
+      : undefined)
+  const repo = seedRepoShellForTest({
+    id: options.id,
+    name: options.name,
+    instanceId: options.instanceId,
+    selectedBranch,
+    ...(preferredWorkspacePaneTabByTarget ? { preferredWorkspacePaneTabByTarget } : {}),
+    remote: options.remote,
   })
   seedRepoReadModelQueryData(repo, {
     branches: branchesWithSnapshotWorktreeMetadata,

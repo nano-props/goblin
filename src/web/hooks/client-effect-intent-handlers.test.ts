@@ -15,7 +15,7 @@ vi.mock('sonner', () => ({
 }))
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { preferredWorkspacePaneTabForTarget, workspacePaneTabsTargetForRepoBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
@@ -34,7 +34,7 @@ afterEach(() => {
 
 describe('client effect intent handlers', () => {
   test('routes terminal bell clicks through the React Query snapshot read model', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       selectedBranch: 'feature/query',
@@ -61,7 +61,7 @@ describe('client effect intent handlers', () => {
   })
 
   test('returns false when changes cannot be shown for a branch without a worktree', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
@@ -77,7 +77,7 @@ describe('client effect intent handlers', () => {
   })
 
   test('create-worktree-requested opens create-worktree for the current repo', async () => {
-    seedRepoState({ id: REPO_ID, branches: [createRepoBranch('main')] })
+    seedRepoWithReadModelForTest({ id: REPO_ID, branches: [createRepoBranch('main')] })
     const d = deps(REPO_ID)
 
     await expect(handleWorkspaceClientIntent({ type: 'create-worktree-requested' }, d)).resolves.toBe(true)
@@ -94,7 +94,7 @@ describe('client effect intent handlers', () => {
   })
 
   test('create-worktree-requested shows a busy toast while a branch action is running', async () => {
-    seedRepoState({ id: REPO_ID, branches: [createRepoBranch('main')] })
+    seedRepoWithReadModelForTest({ id: REPO_ID, branches: [createRepoBranch('main')] })
     useReposStore.setState((state) => {
       const repo = state.repos[REPO_ID]
       if (!repo) return state

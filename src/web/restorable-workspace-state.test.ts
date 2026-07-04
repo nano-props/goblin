@@ -4,7 +4,7 @@ import {
   restoreRestorableWorkspaceStateFromSession,
   workspaceSessionStateFromRestorableWorkspaceState,
 } from '#/web/restorable-workspace-state.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
@@ -16,7 +16,7 @@ describe('restorable-workspace-state', () => {
 
   test('maps restorable workspace state into WorkspaceSessionState', () => {
     const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
@@ -74,7 +74,7 @@ describe('restorable-workspace-state', () => {
 
   test('persists changes as a session-restorable preferred tab when its static tab is open', () => {
     const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
@@ -107,7 +107,7 @@ describe('restorable-workspace-state', () => {
 
   test('does not persist a branch preferred tab whose tab is closed', () => {
     const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
@@ -173,7 +173,7 @@ describe('restorable-workspace-state', () => {
 
   test('persists files as a session-restorable preferred tab when its static tab is open', () => {
     const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
@@ -206,7 +206,7 @@ describe('restorable-workspace-state', () => {
 
   test('round-trips a files tab through session-restore', () => {
     const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
@@ -238,7 +238,7 @@ describe('restorable-workspace-state', () => {
   })
 
   test('persists file tree view state into session state', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',

@@ -5,7 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import type { ReactElement } from 'react'
 import { RepoLayoutSidebar } from '#/web/components/repo-layout/RepoLayoutSidebar.tsx'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 
 vi.mock('#/web/components/RepoPickerHost.tsx', () => ({
@@ -17,7 +17,7 @@ const REPO_ID = '/tmp/repo-shell-sidebar-test'
 beforeEach(() => {
   primaryWindowQueryClient.clear()
   resetReposStore()
-  seedRepoState({
+  seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches: [createRepoBranch('main'), createRepoBranch('feature/a')],
   })

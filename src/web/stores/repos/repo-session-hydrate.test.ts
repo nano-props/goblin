@@ -286,15 +286,34 @@ describe('repo session hydration', () => {
     expect(deriveConnectivity(repo!)).toBe('connected')
   })
 
-  test('hydrateRepoSession does not restore local failures with fake runtime authority', async () => {
+  test('hydrateRepoSession fails when a persisted local repo cannot establish runtime authority', async () => {
     installGoblin()
 
-    await useReposStore
-      .getState()
-      .hydrateRepoSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry('/missing')], '/missing')
+    await expect(
+      useReposStore
+        .getState()
+        .hydrateRepoSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry('/missing')], '/missing'),
+    ).rejects.toThrow('session repo restore failed')
 
     expect(useReposStore.getState().order).toEqual([REPO_A])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
+    expect(useReposStore.getState().repos['/missing']).toBeUndefined()
+  })
+
+  test('hydrateRepoSession fails preferred workspace pane restore for a repo that never opens', async () => {
+    installGoblin()
+
+    await expect(
+      useReposStore.getState().hydrateRepoSession([localRepoSessionEntry('/missing')], '/missing', {
+        workspacePaneRestoreState: {
+          workspacePaneTabsByTargetByRepo: {},
+          preferredWorkspacePaneTabByTargetByRepo: {
+            '/missing': { [branchTargetKey('/missing', 'main')]: 'files' },
+          },
+        },
+      }),
+    ).rejects.toThrow('session repo restore failed')
+
     expect(useReposStore.getState().repos['/missing']).toBeUndefined()
   })
 

@@ -6,7 +6,7 @@ import {
   seedRepoSnapshotQueryFromCacheEntry,
 } from '#/web/stores/repos/persistence.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
-import { createBranchSnapshot, createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createBranchSnapshot, createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoSnapshotCacheEntry } from '#/web/stores/repos/types.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -72,14 +72,14 @@ describe('normalizeRepoSnapshotCache', () => {
 
 describe('persistRepoSnapshotCacheEntry', () => {
   test('does not write a stale cache entry after the repo instance changes', () => {
-    const staleRepo = seedRepoState({
+    const staleRepo = seedRepoWithReadModelForTest({
       id: '/repo',
       instanceId: 'repo-instance-test',
       branches: [createRepoBranch('main')],
       currentBranch: 'main',
       selectedBranch: 'main',
     })
-    seedRepoState({ id: '/repo', instanceId: 'repo-instance-test-2' })
+    seedRepoWithReadModelForTest({ id: '/repo', instanceId: 'repo-instance-test-2' })
 
     persistRepoSnapshotCacheEntry(useReposStore.setState, staleRepo, 'repo-instance-test')
 
@@ -87,7 +87,7 @@ describe('persistRepoSnapshotCacheEntry', () => {
   })
 
   test('persists branch references without dynamic worktree or pull request state', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/repo',
       instanceId: 'repo-instance-test',
       branchSnapshots: [
@@ -122,7 +122,7 @@ describe('persistRepoSnapshotCacheEntry', () => {
   })
 
   test('persists the React Query branch read model when it is newer than the store projection', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/repo',
       instanceId: 'repo-instance-test',
       branches: [createRepoBranch('main')],

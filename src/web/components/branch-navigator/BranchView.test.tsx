@@ -11,7 +11,7 @@ import {
 } from '#/web/primary-window-navigation.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
-import { createBranchSnapshot, createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createBranchSnapshot, createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 
@@ -53,7 +53,7 @@ beforeEach(() => {
 
 describe('BranchView', () => {
   test('uses the React Query snapshot read model for branch rows when available', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       selectedBranch: 'feature/query',
@@ -70,7 +70,7 @@ describe('BranchView', () => {
 
   test('uses the React Query status read model for branch row dirty state when available', () => {
     const branch = createRepoBranch('feature/dirty', { worktree: { path: WORKTREE_PATH } })
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
       selectedBranch: 'feature/dirty',
@@ -85,7 +85,7 @@ describe('BranchView', () => {
   })
 
   test('derives query snapshot worktree state from the query status read model', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       selectedBranch: 'feature/query-dirty',

@@ -8,7 +8,7 @@ import {
 } from '#/web/stores/repos/refresh-coordinator.ts'
 import { beginRepoInvalidationSource, settleRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import type { ReposGet } from '#/web/stores/repos/types.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -54,7 +54,7 @@ describe('repo refresh coordinator', () => {
   })
 
   test('builds status refresh snapshots from the React Query branch read model', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/repo',
       branches: [],
       selectedBranch: 'feature/query',

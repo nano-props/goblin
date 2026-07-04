@@ -12,7 +12,7 @@ vi.mock('sonner', () => ({
     success: vi.fn(),
   },
 }))
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
@@ -63,7 +63,7 @@ describe('useKeyboard', () => {
   })
 
   test('workspace pane tab shortcuts move through currently opened workspace pane tabs', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -94,7 +94,7 @@ describe('useKeyboard', () => {
   })
 
   test('workspace pane tab shortcuts move through branch tabs without a worktree', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
@@ -123,7 +123,7 @@ describe('useKeyboard', () => {
   })
 
   test('branch navigation shortcuts use the React Query snapshot read model for branch order', async () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       selectedBranch: 'main',
@@ -149,7 +149,7 @@ describe('useKeyboard', () => {
   test('primary modifier plus number selects workspace pane tabs even while terminal is focused', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     installNativeBridgeStub()
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -187,7 +187,7 @@ describe('useKeyboard', () => {
 
   test('primary modifier plus t creates a new terminal tab', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -214,7 +214,7 @@ describe('useKeyboard', () => {
 
   test('primary modifier plus n opens the create worktree dialog', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -247,7 +247,7 @@ describe('useKeyboard', () => {
 
   test('primary modifier plus n does not open create worktree while workspace shortcuts are suppressed', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -265,7 +265,7 @@ describe('useKeyboard', () => {
 
   test('primary modifier plus n does not open create worktree while a branch action is busy', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -306,7 +306,7 @@ describe('useKeyboard', () => {
   test('does not run menu-backed primary shortcuts from the client in electron', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     installNativeBridgeStub()
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -341,7 +341,7 @@ describe('useKeyboard', () => {
 
   test('primary modifier plus w closes the selected terminal tab', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',

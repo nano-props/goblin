@@ -13,7 +13,7 @@ import {
   installGoblinTestBridge,
   repoPresentationFromQueryForTest,
   resetReposStore,
-  seedRepoState,
+  seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import type { RepoBranchAction } from '#/web/stores/repos/branch-action-types.ts'
 import type { BranchViewMode } from '#/web/stores/repos/types.ts'
@@ -42,7 +42,7 @@ async function flushAsyncWork() {
 
 beforeEach(() => {
   resetReposStore()
-  seedRepoState({
+  seedRepoWithReadModelForTest({
     id: REPO_ID,
     instanceId: 'repo-instance-test',
     branches: [createRepoBranch('feature/a'), createRepoBranch('feature/b')],
@@ -138,7 +138,7 @@ function installSuccessfulCreateWorktreeBridgeWithExistingWorktree(options?: { o
 describe('branch action capabilities', () => {
   test('gates remote-only actions when a repo transitions to local-only', () => {
     const branch = createRepoBranch('feature/local', { worktree: { path: '/tmp/gbl-branch-actions-test-worktree' } })
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
       remote: {
@@ -177,7 +177,7 @@ describe('branch action capabilities', () => {
 
   test('uses canonical worktree state to gate primary worktree removal', () => {
     const branch = createRepoBranch('feature/main-worktree', { worktree: { path: REPO_ID } })
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
       branchSnapshots: [createBranchSnapshot('feature/main-worktree', { worktree: { path: REPO_ID, isPrimary: true } })],
@@ -193,17 +193,10 @@ describe('branch action capabilities', () => {
   test('allows removing the current branch when it belongs to a linked worktree', () => {
     const worktreePath = '/tmp/gbl-current-linked-worktree'
     const branch = createRepoBranch('feature/current-linked', { worktree: { path: worktreePath } })
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: worktreePath,
       branches: [branch],
       currentBranch: 'feature/current-linked',
-      worktreesByPath: {
-        [worktreePath]: {
-          path: worktreePath,
-          branch: 'feature/current-linked',
-          isMain: false,
-        },
-      },
     })
 
     expect(getBranchActionCapabilities(repoPresentationFromQueryForTest(repo), branch)).toMatchObject({
@@ -222,7 +215,7 @@ describe('branch action capabilities', () => {
       remotePath: '/srv/repo',
     })
     expect(target).not.toBeNull()
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: target!.id,
       branches: [branch],
       remote: {
@@ -245,7 +238,7 @@ describe('branch action capabilities', () => {
 
   test('resolves browser remote providers from tracking remotes', () => {
     const branch = createRepoBranch('feature/provider', { tracking: 'gitlab-upstream/feature/provider' })
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
       remote: {
@@ -263,7 +256,7 @@ describe('branch action capabilities', () => {
 
   test('falls back to the repo browser provider when tracking remote is missing', () => {
     const branch = createRepoBranch('feature/missing-provider', { tracking: 'deleted/feature/missing-provider' })
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
       remote: {
@@ -281,7 +274,7 @@ describe('branch action capabilities', () => {
 
   test('uses the longest provider remote match for slash-containing tracking names', () => {
     const branch = createRepoBranch('feature/longest-provider', { tracking: 'origin/gitlab/feature/longest-provider' })
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
       remote: {
@@ -411,7 +404,7 @@ describe('runBranchAction', () => {
       target: 'feature/a',
     })
 
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       instanceId: 'repo-instance-test-2',
       branches: [createRepoBranch('feature/reopened')],
@@ -733,7 +726,7 @@ describe('runBranchAction', () => {
     setSelectionForTest('feature/a', 'worktrees')
     installSuccessfulCreateWorktreeBridge({
       onSnapshot: () => {
-        seedRepoState({
+        seedRepoWithReadModelForTest({
           id: REPO_ID,
           instanceId: 'repo-instance-test-2',
           branches: [createRepoBranch('feature/a'), createRepoBranch('feature/new')],
@@ -777,7 +770,7 @@ describe('runBranchAction', () => {
 
     const work = useReposStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
     await flushAsyncWork()
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       instanceId: 'repo-instance-test-2',
       branches: [createRepoBranch('feature/new-instance')],

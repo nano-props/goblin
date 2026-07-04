@@ -7,7 +7,7 @@ import { CreateWorktreeDialogHost } from '#/web/components/CreateWorktreeDialogH
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { resetReposStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 vi.mock('#/web/components/create-worktree-dialog/CreateWorktreeDialog.tsx', () => ({
@@ -23,9 +23,8 @@ beforeEach(() => {
   primaryWindowQueryClient.clear()
   resetReposStore()
   primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
-  seedRepoState({
+  seedRepoShellForTest({
     id: REPO_ID,
-    branches: [createRepoBranch('main', { isCurrent: true, ahead: 0, behind: 0 })],
   })
   vi.stubGlobal(
     'fetch',
@@ -57,13 +56,11 @@ describe('CreateWorktreeDialogHost close state', () => {
   })
 
   test('uses the supplied repo session target instead of live active repo state', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoShellForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('main', { isCurrent: true, ahead: 0, behind: 0 })],
     })
-    seedRepoState({
+    seedRepoShellForTest({
       id: OTHER_REPO_ID,
-      branches: [createRepoBranch('main', { isCurrent: true, ahead: 0, behind: 0 })],
     })
     act(() => {
       useReposStore.setState((state) => ({

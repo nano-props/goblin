@@ -10,7 +10,7 @@ import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
-import { createBranchSnapshot, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createBranchSnapshot, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { preferredWorkspacePaneTabForTarget, workspacePaneTabsTargetForRepoBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
@@ -130,7 +130,7 @@ afterEach(() => {
 
 describe('useClientEffectIntentRouter', () => {
   test('terminal bell clicks close all overlays and focus the repo terminal view', async () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
@@ -154,7 +154,7 @@ describe('useClientEffectIntentRouter', () => {
   })
 
   test('terminal bell clicks switch to the emitting worktree branch and selected terminal', async () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
@@ -186,7 +186,7 @@ describe('useClientEffectIntentRouter', () => {
   })
 
   test('terminal bell clicks combine branch and terminal view navigation in a single route-driven action', async () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
@@ -221,7 +221,7 @@ describe('useClientEffectIntentRouter', () => {
   })
 
   test('close-repo menu action delegates to navigation close', async () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
@@ -241,7 +241,7 @@ describe('useClientEffectIntentRouter', () => {
   })
 
   test('zen mode menu action toggles the zen mode state', async () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
@@ -261,7 +261,7 @@ describe('useClientEffectIntentRouter', () => {
   })
 
   test('current repo menu actions prefer the visible routed repo over store activeId', async () => {
-    const activeRepoId = seedRepoState({
+    const activeRepoId = seedRepoWithReadModelForTest({
       id: '/tmp/active-repo',
       currentBranch: 'main',
       selectedBranch: 'main',
@@ -269,7 +269,7 @@ describe('useClientEffectIntentRouter', () => {
         createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/active-repo-worktree' } }),
       ],
     })
-    const visibleRepo = seedRepoState({
+    const visibleRepo = seedRepoWithReadModelForTest({
       id: '/tmp/visible-repo',
       currentBranch: 'feature',
       selectedBranch: 'feature',
@@ -323,7 +323,7 @@ describe('useClientEffectIntentRouter', () => {
   })
 
   test('workspace view menu actions are suppressed while settings-like routes are active', async () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',

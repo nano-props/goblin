@@ -73,6 +73,10 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       }
 
       let managedActiveId: string | null = null
+      const failedOpenEntryIds = new Set<string>()
+      const markOpenEntryFailed = (entry: RepoSessionEntry): void => {
+        failedOpenEntryIds.add(entry.id)
+      }
       const placeholderReady = Promise.all(
         openRepoEntries.map(async (entry) => {
           let placeholderEntry = entry
@@ -83,12 +87,17 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
               instanceId = await runtimeInstanceIdFor(entry.id)
             } else {
               const opened = await localRuntimeOpenFor(entry)
-              if (!opened.repo || !opened.repoInstanceId) return
+              if (!opened.repo || !opened.repoInstanceId) {
+                markOpenEntryFailed(entry)
+                return
+              }
               placeholderEntry = localRepoSessionEntry(opened.repo.id)
               runtimeRepoRoot = opened.repo.id
               instanceId = opened.repoInstanceId
             }
-          } catch {
+          } catch (err) {
+            if (signal?.aborted || isAbortError(err)) return
+            markOpenEntryFailed(entry)
             return
           }
           if (signal?.aborted) {
@@ -137,7 +146,8 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
             if (isRemoteRepoId(entry.id)) {
               try {
                 await runtimeInstanceIdFor(entry.id)
-              } catch {
+              } catch (err) {
+                if (!signal?.aborted && !isAbortError(err)) markOpenEntryFailed(entry)
                 return
               }
               // Remote entries go through the unified orchestrator. It owns:
@@ -167,7 +177,10 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
             }
             const probe = await localRuntimeOpenFor(entry)
             if (signal?.aborted) return
-            if (!probe.repo || !probe.repoInstanceId) return
+            if (!probe.repo || !probe.repoInstanceId) {
+              markOpenEntryFailed(entry)
+              return
+            }
 
             const resolvedRepo = probe.repo
             const repoInstanceId = probe.repoInstanceId
@@ -203,6 +216,12 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         ),
       )
       await placeholderReady
+      const restoreError =
+        failedOpenEntryIds.size > 0
+          ? new Error('session repo restore failed')
+          : unresolvedPreferredRestoreRepoIds(get().repos, workspacePaneRestoreState).length > 0
+            ? new Error('workspace pane preferred tab restore failed')
+            : null
       // Flip sessionReady unconditionally once placeholders are ready.
       // With open repositories, the boot skeleton (shown only when no activeId) gives
       // way to a real workspace immediately — the per-repo body keeps
@@ -223,6 +242,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         return { activeId, sessionReady: true }
       })
       await probeWork
+      if (restoreError) throw restoreError
     },
   }
 }
@@ -232,4 +252,16 @@ export function createRepoSessionActions(set: ReposSet, get: ReposGet) {
     ...createRuntimeRepoSessionActions(set, get),
     ...createRestorableWorkspaceLifecycleActions(set, get),
   }
+}
+
+function unresolvedPreferredRestoreRepoIds(
+  repos: ReposStore['repos'],
+  restoreState: RepoSessionHydrationOptions['workspacePaneRestoreState'],
+): string[] {
+  if (!restoreState) return []
+  return Object.keys(restoreState.preferredWorkspacePaneTabByTargetByRepo).filter((id) => !repos[id])
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === 'AbortError'
 }

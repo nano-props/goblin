@@ -1,14 +1,19 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { runSnapshotSuccessWorkflow } from '#/web/stores/repos/refresh-workflows.ts'
-import type { ReposGet } from '#/web/stores/repos/types.ts'
-import type { ReposSet } from '#/web/stores/repos/types.ts'
-import { createBranchSnapshot, installGoblinTestBridge } from '#/web/test-utils/bridge.ts'
+import {
+  createBranchSnapshot,
+  installGoblinTestBridge,
+  resetReposStore,
+  seedRepoShellForTest,
+} from '#/web/test-utils/bridge.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 
 beforeEach(() => {
+  resetReposStore()
   primaryWindowQueryClient.clear()
 })
 
@@ -16,11 +21,11 @@ describe('repo refresh workflows', () => {
   test('snapshot success backfills summary then visible selected repo workspace', async () => {
     const calls: string[] = []
     installGoblinTestBridge({})
-  setRepoSnapshotQueryData('/repo', 'repo-instance-test-2', {
-    current: 'feature/a',
-    branches: [createBranchSnapshot('feature/a'), createBranchSnapshot('feature/b')],
-  })
-  setRepoStatusQueryData('/repo', 'repo-instance-test-2', [])
+    setRepoSnapshotQueryData('/repo', 'repo-instance-test-2', {
+      current: 'feature/a',
+      branches: [createBranchSnapshot('feature/a'), createBranchSnapshot('feature/b')],
+    })
+    setRepoStatusQueryData('/repo', 'repo-instance-test-2', [])
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: '/repo',
       repoInstanceId: 'repo-instance-test-2',
@@ -28,40 +33,15 @@ describe('repo refresh workflows', () => {
       worktreePath: null,
       tabs: [workspacePaneStaticTabEntry('status')],
     })
-    const get: ReposGet = () =>
-      ({
-        repos: {
-          '/repo': {
-            id: '/repo',
-            name: 'repo',
-            instanceId: 'repo-instance-test-2',
-            data: {
-              branches: [createBranchSnapshot('feature/a')],
-              currentBranch: 'feature/a',
-              status: [],
-              worktreesByPath: {},
-            },
-            ui: {
-              selectedBranch: 'feature/a',
-              branchViewMode: 'all',
-              workspacePaneTabsByBranch: { 'feature/a': [workspacePaneStaticTabEntry('status')] },
-              preferredWorkspacePaneTabByTarget: {},
-            },
-            dataLoads: { pullRequests: { error: null } },
-          },
-        },
-        refreshPullRequests: (
-          id: string,
-          branches?: string[],
-          options?: { repoInstanceId?: string; mode?: string },
-        ) => {
-          calls.push(`prs:${id}:${branches?.join(',') ?? ''}:${options?.mode ?? ''}:${options?.repoInstanceId ?? ''}`)
-          return Promise.resolve()
-        },
-      }) as unknown as ReturnType<ReposGet>
-    const set = ((_: unknown) => {}) as ReposSet
+    seedRepoShellForTest({ id: '/repo', instanceId: 'repo-instance-test-2', selectedBranch: 'feature/a' })
+    useReposStore.setState({
+      refreshPullRequests: (id, branches, options) => {
+        calls.push(`prs:${id}:${branches?.join(',') ?? ''}:${options?.mode ?? ''}:${options?.repoInstanceId ?? ''}`)
+        return Promise.resolve()
+      },
+    })
 
-    runSnapshotSuccessWorkflow(set, get, {
+    runSnapshotSuccessWorkflow(useReposStore.setState, useReposStore.getState, {
       id: '/repo',
       repoInstanceId: 'repo-instance-test-2',
       branchNames: ['feature/a', 'feature/b'],
@@ -94,45 +74,20 @@ describe('repo refresh workflows', () => {
       tabs: [workspacePaneStaticTabEntry('status')],
     })
     const calls: string[] = []
-  setRepoSnapshotQueryData('/repo', 'repo-instance-test-2', {
-    current: 'feature/a',
-    branches: [createBranchSnapshot('feature/a'), createBranchSnapshot('feature/b')],
-  })
-  setRepoStatusQueryData('/repo', 'repo-instance-test-2', [])
-    const get: ReposGet = () =>
-      ({
-        repos: {
-          '/repo': {
-            id: '/repo',
-            name: 'repo',
-            instanceId: 'repo-instance-test-2',
-            data: {
-              branches: [createBranchSnapshot('feature/a')],
-              currentBranch: 'feature/a',
-              status: [],
-              worktreesByPath: {},
-            },
-            ui: {
-              selectedBranch: 'feature/a',
-              branchViewMode: 'all',
-              workspacePaneTabsByBranch: { 'feature/a': [workspacePaneStaticTabEntry('status')] },
-              preferredWorkspacePaneTabByTarget: {},
-            },
-            dataLoads: { pullRequests: { error: null } },
-          },
-        },
-        refreshPullRequests: (
-          id: string,
-          branches?: string[],
-          options?: { repoInstanceId?: string; mode?: string },
-        ) => {
-          calls.push(`prs:${id}:${branches?.join(',') ?? ''}:${options?.mode ?? ''}`)
-          return Promise.resolve()
-        },
-      }) as unknown as ReturnType<ReposGet>
-    const set = ((_: unknown) => {}) as ReposSet
+    setRepoSnapshotQueryData('/repo', 'repo-instance-test-2', {
+      current: 'feature/a',
+      branches: [createBranchSnapshot('feature/a'), createBranchSnapshot('feature/b')],
+    })
+    setRepoStatusQueryData('/repo', 'repo-instance-test-2', [])
+    seedRepoShellForTest({ id: '/repo', instanceId: 'repo-instance-test-2', selectedBranch: 'feature/a' })
+    useReposStore.setState({
+      refreshPullRequests: (id, branches, options) => {
+        calls.push(`prs:${id}:${branches?.join(',') ?? ''}:${options?.mode ?? ''}`)
+        return Promise.resolve()
+      },
+    })
 
-    runSnapshotSuccessWorkflow(set, get, {
+    runSnapshotSuccessWorkflow(useReposStore.setState, useReposStore.getState, {
       id: '/repo',
       repoInstanceId: 'repo-instance-test-2',
       branchNames: ['feature/a', 'feature/b'],
@@ -148,11 +103,11 @@ describe('repo refresh workflows', () => {
 
   test('visible selected workspace backfill resolves the selected branch from the React Query snapshot cache', async () => {
     installGoblinTestBridge({})
-  setRepoSnapshotQueryData('/repo', 'repo-instance-test-2', {
-    current: 'feature/query',
-    branches: [createBranchSnapshot('feature/query')],
-  })
-  setRepoStatusQueryData('/repo', 'repo-instance-test-2', [])
+    setRepoSnapshotQueryData('/repo', 'repo-instance-test-2', {
+      current: 'feature/query',
+      branches: [createBranchSnapshot('feature/query')],
+    })
+    setRepoStatusQueryData('/repo', 'repo-instance-test-2', [])
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: '/repo',
       repoInstanceId: 'repo-instance-test-2',
@@ -161,40 +116,15 @@ describe('repo refresh workflows', () => {
       tabs: [workspacePaneStaticTabEntry('status')],
     })
     const calls: string[] = []
-    const get: ReposGet = () =>
-      ({
-        repos: {
-          '/repo': {
-            id: '/repo',
-            name: 'repo',
-            instanceId: 'repo-instance-test-2',
-            data: {
-              branches: [],
-              currentBranch: 'main',
-              status: [],
-              worktreesByPath: {},
-            },
-            ui: {
-              selectedBranch: 'feature/query',
-              branchViewMode: 'all',
-              workspacePaneTabsByBranch: {},
-              preferredWorkspacePaneTabByTarget: {},
-            },
-            dataLoads: { pullRequests: { error: null } },
-          },
-        },
-        refreshPullRequests: (
-          id: string,
-          branches?: string[],
-          options?: { repoInstanceId?: string; mode?: string },
-        ) => {
-          calls.push(`prs:${id}:${branches?.join(',') ?? ''}:${options?.mode ?? ''}`)
-          return Promise.resolve()
-        },
-      }) as unknown as ReturnType<ReposGet>
-    const set = ((_: unknown) => {}) as ReposSet
+    seedRepoShellForTest({ id: '/repo', instanceId: 'repo-instance-test-2', selectedBranch: 'feature/query' })
+    useReposStore.setState({
+      refreshPullRequests: (id, branches, options) => {
+        calls.push(`prs:${id}:${branches?.join(',') ?? ''}:${options?.mode ?? ''}`)
+        return Promise.resolve()
+      },
+    })
 
-    runSnapshotSuccessWorkflow(set, get, {
+    runSnapshotSuccessWorkflow(useReposStore.setState, useReposStore.getState, {
       id: '/repo',
       repoInstanceId: 'repo-instance-test-2',
       branchNames: ['feature/query'],

@@ -9,7 +9,7 @@ import {
   createRepoBranch,
   repoPresentationFromQueryForTest,
   resetReposStore,
-  seedRepoState,
+  seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
@@ -33,7 +33,7 @@ afterEach(() => {
 
 describe('branch action dispatch', () => {
   test('remove worktree waits for workspace tab resources before dispatching repo action', async () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -95,7 +95,7 @@ describe('branch action dispatch', () => {
   })
 
   test('remove worktree stops when workspace tab resources fail to close', async () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -135,7 +135,7 @@ describe('branch action dispatch', () => {
   })
 
   test('remove worktree proceeds when no workspace tabs are open', async () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -161,7 +161,7 @@ describe('branch action dispatch', () => {
   })
 
   test('remove worktree does not close workspace tabs when local preflight already knows it is dirty', async () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -171,14 +171,6 @@ describe('branch action dispatch', () => {
           workspacePaneStaticTabEntry('status'),
           { type: 'terminal', terminalSessionId: 'session-1' },
         ],
-      },
-      worktreesByPath: {
-        [WORKTREE_PATH]: {
-          path: WORKTREE_PATH,
-          branch: 'feature/worktree',
-          isMain: false,
-          isDirty: true,
-        },
       },
     })
     setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
@@ -209,7 +201,7 @@ describe('branch action dispatch', () => {
   })
 
   test('remove worktree preflight reads worktree metadata from the React Query snapshot cache', async () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree')],
       selectedBranch: 'feature/worktree',
@@ -220,7 +212,6 @@ describe('branch action dispatch', () => {
           { type: 'terminal', terminalSessionId: 'session-1' },
         ],
       },
-      worktreesByPath: {},
     })
     setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
       current: 'main',
@@ -254,7 +245,7 @@ describe('branch action dispatch', () => {
   })
 
   test('remove worktree preflight derives query snapshot worktree state from the query status cache', async () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree')],
       selectedBranch: 'feature/worktree',
@@ -265,7 +256,6 @@ describe('branch action dispatch', () => {
           { type: 'terminal', terminalSessionId: 'session-1' },
         ],
       },
-      worktreesByPath: {},
     })
     setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
       current: 'main',

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { createBranchSnapshot, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createBranchSnapshot, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import {
   createAppLevelIntentPlan,
   createExternalOpenDrainKickPlan,
@@ -11,7 +11,7 @@ import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 describe('client effect intent plans', () => {
   test('creates a worktree terminal bell plan when the worktree group matches a known worktree', () => {
     resetReposStore()
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',

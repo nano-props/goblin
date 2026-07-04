@@ -19,7 +19,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { CreateWorktreeDialogHost } from '#/web/components/CreateWorktreeDialogHost.tsx'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
 
@@ -38,7 +38,7 @@ beforeEach(async () => {
   resetReposStore()
   setServerSettings(defaultSettingsSnapshot())
   const branches = [createRepoBranch('main', { isCurrent: true, ahead: 0, behind: 0 })]
-  const repo = seedRepoState({
+  const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches,
   })

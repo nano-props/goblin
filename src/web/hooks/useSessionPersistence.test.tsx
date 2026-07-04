@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useSessionPersistence } from '#/web/hooks/useSessionPersistence.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import {
@@ -52,7 +52,7 @@ describe('useSessionPersistence', () => {
 
   test('persists the active terminal map into settings session state', () => {
     const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
@@ -92,7 +92,7 @@ describe('useSessionPersistence', () => {
 
   test('persists explicitly closed workspace pane tabs as empty arrays', () => {
     const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
@@ -117,7 +117,7 @@ describe('useSessionPersistence', () => {
 
   test('persists workspace pane tabs from the server query projection', () => {
     const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
@@ -151,7 +151,7 @@ describe('useSessionPersistence', () => {
 
   test('persists workspace pane tabs when the server projection is refreshed', async () => {
     const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
@@ -193,7 +193,7 @@ describe('useSessionPersistence', () => {
 
   test('validates persisted workspace tab targets against query-backed branches', () => {
     const targetKey = worktreeTargetKey('/tmp/repo', 'feature/query-worktree', '/tmp/query-worktree')
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('main')],
       selectedBranch: 'main',
@@ -229,7 +229,7 @@ describe('useSessionPersistence', () => {
     const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
     const oldInstanceId = 'repo-instance-old'
     const currentInstanceId = 'repo-instance-current'
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       instanceId: oldInstanceId,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
@@ -277,7 +277,7 @@ describe('useSessionPersistence', () => {
   })
 
   test('persists file tree selected, expanded, and scroll state into settings session state', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
@@ -316,7 +316,7 @@ describe('useSessionPersistence', () => {
   })
 
   test('does not persist until boot-restored workspace tabs have converged', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
@@ -347,7 +347,7 @@ describe('useSessionPersistence', () => {
 
   test('does not emit a render-phase update warning when a workspace tabs observer mounts', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
@@ -390,7 +390,7 @@ describe('useSessionPersistence', () => {
     persistWorkspaceSessionStateMock.mockImplementationOnce(async () => await persistDeferred.promise)
     persistWorkspaceSessionStateMock.mockImplementation(async () => {})
 
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',

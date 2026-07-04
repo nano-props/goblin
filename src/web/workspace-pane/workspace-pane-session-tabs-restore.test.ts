@@ -7,7 +7,7 @@ import {
   createRepoBranch,
   installWorkspacePaneTabsTestBridge,
   resetReposStore,
-  seedRepoState,
+  seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
@@ -54,7 +54,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
   })
 
   test('commits restored no-worktree branch tabs with a null worktree target', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
@@ -164,7 +164,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
 })
 
 function seedRepo(): void {
-  seedRepoState({
+  seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
     selectedBranch: 'feature/worktree',

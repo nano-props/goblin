@@ -38,7 +38,7 @@ import {
   createRepoBranch,
   installWorkspacePaneTabsTestBridge,
   resetReposStore,
-  seedRepoState,
+  seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { workspacePaneTabsTargetForRepoBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
@@ -422,7 +422,7 @@ describe('RepoWorkspaceToolbar', () => {
 
   test('reloads the scoped recent external app when the worktree path changes', async () => {
     const nextWorktreePath = '/tmp/gbl-repo-workspace-toolbar-worktree-next'
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
     })
@@ -1161,7 +1161,7 @@ function renderToolbar(options: {
   }
   const branchName = options.worktree === false ? 'feature/no-worktree' : 'feature/worktree'
   const branch = createRepoBranch(branchName, options.worktree === false ? {} : { worktree: { path: WORKTREE_PATH } })
-  const repo = seedRepoState({
+  const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches: [branch],
     selectedBranch: branchName,

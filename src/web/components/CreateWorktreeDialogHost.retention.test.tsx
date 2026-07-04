@@ -7,7 +7,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { CreateWorktreeDialogHost } from '#/web/components/CreateWorktreeDialogHost.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { resetReposStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 const dialogMock = vi.hoisted(() => ({
@@ -45,9 +45,8 @@ beforeEach(() => {
   globalThis.localStorage?.clear()
   resetReposStore()
   primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
-  seedRepoState({
+  seedRepoShellForTest({
     id: REPO_ID,
-    branches: [createRepoBranch('main', { isCurrent: true, ahead: 0, behind: 0 })],
   })
 })
 

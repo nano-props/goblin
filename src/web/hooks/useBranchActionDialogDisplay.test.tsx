@@ -23,7 +23,7 @@ import {
   type RemoveWorktreeDialogPayload,
 } from '#/web/stores/repos/branch-action-dialogs.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
@@ -72,7 +72,7 @@ function mountHarness<P>(initial: BranchActionDialogEntry<P> | null): HarnessHan
 }
 
 function setupRepo(): void {
-  seedRepoState({
+  seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches: [
       createRepoBranch('main'),
@@ -135,7 +135,7 @@ describe('useBranchActionDialogDisplay', () => {
   })
 
   test('resolves branch context from the React Query snapshot read model when store branches are stale', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       selectedBranch: 'feature/query',
@@ -325,12 +325,12 @@ describe('useBranchActionDialogDisplay', () => {
     // state for the last opened entry — otherwise the checkbox would
     // visually reset to all-false during the close animation even
     // though the persisted state is still keyed by the entry.
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('main')],
       selectedBranch: 'main',
     })
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: OTHER_REPO_ID,
       branches: [createRepoBranch('main')],
       selectedBranch: 'main',

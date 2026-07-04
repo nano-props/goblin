@@ -7,7 +7,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { BranchFilterAction } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
-import { createBranchSnapshot, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createBranchSnapshot, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 
 const REPO_ID = '/tmp/gbl-repo-toolbar-actions-test-repo'
 
@@ -19,7 +19,7 @@ beforeEach(() => {
 
 describe('RepoToolbarActions', () => {
   test('enables the branch filter from the React Query snapshot branch count', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       selectedBranch: 'feature/query',
@@ -39,7 +39,7 @@ describe('RepoToolbarActions', () => {
   })
 
   test('keeps the branch filter disabled when neither store nor query has branches', () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       selectedBranch: '',

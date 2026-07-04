@@ -18,7 +18,7 @@ import {
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
-import { createPullRequest, createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createPullRequest, createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoPullRequestsQueryData, setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
@@ -101,7 +101,7 @@ describe('RepoWorkspace', () => {
 
     expect(() => {
       act(() => {
-        seedRepoState({ id: REPO_ID, branches: [] })
+        seedRepoWithReadModelForTest({ id: REPO_ID, branches: [] })
       })
     }).not.toThrow()
     expect(screen.getByText('branches.empty')).toBeTruthy()
@@ -110,7 +110,7 @@ describe('RepoWorkspace', () => {
   test('keeps the workspace tab strip mounted and restores scroll position by branch', () => {
     const branchA = createRepoBranch('feature/a', { worktree: { path: '/tmp/repo-workspace-container-repo-a' } })
     const branchB = createRepoBranch('feature/b', { worktree: { path: '/tmp/repo-workspace-container-repo-b' } })
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branchA, branchB],
       selectedBranch: 'feature/a',
@@ -138,7 +138,7 @@ describe('RepoWorkspace', () => {
     })
 
     act(() => {
-      seedRepoState({
+      seedRepoWithReadModelForTest({
         id: REPO_ID,
         instanceId: repo.instanceId,
         branches: [branchA, branchB],
@@ -160,7 +160,7 @@ describe('RepoWorkspace', () => {
     })
 
     act(() => {
-      seedRepoState({
+      seedRepoWithReadModelForTest({
         id: REPO_ID,
         instanceId: repo.instanceId,
         branches: [branchA, branchB],
@@ -180,7 +180,7 @@ describe('RepoWorkspace', () => {
   test('uses the React Query status read model for workspace presentation when available', () => {
     const worktreePath = '/tmp/repo-workspace-container-repo-a'
     const branch = createRepoBranch('feature/a', { worktree: { path: worktreePath } })
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
       selectedBranch: 'feature/a',
@@ -209,7 +209,7 @@ describe('RepoWorkspace', () => {
   })
 
   test('uses the React Query snapshot read model for workspace branch presentation when available', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       selectedBranch: 'feature/query',
@@ -241,7 +241,7 @@ describe('RepoWorkspace', () => {
 
   test('uses the React Query pull request read model for the selected branch when available', () => {
     const branch = createRepoBranch('feature/pr')
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
       selectedBranch: 'feature/pr',

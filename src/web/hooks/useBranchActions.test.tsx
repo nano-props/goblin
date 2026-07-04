@@ -13,7 +13,7 @@ import {
   createRepoBranch,
   repoPresentationFromQueryForTest,
   resetReposStore,
-  seedRepoState,
+  seedRepoWithReadModelForTest,
   type RepoPresentationForTest,
 } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -70,7 +70,7 @@ describe('useBranchActions', () => {
     })
     expect(target).not.toBeNull()
     const branch = createRepoBranch('feature/remote', { worktree: { path: '/srv/repo-feature' } })
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: target!.id,
       branches: [branch],
       remote: {
@@ -98,7 +98,7 @@ describe('useBranchActions', () => {
 
   test('copyPatch reads the server patch through a mutation and writes it to the clipboard', async () => {
     const branch = createRepoBranch('feature/local', { worktree: { path: '/tmp/local-feature' } })
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
     })
@@ -132,7 +132,7 @@ describe('useBranchActions', () => {
     })
     expect(target).not.toBeNull()
     const branch = createRepoBranch('feature/remote', { worktree: { path: '/srv/repo-feature' } })
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: target!.id,
       branches: [branch],
       remote: {
@@ -168,7 +168,7 @@ describe('useBranchActions', () => {
     })
     expect(target).not.toBeNull()
     const branch = createRepoBranch('feature/remote', { worktree: { path: '/srv/repo-feature' } })
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: target!.id,
       branches: [branch],
       remote: {
@@ -202,7 +202,7 @@ describe('useBranchActions', () => {
 
   test('openTerminal uses the embedded server route for non-remote repos', async () => {
     const branch = createRepoBranch('feature/local', { worktree: { path: '/tmp/local-feature' } })
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
     })
@@ -221,7 +221,7 @@ describe('useBranchActions', () => {
 
   test('openEditor forwards an explicit editor app for local repos', async () => {
     const branch = createRepoBranch('feature/local', { worktree: { path: '/tmp/local-feature' } })
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
     })
@@ -240,7 +240,7 @@ describe('useBranchActions', () => {
 
   test('openFinder uses the embedded server route for non-remote repos', async () => {
     const branch = createRepoBranch('feature/local', { worktree: { path: '/tmp/local-feature' } })
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
     })
@@ -260,7 +260,7 @@ describe('useBranchActions', () => {
     const firstOpen = deferred<ExecResult>()
     const branchA = createRepoBranch('feature/a', { worktree: { path: '/tmp/local-feature-a' } })
     const branchB = createRepoBranch('feature/b', { worktree: { path: '/tmp/local-feature-b' } })
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branchA, branchB],
     })

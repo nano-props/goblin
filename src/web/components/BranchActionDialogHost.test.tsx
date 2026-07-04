@@ -19,7 +19,7 @@ import {
   useBranchActionDialogsStore,
   type RemoveWorktreeDialogPayload,
 } from '#/web/stores/repos/branch-action-dialogs.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -110,7 +110,7 @@ const REPO_ID = '/tmp/gbl-dialog-host-test'
 function setupRepo() {
   const worktreePath = '/tmp/dialog-host-worktree'
   const branch = createRepoBranch('feature/host', { worktree: { path: worktreePath } })
-  const repo = seedRepoState({ id: REPO_ID, branches: [branch] })
+  const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [branch] })
   return { repo, branch, worktreePath }
 }
 
@@ -195,9 +195,9 @@ describe('BranchActionDialogHost', () => {
     // Repo A active, open removeConfirm for A/feature/x.
     const { repo: repoA, branch: branchA } = setupRepo()
     const repoBId = '/tmp/gbl-other-repo'
-    // Add repoB to the store alongside repoA via seedRepoState +
-    // setState merge (seedRepoState alone would overwrite `repos`).
-    seedRepoState({ id: repoBId, branches: [createRepoBranch('main')] })
+    // Add repoB to the store alongside repoA via seedRepoWithReadModelForTest +
+    // setState merge (seedRepoWithReadModelForTest alone would overwrite `repos`).
+    seedRepoWithReadModelForTest({ id: repoBId, branches: [createRepoBranch('main')] })
     act(() => {
       useReposStore.setState((state) => ({
         repos: { ...state.repos, [REPO_ID]: repoA },
@@ -336,7 +336,7 @@ describe('BranchActionDialogHost', () => {
     const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
     const repoA = setupRepo().repo
     const repoBId = '/tmp/gbl-other-repo'
-    seedRepoState({ id: repoBId, branches: [createRepoBranch('main')] })
+    seedRepoWithReadModelForTest({ id: repoBId, branches: [createRepoBranch('main')] })
     act(() => {
       useReposStore.setState((state) => ({
         repos: { ...state.repos, [REPO_ID]: repoA },

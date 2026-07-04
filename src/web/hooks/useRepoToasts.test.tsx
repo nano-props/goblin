@@ -20,7 +20,7 @@ vi.mock(import('#/web/stores/i18n.ts'), async (importOriginal) => {
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
-import { resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { resetReposStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
 const toastMocks = vi.hoisted(() => ({
@@ -55,7 +55,7 @@ beforeEach(() => {
 
 describe('useRepoToasts', () => {
   test('shows worktree bootstrap details on create-worktree success toasts', async () => {
-    const repoInstanceId = seedRepoState({ id: REPO_ID }).instanceId
+    const repoInstanceId = seedRepoShellForTest({ id: REPO_ID }).instanceId
     useReposStore.getState().setLastResult(
       REPO_ID,
       {

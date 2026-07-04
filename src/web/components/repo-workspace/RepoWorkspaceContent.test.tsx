@@ -25,7 +25,7 @@ import {
   createRepoBranch,
   installWorkspacePaneTabsTestBridge,
   resetReposStore,
-  seedRepoState,
+  seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -124,7 +124,7 @@ describe('RepoWorkspaceContent', () => {
   test('renders the changes row with the copy patch action in the status tab when the worktree is dirty', () => {
     const onCopyPatch = vi.fn()
     const worktreePath = '/tmp/changes-worktree'
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/changes', {
@@ -185,7 +185,7 @@ describe('RepoWorkspaceContent', () => {
   test('flashes the check affordance when copy patch onSelect resolves to true, then reverts', async () => {
     vi.useFakeTimers()
     const worktreePath = '/tmp/copy-success-worktree'
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/copy-success', {
@@ -248,7 +248,7 @@ describe('RepoWorkspaceContent', () => {
 
   test('does not render the changes row in the status tab when the worktree is clean', () => {
     const worktreePath = '/tmp/clean-worktree'
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/clean', {
@@ -289,7 +289,7 @@ describe('RepoWorkspaceContent', () => {
   test('opens files and changes tabs from the status rows', async () => {
     const worktreePath = '/tmp/status-links-worktree'
     const showRepoBranchWorkspacePaneTab = vi.fn()
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/status-links', {
@@ -348,7 +348,7 @@ describe('RepoWorkspaceContent', () => {
   })
 
   test('opens upstream refs and commit hashes from the status rows', async () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/open-links', {
@@ -412,7 +412,7 @@ describe('RepoWorkspaceContent', () => {
 
   test('hides the copy patch button on the changes row when copyPatchAction.visible is false', () => {
     const worktreePath = '/tmp/visibility-worktree'
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/hidden', {
@@ -457,7 +457,7 @@ describe('RepoWorkspaceContent', () => {
 
   test('renders the changes panel with status entries and tab labelling', () => {
     const worktreePath = '/tmp/changes-panel-worktree'
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/changes-panel', {
@@ -502,7 +502,7 @@ describe('RepoWorkspaceContent', () => {
   })
 
   test('renders branch status for a selected branch without a worktree', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
         createRepoBranch('feature/no-worktree', {
@@ -534,7 +534,7 @@ describe('RepoWorkspaceContent', () => {
   })
 
   test('shows the workspace empty state when the status tab is closed', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
         createRepoBranch('feature/no-worktree', {
@@ -563,7 +563,7 @@ describe('RepoWorkspaceContent', () => {
   })
 
   test('falls back to status when a worktree-scoped preference is unrenderable on a branch without a worktree', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
@@ -590,7 +590,7 @@ describe('RepoWorkspaceContent', () => {
 
   test('falls back to status when terminal is preferred but sync confirms no terminal tabs', () => {
     const worktreePath = '/tmp/terminal-empty-worktree'
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-empty', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-empty',
@@ -620,7 +620,7 @@ describe('RepoWorkspaceContent', () => {
   test('mounts the terminal session while terminal creation is pending with no sessions', () => {
     const worktreePath = '/tmp/terminal-pending-worktree'
     const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-pending', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-pending',
@@ -662,7 +662,7 @@ describe('RepoWorkspaceContent', () => {
     const worktreePath = '/tmp/terminal-pending-empty-strip-worktree'
     const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
     const branchName = 'feature/terminal-pending-empty-strip'
-    const seededRepo = seedRepoState({
+    const seededRepo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
       selectedBranch: branchName,
@@ -699,7 +699,7 @@ describe('RepoWorkspaceContent', () => {
   test('renders terminal loading without a create CTA while initial terminal sync is unresolved', () => {
     const worktreePath = '/tmp/terminal-loading-worktree'
     const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-loading', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-loading',
@@ -741,7 +741,7 @@ describe('RepoWorkspaceContent', () => {
   test('labels terminal panels from the mixed tab list, not runtime session list', () => {
     const worktreePath = '/tmp/terminal-reordered-worktree'
     const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-reordered', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-reordered',
@@ -797,7 +797,7 @@ describe('RepoWorkspaceContent', () => {
       ],
       truncated: false,
     })
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
       selectedBranch: branchName,
@@ -874,7 +874,7 @@ describe('RepoWorkspaceContent', () => {
   })
 
   test('falls back to status when a branch preference names a closed tab', async () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/a'), createRepoBranch('feature/b')],
       selectedBranch: 'feature/b',
@@ -925,7 +925,7 @@ describe('RepoWorkspaceContent', () => {
         date: '2026-06-20T00:00:00.000Z',
       },
     ])
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/history')],
       selectedBranch: 'feature/history',
@@ -973,7 +973,7 @@ describe('RepoWorkspaceContent', () => {
   })
 
   test('labels worktree history panels with the static tab id', async () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/history', { worktree: { path: '/tmp/history-worktree' } })],
       selectedBranch: 'feature/history',
@@ -996,7 +996,7 @@ describe('RepoWorkspaceContent', () => {
 
   test('shows an error state when branch history cannot be read', async () => {
     repoClientMocks.getRepoLog.mockRejectedValue(new Error('error.failed-read-repo'))
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/history')],
       selectedBranch: 'feature/history',

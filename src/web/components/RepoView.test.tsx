@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup } from '@testing-library/react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { RepoView } from '#/web/components/RepoView.tsx'
-import { resetReposStore, seedRepoState, createRepoBranch } from '#/web/test-utils/bridge.ts'
+import { resetReposStore, seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 
@@ -133,7 +133,7 @@ const REPO_ID = '/tmp/repo-view-test'
 beforeEach(() => {
   responsiveMocks.mode = 'default'
   resetReposStore()
-  seedRepoState({
+  seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches: [createRepoBranch('main'), createRepoBranch('feature/a')],
     selectedBranch: null,

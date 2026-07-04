@@ -19,7 +19,7 @@ import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import {
@@ -693,7 +693,7 @@ describe('TerminalSessionProvider', () => {
     setTerminalSessionProjectionForTests(null)
   })
   test('keeps terminal detail open and switches the selected session when one of multiple terminals exits', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -759,7 +759,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('tracks unread bells in provider state and clears them when activating the session', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -829,7 +829,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('tracks unread bells from server realtime events without a live xterm bell', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -883,7 +883,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('applies a server bell that arrives before the session projection materializes', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -929,7 +929,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('routes realtime output, title, and identity directly to the matching terminal session', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -1014,7 +1014,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('updates reused terminal descriptors when the branch changes on the same worktree', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -1090,7 +1090,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('reconciles externally created and removed terminal sessions across windows', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -1143,7 +1143,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('invalidates workspace tabs query from session-closed events', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -1198,7 +1198,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('refreshes workspace tabs query from workspace-tabs-changed broadcasts', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -1241,7 +1241,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('coalesces session and workspace tabs change broadcasts', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -1267,7 +1267,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('keeps a newly created terminal active after session sync when create transfers controller control', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -1318,7 +1318,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('restores the persisted selected terminal for a worktree even when server control points at another session', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -1375,7 +1375,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('initial mount only syncs the current repo session list', async () => {
-    const firstRepo = seedRepoState({
+    const firstRepo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -1419,7 +1419,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('focus sync only refreshes the current repo session list', async () => {
-    const firstRepo = seedRepoState({
+    const firstRepo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -1469,7 +1469,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('does not resync sessions when repo changes do not affect terminal worktree mapping', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -1503,7 +1503,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('failed session sync does not mark the repo ready', async () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -1521,7 +1521,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('allocates the next terminal index after syncing sessions from another window', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -1560,7 +1560,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('does not fall back to a local render snapshot when server omits snapshot', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -1621,7 +1621,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('does not reuse stale server snapshot for a different recycled pty id', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -1682,7 +1682,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('exposes reactive worktree metadata through external-store facade hooks', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -1715,7 +1715,7 @@ describe('TerminalSessionProvider', () => {
   })
 
   test('creates terminal from first-frame payload when the server omits it from sessions projection', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -1838,7 +1838,7 @@ describe('TerminalSessionProvider', () => {
 
       // Seed a repo: this sets activeId, the effect fires, prewarm is called.
       // The function takes no parameters (single shared socket, not per-repo).
-      seedRepoState({
+      seedRepoWithReadModelForTest({
         id: REPO_ID,
         branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
         selectedBranch: 'feature/worktree',
@@ -1970,7 +1970,7 @@ describe('TerminalSessionProvider', () => {
     // session list intact. This test mounts, creates a terminal,
     // unmounts, remounts, and confirms the prior session is still
     // observable in the second mount's context.
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',

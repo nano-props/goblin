@@ -4,7 +4,7 @@ import {
   createPullRequest,
   installGoblinTestBridge,
   resetReposStore,
-  seedRepoState,
+  seedRepoWithReadModelForTest,
   type IpcTestHandler,
 } from '#/web/test-utils/bridge.ts'
 export const REPO_ID = '/tmp/gbl-test-repo'
@@ -28,7 +28,7 @@ export function pullRequestWithHealth(number: number): PullRequestInfo {
 }
 
 export function seedRepo(branches: BranchSnapshotInfo[], instanceId = 'repo-instance-test'): string {
-  return seedRepoState({
+  return seedRepoWithReadModelForTest({
     id: REPO_ID,
     branchSnapshots: branches,
     instanceId,

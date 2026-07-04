@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { App } from '#/web/App.tsx'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { resetReposStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 const responsiveMocks = vi.hoisted(() => ({
@@ -48,7 +48,7 @@ describe('App boot skeleton', () => {
   })
 
   test('renders the active repository shell when a repository is open', () => {
-    seedRepoState({ id: '/tmp/repo' })
+    seedRepoShellForTest({ id: '/tmp/repo' })
 
     const { container } = render(<App />)
 
