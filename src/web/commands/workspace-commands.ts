@@ -23,13 +23,16 @@ import {
   workspacePaneTabProvider,
 } from '#/web/components/workspace-pane/tab-providers.ts'
 import { beginWorkspacePaneTabClose } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
-import { activeWorkspacePaneTabTarget } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import {
+  activeWorkspacePaneTabTarget,
+  activeWorkspacePaneTabTargetResolution,
+} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
   captureWorkspacePaneActiveTabIdentity,
   clearWorkspacePaneTabOpener,
   workspacePaneTabOpener,
 } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import { requireRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 interface ShowWorkspacePaneTabCommandOptions {
   repoId: string | null
@@ -360,7 +363,8 @@ function enterTerminalWorkspacePaneTab(
 function selectedRepoWorkspaceTarget(repoId: string): { branchName: string; worktreePath: string | null } | null {
   const repo = useReposStore.getState().repos[repoId]
   if (!repo?.ui.selectedBranch) return null
-  const branchModel = requireRepoBranchQueryProjection(repo)
+  const branchModel = readRepoBranchQueryProjection(repo)
+  if (!branchModel) return null
   const branch = branchModel.branches.find((candidate) => candidate.name === repo.ui.selectedBranch)
   if (!branch) return null
   return { branchName: branch.name, worktreePath: branch.worktree?.path ?? null }
@@ -400,7 +404,9 @@ function observeWorkspacePaneTabClose(
 function resolveCloseWorkspaceSurfaceIntent(options: CloseWorkspacePaneTabCommandOptions): CloseWorkspaceSurfaceIntent {
   const { repoId, targetIdentity } = options
   if (!repoId) return { kind: 'close-window' }
-  const target = activeWorkspacePaneTabTarget(repoId)
+  const resolution = activeWorkspacePaneTabTargetResolution(repoId)
+  if (resolution.kind === 'unavailable') return { kind: 'noop' }
+  const target = resolution.kind === 'ready' ? resolution.target : null
   if (!target) return { kind: 'close-window' }
   if (targetIdentity) {
     return target.tabs.some((candidate) => candidate.identity === targetIdentity)

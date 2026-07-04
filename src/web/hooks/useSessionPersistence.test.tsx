@@ -21,6 +21,7 @@ import {
   useWorkspacePaneTabsQuery,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 
 const persistWorkspaceSessionStateMock = vi.fn(async (_session: unknown) => {})
 
@@ -35,6 +36,20 @@ beforeEach(() => {
 })
 
 describe('useSessionPersistence', () => {
+  test('blocks saving instead of throwing when branch read models are unavailable', () => {
+    const repo = emptyRepo('/tmp/repo-without-query-model', 'repo-without-query-model', 'repo-instance-without-query')
+    useReposStore.setState({
+      repos: { [repo.id]: repo },
+      order: [repo.id],
+      activeId: repo.id,
+      sessionReady: true,
+      sessionPersistenceReady: true,
+    })
+
+    expect(() => renderInJsdom(<Harness />)).not.toThrow()
+    expect(persistWorkspaceSessionStateMock).not.toHaveBeenCalled()
+  })
+
   test('persists the active terminal map into settings session state', () => {
     const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
     const repo = seedRepoState({

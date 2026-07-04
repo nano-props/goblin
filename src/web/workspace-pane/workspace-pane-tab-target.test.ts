@@ -3,7 +3,10 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import { resetReposStore, seedRepoState, createRepoBranch } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import {
+  resolveWorkspacePaneTabTargetForBranch,
+  workspacePaneTabTargetForBranch,
+} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
@@ -17,7 +20,7 @@ beforeEach(() => {
 })
 
 describe('workspace pane tab target read model', () => {
-  test('fails target resolution when the repo branch read model is unavailable', () => {
+  test('marks target resolution unavailable when the repo branch read model is unavailable', () => {
     const repo = emptyRepo(REPO_ID, 'workspace-pane-target-repo', 'repo-instance-workspace-pane-no-query')
     useReposStore.setState((s) => ({
       repos: { ...s.repos, [REPO_ID]: repo },
@@ -25,9 +28,11 @@ describe('workspace pane tab target read model', () => {
       activeId: REPO_ID,
     }))
 
-    expect(() => workspacePaneTabTargetForBranch(REPO_ID, 'feature/query')).toThrow(
-      'repo branch read model query data unavailable for repo',
-    )
+    expect(resolveWorkspacePaneTabTargetForBranch(REPO_ID, 'feature/query')).toEqual({
+      kind: 'unavailable',
+      reason: 'branch-read-model-unavailable',
+    })
+    expect(workspacePaneTabTargetForBranch(REPO_ID, 'feature/query')).toBeNull()
   })
 
   test('resolves branch targets from the React Query snapshot cache when store branches are stale', () => {
@@ -69,7 +74,7 @@ describe('workspace pane tab target read model', () => {
     ).toBe('workspace-pane:status')
   })
 
-  test('fails opener recording when the repo branch read model is unavailable', () => {
+  test('marks opener recording unavailable when the repo branch read model is unavailable', () => {
     const repo = emptyRepo(REPO_ID, 'workspace-pane-target-repo', 'repo-instance-workspace-pane-no-query')
     useReposStore.setState((s) => ({
       repos: { ...s.repos, [REPO_ID]: repo },
@@ -77,8 +82,8 @@ describe('workspace pane tab target read model', () => {
       activeId: REPO_ID,
     }))
 
-    expect(() =>
+    expect(
       recordWorkspacePaneTabOpener(REPO_ID, 'feature/query', 'workspace-pane:changes', 'workspace-pane:status'),
-    ).toThrow('repo branch read model query data unavailable for repo')
+    ).toBe('unavailable')
   })
 })

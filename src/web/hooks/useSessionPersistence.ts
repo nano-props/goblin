@@ -61,17 +61,23 @@ export function useSessionPersistence() {
     // gates the UI skeleton; sessionPersistenceReady waits for boot-restored
     // server-owned workspace tabs to converge back into the client store.
     if (!sessionReady || !sessionPersistenceReady) return
-    const session = workspaceSessionStateFromRestorableWorkspaceState({
-      repos,
-      restorableWorkspaceState: restorableWorkspaceStateFromStore({
-        order,
-        activeId,
-        zenMode,
-        workspacePaneSize,
-        selectedTerminalSessionIdByTerminalWorktree,
-      }),
-      filetreeInteractionByScope,
-    })
+    let session: ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState>
+    try {
+      session = workspaceSessionStateFromRestorableWorkspaceState({
+        repos,
+        restorableWorkspaceState: restorableWorkspaceStateFromStore({
+          order,
+          activeId,
+          zenMode,
+          workspacePaneSize,
+          selectedTerminalSessionIdByTerminalWorktree,
+        }),
+        filetreeInteractionByScope,
+      })
+    } catch (err) {
+      sessionLog.warn('save blocked', { err })
+      return
+    }
     const serialized = JSON.stringify(session)
     // Restorable session writes should be immediate only for coarse
     // workspace-structure changes. High-frequency runtime churn such as

@@ -2,7 +2,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
 import { activeWorkspacePaneTabTarget } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { hasFreshRepoInstance, type RepoInstanceHandle } from '#/web/stores/repos/repo-guards.ts'
-import { requireRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 // Chrome-tab-style "opener" tracking, covering every workspace pane tab
 // (static and terminal), factored out of both the tab-creation paths
@@ -10,6 +10,8 @@ import { requireRepoBranchQueryProjection } from '#/web/repo-branch-read-model.t
 // commands so none of them need to duplicate this bookkeeping. Kept
 // dependency-free of `workspace-commands.ts`/`terminal-create-command.ts` to
 // avoid a cycle between them.
+
+export type WorkspacePaneTabOpenerRecordResult = 'recorded' | 'missing' | 'stale-instance' | 'unavailable'
 
 /** Snapshots the identity of the tab currently active for `repoId`. Callers
  *  must capture this *before* switching into the newly-opened tab (e.g.
@@ -36,14 +38,16 @@ export function recordWorkspacePaneTabOpener(
   childIdentity: string,
   openerIdentity: string,
   repoInstance?: RepoInstanceHandle | null,
-): void {
+): WorkspacePaneTabOpenerRecordResult {
   const state = useReposStore.getState()
   const repo = state.repos[repoId]
-  if (!repo) return
-  if (repoInstance && !hasFreshRepoInstance(state, repoInstance)) return
-  const branchModel = requireRepoBranchQueryProjection(repo)
-  if (!branchModel.branches.some((branch) => branch.name === branchName)) return
+  if (!repo) return 'missing'
+  if (repoInstance && !hasFreshRepoInstance(state, repoInstance)) return 'stale-instance'
+  const branchModel = readRepoBranchQueryProjection(repo)
+  if (!branchModel) return 'unavailable'
+  if (!branchModel.branches.some((branch) => branch.name === branchName)) return 'missing'
   state.setTabOpener(tabOpenerScopeKey(repoId, branchName), childIdentity, openerIdentity)
+  return 'recorded'
 }
 
 /** Reads the recorded opener for a closing tab's identity on `repoId`/`branchName`'s
