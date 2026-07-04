@@ -16,6 +16,7 @@ import {
   pushRemoteBranch,
   remoteExecResult,
   removeRemoteWorktree,
+  resolveRemoteWorktree,
 } from '#/system/ssh/git.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
@@ -860,6 +861,37 @@ describe('getRemoteTreeWalk knownWorktrees path', () => {
     })
     expect(result).toEqual({ ok: false, message: 'error.worktree-not-found' })
     expect(run).not.toHaveBeenCalled()
+  })
+})
+
+describe('resolveRemoteWorktree', () => {
+  test('returns the canonical known worktree path after POSIX normalization', async () => {
+    const knownWorktrees: WorktreeInfo[] = [
+      { path: '/srv/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false },
+    ]
+    const run = vi.fn()
+
+    const result = await resolveRemoteWorktree(TARGET, '/srv/repo-feature/', {
+      run: run as any,
+      knownWorktrees,
+    })
+
+    expect(result).toEqual(knownWorktrees[0])
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  test('throws the remote read failure instead of returning an empty authority set', async () => {
+    const run = vi.fn(async () => failRemoteResult('ssh unavailable'))
+
+    await expect(resolveRemoteWorktree(TARGET, '/srv/repo-feature', { run: run as any })).rejects.toThrow(
+      'ssh unavailable',
+    )
+
+    expect(run).toHaveBeenCalledWith(
+      { type: 'gitWorktreeList', path: '/srv/repo' },
+      TARGET,
+      { signal: undefined },
+    )
   })
 })
 

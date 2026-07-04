@@ -4,8 +4,8 @@ const mocks = vi.hoisted(() => ({
   getWorktrees: vi.fn(),
   userShellCommandExists: vi.fn(),
   resolveRemoteRepoTarget: vi.fn(),
-  getRemoteStatusAndWorktrees: vi.fn(),
   remoteCommandExists: vi.fn(),
+  resolveRemoteWorktree: vi.fn(),
 }))
 
 vi.mock('#/system/git/worktrees.ts', () => ({
@@ -21,8 +21,8 @@ vi.mock('#/server/modules/repo-source.ts', () => ({
 }))
 
 vi.mock('#/system/ssh/git.ts', () => ({
-  getRemoteStatusAndWorktrees: mocks.getRemoteStatusAndWorktrees,
   remoteCommandExists: mocks.remoteCommandExists,
+  resolveRemoteWorktree: mocks.resolveRemoteWorktree,
 }))
 
 import { getRepositoryFileViewer } from '#/server/modules/repo-file-viewer.ts'
@@ -34,9 +34,11 @@ beforeEach(() => {
     { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
     { path: '/tmp/repo-feature', branch: 'feature', isBare: false, isPrimary: false },
   ])
-  mocks.getRemoteStatusAndWorktrees.mockResolvedValue({
-    statuses: [],
-    worktrees: [{ path: '/srv/repo-feature', branch: 'feature', isBare: false, isPrimary: false }],
+  mocks.resolveRemoteWorktree.mockResolvedValue({
+    path: '/srv/repo-feature',
+    branch: 'feature',
+    isBare: false,
+    isPrimary: false,
   })
 })
 
@@ -142,7 +144,8 @@ describe('repo file viewer read layer', () => {
     const result = await getRepositoryFileViewer(repoId, '/srv/repo-feature/')
 
     expect(result).toEqual({ viewer: 'bat', shell: 'posix' })
-    expect(mocks.remoteCommandExists).toHaveBeenCalledWith(target, '/srv/repo-feature/', 'bat', {
+    expect(mocks.resolveRemoteWorktree).toHaveBeenCalledWith(target, '/srv/repo-feature/', { signal: undefined })
+    expect(mocks.remoteCommandExists).toHaveBeenCalledWith(target, '/srv/repo-feature', 'bat', {
       knownWorktrees: [{ path: '/srv/repo-feature', branch: 'feature', isBare: false, isPrimary: false }],
       signal: undefined,
     })
@@ -160,8 +163,28 @@ describe('repo file viewer read layer', () => {
       port: 22,
     }
     mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
+    mocks.resolveRemoteWorktree.mockRejectedValueOnce(new Error('unknown worktree path'))
 
     await expect(getRepositoryFileViewer(repoId, '/srv/missing')).rejects.toThrow('unknown worktree path')
+
+    expect(mocks.remoteCommandExists).not.toHaveBeenCalled()
+  })
+
+  test('surfaces remote worktree read failures without falling back to cat', async () => {
+    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
+    const target = {
+      id: repoId,
+      alias: 'prod',
+      remotePath: '/srv/repo',
+      displayName: 'prod:repo',
+      host: 'example.com',
+      user: 'tester',
+      port: 22,
+    }
+    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
+    mocks.resolveRemoteWorktree.mockRejectedValueOnce(new Error('ssh unavailable'))
+
+    await expect(getRepositoryFileViewer(repoId, '/srv/repo-feature')).rejects.toThrow('ssh unavailable')
 
     expect(mocks.remoteCommandExists).not.toHaveBeenCalled()
   })

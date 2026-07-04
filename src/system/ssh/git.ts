@@ -257,6 +257,25 @@ export async function remoteCommandExists(
   return !options.signal?.aborted && result.ok
 }
 
+export async function resolveRemoteWorktree(
+  target: RemoteRepoTarget,
+  worktreePath: string,
+  options: {
+    signal?: AbortSignal
+    run?: RemoteGitRunner
+    knownWorktrees?: ReadonlyArray<WorktreeInfo>
+  } = {},
+): Promise<WorktreeInfo> {
+  const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
+  const known = await resolveKnownRemoteWorktree(target, worktreePath, {
+    signal: options.signal,
+    run,
+    knownWorktrees: options.knownWorktrees,
+  })
+  if ('ok' in known) throw new Error(known.message)
+  return known
+}
+
 export async function getRemotePatch(
   target: RemoteRepoTarget,
   worktreePath: string,
