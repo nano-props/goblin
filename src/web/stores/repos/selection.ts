@@ -185,7 +185,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         if (!repo) return s
         const branchModel = requireRepoBranchQueryProjection(repo)
         const target = workspacePaneTabsTargetForRepoBranch(
-          { id: repo.id, data: { branches: branchModel.branches } },
+          { repoRoot: repo.id, branches: branchModel.branches },
           repo.ui.selectedBranch,
         )
         const current = preferredWorkspacePaneTabForTarget(repo.ui, target)
@@ -202,7 +202,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
       const target =
         repo && branchModel
           ? workspacePaneTabsTargetForRepoBranch(
-              { id: repo.id, data: { branches: branchModel.branches } },
+              { repoRoot: repo.id, branches: branchModel.branches },
               repo.ui.selectedBranch,
             )
           : null

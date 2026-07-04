@@ -5,7 +5,7 @@ import { selectedBranchForBranchSet } from '#/web/stores/repos/branch-view-mode.
 import type { RepoSnapshotCacheEntry, RepoState } from '#/web/stores/repos/types.ts'
 import { finishDataLoadSuccess } from '#/web/stores/repos/repo-data-load-state.ts'
 import { stripBranchWorktreeMetadata } from '#/web/stores/repos/worktree-state.ts'
-import { getRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { getRepoSnapshotQueryData, setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import { repoBranchSnapshotDataFromSnapshot, type RepoBranchSnapshotData } from '#/web/repo-branch-read-model.ts'
 const MAX_CACHE_AGE_MS = 14 * 24 * 60 * 60 * 1000
 const MAX_REPOS = 50
@@ -89,6 +89,18 @@ export function restoreRepoProjectionFromCacheEntry(
 ): RepoState {
   if (!snapshot || isExpired(snapshot.savedAt)) return repo
   return restoreProjectionFromSnapshot(repo, snapshot)
+}
+
+export function seedRepoSnapshotQueryFromCacheEntry(
+  repoRoot: string,
+  repoInstanceId: string,
+  snapshot: RepoSnapshotCacheEntry | undefined,
+): void {
+  if (!snapshot || isExpired(snapshot.savedAt)) return
+  setRepoSnapshotQueryData(repoRoot, repoInstanceId, {
+    branches: snapshot.data.branches,
+    current: snapshot.data.currentBranch,
+  })
 }
 
 export function persistRepoSnapshotCacheEntry(

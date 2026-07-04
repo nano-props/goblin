@@ -72,7 +72,7 @@ describe('client effect intent handlers', () => {
     ).resolves.toBe(false)
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch(repo, repo.ui.selectedBranch)) : null).toBe('status')
+    expect(repo ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: repo.data.branches }, repo.ui.selectedBranch)) : null).toBe('status')
   })
 
   test('create-worktree-requested opens create-worktree for the current repo', async () => {

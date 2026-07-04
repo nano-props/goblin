@@ -43,7 +43,7 @@ export function repoStatusRefreshSnapshot(repo: RepoState): RepoStatusRefreshSna
   const branchModel = readRepoBranchQueryProjection(repo)
   const selectedTarget = branchModel
     ? workspacePaneTabsTargetForRepoBranch(
-        { id: repo.id, data: { branches: branchModel.branches } },
+        { repoRoot: repo.id, branches: branchModel.branches },
         repo.ui.selectedBranch,
       )
     : null

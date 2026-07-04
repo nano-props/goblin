@@ -925,7 +925,7 @@ describe('core refresh request ordering', () => {
     expect(repo?.ui.selectedBranch).toBe('feature/a')
     expect(
       repo
-        ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch(repo, 'feature/a'))
+        ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: repo.data.branches }, 'feature/a'))
         : null,
     ).toBe('terminal')
   })
@@ -955,7 +955,7 @@ describe('core refresh request ordering', () => {
     expect(repo?.ui.selectedBranch).toBe('feature/new')
     expect(
       repo
-        ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch(repo, 'feature/new'))
+        ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: repo.data.branches }, 'feature/new'))
         : null,
     ).toBe('terminal')
   })

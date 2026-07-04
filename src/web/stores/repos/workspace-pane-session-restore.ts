@@ -8,6 +8,7 @@ import {
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import type { RepoState, SessionWorkspacePaneRestoreState } from '#/web/stores/repos/types.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import { getRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 
 export function restoreSessionWorkspacePaneStateInRepos(
   repos: Record<string, RepoState>,
@@ -44,9 +45,14 @@ function restoredPreferredWorkspacePaneTabs(
   preferredTabByTarget: SessionWorkspacePaneRestoreState['preferredWorkspacePaneTabByTargetByRepo'][string],
   tabsByTarget: Record<string, readonly WorkspacePaneTabEntry[]>,
 ): RepoState['ui']['preferredWorkspacePaneTabByTarget'] {
+  const snapshot = getRepoSnapshotQueryData(repo.id, repo.instanceId)
+  if (!snapshot) return repo.ui.preferredWorkspacePaneTabByTarget
   let next = repo.ui.preferredWorkspacePaneTabByTarget
   for (const [targetKey, tab] of Object.entries(preferredTabByTarget)) {
-    const target = workspacePaneTabsTargetForRepoTargetKey(repo, targetKey)
+    const target = workspacePaneTabsTargetForRepoTargetKey(
+      { repoRoot: repo.id, branches: snapshot.branches },
+      targetKey,
+    )
     if (!target) continue
     if (!isWorkspacePaneSessionTabType(tab)) continue
     if (

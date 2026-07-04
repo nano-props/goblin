@@ -6,42 +6,40 @@ import {
 import type { RepoUiState } from '#/web/stores/repos/types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 
-interface WorkspacePaneTargetRepo {
-  id: string
-  data: {
-    branches: Array<{ name: string; worktree?: { path?: string } | undefined }>
-  }
+interface WorkspacePaneTargetBranches {
+  repoRoot: string
+  branches: ReadonlyArray<{ name: string; worktree?: { path?: string } | undefined }>
 }
 
 export function workspacePaneTabsTargetForRepoBranch(
-  repo: WorkspacePaneTargetRepo,
+  repo: WorkspacePaneTargetBranches,
   branchName: string | null | undefined,
 ): WorkspacePaneTabsTarget | null {
   if (!branchName) return null
-  const branch = repo.data.branches.find((candidate) => candidate.name === branchName)
+  const branch = repo.branches.find((candidate) => candidate.name === branchName)
   if (!branch) return null
   return {
-    repoRoot: repo.id,
+    repoRoot: repo.repoRoot,
     branchName: branch.name,
     worktreePath: branch.worktree?.path ?? null,
   }
 }
 
 export function workspacePaneTabsTargetForRepoTargetKey(
-  repo: WorkspacePaneTargetRepo,
+  repo: WorkspacePaneTargetBranches,
   targetKey: string,
 ): WorkspacePaneTabsTarget | null {
   const target = parseWorkspacePaneTabsTargetIdentityKey(targetKey)
-  if (!target || target.repoRoot !== repo.id) return null
+  if (!target || target.repoRoot !== repo.repoRoot) return null
   if (target.kind === 'branch') {
-    return repo.data.branches.some((branch) => branch.name === target.branchName)
-      ? { repoRoot: repo.id, branchName: target.branchName, worktreePath: null }
+    return repo.branches.some((branch) => branch.name === target.branchName)
+      ? { repoRoot: repo.repoRoot, branchName: target.branchName, worktreePath: null }
       : null
   }
-  const branch = repo.data.branches.find((candidate) => candidate.worktree?.path === target.worktreePath)
+  const branch = repo.branches.find((candidate) => candidate.worktree?.path === target.worktreePath)
   return branch
     ? {
-        repoRoot: repo.id,
+        repoRoot: repo.repoRoot,
         branchName: branch.name,
         worktreePath: target.worktreePath,
       }

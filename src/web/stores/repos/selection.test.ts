@@ -76,7 +76,7 @@ function seedRepoShellWithoutBranchReadModel(): void {
 
 function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
   const repo = useReposStore.getState().repos[REPO_ID]
-  const target = repo ? workspacePaneTabsTargetForRepoBranch(repo, branchName) : null
+  const target = repo ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: repo.data.branches }, branchName) : null
   return workspacePaneStaticTabsFromEntries(
     target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : [],
   )
@@ -87,7 +87,7 @@ function preferredTabFor(branchName?: string | null): WorkspacePaneTabType | nul
   return repo
     ? preferredWorkspacePaneTabForTarget(
         repo.ui,
-        workspacePaneTabsTargetForRepoBranch(repo, branchName ?? repo.ui.selectedBranch),
+        workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: repo.data.branches }, branchName ?? repo.ui.selectedBranch),
       )
     : null
 }
