@@ -951,7 +951,6 @@ describe('core refresh request ordering', () => {
     ])
     updateRepoForTest((repo) => {
       repo.ui.selectedBranch = 'feature/old'
-      repo.data.branches = []
       repo.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(
         repo.ui,
         { repoRoot: REPO_ID, branchName: 'feature/old', worktreePath: '/tmp/worktree-a' },

@@ -6,6 +6,7 @@ import { preferredWorkspacePaneTabByTargetRecordWith } from '#/web/stores/repos/
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { repoPullRequestsQueryKey, setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import type { PullRequestInfo } from '#/web/types.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import {
   branch,
   pullRequest,
@@ -30,6 +31,11 @@ function selectBranchForTest(branch: string): void {
       }),
     },
   }))
+}
+
+function readModelBranchesForTest() {
+  const repo = useReposStore.getState().repos[REPO_ID]
+  return repo ? (readRepoBranchQueryProjection(repo)?.branches ?? []) : []
 }
 
 describe('refreshPullRequests', () => {
@@ -69,7 +75,7 @@ describe('refreshPullRequests', () => {
       fetchFailed: false,
       fetchError: null,
     })
-    expect(repo?.data.branches[0]?.pullRequest).toBeUndefined()
+    expect(readModelBranchesForTest()[0]?.pullRequest).toBeUndefined()
   })
 
   test('skips pull request refresh for local-only repositories', async () => {
@@ -145,7 +151,7 @@ describe('refreshPullRequests', () => {
 
     await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a', 'feature/b'], { repoInstanceId })
 
-    const branches = useReposStore.getState().repos[REPO_ID]?.data.branches
+    const branches = readModelBranchesForTest()
     expect(branches?.find((b) => b.name === 'feature/a')?.pullRequest).toBeUndefined()
     expect(branches?.find((b) => b.name === 'feature/b')?.pullRequest).toBeUndefined()
     expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.pullRequests.phase).toBe('idle')
@@ -182,7 +188,7 @@ describe('refreshPullRequests', () => {
 
     await useReposStore.getState().refreshPullRequests(REPO_ID, ['master'], { repoInstanceId })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.data.branches[0]?.pullRequest).toBeUndefined()
+    expect(readModelBranchesForTest()[0]?.pullRequest).toBeUndefined()
     expect(
       primaryWindowQueryClient.getQueryData(repoPullRequestsQueryKey(REPO_ID, repoInstanceId, ['master'], 'full')),
     ).toEqual(entries)
@@ -197,7 +203,7 @@ describe('refreshPullRequests', () => {
 
     await useReposStore.getState().refreshPullRequests(REPO_ID, ['master'], { repoInstanceId, mode: 'full' })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.data.branches[0]?.pullRequest).toBeUndefined()
+    expect(readModelBranchesForTest()[0]?.pullRequest).toBeUndefined()
     expect(
       primaryWindowQueryClient.getQueryData(repoPullRequestsQueryKey(REPO_ID, repoInstanceId, ['master'], 'full')),
     ).toEqual(entries)
@@ -211,7 +217,7 @@ describe('refreshPullRequests', () => {
     await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { repoInstanceId, mode: 'summary' })
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.data.branches[0]?.pullRequest).toBeUndefined()
+    expect(readModelBranchesForTest()[0]?.pullRequest).toBeUndefined()
     expect(repo?.dataLoads.pullRequests.phase).toBe('idle')
     expect(
       primaryWindowQueryClient.getQueryData(
@@ -228,7 +234,7 @@ describe('refreshPullRequests', () => {
 
     await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { repoInstanceId, mode: 'summary' })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.data.branches[0]?.pullRequest).toBeUndefined()
+    expect(readModelBranchesForTest()[0]?.pullRequest).toBeUndefined()
     expect(
       primaryWindowQueryClient.getQueryData(
         repoPullRequestsQueryKey(REPO_ID, repoInstanceId, ['feature/a'], 'summary'),
@@ -245,7 +251,7 @@ describe('refreshPullRequests', () => {
       .getState()
       .refreshPullRequests(REPO_ID, ['feature/a', 'feature/b'], { repoInstanceId, mode: 'full' })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.data.branches[1]?.pullRequest).toBeUndefined()
+    expect(readModelBranchesForTest()[1]?.pullRequest).toBeUndefined()
     expect(
       primaryWindowQueryClient.getQueryData(
         repoPullRequestsQueryKey(REPO_ID, repoInstanceId, ['feature/a', 'feature/b'], 'full'),
@@ -268,7 +274,7 @@ describe('refreshPullRequests', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceId).toBe('repo-instance-test-2')
-    expect(repo?.data.branches[0]?.pullRequest).toBeUndefined()
+    expect(readModelBranchesForTest()[0]?.pullRequest).toBeUndefined()
     expect(repo?.dataLoads.pullRequests.phase).toBe('idle')
     expect(
       primaryWindowQueryClient.getQueryData(repoPullRequestsQueryKey(REPO_ID, repoInstanceId, ['feature/a'], 'full')),
@@ -283,7 +289,7 @@ describe('refreshPullRequests', () => {
     await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { repoInstanceId })
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.data.branches[0]?.pullRequest).toBeUndefined()
+    expect(readModelBranchesForTest()[0]?.pullRequest).toBeUndefined()
     expect(repo?.dataLoads.pullRequests.phase).toBe('idle')
     expect(repo?.dataLoads.pullRequests.loadedAt).toBeNull()
     expect(repo?.dataLoads.pullRequests.stale).toBe(false)
@@ -305,7 +311,7 @@ describe('refreshPullRequests', () => {
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.data.branches[0]?.pullRequest).toBeUndefined()
+    expect(readModelBranchesForTest()[0]?.pullRequest).toBeUndefined()
     expect(repo?.dataLoads.pullRequests.phase).not.toBe('idle')
 
     resolvePullRequests(null)
@@ -325,7 +331,7 @@ describe('refreshPullRequests', () => {
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
-    const branches = useReposStore.getState().repos[REPO_ID]?.data.branches
+    const branches = readModelBranchesForTest()
     expect(branches?.find((b) => b.name === 'feature/a')?.pullRequest).toBeUndefined()
     expect(branches?.find((b) => b.name === 'feature/b')?.pullRequest).toBeUndefined()
   })

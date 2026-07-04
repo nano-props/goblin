@@ -45,7 +45,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { BranchRow } from '#/web/components/branch-navigator/BranchRow.tsx'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
-import { createRepoBranch } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, repoStateWithBranchReadModelForTest } from '#/web/test-utils/bridge.ts'
 
 vi.mock('#/web/components/BranchActionsMenu.tsx', () => ({
   BranchActionsMenu: () => null,
@@ -66,7 +66,7 @@ afterEach(() => {
 
 describe('BranchRow', () => {
   test('shows the generic dirty label for dirty worktrees', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
+    const repo = branchRowRepo()
     repo.data.worktreesByPath['/tmp/worktree-a'] = {
       path: '/tmp/worktree-a',
       branch: 'feature/a',
@@ -93,7 +93,7 @@ describe('BranchRow', () => {
   })
 
   test('keeps the generic dirty label even when exact counts are unavailable', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
+    const repo = branchRowRepo()
     repo.data.worktreesByPath['/tmp/worktree-a'] = {
       path: '/tmp/worktree-a',
       branch: 'feature/a',
@@ -119,7 +119,7 @@ describe('BranchRow', () => {
   })
 
   test('shows terminal bell count badges in the action slot in non-compact mode', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
+    const repo = branchRowRepo()
     const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
 
     const { container } = renderInJsdom(
@@ -146,7 +146,7 @@ describe('BranchRow', () => {
   })
 
   test('shows terminal output activity in the action slot in non-compact mode', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
+    const repo = branchRowRepo()
     const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
 
     const { container } = renderInJsdom(
@@ -173,7 +173,7 @@ describe('BranchRow', () => {
   })
 
   test('hides terminal output activity when the branch row is selected in non-compact mode', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
+    const repo = branchRowRepo()
     const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
 
     const { container } = renderInJsdom(
@@ -195,7 +195,7 @@ describe('BranchRow', () => {
   })
 
   test('gives terminal bell priority over terminal output activity', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
+    const repo = branchRowRepo()
     const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
 
     const { container } = renderInJsdom(
@@ -218,7 +218,7 @@ describe('BranchRow', () => {
   })
 
   test('keeps the branch icon when there are no unread terminal bells', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
+    const repo = branchRowRepo()
     const branch = createRepoBranch('feature/a')
 
     const { container } = renderInJsdom(
@@ -239,7 +239,7 @@ describe('BranchRow', () => {
   })
 
   test('does not increase branch name font weight when the row is selected', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
+    const repo = branchRowRepo()
     const branch = createRepoBranch('feature/a')
 
     const { container } = renderInJsdom(
@@ -264,7 +264,7 @@ describe('BranchRow', () => {
 
   test('keeps the leading terminal bell badge behavior in compact mode', () => {
     responsiveMocks.compact = true
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
+    const repo = branchRowRepo()
     const branch = createRepoBranch('feature/a')
 
     const { container } = renderInJsdom(
@@ -296,7 +296,7 @@ describe('BranchRow', () => {
 
   test('shows terminal output activity on the leading edge in compact mode', () => {
     responsiveMocks.compact = true
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
+    const repo = branchRowRepo()
     const branch = createRepoBranch('feature/a')
 
     const { container } = renderInJsdom(
@@ -327,7 +327,7 @@ describe('BranchRow', () => {
 
   test('lets compact terminal output activity take the leading slot over the dirty worktree icon', () => {
     responsiveMocks.compact = true
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
+    const repo = branchRowRepo()
     repo.data.worktreesByPath['/tmp/worktree-a'] = {
       path: '/tmp/worktree-a',
       branch: 'feature/a',
@@ -363,7 +363,7 @@ describe('BranchRow', () => {
 
   test('hides terminal output activity when the branch row is selected in compact mode', () => {
     responsiveMocks.compact = true
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
+    const repo = branchRowRepo()
     const branch = createRepoBranch('feature/a')
 
     const { container } = renderInJsdom(
@@ -387,7 +387,7 @@ describe('BranchRow', () => {
   test('shows the relative commit time without the last commit author', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-06-05T12:00:00.000Z'))
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
+    const repo = branchRowRepo()
     const branch = createRepoBranch('feature/a', {
       lastCommitAuthor: 'Example Author',
       lastCommitDate: '2026-06-05T10:00:00.000Z',
@@ -456,7 +456,7 @@ function renderRow(
   options: { actionMenuOpen?: boolean; branchActionBusy?: boolean; terminalOutputActive?: boolean } = {},
 ): { container: HTMLElement; shell: HTMLDivElement | undefined } {
   responsiveMocks.compact = compact
-  const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
+  const repo = branchRowRepo()
   const branch = createRepoBranch('feature/a')
   const { container } = renderInJsdom(
     <ul>
@@ -480,4 +480,13 @@ function renderRow(
 function branchActionMenuShell(container: HTMLElement): HTMLDivElement | undefined {
   const actionArea = container.querySelector('li')?.children[1]
   return actionArea?.firstElementChild?.lastElementChild as HTMLDivElement | undefined
+}
+
+function branchRowRepo() {
+  return repoStateWithBranchReadModelForTest(emptyRepo('/tmp/repo', 'repo', 'repo-instance-test'), {
+    branches: [],
+    currentBranch: '',
+    status: [],
+    worktreesByPath: {},
+  })
 }

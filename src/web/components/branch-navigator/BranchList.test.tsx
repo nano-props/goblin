@@ -9,7 +9,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import { BranchList } from '#/web/components/branch-navigator/BranchList.tsx'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { createRepoBranch } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, repoStateWithBranchReadModelForTest } from '#/web/test-utils/bridge.ts'
 
 // Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
 // that delegates to the real module so `i18next.use(initReactI18next).
@@ -36,8 +36,8 @@ afterEach(() => {
 
 describe('BranchList', () => {
   test('renders one row per branch and forwards click/double-click', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
     const branches = [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('fix/b')]
+    const repo = branchListRepo(branches, 'main')
     const onSelect = vi.fn()
     const onOpenStatus = vi.fn()
 
@@ -63,7 +63,7 @@ describe('BranchList', () => {
   })
 
   test('renders the emptyState slot when branches is empty', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
+    const repo = branchListRepo([], '')
     const onSelect = vi.fn()
 
     const { container } = renderInJsdom(
@@ -102,8 +102,8 @@ describe('BranchList', () => {
   })
 
   test('highlights the row whose name matches highlightedBranch', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
     const branches = [createRepoBranch('main'), createRepoBranch('feature/a'), createRepoBranch('fix/b')]
+    const repo = branchListRepo(branches, 'main')
 
     const { container } = renderInJsdom(
       <BranchList
@@ -122,3 +122,12 @@ describe('BranchList', () => {
     expect(items[1]?.className).not.toContain('bg-selected')
   })
 })
+
+function branchListRepo(branches: ReturnType<typeof createRepoBranch>[], currentBranch: string) {
+  return repoStateWithBranchReadModelForTest(emptyRepo('/tmp/repo', 'repo', 'repo-instance-test'), {
+    branches,
+    currentBranch,
+    status: [],
+    worktreesByPath: {},
+  })
+}

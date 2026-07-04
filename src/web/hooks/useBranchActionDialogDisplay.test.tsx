@@ -26,6 +26,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 const REPO_ID = '/tmp/gbl-dialog-display-test'
 const OTHER_REPO_ID = '/tmp/gbl-dialog-display-test-other'
@@ -88,23 +89,12 @@ function setupRepo(): void {
 
 function dropBranch(repoId: string, branchName: string): void {
   const repo = useReposStore.getState().repos[repoId]
-  const nextBranches = repo?.data.branches.filter((b: { name: string }) => b.name !== branchName) ?? []
+  const readModel = repo ? readRepoBranchQueryProjection(repo) : null
+  const nextBranches = readModel?.branches.filter((b) => b.name !== branchName) ?? []
   act(() => {
-    useReposStore.setState((state) => ({
-      repos: {
-        ...state.repos,
-        [repoId]: {
-          ...state.repos[repoId]!,
-          data: {
-            ...state.repos[repoId]!.data,
-            branches: state.repos[repoId]!.data.branches.filter((b: { name: string }) => b.name !== branchName),
-          },
-        },
-      },
-    }))
     if (repo) {
       setRepoSnapshotQueryData(repoId, repo.instanceId, {
-        current: repo.data.currentBranch,
+        current: readModel?.currentBranch ?? '',
         branches: nextBranches,
       })
     }
@@ -322,6 +312,7 @@ describe('useBranchActionDialogDisplay', () => {
     expect(handle.current?.displayContext?.branch.name).toBe('feature/x')
 
     dropBranch(REPO_ID, 'feature/x')
+    handle.setSlot(entry)
 
     expect(handle.current?.entry).toEqual(entry)
     expect(handle.current?.liveContext).toBeNull()

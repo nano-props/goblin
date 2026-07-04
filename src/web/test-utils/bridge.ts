@@ -18,7 +18,7 @@
 //     in `beforeEach`.
 
 import type { RepoState, RepoBranchState } from '#/web/stores/repos/types.ts'
-import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchQueryProjection, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import { stripBranchWorktreeMetadata, worktreeStatesFromBranches } from '#/web/stores/repos/worktree-state.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
@@ -57,6 +57,22 @@ import { installWebSocketMock } from '#/web/test-utils/websocket-mock.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
 
 export type IpcTestHandler = (input: any) => unknown
+export type RepoStateWithBranchReadModel = RepoState & { data: RepoState['data'] & RepoBranchReadModelData }
+
+export function repoStateWithBranchReadModelForTest(
+  repo: RepoState,
+  branchReadModel?: RepoBranchReadModelData,
+): RepoStateWithBranchReadModel {
+  const readModel = branchReadModel ?? readRepoBranchQueryProjection(repo)
+  if (!readModel) throw new Error(`missing branch read model for test repo: ${repo.id}`)
+  return {
+    ...repo,
+    data: {
+      ...repo.data,
+      ...readModel,
+    },
+  }
+}
 
 interface TerminalClientTestOutputs {
   'terminal.attach': TerminalAttachResult
@@ -734,7 +750,7 @@ export function seedRepoState(options: {
   statusLoaded?: boolean
   worktreesByPath?: RepoState['data']['worktreesByPath']
   remote?: Partial<RepoState['remote']>
-}): RepoState & { data: RepoState['data'] & RepoBranchReadModelData } {
+}): RepoStateWithBranchReadModel {
   const base = emptyRepo(options.id, options.name ?? 'repo', options.instanceId ?? createOpaqueId('repo-instance'))
   const branchesWithSnapshotWorktreeMetadata = options.branchSnapshots ?? options.branches ?? []
   const branches = options.branches ?? stripBranchWorktreeMetadata(branchesWithSnapshotWorktreeMetadata)
@@ -799,16 +815,12 @@ export function seedRepoState(options: {
       tabs,
     })
   }
-  return {
-    ...repo,
-    data: {
-      ...repo.data,
-      branches,
-      currentBranch: options.currentBranch ?? '',
-      status,
-      worktreesByPath:
-        options.worktreesByPath ??
-        worktreeStatesFromBranches(branchesWithSnapshotWorktreeMetadata, base.data.worktreesByPath, status),
-    },
-  }
+  return repoStateWithBranchReadModelForTest(repo, {
+    branches,
+    currentBranch: options.currentBranch ?? '',
+    status,
+    worktreesByPath:
+      options.worktreesByPath ??
+      worktreeStatesFromBranches(branchesWithSnapshotWorktreeMetadata, base.data.worktreesByPath, status),
+  })
 }

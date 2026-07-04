@@ -51,9 +51,6 @@ export type OpenRepoResult =
   { ok: true; id: string; postOpenEffects?: Promise<OpenRepoPostOpenError[]> } | { ok: false; message: string }
 
 export interface RepoDataState {
-  branches: RepoBranchState[]
-  currentBranch: string
-  currentHEAD?: string
   status: WorktreeStatus[]
   statusLoaded: boolean
   worktreesByPath: Record<string, RepoWorktreeState>
@@ -113,7 +110,10 @@ type RepoAvailabilityState = { phase: 'available' } | { phase: 'unavailable'; re
 export interface RepoSnapshotCacheEntry {
   savedAt: number
   name: string
-  data: Pick<RepoDataState, 'branches' | 'currentBranch'>
+  data: {
+    branches: RepoBranchState[]
+    currentBranch: string
+  }
   ui: Pick<RepoUiState, 'selectedBranch' | 'branchViewMode'>
 }
 

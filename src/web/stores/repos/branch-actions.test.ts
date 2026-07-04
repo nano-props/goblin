@@ -11,6 +11,7 @@ import {
   createBranchSnapshot,
   createRepoBranch,
   installGoblinTestBridge,
+  repoStateWithBranchReadModelForTest,
   resetReposStore,
   seedRepoState,
 } from '#/web/test-utils/bridge.ts'
@@ -149,7 +150,7 @@ describe('branch action capabilities', () => {
         hasGitHubRemote: true,
       },
     })
-    let repo = useReposStore.getState().repos[REPO_ID]!
+    let repo = repoStateWithBranchReadModelForTest(useReposStore.getState().repos[REPO_ID]!)
 
     expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
       canPush: true,
@@ -165,7 +166,7 @@ describe('branch action capabilities', () => {
       repo.remote.remoteProviders = {}
       repo.remote.hasGitHubRemote = false
     })
-    repo = useReposStore.getState().repos[REPO_ID]!
+    repo = repoStateWithBranchReadModelForTest(useReposStore.getState().repos[REPO_ID]!)
 
     expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
       canPush: false,
@@ -241,7 +242,8 @@ describe('branch action capabilities', () => {
       },
     })
 
-    expect(getBranchActionCapabilities(useReposStore.getState().repos[target!.id]!, branch)).toMatchObject({
+    const repo = repoStateWithBranchReadModelForTest(useReposStore.getState().repos[target!.id]!)
+    expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
       canOpenTerminal: true,
       canOpenEditor: true,
     })

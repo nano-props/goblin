@@ -79,7 +79,7 @@ describe('runRemoteRepoConnection', () => {
         id: REMOTE_ID,
         name: 'example:repo',
         instanceId: 'repo-instance-test',
-        data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
+        data: { status: [], statusLoaded: false, worktreesByPath: {} },
         dataLoads: {
           fetch: { phase: 'idle', loadedAt: null, stale: false, error: null },
           snapshot: { phase: 'idle', loadedAt: null, stale: false, error: null },
@@ -139,7 +139,7 @@ describe('runRemoteRepoConnection', () => {
         id: REMOTE_ID,
         name: 'example:repo',
         instanceId: 'repo-instance-test',
-        data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
+        data: { status: [], statusLoaded: false, worktreesByPath: {} },
         dataLoads: emptyDataLoads(),
         operations: emptyOperations(),
         ui: {
@@ -185,7 +185,7 @@ describe('runRemoteRepoConnection', () => {
         id: REMOTE_ID,
         name: 'example:repo',
         instanceId: 'repo-instance-test',
-        data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
+        data: { status: [], statusLoaded: false, worktreesByPath: {} },
         dataLoads: emptyDataLoads(),
         operations: emptyOperations(),
         ui: {
@@ -231,7 +231,7 @@ describe('runRemoteRepoConnection', () => {
         id: REMOTE_ID,
         name: 'example:repo',
         instanceId: 'repo-instance-test',
-        data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
+        data: { status: [], statusLoaded: false, worktreesByPath: {} },
         dataLoads: emptyDataLoads(),
         operations: emptyOperations(),
         ui: {
@@ -310,7 +310,7 @@ describe('runRemoteRepoConnection', () => {
         id: REMOTE_ID,
         name: 'example:repo',
         instanceId: 'repo-instance-test',
-        data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
+        data: { status: [], statusLoaded: false, worktreesByPath: {} },
         dataLoads: emptyDataLoads(),
         operations: emptyOperations(),
         ui: {
@@ -376,7 +376,7 @@ describe('runRemoteRepoConnection', () => {
           id: REMOTE_ID,
           name: 'example:repo',
           instanceId: 'repo-instance-test',
-          data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
+          data: { status: [], statusLoaded: false, worktreesByPath: {} },
           dataLoads: emptyDataLoads(),
           operations: emptyOperations(),
           ui: {

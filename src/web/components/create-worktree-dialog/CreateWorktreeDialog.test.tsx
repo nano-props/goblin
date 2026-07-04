@@ -7,12 +7,12 @@ import type { ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CreateWorktreeDialog } from '#/web/components/create-worktree-dialog/CreateWorktreeDialog.tsx'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
-import type { RepoState } from '#/web/stores/repos/types.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { getRepoRemoteBranches } from '#/web/repo-client.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
-import { createRepoBranch } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, repoStateWithBranchReadModelForTest } from '#/web/test-utils/bridge.ts'
+import type { RepoStateWithBranchReadModel } from '#/web/test-utils/bridge.ts'
 
 vi.mock('#/web/repo-client.ts', async () => {
   const actual = await vi.importActual<typeof import('#/web/repo-client.ts')>('#/web/repo-client.ts')
@@ -123,8 +123,6 @@ describe('CreateWorktreeDialog', () => {
   test('uses the React Query snapshot read model for local branch choices', async () => {
     const user = userEvent.setup()
     const repo = createRepo()
-    repo.data.currentBranch = ''
-    repo.data.branches = []
     setRepoSnapshotQueryData(repo.id, repo.instanceId, {
       current: 'main',
       branches: [createRepoBranch('main'), createRepoBranch('feature/base')],
@@ -219,10 +217,9 @@ describe('CreateWorktreeDialog', () => {
   })
 })
 
-function createRepo(): RepoState {
+function createRepo(): RepoStateWithBranchReadModel {
   const repo = emptyRepo('/tmp/goblin-repo', 'goblin-repo', 'repo-instance-test')
-  repo.data.currentBranch = 'main'
-  repo.data.branches = [
+  const branches = [
     {
       name: 'main',
       isCurrent: true,
@@ -247,14 +244,19 @@ function createRepo(): RepoState {
     },
   ]
   setRepoSnapshotQueryData(repo.id, repo.instanceId, {
-    current: repo.data.currentBranch,
-    branches: repo.data.branches,
+    current: 'main',
+    branches,
   })
   setRepoStatusQueryData(repo.id, repo.instanceId, [])
-  return repo
+  return repoStateWithBranchReadModelForTest(repo, {
+    currentBranch: 'main',
+    branches,
+    status: [],
+    worktreesByPath: {},
+  })
 }
 
-function createRemoteRepo(): RepoState {
+function createRemoteRepo(): RepoStateWithBranchReadModel {
   const target = normalizeRemoteTarget({
     alias: 'prod',
     host: 'example.com',
