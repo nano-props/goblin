@@ -121,12 +121,7 @@ export function useBranchActionDialogDisplay<P>(
 ): BranchActionDialogDisplay<P> {
   const entry = useLastNonNull(slot)
   const slotRepo = slot ? repos[slot.repoId] : null
-  const branchReadModel = useRepoBranchReadModel(
-    slot?.repoId ?? '',
-    slotRepo?.instanceId ?? '',
-    slotRepo ? { worktreesByPath: slotRepo.data.worktreesByPath } : null,
-    !!slotRepo,
-  )
+  const branchReadModel = useRepoBranchReadModel(slot?.repoId ?? '', slotRepo?.instanceId ?? '', !!slotRepo)
   const liveContext = slot ? resolveContext(repos, slot, branchReadModel) : null
   // Retain the last non-null `liveContext` for the close-animation
   // window. After the user clicks Confirm/Cancel, `slot` is null and

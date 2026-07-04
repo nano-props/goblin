@@ -26,6 +26,7 @@ type ClientWorkspaceIntent = Extract<
 
 export type TerminalBellIntentPlan =
   | { kind: 'noop' }
+  | { kind: 'unavailable'; reason: 'branch-read-model-unavailable' }
   | { kind: 'show-repo-terminal'; repoId: string }
   | {
       kind: 'show-worktree-terminal'
@@ -83,7 +84,8 @@ export function createTerminalBellIntentPlan(
   if (!repo) return { kind: 'noop' }
   const parsedKey = event.terminalWorktreeKey ? parseTerminalWorktreeKey(event.terminalWorktreeKey) : null
   if (parsedKey && parsedKey.repoRoot === repo.id && event.terminalSessionId) {
-    const branch = branchReadModel?.branches.find((candidate) => candidate.worktree?.path === parsedKey.worktreePath)
+    if (!branchReadModel) return { kind: 'unavailable', reason: 'branch-read-model-unavailable' }
+    const branch = branchReadModel.branches.find((candidate) => candidate.worktree?.path === parsedKey.worktreePath)
     if (branch) {
       return {
         kind: 'show-worktree-terminal',

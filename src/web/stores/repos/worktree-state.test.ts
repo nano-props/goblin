@@ -4,6 +4,7 @@ import {
   branchWorktreeHasChanges,
   getBranchWorktreeState,
   stripBranchWorktreeMetadata,
+  worktreeStatesFromBranchReadModel,
   worktreeStatesFromBranches,
 } from '#/web/stores/repos/worktree-state.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
@@ -53,6 +54,29 @@ describe('worktree state selectors', () => {
     ])
 
     expect(worktreesByPath['/tmp/worktree-a']).toMatchObject({
+      isDirty: false,
+      changeCount: 0,
+    })
+  })
+
+  test('builds read-model worktree state only from snapshot and status', () => {
+    const branches = [
+      createBranchSnapshot('feature/a', {
+        worktree: {
+          path: '/tmp/worktree-a',
+          summary: {
+            dirty: false,
+            changeCount: 0,
+          },
+        },
+      }),
+    ]
+
+    const worktreesByPath = worktreeStatesFromBranchReadModel(branches, [])
+
+    expect(worktreesByPath['/tmp/worktree-a']).toMatchObject({
+      branch: 'feature/a',
+      isMain: false,
       isDirty: false,
       changeCount: 0,
     })

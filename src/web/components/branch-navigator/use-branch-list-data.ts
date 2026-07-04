@@ -17,9 +17,7 @@ export type BranchListRepo = BranchActionRepo & {
   ui: Pick<RepoUiState, 'selectedBranch' | 'branchViewMode'>
 }
 
-type BranchListRepoShell = Omit<BranchListRepo, 'data'> & {
-  currentWorktreesByPath: RepoState['data']['worktreesByPath']
-}
+type BranchListRepoShell = Omit<BranchListRepo, 'data'>
 
 const branchListRepoShellEqualFields: Array<keyof BranchListRepoShell> = [
   'id',
@@ -27,7 +25,6 @@ const branchListRepoShellEqualFields: Array<keyof BranchListRepoShell> = [
   'ui',
   'operations',
   'remote',
-  'currentWorktreesByPath',
 ]
 
 function branchListRepoShellEqual(a: BranchListRepoShell | undefined, b: BranchListRepoShell | undefined): boolean {
@@ -74,7 +71,6 @@ export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
             operations: {
               branchAction: repo.operations.branchAction,
             },
-            currentWorktreesByPath: repo.data.worktreesByPath,
             remote: {
               lifecycle: repo.remote.lifecycle,
               hasRemotes: repo.remote.hasRemotes,
@@ -88,16 +84,10 @@ export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
     },
     branchListRepoShellEqual,
   )
-  const branchReadModel = useRepoBranchReadModel(
-    repoShell?.id ?? '',
-    repoShell?.instanceId ?? '',
-    repoShell ? { worktreesByPath: repoShell.currentWorktreesByPath } : null,
-    !!repoShell,
-  )
+  const branchReadModel = useRepoBranchReadModel(repoShell?.id ?? '', repoShell?.instanceId ?? '', !!repoShell)
   if (!repoShell || !branchReadModel) return undefined
-  const { currentWorktreesByPath: _currentWorktreesByPath, ...shell } = repoShell
   return {
-    ...shell,
+    ...repoShell,
     data: branchReadModel,
   }
 }

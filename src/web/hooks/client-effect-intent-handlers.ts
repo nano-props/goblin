@@ -64,12 +64,8 @@ export function handleTerminalBellClickIntent(
 ): void {
   const repo = useReposStore.getState().repos[event.repoRoot]
   const branchModel = repo && event.terminalWorktreeKey ? readRepoBranchQueryProjection(repo) : null
-  const plan = createTerminalBellIntentPlan(
-    repo && (!event.terminalWorktreeKey || branchModel) ? repo : undefined,
-    branchModel,
-    event,
-  )
-  if (plan.kind === 'noop') return
+  const plan = createTerminalBellIntentPlan(repo, branchModel, event)
+  if (plan.kind === 'noop' || plan.kind === 'unavailable') return
   deps.closeAllOverlays()
   switch (plan.kind) {
     case 'show-worktree-terminal':

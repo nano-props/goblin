@@ -37,26 +37,14 @@ describe('repo branch read model helpers', () => {
       ],
     }
 
-    const readModel = repoBranchReadModelFromSnapshot(snapshot, {
-      worktreesByPath: {
-        '/tmp/query-worktree': {
-          path: '/tmp/query-worktree',
-          branch: 'feature/query',
-          isMain: false,
-          isDirty: false,
-          changeCount: 0,
-          isLocked: false,
-        },
+    const readModel = repoBranchReadModelFromSnapshot(snapshot, [
+      {
+        path: '/tmp/query-worktree',
+        branch: 'feature/query',
+        isMain: false,
+        entries: [{ path: 'changed.txt', x: 'M', y: 'M' }],
       },
-      status: [
-        {
-          path: '/tmp/query-worktree',
-          branch: 'feature/query',
-          isMain: false,
-          entries: [{ path: 'changed.txt', x: 'M', y: 'M' }],
-        },
-      ],
-    })
+    ])
 
     expect(readModel.currentBranch).toBe('feature/query')
     expect(readModel.currentHEAD).toBe('1111111000000000000000000000000000000000')
