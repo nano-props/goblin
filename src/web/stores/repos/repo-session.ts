@@ -74,6 +74,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
 
       let managedActiveId: string | null = null
       const failedOpenEntryIds = new Set<string>()
+      let workspacePaneRestoreFailed = false
       const markOpenEntryFailed = (entry: RepoSessionEntry): void => {
         failedOpenEntryIds.add(entry.id)
       }
@@ -115,9 +116,8 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
             let changedRepos = changed
             const restoreResult = restoreSessionWorkspacePaneStateInRepos(nextRepos, workspacePaneRestoreState)
             if (restoreResult.status === 'failed') {
-              throw new Error('workspace pane preferred tab restore failed')
-            }
-            if (restoreResult.repos !== nextRepos) {
+              workspacePaneRestoreFailed = true
+            } else if (restoreResult.repos !== nextRepos) {
               nextRepos = restoreResult.repos
               changedRepos = true
             }
@@ -219,7 +219,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       const restoreError =
         failedOpenEntryIds.size > 0
           ? new Error('session repo restore failed')
-          : unresolvedPreferredRestoreRepoIds(get().repos, workspacePaneRestoreState).length > 0
+          : workspacePaneRestoreFailed || unresolvedPreferredRestoreRepoIds(get().repos, workspacePaneRestoreState).length > 0
             ? new Error('workspace pane preferred tab restore failed')
             : null
       // Flip sessionReady unconditionally once placeholders are ready.

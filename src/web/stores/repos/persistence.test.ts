@@ -168,7 +168,7 @@ describe('restoreRepoProjectionFromCacheEntry', () => {
     expect(repo.projection).toEqual({ source: 'cache', savedAt: now })
   })
 
-  test('seeds cached branch references into the query read model', () => {
+  test('seeds cached branch references without inventing status query data', () => {
     const now = Date.now()
     const cached = cachedRepo(now)
     cached.data.currentBranch = 'feature/a'
@@ -191,6 +191,6 @@ describe('restoreRepoProjectionFromCacheEntry', () => {
     expect(snapshot?.current).toBe('feature/a')
     expect(snapshot?.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
     expect(snapshot?.branches[0]?.pullRequest).toBeUndefined()
-    expect(getRepoStatusQueryData('/repo', 'repo-instance-test')).toEqual([])
+    expect(getRepoStatusQueryData('/repo', 'repo-instance-test')).toBeUndefined()
   })
 })

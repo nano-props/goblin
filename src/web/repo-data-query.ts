@@ -164,7 +164,7 @@ export function useRepoRemoteBranchesQuery(
 export function setRepoSnapshotQueryData(
   repoRoot: string,
   repoInstanceId: string,
-  snapshot: RepoSnapshot | null,
+  snapshot: RepoSnapshot,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
   queryClient.setQueryData(repoSnapshotQueryKey(repoRoot, repoInstanceId), snapshot)
@@ -174,8 +174,8 @@ export function getRepoSnapshotQueryData(
   repoRoot: string,
   repoInstanceId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
-): RepoSnapshot | null | undefined {
-  return queryClient.getQueryData<RepoSnapshot | null>(repoSnapshotQueryKey(repoRoot, repoInstanceId))
+): RepoSnapshot | undefined {
+  return queryClient.getQueryData<RepoSnapshot>(repoSnapshotQueryKey(repoRoot, repoInstanceId))
 }
 
 export function getRepoStatusQueryData(
@@ -225,10 +225,16 @@ export function setRepoBulkReadQueryData(
   result: RepoBulkReadCacheEntry,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
+  const included = include ?? ['snapshot', 'status', 'pullRequests']
   queryClient.setQueryData(repoBulkReadQueryKey(repoRoot, repoInstanceId, include), result)
-  setRepoSnapshotQueryData(repoRoot, repoInstanceId, result.snapshot, queryClient)
-  setRepoStatusQueryData(repoRoot, repoInstanceId, result.status, queryClient)
-  if (include?.includes('pullRequests')) {
+  if (included.includes('snapshot')) {
+    if (!result.snapshot) throw new Error(`repo snapshot read result unavailable for repo: ${repoRoot}`)
+    setRepoSnapshotQueryData(repoRoot, repoInstanceId, result.snapshot, queryClient)
+  }
+  if (included.includes('status')) {
+    setRepoStatusQueryData(repoRoot, repoInstanceId, result.status, queryClient)
+  }
+  if (included.includes('pullRequests')) {
     setRepoPullRequestsQueryData(repoRoot, repoInstanceId, undefined, undefined, result.pullRequests, queryClient)
   }
 }

@@ -317,6 +317,45 @@ describe('repo session hydration', () => {
     expect(useReposStore.getState().repos['/missing']).toBeUndefined()
   })
 
+  test('hydrateRepoSession joins pending probes before reporting workspace pane restore failure', async () => {
+    let resolveRepoB!: () => void
+    installGoblin({
+      probe: async (path: string) => {
+        if (path === REPO_B) {
+          await new Promise<void>((resolve) => {
+            resolveRepoB = resolve
+          })
+        }
+        return { ok: true, root: path, name: path.split('/').at(-1) ?? path }
+      },
+    })
+
+    let settled = false
+    const work = useReposStore
+      .getState()
+      .hydrateRepoSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry(REPO_B)], REPO_A, {
+        workspacePaneRestoreState: {
+          workspacePaneTabsByTargetByRepo: {},
+          preferredWorkspacePaneTabByTargetByRepo: {
+            [REPO_A]: { [branchTargetKey(REPO_A, 'main')]: 'files' },
+          },
+        },
+      })
+      .finally(() => {
+        settled = true
+      })
+
+    await vi.waitFor(() => {
+      expect(useReposStore.getState().repos[REPO_A]).toBeDefined()
+    })
+    await Promise.resolve()
+    expect(settled).toBe(false)
+
+    resolveRepoB()
+    await expect(work).rejects.toThrow('workspace pane preferred tab restore failed')
+    expect(useReposStore.getState().repos[REPO_B]).toBeDefined()
+  })
+
   test('hydrateRepoSession limits concurrent repo probes', async () => {
     let active = 0
     let maxActive = 0

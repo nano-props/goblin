@@ -36,7 +36,7 @@ beforeEach(() => {
 })
 
 describe('useSessionPersistence', () => {
-  test('blocks saving instead of throwing when branch read models are unavailable', () => {
+  test('persists the workspace shell when branch read models are unavailable', () => {
     const repo = emptyRepo('/tmp/repo-without-query-model', 'repo-without-query-model', 'repo-instance-without-query')
     useReposStore.setState({
       repos: { [repo.id]: repo },
@@ -47,7 +47,16 @@ describe('useSessionPersistence', () => {
     })
 
     expect(() => renderInJsdom(<Harness />)).not.toThrow()
-    expect(persistWorkspaceSessionStateMock).not.toHaveBeenCalled()
+    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        openRepoEntries: [{ kind: 'local', id: repo.id }],
+        activeRepoId: repo.id,
+        selectedTerminalSessionIdByTerminalWorktree: {},
+        preferredWorkspacePaneTabByTargetByRepo: {},
+        workspacePaneTabsByTargetByRepo: {},
+        filetreeViewStateByWorktreeByRepo: {},
+      }),
+    )
   })
 
   test('persists the active terminal map into settings session state', () => {

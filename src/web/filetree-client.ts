@@ -10,9 +10,9 @@
 //   - Do not import any repo store, terminal hook, or settings
 //     client from here.
 //   - Do not subscribe to invalidation events from here.
-//   - Do not throw on empty / soft-fail results: the wire returns
-//     `{ nodes: [], truncated: false }` on failure and the caller
-//     decides how to surface that.
+//   - Do not convert failures to empty trees or default viewers here:
+//     callers own loading/error display, while server success means the
+//     result is authoritative for the requested worktree.
 
 import { postServerJson } from '#/web/lib/server-fetch.ts'
 import type { RepoFileViewerResult, RepoTreeResult } from '#/shared/api-types.ts'

@@ -29,10 +29,10 @@ export interface RepositoryTreeReadOptions extends RepoTreeSourceOptions {
   readonly precomputedWorktrees?: ReadonlyArray<WorktreeInfo>
 }
 
-/** Read the file tree rooted at `worktreePath`. Soft-fails to
- *  `{ nodes: [], truncated: false }` on any error — the route layer
- *  mirrors that envelope, matching `getRepositorySnapshot`'s
- *  null-on-failure contract. */
+/** Read the file tree rooted at `worktreePath`. An empty result is
+ *  authoritative only when the source successfully reads an empty
+ *  directory; read, resolution, and membership failures throw so the
+ *  client can surface an unavailable state instead of a fake empty tree. */
 export async function getRepositoryTree(
   cwd: string,
   worktreePath: string,
@@ -44,7 +44,7 @@ export async function getRepositoryTree(
   // future caller that bypasses the schema (composite reads, IPC
   // bridges) still gets the same short-circuit.
   if (!hasUsableWorktreePath(worktreePath)) {
-    return { nodes: [], truncated: false }
+    throw new Error('invalid worktree path')
   }
 
   // Dispatch based on the cwd's repo kind. SSH remotes go through
@@ -57,14 +57,7 @@ export async function getRepositoryTree(
   // handing the worktree path to the remote source.
   let remoteTarget: Awaited<ReturnType<typeof resolveRemoteRepoTarget>> | undefined
   if (isRemote) {
-    try {
-      remoteTarget = await resolveRemoteRepoTarget(cwd)
-    } catch {
-      // The user-facing error code is intentionally the same as a
-      // soft-fail so the view does not flash an error banner on
-      // every poll when the SSH alias has been removed mid-session.
-      return { nodes: [], truncated: false }
-    }
+    remoteTarget = await resolveRemoteRepoTarget(cwd)
   }
 
   const worktrees =
@@ -72,8 +65,7 @@ export async function getRepositoryTree(
 
   // F2 (membership): validate that `worktreePath` is a known worktree
   // of this repo before we hand it to the source layer. The remote
-  // source already validates via `resolveKnownRemoteWorktree` (and
-  // returns the empty envelope when the path is unknown); this
+  // source already validates via `resolveKnownRemoteWorktree`; this
   // read-layer guard closes the same gap on the local side, where an
   // unchecked path would let a hostile or buggy client ask git about
   // a directory outside this repo.
@@ -82,23 +74,19 @@ export async function getRepositoryTree(
   // walk. Remote validation lives in `getRemoteTreeWalk`; local
   // validation is performed here using `git worktree list`.
   if (!isRemote && !matchesKnownWorktree(worktrees, worktreePath)) {
-    return { nodes: [], truncated: false }
+    throw new Error('unknown worktree path')
   }
 
-  try {
-    const source = isRemote
-      ? await getRepoTreeSourceRemote({
-          target: remoteTarget as Awaited<ReturnType<typeof resolveRemoteRepoTarget>>,
-          worktreePath,
-          options,
-          signal: undefined,
-          ...(worktrees ? { knownWorktrees: worktrees } : {}),
-        })
-      : await getRepoTreeSourceLocal(worktreePath, options, undefined)
-    return { nodes: source.nodes, truncated: source.truncated }
-  } catch {
-    return { nodes: [], truncated: false }
-  }
+  const source = isRemote
+    ? await getRepoTreeSourceRemote({
+        target: remoteTarget as Awaited<ReturnType<typeof resolveRemoteRepoTarget>>,
+        worktreePath,
+        options,
+        signal: undefined,
+        ...(worktrees ? { knownWorktrees: worktrees } : {}),
+      })
+    : await getRepoTreeSourceLocal(worktreePath, options, undefined)
+  return { nodes: source.nodes, truncated: source.truncated }
 }
 
 /** Shape check for `worktreePath`. Empty strings and embedded NUL

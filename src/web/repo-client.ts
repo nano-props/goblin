@@ -32,7 +32,7 @@ export async function abortCloneOperation(operationId: string): Promise<boolean>
   return await postServerJson('/api/repo/abort-clone', { operationId })
 }
 
-export async function getRepoSnapshot(cwd: string, signal?: AbortSignal): Promise<RepoSnapshot | null> {
+export async function getRepoSnapshot(cwd: string, signal?: AbortSignal): Promise<RepoSnapshot> {
   return await postServerJson('/api/repo/snapshot', { cwd }, { signal })
 }
 

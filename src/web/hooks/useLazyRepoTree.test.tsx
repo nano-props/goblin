@@ -253,7 +253,7 @@ describe('useLazyRepoTree', () => {
     expect(lastSnapshot?.loading).toBe(false)
   })
 
-  test('treats a soft-fail empty envelope as success (no error, no throw)', async () => {
+  test('treats an authoritative empty tree as success', async () => {
     mocks.getRepositoryTree.mockResolvedValueOnce({ nodes: [], truncated: false })
 
     await render({

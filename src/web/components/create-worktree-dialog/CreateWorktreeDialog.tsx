@@ -66,7 +66,7 @@ interface WorktreeBootstrapPromptState {
 }
 
 export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, onCreate }: Props) {
-  const branchReadModel = useRepoBranchReadModel(repo.id, repo.instanceId, open)
+  const branchReadModel = useRepoBranchReadModel(repo.id, repo.instanceId, true)
   if (!branchReadModel) return null
   return (
     <CreateWorktreeDialogContent

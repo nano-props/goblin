@@ -79,13 +79,12 @@ describe('repo file viewer read layer', () => {
     }
   })
 
-  test('does not probe the shell for unknown local worktrees', async () => {
+  test('rejects unknown local worktrees without probing the shell', async () => {
     const platformSpy = mockPlatform('linux')
 
     try {
-      const result = await getRepositoryFileViewer('/tmp/repo', '/tmp/outside')
+      await expect(getRepositoryFileViewer('/tmp/repo', '/tmp/outside')).rejects.toThrow('unknown worktree path')
 
-      expect(result).toEqual({ viewer: 'cat', shell: 'posix' })
       expect(mocks.userShellCommandExists).not.toHaveBeenCalled()
     } finally {
       platformSpy.mockRestore()

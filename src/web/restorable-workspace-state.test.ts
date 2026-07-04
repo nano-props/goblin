@@ -55,10 +55,10 @@ describe('restorable-workspace-state', () => {
     })
   })
 
-  test('fails session persistence when an open repo has no branch read model', () => {
+  test('persists workspace shell when an open repo has no branch read model', () => {
     const repo = emptyRepo('/tmp/repo-without-query-model', 'repo-without-query-model', 'repo-instance-without-query')
 
-    expect(() =>
+    expect(
       workspaceSessionStateFromRestorableWorkspaceState({
         repos: { [repo.id]: repo },
         restorableWorkspaceState: {
@@ -69,7 +69,16 @@ describe('restorable-workspace-state', () => {
           selectedTerminalSessionIdByTerminalWorktree: {},
         },
       }),
-    ).toThrow('repo branch read model query data unavailable for repo: /tmp/repo-without-query-model')
+    ).toEqual({
+      openRepoEntries: [localRepoSessionEntry(repo.id)],
+      activeRepoId: repo.id,
+      zenMode: false,
+      workspacePaneSize: 55,
+      selectedTerminalSessionIdByTerminalWorktree: {},
+      preferredWorkspacePaneTabByTargetByRepo: {},
+      workspacePaneTabsByTargetByRepo: {},
+      filetreeViewStateByWorktreeByRepo: {},
+    })
   })
 
   test('persists changes as a session-restorable preferred tab when its static tab is open', () => {
