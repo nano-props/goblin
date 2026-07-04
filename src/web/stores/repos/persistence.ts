@@ -5,7 +5,7 @@ import { selectedBranchForBranchSet } from '#/web/stores/repos/branch-view-mode.
 import type { RepoSnapshotCacheEntry, RepoState } from '#/web/stores/repos/types.ts'
 import { finishDataLoadSuccess } from '#/web/stores/repos/repo-data-load-state.ts'
 import { stripBranchWorktreeMetadata } from '#/web/stores/repos/worktree-state.ts'
-import { getRepoSnapshotQueryData, setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { getRepoSnapshotQueryData, setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
 import { repoBranchSnapshotDataFromSnapshot, type RepoBranchSnapshotData } from '#/web/repo-branch-read-model.ts'
 const MAX_CACHE_AGE_MS = 14 * 24 * 60 * 60 * 1000
 const MAX_REPOS = 50
@@ -45,7 +45,9 @@ const RepoSnapshotCacheEntrySchema = v.object({
   }),
 })
 
-function cachedBranches(branches: RepoState['data']['branches']): RepoSnapshotCacheEntry['data']['branches'] {
+function cachedBranches(
+  branches: RepoSnapshotCacheEntry['data']['branches'],
+): RepoSnapshotCacheEntry['data']['branches'] {
   return stripBranchWorktreeMetadata(branches).map(({ pullRequest: _pullRequest, ...branch }) => branch)
 }
 
@@ -61,15 +63,9 @@ function restoreProjectionFromSnapshot(repo: RepoState, snapshot: RepoSnapshotCa
     snapshot: { ...repo.dataLoads.snapshot },
   }
   if (snapshot.data.branches.length > 0) finishDataLoadSuccess(dataLoads.snapshot, snapshot.savedAt)
-  const branches = cachedBranches(snapshot.data.branches)
   return {
     ...repo,
     name: snapshot.name || repo.name,
-    data: {
-      ...repo.data,
-      branches,
-      currentBranch: snapshot.data.currentBranch,
-    },
     dataLoads,
     ui: {
       ...repo.ui,
@@ -98,9 +94,10 @@ export function seedRepoSnapshotQueryFromCacheEntry(
 ): void {
   if (!snapshot || isExpired(snapshot.savedAt)) return
   setRepoSnapshotQueryData(repoRoot, repoInstanceId, {
-    branches: snapshot.data.branches,
+    branches: cachedBranches(snapshot.data.branches),
     current: snapshot.data.currentBranch,
   })
+  setRepoStatusQueryData(repoRoot, repoInstanceId, [])
 }
 
 export function persistRepoSnapshotCacheEntry(

@@ -533,7 +533,7 @@ describe('core refresh request ordering', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceId).toBe('repo-instance-test-2')
-    expect(repo?.data.branches.map((b) => b.name)).toEqual(['reopened'])
+    expect(repo ? readRepoBranchQueryProjection(repo)?.branches.map((b) => b.name) : null).toEqual(['reopened'])
     expect(
       primaryWindowQueryClient.getQueryData(repoBulkReadQueryKey(REPO_ID, repoInstanceId, ['snapshot', 'status'])),
     ).toBeUndefined()
@@ -595,7 +595,7 @@ describe('core refresh request ordering', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceId).toBe('repo-instance-test-2')
-    expect(repo?.data.branches.map((b) => b.name)).toEqual(['reopened'])
+    expect(repo ? readRepoBranchQueryProjection(repo)?.branches.map((b) => b.name) : null).toEqual(['reopened'])
   })
 
   test('ignores stale status refreshes for the same repo instance', async () => {

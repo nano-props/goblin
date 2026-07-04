@@ -25,6 +25,7 @@ import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-p
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 const REPO_ID = '/tmp/gbl-selection-test-repo'
 const ipcHandlers: Record<string, (input: any) => unknown> = {}
@@ -76,7 +77,11 @@ function seedRepoShellWithoutBranchReadModel(): void {
 
 function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
   const repo = useReposStore.getState().repos[REPO_ID]
-  const target = repo ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: repo.data.branches }, branchName) : null
+  const branchModel = repo ? readRepoBranchQueryProjection(repo) : null
+  const target =
+    repo && branchModel
+      ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branchName)
+      : null
   return workspacePaneStaticTabsFromEntries(
     target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : [],
   )
@@ -84,10 +89,16 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
 
 function preferredTabFor(branchName?: string | null): WorkspacePaneTabType | null {
   const repo = useReposStore.getState().repos[REPO_ID]
+  const branchModel = repo ? readRepoBranchQueryProjection(repo) : null
   return repo
     ? preferredWorkspacePaneTabForTarget(
         repo.ui,
-        workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: repo.data.branches }, branchName ?? repo.ui.selectedBranch),
+        branchModel
+          ? workspacePaneTabsTargetForRepoBranch(
+              { repoRoot: repo.id, branches: branchModel.branches },
+              branchName ?? repo.ui.selectedBranch,
+            )
+          : null,
       )
     : null
 }

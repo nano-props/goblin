@@ -18,6 +18,7 @@
 //     in `beforeEach`.
 
 import type { RepoState, RepoBranchState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import { stripBranchWorktreeMetadata, worktreeStatesFromBranches } from '#/web/stores/repos/worktree-state.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
@@ -733,9 +734,9 @@ export function seedRepoState(options: {
   statusLoaded?: boolean
   worktreesByPath?: RepoState['data']['worktreesByPath']
   remote?: Partial<RepoState['remote']>
-}): RepoState {
+}): RepoState & { data: RepoState['data'] & RepoBranchReadModelData } {
   const base = emptyRepo(options.id, options.name ?? 'repo', options.instanceId ?? createOpaqueId('repo-instance'))
-  const branchesWithSnapshotWorktreeMetadata = options.branchSnapshots ?? options.branches ?? base.data.branches
+  const branchesWithSnapshotWorktreeMetadata = options.branchSnapshots ?? options.branches ?? []
   const branches = options.branches ?? stripBranchWorktreeMetadata(branchesWithSnapshotWorktreeMetadata)
   const status = options.status ?? base.data.status
   const selectedBranch = options.selectedBranch ?? base.ui.selectedBranch
@@ -755,8 +756,6 @@ export function seedRepoState(options: {
     instanceId: base.instanceId,
     data: {
       ...base.data,
-      branches,
-      currentBranch: options.currentBranch ?? base.data.currentBranch,
       status,
       statusLoaded: options.statusLoaded ?? base.data.statusLoaded,
       worktreesByPath:
@@ -786,7 +785,7 @@ export function seedRepoState(options: {
   })
   setRepoSnapshotQueryData(options.id, repo.instanceId, {
     branches: branchesWithSnapshotWorktreeMetadata,
-    current: options.currentBranch ?? base.data.currentBranch,
+    current: options.currentBranch ?? '',
   })
   setRepoStatusQueryData(options.id, repo.instanceId, status)
   for (const [branchName, tabs] of Object.entries(options.workspacePaneTabsByBranch ?? {})) {
@@ -800,5 +799,16 @@ export function seedRepoState(options: {
       tabs,
     })
   }
-  return repo
+  return {
+    ...repo,
+    data: {
+      ...repo.data,
+      branches,
+      currentBranch: options.currentBranch ?? '',
+      status,
+      worktreesByPath:
+        options.worktreesByPath ??
+        worktreeStatesFromBranches(branchesWithSnapshotWorktreeMetadata, base.data.worktreesByPath, status),
+    },
+  }
 }

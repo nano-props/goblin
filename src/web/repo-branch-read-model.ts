@@ -6,15 +6,16 @@ import {
   useRepoStatusReadModel,
 } from '#/web/repo-data-query.ts'
 import { stripBranchWorktreeMetadata, worktreeStatesFromBranchReadModel } from '#/web/stores/repos/worktree-state.ts'
-import type { RepoState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchState, RepoState, RepoWorktreeState } from '#/web/stores/repos/types.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
+import type { WorktreeStatus } from '#/web/types.ts'
 
 export interface RepoBranchReadModelData {
-  branches: RepoState['data']['branches']
+  branches: RepoBranchState[]
   currentBranch: string
   currentHEAD?: string
-  status: RepoState['data']['status']
-  worktreesByPath: RepoState['data']['worktreesByPath']
+  status: WorktreeStatus[]
+  worktreesByPath: Record<string, RepoWorktreeState>
 }
 
 export type RepoBranchSnapshotData = Pick<RepoBranchReadModelData, 'branches' | 'currentBranch' | 'currentHEAD'>
@@ -29,7 +30,7 @@ export function repoBranchSnapshotDataFromSnapshot(snapshot: RepoSnapshot): Repo
 
 export function repoBranchReadModelFromSnapshot(
   snapshot: RepoSnapshot,
-  status: RepoState['data']['status'],
+  status: WorktreeStatus[],
 ): RepoBranchReadModelData {
   return {
     ...repoBranchSnapshotDataFromSnapshot(snapshot),

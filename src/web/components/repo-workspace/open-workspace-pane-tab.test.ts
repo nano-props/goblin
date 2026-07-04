@@ -17,6 +17,7 @@ import {
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { clearWorkspacePaneTabsOperationQueuesForTests } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 
 const REPO_ID = '/tmp/workspace-pane-tab-repo'
@@ -522,7 +523,7 @@ function seedWorktreeRepo(preferredWorkspacePaneTab: WorkspacePaneStaticTabType)
 
 function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
   const repo = useReposStore.getState().repos[REPO_ID]
-  const target = repo ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: repo.data.branches }, branchName) : null
+  const target = repo ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, branchName) : null
   return workspacePaneStaticTabsFromEntries(
     target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : [],
   )
@@ -531,7 +532,7 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
 function preferredWorkspacePaneTab() {
   const repo = useReposStore.getState().repos[REPO_ID]
   return repo
-    ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: repo.data.branches }, repo.ui.selectedBranch))
+    ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, repo.ui.selectedBranch))
     : null
 }
 

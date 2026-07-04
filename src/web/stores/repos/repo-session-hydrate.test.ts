@@ -95,7 +95,9 @@ describe('repo session hydration', () => {
 
     const cachedRepo = useReposStore.getState().repos[REPO_A]
     expect(cachedRepo?.name).toBe('cached-a')
-    expect(cachedRepo?.data.branches.map((b) => b.name)).toEqual(['cached'])
+    expect(cachedRepo ? getRepoSnapshotQueryData(cachedRepo.id, cachedRepo.instanceId)?.branches.map((b) => b.name) : null).toEqual([
+      'cached',
+    ])
     expect(cachedRepo?.ui.selectedBranch).toBe('cached')
     expect(cachedRepo?.projection.source).toBe('cache')
     expect(cachedRepo?.dataLoads.snapshot.phase).toBe('refreshing')
@@ -165,7 +167,9 @@ describe('repo session hydration', () => {
     await vi.waitFor(() => {
       const repo = useReposStore.getState().repos[REPO_A]
       expect(repo).toBeDefined()
-      expect(repo?.data.branches.map((b) => b.name)).toEqual(['cached'])
+      expect(repo ? getRepoSnapshotQueryData(repo.id, repo.instanceId)?.branches.map((b) => b.name) : null).toEqual([
+        'cached',
+      ])
       // Local repos read as 'connected' under deriveConnectivity; the
       // meaningful invariant is just that the repo stays in the store.
       expect(deriveConnectivity(repo!)).toBe('connected')

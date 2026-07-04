@@ -42,6 +42,7 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { workspacePaneTabsTargetForRepoBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import {
   readWorkspacePaneTabsForTarget,
   setWorkspacePaneTabsForTargetQueryData,
@@ -129,7 +130,9 @@ function RepoWorkspaceToolbarHarness(props: RepoWorkspaceToolbarHarnessProps) {
 }
 
 function repoWorkspaceRepo(repo: RepoState): RepoWorkspaceRepo {
-  return { ...repo, data: { ...repo.data, statusReady: repo.data.statusLoaded } }
+  const branchModel = readRepoBranchQueryProjection(repo)
+  if (!branchModel) throw new Error('missing branch read model')
+  return { ...repo, data: { ...branchModel, statusReady: true } }
 }
 
 beforeEach(() => {
@@ -1359,7 +1362,7 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
 
 function tabsFor(branchName: string): WorkspacePaneTabEntry[] {
   const repo = useReposStore.getState().repos[REPO_ID]
-  const target = repo ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: repo.data.branches }, branchName) : null
+  const target = repo ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, branchName) : null
   return target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : []
 }
 

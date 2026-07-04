@@ -26,6 +26,7 @@ import {
   preferredWorkspacePaneTabByTargetRecordWith,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
 import type {
   TerminalDescriptor,
@@ -88,7 +89,7 @@ vi.mock('#/web/components/terminal/terminal-geometry.ts', async () => {
 function selectedWorkspacePaneTab(repoId: string) {
   const repo = useReposStore.getState().repos[repoId]
   return repo
-    ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: repo.data.branches }, repo.ui.selectedBranch))
+    ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, repo.ui.selectedBranch))
     : null
 }
 
@@ -316,7 +317,7 @@ function workspaceTabsWithTerminal(terminalSessionId: string) {
 
 function tabsFor(repoRoot: string, branchName: string): WorkspacePaneTabEntry[] {
   const repo = useReposStore.getState().repos[repoRoot]
-  const target = repo ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: repo.data.branches }, branchName) : null
+  const target = repo ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, branchName) : null
   return target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : []
 }
 

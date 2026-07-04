@@ -43,6 +43,7 @@ import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/sh
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 const toastMocks = vi.hoisted(() => ({
   error: vi.fn(),
@@ -1511,7 +1512,7 @@ describe('workspace commands', () => {
 function preferredWorkspacePaneTab() {
   const repo = useReposStore.getState().repos[REPO_ID]
   return repo
-    ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: repo.data.branches }, repo.ui.selectedBranch))
+    ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, repo.ui.selectedBranch))
     : null
 }
 
@@ -1521,7 +1522,7 @@ function openTabsFor(branch: string) {
 
 function tabsFor(branch: string): WorkspacePaneTabEntry[] {
   const repo = useReposStore.getState().repos[REPO_ID]
-  const target = repo ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: repo.data.branches }, branch) : null
+  const target = repo ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, branch) : null
   return target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : []
 }
 

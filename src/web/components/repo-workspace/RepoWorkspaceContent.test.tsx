@@ -8,6 +8,7 @@ import { RepoWorkspaceContent } from '#/web/components/repo-workspace/RepoWorksp
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import { getSelectedRepoWorkspacePresentation, type RepoWorkspaceRepo } from '#/web/components/repo-workspace/model.ts'
 import { useRepoWorkspaceTabModel } from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { BranchCopyPatchAction } from '#/web/hooks/branch-action-state.ts'
 import {
   TerminalSessionContext,
@@ -74,7 +75,9 @@ function RepoWorkspaceContentInner(props: RepoWorkspaceContentHarnessProps) {
 }
 
 function repoWorkspaceRepo(repo: RepoState): RepoWorkspaceRepo {
-  return { ...repo, data: { ...repo.data, statusReady: repo.data.statusLoaded } }
+  const branchModel = readRepoBranchQueryProjection(repo)
+  if (!branchModel) throw new Error('missing branch read model')
+  return { ...repo, data: { ...branchModel, statusReady: true } }
 }
 
 beforeEach(() => {

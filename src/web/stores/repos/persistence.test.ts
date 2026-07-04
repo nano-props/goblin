@@ -3,13 +3,14 @@ import {
   restoreRepoProjectionFromCacheEntry,
   normalizeRepoSnapshotCache,
   persistRepoSnapshotCacheEntry,
+  seedRepoSnapshotQueryFromCacheEntry,
 } from '#/web/stores/repos/persistence.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { createBranchSnapshot, createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoSnapshotCacheEntry } from '#/web/stores/repos/types.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { getRepoSnapshotQueryData, getRepoStatusQueryData, setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 function cachedRepo(savedAt: number): RepoSnapshotCacheEntry {
   return {
     savedAt,
@@ -142,9 +143,11 @@ describe('persistRepoSnapshotCacheEntry', () => {
 })
 
 describe('restoreRepoProjectionFromCacheEntry', () => {
-  test('hydrates branch references without restoring dynamic worktree or pull request state', () => {
+  test('restores only shell metadata and UI selection from cache', () => {
     const now = Date.now()
     const cached = cachedRepo(now)
+    cached.name = 'cached-name'
+    cached.ui.selectedBranch = 'feature/a'
     cached.data.branches = [
       createBranchSnapshot('feature/a', {
         worktree: { path: '/tmp/worktree-a' },
@@ -160,9 +163,36 @@ describe('restoreRepoProjectionFromCacheEntry', () => {
 
     const repo = restoreRepoProjectionFromCacheEntry(emptyRepo('/repo', 'repo', 'repo-instance-test'), cached)
 
-    expect(repo.data.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
-    expect(repo.data.branches[0]?.pullRequest).toBeUndefined()
-    expect(repo.data.statusLoaded).toBe(false)
-    expect(repo.data.status).toEqual([])
+    expect(repo.name).toBe('cached-name')
+    expect(repo.ui.selectedBranch).toBe('feature/a')
+    expect(repo.projection).toEqual({ source: 'cache', savedAt: now })
+    expect(repo.data.branches).toEqual([])
+    expect(repo.data.currentBranch).toBe('')
+  })
+
+  test('seeds cached branch references into the query read model', () => {
+    const now = Date.now()
+    const cached = cachedRepo(now)
+    cached.data.currentBranch = 'feature/a'
+    cached.data.branches = [
+      createBranchSnapshot('feature/a', {
+        worktree: { path: '/tmp/worktree-a' },
+        pullRequest: {
+          number: 2,
+          title: 'PR 2',
+          url: 'https://github.com/acme/repo/pull/2',
+          state: 'open',
+          mergeable: 'UNKNOWN',
+        },
+      }),
+    ]
+
+    seedRepoSnapshotQueryFromCacheEntry('/repo', 'repo-instance-test', cached)
+
+    const snapshot = getRepoSnapshotQueryData('/repo', 'repo-instance-test')
+    expect(snapshot?.current).toBe('feature/a')
+    expect(snapshot?.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
+    expect(snapshot?.branches[0]?.pullRequest).toBeUndefined()
+    expect(getRepoStatusQueryData('/repo', 'repo-instance-test')).toEqual([])
   })
 })

@@ -17,6 +17,7 @@ import {
 import type { RepoBranchAction } from '#/web/stores/repos/branch-action-types.ts'
 import type { BranchViewMode } from '#/web/stores/repos/types.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 const REPO_ID = '/tmp/gbl-branch-actions-test-repo'
 
 function branchBrowserRemoteProvider(
@@ -62,6 +63,16 @@ function setSelectionForTest(selectedBranch: string, branchViewMode: BranchViewM
     repo.ui.selectedBranch = selectedBranch
     repo.ui.branchViewMode = branchViewMode
   })
+}
+
+function repoBranchNames(): string[] {
+  const repo = useReposStore.getState().repos[REPO_ID]
+  return repo ? (readRepoBranchQueryProjection(repo)?.branches.map((branch) => branch.name) ?? []) : []
+}
+
+function repoCurrentBranch(): string | null {
+  const repo = useReposStore.getState().repos[REPO_ID]
+  return repo ? (readRepoBranchQueryProjection(repo)?.currentBranch ?? null) : null
 }
 
 function createWorktreeAction(): Extract<RepoBranchAction, { kind: 'createWorktree' }> {
@@ -421,7 +432,7 @@ describe('runBranchAction', () => {
       phase: 'idle',
       target: null,
     })
-    expect(repo?.data.currentBranch).toBe('feature/reopened')
+    expect(repoCurrentBranch()).toBe('feature/reopened')
   })
 
   test('times out queued branch actions that wait too long for core refreshes', async () => {
@@ -782,8 +793,8 @@ describe('runBranchAction', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceId).toBe('repo-instance-test-2')
-    expect(repo?.data.currentBranch).toBe('feature/new-instance')
-    expect(repo?.data.branches.map((branch) => branch.name)).toEqual(['feature/new-instance'])
+    expect(repoCurrentBranch()).toBe('feature/new-instance')
+    expect(repoBranchNames()).toEqual(['feature/new-instance'])
   })
 
   test('keeps selection after non-create branch actions refresh', async () => {
