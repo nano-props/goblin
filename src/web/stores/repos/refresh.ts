@@ -36,7 +36,7 @@ import type { RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import type { PullRequestFetchMode } from '#/web/types.ts'
 
 function resolvePullRequestRefreshRequest(
-  repo: Pick<RepoState, 'id' | 'instanceId' | 'availability' | 'data' | 'remote'>,
+  repo: Pick<RepoState, 'id' | 'instanceId' | 'availability' | 'remote'>,
   branchesArg?: string[],
   options?: {
     mode?: PullRequestFetchMode

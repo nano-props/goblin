@@ -16,7 +16,6 @@ export function emptyRepo(id: string, name: string, instanceId: string): RepoSta
     id,
     name,
     instanceId,
-    data: {},
     dataLoads: emptyRepoDataLoadBundle(),
     operations: emptyRepoOperations(),
     ui: {

@@ -67,10 +67,7 @@ export function repoStateWithBranchReadModelForTest(
   if (!readModel) throw new Error(`missing branch read model for test repo: ${repo.id}`)
   return {
     ...repo,
-    data: {
-      ...repo.data,
-      ...readModel,
-    },
+    data: readModel,
   }
 }
 
@@ -771,7 +768,6 @@ export function seedRepoState(options: {
   const repo: RepoState = {
     ...base,
     instanceId: base.instanceId,
-    data: base.data,
     ui: {
       ...base.ui,
       selectedBranch,

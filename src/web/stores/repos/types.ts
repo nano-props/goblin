@@ -48,9 +48,6 @@ export interface OpenRepoPostOpenError {
 export type OpenRepoResult =
   { ok: true; id: string; postOpenEffects?: Promise<OpenRepoPostOpenError[]> } | { ok: false; message: string }
 
-declare const repoDataStateBrand: unique symbol
-export type RepoDataState = { readonly [repoDataStateBrand]?: never }
-
 export interface RepoWorktreeState {
   path: string
   branch?: string
@@ -118,8 +115,6 @@ export interface RepoState {
   name: string
   /** Bumped on every fresh open so async writers can detect close-and-reopen. */
   instanceId: string
-  /** Client-local projection of runtime-coherent repo truth. */
-  data: RepoDataState
   dataLoads: RepoDataLoadBundle
   operations: RepoOperationsState
   ui: RepoUiState

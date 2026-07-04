@@ -166,7 +166,6 @@ describe('restoreRepoProjectionFromCacheEntry', () => {
     expect(repo.name).toBe('cached-name')
     expect(repo.ui.selectedBranch).toBe('feature/a')
     expect(repo.projection).toEqual({ source: 'cache', savedAt: now })
-    expect(repo.data).toEqual({})
   })
 
   test('seeds cached branch references into the query read model', () => {

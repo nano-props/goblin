@@ -1385,7 +1385,6 @@ describe('TerminalSessionProvider', () => {
 	      ...firstRepo,
 	      id: SECOND_REPO_ID,
 	      instanceId: 'repo-instance-second',
-	      data: {},
 	      ui: {
 	        ...firstRepo.ui,
 	        selectedBranch: 'feature/other',
@@ -1430,7 +1429,6 @@ describe('TerminalSessionProvider', () => {
 	      ...firstRepo,
 	      id: SECOND_REPO_ID,
 	      instanceId: 'repo-instance-second',
-	      data: {},
 	      ui: {
 	        ...firstRepo.ui,
 	        selectedBranch: 'feature/other',

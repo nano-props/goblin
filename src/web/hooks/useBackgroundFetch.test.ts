@@ -53,7 +53,6 @@ function createRepo(input: {
     id: input.id,
     name: 'repo',
     instanceId: 'repo-instance-test',
-    data: {},
     dataLoads: {
       fetch: { phase: 'idle', loadedAt: null, stale: false, error: null },
       snapshot: { phase: 'idle', loadedAt: null, stale: false, error: null },
