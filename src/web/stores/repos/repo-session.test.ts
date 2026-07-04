@@ -5,6 +5,7 @@ import type { BranchSnapshotInfo } from '#/web/types.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
 import { createRepoBranch, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { getRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import { removeRepoRuntimeInstanceFromCache, repoRuntimeInstancesQueryKey } from '#/web/repo-runtime-query.ts'
 import type { RepoRuntimeInstancesSnapshot } from '#/shared/api-types.ts'
 import {
@@ -160,13 +161,17 @@ describe('repo lifecycle', () => {
 
     expect(secondToken).not.toBe(firstToken)
     await vi.waitFor(() => {
-      expect(useReposStore.getState().repos[REPO_A]?.data.currentBranch).toBe('fresh')
+      const repo = useReposStore.getState().repos[REPO_A]
+      expect(repo ? getRepoSnapshotQueryData(repo.id, repo.instanceId)?.current : null).toBe('fresh')
     })
 
     snapshotResolvers[0]?.({ branches: [branchSnapshot('stale')], current: 'stale' })
     await flushIpc()
 
-    expect(useReposStore.getState().repos[REPO_A]?.data.currentBranch).toBe('fresh')
+    {
+      const repo = useReposStore.getState().repos[REPO_A]
+      expect(repo ? getRepoSnapshotQueryData(repo.id, repo.instanceId)?.current : null).toBe('fresh')
+    }
   })
 
   test('closeRepo removes the closed server runtime membership from the query cache', async () => {
@@ -256,7 +261,10 @@ describe('repo lifecycle', () => {
     expect(result).toMatchObject({ ok: true, id: target!.id })
     expect(useReposStore.getState().repos[target!.id]?.name).toBe('example:repo')
     await vi.waitFor(() => {
-      expect(useReposStore.getState().repos[target!.id]?.data.branches.map((branch) => branch.name)).toEqual([])
+      const repo = useReposStore.getState().repos[target!.id]
+      expect(repo ? getRepoSnapshotQueryData(repo.id, repo.instanceId)?.branches.map((branch) => branch.name) : null).toEqual(
+        [],
+      )
     })
   })
 

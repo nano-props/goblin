@@ -35,6 +35,16 @@ function updateRepoForTest(mutator: (repo: TestRepo) => void) {
   })
 }
 
+function repoBranchNames(): string[] {
+  const repo = useReposStore.getState().repos[REPO_ID]
+  return repo ? (readRepoBranchQueryProjection(repo)?.branches.map((branch) => branch.name) ?? []) : []
+}
+
+function repoCurrentBranch(): string | null {
+  const repo = useReposStore.getState().repos[REPO_ID]
+  return repo ? (readRepoBranchQueryProjection(repo)?.currentBranch ?? null) : null
+}
+
 function createWorktreeAction(): TestCreateWorktreeAction {
   return {
     kind: 'createWorktree',
@@ -294,7 +304,7 @@ describe('remote fetch timestamps', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.operations.branchAction.phase).toBe('idle')
-    expect(repo?.data.branches.map((b) => b.name)).toEqual(['main'])
+    expect(repoBranchNames()).toEqual(['main'])
     expect(snapshotCount).toBe(1)
   })
 
@@ -322,7 +332,7 @@ describe('remote fetch timestamps', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(result).toEqual({ ok: true, message: 'ok' })
     expect(repo?.operations.branchAction.phase).toBe('idle')
-    expect(repo?.data.branches.map((b) => b.name)).toEqual(['main', 'feature/a'])
+    expect(repoBranchNames()).toEqual(['main', 'feature/a'])
     expect(snapshotCount).toBe(1)
   })
 
@@ -370,7 +380,7 @@ describe('remote fetch timestamps', () => {
       repoChanged: true,
     })
     expect(snapshotCount).toBe(1)
-    expect(useReposStore.getState().repos[REPO_ID]?.data.branches.map((b) => b.name)).toEqual(['main', 'feature/a'])
+    expect(repoBranchNames()).toEqual(['main', 'feature/a'])
   })
 
   test('deferred branch action results skip toast and refresh until caller confirms follow-up', async () => {
@@ -484,8 +494,7 @@ describe('core refresh request ordering', () => {
     await useReposStore.getState().refreshCoreData(REPO_ID, { repoInstanceId })
 
     expect(compositeCalls).toBe(1)
-    const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.data.branches.map((b) => b.name)).toEqual(['main'])
+    expect(repoBranchNames()).toEqual(['main'])
   })
 
   test('refreshCoreData writes the server composite result into repo data query cache', async () => {
@@ -559,7 +568,7 @@ describe('core refresh request ordering', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.availability).toEqual({ phase: 'available' })
-    expect(repo?.data.branches.map((b) => b.name)).toEqual(['main'])
+    expect(repoBranchNames()).toEqual(['main'])
     expect(repo?.dataLoads.snapshot.error).toBeNull()
   })
 
@@ -750,8 +759,9 @@ describe('core refresh request ordering', () => {
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.data.branches[0]?.worktree).not.toHaveProperty('summary')
-    expect(repo ? readRepoBranchQueryProjection(repo)?.worktreesByPath['/tmp/worktree-a'] : undefined).toMatchObject({
+    const projection = repo ? readRepoBranchQueryProjection(repo) : null
+    expect(projection?.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
+    expect(projection?.worktreesByPath['/tmp/worktree-a']).toMatchObject({
       isDirty: true,
       changeCount: 3,
     })
@@ -897,11 +907,11 @@ describe('core refresh request ordering', () => {
 
     resolveSecond({ branches: [branch('fresh')], current: 'fresh' })
     await second
-    expect(useReposStore.getState().repos[REPO_ID]?.data.currentBranch).toBe('fresh')
+    expect(repoCurrentBranch()).toBe('fresh')
 
     resolveFirst({ branches: [branch('stale')], current: 'stale' })
     await first
-    expect(useReposStore.getState().repos[REPO_ID]?.data.currentBranch).toBe('fresh')
+    expect(repoCurrentBranch()).toBe('fresh')
   })
 
   test('snapshot refresh preserves the terminal preference when the selected branch has no worktree', async () => {
@@ -923,9 +933,13 @@ describe('core refresh request ordering', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.selectedBranch).toBe('feature/a')
+    const projection = repo ? readRepoBranchQueryProjection(repo) : null
     expect(
-      repo
-        ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: repo.data.branches }, 'feature/a'))
+      repo && projection
+        ? preferredWorkspacePaneTabForTarget(
+            repo.ui,
+            workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: projection.branches }, 'feature/a'),
+          )
         : null,
     ).toBe('terminal')
   })
@@ -953,9 +967,13 @@ describe('core refresh request ordering', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.selectedBranch).toBe('feature/new')
+    const projection = repo ? readRepoBranchQueryProjection(repo) : null
     expect(
-      repo
-        ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: repo.data.branches }, 'feature/new'))
+      repo && projection
+        ? preferredWorkspacePaneTabForTarget(
+            repo.ui,
+            workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: projection.branches }, 'feature/new'),
+          )
         : null,
     ).toBe('terminal')
   })

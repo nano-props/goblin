@@ -4,6 +4,7 @@ import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs
 import { deriveConnectivity } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { getRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import { repoRuntimeInstancesQueryKey } from '#/web/repo-runtime-query.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import type { RepoRuntimeInstancesSnapshot } from '#/shared/api-types.ts'
@@ -105,7 +106,7 @@ describe('repo session hydration', () => {
 
     await vi.waitFor(() => {
       const freshRepo = useReposStore.getState().repos[REPO_A]
-      expect(freshRepo?.data.currentBranch).toBe('fresh')
+      expect(freshRepo ? getRepoSnapshotQueryData(freshRepo.id, freshRepo.instanceId)?.current : null).toBe('fresh')
       expect(freshRepo?.projection.source).toBe('fresh')
       expect(freshRepo?.dataLoads.snapshot.phase).toBe('idle')
       expect(freshRepo?.projection.savedAt).toBeNull()
