@@ -4,7 +4,7 @@ import { createRef } from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchListRow } from '#/web/components/branch-navigator/BranchListRow.tsx'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
-import { createRepoBranch, repoStateWithBranchReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, repoShellWithBranchReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
 // Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
@@ -73,7 +73,7 @@ describe('BranchListRow', () => {
 })
 
 function baseProps(
-  repo: ReturnType<typeof repoStateWithBranchReadModelForTest>,
+  repo: ReturnType<typeof repoShellWithBranchReadModelForTest>,
   branchName: string,
 ): Omit<React.ComponentProps<typeof BranchListRow>, 'terminalBellCount' | 'branchActionBusy'> {
   return {
@@ -88,7 +88,7 @@ function baseProps(
 }
 
 function branchListRowRepo() {
-  return repoStateWithBranchReadModelForTest(emptyRepo('/tmp/repo', 'repo', 'repo-instance-test'), {
+  return repoShellWithBranchReadModelForTest(emptyRepo('/tmp/repo', 'repo', 'repo-instance-test'), {
     branches: [],
     currentBranch: '',
     status: [],

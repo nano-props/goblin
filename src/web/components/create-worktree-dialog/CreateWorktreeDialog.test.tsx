@@ -11,8 +11,8 @@ import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { getRepoRemoteBranches } from '#/web/repo-client.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
-import { createRepoBranch, repoStateWithBranchReadModelForTest } from '#/web/test-utils/bridge.ts'
-import type { RepoStateWithBranchReadModel } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, repoShellWithBranchReadModelForTest } from '#/web/test-utils/bridge.ts'
+import type { RepoShellWithBranchReadModel } from '#/web/test-utils/bridge.ts'
 
 vi.mock('#/web/repo-client.ts', async () => {
   const actual = await vi.importActual<typeof import('#/web/repo-client.ts')>('#/web/repo-client.ts')
@@ -217,7 +217,7 @@ describe('CreateWorktreeDialog', () => {
   })
 })
 
-function createRepo(): RepoStateWithBranchReadModel {
+function createRepo(): RepoShellWithBranchReadModel {
   const repo = emptyRepo('/tmp/goblin-repo', 'goblin-repo', 'repo-instance-test')
   const branches = [
     {
@@ -248,7 +248,7 @@ function createRepo(): RepoStateWithBranchReadModel {
     branches,
   })
   setRepoStatusQueryData(repo.id, repo.instanceId, [])
-  return repoStateWithBranchReadModelForTest(repo, {
+  return repoShellWithBranchReadModelForTest(repo, {
     currentBranch: 'main',
     branches,
     status: [],
@@ -256,7 +256,7 @@ function createRepo(): RepoStateWithBranchReadModel {
   })
 }
 
-function createRemoteRepo(): RepoStateWithBranchReadModel {
+function createRemoteRepo(): RepoShellWithBranchReadModel {
   const target = normalizeRemoteTarget({
     alias: 'prod',
     host: 'example.com',

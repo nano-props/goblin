@@ -11,7 +11,7 @@ import {
   createBranchSnapshot,
   createRepoBranch,
   installGoblinTestBridge,
-  repoStateWithBranchReadModelForTest,
+  repoShellWithBranchReadModelForTest,
   resetReposStore,
   seedRepoState,
 } from '#/web/test-utils/bridge.ts'
@@ -150,7 +150,7 @@ describe('branch action capabilities', () => {
         hasGitHubRemote: true,
       },
     })
-    let repo = repoStateWithBranchReadModelForTest(useReposStore.getState().repos[REPO_ID]!)
+    let repo = repoShellWithBranchReadModelForTest(useReposStore.getState().repos[REPO_ID]!)
 
     expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
       canPush: true,
@@ -166,7 +166,7 @@ describe('branch action capabilities', () => {
       repo.remote.remoteProviders = {}
       repo.remote.hasGitHubRemote = false
     })
-    repo = repoStateWithBranchReadModelForTest(useReposStore.getState().repos[REPO_ID]!)
+    repo = repoShellWithBranchReadModelForTest(useReposStore.getState().repos[REPO_ID]!)
 
     expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
       canPush: false,
@@ -185,7 +185,7 @@ describe('branch action capabilities', () => {
     })
 
     expect(branch.worktree).toEqual({ path: REPO_ID })
-    expect(getBranchActionCapabilities(repoStateWithBranchReadModelForTest(repo), branch)).toMatchObject({
+    expect(getBranchActionCapabilities(repoShellWithBranchReadModelForTest(repo), branch)).toMatchObject({
       canRemoveWorktree: false,
     })
   })
@@ -206,7 +206,7 @@ describe('branch action capabilities', () => {
       },
     })
 
-    expect(getBranchActionCapabilities(repoStateWithBranchReadModelForTest(repo), branch)).toMatchObject({
+    expect(getBranchActionCapabilities(repoShellWithBranchReadModelForTest(repo), branch)).toMatchObject({
       canRemoveWorktree: true,
       isRegularBranch: false,
     })
@@ -236,7 +236,7 @@ describe('branch action capabilities', () => {
       },
     })
 
-    const repo = repoStateWithBranchReadModelForTest(useReposStore.getState().repos[target!.id]!)
+    const repo = repoShellWithBranchReadModelForTest(useReposStore.getState().repos[target!.id]!)
     expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
       canOpenTerminal: true,
       canOpenEditor: true,
