@@ -63,7 +63,7 @@ export function Layout() {
         cycleActive,
         selectBranch,
         setWorkspacePaneTab,
-        onOpenSettings: (page) => void navigate({ to: `/settings/${page}` }),
+        onOpenSettings: (page) => void navigate({ to: '/settings/$page', params: { page } }),
       }),
     [activeId, closeRepo, cycleActive, navigate, order, selectBranch, setWorkspacePaneTab],
   )

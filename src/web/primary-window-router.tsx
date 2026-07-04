@@ -59,7 +59,7 @@ function AppRoute() {
     <App
       routeSettingsPage={null}
       onRouteSettingsPageChange={(nextPage) => {
-        if (nextPage) void navigate({ to: `/settings/${nextPage}` })
+        if (nextPage) void navigate({ to: '/settings/$page', params: { page: nextPage } })
       }}
     />
   )
@@ -72,7 +72,9 @@ function SettingsRoute() {
     <App
       routeSettingsPage={page as SettingsPage}
       onRouteSettingsPageChange={(nextPage) => {
-        void navigate({ to: nextPage ? `/settings/${nextPage}` : '/app' })
+        void (nextPage
+          ? navigate({ to: '/settings/$page', params: { page: nextPage } })
+          : navigate({ to: '/app' }))
       }}
     />
   )
