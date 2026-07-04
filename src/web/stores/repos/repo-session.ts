@@ -104,9 +104,12 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
             )
             let nextRepos = repos
             let changedRepos = changed
-            const restoredRepos = restoreSessionWorkspacePaneStateInRepos(nextRepos, workspacePaneRestoreState)
-            if (restoredRepos !== nextRepos) {
-              nextRepos = restoredRepos
+            const restoreResult = restoreSessionWorkspacePaneStateInRepos(nextRepos, workspacePaneRestoreState)
+            if (restoreResult.status === 'failed') {
+              throw new Error('workspace pane preferred tab restore failed')
+            }
+            if (restoreResult.repos !== nextRepos) {
+              nextRepos = restoreResult.repos
               changedRepos = true
             }
             const nextActiveId = activeRepoIdAfterWorkspaceHydration(

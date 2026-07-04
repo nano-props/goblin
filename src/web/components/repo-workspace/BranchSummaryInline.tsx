@@ -20,7 +20,7 @@ import { TerminalBellBadge } from '#/web/components/terminal/TerminalBellBadge.t
 import { TerminalOutputActivityIndicator } from '#/web/components/terminal/TerminalOutputActivityIndicator.tsx'
 
 export type BranchSummaryInlineRepo = BranchWorktreeRepo & {
-  data: BranchWorktreeRepo['data']
+  branchModel: BranchWorktreeRepo['branchModel']
 }
 
 interface BranchSummaryInlineProps {

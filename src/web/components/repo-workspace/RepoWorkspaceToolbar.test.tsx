@@ -132,7 +132,7 @@ function RepoWorkspaceToolbarHarness(props: RepoWorkspaceToolbarHarnessProps) {
 function repoWorkspaceRepo(repo: RepoState): RepoWorkspaceRepo {
   const branchModel = readRepoBranchQueryProjection(repo)
   if (!branchModel) throw new Error('missing branch read model')
-  return { ...repo, data: { ...branchModel, statusReady: true } }
+  return { ...repo, branchModel: { ...branchModel, statusReady: true } }
 }
 
 beforeEach(() => {

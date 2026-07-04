@@ -13,11 +13,11 @@ import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo
 // data query; the store contributes only identity, UI, operation, and
 // remote shell fields for the list.
 export type BranchListRepo = BranchActionRepo & {
-  data: Pick<RepoBranchReadModelData, 'branches' | 'currentBranch' | 'status' | 'worktreesByPath'>
+  branchModel: Pick<RepoBranchReadModelData, 'branches' | 'currentBranch' | 'status' | 'worktreesByPath'>
   ui: Pick<RepoUiState, 'selectedBranch' | 'branchViewMode'>
 }
 
-type BranchListRepoShell = Omit<BranchListRepo, 'data'>
+type BranchListRepoShell = Omit<BranchListRepo, 'branchModel'>
 
 const branchListRepoShellEqualFields: Array<keyof BranchListRepoShell> = [
   'id',
@@ -88,6 +88,6 @@ export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
   if (!repoShell || !branchReadModel) return undefined
   return {
     ...repoShell,
-    data: branchReadModel,
+    branchModel: branchReadModel,
   }
 }

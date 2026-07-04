@@ -15,7 +15,7 @@ import {
 import { renderRepoWorkspacePanePanel } from '#/web/components/repo-workspace/panels.tsx'
 
 interface Props {
-  repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'data' | 'ui'>
+  repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'branchModel' | 'ui'>
   detail: SelectedRepoWorkspacePresentation
   workspacePaneId: string
   workspacePaneTabModel: RepoWorkspaceTabModel
@@ -41,7 +41,7 @@ export function RepoWorkspaceContent({ repo, detail, workspacePaneId, workspaceP
     terminalSyncReady: workspacePaneTabModel.terminalSyncReady,
     terminalCreatePending: workspacePaneTabModel.terminalCreatePending,
   })
-  const noBranchTitleKey = repo.data.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty'
+  const noBranchTitleKey = repo.branchModel.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty'
   if (!branch) return <EmptyState title={t(noBranchTitleKey)} />
 
   if (!selection) {

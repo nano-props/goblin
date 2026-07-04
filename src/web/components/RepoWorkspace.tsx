@@ -24,7 +24,7 @@ interface Props {
 }
 
 // Keep this equality in sync with fields read by RepoWorkspace children.
-type RepoWorkspaceRepoShell = Omit<RepoWorkspaceRepo, 'data'>
+type RepoWorkspaceRepoShell = Omit<RepoWorkspaceRepo, 'branchModel'>
 
 function repoWorkspaceRepoShellEqual(
   a: RepoWorkspaceRepoShell | undefined,
@@ -130,16 +130,16 @@ function RepoWorkspaceLoaded({
   if (!branchReadModel || !statusReadModel.data) {
     return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
   }
-  let presentationData: RepoWorkspaceRepo['data'] = {
+  let presentationBranchModel: RepoWorkspaceRepo['branchModel'] = {
     ...branchReadModel,
     status: statusReadModel.data,
     statusReady: statusReadModel.isSuccess,
   }
   if (selectedBranchName && Array.isArray(pullRequestsReadModel.data)) {
     const pullRequest = pullRequestsReadModel.data.find((entry) => entry.branch === selectedBranchName)?.pullRequest
-    presentationData = {
-      ...presentationData,
-      branches: presentationData.branches.map((branch) => {
+    presentationBranchModel = {
+      ...presentationBranchModel,
+      branches: presentationBranchModel.branches.map((branch) => {
         if (branch.name !== selectedBranchName) return branch
         if (pullRequest) return { ...branch, pullRequest }
         const { pullRequest: _pullRequest, ...branchWithoutPullRequest } = branch
@@ -147,7 +147,7 @@ function RepoWorkspaceLoaded({
       }),
     }
   }
-  const presentationRepo: RepoWorkspaceRepo = { ...repoShell, data: presentationData }
+  const presentationRepo: RepoWorkspaceRepo = { ...repoShell, branchModel: presentationBranchModel }
   const detail = getSelectedRepoWorkspacePresentation(presentationRepo)
 
   return (

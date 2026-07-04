@@ -160,7 +160,7 @@ function repo(): BranchActionRepo {
   return {
     id: '/tmp/gbl-action-items',
     instanceId: 'repo-instance-test',
-    data: {
+    branchModel: {
       currentBranch: 'main',
       status: [],
       worktreesByPath: {},

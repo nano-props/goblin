@@ -50,7 +50,7 @@ export type Translate = (key: string, params?: Record<string, string | number>) 
 
 interface CreateWorktreeFormRepo {
   id: string
-  data: Pick<RepoBranchReadModelData, 'branches' | 'currentBranch'>
+  branchModel: Pick<RepoBranchReadModelData, 'branches' | 'currentBranch'>
 }
 
 export function deriveCreateWorktreeForm(
@@ -59,9 +59,9 @@ export function deriveCreateWorktreeForm(
   remoteTarget: RemoteRepoTarget | null,
   t: Translate,
 ): CreateWorktreeDerived {
-  const localBranchNames = repo.data.branches.map((b) => b.name)
+  const localBranchNames = repo.branchModel.branches.map((b) => b.name)
   const hasLocalBranch = (name: string) => localBranchNames.includes(name)
-  const branchWorktree = (name: string) => repo.data.branches.find((b) => b.name === name)?.worktree
+  const branchWorktree = (name: string) => repo.branchModel.branches.find((b) => b.name === name)?.worktree
 
   const branchTrimmed = state.branch.trim()
   const selectedRemoteRef = state.remoteRef || state.remoteBranches[0] || ''

@@ -11,10 +11,10 @@ import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import {
   createPullRequest,
   createRepoBranch,
-  repoShellWithBranchReadModelForTest,
+  repoPresentationFromQueryForTest,
   resetReposStore,
   seedRepoState,
-  type RepoShellWithBranchReadModel,
+  type RepoPresentationForTest,
 } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import type { ExecResult } from '#/web/types.ts'
@@ -86,7 +86,7 @@ describe('useBranchActions', () => {
     mocks.openRemoteRepositoryTerminal.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(<BranchActionsHarness repo={repoShellWithBranchReadModelForTest(repo)} onReady={(value) => (actions = value)} />)
+    renderInJsdom(<BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />)
 
     await act(async () => {
       await actions?.openTerminal?.('ghostty')
@@ -110,7 +110,7 @@ describe('useBranchActions', () => {
     })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(<BranchActionsHarness repo={repoShellWithBranchReadModelForTest(repo)} onReady={(value) => (actions = value)} />)
+    renderInJsdom(<BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />)
 
     let result = false
     await act(async () => {
@@ -148,7 +148,7 @@ describe('useBranchActions', () => {
     mocks.openRemoteRepositoryEditor.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(<BranchActionsHarness repo={repoShellWithBranchReadModelForTest(repo)} onReady={(value) => (actions = value)} />)
+    renderInJsdom(<BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />)
 
     await act(async () => {
       await actions?.openEditor?.('vscode')
@@ -185,7 +185,7 @@ describe('useBranchActions', () => {
     mocks.openRemoteRepositoryEditor.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(<BranchActionsHarness repo={repoShellWithBranchReadModelForTest(repo)} onReady={(value) => (actions = value)} />)
+    renderInJsdom(<BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />)
 
     await act(async () => {
       await actions?.openTerminal?.('ghostty')
@@ -209,7 +209,7 @@ describe('useBranchActions', () => {
     mocks.openRepoTerminal.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(<BranchActionsHarness repo={repoShellWithBranchReadModelForTest(repo)} onReady={(value) => (actions = value)} />)
+    renderInJsdom(<BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />)
 
     await act(async () => {
       await actions?.openTerminal?.('ghostty')
@@ -228,7 +228,7 @@ describe('useBranchActions', () => {
     mocks.openRepoEditor.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(<BranchActionsHarness repo={repoShellWithBranchReadModelForTest(repo)} onReady={(value) => (actions = value)} />)
+    renderInJsdom(<BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />)
 
     await act(async () => {
       await actions?.openEditor?.('vscode')
@@ -247,7 +247,7 @@ describe('useBranchActions', () => {
     mocks.openRepoInFinder.mockResolvedValue({ ok: true, message: '/tmp/local-feature' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(<BranchActionsHarness repo={repoShellWithBranchReadModelForTest(repo)} onReady={(value) => (actions = value)} />)
+    renderInJsdom(<BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />)
 
     await act(async () => {
       await actions?.openFinder?.()
@@ -269,7 +269,7 @@ describe('useBranchActions', () => {
     const surfaceRef: { current: ReturnType<typeof useBranchActions> | null } = { current: null }
     const view = renderInJsdom(
       <BranchActionsSurfaceHarness
-        repo={repoShellWithBranchReadModelForTest(repo)}
+        repo={repoPresentationFromQueryForTest(repo)}
         branchIndex={0}
         onReady={(value) => {
           surfaceRef.current = value
@@ -290,7 +290,7 @@ describe('useBranchActions', () => {
     act(() => {
       view.rerender(
         <BranchActionsSurfaceHarness
-          repo={repoShellWithBranchReadModelForTest(repo)}
+          repo={repoPresentationFromQueryForTest(repo)}
           branchIndex={1}
           onReady={(value) => {
             surfaceRef.current = value
@@ -313,7 +313,7 @@ function BranchActionsHarness({
   repo,
   onReady,
 }: {
-  repo: RepoShellWithBranchReadModel
+  repo: RepoPresentationForTest
   onReady: (actions: ReturnType<typeof useBranchActions>['actions']) => void
 }) {
   return (
@@ -327,10 +327,10 @@ function BranchActionsHarnessInner({
   repo,
   onReady,
 }: {
-  repo: RepoShellWithBranchReadModel
+  repo: RepoPresentationForTest
   onReady: (actions: ReturnType<typeof useBranchActions>['actions']) => void
 }) {
-  const branch = repo.data.branches[0]!
+  const branch = repo.branchModel.branches[0]!
   const { actions } = useBranchActions(repo, branch)
   React.useEffect(() => {
     onReady(actions)
@@ -343,7 +343,7 @@ function BranchActionsSurfaceHarness({
   branchIndex,
   onReady,
 }: {
-  repo: RepoShellWithBranchReadModel
+  repo: RepoPresentationForTest
   branchIndex: number
   onReady: (surface: ReturnType<typeof useBranchActions>) => void
 }) {
@@ -359,11 +359,11 @@ function BranchActionsSurfaceHarnessInner({
   branchIndex,
   onReady,
 }: {
-  repo: RepoShellWithBranchReadModel
+  repo: RepoPresentationForTest
   branchIndex: number
   onReady: (surface: ReturnType<typeof useBranchActions>) => void
 }) {
-  const branch = repo.data.branches[branchIndex]!
+  const branch = repo.branchModel.branches[branchIndex]!
   const surface = useBranchActions(repo, branch)
   React.useEffect(() => {
     onReady(surface)

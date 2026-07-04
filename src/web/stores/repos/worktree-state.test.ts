@@ -227,7 +227,7 @@ function branchWorktreeRepo(
   } = {},
 ): BranchWorktreeRepo {
   return {
-    data: {
+    branchModel: {
       status: options.status ?? [],
       worktreesByPath: options.worktreesByPath ?? {},
     },

@@ -145,7 +145,7 @@ function removeWorktreePreflightFailure(
   repo: BranchActionRepo,
   target: RemoveWorktreeDialogPayload,
 ): ExecResult | null {
-  const worktree = repo.data.worktreesByPath[target.path]
+  const worktree = repo.branchModel.worktreesByPath[target.path]
   if (!worktree) return null
   if (worktree.isMain) return { ok: false, message: 'error.cannot-remove-main-worktree' }
   if (worktree.isLocked === true) return { ok: false, message: 'error.cannot-remove-locked-worktree' }
@@ -192,8 +192,8 @@ function repoForBranchActionDispatch(repo: BranchActionRepo): BranchActionRepo |
   if (!readModel) return null
   return {
     ...repo,
-    data: {
-      ...repo.data,
+    branchModel: {
+      ...repo.branchModel,
       currentBranch: readModel.currentBranch,
       worktreesByPath: readModel.worktreesByPath,
     },

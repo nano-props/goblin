@@ -109,8 +109,9 @@ function restoreWorkspacePaneState(restoreState: Partial<SessionWorkspacePaneRes
     preferredWorkspacePaneTabByTargetByRepo: restoreState.preferredWorkspacePaneTabByTargetByRepo ?? {},
   }
   useReposStore.setState((s) => {
-    const repos = restoreSessionWorkspacePaneStateInRepos(s.repos, normalizedRestoreState)
-    return repos === s.repos ? s : { repos }
+    const result = restoreSessionWorkspacePaneStateInRepos(s.repos, normalizedRestoreState)
+    if (result.status === 'failed') throw new Error('workspace pane preferred tab restore failed')
+    return result.repos === s.repos ? s : { repos: result.repos }
   })
 }
 
@@ -438,27 +439,41 @@ describe('setWorkspacePaneTab', () => {
     expect(openTabsFor('main')).toEqual(['status', 'files'])
   })
 
-  test('does not restore files as preferred when the files tab is closed', () => {
+  test('fails to restore files as preferred when the files tab projection is missing', () => {
     seedRepo({ selectedBranch: 'main', preferredWorkspacePaneTab: 'status', workspacePaneStaticTabs: ['status'] })
 
-    restoreWorkspacePaneState({
-      preferredWorkspacePaneTabByTargetByRepo: { [REPO_ID]: { [worktreeTargetKey('main', '/repo')]: 'files' } },
-    })
+    expect(() =>
+      restoreWorkspacePaneState({
+        preferredWorkspacePaneTabByTargetByRepo: { [REPO_ID]: { [worktreeTargetKey('main', '/repo')]: 'files' } },
+      }),
+    ).toThrow('workspace pane preferred tab restore failed')
 
     expect(preferredTabFor('main')).toBe('status')
     expect(openTabsFor('main')).toEqual(['status'])
+  })
+
+  test('fails to restore a session-preferred tab when the branch read model is unavailable', () => {
+    seedRepoShellWithoutBranchReadModel()
+
+    expect(() =>
+      restoreWorkspacePaneState({
+        preferredWorkspacePaneTabByTargetByRepo: { [REPO_ID]: { [worktreeTargetKey('main', '/repo')]: 'files' } },
+      }),
+    ).toThrow('workspace pane preferred tab restore failed')
   })
 
   test('files is a worktree-scoped static tab and lives in the worktree-only bucket', () => {
     expect(WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES).toContain('files')
   })
 
-  test('does not restore a target-level preferred tab whose tab is closed', () => {
+  test('fails to restore a target-level preferred tab whose tab projection is missing', () => {
     seedRepo({ selectedBranch: 'main', preferredWorkspacePaneTab: 'status', workspacePaneStaticTabs: ['status'] })
 
-    restoreWorkspacePaneState({
-      preferredWorkspacePaneTabByTargetByRepo: { [REPO_ID]: { [worktreeTargetKey('main', '/repo')]: 'history' } },
-    })
+    expect(() =>
+      restoreWorkspacePaneState({
+        preferredWorkspacePaneTabByTargetByRepo: { [REPO_ID]: { [worktreeTargetKey('main', '/repo')]: 'history' } },
+      }),
+    ).toThrow('workspace pane preferred tab restore failed')
 
     expect(preferredTabFor('main')).toBe('status')
     expect(openTabsFor('main')).toEqual(['status'])

@@ -56,7 +56,7 @@ export interface BranchActions {
 }
 
 export function getBranchActionCapabilities(repo: BranchActionRepo, branch: RepoBranchState): BranchActionCapabilities {
-  const isCurrent = branch.name === repo.data.currentBranch
+  const isCurrent = branch.name === repo.branchModel.currentBranch
   const isProtected = PROTECTED_BRANCHES.has(branch.name)
   const isRegularBranch = !isCurrent && !branch.worktree?.path && !isProtected
   const worktreeState = getBranchWorktreeState(repo, branch)

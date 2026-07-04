@@ -31,7 +31,7 @@ export function BranchView({ repoId, onAfterSelect, onAfterOpenStatus }: Props) 
     () =>
       repo
         ? visibleBranches({
-            branches: repo.data.branches,
+            branches: repo.branchModel.branches,
             viewMode: repo.ui.branchViewMode,
           })
         : [],
@@ -44,7 +44,7 @@ export function BranchView({ repoId, onAfterSelect, onAfterOpenStatus }: Props) 
   }
 
   const handleOpenBranchStatus = (branchName: string) => {
-    const branch = repo?.data.branches.find((candidate) => candidate.name === branchName)
+    const branch = repo?.branchModel.branches.find((candidate) => candidate.name === branchName)
     void openWorkspacePaneTab({
       repoId,
       branchName,
@@ -57,7 +57,7 @@ export function BranchView({ repoId, onAfterSelect, onAfterOpenStatus }: Props) 
   }
 
   const emptyLabel = repo
-    ? repo.data.branches.length === 0
+    ? repo.branchModel.branches.length === 0
       ? 'branches.empty'
       : 'branches.filter-empty'
     : 'branches.empty'

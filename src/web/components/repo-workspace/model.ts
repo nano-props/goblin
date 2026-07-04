@@ -31,7 +31,7 @@ export type SelectedRepoWorkspace = ReturnType<typeof getSelectedRepoWorkspace>
 export type SelectedRepoWorkspacePresentation = ReturnType<typeof getSelectedRepoWorkspacePresentation>
 
 export interface RepoWorkspaceRepo extends BranchActionRepo {
-  data: RepoBranchReadModelData & {
+  branchModel: RepoBranchReadModelData & {
     statusReady: boolean
   }
   ui: Pick<RepoState['ui'], 'selectedBranch' | 'preferredWorkspacePaneTabByTarget'>
@@ -40,7 +40,7 @@ export interface RepoWorkspaceRepo extends BranchActionRepo {
 }
 
 export function getSelectedRepoWorkspace(repo: RepoWorkspaceRepo) {
-  const branch = repo.data.branches.find((b) => b.name === repo.ui.selectedBranch) ?? null
+  const branch = repo.branchModel.branches.find((b) => b.name === repo.ui.selectedBranch) ?? null
   const selectedStatus = selectedBranchStatus(repo, branch)
   const worktreeState = branch ? getBranchWorktreeState(repo, branch) : null
   const statusCount = worktreeState?.changeCount ?? selectedStatus.reduce((n, wt) => n + wt.entries.length, 0)

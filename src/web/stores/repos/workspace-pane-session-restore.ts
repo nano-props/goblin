@@ -10,13 +10,24 @@ import type { RepoState, SessionWorkspacePaneRestoreState } from '#/web/stores/r
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 
+export type RestoreSessionWorkspacePaneStateResult =
+  | { status: 'restored'; repos: Record<string, RepoState> }
+  | {
+      status: 'failed'
+      repos: Record<string, RepoState>
+      missingSnapshots: string[]
+      unresolvedTargets: Array<{ repoId: string; targetKey: string; reason: 'target' | 'tab' }>
+    }
+
 export function restoreSessionWorkspacePaneStateInRepos(
   repos: Record<string, RepoState>,
   restoreState: SessionWorkspacePaneRestoreState | undefined,
-): Record<string, RepoState> {
-  if (!restoreState) return repos
+): RestoreSessionWorkspacePaneStateResult {
+  if (!restoreState) return { status: 'restored', repos }
 
   let nextRepos = repos
+  const missingSnapshots: string[] = []
+  const unresolvedTargets: Array<{ repoId: string; targetKey: string; reason: 'target' | 'tab' }> = []
   const repoIds = new Set(Object.keys(restoreState.preferredWorkspacePaneTabByTargetByRepo))
 
   for (const id of repoIds) {
@@ -26,9 +37,15 @@ export function restoreSessionWorkspacePaneStateInRepos(
     const tabsByTarget = restoreState.workspacePaneTabsByTargetByRepo[id]
     const preferredTabByTarget = restoreState.preferredWorkspacePaneTabByTargetByRepo[id]
 
-    const nextPreferredTabByTarget = preferredTabByTarget
+    const restoredPreferred = preferredTabByTarget
       ? restoredPreferredWorkspacePaneTabs(repo, preferredTabByTarget, tabsByTarget ?? {})
-      : repo.ui.preferredWorkspacePaneTabByTarget
+      : { status: 'restored' as const, preferredWorkspacePaneTabByTarget: repo.ui.preferredWorkspacePaneTabByTarget }
+    if (restoredPreferred.status === 'failed') {
+      if (restoredPreferred.reason === 'snapshot') missingSnapshots.push(id)
+      else unresolvedTargets.push({ repoId: id, targetKey: restoredPreferred.targetKey, reason: restoredPreferred.reason })
+      continue
+    }
+    const nextPreferredTabByTarget = restoredPreferred.preferredWorkspacePaneTabByTarget
 
     if (nextPreferredTabByTarget === repo.ui.preferredWorkspacePaneTabByTarget) continue
     if (nextRepos === repos) nextRepos = { ...repos }
@@ -37,29 +54,36 @@ export function restoreSessionWorkspacePaneStateInRepos(
     })
   }
 
-  return nextRepos
+  if (missingSnapshots.length > 0 || unresolvedTargets.length > 0) {
+    return { status: 'failed', repos: nextRepos, missingSnapshots, unresolvedTargets }
+  }
+  return { status: 'restored', repos: nextRepos }
 }
 
 function restoredPreferredWorkspacePaneTabs(
   repo: RepoState,
   preferredTabByTarget: SessionWorkspacePaneRestoreState['preferredWorkspacePaneTabByTargetByRepo'][string],
   tabsByTarget: Record<string, readonly WorkspacePaneTabEntry[]>,
-): RepoState['ui']['preferredWorkspacePaneTabByTarget'] {
+):
+  | { status: 'restored'; preferredWorkspacePaneTabByTarget: RepoState['ui']['preferredWorkspacePaneTabByTarget'] }
+  | { status: 'failed'; reason: 'snapshot' }
+  | { status: 'failed'; reason: 'target' | 'tab'; targetKey: string } {
   const snapshot = getRepoSnapshotQueryData(repo.id, repo.instanceId)
-  if (!snapshot) return repo.ui.preferredWorkspacePaneTabByTarget
+  if (!snapshot) return { status: 'failed', reason: 'snapshot' }
   let next = repo.ui.preferredWorkspacePaneTabByTarget
   for (const [targetKey, tab] of Object.entries(preferredTabByTarget)) {
     const target = workspacePaneTabsTargetForRepoTargetKey(
       { repoRoot: repo.id, branches: snapshot.branches },
       targetKey,
     )
-    if (!target) continue
-    if (!isWorkspacePaneSessionTabType(tab)) continue
+    if (!target) return { status: 'failed', reason: 'target', targetKey }
+    if (!isWorkspacePaneSessionTabType(tab)) return { status: 'failed', reason: 'tab', targetKey }
     if (
       isWorkspacePaneStaticTabType(tab) &&
+      tab !== 'status' &&
       !workspacePaneStaticTabsFromEntries(tabsByTarget[targetKey] ?? []).includes(tab)
     )
-      continue
+      return { status: 'failed', reason: 'tab', targetKey }
     const current =
       next === repo.ui.preferredWorkspacePaneTabByTarget
         ? preferredWorkspacePaneTabForTarget(repo.ui, target)
@@ -69,5 +93,5 @@ function restoredPreferredWorkspacePaneTabs(
       next === repo.ui.preferredWorkspacePaneTabByTarget ? repo.ui : { preferredWorkspacePaneTabByTarget: next }
     next = preferredWorkspacePaneTabByTargetRecordWith(source, target, tab)
   }
-  return next
+  return { status: 'restored', preferredWorkspacePaneTabByTarget: next }
 }

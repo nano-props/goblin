@@ -11,8 +11,8 @@ import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { getRepoRemoteBranches } from '#/web/repo-client.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
-import { createRepoBranch, repoShellWithBranchReadModelForTest } from '#/web/test-utils/bridge.ts'
-import type { RepoShellWithBranchReadModel } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, repoPresentationForTest } from '#/web/test-utils/bridge.ts'
+import type { RepoPresentationForTest } from '#/web/test-utils/bridge.ts'
 
 vi.mock('#/web/repo-client.ts', async () => {
   const actual = await vi.importActual<typeof import('#/web/repo-client.ts')>('#/web/repo-client.ts')
@@ -217,7 +217,7 @@ describe('CreateWorktreeDialog', () => {
   })
 })
 
-function createRepo(): RepoShellWithBranchReadModel {
+function createRepo(): RepoPresentationForTest {
   const repo = emptyRepo('/tmp/goblin-repo', 'goblin-repo', 'repo-instance-test')
   const branches = [
     {
@@ -248,7 +248,7 @@ function createRepo(): RepoShellWithBranchReadModel {
     branches,
   })
   setRepoStatusQueryData(repo.id, repo.instanceId, [])
-  return repoShellWithBranchReadModelForTest(repo, {
+  return repoPresentationForTest(repo, {
     currentBranch: 'main',
     branches,
     status: [],
@@ -256,7 +256,7 @@ function createRepo(): RepoShellWithBranchReadModel {
   })
 }
 
-function createRemoteRepo(): RepoShellWithBranchReadModel {
+function createRemoteRepo(): RepoPresentationForTest {
   const target = normalizeRemoteTarget({
     alias: 'prod',
     host: 'example.com',
@@ -269,8 +269,8 @@ function createRemoteRepo(): RepoShellWithBranchReadModel {
   repo.id = target.id
   repo.remote.lifecycle = { kind: 'ready', target }
   setRepoSnapshotQueryData(repo.id, repo.instanceId, {
-    current: repo.data.currentBranch,
-    branches: repo.data.branches,
+    current: repo.branchModel.currentBranch,
+    branches: repo.branchModel.branches,
   })
   setRepoStatusQueryData(repo.id, repo.instanceId, [])
   return repo

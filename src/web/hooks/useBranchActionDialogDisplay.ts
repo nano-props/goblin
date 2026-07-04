@@ -77,8 +77,8 @@ import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
 import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 
-type BranchActionDialogRepo = Omit<BranchActionRepo, 'data'> & {
-  data: RepoBranchReadModelData
+type BranchActionDialogRepo = Omit<BranchActionRepo, 'branchModel'> & {
+  branchModel: RepoBranchReadModelData
 }
 
 interface BranchActionDialogContext {
@@ -134,7 +134,7 @@ export function useBranchActionDialogDisplay<P>(
   const retainedLiveContext = useLastNonNull(liveContext)
   // While the dialog is open, `slot === entry` and the two contexts
   // are the same object lookup. Sharing the result saves one
-  // `repo.data.branches.find(...)` per render per slot. After close
+  // `repo.branchModel.branches.find(...)` per render per slot. After close
   // `slot === null` and `entry` is the retained value — we use the
   // retained `liveContext` (which was resolved from `entry` before
   // close) instead of re-resolving against the post-mutation `repos`.
@@ -155,7 +155,7 @@ function resolveContext<P>(
   const repo: BranchActionDialogRepo = {
     id: repoFromStore.id,
     instanceId: repoFromStore.instanceId,
-    data: branchReadModel,
+    branchModel: branchReadModel,
     operations: {
       branchAction: repoFromStore.operations.branchAction,
     },
@@ -168,7 +168,7 @@ function resolveContext<P>(
       remoteProviders: repoFromStore.remote.remoteProviders,
     },
   }
-  const branch = repo.data.branches.find((b) => b.name === entry.branchName)
+  const branch = repo.branchModel.branches.find((b) => b.name === entry.branchName)
   if (!branch) return null
   return { repo, branch }
 }

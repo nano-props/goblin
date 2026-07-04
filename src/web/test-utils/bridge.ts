@@ -57,17 +57,24 @@ import { installWebSocketMock } from '#/web/test-utils/websocket-mock.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
 
 export type IpcTestHandler = (input: any) => unknown
-export type RepoShellWithBranchReadModel = RepoState & { data: RepoBranchReadModelData }
+export type RepoPresentationForTest = RepoState & { branchModel: RepoBranchReadModelData }
 
-export function repoShellWithBranchReadModelForTest(
+export function repoPresentationForTest(
   repo: RepoState,
-  branchReadModel?: RepoBranchReadModelData,
-): RepoShellWithBranchReadModel {
-  const readModel = branchReadModel ?? readRepoBranchQueryProjection(repo)
+  branchReadModel: RepoBranchReadModelData,
+): RepoPresentationForTest {
+  return {
+    ...repo,
+    branchModel: branchReadModel,
+  }
+}
+
+export function repoPresentationFromQueryForTest(repo: RepoState): RepoPresentationForTest {
+  const readModel = readRepoBranchQueryProjection(repo)
   if (!readModel) throw new Error(`missing branch read model for test repo: ${repo.id}`)
   return {
     ...repo,
-    data: readModel,
+    branchModel: readModel,
   }
 }
 
@@ -789,11 +796,11 @@ export function seedRepoState(options: {
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
   })
-  setRepoSnapshotQueryData(options.id, repo.instanceId, {
+  seedRepoReadModelQueryData(repo, {
     branches: branchesWithSnapshotWorktreeMetadata,
-    current: options.currentBranch ?? '',
+    currentBranch: options.currentBranch ?? '',
+    status,
   })
-  setRepoStatusQueryData(options.id, repo.instanceId, status)
   for (const [branchName, tabs] of Object.entries(options.workspacePaneTabsByBranch ?? {})) {
     const branch = branches.find((candidate) => candidate.name === branchName)
     if (!branch) continue
@@ -806,4 +813,19 @@ export function seedRepoState(options: {
     })
   }
   return repo
+}
+
+export function seedRepoReadModelQueryData(
+  repo: Pick<RepoState, 'id' | 'instanceId'>,
+  readModel: {
+    branches: BranchSnapshotInfo[]
+    currentBranch: string
+    status?: WorktreeStatus[]
+  },
+): void {
+  setRepoSnapshotQueryData(repo.id, repo.instanceId, {
+    branches: readModel.branches,
+    current: readModel.currentBranch,
+  })
+  setRepoStatusQueryData(repo.id, repo.instanceId, readModel.status ?? [])
 }

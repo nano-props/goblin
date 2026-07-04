@@ -42,11 +42,12 @@ const MODE_OPTIONS = [
   { id: 'trackRemoteBranch', labelKey: 'action.create-worktree-mode-remote', icon: RadioTower },
 ] satisfies Array<{ id: CreateWorktreeDialogMode; labelKey: string; icon: LucideIcon }>
 
-type CreateWorktreeDialogRepo = Omit<RepoState, 'data'> & { data: RepoBranchReadModelData }
+type CreateWorktreeDialogRepoShell = RepoState
+type CreateWorktreeDialogRepo = RepoState & { branchModel: RepoBranchReadModelData }
 
 interface Props {
   open: boolean
-  repo: CreateWorktreeDialogRepo
+  repo: CreateWorktreeDialogRepoShell
   worktreeBootstrap?: WorktreeBootstrapPromptState
   onClose: () => void
   onCreate: (request: CreateWorktreeRequest) => boolean | void | Promise<boolean | void>
@@ -70,7 +71,7 @@ export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, o
   return (
     <CreateWorktreeDialogContent
       open={open}
-      repo={{ ...repo, data: branchReadModel }}
+      repo={{ ...repo, branchModel: branchReadModel }}
       worktreeBootstrap={worktreeBootstrap}
       onClose={onClose}
       onCreate={onCreate}
@@ -97,7 +98,7 @@ function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, o
   const remoteBranchesLoading = remoteBranchesQuery.isLoading
 
   // Reset on the rising edge of `open` only. A guard ref prevents snapshot
-  // refreshes (which change repo.data.branches / currentBranch) from wiping
+  // refreshes (which change repo.branchModel.branches / currentBranch) from wiping
   // user input while the dialog stays open. The ref starts false so the
   // first render with open=true still triggers the reset.
   const previousOpenRef = useRef(false)
@@ -105,7 +106,7 @@ function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, o
     const wasClosed = !previousOpenRef.current && open
     previousOpenRef.current = open
     if (!wasClosed) return
-    const initialBase = repo.data.currentBranch || repo.data.branches[0]?.name || ''
+    const initialBase = repo.branchModel.currentBranch || repo.branchModel.branches[0]?.name || ''
     setMode('newBranch')
     setBase(initialBase)
     setBranch('')
@@ -114,7 +115,7 @@ function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, o
     setLocalBranch('')
     setWorktreePath('')
     setSubmitting(false)
-  }, [open, repo.data.branches, repo.data.currentBranch])
+  }, [open, repo.branchModel.branches, repo.branchModel.currentBranch])
 
   const remoteTarget = remoteRepoTarget(repo.id, repo.remote.lifecycle)
   const derived = deriveCreateWorktreeForm(
@@ -210,10 +211,10 @@ function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, o
                       <SelectValue placeholder={t('action.create-worktree-base-placeholder')} />
                     </SelectTrigger>
                     <SelectContent>
-                      {repo.data.branches.map((b) => (
+                      {repo.branchModel.branches.map((b) => (
                         <SelectItem key={b.name} value={b.name} textValue={b.name}>
                           <span className="truncate">{b.name}</span>
-                          {b.name === repo.data.currentBranch && (
+                          {b.name === repo.branchModel.currentBranch && (
                             <span className="ml-2 text-xs text-muted-foreground">
                               {t('action.create-worktree-base-current')}
                             </span>
@@ -259,7 +260,7 @@ function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, o
                     <SelectValue placeholder={t('action.create-worktree-existing-placeholder')} />
                   </SelectTrigger>
                   <SelectContent>
-                    {repo.data.branches.map((b) => (
+                    {repo.branchModel.branches.map((b) => (
                       <SelectItem key={b.name} value={b.name} textValue={b.name}>
                         <span className="truncate">{b.name}</span>
                       </SelectItem>

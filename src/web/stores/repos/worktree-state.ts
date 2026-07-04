@@ -11,7 +11,7 @@ interface BranchWorktreeState {
 }
 
 export interface BranchWorktreeRepo {
-  data: Pick<RepoBranchReadModelData, 'worktreesByPath' | 'status'>
+  branchModel: Pick<RepoBranchReadModelData, 'worktreesByPath' | 'status'>
 }
 
 export function worktreeStatesFromBranches(
@@ -96,8 +96,8 @@ export function applyStatusToWorktreeStates(
 
 export function getBranchWorktreeState(repo: BranchWorktreeRepo, branch: RepoBranchState): BranchWorktreeState | null {
   if (!branch.worktree) return null
-  const worktree = repo.data.worktreesByPath[branch.worktree.path]
-  const status = repo.data.status.find((wt) => wt.path === branch.worktree?.path)
+  const worktree = repo.branchModel.worktreesByPath[branch.worktree.path]
+  const status = repo.branchModel.status.find((wt) => wt.path === branch.worktree?.path)
   const statusChangeCount = status?.entries.length
   const dirty = statusChangeCount === undefined ? (worktree?.isDirty ?? false) : statusChangeCount > 0
   const changeCount = statusChangeCount ?? worktree?.changeCount ?? (dirty ? 1 : 0)
@@ -112,7 +112,7 @@ export function getBranchWorktreeState(repo: BranchWorktreeRepo, branch: RepoBra
 }
 
 export function selectedBranchStatus(repo: BranchWorktreeRepo, branch: RepoBranchState | null): WorktreeStatus[] {
-  return branch?.worktree ? repo.data.status.filter((wt) => wt.path === branch.worktree?.path) : []
+  return branch?.worktree ? repo.branchModel.status.filter((wt) => wt.path === branch.worktree?.path) : []
 }
 
 /**
