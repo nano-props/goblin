@@ -57,7 +57,6 @@ describe('BranchView', () => {
       id: REPO_ID,
       branches: [],
       selectedBranch: 'feature/query',
-      statusLoaded: true,
     })
     setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
       current: 'feature/query',
@@ -75,7 +74,6 @@ describe('BranchView', () => {
       id: REPO_ID,
       branches: [branch],
       selectedBranch: 'feature/dirty',
-      statusLoaded: true,
     })
     setRepoStatusQueryData(REPO_ID, repo.instanceId, [
       { path: WORKTREE_PATH, branch: 'feature/dirty', isMain: false, entries: [{ x: 'M', y: ' ', path: 'dirty.ts' }] },
@@ -91,7 +89,6 @@ describe('BranchView', () => {
       id: REPO_ID,
       branches: [],
       selectedBranch: 'feature/query-dirty',
-      statusLoaded: true,
     })
     setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
       current: 'feature/query-dirty',

@@ -747,7 +747,6 @@ export function seedRepoState(options: {
   workspacePaneTabsByBranch?: Record<string, WorkspacePaneTabEntry[]>
   instanceId?: string
   status?: WorktreeStatus[]
-  statusLoaded?: boolean
   worktreesByPath?: Record<string, RepoWorktreeState>
   remote?: Partial<RepoState['remote']>
 }): RepoState {

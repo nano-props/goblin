@@ -101,7 +101,7 @@ describe('RepoWorkspace', () => {
 
     expect(() => {
       act(() => {
-        seedRepoState({ id: REPO_ID, branches: [], statusLoaded: true })
+        seedRepoState({ id: REPO_ID, branches: [] })
       })
     }).not.toThrow()
     expect(screen.getByText('branches.empty')).toBeTruthy()
@@ -115,7 +115,6 @@ describe('RepoWorkspace', () => {
       branches: [branchA, branchB],
       selectedBranch: 'feature/a',
       preferredWorkspacePaneTab: 'status',
-      statusLoaded: true,
       workspacePaneTabsByBranch: {
         'feature/a': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
         'feature/b': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
@@ -145,7 +144,6 @@ describe('RepoWorkspace', () => {
         branches: [branchA, branchB],
         selectedBranch: 'feature/b',
         preferredWorkspacePaneTab: 'status',
-        statusLoaded: true,
         workspacePaneTabsByBranch: {
           'feature/a': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
           'feature/b': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
@@ -168,7 +166,6 @@ describe('RepoWorkspace', () => {
         branches: [branchA, branchB],
         selectedBranch: 'feature/a',
         preferredWorkspacePaneTab: 'status',
-        statusLoaded: true,
         workspacePaneTabsByBranch: {
           'feature/a': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
           'feature/b': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
@@ -188,7 +185,6 @@ describe('RepoWorkspace', () => {
       branches: [branch],
       selectedBranch: 'feature/a',
       preferredWorkspacePaneTab: 'status',
-      statusLoaded: true,
       workspacePaneTabsByBranch: {
         'feature/a': [workspacePaneStaticTabEntry('status')],
       },
@@ -218,7 +214,6 @@ describe('RepoWorkspace', () => {
       branches: [],
       selectedBranch: 'feature/query',
       preferredWorkspacePaneTab: 'status',
-      statusLoaded: true,
       workspacePaneTabsByBranch: {
         'feature/query': [workspacePaneStaticTabEntry('status')],
       },
@@ -251,7 +246,6 @@ describe('RepoWorkspace', () => {
       branches: [branch],
       selectedBranch: 'feature/pr',
       preferredWorkspacePaneTab: 'status',
-      statusLoaded: true,
       workspacePaneTabsByBranch: {
         'feature/pr': [workspacePaneStaticTabEntry('status')],
       },

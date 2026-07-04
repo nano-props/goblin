@@ -136,7 +136,6 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: {
         'feature/changes': [staticEntry('status'), staticEntry('changes')],
       },
-      statusLoaded: true,
       status: [
         {
           path: worktreePath,
@@ -198,7 +197,6 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: {
         'feature/copy-success': [staticEntry('status')],
       },
-      statusLoaded: true,
       status: [
         {
           path: worktreePath,
@@ -262,7 +260,6 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: {
         'feature/clean': [staticEntry('status')],
       },
-      statusLoaded: true,
       status: [{ path: worktreePath, branch: 'feature/clean', isMain: false, entries: [] }],
     })
     const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
@@ -304,7 +301,6 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: {
         'feature/status-links': [staticEntry('status'), staticEntry('changes'), staticEntry('files')],
       },
-      statusLoaded: true,
       status: [
         {
           path: worktreePath,
@@ -428,7 +424,6 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: {
         'feature/hidden': [staticEntry('status')],
       },
-      statusLoaded: true,
       status: [
         {
           path: worktreePath,
@@ -474,7 +469,6 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: {
         'feature/changes-panel': [staticEntry('status'), staticEntry('changes')],
       },
-      statusLoaded: true,
       status: [
         {
           path: worktreePath,

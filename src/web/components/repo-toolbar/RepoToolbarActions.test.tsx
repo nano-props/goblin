@@ -23,7 +23,6 @@ describe('RepoToolbarActions', () => {
       id: REPO_ID,
       branches: [],
       selectedBranch: 'feature/query',
-      statusLoaded: true,
     })
     setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
       current: 'feature/query',
@@ -44,7 +43,6 @@ describe('RepoToolbarActions', () => {
       id: REPO_ID,
       branches: [],
       selectedBranch: '',
-      statusLoaded: true,
     })
 
     renderInJsdom(

@@ -1188,7 +1188,6 @@ function renderToolbar(options: {
             },
           ]
         : [],
-    statusLoaded: true,
     remote: options.remote,
   })
   const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))

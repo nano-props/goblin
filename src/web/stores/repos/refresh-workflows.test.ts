@@ -39,7 +39,6 @@ describe('repo refresh workflows', () => {
               branches: [createBranchSnapshot('feature/a')],
               currentBranch: 'feature/a',
               status: [],
-              statusLoaded: false,
               worktreesByPath: {},
             },
             ui: {
@@ -111,7 +110,6 @@ describe('repo refresh workflows', () => {
               branches: [createBranchSnapshot('feature/a')],
               currentBranch: 'feature/a',
               status: [],
-              statusLoaded: false,
               worktreesByPath: {},
             },
             ui: {
@@ -174,7 +172,6 @@ describe('repo refresh workflows', () => {
               branches: [],
               currentBranch: 'main',
               status: [],
-              statusLoaded: false,
               worktreesByPath: {},
             },
             ui: {
