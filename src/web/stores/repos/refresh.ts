@@ -61,6 +61,11 @@ function resolvePullRequestRefreshRequest(
   return { branchNames, mode }
 }
 
+function currentBranchNamesFromReadModel(id: string, repoInstanceId: string): Set<string> {
+  const branchProjection = readRepoBranchQueryProjection({ id, instanceId: repoInstanceId })
+  return new Set(branchProjection?.branches.map((branch) => branch.name) ?? [])
+}
+
 export function createRefreshActions(set: ReposSet, get: ReposGet) {
   const { runManualSyncPipeline } = createRefreshSyncHelpers(set, get)
 
@@ -108,8 +113,9 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     branchNames: string[],
     mode: PullRequestFetchMode,
   ): void {
+    const existingBranches = currentBranchNamesFromReadModel(id, repoInstanceId)
     updateIfFresh(set, id, repoInstanceId, (r) => {
-      applyPullRequestRefreshUnavailableState(r, branchNames, mode)
+      applyPullRequestRefreshUnavailableState(r, branchNames, existingBranches, mode)
     })
   }
 
@@ -119,8 +125,9 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     branchNames: string[],
     mode: PullRequestFetchMode,
   ): void {
+    const existingBranches = currentBranchNamesFromReadModel(id, repoInstanceId)
     updateIfFresh(set, id, repoInstanceId, (r) => {
-      applyPullRequestRefreshSuccessState(r, branchNames, mode)
+      applyPullRequestRefreshSuccessState(r, branchNames, existingBranches, mode)
     })
   }
 
@@ -131,8 +138,9 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     mode: PullRequestFetchMode,
     operationId: number,
   ): void {
+    const existingBranches = currentBranchNamesFromReadModel(id, repoInstanceId)
     updateIfFresh(set, id, repoInstanceId, (r) => {
-      applyPullRequestRefreshStaleState(r, branchNames, mode, operationId)
+      applyPullRequestRefreshStaleState(r, branchNames, existingBranches, mode, operationId)
     })
   }
 
@@ -144,9 +152,10 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     err: unknown,
   ): void {
     const message = err instanceof Error ? err.message : String(err)
+    const existingBranches = currentBranchNamesFromReadModel(id, repoInstanceId)
     refreshPullRequestsLog.warn('failed', { err })
     updateIfFresh(set, id, repoInstanceId, (r) => {
-      applyPullRequestRefreshErrorState(r, branchNames, mode, message)
+      applyPullRequestRefreshErrorState(r, branchNames, existingBranches, mode, message)
       r.events = appendRepoEvent(r.events, errorEvent(message))
     })
   }

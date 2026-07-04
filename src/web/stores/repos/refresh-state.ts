@@ -18,10 +18,6 @@ import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { RepoState, ReposGet } from '#/web/stores/repos/types.ts'
 import type { ExecResult, PullRequestFetchMode } from '#/web/types.ts'
 
-function existingBranchNames(r: { data: { branches: Array<{ name: string }> } }): Set<string> {
-  return new Set(r.data.branches.map((branch) => branch.name))
-}
-
 function finishPullRequestBranchDataLoads(
   r: {
     dataLoads: {
@@ -29,7 +25,7 @@ function finishPullRequestBranchDataLoads(
     }
   },
   branchNames: string[],
-  existingBranches: Set<string>,
+  existingBranches: ReadonlySet<string>,
   finish: (dataLoad: ReturnType<typeof idlePullRequestDataLoad>) => void,
   options?: { createMissing?: boolean },
 ): void {
@@ -157,9 +153,9 @@ export function applyFetchDataLoadError(r: RepoState, message: string): void {
 export function applyPullRequestRefreshUnavailableState(
   r: RepoState,
   branchNames: string[],
+  existingBranches: ReadonlySet<string>,
   mode: PullRequestFetchMode,
 ): void {
-  const existingBranches = existingBranchNames(r)
   finishPullRequestDataLoadUnavailable(r.dataLoads.pullRequests, mode)
   finishPullRequestBranchDataLoads(r, branchNames, existingBranches, (dataLoad) =>
     finishPullRequestDataLoadUnavailable(dataLoad, mode),
@@ -169,9 +165,9 @@ export function applyPullRequestRefreshUnavailableState(
 export function applyPullRequestRefreshSuccessState(
   r: RepoState,
   branchNames: string[],
+  existingBranches: ReadonlySet<string>,
   mode: PullRequestFetchMode,
 ): void {
-  const existingBranches = existingBranchNames(r)
   finishPullRequestDataLoadSuccess(r.dataLoads.pullRequests, mode)
   finishPullRequestBranchDataLoads(
     r,
@@ -185,10 +181,10 @@ export function applyPullRequestRefreshSuccessState(
 export function applyPullRequestRefreshStaleState(
   r: RepoState,
   branchNames: string[],
+  existingBranches: ReadonlySet<string>,
   mode: PullRequestFetchMode,
   operationId: number,
 ): void {
-  const existingBranches = existingBranchNames(r)
   const currentBranches = branchNames.filter(
     (branch) => r.operations.pullRequestsByBranch[branch]?.operationId === operationId,
   )
@@ -200,11 +196,12 @@ export function applyPullRequestRefreshStaleState(
 export function applyPullRequestRefreshErrorState(
   r: RepoState,
   branchNames: string[],
+  existingBranches: ReadonlySet<string>,
   mode: PullRequestFetchMode,
   message: string,
 ): void {
   finishPullRequestDataLoadError(r.dataLoads.pullRequests, message)
-  finishPullRequestBranchDataLoads(r, branchNames, existingBranchNames(r), (dataLoad) =>
+  finishPullRequestBranchDataLoads(r, branchNames, existingBranches, (dataLoad) =>
     finishPullRequestDataLoadError(dataLoad, message),
   )
 }

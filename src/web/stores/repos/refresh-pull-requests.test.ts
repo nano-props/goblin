@@ -550,7 +550,7 @@ describe('refreshPullRequests', () => {
     expect(repo?.dataLoads.pullRequestsByBranch['feature/b']?.phase).toBe('idle')
   })
 
-  test('does not recreate branch data loads for branches removed before lookup completion', async () => {
+  test('does not recreate branch data loads for branches removed from the query read model before lookup completion', async () => {
     const repoInstanceId = seedRepo([branch('feature/a'), branch('feature/b')])
     let resolve!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
     ipcHandlers['repo.pullRequests'] = () =>
@@ -559,11 +559,15 @@ describe('refreshPullRequests', () => {
       })
 
     const work = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/b'], { repoInstanceId })
+    await Promise.resolve()
+    setRepoSnapshotQueryData(REPO_ID, repoInstanceId, {
+      current: 'feature/a',
+      branches: [branch('feature/a')],
+    })
     useReposStore.setState((s) => ({
       repos: {
         ...s.repos,
         [REPO_ID]: replaceRepo(s.repos[REPO_ID]!, (repo) => {
-          repo.data.branches = repo.data.branches.filter((branch) => branch.name !== 'feature/b')
           delete repo.dataLoads.pullRequestsByBranch['feature/b']
         }),
       },
@@ -573,7 +577,6 @@ describe('refreshPullRequests', () => {
     await work
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.data.branches.map((item) => item.name)).toEqual(['feature/a'])
     expect(repo?.dataLoads.pullRequestsByBranch['feature/b']).toBeUndefined()
   })
 
