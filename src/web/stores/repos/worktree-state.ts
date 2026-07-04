@@ -119,7 +119,7 @@ export function selectedBranchStatus(repo: BranchWorktreeRepo, branch: RepoBranc
  * Whether the branch's worktree currently has uncommitted changes
  * worth surfacing. Centralises the dirty-state derivation so the
  * status tab, keyboard shortcut, and toolbar all agree on the
- * answer — and stay in sync if the fallback chain is ever tweaked.
+ * answer — and stay in sync if the derivation precedence changes.
  */
 export function branchWorktreeHasChanges(repo: BranchWorktreeRepo, branch: RepoBranchState): boolean {
   return (getBranchWorktreeState(repo, branch)?.changeCount ?? 0) > 0
