@@ -142,11 +142,11 @@ function composeSectionSignal(
 
 /**
  * Fetch several repo read results in parallel. Each field is independent:
- * failures are caught per-field and the entry is left in its default
- * (`null` / `[]`) state. The composite request is aborted when the
- * caller's signal fires, and each section additionally gets a hard
- * `timeoutMs` deadline so a slow git / network operation cannot pin
- * the request worker.
+ * requested section fails the whole composite read fails; callers must not
+ * mistake a missing section for authoritative empty repo data. The composite
+ * request is aborted when the caller's signal fires, and each section
+ * additionally gets a hard `timeoutMs` deadline so a slow git / network
+ * operation cannot pin the request worker.
  */
 export async function readRepoBulk(
   cwd: string,
@@ -165,7 +165,7 @@ export async function readRepoBulk(
   const prsCtl = want('pullRequests') ? composeSectionSignal(signal, timeoutMs) : null
 
   try {
-    const settled = await Promise.allSettled([
+    const [snapshot, status, pullRequests] = await Promise.all([
       snapshotCtl
         ? getRepoSnapshot(cwd, snapshotCtl.signal).finally(() => snapshotCtl.cancel())
         : Promise.resolve(null as RepoSnapshot | null),
@@ -176,11 +176,7 @@ export async function readRepoBulk(
         ? getRepoPullRequests(cwd, branches, { mode, signal: prsCtl.signal }).finally(() => prsCtl.cancel())
         : Promise.resolve(null as PullRequestEntry[] | null),
     ])
-    return {
-      snapshot: settled[0]!.status === 'fulfilled' ? settled[0]!.value : null,
-      status: settled[1]!.status === 'fulfilled' ? settled[1]!.value : [],
-      pullRequests: settled[2]!.status === 'fulfilled' ? settled[2]!.value : null,
-    }
+    return { snapshot, status, pullRequests }
   } finally {
     snapshotCtl?.cancel()
     statusCtl?.cancel()

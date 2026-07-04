@@ -14,6 +14,18 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
+const mocks = vi.hoisted(() => ({
+  toastError: vi.fn(),
+  toastSuccess: vi.fn(),
+}))
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: mocks.toastError,
+    success: mocks.toastSuccess,
+  },
+}))
+
 const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
 const fetchMock = mockFetch(async (input: RequestInfo | URL) => {
   const url = new URL(typeof input === 'string' ? input : input.toString())
@@ -27,6 +39,7 @@ const fetchMock = mockFetch(async (input: RequestInfo | URL) => {
 })
 
 beforeEach(() => {
+  vi.clearAllMocks()
   resetReposStore()
   setClientBridgeForTests(null)
   fetchMock.mockClear()
@@ -81,6 +94,30 @@ describe('RepoCloneDialog', () => {
     expect(ensureWorkspaceOpen).toHaveBeenCalledWith('/tmp/cloned-repo')
     expect(activateRepo).toHaveBeenCalledWith('/tmp/cloned-repo')
     expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+
+  test('reports post-open effect failures after opening the cloned workspace', async () => {
+    const ensureWorkspaceOpen = vi.fn(async () => ({
+      ok: true as const,
+      id: '/tmp/cloned-repo',
+      postOpenEffects: Promise.resolve([{ kind: 'recent-repo' as const, message: 'recent write failed' }]),
+    }))
+    useReposStore.setState({ ensureWorkspaceOpen })
+
+    renderInJsdom(
+      <PrimaryWindowNavigationProvider value={navigationWith({})}>
+        <RepoCloneDialog open onOpenChange={vi.fn()} />
+      </PrimaryWindowNavigationProvider>,
+    )
+
+    setInputValue('#clone-url', 'https://example.com/repo.git')
+    setInputValue('#clone-directory-name', 'repo')
+    click('button[type="submit"]')
+    await flush()
+
+    expect(mocks.toastError).toHaveBeenCalledWith('repo-picker.recent-save-failed', {
+      description: '/tmp/cloned-repo\nrecent write failed',
+    })
   })
 })
 

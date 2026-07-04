@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 
 import type { ComponentProps } from 'react'
-import { act, screen } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoWorkspaceContent } from '#/web/components/repo-workspace/RepoWorkspaceContent.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
-import { getSelectedRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
+import { getSelectedRepoWorkspacePresentation, type RepoWorkspaceRepo } from '#/web/components/repo-workspace/model.ts'
 import { useRepoWorkspaceTabModel } from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { BranchCopyPatchAction } from '#/web/hooks/branch-action-state.ts'
 import {
   TerminalSessionContext,
@@ -24,7 +25,7 @@ import {
   createRepoBranch,
   installWorkspacePaneTabsTestBridge,
   resetReposStore,
-  seedRepoState,
+  seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -38,6 +39,7 @@ import {
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import type { RepoState } from '#/web/stores/repos/types.ts'
 
 const repoClientMocks = vi.hoisted(() => ({
   getRepoLog: vi.fn(),
@@ -70,6 +72,12 @@ function RepoWorkspaceContentHarness(props: RepoWorkspaceContentHarnessProps) {
 function RepoWorkspaceContentInner(props: RepoWorkspaceContentHarnessProps) {
   const workspacePaneTabModel = useRepoWorkspaceTabModel(props.repo, props.detail)
   return <RepoWorkspaceContent {...props} workspacePaneTabModel={workspacePaneTabModel} />
+}
+
+function repoWorkspaceRepo(repo: RepoState): RepoWorkspaceRepo {
+  const branchModel = readRepoBranchQueryProjection(repo)
+  if (!branchModel) throw new Error('missing branch read model')
+  return { ...repo, branchModel: { ...branchModel, statusReady: true } }
 }
 
 beforeEach(() => {
@@ -116,7 +124,7 @@ describe('RepoWorkspaceContent', () => {
   test('renders the changes row with the copy patch action in the status tab when the worktree is dirty', () => {
     const onCopyPatch = vi.fn()
     const worktreePath = '/tmp/changes-worktree'
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/changes', {
@@ -128,7 +136,6 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: {
         'feature/changes': [staticEntry('status'), staticEntry('changes')],
       },
-      statusLoaded: true,
       status: [
         {
           path: worktreePath,
@@ -143,7 +150,7 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -156,7 +163,7 @@ describe('RepoWorkspaceContent', () => {
             onSelect: onCopyPatch,
           })}
         >
-          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -178,7 +185,7 @@ describe('RepoWorkspaceContent', () => {
   test('flashes the check affordance when copy patch onSelect resolves to true, then reverts', async () => {
     vi.useFakeTimers()
     const worktreePath = '/tmp/copy-success-worktree'
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/copy-success', {
@@ -190,7 +197,6 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: {
         'feature/copy-success': [staticEntry('status')],
       },
-      statusLoaded: true,
       status: [
         {
           path: worktreePath,
@@ -200,7 +206,7 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     const onCopyPatch = vi.fn().mockResolvedValue(true)
 
     const { container } = renderInJsdom(
@@ -214,7 +220,7 @@ describe('RepoWorkspaceContent', () => {
             onSelect: onCopyPatch,
           })}
         >
-          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -242,7 +248,7 @@ describe('RepoWorkspaceContent', () => {
 
   test('does not render the changes row in the status tab when the worktree is clean', () => {
     const worktreePath = '/tmp/clean-worktree'
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/clean', {
@@ -254,10 +260,9 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: {
         'feature/clean': [staticEntry('status')],
       },
-      statusLoaded: true,
       status: [{ path: worktreePath, branch: 'feature/clean', isMain: false, entries: [] }],
     })
-    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -270,7 +275,7 @@ describe('RepoWorkspaceContent', () => {
             onSelect: vi.fn(),
           })}
         >
-          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -284,7 +289,7 @@ describe('RepoWorkspaceContent', () => {
   test('opens files and changes tabs from the status rows', async () => {
     const worktreePath = '/tmp/status-links-worktree'
     const showRepoBranchWorkspacePaneTab = vi.fn()
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/status-links', {
@@ -296,7 +301,6 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: {
         'feature/status-links': [staticEntry('status'), staticEntry('changes'), staticEntry('files')],
       },
-      statusLoaded: true,
       status: [
         {
           path: worktreePath,
@@ -306,13 +310,13 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <PrimaryWindowNavigationProvider value={navigationWith({ showRepoBranchWorkspacePaneTab })}>
         <TerminalSessionReadContext value={emptyTerminalReadContext}>
           <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-            <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+            <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
           </BranchActionSurfaceContext>
         </TerminalSessionReadContext>
       </PrimaryWindowNavigationProvider>,
@@ -344,7 +348,7 @@ describe('RepoWorkspaceContent', () => {
   })
 
   test('opens upstream refs and commit hashes from the status rows', async () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/open-links', {
@@ -368,12 +372,12 @@ describe('RepoWorkspaceContent', () => {
         hasGitHubRemote: true,
       },
     })
-    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -408,7 +412,7 @@ describe('RepoWorkspaceContent', () => {
 
   test('hides the copy patch button on the changes row when copyPatchAction.visible is false', () => {
     const worktreePath = '/tmp/visibility-worktree'
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/hidden', {
@@ -420,7 +424,6 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: {
         'feature/hidden': [staticEntry('status')],
       },
-      statusLoaded: true,
       status: [
         {
           path: worktreePath,
@@ -430,7 +433,7 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -443,7 +446,7 @@ describe('RepoWorkspaceContent', () => {
             onSelect: vi.fn(),
           })}
         >
-          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -454,7 +457,7 @@ describe('RepoWorkspaceContent', () => {
 
   test('renders the changes panel with status entries and tab labelling', () => {
     const worktreePath = '/tmp/changes-panel-worktree'
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
         createBranchSnapshot('feature/changes-panel', {
@@ -466,7 +469,6 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: {
         'feature/changes-panel': [staticEntry('status'), staticEntry('changes')],
       },
-      statusLoaded: true,
       status: [
         {
           path: worktreePath,
@@ -479,12 +481,12 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -500,7 +502,7 @@ describe('RepoWorkspaceContent', () => {
   })
 
   test('renders branch status for a selected branch without a worktree', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
         createRepoBranch('feature/no-worktree', {
@@ -515,12 +517,12 @@ describe('RepoWorkspaceContent', () => {
       selectedBranch: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'status',
     })
-    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -532,7 +534,7 @@ describe('RepoWorkspaceContent', () => {
   })
 
   test('shows the workspace empty state when the status tab is closed', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
         createRepoBranch('feature/no-worktree', {
@@ -548,11 +550,11 @@ describe('RepoWorkspaceContent', () => {
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: { 'feature/no-worktree': [] },
     })
-    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+        <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
       </TerminalSessionReadContext>,
     )
 
@@ -561,19 +563,19 @@ describe('RepoWorkspaceContent', () => {
   })
 
   test('falls back to status when a worktree-scoped preference is unrenderable on a branch without a worktree', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/no-worktree': [staticEntry('status')] },
     })
-    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -588,7 +590,7 @@ describe('RepoWorkspaceContent', () => {
 
   test('falls back to status when terminal is preferred but sync confirms no terminal tabs', () => {
     const worktreePath = '/tmp/terminal-empty-worktree'
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-empty', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-empty',
@@ -596,12 +598,12 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: { 'feature/terminal-empty': [staticEntry('status')] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceId)
-    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -618,7 +620,7 @@ describe('RepoWorkspaceContent', () => {
   test('mounts the terminal session while terminal creation is pending with no sessions', () => {
     const worktreePath = '/tmp/terminal-pending-worktree'
     const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-pending', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-pending',
@@ -626,7 +628,7 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: { 'feature/terminal-pending': [staticEntry('status')] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceId)
-    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     const registerHost = vi.fn()
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
@@ -641,7 +643,7 @@ describe('RepoWorkspaceContent', () => {
     const { container } = renderInJsdom(
       <TerminalSessionContext value={terminalCommandContextWith({ registerHost })}>
         <TerminalSessionReadContext value={readContext}>
-          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )
@@ -660,7 +662,7 @@ describe('RepoWorkspaceContent', () => {
     const worktreePath = '/tmp/terminal-pending-empty-strip-worktree'
     const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
     const branchName = 'feature/terminal-pending-empty-strip'
-    const seededRepo = seedRepoState({
+    const seededRepo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
       selectedBranch: branchName,
@@ -669,7 +671,7 @@ describe('RepoWorkspaceContent', () => {
     })
     useRepoSyncStore.getState().markReady(REPO_ID, seededRepo.instanceId)
     const repo = useReposStore.getState().repos[REPO_ID]!
-    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     const registerHost = vi.fn()
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
@@ -684,7 +686,7 @@ describe('RepoWorkspaceContent', () => {
     renderInJsdom(
       <TerminalSessionContext value={terminalCommandContextWith({ registerHost })}>
         <TerminalSessionReadContext value={readContext}>
-          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )
@@ -697,14 +699,14 @@ describe('RepoWorkspaceContent', () => {
   test('renders terminal loading without a create CTA while initial terminal sync is unresolved', () => {
     const worktreePath = '/tmp/terminal-loading-worktree'
     const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-loading', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-loading',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/terminal-loading': [staticEntry('status')] },
     })
-    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     const createTerminal = vi.fn(async () => 'session-1')
     const registerHost = vi.fn()
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
@@ -720,7 +722,7 @@ describe('RepoWorkspaceContent', () => {
     const { container } = renderInJsdom(
       <TerminalSessionContext value={terminalCommandContextWith({ createTerminal, registerHost })}>
         <TerminalSessionReadContext value={readContext}>
-          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )
@@ -739,7 +741,7 @@ describe('RepoWorkspaceContent', () => {
   test('labels terminal panels from the mixed tab list, not runtime session list', () => {
     const worktreePath = '/tmp/terminal-reordered-worktree'
     const terminalWorktreeKey = `${REPO_ID}\0${worktreePath}`
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-reordered', { worktree: { path: worktreePath } })],
       selectedBranch: 'feature/terminal-reordered',
@@ -749,7 +751,7 @@ describe('RepoWorkspaceContent', () => {
       },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceId)
-    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     const registerHost = vi.fn()
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
@@ -768,7 +770,7 @@ describe('RepoWorkspaceContent', () => {
     const { container } = renderInJsdom(
       <TerminalSessionContext value={terminalCommandContextWith({ registerHost })}>
         <TerminalSessionReadContext value={readContext}>
-          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )
@@ -795,7 +797,7 @@ describe('RepoWorkspaceContent', () => {
       ],
       truncated: false,
     })
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
       selectedBranch: branchName,
@@ -803,7 +805,7 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: { [branchName]: [staticEntry('files'), staticEntry('status')] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceId)
-    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     const createTerminal = vi.fn(async () => 'session-1')
     const writeInput = vi.fn()
     const showRepoWorkspacePaneTab = vi.fn()
@@ -822,7 +824,11 @@ describe('RepoWorkspaceContent', () => {
           <TerminalSessionContext value={terminalCommandContextWith({ createTerminal, writeInput })}>
             <TerminalSessionReadContext value={emptyTerminalReadContext}>
               <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-                <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+                <RepoWorkspaceContentHarness
+                  repo={repoWorkspaceRepo(repo)}
+                  detail={detail}
+                  workspacePaneId="workspace"
+                />
               </BranchActionSurfaceContext>
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -863,14 +869,12 @@ describe('RepoWorkspaceContent', () => {
     // attributed to "files" (the only tab open, and active, when the file
     // was double-clicked), scoped to this branch.
     expect(
-      useReposStore.getState().tabOpenerIdentityByScope[tabOpenerScopeKey(REPO_ID, branchName)]?.[
-        'terminal:session-1'
-      ],
+      useReposStore.getState().tabOpenerIdentityByScope[tabOpenerScopeKey(REPO_ID, branchName)]?.['terminal:session-1'],
     ).toBe('workspace-pane:files')
   })
 
   test('falls back to status when a branch preference names a closed tab', async () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/a'), createRepoBranch('feature/b')],
       selectedBranch: 'feature/b',
@@ -879,12 +883,12 @@ describe('RepoWorkspaceContent', () => {
         'feature/a': [staticEntry('status'), staticEntry('history')],
       },
     })
-    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -921,18 +925,18 @@ describe('RepoWorkspaceContent', () => {
         date: '2026-06-20T00:00:00.000Z',
       },
     ])
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/history')],
       selectedBranch: 'feature/history',
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
     })
-    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+        <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
       </TerminalSessionReadContext>,
     )
     await flushAsyncWork()
@@ -943,8 +947,9 @@ describe('RepoWorkspaceContent', () => {
       'feature/history',
       expect.objectContaining({ count: 50 }),
     )
-    const graph = container.querySelector('[data-history-commit-graph=""]')
-    expect(graph).not.toBeNull()
+    await waitFor(() => {
+      expect(container.querySelector('[data-history-commit-graph=""]')).not.toBeNull()
+    })
     const rows = Array.from(container.querySelectorAll('[data-history-commit-row=""]'))
     expect(rows).toHaveLength(2)
     expect(rows[0]?.textContent).toContain('78c150a')
@@ -968,18 +973,18 @@ describe('RepoWorkspaceContent', () => {
   })
 
   test('labels worktree history panels with the static tab id', async () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/history', { worktree: { path: '/tmp/history-worktree' } })],
       selectedBranch: 'feature/history',
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
     })
-    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+        <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
       </TerminalSessionReadContext>,
     )
     await flushAsyncWork()
@@ -991,23 +996,25 @@ describe('RepoWorkspaceContent', () => {
 
   test('shows an error state when branch history cannot be read', async () => {
     repoClientMocks.getRepoLog.mockRejectedValue(new Error('error.failed-read-repo'))
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/history')],
       selectedBranch: 'feature/history',
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: { 'feature/history': [staticEntry('history')] },
     })
-    const detail = getSelectedRepoWorkspacePresentation(repo)
+    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
-        <RepoWorkspaceContentHarness repo={repo} detail={detail} workspacePaneId="workspace" />
+        <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
       </TerminalSessionReadContext>,
     )
     await flushAsyncWork()
 
-    expect(container.textContent).toContain('error.failed-read-repo')
+    await waitFor(() => {
+      expect(container.textContent).toContain('error.failed-read-repo')
+    })
     expect(container.textContent).not.toContain('log.empty-for-branch')
   })
 })

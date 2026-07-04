@@ -22,8 +22,14 @@
 //   renders as `{"level":"warn","tag":"window","msg":"failed to load", ...}`.
 
 import { pino, type Logger } from 'pino'
+import { installStdioErrorGuard } from '#/node/stdio-error-guard.ts'
 
 type NodeLogLevel = 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'silent'
+
+// The Electron main process inherits stdio from dev terminals such as Ghostty.
+// If that PTY disappears first, later log writes can emit EIO/EBADF/EPIPE; a
+// disconnected log sink should not crash the app.
+installStdioErrorGuard()
 
 function resolveNodeLogLevel(): NodeLogLevel {
   const envLevel = process.env.GOBLIN_NODE_LOG_LEVEL?.trim()

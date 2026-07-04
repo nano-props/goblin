@@ -45,10 +45,15 @@ Notes:
 - `useReposStore` is not a shared cross-window store.
 - `RuntimeCoherentRepoProjectionState` names the runtime-coherent repo projection slice.
 - `useReposStore.repos` is a client-local projection of runtime-coherent repo truth.
+- React Query is the client read model for repo snapshot/status/pull-request server data. UI and command paths should read through query-backed helpers such as `useRepoBranchReadModel` or `readRepoWithBranchReadModel` instead of treating `useReposStore.repos[*].data.branches` as authoritative runtime truth.
+- React Query is also the client projection for server-owned settings snapshots and workspace pane tab lists. Mutation helpers should update or invalidate those caches from server-returned canonical data, not from client intent payloads.
+- Store repo data may still exist as a projection for UI orchestration, action state, warm restore, and in-place server response application. New runtime reads should prefer the query-backed projection unless they are explicitly write-side projection code.
 - `ReposStore` actions are also grouped by local, restorable, runtime-coherent, and mutation responsibilities.
 - Transport payloads may bundle multiple classes together; consumers should split them back into runtime-coherent and restorable views before use.
 - Runtime-coherent repo actions should prefer orchestration entrypoints plus focused helper modules for projection/state transitions and sync pipelines.
 - Settings truth lives on the server; clients read it through query snapshots or specialized runtime projections.
+- Settings writes belong in `src/web/settings-actions.ts`. `src/web/settings-client.ts` is the transport boundary, not a UI mutation API. UI stores may keep local projections such as theme/i18n state, but their server write-through path should use settings actions so the settings query cache stays coherent.
+- Workspace pane tabs truth lives in the terminal/server runtime. React Query caches the runtime projection. Reorder may use a short-lived optimistic query update, but success must replace it with server-returned tabs and failure must rollback or invalidate.
 - Runtime-coherent state may use invalidation plus refetch or realtime streaming.
 - For runtime correctness boundaries, prefer server-owned fast fail over client guards. A mutation that no longer matches the live runtime instance should be rejected by the server, not locally guessed away by the client.
 - Do not mirror authoritative runtime membership from the client back into the server with whole-snapshot sync. Use server-owned open/close transitions and let the server mint runtime identities.
@@ -76,9 +81,11 @@ Notes:
 - `repoSnapshotCache` names the warm-start repo cache slice.
 - `RepoSnapshotCacheEntry` is the stored snapshot shape inside that cache.
 - Restorable helpers should focus on boot restore and persistence boundaries, not on live runtime convergence.
+- `repoSnapshotCache` is a startup affordance, not a runtime authority. Persist it from query-projected repo data when available; use it to paint placeholders during boot, then converge through normal server/query refresh.
 - `hydrateSession` belongs to the restorable boot path, while `ensureWorkspaceOpen` and `closeRepo` belong to runtime repo lifecycle.
 - Restorable state is not runtime-coherent shared state.
 - Session writes are client -> persistence only after boot restore; they do not publish runtime invalidation.
+- Workspace pane tabs in saved session state are boot-only import data. After restore, runtime tab changes flow server -> React Query -> later persistence; saved session data must not become a live tab authority.
 - Native-only validation or registration may feed back into server-owned runtime settings and then converge through invalidation/refetch.
 
 ## Sync rules
@@ -86,6 +93,8 @@ Notes:
 - Use invalidation plus refetch for runtime-coherent state that changes occasionally.
 - Use streaming only for continuous flows such as terminal output.
 - Treat session restore as boot-only.
+- Keep visual preview and animation state local. Do not persist it, sync it, or write it to server/query caches except through the actual server mutation it previews.
+- For server mutations that return canonical state, write that returned value into React Query. For mutations that only publish invalidation, invalidate the query and let the next read project server truth.
 - Suppress self-echo when a client mutation causes its own invalidation event.
 - Do not keep a mutation alive with client-side compensation after its runtime precondition has gone stale. Fail fast and let the next read/refetch re-project truth.
 - If the client cannot prove a runtime precondition from server-issued data, it should not invent one locally. Ask the server, or fail.

@@ -111,7 +111,7 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
     },
   }
 
-  // Phase 1: 执行核心任务，得到 outcome（不会被后续副作用污染）
+  // Run the core task first so follow-up side effects cannot alter the outcome.
   type Outcome =
     | { kind: 'stale' }
     | { kind: 'error'; error: string; original: unknown }
@@ -137,11 +137,10 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
     outcome = { kind: 'error', error: err instanceof Error ? err.message : String(err), original: err }
   }
 
-  // Phase 2: 统一 settle（只发生一次，在副作用之前）
+  // Settle operation state exactly once before running side effects.
   const settleError = outcome.kind === 'success' ? outcome.error : outcome.kind === 'error' ? outcome.error : null
   settleOperationState(options, repoInstanceId, operationId, settleError)
 
-  // Phase 3: 副作用回调（onResult/onError/onStale）
   if (outcome.kind === 'stale') {
     await options.onStale?.(ctx)
     return null

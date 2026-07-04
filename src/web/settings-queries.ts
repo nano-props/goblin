@@ -1,3 +1,4 @@
+// Query options are the read boundary for server-backed settings projections.
 import { useEffect } from 'react'
 import { queryOptions, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ExternalAppsSnapshot, GitHubCliState, LanInfo, SettingsSnapshot } from '#/shared/api-types.ts'
@@ -71,6 +72,10 @@ export function useSettingsSnapshotQuery() {
   return useQuery(settingsSnapshotQueryOptions())
 }
 
+export function useSettingsSnapshotReadModel(): SettingsSnapshot | undefined {
+  return useSettingsSnapshotQuery().data
+}
+
 export function useExternalAppsQuery() {
   return useQuery(externalAppsQueryOptions())
 }
@@ -89,10 +94,10 @@ export function useSettingsQueryInvalidationSync() {
     () =>
       subscribeSettingsInvalidation((event) => {
         if (event.scopes.includes('settings-snapshot')) {
-          void queryClient.invalidateQueries({ queryKey: settingsSnapshotQueryKey(), exact: true })
+          void queryClient.refetchQueries({ queryKey: settingsSnapshotQueryKey(), exact: true, type: 'active' })
         }
         if (event.scopes.includes('external-apps')) {
-          void queryClient.invalidateQueries({ queryKey: externalAppsQueryKey(), exact: true })
+          void queryClient.refetchQueries({ queryKey: externalAppsQueryKey(), exact: true, type: 'active' })
         }
       }),
     [queryClient],

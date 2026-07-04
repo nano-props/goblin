@@ -10,6 +10,7 @@ import { preferredWorkspacePaneTabByTargetRecordWith } from '#/web/stores/repos/
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
 
 const originalRefreshStatus = useReposStore.getState().refreshStatus
 
@@ -38,10 +39,14 @@ function createRepo(
 ) {
   const repo = emptyRepo(id, 'repo', 'repo-instance-test')
   const worktreePath = `${id}/main`
+  const branches = [createRepoBranch('main', { worktree: { path: worktreePath } })]
   repo.instanceId = id === '/repo-a' ? 'repo-instance-test-a' : 'repo-instance-test-b'
-  repo.data.branches = [createRepoBranch('main', { worktree: { path: worktreePath } })]
-  repo.data.currentBranch = 'main'
   repo.ui.selectedBranch = 'main'
+  setRepoSnapshotQueryData(id, repo.instanceId, {
+    current: 'main',
+    branches,
+  })
+  setRepoStatusQueryData(id, repo.instanceId, [])
   setWorkspacePaneTabsForTargetQueryData({
     repoRoot: id,
     repoInstanceId: repo.instanceId,
@@ -193,24 +198,6 @@ describe('useRepoStatusRefresh', () => {
 
   test('refreshes status when reopening the status tab after bouncing through terminal', async () => {
     const repo = createRepo('/repo-a', { preferredWorkspacePaneTab: 'status' })
-    repo.data.branches = [
-      {
-        name: 'main',
-        isCurrent: true,
-        isDefault: true,
-        worktree: { path: '/repo-a/main' },
-        ahead: 0,
-        behind: 0,
-        tracking: '',
-        trackingGone: false,
-        lastCommitHash: '',
-        lastCommitShortHash: '',
-        lastCommitMessage: '',
-        lastCommitAuthor: '',
-        lastCommitDate: '',
-        mergedToDefault: undefined,
-      },
-    ]
     repo.ui.selectedBranch = 'main'
     await act(async () => {
       useReposStore.setState({

@@ -1,6 +1,7 @@
 import type { RepoSessionEntry, RemoteRepoTarget } from '#/shared/remote-repo.ts'
 import { resolveServerRemoteRepoConnection, type RemoteRepoConnectionDeps } from '#/server/modules/remote.ts'
 import { createBranchSnapshot, installGoblinTestBridge, resetReposStore } from '#/web/test-utils/bridge.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 export const REPO_A = '/tmp/gbl-lifecycle-a'
 export const REPO_B = '/tmp/gbl-lifecycle-b'
 export const branchSnapshot = createBranchSnapshot
@@ -66,10 +67,9 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
     else if (key === 'composite') handlers['repo.composite'] = handler
     else handlers[key] = handler
   }
-  // Phase 3: unified server-side lifecycle boundary. Instead of
-  // hand-rolling the same compose logic the server already owns,
-  // we inject test doubles into the real `resolveServerRemoteRepoConnection`
-  // so the exact same classification / mapping code runs in tests.
+  // Exercise the same server-side lifecycle boundary used in production:
+  // inject test doubles into `resolveServerRemoteRepoConnection` so the
+  // real classification / mapping code runs in tests.
   const deps: RemoteRepoConnectionDeps = {
     resolveTarget: async ({ alias, remotePath }) => {
       const result = handlers['remote.resolveTarget']?.({ alias, remotePath }) as
@@ -99,4 +99,5 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
 
 export function resetLifecycleTest(): void {
   resetReposStore()
+  primaryWindowQueryClient.clear()
 }

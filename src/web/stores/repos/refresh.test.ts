@@ -4,13 +4,23 @@ import { terminalLog } from '#/web/logger.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { repoOperation } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { branch, REPO_ID, resetRefreshTest, ipcHandlers, seedRepo } from '#/web/stores/repos/refresh-test-utils.ts'
-import { seedRepoState } from '#/web/test-utils/bridge.ts'
+import { seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   preferredWorkspacePaneTabByTargetRecordWith,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import {
+  repoBulkReadQueryKey,
+  repoDataQueryKey,
+  repoSnapshotQueryKey,
+  repoStatusQueryKey,
+  setRepoSnapshotQueryData,
+  setRepoStatusQueryData,
+} from '#/web/repo-data-query.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { WorktreeStatus } from '#/web/types.ts'
 beforeEach(resetRefreshTest)
 
@@ -25,6 +35,16 @@ function updateRepoForTest(mutator: (repo: TestRepo) => void) {
   })
 }
 
+function repoBranchNames(): string[] {
+  const repo = useReposStore.getState().repos[REPO_ID]
+  return repo ? (readRepoBranchQueryProjection(repo)?.branches.map((branch) => branch.name) ?? []) : []
+}
+
+function repoCurrentBranch(): string | null {
+  const repo = useReposStore.getState().repos[REPO_ID]
+  return repo ? (readRepoBranchQueryProjection(repo)?.currentBranch ?? null) : null
+}
+
 function createWorktreeAction(): TestCreateWorktreeAction {
   return {
     kind: 'createWorktree',
@@ -37,8 +57,29 @@ function createWorktreeAction(): TestCreateWorktreeAction {
 }
 
 describe('remote fetch timestamps', () => {
+  test('snapshot refresh treats query snapshot branches as existing data while loading', async () => {
+    const repoInstanceId = seedRepo([])
+    setRepoSnapshotQueryData(REPO_ID, repoInstanceId, {
+      current: 'feature/query',
+      branches: [branch('feature/query')],
+    })
+    let resolveSnapshot!: (value: { branches: ReturnType<typeof branch>[]; current: string }) => void
+    ipcHandlers['repo.snapshot'] = () =>
+      new Promise((resolve) => {
+        resolveSnapshot = resolve
+      })
+
+    const work = useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
+    await Promise.resolve()
+
+    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.snapshot.phase).toBe('refreshing')
+
+    resolveSnapshot({ branches: [branch('feature/query')], current: 'feature/query' })
+    await work
+  })
+
   test('manual refresh skips repo.fetch for local-only repositories and refreshes local state', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [branch('feature/a')],
       remote: {
@@ -214,7 +255,9 @@ describe('remote fetch timestamps', () => {
         resolvePull = resolve
       })
 
-    const work = useReposStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' }, { repoInstanceId })
+    const work = useReposStore
+      .getState()
+      .runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' }, { repoInstanceId })
 
     const runningRepo = useReposStore.getState().repos[REPO_ID]
     expect(runningRepo?.operations.branchAction.phase).toBe('running')
@@ -261,7 +304,7 @@ describe('remote fetch timestamps', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.operations.branchAction.phase).toBe('idle')
-    expect(repo?.data.branches.map((b) => b.name)).toEqual(['main'])
+    expect(repoBranchNames()).toEqual(['main'])
     expect(snapshotCount).toBe(1)
   })
 
@@ -289,7 +332,7 @@ describe('remote fetch timestamps', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(result).toEqual({ ok: true, message: 'ok' })
     expect(repo?.operations.branchAction.phase).toBe('idle')
-    expect(repo?.data.branches.map((b) => b.name)).toEqual(['main', 'feature/a'])
+    expect(repoBranchNames()).toEqual(['main', 'feature/a'])
     expect(snapshotCount).toBe(1)
   })
 
@@ -337,7 +380,7 @@ describe('remote fetch timestamps', () => {
       repoChanged: true,
     })
     expect(snapshotCount).toBe(1)
-    expect(useReposStore.getState().repos[REPO_ID]?.data.branches.map((b) => b.name)).toEqual(['main', 'feature/a'])
+    expect(repoBranchNames()).toEqual(['main', 'feature/a'])
   })
 
   test('deferred branch action results skip toast and refresh until caller confirms follow-up', async () => {
@@ -451,12 +494,33 @@ describe('core refresh request ordering', () => {
     await useReposStore.getState().refreshCoreData(REPO_ID, { repoInstanceId })
 
     expect(compositeCalls).toBe(1)
-    const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.data.branches.map((b) => b.name)).toEqual(['main'])
+    expect(repoBranchNames()).toEqual(['main'])
+  })
+
+  test('refreshCoreData writes the server composite result into repo data query cache', async () => {
+    const repoInstanceId = seedRepo([branch('old')])
+    const status: WorktreeStatus[] = [
+      { path: REPO_ID, branch: 'main', isMain: true, entries: [{ x: 'M', y: ' ', path: 'src/main.ts' }] },
+    ]
+    const snapshot = { branches: [branch('main')], current: 'main' }
+    ipcHandlers['repo.composite'] = async () => ({ snapshot, status, pullRequests: null })
+
+    await useReposStore.getState().refreshCoreData(REPO_ID, { repoInstanceId })
+
+    expect(
+      primaryWindowQueryClient.getQueryData(repoBulkReadQueryKey(REPO_ID, repoInstanceId, ['snapshot', 'status'])),
+    ).toEqual({
+      snapshot,
+      status,
+      pullRequests: null,
+    })
+    expect(primaryWindowQueryClient.getQueryData(repoSnapshotQueryKey(REPO_ID, repoInstanceId))).toEqual(snapshot)
+    expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toEqual(status)
   })
 
   test('refreshCoreData drops stale results when the repo is reopened during a composite read', async () => {
     const repoInstanceId = seedRepo([branch('main')], 'repo-instance-test')
+    primaryWindowQueryClient.removeQueries({ queryKey: repoDataQueryKey(REPO_ID, repoInstanceId) })
     ipcHandlers['repo.composite'] = async () => {
       // Reopen the repo while the composite is in flight. With the new
       // atomic flow the snapshot result is stale and should be dropped
@@ -469,7 +533,12 @@ describe('core refresh request ordering', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceId).toBe('repo-instance-test-2')
-    expect(repo?.data.branches.map((b) => b.name)).toEqual(['reopened'])
+    expect(repo ? readRepoBranchQueryProjection(repo)?.branches.map((b) => b.name) : null).toEqual(['reopened'])
+    expect(
+      primaryWindowQueryClient.getQueryData(repoBulkReadQueryKey(REPO_ID, repoInstanceId, ['snapshot', 'status'])),
+    ).toBeUndefined()
+    expect(primaryWindowQueryClient.getQueryData(repoSnapshotQueryKey(REPO_ID, repoInstanceId))).toBeUndefined()
+    expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toBeUndefined()
   })
 
   test('refreshCoreData marks deleted or non-git paths unavailable and skips follow-up reads', async () => {
@@ -499,8 +568,18 @@ describe('core refresh request ordering', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.availability).toEqual({ phase: 'available' })
-    expect(repo?.data.branches.map((b) => b.name)).toEqual(['main'])
+    expect(repoBranchNames()).toEqual(['main'])
     expect(repo?.dataLoads.snapshot.error).toBeNull()
+  })
+
+  test('refreshSnapshot writes the server snapshot result into repo data query cache', async () => {
+    const repoInstanceId = seedRepo([branch('old')])
+    const snapshot = { branches: [branch('main')], current: 'main' }
+    ipcHandlers['repo.snapshot'] = async () => snapshot
+
+    await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
+
+    expect(primaryWindowQueryClient.getQueryData(repoSnapshotQueryKey(REPO_ID, repoInstanceId))).toEqual(snapshot)
   })
 
   test('refreshCoreData drops status when the repo is reopened before the composite settles', async () => {
@@ -516,7 +595,7 @@ describe('core refresh request ordering', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceId).toBe('repo-instance-test-2')
-    expect(repo?.data.branches.map((b) => b.name)).toEqual(['reopened'])
+    expect(repo ? readRepoBranchQueryProjection(repo)?.branches.map((b) => b.name) : null).toEqual(['reopened'])
   })
 
   test('ignores stale status refreshes for the same repo instance', async () => {
@@ -538,14 +617,14 @@ describe('core refresh request ordering', () => {
 
     resolveSecond(fresh)
     await second
-    expect(useReposStore.getState().repos[REPO_ID]?.data.status).toEqual(fresh)
+    expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toEqual(fresh)
 
     resolveFirst([{ path: '/repo', isMain: true, entries: [{ x: 'M', y: ' ', path: 'stale.ts' }] }])
     await first
-    expect(useReposStore.getState().repos[REPO_ID]?.data.status).toEqual(fresh)
+    expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toEqual(fresh)
   })
 
-  test('refreshStatus updates normalized worktree dirty metadata', async () => {
+  test('refreshStatus updates normalized worktree dirty metadata in the branch read model', async () => {
     const repoInstanceId = seedRepo([
       branch('feature/cleaned', undefined, {
         worktree: {
@@ -590,7 +669,8 @@ describe('core refresh request ordering', () => {
 
     await useReposStore.getState().refreshStatus(REPO_ID, { repoInstanceId })
 
-    const worktreesByPath = useReposStore.getState().repos[REPO_ID]?.data.worktreesByPath
+    const repo = useReposStore.getState().repos[REPO_ID]!
+    const worktreesByPath = readRepoBranchQueryProjection(repo)?.worktreesByPath
     expect(worktreesByPath?.['/tmp/worktree-cleaned']).toMatchObject({
       isDirty: false,
       changeCount: 0,
@@ -603,6 +683,18 @@ describe('core refresh request ordering', () => {
       isDirty: true,
       changeCount: 3,
     })
+  })
+
+  test('refreshStatus writes the server status result into repo data query cache', async () => {
+    const repoInstanceId = seedRepo([branch('feature/a')])
+    const status: WorktreeStatus[] = [
+      { path: REPO_ID, branch: 'feature/a', isMain: true, entries: [{ x: 'M', y: ' ', path: 'changed.ts' }] },
+    ]
+    ipcHandlers['repo.status'] = async () => status
+
+    await useReposStore.getState().refreshStatus(REPO_ID, { repoInstanceId })
+
+    expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toEqual(status)
   })
 
   test('snapshot refresh keeps status-derived worktree dirtiness authoritative', async () => {
@@ -620,10 +712,9 @@ describe('core refresh request ordering', () => {
       ],
       'repo-instance-test',
     )
-    updateRepoForTest((repo) => {
-      repo.data.status = [{ path: '/tmp/worktree-a', branch: 'feature/a', isMain: false, entries: [] }]
-      repo.data.statusLoaded = true
-    })
+    setRepoStatusQueryData(REPO_ID, repoInstanceId, [
+      { path: '/tmp/worktree-a', branch: 'feature/a', isMain: false, entries: [] },
+    ])
     ipcHandlers['repo.snapshot'] = async () => ({
       branches: [
         branch('feature/a', undefined, {
@@ -641,13 +732,14 @@ describe('core refresh request ordering', () => {
 
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.data.worktreesByPath['/tmp/worktree-a']).toMatchObject({
+    const repo = useReposStore.getState().repos[REPO_ID]!
+    expect(readRepoBranchQueryProjection(repo)?.worktreesByPath['/tmp/worktree-a']).toMatchObject({
       isDirty: false,
       changeCount: 0,
     })
   })
 
-  test('snapshot refresh stores worktree state outside branch state', async () => {
+  test('snapshot refresh stores worktree state in the branch read model', async () => {
     const repoInstanceId = seedRepo([branch('feature/a')])
     ipcHandlers['repo.snapshot'] = async () => ({
       branches: [
@@ -667,8 +759,9 @@ describe('core refresh request ordering', () => {
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.data.branches[0]?.worktree).not.toHaveProperty('summary')
-    expect(repo?.data.worktreesByPath['/tmp/worktree-a']).toMatchObject({
+    const projection = repo ? readRepoBranchQueryProjection(repo) : null
+    expect(projection?.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
+    expect(projection?.worktreesByPath['/tmp/worktree-a']).toMatchObject({
       isDirty: true,
       changeCount: 3,
     })
@@ -787,7 +880,7 @@ describe('core refresh request ordering', () => {
       resolvers[3]?.(fresh)
       await works[4]
 
-      expect(useReposStore.getState().repos[REPO_ID]?.data.status).toEqual(fresh)
+      expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toEqual(fresh)
     } finally {
       resolvers[1]?.([])
       resolvers[2]?.([])
@@ -814,11 +907,11 @@ describe('core refresh request ordering', () => {
 
     resolveSecond({ branches: [branch('fresh')], current: 'fresh' })
     await second
-    expect(useReposStore.getState().repos[REPO_ID]?.data.currentBranch).toBe('fresh')
+    expect(repoCurrentBranch()).toBe('fresh')
 
     resolveFirst({ branches: [branch('stale')], current: 'stale' })
     await first
-    expect(useReposStore.getState().repos[REPO_ID]?.data.currentBranch).toBe('fresh')
+    expect(repoCurrentBranch()).toBe('fresh')
   })
 
   test('snapshot refresh preserves the terminal preference when the selected branch has no worktree', async () => {
@@ -840,12 +933,18 @@ describe('core refresh request ordering', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.selectedBranch).toBe('feature/a')
-    expect(repo ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch(repo, 'feature/a')) : null).toBe(
-      'terminal',
-    )
+    const projection = repo ? readRepoBranchQueryProjection(repo) : null
+    expect(
+      repo && projection
+        ? preferredWorkspacePaneTabForTarget(
+            repo.ui,
+            workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: projection.branches }, 'feature/a'),
+          )
+        : null,
+    ).toBe('terminal')
   })
 
-  test('snapshot refresh follows the selected worktree when checkout moves it to another branch', async () => {
+  test('snapshot refresh follows selected worktree using the previous query snapshot', async () => {
     const repoInstanceId = seedRepo([
       branch('feature/old', undefined, { worktree: { path: '/tmp/worktree-a' } }),
       branch('feature/new'),
@@ -867,8 +966,14 @@ describe('core refresh request ordering', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.selectedBranch).toBe('feature/new')
+    const projection = repo ? readRepoBranchQueryProjection(repo) : null
     expect(
-      repo ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch(repo, 'feature/new')) : null,
+      repo && projection
+        ? preferredWorkspacePaneTabForTarget(
+            repo.ui,
+            workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: projection.branches }, 'feature/new'),
+          )
+        : null,
     ).toBe('terminal')
   })
 
@@ -895,7 +1000,8 @@ describe('core refresh request ordering', () => {
         repoRoot: REPO_ID,
       }),
     ])
-    const worktreesByPath = useReposStore.getState().repos[REPO_ID]?.data.worktreesByPath
+    const repo = useReposStore.getState().repos[REPO_ID]!
+    const worktreesByPath = readRepoBranchQueryProjection(repo)?.worktreesByPath
     expect(worktreesByPath?.['/tmp/stale-worktree']).toBeUndefined()
     expect(Object.keys(worktreesByPath ?? {}).sort()).toEqual(['/repo', '/tmp/worktree-a'])
   })

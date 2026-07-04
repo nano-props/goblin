@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoWorkspaceToolbar } from '#/web/components/repo-workspace/RepoWorkspaceToolbar.tsx'
 import { WorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/WorkspaceOpenExternallyMenu.tsx'
-import { getSelectedRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
+import { getSelectedRepoWorkspacePresentation, type RepoWorkspaceRepo } from '#/web/components/repo-workspace/model.ts'
 import { useRepoWorkspaceTabModel } from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import {
@@ -38,10 +38,11 @@ import {
   createRepoBranch,
   installWorkspacePaneTabsTestBridge,
   resetReposStore,
-  seedRepoState,
+  seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { workspacePaneTabsTargetForRepoBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import {
   readWorkspacePaneTabsForTarget,
   setWorkspacePaneTabsForTargetQueryData,
@@ -126,6 +127,12 @@ function RepoWorkspaceToolbarHarness(props: RepoWorkspaceToolbarHarnessProps) {
   const workspacePaneTabModel = useRepoWorkspaceTabModel(props.repo, props.detail)
   const branchActions = useBranchActions(props.repo, props.detail.branch!)
   return <RepoWorkspaceToolbar {...props} workspacePaneTabModel={workspacePaneTabModel} branchActions={branchActions} />
+}
+
+function repoWorkspaceRepo(repo: RepoState): RepoWorkspaceRepo {
+  const branchModel = readRepoBranchQueryProjection(repo)
+  if (!branchModel) throw new Error('missing branch read model')
+  return { ...repo, branchModel: { ...branchModel, statusReady: true } }
 }
 
 beforeEach(() => {
@@ -415,7 +422,7 @@ describe('RepoWorkspaceToolbar', () => {
 
   test('reloads the scoped recent external app when the worktree path changes', async () => {
     const nextWorktreePath = '/tmp/gbl-repo-workspace-toolbar-worktree-next'
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
     })
@@ -433,7 +440,7 @@ describe('RepoWorkspaceToolbar', () => {
         ])}
       >
         <WorkspaceOpenExternallyMenu
-          repo={repo}
+          repo={repoWorkspaceRepo(repo)}
           branch={createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })}
           branchActions={branchActions}
         />
@@ -454,7 +461,7 @@ describe('RepoWorkspaceToolbar', () => {
         ])}
       >
         <WorkspaceOpenExternallyMenu
-          repo={repo}
+          repo={repoWorkspaceRepo(repo)}
           branch={createRepoBranch('feature/worktree', { worktree: { path: nextWorktreePath } })}
           branchActions={branchActions}
         />
@@ -1154,7 +1161,7 @@ function renderToolbar(options: {
   }
   const branchName = options.worktree === false ? 'feature/no-worktree' : 'feature/worktree'
   const branch = createRepoBranch(branchName, options.worktree === false ? {} : { worktree: { path: WORKTREE_PATH } })
-  const repo = seedRepoState({
+  const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches: [branch],
     selectedBranch: branchName,
@@ -1181,10 +1188,9 @@ function renderToolbar(options: {
             },
           ]
         : [],
-    statusLoaded: true,
     remote: options.remote,
   })
-  const detail = getSelectedRepoWorkspacePresentation(repo)
+  const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
   const sessions: TerminalSessionSummary[] = Array.from({ length: options.terminalCount }, (_, index) => ({
     type: 'terminal',
     terminalSessionId: `t${index + 1}`,
@@ -1288,7 +1294,7 @@ function renderToolbar(options: {
         <TerminalSessionContext value={commandContext}>
           <TerminalSessionReadContext value={readContext}>
             <RepoWorkspaceToolbarHarness
-              repo={repo}
+              repo={repoWorkspaceRepo(repo)}
               detail={detail}
               workspacePaneId="workspace"
               trafficLightOffset={options.trafficLightOffset}
@@ -1355,7 +1361,7 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
 
 function tabsFor(branchName: string): WorkspacePaneTabEntry[] {
   const repo = useReposStore.getState().repos[REPO_ID]
-  const target = repo ? workspacePaneTabsTargetForRepoBranch(repo, branchName) : null
+  const target = repo ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, branchName) : null
   return target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : []
 }
 

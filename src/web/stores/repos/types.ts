@@ -5,7 +5,6 @@ import type {
   ExecResult,
   GitRemoteInfo,
   PullRequestFetchMode,
-  WorktreeStatus,
 } from '#/web/types.ts'
 import type { RemoteRepoConnectionLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspaceSessionState } from '#/shared/api-types.ts'
@@ -19,7 +18,6 @@ import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
 import type { RepoDataLoadBundle } from '#/web/stores/repos/repo-data-load-state.ts'
 export type BranchViewMode = 'all' | 'worktrees'
 type RepoDataSource = 'cache' | 'fresh'
-// Client branches keep only the worktree reference; metadata lives in worktreesByPath.
 export type RepoBranchState = Omit<BranchSnapshotInfo, 'worktree'> & {
   worktree?: Pick<NonNullable<BranchSnapshotInfo['worktree']>, 'path'>
 }
@@ -42,16 +40,13 @@ export type RepoEvent =
 /** Discriminated union: a successful open guarantees `id`; a failed
  *  open carries a translation key or raw message. The shape forces
  *  callers to narrow before reading either field. */
-export type OpenRepoResult = { ok: true; id: string } | { ok: false; message: string }
-
-export interface RepoDataState {
-  branches: RepoBranchState[]
-  currentBranch: string
-  currentHEAD?: string
-  status: WorktreeStatus[]
-  statusLoaded: boolean
-  worktreesByPath: Record<string, RepoWorktreeState>
+export interface OpenRepoPostOpenError {
+  kind: 'recent-repo'
+  message: string
 }
+
+export type OpenRepoResult =
+  { ok: true; id: string; postOpenEffects?: Promise<OpenRepoPostOpenError[]> } | { ok: false; message: string }
 
 export interface RepoWorktreeState {
   path: string
@@ -79,11 +74,9 @@ export interface RepoRemoteState {
   /**
    * Single source-of-truth lifecycle for a remote repo. `null` for local
    * repos. The lifecycle union owns `target` — code MUST read the target
-   * from `lifecycle.target` (ready / failed-with-target). The legacy
-   * `target?: RemoteRepoTarget` field has been removed in Phase 4 of the
-   * remote-repo refactor; new code should call `remoteRepoTarget(repo)`
-   * from `web/stores/repos/repo-guards.ts` instead of reaching into
-   * `repo.remote.target`.
+   * from `lifecycle.target` (ready / failed-with-target). Call
+   * `remoteRepoTarget(repo)` from `web/stores/repos/repo-guards.ts`
+   * instead of inferring target state from other remote fields.
    */
   lifecycle: RemoteRepoConnectionLifecycle | null
   remotes?: string[]
@@ -109,7 +102,10 @@ type RepoAvailabilityState = { phase: 'available' } | { phase: 'unavailable'; re
 export interface RepoSnapshotCacheEntry {
   savedAt: number
   name: string
-  data: Pick<RepoDataState, 'branches' | 'currentBranch'>
+  data: {
+    branches: RepoBranchState[]
+    currentBranch: string
+  }
   ui: Pick<RepoUiState, 'selectedBranch' | 'branchViewMode'>
 }
 
@@ -119,8 +115,6 @@ export interface RepoState {
   name: string
   /** Bumped on every fresh open so async writers can detect close-and-reopen. */
   instanceId: string
-  /** Client-local projection of runtime-coherent repo truth. */
-  data: RepoDataState
   dataLoads: RepoDataLoadBundle
   operations: RepoOperationsState
   ui: RepoUiState
@@ -174,6 +168,10 @@ interface LocalWorkspaceState {
   /** Persistence gate — true only after all boot-restored state that can
    *  affect WorkspaceSessionState has converged back into the client store. */
   sessionPersistenceReady: boolean
+  /** Boot restore failure that blocks session persistence. UI can render, but
+   *  persisted workspace state must not be overwritten until the restore issue
+   *  is resolved by a successful boot. */
+  sessionRestoreError: string | null
   /** Chrome-tab-style "opener" tracking, covering every workspace pane tab
    *  (static and terminal): maps a tab's identity (see
    *  `workspacePaneTabEntryIdentity`) to the identity of the tab that was
@@ -230,14 +228,16 @@ interface RuntimeCoherentRepoProjectionActions {
   selectBranch: (id: string, branch: string) => void
   clearSelectedBranch: (id: string) => void
   refreshSnapshot: (id: string, options?: { skipLogBackfill?: boolean; repoInstanceId?: string }) => Promise<void>
-  refreshSnapshotAndStatus: (id: string, options?: { skipLogBackfill?: boolean; repoInstanceId?: string }) => Promise<void>
+  refreshSnapshotAndStatus: (
+    id: string,
+    options?: { skipLogBackfill?: boolean; repoInstanceId?: string },
+  ) => Promise<void>
   refreshPullRequests: (
     id: string,
     branches?: string[],
     options?: {
       repoInstanceId?: string
       mode?: PullRequestFetchMode
-      clearMissing?: boolean
     },
   ) => Promise<void>
   refreshStatus: (id: string, options?: { repoInstanceId?: string }) => Promise<void>

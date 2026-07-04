@@ -52,6 +52,9 @@ interface StoredWorkspacePaneTabsEntry {
 const DEFAULT_WORKSPACE_TABS: readonly WorkspacePaneTabEntry[] = [workspacePaneStaticTabEntry('status')]
 
 export class WorkspacePaneTabsRuntime<TUser extends string | number> {
+  // Authoritative in-process runtime state for workspace pane tabs.
+  // Client query caches and session snapshots are projections/restore
+  // inputs; they should not be treated as competing runtime owners.
   private readonly tabsByTarget = new Map<string, StoredWorkspacePaneTabsEntry>()
 
   replaceTabs(input: WorkspacePaneTabsReplaceInput<TUser>): WorkspacePaneTabEntry[] {

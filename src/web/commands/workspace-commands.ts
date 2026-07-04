@@ -23,12 +23,16 @@ import {
   workspacePaneTabProvider,
 } from '#/web/components/workspace-pane/tab-providers.ts'
 import { beginWorkspacePaneTabClose } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
-import { activeWorkspacePaneTabTarget } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import {
+  activeWorkspacePaneTabTarget,
+  activeWorkspacePaneTabTargetResolution,
+} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
   captureWorkspacePaneActiveTabIdentity,
   clearWorkspacePaneTabOpener,
   workspacePaneTabOpener,
 } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 interface ShowWorkspacePaneTabCommandOptions {
   repoId: string | null
@@ -71,10 +75,7 @@ type CloseWorkspacePaneTabOrWindowCommandOptions = CloseWorkspacePaneTabCommandO
   closeWindow?: () => void
 }
 
-type CloseWorkspaceSurfaceIntent =
-  | { kind: 'close-tab' }
-  | { kind: 'close-window' }
-  | { kind: 'noop' }
+type CloseWorkspaceSurfaceIntent = { kind: 'close-tab' } | { kind: 'close-window' } | { kind: 'noop' }
 
 interface SelectWorkspacePaneTabByIndexCommandOptions {
   repoId: string | null
@@ -96,7 +97,11 @@ export async function runShowWorkspacePaneTabCommand({
   return await showWorkspacePaneTabCommand({ repoId, tab, navigation })
 }
 
-async function showWorkspacePaneTabCommand({ repoId, tab, navigation }: ShowWorkspacePaneTabCommandOptions): Promise<boolean> {
+async function showWorkspacePaneTabCommand({
+  repoId,
+  tab,
+  navigation,
+}: ShowWorkspacePaneTabCommandOptions): Promise<boolean> {
   if (!repoId) return false
   const provider = workspacePaneTabProvider(tab)
   if (isWorkspacePaneStaticTabProvider(provider)) {
@@ -230,10 +235,7 @@ async function closeWorkspacePaneTabCommand(options: CloseWorkspacePaneTabComman
   observeWorkspacePaneTabClose(close.completion, target.repoId, target.branchName, closingIdentity)
   if (tab.kind === 'static' && !(await close.completion)) return false
 
-  if (
-    nextTab &&
-    (tab.kind !== 'static' || shouldSelectNextTabAfterStaticClose(target, tab.type, initialActiveId))
-  ) {
+  if (nextTab && (tab.kind !== 'static' || shouldSelectNextTabAfterStaticClose(target, tab.type, initialActiveId))) {
     showWorkspacePaneCommandTab(target, nextTab, navigation)
   }
   return true
@@ -251,7 +253,8 @@ function closeConfirmedTerminalWorkspacePaneTab(options: ConfirmCloseTerminalWor
     wasActive && target && tab
       ? workspacePaneTabOpener(target.repoId, confirmedTerminal.base.branch, tab.identity)
       : null
-  const nextTab = wasActive && target && tab ? nextRepoWorkspaceTabAfterClose(target.tabs, tab.identity, openerIdentity) : null
+  const nextTab =
+    wasActive && target && tab ? nextRepoWorkspaceTabAfterClose(target.tabs, tab.identity, openerIdentity) : null
   const closeTerminalByDescriptor = readTerminalSessionCommandBridge()?.closeTerminalByDescriptor
   if (!closeTerminalByDescriptor) return false
   observeWorkspacePaneTabClose(
@@ -360,7 +363,9 @@ function enterTerminalWorkspacePaneTab(
 function selectedRepoWorkspaceTarget(repoId: string): { branchName: string; worktreePath: string | null } | null {
   const repo = useReposStore.getState().repos[repoId]
   if (!repo?.ui.selectedBranch) return null
-  const branch = repo.data.branches.find((candidate) => candidate.name === repo.ui.selectedBranch)
+  const branchModel = readRepoBranchQueryProjection(repo)
+  if (!branchModel) return null
+  const branch = branchModel.branches.find((candidate) => candidate.name === repo.ui.selectedBranch)
   if (!branch) return null
   return { branchName: branch.name, worktreePath: branch.worktree?.path ?? null }
 }
@@ -399,7 +404,9 @@ function observeWorkspacePaneTabClose(
 function resolveCloseWorkspaceSurfaceIntent(options: CloseWorkspacePaneTabCommandOptions): CloseWorkspaceSurfaceIntent {
   const { repoId, targetIdentity } = options
   if (!repoId) return { kind: 'close-window' }
-  const target = activeWorkspacePaneTabTarget(repoId)
+  const resolution = activeWorkspacePaneTabTargetResolution(repoId)
+  if (resolution.kind === 'unavailable') return { kind: 'noop' }
+  const target = resolution.kind === 'ready' ? resolution.target : null
   if (!target) return { kind: 'close-window' }
   if (targetIdentity) {
     return target.tabs.some((candidate) => candidate.identity === targetIdentity)

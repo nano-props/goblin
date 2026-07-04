@@ -1,4 +1,4 @@
-import type { BranchViewMode, RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
+import type { BranchViewMode, RepoBranchState } from '#/web/stores/repos/types.ts'
 interface BranchSelectionInput {
   branches: RepoBranchState[]
   currentBranch: string
@@ -30,13 +30,4 @@ export function selectedBranchForBranchSet({
   if (selectedBranch === null) return null
   if (selectedBranch && visible.some((branch) => branch.name === selectedBranch)) return selectedBranch
   return visible.find((branch) => branch.name === currentBranch)?.name ?? visible[0]?.name ?? null
-}
-
-export function selectedBranchForViewMode(repo: RepoState, viewMode: BranchViewMode): string | null {
-  return selectedBranchForBranchSet({
-    branches: repo.data.branches,
-    currentBranch: repo.data.currentBranch,
-    selectedBranch: repo.ui.selectedBranch,
-    viewMode,
-  })
 }

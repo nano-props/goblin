@@ -1,6 +1,9 @@
 import { lastPathSegment } from '#/web/lib/paths.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
-import { restoreRepoProjectionFromCacheEntry } from '#/web/stores/repos/persistence.ts'
+import {
+  restoreRepoProjectionFromCacheEntry,
+  seedRepoSnapshotQueryFromCacheEntry,
+} from '#/web/stores/repos/persistence.ts'
 import { disposeRepoOperationScheduler } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
@@ -12,13 +15,28 @@ import {
 } from '#/web/repo-client.ts'
 import { resolveRemoteRepositoryTarget } from '#/web/remote-client.ts'
 import { recordRecentRepo } from '#/web/settings-actions.ts'
+import {
+  invalidateRepoRuntimeInstances,
+  removeRepoRuntimeInstanceFromCache,
+  refreshRepoRuntimeInstances,
+  updateRepoRuntimeInstanceCache,
+} from '#/web/repo-runtime-query.ts'
+import { clearWorkspacePaneTabsProjectionState } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { reposLog } from '#/web/logger.ts'
 import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-orchestrator.ts'
 import {
   markRemoteLifecycleConnecting,
   markRemoteLifecycleFailed,
   markRemoteLifecycleReady,
 } from '#/web/stores/repos/availability.ts'
-import type { OpenRepoResult, ReposGet, ReposSet, RepoState, ReposStore } from '#/web/stores/repos/types.ts'
+import type {
+  OpenRepoPostOpenError,
+  OpenRepoResult,
+  ReposGet,
+  ReposSet,
+  RepoState,
+  ReposStore,
+} from '#/web/stores/repos/types.ts'
 import { nextActiveRepoIdAfterWorkspaceClose } from '#/web/open-workspace-state.ts'
 import {
   isRemoteRepoId,
@@ -113,11 +131,31 @@ export async function openLocalRepoRuntimeForInput(input: string | RepoSessionEn
       repoInstanceId: null,
     }
   }
+  await updateRepoRuntimeInstanceCache({ repoRoot: opened.repo.id, repoInstanceId: opened.repoInstanceId })
   return {
     input: entry.id,
     reason: null,
     repo: opened.repo,
     repoInstanceId: opened.repoInstanceId,
+  }
+}
+
+export async function openRepoRuntimeInstanceWithCache(repoRoot: string): Promise<string> {
+  const repoInstanceId = await openRepoRuntimeInstance(repoRoot)
+  await updateRepoRuntimeInstanceCache({ repoRoot, repoInstanceId })
+  return repoInstanceId
+}
+
+export async function closeRepoRuntimeInstanceWithCache(repoRoot: string, repoInstanceId: string): Promise<void> {
+  try {
+    const closed = await closeRepoRuntimeInstance(repoRoot, repoInstanceId)
+    if (closed) await removeRepoRuntimeInstanceFromCache({ repoRoot, repoInstanceId })
+    else await refreshRepoRuntimeInstances()
+  } catch (err) {
+    await refreshRepoRuntimeInstances()
+    throw err
+  } finally {
+    clearWorkspacePaneTabsProjectionState(repoRoot, repoInstanceId)
   }
 }
 
@@ -134,11 +172,44 @@ function orderedInsert(order: string[], id: string, rankById?: ReadonlyMap<strin
   return next
 }
 
+function removeRepoFromSessionState(s: ReposStore, id: string): Partial<ReposStore> {
+  if (!s.repos[id]) return s
+  const repos = { ...s.repos }
+  const selectedTerminalSessionIdByTerminalWorktree = { ...s.selectedTerminalSessionIdByTerminalWorktree }
+  const tabOpenerIdentityByScope = { ...s.tabOpenerIdentityByScope }
+  delete repos[id]
+  for (const terminalWorktreeKey of Object.keys(selectedTerminalSessionIdByTerminalWorktree)) {
+    if (terminalWorktreeKey.startsWith(`${id}\0`)) delete selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]
+  }
+  for (const scopeKey of Object.keys(tabOpenerIdentityByScope)) {
+    if (scopeKey.startsWith(`${id}\0`)) delete tabOpenerIdentityByScope[scopeKey]
+  }
+  const order = s.order.filter((x) => x !== id)
+  const activeId = nextActiveRepoIdAfterWorkspaceClose(s.order, s.activeId, id)
+  return {
+    repos,
+    selectedTerminalSessionIdByTerminalWorktree,
+    tabOpenerIdentityByScope,
+    order,
+    activeId,
+  }
+}
+
+async function recordRecentRepoPostOpen(repo: RepoSessionEntry): Promise<OpenRepoPostOpenError[]> {
+  try {
+    await recordRecentRepo(repo)
+    return []
+  } catch (err) {
+    reposLog.warn('failed to record recent repo after opening workspace', { repo, err })
+    return [{ kind: 'recent-repo', message: err instanceof Error ? err.message : 'repo-picker.recent-save-failed' }]
+  }
+}
+
 /** Build a fresh repo by layering the restorable cache on top of an
  *  empty shell. `nameHints` is consulted in order; the first non-empty
  *  hint wins, then the cached name, then the last path segment of the
- *  id. The caller mutates the result (e.g. sets `remote.target`,
- *  flips availability) before returning it from `upsertRepo.create`. */
+ *  id. The caller mutates lifecycle / availability fields before
+ *  returning it from `upsertRepo.create`. */
 function buildNewRepo(
   s: Pick<ReposStore, 'repoSnapshotCache'>,
   id: string,
@@ -148,6 +219,7 @@ function buildNewRepo(
   const cached = s.repoSnapshotCache[id]
   const hint = nameHints.find((value): value is string => !!value)
   const name = hint ?? cached?.name ?? lastPathSegment(id)
+  seedRepoSnapshotQueryFromCacheEntry(id, instanceId, cached)
   const repo = restoreRepoProjectionFromCacheEntry(emptyRepo(id, name, instanceId), cached)
   return hint ? { ...repo, name: hint } : repo
 }
@@ -277,8 +349,7 @@ export function addUnavailableRepo(
     create: () => {
       const repo = buildNewRepo(s, id, [target?.displayName], instanceId)
       // New repo: write the failed lifecycle (with last-known target
-      // if the probe got far enough to resolve one). The legacy
-      // `target` field is mirrored for un-migrated call sites.
+      // if the probe got far enough to resolve one).
       markRemoteLifecycleFailed(repo, reason, target)
       return repo
     },
@@ -312,12 +383,12 @@ export function addUnavailableRepo(
  * addUnavailableRepo. No-op if the repo is already in the store (so
  * calling this twice for the same entry is safe).
  *
- * Note: we intentionally do NOT set `remote.target` here. The ref only
- * carries alias/remotePath; host/user/port require `resolveRemoteRepositoryTarget`,
- * which hasn't run yet. Until the probe succeeds and addResolvedRepo
- * fills in the target, the placeholder lives in a "known alias,
- * unknown concrete host" state — `deriveConnectivity(repo) === 'connecting'`
- * is the signal callers should branch on rather than reading target fields.
+ * Note: the ref only carries alias/remotePath; host/user/port require
+ * `resolveRemoteRepositoryTarget`, which hasn't run yet. Until the probe
+ * succeeds and addResolvedRepo fills in the target, the placeholder lives
+ * in a "known alias, unknown concrete host" state —
+ * `deriveConnectivity(repo) === 'connecting'` is the signal callers should
+ * branch on rather than reading target fields.
  */
 export function insertPlaceholderRepo(
   s: Pick<ReposStore, 'repos' | 'repoSnapshotCache' | 'order'>,
@@ -377,7 +448,7 @@ export function createRuntimeRepoSessionActions(
         // store entry; the orchestrator will fill in target +
         // trigger refresh on settle.
         if (!get().repos[entry.id]) {
-          const instanceId = await openRepoRuntimeInstance(entry.id)
+          const instanceId = await openRepoRuntimeInstanceWithCache(entry.id)
           set((s) => {
             const result = insertPlaceholderRepo(
               { repos: s.repos, repoSnapshotCache: s.repoSnapshotCache, order: s.order },
@@ -391,25 +462,20 @@ export function createRuntimeRepoSessionActions(
         if (!outcome) return { ok: false, message: 'error.not-git-repo' }
         if (outcome.kind === 'ready' && outcome.target) {
           const recentEntry = remoteRepoSessionEntry(outcome.target)
-          void recordRecentRepo(recentEntry).catch(() => {
-            /* recent menu is best-effort */
-          })
-          return { ok: true, id: outcome.repoId }
+          return { ok: true, id: outcome.repoId, postOpenEffects: recordRecentRepoPostOpen(recentEntry) }
         }
         return { ok: false, message: outcome.reason ?? 'error.failed-read-repo' }
       }
-      // Local probe stays on the legacy path — there's no remote
+      // Local repos use the direct runtime-open path — there's no remote
       // lifecycle to converge and no orchestrator concern.
       const resolved = await openLocalRepoRuntimeForInput(entry)
-      if (!resolved.repo || !resolved.repoInstanceId) return { ok: false, message: resolved.reason ?? 'error.not-git-repo' }
+      if (!resolved.repo || !resolved.repoInstanceId)
+        return { ok: false, message: resolved.reason ?? 'error.not-git-repo' }
       const repo = resolved.repo
       const { id } = repo
       const instanceId = resolved.repoInstanceId
       let initialRefresh: InitialRepoRefresh | null = null
       const recentEntry = repo.target ? remoteRepoSessionEntry(repo.target) : { kind: 'local' as const, id }
-      void recordRecentRepo(recentEntry).catch(() => {
-        /* recent menu is best-effort */
-      })
 
       set((s) => {
         const { repos, order, changed } = addResolvedRepo(s, repo, instanceId)
@@ -423,7 +489,7 @@ export function createRuntimeRepoSessionActions(
       })
 
       if (initialRefresh) refreshInitialRepoState(get, initialRefresh)
-      return { ok: true, id }
+      return { ok: true, id, postOpenEffects: recordRecentRepoPostOpen(recentEntry) }
     },
 
     closeRepo(id: string) {
@@ -436,32 +502,17 @@ export function createRuntimeRepoSessionActions(
       void abortRepoOperation(id).catch(() => {
         /* main may have nothing to abort — ignore */
       })
-      set((s) => {
-        if (!s.repos[id]) return s
-        const repos = { ...s.repos }
-        const selectedTerminalSessionIdByTerminalWorktree = { ...s.selectedTerminalSessionIdByTerminalWorktree }
-        const tabOpenerIdentityByScope = { ...s.tabOpenerIdentityByScope }
-        delete repos[id]
-        for (const terminalWorktreeKey of Object.keys(selectedTerminalSessionIdByTerminalWorktree)) {
-          if (terminalWorktreeKey.startsWith(`${id}\0`))
-            delete selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]
-        }
-        for (const scopeKey of Object.keys(tabOpenerIdentityByScope)) {
-          if (scopeKey.startsWith(`${id}\0`)) delete tabOpenerIdentityByScope[scopeKey]
-        }
-        const order = s.order.filter((x) => x !== id)
-        const activeId = nextActiveRepoIdAfterWorkspaceClose(s.order, s.activeId, id)
-        return {
-          repos,
-          selectedTerminalSessionIdByTerminalWorktree,
-          tabOpenerIdentityByScope,
-          order,
-          activeId,
-        }
-      })
+      set((s) => removeRepoFromSessionState(s, id))
       if (typeof repoInstanceId === 'string') {
-        void closeRepoRuntimeInstance(id, repoInstanceId).catch(() => {
-          /* close is best-effort; stale repoInstanceId paths already fail server-side */
+        void closeRepoRuntimeInstanceWithCache(id, repoInstanceId).catch((err) => {
+          reposLog.warn('failed to close repo runtime instance', { id, repoInstanceId, err })
+          void invalidateRepoRuntimeInstances().catch((refreshErr) => {
+            reposLog.warn('failed to refresh repo runtime membership after close failure', {
+              id,
+              repoInstanceId,
+              err: refreshErr,
+            })
+          })
         })
       }
     },

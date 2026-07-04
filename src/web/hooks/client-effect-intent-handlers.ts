@@ -7,6 +7,7 @@ import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { clearRecentRepoHistory } from '#/web/settings-actions.ts'
 import { openRepoFromDialog } from '#/web/lib/open-repo-dialog.ts'
+import { reportOpenRepoPostOpenEffects } from '#/web/lib/open-repo-result-feedback.ts'
 import { consumeExternalOpenPaths } from '#/web/app-shell-client.ts'
 import { openRepoPaths } from '#/web/lib/open-repo-paths.ts'
 import { externalOpenLog } from '#/web/logger.ts'
@@ -26,6 +27,7 @@ import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 interface TerminalBellIntentDeps {
   navigation: PrimaryWindowNavigationActions
@@ -60,8 +62,10 @@ export function handleTerminalBellClickIntent(
   event: Extract<ClientEffectIntent, { type: 'terminal-bell-click' }>,
   deps: TerminalBellIntentDeps,
 ): void {
-  const plan = createTerminalBellIntentPlan(useReposStore.getState().repos[event.repoRoot], event)
-  if (plan.kind === 'noop') return
+  const repo = useReposStore.getState().repos[event.repoRoot]
+  const branchModel = repo && event.terminalWorktreeKey ? readRepoBranchQueryProjection(repo) : null
+  const plan = createTerminalBellIntentPlan(repo, branchModel, event)
+  if (plan.kind === 'noop' || plan.kind === 'unavailable') return
   deps.closeAllOverlays()
   switch (plan.kind) {
     case 'show-worktree-terminal':
@@ -100,7 +104,10 @@ export async function handleAppLevelClientIntent(
       return true
     case 'ensure-recent-repo-open': {
       const result = await deps.ensureWorkspaceOpen(plan.entry)
-      if (result.ok) deps.navigation.activateRepo(result.id)
+      if (result.ok) {
+        reportOpenRepoPostOpenEffects(result, deps.t)
+        deps.navigation.activateRepo(result.id)
+      }
       return true
     }
     case 'reset-layout':
@@ -231,6 +238,11 @@ export function createExternalOpenIntentDrainer(deps: ExternalOpenIntentDrainerD
               const openErrorMessage = deps.t(message)
               toast.error(deps.t('drop.open-failed'), {
                 description: `${path}\n${openErrorMessage}`,
+              })
+            },
+            onPostOpenError: (path, message) => {
+              toast.error(deps.t('repo-picker.recent-save-failed'), {
+                description: `${path}\n${deps.t(message)}`,
               })
             },
           })

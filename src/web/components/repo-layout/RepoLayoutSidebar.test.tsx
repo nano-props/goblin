@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { QueryClientProvider } from '@tanstack/react-query'
+import type { ReactElement } from 'react'
 import { RepoLayoutSidebar } from '#/web/components/repo-layout/RepoLayoutSidebar.tsx'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 
 vi.mock('#/web/components/RepoPickerHost.tsx', () => ({
   RepoPickerHost: () => <button type="button" data-testid="repo-picker-host" className="h-10 w-full shrink-0" />,
@@ -12,21 +15,23 @@ vi.mock('#/web/components/RepoPickerHost.tsx', () => ({
 const REPO_ID = '/tmp/repo-shell-sidebar-test'
 
 beforeEach(() => {
+  primaryWindowQueryClient.clear()
   resetReposStore()
-  seedRepoState({
+  seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches: [createRepoBranch('main'), createRepoBranch('feature/a')],
   })
 })
 
 afterEach(() => {
+  primaryWindowQueryClient.clear()
   resetReposStore()
   vi.restoreAllMocks()
 })
 
 describe('RepoLayoutSidebar', () => {
   test('renders sidebar actions before the branch content without growing action rows', () => {
-    const { container } = renderInJsdom(
+    const { container } = renderSidebar(
       <RepoLayoutSidebar repoId={REPO_ID} compact={false} branchContent={<div data-testid="branch-content" />} />,
     )
 
@@ -53,7 +58,7 @@ describe('RepoLayoutSidebar', () => {
   })
 
   test('renders placeholder state when no repo is open', () => {
-    const { container } = renderInJsdom(<RepoLayoutSidebar compact={false} />)
+    const { container } = renderSidebar(<RepoLayoutSidebar compact={false} />)
 
     expect(container.querySelector('[data-testid="repo-picker-host"]')).not.toBeNull()
 
@@ -70,7 +75,7 @@ describe('RepoLayoutSidebar', () => {
   })
 
   test('renders zen reveal top chrome as draggable without owning zen-toggle geometry', () => {
-    const { container } = renderInJsdom(
+    const { container } = renderSidebar(
       <RepoLayoutSidebar repoId={REPO_ID} compact={false} branchContent={<div data-testid="branch-content" />} />,
     )
 
@@ -83,7 +88,7 @@ describe('RepoLayoutSidebar', () => {
   })
 
   test('can render the top chrome as neutral when the docked sidebar is collapsed', () => {
-    const { container } = renderInJsdom(
+    const { container } = renderSidebar(
       <RepoLayoutSidebar
         repoId={REPO_ID}
         compact={false}
@@ -98,3 +103,7 @@ describe('RepoLayoutSidebar', () => {
     expect(sidebarTop?.hasAttribute('data-interactive')).toBe(false)
   })
 })
+
+function renderSidebar(element: ReactElement) {
+  return renderInJsdom(<QueryClientProvider client={primaryWindowQueryClient}>{element}</QueryClientProvider>)
+}

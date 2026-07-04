@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, test } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { resetReposStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
 
 function Harness() {
   const overlays = useAppOverlays()
@@ -72,7 +72,7 @@ describe('useAppOverlays', () => {
   test('tracks non-settings overlays centrally and resets all overlays together', () => {
     // Seed an active repo so the openCreateWorktree defensive
     // guard (in production) does not short-circuit the test.
-    seedRepoState({ id: '/tmp/gbl-overlay-test', branches: [] })
+    seedRepoShellForTest({ id: '/tmp/gbl-overlay-test' })
 
     const { container } = renderInJsdom(<Harness />)
 
@@ -111,7 +111,7 @@ describe('useAppOverlays', () => {
 
   test('can derive route-driven create-worktree state from the active repo', () => {
     const repoId = '/tmp/gbl-route-overlay-repo'
-    seedRepoState({ id: repoId, branches: [] })
+    seedRepoShellForTest({ id: repoId })
     const { container } = renderInJsdom(<RoutedHarness />)
 
     click(container, '#open-create-worktree')
@@ -146,7 +146,7 @@ describe('useAppOverlays', () => {
 
     // Now seed an active repo; opening should now work.
     act(() => {
-      seedRepoState({ id: '/tmp/gbl-overlay-test', branches: [] })
+      seedRepoShellForTest({ id: '/tmp/gbl-overlay-test' })
     })
     rerender(<Harness />)
     click(container, '#open-create-worktree')
@@ -156,7 +156,7 @@ describe('useAppOverlays', () => {
   test('create-worktree captures the opening repo and closes when the active repo changes', () => {
     const repoA = '/tmp/gbl-overlay-repo-a'
     const repoB = '/tmp/gbl-overlay-repo-b'
-    seedRepoState({ id: repoA, branches: [] })
+    seedRepoShellForTest({ id: repoA })
     const { container } = renderInJsdom(<Harness />)
 
     click(container, '#open-create-worktree')
@@ -165,7 +165,7 @@ describe('useAppOverlays', () => {
     expect(text(container, '#any-open')).toBe('open')
 
     act(() => {
-      seedRepoState({ id: repoB, branches: [] })
+      seedRepoShellForTest({ id: repoB })
     })
 
     expect(text(container, '#create-worktree-open')).toBe('closed')

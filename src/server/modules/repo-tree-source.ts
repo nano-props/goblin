@@ -34,9 +34,9 @@ export async function getRepoTreeSourceLocal(
   options: RepoTreeSourceOptions,
   signal: AbortSignal | undefined,
 ): Promise<RepoTreeSourceResult> {
-  if (signal?.aborted) return { nodes: [], truncated: false }
+  if (signal?.aborted) throw new Error('aborted')
   const prefix = normalizePrefix(options.prefix)
-  if (!isSafeNormalizedPrefix(prefix)) return { nodes: [], truncated: false }
+  if (!isSafeNormalizedPrefix(prefix)) throw new Error('invalid tree prefix')
   return await getRepoTreeDirectoryChildrenLocal(worktreePath, prefix, signal)
 }
 
@@ -51,25 +51,18 @@ export interface GetRepoTreeSourceRemoteInput {
 
 export async function getRepoTreeSourceRemote(input: GetRepoTreeSourceRemoteInput): Promise<RepoTreeSourceResult> {
   const { target, worktreePath, options, signal, knownWorktrees } = input
-  if (signal?.aborted) return { nodes: [], truncated: false }
+  if (signal?.aborted) throw new Error('aborted')
 
   const prefix = normalizePrefix(options.prefix)
-  if (!isSafeNormalizedPrefix(prefix)) return { nodes: [], truncated: false }
+  if (!isSafeNormalizedPrefix(prefix)) throw new Error('invalid tree prefix')
 
-  let remoteResult
-  try {
-    remoteResult = await getRemoteTreeWalk(target, worktreePath, {
-      signal,
-      prefix,
-      ...(knownWorktrees ? { knownWorktrees } : {}),
-    })
-  } catch (err) {
-    if (signal?.aborted) return { nodes: [], truncated: false }
-    void err
-    return { nodes: [], truncated: false }
-  }
-  if (signal?.aborted) return { nodes: [], truncated: false }
-  if (!remoteResult.ok) return { nodes: [], truncated: false }
+  const remoteResult = await getRemoteTreeWalk(target, worktreePath, {
+    signal,
+    prefix,
+    ...(knownWorktrees ? { knownWorktrees } : {}),
+  })
+  if (signal?.aborted) throw new Error('aborted')
+  if (!remoteResult.ok) throw new Error(remoteResult.message)
 
   const root = worktreePath.replace(/\/+$/u, '')
   const entries = parseNullSeparatedPaths(remoteResult.message)
@@ -87,13 +80,8 @@ async function getRepoTreeDirectoryChildrenLocal(
   prefix: string,
   signal: AbortSignal | undefined,
 ): Promise<RepoTreeSourceResult> {
-  let dirents
-  try {
-    dirents = await readdir(path.join(worktreePath, ...prefix.split('/').filter(Boolean)), { withFileTypes: true })
-  } catch {
-    return { nodes: [], truncated: false }
-  }
-  if (signal?.aborted) return { nodes: [], truncated: false }
+  const dirents = await readdir(path.join(worktreePath, ...prefix.split('/').filter(Boolean)), { withFileTypes: true })
+  if (signal?.aborted) throw new Error('aborted')
 
   const entries = dirents
     .filter((dirent) => dirent.name !== '.git')
@@ -108,7 +96,7 @@ async function getRepoTreeDirectoryChildrenLocal(
     })
 
   const visibleEntries = await visibleGitDirectoryEntries(worktreePath, entries, signal)
-  if (signal?.aborted) return { nodes: [], truncated: false }
+  if (signal?.aborted) throw new Error('aborted')
 
   return nodesFromDirectoryEntries(
     prefix,

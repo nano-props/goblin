@@ -110,6 +110,15 @@ export interface RuntimeRecentReposState {
   recentRepos: RepoSessionEntry[]
 }
 
+export interface RepoRuntimeInstanceEntry {
+  repoRoot: string
+  repoInstanceId: string
+}
+
+export interface RepoRuntimeInstancesSnapshot {
+  instances: RepoRuntimeInstanceEntry[]
+}
+
 export interface RepoSettingsState {
   repoSettings: RepoSettingsEntry[]
 }
@@ -233,7 +242,6 @@ export interface PullRequestEntry {
 
 export interface PullRequestFetchOptions {
   mode?: PullRequestFetchMode
-  clearMissing?: boolean
 }
 
 export type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
@@ -267,6 +275,8 @@ export interface AppIpcHandlers {
   repo: {
     probe: (input: { cwd: string }) => Promise<ProbeResult>
     runtimeOpen: (input: { repoRoot: string } | { repoInput: string }) => Promise<RepoRuntimeOpenResponse>
+    runtimeList: () => Promise<RepoRuntimeInstancesSnapshot>
+    runtimeClose: (input: { repoRoot: string; repoInstanceId: string }) => Promise<{ ok: boolean; closed: boolean }>
     clone: (input: {
       operationId: string
       url: string

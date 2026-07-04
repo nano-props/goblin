@@ -15,14 +15,17 @@
 import { useEffect, useState } from 'react'
 import { CreateWorktreeDialog } from '#/web/components/create-worktree-dialog/CreateWorktreeDialog.tsx'
 import type { CreateWorktreeRequest } from '#/web/components/create-worktree-dialog/create-worktree-dialog.logic.ts'
+import {
+  isConfigTrustStateLoading,
+  resolveConfigTrusted,
+  resolveNextConfigTrustChoice,
+  resolveWorktreeBootstrapDecision,
+} from '#/web/components/create-worktree-dialog/create-worktree-bootstrap-host.logic.ts'
 import { DialogHostMount } from '#/web/components/ui/dialog-host-mount.tsx'
 import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
 import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
-import { currentSettingsSnapshot } from '#/web/settings-read-projection.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { useSettingsSnapshotReadModel } from '#/web/settings-queries.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { isRepoWorktreeBootstrapConfigTrusted } from '#/shared/repo-settings.ts'
-import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
 
 interface Props {
@@ -54,7 +57,7 @@ function CreateWorktreeDialogSession({ open, onOpenChange, repoId: sessionRepoId
   const [bootstrapPreviewError, setBootstrapPreviewError] = useState(false)
   const [bootstrapPreviewLoading, setBootstrapPreviewLoading] = useState(false)
   const [configTrustChoice, setConfigTrustChoice] = useState<boolean | null>(null)
-  const settingsSnapshot = useCurrentSettingsSnapshot()
+  const settingsSnapshot = useSettingsSnapshotReadModel()
 
   function resetBootstrapPreflightState(): void {
     setBootstrapPreview(null)
@@ -100,7 +103,7 @@ function CreateWorktreeDialogSession({ open, onOpenChange, repoId: sessionRepoId
     }
   }, [open, repoId, repoInstanceId])
 
-  if (!displayRepo) return null
+  const displayRepoId = displayRepo?.id ?? ''
 
   function submitCreateWorktree(
     repoId: string,
@@ -121,43 +124,63 @@ function CreateWorktreeDialogSession({ open, onOpenChange, repoId: sessionRepoId
 
   function handleCreateWorktree(request: CreateWorktreeRequest): boolean {
     if (!liveRepo) return false
-    if (liveRepo.operations.branchAction.phase !== 'idle' || bootstrapPreviewLoading || configTrustStateLoading()) {
+    if (liveRepo.operations.branchAction.phase !== 'idle' || bootstrapPreviewLoading || worktreeBootstrapTrustLoading) {
       return false
     }
     const repoId = liveRepo.id
     const repoInstanceId = liveRepo.instanceId
 
-    const worktreeBootstrap = resolveWorktreeBootstrapDecision(repoId)
+    const worktreeBootstrap = currentWorktreeBootstrapDecision(repoId)
     return submitCreateWorktree(repoId, repoInstanceId, request, worktreeBootstrap)
   }
 
-  function resolveWorktreeBootstrapDecision(repoId: string): WorktreeBootstrapDecision {
-    const configHash = bootstrapPreview?.hasOperations ? bootstrapPreview.configHash : null
-    if (!configHash) return { kind: 'skip' }
-    return { kind: 'run', configHash, configTrusted: shouldConfigBeTrusted(repoId, configHash) }
-  }
-
-  function isCurrentBootstrapConfigTrusted(repoId: string, configHash: string | null | undefined): boolean {
-    return isRepoWorktreeBootstrapConfigTrusted(settingsSnapshot?.repoSettings ?? [], repoId, configHash)
-  }
-
-  function shouldConfigBeTrusted(repoId: string, configHash: string | null | undefined): boolean {
-    return configTrustChoice ?? isCurrentBootstrapConfigTrusted(repoId, configHash)
-  }
-
-  function configTrustStateLoading(): boolean {
-    return bootstrapPreview?.hasOperations === true && !!bootstrapPreview.configHash && settingsSnapshot === undefined
+  function currentWorktreeBootstrapDecision(repoId: string): WorktreeBootstrapDecision {
+    return resolveWorktreeBootstrapDecision({
+      preview: bootstrapPreview,
+      repoSettings: settingsSnapshot?.repoSettings ?? [],
+      repoId,
+      configTrustChoice,
+    })
   }
 
   const bootstrapConfigHash = bootstrapPreview?.configHash ?? null
-  const configTrusted = settingsSnapshot ? shouldConfigBeTrusted(displayRepo.id, bootstrapConfigHash) : false
-  const worktreeBootstrapLoading = bootstrapPreviewLoading || configTrustStateLoading()
+  const serverConfigTrusted = resolveConfigTrusted({
+    repoSettings: settingsSnapshot?.repoSettings ?? [],
+    repoId: displayRepoId,
+    configHash: bootstrapConfigHash,
+    configTrustChoice: null,
+  })
+  const configTrusted = settingsSnapshot
+    ? resolveConfigTrusted({
+        repoSettings: settingsSnapshot.repoSettings,
+        repoId: displayRepoId,
+        configHash: bootstrapConfigHash,
+        configTrustChoice,
+      })
+    : false
+
+  function handleConfigTrustedChange(next: boolean): void {
+    setConfigTrustChoice((currentChoice) =>
+      resolveNextConfigTrustChoice({
+        next,
+        currentTrusted: configTrusted,
+        serverTrusted: serverConfigTrusted,
+        currentChoice,
+      }),
+    )
+  }
+
+  const worktreeBootstrapTrustLoading = isConfigTrustStateLoading({
+    preview: bootstrapPreview,
+    settingsReady: settingsSnapshot !== undefined,
+  })
+  const worktreeBootstrapLoading = bootstrapPreviewLoading || worktreeBootstrapTrustLoading
   const worktreeBootstrap = {
     loading: worktreeBootstrapLoading,
     preview: bootstrapPreview,
     error: bootstrapPreviewError,
     configTrusted,
-    onConfigTrustedChange: setConfigTrustChoice,
+    onConfigTrustedChange: handleConfigTrustedChange,
   }
   // The effect above clears bootstrap state as soon as `open` becomes false.
   // That keeps the next open session from inheriting stale preflight data, but
@@ -171,6 +194,7 @@ function CreateWorktreeDialogSession({ open, onOpenChange, repoId: sessionRepoId
   // `useCreateWorktreeDialogDisplayState` helper instead of adding one-off
   // retained props here.
   const displayWorktreeBootstrap = useLastNonNull(open ? worktreeBootstrap : null)
+  if (!displayRepo) return null
 
   return (
     <CreateWorktreeDialog
@@ -181,35 +205,4 @@ function CreateWorktreeDialogSession({ open, onOpenChange, repoId: sessionRepoId
       onCreate={handleCreateWorktree}
     />
   )
-}
-
-function useCurrentSettingsSnapshot(): SettingsSnapshot | undefined {
-  const [snapshot, setSnapshot] = useState(() => currentSettingsSnapshot())
-
-  useEffect(() => {
-    let disposed = false
-    let queued = false
-
-    function syncSnapshot(): void {
-      if (disposed) return
-      setSnapshot(currentSettingsSnapshot())
-    }
-
-    syncSnapshot()
-
-    const unsubscribe = primaryWindowQueryClient.getQueryCache().subscribe(() => {
-      if (queued) return
-      queued = true
-      queueMicrotask(() => {
-        queued = false
-        syncSnapshot()
-      })
-    })
-    return () => {
-      disposed = true
-      unsubscribe()
-    }
-  }, [])
-
-  return snapshot
 }

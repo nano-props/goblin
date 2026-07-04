@@ -157,7 +157,7 @@ describe('readRepoBulk timeout', () => {
     expect(result).toEqual({ snapshot, status, pullRequests: null })
   })
 
-  test('falls back to the per-section default when a section times out', async () => {
+  test('rejects when a requested section times out', async () => {
     vi.useFakeTimers()
     // Snapshot returns immediately; status hangs until aborted; PRs
     // returns null after a short delay.
@@ -183,13 +183,11 @@ describe('readRepoBulk timeout', () => {
     const promise = readRepoBulk('/tmp/repo', ['snapshot', 'status', 'pullRequests'], {
       timeoutMs: 50,
     })
+    const rejected = expect(promise).rejects.toThrow('aborted')
     // Advance the fake clock past the section deadline so the status
     // signal aborts and its promise rejects.
     await vi.advanceTimersByTimeAsync(75)
-    const result = await promise
-    expect(result.snapshot).not.toBeNull()
-    expect(result.status).toEqual([])
-    expect(result.pullRequests).toBeNull()
+    await rejected
   })
 
   test('disables the per-section timeout when timeoutMs is 0', async () => {
@@ -261,11 +259,11 @@ describe('readRepoBulk timeout', () => {
     const promise = readRepoBulk('/tmp/repo', ['snapshot', 'status', 'pullRequests'], {
       signal: controller.signal,
     })
+    const rejected = expect(promise).rejects.toThrow('aborted')
     // Let the section promises wire up their abort listeners.
     await Promise.resolve()
     controller.abort()
-    const result = await promise
-    expect(result).toEqual({ snapshot: null, status: [], pullRequests: null })
+    await rejected
     expect(snapshotSignal?.aborted).toBe(true)
     expect(statusSignal?.aborted).toBe(true)
     expect(prsSignal?.aborted).toBe(true)

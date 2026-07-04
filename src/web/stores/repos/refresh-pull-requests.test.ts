@@ -3,7 +3,10 @@ import { PULL_REQUEST_UNKNOWN_RETRY_DELAY_MS } from '#/shared/pull-request-state
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { preferredWorkspacePaneTabByTargetRecordWith } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { repoPullRequestsQueryKey, setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import type { PullRequestInfo } from '#/web/types.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import {
   branch,
   pullRequest,
@@ -28,6 +31,11 @@ function selectBranchForTest(branch: string): void {
       }),
     },
   }))
+}
+
+function readModelBranchesForTest() {
+  const repo = useReposStore.getState().repos[REPO_ID]
+  return repo ? (readRepoBranchQueryProjection(repo)?.branches ?? []) : []
 }
 
 describe('refreshPullRequests', () => {
@@ -67,7 +75,7 @@ describe('refreshPullRequests', () => {
       fetchFailed: false,
       fetchError: null,
     })
-    expect(repo?.data.branches[0]?.pullRequest).toBeUndefined()
+    expect(readModelBranchesForTest()[0]?.pullRequest).toBeUndefined()
   })
 
   test('skips pull request refresh for local-only repositories', async () => {
@@ -130,49 +138,78 @@ describe('refreshPullRequests', () => {
     expect(cached?.ui.selectedBranch).toBeNull()
   })
 
-  test('attaches returned pull requests and clears stale entries for requested branches', async () => {
+  test('writes returned pull requests to the React Query read model', async () => {
     const stale = pullRequest(1)
     const fresh = pullRequest(2)
     const repoInstanceId = seedRepo([branch('feature/a'), branch('feature/b', stale)])
+    const entries = [{ branch: 'feature/a', pullRequest: fresh }]
     let mode: string | undefined
     ipcHandlers['repo.pullRequests'] = async ({ mode: receivedMode }: { mode?: string }) => {
       mode = receivedMode
-      return [{ branch: 'feature/a', pullRequest: fresh }]
+      return entries
     }
 
     await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a', 'feature/b'], { repoInstanceId })
 
-    const branches = useReposStore.getState().repos[REPO_ID]?.data.branches
-    expect(branches?.find((b) => b.name === 'feature/a')?.pullRequest).toEqual(fresh)
+    const branches = readModelBranchesForTest()
+    expect(branches?.find((b) => b.name === 'feature/a')?.pullRequest).toBeUndefined()
     expect(branches?.find((b) => b.name === 'feature/b')?.pullRequest).toBeUndefined()
     expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.pullRequests.phase).toBe('idle')
     expect(mode).toBe('full')
+    expect(
+      primaryWindowQueryClient.getQueryData(
+        repoPullRequestsQueryKey(REPO_ID, repoInstanceId, ['feature/a', 'feature/b'], 'full'),
+      ),
+    ).toEqual(entries)
   })
 
-  test('does not attach reverse pull requests to the default branch', async () => {
+  test('defaults pull request refresh branches from the React Query snapshot cache', async () => {
+    const repoInstanceId = seedRepo([branch('main')])
+    setRepoSnapshotQueryData(REPO_ID, repoInstanceId, {
+      current: 'feature/query-a',
+      branches: [branch('feature/query-a'), branch('feature/query-b')],
+    })
+    const calls: Array<{ branches?: string[]; mode?: string }> = []
+    ipcHandlers['repo.pullRequests'] = async ({ branches, mode }: { branches?: string[]; mode?: string }) => {
+      calls.push({ branches, mode })
+      return []
+    }
+
+    await useReposStore.getState().refreshPullRequests(REPO_ID, undefined, { repoInstanceId })
+
+    expect(calls).toEqual([{ branches: ['feature/query-a', 'feature/query-b'], mode: 'full' }])
+  })
+
+  test('does not attach pull request query results to branch state', async () => {
     const reverse = pullRequest(1, { baseRefName: 'feature/a', headRefName: 'master' })
-    const repoInstanceId = seedRepo([branch('master', reverse, { isDefault: true })])
-    ipcHandlers['repo.pullRequests'] = async () => [{ branch: 'master', pullRequest: reverse }]
+    const repoInstanceId = seedRepo([branch('master', undefined, { isDefault: true })])
+    const entries = [{ branch: 'master', pullRequest: reverse }]
+    ipcHandlers['repo.pullRequests'] = async () => entries
 
     await useReposStore.getState().refreshPullRequests(REPO_ID, ['master'], { repoInstanceId })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.data.branches[0]?.pullRequest).toBeUndefined()
+    expect(readModelBranchesForTest()[0]?.pullRequest).toBeUndefined()
+    expect(
+      primaryWindowQueryClient.getQueryData(repoPullRequestsQueryKey(REPO_ID, repoInstanceId, ['master'], 'full')),
+    ).toEqual(entries)
   })
 
-  test('clears returned pull requests that do not belong even when missing entries are preserved', async () => {
+  test('does not carry seeded branch pull requests through refresh', async () => {
     const existing = pullRequest(1, { headRefName: 'master', baseRefName: 'master' })
     const reverse = pullRequest(2, { headRefName: 'master', baseRefName: 'feature/a' })
     const repoInstanceId = seedRepo([branch('master', existing, { isDefault: true })])
-    ipcHandlers['repo.pullRequests'] = async () => [{ branch: 'master', pullRequest: reverse }]
+    const entries = [{ branch: 'master', pullRequest: reverse }]
+    ipcHandlers['repo.pullRequests'] = async () => entries
 
-    await useReposStore
-      .getState()
-      .refreshPullRequests(REPO_ID, ['master'], { repoInstanceId, mode: 'full', clearMissing: false })
+    await useReposStore.getState().refreshPullRequests(REPO_ID, ['master'], { repoInstanceId, mode: 'full' })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.data.branches[0]?.pullRequest).toBeUndefined()
+    expect(readModelBranchesForTest()[0]?.pullRequest).toBeUndefined()
+    expect(
+      primaryWindowQueryClient.getQueryData(repoPullRequestsQueryKey(REPO_ID, repoInstanceId, ['master'], 'full')),
+    ).toEqual(entries)
   })
 
-  test('keeps existing pull requests when summary lookup omits a requested branch', async () => {
+  test('keeps omitted summary pull requests out of branch state', async () => {
     const existing = pullRequest(1)
     const repoInstanceId = seedRepo([branch('feature/a', existing)])
     ipcHandlers['repo.pullRequests'] = async () => []
@@ -180,24 +217,16 @@ describe('refreshPullRequests', () => {
     await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { repoInstanceId, mode: 'summary' })
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.data.branches[0]?.pullRequest).toEqual(existing)
+    expect(readModelBranchesForTest()[0]?.pullRequest).toBeUndefined()
     expect(repo?.dataLoads.pullRequests.phase).toBe('idle')
+    expect(
+      primaryWindowQueryClient.getQueryData(
+        repoPullRequestsQueryKey(REPO_ID, repoInstanceId, ['feature/a'], 'summary'),
+      ),
+    ).toEqual([])
   })
 
-  test('summary lookup can explicitly clear missing requested pull requests', async () => {
-    const existing = pullRequest(1)
-    const repoInstanceId = seedRepo([branch('feature/a', existing)])
-    ipcHandlers['repo.pullRequests'] = async () => []
-
-    await useReposStore
-      .getState()
-      .refreshPullRequests(REPO_ID, ['feature/a'], { repoInstanceId, mode: 'summary', clearMissing: true })
-
-    expect(useReposStore.getState().repos[REPO_ID]?.data.branches[0]?.pullRequest).toBeUndefined()
-    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.pullRequests.phase).toBe('idle')
-  })
-
-  test('summary lookup preserves existing full pull request health fields', async () => {
+  test('summary lookup writes only summary query data', async () => {
     const existing = pullRequestWithHealth(1)
     const summary = pullRequest(1)
     const repoInstanceId = seedRepo([branch('feature/a', existing)])
@@ -205,24 +234,29 @@ describe('refreshPullRequests', () => {
 
     await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { repoInstanceId, mode: 'summary' })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.data.branches[0]?.pullRequest).toEqual({
-      ...summary,
-      checks: existing.checks,
-      reviewDecision: existing.reviewDecision,
-      mergeable: existing.mergeable,
-    })
+    expect(readModelBranchesForTest()[0]?.pullRequest).toBeUndefined()
+    expect(
+      primaryWindowQueryClient.getQueryData(
+        repoPullRequestsQueryKey(REPO_ID, repoInstanceId, ['feature/a'], 'summary'),
+      ),
+    ).toEqual([{ branch: 'feature/a', pullRequest: summary }])
   })
 
-  test('full backfill can avoid clearing omitted branches', async () => {
+  test('full backfill does not mutate branch pull request fields', async () => {
     const existing = pullRequest(1)
     const repoInstanceId = seedRepo([branch('feature/a'), branch('feature/b', existing)])
     ipcHandlers['repo.pullRequests'] = async () => []
 
     await useReposStore
       .getState()
-      .refreshPullRequests(REPO_ID, ['feature/a', 'feature/b'], { repoInstanceId, mode: 'full', clearMissing: false })
+      .refreshPullRequests(REPO_ID, ['feature/a', 'feature/b'], { repoInstanceId, mode: 'full' })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.data.branches[1]?.pullRequest).toEqual(existing)
+    expect(readModelBranchesForTest()[1]?.pullRequest).toBeUndefined()
+    expect(
+      primaryWindowQueryClient.getQueryData(
+        repoPullRequestsQueryKey(REPO_ID, repoInstanceId, ['feature/a', 'feature/b'], 'full'),
+      ),
+    ).toEqual([])
   })
 
   test('does not let stale responses write into a reopened repo instance', async () => {
@@ -240,11 +274,14 @@ describe('refreshPullRequests', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceId).toBe('repo-instance-test-2')
-    expect(repo?.data.branches[0]?.pullRequest).toBeUndefined()
+    expect(readModelBranchesForTest()[0]?.pullRequest).toBeUndefined()
     expect(repo?.dataLoads.pullRequests.phase).toBe('idle')
+    expect(
+      primaryWindowQueryClient.getQueryData(repoPullRequestsQueryKey(REPO_ID, repoInstanceId, ['feature/a'], 'full')),
+    ).toBeUndefined()
   })
 
-  test('preserves existing pull requests when lookup is unavailable', async () => {
+  test('keeps unavailable pull request lookups out of branch state', async () => {
     const existing = pullRequest(1)
     const repoInstanceId = seedRepo([branch('feature/a', existing)])
     ipcHandlers['repo.pullRequests'] = async () => null
@@ -252,13 +289,16 @@ describe('refreshPullRequests', () => {
     await useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/a'], { repoInstanceId })
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.data.branches[0]?.pullRequest).toEqual(existing)
+    expect(readModelBranchesForTest()[0]?.pullRequest).toBeUndefined()
     expect(repo?.dataLoads.pullRequests.phase).toBe('idle')
     expect(repo?.dataLoads.pullRequests.loadedAt).toBeNull()
-    expect(repo?.dataLoads.pullRequests.stale).toBe(true)
+    expect(repo?.dataLoads.pullRequests.stale).toBe(false)
+    expect(
+      primaryWindowQueryClient.getQueryData(repoPullRequestsQueryKey(REPO_ID, repoInstanceId, ['feature/a'], 'full')),
+    ).toBeNull()
   })
 
-  test('preserves existing pull request metadata while snapshot refresh rechecks', async () => {
+  test('snapshot refresh strips branch pull request metadata while rechecking query data', async () => {
     const existing = pullRequest(1)
     const repoInstanceId = seedRepo([branch('feature/a', existing)])
     let resolvePullRequests!: (value: null) => void
@@ -271,7 +311,7 @@ describe('refreshPullRequests', () => {
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.data.branches[0]?.pullRequest).toEqual(existing)
+    expect(readModelBranchesForTest()[0]?.pullRequest).toBeUndefined()
     expect(repo?.dataLoads.pullRequests.phase).not.toBe('idle')
 
     resolvePullRequests(null)
@@ -291,7 +331,7 @@ describe('refreshPullRequests', () => {
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
-    const branches = useReposStore.getState().repos[REPO_ID]?.data.branches
+    const branches = readModelBranchesForTest()
     expect(branches?.find((b) => b.name === 'feature/a')?.pullRequest).toBeUndefined()
     expect(branches?.find((b) => b.name === 'feature/b')?.pullRequest).toBeUndefined()
   })
@@ -311,13 +351,13 @@ describe('refreshPullRequests', () => {
       phase: 'idle',
       error: 'github unavailable',
       mode: null,
-      stale: true,
+      stale: false,
     })
     expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.pullRequestsByBranch['feature/a']).toMatchObject({
       phase: 'idle',
       error: 'github unavailable',
       mode: null,
-      stale: true,
+      stale: false,
     })
   })
 
@@ -347,7 +387,7 @@ describe('refreshPullRequests', () => {
     ])
   })
 
-  test('snapshot refresh retries visible full lookup when merge status is still pending', async () => {
+  test('snapshot refresh retries visible full lookup when query merge status is still pending', async () => {
     vi.useFakeTimers()
     const repoInstanceId = seedRepo([branch('feature/a')])
     selectBranchForTest('feature/a')
@@ -377,7 +417,9 @@ describe('refreshPullRequests', () => {
       { branches: ['feature/a'], mode: 'full' },
       { branches: ['feature/a'], mode: 'full' },
     ])
-    expect(useReposStore.getState().repos[REPO_ID]?.data.branches[0]?.pullRequest?.mergeable).toBe('MERGEABLE')
+    expect(
+      primaryWindowQueryClient.getQueryData(repoPullRequestsQueryKey(REPO_ID, repoInstanceId, ['feature/a'], 'full')),
+    ).toEqual([{ branch: 'feature/a', pullRequest: pullRequest(1, { mergeable: 'MERGEABLE' }) }])
   })
 
   test('snapshot refresh skips selected full lookup when status detail is not visible', async () => {
@@ -388,7 +430,11 @@ describe('refreshPullRequests', () => {
         [REPO_ID]: replaceRepo(s.repos[REPO_ID]!, (repo) => {
           repo.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(
             repo.ui,
-            { repoRoot: REPO_ID, branchName: repo.ui.selectedBranch ?? 'feature/a', worktreePath: '/tmp/feature-a-worktree' },
+            {
+              repoRoot: REPO_ID,
+              branchName: repo.ui.selectedBranch ?? 'feature/a',
+              worktreePath: '/tmp/feature-a-worktree',
+            },
             'terminal',
           )
         }),
@@ -469,13 +515,17 @@ describe('refreshPullRequests', () => {
     resolveSecond([{ branch: 'feature/a', pullRequest: fresh }])
     await second
 
-    expect(useReposStore.getState().repos[REPO_ID]?.data.branches[0]?.pullRequest).toEqual(fresh)
+    expect(
+      primaryWindowQueryClient.getQueryData(repoPullRequestsQueryKey(REPO_ID, repoInstanceId, ['feature/a'], 'full')),
+    ).toEqual([{ branch: 'feature/a', pullRequest: fresh }])
 
     resolveFirst([])
     await first
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.data.branches[0]?.pullRequest).toEqual(fresh)
+    expect(
+      primaryWindowQueryClient.getQueryData(repoPullRequestsQueryKey(REPO_ID, repoInstanceId, ['feature/a'], 'full')),
+    ).toEqual([{ branch: 'feature/a', pullRequest: fresh }])
     expect(repo?.dataLoads.pullRequests.phase).toBe('idle')
   })
 
@@ -506,7 +556,7 @@ describe('refreshPullRequests', () => {
     expect(repo?.dataLoads.pullRequestsByBranch['feature/b']?.phase).toBe('idle')
   })
 
-  test('does not recreate branch data loads for branches removed before lookup completion', async () => {
+  test('does not recreate branch data loads for branches removed from the query read model before lookup completion', async () => {
     const repoInstanceId = seedRepo([branch('feature/a'), branch('feature/b')])
     let resolve!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
     ipcHandlers['repo.pullRequests'] = () =>
@@ -515,11 +565,15 @@ describe('refreshPullRequests', () => {
       })
 
     const work = useReposStore.getState().refreshPullRequests(REPO_ID, ['feature/b'], { repoInstanceId })
+    await Promise.resolve()
+    setRepoSnapshotQueryData(REPO_ID, repoInstanceId, {
+      current: 'feature/a',
+      branches: [branch('feature/a')],
+    })
     useReposStore.setState((s) => ({
       repos: {
         ...s.repos,
         [REPO_ID]: replaceRepo(s.repos[REPO_ID]!, (repo) => {
-          repo.data.branches = repo.data.branches.filter((branch) => branch.name !== 'feature/b')
           delete repo.dataLoads.pullRequestsByBranch['feature/b']
         }),
       },
@@ -529,11 +583,10 @@ describe('refreshPullRequests', () => {
     await work
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.data.branches.map((item) => item.name)).toEqual(['feature/a'])
     expect(repo?.dataLoads.pullRequestsByBranch['feature/b']).toBeUndefined()
   })
 
-  test('does not persist cache from a stale pull request lookup while a newer lookup is running', async () => {
+  test('does not persist repo snapshot cache from pull request lookups', async () => {
     const repoInstanceId = seedRepo([branch('feature/a')])
     let callCount = 0
     let resolveFirst!: (value: { branch: string; pullRequest: PullRequestInfo }[]) => void
@@ -558,7 +611,9 @@ describe('refreshPullRequests', () => {
     resolveSecond([{ branch: 'feature/a', pullRequest: fresh }])
     await second
 
-    expect(useReposStore.getState().repoSnapshotCache[REPO_ID]?.data.branches[0]).toMatchObject({ name: 'feature/a' })
-    expect(useReposStore.getState().repoSnapshotCache[REPO_ID]?.data.branches[0]?.pullRequest).toBeUndefined()
+    expect(useReposStore.getState().repoSnapshotCache[REPO_ID]).toBeUndefined()
+    expect(
+      primaryWindowQueryClient.getQueryData(repoPullRequestsQueryKey(REPO_ID, repoInstanceId, ['feature/a'], 'full')),
+    ).toEqual([{ branch: 'feature/a', pullRequest: fresh }])
   })
 })

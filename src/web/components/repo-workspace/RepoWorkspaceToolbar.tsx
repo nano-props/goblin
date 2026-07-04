@@ -160,6 +160,7 @@ export function RepoWorkspaceToolbar({
     clearDragPreview: clearWorkspacePaneTabDragPreview,
   } = useWorkspacePaneTabDragPreview({
     repoRoot: repo.id,
+    repoInstanceId: repo.instanceId,
     branchName,
     worktreePath: terminalBase?.worktreePath ?? null,
     canonicalTabs: workspacePaneTabModel.tabEntries,

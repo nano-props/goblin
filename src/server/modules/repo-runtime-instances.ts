@@ -11,6 +11,11 @@ export interface RepoRuntimeInstanceClosedEvent {
   repoInstanceId: string
 }
 
+export interface RepoRuntimeInstanceEntry {
+  repoRoot: string
+  repoInstanceId: string
+}
+
 const runtimeInstancesByUser = new Map<string, Map<string, RepoRuntimeInstanceState>>()
 const repoRuntimeInstanceClosedListeners = new Set<(event: RepoRuntimeInstanceClosedEvent) => void>()
 const repoRuntimeInstanceLogger = serverLogger.child({ tag: 'repo-runtime-instance' })
@@ -58,6 +63,16 @@ export function closeRepoRuntimeInstance(userId: string, repoRoot: string, repoI
   state.currentInstanceId = null
   emitRepoRuntimeInstanceClosed({ userId, repoRoot, repoInstanceId })
   return true
+}
+
+export function listRepoRuntimeInstances(userId: string): RepoRuntimeInstanceEntry[] {
+  const states = runtimeInstancesByUser.get(userId)
+  if (!states) return []
+  const instances: RepoRuntimeInstanceEntry[] = []
+  for (const [repoRoot, state] of states) {
+    if (state.currentInstanceId) instances.push({ repoRoot, repoInstanceId: state.currentInstanceId })
+  }
+  return instances
 }
 
 export function isCurrentRepoRuntimeInstance(userId: string, repoRoot: string, repoInstanceId: string): boolean {

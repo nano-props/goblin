@@ -15,6 +15,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { RemoteDiagnosticsPanel } from '#/web/components/RemoteDiagnosticsPanel.tsx'
 import { isResolvableRemotePathInput, remoteRepoSessionEntry } from '#/shared/remote-repo.ts'
 import { cn } from '#/web/lib/cn.ts'
+import { reportOpenRepoPostOpenEffects } from '#/web/lib/open-repo-result-feedback.ts'
 import type { RemoteDiagnosticsResult, RemoteRepoTarget, SshConfigHost } from '#/shared/remote-repo.ts'
 interface Props {
   open: boolean
@@ -141,6 +142,7 @@ export function OpenRemoteRepositoryDialog({ open, onOpenChange }: Props) {
         return
       }
       navigation.activateRepo(openResult.id)
+      reportOpenRepoPostOpenEffects(openResult, t, { descriptionPrefix: nextTarget.displayName })
       onOpenChange(false)
     } catch (err) {
       setActionError(formatRemoteDialogError(t, err))

@@ -73,10 +73,16 @@ import {
   useBranchActionDialogsStore,
 } from '#/web/stores/repos/branch-action-dialogs.ts'
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
+import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
+import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
+
+type BranchActionDialogRepo = Omit<BranchActionRepo, 'branchModel'> & {
+  branchModel: RepoBranchReadModelData
+}
 
 interface BranchActionDialogContext {
-  repo: RepoState
+  repo: BranchActionDialogRepo
   branch: RepoBranchState
 }
 
@@ -114,7 +120,9 @@ export function useBranchActionDialogDisplay<P>(
   repos: Record<string, RepoState>,
 ): BranchActionDialogDisplay<P> {
   const entry = useLastNonNull(slot)
-  const liveContext = slot ? resolveContext(repos, slot) : null
+  const slotRepo = slot ? repos[slot.repoId] : null
+  const branchReadModel = useRepoBranchReadModel(slot?.repoId ?? '', slotRepo?.instanceId ?? '', !!slotRepo)
+  const liveContext = slot ? resolveContext(repos, slot, branchReadModel) : null
   // Retain the last non-null `liveContext` for the close-animation
   // window. After the user clicks Confirm/Cancel, `slot` is null and
   // `liveContext` is null, but the host still needs a stable context
@@ -126,7 +134,7 @@ export function useBranchActionDialogDisplay<P>(
   const retainedLiveContext = useLastNonNull(liveContext)
   // While the dialog is open, `slot === entry` and the two contexts
   // are the same object lookup. Sharing the result saves one
-  // `repo.data.branches.find(...)` per render per slot. After close
+  // `repo.branchModel.branches.find(...)` per render per slot. After close
   // `slot === null` and `entry` is the retained value — we use the
   // retained `liveContext` (which was resolved from `entry` before
   // close) instead of re-resolving against the post-mutation `repos`.
@@ -140,10 +148,27 @@ export function useBranchActionDialogDisplay<P>(
 function resolveContext<P>(
   repos: Record<string, RepoState>,
   entry: BranchActionDialogEntry<P>,
+  branchReadModel: RepoBranchReadModelData | null,
 ): BranchActionDialogContext | null {
-  const repo = repos[entry.repoId]
-  if (!repo) return null
-  const branch = repo.data.branches.find((b) => b.name === entry.branchName)
+  const repoFromStore = repos[entry.repoId]
+  if (!repoFromStore || !branchReadModel) return null
+  const repo: BranchActionDialogRepo = {
+    id: repoFromStore.id,
+    instanceId: repoFromStore.instanceId,
+    branchModel: branchReadModel,
+    operations: {
+      branchAction: repoFromStore.operations.branchAction,
+    },
+    remote: {
+      lifecycle: repoFromStore.remote.lifecycle,
+      hasRemotes: repoFromStore.remote.hasRemotes,
+      hasBrowserRemote: repoFromStore.remote.hasBrowserRemote,
+      hasGitHubRemote: repoFromStore.remote.hasGitHubRemote,
+      browserRemoteProvider: repoFromStore.remote.browserRemoteProvider,
+      remoteProviders: repoFromStore.remote.remoteProviders,
+    },
+  }
+  const branch = repo.branchModel.branches.find((b) => b.name === entry.branchName)
   if (!branch) return null
   return { repo, branch }
 }

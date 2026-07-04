@@ -199,6 +199,7 @@ export const ja: Record<DictKey, string> = {
   'drop.title': 'ドロップしてローカルリポジトリを開く',
   'drop.body': 'Git リポジトリフォルダを Goblin のどこにでもドロップできます。',
   'drop.open-failed': 'ローカルリポジトリを開けませんでした',
+  'repo-picker.recent-save-failed': 'リポジトリは開きましたが、最近使った項目は更新されませんでした',
 
   // ---- Workspace pane tabs ------------------------------------------------
   'tab.branches': 'ブランチ',
@@ -499,6 +500,7 @@ export const ja: Record<DictKey, string> = {
   'error.cannot-delete-protected-branch': '保護されたブランチは削除できません',
   'error.cannot-delete-checked-out-branch': 'ワークツリーでチェックアウト済みのブランチは削除できません',
   'error.branch-not-fully-merged': 'ブランチに固有コミットがあるため、Git が安全な削除を拒否しました',
+  'error.worktree-not-found': 'ワークツリーが見つかりません',
   'error.worktree-not-found-for-branch': 'このブランチのワークツリーが見つかりません',
   'error.cannot-remove-main-worktree': 'メインのワークツリーは削除できません',
   'error.cannot-remove-dirty-worktree': 'ワークツリーに未コミットの変更があります — 先にコミットまたは破棄してください',

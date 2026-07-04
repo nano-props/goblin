@@ -30,9 +30,8 @@ export function persistedOpenWorkspaceEntries(
     // may or may not have a retained target; without one we
     // can't reconstruct a session entry, so the repo is dropped
     // from the recent-workspace list. This is the same
-    // intentional trade-off as the pre-Phase-4 code: a
-    // placeholder with no target is just a connecting spinner,
-    // not a repo the user explicitly opened.
+    // intentional trade-off: a placeholder with no target is just a
+    // connecting spinner, not a repo the user explicitly opened.
     const target = remoteRepoConnectionTarget(repo.remote.lifecycle)
     if (!target) return []
     return [remoteRepoSessionEntry(remoteRepoRefFromTarget(target))]

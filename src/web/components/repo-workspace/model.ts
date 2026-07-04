@@ -3,6 +3,7 @@ import { dataLoadBusy, dataLoadInitialLoading } from '#/web/stores/repos/repo-da
 import { deriveConnectivity } from '#/web/stores/repos/repo-guards.ts'
 import { getBranchWorktreeState, selectedBranchStatus } from '#/web/stores/repos/worktree-state.ts'
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 
 export interface RepoWorkspacePresentation {
   exists: boolean
@@ -30,14 +31,16 @@ export type SelectedRepoWorkspace = ReturnType<typeof getSelectedRepoWorkspace>
 export type SelectedRepoWorkspacePresentation = ReturnType<typeof getSelectedRepoWorkspacePresentation>
 
 export interface RepoWorkspaceRepo extends BranchActionRepo {
-  data: BranchActionRepo['data'] & Pick<RepoState['data'], 'branches' | 'statusLoaded'>
+  branchModel: RepoBranchReadModelData & {
+    statusReady: boolean
+  }
   ui: Pick<RepoState['ui'], 'selectedBranch' | 'preferredWorkspacePaneTabByTarget'>
   dataLoads: Pick<RepoState['dataLoads'], 'status' | 'pullRequests'>
   remote: BranchActionRepo['remote'] & Pick<RepoState['remote'], 'lifecycle'>
 }
 
 export function getSelectedRepoWorkspace(repo: RepoWorkspaceRepo) {
-  const branch = repo.data.branches.find((b) => b.name === repo.ui.selectedBranch) ?? null
+  const branch = repo.branchModel.branches.find((b) => b.name === repo.ui.selectedBranch) ?? null
   const selectedStatus = selectedBranchStatus(repo, branch)
   const worktreeState = branch ? getBranchWorktreeState(repo, branch) : null
   const statusCount = worktreeState?.changeCount ?? selectedStatus.reduce((n, wt) => n + wt.entries.length, 0)

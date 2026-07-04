@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useSessionPersistence } from '#/web/hooks/useSessionPersistence.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import {
@@ -15,7 +15,13 @@ import {
   useFiletreeInteractionStore,
 } from '#/web/stores/repos/filetree-interaction-state.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import { useWorkspacePaneTabsQuery } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import {
+  replaceWorkspacePaneTabsQueryData,
+  setWorkspacePaneTabsForTargetQueryData,
+  useWorkspacePaneTabsQuery,
+} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 
 const persistWorkspaceSessionStateMock = vi.fn(async (_session: unknown) => {})
 
@@ -30,9 +36,32 @@ beforeEach(() => {
 })
 
 describe('useSessionPersistence', () => {
+  test('persists the workspace shell when branch read models are unavailable', () => {
+    const repo = emptyRepo('/tmp/repo-without-query-model', 'repo-without-query-model', 'repo-instance-without-query')
+    useReposStore.setState({
+      repos: { [repo.id]: repo },
+      order: [repo.id],
+      activeId: repo.id,
+      sessionReady: true,
+      sessionPersistenceReady: true,
+    })
+
+    expect(() => renderInJsdom(<Harness />)).not.toThrow()
+    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        openRepoEntries: [{ kind: 'local', id: repo.id }],
+        activeRepoId: repo.id,
+        selectedTerminalSessionIdByTerminalWorktree: {},
+        preferredWorkspacePaneTabByTargetByRepo: {},
+        workspacePaneTabsByTargetByRepo: {},
+        filetreeViewStateByWorktreeByRepo: {},
+      }),
+    )
+  })
+
   test('persists the active terminal map into settings session state', () => {
     const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
@@ -72,7 +101,7 @@ describe('useSessionPersistence', () => {
 
   test('persists explicitly closed workspace pane tabs as empty arrays', () => {
     const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
@@ -95,8 +124,169 @@ describe('useSessionPersistence', () => {
     )
   })
 
+  test('persists workspace pane tabs from the server query projection', () => {
+    const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
+    const repo = seedRepoWithReadModelForTest({
+      id: '/tmp/repo',
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
+      selectedBranch: 'feature/worktree',
+      preferredWorkspacePaneTab: 'history',
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: repo.id,
+      repoInstanceId: repo.instanceId,
+      branchName: 'feature/worktree',
+      worktreePath: '/tmp/worktree',
+      tabs: [workspacePaneStaticTabEntry('history')],
+    })
+
+    renderInJsdom(<Harness />)
+
+    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        preferredWorkspacePaneTabByTargetByRepo: {
+          '/tmp/repo': {
+            [targetKey]: 'history',
+          },
+        },
+        workspacePaneTabsByTargetByRepo: {
+          '/tmp/repo': {
+            [targetKey]: [workspacePaneStaticTabEntry('history')],
+          },
+        },
+      }),
+    )
+  })
+
+  test('persists workspace pane tabs when the server projection is refreshed', async () => {
+    const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
+    const repo = seedRepoWithReadModelForTest({
+      id: '/tmp/repo',
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
+      selectedBranch: 'feature/worktree',
+    })
+    useReposStore.setState({
+      repos: { [repo.id]: repo },
+      order: [repo.id],
+      activeId: repo.id,
+      sessionReady: true,
+      sessionPersistenceReady: true,
+    })
+
+    renderInJsdom(<Harness />)
+    persistWorkspaceSessionStateMock.mockClear()
+
+    act(() => {
+      replaceWorkspacePaneTabsQueryData(repo.id, repo.instanceId, [
+        {
+          repoRoot: repo.id,
+          branchName: 'feature/worktree',
+          worktreePath: '/tmp/worktree',
+          tabs: [workspacePaneStaticTabEntry('history')],
+        },
+      ])
+    })
+
+    await vi.waitFor(() => {
+      expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workspacePaneTabsByTargetByRepo: {
+            '/tmp/repo': {
+              [targetKey]: [workspacePaneStaticTabEntry('history')],
+            },
+          },
+        }),
+      )
+    })
+  })
+
+  test('validates persisted workspace tab targets against query-backed branches', () => {
+    const targetKey = worktreeTargetKey('/tmp/repo', 'feature/query-worktree', '/tmp/query-worktree')
+    const repo = seedRepoWithReadModelForTest({
+      id: '/tmp/repo',
+      branches: [createRepoBranch('main')],
+      selectedBranch: 'main',
+      preferredWorkspacePaneTab: 'history',
+    })
+    setRepoSnapshotQueryData(repo.id, repo.instanceId, {
+      branches: [createRepoBranch('feature/query-worktree', { worktree: { path: '/tmp/query-worktree' } })],
+      current: 'feature/query-worktree',
+    })
+    setRepoStatusQueryData(repo.id, repo.instanceId, [])
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: repo.id,
+      repoInstanceId: repo.instanceId,
+      branchName: 'feature/query-worktree',
+      worktreePath: '/tmp/query-worktree',
+      tabs: [workspacePaneStaticTabEntry('history')],
+    })
+
+    renderInJsdom(<Harness />)
+
+    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspacePaneTabsByTargetByRepo: {
+          '/tmp/repo': {
+            [targetKey]: [workspacePaneStaticTabEntry('history')],
+          },
+        },
+      }),
+    )
+  })
+
+  test('persists workspace pane tabs from the current repo runtime instance', () => {
+    const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
+    const oldInstanceId = 'repo-instance-old'
+    const currentInstanceId = 'repo-instance-current'
+    const repo = seedRepoWithReadModelForTest({
+      id: '/tmp/repo',
+      instanceId: oldInstanceId,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
+      selectedBranch: 'feature/worktree',
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: repo.id,
+      repoInstanceId: oldInstanceId,
+      branchName: 'feature/worktree',
+      worktreePath: '/tmp/worktree',
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: repo.id,
+      repoInstanceId: currentInstanceId,
+      branchName: 'feature/worktree',
+      worktreePath: '/tmp/worktree',
+      tabs: [workspacePaneStaticTabEntry('history')],
+    })
+    useReposStore.setState({
+      repos: {
+        [repo.id]: {
+          ...repo,
+          instanceId: currentInstanceId,
+        },
+      },
+    })
+    setRepoSnapshotQueryData(repo.id, currentInstanceId, {
+      current: 'feature/worktree',
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
+    })
+    setRepoStatusQueryData(repo.id, currentInstanceId, [])
+
+    renderInJsdom(<Harness />)
+
+    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspacePaneTabsByTargetByRepo: {
+          '/tmp/repo': {
+            [targetKey]: [workspacePaneStaticTabEntry('history')],
+          },
+        },
+      }),
+    )
+  })
+
   test('persists file tree selected, expanded, and scroll state into settings session state', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
@@ -135,7 +325,7 @@ describe('useSessionPersistence', () => {
   })
 
   test('does not persist until boot-restored workspace tabs have converged', () => {
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
@@ -166,7 +356,7 @@ describe('useSessionPersistence', () => {
 
   test('does not emit a render-phase update warning when a workspace tabs observer mounts', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',
@@ -192,7 +382,9 @@ describe('useSessionPersistence', () => {
     )
 
     expect(errorSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining('Cannot update a component (`AuthenticatedSideEffects`) while rendering a different component'),
+      expect.stringContaining(
+        'Cannot update a component (`AuthenticatedSideEffects`) while rendering a different component',
+      ),
       expect.anything(),
       expect.anything(),
       expect.anything(),
@@ -204,12 +396,10 @@ describe('useSessionPersistence', () => {
 
   test('coalesces overlapping session saves into the latest state', async () => {
     const persistDeferred = Promise.withResolvers<void>()
-    persistWorkspaceSessionStateMock.mockImplementationOnce(
-      async () => await persistDeferred.promise,
-    )
+    persistWorkspaceSessionStateMock.mockImplementationOnce(async () => await persistDeferred.promise)
     persistWorkspaceSessionStateMock.mockImplementation(async () => {})
 
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       selectedBranch: 'feature/worktree',

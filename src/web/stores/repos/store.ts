@@ -3,9 +3,10 @@
 // so opening a subdirectory dedupes against an already-open root).
 //
 // `order` controls repository switcher order; `activeId` is the visible
-// repo on the right. Per-repo data (branches, log, status, worktrees,
-// commit detail) lives inside `repos[id]` so each repo keeps its own
-// scroll/selection state when the user flips between them.
+// repo on the right. `repos[id]` owns the runtime shell, UI intent,
+// operations, loading metadata, and session-local state. Repo domain read
+// data such as branches, status, and worktrees is server/React Query
+// authoritative and is composed into presentation models at the UI edge.
 //
 // Race-condition defenses
 //   - `instanceId`: every time a repo is created/reset we mint a new
@@ -109,6 +110,7 @@ export const useReposStore = create<ReposStore>()(
       // Local client-only state.
       sessionReady: false,
       sessionPersistenceReady: false,
+      sessionRestoreError: null,
       tabOpenerIdentityByScope: {},
 
       ...createRepoSessionActions(set, get),

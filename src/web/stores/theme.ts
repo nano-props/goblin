@@ -7,18 +7,16 @@
 // covers both the desktop and plain-browser repoOperationSchedulers. Electron main
 // still projects the server-owned preference into native host state,
 // but it is not the business source of truth.
+// Theme hydration can read the transport snapshot directly; theme writes go
+// through settings-actions.
 
 import { create, type StoreApi } from 'zustand'
 import { DEFAULT_COLOR_THEME, isColorTheme } from '#/shared/color-theme.ts'
 import type { ResolvedTheme, SettingsSnapshot, ThemePref, ThemeState } from '#/shared/api-types.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
-import {
-  getThemeState,
-  resolveThemeStateFromSettings,
-  setThemeColorTheme,
-  setThemePref,
-} from '#/web/settings-client.ts'
+import { getThemeState, resolveThemeStateFromSettings } from '#/web/settings-client.ts'
 import { subscribeSettingsInvalidationRefetch } from '#/web/settings-invalidation-refetch.ts'
+import { setThemeColorThemePreference, setThemePreference } from '#/web/settings-actions.ts'
 
 interface ThemeStore extends ThemeState {
   setPref: (pref: ThemePref) => Promise<void>
@@ -147,11 +145,13 @@ export const useThemeStore = create<ThemeStore>((set, get) => ({
 
   async setPref(pref) {
     if (pref === get().pref) return
-    commitThemeState(set, await setThemePref(pref))
+    const next = await setThemePreference(pref)
+    commitThemeState(set, next)
   },
 
   async setColorTheme(colorTheme) {
     if (colorTheme === get().colorTheme) return
-    commitThemeState(set, await setThemeColorTheme(colorTheme))
+    const next = await setThemeColorThemePreference(colorTheme)
+    commitThemeState(set, next)
   },
 }))

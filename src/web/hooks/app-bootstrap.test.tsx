@@ -175,7 +175,7 @@ describe('app bootstrap hooks', () => {
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(1)
   })
 
-  test('opens the persistence gate after pruning stale workspace tabs restore entries', async () => {
+  test('reports unresolved workspace tabs restore entries as restore failure', async () => {
     const targetKey = branchTargetKey('/tmp/repo', 'main')
     const session = {
       openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
@@ -193,7 +193,7 @@ describe('app bootstrap hooks', () => {
     }
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ session }))
     mockedRestoreServerWorkspacePaneTabsFromSession.mockResolvedValue({
-      status: 'stale-pruned',
+      status: 'failed',
       unresolvedRepos: ['/missing/repo'],
       unresolvedTargets: [{ repoRoot: '/tmp/repo', targetKey: '/tmp/repo\0branch\0missing' }],
       failedCommits: [],
@@ -206,7 +206,9 @@ describe('app bootstrap hooks', () => {
     renderInJsdom(<Harness />)
     await flushMicrotasks(3)
 
-    expect(useReposStore.getState().sessionPersistenceReady).toBe(true)
+    expect(useReposStore.getState().sessionReady).toBe(true)
+    expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
+    expect(useReposStore.getState().sessionRestoreError).toBe('workspace pane tabs restore failed')
     expect(mockedRestoreServerWorkspacePaneTabsFromSession).toHaveBeenCalledWith({
       '/tmp/repo': {
         [targetKey]: [],
@@ -214,7 +216,66 @@ describe('app bootstrap hooks', () => {
     })
   })
 
-  test('keeps persistence closed after a failed server workspace tabs commit', async () => {
+  test('blocks persistence when workspace preferred tab restore fails during repo hydration', async () => {
+    const targetKey = branchTargetKey('/tmp/repo', 'main')
+    const session = {
+      openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
+      activeRepoId: '/tmp/repo',
+      zenMode: true,
+      workspacePaneSize: 55,
+      selectedTerminalSessionIdByTerminalWorktree: {},
+      preferredWorkspacePaneTabByTargetByRepo: {
+        '/tmp/repo': {
+          [targetKey]: 'files' as const,
+        },
+      },
+      workspacePaneTabsByTargetByRepo: {},
+      filetreeViewStateByWorktreeByRepo: {},
+    }
+    mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ session }))
+    vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
+    vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
+    vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
+    vi.spyOn(useReposStore.getState(), 'hydrateRepoSession').mockRejectedValue(
+      new Error('workspace pane preferred tab restore failed'),
+    )
+
+    renderInJsdom(<Harness />)
+    await flushMicrotasks(3)
+
+    expect(useReposStore.getState().sessionReady).toBe(true)
+    expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
+    expect(useReposStore.getState().sessionRestoreError).toBe('workspace pane preferred tab restore failed')
+    expect(mockedRestoreServerWorkspacePaneTabsFromSession).not.toHaveBeenCalled()
+  })
+
+  test('blocks persistence when repo session hydration fails', async () => {
+    const session = {
+      openRepoEntries: [{ kind: 'local' as const, id: '/tmp/missing-repo' }],
+      activeRepoId: '/tmp/missing-repo',
+      zenMode: true,
+      workspacePaneSize: 55,
+      selectedTerminalSessionIdByTerminalWorktree: {},
+      preferredWorkspacePaneTabByTargetByRepo: {},
+      workspacePaneTabsByTargetByRepo: {},
+      filetreeViewStateByWorktreeByRepo: {},
+    }
+    mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ session }))
+    vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
+    vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
+    vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
+    vi.spyOn(useReposStore.getState(), 'hydrateRepoSession').mockRejectedValue(new Error('session repo restore failed'))
+
+    renderInJsdom(<Harness />)
+    await flushMicrotasks(3)
+
+    expect(useReposStore.getState().sessionReady).toBe(true)
+    expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
+    expect(useReposStore.getState().sessionRestoreError).toBe('session repo restore failed')
+    expect(mockedRestoreServerWorkspacePaneTabsFromSession).not.toHaveBeenCalled()
+  })
+
+  test('reports a failed server workspace tabs commit and keeps persistence blocked', async () => {
     const targetKey = branchTargetKey('/tmp/repo', 'main')
     const session = {
       openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
@@ -255,7 +316,9 @@ describe('app bootstrap hooks', () => {
     renderInJsdom(<Harness />)
     await flushMicrotasks(3)
 
+    expect(useReposStore.getState().sessionReady).toBe(true)
     expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
+    expect(useReposStore.getState().sessionRestoreError).toBe('workspace pane tabs restore failed')
   })
 
   test('opens the persistence gate even when boot session restore fails', async () => {
@@ -265,7 +328,8 @@ describe('app bootstrap hooks', () => {
     await flushMicrotasks(3)
 
     expect(useReposStore.getState().sessionReady).toBe(true)
-    expect(useReposStore.getState().sessionPersistenceReady).toBe(true)
+    expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
+    expect(useReposStore.getState().sessionRestoreError).toBe('settings unavailable')
   })
 })
 

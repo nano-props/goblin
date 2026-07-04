@@ -2,11 +2,17 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   handleRepoInvalidationRefresh,
   repoInvalidationRefreshDisposition,
+  repoStatusRefreshSnapshot,
   resetRepoRefreshCoordinatorState,
   runRepoRefreshIntent,
 } from '#/web/stores/repos/refresh-coordinator.ts'
 import { beginRepoInvalidationSource, settleRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import type { ReposGet } from '#/web/stores/repos/types.ts'
+import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 function callsGet() {
   const calls: string[] = []
@@ -27,11 +33,7 @@ function callsGet() {
         calls.push(`core:${id}:${options?.repoInstanceId ?? ''}`)
         return Promise.resolve()
       },
-      refreshPullRequests: (
-        id: string,
-        branches?: string[],
-        options?: { repoInstanceId?: string; mode?: string; clearMissing?: boolean },
-      ) => {
+      refreshPullRequests: (id: string, branches?: string[], options?: { repoInstanceId?: string; mode?: string }) => {
         calls.push(`prs:${id}:${branches?.join(',') ?? ''}:${options?.mode ?? ''}:${options?.repoInstanceId ?? ''}`)
         return Promise.resolve()
       },
@@ -41,6 +43,8 @@ function callsGet() {
 
 describe('repo refresh coordinator', () => {
   beforeEach(() => {
+    primaryWindowQueryClient.clear()
+    resetReposStore()
     resetRepoRefreshCoordinatorState()
   })
 
@@ -49,10 +53,42 @@ describe('repo refresh coordinator', () => {
     vi.useRealTimers()
   })
 
+  test('builds status refresh snapshots from the React Query branch read model', () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: '/repo',
+      branches: [],
+      selectedBranch: 'feature/query',
+      preferredWorkspacePaneTab: 'status',
+    })
+    setRepoSnapshotQueryData('/repo', repo.instanceId, {
+      current: 'feature/query',
+      branches: [createRepoBranch('feature/query', { worktree: { path: '/tmp/query-worktree' } })],
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: '/repo',
+      repoInstanceId: repo.instanceId,
+      branchName: 'feature/query',
+      worktreePath: '/tmp/query-worktree',
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+
+    expect(repoStatusRefreshSnapshot(repo)).toMatchObject({
+      id: '/repo',
+      repoInstanceId: repo.instanceId,
+      preferredWorkspacePaneTab: 'status',
+      statusViewOpen: true,
+    })
+  })
+
   test('routes initial load through a coordinated snapshot and status refresh', async () => {
     const { calls, get } = callsGet()
 
-    await runRepoRefreshIntent(get, { kind: 'core-data-changed', reason: 'initial-load', id: '/repo', repoInstanceId: 'repo-instance-test-7' })
+    await runRepoRefreshIntent(get, {
+      kind: 'core-data-changed',
+      reason: 'initial-load',
+      id: '/repo',
+      repoInstanceId: 'repo-instance-test-7',
+    })
 
     expect(calls).toEqual(['core:/repo:repo-instance-test-7'])
   })
@@ -60,7 +96,11 @@ describe('repo refresh coordinator', () => {
   test('routes manual refresh requests through syncAndRefresh', async () => {
     const { calls, get } = callsGet()
 
-    await runRepoRefreshIntent(get, { kind: 'manual-refresh-requested', id: '/repo', repoInstanceId: 'repo-instance-test-5' })
+    await runRepoRefreshIntent(get, {
+      kind: 'manual-refresh-requested',
+      id: '/repo',
+      repoInstanceId: 'repo-instance-test-5',
+    })
 
     expect(calls).toEqual(['manual:/repo:repo-instance-test-5'])
   })
@@ -124,7 +164,12 @@ describe('repo refresh coordinator', () => {
       }) as unknown as ReturnType<ReposGet>
 
     await expect(
-      runRepoRefreshIntent(get, { kind: 'core-data-changed', reason: 'branch-action', id: '/repo', repoInstanceId: 'repo-instance-test-13' }),
+      runRepoRefreshIntent(get, {
+        kind: 'core-data-changed',
+        reason: 'branch-action',
+        id: '/repo',
+        repoInstanceId: 'repo-instance-test-13',
+      }),
     ).rejects.toThrow('boom')
 
     expect(repoInvalidationRefreshDisposition({})).toBe('refresh')

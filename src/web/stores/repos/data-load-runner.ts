@@ -25,7 +25,7 @@ interface RunLatestDataLoadOperationOptions<T> {
   selectDataLoad: (repo: RepoDraft) => RepoDataLoadState
   start?: (repo: RepoDraft) => { hasData?: boolean } | void
   task: (signal: AbortSignal) => Promise<T>
-  applyResult: (repo: RepoDraft, result: T) => boolean | void
+  applyResult?: (repo: RepoDraft, result: T) => boolean | void
   onSuccess?: (result: T, ctx: { isCurrent: () => boolean }) => void | Promise<void>
   onError?: (message: string, repo: RepoDraft) => void
   /**
@@ -55,7 +55,7 @@ export async function runLatestDataLoadOperation<T>(options: RunLatestDataLoadOp
     task: options.task,
     onResult: async (result, ctx) => {
       updateIfFresh(options.set, options.id, options.repoInstanceId, (repo) => {
-        const shouldFinish = options.applyResult(repo, result)
+        const shouldFinish = options.applyResult?.(repo, result)
         if (shouldFinish === false) return
         finishDataLoadSuccess(options.selectDataLoad(repo))
       })

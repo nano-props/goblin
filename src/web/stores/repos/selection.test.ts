@@ -11,7 +11,7 @@ import {
   createRepoBranch as branch,
   installGoblinTestBridge,
   resetReposStore,
-  seedRepoState,
+  seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import {
   preferredWorkspacePaneTabForTarget,
@@ -23,6 +23,10 @@ import { DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 const REPO_ID = '/tmp/gbl-selection-test-repo'
 const ipcHandlers: Record<string, (input: any) => unknown> = {}
 
@@ -34,7 +38,7 @@ function seedRepo(options: {
   branches?: BranchSnapshotInfo[]
 }) {
   const selectedBranch = options.selectedBranch === undefined ? 'feature/plain' : options.selectedBranch
-  seedRepoState({
+  seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches: options.branches ?? [
       branch('main', { worktree: { path: '/repo' } }),
@@ -61,9 +65,23 @@ function seedRepo(options: {
   })
 }
 
+function seedRepoShellWithoutBranchReadModel(): void {
+  const repo = emptyRepo(REPO_ID, 'selection-test-repo', 'repo-instance-selection-no-query')
+  repo.ui.selectedBranch = 'main'
+  useReposStore.setState((s) => ({
+    repos: { ...s.repos, [REPO_ID]: repo },
+    order: [...s.order, REPO_ID],
+    activeId: REPO_ID,
+  }))
+}
+
 function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
   const repo = useReposStore.getState().repos[REPO_ID]
-  const target = repo ? workspacePaneTabsTargetForRepoBranch(repo, branchName) : null
+  const branchModel = repo ? readRepoBranchQueryProjection(repo) : null
+  const target =
+    repo && branchModel
+      ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branchName)
+      : null
   return workspacePaneStaticTabsFromEntries(
     target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : [],
   )
@@ -71,10 +89,16 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
 
 function preferredTabFor(branchName?: string | null): WorkspacePaneTabType | null {
   const repo = useReposStore.getState().repos[REPO_ID]
+  const branchModel = repo ? readRepoBranchQueryProjection(repo) : null
   return repo
     ? preferredWorkspacePaneTabForTarget(
         repo.ui,
-        workspacePaneTabsTargetForRepoBranch(repo, branchName ?? repo.ui.selectedBranch),
+        branchModel
+          ? workspacePaneTabsTargetForRepoBranch(
+              { repoRoot: repo.id, branches: branchModel.branches },
+              branchName ?? repo.ui.selectedBranch,
+            )
+          : null,
       )
     : null
 }
@@ -85,8 +109,9 @@ function restoreWorkspacePaneState(restoreState: Partial<SessionWorkspacePaneRes
     preferredWorkspacePaneTabByTargetByRepo: restoreState.preferredWorkspacePaneTabByTargetByRepo ?? {},
   }
   useReposStore.setState((s) => {
-    const repos = restoreSessionWorkspacePaneStateInRepos(s.repos, normalizedRestoreState)
-    return repos === s.repos ? s : { repos }
+    const result = restoreSessionWorkspacePaneStateInRepos(s.repos, normalizedRestoreState)
+    if (result.status === 'failed') throw new Error('workspace pane preferred tab restore failed')
+    return result.repos === s.repos ? s : { repos: result.repos }
   })
 }
 
@@ -112,6 +137,7 @@ function stubRefreshActions(
 }
 
 beforeEach(() => {
+  primaryWindowQueryClient.clear()
   for (const key of Object.keys(ipcHandlers)) delete ipcHandlers[key]
   resetReposStore()
   installGoblinTestBridge(ipcHandlers)
@@ -120,6 +146,14 @@ beforeEach(() => {
 })
 
 describe('setBranchViewMode', () => {
+  test('fails when the repo branch read model is unavailable', () => {
+    seedRepoShellWithoutBranchReadModel()
+
+    expect(() => useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')).toThrow(
+      'repo branch read model query data unavailable for repo',
+    )
+  })
+
   test('changes the selected branch when the previous selection is hidden', () => {
     seedRepo({ selectedBranch: 'feature/plain' })
 
@@ -151,6 +185,22 @@ describe('setBranchViewMode', () => {
     expect(repo?.ui.branchViewMode).toBe('worktrees')
     expect(repo?.ui.selectedBranch).toBeNull()
     expect(useReposStore.getState().repoSnapshotCache[REPO_ID]?.ui.selectedBranch).toBeNull()
+  })
+
+  test('uses the React Query snapshot read model when changing branch view mode', () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [],
+      selectedBranch: 'feature/plain',
+    })
+    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
+      current: 'main',
+      branches: [branch('main', { worktree: { path: '/repo' } }), branch('feature/plain')],
+    })
+
+    useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('main')
   })
 
   test('passes the current repo instance id to follow-up refreshes', () => {
@@ -203,6 +253,14 @@ describe('setBranchViewMode', () => {
 })
 
 describe('selectBranch', () => {
+  test('fails when the repo branch read model is unavailable', () => {
+    seedRepoShellWithoutBranchReadModel()
+
+    expect(() => useReposStore.getState().selectBranch(REPO_ID, 'feature/query')).toThrow(
+      'repo branch read model query data unavailable for repo',
+    )
+  })
+
   test('refreshes pull request details locally', async () => {
     let resolve!: () => void
     const calls: Array<{ branches?: string[]; mode?: string }> = []
@@ -239,6 +297,22 @@ describe('selectBranch', () => {
     } finally {
       restore()
     }
+  })
+
+  test('uses the React Query snapshot read model to validate selected branches', () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [],
+      selectedBranch: 'main',
+    })
+    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
+      current: 'main',
+      branches: [branch('main'), branch('feature/query')],
+    })
+
+    useReposStore.getState().selectBranch(REPO_ID, 'feature/query')
+
+    expect(useReposStore.getState().repos[REPO_ID]?.ui.selectedBranch).toBe('feature/query')
   })
 
   test('ignores a branch that is not in the current snapshot', () => {
@@ -310,6 +384,14 @@ describe('clearSelectedBranch', () => {
 })
 
 describe('setWorkspacePaneTab', () => {
+  test('fails when the repo branch read model is unavailable', () => {
+    seedRepoShellWithoutBranchReadModel()
+
+    expect(() => useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'changes')).toThrow(
+      'repo branch read model query data unavailable for repo',
+    )
+  })
+
   test('persists the selected workspace pane tab immediately', () => {
     seedRepo({ selectedBranch: 'feature/worktree', preferredWorkspacePaneTab: 'status' })
 
@@ -325,6 +407,27 @@ describe('setWorkspacePaneTab', () => {
     expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
   })
 
+  test('uses the React Query snapshot read model to resolve workspace pane tab targets', () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [],
+      selectedBranch: 'feature/query',
+      preferredWorkspacePaneTab: 'status',
+    })
+    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
+      current: 'feature/query',
+      branches: [branch('feature/query', { worktree: { path: '/tmp/query-worktree' } })],
+    })
+
+    useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'changes')
+
+    expect(
+      useReposStore.getState().repos[REPO_ID]?.ui.preferredWorkspacePaneTabByTarget[
+        worktreeTargetKey('feature/query', '/tmp/query-worktree')
+      ],
+    ).toBe('changes')
+  })
+
   test('restores a session-preferred files tab when its static tab is open', () => {
     seedRepo({
       selectedBranch: 'main',
@@ -336,27 +439,41 @@ describe('setWorkspacePaneTab', () => {
     expect(openTabsFor('main')).toEqual(['status', 'files'])
   })
 
-  test('does not restore files as preferred when the files tab is closed', () => {
+  test('fails to restore files as preferred when the files tab projection is missing', () => {
     seedRepo({ selectedBranch: 'main', preferredWorkspacePaneTab: 'status', workspacePaneStaticTabs: ['status'] })
 
-    restoreWorkspacePaneState({
-      preferredWorkspacePaneTabByTargetByRepo: { [REPO_ID]: { [worktreeTargetKey('main', '/repo')]: 'files' } },
-    })
+    expect(() =>
+      restoreWorkspacePaneState({
+        preferredWorkspacePaneTabByTargetByRepo: { [REPO_ID]: { [worktreeTargetKey('main', '/repo')]: 'files' } },
+      }),
+    ).toThrow('workspace pane preferred tab restore failed')
 
     expect(preferredTabFor('main')).toBe('status')
     expect(openTabsFor('main')).toEqual(['status'])
+  })
+
+  test('fails to restore a session-preferred tab when the branch read model is unavailable', () => {
+    seedRepoShellWithoutBranchReadModel()
+
+    expect(() =>
+      restoreWorkspacePaneState({
+        preferredWorkspacePaneTabByTargetByRepo: { [REPO_ID]: { [worktreeTargetKey('main', '/repo')]: 'files' } },
+      }),
+    ).toThrow('workspace pane preferred tab restore failed')
   })
 
   test('files is a worktree-scoped static tab and lives in the worktree-only bucket', () => {
     expect(WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES).toContain('files')
   })
 
-  test('does not restore a target-level preferred tab whose tab is closed', () => {
+  test('fails to restore a target-level preferred tab whose tab projection is missing', () => {
     seedRepo({ selectedBranch: 'main', preferredWorkspacePaneTab: 'status', workspacePaneStaticTabs: ['status'] })
 
-    restoreWorkspacePaneState({
-      preferredWorkspacePaneTabByTargetByRepo: { [REPO_ID]: { [worktreeTargetKey('main', '/repo')]: 'history' } },
-    })
+    expect(() =>
+      restoreWorkspacePaneState({
+        preferredWorkspacePaneTabByTargetByRepo: { [REPO_ID]: { [worktreeTargetKey('main', '/repo')]: 'history' } },
+      }),
+    ).toThrow('workspace pane preferred tab restore failed')
 
     expect(preferredTabFor('main')).toBe('status')
     expect(openTabsFor('main')).toEqual(['status'])

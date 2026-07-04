@@ -36,6 +36,7 @@ import { userIdFromContext } from '#/server/common/identity.ts'
 import {
   closeRepoRuntimeInstance,
   getOrOpenRepoRuntimeInstance,
+  listRepoRuntimeInstances,
   openRepoRuntimeInstance,
 } from '#/server/modules/repo-runtime-instances.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
@@ -58,6 +59,14 @@ export function createRepoRoutes() {
       return fallback
     }
   }
+  async function readJsonOrThrow<T>(run: () => Promise<T>, label: string): Promise<T> {
+    try {
+      return await run()
+    } catch (err) {
+      serverRepoNodeLog.warn({ err, label }, 'failed')
+      throw err
+    }
+  }
 
   app.post('/probe', async (c) => {
     const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.probe, c)
@@ -65,30 +74,29 @@ export function createRepoRoutes() {
   })
   app.post('/snapshot', async (c) => {
     const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.snapshot, c)
-    return c.json(await jsonOr(() => getRepoSnapshot(cwd, c.req.raw.signal), null, 'snapshot'))
+    return c.json(await readJsonOrThrow(() => getRepoSnapshot(cwd, c.req.raw.signal), 'snapshot'))
   })
   app.post('/status', async (c) => {
     const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.status, c)
-    return c.json(await jsonOr(() => getRepoStatus(cwd, c.req.raw.signal), [], 'status'))
+    return c.json(await readJsonOrThrow(() => getRepoStatus(cwd, c.req.raw.signal), 'status'))
   })
   app.post('/log', async (c) => {
     const { cwd, branch, count, skip } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.log, c)
     return c.json(
-      await jsonOr<RepoLogResponse>(
+      await readJsonOrThrow<RepoLogResponse>(
         () =>
           getRepoLog(cwd, branch, {
             count: count ?? DEFAULT_REPOSITORY_LOG_COUNT,
             skip: skip ?? 0,
             signal: c.req.raw.signal,
           }),
-        READ_REPO_ERROR,
         'log',
       ),
     )
   })
   app.post('/remote-branches', async (c) => {
     const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.getRemoteBranches, c)
-    return c.json(await jsonOr(() => getRepoRemoteBranches(cwd, c.req.raw.signal), [], 'remote-branches'))
+    return c.json(await readJsonOrThrow(() => getRepoRemoteBranches(cwd, c.req.raw.signal), 'remote-branches'))
   })
   app.post('/worktree-bootstrap-preview', async (c) => {
     const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.worktreeBootstrapPreview, c)
@@ -102,19 +110,16 @@ export function createRepoRoutes() {
   })
   app.post('/patch', async (c) => {
     const { cwd, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.patch, c)
-    return c.json(await jsonOr(() => getRepoPatch(cwd, worktreePath, c.req.raw.signal), READ_REPO_ERROR, 'patch'))
+    return c.json(await readJsonOrThrow(() => getRepoPatch(cwd, worktreePath, c.req.raw.signal), 'patch'))
   })
   app.post('/tree', async (c) => {
     const { cwd, worktreePath, prefix } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.tree, c)
     return c.json(
-      await jsonOr(
+      await readJsonOrThrow(
         // Do not pipe the HTTP request signal into the git tree read.
         // In the Electron/Vite proxy path that signal can abort while
-        // React Query is still settling the tab render, and the tree read
-        // soft-fails to an empty result that the UI then displays as a real
-        // empty worktree.
+        // React Query is still settling the tab render.
         () => getRepositoryTree(cwd, worktreePath, { prefix }),
-        { nodes: [], truncated: false },
         'tree',
       ),
     )
@@ -122,9 +127,8 @@ export function createRepoRoutes() {
   app.post('/file-viewer', async (c) => {
     const { cwd, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fileViewer, c)
     return c.json(
-      await jsonOr(
+      await readJsonOrThrow(
         () => getRepositoryFileViewer(cwd, worktreePath, c.req.raw.signal),
-        { viewer: 'cat', shell: 'posix' },
         'file-viewer',
       ),
     )
@@ -144,9 +148,8 @@ export function createRepoRoutes() {
   app.post('/pull-requests', async (c) => {
     const { cwd, branches, mode } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pullRequests, c)
     return c.json(
-      await jsonOr(
+      await readJsonOrThrow(
         () => getRepoPullRequests(cwd, branches, { mode: mode ?? 'full', signal: c.req.raw.signal }),
-        null,
         'pull-requests',
       ),
     )
@@ -157,7 +160,7 @@ export function createRepoRoutes() {
       'snapshot' | 'status' | 'pullRequests'
     >
     return c.json(
-      await jsonOr(
+      await readJsonOrThrow(
         () =>
           readRepoBulk(cwd, wants, {
             branches,
@@ -165,7 +168,6 @@ export function createRepoRoutes() {
             signal: c.req.raw.signal,
             timeoutMs,
           }),
-        { snapshot: null, status: [], pullRequests: null },
         'composite',
       ),
     )
@@ -294,6 +296,12 @@ export function createRepoRoutes() {
       })
     }
     return c.json({ ok: true as const, repoInstanceId: openRepoRuntimeInstance(userId, input.repoRoot) })
+  })
+  app.post('/runtime-list', async (c) => {
+    const userId = userIdFromContext(c)
+    if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
+    await parseHttpBody(REPO_PROCEDURE_SCHEMAS.runtimeList, c)
+    return c.json({ instances: listRepoRuntimeInstances(userId) })
   })
   app.post('/runtime-close', async (c) => {
     const userId = userIdFromContext(c)

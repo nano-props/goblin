@@ -4,7 +4,7 @@ import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
-import { resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { resetReposStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/repos/repo-operation-scheduler.ts'
@@ -32,7 +32,7 @@ afterEach(() => {
 
 describe('RepoActivityControl component', () => {
   test('keeps the primary refresh button enabled during background-blocked refresh states', () => {
-    seedRepoState({ id: REPO_ID, remote: { hasRemotes: true } })
+    seedRepoShellForTest({ id: REPO_ID, remote: { hasRemotes: true } })
     markRepoOperationTargets(REPO_ID, nextRepoOperationId(REPO_ID), [{ key: 'status', reason: 'status' }], 'running')
 
     const { container } = renderInJsdom(<RepoActivityControl repoId={REPO_ID} />)
@@ -42,7 +42,7 @@ describe('RepoActivityControl component', () => {
   })
 
   test('disables the primary refresh button during manual refreshes', () => {
-    seedRepoState({ id: REPO_ID, remote: { hasRemotes: true } })
+    seedRepoShellForTest({ id: REPO_ID, remote: { hasRemotes: true } })
     markRepoOperationTargets(
       REPO_ID,
       nextRepoOperationId(REPO_ID),
@@ -57,7 +57,7 @@ describe('RepoActivityControl component', () => {
   })
 
   test('renders the primary refresh button for local-only repositories without the local-only label', () => {
-    seedRepoState({ id: REPO_ID, remote: { hasRemotes: false } })
+    seedRepoShellForTest({ id: REPO_ID, remote: { hasRemotes: false } })
 
     const { container } = renderInJsdom(<RepoActivityControl repoId={REPO_ID} />)
 
@@ -67,7 +67,7 @@ describe('RepoActivityControl component', () => {
 
   test('shows the last-sync time in the refresh button tooltip when fetch has loaded', async () => {
     const loadedAt = Date.now() - 5_000
-    const repo = seedRepoState({ id: REPO_ID, remote: { hasRemotes: true } })
+    const repo = seedRepoShellForTest({ id: REPO_ID, remote: { hasRemotes: true } })
     useReposStore.setState((state) => ({
       repos: {
         ...state.repos,
@@ -96,7 +96,7 @@ describe('RepoActivityControl component', () => {
   })
 
   test('falls back to the fetch action title in the refresh button tooltip before the first sync', async () => {
-    seedRepoState({ id: REPO_ID, remote: { hasRemotes: true } })
+    seedRepoShellForTest({ id: REPO_ID, remote: { hasRemotes: true } })
 
     const { container } = renderInJsdom(<RepoActivityControl repoId={REPO_ID} />)
 

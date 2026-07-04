@@ -253,6 +253,31 @@ describe('settings-client', () => {
     )
   })
 
+  test('rejects language updates that do not return an authoritative i18n snapshot', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const fetchMock = mockFetch(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        prefs: {
+          lang: 'ja',
+          theme: 'auto',
+          colorTheme: 'macos',
+          fetchIntervalSec: 120,
+          terminalNotificationsEnabled: false,
+          shortcutsDisabled: false,
+          globalShortcutDisabled: false,
+          globalShortcut: 'CommandOrControl+Shift+G',
+          lanEnabled: false,
+        },
+      }),
+    }))
+
+    const { setI18nPref } = await import('#/web/settings-client.ts')
+    await expect(setI18nPref('ja')).rejects.toThrow('settings language update did not return i18n snapshot')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   test('projects recent repos through the native bridge', async () => {
     const invokeIpc = vi.fn(async () => undefined)
     Object.defineProperty(globalThis, 'window', {
@@ -417,13 +442,7 @@ describe('settings-client', () => {
     )
   })
 
-  // Best-effort projection IPC: the server is the authority, the
-  // native bridge projection is a mirror for the menu state. A
-  // projection IPC failure must not reject the caller's promise —
-  // the server write already committed (otherwise `result` would
-  // have thrown). Rejecting here would surface a misleading
-  // "settings write failed" toast on top of a successful write.
-  test('keeps the server-side setting committed when the native projection IPC rejects', async () => {
+  test('rejects when a committed setting cannot be projected to the native host', async () => {
     const invokeIpc = vi.fn(async () => {
       throw new Error('native bridge wedged')
     })
@@ -465,12 +484,12 @@ describe('settings-client', () => {
       }),
     }))
     const { setThemePref } = await import('#/web/settings-client.ts')
-    await expect(setThemePref('dark')).resolves.toMatchObject({ pref: 'dark' })
+    await expect(setThemePref('dark')).rejects.toThrow('native bridge wedged')
     expect(invokeIpc).toHaveBeenCalledTimes(1)
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  test('keeps recent repos committed when the projection IPC rejects', async () => {
+  test('rejects when committed recent repos cannot be projected to the native host', async () => {
     const invokeIpc = vi.fn(async () => {
       throw new Error('projection IPC rejected')
     })
@@ -508,13 +527,11 @@ describe('settings-client', () => {
       }),
     }))
     const { addRecentRepo } = await import('#/web/settings-client.ts')
-    await expect(addRecentRepo({ kind: 'local', id: '/persisted' })).resolves.toMatchObject({
-      recentRepos: [{ kind: 'local', id: '/persisted' }],
-    })
+    await expect(addRecentRepo({ kind: 'local', id: '/persisted' })).rejects.toThrow('projection IPC rejected')
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  test('keeps the cleared recent-repos list when the projection IPC rejects', async () => {
+  test('rejects when clearing recent repos cannot be projected to the native host', async () => {
     const invokeIpc = vi.fn(async () => {
       throw new Error('projection IPC rejected')
     })
@@ -545,7 +562,7 @@ describe('settings-client', () => {
     })
     const fetchMock = mockFetch(async () => ({ ok: true, json: async () => ({ ok: true }) }))
     const { clearRecentRepos } = await import('#/web/settings-client.ts')
-    await expect(clearRecentRepos()).resolves.toBeUndefined()
+    await expect(clearRecentRepos()).rejects.toThrow('projection IPC rejected')
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

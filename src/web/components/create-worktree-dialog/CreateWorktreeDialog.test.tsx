@@ -1,13 +1,18 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render as rtlRender, screen, waitFor } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
+import { QueryClientProvider } from '@tanstack/react-query'
+import type { ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CreateWorktreeDialog } from '#/web/components/create-worktree-dialog/CreateWorktreeDialog.tsx'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
-import type { RepoState } from '#/web/stores/repos/types.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { getRepoRemoteBranches } from '#/web/repo-client.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
+import { createRepoBranch, repoPresentationForTest } from '#/web/test-utils/bridge.ts'
+import type { RepoPresentationForTest } from '#/web/test-utils/bridge.ts'
 
 vi.mock('#/web/repo-client.ts', async () => {
   const actual = await vi.importActual<typeof import('#/web/repo-client.ts')>('#/web/repo-client.ts')
@@ -23,6 +28,7 @@ const testWindow = window as unknown as {
 }
 
 beforeEach(() => {
+  primaryWindowQueryClient.clear()
   testWindow.__GOBLIN_BOOTSTRAP__ = {
     runtime: { kind: 'electron', bridgeVersion: 1, capabilities: [] },
     initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' },
@@ -43,6 +49,10 @@ afterEach(() => {
   delete testWindow.goblinNative
   delete testWindow.__GOBLIN_BOOTSTRAP__
 })
+
+function render(ui: ReactElement) {
+  return rtlRender(<QueryClientProvider client={primaryWindowQueryClient}>{ui}</QueryClientProvider>)
+}
 
 describe('CreateWorktreeDialog', () => {
   test('focuses the new branch input when opened in newBranch mode', () => {
@@ -108,6 +118,28 @@ describe('CreateWorktreeDialog', () => {
       },
     })
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  test('uses the React Query snapshot read model for local branch choices', async () => {
+    const user = userEvent.setup()
+    const repo = createRepo()
+    setRepoSnapshotQueryData(repo.id, repo.instanceId, {
+      current: 'main',
+      branches: [createRepoBranch('main'), createRepoBranch('feature/base')],
+    })
+    const onCreate = vi.fn(async () => {})
+
+    render(<CreateWorktreeDialog open repo={repo} onClose={vi.fn()} onCreate={onCreate} />)
+
+    await user.type(screen.getByRole('textbox', { name: /action.create-worktree-branch-label/i }), 'feature/query')
+    await user.click(screen.getByRole('button', { name: /action.create-worktree-confirm/i }))
+
+    expect(onCreate).toHaveBeenCalledWith({
+      input: {
+        worktreePath: '/tmp/goblin-repo-feature-query',
+        mode: { kind: 'newBranch', newBranch: 'feature/query', baseRef: 'main' },
+      },
+    })
   })
 
   test('switches to existingBranch mode and submits the selected branch', async () => {
@@ -185,10 +217,9 @@ describe('CreateWorktreeDialog', () => {
   })
 })
 
-function createRepo(): RepoState {
+function createRepo(): RepoPresentationForTest {
   const repo = emptyRepo('/tmp/goblin-repo', 'goblin-repo', 'repo-instance-test')
-  repo.data.currentBranch = 'main'
-  repo.data.branches = [
+  const branches = [
     {
       name: 'main',
       isCurrent: true,
@@ -212,10 +243,20 @@ function createRepo(): RepoState {
       lastCommitAuthor: 'Test',
     },
   ]
-  return repo
+  setRepoSnapshotQueryData(repo.id, repo.instanceId, {
+    current: 'main',
+    branches,
+  })
+  setRepoStatusQueryData(repo.id, repo.instanceId, [])
+  return repoPresentationForTest(repo, {
+    currentBranch: 'main',
+    branches,
+    status: [],
+    worktreesByPath: {},
+  })
 }
 
-function createRemoteRepo(): RepoState {
+function createRemoteRepo(): RepoPresentationForTest {
   const target = normalizeRemoteTarget({
     alias: 'prod',
     host: 'example.com',
@@ -227,5 +268,10 @@ function createRemoteRepo(): RepoState {
   const repo = createRepo()
   repo.id = target.id
   repo.remote.lifecycle = { kind: 'ready', target }
+  setRepoSnapshotQueryData(repo.id, repo.instanceId, {
+    current: repo.branchModel.currentBranch,
+    branches: repo.branchModel.branches,
+  })
+  setRepoStatusQueryData(repo.id, repo.instanceId, [])
   return repo
 }

@@ -24,18 +24,10 @@ export function markRepoUnavailable(repo: RepoAvailabilityTarget, reason: string
   repo.remote.fetchError = null
 }
 
-// Re-export the shared reason-mapping helper so existing
-// `import { toRemoteRepoFailureReason } from '#/web/.../availability.ts'`
-// call sites keep compiling through the Phase 1→3 transition. The
-// canonical definition lives in `shared/remote-repo.ts` so the
-// server boundary can use the same mapping.
-export { toRemoteRepoFailureReason } from '#/shared/remote-repo.ts'
-
 /**
  * Set the remote lifecycle to `connecting` (entry point of a fresh
- * remote-repo run). The legacy `target` field is gone in Phase 4;
- * the lifecycle union owns the target and the `connecting` variant
- * has no slot for it. Pass-through to availability keeps the
+ * remote-repo run). The lifecycle union owns the target and the
+ * `connecting` variant has no slot for it. Pass-through to availability keeps the
  * refresh-pipeline call sites (refresh.ts) that flip
  * `availability` from `available` working unchanged — the
  * availability mirror is still useful as a hint, not as the

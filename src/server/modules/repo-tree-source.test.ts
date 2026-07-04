@@ -39,11 +39,10 @@ describe('repo-tree-source — local direct children', () => {
     if (worktree) await fs.rm(worktree, { recursive: true, force: true })
   })
 
-  test('returns an empty result when the signal is already aborted', async () => {
+  test('rejects when the signal is already aborted', async () => {
     const controller = new AbortController()
     controller.abort()
-    const result = await getRepoTreeSourceLocal('/tmp', {}, controller.signal)
-    expect(result).toEqual({ nodes: [], truncated: false })
+    await expect(getRepoTreeSourceLocal('/tmp', {}, controller.signal)).rejects.toThrow('aborted')
   })
 
   test('returns only root direct children', async () => {
@@ -120,16 +119,16 @@ describe('repo-tree-source — local direct children', () => {
     expect(secrets.nodes.map((node) => node.id)).toEqual(['secrets/tracked.txt'])
   })
 
-  test('returns empty nodes when the worktree path does not exist', async () => {
+  test('rejects when the worktree path does not exist', async () => {
     const missing = path.join(os.tmpdir(), 'definitely-not-a-real-path-' + Date.now())
-    const result = await getRepoTreeSourceLocal(missing, {}, undefined)
-    expect(result).toEqual({ nodes: [], truncated: false })
+    await expect(getRepoTreeSourceLocal(missing, {}, undefined)).rejects.toThrow()
   })
 
   test('rejects unsafe prefixes before filesystem reads', async () => {
     worktree = await makeTempWorktree({ 'src/a.ts': '' })
-    const result = await getRepoTreeSourceLocal(worktree, { prefix: '../secret' }, undefined)
-    expect(result).toEqual({ nodes: [], truncated: false })
+    await expect(getRepoTreeSourceLocal(worktree, { prefix: '../secret' }, undefined)).rejects.toThrow(
+      'invalid tree prefix',
+    )
   })
 })
 
@@ -203,13 +202,12 @@ describe('repo-tree-source — remote direct children', () => {
     remoteMocks.getRemoteTreeWalk.mockReset()
   })
 
-  test('returns the empty envelope when the signal is already aborted', async () => {
+  test('rejects when the signal is already aborted', async () => {
     const controller = new AbortController()
     controller.abort()
-    const result = await getRepoTreeSourceRemote(
-      makeRemoteInput('/srv/repos/myrepo/.worktrees/feature', {}, controller.signal),
-    )
-    expect(result).toEqual({ nodes: [], truncated: false })
+    await expect(
+      getRepoTreeSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature', {}, controller.signal)),
+    ).rejects.toThrow('aborted')
     expect(remoteMocks.getRemoteTreeWalk).not.toHaveBeenCalled()
   })
 
@@ -257,10 +255,11 @@ describe('repo-tree-source — remote direct children', () => {
     expect(result.nodes.map((node) => node.id)).toEqual(['src/a.ts'])
   })
 
-  test('soft-fails to the empty envelope when the remote walk fails', async () => {
+  test('rejects when the remote walk fails', async () => {
     remoteMocks.getRemoteTreeWalk.mockResolvedValueOnce({ ok: false, message: 'no worktree found' })
-    const result = await getRepoTreeSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature'))
-    expect(result).toEqual({ nodes: [], truncated: false })
+    await expect(getRepoTreeSourceRemote(makeRemoteInput('/srv/repos/myrepo/.worktrees/feature'))).rejects.toThrow(
+      'no worktree found',
+    )
   })
 })
 

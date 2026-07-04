@@ -2,7 +2,7 @@
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { openBranchExternalTarget, openUpstreamBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
-import { resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { resetReposStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
 
 const mocks = vi.hoisted(() => ({
   openExternalUrl: vi.fn(),
@@ -51,7 +51,7 @@ describe('openBranchExternalTarget', () => {
 describe('openUpstreamBranchExternalTarget', () => {
   test('parses `remote/branch` and opens the named remote', async () => {
     mocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
-    seedRepoState({ id: REPO_ID, remote: { remotes: ['origin'] } })
+    seedRepoShellForTest({ id: REPO_ID, remote: { remotes: ['origin'] } })
 
     await openUpstreamBranchExternalTarget(REPO_ID, 'origin/main')
 
@@ -64,7 +64,7 @@ describe('openUpstreamBranchExternalTarget', () => {
 
   test('preserves slashes in the branch name', async () => {
     mocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
-    seedRepoState({ id: REPO_ID, remote: { remotes: ['origin'] } })
+    seedRepoShellForTest({ id: REPO_ID, remote: { remotes: ['origin'] } })
 
     await openUpstreamBranchExternalTarget(REPO_ID, 'origin/feature/foo')
 
@@ -77,7 +77,7 @@ describe('openUpstreamBranchExternalTarget', () => {
 
   test('uses the longest matching remote name when remote names contain slashes', async () => {
     mocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
-    seedRepoState({
+    seedRepoShellForTest({
       id: REPO_ID,
       remote: {
         remotes: ['origin', 'origin/team'],

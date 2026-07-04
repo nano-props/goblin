@@ -10,6 +10,7 @@
 //   - one-dialog-at-a-time invariant across the `openXxx` actions
 
 import { act, cleanup } from '@testing-library/react'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchActionDialogHost } from '#/web/components/BranchActionDialogHost.tsx'
 import {
@@ -18,11 +19,12 @@ import {
   useBranchActionDialogsStore,
   type RemoveWorktreeDialogPayload,
 } from '#/web/stores/repos/branch-action-dialogs.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
-import { idleOperation } from '#/web/stores/repos/operations.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 vi.mock('#/web/hooks/branchActionDispatch.ts', () => ({
   dispatchPush: vi.fn(),
@@ -108,32 +110,12 @@ const REPO_ID = '/tmp/gbl-dialog-host-test'
 function setupRepo() {
   const worktreePath = '/tmp/dialog-host-worktree'
   const branch = createRepoBranch('feature/host', { worktree: { path: worktreePath } })
-  const repo = seedRepoState({ id: REPO_ID, branches: [branch] })
+  const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [branch] })
   return { repo, branch, worktreePath }
 }
 
-function buildRepo(repo: ReturnType<typeof seedRepoState>): BranchActionRepo {
-  return {
-    id: repo.id,
-    instanceId: repo.instanceId,
-    data: {
-      currentBranch: repo.data.currentBranch,
-      status: repo.data.status,
-      worktreesByPath: repo.data.worktreesByPath,
-    },
-    operations: { branchAction: idleOperation() },
-    remote: {
-      lifecycle: null,
-      hasRemotes: true,
-      hasBrowserRemote: false,
-      hasGitHubRemote: false,
-      browserRemoteProvider: undefined,
-      remoteProviders: {},
-    },
-  }
-}
-
 beforeEach(() => {
+  primaryWindowQueryClient.clear()
   resetReposStore()
   resetBranchActionDialogsStore()
 })
@@ -146,7 +128,13 @@ afterEach(() => {
 })
 
 function render(element: React.ReactNode) {
-  return renderInJsdom(element)
+  const result = renderInJsdom(<QueryClientProvider client={primaryWindowQueryClient}>{element}</QueryClientProvider>)
+  return {
+    ...result,
+    rerender: (next: React.ReactNode) => {
+      result.rerender(<QueryClientProvider client={primaryWindowQueryClient}>{next}</QueryClientProvider>)
+    },
+  }
 }
 
 function findButtonByText(text: string): HTMLButtonElement | null {
@@ -154,10 +142,29 @@ function findButtonByText(text: string): HTMLButtonElement | null {
   return buttons.find((b) => b.textContent?.includes(text)) ?? null
 }
 
+function setBranchSnapshotForRepo(repoId: string, branches: ReturnType<typeof createRepoBranch>[]): void {
+  const repo = useReposStore.getState().repos[repoId]
+  if (!repo) throw new Error(`missing test repo: ${repoId}`)
+  const readModel = readRepoBranchQueryProjection(repo)
+  setRepoSnapshotQueryData(repoId, repo.instanceId, {
+    current: readModel?.currentBranch ?? '',
+    branches,
+  })
+}
+
+function removeBranchFromReadModel(repoId: string, branchName: string): void {
+  const repo = useReposStore.getState().repos[repoId]
+  if (!repo) throw new Error(`missing test repo: ${repoId}`)
+  const readModel = readRepoBranchQueryProjection(repo)
+  setBranchSnapshotForRepo(
+    repoId,
+    readModel?.branches.filter((branch) => branch.name !== branchName) ?? [],
+  )
+}
+
 describe('BranchActionDialogHost', () => {
   test('regression: store state survives a full unmount/remount cycle of the host', () => {
     const { repo, branch } = setupRepo()
-    buildRepo(repo)
 
     const payload: RemoveWorktreeDialogPayload = { branch: branch.name, path: branch.worktree!.path }
 
@@ -188,9 +195,9 @@ describe('BranchActionDialogHost', () => {
     // Repo A active, open removeConfirm for A/feature/x.
     const { repo: repoA, branch: branchA } = setupRepo()
     const repoBId = '/tmp/gbl-other-repo'
-    // Add repoB to the store alongside repoA via seedRepoState +
-    // setState merge (seedRepoState alone would overwrite `repos`).
-    seedRepoState({ id: repoBId, branches: [createRepoBranch('main')] })
+    // Add repoB to the store alongside repoA via seedRepoWithReadModelForTest +
+    // setState merge (seedRepoWithReadModelForTest alone would overwrite `repos`).
+    seedRepoWithReadModelForTest({ id: repoBId, branches: [createRepoBranch('main')] })
     act(() => {
       useReposStore.setState((state) => ({
         repos: { ...state.repos, [REPO_ID]: repoA },
@@ -225,16 +232,7 @@ describe('BranchActionDialogHost', () => {
   test('regression: closeStaleDialogs clears a dialog whose branch does not match the new selected branch', () => {
     const { repo, branch: branchX } = setupRepo()
     const branchY = createRepoBranch('feature/y', { worktree: { path: '/tmp/y' } })
-    // Add branchY to the same repo.
-    useReposStore.setState((state) => ({
-      repos: {
-        ...state.repos,
-        [REPO_ID]: {
-          ...state.repos[REPO_ID]!,
-          data: { ...state.repos[REPO_ID]!.data, branches: [...state.repos[REPO_ID]!.data.branches, branchY] },
-        },
-      },
-    }))
+    setBranchSnapshotForRepo(REPO_ID, [branchX, branchY])
 
     act(() => {
       useBranchActionDialogsStore.getState().openRemoveWorktreeConfirm(
@@ -338,7 +336,7 @@ describe('BranchActionDialogHost', () => {
     const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
     const repoA = setupRepo().repo
     const repoBId = '/tmp/gbl-other-repo'
-    seedRepoState({ id: repoBId, branches: [createRepoBranch('main')] })
+    seedRepoWithReadModelForTest({ id: repoBId, branches: [createRepoBranch('main')] })
     act(() => {
       useReposStore.setState((state) => ({
         repos: { ...state.repos, [REPO_ID]: repoA },
@@ -644,18 +642,7 @@ describe('BranchActionDialogHost', () => {
   describe('regression: title stays visible when displayContext goes null mid-fade-out', () => {
     function dropBranchFromRepo(branchName: string): void {
       act(() => {
-        useReposStore.setState((state) => {
-          const next = state.repos[REPO_ID]!.data.branches.filter((b: { name: string }) => b.name !== branchName)
-          return {
-            repos: {
-              ...state.repos,
-              [REPO_ID]: {
-                ...state.repos[REPO_ID]!,
-                data: { ...state.repos[REPO_ID]!.data, branches: next },
-              },
-            },
-          }
-        })
+        removeBranchFromReadModel(REPO_ID, branchName)
       })
     }
 
@@ -762,18 +749,7 @@ describe('BranchActionDialogHost', () => {
   describe('regression: body stays visible when the branch is removed mid-fade-out', () => {
     function dropBranchFromRepo(branchName: string): void {
       act(() => {
-        useReposStore.setState((state) => {
-          const next = state.repos[REPO_ID]!.data.branches.filter((b: { name: string }) => b.name !== branchName)
-          return {
-            repos: {
-              ...state.repos,
-              [REPO_ID]: {
-                ...state.repos[REPO_ID]!,
-                data: { ...state.repos[REPO_ID]!.data, branches: next },
-              },
-            },
-          }
-        })
+        removeBranchFromReadModel(REPO_ID, branchName)
       })
     }
 

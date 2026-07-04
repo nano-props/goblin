@@ -1,5 +1,6 @@
 import type { BranchSnapshotInfo, WorktreeStatus } from '#/web/types.ts'
-import type { RepoBranchState, RepoState, RepoWorktreeState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchState, RepoWorktreeState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 interface BranchWorktreeState {
   path: string
   dirty: boolean
@@ -10,7 +11,7 @@ interface BranchWorktreeState {
 }
 
 export interface BranchWorktreeRepo {
-  data: Pick<RepoState['data'], 'worktreesByPath' | 'status'>
+  branchModel: Pick<RepoBranchReadModelData, 'worktreesByPath' | 'status'>
 }
 
 export function worktreeStatesFromBranches(
@@ -41,9 +42,33 @@ export function worktreeStatesFromBranches(
   return next
 }
 
+export function worktreeStatesFromBranchReadModel(
+  branches: BranchSnapshotInfo[],
+  status: WorktreeStatus[],
+): Record<string, RepoWorktreeState> {
+  const statusByPath = new Map(status.map((wt) => [wt.path, wt]))
+  const next: Record<string, RepoWorktreeState> = {}
+  for (const branch of branches) {
+    const snapshotWorktree = branch.worktree
+    if (!snapshotWorktree) continue
+    const statusEntry = statusByPath.get(snapshotWorktree.path)
+    const statusCount = statusEntry?.entries.length
+    const snapshotSummary = snapshotWorktree.summary
+    next[snapshotWorktree.path] = {
+      path: snapshotWorktree.path,
+      branch: statusEntry?.branch ?? branch.name,
+      isMain: snapshotWorktree.isPrimary ?? statusEntry?.isMain ?? false,
+      isDirty: statusCount === undefined ? snapshotSummary?.dirty : statusCount > 0,
+      changeCount: statusCount ?? snapshotSummary?.changeCount,
+      isLocked: snapshotWorktree.isLocked,
+    }
+  }
+  return next
+}
+
 export function stripBranchWorktreeMetadata(branches: BranchSnapshotInfo[]): RepoBranchState[] {
   return branches.map((branch) => {
-    const { worktree, ...rest } = branch
+    const { worktree, pullRequest: _pullRequest, ...rest } = branch
     if (!worktree) return rest
     return { ...rest, worktree: { path: worktree.path } }
   })
@@ -71,8 +96,8 @@ export function applyStatusToWorktreeStates(
 
 export function getBranchWorktreeState(repo: BranchWorktreeRepo, branch: RepoBranchState): BranchWorktreeState | null {
   if (!branch.worktree) return null
-  const worktree = repo.data.worktreesByPath[branch.worktree.path]
-  const status = repo.data.status.find((wt) => wt.path === branch.worktree?.path)
+  const worktree = repo.branchModel.worktreesByPath[branch.worktree.path]
+  const status = repo.branchModel.status.find((wt) => wt.path === branch.worktree?.path)
   const statusChangeCount = status?.entries.length
   const dirty = statusChangeCount === undefined ? (worktree?.isDirty ?? false) : statusChangeCount > 0
   const changeCount = statusChangeCount ?? worktree?.changeCount ?? (dirty ? 1 : 0)
@@ -87,14 +112,14 @@ export function getBranchWorktreeState(repo: BranchWorktreeRepo, branch: RepoBra
 }
 
 export function selectedBranchStatus(repo: BranchWorktreeRepo, branch: RepoBranchState | null): WorktreeStatus[] {
-  return branch?.worktree ? repo.data.status.filter((wt) => wt.path === branch.worktree?.path) : []
+  return branch?.worktree ? repo.branchModel.status.filter((wt) => wt.path === branch.worktree?.path) : []
 }
 
 /**
  * Whether the branch's worktree currently has uncommitted changes
  * worth surfacing. Centralises the dirty-state derivation so the
  * status tab, keyboard shortcut, and toolbar all agree on the
- * answer — and stay in sync if the fallback chain is ever tweaked.
+ * answer — and stay in sync if the derivation precedence changes.
  */
 export function branchWorktreeHasChanges(repo: BranchWorktreeRepo, branch: RepoBranchState): boolean {
   return (getBranchWorktreeState(repo, branch)?.changeCount ?? 0) > 0

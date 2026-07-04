@@ -201,6 +201,7 @@ export const en = {
   'drop.title': 'Drop to open local repository',
   'drop.body': 'Drop a Git repository folder anywhere in Goblin.',
   'drop.open-failed': 'Could not open local repository',
+  'repo-picker.recent-save-failed': 'Repository opened, but recent history was not updated',
 
   // ---- Workspace pane tabs -----------------------------------------------
   'tab.branches': 'Branches',
@@ -503,6 +504,7 @@ export const en = {
   'error.cannot-delete-protected-branch': 'Cannot delete a protected branch',
   'error.cannot-delete-checked-out-branch': 'Cannot delete a branch checked out in a worktree',
   'error.branch-not-fully-merged': 'Branch has unique commits — Git refused the safe delete',
+  'error.worktree-not-found': 'Worktree not found',
   'error.worktree-not-found-for-branch': 'Worktree not found for branch',
   'error.cannot-remove-main-worktree': 'Cannot remove the main worktree',
   'error.cannot-remove-dirty-worktree': 'Worktree has uncommitted changes — commit or discard them first',

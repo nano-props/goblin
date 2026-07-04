@@ -111,7 +111,6 @@ function seedRepo(id: string, lifecycle: RemoteRepoConnectionLifecycle | null) {
         id,
         name: id,
         instanceId: 'repo-instance-test',
-        data: { branches: [], currentBranch: '', status: [], statusLoaded: false, worktreesByPath: {} },
         dataLoads: {
           fetch: { phase: 'idle', loadedAt: null, stale: false, error: null },
           snapshot: { phase: 'idle', loadedAt: null, stale: false, error: null },

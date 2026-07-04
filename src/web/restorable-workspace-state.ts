@@ -16,6 +16,16 @@ import {
   workspacePaneTabsQueryKey,
   type WorkspacePaneTabsQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { readRepoBranchQueryProjection, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
+
+interface WorkspaceSessionRepoProjection {
+  id: string
+  remote: ReposStore['repos'][string]['remote']
+  ui: Pick<ReposStore['repos'][string]['ui'], 'preferredWorkspacePaneTabByTarget'>
+  branches: RepoBranchReadModelData['branches']
+}
+
+type WorkspaceSessionRepoProjectionMap = Record<string, WorkspaceSessionRepoProjection | undefined>
 
 export function workspaceSessionStateFromRestorableWorkspaceState(input: {
   repos: ReposStore['repos']
@@ -23,39 +33,80 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
   filetreeInteractionByScope?: Readonly<Record<string, FiletreeInteractionSnapshot>>
 }): WorkspaceSessionState {
   const { repos, restorableWorkspaceState } = input
+  // Workspace membership is shell state: it must remain restorable even
+  // while repo data queries are unavailable. Target-scoped state below
+  // is different; it references branch/worktree identities and is only
+  // persisted for repos whose branch read model can validate those targets.
+  const shellRepos = workspaceSessionRepoShells(repos, restorableWorkspaceState.order)
+  const projectedRepos = workspaceSessionRepoProjections(repos, restorableWorkspaceState.order)
   const workspacePaneTabsByTargetByRepo = workspacePaneTabsByTargetByRepoFromQueryCache(
     repos,
     restorableWorkspaceState.order,
   )
   return {
-    openRepoEntries: persistedOpenWorkspaceEntries(restorableWorkspaceState.order, repos),
+    openRepoEntries: persistedOpenWorkspaceEntries(restorableWorkspaceState.order, shellRepos),
     activeRepoId: persistedActiveRepoIdForSession(restorableWorkspaceState.activeId),
     zenMode: restorableWorkspaceState.zenMode,
     workspacePaneSize: restorableWorkspaceState.workspacePaneSize,
     selectedTerminalSessionIdByTerminalWorktree: persistedSelectedTerminalSessionIdByTerminalWorktreeForSession(
       restorableWorkspaceState.selectedTerminalSessionIdByTerminalWorktree,
-      repos,
+      projectedRepos,
     ),
     preferredWorkspacePaneTabByTargetByRepo: persistedPreferredWorkspacePaneTabByTargetByRepoForSession(
-      repos,
+      projectedRepos,
       restorableWorkspaceState.order,
       workspacePaneTabsByTargetByRepo,
     ),
     workspacePaneTabsByTargetByRepo: persistedWorkspacePaneTabsByTargetByRepoForSession(
-      repos,
+      projectedRepos,
       restorableWorkspaceState.order,
       workspacePaneTabsByTargetByRepo,
     ),
     filetreeViewStateByWorktreeByRepo: persistedFiletreeViewStateByWorktreeByRepoForSession(
       input.filetreeInteractionByScope ?? {},
-      repos,
+      projectedRepos,
       restorableWorkspaceState.order,
     ),
   }
 }
 
-function workspacePaneTabsByTargetByRepoFromQueryCache(
+function workspaceSessionRepoProjections(
   repos: ReposStore['repos'],
+  order: readonly string[],
+): WorkspaceSessionRepoProjectionMap {
+  const projectedRepos: WorkspaceSessionRepoProjectionMap = {}
+  for (const id of order) {
+    const repo = repos[id]
+    if (!repo) continue
+    const branchModel = readRepoBranchQueryProjection(repo)
+    if (!branchModel) continue
+    projectedRepos[id] = {
+      id: repo.id,
+      remote: repo.remote,
+      ui: {
+        preferredWorkspacePaneTabByTarget: repo.ui.preferredWorkspacePaneTabByTarget,
+      },
+      branches: branchModel.branches,
+    }
+  }
+  return projectedRepos
+}
+
+function workspaceSessionRepoShells(
+  repos: ReposStore['repos'],
+  order: readonly string[],
+): Record<string, Pick<ReposStore['repos'][string], 'id' | 'remote'> | undefined> {
+  const shells: Record<string, Pick<ReposStore['repos'][string], 'id' | 'remote'> | undefined> = {}
+  for (const id of order) {
+    const repo = repos[id]
+    if (!repo) continue
+    shells[id] = { id: repo.id, remote: repo.remote }
+  }
+  return shells
+}
+
+function workspacePaneTabsByTargetByRepoFromQueryCache(
+  repos: Record<string, Pick<ReposStore['repos'][string], 'instanceId'> | undefined>,
   order: readonly string[],
 ): Record<string, Record<string, WorkspacePaneTabEntry[]>> {
   const byRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>> = {}

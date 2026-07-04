@@ -6,15 +6,13 @@ import {
   type FiletreeInteractionSnapshot,
 } from '#/web/stores/repos/filetree-interaction-state.ts'
 
-interface RepoWithWorktrees {
-  data?: {
-    branches?: Array<{ worktree?: { path?: string } | undefined }>
-  }
+interface RepoWorktreeProjection {
+  branches: ReadonlyArray<{ worktree?: { path?: string } | undefined }>
 }
 
 export function persistedFiletreeViewStateByWorktreeByRepoForSession(
   interactionByScope: Readonly<Record<string, FiletreeInteractionSnapshot>>,
-  repos: Record<string, RepoWithWorktrees | undefined>,
+  repos: Record<string, RepoWorktreeProjection | undefined>,
   order: readonly string[],
 ): NonNullable<WorkspaceSessionState['filetreeViewStateByWorktreeByRepo']> {
   const openRepoIds = new Set(order)
@@ -70,8 +68,8 @@ function hasRestorableFiletreeViewState(viewState: FiletreeSessionViewState): bo
   return viewState.selectedKeys.length > 0 || viewState.expandedKeys.length > 0 || viewState.topVisibleRowIndex > 0
 }
 
-function knownWorktreePaths(repo: RepoWithWorktrees): ReadonlySet<string> {
-  return new Set((repo.data?.branches ?? []).map((branch) => branch.worktree?.path).filter(isNonEmptyString))
+function knownWorktreePaths(repo: RepoWorktreeProjection): ReadonlySet<string> {
+  return new Set(repo.branches.map((branch) => branch.worktree?.path).filter(isNonEmptyString))
 }
 
 function isNonEmptyString(value: unknown): value is string {

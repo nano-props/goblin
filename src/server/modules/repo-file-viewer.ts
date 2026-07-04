@@ -4,7 +4,7 @@ import type { WorktreeInfo } from '#/shared/git-types.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import { resolveRemoteRepoTarget } from '#/server/modules/repo-source.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
-import { remoteCommandExists } from '#/system/ssh/git.ts'
+import { remoteCommandExists, resolveRemoteWorktree } from '#/system/ssh/git.ts'
 import { userShellCommandExists } from '#/system/user-shell.ts'
 
 const BAT_VIEWERS = ['bat', 'batcat'] as const
@@ -17,19 +17,22 @@ export async function getRepositoryFileViewer(
   signal?: AbortSignal,
 ): Promise<RepoFileViewerResult> {
   const fallbackViewer = localFallbackViewer()
-  if (signal?.aborted || !hasUsableWorktreePath(worktreePath)) return fallbackViewer
+  if (signal?.aborted) throw new Error('aborted')
+  if (!hasUsableWorktreePath(worktreePath)) throw new Error('invalid worktree path')
 
   if (isRemoteRepoId(cwd)) {
     const target = await resolveRemoteRepoTarget(cwd)
+    const worktree = await resolveRemoteWorktree(target, worktreePath, { signal })
+    const knownWorktrees = [worktree]
     for (const viewer of BAT_VIEWERS) {
-      const exists = await remoteCommandExists(target, worktreePath, viewer, { signal })
+      const exists = await remoteCommandExists(target, worktree.path, viewer, { signal, knownWorktrees })
       if (exists) return { viewer, shell: 'posix' }
     }
     return POSIX_CAT_VIEWER
   }
 
   const worktrees = await getWorktrees(cwd, { includeStatus: false, signal })
-  if (!matchesKnownWorktree(worktrees, worktreePath)) return fallbackViewer
+  if (!matchesKnownWorktree(worktrees, worktreePath)) throw new Error('unknown worktree path')
 
   for (const viewer of BAT_VIEWERS) {
     const exists = await userShellCommandExists(viewer, worktreePath, signal)

@@ -212,6 +212,31 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     await expect(response.json()).resolves.toEqual({ ok: false, input: '/missing', reason: 'missing' })
   })
 
+  test('runtime-list returns the server-owned open runtime instances for the user', async () => {
+    const app = createTestRepoRoutes()
+
+    const openResponse = await app.request(
+      new Request('http://localhost/runtime-open', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ repoRoot: '/tmp/runtime-list-repo' }),
+      }),
+    )
+    const opened = (await openResponse.json()) as { ok: true; repoInstanceId: string }
+
+    const response = await app.request(
+      new Request('http://localhost/runtime-list', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    const json = (await response.json()) as { instances: Array<{ repoRoot: string; repoInstanceId: string }> }
+    expect(json.instances).toContainEqual({ repoRoot: '/tmp/runtime-list-repo', repoInstanceId: opened.repoInstanceId })
+  })
+
   test('passes worktree bootstrap preview requests through to the module layer', async () => {
     mocks.getRepoWorktreeBootstrapPreview.mockResolvedValueOnce({
       ok: true,
@@ -275,7 +300,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     )
   })
 
-  test('returns an error envelope when repo log reading fails', async () => {
+  test('hard-fails when repo log reading fails', async () => {
     mocks.getRepoLog.mockRejectedValueOnce(new Error('fatal: bad revision'))
     const app = createTestRepoRoutes()
     const response = await app.request(
@@ -286,8 +311,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       }),
     )
 
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ ok: false, message: 'error.failed-read-repo' })
+    expect(response.status).toBe(500)
     expect(mocks.getRepoLog).toHaveBeenCalledWith('/tmp/repo', 'feature/work', {
       count: 50,
       skip: 0,
@@ -352,7 +376,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(mocks.getRepositoryTree).not.toHaveBeenCalled()
   })
 
-  test('returns the soft-fail empty envelope when /tree read fails', async () => {
+  test('hard-fails when /tree read fails', async () => {
     mocks.getRepositoryTree.mockRejectedValueOnce(new Error('boom'))
     const app = createTestRepoRoutes()
     const response = await app.request(
@@ -362,8 +386,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
         body: JSON.stringify({ cwd: '/tmp/repo', worktreePath: '/tmp/repo' }),
       }),
     )
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ nodes: [], truncated: false })
+    expect(response.status).toBe(500)
   })
 
   test('passes /file-viewer requests through to the read layer', async () => {
@@ -385,7 +408,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     )
   })
 
-  test('returns the cat fallback when /file-viewer read fails', async () => {
+  test('hard-fails when /file-viewer read fails', async () => {
     mocks.getRepositoryFileViewer.mockRejectedValueOnce(new Error('boom'))
     const app = createTestRepoRoutes()
     const response = await app.request(
@@ -395,8 +418,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
         body: JSON.stringify({ cwd: '/tmp/repo', worktreePath: '/tmp/repo/.worktrees/feature' }),
       }),
     )
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ viewer: 'cat', shell: 'posix' })
+    expect(response.status).toBe(500)
   })
 
   test('passes /trash-file requests through to the filetree write layer', async () => {
@@ -587,11 +609,7 @@ describe('repo routes — composite read', () => {
     expect(json.code).toBe('BAD_REQUEST')
   })
 
-  test('soft-fails to the default envelope when the read function rejects', async () => {
-    // Mirrors the existing jsonOr behaviour for /snapshot, /status,
-    // and /pull-requests: a backend failure on the composite
-    // endpoint returns the empty default rather than a 5xx, so
-    // the client can keep rendering whatever it already has.
+  test('hard-fails when the read function rejects', async () => {
     mocks.readRepoBulk.mockRejectedValue(new Error('backend exploded'))
     const app = createTestRepoRoutes()
     const response = await app.request(
@@ -601,8 +619,35 @@ describe('repo routes — composite read', () => {
         body: JSON.stringify({ cwd: '/tmp/repo' }),
       }),
     )
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ snapshot: null, status: [], pullRequests: null })
+    expect(response.status).toBe(500)
+  })
+})
+
+describe('repo routes — authoritative repo reads', () => {
+  test('hard-fails /snapshot when the read layer rejects', async () => {
+    mocks.getRepoSnapshot.mockRejectedValue(new Error('backend exploded'))
+    const app = createTestRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/snapshot', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo' }),
+      }),
+    )
+    expect(response.status).toBe(500)
+  })
+
+  test('hard-fails /status when the read layer rejects', async () => {
+    mocks.getRepoStatus.mockRejectedValue(new Error('backend exploded'))
+    const app = createTestRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/status', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo' }),
+      }),
+    )
+    expect(response.status).toBe(500)
   })
 })
 

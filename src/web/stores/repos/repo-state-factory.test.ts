@@ -49,13 +49,11 @@ describe('deriveConnectivity', () => {
     expect(deriveConnectivity(repo)).toBe('unreachable')
   })
 
-  test('a remote repo with no lifecycle reads as connecting (post-Phase-4 default)', () => {
-    // Phase 4 deleted the legacy `availability.phase` / `target`
-    // fallback. A remote repo without a lifecycle is treated as
-    // `connecting` rather than `connected` — its terminal state
-    // hasn't been recorded yet. Test fixtures, persistence
-    // restores, or any non-migrated write path that lands a
-    // remote repo with no lifecycle are the only callers that
+  test('a remote repo with no lifecycle reads as connecting', () => {
+    // A remote repo without a lifecycle is treated as `connecting`
+    // rather than `connected` because its terminal state has not been
+    // recorded yet. Test fixtures and persistence restores are the only
+    // expected callers that can construct this shape.
     // should hit this branch.
     const repo = emptyRepo(REMOTE_ID, 'remote', 'repo-instance-test')
     expect(deriveConnectivity(repo)).toBe('connecting')

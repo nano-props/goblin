@@ -1,6 +1,7 @@
 import { toast } from 'sonner'
 import { chooseLocalRepositoryPath, hasNativeDirectoryPicker } from '#/web/app-shell-client.ts'
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
+import { reportOpenRepoPostOpenEffects } from '#/web/lib/open-repo-result-feedback.ts'
 interface Options {
   ensureWorkspaceOpen: (path: string) => Promise<OpenRepoResult>
   activateRepo?: (repoId: string) => void
@@ -27,5 +28,6 @@ export async function openRepoFromDialog({
     })
     return
   }
+  reportOpenRepoPostOpenEffects(result, t)
   activateRepo?.(result.id)
 }

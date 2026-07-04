@@ -2,6 +2,7 @@ import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneTabsTargetForRepoTargetKey } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { commitWorkspacePaneTabs, type WorkspacePaneTabsMutationResult } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
+import { getRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 
 interface WorkspacePaneTabsRestoreDetails {
   unresolvedRepos: string[]
@@ -11,12 +12,14 @@ interface WorkspacePaneTabsRestoreDetails {
 
 export type RestoreWorkspacePaneTabsFromSessionResult =
   | ({ status: 'restored' } & WorkspacePaneTabsRestoreDetails)
-  | ({ status: 'stale-pruned' } & WorkspacePaneTabsRestoreDetails)
   | ({ status: 'failed' } & WorkspacePaneTabsRestoreDetails)
 
 export async function restoreServerWorkspacePaneTabsFromSession(
   workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
 ): Promise<RestoreWorkspacePaneTabsFromSessionResult> {
+  // Boot-only import from persisted session state into the server runtime.
+  // After this completes, runtime tab changes flow server -> query cache ->
+  // eventual session persistence; the saved session is not a live owner.
   const commits: Promise<WorkspacePaneTabsMutationResult>[] = []
   const repos = useReposStore.getState().repos
   const unresolvedRepos: string[] = []
@@ -28,7 +31,10 @@ export async function restoreServerWorkspacePaneTabsFromSession(
       continue
     }
     for (const [targetKey, tabs] of Object.entries(tabsByTarget)) {
-      const target = workspacePaneTabsTargetForRepoTargetKey(repo, targetKey)
+      const snapshot = getRepoSnapshotQueryData(repo.id, repo.instanceId)
+      const target = snapshot
+        ? workspacePaneTabsTargetForRepoTargetKey({ repoRoot: repo.id, branches: snapshot.branches }, targetKey)
+        : null
       if (!target) {
         unresolvedTargets.push({ repoRoot, targetKey })
         continue
@@ -43,8 +49,9 @@ export async function restoreServerWorkspacePaneTabsFromSession(
     unresolvedTargets,
     failedCommits,
   }
-  if (failedCommits.length > 0) return { status: 'failed', ...details }
-  if (unresolvedRepos.length > 0 || unresolvedTargets.length > 0) return { status: 'stale-pruned', ...details }
+  if (failedCommits.length > 0 || unresolvedRepos.length > 0 || unresolvedTargets.length > 0) {
+    return { status: 'failed', ...details }
+  }
   return {
     status: 'restored',
     ...details,

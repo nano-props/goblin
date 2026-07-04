@@ -5,7 +5,7 @@ import {
   createRepoBranch,
   installWorkspacePaneTabsTestBridge,
   resetReposStore,
-  seedRepoState,
+  seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
@@ -17,6 +17,7 @@ import {
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { clearWorkspacePaneTabsOperationQueuesForTests } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 
 const REPO_ID = '/tmp/workspace-pane-tab-repo'
@@ -108,7 +109,7 @@ describe('openWorkspacePaneTab', () => {
   })
 
   test('can explicitly append a newly opened static tab while still recording the opener', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -142,7 +143,7 @@ describe('openWorkspacePaneTab', () => {
   })
 
   test('does not select changes when the selected branch has no worktree', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
@@ -167,7 +168,7 @@ describe('openWorkspacePaneTab', () => {
   })
 
   test('opens status for a branch without a worktree', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
@@ -208,7 +209,7 @@ describe('openWorkspacePaneTab', () => {
   })
 
   test('records the active tab as the opener when opening a new static tab', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -236,7 +237,7 @@ describe('openWorkspacePaneTab', () => {
   })
 
   test('does not overwrite the recorded opener when refocusing an already-open static tab', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -272,7 +273,7 @@ describe('openWorkspacePaneTab', () => {
   })
 
   test('records the opener under the branch the operation targeted, even if the user switches branches while the commit is in flight', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
         createRepoBranch('feature/a', { worktree: { path: WORKTREE_PATH } }),
@@ -323,7 +324,7 @@ describe('openWorkspacePaneTab', () => {
   })
 
   test('does not record an opener if the repo closes before the open commit resolves', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/a', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/a',
@@ -363,7 +364,7 @@ describe('openWorkspacePaneTab', () => {
   })
 
   test('does not select a stale opened tab after the repo closes and reopens before the commit resolves', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/a', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/a',
@@ -406,7 +407,7 @@ describe('openWorkspacePaneTab', () => {
     await commitStarted
 
     useReposStore.getState().closeRepo(REPO_ID)
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/reopened', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/reopened',
@@ -431,9 +432,9 @@ describe('openWorkspacePaneTab', () => {
   test('scopes recorded openers per repo/branch so identical static tab identities do not bleed across targets', async () => {
     const OTHER_REPO_ID = '/tmp/workspace-pane-tab-other-repo'
     const OTHER_WORKTREE_PATH = '/tmp/workspace-pane-tab-other-worktree'
-    // seedRepoState replaces the whole `repos` map, so seed both repos
+    // seedRepoWithReadModelForTest replaces the whole `repos` map, so seed both repos
     // before merging them back together into one multi-repo store state.
-    const repoA = seedRepoState({
+    const repoA = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       selectedBranch: 'feature/worktree',
@@ -442,7 +443,7 @@ describe('openWorkspacePaneTab', () => {
         'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
       },
     })
-    const repoB = seedRepoState({
+    const repoB = seedRepoWithReadModelForTest({
       id: OTHER_REPO_ID,
       branches: [createRepoBranch('main', { worktree: { path: OTHER_WORKTREE_PATH } })],
       selectedBranch: 'main',
@@ -512,7 +513,7 @@ describe('openWorkspacePaneTab', () => {
 })
 
 function seedWorktreeRepo(preferredWorkspacePaneTab: WorkspacePaneStaticTabType) {
-  seedRepoState({
+  seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
     selectedBranch: 'feature/worktree',
@@ -522,7 +523,7 @@ function seedWorktreeRepo(preferredWorkspacePaneTab: WorkspacePaneStaticTabType)
 
 function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
   const repo = useReposStore.getState().repos[REPO_ID]
-  const target = repo ? workspacePaneTabsTargetForRepoBranch(repo, branchName) : null
+  const target = repo ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, branchName) : null
   return workspacePaneStaticTabsFromEntries(
     target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : [],
   )
@@ -531,7 +532,7 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
 function preferredWorkspacePaneTab() {
   const repo = useReposStore.getState().repos[REPO_ID]
   return repo
-    ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch(repo, repo.ui.selectedBranch))
+    ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, repo.ui.selectedBranch))
     : null
 }
 

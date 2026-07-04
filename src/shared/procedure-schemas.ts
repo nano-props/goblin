@@ -61,6 +61,7 @@ const RepoRuntimeCloseSchema = v.object({
   repoRoot: v.string(),
   repoInstanceId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
 })
+const EmptyBodySchema = v.optional(v.object({}))
 
 export const REPO_PROCEDURE_SCHEMAS = {
   // Action endpoints — POST with a JSON body.
@@ -118,6 +119,7 @@ export const REPO_PROCEDURE_SCHEMAS = {
   openInFinder: v.object({ path: v.string() }),
   backgroundSyncRepos: v.object({ repoIds: StringArray }),
   runtimeOpen: RepoRuntimeOpenSchema,
+  runtimeList: EmptyBodySchema,
   runtimeClose: RepoRuntimeCloseSchema,
   abort: CwdInput,
   probe: CwdInput,

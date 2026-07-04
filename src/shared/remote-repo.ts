@@ -133,13 +133,10 @@ export function isRemoteRepoFailureReason(value: unknown): value is RemoteRepoFa
 /**
  * Map a raw failure source (i18n key, `RemoteDiagnosticCategory`, or
  * arbitrary string) to a {@link RemoteRepoFailureReason}. Shared
- * between the server (lifecycle boundary) and the web (legacy
- * probe-failure writes that haven't been migrated to the new
- * boundary yet). The lifecycle union takes a `RemoteRepoFailureReason`
- * directly — the server is the authoritative source of the
- * reason after Phase 3, but the helper is co-located here so the
- * `RemoteDiagnosticCategory` / i18n-key → `RemoteRepoFailureReason`
- * mapping has one definition.
+ * between the server lifecycle boundary and web-side failure writes.
+ * The lifecycle union takes a `RemoteRepoFailureReason` directly, and this
+ * helper keeps the `RemoteDiagnosticCategory` / i18n-key mapping in one
+ * definition.
  */
 export function toRemoteRepoFailureReason(reason: string): RemoteRepoFailureReason {
   if (isRemoteRepoFailureReason(reason)) return reason
@@ -180,8 +177,8 @@ export function toRemoteRepoFailureReason(reason: string): RemoteRepoFailureReas
  *   - `failed`:     lifecycle converged to failure; last-known target may be
  *                   retained so the UI can still display remote context
  *
- * `target` is intentionally only accessible inside the union — this is
- * what forbids the legacy `if (!repo.remote.target) /* connecting *​/` pattern.
+ * `target` is intentionally only accessible inside the union so callers
+ * cannot infer connectivity from unrelated remote fields.
  */
 export type RemoteRepoConnectionLifecycle =
   | { kind: 'connecting' }

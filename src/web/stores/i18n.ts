@@ -12,13 +12,16 @@
 // static loading/error state until the first hydrate call replaces
 // it with the user's preferred language. The `hydrated` flag flips
 // to true on the first successful snapshot commit.
+// I18n hydration reads the public settings transport; preference writes go
+// through settings-actions.
 
 import i18next from 'i18next'
 import { initReactI18next, useTranslation } from 'react-i18next'
 import { create, type StoreApi } from 'zustand'
 import type { I18nSnapshot, Lang, LangPref } from '#/shared/api-types.ts'
-import { getI18nSnapshot, setI18nPref } from '#/web/settings-client.ts'
+import { getI18nSnapshot } from '#/web/settings-client.ts'
 import { subscribeSettingsInvalidationRefetch } from '#/web/settings-invalidation-refetch.ts'
+import { setI18nPreference } from '#/web/settings-actions.ts'
 
 export type { Lang, LangPref }
 type Dict = Record<string, string>
@@ -97,7 +100,7 @@ export const useI18nStore = create<I18nState>((set) => ({
   },
 
   async setPref(pref) {
-    const snapshot = await setI18nPref(pref)
+    const snapshot = await setI18nPreference(pref)
     if (snapshot) {
       await commitSnapshot(set, snapshot)
     }

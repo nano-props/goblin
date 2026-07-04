@@ -3,7 +3,11 @@ import { normalizeRemoteTarget, remoteRepoSessionEntry } from '#/shared/remote-r
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
-import { createRepoBranch, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { getRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { removeRepoRuntimeInstanceFromCache, repoRuntimeInstancesQueryKey } from '#/web/repo-runtime-query.ts'
+import type { RepoRuntimeInstancesSnapshot } from '#/shared/api-types.ts'
 import {
   branchSnapshot,
   flushIpc,
@@ -21,14 +25,47 @@ describe('repo lifecycle', () => {
 
     const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
     if (result.ok) useReposStore.getState().setActive(result.id)
+    if (result.ok) await result.postOpenEffects
 
-    expect(result).toEqual({ ok: true, id: REPO_A })
+    expect(result).toMatchObject({ ok: true, id: REPO_A })
     expect(useReposStore.getState().order).toEqual([REPO_A])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
     expect(calls.recent).toEqual([{ kind: 'local', id: REPO_A }])
     await vi.waitFor(() => {
       expect(calls.composite).toEqual([REPO_A])
     })
+  })
+
+  test('ensureWorkspaceOpen writes server runtime membership into the query cache', async () => {
+    installGoblin()
+
+    const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
+
+    expect(result).toMatchObject({ ok: true, id: REPO_A })
+    const cached = primaryWindowQueryClient.getQueryData<RepoRuntimeInstancesSnapshot>(repoRuntimeInstancesQueryKey())
+    expect(cached?.instances).toEqual([
+      { repoRoot: REPO_A, repoInstanceId: useReposStore.getState().repos[REPO_A]!.instanceId },
+    ])
+  })
+
+  test('ensureWorkspaceOpen reports recent-history write failures without rolling back the opened repo', async () => {
+    installGoblin({
+      'settings.addRecentRepo': () => {
+        throw new Error('recent write failed')
+      },
+    })
+
+    const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
+
+    expect(result).toMatchObject({ ok: true, id: REPO_A })
+    expect(result.ok ? await result.postOpenEffects : null).toEqual([
+      { kind: 'recent-repo', message: 'recent write failed' },
+    ])
+    expect(useReposStore.getState().repos[REPO_A]).toBeDefined()
+    const cached = primaryWindowQueryClient.getQueryData<RepoRuntimeInstancesSnapshot>(repoRuntimeInstancesQueryKey())
+    expect(cached?.instances).toEqual([
+      { repoRoot: REPO_A, repoInstanceId: useReposStore.getState().repos[REPO_A]!.instanceId },
+    ])
   })
 
   test('ensureWorkspaceOpen adds a repo to the open set without changing the active selection', async () => {
@@ -38,7 +75,7 @@ describe('repo lifecycle', () => {
     if (first.ok) useReposStore.getState().setActive(first.id)
     const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_B)
 
-    expect(result).toEqual({ ok: true, id: REPO_B })
+    expect(result).toMatchObject({ ok: true, id: REPO_B })
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
     await vi.waitFor(() => {
@@ -124,13 +161,50 @@ describe('repo lifecycle', () => {
 
     expect(secondToken).not.toBe(firstToken)
     await vi.waitFor(() => {
-      expect(useReposStore.getState().repos[REPO_A]?.data.currentBranch).toBe('fresh')
+      const repo = useReposStore.getState().repos[REPO_A]
+      expect(repo ? getRepoSnapshotQueryData(repo.id, repo.instanceId)?.current : null).toBe('fresh')
     })
 
     snapshotResolvers[0]?.({ branches: [branchSnapshot('stale')], current: 'stale' })
     await flushIpc()
 
-    expect(useReposStore.getState().repos[REPO_A]?.data.currentBranch).toBe('fresh')
+    {
+      const repo = useReposStore.getState().repos[REPO_A]
+      expect(repo ? getRepoSnapshotQueryData(repo.id, repo.instanceId)?.current : null).toBe('fresh')
+    }
+  })
+
+  test('closeRepo removes the closed server runtime membership from the query cache', async () => {
+    installGoblin()
+
+    const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
+    expect(result).toMatchObject({ ok: true, id: REPO_A })
+    const repoInstanceId = useReposStore.getState().repos[REPO_A]!.instanceId
+
+    useReposStore.getState().closeRepo(REPO_A)
+    await vi.waitFor(() => {
+      const cached = primaryWindowQueryClient.getQueryData<RepoRuntimeInstancesSnapshot>(repoRuntimeInstancesQueryKey())
+      expect(cached?.instances).not.toContainEqual({ repoRoot: REPO_A, repoInstanceId })
+    })
+  })
+
+  test('runtime membership cache reconciles from the server when local removal misses', async () => {
+    installGoblin()
+
+    const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
+    expect(result).toMatchObject({ ok: true, id: REPO_A })
+    const repoInstanceId = useReposStore.getState().repos[REPO_A]!.instanceId
+    primaryWindowQueryClient.setQueryData<RepoRuntimeInstancesSnapshot>(repoRuntimeInstancesQueryKey(), {
+      instances: [{ repoRoot: REPO_B, repoInstanceId: 'repo-instance-stale-cache' }],
+    })
+
+    await removeRepoRuntimeInstanceFromCache({
+      repoRoot: REPO_A,
+      repoInstanceId: 'repo-instance-not-in-cache',
+    })
+
+    const cached = primaryWindowQueryClient.getQueryData<RepoRuntimeInstancesSnapshot>(repoRuntimeInstancesQueryKey())
+    expect(cached?.instances).toEqual([{ repoRoot: REPO_A, repoInstanceId }])
   })
 
   test('ensureWorkspaceOpen preserves remote target metadata for recent repos and later actions', async () => {
@@ -147,8 +221,9 @@ describe('repo lifecycle', () => {
     })
 
     const result = await useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(target!))
+    if (result.ok) await result.postOpenEffects
 
-    expect(result).toEqual({ ok: true, id: target!.id })
+    expect(result).toMatchObject({ ok: true, id: target!.id })
     expect(useReposStore.getState().repos[target!.id]?.remote.lifecycle).toEqual({ kind: 'ready', target })
     expect(calls.recent).toEqual([remoteRepoSessionEntry(target!)])
   })
@@ -183,9 +258,14 @@ describe('repo lifecycle', () => {
 
     const result = await useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(target!))
 
-    expect(result).toEqual({ ok: true, id: target!.id })
+    expect(result).toMatchObject({ ok: true, id: target!.id })
     expect(useReposStore.getState().repos[target!.id]?.name).toBe('example:repo')
-    expect(useReposStore.getState().repos[target!.id]?.data.branches.map((branch) => branch.name)).toEqual(['cached'])
+    await vi.waitFor(() => {
+      const repo = useReposStore.getState().repos[target!.id]
+      expect(repo ? getRepoSnapshotQueryData(repo.id, repo.instanceId)?.branches.map((branch) => branch.name) : null).toEqual(
+        [],
+      )
+    })
   })
 
   test('ensureWorkspaceOpen refreshes when a remote target changes between opens', async () => {
@@ -219,7 +299,7 @@ describe('repo lifecycle', () => {
     })
 
     const first = await useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(oldTarget!))
-    expect(first).toEqual({ ok: true, id: oldTarget!.id })
+    expect(first).toMatchObject({ ok: true, id: oldTarget!.id })
     expect(useReposStore.getState().repos[oldTarget!.id]?.remote.lifecycle).toEqual({
       kind: 'ready',
       target: oldTarget,
@@ -233,7 +313,7 @@ describe('repo lifecycle', () => {
       'remote.resolveTarget': () => ({ target: newTarget }),
     })
     const second = await useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(newTarget!))
-    expect(second).toEqual({ ok: true, id: newTarget!.id })
+    expect(second).toMatchObject({ ok: true, id: newTarget!.id })
     expect(useReposStore.getState().repos[newTarget!.id]?.remote.lifecycle).toEqual({
       kind: 'ready',
       target: newTarget,
@@ -242,10 +322,10 @@ describe('repo lifecycle', () => {
   })
 
   test('closeRepo clears recorded tab openers scoped to that repo, but leaves other repos untouched', () => {
-    // seedRepoState replaces the whole `repos` map, so seed both repos
+    // seedRepoWithReadModelForTest replaces the whole `repos` map, so seed both repos
     // before merging them back together into one multi-repo store state.
-    const repoA = seedRepoState({ id: REPO_A, branches: [createRepoBranch('feature/a')], selectedBranch: 'feature/a' })
-    const repoB = seedRepoState({ id: REPO_B, branches: [createRepoBranch('feature/b')], selectedBranch: 'feature/b' })
+    const repoA = seedRepoWithReadModelForTest({ id: REPO_A, branches: [createRepoBranch('feature/a')], selectedBranch: 'feature/a' })
+    const repoB = seedRepoWithReadModelForTest({ id: REPO_B, branches: [createRepoBranch('feature/b')], selectedBranch: 'feature/b' })
     useReposStore.setState({
       repos: { [REPO_A]: repoA, [REPO_B]: repoB },
       order: [REPO_A, REPO_B],

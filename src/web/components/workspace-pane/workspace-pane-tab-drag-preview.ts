@@ -12,6 +12,7 @@ interface WorkspacePaneTabDragPreviewSnapshot {
 
 export interface WorkspacePaneTabDragPreviewInput {
   repoRoot: string
+  repoInstanceId: string
   branchName: string | null
   worktreePath: string | null
   canonicalTabs: readonly WorkspacePaneTabEntry[]
@@ -27,16 +28,20 @@ export interface WorkspacePaneTabDragPreviewState {
 export function useWorkspacePaneTabDragPreview(
   input: WorkspacePaneTabDragPreviewInput,
 ): WorkspacePaneTabDragPreviewState {
+  // Visual-only drag state. Runtime tab truth lives on the server and
+  // React Query only caches that server projection; this hook must not
+  // write either one.
   const targetKey = useMemo(
     () =>
       input.branchName
         ? workspacePaneTabDragPreviewTargetKey({
             repoRoot: input.repoRoot,
+            repoInstanceId: input.repoInstanceId,
             branchName: input.branchName,
             worktreePath: input.worktreePath,
           })
         : null,
-    [input.branchName, input.repoRoot, input.worktreePath],
+    [input.branchName, input.repoInstanceId, input.repoRoot, input.worktreePath],
   )
   const canonicalTabsIdentity = useMemo(
     () => workspacePaneTabEntryListIdentity(input.canonicalTabs),
@@ -88,8 +93,9 @@ export function useWorkspacePaneTabDragPreview(
 
 function workspacePaneTabDragPreviewTargetKey(input: {
   repoRoot: string
+  repoInstanceId: string
   branchName: string
   worktreePath: string | null
 }): string {
-  return workspacePaneTabsTargetIdentityKey(input)
+  return `${workspacePaneTabsTargetIdentityKey(input)}::${input.repoInstanceId}`
 }

@@ -16,6 +16,7 @@ import {
   pushRemoteBranch,
   remoteExecResult,
   removeRemoteWorktree,
+  resolveRemoteWorktree,
 } from '#/system/ssh/git.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteCommandResult } from '#/system/ssh/commands.ts'
@@ -863,6 +864,37 @@ describe('getRemoteTreeWalk knownWorktrees path', () => {
   })
 })
 
+describe('resolveRemoteWorktree', () => {
+  test('returns the canonical known worktree path after POSIX normalization', async () => {
+    const knownWorktrees: WorktreeInfo[] = [
+      { path: '/srv/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false },
+    ]
+    const run = vi.fn()
+
+    const result = await resolveRemoteWorktree(TARGET, '/srv/repo-feature/', {
+      run: run as any,
+      knownWorktrees,
+    })
+
+    expect(result).toEqual(knownWorktrees[0])
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  test('throws the remote read failure instead of returning an empty authority set', async () => {
+    const run = vi.fn(async () => failRemoteResult('ssh unavailable'))
+
+    await expect(resolveRemoteWorktree(TARGET, '/srv/repo-feature', { run: run as any })).rejects.toThrow(
+      'ssh unavailable',
+    )
+
+    expect(run).toHaveBeenCalledWith(
+      { type: 'gitWorktreeList', path: '/srv/repo' },
+      TARGET,
+      { signal: undefined },
+    )
+  })
+})
+
 describe('remoteCommandExists', () => {
   test('validates the remote worktree before checking the command', async () => {
     const knownWorktrees: WorktreeInfo[] = [
@@ -888,6 +920,28 @@ describe('remoteCommandExists', () => {
       expect.objectContaining({ type: 'gitWorktreeList' }),
       expect.anything(),
       expect.anything(),
+    )
+  })
+
+  test('matches known remote worktrees after POSIX path normalization', async () => {
+    const knownWorktrees: WorktreeInfo[] = [
+      { path: '/srv/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false },
+    ]
+    const run = vi.fn(async (command: { type: string }) => {
+      if (command.type === 'commandExists') return okRemoteResult('')
+      return failRemoteResult('unexpected')
+    })
+
+    const result = await remoteCommandExists(TARGET, '/srv/repo-feature/', 'bat', {
+      run: run as any,
+      knownWorktrees,
+    })
+
+    expect(result).toBe(true)
+    expect(run).toHaveBeenCalledWith(
+      { type: 'commandExists', path: '/srv/repo-feature', commandName: 'bat' },
+      TARGET,
+      { signal: undefined },
     )
   })
 

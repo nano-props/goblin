@@ -29,7 +29,10 @@ import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
-import { onRepoRuntimeInstanceClosed } from '#/server/modules/repo-runtime-instances.ts'
+import {
+  isCurrentRepoRuntimeInstance,
+  onRepoRuntimeInstanceClosed,
+} from '#/server/modules/repo-runtime-instances.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 
 // Intentionally long TTL: we want terminals to survive as long as possible in
@@ -102,6 +105,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     isValidTerminalSessionId,
     manager,
     workspaceTabs,
+    isCurrentRepoInstance: isCurrentRepoRuntimeInstance,
     broadcastSessionsChanged(userId, repoRoot) {
       broadcastRepoSessionsChanged(userId, repoRoot)
     },

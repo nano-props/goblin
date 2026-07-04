@@ -13,32 +13,9 @@ import {
   startPullRequestDataLoad,
 } from '#/web/stores/repos/repo-data-load-state.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
-import { stripBranchWorktreeMetadata, worktreeStatesFromBranches } from '#/web/stores/repos/worktree-state.ts'
-import { branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { RepoState, ReposGet } from '#/web/stores/repos/types.ts'
-import type { ExecResult, PullRequestFetchMode, PullRequestInfo } from '#/web/types.ts'
-
-function mergePullRequest(
-  previous: { pullRequest?: PullRequestInfo },
-  next: PullRequestInfo,
-  mode: PullRequestFetchMode,
-): PullRequestInfo {
-  const existing = previous.pullRequest
-  const preserveExistingDetails =
-    mode !== 'full' && !!existing && existing.number === next.number && existing.url === next.url
-  if (!preserveExistingDetails) return next
-  return {
-    ...next,
-    checks: existing.checks ?? next.checks,
-    reviewDecision: existing.reviewDecision === undefined ? next.reviewDecision : existing.reviewDecision,
-    mergeable: existing.mergeable ?? next.mergeable,
-  }
-}
-
-function existingBranchNames(r: { data: { branches: Array<{ name: string }> } }): Set<string> {
-  return new Set(r.data.branches.map((branch) => branch.name))
-}
+import type { ExecResult, PullRequestFetchMode } from '#/web/types.ts'
 
 function finishPullRequestBranchDataLoads(
   r: {
@@ -47,7 +24,7 @@ function finishPullRequestBranchDataLoads(
     }
   },
   branchNames: string[],
-  existingBranches: Set<string>,
+  existingBranches: ReadonlySet<string>,
   finish: (dataLoad: ReturnType<typeof idlePullRequestDataLoad>) => void,
   options?: { createMissing?: boolean },
 ): void {
@@ -63,9 +40,14 @@ function finishPullRequestBranchDataLoads(
   }
 }
 
-export function applySnapshotToRepoProjection(r: RepoState, snap: RepoSnapshot, validBranches: Set<string>): void {
+export function applySnapshotToRepoProjection(
+  r: RepoState,
+  snap: RepoSnapshot,
+  validBranches: Set<string>,
+  previousSnapshotBranches: RepoSnapshot['branches'] | null,
+): void {
   const selectedWorktreeRetarget = selectedWorktreeBranchRetarget({
-    previousBranches: r.data.branches,
+    previousBranches: previousSnapshotBranches,
     nextBranches: snap.branches,
     selectedBranch: r.ui.selectedBranch,
   })
@@ -75,26 +57,6 @@ export function applySnapshotToRepoProjection(r: RepoState, snap: RepoSnapshot, 
     selectedBranch: selectedWorktreeRetarget?.toBranchName ?? r.ui.selectedBranch,
     viewMode: r.ui.branchViewMode,
   })
-  const preservePullRequests = snap.remote ? snap.remote.hasGitHubRemote === true : r.remote.hasGitHubRemote === true
-  const pullRequestsByBranch = preservePullRequests
-    ? new Map(
-        r.data.branches.flatMap((branch) => (branch.pullRequest ? [[branch.name, branch.pullRequest] as const] : [])),
-      )
-    : new Map()
-  const branchesWithSnapshotWorktreeMetadata = snap.branches.map((branch) => {
-    const pullRequest = branch.pullRequest ?? pullRequestsByBranch.get(branch.name)
-    return pullRequest && branchPullRequestBelongsToBranch(branch, pullRequest) ? { ...branch, pullRequest } : branch
-  })
-  const branches = stripBranchWorktreeMetadata(branchesWithSnapshotWorktreeMetadata)
-  const branchNames = branches.map((branch) => branch.name)
-  r.data.branches = branches
-  r.data.currentBranch = snap.current
-  r.data.currentHEAD = snap.currentHEAD
-  r.data.worktreesByPath = worktreeStatesFromBranches(
-    branchesWithSnapshotWorktreeMetadata,
-    r.data.worktreesByPath,
-    r.data.status,
-  )
   r.dataLoads.pullRequestsByBranch = Object.fromEntries(
     Object.entries(r.dataLoads.pullRequestsByBranch).filter(([branch]) => validBranches.has(branch)),
   )
@@ -120,11 +82,12 @@ export function applySnapshotToRepoProjection(r: RepoState, snap: RepoSnapshot, 
 }
 
 function selectedWorktreeBranchRetarget(input: {
-  previousBranches: RepoState['data']['branches']
+  previousBranches: RepoSnapshot['branches'] | null
   nextBranches: RepoSnapshot['branches']
   selectedBranch: string | null
 }): { fromBranchName: string; toBranchName: string } | null {
   if (!input.selectedBranch) return null
+  if (!input.previousBranches) return null
   const previousWorktreePath = input.previousBranches.find((branch) => branch.name === input.selectedBranch)?.worktree
     ?.path
   if (!previousWorktreePath) return null
@@ -136,38 +99,16 @@ function selectedWorktreeBranchRetarget(input: {
 export function startPullRequestRefreshDataLoads(
   r: RepoState,
   branchNames: string[],
-  requested: Set<string>,
   mode: PullRequestFetchMode,
 ): void {
   startPullRequestDataLoad(r.dataLoads.pullRequests, mode, {
-    hasData: r.data.branches.some((branch) => requested.has(branch.name) && !!branch.pullRequest),
+    hasData: false,
   })
   for (const branch of branchNames) {
     r.dataLoads.pullRequestsByBranch[branch] ??= idlePullRequestDataLoad()
-    const branchState = r.data.branches.find((item) => item.name === branch)
     startPullRequestDataLoad(r.dataLoads.pullRequestsByBranch[branch], mode, {
-      hasData: !!branchState?.pullRequest,
+      hasData: false,
     })
-  }
-}
-
-function applyPullRequestEntries(
-  r: RepoState,
-  entries: Array<{ branch: string; pullRequest: PullRequestInfo }>,
-  requested: Set<string>,
-  clearMissing: boolean,
-  mode: PullRequestFetchMode,
-): void {
-  const byBranch = new Map(entries.map((entry) => [entry.branch, entry.pullRequest]))
-  for (const branch of r.data.branches) {
-    const pullRequest = byBranch.get(branch.name)
-    if (pullRequest) {
-      if (branchPullRequestBelongsToBranch(branch, pullRequest))
-        branch.pullRequest = mergePullRequest(branch, pullRequest, mode)
-      else branch.pullRequest = undefined
-      continue
-    }
-    if (clearMissing && requested.has(branch.name) && branch.pullRequest) branch.pullRequest = undefined
   }
 }
 
@@ -206,9 +147,9 @@ export function applyFetchDataLoadError(r: RepoState, message: string): void {
 export function applyPullRequestRefreshUnavailableState(
   r: RepoState,
   branchNames: string[],
+  existingBranches: ReadonlySet<string>,
   mode: PullRequestFetchMode,
 ): void {
-  const existingBranches = existingBranchNames(r)
   finishPullRequestDataLoadUnavailable(r.dataLoads.pullRequests, mode)
   finishPullRequestBranchDataLoads(r, branchNames, existingBranches, (dataLoad) =>
     finishPullRequestDataLoadUnavailable(dataLoad, mode),
@@ -218,12 +159,9 @@ export function applyPullRequestRefreshUnavailableState(
 export function applyPullRequestRefreshSuccessState(
   r: RepoState,
   branchNames: string[],
-  entries: Array<{ branch: string; pullRequest: PullRequestInfo }>,
-  requested: Set<string>,
-  clearMissing: boolean,
+  existingBranches: ReadonlySet<string>,
   mode: PullRequestFetchMode,
 ): void {
-  const existingBranches = existingBranchNames(r)
   finishPullRequestDataLoadSuccess(r.dataLoads.pullRequests, mode)
   finishPullRequestBranchDataLoads(
     r,
@@ -232,16 +170,15 @@ export function applyPullRequestRefreshSuccessState(
     (dataLoad) => finishPullRequestDataLoadSuccess(dataLoad, mode),
     { createMissing: true },
   )
-  applyPullRequestEntries(r, entries, requested, clearMissing, mode)
 }
 
 export function applyPullRequestRefreshStaleState(
   r: RepoState,
   branchNames: string[],
+  existingBranches: ReadonlySet<string>,
   mode: PullRequestFetchMode,
   operationId: number,
 ): void {
-  const existingBranches = existingBranchNames(r)
   const currentBranches = branchNames.filter(
     (branch) => r.operations.pullRequestsByBranch[branch]?.operationId === operationId,
   )
@@ -253,11 +190,12 @@ export function applyPullRequestRefreshStaleState(
 export function applyPullRequestRefreshErrorState(
   r: RepoState,
   branchNames: string[],
+  existingBranches: ReadonlySet<string>,
   mode: PullRequestFetchMode,
   message: string,
 ): void {
   finishPullRequestDataLoadError(r.dataLoads.pullRequests, message)
-  finishPullRequestBranchDataLoads(r, branchNames, existingBranchNames(r), (dataLoad) =>
+  finishPullRequestBranchDataLoads(r, branchNames, existingBranches, (dataLoad) =>
     finishPullRequestDataLoadError(dataLoad, message),
   )
 }

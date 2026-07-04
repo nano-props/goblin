@@ -6,8 +6,7 @@ import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState, ScrollPane } from '#/web/components/Layout.tsx'
 import { StatusListSkeleton } from '#/web/components/Skeleton.tsx'
 import { StatusList } from '#/web/components/StatusList.tsx'
-import { getRepoLog } from '#/web/repo-client.ts'
-import type { LogEntry } from '#/web/types.ts'
+import { useRepoLogQuery } from '#/web/repo-data-query.ts'
 import { BranchStatus } from '#/web/components/repo-workspace/BranchStatus.tsx'
 import { FiletreeNoWorktreeView, FiletreeView } from '#/web/components/repo-workspace/FiletreeView.tsx'
 import { useLazyRepoTree } from '#/web/hooks/useLazyRepoTree.ts'
@@ -30,17 +29,14 @@ import {
 } from '#/web/stores/repos/filetree-interaction-state.ts'
 import { getRepositoryFileViewer } from '#/web/filetree-client.ts'
 import { absoluteFilePathForTerminal, fileReadCommand } from '#/web/components/repo-workspace/file-read-command.ts'
-import {
-  HistoryCommitGraph,
-  HistoryCommitGraphSkeleton,
-} from '#/web/components/repo-workspace/HistoryCommitGraph.tsx'
+import { HistoryCommitGraph, HistoryCommitGraphSkeleton } from '#/web/components/repo-workspace/HistoryCommitGraph.tsx'
 
 const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
 
 export interface WorkspacePanePanelRenderInput {
   type: WorkspacePaneTabType
-  repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'data' | 'ui'> & {
-    data: RepoWorkspaceRepo['data'] & Pick<RepoWorkspaceRepo['data'], 'statusLoaded'>
+  repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'branchModel' | 'ui'> & {
+    branchModel: RepoWorkspaceRepo['branchModel']
   }
   detail: SelectedRepoWorkspacePresentation
   workspacePaneId: string
@@ -91,6 +87,7 @@ function HistoryWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }
   return (
     <BranchHistoryTab
       repoId={repo.id}
+      repoInstanceId={repo.instanceId}
       branchName={branch.name}
       workspacePaneId={workspacePaneId}
       panelLabel={panelLabel}
@@ -245,10 +242,7 @@ function FiletreeTab({
       if (!beginOpeningFile(openingFileKey)) return
       try {
         const openerIdentity = captureWorkspacePaneActiveTabIdentity(repoId)
-        const viewerResult = await getRepositoryFileViewer(repoId, worktreePath).catch(() => ({
-          viewer: 'cat' as const,
-          shell: 'posix' as const,
-        }))
+        const viewerResult = await getRepositoryFileViewer(repoId, worktreePath)
         await runCreateTerminalTabCommand({
           base: { repoRoot: repoId, repoInstanceId, branch: branchName, worktreePath },
           createTerminal,
@@ -360,57 +354,36 @@ function BranchTabPanel({ id, labelledById, label, busy = false, children }: Tab
 
 function BranchHistoryTab({
   repoId,
+  repoInstanceId,
   branchName,
   workspacePaneId,
   panelLabel,
 }: {
   repoId: string
+  repoInstanceId: string
   branchName: string
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
 }) {
   const t = useT()
-  const [state, setState] = useState<{
-    phase: 'loading' | 'loaded' | 'error'
-    entries: LogEntry[]
-    error: string | null
-  }>({
-    phase: 'loading',
-    entries: [],
-    error: null,
+  const historyQuery = useRepoLogQuery(repoId, repoInstanceId, branchName, {
+    count: DEFAULT_REPOSITORY_LOG_COUNT,
   })
-
-  useEffect(() => {
-    const ctrl = new AbortController()
-    setState({ phase: 'loading', entries: [], error: null })
-    void getRepoLog(repoId, branchName, { count: DEFAULT_REPOSITORY_LOG_COUNT, signal: ctrl.signal })
-      .then((entries) => {
-        if (!ctrl.signal.aborted) setState({ phase: 'loaded', entries, error: null })
-      })
-      .catch((err) => {
-        if (ctrl.signal.aborted) return
-        setState({
-          phase: 'error',
-          entries: [],
-          error: err instanceof Error ? err.message : DEFAULT_BRANCH_HISTORY_ERROR_KEY,
-        })
-      })
-    return () => ctrl.abort()
-  }, [branchName, repoId])
-
-  const errorTitleKey = state.error ?? DEFAULT_BRANCH_HISTORY_ERROR_KEY
+  const entries = historyQuery.data ?? []
+  const errorTitleKey =
+    historyQuery.error instanceof Error ? historyQuery.error.message : DEFAULT_BRANCH_HISTORY_ERROR_KEY
 
   return (
-    <BranchTabPanel id={`${workspacePaneId}-history-panel`} {...panelLabel} busy={state.phase === 'loading'}>
-      {state.phase === 'loading' ? (
+    <BranchTabPanel id={`${workspacePaneId}-history-panel`} {...panelLabel} busy={historyQuery.isLoading}>
+      {historyQuery.isLoading ? (
         <HistoryCommitGraphSkeleton rows={8} />
-      ) : state.phase === 'error' ? (
+      ) : historyQuery.isError ? (
         <EmptyState title={t(errorTitleKey)} />
-      ) : state.entries.length === 0 ? (
+      ) : entries.length === 0 ? (
         <EmptyState title={t('log.empty-for-branch', { branch: branchName })} />
       ) : (
         <ScrollPane>
-          <HistoryCommitGraph repoId={repoId} entries={state.entries} />
+          <HistoryCommitGraph repoId={repoId} entries={entries} />
         </ScrollPane>
       )}
     </BranchTabPanel>
@@ -490,9 +463,9 @@ function BranchChangesTab({
 
   return (
     <BranchTabPanel id={`${workspacePaneId}-changes-panel`} {...panelLabel} busy={statusLoading}>
-      {branch.worktree?.path && statusLoading && !repo.data.statusLoaded ? (
+      {branch.worktree?.path && statusLoading && !repo.branchModel.statusReady ? (
         <StatusListSkeleton rows={8} />
-      ) : branch.worktree?.path && !repo.data.statusLoaded && statusError ? (
+      ) : branch.worktree?.path && !repo.branchModel.statusReady && statusError ? (
         <EmptyState title={t(statusError)} />
       ) : branch.worktree?.path ? (
         <div className="relative flex min-h-0 flex-1 flex-col">

@@ -10,7 +10,7 @@ import {
 import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 import { toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
-import type { WorkspaceSessionState, UserSettingsUpdateResponse } from '#/shared/api-types.ts'
+import type { RepoSettingsState, WorkspaceSessionState, UserSettingsUpdateResponse } from '#/shared/api-types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { repoSessionEntryId } from '#/shared/remote-repo.ts'
 import { settingsInvalidationScopesForPrefsPatch } from '#/shared/server-invalidation.ts'
@@ -105,8 +105,8 @@ export async function handleClearRecentRepos(): Promise<{ ok: true }> {
 
 export async function handleSetRepoWorkspaceExternalAppRecent(
   input: SetRepoWorkspaceExternalAppRecentInput,
-): Promise<{ ok: true }> {
-  await setServerRepoWorkspaceExternalAppRecent(input)
+): Promise<{ ok: true } & RepoSettingsState> {
+  const repoSettings = await setServerRepoWorkspaceExternalAppRecent(input)
   publishSettingsInvalidation(['settings-snapshot'])
-  return { ok: true }
+  return { ok: true, repoSettings }
 }

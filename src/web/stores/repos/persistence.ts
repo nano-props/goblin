@@ -5,6 +5,8 @@ import { selectedBranchForBranchSet } from '#/web/stores/repos/branch-view-mode.
 import type { RepoSnapshotCacheEntry, RepoState } from '#/web/stores/repos/types.ts'
 import { finishDataLoadSuccess } from '#/web/stores/repos/repo-data-load-state.ts'
 import { stripBranchWorktreeMetadata } from '#/web/stores/repos/worktree-state.ts'
+import { getRepoSnapshotQueryData, setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { repoBranchSnapshotDataFromSnapshot, type RepoBranchSnapshotData } from '#/web/repo-branch-read-model.ts'
 const MAX_CACHE_AGE_MS = 14 * 24 * 60 * 60 * 1000
 const MAX_REPOS = 50
 const FiniteNumber = v.pipe(v.number(), v.finite())
@@ -43,7 +45,9 @@ const RepoSnapshotCacheEntrySchema = v.object({
   }),
 })
 
-function cachedBranches(branches: RepoState['data']['branches']): RepoSnapshotCacheEntry['data']['branches'] {
+function cachedBranches(
+  branches: RepoSnapshotCacheEntry['data']['branches'],
+): RepoSnapshotCacheEntry['data']['branches'] {
   return stripBranchWorktreeMetadata(branches).map(({ pullRequest: _pullRequest, ...branch }) => branch)
 }
 
@@ -59,15 +63,9 @@ function restoreProjectionFromSnapshot(repo: RepoState, snapshot: RepoSnapshotCa
     snapshot: { ...repo.dataLoads.snapshot },
   }
   if (snapshot.data.branches.length > 0) finishDataLoadSuccess(dataLoads.snapshot, snapshot.savedAt)
-  const branches = cachedBranches(snapshot.data.branches)
   return {
     ...repo,
     name: snapshot.name || repo.name,
-    data: {
-      ...repo.data,
-      branches,
-      currentBranch: snapshot.data.currentBranch,
-    },
     dataLoads,
     ui: {
       ...repo.ui,
@@ -89,10 +87,27 @@ export function restoreRepoProjectionFromCacheEntry(
   return restoreProjectionFromSnapshot(repo, snapshot)
 }
 
-export function persistRepoSnapshotCacheEntry(set: ReposSet, repo: RepoState | undefined, repoInstanceId: string): void {
+export function seedRepoSnapshotQueryFromCacheEntry(
+  repoRoot: string,
+  repoInstanceId: string,
+  snapshot: RepoSnapshotCacheEntry | undefined,
+): void {
+  if (!snapshot || isExpired(snapshot.savedAt)) return
+  setRepoSnapshotQueryData(repoRoot, repoInstanceId, {
+    branches: cachedBranches(snapshot.data.branches),
+    current: snapshot.data.currentBranch,
+  })
+}
+
+export function persistRepoSnapshotCacheEntry(
+  set: ReposSet,
+  repo: RepoState | undefined,
+  repoInstanceId: string,
+): void {
   if (!repo) return
   if (repo.instanceId !== repoInstanceId) return
-  const entry = repoSnapshotCacheEntryFromRepo(repo)
+  const snapshot = getRepoSnapshotQueryData(repo.id, repo.instanceId)
+  const entry = snapshot ? repoSnapshotCacheEntryFromRepo(repo, repoBranchSnapshotDataFromSnapshot(snapshot)) : null
   if (!entry) return
   set((s) => {
     if (s.repos[repo.id]?.instanceId !== repoInstanceId) return s
@@ -111,14 +126,17 @@ export function normalizeRepoSnapshotCache(value: unknown): Record<string, RepoS
   return trimRepoCache(Object.fromEntries(entries))
 }
 
-function repoSnapshotCacheEntryFromRepo(repo: RepoState): RepoSnapshotCacheEntry | null {
-  if (repo.data.branches.length === 0) return null
+function repoSnapshotCacheEntryFromRepo(
+  repo: RepoState,
+  branchModel: RepoBranchSnapshotData,
+): RepoSnapshotCacheEntry | null {
+  if (branchModel.branches.length === 0) return null
   return {
     savedAt: Date.now(),
     name: repo.name,
     data: {
-      branches: cachedBranches(repo.data.branches),
-      currentBranch: repo.data.currentBranch,
+      branches: cachedBranches(branchModel.branches),
+      currentBranch: branchModel.currentBranch,
     },
     ui: {
       selectedBranch: repo.ui.selectedBranch,

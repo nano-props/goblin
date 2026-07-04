@@ -2,7 +2,10 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { toast } from 'sonner'
-import { handleWorkspaceClientIntent } from '#/web/hooks/client-effect-intent-handlers.ts'
+import {
+  handleTerminalBellClickIntent,
+  handleWorkspaceClientIntent,
+} from '#/web/hooks/client-effect-intent-handlers.ts'
 
 vi.mock('sonner', () => ({
   toast: {
@@ -12,12 +15,16 @@ vi.mock('sonner', () => ({
 }))
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { preferredWorkspacePaneTabForTarget, workspacePaneTabsTargetForRepoBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 const REPO_ID = '/tmp/gbl-client-intent-handlers-repo'
 
 beforeEach(() => {
+  primaryWindowQueryClient.clear()
   resetReposStore()
 })
 
@@ -26,8 +33,35 @@ afterEach(() => {
 })
 
 describe('client effect intent handlers', () => {
+  test('routes terminal bell clicks through the React Query snapshot read model', () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [],
+      selectedBranch: 'feature/query',
+    })
+    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
+      current: 'feature/query',
+      branches: [createRepoBranch('feature/query', { worktree: { path: '/tmp/bell-worktree' } })],
+    })
+    const d = deps(REPO_ID)
+    d.navigation.showRepoBranchWorkspacePaneTab = vi.fn()
+
+    handleTerminalBellClickIntent(
+      {
+        type: 'terminal-bell-click',
+        repoRoot: REPO_ID,
+        terminalSessionId: 'session-query',
+        terminalWorktreeKey: `${REPO_ID}\0/tmp/bell-worktree`,
+      },
+      d,
+    )
+
+    expect(d.setSelectedTerminal).toHaveBeenCalledWith(`${REPO_ID}\0/tmp/bell-worktree`, 'session-query')
+    expect(d.navigation.showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/query', 'terminal')
+  })
+
   test('returns false when changes cannot be shown for a branch without a worktree', async () => {
-    seedRepoState({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
       selectedBranch: 'feature/no-worktree',
@@ -39,11 +73,11 @@ describe('client effect intent handlers', () => {
     ).resolves.toBe(false)
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch(repo, repo.ui.selectedBranch)) : null).toBe('status')
+    expect(repo ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, repo.ui.selectedBranch)) : null).toBe('status')
   })
 
   test('create-worktree-requested opens create-worktree for the current repo', async () => {
-    seedRepoState({ id: REPO_ID, branches: [createRepoBranch('main')] })
+    seedRepoWithReadModelForTest({ id: REPO_ID, branches: [createRepoBranch('main')] })
     const d = deps(REPO_ID)
 
     await expect(handleWorkspaceClientIntent({ type: 'create-worktree-requested' }, d)).resolves.toBe(true)
@@ -60,7 +94,7 @@ describe('client effect intent handlers', () => {
   })
 
   test('create-worktree-requested shows a busy toast while a branch action is running', async () => {
-    seedRepoState({ id: REPO_ID, branches: [createRepoBranch('main')] })
+    seedRepoWithReadModelForTest({ id: REPO_ID, branches: [createRepoBranch('main')] })
     useReposStore.setState((state) => {
       const repo = state.repos[REPO_ID]
       if (!repo) return state

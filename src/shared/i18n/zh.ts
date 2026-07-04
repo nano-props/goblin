@@ -184,6 +184,7 @@ export const zh: Record<DictKey, string> = {
   'drop.title': '松手打开本地仓库',
   'drop.body': '把 Git 仓库文件夹拖到 Goblin 任意位置。',
   'drop.open-failed': '无法打开本地仓库',
+  'repo-picker.recent-save-failed': '仓库已打开，但最近记录未更新',
 
   // ---- Workspace pane tabs ------------------------------------------------
   'tab.branches': '分支',
@@ -478,6 +479,7 @@ export const zh: Record<DictKey, string> = {
   'error.cannot-delete-protected-branch': '不能删除受保护分支',
   'error.cannot-delete-checked-out-branch': '不能删除已在工作树中检出的分支',
   'error.branch-not-fully-merged': '分支有独有提交 — Git 已拒绝安全删除',
+  'error.worktree-not-found': '未找到工作树',
   'error.worktree-not-found-for-branch': '未找到该分支对应的工作树',
   'error.cannot-remove-main-worktree': '不能移除主工作树',
   'error.cannot-remove-dirty-worktree': '工作树有未提交的改动 — 请先提交或丢弃',

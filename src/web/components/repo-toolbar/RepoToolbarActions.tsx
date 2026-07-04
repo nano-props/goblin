@@ -12,6 +12,7 @@ import { InlineShortcut } from '#/web/components/InlineShortcut.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { formatAccelerator } from '#/shared/accelerator.ts'
 import { CREATE_WORKTREE_SHORTCUT } from '#/shared/shortcut-definitions.ts'
+import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
 
 interface Props {
   repoId: string
@@ -27,19 +28,22 @@ export function BranchFilterAction({ repoId }: Props) {
 
 function WorktreeFilterToggle({ repoId }: Props) {
   const setBranchViewMode = useReposStore((s) => s.setBranchViewMode)
-  const { branchCount, branchViewMode } = useReposStore(
+  const repoView = useReposStore(
     useShallow((s) => {
       const repo = s.repos[repoId]
       return {
-        branchCount: repo?.data.branches.length ?? 0,
+        id: repo?.id ?? '',
+        instanceId: repo?.instanceId ?? '',
         branchViewMode: repo?.ui.branchViewMode ?? 'all',
+        exists: !!repo,
       }
     }),
   )
+  const branchReadModel = useRepoBranchReadModel(repoView.id, repoView.instanceId, repoView.exists)
   return (
     <BranchViewModeControl
-      value={branchViewMode}
-      disabled={branchCount === 0}
+      value={repoView.branchViewMode}
+      disabled={!branchReadModel || branchReadModel.branches.length === 0}
       onChange={(viewMode: BranchViewMode) => setBranchViewMode(repoId, viewMode)}
     />
   )

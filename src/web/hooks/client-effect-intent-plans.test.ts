@@ -1,16 +1,17 @@
 import { describe, expect, test } from 'vitest'
-import { createBranchSnapshot, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import { createBranchSnapshot, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import {
   createAppLevelIntentPlan,
   createExternalOpenDrainKickPlan,
   createTerminalBellIntentPlan,
   createWorkspaceIntentPlan,
 } from '#/web/hooks/client-effect-intent-plans.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 describe('client effect intent plans', () => {
   test('creates a worktree terminal bell plan when the worktree group matches a known worktree', () => {
     resetReposStore()
-    const repo = seedRepoState({
+    const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       currentBranch: 'main',
       selectedBranch: 'main',
@@ -20,7 +21,7 @@ describe('client effect intent plans', () => {
       ],
     })
 
-    const plan = createTerminalBellIntentPlan(repo, {
+    const plan = createTerminalBellIntentPlan(repo, readRepoBranchQueryProjection(repo), {
       type: 'terminal-bell-click',
       repoRoot: repo.id,
       terminalSessionId: 'session-2',
@@ -34,6 +35,21 @@ describe('client effect intent plans', () => {
       terminalSessionId: 'session-2',
       terminalWorktreeKey: '/tmp/repo\0/tmp/repo-feature',
     })
+  })
+
+  test('marks worktree terminal bell intent unavailable when the branch read model is missing', () => {
+    const plan = createTerminalBellIntentPlan(
+      { id: '/tmp/repo' },
+      null,
+      {
+        type: 'terminal-bell-click',
+        repoRoot: '/tmp/repo',
+        terminalSessionId: 'session-2',
+        terminalWorktreeKey: '/tmp/repo\0/tmp/repo-feature',
+      },
+    )
+
+    expect(plan).toEqual({ kind: 'unavailable', reason: 'branch-read-model-unavailable' })
   })
 
   test('suppresses recent repo open when overlays block the action', () => {

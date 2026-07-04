@@ -3,7 +3,11 @@ import { localRepoSessionEntry, normalizeRemoteTarget, remoteRepoSessionEntry } 
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { deriveConnectivity } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { getRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { repoRuntimeInstancesQueryKey } from '#/web/repo-runtime-query.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
+import type { RepoRuntimeInstancesSnapshot } from '#/shared/api-types.ts'
 import {
   branchSnapshot,
   flushIpc,
@@ -44,6 +48,8 @@ describe('repo session hydration', () => {
     const repo = useReposStore.getState().repos[REPO_A]
     expect(repo).toBeDefined()
     expect(repo?.instanceId).toMatch(/^repo-instance-/)
+    const cached = primaryWindowQueryClient.getQueryData<RepoRuntimeInstancesSnapshot>(repoRuntimeInstancesQueryKey())
+    expect(cached?.instances).toEqual([{ repoRoot: REPO_A, repoInstanceId: repo!.instanceId }])
     await vi.waitFor(() => {
       expect(calls.composite).toEqual([REPO_A])
     })
@@ -89,7 +95,9 @@ describe('repo session hydration', () => {
 
     const cachedRepo = useReposStore.getState().repos[REPO_A]
     expect(cachedRepo?.name).toBe('cached-a')
-    expect(cachedRepo?.data.branches.map((b) => b.name)).toEqual(['cached'])
+    expect(cachedRepo ? getRepoSnapshotQueryData(cachedRepo.id, cachedRepo.instanceId)?.branches.map((b) => b.name) : null).toEqual([
+      'cached',
+    ])
     expect(cachedRepo?.ui.selectedBranch).toBe('cached')
     expect(cachedRepo?.projection.source).toBe('cache')
     expect(cachedRepo?.dataLoads.snapshot.phase).toBe('refreshing')
@@ -100,7 +108,7 @@ describe('repo session hydration', () => {
 
     await vi.waitFor(() => {
       const freshRepo = useReposStore.getState().repos[REPO_A]
-      expect(freshRepo?.data.currentBranch).toBe('fresh')
+      expect(freshRepo ? getRepoSnapshotQueryData(freshRepo.id, freshRepo.instanceId)?.current : null).toBe('fresh')
       expect(freshRepo?.projection.source).toBe('fresh')
       expect(freshRepo?.dataLoads.snapshot.phase).toBe('idle')
       expect(freshRepo?.projection.savedAt).toBeNull()
@@ -159,7 +167,9 @@ describe('repo session hydration', () => {
     await vi.waitFor(() => {
       const repo = useReposStore.getState().repos[REPO_A]
       expect(repo).toBeDefined()
-      expect(repo?.data.branches.map((b) => b.name)).toEqual(['cached'])
+      expect(repo ? getRepoSnapshotQueryData(repo.id, repo.instanceId)?.branches.map((b) => b.name) : null).toEqual([
+        'cached',
+      ])
       // Local repos read as 'connected' under deriveConnectivity; the
       // meaningful invariant is just that the repo stays in the store.
       expect(deriveConnectivity(repo!)).toBe('connected')
@@ -242,7 +252,7 @@ describe('repo session hydration', () => {
   test('hydrateRepoSession flips sessionReady even when openRepoEntries is empty', async () => {
     // Regression: a session with zero open repos used to leave the boot
     // skeleton up forever because sessionReady only flipped on the first
-    // placeholder landing, and Phase 1 with no entries is a no-op.
+    // placeholder landing, and an empty restore has no placeholders.
     installGoblin()
 
     await useReposStore.getState().hydrateRepoSession([], null)
@@ -276,16 +286,74 @@ describe('repo session hydration', () => {
     expect(deriveConnectivity(repo!)).toBe('connected')
   })
 
-  test('hydrateRepoSession does not restore local failures with fake runtime authority', async () => {
+  test('hydrateRepoSession fails when a persisted local repo cannot establish runtime authority', async () => {
     installGoblin()
 
-    await useReposStore
-      .getState()
-      .hydrateRepoSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry('/missing')], '/missing')
+    await expect(
+      useReposStore
+        .getState()
+        .hydrateRepoSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry('/missing')], '/missing'),
+    ).rejects.toThrow('session repo restore failed')
 
     expect(useReposStore.getState().order).toEqual([REPO_A])
     expect(useReposStore.getState().activeId).toBe(REPO_A)
     expect(useReposStore.getState().repos['/missing']).toBeUndefined()
+  })
+
+  test('hydrateRepoSession fails preferred workspace pane restore for a repo that never opens', async () => {
+    installGoblin()
+
+    await expect(
+      useReposStore.getState().hydrateRepoSession([localRepoSessionEntry('/missing')], '/missing', {
+        workspacePaneRestoreState: {
+          workspacePaneTabsByTargetByRepo: {},
+          preferredWorkspacePaneTabByTargetByRepo: {
+            '/missing': { [branchTargetKey('/missing', 'main')]: 'files' },
+          },
+        },
+      }),
+    ).rejects.toThrow('session repo restore failed')
+
+    expect(useReposStore.getState().repos['/missing']).toBeUndefined()
+  })
+
+  test('hydrateRepoSession joins pending probes before reporting workspace pane restore failure', async () => {
+    let resolveRepoB!: () => void
+    installGoblin({
+      probe: async (path: string) => {
+        if (path === REPO_B) {
+          await new Promise<void>((resolve) => {
+            resolveRepoB = resolve
+          })
+        }
+        return { ok: true, root: path, name: path.split('/').at(-1) ?? path }
+      },
+    })
+
+    let settled = false
+    const work = useReposStore
+      .getState()
+      .hydrateRepoSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry(REPO_B)], REPO_A, {
+        workspacePaneRestoreState: {
+          workspacePaneTabsByTargetByRepo: {},
+          preferredWorkspacePaneTabByTargetByRepo: {
+            [REPO_A]: { [branchTargetKey(REPO_A, 'main')]: 'files' },
+          },
+        },
+      })
+      .finally(() => {
+        settled = true
+      })
+
+    await vi.waitFor(() => {
+      expect(useReposStore.getState().repos[REPO_A]).toBeDefined()
+    })
+    await Promise.resolve()
+    expect(settled).toBe(false)
+
+    resolveRepoB()
+    await expect(work).rejects.toThrow('workspace pane preferred tab restore failed')
+    expect(useReposStore.getState().repos[REPO_B]).toBeDefined()
   })
 
   test('hydrateRepoSession limits concurrent repo probes', async () => {
@@ -353,11 +421,10 @@ describe('repo session hydration', () => {
 
     await useReposStore.getState().hydrateRepoSession([remoteRepoSessionEntry(target!)], target!.id)
 
-    // Phase 4: the lifecycle union owns the failure signal.
-    // The `availability` mirror field is kept for the refresh
-    // pipeline guards (refresh.ts / refresh-coordinator.ts)
-    // but is NOT the authoritative source — this assertion
-    // pins the union shape, not the mirror.
+    // The lifecycle union owns the failure signal. The `availability`
+    // mirror field is kept for refresh pipeline guards
+    // (refresh.ts / refresh-coordinator.ts), but is not authoritative;
+    // this assertion pins the union shape, not the mirror.
     expect(useReposStore.getState().repos[target!.id]).toMatchObject({
       id: target!.id,
       remote: {

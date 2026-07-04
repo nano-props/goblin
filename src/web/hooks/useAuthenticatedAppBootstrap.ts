@@ -1,3 +1,5 @@
+// Authenticated bootstrap primes query state from the server transport before
+// feature stores start reading it.
 import { useEffect, useRef } from 'react'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import { normalizeWorkspaceSessionLayoutState } from '#/shared/workspace-layout.ts'
@@ -6,7 +8,7 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { restoreFiletreeViewStateFromSession } from '#/web/filetree-session-state.ts'
 import { restoreRestorableWorkspaceStateFromSession } from '#/web/restorable-workspace-state.ts'
 import { getExternalAppsSnapshot, getSettingsSnapshot } from '#/web/settings-client.ts'
-import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-queries.ts'
+import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -50,7 +52,7 @@ async function hydrateNonCriticalAuthenticatedState(settingsSnapshot: Promise<Se
 
 async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>): Promise<void> {
   try {
-    useReposStore.setState({ sessionPersistenceReady: false })
+    useReposStore.setState({ sessionPersistenceReady: false, sessionRestoreError: null })
     useSessionRestoreStore.getState().hydrateFromSettingsSnapshot(await settingsSnapshot)
     const session = useSessionRestoreStore.getState().consumeBootSessionSnapshot()
     const normalizedLayout = normalizeWorkspaceSessionLayoutState(session)
@@ -75,24 +77,18 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>): 
     finishWorkspacePaneTabsBootRestore(workspaceTabsRestoreResult)
   } catch (err) {
     bootstrapLog.warn('session restore failed', { err })
-    useReposStore.setState({ sessionReady: true, sessionPersistenceReady: true })
+    blockSessionPersistenceAfterRestoreFailure(restoreFailureMessage(err))
   }
 }
 
 function finishWorkspacePaneTabsBootRestore(result: RestoreWorkspacePaneTabsFromSessionResult): void {
   switch (result.status) {
     case 'restored':
-      useReposStore.setState({ sessionPersistenceReady: true })
-      return
-    case 'stale-pruned':
-      // Stale session entries can happen after moving between machines,
-      // deleting a worktree, or renaming a branch. Let normal session
-      // persistence prune those unreachable tabs on the next save.
-      bootstrapLog.info('workspace pane tabs restore pruned stale entries', workspacePaneTabsRestoreSummary(result))
-      useReposStore.setState({ sessionPersistenceReady: true })
+      useReposStore.setState({ sessionPersistenceReady: true, sessionRestoreError: null })
       return
     case 'failed':
-      bootstrapLog.warn('workspace pane tabs restore incomplete', workspacePaneTabsRestoreSummary(result))
+      bootstrapLog.warn('workspace pane tabs restore failed', workspacePaneTabsRestoreSummary(result))
+      blockSessionPersistenceAfterRestoreFailure('workspace pane tabs restore failed')
       return
   }
 }
@@ -103,6 +99,18 @@ function workspacePaneTabsRestoreSummary(result: RestoreWorkspacePaneTabsFromSes
     unresolvedTargets: result.unresolvedTargets,
     failedCommitCount: result.failedCommits.length,
   }
+}
+
+function blockSessionPersistenceAfterRestoreFailure(message: string): void {
+  useReposStore.setState({
+    sessionReady: true,
+    sessionPersistenceReady: false,
+    sessionRestoreError: message,
+  })
+}
+
+function restoreFailureMessage(err: unknown): string {
+  return err instanceof Error ? err.message : 'session restore failed'
 }
 
 async function runOptionalBootstrapTask(label: string, task: () => Promise<void>): Promise<void> {
@@ -127,18 +135,23 @@ async function primeSettingsQueryCache(settingsSnapshot: Promise<SettingsSnapsho
   // reaches `fetch`). Wrap each one individually so the other can
   // still succeed and so a synchronous throw doesn't propagate up
   // and abort the rest of the boot.
-  const fetchAndPrime = async (fetcher: () => Promise<unknown>, queryKey: readonly unknown[]): Promise<void> => {
+  const fetchAndPrime = async (
+    label: string,
+    fetcher: () => Promise<unknown>,
+    queryKey: readonly unknown[],
+  ): Promise<void> => {
     try {
       const snapshot = await fetcher()
       primaryWindowQueryClient.setQueryData(queryKey, snapshot)
-    } catch {
+    } catch (err) {
       // Settings fetch failure must not block boot - the page will
       // retry the auto-fetch on first use. The empty cache is the
       // same state the client had before this priming pass.
+      bootstrapLog.warn(`${label} query prime failed`, { err })
     }
   }
   await Promise.all([
-    fetchAndPrime(() => settingsSnapshot, settingsSnapshotQueryKey()),
-    fetchAndPrime(getExternalAppsSnapshot, externalAppsQueryKey()),
+    fetchAndPrime('settings snapshot', () => settingsSnapshot, settingsSnapshotQueryKey()),
+    fetchAndPrime('external apps', getExternalAppsSnapshot, externalAppsQueryKey()),
   ])
 }

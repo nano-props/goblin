@@ -12,6 +12,8 @@ import {
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { invalidateRepoDataQueries } from '#/web/repo-data-query.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 interface RepoRefreshIntentBase {
   id: string
@@ -38,7 +40,13 @@ export interface RepoStatusRefreshSnapshot {
 }
 
 export function repoStatusRefreshSnapshot(repo: RepoState): RepoStatusRefreshSnapshot {
-  const selectedTarget = workspacePaneTabsTargetForRepoBranch(repo, repo.ui.selectedBranch)
+  const branchModel = readRepoBranchQueryProjection(repo)
+  const selectedTarget = branchModel
+    ? workspacePaneTabsTargetForRepoBranch(
+        { repoRoot: repo.id, branches: branchModel.branches },
+        repo.ui.selectedBranch,
+      )
+    : null
   return {
     id: repo.id,
     repoInstanceId: repo.instanceId,
@@ -106,6 +114,7 @@ export async function handleRepoInvalidationRefresh(
   if (!repo || repo.instanceId !== repoInstanceId || isRepoUnavailable(repo)) return
   const disposition = repoInvalidationRefreshDisposition(event)
   if (disposition !== 'refresh') return
+  invalidateRepoDataQueries(repoId, repoInstanceId)
   await get().refreshCoreData(repoId, { repoInstanceId })
 }
 

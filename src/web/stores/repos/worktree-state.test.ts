@@ -4,10 +4,13 @@ import {
   branchWorktreeHasChanges,
   getBranchWorktreeState,
   stripBranchWorktreeMetadata,
+  worktreeStatesFromBranchReadModel,
   worktreeStatesFromBranches,
+  type BranchWorktreeRepo,
 } from '#/web/stores/repos/worktree-state.ts'
-import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { createBranchSnapshot, createRepoBranch } from '#/web/test-utils/bridge.ts'
+import type { RepoWorktreeState } from '#/web/stores/repos/types.ts'
+import type { WorktreeStatus } from '#/web/types.ts'
 function assertRepoBranchStateTypeGuards() {
   createRepoBranch('feature/a', {
     worktree: {
@@ -53,6 +56,29 @@ describe('worktree state selectors', () => {
     ])
 
     expect(worktreesByPath['/tmp/worktree-a']).toMatchObject({
+      isDirty: false,
+      changeCount: 0,
+    })
+  })
+
+  test('builds read-model worktree state only from snapshot and status', () => {
+    const branches = [
+      createBranchSnapshot('feature/a', {
+        worktree: {
+          path: '/tmp/worktree-a',
+          summary: {
+            dirty: false,
+            changeCount: 0,
+          },
+        },
+      }),
+    ]
+
+    const worktreesByPath = worktreeStatesFromBranchReadModel(branches, [])
+
+    expect(worktreesByPath['/tmp/worktree-a']).toMatchObject({
+      branch: 'feature/a',
+      isMain: false,
       isDirty: false,
       changeCount: 0,
     })
@@ -125,7 +151,7 @@ describe('worktree state selectors', () => {
   })
 
   test('does not read stripped snapshot metadata from branch state', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
+    const repo = branchWorktreeRepo()
     const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
 
     expect(getBranchWorktreeState(repo, branch)).toMatchObject({
@@ -135,7 +161,6 @@ describe('worktree state selectors', () => {
   })
 
   test('falls back to a generic dirty change count when exact metadata is unavailable', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
     const snapshot = createBranchSnapshot('feature/a', {
       worktree: {
         path: '/tmp/worktree-a',
@@ -145,7 +170,7 @@ describe('worktree state selectors', () => {
       },
     })
 
-    repo.data.worktreesByPath = worktreeStatesFromBranches([snapshot])
+    const repo = branchWorktreeRepo({ worktreesByPath: worktreeStatesFromBranches([snapshot]) })
     const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
 
     expect(getBranchWorktreeState(repo, branch)).toMatchObject({
@@ -157,41 +182,54 @@ describe('worktree state selectors', () => {
 
 describe('branchWorktreeHasChanges', () => {
   test('returns false when the branch has no worktree', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
+    const repo = branchWorktreeRepo()
     const branch = createRepoBranch('feature/a')
 
     expect(branchWorktreeHasChanges(repo, branch)).toBe(false)
   })
 
   test('returns true when status entries exist for the worktree path', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
     const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
-
-    repo.data.status = [
-      { path: '/tmp/worktree-a', branch: 'feature/a', isMain: false, entries: [{ x: 'M', y: ' ', path: 'a.ts' }] },
-    ]
+    const repo = branchWorktreeRepo({
+      status: [
+        { path: '/tmp/worktree-a', branch: 'feature/a', isMain: false, entries: [{ x: 'M', y: ' ', path: 'a.ts' }] },
+      ],
+    })
 
     expect(branchWorktreeHasChanges(repo, branch)).toBe(true)
   })
 
   test('returns true when only worktree metadata indicates a dirty state', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
     const snapshot = createBranchSnapshot('feature/a', {
       worktree: {
         path: '/tmp/worktree-a',
         summary: { dirty: true, changeCount: 4 },
       },
     })
-    repo.data.worktreesByPath = worktreeStatesFromBranches([snapshot])
+    const repo = branchWorktreeRepo({ worktreesByPath: worktreeStatesFromBranches([snapshot]) })
     const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
 
     expect(branchWorktreeHasChanges(repo, branch)).toBe(true)
   })
 
   test('returns false for a clean worktree with no status entries', () => {
-    const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
+    const repo = branchWorktreeRepo()
     const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
 
     expect(branchWorktreeHasChanges(repo, branch)).toBe(false)
   })
 })
+
+function branchWorktreeRepo(
+  options: {
+    status?: WorktreeStatus[]
+    worktreesByPath?: Record<string, RepoWorktreeState>
+  } = {},
+): BranchWorktreeRepo {
+  return {
+    branchModel: {
+      status: options.status ?? [],
+      worktreesByPath: options.worktreesByPath ?? {},
+    },
+  }
+}

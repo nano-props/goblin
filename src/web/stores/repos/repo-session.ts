@@ -3,8 +3,10 @@ import type { RepoSessionHydrationOptions, ReposGet, ReposSet, ReposStore } from
 import {
   insertPlaceholderRepo,
   addResolvedRepo,
+  closeRepoRuntimeInstanceWithCache,
   createRuntimeRepoSessionActions,
   openLocalRepoRuntimeForInput,
+  openRepoRuntimeInstanceWithCache,
   refreshInitialRepoState,
   type RuntimeOpenResolvedRepo,
 } from '#/web/stores/repos/repo-session-write-paths.ts'
@@ -12,7 +14,6 @@ import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connecti
 import { activeRepoIdAfterWorkspaceHydration } from '#/web/open-workspace-state.ts'
 import { isRemoteRepoId, localRepoSessionEntry, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { restoreSessionWorkspacePaneStateInRepos } from '#/web/stores/repos/workspace-pane-session-restore.ts'
-import { closeRepoRuntimeInstance, openRepoRuntimeInstance } from '#/web/repo-client.ts'
 
 interface InitialRepoRefresh {
   id: string
@@ -35,17 +36,17 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       // reopens what WorkspaceSessionState described, but does not subscribe the repos
       // store to future session writes from persistence.
       //
-      // The flow is split into two phases so the repo picker can render
+      // The flow is split into placeholder-ready and settled steps so the repo picker can render
       // server-authoritative placeholders before full refresh finishes:
-      //   Phase 1: establish runtime authority. Local entries go through
+      //   1. Establish runtime authority. Local entries go through
       //     the server's canonical open path (probe input -> canonical
       //     root -> repoInstanceId) before any repo state is written. Remote
       //     entries keep their remote id and are opened directly.
-      //   Phase 2: settle the restored repos. Local entries promote the
+      //   2. Settle the restored repos. Local entries promote the
       //     canonical placeholder to a resolved repo and kick off initial
       //     refresh. Remote entries go through the unified orchestrator.
       //
-      // sessionReady flips after Phase 1 completes. The per-repo body keeps
+      // sessionReady flips after placeholders are ready. The per-repo body keeps
       // showing its own skeleton until each snapshot resolves.
       const rankById = new Map<string, number>()
       openRepoEntries.forEach((entry, index) => {
@@ -58,7 +59,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         if (signal?.aborted) throw new Error('aborted')
         const existing = runtimeInstanceIdPromiseByRepoId.get(repoId)
         if (existing) return existing
-        const created = openRepoRuntimeInstance(repoId)
+        const created = openRepoRuntimeInstanceWithCache(repoId)
         runtimeInstanceIdPromiseByRepoId.set(repoId, created)
         return created
       }
@@ -72,6 +73,11 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       }
 
       let managedActiveId: string | null = null
+      const failedOpenEntryIds = new Set<string>()
+      let workspacePaneRestoreFailed = false
+      const markOpenEntryFailed = (entry: RepoSessionEntry): void => {
+        failedOpenEntryIds.add(entry.id)
+      }
       const placeholderReady = Promise.all(
         openRepoEntries.map(async (entry) => {
           let placeholderEntry = entry
@@ -82,18 +88,21 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
               instanceId = await runtimeInstanceIdFor(entry.id)
             } else {
               const opened = await localRuntimeOpenFor(entry)
-              if (!opened.repo || !opened.repoInstanceId) return
+              if (!opened.repo || !opened.repoInstanceId) {
+                markOpenEntryFailed(entry)
+                return
+              }
               placeholderEntry = localRepoSessionEntry(opened.repo.id)
               runtimeRepoRoot = opened.repo.id
               instanceId = opened.repoInstanceId
             }
-          } catch {
+          } catch (err) {
+            if (signal?.aborted || isAbortError(err)) return
+            markOpenEntryFailed(entry)
             return
           }
           if (signal?.aborted) {
-            void closeRepoRuntimeInstance(runtimeRepoRoot, instanceId).catch(() => {
-              /* abort rollback is best-effort; next open re-establishes authority */
-            })
+            await closeRepoRuntimeInstanceWithCache(runtimeRepoRoot, instanceId)
             return
           }
           set((s) => {
@@ -105,9 +114,11 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
             )
             let nextRepos = repos
             let changedRepos = changed
-            const restoredRepos = restoreSessionWorkspacePaneStateInRepos(nextRepos, workspacePaneRestoreState)
-            if (restoredRepos !== nextRepos) {
-              nextRepos = restoredRepos
+            const restoreResult = restoreSessionWorkspacePaneStateInRepos(nextRepos, workspacePaneRestoreState)
+            if (restoreResult.status === 'failed') {
+              workspacePaneRestoreFailed = true
+            } else if (restoreResult.repos !== nextRepos) {
+              nextRepos = restoreResult.repos
               changedRepos = true
             }
             const nextActiveId = activeRepoIdAfterWorkspaceHydration(
@@ -135,7 +146,8 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
             if (isRemoteRepoId(entry.id)) {
               try {
                 await runtimeInstanceIdFor(entry.id)
-              } catch {
+              } catch (err) {
+                if (!signal?.aborted && !isAbortError(err)) markOpenEntryFailed(entry)
                 return
               }
               // Remote entries go through the unified orchestrator. It owns:
@@ -165,7 +177,10 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
             }
             const probe = await localRuntimeOpenFor(entry)
             if (signal?.aborted) return
-            if (!probe.repo || !probe.repoInstanceId) return
+            if (!probe.repo || !probe.repoInstanceId) {
+              markOpenEntryFailed(entry)
+              return
+            }
 
             const resolvedRepo = probe.repo
             const repoInstanceId = probe.repoInstanceId
@@ -201,7 +216,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         ),
       )
       await placeholderReady
-      // Flip sessionReady unconditionally once Phase 1 has finished.
+      // Flip sessionReady unconditionally once placeholders are ready.
       // With open repositories, the boot skeleton (shown only when no activeId) gives
       // way to a real workspace immediately — the per-repo body keeps
       // showing its own skeleton until each snapshot resolves. With no open
@@ -221,6 +236,13 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         return { activeId, sessionReady: true }
       })
       await probeWork
+      const restoreError =
+        failedOpenEntryIds.size > 0
+          ? new Error('session repo restore failed')
+          : workspacePaneRestoreFailed || unresolvedPreferredRestoreRepoIds(get().repos, workspacePaneRestoreState).length > 0
+            ? new Error('workspace pane preferred tab restore failed')
+            : null
+      if (restoreError) throw restoreError
     },
   }
 }
@@ -230,4 +252,16 @@ export function createRepoSessionActions(set: ReposSet, get: ReposGet) {
     ...createRuntimeRepoSessionActions(set, get),
     ...createRestorableWorkspaceLifecycleActions(set, get),
   }
+}
+
+function unresolvedPreferredRestoreRepoIds(
+  repos: ReposStore['repos'],
+  restoreState: RepoSessionHydrationOptions['workspacePaneRestoreState'],
+): string[] {
+  if (!restoreState) return []
+  return Object.keys(restoreState.preferredWorkspacePaneTabByTargetByRepo).filter((id) => !repos[id])
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof Error && err.name === 'AbortError'
 }

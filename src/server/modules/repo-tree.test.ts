@@ -93,18 +93,15 @@ describe('repo-tree — read layer', () => {
   })
 
   test('rejects an unknown local worktree path before invoking the source', async () => {
-    const result = await getRepositoryTree('/tmp/repo', '/etc/passwd')
+    await expect(getRepositoryTree('/tmp/repo', '/etc/passwd')).rejects.toThrow('unknown worktree path')
 
-    expect(result).toEqual({ nodes: [], truncated: false })
     expect(mocks.getRepoTreeSourceLocal).not.toHaveBeenCalled()
   })
 
-  test('soft-fails when the local source throws', async () => {
+  test('rejects when the local source throws', async () => {
     mocks.getRepoTreeSourceLocal.mockRejectedValueOnce(new Error('boom'))
 
-    const result = await getRepositoryTree('/tmp/repo', '/tmp/repo/.worktrees/feature')
-
-    expect(result).toEqual({ nodes: [], truncated: false })
+    await expect(getRepositoryTree('/tmp/repo', '/tmp/repo/.worktrees/feature')).rejects.toThrow('boom')
   })
 
   test('resolves a remote target and forwards to the remote source', async () => {
@@ -142,21 +139,20 @@ describe('repo-tree — read layer', () => {
     )
   })
 
-  test('soft-fails when remote target resolution fails', async () => {
+  test('rejects when remote target resolution fails', async () => {
     mocks.resolveRemoteRepoTarget.mockRejectedValueOnce(new Error('ssh config not found'))
 
-    const result = await getRepositoryTree(remoteRepoId, '/srv/repos/myrepo/.worktrees/feature')
-
-    expect(result).toEqual({ nodes: [], truncated: false })
+    await expect(getRepositoryTree(remoteRepoId, '/srv/repos/myrepo/.worktrees/feature')).rejects.toThrow(
+      'ssh config not found',
+    )
     expect(mocks.getRepoTreeSourceRemote).not.toHaveBeenCalled()
   })
 
   test('rejects malformed worktree paths before any source call', async () => {
-    expect(await getRepositoryTree('/tmp/repo', '')).toEqual({ nodes: [], truncated: false })
-    expect(await getRepositoryTree('/tmp/repo', '/tmp/repo/.worktrees/feature\0/etc/passwd')).toEqual({
-      nodes: [],
-      truncated: false,
-    })
+    await expect(getRepositoryTree('/tmp/repo', '')).rejects.toThrow('invalid worktree path')
+    await expect(getRepositoryTree('/tmp/repo', '/tmp/repo/.worktrees/feature\0/etc/passwd')).rejects.toThrow(
+      'invalid worktree path',
+    )
     expect(mocks.getRepoTreeSourceLocal).not.toHaveBeenCalled()
     expect(mocks.getRepoTreeSourceRemote).not.toHaveBeenCalled()
   })

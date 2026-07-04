@@ -3,6 +3,7 @@ import { postServerJson } from '#/web/lib/server-fetch.ts'
 import type {
   CloneRepoResult,
   PullRequestEntry,
+  RepoRuntimeInstancesSnapshot,
   RepoRuntimeOpenResult,
   RepoSnapshot,
   RepoLogResponse,
@@ -31,7 +32,7 @@ export async function abortCloneOperation(operationId: string): Promise<boolean>
   return await postServerJson('/api/repo/abort-clone', { operationId })
 }
 
-export async function getRepoSnapshot(cwd: string, signal?: AbortSignal): Promise<RepoSnapshot | null> {
+export async function getRepoSnapshot(cwd: string, signal?: AbortSignal): Promise<RepoSnapshot> {
   return await postServerJson('/api/repo/snapshot', { cwd }, { signal })
 }
 
@@ -226,12 +227,16 @@ export async function openRepoRuntimeForInput(repoInput: string): Promise<RepoRu
 }
 
 export async function closeRepoRuntimeInstance(repoRoot: string, repoInstanceId: string): Promise<boolean> {
-  const result = await postServerJson<
-    { repoRoot: string; repoInstanceId: string },
-    { ok: boolean; closed: boolean }
-  >('/api/repo/runtime-close', {
-    repoRoot,
-    repoInstanceId,
-  })
+  const result = await postServerJson<{ repoRoot: string; repoInstanceId: string }, { ok: boolean; closed: boolean }>(
+    '/api/repo/runtime-close',
+    {
+      repoRoot,
+      repoInstanceId,
+    },
+  )
   return result.closed
+}
+
+export async function listRepoRuntimeInstances(signal?: AbortSignal): Promise<RepoRuntimeInstancesSnapshot> {
+  return await postServerJson<{}, RepoRuntimeInstancesSnapshot>('/api/repo/runtime-list', {}, { signal })
 }

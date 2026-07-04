@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
-import { useStoreWithEqualityFn } from 'zustand/traditional'
 
 import '#/web/components/terminal/terminal-session.css'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -14,7 +13,7 @@ import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
 import { loadTerminalSessions } from '#/web/terminal-session-queries.ts'
 import {
-  invalidateWorkspacePaneTabs,
+  refreshWorkspacePaneTabs,
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
@@ -22,7 +21,7 @@ import {
   getTerminalSessionProjection,
 } from '#/web/components/terminal/TerminalSessionProjection.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
-import { repoIndexEqual, repoIndexFromRepos } from '#/web/components/terminal/terminal-repo-index.ts'
+import { useTerminalRepoIndex } from '#/web/components/terminal/terminal-repo-index.ts'
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 
 interface TerminalSessionProviderProps {
@@ -30,7 +29,7 @@ interface TerminalSessionProviderProps {
 }
 
 export function TerminalSessionProvider({ children }: TerminalSessionProviderProps) {
-  const repoIndex = useStoreWithEqualityFn(useReposStore, (s) => repoIndexFromRepos(s.repos), repoIndexEqual)
+  const repoIndex = useTerminalRepoIndex()
   // The provider lives at the router root (above the per-route App), so it
   // reads the active repo directly from the repos store rather than via a
   // prop. This keeps the terminal session projection alive across settings
@@ -175,7 +174,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     const offSessionClosed = terminalClient.onSessionClosed((event) => {
       projection.handleSessionClosed(event)
       const repoInstanceId = repoIndexRef.current[event.repoRoot]?.instanceId
-      if (typeof repoInstanceId === 'string') invalidateWorkspacePaneTabs(event.repoRoot, repoInstanceId)
+      if (typeof repoInstanceId === 'string') refreshWorkspacePaneTabs(event.repoRoot, repoInstanceId)
     })
 
     setTerminalSessionCommandBridge({
@@ -228,7 +227,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     const offSessionsChanged = terminalClient.onSessionsChanged(scheduleServerSync)
     const offWorkspaceTabsChanged = terminalClient.onWorkspaceTabsChanged((repoRoot) => {
       const repoInstanceId = repoIndexRef.current[repoRoot]?.instanceId
-      if (typeof repoInstanceId === 'string') invalidateWorkspacePaneTabs(repoRoot, repoInstanceId)
+      if (typeof repoInstanceId === 'string') refreshWorkspacePaneTabs(repoRoot, repoInstanceId)
       scheduleServerSync(repoRoot)
     })
 

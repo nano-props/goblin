@@ -58,7 +58,7 @@ Typical files:
 - Runs writes, follow-up refresh, invalidation, and local projection/cache updates.
 - This is the main place for write flow.
 - Server-side write paths own invalidation publishing.
-- Web-side write paths own query cache updates after server response.
+- Web-side write paths own query cache updates after server response. Settings writes are centralized in `src/web/settings-actions.ts`; raw `settings-client.ts` writes are transport-level and should not be called from components.
 
 Typical files:
 
