@@ -1,5 +1,6 @@
 import type { BranchSnapshotInfo, WorktreeStatus } from '#/web/types.ts'
-import type { RepoBranchState, RepoState, RepoWorktreeState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchState, RepoWorktreeState } from '#/web/stores/repos/types.ts'
+import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 interface BranchWorktreeState {
   path: string
   dirty: boolean
@@ -10,7 +11,7 @@ interface BranchWorktreeState {
 }
 
 export interface BranchWorktreeRepo {
-  data: Pick<RepoState['data'], 'worktreesByPath' | 'status'>
+  data: Pick<RepoBranchReadModelData, 'worktreesByPath' | 'status'>
 }
 
 export function worktreeStatesFromBranches(

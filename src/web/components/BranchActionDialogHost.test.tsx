@@ -22,8 +22,6 @@ import {
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
-import { idleOperation } from '#/web/stores/repos/operations.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
@@ -116,27 +114,6 @@ function setupRepo() {
   return { repo, branch, worktreePath }
 }
 
-function buildRepo(repo: ReturnType<typeof seedRepoState>): BranchActionRepo {
-  return {
-    id: repo.id,
-    instanceId: repo.instanceId,
-    data: {
-      currentBranch: repo.data.currentBranch,
-      status: repo.data.status,
-      worktreesByPath: repo.data.worktreesByPath,
-    },
-    operations: { branchAction: idleOperation() },
-    remote: {
-      lifecycle: null,
-      hasRemotes: true,
-      hasBrowserRemote: false,
-      hasGitHubRemote: false,
-      browserRemoteProvider: undefined,
-      remoteProviders: {},
-    },
-  }
-}
-
 beforeEach(() => {
   primaryWindowQueryClient.clear()
   resetReposStore()
@@ -188,7 +165,6 @@ function removeBranchFromReadModel(repoId: string, branchName: string): void {
 describe('BranchActionDialogHost', () => {
   test('regression: store state survives a full unmount/remount cycle of the host', () => {
     const { repo, branch } = setupRepo()
-    buildRepo(repo)
 
     const payload: RemoveWorktreeDialogPayload = { branch: branch.name, path: branch.worktree!.path }
 

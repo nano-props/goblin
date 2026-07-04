@@ -42,15 +42,15 @@ const MODE_OPTIONS = [
   { id: 'trackRemoteBranch', labelKey: 'action.create-worktree-mode-remote', icon: RadioTower },
 ] satisfies Array<{ id: CreateWorktreeDialogMode; labelKey: string; icon: LucideIcon }>
 
+type CreateWorktreeDialogRepo = Omit<RepoState, 'data'> & { data: RepoBranchReadModelData }
+
 interface Props {
   open: boolean
-  repo: RepoState
+  repo: CreateWorktreeDialogRepo
   worktreeBootstrap?: WorktreeBootstrapPromptState
   onClose: () => void
   onCreate: (request: CreateWorktreeRequest) => boolean | void | Promise<boolean | void>
 }
-
-type CreateWorktreeDialogRepo = Omit<RepoState, 'data'> & { data: RepoBranchReadModelData }
 
 type ContentProps = Omit<Props, 'repo'> & {
   repo: CreateWorktreeDialogRepo

@@ -37,16 +37,17 @@ beforeEach(async () => {
   globalThis.localStorage?.clear()
   resetReposStore()
   setServerSettings(defaultSettingsSnapshot())
+  const branches = [createRepoBranch('main', { isCurrent: true, ahead: 0, behind: 0 })]
   const repo = seedRepoState({
     id: REPO_ID,
-    branches: [createRepoBranch('main', { isCurrent: true, ahead: 0, behind: 0 })],
+    branches,
   })
   setRepoSnapshotQueryData(
     repo.id,
     repo.instanceId,
     {
-      current: repo.data.currentBranch,
-      branches: repo.data.branches,
+      current: '',
+      branches,
     },
     testQueryClient,
   )

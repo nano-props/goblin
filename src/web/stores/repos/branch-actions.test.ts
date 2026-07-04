@@ -180,18 +180,12 @@ describe('branch action capabilities', () => {
     const repo = seedRepoState({
       id: REPO_ID,
       branches: [branch],
+      branchSnapshots: [createBranchSnapshot('feature/main-worktree', { worktree: { path: REPO_ID, isPrimary: true } })],
       currentBranch: 'main',
-      worktreesByPath: {
-        [REPO_ID]: {
-          path: REPO_ID,
-          branch: 'feature/main-worktree',
-          isMain: true,
-        },
-      },
     })
 
     expect(branch.worktree).toEqual({ path: REPO_ID })
-    expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
+    expect(getBranchActionCapabilities(repoStateWithBranchReadModelForTest(repo), branch)).toMatchObject({
       canRemoveWorktree: false,
     })
   })
@@ -212,7 +206,7 @@ describe('branch action capabilities', () => {
       },
     })
 
-    expect(getBranchActionCapabilities(repo, branch)).toMatchObject({
+    expect(getBranchActionCapabilities(repoStateWithBranchReadModelForTest(repo), branch)).toMatchObject({
       canRemoveWorktree: true,
       isRegularBranch: false,
     })

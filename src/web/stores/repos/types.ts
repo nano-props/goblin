@@ -5,7 +5,6 @@ import type {
   ExecResult,
   GitRemoteInfo,
   PullRequestFetchMode,
-  WorktreeStatus,
 } from '#/web/types.ts'
 import type { RemoteRepoConnectionLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspaceSessionState } from '#/shared/api-types.ts'
@@ -19,7 +18,6 @@ import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
 import type { RepoDataLoadBundle } from '#/web/stores/repos/repo-data-load-state.ts'
 export type BranchViewMode = 'all' | 'worktrees'
 type RepoDataSource = 'cache' | 'fresh'
-// Client branches keep only the worktree reference; metadata lives in worktreesByPath.
 export type RepoBranchState = Omit<BranchSnapshotInfo, 'worktree'> & {
   worktree?: Pick<NonNullable<BranchSnapshotInfo['worktree']>, 'path'>
 }
@@ -50,11 +48,8 @@ export interface OpenRepoPostOpenError {
 export type OpenRepoResult =
   { ok: true; id: string; postOpenEffects?: Promise<OpenRepoPostOpenError[]> } | { ok: false; message: string }
 
-export interface RepoDataState {
-  status: WorktreeStatus[]
-  statusLoaded: boolean
-  worktreesByPath: Record<string, RepoWorktreeState>
-}
+declare const repoDataStateBrand: unique symbol
+export type RepoDataState = { readonly [repoDataStateBrand]?: never }
 
 export interface RepoWorktreeState {
   path: string

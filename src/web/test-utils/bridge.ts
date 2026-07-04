@@ -17,7 +17,7 @@
 //     drive it. Tests that need a fresh store call `resetReposStore`
 //     in `beforeEach`.
 
-import type { RepoState, RepoBranchState } from '#/web/stores/repos/types.ts'
+import type { RepoState, RepoBranchState, RepoWorktreeState } from '#/web/stores/repos/types.ts'
 import { readRepoBranchQueryProjection, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import { stripBranchWorktreeMetadata, worktreeStatesFromBranches } from '#/web/stores/repos/worktree-state.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -57,7 +57,7 @@ import { installWebSocketMock } from '#/web/test-utils/websocket-mock.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
 
 export type IpcTestHandler = (input: any) => unknown
-export type RepoStateWithBranchReadModel = RepoState & { data: RepoState['data'] & RepoBranchReadModelData }
+export type RepoStateWithBranchReadModel = Omit<RepoState, 'data'> & { data: RepoBranchReadModelData }
 
 export function repoStateWithBranchReadModelForTest(
   repo: RepoState,
@@ -748,13 +748,15 @@ export function seedRepoState(options: {
   instanceId?: string
   status?: WorktreeStatus[]
   statusLoaded?: boolean
-  worktreesByPath?: RepoState['data']['worktreesByPath']
+  worktreesByPath?: Record<string, RepoWorktreeState>
   remote?: Partial<RepoState['remote']>
-}): RepoStateWithBranchReadModel {
+}): RepoState {
   const base = emptyRepo(options.id, options.name ?? 'repo', options.instanceId ?? createOpaqueId('repo-instance'))
   const branchesWithSnapshotWorktreeMetadata = options.branchSnapshots ?? options.branches ?? []
   const branches = options.branches ?? stripBranchWorktreeMetadata(branchesWithSnapshotWorktreeMetadata)
-  const status = options.status ?? base.data.status
+  const status = options.status ?? []
+  const worktreesByPath =
+    options.worktreesByPath ?? worktreeStatesFromBranches(branchesWithSnapshotWorktreeMetadata, {}, status)
   const selectedBranch = options.selectedBranch ?? base.ui.selectedBranch
   const preferredWorkspacePaneTabByTarget =
     options.preferredWorkspacePaneTabByTarget ??
@@ -770,14 +772,7 @@ export function seedRepoState(options: {
   const repo: RepoState = {
     ...base,
     instanceId: base.instanceId,
-    data: {
-      ...base.data,
-      status,
-      statusLoaded: options.statusLoaded ?? base.data.statusLoaded,
-      worktreesByPath:
-        options.worktreesByPath ??
-        worktreeStatesFromBranches(branchesWithSnapshotWorktreeMetadata, base.data.worktreesByPath, status),
-    },
+    data: base.data,
     ui: {
       ...base.ui,
       selectedBranch,
@@ -815,12 +810,5 @@ export function seedRepoState(options: {
       tabs,
     })
   }
-  return repoStateWithBranchReadModelForTest(repo, {
-    branches,
-    currentBranch: options.currentBranch ?? '',
-    status,
-    worktreesByPath:
-      options.worktreesByPath ??
-      worktreeStatesFromBranches(branchesWithSnapshotWorktreeMetadata, base.data.worktreesByPath, status),
-  })
+  return repo
 }

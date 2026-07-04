@@ -21,6 +21,7 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import { createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import type { RepoState } from '#/web/stores/repos/types.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   preferredWorkspacePaneTabByTargetRecordWith,
@@ -54,7 +55,7 @@ import {
   setWorkspacePaneTabsForTargetQueryData,
   workspacePaneTabsQueryKey,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
 
 const mockSessions = vi.hoisted(
   () =>
@@ -1035,20 +1036,16 @@ describe('TerminalSessionProvider', () => {
         await getContext().createTerminal(base)
       })
 
-      await act(async () => {
-        useReposStore.setState((state) => ({
-          repos: {
-            ...state.repos,
-            [REPO_ID]: state.repos[REPO_ID]
-              ? {
-                  ...state.repos[REPO_ID],
-                  data: {
-                    ...state.repos[REPO_ID]!.data,
-                    branches: [createRepoBranch('feature/renamed', { worktree: { path: WORKTREE_PATH } })],
-                  },
-                  ui: {
-                    ...state.repos[REPO_ID]!.ui,
-                    selectedBranch: 'feature/renamed',
+	      await act(async () => {
+	        useReposStore.setState((state) => ({
+	          repos: {
+	            ...state.repos,
+	            [REPO_ID]: state.repos[REPO_ID]
+	              ? {
+	                  ...state.repos[REPO_ID],
+	                  ui: {
+	                    ...state.repos[REPO_ID]!.ui,
+	                    selectedBranch: 'feature/renamed',
                   },
                 }
               : state.repos[REPO_ID],
@@ -1384,33 +1381,27 @@ describe('TerminalSessionProvider', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
     })
-    const secondRepo = {
-      ...firstRepo,
-      id: SECOND_REPO_ID,
-      instanceId: 'repo-instance-second',
-      data: {
-        ...firstRepo.data,
-        branches: [createRepoBranch('feature/other', { worktree: { path: SECOND_WORKTREE_PATH } })],
-        worktreesByPath: {
-          [SECOND_WORKTREE_PATH]: {
-            path: SECOND_WORKTREE_PATH,
-            branch: 'feature/other',
-            isMain: false,
-            isLocked: false,
-          },
-        },
-      },
-      ui: {
-        ...firstRepo.ui,
-        selectedBranch: 'feature/other',
+	    const secondRepo = {
+	      ...firstRepo,
+	      id: SECOND_REPO_ID,
+	      instanceId: 'repo-instance-second',
+	      data: {},
+	      ui: {
+	        ...firstRepo.ui,
+	        selectedBranch: 'feature/other',
         preferredWorkspacePaneTabByTarget: preferredWorkspacePaneTabByTargetRecordWith(
           firstRepo.ui,
           { repoRoot: SECOND_REPO_ID, branchName: 'feature/other', worktreePath: SECOND_WORKTREE_PATH },
           'terminal',
         ),
       },
-    } satisfies typeof firstRepo
-    useReposStore.setState((state) => ({
+	    } satisfies RepoState
+	    setRepoSnapshotQueryData(SECOND_REPO_ID, secondRepo.instanceId, {
+	      current: 'feature/other',
+	      branches: [createRepoBranch('feature/other', { worktree: { path: SECOND_WORKTREE_PATH } })],
+	    })
+	    setRepoStatusQueryData(SECOND_REPO_ID, secondRepo.instanceId, [])
+	    useReposStore.setState((state) => ({
       ...state,
       repos: {
         ...state.repos,
@@ -1435,33 +1426,27 @@ describe('TerminalSessionProvider', () => {
       selectedBranch: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
     })
-    const secondRepo = {
-      ...firstRepo,
-      id: SECOND_REPO_ID,
-      instanceId: 'repo-instance-second',
-      data: {
-        ...firstRepo.data,
-        branches: [createRepoBranch('feature/other', { worktree: { path: SECOND_WORKTREE_PATH } })],
-        worktreesByPath: {
-          [SECOND_WORKTREE_PATH]: {
-            path: SECOND_WORKTREE_PATH,
-            branch: 'feature/other',
-            isMain: false,
-            isLocked: false,
-          },
-        },
-      },
-      ui: {
-        ...firstRepo.ui,
-        selectedBranch: 'feature/other',
+	    const secondRepo = {
+	      ...firstRepo,
+	      id: SECOND_REPO_ID,
+	      instanceId: 'repo-instance-second',
+	      data: {},
+	      ui: {
+	        ...firstRepo.ui,
+	        selectedBranch: 'feature/other',
         preferredWorkspacePaneTabByTarget: preferredWorkspacePaneTabByTargetRecordWith(
           firstRepo.ui,
           { repoRoot: SECOND_REPO_ID, branchName: 'feature/other', worktreePath: SECOND_WORKTREE_PATH },
           'terminal',
         ),
       },
-    } satisfies typeof firstRepo
-    useReposStore.setState((state) => ({
+	    } satisfies RepoState
+	    setRepoSnapshotQueryData(SECOND_REPO_ID, secondRepo.instanceId, {
+	      current: 'feature/other',
+	      branches: [createRepoBranch('feature/other', { worktree: { path: SECOND_WORKTREE_PATH } })],
+	    })
+	    setRepoStatusQueryData(SECOND_REPO_ID, secondRepo.instanceId, [])
+	    useReposStore.setState((state) => ({
       ...state,
       repos: {
         ...state.repos,

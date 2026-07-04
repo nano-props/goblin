@@ -4,7 +4,13 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { dispatchRemoveWorktree } from '#/web/hooks/branchActionDispatch.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
-import { createBranchSnapshot, createRepoBranch, resetReposStore, seedRepoState } from '#/web/test-utils/bridge.ts'
+import {
+  createBranchSnapshot,
+  createRepoBranch,
+  repoStateWithBranchReadModelForTest,
+  resetReposStore,
+  seedRepoState,
+} from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -56,7 +62,7 @@ describe('branch action dispatch', () => {
     installTerminalBridge({ closeTerminalsForWorktree })
 
     const pending = dispatchRemoveWorktree({
-      repo,
+      repo: repoStateWithBranchReadModelForTest(repo),
       target: { branch: 'feature/worktree', path: WORKTREE_PATH },
       alsoDeleteBranch: false,
       forceDeleteBranch: false,
@@ -107,7 +113,7 @@ describe('branch action dispatch', () => {
 
     await expect(
       dispatchRemoveWorktree({
-        repo,
+        repo: repoStateWithBranchReadModelForTest(repo),
         target: { branch: 'feature/worktree', path: WORKTREE_PATH },
         alsoDeleteBranch: true,
         forceDeleteBranch: false,
@@ -143,7 +149,7 @@ describe('branch action dispatch', () => {
 
     await expect(
       dispatchRemoveWorktree({
-        repo,
+        repo: repoStateWithBranchReadModelForTest(repo),
         target: { branch: 'feature/worktree', path: WORKTREE_PATH },
         alsoDeleteBranch: false,
         forceDeleteBranch: false,
@@ -190,7 +196,7 @@ describe('branch action dispatch', () => {
 
     await expect(
       dispatchRemoveWorktree({
-        repo,
+        repo: repoStateWithBranchReadModelForTest(repo),
         target: { branch: 'feature/worktree', path: WORKTREE_PATH },
         alsoDeleteBranch: false,
         forceDeleteBranch: false,
@@ -235,7 +241,7 @@ describe('branch action dispatch', () => {
 
     await expect(
       dispatchRemoveWorktree({
-        repo,
+        repo: repoStateWithBranchReadModelForTest(repo),
         target: { branch: 'feature/worktree', path: WORKTREE_PATH },
         alsoDeleteBranch: false,
         forceDeleteBranch: false,
@@ -288,7 +294,7 @@ describe('branch action dispatch', () => {
 
     await expect(
       dispatchRemoveWorktree({
-        repo,
+        repo: repoStateWithBranchReadModelForTest(repo),
         target: { branch: 'feature/worktree', path: WORKTREE_PATH },
         alsoDeleteBranch: false,
         forceDeleteBranch: false,

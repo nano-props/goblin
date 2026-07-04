@@ -16,11 +16,7 @@ export function emptyRepo(id: string, name: string, instanceId: string): RepoSta
     id,
     name,
     instanceId,
-    data: {
-      status: [],
-      statusLoaded: false,
-      worktreesByPath: {},
-    },
+    data: {},
     dataLoads: emptyRepoDataLoadBundle(),
     operations: emptyRepoOperations(),
     ui: {

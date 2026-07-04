@@ -27,6 +27,7 @@ import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
 import { useSettingsSnapshotReadModel } from '#/web/settings-queries.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
+import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
 
 interface Props {
   open: boolean
@@ -103,8 +104,8 @@ function CreateWorktreeDialogSession({ open, onOpenChange, repoId: sessionRepoId
     }
   }, [open, repoId, repoInstanceId])
 
-  if (!displayRepo) return null
-  const displayRepoId = displayRepo.id
+  const displayBranchReadModel = useRepoBranchReadModel(displayRepo?.id ?? '', displayRepo?.instanceId ?? '', !!displayRepo)
+  const displayRepoId = displayRepo?.id ?? ''
 
   function submitCreateWorktree(
     repoId: string,
@@ -195,11 +196,16 @@ function CreateWorktreeDialogSession({ open, onOpenChange, repoId: sessionRepoId
   // `useCreateWorktreeDialogDisplayState` helper instead of adding one-off
   // retained props here.
   const displayWorktreeBootstrap = useLastNonNull(open ? worktreeBootstrap : null)
+  if (!displayRepo || !displayBranchReadModel) return null
+  const dialogRepo = {
+    ...displayRepo,
+    data: displayBranchReadModel,
+  }
 
   return (
-    <CreateWorktreeDialog
-      open={open}
-      repo={displayRepo}
+	    <CreateWorktreeDialog
+	      open={open}
+	      repo={dialogRepo}
       worktreeBootstrap={displayWorktreeBootstrap ?? undefined}
       onClose={() => onOpenChange(false)}
       onCreate={handleCreateWorktree}
