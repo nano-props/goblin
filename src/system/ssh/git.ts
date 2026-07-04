@@ -127,6 +127,13 @@ export async function getRemoteStatus(
  * `gitWorktreeList` round trip. That collapses the remote `/tree`
  * read path from (1 worktree-list + N statuses + 1 redundant
  * worktree-list + 1 walk) to (1 batched call + 1 walk) = 2 calls.
+ *
+ * This is a display read model, not a membership authority. Remote
+ * command failures intentionally soft-fail to empty arrays so status
+ * refresh can mark data unavailable without throwing through broad
+ * refresh workflows. Callers that must authorize a worktree-scoped
+ * operation should use `resolveRemoteWorktree` instead, where a remote
+ * read failure is distinct from a real unknown worktree.
  */
 export async function getRemoteStatusAndWorktrees(
   target: RemoteRepoTarget,
@@ -247,6 +254,11 @@ export async function remoteCommandExists(
 ): Promise<boolean> {
   if (!REMOTE_COMMAND_NAME_RE.test(commandName)) return false
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
+  // This helper answers only "can this already-authorized worktree run
+  // this command?". It returns false for invalid command names,
+  // unresolved worktrees, and failed probes, so callers that need to
+  // surface worktree/remote read failures must resolve the worktree
+  // first with `resolveRemoteWorktree`.
   const known = await resolveKnownRemoteWorktree(target, worktreePath, {
     signal: options.signal,
     run,
@@ -257,6 +269,11 @@ export async function remoteCommandExists(
   return !options.signal?.aborted && result.ok
 }
 
+/** Resolve a remote worktree path against the remote repo's worktree
+ *  list. Unlike display reads such as `getRemoteStatusAndWorktrees`,
+ *  this is an authority boundary: remote list failures throw their
+ *  real error, while a successful list that lacks the target path
+ *  throws `error.worktree-not-found`. */
 export async function resolveRemoteWorktree(
   target: RemoteRepoTarget,
   worktreePath: string,
