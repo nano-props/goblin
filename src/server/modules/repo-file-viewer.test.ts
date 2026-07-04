@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   getWorktrees: vi.fn(),
   userShellCommandExists: vi.fn(),
   resolveRemoteRepoTarget: vi.fn(),
+  getRemoteStatusAndWorktrees: vi.fn(),
   remoteCommandExists: vi.fn(),
 }))
 
@@ -20,6 +21,7 @@ vi.mock('#/server/modules/repo-source.ts', () => ({
 }))
 
 vi.mock('#/system/ssh/git.ts', () => ({
+  getRemoteStatusAndWorktrees: mocks.getRemoteStatusAndWorktrees,
   remoteCommandExists: mocks.remoteCommandExists,
 }))
 
@@ -32,6 +34,10 @@ beforeEach(() => {
     { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
     { path: '/tmp/repo-feature', branch: 'feature', isBare: false, isPrimary: false },
   ])
+  mocks.getRemoteStatusAndWorktrees.mockResolvedValue({
+    statuses: [],
+    worktrees: [{ path: '/srv/repo-feature', branch: 'feature', isBare: false, isPrimary: false }],
+  })
 })
 
 describe('repo file viewer read layer', () => {
@@ -109,12 +115,32 @@ describe('repo file viewer read layer', () => {
 
     expect(result).toEqual({ viewer: 'batcat', shell: 'posix' })
     expect(mocks.remoteCommandExists).toHaveBeenNthCalledWith(1, target, '/srv/repo-feature', 'bat', {
+      knownWorktrees: [{ path: '/srv/repo-feature', branch: 'feature', isBare: false, isPrimary: false }],
       signal: undefined,
     })
     expect(mocks.remoteCommandExists).toHaveBeenNthCalledWith(2, target, '/srv/repo-feature', 'batcat', {
+      knownWorktrees: [{ path: '/srv/repo-feature', branch: 'feature', isBare: false, isPrimary: false }],
       signal: undefined,
     })
     expect(mocks.getWorktrees).not.toHaveBeenCalled()
+  })
+
+  test('rejects unknown remote worktrees without probing viewer commands', async () => {
+    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
+    const target = {
+      id: repoId,
+      alias: 'prod',
+      remotePath: '/srv/repo',
+      displayName: 'prod:repo',
+      host: 'example.com',
+      user: 'tester',
+      port: 22,
+    }
+    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
+
+    await expect(getRepositoryFileViewer(repoId, '/srv/missing')).rejects.toThrow('unknown worktree path')
+
+    expect(mocks.remoteCommandExists).not.toHaveBeenCalled()
   })
 })
 

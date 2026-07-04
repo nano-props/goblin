@@ -4,7 +4,7 @@ import type { WorktreeInfo } from '#/shared/git-types.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import { resolveRemoteRepoTarget } from '#/server/modules/repo-source.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
-import { remoteCommandExists } from '#/system/ssh/git.ts'
+import { getRemoteStatusAndWorktrees, remoteCommandExists } from '#/system/ssh/git.ts'
 import { userShellCommandExists } from '#/system/user-shell.ts'
 
 const BAT_VIEWERS = ['bat', 'batcat'] as const
@@ -22,8 +22,10 @@ export async function getRepositoryFileViewer(
 
   if (isRemoteRepoId(cwd)) {
     const target = await resolveRemoteRepoTarget(cwd)
+    const { worktrees } = await getRemoteStatusAndWorktrees(target, { signal })
+    if (!matchesKnownRemoteWorktree(worktrees, worktreePath)) throw new Error('unknown worktree path')
     for (const viewer of BAT_VIEWERS) {
-      const exists = await remoteCommandExists(target, worktreePath, viewer, { signal })
+      const exists = await remoteCommandExists(target, worktreePath, viewer, { signal, knownWorktrees: worktrees })
       if (exists) return { viewer, shell: 'posix' }
     }
     return POSIX_CAT_VIEWER
@@ -58,4 +60,8 @@ function matchesKnownWorktree(worktrees: ReadonlyArray<WorktreeInfo>, worktreePa
     if (path.resolve(wt.path) === resolved) return true
   }
   return false
+}
+
+function matchesKnownRemoteWorktree(worktrees: ReadonlyArray<WorktreeInfo>, worktreePath: string): boolean {
+  return worktrees.some((wt) => !wt.isBare && wt.path === worktreePath)
 }
