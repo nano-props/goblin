@@ -492,6 +492,7 @@ export const ko: Record<DictKey, string> = {
   'error.cannot-delete-protected-branch': '보호된 브랜치는 삭제할 수 없습니다',
   'error.cannot-delete-checked-out-branch': '워크트리에서 체크아웃된 브랜치는 삭제할 수 없습니다',
   'error.branch-not-fully-merged': '브랜치에 고유 커밋이 있어 Git 이 안전 삭제를 거부했습니다',
+  'error.worktree-not-found': '워크트리를 찾을 수 없습니다',
   'error.worktree-not-found-for-branch': '브랜치에 해당하는 워크트리를 찾을 수 없습니다',
   'error.cannot-remove-main-worktree': '메인 워크트리는 제거할 수 없습니다',
   'error.cannot-remove-dirty-worktree': '워크트리에 커밋되지 않은 변경 사항이 있습니다 — 먼저 커밋하거나 되돌리세요',

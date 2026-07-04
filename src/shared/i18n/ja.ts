@@ -500,6 +500,7 @@ export const ja: Record<DictKey, string> = {
   'error.cannot-delete-protected-branch': '保護されたブランチは削除できません',
   'error.cannot-delete-checked-out-branch': 'ワークツリーでチェックアウト済みのブランチは削除できません',
   'error.branch-not-fully-merged': 'ブランチに固有コミットがあるため、Git が安全な削除を拒否しました',
+  'error.worktree-not-found': 'ワークツリーが見つかりません',
   'error.worktree-not-found-for-branch': 'このブランチのワークツリーが見つかりません',
   'error.cannot-remove-main-worktree': 'メインのワークツリーは削除できません',
   'error.cannot-remove-dirty-worktree': 'ワークツリーに未コミットの変更があります — 先にコミットまたは破棄してください',
