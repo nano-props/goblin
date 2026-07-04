@@ -161,6 +161,7 @@ export function WorkspaceOpenExternallyMenu({ repo, branch, branchActions }: Pro
                   <WorkspaceOpenExternallyItem
                     item={item}
                     pending={pending}
+                    disabled={busy}
                     selected={item.id === primaryItem?.id}
                     onSelect={() => runLocalItem(item)}
                   />
@@ -208,29 +209,35 @@ function PrimaryButton({
 function WorkspaceOpenExternallyItem({
   item,
   pending,
+  disabled,
   selected,
   onSelect,
 }: {
   item: WorkspaceExternalAppItem
   pending: string | null
+  disabled: boolean
   selected: boolean
   onSelect: () => void
 }) {
   const t = useT()
   const Icon = item.Icon
+  const itemBusy = pending === item.id
   return (
     <button
       type="button"
       title={t(item.labelKey)}
       aria-pressed={selected}
+      aria-busy={itemBusy ? true : undefined}
+      disabled={disabled}
       onClick={onSelect}
       className={cn(
-        'flex h-8 w-full cursor-pointer items-center gap-2 rounded-sm py-1 pl-2 pr-2 text-left text-sm outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground',
+        'flex h-8 w-full items-center gap-2 rounded-sm py-1 pl-2 pr-2 text-left text-sm outline-none transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50',
+        disabled ? 'cursor-default' : 'cursor-pointer hover:bg-accent hover:text-accent-foreground',
         focusRing,
       )}
     >
       <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4 [&_svg]:shrink-0">
-        {pending === item.id ? <Loader2 size={16} className="animate-spin" /> : <Icon className="size-4" />}
+        {itemBusy ? <Loader2 size={16} className="animate-spin" /> : <Icon className="size-4" />}
       </span>
       <span className="min-w-0 flex-1 truncate">{t(item.labelKey)}</span>
     </button>

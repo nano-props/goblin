@@ -375,6 +375,7 @@ interface WorkspacePaneTabSwitcherPopoverProps {
   label: string
   newLabel: string
   canCreateNew: boolean
+  newTerminalBusy: boolean
   onNew: () => void
   onSelect: (identity: string) => void
   onClose: (event: React.MouseEvent, identity: string) => void
@@ -387,6 +388,7 @@ function WorkspacePaneTabSwitcherPopover({
   label,
   newLabel,
   canCreateNew,
+  newTerminalBusy,
   onNew,
   onSelect,
   onClose,
@@ -401,6 +403,7 @@ function WorkspacePaneTabSwitcherPopover({
   }
 
   const selectNew = () => {
+    if (newTerminalBusy) return
     setOpen(false)
     onNew()
   }
@@ -477,8 +480,15 @@ function WorkspacePaneTabSwitcherPopover({
           <div className="border-t border-separator p-1">
             <button
               type="button"
-              className="flex h-7 w-full cursor-pointer items-center gap-2 rounded-sm px-2 text-left text-sm text-popover-foreground outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground"
+              className={cn(
+                'flex h-7 w-full items-center gap-2 rounded-sm px-2 text-left text-sm text-popover-foreground outline-none transition-colors duration-100',
+                newTerminalBusy
+                  ? 'cursor-default opacity-50'
+                  : 'cursor-pointer hover:bg-accent hover:text-accent-foreground',
+              )}
               onClick={selectNew}
+              disabled={newTerminalBusy}
+              aria-busy={newTerminalBusy ? 'true' : undefined}
             >
               <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
                 <Plus size={14} />
@@ -549,9 +559,10 @@ export function WorkspacePaneTabStrip({
     })
   }, [scrollBehavior])
   const handleNew = useCallback(() => {
+    if (newTerminalBusy) return
     scrollNewButtonIntoView()
     onNew()
-  }, [onNew, scrollNewButtonIntoView])
+  }, [newTerminalBusy, onNew, scrollNewButtonIntoView])
   const handleViewportScroll = useWorkspacePaneTabStripScrollMemory({
     workspacePaneTabTargetKey,
     enabled: !collapseToSelectedTab,
@@ -715,6 +726,7 @@ export function WorkspacePaneTabStrip({
           workspacePaneId={workspacePaneId}
           context={tabBodyContext}
           canCreateNew={canCreateNew}
+          newTerminalBusy={newTerminalBusy}
           onNew={handleNew}
         />
       }
@@ -759,6 +771,7 @@ interface WorkspacePaneCompactTabsBodyProps extends WorkspacePaneTabBodyCommonPr
   compactItem: WorkspacePaneTabItem | null
   workspacePaneId: string
   canCreateNew: boolean
+  newTerminalBusy: boolean
   onNew: () => void
 }
 
@@ -768,6 +781,7 @@ function WorkspacePaneCompactTabsBody({
   workspacePaneId,
   context,
   canCreateNew,
+  newTerminalBusy,
   onNew,
 }: WorkspacePaneCompactTabsBodyProps) {
   const {
@@ -828,6 +842,7 @@ function WorkspacePaneCompactTabsBody({
         label={t('workspace-pane-tabs.tabs')}
         newLabel={t('terminal.new')}
         canCreateNew={canCreateNew}
+        newTerminalBusy={newTerminalBusy}
         onNew={onNew}
         onSelect={onSelect}
         onClose={onClose}
@@ -973,6 +988,7 @@ function WorkspacePaneNewButton({
       className={cn('h-7 w-7 shrink-0', compact && 'w-7')}
       id={id}
       onClick={onClick}
+      disabled={busy}
       aria-busy={busy ? 'true' : undefined}
       aria-label={label}
       title={label}
