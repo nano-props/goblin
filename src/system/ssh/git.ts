@@ -797,7 +797,8 @@ async function resolveKnownRemoteWorktree(
     if (!result.ok) return remoteExecResult(result)
     worktrees = parseWorktrees(result.stdout)
   }
-  const worktree = worktrees.find((item) => item.path === worktreePath && !item.isBare)
+  const resolvedPath = path.posix.resolve(worktreePath)
+  const worktree = worktrees.find((item) => path.posix.resolve(item.path) === resolvedPath && !item.isBare)
   if (!worktree) return { ok: false, message: 'error.worktree-not-found' }
   return worktree
 }

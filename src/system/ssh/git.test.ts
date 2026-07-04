@@ -891,6 +891,28 @@ describe('remoteCommandExists', () => {
     )
   })
 
+  test('matches known remote worktrees after POSIX path normalization', async () => {
+    const knownWorktrees: WorktreeInfo[] = [
+      { path: '/srv/repo-feature', branch: 'feature/test', isBare: false, isPrimary: false },
+    ]
+    const run = vi.fn(async (command: { type: string }) => {
+      if (command.type === 'commandExists') return okRemoteResult('')
+      return failRemoteResult('unexpected')
+    })
+
+    const result = await remoteCommandExists(TARGET, '/srv/repo-feature/', 'bat', {
+      run: run as any,
+      knownWorktrees,
+    })
+
+    expect(result).toBe(true)
+    expect(run).toHaveBeenCalledWith(
+      { type: 'commandExists', path: '/srv/repo-feature', commandName: 'bat' },
+      TARGET,
+      { signal: undefined },
+    )
+  })
+
   test('returns false for unsafe command names without touching the remote', async () => {
     const run = vi.fn()
 

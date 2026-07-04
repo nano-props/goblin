@@ -63,5 +63,6 @@ function matchesKnownWorktree(worktrees: ReadonlyArray<WorktreeInfo>, worktreePa
 }
 
 function matchesKnownRemoteWorktree(worktrees: ReadonlyArray<WorktreeInfo>, worktreePath: string): boolean {
-  return worktrees.some((wt) => !wt.isBare && wt.path === worktreePath)
+  const resolved = path.posix.resolve(worktreePath)
+  return worktrees.some((wt) => !wt.isBare && path.posix.resolve(wt.path) === resolved)
 }

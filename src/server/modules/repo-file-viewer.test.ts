@@ -125,6 +125,29 @@ describe('repo file viewer read layer', () => {
     expect(mocks.getWorktrees).not.toHaveBeenCalled()
   })
 
+  test('matches remote worktree paths after POSIX normalization', async () => {
+    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
+    const target = {
+      id: repoId,
+      alias: 'prod',
+      remotePath: '/srv/repo',
+      displayName: 'prod:repo',
+      host: 'example.com',
+      user: 'tester',
+      port: 22,
+    }
+    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
+    mocks.remoteCommandExists.mockResolvedValueOnce(true)
+
+    const result = await getRepositoryFileViewer(repoId, '/srv/repo-feature/')
+
+    expect(result).toEqual({ viewer: 'bat', shell: 'posix' })
+    expect(mocks.remoteCommandExists).toHaveBeenCalledWith(target, '/srv/repo-feature/', 'bat', {
+      knownWorktrees: [{ path: '/srv/repo-feature', branch: 'feature', isBare: false, isPrimary: false }],
+      signal: undefined,
+    })
+  })
+
   test('rejects unknown remote worktrees without probing viewer commands', async () => {
     const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
     const target = {
