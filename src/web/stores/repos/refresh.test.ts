@@ -930,13 +930,14 @@ describe('core refresh request ordering', () => {
     ).toBe('terminal')
   })
 
-  test('snapshot refresh follows the selected worktree when checkout moves it to another branch', async () => {
+  test('snapshot refresh follows selected worktree using the previous query snapshot', async () => {
     const repoInstanceId = seedRepo([
       branch('feature/old', undefined, { worktree: { path: '/tmp/worktree-a' } }),
       branch('feature/new'),
     ])
     updateRepoForTest((repo) => {
       repo.ui.selectedBranch = 'feature/old'
+      repo.data.branches = []
       repo.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(
         repo.ui,
         { repoRoot: REPO_ID, branchName: 'feature/old', worktreePath: '/tmp/worktree-a' },

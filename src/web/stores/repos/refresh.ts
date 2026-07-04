@@ -23,6 +23,7 @@ import { finishDataLoadError, finishDataLoadSuccess, startDataLoad } from '#/web
 import { getRepoPullRequests, getRepoSnapshot, getRepoStatus, readRepoBulk } from '#/web/repo-client.ts'
 import {
   setRepoBulkReadQueryData,
+  getRepoSnapshotQueryData,
   getRepoStatusQueryData,
   setRepoPullRequestsQueryData,
   setRepoSnapshotQueryData,
@@ -78,12 +79,13 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     id: string,
     repoInstanceId: string,
     snap: RepoSnapshot,
+    previousSnapshotBranches: RepoSnapshot['branches'] | null,
     isSnapshotCurrent: () => boolean,
     options?: { skipLogBackfill?: boolean },
   ): Promise<void> {
     const validBranches = new Set(snap.branches.map((b) => b.name))
     updateIfFresh(set, id, repoInstanceId, (r) => {
-      applySnapshotToRepoProjection(r, snap, validBranches)
+      applySnapshotToRepoProjection(r, snap, validBranches, previousSnapshotBranches)
     })
     pruneRepoBranchPullRequestOperations(id, validBranches)
     const branchNames = snap.branches.map((branch) => branch.name)
@@ -169,6 +171,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         task: (signal) => getRepoSnapshot(id, signal),
         errorFromResult: (snap) => (snap ? null : 'error.failed-read-repo'),
         onResult: async (snap, ctx) => {
+          const previousSnapshot = ctx.isCurrent() ? getRepoSnapshotQueryData(id, repoInstanceId) : null
           if (ctx.isCurrent()) setRepoSnapshotQueryData(id, repoInstanceId, snap)
           if (!snap) {
             updateIfFresh(set, id, repoInstanceId, (r) => {
@@ -177,7 +180,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             })
             return
           }
-          await runSnapshotSuccessFlow(id, repoInstanceId, snap, ctx.isCurrent, {
+          await runSnapshotSuccessFlow(id, repoInstanceId, snap, previousSnapshot?.branches ?? null, ctx.isCurrent, {
             skipLogBackfill: options?.skipLogBackfill,
           })
         },
@@ -309,6 +312,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
           return result.snapshot === null ? 'error.failed-read-repo' : null
         },
         onResult: async (result, ctx) => {
+          const previousSnapshot = ctx.isCurrent() ? getRepoSnapshotQueryData(id, repoInstanceId) : null
           if (ctx.isCurrent()) setRepoBulkReadQueryData(id, repoInstanceId, ['snapshot', 'status'], result)
           // Apply status first (leaf, no follow-up).
           updateIfFresh(set, id, repoInstanceId, (r) => {
@@ -330,9 +334,16 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             })
             return
           }
-          await runSnapshotSuccessFlow(id, repoInstanceId, result.snapshot, ctx.isCurrent, {
-            skipLogBackfill: options?.skipLogBackfill,
-          })
+          await runSnapshotSuccessFlow(
+            id,
+            repoInstanceId,
+            result.snapshot,
+            previousSnapshot?.branches ?? null,
+            ctx.isCurrent,
+            {
+              skipLogBackfill: options?.skipLogBackfill,
+            },
+          )
         },
         onError: (message) => {
           updateIfFresh(set, id, repoInstanceId, (r) => {

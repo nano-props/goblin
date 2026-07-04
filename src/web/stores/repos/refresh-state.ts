@@ -45,9 +45,14 @@ function finishPullRequestBranchDataLoads(
   }
 }
 
-export function applySnapshotToRepoProjection(r: RepoState, snap: RepoSnapshot, validBranches: Set<string>): void {
+export function applySnapshotToRepoProjection(
+  r: RepoState,
+  snap: RepoSnapshot,
+  validBranches: Set<string>,
+  previousSnapshotBranches: RepoSnapshot['branches'] | null,
+): void {
   const selectedWorktreeRetarget = selectedWorktreeBranchRetarget({
-    previousBranches: r.data.branches,
+    previousBranches: previousSnapshotBranches,
     nextBranches: snap.branches,
     selectedBranch: r.ui.selectedBranch,
   })
@@ -87,11 +92,12 @@ export function applySnapshotToRepoProjection(r: RepoState, snap: RepoSnapshot, 
 }
 
 function selectedWorktreeBranchRetarget(input: {
-  previousBranches: RepoState['data']['branches']
+  previousBranches: RepoSnapshot['branches'] | null
   nextBranches: RepoSnapshot['branches']
   selectedBranch: string | null
 }): { fromBranchName: string; toBranchName: string } | null {
   if (!input.selectedBranch) return null
+  if (!input.previousBranches) return null
   const previousWorktreePath = input.previousBranches.find((branch) => branch.name === input.selectedBranch)?.worktree
     ?.path
   if (!previousWorktreePath) return null
