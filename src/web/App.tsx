@@ -20,6 +20,8 @@ interface AppProps {
   onOpenRepoDashboard?: (repoId: string) => void
   onOpenRepoBranch?: (repoId: string, branchName: string) => void
   onOpenRepoNewWorktree?: (repoId: string) => void
+  onCancelRepoNewWorktree?: (repoId: string) => void
+  onReplaceRepoBranch?: (repoId: string, branchName: string) => void
 }
 
 export type RepoRouteView =
@@ -34,6 +36,8 @@ export function App({
   onOpenRepoDashboard,
   onOpenRepoBranch,
   onOpenRepoNewWorktree,
+  onCancelRepoNewWorktree,
+  onReplaceRepoBranch,
 }: AppProps) {
   const sessionReady = useReposStore((s) => s.sessionReady)
   const zenMode = useReposStore((s) => s.zenMode)
@@ -64,6 +68,8 @@ export function App({
             onOpenRepoDashboard={onOpenRepoDashboard}
             onOpenRepoBranch={onOpenRepoBranch}
             onOpenRepoNewWorktree={onOpenRepoNewWorktree}
+            onCancelRepoNewWorktree={onCancelRepoNewWorktree}
+            onReplaceRepoBranch={onReplaceRepoBranch}
           />
         ) : !sessionReady ? (
           <RepoWorkspaceLayoutSkeleton

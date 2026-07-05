@@ -136,6 +136,8 @@ function useRepoRouteNavigation() {
     onOpenRepoDashboard: (repoId: string) => routeNavigation.openRepoDashboard(repoId),
     onOpenRepoBranch: (repoId: string, branchName: string) => routeNavigation.openRepoBranch(repoId, branchName),
     onOpenRepoNewWorktree: (repoId: string) => routeNavigation.openRepoNewWorktree(repoId),
+    onCancelRepoNewWorktree: (repoId: string) => routeNavigation.cancelRepoNewWorktree(repoId),
+    onReplaceRepoBranch: (repoId: string, branchName: string) => routeNavigation.openRepoBranch(repoId, branchName, { replace: true }),
   }
 }
 

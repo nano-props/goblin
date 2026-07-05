@@ -19,9 +19,10 @@ interface CreateWorktreePagePaneProps {
   repoId: string
   trafficLightOffset?: boolean
   onCancel: () => void
+  onCreated: (branchName: string) => void
 }
 
-export function CreateWorktreePagePane({ repoId, trafficLightOffset = false, onCancel }: CreateWorktreePagePaneProps) {
+export function CreateWorktreePagePane({ repoId, trafficLightOffset = false, onCancel, onCreated }: CreateWorktreePagePaneProps) {
   const liveRepo = useReposStore((s) => s.repos[repoId])
   const submitBranchAction = useReposStore((s) => s.submitBranchAction)
   const branchReadModel = useRepoBranchReadModel(liveRepo?.id ?? '', liveRepo?.instanceId ?? '', !!liveRepo)
@@ -127,7 +128,8 @@ export function CreateWorktreePagePane({ repoId, trafficLightOffset = false, onC
       { kind: 'createWorktree', input: request.input, worktreeBootstrap: currentWorktreeBootstrapDecision() },
       { repoInstanceId: liveRepo.instanceId, refreshOnError: false },
     )
-    return true
+    onCreated(createWorktreeTargetBranch(request.input))
+    return false
   }
 
   return (
@@ -143,4 +145,17 @@ export function CreateWorktreePagePane({ repoId, trafficLightOffset = false, onC
       </ScrollPane>
     </>
   )
+}
+
+function createWorktreeTargetBranch(input: CreateWorktreeRequest['input']): string {
+  switch (input.mode.kind) {
+    case 'newBranch':
+      return input.mode.newBranch
+    case 'existingBranch':
+      return input.mode.branch
+    case 'trackRemoteBranch':
+      return input.mode.localBranch
+  }
+  const exhaustive: never = input.mode
+  return exhaustive
 }

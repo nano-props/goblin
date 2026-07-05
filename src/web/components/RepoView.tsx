@@ -30,6 +30,8 @@ interface Props {
   onOpenRepoDashboard?: (repoId: string) => void
   onOpenRepoBranch?: (repoId: string, branchName: string) => void
   onOpenRepoNewWorktree?: (repoId: string) => void
+  onCancelRepoNewWorktree?: (repoId: string) => void
+  onReplaceRepoBranch?: (repoId: string, branchName: string) => void
 }
 
 export function RepoView({
@@ -39,6 +41,8 @@ export function RepoView({
   onOpenRepoDashboard,
   onOpenRepoBranch,
   onOpenRepoNewWorktree,
+  onCancelRepoNewWorktree,
+  onReplaceRepoBranch,
 }: Props) {
   const uiMode = useResponsiveUiMode()
   const compact = uiMode === 'compact'
@@ -185,7 +189,11 @@ export function RepoView({
             <CreateWorktreePagePane
               repoId={repoId}
               trafficLightOffset={workspaceTrafficLightOffset}
-              onCancel={() => onOpenRepoDashboard?.(repo.id)}
+              onCancel={() => {
+                if (onCancelRepoNewWorktree) onCancelRepoNewWorktree(repo.id)
+                else onOpenRepoDashboard?.(repo.id)
+              }}
+              onCreated={(branchName) => onReplaceRepoBranch?.(repo.id, branchName)}
             />
           ) : (
             <RepoWorkspace

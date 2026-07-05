@@ -19,6 +19,10 @@ const responsiveMocks = vi.hoisted(() => ({
 const branchNavigatorMocks = vi.hoisted(() => ({
   activate: vi.fn<(repoId: string) => void>(),
 }))
+const createWorktreePageMocks = vi.hoisted(() => ({
+  cancel: vi.fn<() => void>(),
+  created: vi.fn<(branchName: string) => void>(),
+}))
 
 vi.mock('#/web/hooks/useResponsiveUiMode.tsx', () => ({
   useResponsiveUiMode: () => responsiveMocks.mode,
@@ -58,6 +62,29 @@ vi.mock('#/web/components/RepoWorkspace.tsx', () => ({
       data-shortcuts-enabled={shortcutsEnabled ? 'true' : 'false'}
       data-traffic-light-offset={toolbarTrafficLightOffset ? 'true' : 'false'}
     />
+  ),
+}))
+
+vi.mock('#/web/components/repo-pages/CreateWorktreePagePane.tsx', () => ({
+  CreateWorktreePagePane: ({ onCancel, onCreated }: { onCancel: () => void; onCreated: (branchName: string) => void }) => (
+    <div data-testid="create-worktree-page">
+      <button
+        type="button"
+        data-testid="create-worktree-cancel"
+        onClick={() => {
+          createWorktreePageMocks.cancel()
+          onCancel()
+        }}
+      />
+      <button
+        type="button"
+        data-testid="create-worktree-created"
+        onClick={() => {
+          createWorktreePageMocks.created('feature/new-worktree')
+          onCreated('feature/new-worktree')
+        }}
+      />
+    </div>
   ),
 }))
 
@@ -154,6 +181,8 @@ beforeEach(() => {
 
 afterEach(() => {
   branchNavigatorMocks.activate.mockReset()
+  createWorktreePageMocks.cancel.mockReset()
+  createWorktreePageMocks.created.mockReset()
   vi.restoreAllMocks()
 })
 
@@ -193,6 +222,42 @@ describe('RepoView workspace navigation', () => {
   test('route branch view leaves store selection unchanged when read model is ready', () => {
     render(<RepoView repoId={REPO_ID} routeView={{ kind: 'branch', repoId: REPO_ID, branchName: 'feature/a' }} />)
 
+  })
+
+  test('new worktree page cancel returns to the stored source route', () => {
+    const onCancelRepoNewWorktree = vi.fn()
+    const onOpenRepoDashboard = vi.fn()
+    const { container } = render(
+      <RepoView
+        repoId={REPO_ID}
+        routeView={{ kind: 'newWorktree', repoId: REPO_ID }}
+        onCancelRepoNewWorktree={onCancelRepoNewWorktree}
+        onOpenRepoDashboard={onOpenRepoDashboard}
+      />,
+    )
+
+    buttonByTestId(container, 'create-worktree-cancel')?.click()
+
+    expect(onCancelRepoNewWorktree).toHaveBeenCalledWith(REPO_ID)
+    expect(onOpenRepoDashboard).not.toHaveBeenCalled()
+  })
+
+  test('new worktree page creation replaces the form route with the created branch route', () => {
+    const onCancelRepoNewWorktree = vi.fn()
+    const onReplaceRepoBranch = vi.fn()
+    const { container } = render(
+      <RepoView
+        repoId={REPO_ID}
+        routeView={{ kind: 'newWorktree', repoId: REPO_ID }}
+        onCancelRepoNewWorktree={onCancelRepoNewWorktree}
+        onReplaceRepoBranch={onReplaceRepoBranch}
+      />,
+    )
+
+    buttonByTestId(container, 'create-worktree-created')?.click()
+
+    expect(onReplaceRepoBranch).toHaveBeenCalledWith(REPO_ID, 'feature/new-worktree')
+    expect(onCancelRepoNewWorktree).not.toHaveBeenCalled()
   })
 
   test('large-screen Zen Mode uses Branch Navigator until a branch opens a collapsed split workspace', () => {
@@ -728,6 +793,10 @@ function render(element: React.ReactNode) {
 
 function branchNavigator(container: HTMLElement): HTMLButtonElement | null {
   return container.querySelector<HTMLButtonElement>('[data-testid="branch-navigator"]')
+}
+
+function buttonByTestId(container: HTMLElement, testId: string): HTMLButtonElement | null {
+  return container.querySelector<HTMLButtonElement>(`[data-testid="${testId}"]`)
 }
 
 function repoWorkspace(container: HTMLElement): HTMLElement | null {

@@ -31,7 +31,7 @@ import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo
 import { cn } from '#/web/lib/cn.ts'
 import {
   deriveCreateWorktreeForm,
-  type CreateWorktreeDialogMode,
+  type CreateWorktreeMode,
   type CreateWorktreeRequest,
 } from '#/web/components/create-worktree-dialog/create-worktree-dialog.logic.ts'
 import type { WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
@@ -40,21 +40,21 @@ const MODE_OPTIONS = [
   { id: 'newBranch', labelKey: 'action.create-worktree-mode-new', icon: GitBranchPlus },
   { id: 'existingBranch', labelKey: 'action.create-worktree-mode-existing', icon: GitBranch },
   { id: 'trackRemoteBranch', labelKey: 'action.create-worktree-mode-remote', icon: RadioTower },
-] satisfies Array<{ id: CreateWorktreeDialogMode; labelKey: string; icon: LucideIcon }>
+] satisfies Array<{ id: CreateWorktreeMode; labelKey: string; icon: LucideIcon }>
 
-type CreateWorktreeDialogRepoShell = RepoState
-type CreateWorktreeDialogRepo = RepoState & { branchModel: RepoBranchReadModelData }
+type CreateWorktreeRepoShell = RepoState
+type CreateWorktreeRepo = RepoState & { branchModel: RepoBranchReadModelData }
 
 interface Props {
   open: boolean
-  repo: CreateWorktreeDialogRepoShell
+  repo: CreateWorktreeRepoShell
   worktreeBootstrap?: WorktreeBootstrapPromptState
   onClose: () => void
   onCreate: (request: CreateWorktreeRequest) => boolean | void | Promise<boolean | void>
 }
 
 type ContentProps = Omit<Props, 'repo'> & {
-  repo: CreateWorktreeDialogRepo
+  repo: CreateWorktreeRepo
 }
 
 export interface WorktreeBootstrapPromptState {
@@ -129,7 +129,7 @@ export function CreateWorktreePageSurface({
 
 interface CreateWorktreeFormSurfaceProps {
   active: boolean
-  repo: CreateWorktreeDialogRepo
+  repo: CreateWorktreeRepo
   worktreeBootstrap?: WorktreeBootstrapPromptState
   onCancel: () => void
   onCreate: (request: CreateWorktreeRequest) => boolean | void | Promise<boolean | void>
@@ -145,7 +145,7 @@ export function CreateWorktreeFormSurface({
   const t = useT()
   const compact = useIsCompactUi()
 
-  const [mode, setMode] = useState<CreateWorktreeDialogMode>('newBranch')
+  const [mode, setMode] = useState<CreateWorktreeMode>('newBranch')
   const initialBase = repo.branchModel.currentBranch || repo.branchModel.branches[0]?.name || ''
   const [base, setBase] = useState<string>(initialBase)
   const [branch, setBranch] = useState('')
@@ -227,7 +227,7 @@ export function CreateWorktreeFormSurface({
             type="single"
             value={mode}
             onValueChange={(next) => {
-              if (next) setMode(next as CreateWorktreeDialogMode)
+              if (next) setMode(next as CreateWorktreeMode)
             }}
             variant="outline"
             size="sm"

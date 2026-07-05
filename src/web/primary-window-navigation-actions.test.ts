@@ -107,5 +107,6 @@ function routeNavigation(): PrimaryWindowRouteNavigation {
     openRepoDashboard: vi.fn(),
     openRepoBranch: vi.fn(),
     openRepoNewWorktree: vi.fn(),
+    cancelRepoNewWorktree: vi.fn(),
   }
 }
