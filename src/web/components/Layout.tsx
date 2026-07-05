@@ -4,26 +4,28 @@ import { SplitPane } from '#/web/components/SplitPane.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import { DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import type { RepoWorkspaceMode } from '#/web/lib/workspace-layout.ts'
-import { WORKSPACE_PANE_MOTION_STYLE } from '#/web/components/workspace-motion.ts'
+import { WORKSPACE_PANE_MOTION_STYLE, WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { REPO_SIDEBAR_MIN_WIDTH, REPO_WORKSPACE_MIN_WIDTH } from '#/web/components/repo-layout/sidebar-sizing.ts'
+import { useRetainedValueDuringExit } from '#/web/hooks/useRetainedValueDuringExit.ts'
 
 interface ShellProps {
   children: ReactNode
 }
 
 interface RepoWorkspaceProps {
-  branchNavigatorPane: ReactNode
+  sidebarPane: ReactNode
   repoWorkspacePane: ReactNode
   mode?: RepoWorkspaceMode
-  branchNavigatorCollapsed?: boolean
+  sidebarCollapsed?: boolean
   workspacePaneSize?: number
   onWorkspacePaneSizeChange?: (size: number) => void
 }
 
 interface CompactRepoWorkspaceProps {
   activePane: 'navigator' | 'workspace'
-  branchNavigatorPane: ReactNode
+  sidebarPane: ReactNode
   repoWorkspacePane: ReactNode
+  transitionScopeKey?: unknown
 }
 
 interface PaneProps {
@@ -38,10 +40,10 @@ interface EmptyStateProps {
 }
 
 export function RepoWorkspace({
-  branchNavigatorPane,
+  sidebarPane,
   repoWorkspacePane,
   mode = 'split',
-  branchNavigatorCollapsed = false,
+  sidebarCollapsed = false,
   workspacePaneSize = DEFAULT_WORKSPACE_PANE_SIZE,
   onWorkspacePaneSizeChange,
 }: RepoWorkspaceProps) {
@@ -49,16 +51,16 @@ export function RepoWorkspace({
 
   return (
     <SplitPane
-      before={branchNavigatorPane}
+      before={sidebarPane}
       after={repoWorkspacePane}
       afterSize={workspacePaneSize}
       onAfterSizeChange={onWorkspacePaneSizeChange}
-      beforeCollapsed={branchNavigatorCollapsed}
+      beforeCollapsed={sidebarCollapsed}
       animateBeforeCollapse
       beforeMinSize={REPO_SIDEBAR_MIN_WIDTH}
       beforeContentMinSize={REPO_SIDEBAR_MIN_WIDTH}
       afterMinSize={REPO_WORKSPACE_MIN_WIDTH}
-      afterMaxSize={branchNavigatorCollapsed ? undefined : '90%'}
+      afterMaxSize={sidebarCollapsed ? undefined : '90%'}
       className="flex-1"
     />
   )
@@ -70,10 +72,23 @@ export function RepoWorkspacePane({ children }: PaneProps) {
 
 export function CompactRepoWorkspace({
   activePane,
-  branchNavigatorPane,
+  sidebarPane,
   repoWorkspacePane,
+  transitionScopeKey,
 }: CompactRepoWorkspaceProps) {
   const workspaceActive = activePane === 'workspace'
+  const retainedSidebarPane = useRetainedValueDuringExit({
+    value: { content: sidebarPane },
+    active: !workspaceActive,
+    retainMs: WORKSPACE_PANE_TRANSITION_MS,
+    resetKey: transitionScopeKey,
+  })
+  const retainedWorkspacePane = useRetainedValueDuringExit({
+    value: { content: repoWorkspacePane },
+    active: workspaceActive,
+    retainMs: WORKSPACE_PANE_TRANSITION_MS,
+    resetKey: transitionScopeKey,
+  })
 
   return (
     <div
@@ -88,7 +103,7 @@ export function CompactRepoWorkspace({
         inert={workspaceActive || undefined}
         className="goblin-compact-workspace__pane goblin-compact-workspace__pane--navigator absolute inset-0 flex min-h-0 min-w-0 bg-background"
       >
-        {branchNavigatorPane}
+        {workspaceActive ? (retainedSidebarPane?.content ?? sidebarPane) : sidebarPane}
       </div>
       <div
         data-compact-workspace-pane="workspace"
@@ -96,7 +111,7 @@ export function CompactRepoWorkspace({
         inert={!workspaceActive || undefined}
         className="goblin-compact-workspace__pane goblin-compact-workspace__pane--workspace absolute inset-0 flex min-h-0 min-w-0 bg-background"
       >
-        {repoWorkspacePane}
+        {workspaceActive ? repoWorkspacePane : (retainedWorkspacePane?.content ?? repoWorkspacePane)}
       </div>
     </div>
   )

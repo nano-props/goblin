@@ -9,6 +9,7 @@ export interface PrimaryWindowRouteNavigation {
   openHome: () => void
   openSettings: (page: SettingsPage) => void
   closeSettings: () => void
+  openRepoRoot: (repoId: string) => void
   openRepoDashboard: (repoId: string) => void
   openRepoBranch: (repoId: string, branchName: string, options?: { replace?: boolean }) => void
   openRepoNewWorktree: (repoId: string) => void
@@ -37,6 +38,10 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
       const href = returnToFromHref(router?.state.location.href ?? null)
       if (href) router?.history.push(href)
       else void router?.navigate({ to: '/' })
+    },
+    openRepoRoot(repoId) {
+      const repoSlug = repoSlugForId(repoId)
+      if (repoSlug) void router?.navigate({ to: '/repo/$repoSlug', params: { repoSlug } })
     },
     openRepoDashboard(repoId) {
       const repoSlug = repoSlugForId(repoId)
@@ -67,7 +72,7 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
       if (href) router?.history.push(href)
       else {
         const repoSlug = repoSlugForId(repoId)
-        if (repoSlug) void router?.navigate({ to: '/repo/$repoSlug/dashboard', params: { repoSlug } })
+        if (repoSlug) void router?.navigate({ to: '/repo/$repoSlug', params: { repoSlug } })
       }
     },
   }), [router])

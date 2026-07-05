@@ -66,8 +66,16 @@ vi.mock('#/web/components/RepoWorkspace.tsx', () => ({
 }))
 
 vi.mock('#/web/components/repo-pages/CreateWorktreePagePane.tsx', () => ({
-  CreateWorktreePagePane: ({ onCancel, onCreated }: { onCancel: () => void; onCreated: (branchName: string) => void }) => (
-    <div data-testid="create-worktree-page">
+  CreateWorktreePagePane: ({
+    compact,
+    onCancel,
+    onCreated,
+  }: {
+    compact?: boolean
+    onCancel: () => void
+    onCreated: (branchName: string) => void
+  }) => (
+    <div data-testid="create-worktree-page" data-compact={compact ? 'true' : 'false'}>
       <button
         type="button"
         data-testid="create-worktree-cancel"
@@ -110,25 +118,25 @@ vi.mock('#/web/components/WorkspaceZenModeToggle.tsx', () => ({
 vi.mock('#/web/components/Layout.tsx', () => ({
   RepoWorkspace: ({
     mode,
-    branchNavigatorCollapsed,
-    branchNavigatorPane,
+    sidebarCollapsed,
+    sidebarPane,
     repoWorkspacePane,
   }: {
     mode?: 'split' | 'single-pane'
-    branchNavigatorCollapsed?: boolean
-    branchNavigatorPane: React.ReactNode
+    sidebarCollapsed?: boolean
+    sidebarPane: React.ReactNode
     repoWorkspacePane: React.ReactNode
   }) => (
     <div
       data-testid="repo-workspace-layout"
       data-mode={mode ?? 'split'}
-      data-branch-navigator-collapsed={branchNavigatorCollapsed ? 'true' : 'false'}
+      data-sidebar-collapsed={sidebarCollapsed ? 'true' : 'false'}
     >
       {mode === 'single-pane' ? (
         repoWorkspacePane
       ) : (
         <>
-          {branchNavigatorPane}
+          {sidebarPane}
           {repoWorkspacePane}
         </>
       )}
@@ -137,16 +145,16 @@ vi.mock('#/web/components/Layout.tsx', () => ({
   RepoWorkspacePane: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   CompactRepoWorkspace: ({
     activePane,
-    branchNavigatorPane,
+    sidebarPane,
     repoWorkspacePane,
   }: {
     activePane: 'navigator' | 'workspace'
-    branchNavigatorPane: React.ReactNode
+    sidebarPane: React.ReactNode
     repoWorkspacePane: React.ReactNode
   }) => (
     <div data-compact-workspace="" data-active-pane={activePane}>
       <div data-compact-workspace-pane="navigator" aria-hidden={activePane === 'workspace' ? 'true' : undefined}>
-        {branchNavigatorPane}
+        {sidebarPane}
       </div>
       <div data-compact-workspace-pane="workspace" aria-hidden={activePane === 'navigator' ? 'true' : undefined}>
         {repoWorkspacePane}
@@ -242,6 +250,24 @@ describe('RepoView workspace navigation', () => {
     expect(onOpenRepoDashboard).not.toHaveBeenCalled()
   })
 
+  test('new worktree page cancel falls back to repo root when route cancel is unavailable', () => {
+    const onOpenRepoRoot = vi.fn()
+    const onOpenRepoDashboard = vi.fn()
+    const { container } = render(
+      <RepoView
+        repoId={REPO_ID}
+        routeView={{ kind: 'newWorktree', repoId: REPO_ID }}
+        onOpenRepoRoot={onOpenRepoRoot}
+        onOpenRepoDashboard={onOpenRepoDashboard}
+      />,
+    )
+
+    buttonByTestId(container, 'create-worktree-cancel')?.click()
+
+    expect(onOpenRepoRoot).toHaveBeenCalledWith(REPO_ID)
+    expect(onOpenRepoDashboard).not.toHaveBeenCalled()
+  })
+
   test('new worktree page creation replaces the form route with the created branch route', () => {
     const onCancelRepoNewWorktree = vi.fn()
     const onReplaceRepoBranch = vi.fn()
@@ -260,6 +286,61 @@ describe('RepoView workspace navigation', () => {
     expect(onCancelRepoNewWorktree).not.toHaveBeenCalled()
   })
 
+  test('compact repo root keeps the navigator visible with an empty workspace pane hidden', () => {
+    responsiveMocks.mode = 'compact'
+
+    const { container } = render(<RepoView repoId={REPO_ID} routeView={{ kind: 'empty', repoId: REPO_ID }} />)
+
+    expect(compactWorkspace(container)?.dataset.activePane).toBe('navigator')
+    expect(compactPane(container, 'navigator')?.getAttribute('aria-hidden')).toBeNull()
+    expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBe('true')
+    expect(branchNavigator(container)).not.toBeNull()
+    expect(container.querySelector('[data-testid="repo-empty-workspace-pane"]')).not.toBeNull()
+    expect(repoWorkspace(container)).toBeNull()
+  })
+
+  test('large-screen Zen Mode repo root keeps the sidebar as the active single pane', () => {
+    useReposStore.getState().setZenMode(true)
+
+    const { container } = render(<RepoView repoId={REPO_ID} routeView={{ kind: 'empty', repoId: REPO_ID }} />)
+
+    expect(workspace(container)).toBeNull()
+    expect(branchNavigator(container)).not.toBeNull()
+    expect(container.querySelector('[data-testid="repo-empty-workspace-pane"]')).toBeNull()
+  })
+
+  test('compact dashboard page shows the workspace pane and returns to repo root', () => {
+    responsiveMocks.mode = 'compact'
+    const onOpenRepoRoot = vi.fn()
+
+    const { container } = render(
+      <RepoView
+        repoId={REPO_ID}
+        routeView={{ kind: 'dashboard', repoId: REPO_ID }}
+        onOpenRepoRoot={onOpenRepoRoot}
+      />,
+    )
+
+    expect(compactWorkspace(container)?.dataset.activePane).toBe('workspace')
+    expect(compactPane(container, 'navigator')?.getAttribute('aria-hidden')).toBe('true')
+    expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBeNull()
+
+    buttonByLabel(container, 'workspace.back-to-branch-navigator')?.click()
+
+    expect(onOpenRepoRoot).toHaveBeenCalledWith(REPO_ID)
+  })
+
+  test('compact new worktree page shows the workspace pane with compact page chrome', () => {
+    responsiveMocks.mode = 'compact'
+
+    const { container } = render(
+      <RepoView repoId={REPO_ID} routeView={{ kind: 'newWorktree', repoId: REPO_ID }} />,
+    )
+
+    expect(compactWorkspace(container)?.dataset.activePane).toBe('workspace')
+    expect(container.querySelector<HTMLElement>('[data-testid="create-worktree-page"]')?.dataset.compact).toBe('true')
+  })
+
   test('large-screen Zen Mode uses Branch Navigator until a branch opens a collapsed split workspace', () => {
     useReposStore.getState().setZenMode(true)
     const { container, rerender } = render(<RepoView repoId={REPO_ID} />)
@@ -275,7 +356,7 @@ describe('RepoView workspace navigation', () => {
 
     expect(branchNavigator(container)).not.toBeNull()
     expect(workspace(container)?.dataset.mode).toBe('split')
-    expect(workspace(container)?.dataset.branchNavigatorCollapsed).toBe('true')
+    expect(workspace(container)?.dataset.sidebarCollapsed).toBe('true')
     expect(repoWorkspace(container)).not.toBeNull()
     expect(repoWorkspace(container)?.dataset.trafficLightOffset).toBe('true')
     expect(zenModeSidebarTrigger(container)).not.toBeNull()
@@ -590,7 +671,7 @@ describe('RepoView workspace navigation', () => {
         useReposStore.getState().setZenMode(false)
       })
 
-      expect(workspace(container)?.dataset.branchNavigatorCollapsed).toBe('false')
+      expect(workspace(container)?.dataset.sidebarCollapsed).toBe('false')
       expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
       expect(zenModeSidebarReveal(container)?.dataset.interactive).toBe('false')
       expect(zenModeSidebarReveal(container)?.getAttribute('aria-hidden')).toBe('true')
@@ -728,7 +809,7 @@ describe('RepoView workspace navigation', () => {
 
     const { container } = render(branchRepoView())
 
-    expect(workspace(container)?.dataset.branchNavigatorCollapsed).toBe('true')
+    expect(workspace(container)?.dataset.sidebarCollapsed).toBe('true')
     expect(zenModeSidebarReveal(container)).not.toBeNull()
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
   })
@@ -750,7 +831,7 @@ describe('RepoView workspace navigation', () => {
 
     const { container } = render(branchRepoView())
 
-    expect(workspace(container)?.dataset.branchNavigatorCollapsed).toBe('true')
+    expect(workspace(container)?.dataset.sidebarCollapsed).toBe('true')
     expect(zenModeSidebarReveal(container)).not.toBeNull()
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
   })
@@ -797,6 +878,10 @@ function branchNavigator(container: HTMLElement): HTMLButtonElement | null {
 
 function buttonByTestId(container: HTMLElement, testId: string): HTMLButtonElement | null {
   return container.querySelector<HTMLButtonElement>(`[data-testid="${testId}"]`)
+}
+
+function buttonByLabel(container: HTMLElement, label: string): HTMLButtonElement | null {
+  return container.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`)
 }
 
 function repoWorkspace(container: HTMLElement): HTMLElement | null {

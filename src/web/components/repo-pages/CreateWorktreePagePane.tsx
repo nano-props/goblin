@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { GitBranchPlus } from 'lucide-react'
-import { CreateWorktreePageSurface } from '#/web/components/create-worktree/CreateWorktreeSurface.tsx'
+import { CreateWorktreePageBody } from '#/web/components/create-worktree/CreateWorktreeSurface.tsx'
 import type { CreateWorktreeRequest } from '#/web/components/create-worktree/create-worktree.logic.ts'
 import {
   isConfigTrustStateLoading,
@@ -9,7 +9,7 @@ import {
   resolveWorktreeBootstrapDecision,
 } from '#/web/components/create-worktree/create-worktree-bootstrap-host.logic.ts'
 import { ScrollPane } from '#/web/components/Layout.tsx'
-import { RepoPageToolbar } from '#/web/components/repo-pages/RepoPageToolbar.tsx'
+import { RepoPageLoadingBody, RepoPagePane } from '#/web/components/repo-pages/RepoPagePane.tsx'
 import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
 import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
 import { useSettingsSnapshotReadModel } from '#/web/settings-queries.ts'
@@ -19,12 +19,19 @@ import type { WorktreeBootstrapDecision, WorktreeBootstrapPreview } from '#/shar
 
 interface CreateWorktreePagePaneProps {
   repoId: string
+  compact?: boolean
   trafficLightOffset?: boolean
   onCancel: () => void
   onCreated: (branchName: string) => void
 }
 
-export function CreateWorktreePagePane({ repoId, trafficLightOffset = false, onCancel, onCreated }: CreateWorktreePagePaneProps) {
+export function CreateWorktreePagePane({
+  repoId,
+  compact = false,
+  trafficLightOffset = false,
+  onCancel,
+  onCreated,
+}: CreateWorktreePagePaneProps) {
   const t = useT()
   const liveRepo = useReposStore((s) => s.repos[repoId])
   const runBranchAction = useReposStore((s) => s.runBranchAction)
@@ -38,7 +45,7 @@ export function CreateWorktreePagePane({ repoId, trafficLightOffset = false, onC
   const repoInstanceId = liveRepo?.instanceId ?? null
 
   useEffect(() => {
-    if (!liveRepo || repoInstanceId === null) {
+    if (repoInstanceId === null) {
       setBootstrapPreview(null)
       setBootstrapPreviewError(false)
       setBootstrapPreviewLoading(false)
@@ -73,9 +80,15 @@ export function CreateWorktreePagePane({ repoId, trafficLightOffset = false, onC
       ignore = true
       controller.abort()
     }
-  }, [liveRepo, repoId, repoInstanceId])
+  }, [repoId, repoInstanceId])
 
-  if (!liveRepo || !branchReadModel) return null
+  if (!liveRepo || !branchReadModel) {
+    return (
+      <CreateWorktreePageShell compact={compact} trafficLightOffset={trafficLightOffset} onBack={onCancel}>
+        <RepoPageLoadingBody />
+      </CreateWorktreePageShell>
+    )
+  }
 
   const bootstrapConfigHash = bootstrapPreview?.configHash ?? null
   const serverConfigTrusted = resolveConfigTrusted({
@@ -136,17 +149,41 @@ export function CreateWorktreePagePane({ repoId, trafficLightOffset = false, onC
   }
 
   return (
-    <>
-      <RepoPageToolbar icon={GitBranchPlus} label={t('action.create-worktree-title')} trafficLightOffset={trafficLightOffset} />
+    <CreateWorktreePageShell compact={compact} trafficLightOffset={trafficLightOffset} onBack={onCancel}>
       <ScrollPane>
-        <CreateWorktreePageSurface
+        <CreateWorktreePageBody
           repo={{ ...liveRepo, branchModel: branchReadModel }}
           worktreeBootstrap={worktreeBootstrap}
           onCancel={onCancel}
           onCreate={handleCreateWorktree}
         />
       </ScrollPane>
-    </>
+    </CreateWorktreePageShell>
+  )
+}
+
+function CreateWorktreePageShell({
+  compact,
+  trafficLightOffset,
+  onBack,
+  children,
+}: {
+  compact: boolean
+  trafficLightOffset: boolean
+  onBack: () => void
+  children: ReactNode
+}) {
+  const t = useT()
+  return (
+    <RepoPagePane
+      icon={GitBranchPlus}
+      label={t('action.create-worktree-title')}
+      compact={compact}
+      trafficLightOffset={trafficLightOffset}
+      onBack={onBack}
+    >
+      {children}
+    </RepoPagePane>
   )
 }
 

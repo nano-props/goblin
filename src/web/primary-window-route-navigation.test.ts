@@ -8,6 +8,12 @@ describe('primary window route navigation helpers', () => {
     })
   })
 
+  test('records repo root as a return target when opening new worktree from the empty repo route', () => {
+    expect(routeReturnSearch('/repo/repo-slug', '/repo/repo-slug/worktree/new')).toEqual({
+      returnTo: '/repo/repo-slug',
+    })
+  })
+
   test('does not record the current route as its own return target', () => {
     expect(routeReturnSearch('/repo/repo-slug/worktree/new', '/repo/repo-slug/worktree/new')).toEqual({})
   })

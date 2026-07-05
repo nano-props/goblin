@@ -5,7 +5,7 @@ import { userEvent } from '@testing-library/user-event'
 import { QueryClientProvider } from '@tanstack/react-query'
 import type { ReactElement } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { CreateWorktreePageSurface } from '#/web/components/create-worktree/CreateWorktreeSurface.tsx'
+import { CreateWorktreePageBody } from '#/web/components/create-worktree/CreateWorktreeSurface.tsx'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { getRepoRemoteBranches } from '#/web/repo-client.ts'
@@ -13,6 +13,7 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
 import { createRepoBranch, repoPresentationForTest } from '#/web/test-utils/bridge.ts'
 import type { RepoPresentationForTest } from '#/web/test-utils/bridge.ts'
+import type { WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
 
 vi.mock('#/web/repo-client.ts', async () => {
   const actual = await vi.importActual<typeof import('#/web/repo-client.ts')>('#/web/repo-client.ts')
@@ -48,10 +49,16 @@ function render(ui: ReactElement) {
   return rtlRender(<QueryClientProvider client={primaryWindowQueryClient}>{ui}</QueryClientProvider>)
 }
 
-describe('CreateWorktreePageSurface', () => {
+describe('CreateWorktreePageBody', () => {
+  test('does not steal focus when the page mounts', () => {
+    render(<CreateWorktreePageBody repo={createRepo()} onCancel={vi.fn()} onCreate={vi.fn()} />)
+
+    expect(document.activeElement).toBe(document.body)
+  })
+
   test('disables submit until the form is valid', async () => {
     const user = userEvent.setup()
-    render(<CreateWorktreePageSurface repo={createRepo()} onCancel={vi.fn()} onCreate={vi.fn()} />)
+    render(<CreateWorktreePageBody repo={createRepo()} onCancel={vi.fn()} onCreate={vi.fn()} />)
 
     const submitButton = screen.getByRole('button', { name: /action.create-worktree-confirm/i }) as HTMLButtonElement
     expect(submitButton.disabled).toBe(true)
@@ -65,7 +72,7 @@ describe('CreateWorktreePageSurface', () => {
 
   test('shows an error when the new branch name already exists', async () => {
     const user = userEvent.setup()
-    render(<CreateWorktreePageSurface repo={createRepo()} onCancel={vi.fn()} onCreate={vi.fn()} />)
+    render(<CreateWorktreePageBody repo={createRepo()} onCancel={vi.fn()} onCreate={vi.fn()} />)
 
     await user.type(screen.getByRole('textbox', { name: /action.create-worktree-branch-label/i }), 'main')
 
@@ -79,7 +86,7 @@ describe('CreateWorktreePageSurface', () => {
     const onCancel = vi.fn()
     const onCreate = vi.fn(() => Promise.resolve())
 
-    render(<CreateWorktreePageSurface repo={createRepo()} onCancel={onCancel} onCreate={onCreate} />)
+    render(<CreateWorktreePageBody repo={createRepo()} onCancel={onCancel} onCreate={onCreate} />)
 
     await user.type(screen.getByRole('textbox', { name: /action.create-worktree-branch-label/i }), 'feature/new')
     await user.click(screen.getByRole('button', { name: /action.create-worktree-confirm/i }))
@@ -97,7 +104,7 @@ describe('CreateWorktreePageSurface', () => {
     const user = userEvent.setup()
     const onCreate = vi.fn(async () => {})
 
-    render(<CreateWorktreePageSurface repo={createRepo()} onCancel={vi.fn()} onCreate={onCreate} />)
+    render(<CreateWorktreePageBody repo={createRepo()} onCancel={vi.fn()} onCreate={onCreate} />)
 
     await user.click(screen.getByRole('radio', { name: /action.create-worktree-mode-existing/i }))
     await waitFor(() => {
@@ -115,7 +122,7 @@ describe('CreateWorktreePageSurface', () => {
     const user = userEvent.setup()
     const onCreate = vi.fn(async () => {})
 
-    render(<CreateWorktreePageSurface repo={createRemoteRepo()} onCancel={vi.fn()} onCreate={onCreate} />)
+    render(<CreateWorktreePageBody repo={createRemoteRepo()} onCancel={vi.fn()} onCreate={onCreate} />)
 
     await user.click(screen.getByRole('radio', { name: /action.create-worktree-mode-remote/i }))
     await waitFor(() => {
@@ -139,7 +146,7 @@ describe('CreateWorktreePageSurface', () => {
     const user = userEvent.setup()
     const onCreate = vi.fn(async () => {})
 
-    render(<CreateWorktreePageSurface repo={createRemoteRepo()} onCancel={vi.fn()} onCreate={onCreate} />)
+    render(<CreateWorktreePageBody repo={createRemoteRepo()} onCancel={vi.fn()} onCreate={onCreate} />)
 
     await user.type(screen.getByRole('textbox', { name: /action.create-worktree-branch-label/i }), 'feature/new')
     const pathInput = screen.getByRole('textbox', { name: /action.create-worktree-path-label/i })
@@ -153,6 +160,50 @@ describe('CreateWorktreePageSurface', () => {
         mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'main' },
       },
     })
+  })
+
+  test('reserves the trust prompt row even when the prompt is hidden', () => {
+    const { container } = render(
+      <CreateWorktreePageBody
+        repo={createRepo()}
+        worktreeBootstrap={{
+          loading: false,
+          preview: null,
+          error: false,
+          configTrusted: false,
+          onConfigTrustedChange: vi.fn(),
+        }}
+        onCancel={vi.fn()}
+        onCreate={vi.fn()}
+      />,
+    )
+
+    expect(container.querySelector('.min-h-6')).not.toBeNull()
+    expect(screen.queryByText(/action.create-worktree-bootstrap-config-trusted/i)).not.toBeNull()
+  })
+
+  test('shows the trust prompt in the reserved row when bootstrap operations are present', () => {
+    const preview = {
+      hasOperations: true,
+      configHash: 'config-hash',
+    } as WorktreeBootstrapPreview
+
+    render(
+      <CreateWorktreePageBody
+        repo={createRepo()}
+        worktreeBootstrap={{
+          loading: false,
+          preview,
+          error: false,
+          configTrusted: false,
+          onConfigTrustedChange: vi.fn(),
+        }}
+        onCancel={vi.fn()}
+        onCreate={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText(/action.create-worktree-bootstrap-config-trusted/i)).toBeTruthy()
   })
 })
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { initialRepoRouteSlugFromStore } from '#/web/primary-window-router.tsx'
+import { initialRepoRouteSlugFromStore, repoRouteViewFromChildRoute } from '#/web/primary-window-router.tsx'
 import { repoSlugFromId } from '#/web/repo-route-slugs.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 
@@ -42,5 +42,30 @@ describe('primary window initial route', () => {
         sessionReady: true,
       }),
     ).toBe(repoSlugFromId('/repo-a'))
+  })
+})
+
+describe('repo route view derivation', () => {
+  test('uses the repo root as an empty route view', () => {
+    expect(repoRouteViewFromChildRoute('/repo', { dashboard: false, branchSlug: null, newWorktree: false })).toEqual({
+      kind: 'empty',
+      repoId: '/repo',
+    })
+  })
+
+  test('maps repo child routes to stable repo route views', () => {
+    expect(repoRouteViewFromChildRoute('/repo', { dashboard: true, branchSlug: null, newWorktree: false })).toEqual({
+      kind: 'dashboard',
+      repoId: '/repo',
+    })
+    expect(repoRouteViewFromChildRoute('/repo', { dashboard: false, branchSlug: null, newWorktree: true })).toEqual({
+      kind: 'newWorktree',
+      repoId: '/repo',
+    })
+    expect(repoRouteViewFromChildRoute('/repo', { dashboard: false, branchSlug: 'ZmVhdHVyZS9h', newWorktree: false })).toEqual({
+      kind: 'branch',
+      repoId: '/repo',
+      branchName: 'feature/a',
+    })
   })
 })

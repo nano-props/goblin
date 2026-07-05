@@ -21,7 +21,7 @@ interface Props {
   currentBranchName?: string | null
   shortcutsEnabled?: boolean
   toolbarTrafficLightOffset?: boolean
-  onBackToRepoDashboard?: () => void
+  onBackToBranchNavigator?: () => void
 }
 
 // Keep this equality in sync with fields read by RepoWorkspace children.
@@ -56,7 +56,7 @@ export function RepoWorkspace({
   currentBranchName,
   shortcutsEnabled = true,
   toolbarTrafficLightOffset = false,
-  onBackToRepoDashboard,
+  onBackToBranchNavigator,
 }: Props) {
   const workspacePaneId = useId()
   const repoShell = useStoreWithEqualityFn(
@@ -100,7 +100,7 @@ export function RepoWorkspace({
         workspacePaneId={workspacePaneId}
         shortcutsEnabled={shortcutsEnabled}
         toolbarTrafficLightOffset={toolbarTrafficLightOffset}
-        onBackToRepoDashboard={onBackToRepoDashboard}
+        onBackToBranchNavigator={onBackToBranchNavigator}
       />
   )
 }
@@ -110,13 +110,13 @@ function RepoWorkspaceLoaded({
   workspacePaneId,
   shortcutsEnabled,
   toolbarTrafficLightOffset,
-  onBackToRepoDashboard,
+  onBackToBranchNavigator,
 }: {
   repoShell: RepoWorkspaceRepoShell
   workspacePaneId: string
   shortcutsEnabled: boolean
   toolbarTrafficLightOffset: boolean
-  onBackToRepoDashboard?: () => void
+  onBackToBranchNavigator?: () => void
 }) {
   const statusReadModel = useRepoStatusReadModel(repoShell.id, repoShell.instanceId, true)
   const branchReadModel = useRepoBranchReadModel(repoShell.id, repoShell.instanceId, true)
@@ -161,7 +161,7 @@ function RepoWorkspaceLoaded({
           workspacePaneId={workspacePaneId}
           shortcutsEnabled={shortcutsEnabled}
           toolbarTrafficLightOffset={toolbarTrafficLightOffset}
-          onBackToRepoDashboard={onBackToRepoDashboard}
+          onBackToBranchNavigator={onBackToBranchNavigator}
         />
       ) : (
         <RepoWorkspacePane
@@ -169,7 +169,7 @@ function RepoWorkspaceLoaded({
           detail={detail}
           workspacePaneId={workspacePaneId}
           toolbarTrafficLightOffset={toolbarTrafficLightOffset}
-          onBackToRepoDashboard={onBackToRepoDashboard}
+          onBackToBranchNavigator={onBackToBranchNavigator}
         />
       )}
     </section>
@@ -182,7 +182,7 @@ interface RepoWorkspacePaneProps {
   workspacePaneId: string
   toolbarTrafficLightOffset?: boolean
   branchActions?: BranchActions
-  onBackToRepoDashboard?: () => void
+  onBackToBranchNavigator?: () => void
 }
 
 function RepoWorkspacePane({
@@ -191,7 +191,7 @@ function RepoWorkspacePane({
   workspacePaneId,
   toolbarTrafficLightOffset = false,
   branchActions,
-  onBackToRepoDashboard,
+  onBackToBranchNavigator,
 }: RepoWorkspacePaneProps) {
   const workspacePaneTabModel = useRepoWorkspaceTabModel(repo, detail)
 
@@ -204,7 +204,7 @@ function RepoWorkspacePane({
         trafficLightOffset={toolbarTrafficLightOffset}
         workspacePaneTabModel={workspacePaneTabModel}
         branchActions={branchActions}
-        onBackToRepoDashboard={onBackToRepoDashboard}
+        onBackToBranchNavigator={onBackToBranchNavigator}
       />
       <RepoWorkspaceContent
         repo={repo}
@@ -223,7 +223,7 @@ interface BranchActionWorkspacePaneProps {
   workspacePaneId: string
   shortcutsEnabled: boolean
   toolbarTrafficLightOffset?: boolean
-  onBackToRepoDashboard?: () => void
+  onBackToBranchNavigator?: () => void
 }
 
 function BranchActionWorkspacePane({
@@ -233,7 +233,7 @@ function BranchActionWorkspacePane({
   workspacePaneId,
   shortcutsEnabled,
   toolbarTrafficLightOffset = false,
-  onBackToRepoDashboard,
+  onBackToBranchNavigator,
 }: BranchActionWorkspacePaneProps) {
   const branchActions = useBranchActions(repo, branch)
   const actions = useBranchActionItems(repo, branch, branchActions)
@@ -247,7 +247,7 @@ function BranchActionWorkspacePane({
         workspacePaneId={workspacePaneId}
         toolbarTrafficLightOffset={toolbarTrafficLightOffset}
         branchActions={branchActions}
-        onBackToRepoDashboard={onBackToRepoDashboard}
+        onBackToBranchNavigator={onBackToBranchNavigator}
       />
     </BranchActionSurfaceContext>
   )

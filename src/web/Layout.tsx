@@ -192,7 +192,7 @@ function WorkspaceBootPlaceholder() {
 }
 
 interface RepoRouteContext {
-  kind: 'dashboard' | 'branch' | 'newWorktree'
+  kind: 'empty' | 'dashboard' | 'branch' | 'newWorktree'
   repoSlug: string
   branchName?: string
 }
@@ -210,9 +210,9 @@ function repoRouteContextFromMatches(matches: Array<{ routeId: string; params: R
     return branchName ? { kind: 'branch', repoSlug, branchName } : null
   }
 
-  return repoMatch.routeId.includes('/worktree/new')
-    ? { kind: 'newWorktree', repoSlug }
-    : { kind: 'dashboard', repoSlug }
+  if (repoMatch.routeId.includes('/worktree/new')) return { kind: 'newWorktree', repoSlug }
+  if (repoMatch.routeId.includes('/dashboard')) return { kind: 'dashboard', repoSlug }
+  return { kind: 'empty', repoSlug }
 }
 
 interface PrimaryWindowOverlaysProps {

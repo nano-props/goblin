@@ -23,7 +23,7 @@ vi.mock('#/web/components/repo-layout/RepoLayoutWorkspaceShell.tsx', () => ({
       data-zen-mode-toggle-enabled={String(props.zenModeToggleEnabled)}
       data-single-pane-active-pane={props.singlePaneActivePane}
     >
-      {props.branchNavigatorPane}
+      {props.sidebarPane}
       {props.repoWorkspacePane}
     </div>
   ),

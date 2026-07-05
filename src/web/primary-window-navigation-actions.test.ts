@@ -104,6 +104,7 @@ function routeNavigation(): PrimaryWindowRouteNavigation {
     openHome: vi.fn(),
     openSettings: vi.fn(),
     closeSettings: vi.fn(),
+    openRepoRoot: vi.fn(),
     openRepoDashboard: vi.fn(),
     openRepoBranch: vi.fn(),
     openRepoNewWorktree: vi.fn(),

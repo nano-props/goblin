@@ -54,7 +54,7 @@ interface Props {
   workspacePaneTabModel: RepoWorkspaceTabModel
   trafficLightOffset?: boolean
   branchActions?: BranchActions
-  onBackToRepoDashboard?: () => void
+  onBackToBranchNavigator?: () => void
 }
 
 export function RepoWorkspaceToolbar({
@@ -64,7 +64,7 @@ export function RepoWorkspaceToolbar({
   workspacePaneTabModel,
   trafficLightOffset = false,
   branchActions,
-  onBackToRepoDashboard,
+  onBackToBranchNavigator,
 }: Props) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
@@ -287,8 +287,8 @@ export function RepoWorkspaceToolbar({
         variant="ghost"
         size="icon"
         className="h-7 w-7 shrink-0"
-        onClick={onBackToRepoDashboard}
-        disabled={!onBackToRepoDashboard}
+        onClick={onBackToBranchNavigator}
+        disabled={!onBackToBranchNavigator}
         aria-label={backLabel}
         title={backLabel}
       >

@@ -17,6 +17,7 @@ interface AppProps {
   routeSettingsPage?: SettingsPage | null
   routeRepoView?: RepoRouteView | null
   onRouteSettingsPageChange?: (page: SettingsPage | null) => void
+  onOpenRepoRoot?: (repoId: string) => void
   onOpenRepoDashboard?: (repoId: string) => void
   onOpenRepoBranch?: (repoId: string, branchName: string) => void
   onOpenRepoNewWorktree?: (repoId: string) => void
@@ -25,6 +26,7 @@ interface AppProps {
 }
 
 export type RepoRouteView =
+  | { kind: 'empty'; repoId: string }
   | { kind: 'dashboard'; repoId: string }
   | { kind: 'branch'; repoId: string; branchName: string }
   | { kind: 'newWorktree'; repoId: string }
@@ -33,6 +35,7 @@ export function App({
   routeSettingsPage = null,
   routeRepoView = null,
   onRouteSettingsPageChange,
+  onOpenRepoRoot,
   onOpenRepoDashboard,
   onOpenRepoBranch,
   onOpenRepoNewWorktree,
@@ -65,6 +68,7 @@ export function App({
             repoId={routeRepoView.repoId}
             routeView={routeRepoView}
             onOpenSettings={() => onRouteSettingsPageChange?.('general')}
+            onOpenRepoRoot={onOpenRepoRoot}
             onOpenRepoDashboard={onOpenRepoDashboard}
             onOpenRepoBranch={onOpenRepoBranch}
             onOpenRepoNewWorktree={onOpenRepoNewWorktree}

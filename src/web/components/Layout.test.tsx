@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { describe, expect, test, vi } from 'vitest'
+import { act } from '@testing-library/react'
 import { CompactRepoWorkspace, RepoWorkspace } from '#/web/components/Layout.tsx'
 import { authenticatedAppShellMode } from '#/web/Layout.tsx'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
@@ -32,7 +33,7 @@ describe('CompactRepoWorkspace', () => {
     rerender(
       <CompactRepoWorkspace
         activePane="workspace"
-        branchNavigatorPane={<button type="button">navigator</button>}
+        sidebarPane={<button type="button">navigator</button>}
         repoWorkspacePane={<button type="button">workspace</button>}
       />,
     )
@@ -43,12 +44,49 @@ describe('CompactRepoWorkspace', () => {
     expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBeNull()
     expect(compactPane(container, 'workspace')?.hasAttribute('inert')).toBe(false)
   })
+
+  test('retains the outgoing workspace pane content for the slide-out transition', () => {
+    vi.useFakeTimers()
+    try {
+      const { container, rerender } = renderInJsdom(
+        <CompactRepoWorkspace
+          activePane="workspace"
+          sidebarPane={<button type="button">navigator</button>}
+          repoWorkspacePane={<div data-testid="workspace-a">workspace-a</div>}
+          transitionScopeKey="repo-a"
+        />,
+      )
+
+      expect(compactPane(container, 'workspace')?.textContent).toContain('workspace-a')
+
+      rerender(
+        <CompactRepoWorkspace
+          activePane="navigator"
+          sidebarPane={<button type="button">navigator</button>}
+          repoWorkspacePane={<div data-testid="workspace-b">workspace-b</div>}
+          transitionScopeKey="repo-a"
+        />,
+      )
+
+      expect(compactWorkspace(container)?.dataset.activePane).toBe('navigator')
+      expect(compactPane(container, 'workspace')?.textContent).toContain('workspace-a')
+      expect(compactPane(container, 'workspace')?.textContent).not.toContain('workspace-b')
+
+      act(() => {
+        vi.advanceTimersByTime(WORKSPACE_PANE_TRANSITION_MS)
+      })
+
+      expect(compactPane(container, 'workspace')?.textContent).toContain('workspace-b')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('RepoWorkspace', () => {
   test('defaults the split layout to a 30/70 sidebar/workspace ratio', () => {
     const { container } = renderInJsdom(
-      <RepoWorkspace branchNavigatorPane={<div>navigator</div>} repoWorkspacePane={<div>workspace</div>} />,
+      <RepoWorkspace sidebarPane={<div>navigator</div>} repoWorkspacePane={<div>workspace</div>} />,
     )
 
     expect(splitPane(container)?.dataset.afterSize).toBe('70')
@@ -72,7 +110,7 @@ function renderCompactWorkspace(activePane: 'navigator' | 'workspace') {
   return renderInJsdom(
     <CompactRepoWorkspace
       activePane={activePane}
-      branchNavigatorPane={<button type="button">navigator</button>}
+      sidebarPane={<button type="button">navigator</button>}
       repoWorkspacePane={<button type="button">workspace</button>}
     />,
   )

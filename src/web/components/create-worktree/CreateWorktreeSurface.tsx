@@ -9,12 +9,13 @@
 // obvious branch / ref name problems up front; anything else stays
 // git's responsibility.
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { GitBranch, GitBranchPlus, RadioTower, type LucideIcon } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/web/components/ui/select.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Field, FieldDescription, FieldError, FieldLabel } from '#/web/components/ui/field.tsx'
-import { AnimateHeight } from '#/web/components/ui/animate-height.tsx'
+import { CollapseTransition } from '#/web/components/ui/collapse-transition.tsx'
+import { ReservedFadeSlot } from '#/web/components/ui/reserved-fade-slot.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
 import { RemotePathSuggestions } from '#/web/components/ui/remote-path-suggestions.tsx'
 import { ToggleGroup, ToggleGroupItem } from '#/web/components/ui/toggle-group.tsx'
@@ -50,12 +51,12 @@ export interface WorktreeBootstrapPromptState {
   onConfigTrustedChange: (trust: boolean) => void
 }
 
-export function CreateWorktreePageSurface({
+export function CreateWorktreePageBody({
   repo,
   worktreeBootstrap,
   onCancel,
   onCreate,
-}: Omit<CreateWorktreeFormSurfaceProps, 'active'>) {
+}: CreateWorktreeFormProps) {
   const t = useT()
 
   return (
@@ -64,8 +65,7 @@ export function CreateWorktreePageSurface({
         <h1 className="text-sm leading-tight font-semibold">{t('action.create-worktree-title')}</h1>
         <p className="text-sm text-muted-foreground">{t('action.create-worktree-hint')}</p>
       </div>
-      <CreateWorktreeFormSurface
-        active
+      <CreateWorktreeForm
         repo={repo}
         worktreeBootstrap={worktreeBootstrap}
         onCancel={onCancel}
@@ -75,21 +75,19 @@ export function CreateWorktreePageSurface({
   )
 }
 
-interface CreateWorktreeFormSurfaceProps {
-  active: boolean
+interface CreateWorktreeFormProps {
   repo: CreateWorktreeRepo
   worktreeBootstrap?: WorktreeBootstrapPromptState
   onCancel: () => void
   onCreate: (request: CreateWorktreeRequest) => boolean | void | Promise<boolean | void>
 }
 
-export function CreateWorktreeFormSurface({
-  active,
+export function CreateWorktreeForm({
   repo,
   worktreeBootstrap,
   onCancel,
   onCreate,
-}: CreateWorktreeFormSurfaceProps) {
+}: CreateWorktreeFormProps) {
   const t = useT()
   const compact = useIsCompactUi()
 
@@ -103,29 +101,10 @@ export function CreateWorktreeFormSurface({
   const [worktreePath, setWorktreePath] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const remoteBranchesQuery = useRepoRemoteBranchesQuery(repo.id, repo.instanceId, {
-    enabled: active && mode === 'trackRemoteBranch',
+    enabled: mode === 'trackRemoteBranch',
   })
   const remoteBranches = remoteBranchesQuery.data ?? []
   const remoteBranchesLoading = remoteBranchesQuery.isLoading
-
-  // Reset on the rising edge of `active` only. A guard ref prevents snapshot
-  // refreshes (which change repo.branchModel.branches / currentBranch) from wiping
-  // user input while the surface stays active. The ref starts false so the
-  // first render with active=true still triggers the reset.
-  const previousOpenRef = useRef(false)
-  useEffect(() => {
-    const wasClosed = !previousOpenRef.current && active
-    previousOpenRef.current = active
-    if (!wasClosed) return
-    setMode('newBranch')
-    setBase(initialBase)
-    setBranch('')
-    setExistingBranch(initialBase)
-    setRemoteRef('')
-    setLocalBranch('')
-    setWorktreePath('')
-    setSubmitting(false)
-  }, [active, repo.branchModel.branches, repo.branchModel.currentBranch])
 
   const remoteTarget = remoteRepoTarget(repo.id, repo.remote.lifecycle)
   const derived = deriveCreateWorktreeForm(
@@ -138,6 +117,7 @@ export function CreateWorktreeFormSurface({
   const branchActionBusy = repo.operations.branchAction.phase !== 'idle'
   const bootstrapBusy = worktreeBootstrap?.loading === true
   const canSubmit = !!derived.input && derived.validPath && !branchActionBusy && !bootstrapBusy && !submitting
+  const showBootstrapTrust = shouldShowWorktreeBootstrapTrust(worktreeBootstrap)
 
   async function handleSubmit(): Promise<void> {
     const nextInput = derived.input
@@ -154,7 +134,7 @@ export function CreateWorktreeFormSurface({
   }
 
   const remotePathSuggestions = useRemotePathSuggestions({
-    enabled: active && !!remoteTarget && derived.pathName.length > 0,
+    enabled: !!remoteTarget && derived.pathName.length > 0,
     alias: remoteTarget?.alias ?? '',
     remotePath: remoteTarget?.remotePath ?? '/',
     prefix: worktreePath,
@@ -198,7 +178,7 @@ export function CreateWorktreeFormSurface({
           </ToggleGroup>
         </Field>
 
-        <AnimateHeight>
+        <CreateWorktreeAnimatedSection>
           <div className="space-y-3">
             {mode === 'newBranch' && (
               <>
@@ -235,7 +215,6 @@ export function CreateWorktreeFormSurface({
                   <FieldLabel htmlFor="cwt-branch">{t('action.create-worktree-branch-label')}</FieldLabel>
                   <Input
                     id="cwt-branch"
-                    autoFocus
                     className="h-10 text-sm"
                     value={branch}
                     onChange={(e) => setBranch(e.target.value)}
@@ -326,7 +305,7 @@ export function CreateWorktreeFormSurface({
               </>
             )}
           </div>
-        </AnimateHeight>
+        </CreateWorktreeAnimatedSection>
 
         <Field className="gap-2">
           <FieldLabel htmlFor="cwt-path">{t('action.create-worktree-path-label')}</FieldLabel>
@@ -364,11 +343,13 @@ export function CreateWorktreeFormSurface({
           </FieldDescription>
         </Field>
 
-        <WorktreeBootstrapTrustCheckbox state={worktreeBootstrap} />
+        <CreateWorktreeReservedFadeSlot present={showBootstrapTrust}>
+          <WorktreeBootstrapTrustCheckbox state={worktreeBootstrap} />
+        </CreateWorktreeReservedFadeSlot>
 
         <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="outline" className={cn(compact && 'w-full')} onClick={onCancel}>
-            {t('dialog.cancel')}
+            {t('action.create-worktree-cancel')}
           </Button>
           <Button type="submit" className={cn('min-w-28', compact && 'w-full min-w-0')} disabled={!canSubmit}>
             {t('action.create-worktree-confirm')}
@@ -379,11 +360,21 @@ export function CreateWorktreeFormSurface({
   )
 }
 
+function CreateWorktreeAnimatedSection({ children, present = true }: { children: React.ReactNode; present?: boolean }) {
+  return <CollapseTransition present={present}>{children}</CollapseTransition>
+}
+
+function CreateWorktreeReservedFadeSlot({ children, present }: { children: React.ReactNode; present: boolean }) {
+  return (
+    <ReservedFadeSlot present={present} className="min-h-6">
+      {children}
+    </ReservedFadeSlot>
+  )
+}
+
 function WorktreeBootstrapTrustCheckbox({ state }: { state: WorktreeBootstrapPromptState | undefined }) {
   const t = useT()
-  const preview = state?.preview ?? null
-  const showPrompt = !state?.loading && !state?.error && preview?.hasOperations === true && !!preview.configHash
-  if (!state || !showPrompt) return null
+  if (!state) return null
 
   return (
     <div className="pt-0.5 text-sm">
@@ -392,4 +383,9 @@ function WorktreeBootstrapTrustCheckbox({ state }: { state: WorktreeBootstrapPro
       </ConfirmCheckbox>
     </div>
   )
+}
+
+function shouldShowWorktreeBootstrapTrust(state: WorktreeBootstrapPromptState | undefined): boolean {
+  const preview = state?.preview ?? null
+  return !state?.loading && !state?.error && preview?.hasOperations === true && !!preview.configHash
 }

@@ -10,7 +10,7 @@ interface RepoWorkspaceShellProps {
   repoWorkspaceActive: boolean
   workspacePaneSize: number
   onWorkspacePaneSizeChange: (size: number) => void
-  branchNavigatorPane: ReactNode
+  sidebarPane: ReactNode
   repoWorkspacePane: ReactNode
   singlePaneActivePane?: 'navigator' | 'workspace'
   zenModeToggleEnabled?: boolean
@@ -24,7 +24,7 @@ export function RepoLayoutWorkspaceShell({
   repoWorkspaceActive,
   workspacePaneSize,
   onWorkspacePaneSizeChange,
-  branchNavigatorPane,
+  sidebarPane,
   repoWorkspacePane,
   singlePaneActivePane = 'navigator',
   zenModeToggleEnabled = true,
@@ -37,19 +37,20 @@ export function RepoLayoutWorkspaceShell({
     repoWorkspaceActive,
   })
   const sidebarPaneSize = 100 - workspacePaneSize
-  const zenRevealEnabled = !compact && behavior.branchNavigatorCollapsed
+  const zenRevealEnabled = !compact && behavior.sidebarCollapsed
 
   const renderWorkspaceBody = (
     workspacePane: ReactNode,
-    navigatorPane: ReactNode = branchNavigatorPane,
+    navigatorPane: ReactNode = sidebarPane,
     activePane: 'navigator' | 'workspace' = singlePaneActivePane,
   ) => {
     if (compact) {
       return (
         <CompactRepoWorkspace
           activePane={activePane}
-          branchNavigatorPane={navigatorPane}
+          sidebarPane={navigatorPane}
           repoWorkspacePane={workspacePane}
+          transitionScopeKey={repoId}
         />
       )
     }
@@ -61,8 +62,8 @@ export function RepoLayoutWorkspaceShell({
         mode="split"
         workspacePaneSize={workspacePaneSize}
         onWorkspacePaneSizeChange={onWorkspacePaneSizeChange}
-        branchNavigatorCollapsed={behavior.branchNavigatorCollapsed}
-        branchNavigatorPane={navigatorPane}
+        sidebarCollapsed={behavior.sidebarCollapsed}
+        sidebarPane={navigatorPane}
         repoWorkspacePane={workspacePane}
       />
     )
@@ -70,7 +71,7 @@ export function RepoLayoutWorkspaceShell({
 
   return (
     <section className="relative flex min-w-0 flex-1 flex-col">
-      {renderWorkspaceBody(repoWorkspacePane, branchNavigatorPane)}
+      {renderWorkspaceBody(repoWorkspacePane, sidebarPane)}
       {!compact ? (
         <ZenModeSidebarChrome
           repoId={repoId}
