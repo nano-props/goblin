@@ -51,6 +51,25 @@ describe('useHostInfoStore', () => {
     expect(useHostInfoStore.getState().hydrated).toBe(true)
   })
 
+  test('does not mark the store hydrated when hydrate is aborted', async () => {
+    const controller = new AbortController()
+    fetchMock.mockImplementationOnce((_url, init) => {
+      const signal = (init as { signal?: AbortSignal }).signal
+      return new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(controller.signal.reason), {
+          once: true,
+        })
+      })
+    })
+
+    const hydrate = useHostInfoStore.getState().hydrate({ signal: controller.signal })
+    controller.abort(new Error('cancelled'))
+    await hydrate
+
+    expect(useHostInfoStore.getState().snapshot).toBeNull()
+    expect(useHostInfoStore.getState().hydrated).toBe(false)
+  })
+
   test('returns the cached snapshot via the homeDirectory / getPlatform helpers', async () => {
     useHostInfoStore.setState({
       snapshot: { homeDir: '/Users/cached', platform: 'linux', hostname: 'cache', pid: 7 },

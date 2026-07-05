@@ -2,8 +2,8 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-import { Loader2 } from 'lucide-react'
 import { AuthProvider } from '#/web/auth/AuthProvider.tsx'
+import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
 import { ResponsiveUiProvider } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { PrimaryWindowRouterProvider } from '#/web/primary-window-router.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -62,16 +62,7 @@ function AppRoot() {
 }
 
 function BootLoading() {
-  return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="flex h-full items-center justify-center bg-background text-muted-foreground"
-    >
-      <Loader2 className="size-5 animate-spin" aria-hidden />
-      <span className="sr-only">Loading</span>
-    </div>
-  )
+  return <CenteredLoadingStatus label="Loading" />
 }
 
 function BootError({ onRetry }: { onRetry: () => void }) {

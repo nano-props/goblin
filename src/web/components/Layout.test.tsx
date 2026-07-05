@@ -7,6 +7,10 @@ import { CompactRepoWorkspace, RepoWorkspace } from '#/web/components/Layout.tsx
 import { authenticatedAppShellMode } from '#/web/Layout.tsx'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
+
+const restoringWorkspaceState: AuthenticatedAppBootstrapState = { status: 'restoring-workspace' }
+const readyState: AuthenticatedAppBootstrapState = { status: 'ready' }
 
 vi.mock('#/web/components/SplitPane.tsx', () => ({
   SplitPane: ({ before, after, afterSize }: { before: ReactNode; after: ReactNode; afterSize: number }) => (
@@ -95,14 +99,14 @@ describe('RepoWorkspace', () => {
 
 describe('authenticatedAppShellMode', () => {
   test('settings routes render outside the workspace boot gate', () => {
-    expect(authenticatedAppShellMode('/settings/general', 'booting')).toBe('settings')
-    expect(authenticatedAppShellMode('/settings/shortcuts', 'ready')).toBe('settings')
+    expect(authenticatedAppShellMode('/settings/general', restoringWorkspaceState)).toBe('settings')
+    expect(authenticatedAppShellMode('/settings/shortcuts', readyState)).toBe('settings')
   })
 
   test('workspace routes wait for authenticated boot before mounting runtime', () => {
-    expect(authenticatedAppShellMode('/', 'booting')).toBe('workspace-boot')
-    expect(authenticatedAppShellMode('/repo/repo/dashboard', 'booting')).toBe('workspace-boot')
-    expect(authenticatedAppShellMode('/repo/repo/dashboard', 'ready')).toBe('workspace-ready')
+    expect(authenticatedAppShellMode('/', restoringWorkspaceState)).toBe('workspace-restore')
+    expect(authenticatedAppShellMode('/repo/repo/dashboard', restoringWorkspaceState)).toBe('workspace-restore')
+    expect(authenticatedAppShellMode('/repo/repo/dashboard', readyState)).toBe('workspace-ready')
   })
 })
 

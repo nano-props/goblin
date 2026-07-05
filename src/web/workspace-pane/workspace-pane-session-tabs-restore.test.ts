@@ -161,6 +161,28 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
 
     expect(replaceWorkspaceTabs).not.toHaveBeenCalled()
   })
+
+  test('returns cancelled without committing when the restore signal is already aborted', async () => {
+    seedRepo()
+    const replaceWorkspaceTabs = vi.fn(async () => [workspacePaneStaticTabEntry('history')])
+    installWorkspacePaneTabsTestBridge({ replaceWorkspaceTabs })
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(
+      restoreServerWorkspacePaneTabsFromSession(
+        {
+          [REPO_ID]: {
+            [worktreeTargetKey()]: [workspacePaneStaticTabEntry('history')],
+          },
+        },
+        { signal: controller.signal },
+      ),
+    ).resolves.toMatchObject({ status: 'cancelled' })
+
+    expect(replaceWorkspaceTabs).not.toHaveBeenCalled()
+    expect(readTabsFor('feature/worktree', WORKTREE_PATH)).toEqual([workspacePaneStaticTabEntry('status')])
+  })
 })
 
 function seedRepo(): void {

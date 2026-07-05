@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchServerJson, postServerJson } from '#/web/lib/server-fetch.ts'
 import { ACCESS_TOKEN_URL_PARAM } from '#/shared/access-token.ts'
+import { createTimeoutAbortController } from '#/web/lib/abort.ts'
+
+const AUTH_STATUS_TIMEOUT_MS = 15_000
 
 export type AccessTokenStatus = 'checking' | 'authenticated' | 'unauthenticated'
 
@@ -54,9 +57,9 @@ function stripAccessTokenFromUrl(): void {
  *
  * URL-token handling: when the page is opened with `?accessToken=...`
  * (e.g. by scanning a QR code printed by `scripts/start-server.ts`),
- * the hook POSTs it to `/api/login` to set the cookie, then strips
- * the param from the URL. The subsequent `whoami` then succeeds
- * and the gate clears without a page reload.
+ * the hook strips the param from the URL before the network hop, then
+ * POSTs it to `/api/login` to set the cookie. The subsequent `whoami`
+ * then succeeds and the gate clears without a page reload.
  */
 export function useAccessTokenStatus(): AccessTokenStatusState {
   const [state, setState] = useState<AccessTokenStatus>('checking')
@@ -68,47 +71,55 @@ export function useAccessTokenStatus(): AccessTokenStatusState {
 
   useEffect(() => {
     let cancelled = false
+    const timeout = createTimeoutAbortController(
+      AUTH_STATUS_TIMEOUT_MS,
+      `auth status check timed out after ${AUTH_STATUS_TIMEOUT_MS}ms`,
+    )
     void (async () => {
-      // Step 1: if the URL carries an access token, exchange it for
-      // a cookie. Errors are swallowed — the gate will fall back to
-      // the manual login form on the next whoami.
-      const urlToken = readAccessTokenFromUrl()
-      if (urlToken) {
-        let loginOk = false
-        try {
-          await postServerJson<{ token: string }, { ok: true }>('/api/login', { token: urlToken })
-          loginOk = true
-        } catch {
-          // Bad token (401) or network error. Either way, strip the
-          // token from the URL: on a successful login the cookie
-          // outlives the URL, and on a failure the token must not
-          // linger — it would otherwise be sent as `Referer` on
-          // any subsequent same-origin request and stay in browser
-          // history indefinitely. The login form re-appears
-          // (state = unauthenticated below) so the user can paste
-          // a corrected token by hand.
-        }
+      try {
+        const urlLoginStatus = await exchangeUrlTokenForCookie(timeout.signal)
         if (cancelled) return
-        stripAccessTokenFromUrl()
-        if (!loginOk) {
+        if (urlLoginStatus === 'failed') {
           setState('unauthenticated')
           return
         }
-      }
-      // Step 2: probe the auth state.
-      try {
-        const result = await fetchServerJson<{ ok: true }>('/api/whoami')
-        if (cancelled) return
-        setState(result.ok ? 'authenticated' : 'unauthenticated')
-      } catch {
-        if (cancelled) return
-        setState('unauthenticated')
+        // Step 2: probe the auth state.
+        try {
+          const result = await fetchServerJson<{ ok: true }>('/api/whoami', { signal: timeout.signal })
+          if (cancelled) return
+          setState(result.ok ? 'authenticated' : 'unauthenticated')
+        } catch {
+          if (cancelled) return
+          setState('unauthenticated')
+        }
+      } finally {
+        timeout.dispose()
       }
     })()
     return () => {
       cancelled = true
+      timeout.abort(new Error('auth status check cancelled'))
+      timeout.dispose()
     }
   }, [refreshKey])
 
   return { state, refresh }
+}
+
+async function exchangeUrlTokenForCookie(signal: AbortSignal): Promise<'absent' | 'authenticated' | 'failed'> {
+  // If the URL carries an access token, exchange it for a cookie. Strip it
+  // before the network hop so unmounts, redirects, or stalled requests cannot
+  // leave the token in browser history or future Referer headers.
+  const urlToken = readAccessTokenFromUrl()
+  if (!urlToken) return 'absent'
+  stripAccessTokenFromUrl()
+  try {
+    await postServerJson<{ token: string }, { ok: true }>('/api/login', { token: urlToken }, { signal })
+    return 'authenticated'
+  } catch {
+    // Bad token (401) or network error. Either way, the token is already gone
+    // from the URL and the login form re-appears so the user can paste a
+    // corrected token by hand.
+    return 'failed'
+  }
 }

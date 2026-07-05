@@ -27,8 +27,8 @@ import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-s
 type RecentReposUpdateResponse = { ok: boolean; addedRepo?: RepoSessionEntry | null } & RuntimeRecentReposState
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 
-export async function getSettingsSnapshot(): Promise<SettingsSnapshot> {
-  return await fetchServerJson<SettingsSnapshot>('/api/settings')
+export async function getSettingsSnapshot(options?: { signal?: AbortSignal }): Promise<SettingsSnapshot> {
+  return await fetchServerJson<SettingsSnapshot>('/api/settings', { signal: options?.signal })
 }
 
 function resolveThemeStateFromUserSettings(settings: Pick<UserSettings, 'theme' | 'colorTheme'>): ThemeState {
@@ -104,8 +104,8 @@ export async function setLanEnabled(enabled: boolean): Promise<boolean> {
   return (await updateUserSettingsPatch({ lanEnabled: enabled })).prefs.lanEnabled
 }
 
-export async function getExternalAppsSnapshot(): Promise<ExternalAppsSnapshot> {
-  return await fetchServerJson<ExternalAppsSnapshot>('/api/settings/external-apps')
+export async function getExternalAppsSnapshot(options?: { signal?: AbortSignal }): Promise<ExternalAppsSnapshot> {
+  return await fetchServerJson<ExternalAppsSnapshot>('/api/settings/external-apps', { signal: options?.signal })
 }
 
 export async function refreshExternalAppsSnapshot(): Promise<ExternalAppsSnapshot> {

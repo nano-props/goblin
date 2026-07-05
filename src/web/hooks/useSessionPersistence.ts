@@ -1,7 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react'
 import { persistWorkspaceSessionState, persistWorkspaceSessionStateOnUnload } from '#/web/settings-actions.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { restorableWorkspaceStateFromStore } from '#/web/stores/repos/selector-state.ts'
+import {
+  restorableWorkspaceStateFromStore,
+  workspaceSessionPersistenceOpenFromStore,
+} from '#/web/stores/repos/selector-state.ts'
 import { workspaceSessionStateFromRestorableWorkspaceState } from '#/web/restorable-workspace-state.ts'
 import { sessionLog } from '#/web/logger.ts'
 import { useFiletreeInteractionStore } from '#/web/stores/repos/filetree-interaction-state.ts'
@@ -12,8 +15,9 @@ import {
 const SESSION_SAVE_DEBOUNCE_MS = 200
 
 interface SessionPersistenceInput {
-  sessionReady: boolean
+  workspaceMembershipReady: boolean
   sessionPersistenceReady: boolean
+  sessionRestoreError: string | null
   repos: ReturnType<typeof useReposStore.getState>['repos']
   order: string[]
   restoredRepoId: string | null
@@ -31,8 +35,9 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
   const selectedTerminalSessionIdByTerminalWorktree = useReposStore(
     (s) => s.selectedTerminalSessionIdByTerminalWorktree,
   )
-  const sessionReady = useReposStore((s) => s.sessionReady)
+  const workspaceMembershipReady = useReposStore((s) => s.workspaceMembershipReady)
   const sessionPersistenceReady = useReposStore((s) => s.sessionPersistenceReady)
+  const sessionRestoreError = useReposStore((s) => s.sessionRestoreError)
   const repos = useReposStore((s) => s.repos)
   const workspacePaneTabsVersion = useWorkspacePaneTabsCacheVersion()
   const filetreeInteractionByScope = useFiletreeInteractionStore((s) => s.interactionByScope)
@@ -73,8 +78,9 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
   useLayoutEffect(() => {
     if (routedRepoId) lastRoutedRepoIdRef.current = routedRepoId
     latestInputRef.current = {
-      sessionReady,
+      workspaceMembershipReady,
       sessionPersistenceReady,
+      sessionRestoreError,
       repos,
       order,
       restoredRepoId,
@@ -91,15 +97,16 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
     routedRepoId,
     selectedTerminalSessionIdByTerminalWorktree,
     sessionPersistenceReady,
-    sessionReady,
+    sessionRestoreError,
+    workspaceMembershipReady,
     workspacePaneSize,
     zenMode,
   ])
 
   useEffect(() => {
-    // Client -> persistence only. Boot restore runs elsewhere first. sessionReady
-    // gates the UI skeleton; sessionPersistenceReady waits for boot-restored
-    // server-owned workspace tabs to converge back into the client store.
+    // Client -> persistence only. Boot restore runs elsewhere first.
+    // workspaceMembershipReady gates the UI skeleton; sessionPersistenceReady waits
+    // for boot-restored server-owned workspace tabs to converge back into the client store.
     let session: ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState> | null
     try {
       session = sessionFromPersistenceInput(latestInputRef.current, lastRoutedRepoIdRef.current)
@@ -131,8 +138,9 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
     const timeout = window.setTimeout(save, SESSION_SAVE_DEBOUNCE_MS)
     return () => window.clearTimeout(timeout)
   }, [
-    sessionReady,
+    workspaceMembershipReady,
     sessionPersistenceReady,
+    sessionRestoreError,
     order,
     restoredRepoId,
     routedRepoId,
@@ -171,7 +179,7 @@ function sessionFromPersistenceInput(
   input: SessionPersistenceInput | null,
   lastRoutedRepoId: string | null,
 ): ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState> | null {
-  if (!input?.sessionReady || !input.sessionPersistenceReady) return null
+  if (!input || !workspaceSessionPersistenceOpenFromStore(input)) return null
   return workspaceSessionStateFromRestorableWorkspaceState({
     repos: input.repos,
     restorableWorkspaceState: restorableWorkspaceStateFromStore({

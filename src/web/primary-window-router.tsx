@@ -9,7 +9,7 @@ import {
   useMatch,
 } from '@tanstack/react-router'
 import { App, type RepoRouteView } from '#/web/App.tsx'
-import { AuthenticatedWorkspaceBootGate, Layout } from '#/web/Layout.tsx'
+import { Layout, WorkspaceSessionRestoreGate } from '#/web/Layout.tsx'
 import { isSettingsPage } from '#/shared/settings-pages.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import {
@@ -80,18 +80,18 @@ function IndexRoute() {
   const navigation = useRepoRouteNavigation()
   if (firstRepoSlug) return <Navigate to="/repo/$repoSlug/dashboard" params={{ repoSlug: firstRepoSlug }} replace />
   return (
-    <AuthenticatedWorkspaceBootGate>
+    <WorkspaceSessionRestoreGate>
       <App routeSettingsPage={null} {...navigation} />
-    </AuthenticatedWorkspaceBootGate>
+    </WorkspaceSessionRestoreGate>
   )
 }
 
 export function initialRepoRouteSlugFromStore(
-  state: Pick<ReposStore, 'restoredRepoId' | 'order' | 'repos' | 'sessionReady'>,
+  state: Pick<ReposStore, 'restoredRepoId' | 'order' | 'repos' | 'workspaceMembershipReady'>,
 ): string | null {
   const restoredRepo = state.restoredRepoId ? state.repos[state.restoredRepoId] : null
   if (restoredRepo) return repoSlugFromId(restoredRepo.id)
-  if (!state.sessionReady) return null
+  if (!state.workspaceMembershipReady) return null
   const firstRepoId = state.order[0]
   const firstRepo = firstRepoId ? state.repos[firstRepoId] : null
   return firstRepo ? repoSlugFromId(firstRepo.id) : null
@@ -99,23 +99,28 @@ export function initialRepoRouteSlugFromStore(
 
 function RepoRoute() {
   const { repoSlug } = repoRoute.useParams()
-  const repoId = useRepoIdFromSlug(repoSlug)
   const dashboardMatch = useMatch({ from: repoDashboardRoute.id, shouldThrow: false })
   const branchMatch = useMatch({ from: repoBranchRoute.id, shouldThrow: false })
   const newWorktreeMatch = useMatch({ from: repoWorktreeNewRoute.id, shouldThrow: false })
   const navigation = useRepoRouteNavigation()
-  const routeRepoView = repoId
-    ? repoRouteViewFromChildRoute(repoId, {
-        dashboard: !!dashboardMatch,
-        branchSlug: branchMatch?.params.branchSlug ?? null,
-        newWorktree: !!newWorktreeMatch,
-      })
-    : null
+  const routeRepoView = repoRouteViewFromSlugChildRoute(repoSlug, {
+    dashboard: !!dashboardMatch,
+    branchSlug: branchMatch?.params.branchSlug ?? null,
+    newWorktree: !!newWorktreeMatch,
+  })
   return (
-    <AuthenticatedWorkspaceBootGate>
+    <WorkspaceSessionRestoreGate>
       <App routeRepoView={routeRepoView} {...navigation} />
-    </AuthenticatedWorkspaceBootGate>
+    </WorkspaceSessionRestoreGate>
   )
+}
+
+export function repoRouteViewFromSlugChildRoute(
+  repoSlug: string,
+  childRoute: { dashboard: boolean; branchSlug: string | null; newWorktree: boolean },
+): RepoRouteView | null {
+  const repoId = repoIdFromSlug(repoSlug)
+  return repoId ? repoRouteViewFromChildRoute(repoId, childRoute) : null
 }
 
 export function repoRouteViewFromChildRoute(
@@ -144,14 +149,6 @@ function useRepoRouteNavigation() {
     onCancelRepoNewWorktree: (repoId: string) => routeNavigation.cancelRepoNewWorktree(repoId),
     onReplaceRepoBranch: (repoId: string, branchName: string) => routeNavigation.openRepoBranch(repoId, branchName, { replace: true }),
   }
-}
-
-function useRepoIdFromSlug(repoSlug: string): string | null {
-  const repoId = repoIdFromSlug(repoSlug)
-  return useReposStore((s) => {
-    if (!repoId) return null
-    return s.repos[repoId]?.id ?? null
-  })
 }
 
 function SettingsRoute() {

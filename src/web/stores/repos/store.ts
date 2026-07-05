@@ -109,7 +109,7 @@ export const useReposStore = create<ReposStore>()(
       selectedTerminalSessionIdByTerminalWorktree: {},
 
       // Local client-only state.
-      sessionReady: false,
+      workspaceMembershipReady: false,
       sessionPersistenceReady: false,
       sessionRestoreError: null,
       tabOpenerIdentityByScope: {},

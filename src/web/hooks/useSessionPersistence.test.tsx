@@ -45,7 +45,7 @@ describe('useSessionPersistence', () => {
       repos: { [repo.id]: repo },
       order: [repo.id],
       restoredRepoId: repo.id,
-      sessionReady: true,
+      workspaceMembershipReady: true,
       sessionPersistenceReady: true,
     })
 
@@ -77,7 +77,7 @@ describe('useSessionPersistence', () => {
       repos: { [repo.id]: repo },
       order: [repo.id],
       restoredRepoId: repo.id,
-      sessionReady: true,
+      workspaceMembershipReady: true,
       sessionPersistenceReady: true,
       selectedTerminalSessionIdByTerminalWorktree: {
         '/tmp/repo\0/tmp/worktree': 'session-2',
@@ -109,7 +109,7 @@ describe('useSessionPersistence', () => {
       repos: { [inactiveRepo.id]: inactiveRepo, [visibleRepo.id]: visibleRepo },
       order: [inactiveRepo.id, visibleRepo.id],
       restoredRepoId: inactiveRepo.id,
-      sessionReady: true,
+      workspaceMembershipReady: true,
       sessionPersistenceReady: true,
     })
 
@@ -129,7 +129,7 @@ describe('useSessionPersistence', () => {
       repos: { [inactiveRepo.id]: inactiveRepo, [visibleRepo.id]: visibleRepo },
       order: [inactiveRepo.id, visibleRepo.id],
       restoredRepoId: inactiveRepo.id,
-      sessionReady: true,
+      workspaceMembershipReady: true,
       sessionPersistenceReady: true,
     })
 
@@ -158,7 +158,7 @@ describe('useSessionPersistence', () => {
       repos: { [inactiveRepo.id]: inactiveRepo, [visibleRepo.id]: visibleRepo },
       order: [inactiveRepo.id, visibleRepo.id],
       restoredRepoId: inactiveRepo.id,
-      sessionReady: true,
+      workspaceMembershipReady: true,
       sessionPersistenceReady: true,
     })
 
@@ -244,7 +244,7 @@ describe('useSessionPersistence', () => {
       repos: { [repo.id]: repo },
       order: [repo.id],
       restoredRepoId: repo.id,
-      sessionReady: true,
+      workspaceMembershipReady: true,
       sessionPersistenceReady: true,
     })
 
@@ -371,7 +371,7 @@ describe('useSessionPersistence', () => {
       repos: { [repo.id]: repo },
       order: [repo.id],
       restoredRepoId: repo.id,
-      sessionReady: true,
+      workspaceMembershipReady: true,
       sessionPersistenceReady: true,
     })
     useFiletreeInteractionStore.getState().restoreViewState({
@@ -409,7 +409,7 @@ describe('useSessionPersistence', () => {
       repos: { [repo.id]: repo },
       order: [repo.id],
       restoredRepoId: repo.id,
-      sessionReady: true,
+      workspaceMembershipReady: true,
       sessionPersistenceReady: false,
     })
 
@@ -443,7 +443,7 @@ describe('useSessionPersistence', () => {
       repos: { [repo.id]: repo },
       order: [repo.id],
       restoredRepoId: repo.id,
-      sessionReady: true,
+      workspaceMembershipReady: true,
       sessionPersistenceReady: true,
     })
 
@@ -487,7 +487,7 @@ describe('useSessionPersistence', () => {
       repos: { [repo.id]: repo },
       order: [repo.id],
       restoredRepoId: repo.id,
-      sessionReady: true,
+      workspaceMembershipReady: true,
       sessionPersistenceReady: true,
     })
 

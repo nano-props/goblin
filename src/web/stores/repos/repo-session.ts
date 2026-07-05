@@ -46,8 +46,9 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       //     canonical placeholder to a resolved repo and kick off initial
       //     refresh. Remote entries go through the unified orchestrator.
       //
-      // sessionReady flips after placeholders are ready. The per-repo body keeps
-      // showing its own skeleton until each snapshot resolves.
+      // workspaceMembershipReady means restored entries have produced
+      // placeholders (or settled as absent). The per-repo body keeps showing
+      // its own skeleton until each snapshot resolves.
       const rankById = new Map<string, number>()
       openRepoEntries.forEach((entry, index) => {
         if (!rankById.has(entry.id)) rankById.set(entry.id, index)
@@ -221,15 +222,16 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         ),
       )
       await placeholderReady
-      // Flip sessionReady unconditionally once placeholders are ready.
-      // With open repositories, the boot skeleton gives
+      if (signal?.aborted) return
+      // Flip workspaceMembershipReady unconditionally once workspace membership is ready.
+      // With open repositories, the workspace restore skeleton gives
       // way to a real workspace immediately — the per-repo body keeps
       // showing its own skeleton until each snapshot resolves. With no open
       // repositories (openRepoEntries was empty), there's nothing else to compute but
-      // we still need to clear the boot skeleton, so just flip the flag.
+      // we still need to clear the workspace restore skeleton, so just flip the flag.
       set((s) => {
-        if (s.sessionReady) return s
-        if (s.order.length === 0) return { sessionReady: true }
+        if (s.workspaceMembershipReady) return s
+        if (s.order.length === 0) return { workspaceMembershipReady: true }
         const nextRestoredRepoId = restoredRepoIdAfterWorkspaceHydration(
           s.restoredRepoId,
           s.repos,
@@ -240,7 +242,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         if (s.restoredRepoId === null || s.restoredRepoId === managedRestoredRepoId) {
           managedRestoredRepoId = nextRestoredRepoId
         }
-        return { restoredRepoId: nextRestoredRepoId, sessionReady: true }
+        return { restoredRepoId: nextRestoredRepoId, workspaceMembershipReady: true }
       })
       await probeWork
       if (restoredRepoId && !get().repos[restoredRepoId]) {

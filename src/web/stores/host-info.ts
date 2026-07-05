@@ -50,7 +50,7 @@ interface HostInfoSnapshot {
 interface HostInfoState {
   snapshot: HostInfoSnapshot | null
   hydrated: boolean
-  hydrate: () => Promise<void>
+  hydrate: (options?: { signal?: AbortSignal }) => Promise<void>
 }
 
 let hydrateVersion = 0
@@ -59,7 +59,7 @@ export const useHostInfoStore = create<HostInfoState>((set) => ({
   snapshot: null,
   hydrated: false,
 
-  async hydrate() {
+  async hydrate(options) {
     // Bump the version so a fast second call (StrictMode dev
     // double-invoke, the user reloading the client with a stale
     // `hydrate()` still in flight) cannot overwrite a fresher
@@ -67,8 +67,9 @@ export const useHostInfoStore = create<HostInfoState>((set) => ({
     const version = ++hydrateVersion
     let snapshot: HostInfoSnapshot
     try {
-      snapshot = await fetchServerJson<HostInfoSnapshot>('/api/host')
+      snapshot = await fetchServerJson<HostInfoSnapshot>('/api/host', { signal: options?.signal })
     } catch {
+      if (options?.signal?.aborted) return
       // Network failure / server down. The sync getters fall
       // back to safe defaults (`''` / `'web'`), which is what
       // they returned before hydration existed; the settings

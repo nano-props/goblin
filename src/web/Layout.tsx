@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { useShallow } from 'zustand/react/shallow'
 import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
+import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
 import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
 import { TokenGate } from '#/web/components/TokenGate.tsx'
 import { RepoCloneDialog } from '#/web/components/RepoCloneDialog.tsx'
@@ -38,16 +39,16 @@ import { branchNameFromSlug, repoIdFromSlug } from '#/web/repo-route-slugs.ts'
 import { usePrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 
-const AuthenticatedWorkspaceBootContext = createContext<AuthenticatedAppBootstrapState>('booting')
+const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapState>({ status: 'restoring-workspace' })
 
-export type AuthenticatedAppShellMode = 'settings' | 'workspace-boot' | 'workspace-ready'
+export type AuthenticatedAppShellMode = 'settings' | 'workspace-restore' | 'workspace-ready'
 
 export function authenticatedAppShellMode(
   pathname: string,
   bootstrapState: AuthenticatedAppBootstrapState,
 ): AuthenticatedAppShellMode {
   if (pathname.startsWith('/settings')) return 'settings'
-  return bootstrapState === 'booting' ? 'workspace-boot' : 'workspace-ready'
+  return bootstrapState.status === 'restoring-workspace' ? 'workspace-restore' : 'workspace-ready'
 }
 
 export function Layout() {
@@ -69,16 +70,16 @@ function AuthenticatedAppShell() {
   const shellMode = authenticatedAppShellMode(location.pathname, bootstrapState)
 
   return (
-    <AuthenticatedWorkspaceBootContext value={bootstrapState}>
+    <AuthenticatedWorkspaceRestoreContext value={bootstrapState}>
       {shellMode === 'settings' ? (
         <AuthenticatedSettingsShell />
-      ) : shellMode === 'workspace-boot' ? (
-        <WorkspaceBootPlaceholder />
+      ) : shellMode === 'workspace-restore' ? (
+        <WorkspaceSessionRestorePlaceholder />
       ) : (
         <AuthenticatedWorkspaceShell />
       )}
       {import.meta.env.DEV ? <TanStackRouterDevtools /> : null}
-    </AuthenticatedWorkspaceBootContext>
+    </AuthenticatedWorkspaceRestoreContext>
   )
 }
 
@@ -177,18 +178,14 @@ function AuthenticatedWorkspaceShell() {
   )
 }
 
-export function AuthenticatedWorkspaceBootGate({ children }: { children: ReactNode }) {
-  const bootstrapState = useContext(AuthenticatedWorkspaceBootContext)
-  if (bootstrapState === 'booting') return <WorkspaceBootPlaceholder />
+export function WorkspaceSessionRestoreGate({ children }: { children: ReactNode }) {
+  const bootstrapState = useContext(AuthenticatedWorkspaceRestoreContext)
+  if (bootstrapState.status === 'restoring-workspace') return <WorkspaceSessionRestorePlaceholder />
   return <>{children}</>
 }
 
-function WorkspaceBootPlaceholder() {
-  return (
-    <div className="flex h-full items-center justify-center text-muted-foreground" role="status" aria-live="polite">
-      <span>…</span>
-    </div>
-  )
+function WorkspaceSessionRestorePlaceholder() {
+  return <CenteredLoadingStatus label="Restoring workspace" />
 }
 
 interface RepoRouteContext {

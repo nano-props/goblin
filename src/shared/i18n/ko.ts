@@ -187,6 +187,7 @@ export const ko: Record<DictKey, string> = {
   // ---- Empty state -------------------------------------------------------
   'empty.title': '열린 리포지토리가 없습니다',
   'empty.body': '사이드바에서 저장소를 선택하거나 Git 폴더를 이 창으로 드래그하세요.',
+  'repo-route.not-found-title': '리포지토리를 찾을 수 없음',
 
   // ---- Drag and drop -----------------------------------------------------
   'drop.title': '놓아서 로컬 리포지토리 열기',

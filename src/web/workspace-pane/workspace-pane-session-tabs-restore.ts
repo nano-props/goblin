@@ -13,9 +13,11 @@ interface WorkspacePaneTabsRestoreDetails {
 export type RestoreWorkspacePaneTabsFromSessionResult =
   | ({ status: 'restored' } & WorkspacePaneTabsRestoreDetails)
   | ({ status: 'failed' } & WorkspacePaneTabsRestoreDetails)
+  | ({ status: 'cancelled' } & WorkspacePaneTabsRestoreDetails)
 
 export async function restoreServerWorkspacePaneTabsFromSession(
   workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
+  options: { signal?: AbortSignal } = {},
 ): Promise<RestoreWorkspacePaneTabsFromSessionResult> {
   // Boot-only import from persisted session state into the server runtime.
   // After this completes, runtime tab changes flow server -> query cache ->
@@ -24,13 +26,16 @@ export async function restoreServerWorkspacePaneTabsFromSession(
   const repos = useReposStore.getState().repos
   const unresolvedRepos: string[] = []
   const unresolvedTargets: Array<{ repoRoot: string; targetKey: string }> = []
+  const details = () => ({ unresolvedRepos, unresolvedTargets, failedCommits: [] })
   for (const [repoRoot, tabsByTarget] of Object.entries(workspacePaneTabsByTargetByRepo)) {
+    if (options.signal?.aborted) return { status: 'cancelled', ...details() }
     const repo = repos[repoRoot]
     if (!repo) {
       unresolvedRepos.push(repoRoot)
       continue
     }
     for (const [targetKey, tabs] of Object.entries(tabsByTarget)) {
+      if (options.signal?.aborted) return { status: 'cancelled', ...details() }
       const snapshot = getRepoSnapshotQueryData(repo.id, repo.instanceId)
       const target = snapshot
         ? workspacePaneTabsTargetForRepoTargetKey({ repoRoot: repo.id, branches: snapshot.branches }, targetKey)
@@ -43,18 +48,22 @@ export async function restoreServerWorkspacePaneTabsFromSession(
     }
   }
   const results = await Promise.all(commits)
+  // The terminal client does not currently expose per-request cancellation for
+  // workspace-tab commits, so an abort that lands here can only stop boot from
+  // advancing; it cannot unsend a mutation already accepted by the server.
+  if (options.signal?.aborted) return { status: 'cancelled', ...details() }
   const failedCommits = results.filter((result) => !result.ok)
-  const details = {
+  const restoreDetails = {
     unresolvedRepos,
     unresolvedTargets,
     failedCommits,
   }
   if (failedCommits.length > 0 || unresolvedRepos.length > 0 || unresolvedTargets.length > 0) {
-    return { status: 'failed', ...details }
+    return { status: 'failed', ...restoreDetails }
   }
   return {
     status: 'restored',
-    ...details,
+    ...restoreDetails,
   }
 }
 

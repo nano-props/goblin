@@ -29,7 +29,7 @@ describe('repo session hydration', () => {
 
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().restoredRepoId).toBe(REPO_B)
-    expect(useReposStore.getState().sessionReady).toBe(true)
+    expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
     expect(calls.recent).toEqual([])
     await vi.waitFor(() => {
       expect(calls.composite).toEqual([REPO_A, REPO_B])
@@ -171,7 +171,7 @@ describe('repo session hydration', () => {
       // meaningful invariant is just that the repo stays in the store.
       expect(deriveConnectivity(repo!)).toBe('connected')
       expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
-      expect(useReposStore.getState().sessionReady).toBe(false)
+      expect(useReposStore.getState().workspaceMembershipReady).toBe(false)
     })
 
     await vi.waitFor(() => {
@@ -181,7 +181,7 @@ describe('repo session hydration', () => {
     await work
 
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
-    expect(useReposStore.getState().sessionReady).toBe(true)
+    expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
   })
 
   test('hydrateRepoSession leaves server-owned branch tab open-sets out of repo store', async () => {
@@ -229,7 +229,7 @@ describe('repo session hydration', () => {
     await work
 
     const repo = useReposStore.getState().repos[REPO_A]
-    expect(useReposStore.getState().sessionReady).toBe(true)
+    expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
     expect(repo?.projection.source).toBe('cache')
     expect(repo?.ui.preferredWorkspacePaneTabByTarget).toEqual({})
   })
@@ -245,9 +245,9 @@ describe('repo session hydration', () => {
     expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
   })
 
-  test('hydrateRepoSession flips sessionReady even when openRepoEntries is empty', async () => {
+  test('hydrateRepoSession flips workspaceMembershipReady even when openRepoEntries is empty', async () => {
     // Regression: a session with zero open repos used to leave the boot
-    // skeleton up forever because sessionReady only flipped on the first
+    // skeleton up forever because workspaceMembershipReady only flipped on the first
     // placeholder landing, and an empty restore has no placeholders.
     installGoblin()
 
@@ -255,7 +255,7 @@ describe('repo session hydration', () => {
 
     expect(useReposStore.getState().order).toEqual([])
     expect(useReposStore.getState().restoredRepoId).toBeNull()
-    expect(useReposStore.getState().sessionReady).toBe(true)
+    expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
   })
 
   test('hydrateRepoSession promotes a remote repo to connected once the probe resolves', async () => {
@@ -471,7 +471,7 @@ describe('repo session hydration', () => {
     // inserting placeholders. An already-aborted boot run therefore
     // short-circuits before either placeholder or probe work starts.
     expect(useReposStore.getState().order).toEqual([])
-    expect(useReposStore.getState().sessionReady).toBe(true)
+    expect(useReposStore.getState().workspaceMembershipReady).toBe(false)
     // But the probe handler was never invoked because the abort check
     // fires before resolveRepoPath is called.
     expect(probeCalls).toBe(0)
@@ -525,6 +525,7 @@ describe('repo session hydration', () => {
     expect(runtimeOpenResolved).toBe(true)
     expect(runtimeCloseCount).toBe(1)
     expect(useReposStore.getState().order).toEqual([])
+    expect(useReposStore.getState().workspaceMembershipReady).toBe(false)
   })
 })
 

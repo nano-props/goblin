@@ -164,9 +164,11 @@ export interface RepoSessionHydrationOptions {
 interface LocalWorkspaceState {
   /** Client-only workspace UI state that should never be serialized into
    *  WorkspaceSessionState or treated as restorable workspace state. */
-  /** Hydration flag — true once boot session is restored, so we don't
-   *  overwrite the saved session with an empty one before restore. */
-  sessionReady: boolean
+  /** Workspace membership restore flag. True once boot session entries have
+   *  produced the placeholder repo set (or proved there are no repos), so the
+   *  workspace shell can render without overwriting the saved session with an
+   *  empty one before restore. Repo content hydration may still be running. */
+  workspaceMembershipReady: boolean
   /** Persistence gate — true only after all boot-restored state that can
    *  affect WorkspaceSessionState has converged back into the client store. */
   sessionPersistenceReady: boolean
