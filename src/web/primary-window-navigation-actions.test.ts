@@ -96,6 +96,36 @@ describe('createPrimaryWindowNavigationActions', () => {
 
     expect(navigation.openHome).toHaveBeenCalled()
   })
+
+  test('opens create worktree for the current repo', () => {
+    const navigation = routeNavigation()
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: '/tmp/repo-a',
+      order: ['/tmp/repo-a'],
+      closeRepo: vi.fn(),
+      setWorkspacePaneTab: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    actions.openCreateWorktree()
+
+    expect(navigation.openRepoNewWorktree).toHaveBeenCalledWith('/tmp/repo-a')
+  })
+
+  test('does not open create worktree without a current repo', () => {
+    const navigation = routeNavigation()
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: null,
+      order: [],
+      closeRepo: vi.fn(),
+      setWorkspacePaneTab: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    actions.openCreateWorktree()
+
+    expect(navigation.openRepoNewWorktree).not.toHaveBeenCalled()
+  })
 })
 
 function routeNavigation(): PrimaryWindowRouteNavigation {

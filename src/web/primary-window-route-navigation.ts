@@ -105,7 +105,11 @@ export function returnToFromHref(href: string | null): string | null {
   const hashStart = href.indexOf('#', queryStart)
   const search = href.slice(queryStart + 1, hashStart < 0 ? undefined : hashStart)
   const returnTo = new URLSearchParams(search).get('returnTo')
-  return returnTo && returnTo.startsWith('/') ? returnTo : null
+  return isAppRelativeHref(returnTo) ? returnTo : null
+}
+
+function isAppRelativeHref(href: string | null): href is string {
+  return !!href && href.startsWith('/') && !href.startsWith('//')
 }
 
 function pathFromHref(href: string): string | null {

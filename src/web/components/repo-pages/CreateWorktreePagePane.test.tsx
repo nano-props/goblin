@@ -82,9 +82,10 @@ describe('CreateWorktreePagePane', () => {
 
   test('navigates to the created branch after the action succeeds', async () => {
     const onCreated = vi.fn()
+    const onCancel = vi.fn()
     useReposStore.setState({ runBranchAction: vi.fn(async () => ({ ok: true, message: 'ok' })) })
 
-    const { container } = renderInJsdom(<CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={onCreated} />)
+    const { container } = renderInJsdom(<CreateWorktreePagePane repoId={REPO_ID} onCancel={onCancel} onCreated={onCreated} />)
 
     await waitFor(() => {
       expect(button(container).dataset.loading).toBe('false')
@@ -97,6 +98,7 @@ describe('CreateWorktreePagePane', () => {
     await waitFor(() => {
       expect(onCreated).toHaveBeenCalledWith('feature/new')
     })
+    expect(onCancel).not.toHaveBeenCalled()
   })
 
   test('does not reload bootstrap preview when the repo presentation refreshes', async () => {

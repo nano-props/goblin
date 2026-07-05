@@ -197,7 +197,7 @@ interface RepoRouteContext {
   branchName?: string
 }
 
-function repoRouteContextFromMatches(matches: Array<{ routeId: string; params: Record<string, string> }>): RepoRouteContext | null {
+export function repoRouteContextFromMatches(matches: Array<{ routeId: string; params: Record<string, string> }>): RepoRouteContext | null {
   const repoMatch = [...matches].reverse().find((match) => typeof match.params.repoSlug === 'string')
   if (!repoMatch) return null
 
@@ -207,7 +207,7 @@ function repoRouteContextFromMatches(matches: Array<{ routeId: string; params: R
   const branchSlug = repoMatch.params.branchSlug
   if (branchSlug) {
     const branchName = branchNameFromSlug(branchSlug)
-    return branchName ? { kind: 'branch', repoSlug, branchName } : null
+    return branchName ? { kind: 'branch', repoSlug, branchName } : { kind: 'empty', repoSlug }
   }
 
   if (repoMatch.routeId.includes('/worktree/new')) return { kind: 'newWorktree', repoSlug }

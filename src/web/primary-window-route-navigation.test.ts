@@ -42,4 +42,8 @@ describe('primary window route navigation helpers', () => {
   test('ignores external return targets', () => {
     expect(returnToFromHref('/settings/general?returnTo=https%3A%2F%2Fexample.invalid')).toBeNull()
   })
+
+  test('ignores protocol-relative return targets', () => {
+    expect(returnToFromHref('/settings/general?returnTo=%2F%2Fexample.invalid')).toBeNull()
+  })
 })

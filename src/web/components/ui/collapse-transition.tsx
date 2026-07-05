@@ -55,6 +55,7 @@ export function CollapseTransition({
       outer.style.opacity = present && h > 0 ? '1' : '0'
       targetRef.current = h
       const handleTransitionEnd = () => {
+        if (present) outer.style.height = 'auto'
         outer.style.overflow = ''
         outer.style.overflowClipMargin = ''
         transitionCleanupRef.current = null
@@ -66,11 +67,14 @@ export function CollapseTransition({
       setRenderedChildren(null)
     }
 
+  }, [duration, present, renderedChildren])
+
+  useLayoutEffect(() => {
     return () => {
       transitionCleanupRef.current?.()
       transitionCleanupRef.current = null
     }
-  }, [duration, present, renderedChildren])
+  }, [])
 
   return (
     <div ref={outerRef}>

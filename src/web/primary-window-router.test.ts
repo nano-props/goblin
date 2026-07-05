@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import { initialRepoRouteSlugFromStore, repoRouteViewFromChildRoute } from '#/web/primary-window-router.tsx'
 import { repoSlugFromId } from '#/web/repo-route-slugs.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { repoRouteContextFromMatches } from '#/web/Layout.tsx'
 
 describe('primary window initial route', () => {
   test('prefers the restored repo over the first repo in order', () => {
@@ -67,5 +68,15 @@ describe('repo route view derivation', () => {
       repoId: '/repo',
       branchName: 'feature/a',
     })
+  })
+})
+
+describe('repo route context derivation', () => {
+  test('keeps repo context when a branch slug is malformed', () => {
+    expect(
+      repoRouteContextFromMatches([
+        { routeId: '/repo/$repoSlug/branch/$branchSlug', params: { repoSlug: 'L3JlcG8', branchSlug: '%' } },
+      ]),
+    ).toEqual({ kind: 'empty', repoSlug: 'L3JlcG8' })
   })
 })
