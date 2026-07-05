@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { GitBranchPlus } from 'lucide-react'
 import { CreateWorktreePageSurface } from '#/web/components/create-worktree-dialog/CreateWorktreeDialog.tsx'
 import type { CreateWorktreeRequest } from '#/web/components/create-worktree-dialog/create-worktree-dialog.logic.ts'
 import {
@@ -8,11 +9,12 @@ import {
   resolveWorktreeBootstrapDecision,
 } from '#/web/components/create-worktree-dialog/create-worktree-bootstrap-host.logic.ts'
 import { ScrollPane } from '#/web/components/Layout.tsx'
-import { WorkspaceChrome } from '#/web/components/workspace-toolbar-chrome.tsx'
+import { RepoPageToolbar } from '#/web/components/repo-pages/RepoPageToolbar.tsx'
 import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
 import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
 import { useSettingsSnapshotReadModel } from '#/web/settings-queries.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useT } from '#/web/stores/i18n.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
 
 interface CreateWorktreePagePaneProps {
@@ -23,6 +25,7 @@ interface CreateWorktreePagePaneProps {
 }
 
 export function CreateWorktreePagePane({ repoId, trafficLightOffset = false, onCancel, onCreated }: CreateWorktreePagePaneProps) {
+  const t = useT()
   const liveRepo = useReposStore((s) => s.repos[repoId])
   const runBranchAction = useReposStore((s) => s.runBranchAction)
   const branchReadModel = useRepoBranchReadModel(liveRepo?.id ?? '', liveRepo?.instanceId ?? '', !!liveRepo)
@@ -134,7 +137,7 @@ export function CreateWorktreePagePane({ repoId, trafficLightOffset = false, onC
 
   return (
     <>
-      <WorkspaceChrome trafficLightOffset={trafficLightOffset} />
+      <RepoPageToolbar icon={GitBranchPlus} label={t('action.create-worktree-title')} trafficLightOffset={trafficLightOffset} />
       <ScrollPane>
         <CreateWorktreePageSurface
           repo={{ ...liveRepo, branchModel: branchReadModel }}

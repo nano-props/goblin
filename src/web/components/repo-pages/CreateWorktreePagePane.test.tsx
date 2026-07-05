@@ -38,7 +38,10 @@ vi.mock('#/web/components/Layout.tsx', () => ({
 }))
 
 vi.mock('#/web/components/workspace-toolbar-chrome.tsx', () => ({
-  WorkspaceChrome: () => null,
+  WorkspaceToolbar: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  WorkspaceToolbarContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  WorkspaceToolbarLeadingSpacer: () => null,
+  WorkspaceToolbarPrimary: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
 
 vi.mock('#/web/repo-branch-read-model.ts', () => ({
