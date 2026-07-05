@@ -24,7 +24,7 @@ interface CreateWorktreePagePaneProps {
 
 export function CreateWorktreePagePane({ repoId, trafficLightOffset = false, onCancel, onCreated }: CreateWorktreePagePaneProps) {
   const liveRepo = useReposStore((s) => s.repos[repoId])
-  const submitBranchAction = useReposStore((s) => s.submitBranchAction)
+  const runBranchAction = useReposStore((s) => s.runBranchAction)
   const branchReadModel = useRepoBranchReadModel(liveRepo?.id ?? '', liveRepo?.instanceId ?? '', !!liveRepo)
   const [bootstrapPreview, setBootstrapPreview] = useState<WorktreeBootstrapPreview | null>(null)
   const [bootstrapPreviewError, setBootstrapPreviewError] = useState(false)
@@ -119,16 +119,16 @@ export function CreateWorktreePagePane({ repoId, trafficLightOffset = false, onC
     })
   }
 
-  function handleCreateWorktree(request: CreateWorktreeRequest): boolean {
+  async function handleCreateWorktree(request: CreateWorktreeRequest): Promise<boolean> {
     const currentRepo = useReposStore.getState().repos[repoId]
     if (!currentRepo || currentRepo.instanceId !== liveRepo.instanceId) return false
     if (currentRepo.operations.branchAction.phase !== 'idle' || worktreeBootstrap.loading) return false
-    submitBranchAction(
+    const result = await runBranchAction(
       repoId,
       { kind: 'createWorktree', input: request.input, worktreeBootstrap: currentWorktreeBootstrapDecision() },
       { repoInstanceId: liveRepo.instanceId, refreshOnError: false },
     )
-    onCreated(createWorktreeTargetBranch(request.input))
+    if (result?.ok) onCreated(createWorktreeTargetBranch(request.input))
     return false
   }
 

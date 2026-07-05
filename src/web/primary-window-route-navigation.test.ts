@@ -12,6 +12,21 @@ describe('primary window route navigation helpers', () => {
     expect(routeReturnSearch('/repo/repo-slug/worktree/new', '/repo/repo-slug/worktree/new')).toEqual({})
   })
 
+  test('preserves an existing return target when re-entering the same route', () => {
+    expect(
+      routeReturnSearch(
+        '/repo/repo-slug/worktree/new?returnTo=%2Frepo%2Frepo-slug%2Fbranch%2Fbranch-slug',
+        '/repo/repo-slug/worktree/new',
+      ),
+    ).toEqual({ returnTo: '/repo/repo-slug/branch/branch-slug' })
+  })
+
+  test('preserves an existing return target while navigating inside a route family', () => {
+    expect(routeReturnSearch('/settings/general?returnTo=%2Frepo%2Frepo-slug%2Fdashboard', '/settings', '/settings')).toEqual({
+      returnTo: '/repo/repo-slug/dashboard',
+    })
+  })
+
   test('reads a same-origin relative return target from the current href', () => {
     expect(returnToFromHref('/repo/repo-slug/worktree/new?returnTo=%2Frepo%2Frepo-slug%2Fbranch%2Fbranch-slug')).toBe(
       '/repo/repo-slug/branch/branch-slug',

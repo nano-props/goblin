@@ -30,7 +30,7 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
       void router?.navigate({
         to: '/settings/$page',
         params: { page },
-        search: routeReturnSearch(href, '/settings'),
+        search: routeReturnSearch(href, '/settings', '/settings'),
       })
     },
     closeSettings() {
@@ -78,10 +78,18 @@ function repoSlugForId(repoId: string): string | null {
   return repo ? repoSlugFromId(repo.id) : null
 }
 
-export function routeReturnSearch(href: string | null, currentPath: string): { returnTo?: string } {
+export function routeReturnSearch(
+  href: string | null,
+  targetPath: string,
+  currentRouteFamily = targetPath,
+): { returnTo?: string } {
   if (!href) return {}
   const path = pathFromHref(href)
-  if (!path || path === currentPath) return {}
+  if (!path) return {}
+  if (path === targetPath || path.startsWith(currentRouteFamily)) {
+    const existingReturnTo = returnToFromHref(href)
+    return existingReturnTo ? { returnTo: existingReturnTo } : {}
+  }
   return { returnTo: href }
 }
 
