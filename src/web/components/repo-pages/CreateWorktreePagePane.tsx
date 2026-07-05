@@ -10,12 +10,24 @@ import {
 } from '#/web/components/create-worktree/create-worktree-bootstrap-host.logic.ts'
 import { ScrollPane } from '#/web/components/Layout.tsx'
 import { RepoPageLoadingBody, RepoPagePane } from '#/web/components/repo-pages/RepoPagePane.tsx'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
 import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
-import { useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
+import { settingsSnapshotQueryOptions } from '#/web/settings-queries.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import type { WorktreeBootstrapDecision, WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
+import type { SettingsSnapshot } from '#/shared/api-types.ts'
+import type { WorktreeBootstrapDecision } from '#/shared/worktree-bootstrap-summary.ts'
+import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
+
+type ConfigTrustChoice = { key: string; value: boolean } | null
+type BootstrapLoad = {
+  repoId: string
+  repoInstanceId: string
+  previewResult: WorktreeBootstrapPreviewResult
+  settingsSnapshot?: SettingsSnapshot
+  settingsError: boolean
+}
 
 interface CreateWorktreePagePaneProps {
   repoId: string
@@ -36,45 +48,31 @@ export function CreateWorktreePagePane({
   const liveRepo = useReposStore((s) => s.repos[repoId])
   const runBranchAction = useReposStore((s) => s.runBranchAction)
   const branchReadModel = useRepoBranchReadModel(liveRepo?.id ?? '', liveRepo?.instanceId ?? '', !!liveRepo)
-  const [bootstrapPreview, setBootstrapPreview] = useState<WorktreeBootstrapPreview | null>(null)
-  const [bootstrapPreviewError, setBootstrapPreviewError] = useState(false)
-  const [bootstrapPreviewLoading, setBootstrapPreviewLoading] = useState(false)
-  const [configTrustChoice, setConfigTrustChoice] = useState<boolean | null>(null)
-  const settingsQuery = useSettingsSnapshotQuery()
-  const settingsSnapshot = settingsQuery.data
-
   const repoInstanceId = liveRepo?.instanceId ?? null
+  const [configTrustChoice, setConfigTrustChoice] = useState<ConfigTrustChoice>(null)
+  const [bootstrapLoad, setBootstrapLoad] = useState<BootstrapLoad | null>(null)
+  const [bootstrapLoading, setBootstrapLoading] = useState(false)
 
   useEffect(() => {
     if (repoInstanceId === null) {
-      setBootstrapPreview(null)
-      setBootstrapPreviewError(false)
-      setBootstrapPreviewLoading(false)
+      setBootstrapLoad(null)
+      setBootstrapLoading(false)
       setConfigTrustChoice(null)
       return
     }
 
     const controller = new AbortController()
     let ignore = false
-    setBootstrapPreview(null)
-    setBootstrapPreviewError(false)
-    setBootstrapPreviewLoading(true)
+    setBootstrapLoad(null)
+    setBootstrapLoading(true)
     setConfigTrustChoice(null)
 
-    void getRepoWorktreeBootstrapPreview(repoId, controller.signal)
-      .then((result) => {
-        if (ignore) return
-        setBootstrapPreview(result.ok ? result.preview : null)
-        setBootstrapPreviewError(!result.ok)
-      })
-      .catch(() => {
-        if (ignore) return
-        setBootstrapPreview(null)
-        setBootstrapPreviewError(true)
+    void loadBootstrap(repoId, repoInstanceId, controller.signal)
+      .then((load) => {
+        if (!ignore) setBootstrapLoad(load)
       })
       .finally(() => {
-        if (ignore) return
-        setBootstrapPreviewLoading(false)
+        if (!ignore) setBootstrapLoading(false)
       })
 
     return () => {
@@ -83,17 +81,24 @@ export function CreateWorktreePagePane({
     }
   }, [repoId, repoInstanceId])
 
-  // Page-level readiness: gate the whole form on every fetch we depend on, so
-  // the trust prompt never has to fade in *after* the body is already on screen.
-  // A failed preview is allowed through so a preview error doesn't trap the
-  // user in a skeleton forever.
-  const bootstrapReady = bootstrapPreview !== null || bootstrapPreviewError
-  const settingsReady = settingsSnapshot !== undefined || settingsQuery.isError
+  const activeBootstrapLoad =
+    repoInstanceId && isBootstrapLoadForRepo(bootstrapLoad, repoId, repoInstanceId) ? bootstrapLoad : null
+  const bootstrapPreviewResult = activeBootstrapLoad?.previewResult
+  const bootstrapPreview = bootstrapPreviewResult?.ok ? bootstrapPreviewResult.preview : null
+  const bootstrapPreviewError = bootstrapPreviewResult?.ok === false
+  const bootstrapConfigHash = bootstrapPreview?.configHash ?? null
+  const bootstrapTrustKey = bootstrapConfigHash ? `${repoId}\u0000${repoInstanceId ?? ''}\u0000${bootstrapConfigHash}` : null
+  const effectiveConfigTrustChoice =
+    configTrustChoice && configTrustChoice.key === bootstrapTrustKey ? configTrustChoice.value : null
+  const settingsSnapshot = activeBootstrapLoad?.settingsSnapshot
+  const settingsReady = !!settingsSnapshot || !!activeBootstrapLoad?.settingsError
   const worktreeBootstrapTrustLoading = isConfigTrustStateLoading({
     preview: bootstrapPreview,
     settingsReady,
   })
-  const pageReady = !!liveRepo && !!branchReadModel && bootstrapReady && !worktreeBootstrapTrustLoading
+  const bootstrapDecisionReady =
+    !bootstrapLoading && (bootstrapPreviewError || (bootstrapPreview !== null && !worktreeBootstrapTrustLoading))
+  const pageReady = !!liveRepo && !!branchReadModel && bootstrapDecisionReady
 
   if (!pageReady) {
     return (
@@ -103,7 +108,6 @@ export function CreateWorktreePagePane({
     )
   }
 
-  const bootstrapConfigHash = bootstrapPreview?.configHash ?? null
   const serverConfigTrusted = resolveConfigTrusted({
     repoSettings: settingsSnapshot?.repoSettings ?? [],
     repoId,
@@ -115,23 +119,25 @@ export function CreateWorktreePagePane({
         repoSettings: settingsSnapshot.repoSettings,
         repoId,
         configHash: bootstrapConfigHash,
-        configTrustChoice,
+        configTrustChoice: effectiveConfigTrustChoice,
       })
     : false
   const worktreeBootstrap = {
-    loading: bootstrapPreviewLoading || worktreeBootstrapTrustLoading,
+    loading: !bootstrapDecisionReady,
     preview: bootstrapPreview,
     error: bootstrapPreviewError,
     configTrusted,
     onConfigTrustedChange: (next: boolean) => {
-      setConfigTrustChoice((currentChoice) =>
-        resolveNextConfigTrustChoice({
+      setConfigTrustChoice((currentChoice) => {
+        const currentValue = currentChoice && currentChoice.key === bootstrapTrustKey ? currentChoice.value : null
+        const nextValue = resolveNextConfigTrustChoice({
           next,
           currentTrusted: configTrusted,
           serverTrusted: serverConfigTrusted,
-          currentChoice,
-        }),
-      )
+          currentChoice: currentValue,
+        })
+        return nextValue === null || !bootstrapTrustKey ? null : { key: bootstrapTrustKey, value: nextValue }
+      })
     },
   }
 
@@ -140,7 +146,7 @@ export function CreateWorktreePagePane({
       preview: bootstrapPreview,
       repoSettings: settingsSnapshot?.repoSettings ?? [],
       repoId,
-      configTrustChoice,
+      configTrustChoice: effectiveConfigTrustChoice,
     })
   }
 
@@ -207,4 +213,31 @@ function createWorktreeTargetBranch(input: CreateWorktreeRequest['input']): stri
   }
   const exhaustive: never = input.mode
   return exhaustive
+}
+
+function isBootstrapLoadForRepo(
+  load: BootstrapLoad | null,
+  repoId: string,
+  repoInstanceId: string,
+): boolean {
+  return load?.repoId === repoId && load.repoInstanceId === repoInstanceId
+}
+
+async function loadBootstrap(repoId: string, repoInstanceId: string, signal: AbortSignal): Promise<BootstrapLoad> {
+  const previewResult = await getRepoWorktreeBootstrapPreview(repoId, signal).catch(
+    (): WorktreeBootstrapPreviewResult => ({ ok: false, message: 'error.failed-read-repo' }),
+  )
+  let settingsSnapshot: SettingsSnapshot | undefined
+  let settingsError = false
+
+  if (previewResult.ok && previewResult.preview.hasOperations && previewResult.preview.configHash) {
+    try {
+      if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
+      settingsSnapshot = await primaryWindowQueryClient.fetchQuery(settingsSnapshotQueryOptions())
+    } catch {
+      settingsError = true
+    }
+  }
+
+  return { repoId, repoInstanceId, previewResult, settingsSnapshot, settingsError }
 }

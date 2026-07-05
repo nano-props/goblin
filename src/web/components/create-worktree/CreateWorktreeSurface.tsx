@@ -361,10 +361,6 @@ function CreateWorktreeAnimatedSection({ children, present = true }: { children:
 }
 
 function WorktreeBootstrapTrustRow({ state }: { state: WorktreeBootstrapPromptState | undefined }) {
-  // Page-level readiness in CreateWorktreePagePane already holds the whole
-  // form in a skeleton until the bootstrap preview and settings both settle,
-  // so this row never has to render during loading. Anything that should
-  // appear under the path field resolves at the same instant the form does.
   if (!shouldShowWorktreeBootstrapTrust(state)) return null
   return <WorktreeBootstrapTrustCheckbox state={state} />
 }

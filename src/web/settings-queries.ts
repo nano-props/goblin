@@ -27,7 +27,7 @@ export {
   settingsSnapshotQueryKey,
 } from '#/web/settings-query-cache.ts'
 
-function settingsSnapshotQueryOptions() {
+export function settingsSnapshotQueryOptions() {
   return queryOptions<SettingsSnapshot>({
     queryKey: settingsSnapshotQueryKey(),
     queryFn: getSettingsSnapshot,
