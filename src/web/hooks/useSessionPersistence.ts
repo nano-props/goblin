@@ -1,7 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react'
 import { persistWorkspaceSessionState, persistWorkspaceSessionStateOnUnload } from '#/web/settings-actions.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { restorableWorkspaceStateFromStore } from '#/web/stores/repos/selector-state.ts'
+import {
+  restorableWorkspaceStateFromStore,
+  workspaceSessionPersistenceOpenFromStore,
+} from '#/web/stores/repos/selector-state.ts'
 import { workspaceSessionStateFromRestorableWorkspaceState } from '#/web/restorable-workspace-state.ts'
 import { sessionLog } from '#/web/logger.ts'
 import { useFiletreeInteractionStore } from '#/web/stores/repos/filetree-interaction-state.ts'
@@ -14,6 +17,7 @@ const SESSION_SAVE_DEBOUNCE_MS = 200
 interface SessionPersistenceInput {
   workspaceMembershipReady: boolean
   sessionPersistenceReady: boolean
+  sessionRestoreError: string | null
   repos: ReturnType<typeof useReposStore.getState>['repos']
   order: string[]
   restoredRepoId: string | null
@@ -33,6 +37,7 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
   )
   const workspaceMembershipReady = useReposStore((s) => s.workspaceMembershipReady)
   const sessionPersistenceReady = useReposStore((s) => s.sessionPersistenceReady)
+  const sessionRestoreError = useReposStore((s) => s.sessionRestoreError)
   const repos = useReposStore((s) => s.repos)
   const workspacePaneTabsVersion = useWorkspacePaneTabsCacheVersion()
   const filetreeInteractionByScope = useFiletreeInteractionStore((s) => s.interactionByScope)
@@ -75,6 +80,7 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
     latestInputRef.current = {
       workspaceMembershipReady,
       sessionPersistenceReady,
+      sessionRestoreError,
       repos,
       order,
       restoredRepoId,
@@ -91,6 +97,7 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
     routedRepoId,
     selectedTerminalSessionIdByTerminalWorktree,
     sessionPersistenceReady,
+    sessionRestoreError,
     workspaceMembershipReady,
     workspacePaneSize,
     zenMode,
@@ -133,6 +140,7 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
   }, [
     workspaceMembershipReady,
     sessionPersistenceReady,
+    sessionRestoreError,
     order,
     restoredRepoId,
     routedRepoId,
@@ -171,7 +179,7 @@ function sessionFromPersistenceInput(
   input: SessionPersistenceInput | null,
   lastRoutedRepoId: string | null,
 ): ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState> | null {
-  if (!input?.workspaceMembershipReady || !input.sessionPersistenceReady) return null
+  if (!input || !workspaceSessionPersistenceOpenFromStore(input)) return null
   return workspaceSessionStateFromRestorableWorkspaceState({
     repos: input.repos,
     restorableWorkspaceState: restorableWorkspaceStateFromStore({

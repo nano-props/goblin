@@ -222,11 +222,14 @@ describe('app bootstrap hooks', () => {
     expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
     expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
     expect(useReposStore.getState().sessionRestoreError).toBe('workspace pane tabs restore failed')
-    expect(mockedRestoreServerWorkspacePaneTabsFromSession).toHaveBeenCalledWith({
-      '/tmp/repo': {
-        [targetKey]: [],
+    expect(mockedRestoreServerWorkspacePaneTabsFromSession).toHaveBeenCalledWith(
+      {
+        '/tmp/repo': {
+          [targetKey]: [],
+        },
       },
-    })
+      { signal: expect.any(AbortSignal) },
+    )
   })
 
   test('blocks persistence when workspace preferred tab restore fails during repo hydration', async () => {

@@ -3,6 +3,8 @@ import {
   keyboardRuntimeStateFromStore,
   restorableWorkspaceStateFromStore,
   runtimeCoherentRepoProjectionStateFromStore,
+  workspaceRestoreStatusFromStore,
+  workspaceSessionPersistenceOpenFromStore,
 } from '#/web/stores/repos/selector-state.ts'
 import {
   primaryWindowNavigationStoreActionsFromStore,
@@ -164,5 +166,53 @@ describe('repo selectors', () => {
     ).toEqual({
       repo: null,
     })
+  })
+
+  test('derives workspace restore status from membership and persistence gates', () => {
+    expect(
+      workspaceRestoreStatusFromStore({
+        workspaceMembershipReady: false,
+        sessionPersistenceReady: false,
+        sessionRestoreError: null,
+      }),
+    ).toBe('restoring-membership')
+    expect(
+      workspaceRestoreStatusFromStore({
+        workspaceMembershipReady: true,
+        sessionPersistenceReady: false,
+        sessionRestoreError: null,
+      }),
+    ).toBe('restoring-runtime-state')
+    expect(
+      workspaceRestoreStatusFromStore({
+        workspaceMembershipReady: true,
+        sessionPersistenceReady: false,
+        sessionRestoreError: 'restore failed',
+      }),
+    ).toBe('blocked')
+    expect(
+      workspaceRestoreStatusFromStore({
+        workspaceMembershipReady: true,
+        sessionPersistenceReady: true,
+        sessionRestoreError: null,
+      }),
+    ).toBe('ready')
+  })
+
+  test('opens session persistence only after workspace restore is ready', () => {
+    expect(
+      workspaceSessionPersistenceOpenFromStore({
+        workspaceMembershipReady: true,
+        sessionPersistenceReady: true,
+        sessionRestoreError: null,
+      }),
+    ).toBe(true)
+    expect(
+      workspaceSessionPersistenceOpenFromStore({
+        workspaceMembershipReady: true,
+        sessionPersistenceReady: true,
+        sessionRestoreError: 'restore failed',
+      }),
+    ).toBe(false)
   })
 })

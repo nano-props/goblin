@@ -1,0 +1,74 @@
+# Startup Architecture
+
+The primary window boot path has two separate concerns: public shell hydration and authenticated workspace restore. Keep new startup work in the narrowest stage that owns the data it needs.
+
+## Stages
+
+1. Public bootstrap
+   - Owner: `usePublicAppBootstrap`.
+   - Runs before authentication completes.
+   - Allowed work: unauthenticated-safe client state such as theme, host-independent shell defaults, and public cache priming.
+   - Must not read or write workspace session state.
+
+2. Token gate
+   - Owner: `TokenGate` and `useAccessTokenStatus`.
+   - Validates `/api/whoami`, exchanges URL tokens through `/api/login`, and removes URL tokens before any network hop.
+   - Uses a timeout-backed abort controller. Cleanup cancels the active auth check and must not update React state after unmount.
+
+3. Authenticated workspace restore
+   - Owner: `useAuthenticatedAppBootstrap`.
+   - A single restore run owns the settings snapshot, non-critical authenticated hydration, workspace session restore, timeout, and cleanup cancellation.
+   - The run returns an explicit outcome: `completed` or `cancelled`. Only `completed` may transition the authenticated shell to `ready`.
+   - Cleanup cancellation is not a restore failure. Timeouts and actual restore errors are failures and must leave enough state for the UI to render without opening persistence.
+
+4. Workspace membership restore
+   - Owner: `hydrateRepoSession` in the repos store.
+   - Produces the restored repo membership and placeholder repos. `workspaceMembershipReady` means membership has settled; repo content may still be loading.
+   - If the restore signal is aborted, this stage must return without flipping `workspaceMembershipReady`.
+
+5. Server-owned workspace tab restore
+   - Owner: `restoreServerWorkspacePaneTabsFromSession`.
+   - Imports persisted workspace pane tabs into the server runtime after repo membership exists.
+   - Accepts an optional `AbortSignal`. It can skip work before commits start and report `cancelled` after commits settle; it does not currently interrupt an already-started terminal mutation.
+   - After this stage succeeds, `sessionPersistenceReady` may open.
+
+6. Workspace shell side effects
+   - Owner: `AuthenticatedWorkspaceShell` and `AuthenticatedWorkspaceSideEffects`.
+   - Runs only after authenticated bootstrap is ready.
+   - Uses the routed repo id from the URL as the durable source of truth, and the hydrated repo id only for operations that require repo data.
+
+## Readiness Model
+
+The repos store keeps low-level fields because different UI surfaces need different boundaries:
+
+- `workspaceMembershipReady`: restored repo membership has settled.
+- `sessionPersistenceReady`: all boot-restored state that can affect session persistence has converged back into client-observable state.
+- `sessionRestoreError`: restore failed in a way that must block persistence.
+
+Code that needs the combined state should use `workspaceRestoreStatusFromStore` or `workspaceSessionPersistenceOpenFromStore` from `src/web/stores/repos/selector-state.ts` instead of recombining booleans at call sites.
+
+## Routing Rules
+
+- Repo routes derive `RepoRouteView` directly from the URL before store hydration.
+- A routed repo may be missing from the repo store while workspace membership is restoring. Render restore skeletons until `workspaceMembershipReady` is true.
+- After membership is ready, a routed repo missing from the store is a not-found state, not an empty placeholder.
+- Session persistence should prefer the routed repo id over `restoredRepoId` so deep links are not overwritten by stale boot state.
+
+## Persistence Rules
+
+- Session persistence is client-to-settings only. Boot restore owns initial settings-to-client hydration.
+- Do not persist until `workspaceSessionPersistenceOpenFromStore` is true.
+- Restore failures must block persistence so the saved session is not overwritten with a partial or empty workspace.
+- High-frequency runtime state should stay debounced; coarse workspace structure changes may save immediately.
+
+## Adding Startup Work
+
+When adding startup behavior, choose one stage and document why it belongs there.
+
+- Public, unauthenticated work goes in public bootstrap.
+- Authenticated but non-blocking work can run as an optional task in authenticated bootstrap and must log but not block workspace restore.
+- Work that affects repo membership belongs in `hydrateRepoSession`.
+- Work that affects persisted workspace session must complete before `sessionPersistenceReady` opens.
+- Work that needs hydrated repo data but is not part of restore belongs in workspace shell side effects.
+
+Every async startup task needs a cleanup story: cancellation must not commit success, unblock persistence, or set React state after unmount.

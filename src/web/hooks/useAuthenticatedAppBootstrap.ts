@@ -29,6 +29,8 @@ interface AuthenticatedWorkspaceRestoreRun {
   cancel: () => void
 }
 
+type WorkspaceRestoreOutcome = { status: 'completed' } | { status: 'cancelled' }
+
 export function useAuthenticatedAppBootstrap(): AuthenticatedAppBootstrapState {
   const restoreRunRef = useRef<AuthenticatedWorkspaceRestoreRun | null>(null)
   const [state, setState] = useState<AuthenticatedAppBootstrapState>('booting')
@@ -60,9 +62,9 @@ function startAuthenticatedWorkspaceRestoreRun(onReady: () => void): Authenticat
     if (!timeout.signal.aborted) bootstrapLog.warn('settings priming failed', { err })
   })
   void hydrateNonCriticalAuthenticatedState(settingsSnapshot, timeout.signal)
-  void restoreBootSession(settingsSnapshot, timeout.signal).then((completed) => {
+  void restoreBootSession(settingsSnapshot, timeout.signal).then((outcome) => {
     timeout.dispose()
-    if (!cancelled && completed) onReady()
+    if (!cancelled && outcome.status === 'completed') onReady()
   })
   return {
     cancel: () => {
@@ -83,7 +85,7 @@ async function hydrateNonCriticalAuthenticatedState(settingsSnapshot: Promise<Se
   ])
 }
 
-async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>, signal: AbortSignal): Promise<boolean> {
+async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>, signal: AbortSignal): Promise<WorkspaceRestoreOutcome> {
   try {
     useReposStore.setState({ sessionPersistenceReady: false, sessionRestoreError: null })
     useSessionRestoreStore.getState().hydrateFromSettingsSnapshot(await settingsSnapshot)
@@ -109,18 +111,22 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>, s
     if (signal.aborted) throw abortReason(signal)
     const workspaceTabsRestoreResult = await restoreServerWorkspacePaneTabsFromSession(
       restoredWorkspaceState.workspacePaneTabsByTargetByRepo,
+      { signal },
     )
+    if (workspaceTabsRestoreResult.status === 'cancelled') return { status: 'cancelled' }
     finishWorkspacePaneTabsBootRestore(workspaceTabsRestoreResult)
-    return true
+    return { status: 'completed' }
   } catch (err) {
-    if (err === AUTHENTICATED_WORKSPACE_RESTORE_CANCELLED) return false
+    if (err === AUTHENTICATED_WORKSPACE_RESTORE_CANCELLED) return { status: 'cancelled' }
     bootstrapLog.warn('session restore failed', { err })
     blockSessionPersistenceAfterRestoreFailure(restoreFailureMessage(err))
-    return true
+    return { status: 'completed' }
   }
 }
 
-function finishWorkspacePaneTabsBootRestore(result: RestoreWorkspacePaneTabsFromSessionResult): void {
+function finishWorkspacePaneTabsBootRestore(
+  result: Exclude<RestoreWorkspacePaneTabsFromSessionResult, { status: 'cancelled' }>,
+): void {
   switch (result.status) {
     case 'restored':
       useReposStore.setState({ sessionPersistenceReady: true, sessionRestoreError: null })

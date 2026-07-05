@@ -7,6 +7,7 @@ Use these docs for app-level product and architecture decisions:
 - `ssh-remote.md`: SSH remote repository backend design
 - `layering.md`: feature layering rules
 - `state-sync.md`: state control and sync model
+- `startup.md`: primary window startup, restore, routing, and persistence gates
 - `client-model.md`: client model
 - `testing.md`: testing strategy
 - `realtime.md`: realtime rules
