@@ -39,3 +39,11 @@ test('does not expose failed settings writes through the in-memory cache', async
     { kind: 'local', id: '/repo-a' },
   ])
 })
+
+test('retries default settings initialization after a transient write failure', async () => {
+  const mod = await import('#/server/modules/settings-source.ts')
+  persistence.failNextWrite = true
+
+  await expect(mod.getServerFetchIntervalSec()).rejects.toThrow('disk full')
+  await expect(mod.getServerFetchIntervalSec()).resolves.toBe(120)
+})

@@ -465,7 +465,10 @@ async function loadUserSettings(): Promise<UserSettingsData> {
     settingsData = data
     cachedFetchIntervalSec = data.fetchIntervalSec
     return data
-  })()
+  })().catch((err) => {
+    settingsLoadPromise = null
+    throw err
+  })
   return await settingsLoadPromise
 }
 
