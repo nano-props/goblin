@@ -471,7 +471,7 @@ describe('repo session hydration', () => {
     // inserting placeholders. An already-aborted boot run therefore
     // short-circuits before either placeholder or probe work starts.
     expect(useReposStore.getState().order).toEqual([])
-    expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
+    expect(useReposStore.getState().workspaceMembershipReady).toBe(false)
     // But the probe handler was never invoked because the abort check
     // fires before resolveRepoPath is called.
     expect(probeCalls).toBe(0)
@@ -525,6 +525,7 @@ describe('repo session hydration', () => {
     expect(runtimeOpenResolved).toBe(true)
     expect(runtimeCloseCount).toBe(1)
     expect(useReposStore.getState().order).toEqual([])
+    expect(useReposStore.getState().workspaceMembershipReady).toBe(false)
   })
 })
 

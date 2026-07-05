@@ -222,6 +222,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         ),
       )
       await placeholderReady
+      if (signal?.aborted) return
       // Flip workspaceMembershipReady unconditionally once workspace membership is ready.
       // With open repositories, the workspace restore skeleton gives
       // way to a real workspace immediately — the per-repo body keeps
