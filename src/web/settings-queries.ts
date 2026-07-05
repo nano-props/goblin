@@ -27,16 +27,27 @@ export {
   settingsSnapshotQueryKey,
 } from '#/web/settings-query-cache.ts'
 
-function settingsSnapshotQueryOptions() {
+export function settingsSnapshotQueryOptions(options: { signal?: AbortSignal } = {}) {
   return queryOptions<SettingsSnapshot>({
     queryKey: settingsSnapshotQueryKey(),
-    queryFn: getSettingsSnapshot,
+    queryFn: ({ signal }) => getSettingsSnapshot({ signal: combineAbortSignals(options.signal, signal) }),
     // No initial data from the bootstrap — the server no longer
     // inlines it. The query starts pending and the authenticated
     // bootstrap pass populates the cache.
     staleTime: 0,
     gcTime: 5 * 60_000,
   })
+}
+
+function combineAbortSignals(externalSignal: AbortSignal | undefined, querySignal: AbortSignal): AbortSignal {
+  if (!externalSignal) return querySignal
+  if (externalSignal.aborted) return externalSignal
+  if (querySignal.aborted) return querySignal
+  const controller = new AbortController()
+  const abort = () => controller.abort()
+  externalSignal.addEventListener('abort', abort, { once: true })
+  querySignal.addEventListener('abort', abort, { once: true })
+  return controller.signal
 }
 
 function externalAppsQueryOptions() {
