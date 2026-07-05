@@ -77,7 +77,8 @@ interface UserSettingsData {
 export type UserSettingsPatch = Partial<UserSettings>
 
 let cachedFetchIntervalSec = DEFAULT_FETCH_INTERVAL_SEC
-let settingsPromise: Promise<UserSettingsData> | null = null
+let settingsData: UserSettingsData | null = null
+let settingsLoadPromise: Promise<UserSettingsData> | null = null
 let settingsMutationPromise: Promise<void> = Promise.resolve()
 const listeners = new Set<FetchIntervalListener>()
 
@@ -417,6 +418,10 @@ function cloneRepoSettings(repoSettings: readonly RepoSettingsEntry[]): RepoSett
   }))
 }
 
+function cloneSession(session: WorkspaceSessionState): WorkspaceSessionState {
+  return normalizeSession(session)
+}
+
 async function readUserSettingsFile(): Promise<UserSettingsData | null> {
   const raw = await readUserSettingsJson()
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
@@ -442,27 +447,55 @@ async function writeUserSettingsFile(data: UserSettingsData): Promise<void> {
 }
 
 async function loadUserSettings(): Promise<UserSettingsData> {
-  settingsPromise ??= (async () => {
+  if (settingsData) return settingsData
+  settingsLoadPromise ??= (async () => {
     const persisted = await readUserSettingsFile()
-    const data = persisted ?? {
-      ...defaultUserSettings(),
-      session: defaultSession(),
-      recentRepos: [],
-      repoSettings: [],
+    let data: UserSettingsData
+    if (persisted) {
+      data = persisted
+    } else {
+      data = {
+        ...defaultUserSettings(),
+        session: defaultSession(),
+        recentRepos: [],
+        repoSettings: [],
+      }
+      await writeUserSettingsFile(data)
     }
-    await writeUserSettingsFile(data)
+    settingsData = data
     cachedFetchIntervalSec = data.fetchIntervalSec
     return data
   })()
-  return await settingsPromise
+  return await settingsLoadPromise
 }
 
-async function mutateUserSettings<T>(mutation: (data: UserSettingsData) => Promise<T> | T): Promise<T> {
+interface UserSettingsMutation<T> {
+  next: UserSettingsData
+  result: T
+  changed?: boolean
+  afterCommit?: () => void
+}
+
+function unchangedUserSettings<T>(data: UserSettingsData, result: T): UserSettingsMutation<T> {
+  return { next: data, result, changed: false }
+}
+
+async function mutateUserSettings<T>(
+  mutation: (data: UserSettingsData) => Promise<UserSettingsMutation<T>> | UserSettingsMutation<T>,
+): Promise<T> {
   let result!: T
   const run = settingsMutationPromise
     .catch(() => {})
     .then(async () => {
-      result = await mutation(await loadUserSettings())
+      const current = await loadUserSettings()
+      const commit = await mutation(current)
+      if (commit.changed !== false) {
+        await writeUserSettingsFile(commit.next)
+        settingsData = commit.next
+        settingsLoadPromise = Promise.resolve(commit.next)
+      }
+      commit.afterCommit?.()
+      result = commit.result
     })
   settingsMutationPromise = run.then(
     () => {},
@@ -477,23 +510,21 @@ async function mutateUserSettings<T>(mutation: (data: UserSettingsData) => Promi
  * entry if it doesn't exist. The patch receives the current entry (or
  * `undefined`) and returns the new entry, or `null` to skip the update
  * entirely (used by callers that want to no-op on unchanged values).
- * Returns `true` when `data.repoSettings` was modified.
+ * Returns the updated list, or `null` when the patch is a no-op.
  */
 function updateRepoSettingsEntry(
-  data: UserSettingsData,
+  repoSettings: readonly RepoSettingsEntry[],
   repoId: string,
   patch: (existing: RepoSettingsEntry | undefined) => RepoSettingsEntry | null,
-): boolean {
-  const existingIndex = data.repoSettings.findIndex((entry) => entry.repoId === repoId)
-  const existing = existingIndex >= 0 ? data.repoSettings[existingIndex] : undefined
+): RepoSettingsEntry[] | null {
+  const existingIndex = repoSettings.findIndex((entry) => entry.repoId === repoId)
+  const existing = existingIndex >= 0 ? repoSettings[existingIndex] : undefined
   const next = patch(existing)
-  if (next === null) return false
+  if (next === null) return null
   if (existingIndex >= 0) {
-    data.repoSettings = data.repoSettings.map((entry, index) => (index === existingIndex ? next : entry))
-  } else {
-    data.repoSettings = [...data.repoSettings, next]
+    return repoSettings.map((entry, index) => (index === existingIndex ? next : entry))
   }
-  return true
+  return [...repoSettings, next]
 }
 
 export async function getServerFetchIntervalSec(): Promise<number> {
@@ -513,15 +544,18 @@ export function subscribeServerFetchInterval(listener: FetchIntervalListener): (
 export async function setServerFetchIntervalSec(sec: number): Promise<number> {
   return await mutateUserSettings(async (data) => {
     const next = normalizeFetchInterval(sec)
-    if (data.fetchIntervalSec !== next) {
-      data.fetchIntervalSec = next
-      await writeUserSettingsFile(data)
+    const changed = data.fetchIntervalSec !== next
+    return {
+      next: changed ? { ...data, fetchIntervalSec: next } : data,
+      result: next,
+      changed,
+      afterCommit: () => {
+        if (cachedFetchIntervalSec !== next) {
+          cachedFetchIntervalSec = next
+          for (const listener of listeners) listener(next)
+        }
+      },
     }
-    if (cachedFetchIntervalSec !== next) {
-      cachedFetchIntervalSec = next
-      for (const listener of listeners) listener(next)
-    }
-    return next
   })
 }
 
@@ -553,34 +587,45 @@ export async function updateUserSettings(patch: UserSettingsPatch): Promise<User
       data.globalShortcutDisabled !== nextGlobalShortcutDisabled ||
       data.globalShortcut !== nextGlobalShortcut ||
       data.lanEnabled !== nextLanEnabled
-    data.lang = nextLang
-    data.theme = nextTheme
-    data.colorTheme = nextColorTheme
-    data.fetchIntervalSec = nextFetchIntervalSec
-    data.terminalNotificationsEnabled = nextTerminalNotificationsEnabled
-    data.shortcutsDisabled = nextShortcutsDisabled
-    data.globalShortcutDisabled = nextGlobalShortcutDisabled
-    data.globalShortcut = nextGlobalShortcut
-    data.lanEnabled = nextLanEnabled
-    if (changed) await writeUserSettingsFile(data)
-    if (cachedFetchIntervalSec !== nextFetchIntervalSec) {
-      cachedFetchIntervalSec = nextFetchIntervalSec
-      for (const listener of listeners) listener(nextFetchIntervalSec)
+    const nextData: UserSettingsData = changed
+      ? {
+          ...data,
+          lang: nextLang,
+          theme: nextTheme,
+          colorTheme: nextColorTheme,
+          fetchIntervalSec: nextFetchIntervalSec,
+          terminalNotificationsEnabled: nextTerminalNotificationsEnabled,
+          shortcutsDisabled: nextShortcutsDisabled,
+          globalShortcutDisabled: nextGlobalShortcutDisabled,
+          globalShortcut: nextGlobalShortcut,
+          lanEnabled: nextLanEnabled,
+        }
+      : data
+    return {
+      next: nextData,
+      result: userSettingsFromData(nextData),
+      changed,
+      afterCommit: () => {
+        if (cachedFetchIntervalSec !== nextFetchIntervalSec) {
+          cachedFetchIntervalSec = nextFetchIntervalSec
+          for (const listener of listeners) listener(nextFetchIntervalSec)
+        }
+      },
     }
-    return userSettingsFromData(data)
   })
 }
 
 export async function getServerSessionState(): Promise<WorkspaceSessionState> {
-  return (await loadUserSettings()).session
+  return cloneSession((await loadUserSettings()).session)
 }
 
 export async function setServerSessionState(session: WorkspaceSessionState): Promise<WorkspaceSessionState> {
   return await mutateUserSettings(async (data) => {
     const next = normalizeSession(session)
-    data.session = next
-    await writeUserSettingsFile(data)
-    return next
+    return {
+      next: { ...data, session: next },
+      result: cloneSession(next),
+    }
   })
 }
 
@@ -598,21 +643,24 @@ export async function trustServerRepoWorktreeBootstrapConfig(input: {
 }): Promise<RepoSettingsEntry[]> {
   return await mutateUserSettings(async (data) => {
     const repoId = toSafeRepoLocator(input.repoId)
-    if (!repoId || !isWorktreeBootstrapConfigHash(input.configHash)) return cloneRepoSettings(data.repoSettings)
+    if (!repoId || !isWorktreeBootstrapConfigHash(input.configHash)) {
+      return unchangedUserSettings(data, cloneRepoSettings(data.repoSettings))
+    }
     const worktreeBootstrapTrust: WorktreeBootstrapTrust = {
       configHash: input.configHash,
       trustedAt: new Date().toISOString(),
     }
-    if (
-      updateRepoSettingsEntry(data, repoId, (existing) => ({
-        repoId,
-        ...existing,
-        worktreeBootstrapTrust,
-      }))
-    ) {
-      await writeUserSettingsFile(data)
+    const repoSettings = updateRepoSettingsEntry(data.repoSettings, repoId, (existing) => ({
+      repoId,
+      ...existing,
+      worktreeBootstrapTrust,
+    }))
+    const nextData = repoSettings ? { ...data, repoSettings } : data
+    return {
+      next: nextData,
+      result: cloneRepoSettings(nextData.repoSettings),
+      changed: repoSettings !== null,
     }
-    return cloneRepoSettings(data.repoSettings)
   })
 }
 
@@ -622,21 +670,21 @@ export async function untrustServerRepoWorktreeBootstrapConfig(input: {
 }): Promise<boolean> {
   return await mutateUserSettings(async (data) => {
     const repoId = toSafeRepoLocator(input.repoId)
-    if (!repoId || !isWorktreeBootstrapConfigHash(input.configHash)) return false
+    if (!repoId || !isWorktreeBootstrapConfigHash(input.configHash)) return unchangedUserSettings(data, false)
     const existingIndex = data.repoSettings.findIndex((entry) => entry.repoId === repoId)
-    if (existingIndex < 0) return false
+    if (existingIndex < 0) return unchangedUserSettings(data, false)
     const existing = data.repoSettings[existingIndex]
-    if (existing.worktreeBootstrapTrust?.configHash !== input.configHash) return false
+    if (existing.worktreeBootstrapTrust?.configHash !== input.configHash) return unchangedUserSettings(data, false)
 
     const nextEntry: RepoSettingsEntry = { ...existing }
     delete nextEntry.worktreeBootstrapTrust
     if (nextEntry.workspaceExternalAppRecent) {
-      data.repoSettings = data.repoSettings.map((entry, index) => (index === existingIndex ? nextEntry : entry))
+      const repoSettings = data.repoSettings.map((entry, index) => (index === existingIndex ? nextEntry : entry))
+      return { next: { ...data, repoSettings }, result: true }
     } else {
-      data.repoSettings = data.repoSettings.filter((_, index) => index !== existingIndex)
+      const repoSettings = data.repoSettings.filter((_, index) => index !== existingIndex)
+      return { next: { ...data, repoSettings }, result: true }
     }
-    await writeUserSettingsFile(data)
-    return true
   })
 }
 
@@ -661,12 +709,12 @@ export async function setServerRepoWorkspaceExternalAppRecent(input: {
     const isBareRepoScope = input.worktreePath === null || input.worktreePath === undefined
     const safeWorktreePath = isBareRepoScope ? null : toSafeSessionPath(input.worktreePath)
     if (!repoId || (!isBareRepoScope && safeWorktreePath === null) || !isKnownWorkspaceExternalAppItemId(input.itemId)) {
-      return cloneRepoSettings(data.repoSettings)
+      return unchangedUserSettings(data, cloneRepoSettings(data.repoSettings))
     }
     const worktreeKey = workspaceExternalAppRecentKey(safeWorktreePath)
     // No-op when the value hasn't changed — keeps a no-op click from
     // triggering a full user-settings.json rewrite.
-    const updated = updateRepoSettingsEntry(data, repoId, (existing) => {
+    const repoSettings = updateRepoSettingsEntry(data.repoSettings, repoId, (existing) => {
       const existingByWorktree = existing?.workspaceExternalAppRecent?.byWorktree ?? {}
       if (existingByWorktree[worktreeKey] === input.itemId) return null
       return {
@@ -675,8 +723,12 @@ export async function setServerRepoWorkspaceExternalAppRecent(input: {
         workspaceExternalAppRecent: { byWorktree: { ...existingByWorktree, [worktreeKey]: input.itemId } },
       }
     })
-    if (updated) await writeUserSettingsFile(data)
-    return cloneRepoSettings(data.repoSettings)
+    const nextData = repoSettings ? { ...data, repoSettings } : data
+    return {
+      next: nextData,
+      result: cloneRepoSettings(nextData.repoSettings),
+      changed: repoSettings !== null,
+    }
   })
 }
 
@@ -692,13 +744,13 @@ export async function pruneServerRepoSettingsForRemovedWorktree(input: {
   return await mutateUserSettings(async (data) => {
     const repoId = toSafeRepoLocator(input.repoId)
     const safeWorktreePath = toSafeSessionPath(input.worktreePath)
-    if (!repoId || safeWorktreePath === null) return false
+    if (!repoId || safeWorktreePath === null) return unchangedUserSettings(data, false)
     const worktreeKey = workspaceExternalAppRecentKey(safeWorktreePath)
     const existingIndex = data.repoSettings.findIndex((entry) => entry.repoId === repoId)
-    if (existingIndex < 0) return false
+    if (existingIndex < 0) return unchangedUserSettings(data, false)
     const existing = data.repoSettings[existingIndex]
     const existingByWorktree = existing.workspaceExternalAppRecent?.byWorktree
-    if (!existingByWorktree || !(worktreeKey in existingByWorktree)) return false
+    if (!existingByWorktree || !(worktreeKey in existingByWorktree)) return unchangedUserSettings(data, false)
 
     const nextByWorktree = { ...existingByWorktree }
     delete nextByWorktree[worktreeKey]
@@ -709,40 +761,36 @@ export async function pruneServerRepoSettingsForRemovedWorktree(input: {
       delete nextEntry.workspaceExternalAppRecent
     }
 
-    if (nextEntry.worktreeBootstrapTrust || nextEntry.workspaceExternalAppRecent) {
-      data.repoSettings = data.repoSettings.map((entry, index) => (index === existingIndex ? nextEntry : entry))
-    } else {
-      data.repoSettings = data.repoSettings.filter((_, index) => index !== existingIndex)
-    }
-    await writeUserSettingsFile(data)
-    return true
+    const repoSettings = nextEntry.worktreeBootstrapTrust || nextEntry.workspaceExternalAppRecent
+      ? data.repoSettings.map((entry, index) => (index === existingIndex ? nextEntry : entry))
+      : data.repoSettings.filter((_, index) => index !== existingIndex)
+    return { next: { ...data, repoSettings }, result: true }
   })
 }
 
 export async function addServerRecentRepo(repo: RepoSessionEntry): Promise<RepoSessionEntry[]> {
   return await mutateUserSettings(async (data) => {
     const safeRepo = toSafeSessionRepoEntry(repo)
-    if (!safeRepo) return [...data.recentRepos]
+    if (!safeRepo) return unchangedUserSettings(data, [...data.recentRepos])
     const safeId = repoSessionEntryId(safeRepo)
-    data.recentRepos = [safeRepo, ...data.recentRepos.filter((entry) => repoSessionEntryId(entry) !== safeId)].slice(
+    const recentRepos = [safeRepo, ...data.recentRepos.filter((entry) => repoSessionEntryId(entry) !== safeId)].slice(
       0,
       MAX_RECENT_REPOS,
     )
-    await writeUserSettingsFile(data)
-    return [...data.recentRepos]
+    return { next: { ...data, recentRepos }, result: [...recentRepos] }
   })
 }
 
 export async function clearServerRecentRepos(): Promise<void> {
   await mutateUserSettings(async (data) => {
-    if (data.recentRepos.length === 0) return
-    data.recentRepos = []
-    await writeUserSettingsFile(data)
+    if (data.recentRepos.length === 0) return { next: data, result: undefined, changed: false }
+    return { next: { ...data, recentRepos: [] }, result: undefined }
   })
 }
 
 export function resetServerSettingsSourceForTests(): void {
-  settingsPromise = null
+  settingsData = null
+  settingsLoadPromise = null
   settingsMutationPromise = Promise.resolve()
   listeners.clear()
   cachedFetchIntervalSec = DEFAULT_FETCH_INTERVAL_SEC
