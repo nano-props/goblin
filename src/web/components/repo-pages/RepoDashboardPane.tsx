@@ -43,9 +43,16 @@ interface RepoDashboardPaneProps {
   compact?: boolean
   trafficLightOffset?: boolean
   onBack?: () => void
+  onSelectBranch?: (branchName: string) => void
 }
 
-export function RepoDashboardPane({ repoId, compact = false, trafficLightOffset = false, onBack }: RepoDashboardPaneProps) {
+export function RepoDashboardPane({
+  repoId,
+  compact = false,
+  trafficLightOffset = false,
+  onBack,
+  onSelectBranch,
+}: RepoDashboardPaneProps) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
   const repo = useReposStore(
@@ -85,8 +92,17 @@ export function RepoDashboardPane({ repoId, compact = false, trafficLightOffset 
               <DashboardHeader repo={repo} currentBranch={branchModel.currentBranch} lang={lang} />
               <DashboardStats compact={compact} summary={summary} />
               <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]')}>
-                <DashboardAttention branchModel={branchModel} pullRequestEntries={pullRequestEntries} summary={summary} />
-                <DashboardRecentBranches branchModel={branchModel} branches={summary.recentBranches} />
+                <DashboardAttention
+                  branchModel={branchModel}
+                  pullRequestEntries={pullRequestEntries}
+                  summary={summary}
+                  onSelectBranch={onSelectBranch}
+                />
+                <DashboardRecentBranches
+                  branchModel={branchModel}
+                  branches={summary.recentBranches}
+                  onSelectBranch={onSelectBranch}
+                />
               </div>
             </>
           ) : (
@@ -214,7 +230,7 @@ function dashboardRemoteState(repo: Pick<RepoState, 'remote'>): { labelKey: stri
 function DashboardStats({ compact, summary }: { compact: boolean; summary: DashboardSummary }) {
   const t = useT()
   return (
-    <div className={cn('grid gap-2', compact ? 'grid-cols-2' : 'grid-cols-4')}>
+    <div className={cn('grid gap-2', compact ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4')}>
       <MetricCard icon={GitBranch} label={t('dashboard.metric.branches')} value={summary.branchCount} detail={t('dashboard.metric.branches-detail', { count: summary.worktreeCount })} />
       <MetricCard icon={Workflow} label={t('dashboard.metric.worktrees')} value={summary.worktreeCount} detail={t('dashboard.metric.worktrees-detail', { count: summary.dirtyWorktreeCount })} tone={summary.dirtyWorktreeCount > 0 ? 'attention' : 'default'} />
       <MetricCard icon={GitCompareArrows} label={t('dashboard.metric.sync')} value={`${summary.aheadCount}/${summary.behindCount}`} detail={t('dashboard.metric.sync-detail')} tone={summary.behindCount > 0 ? 'attention' : 'success'} />
@@ -237,8 +253,8 @@ function MetricCard({
   tone?: DashboardTone
 }) {
   return (
-    <div className="flex min-h-14 items-center gap-2.5 rounded-lg border border-border/60 bg-background/85 px-3 py-2 shadow-[var(--shadow-inset-highlight)]">
-      <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted/45">
+    <div className="flex min-h-14 items-center gap-2 rounded-lg border border-border/60 bg-background/85 px-2.5 py-2 shadow-[var(--shadow-inset-highlight)]">
+      <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted/45">
         <Icon size={14} className={metricToneClass(tone)} />
       </div>
       <div className="min-w-0 flex-1">
@@ -262,10 +278,12 @@ function DashboardAttention({
   branchModel,
   pullRequestEntries,
   summary,
+  onSelectBranch,
 }: {
   branchModel: RepoBranchReadModelData
   pullRequestEntries: PullRequestEntry[] | null
   summary: DashboardSummary
+  onSelectBranch?: (branchName: string) => void
 }) {
   const t = useT()
   return (
@@ -278,6 +296,7 @@ function DashboardAttention({
               branchModel={branchModel}
               pullRequestEntries={pullRequestEntries}
               branch={branch}
+              onSelectBranch={onSelectBranch}
             />
           ))}
         </div>
@@ -292,16 +311,28 @@ function BranchAttentionRow({
   branchModel,
   pullRequestEntries,
   branch,
+  onSelectBranch,
 }: {
   branchModel: RepoBranchReadModelData
   pullRequestEntries: PullRequestEntry[] | null
   branch: RepoBranchState
+  onSelectBranch?: (branchName: string) => void
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+    <button
+      type="button"
+      data-testid="dashboard-branch-link"
+      className={cn(
+        'flex w-full min-w-0 flex-col gap-2 px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 sm:flex-row sm:items-center sm:justify-between',
+        onSelectBranch && 'hover:bg-accent/45',
+        !onSelectBranch && 'cursor-default',
+      )}
+      disabled={!onSelectBranch}
+      onClick={() => onSelectBranch?.(branch.name)}
+    >
       <BranchSummaryInline repo={{ branchModel }} branch={branch} />
       <BranchSignals branchModel={branchModel} pullRequest={pullRequestForBranch(pullRequestEntries, branch.name)} branch={branch} />
-    </div>
+    </button>
   )
 }
 
@@ -345,9 +376,11 @@ function SignalDelta({ direction, count }: { direction: 'ahead' | 'behind'; coun
 function DashboardRecentBranches({
   branchModel,
   branches,
+  onSelectBranch,
 }: {
   branchModel: RepoBranchReadModelData
   branches: RepoBranchState[]
+  onSelectBranch?: (branchName: string) => void
 }) {
   const t = useT()
   return (
@@ -355,12 +388,23 @@ function DashboardRecentBranches({
       {branches.length > 0 ? (
         <div className="divide-y divide-separator">
           {branches.map((branch) => (
-            <div key={branch.name} className="px-3 py-2.5">
+            <button
+              key={branch.name}
+              type="button"
+              data-testid="dashboard-branch-link"
+              className={cn(
+                'block w-full px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45',
+                onSelectBranch && 'hover:bg-accent/45',
+                !onSelectBranch && 'cursor-default',
+              )}
+              disabled={!onSelectBranch}
+              onClick={() => onSelectBranch?.(branch.name)}
+            >
               <BranchSummaryInline repo={{ branchModel }} branch={branch} />
               <div className="mt-0.5 truncate pl-5 text-[11px] text-muted-foreground" title={branch.lastCommitMessage}>
                 {branch.lastCommitShortHash} · {branch.lastCommitMessage}
               </div>
-            </div>
+            </button>
           ))}
         </div>
       ) : (

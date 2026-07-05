@@ -53,4 +53,23 @@ describe('RepoDashboardPane', () => {
     expect(container.textContent).toContain('dashboard.checks-failing')
     expect(container.textContent).toContain('feature/pr')
   })
+
+  test('opens a branch from dashboard branch rows', () => {
+    const onSelectBranch = vi.fn()
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/open')],
+      currentBranchName: 'feature/open',
+    })
+
+    const { getByTestId } = renderInJsdom(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <RepoDashboardPane repoId={REPO_ID} onSelectBranch={onSelectBranch} />
+      </QueryClientProvider>,
+    )
+
+    getByTestId('dashboard-branch-link').click()
+
+    expect(onSelectBranch).toHaveBeenCalledWith('feature/open')
+  })
 })

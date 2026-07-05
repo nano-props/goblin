@@ -201,6 +201,7 @@ export function RepoView({
               compact={compact}
               trafficLightOffset={workspaceTrafficLightOffset}
               onBack={() => onOpenRepoRoot?.(repo.id)}
+              onSelectBranch={(branchName) => onOpenRepoBranch?.(repo.id, branchName)}
             />
           ) : routeView?.kind === 'newWorktree' ? (
             <CreateWorktreePagePane
