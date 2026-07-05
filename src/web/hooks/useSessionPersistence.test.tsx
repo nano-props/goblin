@@ -512,6 +512,40 @@ describe('useSessionPersistence', () => {
       }),
     )
   })
+
+  test('flushes a debounced session save when the native app is quitting', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: '/tmp/repo',
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
+      currentBranchName: 'feature/worktree',
+    })
+    useReposStore.setState({
+      repos: { [repo.id]: repo },
+      order: [repo.id],
+      workspaceMembershipReady: true,
+      sessionPersistenceReady: true,
+    })
+
+    renderInJsdom(<Harness />)
+    persistWorkspaceSessionStateMock.mockClear()
+
+    act(() => {
+      useReposStore.setState({ selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'session-2' } })
+    })
+    expect(persistWorkspaceSessionStateMock).not.toHaveBeenCalled()
+
+    const { markAppQuitting } = await import('#/web/app-lifecycle.ts')
+    await act(async () => {
+      await markAppQuitting()
+    })
+
+    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'session-2' },
+      }),
+    )
+  })
+
 })
 
 function Harness({ routedRepoId = null }: { routedRepoId?: string | null }) {

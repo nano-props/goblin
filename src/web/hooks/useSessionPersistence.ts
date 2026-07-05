@@ -12,6 +12,7 @@ import {
   subscribeWorkspacePaneTabsPersistenceChanges,
   workspacePaneTabsPersistenceSnapshot,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 const SESSION_SAVE_DEBOUNCE_MS = 200
 
 interface SessionPersistenceInput {
@@ -49,14 +50,28 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
     session: ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState>
     serialized: string
   } | null>(null)
+  const latestSaveRef = useRef<{
+    session: ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState>
+    serialized: string
+  } | null>(null)
   const saveDrainRef = useRef<Promise<void> | null>(null)
+  const debounceTimerRef = useRef<number | null>(null)
+  const lastSaveErrorRef = useRef<unknown>(null)
 
   const enqueueSave = (
     session: ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState>,
     serialized: string,
+    options?: { throwOnFailure?: boolean },
   ) => {
+    lastSaveErrorRef.current = null
     queuedSaveRef.current = { session, serialized }
-    if (saveDrainRef.current) return
+    if (saveDrainRef.current) {
+      return options?.throwOnFailure
+        ? saveDrainRef.current.then(() => {
+            if (lastSaveErrorRef.current) throw lastSaveErrorRef.current
+          })
+        : saveDrainRef.current
+    }
     saveDrainRef.current = (async () => {
       while (queuedSaveRef.current) {
         const next = queuedSaveRef.current
@@ -64,15 +79,19 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
         lastSavedRef.current = next.serialized
         try {
           await persistWorkspaceSessionState(next.session)
+          lastSaveErrorRef.current = null
         } catch (err) {
           if (lastSavedRef.current === next.serialized) lastSavedRef.current = null
+          lastSaveErrorRef.current = err
           sessionLog.warn('save failed', { err })
+          if (options?.throwOnFailure) throw err
         }
       }
     })().finally(() => {
       saveDrainRef.current = null
       if (queuedSaveRef.current) enqueueSave(queuedSaveRef.current.session, queuedSaveRef.current.serialized)
     })
+    return saveDrainRef.current
   }
 
   useLayoutEffect(() => {
@@ -104,6 +123,18 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
   ])
 
   useEffect(() => {
+    return subscribeAppQuitting(async () => {
+      if (debounceTimerRef.current !== null) {
+        window.clearTimeout(debounceTimerRef.current)
+        debounceTimerRef.current = null
+      }
+      const latest = latestSaveRef.current
+      if (!latest || lastSavedRef.current === latest.serialized) return
+      await enqueueSave(latest.session, latest.serialized, { throwOnFailure: true })
+    })
+  }, [])
+
+  useEffect(() => {
     // Client -> persistence only. Boot restore runs elsewhere first.
     // workspaceMembershipReady gates the UI skeleton; sessionPersistenceReady waits
     // for boot-restored server-owned workspace tabs to converge back into the client store.
@@ -116,6 +147,7 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
       return
     }
     const serialized = JSON.stringify(session)
+    latestSaveRef.current = { session, serialized }
     // Restorable session writes should be immediate only for coarse
     // workspace-structure changes. High-frequency runtime churn such as
     // terminal selection and workspace-tab mutation is still restorable, but
@@ -135,8 +167,17 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
       save()
       return
     }
-    const timeout = window.setTimeout(save, SESSION_SAVE_DEBOUNCE_MS)
-    return () => window.clearTimeout(timeout)
+    if (debounceTimerRef.current !== null) window.clearTimeout(debounceTimerRef.current)
+    debounceTimerRef.current = window.setTimeout(() => {
+      debounceTimerRef.current = null
+      save()
+    }, SESSION_SAVE_DEBOUNCE_MS)
+    return () => {
+      if (debounceTimerRef.current !== null) {
+        window.clearTimeout(debounceTimerRef.current)
+        debounceTimerRef.current = null
+      }
+    }
   }, [
     workspaceMembershipReady,
     sessionPersistenceReady,

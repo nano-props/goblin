@@ -403,7 +403,6 @@ function WorkspacePaneTabSwitcherPopover({
   }
 
   const selectNew = () => {
-    if (newTerminalBusy) return
     setOpen(false)
     onNew()
   }
@@ -483,11 +482,10 @@ function WorkspacePaneTabSwitcherPopover({
               className={cn(
                 'flex h-7 w-full items-center gap-2 rounded-sm px-2 text-left text-sm text-popover-foreground outline-none transition-colors duration-100',
                 newTerminalBusy
-                  ? 'cursor-default opacity-50'
+                  ? 'cursor-pointer opacity-70 hover:bg-accent hover:text-accent-foreground'
                   : 'cursor-pointer hover:bg-accent hover:text-accent-foreground',
               )}
               onClick={selectNew}
-              disabled={newTerminalBusy}
               aria-busy={newTerminalBusy ? 'true' : undefined}
             >
               <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
@@ -559,10 +557,9 @@ export function WorkspacePaneTabStrip({
     })
   }, [scrollBehavior])
   const handleNew = useCallback(() => {
-    if (newTerminalBusy) return
     scrollNewButtonIntoView()
     onNew()
-  }, [newTerminalBusy, onNew, scrollNewButtonIntoView])
+  }, [onNew, scrollNewButtonIntoView])
   const handleViewportScroll = useWorkspacePaneTabStripScrollMemory({
     workspacePaneTabTargetKey,
     enabled: !collapseToSelectedTab,
@@ -988,7 +985,6 @@ function WorkspacePaneNewButton({
       className={cn('h-7 w-7 shrink-0', compact && 'w-7')}
       id={id}
       onClick={onClick}
-      disabled={busy}
       aria-busy={busy ? 'true' : undefined}
       aria-label={label}
       title={label}

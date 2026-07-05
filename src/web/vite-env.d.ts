@@ -3,6 +3,7 @@
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import type { IpcEvent, IpcRequest, SettingsPage } from '#/shared/api-types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
+import type { AppQuitDrainResult } from '#/shared/app-quit-drain.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type {
   TerminalMutationResult,
@@ -19,6 +20,7 @@ import type {
 interface GoblinNativeBridge {
   invokeIpc: (request: IpcRequest) => Promise<unknown>
   abortIpc: (requestId: string) => Promise<boolean>
+  notifyAppQuitDrained?: (result: AppQuitDrainResult) => Promise<boolean>
   onEvent: (cb: (event: IpcEvent) => void) => () => void
   onIntent?: (cb: (event: ClientEffectIntent) => void) => () => void
   pathForFile: (file: File) => string

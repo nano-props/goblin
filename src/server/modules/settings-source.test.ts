@@ -1,5 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
+import { readFile, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { defaultWorkspaceSessionState } from '#/shared/settings-defaults.ts'
@@ -124,6 +125,43 @@ test('persists updates and notifies subscribers from the server settings store',
       },
     },
   ])
+})
+
+test('quarantines corrupt settings JSON before rebuilding defaults', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  await writeFile(path.join(tmp, 'user-settings.json'), '{bad json', 'utf-8')
+
+  const mod = await import('#/server/modules/settings-source.ts')
+
+  await expect(mod.getServerFetchIntervalSec()).resolves.toBe(120)
+  expect(JSON.parse(await readFile(path.join(tmp, 'user-settings.json'), 'utf-8'))).toMatchObject({
+    lang: 'auto',
+    fetchIntervalSec: 120,
+  })
+  expect(readdirSync(tmp).some((name) => name.startsWith('user-settings.json.corrupt-'))).toBe(true)
+})
+
+test('serializes concurrent settings mutations without dropping updates', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+
+  const mod = await import('#/server/modules/settings-source.ts')
+
+  await Promise.all([
+    mod.addServerRecentRepo({ kind: 'local', id: '/repo-a' }),
+    mod.addServerRecentRepo({ kind: 'local', id: '/repo-b' }),
+    mod.addServerRecentRepo({ kind: 'local', id: '/repo-c' }),
+  ])
+
+  expect(await mod.getServerRecentRepos()).toEqual([
+    { kind: 'local', id: '/repo-c' },
+    { kind: 'local', id: '/repo-b' },
+    { kind: 'local', id: '/repo-a' },
+  ])
+  expect(existsSync(path.join(tmp, 'user-settings.json'))).toBe(true)
 })
 
 test('updates repo-level worktree bootstrap trust by repo id', async () => {

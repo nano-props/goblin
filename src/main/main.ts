@@ -1,4 +1,4 @@
-import { app, dialog } from 'electron'
+import { app, dialog, ipcMain } from 'electron'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import { activatePrimaryWindow } from '#/main/window.ts'
 import { initTheme } from '#/main/theme.ts'
@@ -16,6 +16,8 @@ import { wireTerminalIpc } from '#/main/terminal.ts'
 import { syncGlobalShortcuts, unregisterAppShortcuts } from '#/main/shortcuts.ts'
 import { enqueueExternalOpenPath } from '#/main/external-open.ts'
 import { broadcastClientEffectIntent } from '#/main/client-surface-events.ts'
+import { APP_QUIT_DRAINED_CHANNEL } from '#/shared/ipc-channels.ts'
+import { isAppQuitDrainResult, type AppQuitDrainResult } from '#/shared/app-quit-drain.ts'
 import { getSettingsSnapshot, setGlobalShortcutState } from '#/main/settings-server-client.ts'
 import { startEmbeddedServer, stopEmbeddedServer } from '#/main/embedded-server-lifecycle.ts'
 
@@ -32,6 +34,8 @@ function activatePrimaryWindowFromEvent(): void {
 
 let activationBarrier: Promise<void> = Promise.resolve()
 let isQuitting = false
+const CLIENT_QUIT_DRAIN_TIMEOUT_MS = 1000
+type ClientQuitDrain = AppQuitDrainResult | { ok: false; timedOut: true }
 
 app.on('open-file', (event, path) => {
   event.preventDefault()
@@ -59,11 +63,11 @@ async function main(): Promise<void> {
     unregisterAppShortcuts()
   })
 
-  // Drain debounced settings writes before exit so the last theme pick,
-  // window resize, or session change isn't lost. We exit explicitly
-  // after the flush: re-entering app.quit from before-quit is not
-  // reliable across Electron quit paths, and app.exit skips will-quit,
-  // so do will-quit cleanup here too.
+  // Drain debounced window-state writes before exit so the last resize or
+  // move isn't lost. Settings writes are awaited at their server boundary.
+  // We exit explicitly after the flush: re-entering app.quit from
+  // before-quit is not reliable across Electron quit paths, and app.exit
+  // skips will-quit, so do will-quit cleanup here too.
   app.on('before-quit', async (event) => {
     if (isQuitting) return
     event.preventDefault()
@@ -80,7 +84,14 @@ async function main(): Promise<void> {
 
 async function finalizeNativeHostExit(): Promise<void> {
   try {
+    const clientQuitDrain = waitForClientQuitDrain()
     broadcastClientEffectIntent({ type: 'app-quitting' })
+    const clientQuitDrainResult = await clientQuitDrain
+    if ('timedOut' in clientQuitDrainResult) {
+      windowNodeLog.warn('timed out waiting for client quit persistence drain')
+    } else if (!clientQuitDrainResult.ok) {
+      windowNodeLog.warn({ err: clientQuitDrainResult.error }, 'client quit persistence drain failed')
+    }
     const windowStateFlushed = await flushWindowState()
     if (!windowStateFlushed) windowStateNodeLog.error('final flush failed before quit')
     await stopEmbeddedServer()
@@ -88,6 +99,24 @@ async function finalizeNativeHostExit(): Promise<void> {
     unregisterAppShortcuts()
     app.exit(0)
   }
+}
+
+async function waitForClientQuitDrain(): Promise<ClientQuitDrain> {
+  return await new Promise((resolve) => {
+    let settled = false
+    const finish = (drain: ClientQuitDrain) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      ipcMain.removeHandler(APP_QUIT_DRAINED_CHANNEL)
+      resolve(drain)
+    }
+    const timeout = setTimeout(() => finish({ ok: false, timedOut: true }), CLIENT_QUIT_DRAIN_TIMEOUT_MS)
+    ipcMain.handle(APP_QUIT_DRAINED_CHANNEL, (_event, result: unknown) => {
+      finish(isAppQuitDrainResult(result) ? result : { ok: false, error: { name: 'Error', message: 'Malformed quit drain result' } })
+      return true
+    })
+  })
 }
 
 async function initializeNativeHost(): Promise<void> {

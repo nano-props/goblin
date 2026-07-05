@@ -2,6 +2,7 @@ export const HOST_IPC_CALL_CHANNEL = 'goblin:ipc'
 export const HOST_IPC_ABORT_CHANNEL = 'goblin:ipc-abort'
 export const HOST_IPC_EVENT_CHANNEL = 'goblin:event'
 export const CLIENT_EFFECT_INTENT_CHANNEL = 'goblin:client-effect-intent'
+export const APP_QUIT_DRAINED_CHANNEL = 'goblin:app-quit-drained'
 
 export const HOST_OPEN_SETTINGS_WINDOW_CHANNEL = 'goblin:host-open-settings-window'
 export const HOST_OPEN_EXTERNAL_URL_CHANNEL = 'goblin:host-open-external-url'
