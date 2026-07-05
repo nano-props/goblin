@@ -233,7 +233,7 @@ async function loadBootstrap(repoId: string, repoInstanceId: string, signal: Abo
   if (previewResult.ok && previewResult.preview.hasOperations && previewResult.preview.configHash) {
     try {
       if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
-      settingsSnapshot = await primaryWindowQueryClient.fetchQuery(settingsSnapshotQueryOptions())
+      settingsSnapshot = await primaryWindowQueryClient.fetchQuery(settingsSnapshotQueryOptions({ signal }))
     } catch {
       settingsError = true
     }
