@@ -26,6 +26,16 @@ import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
 
 type DashboardTone = 'default' | 'attention' | 'success'
 
+const DASHBOARD_CARD_CLASS_NAME = 'rounded-lg border border-border/60 bg-card shadow-[var(--shadow-inset-highlight)]'
+const DASHBOARD_BRANCH_ROW_CLASS_NAME =
+  'w-full px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45'
+
+interface DashboardBranchItem {
+  branch: RepoBranchState
+  dirty: boolean
+  pullRequest?: PullRequestEntry['pullRequest']
+}
+
 interface DashboardSummary {
   branchCount: number
   worktreeCount: number
@@ -33,8 +43,8 @@ interface DashboardSummary {
   aheadCount: number
   behindCount: number
   openPullRequestCount: number
-  attentionBranches: RepoBranchState[]
-  recentBranches: RepoBranchState[]
+  attentionBranches: DashboardBranchItem[]
+  recentBranches: DashboardBranchItem[]
 }
 
 interface RepoDashboardPaneProps {
@@ -99,7 +109,6 @@ export function RepoDashboardPane({
               >
                 <DashboardAttention
                   branchModel={branchModel}
-                  pullRequestEntries={pullRequestEntries}
                   summary={summary}
                   onSelectBranch={onSelectBranch}
                 />
@@ -111,7 +120,7 @@ export function RepoDashboardPane({
               </div>
             </>
           ) : (
-            <div className="rounded-lg border border-border/60 bg-background/85 p-4 text-sm text-muted-foreground shadow-[var(--shadow-inset-highlight)]">
+            <div className={cn(DASHBOARD_CARD_CLASS_NAME, 'p-4 text-sm text-muted-foreground')}>
               {t('dashboard.loading')}
             </div>
           )}
@@ -124,23 +133,24 @@ export function RepoDashboardPane({
 function buildDashboardSummary(branchModel: RepoBranchReadModelData, pullRequestEntries: PullRequestEntry[] | null): DashboardSummary {
   const branches = branchModel.branches
   const pullRequestsByBranch = new Map(pullRequestEntries?.map((entry) => [entry.branch, entry.pullRequest]) ?? [])
-  const worktreeBranches = branches.filter((branch) => !!branch.worktree?.path)
-  const dirtyWorktreeCount = worktreeBranches.filter((branch) => branchWorktreeDirty(branchModel, branch)).length
+  const branchItems = branches.map((branch) => buildDashboardBranchItem(branchModel, pullRequestsByBranch, branch))
+  const worktreeBranches = branchItems.filter(({ branch }) => !!branch.worktree?.path)
+  const dirtyWorktreeCount = worktreeBranches.filter((item) => item.dirty).length
   const aheadCount = branches.filter((branch) => branch.ahead > 0).length
   const behindCount = branches.filter((branch) => branch.behind > 0).length
   const openPullRequestCount = [...pullRequestsByBranch.values()].filter((pullRequest) => pullRequest.state === 'open').length
-  const attentionBranches = branches
+  const attentionBranches = branchItems
     .filter(
-      (branch) =>
+      ({ branch, dirty, pullRequest }) =>
         !!branch.trackingGone ||
         branch.behind > 0 ||
         branch.ahead > 0 ||
-        branchWorktreeDirty(branchModel, branch) ||
-        pullRequestsByBranch.get(branch.name)?.checks?.failing,
+        dirty ||
+        pullRequest?.checks?.failing,
     )
-    .sort((a, b) => compareBranchesForAttention(a, b, branchModel, pullRequestsByBranch))
+    .sort(compareBranchesForAttention)
     .slice(0, 6)
-  const recentBranches = [...branches].sort(compareBranchesByCommitDate).slice(0, 8)
+  const recentBranches = [...branchItems].sort(compareBranchesByCommitDate).slice(0, 8)
 
   return {
     branchCount: branches.length,
@@ -154,33 +164,33 @@ function buildDashboardSummary(branchModel: RepoBranchReadModelData, pullRequest
   }
 }
 
-function compareBranchesByCommitDate(a: RepoBranchState, b: RepoBranchState) {
-  return Date.parse(b.lastCommitDate) - Date.parse(a.lastCommitDate)
-}
-
-function compareBranchesForAttention(
-  a: RepoBranchState,
-  b: RepoBranchState,
+function buildDashboardBranchItem(
   branchModel: RepoBranchReadModelData,
   pullRequestsByBranch: Map<string, PullRequestEntry['pullRequest']>,
-) {
-  return (
-    branchAttentionScore(b, branchModel, pullRequestsByBranch) -
-      branchAttentionScore(a, branchModel, pullRequestsByBranch) || compareBranchesByCommitDate(a, b)
-  )
-}
-
-function branchAttentionScore(
   branch: RepoBranchState,
-  branchModel: RepoBranchReadModelData,
-  pullRequestsByBranch: Map<string, PullRequestEntry['pullRequest']>,
-) {
+): DashboardBranchItem {
+  return {
+    branch,
+    dirty: branchWorktreeDirty(branchModel, branch),
+    pullRequest: pullRequestsByBranch.get(branch.name),
+  }
+}
+
+function compareBranchesByCommitDate(a: DashboardBranchItem, b: DashboardBranchItem) {
+  return Date.parse(b.branch.lastCommitDate) - Date.parse(a.branch.lastCommitDate)
+}
+
+function compareBranchesForAttention(a: DashboardBranchItem, b: DashboardBranchItem) {
+  return branchAttentionScore(b) - branchAttentionScore(a) || compareBranchesByCommitDate(a, b)
+}
+
+function branchAttentionScore({ branch, dirty, pullRequest }: DashboardBranchItem) {
   return (
     (branch.trackingGone ? 100 : 0) +
-    (branchWorktreeDirty(branchModel, branch) ? 40 : 0) +
+    (dirty ? 40 : 0) +
     Math.min(branch.behind, 20) * 3 +
     Math.min(branch.ahead, 20) * 2 +
-    (pullRequestsByBranch.get(branch.name)?.checks?.failing ?? 0) * 8
+    (pullRequest?.checks?.failing ?? 0) * 8
   )
 }
 
@@ -206,7 +216,7 @@ function DashboardHeader({
   const remoteState = dashboardRemoteState(repo)
 
   return (
-    <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-border/60 bg-background/85 p-4 shadow-[var(--shadow-inset-highlight)] sm:flex-row sm:items-start sm:justify-between">
+    <div className={cn(DASHBOARD_CARD_CLASS_NAME, 'flex min-w-0 flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between')}>
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-2">
           <h1 className="min-w-0 truncate text-base font-semibold text-foreground">{repo.name}</h1>
@@ -258,7 +268,7 @@ function MetricCard({
   tone?: DashboardTone
 }) {
   return (
-    <div className="flex min-h-14 items-center gap-2 rounded-lg border border-border/60 bg-background/85 px-2.5 py-2 shadow-[var(--shadow-inset-highlight)]">
+    <div className={cn(DASHBOARD_CARD_CLASS_NAME, 'flex min-h-14 items-center gap-2 px-2.5 py-2')}>
       <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted/45">
         <Icon size={14} className={metricToneClass(tone)} />
       </div>
@@ -281,12 +291,10 @@ function metricToneClass(tone: DashboardTone) {
 
 function DashboardAttention({
   branchModel,
-  pullRequestEntries,
   summary,
   onSelectBranch,
 }: {
   branchModel: RepoBranchReadModelData
-  pullRequestEntries: PullRequestEntry[] | null
   summary: DashboardSummary
   onSelectBranch?: (branchName: string) => void
 }) {
@@ -296,12 +304,11 @@ function DashboardAttention({
   return (
     <DashboardSection title={t('dashboard.attention.title')} description={t('dashboard.attention.description')}>
       <div className="divide-y divide-separator">
-        {summary.attentionBranches.map((branch) => (
+        {summary.attentionBranches.map((item) => (
           <BranchAttentionRow
-            key={branch.name}
+            key={item.branch.name}
             branchModel={branchModel}
-            pullRequestEntries={pullRequestEntries}
-            branch={branch}
+            item={item}
             onSelectBranch={onSelectBranch}
           />
         ))}
@@ -312,21 +319,21 @@ function DashboardAttention({
 
 function BranchAttentionRow({
   branchModel,
-  pullRequestEntries,
-  branch,
+  item,
   onSelectBranch,
 }: {
   branchModel: RepoBranchReadModelData
-  pullRequestEntries: PullRequestEntry[] | null
-  branch: RepoBranchState
+  item: DashboardBranchItem
   onSelectBranch?: (branchName: string) => void
 }) {
+  const { branch } = item
   return (
     <button
       type="button"
       data-testid="dashboard-branch-link"
       className={cn(
-        'flex w-full min-w-0 flex-col gap-2 px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45 sm:flex-row sm:items-center sm:justify-between',
+        DASHBOARD_BRANCH_ROW_CLASS_NAME,
+        'flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between',
         onSelectBranch && 'hover:bg-accent/45',
         !onSelectBranch && 'cursor-default',
       )}
@@ -334,34 +341,27 @@ function BranchAttentionRow({
       onClick={() => onSelectBranch?.(branch.name)}
     >
       <BranchSummaryInline repo={{ branchModel }} branch={branch} />
-      <BranchSignals branchModel={branchModel} pullRequest={pullRequestForBranch(pullRequestEntries, branch.name)} branch={branch} />
+      <BranchSignals item={item} />
     </button>
   )
 }
 
 function BranchSignals({
-  branchModel,
-  pullRequest,
-  branch,
+  item,
 }: {
-  branchModel: RepoBranchReadModelData
-  pullRequest?: PullRequestEntry['pullRequest']
-  branch: RepoBranchState
+  item: DashboardBranchItem
 }) {
   const t = useT()
+  const { branch, dirty, pullRequest } = item
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-1.5 text-xs">
-      {branchWorktreeDirty(branchModel, branch) && <Badge variant="attention">{t('branches.dirty')}</Badge>}
+      {dirty && <Badge variant="attention">{t('branches.dirty')}</Badge>}
       {branch.trackingGone && <Badge variant="attention">{t('branches.gone')}</Badge>}
       {branch.ahead > 0 && <SignalDelta direction="ahead" count={branch.ahead} />}
       {branch.behind > 0 && <SignalDelta direction="behind" count={branch.behind} />}
       {pullRequest?.checks?.failing ? <Badge variant="danger">{t('dashboard.checks-failing', { count: pullRequest.checks.failing })}</Badge> : null}
     </div>
   )
-}
-
-function pullRequestForBranch(pullRequestEntries: PullRequestEntry[] | null, branchName: string) {
-  return pullRequestEntries?.find((entry) => entry.branch === branchName)?.pullRequest
 }
 
 function SignalDelta({ direction, count }: { direction: 'ahead' | 'behind'; count: number }) {
@@ -382,7 +382,7 @@ function DashboardRecentBranches({
   onSelectBranch,
 }: {
   branchModel: RepoBranchReadModelData
-  branches: RepoBranchState[]
+  branches: DashboardBranchItem[]
   onSelectBranch?: (branchName: string) => void
 }) {
   const t = useT()
@@ -390,22 +390,23 @@ function DashboardRecentBranches({
     <DashboardSection title={t('dashboard.recent.title')} description={t('dashboard.recent.description')}>
       {branches.length > 0 ? (
         <div className="divide-y divide-separator">
-          {branches.map((branch) => (
+          {branches.map((item) => (
             <button
-              key={branch.name}
+              key={item.branch.name}
               type="button"
               data-testid="dashboard-branch-link"
               className={cn(
-                'block w-full px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/45',
+                DASHBOARD_BRANCH_ROW_CLASS_NAME,
+                'block',
                 onSelectBranch && 'hover:bg-accent/45',
                 !onSelectBranch && 'cursor-default',
               )}
               disabled={!onSelectBranch}
-              onClick={() => onSelectBranch?.(branch.name)}
+              onClick={() => onSelectBranch?.(item.branch.name)}
             >
-              <BranchSummaryInline repo={{ branchModel }} branch={branch} />
-              <div className="mt-0.5 truncate pl-5 text-[11px] text-muted-foreground" title={branch.lastCommitMessage}>
-                {branch.lastCommitShortHash} · {branch.lastCommitMessage}
+              <BranchSummaryInline repo={{ branchModel }} branch={item.branch} />
+              <div className="mt-0.5 truncate pl-5 text-[11px] text-muted-foreground" title={item.branch.lastCommitMessage}>
+                {item.branch.lastCommitShortHash} · {item.branch.lastCommitMessage}
               </div>
             </button>
           ))}
@@ -419,7 +420,7 @@ function DashboardRecentBranches({
 
 function DashboardSection({ title, description, children }: { title: string; description: string; children: ReactNode }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-border/60 bg-background/85 shadow-[var(--shadow-inset-highlight)]">
+    <section className={cn(DASHBOARD_CARD_CLASS_NAME, 'overflow-hidden')}>
       <div className="flex min-w-0 flex-col gap-0.5 border-b border-separator px-3 py-2.5 sm:flex-row sm:items-baseline sm:gap-2">
         <h2 className="shrink-0 text-[13px] font-semibold text-foreground">{title}</h2>
         <div className="min-w-0 truncate text-[11px] text-muted-foreground">{description}</div>
