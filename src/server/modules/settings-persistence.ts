@@ -35,7 +35,9 @@ export async function readUserSettingsJson(): Promise<unknown | null> {
     return JSON.parse(raw)
   } catch (err) {
     if (err instanceof SyntaxError) await quarantineCorruptSettingsFile(file, err)
-    else if ((err as NodeJS.ErrnoException).code !== 'ENOENT') serverNodeLog.warn({ err, file }, 'failed to read settings file')
+    else if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      serverNodeLog.warn({ err, file }, 'failed to read settings file')
+    }
     return null
   }
 }
@@ -50,10 +52,6 @@ export async function writeUserSettingsJson(data: unknown): Promise<void> {
       await writeFileAtomic(file, payload, { encoding: 'utf-8' })
     })
   return await writeQueue
-}
-
-export async function flushUserSettingsJsonWrites(): Promise<void> {
-  await writeQueue
 }
 
 export function resetUserSettingsPersistenceForTests(): void {
