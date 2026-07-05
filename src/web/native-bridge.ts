@@ -1,4 +1,5 @@
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
+import type { AppQuitDrainResult } from '#/shared/app-quit-drain.ts'
 
 export function readNativeBridge(): Window['goblinNative'] | null {
   try {
@@ -18,6 +19,6 @@ export function subscribeNativeEffectIntent(cb: (event: ClientEffectIntent) => v
   return bridge?.onIntent?.(cb) ?? (() => {})
 }
 
-export async function notifyNativeAppQuitDrained(): Promise<void> {
-  await readNativeBridge()?.notifyAppQuitDrained?.()
+export async function notifyNativeAppQuitDrained(result: AppQuitDrainResult): Promise<void> {
+  await readNativeBridge()?.notifyAppQuitDrained?.(result)
 }

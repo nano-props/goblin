@@ -130,7 +130,7 @@ function maybeDisposeEffectIntentListener() {
 contextBridge.exposeInMainWorld('goblinNative', {
   invokeIpc: ({ path, input, requestId }) => ipcCall({ path, input, requestId }),
   abortIpc: (requestId) => safeInvoke(IPC.ipc.abort, { requestId }),
-  notifyAppQuitDrained: () => safeInvoke(IPC.ipc.appQuitDrained),
+  notifyAppQuitDrained: (result) => safeInvoke(IPC.ipc.appQuitDrained, result),
   pathForFile: (file) => {
     // `webUtils` itself is destructured at the top of this file, so
     // a missing symbol there would already have crashed the preload

@@ -184,7 +184,7 @@ describe('native host startup lifecycle', () => {
       expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({ type: 'app-quitting' })
     })
     expect(mocks.flushWindowState).not.toHaveBeenCalled()
-    await mocks.ipcHandlers.get('goblin:app-quit-drained')?.()
+    await mocks.ipcHandlers.get('goblin:app-quit-drained')?.(null, { ok: true })
     await quitting
     const secondPassEvent = { preventDefault: vi.fn() }
     await emit('before-quit', secondPassEvent)
@@ -196,6 +196,27 @@ describe('native host startup lifecycle', () => {
     expect(mocks.exit).toHaveBeenCalledWith(0)
     expect(mocks.quit).not.toHaveBeenCalled()
     expect(secondPassEvent.preventDefault).not.toHaveBeenCalled()
+  })
+
+  test('does not wait for timeout when the client quit drain reports failure', async () => {
+    await import('#/main/main.ts')
+
+    const event = { preventDefault: vi.fn() }
+    const quitting = emit('before-quit', event)
+    await vi.waitFor(() => {
+      expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({ type: 'app-quitting' })
+    })
+
+    await mocks.ipcHandlers
+      .get('goblin:app-quit-drained')
+      ?.(null, { ok: false, error: { name: 'Error', message: 'disk full' } })
+    await quitting
+
+    expect(mocks.flushWindowState).toHaveBeenCalledTimes(1)
+    expect(mocks.exit).toHaveBeenCalledWith(0)
+    mocks.timeouts.values().next().value?.()
+    expect(mocks.flushWindowState).toHaveBeenCalledTimes(1)
+    expect(mocks.exit).toHaveBeenCalledTimes(1)
   })
 
   test('defers second-instance activation until startup initialization finishes', async () => {

@@ -1,4 +1,5 @@
 import { notifyNativeAppQuitDrained, subscribeNativeEffectIntent } from '#/web/native-bridge.ts'
+import { errorToAppQuitDrainResult } from '#/shared/app-quit-drain.ts'
 
 type Listener = () => void | Promise<void>
 
@@ -25,8 +26,14 @@ export async function markAppQuitting(): Promise<void> {
   quitting = true
   const pending = Array.from(listeners).map(async (listener) => await listener())
   listeners.clear()
-  await Promise.all(pending)
-  await notifyNativeAppQuitDrained()
+  const results = await Promise.allSettled(pending)
+  const failure = results.find((result) => result.status === 'rejected')
+  if (!failure) {
+    await notifyNativeAppQuitDrained({ ok: true })
+    return
+  }
+  await notifyNativeAppQuitDrained(errorToAppQuitDrainResult(failure.reason))
+  throw failure.reason
 }
 
 // Keep native quit lifecycle wiring at this low level so every Electron

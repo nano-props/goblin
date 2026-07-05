@@ -17,6 +17,7 @@ import { syncGlobalShortcuts, unregisterAppShortcuts } from '#/main/shortcuts.ts
 import { enqueueExternalOpenPath } from '#/main/external-open.ts'
 import { broadcastClientEffectIntent } from '#/main/client-surface-events.ts'
 import { APP_QUIT_DRAINED_CHANNEL } from '#/shared/ipc-channels.ts'
+import { isAppQuitDrainResult, type AppQuitDrainResult } from '#/shared/app-quit-drain.ts'
 import { getSettingsSnapshot, setGlobalShortcutState } from '#/main/settings-server-client.ts'
 import { startEmbeddedServer, stopEmbeddedServer } from '#/main/embedded-server-lifecycle.ts'
 
@@ -34,6 +35,7 @@ function activatePrimaryWindowFromEvent(): void {
 let activationBarrier: Promise<void> = Promise.resolve()
 let isQuitting = false
 const CLIENT_QUIT_DRAIN_TIMEOUT_MS = 1000
+type ClientQuitDrain = AppQuitDrainResult | { ok: false; timedOut: true }
 
 app.on('open-file', (event, path) => {
   event.preventDefault()
@@ -84,8 +86,12 @@ async function finalizeNativeHostExit(): Promise<void> {
   try {
     const clientQuitDrain = waitForClientQuitDrain()
     broadcastClientEffectIntent({ type: 'app-quitting' })
-    const clientQuitDrained = await clientQuitDrain
-    if (!clientQuitDrained) windowNodeLog.warn('timed out waiting for client quit persistence drain')
+    const clientQuitDrainResult = await clientQuitDrain
+    if ('timedOut' in clientQuitDrainResult) {
+      windowNodeLog.warn('timed out waiting for client quit persistence drain')
+    } else if (!clientQuitDrainResult.ok) {
+      windowNodeLog.warn({ err: clientQuitDrainResult.error }, 'client quit persistence drain failed')
+    }
     const windowStateFlushed = await flushWindowState()
     if (!windowStateFlushed) windowStateNodeLog.error('final flush failed before quit')
     await stopEmbeddedServer()
@@ -95,19 +101,19 @@ async function finalizeNativeHostExit(): Promise<void> {
   }
 }
 
-async function waitForClientQuitDrain(): Promise<boolean> {
+async function waitForClientQuitDrain(): Promise<ClientQuitDrain> {
   return await new Promise((resolve) => {
     let settled = false
-    const finish = (drained: boolean) => {
+    const finish = (drain: ClientQuitDrain) => {
       if (settled) return
       settled = true
       clearTimeout(timeout)
       ipcMain.removeHandler(APP_QUIT_DRAINED_CHANNEL)
-      resolve(drained)
+      resolve(drain)
     }
-    const timeout = setTimeout(() => finish(false), CLIENT_QUIT_DRAIN_TIMEOUT_MS)
-    ipcMain.handle(APP_QUIT_DRAINED_CHANNEL, () => {
-      finish(true)
+    const timeout = setTimeout(() => finish({ ok: false, timedOut: true }), CLIENT_QUIT_DRAIN_TIMEOUT_MS)
+    ipcMain.handle(APP_QUIT_DRAINED_CHANNEL, (_event, result: unknown) => {
+      finish(isAppQuitDrainResult(result) ? result : { ok: false, error: { name: 'Error', message: 'Malformed quit drain result' } })
       return true
     })
   })
