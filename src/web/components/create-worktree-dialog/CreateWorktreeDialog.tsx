@@ -111,7 +111,7 @@ export function CreateWorktreePageSurface({
   const t = useT()
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-6">
+    <div className="flex w-full flex-col gap-4 p-6">
       <div className="flex flex-col gap-2">
         <h1 className="text-sm leading-tight font-semibold">{t('action.create-worktree-title')}</h1>
         <p className="text-sm text-muted-foreground">{t('action.create-worktree-hint')}</p>
