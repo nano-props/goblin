@@ -468,6 +468,28 @@ describe('app bootstrap hooks', () => {
     expect(useReposStore.getState().sessionRestoreError).toBeNull()
   })
 
+  test('passes the restore abort signal to non-critical authenticated hydrates', async () => {
+    let i18nSignal: AbortSignal | undefined
+    let hostInfoSignal: AbortSignal | undefined
+    vi.spyOn(useI18nStore.getState(), 'hydrate').mockImplementation((options = {}) => {
+      i18nSignal = options.signal
+      return new Promise(() => {})
+    })
+    vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockImplementation((options = {}) => {
+      hostInfoSignal = options.signal
+      return new Promise(() => {})
+    })
+    vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
+    vi.spyOn(useReposStore.getState(), 'hydrateRepoSession').mockResolvedValue(undefined)
+
+    const result = renderInJsdom(<Harness />)
+    await flushMicrotasks(2)
+    result.unmount()
+
+    expect(i18nSignal?.aborted).toBe(true)
+    expect(hostInfoSignal?.aborted).toBe(true)
+  })
+
   test('allows a cancelled StrictMode-style first run to restart and finish', async () => {
     const first = Promise.withResolvers<never>()
     const secondSettings = defaultSettingsSnapshot()

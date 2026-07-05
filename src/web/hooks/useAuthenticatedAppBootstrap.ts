@@ -64,7 +64,7 @@ function startAuthenticatedWorkspaceRestoreRun(onReady: () => void): Authenticat
   // Promise.resolve() converts synchronous configuration failures into the same
   // async failure channel as fetch errors, so restoreBootSession owns the result.
   const settingsSnapshot = Promise.resolve().then(() => getSettingsSnapshot({ signal: timeout.signal }))
-  void primeSettingsQueryCache(settingsSnapshot).catch((err) => {
+  void primeSettingsQueryCache(settingsSnapshot, timeout.signal).catch((err) => {
     if (!timeout.signal.aborted) bootstrapLog.warn('settings priming failed', { err })
   })
   void hydrateNonCriticalAuthenticatedState(settingsSnapshot, timeout.signal)
@@ -86,8 +86,8 @@ async function hydrateNonCriticalAuthenticatedState(settingsSnapshot: Promise<Se
     runOptionalBootstrapTask('theme hydrate', async () => {
       await useThemeStore.getState().hydrateFromSettingsSnapshot(await settingsSnapshot)
     }, signal),
-    runOptionalBootstrapTask('i18n hydrate', () => useI18nStore.getState().hydrate(), signal),
-    runOptionalBootstrapTask('host-info hydrate', () => useHostInfoStore.getState().hydrate(), signal),
+    runOptionalBootstrapTask('i18n hydrate', () => useI18nStore.getState().hydrate({ signal }), signal),
+    runOptionalBootstrapTask('host-info hydrate', () => useHostInfoStore.getState().hydrate({ signal }), signal),
   ])
 }
 
@@ -217,7 +217,7 @@ async function runOptionalBootstrapTask(label: string, task: () => Promise<void>
  * log on failure - the client's boot must not be blocked by a
  * settings fetch outage.
  */
-async function primeSettingsQueryCache(settingsSnapshot: Promise<SettingsSnapshot>): Promise<void> {
+async function primeSettingsQueryCache(settingsSnapshot: Promise<SettingsSnapshot>, signal: AbortSignal): Promise<void> {
   // `getSettingsSnapshot()` / `getExternalAppsSnapshot()` can throw
   // synchronously when the bootstrap is missing (the request never
   // reaches `fetch`). Wrap each one individually so the other can
@@ -232,6 +232,7 @@ async function primeSettingsQueryCache(settingsSnapshot: Promise<SettingsSnapsho
       const snapshot = await fetcher()
       primaryWindowQueryClient.setQueryData(queryKey, snapshot)
     } catch (err) {
+      if (signal.aborted && isAbortReason(err, signal)) return
       // Settings fetch failure must not block boot - the page will
       // retry the auto-fetch on first use. The empty cache is the
       // same state the client had before this priming pass.
@@ -240,6 +241,6 @@ async function primeSettingsQueryCache(settingsSnapshot: Promise<SettingsSnapsho
   }
   await Promise.all([
     fetchAndPrime('settings snapshot', () => settingsSnapshot, settingsSnapshotQueryKey()),
-    fetchAndPrime('external apps', getExternalAppsSnapshot, externalAppsQueryKey()),
+    fetchAndPrime('external apps', () => getExternalAppsSnapshot({ signal }), externalAppsQueryKey()),
   ])
 }

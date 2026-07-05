@@ -104,8 +104,8 @@ export async function setLanEnabled(enabled: boolean): Promise<boolean> {
   return (await updateUserSettingsPatch({ lanEnabled: enabled })).prefs.lanEnabled
 }
 
-export async function getExternalAppsSnapshot(): Promise<ExternalAppsSnapshot> {
-  return await fetchServerJson<ExternalAppsSnapshot>('/api/settings/external-apps')
+export async function getExternalAppsSnapshot(options?: { signal?: AbortSignal }): Promise<ExternalAppsSnapshot> {
+  return await fetchServerJson<ExternalAppsSnapshot>('/api/settings/external-apps', { signal: options?.signal })
 }
 
 export async function refreshExternalAppsSnapshot(): Promise<ExternalAppsSnapshot> {
