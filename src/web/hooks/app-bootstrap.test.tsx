@@ -373,6 +373,50 @@ describe('app bootstrap hooks', () => {
     expect(useReposStore.getState().sessionRestoreError).toBe('authenticated workspace restore timed out after 30000ms')
   })
 
+  test('reports timeout when workspace tab restore is cancelled by the restore timeout', async () => {
+    vi.useFakeTimers()
+    const targetKey = branchTargetKey('/tmp/repo', 'main')
+    const session = {
+      openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
+      restoredRepoId: '/tmp/repo',
+      zenMode: true,
+      workspacePaneSize: 55,
+      selectedTerminalSessionIdByTerminalWorktree: {},
+      preferredWorkspacePaneTabByTargetByRepo: {},
+      workspacePaneTabsByTargetByRepo: {
+        '/tmp/repo': {
+          [targetKey]: [],
+        },
+      },
+      filetreeViewStateByWorktreeByRepo: {},
+    }
+    mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ session }))
+    vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
+    vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
+    vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
+    vi.spyOn(useReposStore.getState(), 'hydrateRepoSession').mockResolvedValue(undefined)
+    mockedRestoreServerWorkspacePaneTabsFromSession.mockImplementation(async (_tabs, { signal } = {}) => {
+      await new Promise<void>((resolve) => {
+        signal?.addEventListener('abort', () => resolve(), { once: true })
+      })
+      return {
+        status: 'cancelled',
+        unresolvedRepos: [],
+        unresolvedTargets: [],
+        failedCommits: [],
+      }
+    })
+
+    renderInJsdom(<Harness />)
+    await flushMicrotasks(3)
+    await vi.advanceTimersByTimeAsync(30_000)
+    await flushMicrotasks(3)
+
+    expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
+    expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
+    expect(useReposStore.getState().sessionRestoreError).toBe('authenticated workspace restore timed out after 30000ms')
+  })
+
   test('aborts authenticated workspace restore on unmount without committing restore failure', async () => {
     let signal: AbortSignal | undefined
     mockedGetSettingsSnapshot.mockImplementation((options: { signal?: AbortSignal } = {}) => {

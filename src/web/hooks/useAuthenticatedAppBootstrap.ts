@@ -113,7 +113,10 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>, s
       restoredWorkspaceState.workspacePaneTabsByTargetByRepo,
       { signal },
     )
-    if (workspaceTabsRestoreResult.status === 'cancelled') return { status: 'cancelled' }
+    if (workspaceTabsRestoreResult.status === 'cancelled') {
+      if (signal.reason === AUTHENTICATED_WORKSPACE_RESTORE_CANCELLED) return { status: 'cancelled' }
+      throw abortReason(signal)
+    }
     finishWorkspacePaneTabsBootRestore(workspaceTabsRestoreResult)
     return { status: 'completed' }
   } catch (err) {
