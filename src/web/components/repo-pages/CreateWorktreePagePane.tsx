@@ -3,6 +3,7 @@ import { GitBranchPlus } from 'lucide-react'
 import { CreateWorktreePageBody } from '#/web/components/create-worktree/CreateWorktreeSurface.tsx'
 import type { CreateWorktreeRequest } from '#/web/components/create-worktree/create-worktree.logic.ts'
 import {
+  isConfigTrustStateLoading,
   resolveConfigTrusted,
   resolveNextConfigTrustChoice,
   resolveWorktreeBootstrapDecision,
@@ -11,7 +12,7 @@ import { ScrollPane } from '#/web/components/Layout.tsx'
 import { RepoPageLoadingBody, RepoPagePane } from '#/web/components/repo-pages/RepoPagePane.tsx'
 import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
 import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
-import { useSettingsSnapshotReadModel } from '#/web/settings-queries.ts'
+import { useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
@@ -39,7 +40,8 @@ export function CreateWorktreePagePane({
   const [bootstrapPreviewError, setBootstrapPreviewError] = useState(false)
   const [bootstrapPreviewLoading, setBootstrapPreviewLoading] = useState(false)
   const [configTrustChoice, setConfigTrustChoice] = useState<boolean | null>(null)
-  const settingsSnapshot = useSettingsSnapshotReadModel()
+  const settingsQuery = useSettingsSnapshotQuery()
+  const settingsSnapshot = settingsQuery.data
 
   const repoInstanceId = liveRepo?.instanceId ?? null
 
@@ -86,8 +88,12 @@ export function CreateWorktreePagePane({
   // A failed preview is allowed through so a preview error doesn't trap the
   // user in a skeleton forever.
   const bootstrapReady = bootstrapPreview !== null || bootstrapPreviewError
-  const settingsReady = settingsSnapshot !== undefined
-  const pageReady = !!liveRepo && !!branchReadModel && bootstrapReady && settingsReady
+  const settingsReady = settingsSnapshot !== undefined || settingsQuery.isError
+  const worktreeBootstrapTrustLoading = isConfigTrustStateLoading({
+    preview: bootstrapPreview,
+    settingsReady,
+  })
+  const pageReady = !!liveRepo && !!branchReadModel && bootstrapReady && !worktreeBootstrapTrustLoading
 
   if (!pageReady) {
     return (
@@ -113,7 +119,7 @@ export function CreateWorktreePagePane({
       })
     : false
   const worktreeBootstrap = {
-    loading: bootstrapPreviewLoading,
+    loading: bootstrapPreviewLoading || worktreeBootstrapTrustLoading,
     preview: bootstrapPreview,
     error: bootstrapPreviewError,
     configTrusted,

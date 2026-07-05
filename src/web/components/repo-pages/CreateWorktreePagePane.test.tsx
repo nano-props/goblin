@@ -16,6 +16,10 @@ const surfaceMocks = vi.hoisted(() => ({
   branchReadModel: { branches: [{ name: 'main' }], currentBranch: 'main', status: [], worktreesByPath: {} } as
     | { branches: Array<{ name: string }>; currentBranch: string; status: never[]; worktreesByPath: Record<string, never> }
     | null,
+  settingsQuery: { data: { repoSettings: [] }, isError: false } as {
+    data: { repoSettings: never[] } | undefined
+    isError: boolean
+  },
 }))
 
 vi.mock('#/web/components/create-worktree/CreateWorktreeSurface.tsx', () => ({
@@ -53,7 +57,7 @@ vi.mock('#/web/repo-branch-read-model.ts', () => ({
 }))
 
 vi.mock('#/web/settings-queries.ts', () => ({
-  useSettingsSnapshotReadModel: () => ({ repoSettings: [] }),
+  useSettingsSnapshotQuery: () => surfaceMocks.settingsQuery,
 }))
 
 vi.mock('#/web/repo-client.ts', () => ({
@@ -66,6 +70,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   resetReposStore()
   surfaceMocks.branchReadModel = { branches: [{ name: 'main' }], currentBranch: 'main', status: [], worktreesByPath: {} }
+  surfaceMocks.settingsQuery = { data: { repoSettings: [] }, isError: false }
   seedRepoShellForTest({ id: REPO_ID })
 })
 
@@ -100,6 +105,94 @@ describe('CreateWorktreePagePane', () => {
 
     // letting the preview resolve (with ok=false, an error result) releases the gate
     resolvePreview({ ok: false, message: 'error.failed-read-repo' })
+    await waitFor(() => {
+      expect(container.querySelector('[data-testid="repo-page-loading"]')).toBeNull()
+    })
+    expect(container.querySelector('[data-testid="submit-create-worktree"]')).not.toBeNull()
+  })
+
+  test('shows the form without settings when the bootstrap preview has no runnable config', async () => {
+    surfaceMocks.settingsQuery = { data: undefined, isError: false }
+    vi.mocked(getRepoWorktreeBootstrapPreview).mockResolvedValueOnce({
+      ok: true,
+      preview: {
+        hasConfig: false,
+        hasOperations: false,
+        configHash: null,
+        copyCount: 0,
+        symlinkCount: 0,
+        hardlinkCount: 0,
+        excludeCount: 0,
+      },
+    })
+
+    const { container } = renderInJsdom(<CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />)
+
+    await waitFor(() => {
+      expect(container.querySelector('[data-testid="repo-page-loading"]')).toBeNull()
+    })
+    expect(container.querySelector('[data-testid="submit-create-worktree"]')).not.toBeNull()
+  })
+
+  test('waits for settings when the bootstrap preview needs trust state', async () => {
+    surfaceMocks.settingsQuery = { data: undefined, isError: false }
+    let resolvePreview!: (value: {
+      ok: true,
+      preview: {
+        hasConfig: boolean
+        hasOperations: boolean
+        configHash: string
+        copyCount: number
+        symlinkCount: number
+        hardlinkCount: number
+        excludeCount: number
+      }
+    }) => void
+    vi.mocked(getRepoWorktreeBootstrapPreview).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolvePreview = resolve
+        }),
+    )
+
+    const { container } = renderInJsdom(<CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />)
+
+    await act(async () => {
+      resolvePreview({
+        ok: true,
+        preview: {
+          hasConfig: true,
+          hasOperations: true,
+          configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          copyCount: 1,
+          symlinkCount: 0,
+          hardlinkCount: 0,
+          excludeCount: 0,
+        },
+      })
+    })
+
+    expect(container.querySelector('[data-testid="repo-page-loading"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="submit-create-worktree"]')).toBeNull()
+  })
+
+  test('releases the form when settings fails after a trust-relevant bootstrap preview', async () => {
+    surfaceMocks.settingsQuery = { data: undefined, isError: true }
+    vi.mocked(getRepoWorktreeBootstrapPreview).mockResolvedValueOnce({
+      ok: true,
+      preview: {
+        hasConfig: true,
+        hasOperations: true,
+        configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        copyCount: 1,
+        symlinkCount: 0,
+        hardlinkCount: 0,
+        excludeCount: 0,
+      },
+    })
+
+    const { container } = renderInJsdom(<CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />)
+
     await waitFor(() => {
       expect(container.querySelector('[data-testid="repo-page-loading"]')).toBeNull()
     })
