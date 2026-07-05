@@ -1,7 +1,7 @@
 import { useContext } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
-import { FolderPlus, LayoutDashboard } from 'lucide-react'
+import { GitBranchPlus, LayoutDashboard } from 'lucide-react'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
 import { BranchViewModeControl } from '#/web/components/repo-toolbar/BranchViewModeControl.tsx'
@@ -97,7 +97,7 @@ export function CreateWorktreeRowAction({
       data-testid="create-worktree-button"
       size="dense"
       className="group"
-      leading={<FolderPlus size={16} />}
+      leading={<GitBranchPlus size={16} />}
       trailing={<InlineShortcut shortcut={shortcutLabel} showOnHover={true} aria-hidden={true} />}
     >
       {label}
