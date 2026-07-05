@@ -56,13 +56,22 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
   } | null>(null)
   const saveDrainRef = useRef<Promise<void> | null>(null)
   const debounceTimerRef = useRef<number | null>(null)
+  const lastSaveErrorRef = useRef<unknown>(null)
 
   const enqueueSave = (
     session: ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState>,
     serialized: string,
+    options?: { throwOnFailure?: boolean },
   ) => {
+    lastSaveErrorRef.current = null
     queuedSaveRef.current = { session, serialized }
-    if (saveDrainRef.current) return
+    if (saveDrainRef.current) {
+      return options?.throwOnFailure
+        ? saveDrainRef.current.then(() => {
+            if (lastSaveErrorRef.current) throw lastSaveErrorRef.current
+          })
+        : saveDrainRef.current
+    }
     saveDrainRef.current = (async () => {
       while (queuedSaveRef.current) {
         const next = queuedSaveRef.current
@@ -70,15 +79,19 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
         lastSavedRef.current = next.serialized
         try {
           await persistWorkspaceSessionState(next.session)
+          lastSaveErrorRef.current = null
         } catch (err) {
           if (lastSavedRef.current === next.serialized) lastSavedRef.current = null
+          lastSaveErrorRef.current = err
           sessionLog.warn('save failed', { err })
+          if (options?.throwOnFailure) throw err
         }
       }
     })().finally(() => {
       saveDrainRef.current = null
       if (queuedSaveRef.current) enqueueSave(queuedSaveRef.current.session, queuedSaveRef.current.serialized)
     })
+    return saveDrainRef.current
   }
 
   useLayoutEffect(() => {
@@ -110,14 +123,14 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
   ])
 
   useEffect(() => {
-    return subscribeAppQuitting(() => {
+    return subscribeAppQuitting(async () => {
       if (debounceTimerRef.current !== null) {
         window.clearTimeout(debounceTimerRef.current)
         debounceTimerRef.current = null
       }
       const latest = latestSaveRef.current
       if (!latest || lastSavedRef.current === latest.serialized) return
-      enqueueSave(latest.session, latest.serialized)
+      await enqueueSave(latest.session, latest.serialized, { throwOnFailure: true })
     })
   }, [])
 

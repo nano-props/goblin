@@ -19,6 +19,7 @@ import type {
 interface GoblinNativeBridge {
   invokeIpc: (request: IpcRequest) => Promise<unknown>
   abortIpc: (requestId: string) => Promise<boolean>
+  notifyAppQuitDrained?: () => Promise<boolean>
   onEvent: (cb: (event: IpcEvent) => void) => () => void
   onIntent?: (cb: (event: ClientEffectIntent) => void) => () => void
   pathForFile: (file: File) => string

@@ -535,7 +535,9 @@ describe('useSessionPersistence', () => {
     expect(persistWorkspaceSessionStateMock).not.toHaveBeenCalled()
 
     const { markAppQuitting } = await import('#/web/app-lifecycle.ts')
-    act(() => markAppQuitting())
+    await act(async () => {
+      await markAppQuitting()
+    })
 
     expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -543,6 +545,7 @@ describe('useSessionPersistence', () => {
       }),
     )
   })
+
 })
 
 function Harness({ routedRepoId = null }: { routedRepoId?: string | null }) {

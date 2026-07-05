@@ -17,3 +17,7 @@ export function subscribeNativeEffectIntent(cb: (event: ClientEffectIntent) => v
   const bridge = readNativeBridge()
   return bridge?.onIntent?.(cb) ?? (() => {})
 }
+
+export async function notifyNativeAppQuitDrained(): Promise<void> {
+  await readNativeBridge()?.notifyAppQuitDrained?.()
+}

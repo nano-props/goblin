@@ -28,6 +28,7 @@ const IPC = {
     abort: 'goblin:ipc-abort',
     event: 'goblin:event',
     effectIntent: 'goblin:client-effect-intent',
+    appQuitDrained: 'goblin:app-quit-drained',
   },
   host: {
     openSettingsWindow: 'goblin:host-open-settings-window',
@@ -129,6 +130,7 @@ function maybeDisposeEffectIntentListener() {
 contextBridge.exposeInMainWorld('goblinNative', {
   invokeIpc: ({ path, input, requestId }) => ipcCall({ path, input, requestId }),
   abortIpc: (requestId) => safeInvoke(IPC.ipc.abort, { requestId }),
+  notifyAppQuitDrained: () => safeInvoke(IPC.ipc.appQuitDrained),
   pathForFile: (file) => {
     // `webUtils` itself is destructured at the top of this file, so
     // a missing symbol there would already have crashed the preload

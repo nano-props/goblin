@@ -4,10 +4,23 @@ import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 const mocks = vi.hoisted(() => {
   const handlers = new Map<string, Array<(...args: any[]) => any>>()
+  const ipcHandlers = new Map<string, (...args: any[]) => any>()
+  const timeouts = new Map<number, () => void>()
+  let timeoutId = 0
   let resolveReady: () => void = () => {}
   let whenReadyPromise = Promise.resolve()
   return {
     handlers,
+    ipcHandlers,
+    timeouts,
+    setTimeout: vi.fn((handler: () => void) => {
+      timeoutId += 1
+      timeouts.set(timeoutId, handler)
+      return timeoutId
+    }),
+    clearTimeout: vi.fn((id: number) => {
+      timeouts.delete(id)
+    }),
     appOn: vi.fn((name: string, handler: (...args: any[]) => any) => {
       const next = handlers.get(name) ?? []
       next.push(handler)
@@ -68,8 +81,12 @@ vi.mock('electron', () => ({
   // from them but the calls must not throw, so we expose a no-op ipcMain.
   ipcMain: {
     on: vi.fn(),
-    handle: vi.fn(),
-    removeHandler: vi.fn(),
+    handle: vi.fn((channel: string, handler: (...args: any[]) => any) => {
+      mocks.ipcHandlers.set(channel, handler)
+    }),
+    removeHandler: vi.fn((channel: string) => {
+      mocks.ipcHandlers.delete(channel)
+    }),
     removeAllListeners: vi.fn(),
   },
 }))
@@ -153,6 +170,7 @@ describe('native host startup lifecycle', () => {
     vi.resetModules()
     vi.clearAllMocks()
     mocks.handlers.clear()
+    mocks.ipcHandlers.clear()
     mocks.resetReady()
     mocks.getSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
   })
@@ -161,7 +179,13 @@ describe('native host startup lifecycle', () => {
     await import('#/main/main.ts')
 
     const event = { preventDefault: vi.fn() }
-    await emit('before-quit', event)
+    const quitting = emit('before-quit', event)
+    await vi.waitFor(() => {
+      expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({ type: 'app-quitting' })
+    })
+    expect(mocks.flushWindowState).not.toHaveBeenCalled()
+    await mocks.ipcHandlers.get('goblin:app-quit-drained')?.()
+    await quitting
     const secondPassEvent = { preventDefault: vi.fn() }
     await emit('before-quit', secondPassEvent)
 
@@ -197,6 +221,9 @@ describe('native host startup lifecycle', () => {
 
     await vi.waitFor(() => {
       expect(mocks.buildAppMenu).toHaveBeenCalled()
+    })
+    mocks.timeouts.values().next().value?.()
+    await vi.waitFor(() => {
       expect(mocks.exit).toHaveBeenCalledWith(0)
     })
 

@@ -1,4 +1,4 @@
-import { app, dialog } from 'electron'
+import { app, dialog, ipcMain } from 'electron'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import { activatePrimaryWindow } from '#/main/window.ts'
 import { initTheme } from '#/main/theme.ts'
@@ -16,6 +16,7 @@ import { wireTerminalIpc } from '#/main/terminal.ts'
 import { syncGlobalShortcuts, unregisterAppShortcuts } from '#/main/shortcuts.ts'
 import { enqueueExternalOpenPath } from '#/main/external-open.ts'
 import { broadcastClientEffectIntent } from '#/main/client-surface-events.ts'
+import { APP_QUIT_DRAINED_CHANNEL } from '#/shared/ipc-channels.ts'
 import { getSettingsSnapshot, setGlobalShortcutState } from '#/main/settings-server-client.ts'
 import { startEmbeddedServer, stopEmbeddedServer } from '#/main/embedded-server-lifecycle.ts'
 
@@ -32,6 +33,7 @@ function activatePrimaryWindowFromEvent(): void {
 
 let activationBarrier: Promise<void> = Promise.resolve()
 let isQuitting = false
+const CLIENT_QUIT_DRAIN_TIMEOUT_MS = 1000
 
 app.on('open-file', (event, path) => {
   event.preventDefault()
@@ -80,7 +82,10 @@ async function main(): Promise<void> {
 
 async function finalizeNativeHostExit(): Promise<void> {
   try {
+    const clientQuitDrain = waitForClientQuitDrain()
     broadcastClientEffectIntent({ type: 'app-quitting' })
+    const clientQuitDrained = await clientQuitDrain
+    if (!clientQuitDrained) windowNodeLog.warn('timed out waiting for client quit persistence drain')
     const windowStateFlushed = await flushWindowState()
     if (!windowStateFlushed) windowStateNodeLog.error('final flush failed before quit')
     await stopEmbeddedServer()
@@ -88,6 +93,24 @@ async function finalizeNativeHostExit(): Promise<void> {
     unregisterAppShortcuts()
     app.exit(0)
   }
+}
+
+async function waitForClientQuitDrain(): Promise<boolean> {
+  return await new Promise((resolve) => {
+    let settled = false
+    const finish = (drained: boolean) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      ipcMain.removeHandler(APP_QUIT_DRAINED_CHANNEL)
+      resolve(drained)
+    }
+    const timeout = setTimeout(() => finish(false), CLIENT_QUIT_DRAIN_TIMEOUT_MS)
+    ipcMain.handle(APP_QUIT_DRAINED_CHANNEL, () => {
+      finish(true)
+      return true
+    })
+  })
 }
 
 async function initializeNativeHost(): Promise<void> {

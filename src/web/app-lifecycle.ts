@@ -1,6 +1,6 @@
-import { subscribeNativeEffectIntent } from '#/web/native-bridge.ts'
+import { notifyNativeAppQuitDrained, subscribeNativeEffectIntent } from '#/web/native-bridge.ts'
 
-type Listener = () => void
+type Listener = () => void | Promise<void>
 
 const listeners = new Set<Listener>()
 let quitting = false
@@ -20,11 +20,13 @@ export function subscribeAppQuitting(listener: Listener): () => void {
   }
 }
 
-export function markAppQuitting(): void {
+export async function markAppQuitting(): Promise<void> {
   if (quitting) return
   quitting = true
-  for (const listener of Array.from(listeners)) listener()
+  const pending = Array.from(listeners).map(async (listener) => await listener())
   listeners.clear()
+  await Promise.all(pending)
+  await notifyNativeAppQuitDrained()
 }
 
 // Keep native quit lifecycle wiring at this low level so every Electron
@@ -35,5 +37,5 @@ export function markAppQuitting(): void {
 // browser teardown plus server-side graceful shutdown instead. Missing native
 // lifecycle wiring is therefore expected in web-only mode, not an error.
 subscribeNativeEffectIntent((event) => {
-  if (event.type === 'app-quitting') markAppQuitting()
+  if (event.type === 'app-quitting') void markAppQuitting()
 })
