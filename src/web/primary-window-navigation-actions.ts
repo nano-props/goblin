@@ -32,7 +32,11 @@ export function createPrimaryWindowNavigationActions({
       routeNavigation.openRepoDashboard(repoId)
     },
     closeRepo(repoId) {
+      const nextRepoId = repoId === currentRepoId ? nextNavigationRepoIdAfterClose(order, repoId) : null
       closeRepo(repoId)
+      if (repoId !== currentRepoId) return
+      if (nextRepoId) routeNavigation.openRepoDashboard(nextRepoId)
+      else routeNavigation.openHome()
     },
     cycleRepo(direction) {
       const repoId = nextNavigationRepoId(order, currentRepoId, direction)
@@ -53,6 +57,12 @@ export function createPrimaryWindowNavigationActions({
       routeNavigation.openRepoNewWorktree(currentRepoId)
     },
   }
+}
+
+function nextNavigationRepoIdAfterClose(order: string[], closingRepoId: string): string | null {
+  const currentIndex = order.indexOf(closingRepoId)
+  if (currentIndex === -1) return order[0] ?? null
+  return order[currentIndex + 1] ?? order[currentIndex - 1] ?? null
 }
 
 function nextNavigationRepoId(order: string[], currentRepoId: string | null, direction: 1 | -1): string | null {

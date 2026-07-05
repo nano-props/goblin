@@ -6,7 +6,6 @@ import {
   createRouter,
   Navigate,
   redirect,
-  useNavigate,
 } from '@tanstack/react-router'
 import { App } from '#/web/App.tsx'
 import { AuthenticatedWorkspaceBootGate, Layout } from '#/web/Layout.tsx'
@@ -150,14 +149,13 @@ function useRepoIdFromSlug(repoSlug: string): string | null {
 
 function SettingsRoute() {
   const { page } = settingsRoute.useParams()
-  const navigate = useNavigate()
+  const routeNavigation = usePrimaryWindowRouteNavigation()
   return (
     <App
       routeSettingsPage={page as SettingsPage}
       onRouteSettingsPageChange={(nextPage) => {
-        void (nextPage
-          ? navigate({ to: '/settings/$page', params: { page: nextPage } })
-          : navigate({ to: '/' }))
+        if (nextPage) routeNavigation.openSettings(nextPage)
+        else routeNavigation.closeSettings()
       }}
     />
   )

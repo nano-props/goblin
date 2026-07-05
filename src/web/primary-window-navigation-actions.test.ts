@@ -48,26 +48,62 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(navigation.openRepoDashboard).toHaveBeenCalledWith('/tmp/repo-c')
   })
 
-  test('closes the repo through the store action', () => {
+  test('closes the repo through the store action without navigation when it is not current', () => {
     const closeRepo = vi.fn()
+    const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
-      currentRepoId: '/tmp/repo-b',
+      currentRepoId: '/tmp/repo-a',
       order: ['/tmp/repo-a', '/tmp/repo-b', '/tmp/repo-c'],
       closeRepo,
       setWorkspacePaneTab: vi.fn(),
-      routeNavigation: routeNavigation(),
+      routeNavigation: navigation,
     })
 
     actions.closeRepo('/tmp/repo-b')
 
     expect(closeRepo).toHaveBeenCalledWith('/tmp/repo-b')
+    expect(navigation.openRepoDashboard).not.toHaveBeenCalled()
+  })
+
+  test('closes the current repo and navigates to the next repo dashboard', () => {
+    const closeRepo = vi.fn()
+    const navigation = routeNavigation()
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: '/tmp/repo-b',
+      order: ['/tmp/repo-a', '/tmp/repo-b', '/tmp/repo-c'],
+      closeRepo,
+      setWorkspacePaneTab: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    actions.closeRepo('/tmp/repo-b')
+
+    expect(closeRepo).toHaveBeenCalledWith('/tmp/repo-b')
+    expect(navigation.openRepoDashboard).toHaveBeenCalledWith('/tmp/repo-c')
+  })
+
+  test('closes the final current repo and navigates home', () => {
+    const navigation = routeNavigation()
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: '/tmp/repo-a',
+      order: ['/tmp/repo-a'],
+      closeRepo: vi.fn(),
+      setWorkspacePaneTab: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    actions.closeRepo('/tmp/repo-a')
+
+    expect(navigation.openHome).toHaveBeenCalled()
   })
 })
 
 function routeNavigation(): PrimaryWindowRouteNavigation {
   return {
     repoSlugForId: vi.fn(() => 'repo-slug'),
+    openHome: vi.fn(),
     openSettings: vi.fn(),
+    closeSettings: vi.fn(),
     openRepoDashboard: vi.fn(),
     openRepoBranch: vi.fn(),
     openRepoNewWorktree: vi.fn(),
