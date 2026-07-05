@@ -3,7 +3,6 @@ import { GitBranchPlus } from 'lucide-react'
 import { CreateWorktreePageBody } from '#/web/components/create-worktree/CreateWorktreeSurface.tsx'
 import type { CreateWorktreeRequest } from '#/web/components/create-worktree/create-worktree.logic.ts'
 import {
-  isConfigTrustStateLoading,
   resolveConfigTrusted,
   resolveNextConfigTrustChoice,
   resolveWorktreeBootstrapDecision,
@@ -82,7 +81,15 @@ export function CreateWorktreePagePane({
     }
   }, [repoId, repoInstanceId])
 
-  if (!liveRepo || !branchReadModel) {
+  // Page-level readiness: gate the whole form on every fetch we depend on, so
+  // the trust prompt never has to fade in *after* the body is already on screen.
+  // A failed preview is allowed through so a preview error doesn't trap the
+  // user in a skeleton forever.
+  const bootstrapReady = bootstrapPreview !== null || bootstrapPreviewError
+  const settingsReady = settingsSnapshot !== undefined
+  const pageReady = !!liveRepo && !!branchReadModel && bootstrapReady && settingsReady
+
+  if (!pageReady) {
     return (
       <CreateWorktreePageShell compact={compact} trafficLightOffset={trafficLightOffset} onBack={onCancel}>
         <RepoPageLoadingBody />
@@ -105,12 +112,8 @@ export function CreateWorktreePagePane({
         configTrustChoice,
       })
     : false
-  const worktreeBootstrapTrustLoading = isConfigTrustStateLoading({
-    preview: bootstrapPreview,
-    settingsReady: settingsSnapshot !== undefined,
-  })
   const worktreeBootstrap = {
-    loading: bootstrapPreviewLoading || worktreeBootstrapTrustLoading,
+    loading: bootstrapPreviewLoading,
     preview: bootstrapPreview,
     error: bootstrapPreviewError,
     configTrusted,

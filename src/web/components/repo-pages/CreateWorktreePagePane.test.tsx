@@ -80,6 +80,32 @@ describe('CreateWorktreePagePane', () => {
     expect(container.querySelector('[data-testid="submit-create-worktree"]')).toBeNull()
   })
 
+  test('keeps stable page chrome while the bootstrap preview is still loading', async () => {
+    // Reset the implementation locally so this test does not rely on the
+    // project-level vitest `mockReset` setting to scrub earlier tests.
+    vi.mocked(getRepoWorktreeBootstrapPreview).mockReset()
+    let resolvePreview!: (value: { ok: false; message: string }) => void
+    vi.mocked(getRepoWorktreeBootstrapPreview).mockImplementation(
+      () =>
+        new Promise<{ ok: false; message: string }>((resolve) => {
+          resolvePreview = resolve
+        }),
+    )
+
+    const { container } = renderInJsdom(<CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={vi.fn()} />)
+
+    // form is still loading because the preview request hasn't resolved yet
+    expect(container.querySelector('[data-testid="repo-page-loading"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="submit-create-worktree"]')).toBeNull()
+
+    // letting the preview resolve (with ok=false, an error result) releases the gate
+    resolvePreview({ ok: false, message: 'error.failed-read-repo' })
+    await waitFor(() => {
+      expect(container.querySelector('[data-testid="repo-page-loading"]')).toBeNull()
+    })
+    expect(container.querySelector('[data-testid="submit-create-worktree"]')).not.toBeNull()
+  })
+
   test('navigates to the created branch after the action succeeds', async () => {
     const onCreated = vi.fn()
     const onCancel = vi.fn()
