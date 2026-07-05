@@ -59,11 +59,11 @@ async function main(): Promise<void> {
     unregisterAppShortcuts()
   })
 
-  // Drain debounced settings writes before exit so the last theme pick,
-  // window resize, or session change isn't lost. We exit explicitly
-  // after the flush: re-entering app.quit from before-quit is not
-  // reliable across Electron quit paths, and app.exit skips will-quit,
-  // so do will-quit cleanup here too.
+  // Drain debounced window-state writes before exit so the last resize or
+  // move isn't lost. Settings writes are awaited at their server boundary.
+  // We exit explicitly after the flush: re-entering app.quit from
+  // before-quit is not reliable across Electron quit paths, and app.exit
+  // skips will-quit, so do will-quit cleanup here too.
   app.on('before-quit', async (event) => {
     if (isQuitting) return
     event.preventDefault()
