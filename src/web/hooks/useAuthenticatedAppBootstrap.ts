@@ -30,6 +30,7 @@ interface AuthenticatedWorkspaceRestoreRun {
 }
 
 type WorkspaceRestoreOutcome = { status: 'completed' } | { status: 'cancelled' }
+type WorkspaceRestoreCancellationKind = 'cleanup' | 'failure'
 
 export function useAuthenticatedAppBootstrap(): AuthenticatedAppBootstrapState {
   const restoreRunRef = useRef<AuthenticatedWorkspaceRestoreRun | null>(null)
@@ -114,7 +115,7 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>, s
       { signal },
     )
     if (workspaceTabsRestoreResult.status === 'cancelled') {
-      if (signal.reason === AUTHENTICATED_WORKSPACE_RESTORE_CANCELLED) return { status: 'cancelled' }
+      if (workspaceRestoreCancellationKind(signal) === 'cleanup') return { status: 'cancelled' }
       throw abortReason(signal)
     }
     finishWorkspacePaneTabsBootRestore(workspaceTabsRestoreResult)
@@ -163,6 +164,10 @@ function restoreFailureMessage(err: unknown): string {
 
 function abortReason(signal: AbortSignal): unknown {
   return signal.reason instanceof Error ? signal.reason : new Error('authenticated workspace restore aborted')
+}
+
+function workspaceRestoreCancellationKind(signal: AbortSignal): WorkspaceRestoreCancellationKind {
+  return signal.reason === AUTHENTICATED_WORKSPACE_RESTORE_CANCELLED ? 'cleanup' : 'failure'
 }
 
 function isAbortReason(err: unknown, signal: AbortSignal): boolean {
