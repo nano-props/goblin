@@ -26,6 +26,23 @@ afterEach(() => {
 })
 
 describe('RepoDashboardPane', () => {
+  test('hides the attention section when no branch needs attention', () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('main')],
+      currentBranchName: 'main',
+    })
+
+    const { container } = renderInJsdom(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <RepoDashboardPane repoId={REPO_ID} />
+      </QueryClientProvider>,
+    )
+
+    expect(container.textContent).not.toContain('dashboard.attention.title')
+    expect(container.textContent).not.toContain('dashboard.attention.empty')
+  })
+
   test('uses pull request query data for PR metrics and attention badges', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,

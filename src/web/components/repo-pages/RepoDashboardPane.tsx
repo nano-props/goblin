@@ -1,5 +1,4 @@
 import {
-  AlertTriangle,
   ArrowDown,
   ArrowUp,
   GitBranch,
@@ -76,6 +75,7 @@ export function RepoDashboardPane({
     () => (branchModel ? buildDashboardSummary(branchModel, pullRequestEntries) : null),
     [branchModel, pullRequestEntries],
   )
+  const hasAttentionBranches = !!summary?.attentionBranches.length
 
   return (
     <RepoPagePane
@@ -91,7 +91,12 @@ export function RepoDashboardPane({
             <>
               <DashboardHeader repo={repo} currentBranch={branchModel.currentBranch} lang={lang} />
               <DashboardStats compact={compact} summary={summary} />
-              <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]')}>
+              <div
+                className={cn(
+                  'grid gap-4',
+                  compact || !hasAttentionBranches ? 'grid-cols-1' : 'xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]',
+                )}
+              >
                 <DashboardAttention
                   branchModel={branchModel}
                   pullRequestEntries={pullRequestEntries}
@@ -286,23 +291,21 @@ function DashboardAttention({
   onSelectBranch?: (branchName: string) => void
 }) {
   const t = useT()
+  if (summary.attentionBranches.length === 0) return null
+
   return (
     <DashboardSection title={t('dashboard.attention.title')} description={t('dashboard.attention.description')}>
-      {summary.attentionBranches.length > 0 ? (
-        <div className="divide-y divide-separator">
-          {summary.attentionBranches.map((branch) => (
-            <BranchAttentionRow
-              key={branch.name}
-              branchModel={branchModel}
-              pullRequestEntries={pullRequestEntries}
-              branch={branch}
-              onSelectBranch={onSelectBranch}
-            />
-          ))}
-        </div>
-      ) : (
-        <EmptySection icon={AlertTriangle} label={t('dashboard.attention.empty')} />
-      )}
+      <div className="divide-y divide-separator">
+        {summary.attentionBranches.map((branch) => (
+          <BranchAttentionRow
+            key={branch.name}
+            branchModel={branchModel}
+            pullRequestEntries={pullRequestEntries}
+            branch={branch}
+            onSelectBranch={onSelectBranch}
+          />
+        ))}
+      </div>
     </DashboardSection>
   )
 }
