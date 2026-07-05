@@ -39,7 +39,7 @@ import { branchNameFromSlug, repoIdFromSlug } from '#/web/repo-route-slugs.ts'
 import { usePrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 
-const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapState>('booting')
+const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapState>({ status: 'restoring-workspace' })
 
 export type AuthenticatedAppShellMode = 'settings' | 'workspace-restore' | 'workspace-ready'
 
@@ -48,7 +48,7 @@ export function authenticatedAppShellMode(
   bootstrapState: AuthenticatedAppBootstrapState,
 ): AuthenticatedAppShellMode {
   if (pathname.startsWith('/settings')) return 'settings'
-  return bootstrapState === 'booting' ? 'workspace-restore' : 'workspace-ready'
+  return bootstrapState.status === 'restoring-workspace' ? 'workspace-restore' : 'workspace-ready'
 }
 
 export function Layout() {
@@ -180,7 +180,7 @@ function AuthenticatedWorkspaceShell() {
 
 export function WorkspaceSessionRestoreGate({ children }: { children: ReactNode }) {
   const bootstrapState = useContext(AuthenticatedWorkspaceRestoreContext)
-  if (bootstrapState === 'booting') return <WorkspaceSessionRestorePlaceholder />
+  if (bootstrapState.status === 'restoring-workspace') return <WorkspaceSessionRestorePlaceholder />
   return <>{children}</>
 }
 

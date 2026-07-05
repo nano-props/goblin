@@ -347,7 +347,9 @@ describe('app bootstrap hooks', () => {
     mockedGetSettingsSnapshot.mockRejectedValue(new Error('settings unavailable'))
 
     renderInJsdom(<Harness />)
-    await flushMicrotasks(3)
+    await vi.waitFor(() => {
+      expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
+    })
 
     expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
     expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
@@ -415,6 +417,35 @@ describe('app bootstrap hooks', () => {
     expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
     expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
     expect(useReposStore.getState().sessionRestoreError).toBe('authenticated workspace restore timed out after 30000ms')
+  })
+
+  test('reports timeout when repo session hydration does not return after abort', async () => {
+    vi.useFakeTimers()
+    const session = {
+      openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
+      restoredRepoId: '/tmp/repo',
+      zenMode: true,
+      workspacePaneSize: 55,
+      selectedTerminalSessionIdByTerminalWorktree: {},
+      preferredWorkspacePaneTabByTargetByRepo: {},
+      workspacePaneTabsByTargetByRepo: {},
+      filetreeViewStateByWorktreeByRepo: {},
+    }
+    mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot({ session }))
+    vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
+    vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
+    vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
+    vi.spyOn(useReposStore.getState(), 'hydrateRepoSession').mockImplementation(() => new Promise(() => {}))
+
+    renderInJsdom(<Harness />)
+    await flushMicrotasks(3)
+    await vi.advanceTimersByTimeAsync(30_000)
+    await flushMicrotasks(3)
+
+    expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
+    expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
+    expect(useReposStore.getState().sessionRestoreError).toBe('authenticated workspace restore timed out after 30000ms')
+    expect(mockedRestoreServerWorkspacePaneTabsFromSession).not.toHaveBeenCalled()
   })
 
   test('aborts authenticated workspace restore on unmount without committing restore failure', async () => {

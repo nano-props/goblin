@@ -20,7 +20,12 @@ import {
 } from '#/web/workspace-pane/workspace-pane-session-tabs-restore.ts'
 import { createTimeoutAbortController } from '#/web/lib/abort.ts'
 
-export type AuthenticatedAppBootstrapState = 'booting' | 'ready'
+export type AuthenticatedAppBootstrapState =
+  | { status: 'restoring-workspace' }
+  | { status: 'ready' }
+
+const RESTORING_WORKSPACE_BOOTSTRAP_STATE: AuthenticatedAppBootstrapState = { status: 'restoring-workspace' }
+const READY_BOOTSTRAP_STATE: AuthenticatedAppBootstrapState = { status: 'ready' }
 
 const AUTHENTICATED_WORKSPACE_RESTORE_TIMEOUT_MS = 30_000
 const AUTHENTICATED_WORKSPACE_RESTORE_CANCELLED = new Error('authenticated workspace restore cancelled')
@@ -34,11 +39,11 @@ type WorkspaceRestoreCancellationKind = 'cleanup' | 'failure'
 
 export function useAuthenticatedAppBootstrap(): AuthenticatedAppBootstrapState {
   const restoreRunRef = useRef<AuthenticatedWorkspaceRestoreRun | null>(null)
-  const [state, setState] = useState<AuthenticatedAppBootstrapState>('booting')
+  const [state, setState] = useState<AuthenticatedAppBootstrapState>(RESTORING_WORKSPACE_BOOTSTRAP_STATE)
 
   useEffect(() => {
     if (restoreRunRef.current) return
-    const run = startAuthenticatedWorkspaceRestoreRun(() => setState('ready'))
+    const run = startAuthenticatedWorkspaceRestoreRun(() => setState(READY_BOOTSTRAP_STATE))
     restoreRunRef.current = run
     return () => {
       run.cancel()
@@ -89,7 +94,7 @@ async function hydrateNonCriticalAuthenticatedState(settingsSnapshot: Promise<Se
 async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>, signal: AbortSignal): Promise<WorkspaceRestoreOutcome> {
   try {
     useReposStore.setState({ sessionPersistenceReady: false, sessionRestoreError: null })
-    useSessionRestoreStore.getState().hydrateFromSettingsSnapshot(await settingsSnapshot)
+    useSessionRestoreStore.getState().hydrateFromSettingsSnapshot(await abortable(settingsSnapshot, signal))
     if (signal.aborted) throw abortReason(signal)
     const session = useSessionRestoreStore.getState().consumeBootSessionSnapshot()
     const normalizedLayout = normalizeWorkspaceSessionLayoutState(session)
@@ -102,18 +107,24 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>, s
     restoreFiletreeViewStateFromSession(session.filetreeViewStateByWorktreeByRepo)
     applySessionLayoutState(normalizedLayout)
     applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalSessionIdByTerminalWorktree)
-    await hydrateRepoSession(session.openRepoEntries, session.restoredRepoId, {
+    await abortable(
+      hydrateRepoSession(session.openRepoEntries, session.restoredRepoId, {
+        signal,
+        workspacePaneRestoreState: {
+          workspacePaneTabsByTargetByRepo: restoredWorkspaceState.workspacePaneTabsByTargetByRepo,
+          preferredWorkspacePaneTabByTargetByRepo: restoredWorkspaceState.preferredWorkspacePaneTabByTargetByRepo,
+        },
+      }),
       signal,
-      workspacePaneRestoreState: {
-        workspacePaneTabsByTargetByRepo: restoredWorkspaceState.workspacePaneTabsByTargetByRepo,
-        preferredWorkspacePaneTabByTargetByRepo: restoredWorkspaceState.preferredWorkspacePaneTabByTargetByRepo,
-      },
-    })
-    if (signal.aborted) throw abortReason(signal)
-    const workspaceTabsRestoreResult = await restoreServerWorkspacePaneTabsFromSession(
-      restoredWorkspaceState.workspacePaneTabsByTargetByRepo,
-      { signal },
     )
+    if (signal.aborted) throw abortReason(signal)
+    const workspaceTabsRestoreResult = await abortable(
+      restoreServerWorkspacePaneTabsFromSession(restoredWorkspaceState.workspacePaneTabsByTargetByRepo, {
+        signal,
+      }),
+      signal,
+    )
+
     if (workspaceTabsRestoreResult.status === 'cancelled') {
       if (workspaceRestoreCancellationKind(signal) === 'cleanup') return { status: 'cancelled' }
       throw abortReason(signal)
@@ -125,6 +136,20 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>, s
     bootstrapLog.warn('session restore failed', { err })
     blockSessionPersistenceAfterRestoreFailure(restoreFailureMessage(err))
     return { status: 'completed' }
+  }
+}
+
+async function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) throw abortReason(signal)
+  let onAbort: (() => void) | null = null
+  const aborted = new Promise<never>((_resolve, reject) => {
+    onAbort = () => reject(abortReason(signal))
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
+  try {
+    return await Promise.race([promise, aborted])
+  } finally {
+    if (onAbort) signal.removeEventListener('abort', onAbort)
   }
 }
 

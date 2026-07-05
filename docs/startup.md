@@ -18,7 +18,8 @@ The primary window boot path has two separate concerns: public shell hydration a
 3. Authenticated workspace restore
    - Owner: `useAuthenticatedAppBootstrap`.
    - A single restore run owns the settings snapshot, non-critical authenticated hydration, workspace session restore, timeout, and cleanup cancellation.
-   - The run returns an explicit outcome: `completed` or `cancelled`. Only `completed` may transition the authenticated shell to `ready`.
+   - The hook exposes an explicit shell state: `{ status: 'restoring-workspace' }` or `{ status: 'ready' }`.
+   - The run returns an explicit outcome: `completed` or `cancelled`. Only `completed` may transition the authenticated shell to `{ status: 'ready' }`.
    - Cleanup cancellation is not a restore failure. Timeouts and actual restore errors are failures and must leave enough state for the UI to render without opening persistence.
 
 4. Workspace membership restore
