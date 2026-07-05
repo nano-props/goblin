@@ -81,7 +81,7 @@ describe('settings snapshot partitions', () => {
       ],
       session: {
         openRepoEntries: [{ kind: 'local', id: '/tmp/repo-b' }],
-        activeRepoId: '/tmp/repo-b',
+        restoredRepoId: '/tmp/repo-b',
         zenMode: false,
         workspacePaneSize: 50,
         selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'session-1' },
@@ -111,7 +111,7 @@ describe('settings snapshot partitions', () => {
     })
     expect(restorableWorkspaceSessionStateFromSettingsSnapshot(snapshot)).toEqual({
       openRepoEntries: [{ kind: 'local', id: '/tmp/repo-b' }],
-      activeRepoId: '/tmp/repo-b',
+      restoredRepoId: '/tmp/repo-b',
       zenMode: false,
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'session-1' },

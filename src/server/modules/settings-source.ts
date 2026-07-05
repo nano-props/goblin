@@ -308,15 +308,17 @@ function normalizeSession(value: unknown): WorkspaceSessionState {
           .filter((entry): entry is RepoSessionEntry => entry !== null),
       )
     : []
-  const activeRepoId = toSafeRepoLocator(partial.activeRepoId)
+  const restoredRepoId = toSafeRepoLocator(partial.restoredRepoId)
   const workspacePaneTabsByTargetByRepo = normalizeWorkspacePaneTabsByTargetByRepo(
     partial.workspacePaneTabsByTargetByRepo,
     openRepoEntries,
   )
   return {
     openRepoEntries,
-    activeRepoId:
-      activeRepoId && openRepoEntries.some((entry) => repoSessionEntryId(entry) === activeRepoId) ? activeRepoId : null,
+    restoredRepoId:
+      restoredRepoId && openRepoEntries.some((entry) => repoSessionEntryId(entry) === restoredRepoId)
+        ? restoredRepoId
+        : null,
     zenMode: typeof partial.zenMode === 'boolean' ? partial.zenMode : DEFAULT_ZEN_MODE,
     workspacePaneSize: normalizeWorkspacePaneSize(partial.workspacePaneSize),
     selectedTerminalSessionIdByTerminalWorktree: normalizeSelectedTerminalSessionIdByTerminalWorktree(

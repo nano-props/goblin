@@ -15,6 +15,8 @@ import { BranchNavigatorSkeleton } from '#/web/components/Skeleton.tsx'
 
 interface Props {
   repoId: string
+  onSelectBranch?: (branch: string) => void
+  currentBranchName?: string | null
   /** Run after the user picks a row. Kept optional for embedded
    * surfaces that need to react after selection. */
   onAfterSelect?: (branch: string) => void
@@ -22,7 +24,7 @@ interface Props {
   onAfterOpenStatus?: (branch: string) => void
 }
 
-export function BranchView({ repoId, onAfterSelect, onAfterOpenStatus }: Props) {
+export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterSelect, onAfterOpenStatus }: Props) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
   const repo = useBranchListRepo(repoId)
@@ -39,7 +41,8 @@ export function BranchView({ repoId, onAfterSelect, onAfterOpenStatus }: Props) 
   )
 
   const handleSelectBranch = (branch: string) => {
-    navigation.selectRepoBranch(repoId, branch)
+    if (onSelectBranch) onSelectBranch(branch)
+    else navigation.selectRepoBranch(repoId, branch)
     onAfterSelect?.(branch)
   }
 
@@ -62,9 +65,7 @@ export function BranchView({ repoId, onAfterSelect, onAfterOpenStatus }: Props) 
       : 'branches.filter-empty'
     : 'branches.empty'
 
-  // Highlight comes from the same store projection as the list data,
-  // so callers can't pass a stale or wrong value.
-  const highlightedBranch = repo?.ui.selectedBranch ?? null
+  const highlightedBranch = currentBranchName ?? null
 
   if (!repo) return <BranchNavigatorSkeleton />
 

@@ -4,13 +4,22 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  Navigate,
   redirect,
   useNavigate,
 } from '@tanstack/react-router'
 import { App } from '#/web/App.tsx'
-import { Layout } from '#/web/Layout.tsx'
+import { AuthenticatedWorkspaceBootGate, Layout } from '#/web/Layout.tsx'
 import { isSettingsPage } from '#/shared/settings-pages.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
+import {
+  branchNameFromSlug,
+  repoIdFromSlug,
+  repoSlugFromId,
+} from '#/web/repo-route-slugs.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
+import type { ReposStore } from '#/web/stores/repos/types.ts'
+import { usePrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 
 const rootRoute = createRootRoute()
 
@@ -23,15 +32,25 @@ const layoutRoute = createRoute({
 const indexRoute = createRoute({
   getParentRoute: () => layoutRoute,
   path: '/',
-  beforeLoad: () => {
-    throw redirect({ to: '/app' })
-  },
+  component: IndexRoute,
 })
 
-const appRoute = createRoute({
+const repoDashboardRoute = createRoute({
   getParentRoute: () => layoutRoute,
-  path: '/app',
-  component: AppRoute,
+  path: '/repo/$repoSlug/dashboard',
+  component: RepoDashboardRoute,
+})
+
+const repoBranchRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: '/repo/$repoSlug/branch/$branchSlug',
+  component: RepoBranchRoute,
+})
+
+const repoWorktreeNewRoute = createRoute({
+  getParentRoute: () => layoutRoute,
+  path: '/repo/$repoSlug/worktree/new',
+  component: RepoWorktreeNewRoute,
 })
 
 const settingsIndexRoute = createRoute({
@@ -53,16 +72,80 @@ const settingsRoute = createRoute({
   },
 })
 
-function AppRoute() {
-  const navigate = useNavigate()
+function IndexRoute() {
+  const firstRepoSlug = useReposStore(initialRepoRouteSlugFromStore)
+  const navigation = useRepoRouteNavigation()
+  if (firstRepoSlug) return <Navigate to="/repo/$repoSlug/dashboard" params={{ repoSlug: firstRepoSlug }} replace />
   return (
-    <App
-      routeSettingsPage={null}
-      onRouteSettingsPageChange={(nextPage) => {
-        if (nextPage) void navigate({ to: '/settings/$page', params: { page: nextPage } })
-      }}
-    />
+    <AuthenticatedWorkspaceBootGate>
+      <App routeSettingsPage={null} {...navigation} />
+    </AuthenticatedWorkspaceBootGate>
   )
+}
+
+export function initialRepoRouteSlugFromStore(
+  state: Pick<ReposStore, 'restoredRepoId' | 'order' | 'repos' | 'sessionReady'>,
+): string | null {
+  const restoredRepo = state.restoredRepoId ? state.repos[state.restoredRepoId] : null
+  if (restoredRepo) return repoSlugFromId(restoredRepo.id)
+  if (!state.sessionReady) return null
+  const firstRepoId = state.order[0]
+  const firstRepo = firstRepoId ? state.repos[firstRepoId] : null
+  return firstRepo ? repoSlugFromId(firstRepo.id) : null
+}
+
+function RepoDashboardRoute() {
+  const { repoSlug } = repoDashboardRoute.useParams()
+  const repoId = useRepoIdFromSlug(repoSlug)
+  const navigation = useRepoRouteNavigation()
+  return (
+    <AuthenticatedWorkspaceBootGate>
+      <App routeRepoView={repoId ? { kind: 'dashboard', repoId } : null} {...navigation} />
+    </AuthenticatedWorkspaceBootGate>
+  )
+}
+
+function RepoBranchRoute() {
+  const { repoSlug, branchSlug } = repoBranchRoute.useParams()
+  const repoId = useRepoIdFromSlug(repoSlug)
+  const branchName = branchNameFromSlug(branchSlug)
+  const navigation = useRepoRouteNavigation()
+  return (
+    <AuthenticatedWorkspaceBootGate>
+      <App routeRepoView={repoId && branchName ? { kind: 'branch', repoId, branchName } : null} {...navigation} />
+    </AuthenticatedWorkspaceBootGate>
+  )
+}
+
+function RepoWorktreeNewRoute() {
+  const { repoSlug } = repoWorktreeNewRoute.useParams()
+  const repoId = useRepoIdFromSlug(repoSlug)
+  const navigation = useRepoRouteNavigation()
+  return (
+    <AuthenticatedWorkspaceBootGate>
+      <App routeRepoView={repoId ? { kind: 'newWorktree', repoId } : null} {...navigation} />
+    </AuthenticatedWorkspaceBootGate>
+  )
+}
+
+function useRepoRouteNavigation() {
+  const routeNavigation = usePrimaryWindowRouteNavigation()
+  return {
+    onRouteSettingsPageChange: (page: SettingsPage | null) => {
+      if (page) routeNavigation.openSettings(page)
+    },
+    onOpenRepoDashboard: (repoId: string) => routeNavigation.openRepoDashboard(repoId),
+    onOpenRepoBranch: (repoId: string, branchName: string) => routeNavigation.openRepoBranch(repoId, branchName),
+    onOpenRepoNewWorktree: (repoId: string) => routeNavigation.openRepoNewWorktree(repoId),
+  }
+}
+
+function useRepoIdFromSlug(repoSlug: string): string | null {
+  const repoId = repoIdFromSlug(repoSlug)
+  return useReposStore((s) => {
+    if (!repoId) return null
+    return s.repos[repoId]?.id ?? null
+  })
 }
 
 function SettingsRoute() {
@@ -74,14 +157,21 @@ function SettingsRoute() {
       onRouteSettingsPageChange={(nextPage) => {
         void (nextPage
           ? navigate({ to: '/settings/$page', params: { page: nextPage } })
-          : navigate({ to: '/app' }))
+          : navigate({ to: '/' }))
       }}
     />
   )
 }
 
 const primaryWindowRouteTree = rootRoute.addChildren([
-  layoutRoute.addChildren([indexRoute, appRoute, settingsIndexRoute, settingsRoute]),
+  layoutRoute.addChildren([
+    indexRoute,
+    repoDashboardRoute,
+    repoBranchRoute,
+    repoWorktreeNewRoute,
+    settingsIndexRoute,
+    settingsRoute,
+  ]),
 ])
 
 const primaryWindowRouter = createRouter({

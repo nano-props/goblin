@@ -195,6 +195,7 @@ export const ko: Record<DictKey, string> = {
   'repo-picker.recent-save-failed': '리포지토리는 열렸지만 최근 기록은 업데이트되지 않았습니다',
 
   // ---- Workspace pane tabs ------------------------------------------------
+  'repo.dashboard': '대시보드',
   'tab.branches': '브랜치',
   'tab.repo-workspace': '리포지토리 작업 공간',
   'tab.status': '상태',

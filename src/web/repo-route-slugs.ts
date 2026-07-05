@@ -1,0 +1,33 @@
+export function repoSlugFromId(repoId: string): string {
+  return slugFromText(repoId)
+}
+
+export function repoIdFromSlug(slug: string): string | null {
+  return textFromSlug(slug)
+}
+
+export function branchSlugFromName(branchName: string): string {
+  return slugFromText(branchName)
+}
+
+export function branchNameFromSlug(slug: string): string | null {
+  return textFromSlug(slug)
+}
+
+function slugFromText(value: string): string {
+  const bytes = new TextEncoder().encode(value)
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '')
+}
+
+function textFromSlug(slug: string): string | null {
+  try {
+    const padded = slug.replaceAll('-', '+').replaceAll('_', '/') + '='.repeat((4 - (slug.length % 4)) % 4)
+    const binary = atob(padded)
+    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
+    return new TextDecoder().decode(bytes)
+  } catch {
+    return null
+  }
+}

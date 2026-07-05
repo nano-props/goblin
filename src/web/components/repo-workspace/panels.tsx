@@ -13,7 +13,7 @@ import { useLazyRepoTree } from '#/web/hooks/useLazyRepoTree.ts'
 import { TerminalSessionView } from '#/web/components/terminal/TerminalSessionView.tsx'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { RepoTreeNode } from '#/shared/api-types.ts'
-import type { RepoWorkspaceRepo, SelectedRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
+import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
@@ -38,7 +38,7 @@ export interface WorkspacePanePanelRenderInput {
   repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'branchModel' | 'ui'> & {
     branchModel: RepoWorkspaceRepo['branchModel']
   }
-  detail: SelectedRepoWorkspacePresentation
+  detail: CurrentRepoWorkspacePresentation
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
   terminalSyncReady: boolean
@@ -54,7 +54,7 @@ interface TabPanelProps {
   children: ReactNode
 }
 
-type RepoWorkspaceBranch = NonNullable<SelectedRepoWorkspacePresentation['branch']>
+type RepoWorkspaceBranch = NonNullable<CurrentRepoWorkspacePresentation['branch']>
 type WorkspacePanePanelComponent = (props: WorkspacePanePanelProps) => ReactNode
 
 const REPO_WORKSPACE_PANE_PANEL_BY_TYPE: Partial<Record<WorkspacePaneTabType, WorkspacePanePanelComponent>> = {
@@ -104,7 +104,7 @@ function ChangesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }
       panelLabel={panelLabel}
       repo={repo}
       branch={branch}
-      selectedStatus={detail.selectedStatus}
+      currentBranchStatus={detail.currentBranchStatus}
       statusLoading={detail.loading.status}
       statusError={detail.errors.status}
       statusStale={detail.stale.status}
@@ -241,14 +241,14 @@ function FiletreeTab({
       const openingFileKey = `${openingFileKeyPrefix}${node.id}`
       if (!beginOpeningFile(openingFileKey)) return
       try {
-        const openerIdentity = captureWorkspacePaneActiveTabIdentity(repoId)
+        const openerIdentity = captureWorkspacePaneActiveTabIdentity(repoId, branchName)
         const viewerResult = await getRepositoryFileViewer(repoId, worktreePath)
         await runCreateTerminalTabCommand({
           base: { repoRoot: repoId, repoInstanceId, branch: branchName, worktreePath },
           createTerminal,
           createOwnedTerminal,
           openerIdentity,
-          enterTerminalTab: () => navigation.showRepoWorkspacePaneTab(repoId, 'terminal'),
+          enterTerminalTab: () => navigation.showRepoBranchWorkspacePaneTab(repoId, branchName, 'terminal'),
           options: {
             startupShellCommand: fileReadCommand(viewerResult, absoluteFilePathForTerminal(worktreePath, node.path)),
             insertAfterIdentity: openerIdentity,
@@ -444,7 +444,7 @@ function BranchChangesTab({
   panelLabel,
   repo,
   branch,
-  selectedStatus,
+  currentBranchStatus,
   statusLoading,
   statusError,
   statusStale,
@@ -453,13 +453,13 @@ function BranchChangesTab({
   panelLabel: WorkspacePanePanelLabel
   repo: WorkspacePanePanelRenderInput['repo']
   branch: RepoWorkspaceBranch
-  selectedStatus: SelectedRepoWorkspacePresentation['selectedStatus']
+  currentBranchStatus: CurrentRepoWorkspacePresentation['currentBranchStatus']
   statusLoading: boolean
   statusError: string | null
   statusStale: boolean
 }) {
   const t = useT()
-  const totalEntries = selectedStatus.reduce((n, wt) => n + wt.entries.length, 0)
+  const totalEntries = currentBranchStatus.reduce((n, wt) => n + wt.entries.length, 0)
 
   return (
     <BranchTabPanel id={`${workspacePaneId}-changes-panel`} {...panelLabel} busy={statusLoading}>
@@ -472,10 +472,10 @@ function BranchChangesTab({
           {statusStale && statusError && <StaleStatusNotice message={statusError} />}
           {totalEntries > 0 ? (
             <ScrollPane>
-              <StatusList status={selectedStatus} />
+              <StatusList status={currentBranchStatus} />
             </ScrollPane>
           ) : (
-            <StatusList status={selectedStatus} />
+            <StatusList status={currentBranchStatus} />
           )}
         </div>
       ) : (

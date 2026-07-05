@@ -20,16 +20,16 @@ import {
 beforeEach(resetLifecycleTest)
 
 describe('repo lifecycle', () => {
-  test('ensureWorkspaceOpen plus setActive opens the resolved repo, records it as recent, and starts initial local refresh', async () => {
+  test('ensureWorkspaceOpen opens the resolved repo, records it as recent, and starts initial local refresh', async () => {
     const calls = installGoblin()
 
     const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
-    if (result.ok) useReposStore.getState().setActive(result.id)
+    if (result.ok) useReposStore.setState({ restoredRepoId: result.id })
     if (result.ok) await result.postOpenEffects
 
     expect(result).toMatchObject({ ok: true, id: REPO_A })
     expect(useReposStore.getState().order).toEqual([REPO_A])
-    expect(useReposStore.getState().activeId).toBe(REPO_A)
+    expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
     expect(calls.recent).toEqual([{ kind: 'local', id: REPO_A }])
     await vi.waitFor(() => {
       expect(calls.composite).toEqual([REPO_A])
@@ -72,26 +72,26 @@ describe('repo lifecycle', () => {
     const calls = installGoblin()
 
     const first = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
-    if (first.ok) useReposStore.getState().setActive(first.id)
+    if (first.ok) useReposStore.setState({ restoredRepoId: first.id })
     const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_B)
 
     expect(result).toMatchObject({ ok: true, id: REPO_B })
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
-    expect(useReposStore.getState().activeId).toBe(REPO_A)
+    expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
     await vi.waitFor(() => {
       expect(calls.composite).toEqual([REPO_A, REPO_B])
     })
   })
 
-  test('ensureWorkspaceOpen opens without changing the active repo', async () => {
+  test('ensureWorkspaceOpen opens without changing the restored repo', async () => {
     const calls = installGoblin()
 
     const first = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
-    if (first.ok) useReposStore.getState().setActive(first.id)
+    if (first.ok) useReposStore.setState({ restoredRepoId: first.id })
     await useReposStore.getState().ensureWorkspaceOpen(REPO_B)
 
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
-    expect(useReposStore.getState().activeId).toBe(REPO_A)
+    expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
     await vi.waitFor(() => {
       expect(calls.composite).toEqual([REPO_A, REPO_B])
     })
@@ -101,30 +101,30 @@ describe('repo lifecycle', () => {
     installGoblin()
 
     const first = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
-    if (first.ok) useReposStore.getState().setActive(first.id)
+    if (first.ok) useReposStore.setState({ restoredRepoId: first.id })
     await useReposStore.getState().ensureWorkspaceOpen(REPO_B)
 
     expect(Object.keys(useReposStore.getState().repos)).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
-    expect(useReposStore.getState().activeId).toBe(REPO_A)
+    expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
   })
 
   test('ensureWorkspaceOpen does not re-refresh an already-open repo with unchanged target', async () => {
     const calls = installGoblin()
 
     const first = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
-    if (first.ok) useReposStore.getState().setActive(first.id)
+    if (first.ok) useReposStore.setState({ restoredRepoId: first.id })
     const second = await useReposStore.getState().ensureWorkspaceOpen(REPO_B)
-    if (second.ok) useReposStore.getState().setActive(second.id)
+    if (second.ok) useReposStore.setState({ restoredRepoId: second.id })
     // Opening REPO_A again is a focus action: the repo is already
     // resolved and its data is coherent, so we skip the snapshot/status
     // pipeline. (hydrateRepoSession still always refreshes on boot — see
     // the lifecycle-hydrate test for the cached-then-fresh contract.)
     const third = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
-    if (third.ok) useReposStore.getState().setActive(third.id)
+    if (third.ok) useReposStore.setState({ restoredRepoId: third.id })
 
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
-    expect(useReposStore.getState().activeId).toBe(REPO_A)
+    expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
     await vi.waitFor(() => {
       expect(calls.composite).toEqual([REPO_A, REPO_B])
     })
@@ -149,11 +149,11 @@ describe('repo lifecycle', () => {
     })
 
     const first = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
-    if (first.ok) useReposStore.getState().setActive(first.id)
+    if (first.ok) useReposStore.setState({ restoredRepoId: first.id })
     const firstToken = useReposStore.getState().repos[REPO_A]?.instanceId
     useReposStore.getState().closeRepo(REPO_A)
     const second = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
-    if (second.ok) useReposStore.getState().setActive(second.id)
+    if (second.ok) useReposStore.setState({ restoredRepoId: second.id })
     const secondToken = useReposStore.getState().repos[REPO_A]?.instanceId
 
     snapshotResolvers[1]?.({ branches: [branchSnapshot('fresh')], current: 'fresh' })
@@ -248,7 +248,6 @@ describe('repo lifecycle', () => {
             currentBranch: 'cached',
           },
           ui: {
-            selectedBranch: 'cached',
             branchViewMode: 'all',
           },
         },
@@ -324,12 +323,12 @@ describe('repo lifecycle', () => {
   test('closeRepo clears recorded tab openers scoped to that repo, but leaves other repos untouched', () => {
     // seedRepoWithReadModelForTest replaces the whole `repos` map, so seed both repos
     // before merging them back together into one multi-repo store state.
-    const repoA = seedRepoWithReadModelForTest({ id: REPO_A, branches: [createRepoBranch('feature/a')], selectedBranch: 'feature/a' })
-    const repoB = seedRepoWithReadModelForTest({ id: REPO_B, branches: [createRepoBranch('feature/b')], selectedBranch: 'feature/b' })
+    const repoA = seedRepoWithReadModelForTest({ id: REPO_A, branches: [createRepoBranch('feature/a')], currentBranchName: 'feature/a' })
+    const repoB = seedRepoWithReadModelForTest({ id: REPO_B, branches: [createRepoBranch('feature/b')], currentBranchName: 'feature/b' })
     useReposStore.setState({
       repos: { [REPO_A]: repoA, [REPO_B]: repoB },
       order: [REPO_A, REPO_B],
-      activeId: REPO_A,
+      restoredRepoId: REPO_A,
     })
     useReposStore
       .getState()

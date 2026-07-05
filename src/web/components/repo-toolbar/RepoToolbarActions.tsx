@@ -1,7 +1,7 @@
 import { useContext } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
-import { FolderPlus } from 'lucide-react'
+import { FolderPlus, LayoutDashboard } from 'lucide-react'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
 import { BranchViewModeControl } from '#/web/components/repo-toolbar/BranchViewModeControl.tsx'
@@ -18,12 +18,37 @@ interface Props {
   repoId: string
 }
 
+interface CreateWorktreeRowActionProps extends Props {
+  selected?: boolean
+  onCreateWorktree?: () => void
+}
+
+interface DashboardRowActionProps extends Props {
+  selected?: boolean
+  onOpenDashboard?: () => void
+}
+
 export function RepoSyncAction({ repoId }: Props) {
   return <RepoActivityControl repoId={repoId} />
 }
 
 export function BranchFilterAction({ repoId }: Props) {
   return <WorktreeFilterToggle repoId={repoId} />
+}
+
+export function DashboardRowAction({ selected = false, onOpenDashboard }: DashboardRowActionProps) {
+  const t = useT()
+  return (
+    <SidebarRowButton
+      onClick={() => onOpenDashboard?.()}
+      aria-label={t('repo.dashboard')}
+      size="dense"
+      selected={selected}
+      leading={<LayoutDashboard size={16} />}
+    >
+      {t('repo.dashboard')}
+    </SidebarRowButton>
+  )
 }
 
 function WorktreeFilterToggle({ repoId }: Props) {
@@ -49,7 +74,11 @@ function WorktreeFilterToggle({ repoId }: Props) {
   )
 }
 
-export function CreateWorktreeRowAction({ repoId }: Props) {
+export function CreateWorktreeRowAction({
+  repoId,
+  selected = false,
+  onCreateWorktree: routeCreateWorktree,
+}: CreateWorktreeRowActionProps) {
   const t = useT()
   const { disabled, openCreateWorktree } = useCreateWorktreeTrigger(repoId)
   const label = t('action.create-worktree-title')
@@ -58,9 +87,12 @@ export function CreateWorktreeRowAction({ repoId }: Props) {
   return (
     <SidebarRowButton
       onClick={() => {
-        if (!disabled) openCreateWorktree()
+        if (disabled) return
+        if (routeCreateWorktree) routeCreateWorktree()
+        else openCreateWorktree()
       }}
       disabled={disabled}
+      selected={selected}
       aria-label={`${label} (${shortcutLabel})`}
       data-testid="create-worktree-button"
       size="dense"

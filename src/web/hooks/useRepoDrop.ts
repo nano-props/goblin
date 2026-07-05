@@ -31,14 +31,14 @@ export function useRepoDrop({ blocked }: Options) {
   tRef.current = t
   const blockedRef = useRef(blocked)
   blockedRef.current = blocked
-  const [active, setActive] = useState(false)
+  const [active, setDropActive] = useState(false)
 
   // If a modal opens mid-drag, the gate stops reacting to enter/over/
-  // drop but `setActive(false)` would never fire on its own. Force-clear
+    // drop but `setDropActive(false)` would never fire on its own. Force-clear
   // when blocked flips on so the dashed border doesn't stay painted
   // over the modal.
   useEffect(() => {
-    if (blocked) setActive(false)
+    if (blocked) setDropActive(false)
   }, [blocked])
 
   const onDragEnter = (event: DragEvent<HTMLDivElement>) => {
@@ -46,7 +46,7 @@ export function useRepoDrop({ blocked }: Options) {
     const handledByChild = event.isDefaultPrevented()
     event.preventDefault()
     if (isDropBlocked(blockedRef.current)) return
-    setActive(!handledByChild)
+    setDropActive(!handledByChild)
   }
 
   const onDragOver = (event: DragEvent<HTMLDivElement>) => {
@@ -54,7 +54,7 @@ export function useRepoDrop({ blocked }: Options) {
     const handledByChild = event.isDefaultPrevented()
     event.preventDefault()
     if (isDropBlocked(blockedRef.current)) return
-    setActive(!handledByChild)
+    setDropActive(!handledByChild)
     event.dataTransfer.dropEffect = 'copy'
   }
 
@@ -64,14 +64,14 @@ export function useRepoDrop({ blocked }: Options) {
     // boundaries — the dashed border ends up stuck "on" after a few
     // hovers. `relatedTarget === null` fires once when the cursor
     // exits the BrowserWindow, which is the signal we actually want.
-    if (event.relatedTarget === null) setActive(false)
+    if (event.relatedTarget === null) setDropActive(false)
   }
 
   const onDrop = (event: DragEvent<HTMLDivElement>) => {
     if (!hasFiles(event)) return
     const handledByChild = event.isDefaultPrevented()
     event.preventDefault()
-    setActive(false)
+    setDropActive(false)
     if (handledByChild) return
     if (isDropBlocked(blockedRef.current)) return
     const paths = Array.from(event.dataTransfer.files)

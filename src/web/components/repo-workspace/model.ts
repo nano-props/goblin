@@ -27,23 +27,23 @@ export function getRepoWorkspacePresentation(repo: RepoState | undefined): RepoW
   }
 }
 
-export type SelectedRepoWorkspace = ReturnType<typeof getSelectedRepoWorkspace>
-export type SelectedRepoWorkspacePresentation = ReturnType<typeof getSelectedRepoWorkspacePresentation>
+export type CurrentRepoWorkspace = ReturnType<typeof getCurrentRepoWorkspace>
+export type CurrentRepoWorkspacePresentation = ReturnType<typeof getCurrentRepoWorkspacePresentation>
 
 export interface RepoWorkspaceRepo extends BranchActionRepo {
   branchModel: RepoBranchReadModelData & {
     statusReady: boolean
   }
-  ui: Pick<RepoState['ui'], 'selectedBranch' | 'preferredWorkspacePaneTabByTarget'>
+  ui: Pick<RepoState['ui'], 'preferredWorkspacePaneTabByTarget'> & { currentBranchName: string | null }
   dataLoads: Pick<RepoState['dataLoads'], 'status' | 'pullRequests'>
   remote: BranchActionRepo['remote'] & Pick<RepoState['remote'], 'lifecycle'>
 }
 
-export function getSelectedRepoWorkspace(repo: RepoWorkspaceRepo) {
-  const branch = repo.branchModel.branches.find((b) => b.name === repo.ui.selectedBranch) ?? null
-  const selectedStatus = selectedBranchStatus(repo, branch)
+export function getCurrentRepoWorkspace(repo: RepoWorkspaceRepo) {
+  const branch = repo.branchModel.branches.find((b) => b.name === repo.ui.currentBranchName) ?? null
+  const currentBranchStatus = selectedBranchStatus(repo, branch)
   const worktreeState = branch ? getBranchWorktreeState(repo, branch) : null
-  const statusCount = worktreeState?.changeCount ?? selectedStatus.reduce((n, wt) => n + wt.entries.length, 0)
+  const statusCount = worktreeState?.changeCount ?? currentBranchStatus.reduce((n, wt) => n + wt.entries.length, 0)
 
   // The repo workspace presentation reads the target from the lifecycle
   // union via `remoteRepoTarget`; we don't mirror it on the
@@ -52,11 +52,11 @@ export function getSelectedRepoWorkspace(repo: RepoWorkspaceRepo) {
   // re-resolve the live lifecycle via `useReposStore` (the
   // presentation object is a snapshot — it doesn't re-render on
   // lifecycle transitions).
-  return { repoId: repo.id, branch, selectedStatus, statusCount, worktreeState }
+  return { repoId: repo.id, branch, currentBranchStatus, statusCount, worktreeState }
 }
 
-export function getSelectedRepoWorkspacePresentation(repo: RepoWorkspaceRepo) {
-  const detail = getSelectedRepoWorkspace(repo)
+export function getCurrentRepoWorkspacePresentation(repo: RepoWorkspaceRepo) {
+  const detail = getCurrentRepoWorkspace(repo)
   const statusLoading = dataLoadBusy(repo.dataLoads.status)
 
   return {

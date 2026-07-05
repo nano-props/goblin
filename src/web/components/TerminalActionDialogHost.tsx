@@ -7,11 +7,11 @@ import { useT } from '#/web/stores/i18n.ts'
 import { useTerminalActionDialogsStore } from '#/web/stores/repos/terminal-action-dialogs.ts'
 
 interface Props {
-  activeRepoId: string | null
+  currentRepoId: string | null
   navigation: PrimaryWindowNavigationActions
 }
 
-export function TerminalActionDialogHost({ activeRepoId, navigation }: Props) {
+export function TerminalActionDialogHost({ currentRepoId, navigation }: Props) {
   const t = useT()
   const closeConfirm = useTerminalActionDialogsStore((s) => s.closeConfirm)
   const closeCloseConfirm = useTerminalActionDialogsStore((s) => s.closeCloseConfirm)
@@ -19,9 +19,9 @@ export function TerminalActionDialogHost({ activeRepoId, navigation }: Props) {
   const displayCloseConfirm = useLastNonNull(closeConfirm)
 
   useEffect(() => {
-    if (activeRepoId) closeStaleDialogs(activeRepoId)
+    if (currentRepoId) closeStaleDialogs(currentRepoId)
     else closeCloseConfirm()
-  }, [activeRepoId, closeCloseConfirm, closeStaleDialogs])
+  }, [currentRepoId, closeCloseConfirm, closeStaleDialogs])
 
   return (
     <ConfirmDialog
@@ -46,6 +46,7 @@ export function TerminalActionDialogHost({ activeRepoId, navigation }: Props) {
         closeCloseConfirm()
         await runConfirmCloseTerminalWorkspacePaneTabCommand({
           repoId: payload.repoId,
+          branchName: payload.terminalBase.branch,
           navigation,
           targetIdentity: payload.targetIdentity,
           confirmedTerminal: {

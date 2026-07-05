@@ -96,7 +96,6 @@ describe('runRemoteRepoConnection', () => {
           pullRequestsByBranch: {},
         },
         ui: {
-          selectedBranch: null,
           branchViewMode: 'all',
           preferredWorkspacePaneTabByTarget: {},
         },
@@ -141,7 +140,6 @@ describe('runRemoteRepoConnection', () => {
         dataLoads: emptyDataLoads(),
         operations: emptyOperations(),
         ui: {
-          selectedBranch: null,
           branchViewMode: 'all',
           preferredWorkspacePaneTabByTarget: {},
         },
@@ -186,7 +184,6 @@ describe('runRemoteRepoConnection', () => {
         dataLoads: emptyDataLoads(),
         operations: emptyOperations(),
         ui: {
-          selectedBranch: null,
           branchViewMode: 'all',
           preferredWorkspacePaneTabByTarget: {},
         },
@@ -231,7 +228,6 @@ describe('runRemoteRepoConnection', () => {
         dataLoads: emptyDataLoads(),
         operations: emptyOperations(),
         ui: {
-          selectedBranch: null,
           branchViewMode: 'all',
           preferredWorkspacePaneTabByTarget: {},
         },
@@ -309,7 +305,6 @@ describe('runRemoteRepoConnection', () => {
         dataLoads: emptyDataLoads(),
         operations: emptyOperations(),
         ui: {
-          selectedBranch: null,
           branchViewMode: 'all',
           preferredWorkspacePaneTabByTarget: {},
         },
@@ -374,7 +369,6 @@ describe('runRemoteRepoConnection', () => {
           dataLoads: emptyDataLoads(),
           operations: emptyOperations(),
           ui: {
-            selectedBranch: null,
             branchViewMode: 'all',
             preferredWorkspacePaneTabByTarget: {},
           },

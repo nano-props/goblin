@@ -12,7 +12,7 @@ import { cn } from '#/web/lib/cn.ts'
 //
 // Positioning: DropdownMenu is the command/navigation dropdown. The trigger
 // is a ghost button or icon button (e.g. a chevron on a tab, an icon in the
-// toolbar) — used for switching the active repo/terminal/branch or opening
+// toolbar) — used for switching the current repo/terminal/branch or opening
 // a menu of actions. Items use `bg-selected text-selected-foreground`
 // (applied via `SelectedDropdownMenuItem`) to mark the currently-active
 // entry. Do NOT reach for this in form fields — that's `select.tsx`,
@@ -217,7 +217,7 @@ function DropdownMenuSubContent({
 // SelectedDropdownMenuItem pairs the "currently selected" intent with the
 // codebase's persistent selection styling (`bg-selected text-selected-foreground`).
 // Use this for items that pick one option from a list (e.g. switching the
-// active repo/terminal/branch in their tab-strip dropdowns); the selected
+// current repo/terminal/branch in their tab-strip dropdowns); the selected
 // item remains focusable so it still picks up the hover accent. The same
 // `bg-selected text-selected-foreground` className is also applied directly
 // (without this wrapper) by the active toolbar menu item and the settings

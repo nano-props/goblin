@@ -920,7 +920,6 @@ describe('core refresh request ordering', () => {
     // model, which inspects the active branch's worktree + terminal session count.
     const repoInstanceId = seedRepo([branch('main', undefined, { worktree: { path: '/repo' } }), branch('feature/a')])
     updateRepoForTest((repo) => {
-      repo.ui.selectedBranch = 'feature/a'
       repo.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(
         repo.ui,
         { repoRoot: REPO_ID, branchName: 'feature/a', worktreePath: null },
@@ -932,7 +931,6 @@ describe('core refresh request ordering', () => {
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.ui.selectedBranch).toBe('feature/a')
     const projection = repo ? readRepoBranchQueryProjection(repo) : null
     expect(
       repo && projection
@@ -950,7 +948,6 @@ describe('core refresh request ordering', () => {
       branch('feature/new'),
     ])
     updateRepoForTest((repo) => {
-      repo.ui.selectedBranch = 'feature/old'
       repo.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(
         repo.ui,
         { repoRoot: REPO_ID, branchName: 'feature/old', worktreePath: '/tmp/worktree-a' },
@@ -965,7 +962,6 @@ describe('core refresh request ordering', () => {
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.ui.selectedBranch).toBe('feature/new')
     const projection = repo ? readRepoBranchQueryProjection(repo) : null
     expect(
       repo && projection

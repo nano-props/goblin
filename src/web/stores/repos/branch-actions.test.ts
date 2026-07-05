@@ -59,9 +59,8 @@ function updateRepoForTest(
   })
 }
 
-function setSelectionForTest(selectedBranch: string, branchViewMode: BranchViewMode) {
+function setSelectionForTest(currentBranchName: string, branchViewMode: BranchViewMode) {
   updateRepoForTest((repo) => {
-    repo.ui.selectedBranch = selectedBranch
     repo.ui.branchViewMode = branchViewMode
   })
 }
@@ -692,7 +691,6 @@ describe('runBranchAction', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.branchViewMode).toBe('all')
-    expect(repo?.ui.selectedBranch).toBe('feature/a')
   })
 
   test('keeps worktrees filtering after creating a worktree', async () => {
@@ -703,7 +701,6 @@ describe('runBranchAction', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.branchViewMode).toBe('worktrees')
-    expect(repo?.ui.selectedBranch).toBe('feature/a')
   })
 
   test.each([
@@ -719,7 +716,6 @@ describe('runBranchAction', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.branchViewMode).toBe('worktrees')
-    expect(repo?.ui.selectedBranch).toBe('feature/a')
   })
 
   test('does not let stale create worktree refresh results change selection', async () => {
@@ -730,7 +726,7 @@ describe('runBranchAction', () => {
           id: REPO_ID,
           instanceId: 'repo-instance-test-2',
           branches: [createRepoBranch('feature/a'), createRepoBranch('feature/new')],
-          selectedBranch: 'feature/a',
+          currentBranchName: 'feature/a',
         })
         setSelectionForTest('feature/a', 'worktrees')
       },
@@ -741,7 +737,6 @@ describe('runBranchAction', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceId).toBe('repo-instance-test-2')
     expect(repo?.ui.branchViewMode).toBe('worktrees')
-    expect(repo?.ui.selectedBranch).toBe('feature/a')
   })
 
   test('does not let stale branch action refresh results overwrite a reopened repo', async () => {
@@ -807,6 +802,5 @@ describe('runBranchAction', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.branchViewMode).toBe('worktrees')
-    expect(repo?.ui.selectedBranch).toBe('feature/a')
   })
 })

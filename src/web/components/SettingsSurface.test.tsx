@@ -43,7 +43,7 @@ function defaultIpcResult(path: string, input?: unknown) {
       lanEnabled: false,
       session: {
         openRepoEntries: [],
-        activeRepoId: null,
+        restoredRepoId: null,
         zenMode: true,
         workspacePaneSize: 50,
       },

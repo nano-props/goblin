@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'vitest'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import {
-  activeRepoIdAfterWorkspaceHydration,
-  nextActiveRepoIdAfterWorkspaceClose,
+  restoredRepoIdAfterWorkspaceHydration,
+  nextRestoredRepoIdAfterWorkspaceClose,
   persistedOpenWorkspaceEntries,
 } from '#/web/open-workspace-state.ts'
 
@@ -44,28 +44,28 @@ describe('persistedOpenWorkspaceEntries', () => {
   })
 })
 
-describe('nextActiveRepoIdAfterWorkspaceClose', () => {
+describe('nextRestoredRepoIdAfterWorkspaceClose', () => {
   test('keeps the active selection when closing an inactive workspace', () => {
-    expect(nextActiveRepoIdAfterWorkspaceClose(['/tmp/repo-a', '/tmp/repo-b'], '/tmp/repo-a', '/tmp/repo-b')).toBe(
+    expect(nextRestoredRepoIdAfterWorkspaceClose(['/tmp/repo-a', '/tmp/repo-b'], '/tmp/repo-a', '/tmp/repo-b')).toBe(
       '/tmp/repo-a',
     )
   })
 
   test('slides to the right neighbor, then the left, then null', () => {
     expect(
-      nextActiveRepoIdAfterWorkspaceClose(['/tmp/repo-a', '/tmp/repo-b', '/tmp/repo-c'], '/tmp/repo-b', '/tmp/repo-b'),
+      nextRestoredRepoIdAfterWorkspaceClose(['/tmp/repo-a', '/tmp/repo-b', '/tmp/repo-c'], '/tmp/repo-b', '/tmp/repo-b'),
     ).toBe('/tmp/repo-c')
-    expect(nextActiveRepoIdAfterWorkspaceClose(['/tmp/repo-a', '/tmp/repo-b'], '/tmp/repo-b', '/tmp/repo-b')).toBe(
+    expect(nextRestoredRepoIdAfterWorkspaceClose(['/tmp/repo-a', '/tmp/repo-b'], '/tmp/repo-b', '/tmp/repo-b')).toBe(
       '/tmp/repo-a',
     )
-    expect(nextActiveRepoIdAfterWorkspaceClose(['/tmp/repo-a'], '/tmp/repo-a', '/tmp/repo-a')).toBeNull()
+    expect(nextRestoredRepoIdAfterWorkspaceClose(['/tmp/repo-a'], '/tmp/repo-a', '/tmp/repo-a')).toBeNull()
   })
 })
 
-describe('activeRepoIdAfterWorkspaceHydration', () => {
-  test('preserves a user-selected active repo over the restored preferred repo', () => {
+describe('restoredRepoIdAfterWorkspaceHydration', () => {
+  test('preserves a user-selected restored repo over the persisted restored repo', () => {
     expect(
-      activeRepoIdAfterWorkspaceHydration(
+      restoredRepoIdAfterWorkspaceHydration(
         '/tmp/repo-a',
         { '/tmp/repo-a': {}, '/tmp/repo-b': {} },
         ['/tmp/repo-a', '/tmp/repo-b'],
@@ -75,9 +75,9 @@ describe('activeRepoIdAfterWorkspaceHydration', () => {
     ).toBe('/tmp/repo-a')
   })
 
-  test('falls back to the restored preferred repo and then the first open workspace', () => {
+  test('falls back to the restored preferred repo and then the first open workspace when no preferred repo was restored', () => {
     expect(
-      activeRepoIdAfterWorkspaceHydration(
+      restoredRepoIdAfterWorkspaceHydration(
         null,
         { '/tmp/repo-a': {}, '/tmp/repo-b': {} },
         ['/tmp/repo-a', '/tmp/repo-b'],
@@ -85,8 +85,14 @@ describe('activeRepoIdAfterWorkspaceHydration', () => {
         null,
       ),
     ).toBe('/tmp/repo-b')
+    expect(restoredRepoIdAfterWorkspaceHydration(null, { '/tmp/repo-a': {} }, ['/tmp/repo-a'], null, null)).toBe(
+      '/tmp/repo-a',
+    )
+  })
+
+  test('does not select the first restored repo while the persisted restored repo is still unavailable', () => {
     expect(
-      activeRepoIdAfterWorkspaceHydration(null, { '/tmp/repo-a': {} }, ['/tmp/repo-a'], '/tmp/missing', null),
-    ).toBe('/tmp/repo-a')
+      restoredRepoIdAfterWorkspaceHydration(null, { '/tmp/repo-a': {} }, ['/tmp/repo-a'], '/tmp/missing', null),
+    ).toBeNull()
   })
 })

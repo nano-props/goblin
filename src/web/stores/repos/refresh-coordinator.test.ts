@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   handleRepoInvalidationRefresh,
   repoInvalidationRefreshDisposition,
-  repoStatusRefreshSnapshot,
   resetRepoRefreshCoordinatorState,
   runRepoRefreshIntent,
+  currentRepoStatusRefreshSnapshot,
 } from '#/web/stores/repos/refresh-coordinator.ts'
 import { beginRepoInvalidationSource, settleRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import type { ReposGet } from '#/web/stores/repos/types.ts'
@@ -57,7 +57,7 @@ describe('repo refresh coordinator', () => {
     const repo = seedRepoWithReadModelForTest({
       id: '/repo',
       branches: [],
-      selectedBranch: 'feature/query',
+      currentBranchName: 'feature/query',
       preferredWorkspacePaneTab: 'status',
     })
     setRepoSnapshotQueryData('/repo', repo.instanceId, {
@@ -72,7 +72,7 @@ describe('repo refresh coordinator', () => {
       tabs: [workspacePaneStaticTabEntry('status')],
     })
 
-    expect(repoStatusRefreshSnapshot(repo)).toMatchObject({
+    expect(currentRepoStatusRefreshSnapshot(repo, 'feature/query')).toMatchObject({
       id: '/repo',
       repoInstanceId: repo.instanceId,
       preferredWorkspacePaneTab: 'status',

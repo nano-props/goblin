@@ -37,7 +37,7 @@ import type {
   RepoState,
   ReposStore,
 } from '#/web/stores/repos/types.ts'
-import { nextActiveRepoIdAfterWorkspaceClose } from '#/web/open-workspace-state.ts'
+import { nextRestoredRepoIdAfterWorkspaceClose } from '#/web/open-workspace-state.ts'
 import {
   isRemoteRepoId,
   localRepoSessionEntry,
@@ -185,13 +185,13 @@ function removeRepoFromSessionState(s: ReposStore, id: string): Partial<ReposSto
     if (scopeKey.startsWith(`${id}\0`)) delete tabOpenerIdentityByScope[scopeKey]
   }
   const order = s.order.filter((x) => x !== id)
-  const activeId = nextActiveRepoIdAfterWorkspaceClose(s.order, s.activeId, id)
+  const restoredRepoId = nextRestoredRepoIdAfterWorkspaceClose(s.order, s.restoredRepoId, id)
   return {
     repos,
     selectedTerminalSessionIdByTerminalWorktree,
     tabOpenerIdentityByScope,
     order,
-    activeId,
+    restoredRepoId,
   }
 }
 

@@ -40,7 +40,7 @@ afterEach(() => {
 
 describe('FiletreeActionDialogHost', () => {
   test('retains the file path message while the close animation runs after store state is cleared', () => {
-    renderInJsdom(<FiletreeActionDialogHost activeRepoId="/repo" />)
+    renderInJsdom(<FiletreeActionDialogHost currentRepoId="/repo" />)
 
     act(() => {
       useFiletreeActionDialogsStore.getState().openTrashFileConfirm({

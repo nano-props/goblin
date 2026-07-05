@@ -1,5 +1,5 @@
-import { useEffect, useRef, useSyncExternalStore } from 'react'
-import { persistWorkspaceSessionState } from '#/web/settings-actions.ts'
+import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react'
+import { persistWorkspaceSessionState, persistWorkspaceSessionStateOnUnload } from '#/web/settings-actions.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { restorableWorkspaceStateFromStore } from '#/web/stores/repos/selector-state.ts'
 import { workspaceSessionStateFromRestorableWorkspaceState } from '#/web/restorable-workspace-state.ts'
@@ -11,8 +11,20 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 const SESSION_SAVE_DEBOUNCE_MS = 200
 
-export function useSessionPersistence() {
-  const activeId = useReposStore((s) => s.activeId)
+interface SessionPersistenceInput {
+  sessionReady: boolean
+  sessionPersistenceReady: boolean
+  repos: ReturnType<typeof useReposStore.getState>['repos']
+  order: string[]
+  restoredRepoId: string | null
+  zenMode: boolean
+  workspacePaneSize: number
+  selectedTerminalSessionIdByTerminalWorktree: Record<string, string>
+  filetreeInteractionByScope: Parameters<typeof workspaceSessionStateFromRestorableWorkspaceState>[0]['filetreeInteractionByScope']
+}
+
+export function useSessionPersistence({ routedRepoId }: { routedRepoId: string | null }) {
+  const restoredRepoId = useReposStore((s) => s.restoredRepoId)
   const order = useReposStore((s) => s.order)
   const zenMode = useReposStore((s) => s.zenMode)
   const workspacePaneSize = useReposStore((s) => s.workspacePaneSize)
@@ -26,6 +38,8 @@ export function useSessionPersistence() {
   const filetreeInteractionByScope = useFiletreeInteractionStore((s) => s.interactionByScope)
   const lastSavedRef = useRef<string | null>(null)
   const lastImmediateKeyRef = useRef<string | null>(null)
+  const lastRoutedRepoIdRef = useRef<string | null>(null)
+  const latestInputRef = useRef<SessionPersistenceInput | null>(null)
   const queuedSaveRef = useRef<{
     session: ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState>
     serialized: string
@@ -56,24 +70,40 @@ export function useSessionPersistence() {
     })
   }
 
+  useLayoutEffect(() => {
+    if (routedRepoId) lastRoutedRepoIdRef.current = routedRepoId
+    latestInputRef.current = {
+      sessionReady,
+      sessionPersistenceReady,
+      repos,
+      order,
+      restoredRepoId,
+      zenMode,
+      workspacePaneSize,
+      selectedTerminalSessionIdByTerminalWorktree,
+      filetreeInteractionByScope,
+    }
+  }, [
+    restoredRepoId,
+    filetreeInteractionByScope,
+    order,
+    repos,
+    routedRepoId,
+    selectedTerminalSessionIdByTerminalWorktree,
+    sessionPersistenceReady,
+    sessionReady,
+    workspacePaneSize,
+    zenMode,
+  ])
+
   useEffect(() => {
     // Client -> persistence only. Boot restore runs elsewhere first. sessionReady
     // gates the UI skeleton; sessionPersistenceReady waits for boot-restored
     // server-owned workspace tabs to converge back into the client store.
-    if (!sessionReady || !sessionPersistenceReady) return
-    let session: ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState>
+    let session: ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState> | null
     try {
-      session = workspaceSessionStateFromRestorableWorkspaceState({
-        repos,
-        restorableWorkspaceState: restorableWorkspaceStateFromStore({
-          order,
-          activeId,
-          zenMode,
-          workspacePaneSize,
-          selectedTerminalSessionIdByTerminalWorktree,
-        }),
-        filetreeInteractionByScope,
-      })
+      session = sessionFromPersistenceInput(latestInputRef.current, lastRoutedRepoIdRef.current)
+      if (!session) return
     } catch (err) {
       sessionLog.warn('save blocked', { err })
       return
@@ -86,7 +116,7 @@ export function useSessionPersistence() {
     // server-owned runtime traffic one write at a time.
     const immediateKey = JSON.stringify({
       openRepoEntries: session.openRepoEntries,
-      activeRepoId: session.activeRepoId,
+      restoredRepoId: session.restoredRepoId,
       zenMode: session.zenMode,
       workspacePaneSize: session.workspacePaneSize,
     })
@@ -104,7 +134,8 @@ export function useSessionPersistence() {
     sessionReady,
     sessionPersistenceReady,
     order,
-    activeId,
+    restoredRepoId,
+    routedRepoId,
     workspacePaneSize,
     zenMode,
     selectedTerminalSessionIdByTerminalWorktree,
@@ -112,6 +143,46 @@ export function useSessionPersistence() {
     workspacePaneTabsVersion,
     filetreeInteractionByScope,
   ])
+
+  useEffect(() => {
+    const flushLatestSession = () => {
+      try {
+        const session = sessionFromPersistenceInput(latestInputRef.current, lastRoutedRepoIdRef.current)
+        if (session) persistWorkspaceSessionStateOnUnload(session)
+      } catch (err) {
+        sessionLog.warn('unload save blocked', { err })
+      }
+    }
+    const flushWhenHidden = () => {
+      if (document.visibilityState === 'hidden') flushLatestSession()
+    }
+    window.addEventListener('pagehide', flushLatestSession)
+    window.addEventListener('beforeunload', flushLatestSession)
+    document.addEventListener('visibilitychange', flushWhenHidden)
+    return () => {
+      window.removeEventListener('pagehide', flushLatestSession)
+      window.removeEventListener('beforeunload', flushLatestSession)
+      document.removeEventListener('visibilitychange', flushWhenHidden)
+    }
+  }, [])
+}
+
+function sessionFromPersistenceInput(
+  input: SessionPersistenceInput | null,
+  lastRoutedRepoId: string | null,
+): ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState> | null {
+  if (!input?.sessionReady || !input.sessionPersistenceReady) return null
+  return workspaceSessionStateFromRestorableWorkspaceState({
+    repos: input.repos,
+    restorableWorkspaceState: restorableWorkspaceStateFromStore({
+      order: input.order,
+      restoredRepoId: lastRoutedRepoId ?? input.restoredRepoId,
+      zenMode: input.zenMode,
+      workspacePaneSize: input.workspacePaneSize,
+      selectedTerminalSessionIdByTerminalWorktree: input.selectedTerminalSessionIdByTerminalWorktree,
+    }),
+    filetreeInteractionByScope: input.filetreeInteractionByScope,
+  })
 }
 
 function useWorkspacePaneTabsCacheVersion(): number {

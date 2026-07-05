@@ -70,9 +70,9 @@ const navigation: PrimaryWindowNavigationActions = {
   closeRepo: vi.fn(),
   cycleRepo: vi.fn(),
   selectRepoBranch: vi.fn(),
-  showRepoWorkspacePaneTab: vi.fn(),
   showRepoBranchWorkspacePaneTab: vi.fn(),
   openSettings: vi.fn(),
+  openCreateWorktree: vi.fn(),
 }
 
 beforeEach(() => {
@@ -110,22 +110,22 @@ describe('RepoWorkspace', () => {
   test('keeps the workspace tab strip mounted and restores scroll position by branch', () => {
     const branchA = createRepoBranch('feature/a', { worktree: { path: '/tmp/repo-workspace-container-repo-a' } })
     const branchB = createRepoBranch('feature/b', { worktree: { path: '/tmp/repo-workspace-container-repo-b' } })
-    const repo = seedRepoWithReadModelForTest({
+    seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branchA, branchB],
-      selectedBranch: 'feature/a',
+      currentBranchName: 'feature/a',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
         'feature/a': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
         'feature/b': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
       },
     })
-    const { container } = render(
+    const { container, rerender } = render(
       <QueryClientProvider client={primaryWindowQueryClient}>
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace repoId={REPO_ID} />
+              <RepoWorkspace repoId={REPO_ID} currentBranchName="feature/a" />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
@@ -138,17 +138,17 @@ describe('RepoWorkspace', () => {
     })
 
     act(() => {
-      seedRepoWithReadModelForTest({
-        id: REPO_ID,
-        instanceId: repo.instanceId,
-        branches: [branchA, branchB],
-        selectedBranch: 'feature/b',
-        preferredWorkspacePaneTab: 'status',
-        workspacePaneTabsByBranch: {
-          'feature/a': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
-          'feature/b': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
-        },
-      })
+      rerender(
+        <QueryClientProvider client={primaryWindowQueryClient}>
+          <PrimaryWindowNavigationProvider value={navigation}>
+            <TerminalSessionContext value={terminalCommandContext}>
+              <TerminalSessionReadContext value={terminalReadContext}>
+                <RepoWorkspace repoId={REPO_ID} currentBranchName="feature/b" />
+              </TerminalSessionReadContext>
+            </TerminalSessionContext>
+          </PrimaryWindowNavigationProvider>
+        </QueryClientProvider>,
+      )
     })
 
     expect(scrollViewport(container)).toBe(viewport)
@@ -160,17 +160,17 @@ describe('RepoWorkspace', () => {
     })
 
     act(() => {
-      seedRepoWithReadModelForTest({
-        id: REPO_ID,
-        instanceId: repo.instanceId,
-        branches: [branchA, branchB],
-        selectedBranch: 'feature/a',
-        preferredWorkspacePaneTab: 'status',
-        workspacePaneTabsByBranch: {
-          'feature/a': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
-          'feature/b': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
-        },
-      })
+      rerender(
+        <QueryClientProvider client={primaryWindowQueryClient}>
+          <PrimaryWindowNavigationProvider value={navigation}>
+            <TerminalSessionContext value={terminalCommandContext}>
+              <TerminalSessionReadContext value={terminalReadContext}>
+                <RepoWorkspace repoId={REPO_ID} currentBranchName="feature/a" />
+              </TerminalSessionReadContext>
+            </TerminalSessionContext>
+          </PrimaryWindowNavigationProvider>
+        </QueryClientProvider>,
+      )
     })
 
     expect(scrollViewport(container)).toBe(viewport)
@@ -183,7 +183,7 @@ describe('RepoWorkspace', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
-      selectedBranch: 'feature/a',
+      currentBranchName: 'feature/a',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
         'feature/a': [workspacePaneStaticTabEntry('status')],
@@ -198,7 +198,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace repoId={REPO_ID} />
+              <RepoWorkspace repoId={REPO_ID} currentBranchName="feature/a" />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
@@ -212,7 +212,7 @@ describe('RepoWorkspace', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
-      selectedBranch: 'feature/query',
+      currentBranchName: 'feature/query',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
         'feature/query': [workspacePaneStaticTabEntry('status')],
@@ -228,7 +228,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace repoId={REPO_ID} />
+              <RepoWorkspace repoId={REPO_ID} currentBranchName="feature/query" />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
@@ -239,12 +239,12 @@ describe('RepoWorkspace', () => {
     expect(container.textContent).not.toContain('branches.empty')
   })
 
-  test('uses the React Query pull request read model for the selected branch when available', () => {
+  test('uses the React Query pull request read model for the current branch when available', () => {
     const branch = createRepoBranch('feature/pr')
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
-      selectedBranch: 'feature/pr',
+      currentBranchName: 'feature/pr',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
         'feature/pr': [workspacePaneStaticTabEntry('status')],
@@ -260,7 +260,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace repoId={REPO_ID} />
+              <RepoWorkspace repoId={REPO_ID} currentBranchName="feature/pr" />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>

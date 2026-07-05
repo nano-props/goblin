@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import { describe, expect, test, vi } from 'vitest'
 import { CompactRepoWorkspace, RepoWorkspace } from '#/web/components/Layout.tsx'
+import { authenticatedAppShellMode } from '#/web/Layout.tsx'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
@@ -51,6 +52,19 @@ describe('RepoWorkspace', () => {
     )
 
     expect(splitPane(container)?.dataset.afterSize).toBe('70')
+  })
+})
+
+describe('authenticatedAppShellMode', () => {
+  test('settings routes render outside the workspace boot gate', () => {
+    expect(authenticatedAppShellMode('/settings/general', 'booting')).toBe('settings')
+    expect(authenticatedAppShellMode('/settings/shortcuts', 'ready')).toBe('settings')
+  })
+
+  test('workspace routes wait for authenticated boot before mounting runtime', () => {
+    expect(authenticatedAppShellMode('/', 'booting')).toBe('workspace-boot')
+    expect(authenticatedAppShellMode('/repo/repo/dashboard', 'booting')).toBe('workspace-boot')
+    expect(authenticatedAppShellMode('/repo/repo/dashboard', 'ready')).toBe('workspace-ready')
   })
 })
 

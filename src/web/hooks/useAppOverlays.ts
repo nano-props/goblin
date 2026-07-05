@@ -1,8 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { useOverlayRegistry } from '#/web/hooks/useOverlayRegistry.ts'
-import { useRepoScopedOverlay } from '#/web/hooks/useRepoScopedOverlay.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-export const APP_OVERLAY_KEYS = ['clone', 'openRepo', 'openRemoteRepo', 'createWorktree'] as const
+export const APP_OVERLAY_KEYS = ['clone', 'openRepo', 'openRemoteRepo'] as const
 export type AppOverlayKey = (typeof APP_OVERLAY_KEYS)[number]
 
 interface AppOverlayRouteOptions {
@@ -19,10 +17,6 @@ export function useAppOverlays(options: AppOverlayRouteOptions = {}) {
   const routeOverlay = options.routeOverlay ?? null
   const onRouteOverlayChange = options.onRouteOverlayChange
   const routeDriven = typeof onRouteOverlayChange === 'function'
-  const activeRepoId = useReposStore((s) => {
-    const activeId = s.activeId
-    return activeId && s.repos[activeId] ? activeId : null
-  })
 
   const openCloneRepo = useCallback(() => {
     if (routeDriven) {
@@ -81,23 +75,6 @@ export function useAppOverlays(options: AppOverlayRouteOptions = {}) {
     [onRouteOverlayChange, routeDriven, routeOverlay, setOpen],
   )
 
-  const rawCreateWorktreeOpen = routeDriven ? routeOverlay === 'createWorktree' : openByKey.createWorktree
-  const setCreateWorktreeRawOpen = useCallback(
-    (nextOpen: boolean) => {
-      if (routeDriven) {
-        onRouteOverlayChange?.(nextOpen ? 'createWorktree' : routeOverlay === 'createWorktree' ? null : routeOverlay)
-        return
-      }
-      setOpen('createWorktree', nextOpen)
-    },
-    [onRouteOverlayChange, routeDriven, routeOverlay, setOpen],
-  )
-  const createWorktreeOverlay = useRepoScopedOverlay({
-    activeRepoId,
-    rawOpen: rawCreateWorktreeOpen,
-    setRawOpen: setCreateWorktreeRawOpen,
-  })
-
   const closeAllOverlays = useCallback(() => {
     if (routeDriven) {
       onRouteOverlayChange?.(null)
@@ -113,18 +90,10 @@ export function useAppOverlays(options: AppOverlayRouteOptions = {}) {
       openRemoteRepo: {
         open: routeDriven ? routeOverlay === 'openRemoteRepo' : openByKey.openRemoteRepo,
       },
-      createWorktree: createWorktreeOverlay.state,
     }),
-    [
-      createWorktreeOverlay.state,
-      openByKey.clone,
-      openByKey.openRepo,
-      openByKey.openRemoteRepo,
-      routeDriven,
-      routeOverlay,
-    ],
+    [openByKey.clone, openByKey.openRepo, openByKey.openRemoteRepo, routeDriven, routeOverlay],
   )
-  const anyOverlayOpen = state.clone.open || state.openRepo.open || state.openRemoteRepo.open || state.createWorktree.open
+  const anyOverlayOpen = state.clone.open || state.openRepo.open || state.openRemoteRepo.open
 
   return {
     state,
@@ -135,8 +104,6 @@ export function useAppOverlays(options: AppOverlayRouteOptions = {}) {
     setOpenRepoOpen,
     openRemoteRepo,
     setOpenRemoteRepoOpen,
-    openCreateWorktree: createWorktreeOverlay.openForActiveRepo,
-    setCreateWorktreeOpen: createWorktreeOverlay.setOpen,
     closeAllOverlays,
   }
 }

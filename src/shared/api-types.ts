@@ -81,8 +81,8 @@ export interface ThemeState {
 export interface WorkspaceSessionState {
   /** Repo entries that were open, in switcher order. */
   openRepoEntries: RepoSessionEntry[]
-  /** The active repository id — null when no repos were open. */
-  activeRepoId: string | null
+  /** Repo id restored when opening `/` — null when no repos were open. */
+  restoredRepoId: string | null
   zenMode: boolean
   workspacePaneSize: number
   selectedTerminalSessionIdByTerminalWorktree: Record<string, string>

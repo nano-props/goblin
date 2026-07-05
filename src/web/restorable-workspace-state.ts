@@ -3,7 +3,7 @@ import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { RestorableWorkspaceState, ReposStore } from '#/web/stores/repos/types.ts'
 import { persistedOpenWorkspaceEntries } from '#/web/open-workspace-state.ts'
 import {
-  persistedActiveRepoIdForSession,
+  persistedRestoredRepoIdForSession,
   persistedWorkspacePaneTabsByTargetByRepoForSession,
   persistedSelectedTerminalSessionIdByTerminalWorktreeForSession,
   persistedPreferredWorkspacePaneTabByTargetByRepoForSession,
@@ -45,7 +45,7 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
   )
   return {
     openRepoEntries: persistedOpenWorkspaceEntries(restorableWorkspaceState.order, shellRepos),
-    activeRepoId: persistedActiveRepoIdForSession(restorableWorkspaceState.activeId),
+    restoredRepoId: persistedRestoredRepoIdForSession(restorableWorkspaceState.restoredRepoId),
     zenMode: restorableWorkspaceState.zenMode,
     workspacePaneSize: restorableWorkspaceState.workspacePaneSize,
     selectedTerminalSessionIdByTerminalWorktree: persistedSelectedTerminalSessionIdByTerminalWorktreeForSession(
@@ -128,7 +128,7 @@ function workspacePaneTabsByTargetByRepoFromQueryCache(
  *  subsequent updates flow through useSessionPersistence. */
 interface RestoredWorkspaceStateFromSession extends Pick<
   RestorableWorkspaceState,
-  'activeId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalSessionIdByTerminalWorktree'
+  'restoredRepoId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalSessionIdByTerminalWorktree'
 > {
   preferredWorkspacePaneTabByTargetByRepo: WorkspaceSessionState['preferredWorkspacePaneTabByTargetByRepo']
   workspacePaneTabsByTargetByRepo: WorkspaceSessionState['workspacePaneTabsByTargetByRepo']
@@ -136,10 +136,10 @@ interface RestoredWorkspaceStateFromSession extends Pick<
 
 export function restoreRestorableWorkspaceStateFromSession(
   session: WorkspaceSessionState,
-  activeId: string | null = session.activeRepoId,
+  restoredRepoId: string | null = session.restoredRepoId,
 ): RestoredWorkspaceStateFromSession {
   return {
-    activeId,
+    restoredRepoId,
     zenMode: session.zenMode,
     workspacePaneSize: session.workspacePaneSize,
     selectedTerminalSessionIdByTerminalWorktree: session.selectedTerminalSessionIdByTerminalWorktree,

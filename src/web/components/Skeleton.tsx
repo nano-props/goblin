@@ -58,7 +58,7 @@ export function StatusListSkeleton({ rows = 6 }: RowCountProps) {
 }
 
 // RepoWorkspaceLayoutSkeleton renders the branch navigator + workspace pane while
-// a repo is being hydrated. The active repo shell owns the sidebar
+// a repo is being hydrated. The current repo shell owns the sidebar
 // chrome, so the workspace skeleton just shows the panes.
 export function RepoWorkspaceLayoutSkeleton({
   singlePane = false,

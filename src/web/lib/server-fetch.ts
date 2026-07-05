@@ -37,11 +37,12 @@ export async function fetchServerJson<T>(path: string | URL, init?: RequestInit)
 export async function postServerJson<TInput extends object, TOutput>(
   path: string,
   input: TInput,
-  options?: { signal?: AbortSignal },
+  options?: { signal?: AbortSignal; keepalive?: boolean },
 ): Promise<TOutput> {
   return await fetchServerJson<TOutput>(path, {
     method: 'POST',
     signal: options?.signal,
+    keepalive: options?.keepalive,
     headers: {
       'content-type': 'application/json',
     },

@@ -1,0 +1,146 @@
+import { useEffect, useState } from 'react'
+import { CreateWorktreePageSurface } from '#/web/components/create-worktree-dialog/CreateWorktreeDialog.tsx'
+import type { CreateWorktreeRequest } from '#/web/components/create-worktree-dialog/create-worktree-dialog.logic.ts'
+import {
+  isConfigTrustStateLoading,
+  resolveConfigTrusted,
+  resolveNextConfigTrustChoice,
+  resolveWorktreeBootstrapDecision,
+} from '#/web/components/create-worktree-dialog/create-worktree-bootstrap-host.logic.ts'
+import { ScrollPane } from '#/web/components/Layout.tsx'
+import { WorkspaceChrome } from '#/web/components/workspace-toolbar-chrome.tsx'
+import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
+import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { useSettingsSnapshotReadModel } from '#/web/settings-queries.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
+import type { WorktreeBootstrapDecision, WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
+
+interface CreateWorktreePagePaneProps {
+  repoId: string
+  trafficLightOffset?: boolean
+  onCancel: () => void
+}
+
+export function CreateWorktreePagePane({ repoId, trafficLightOffset = false, onCancel }: CreateWorktreePagePaneProps) {
+  const liveRepo = useReposStore((s) => s.repos[repoId])
+  const submitBranchAction = useReposStore((s) => s.submitBranchAction)
+  const branchReadModel = useRepoBranchReadModel(liveRepo?.id ?? '', liveRepo?.instanceId ?? '', !!liveRepo)
+  const [bootstrapPreview, setBootstrapPreview] = useState<WorktreeBootstrapPreview | null>(null)
+  const [bootstrapPreviewError, setBootstrapPreviewError] = useState(false)
+  const [bootstrapPreviewLoading, setBootstrapPreviewLoading] = useState(false)
+  const [configTrustChoice, setConfigTrustChoice] = useState<boolean | null>(null)
+  const settingsSnapshot = useSettingsSnapshotReadModel()
+
+  const repoInstanceId = liveRepo?.instanceId ?? null
+
+  useEffect(() => {
+    if (!liveRepo || repoInstanceId === null) {
+      setBootstrapPreview(null)
+      setBootstrapPreviewError(false)
+      setBootstrapPreviewLoading(false)
+      setConfigTrustChoice(null)
+      return
+    }
+
+    const controller = new AbortController()
+    let ignore = false
+    setBootstrapPreview(null)
+    setBootstrapPreviewError(false)
+    setBootstrapPreviewLoading(true)
+    setConfigTrustChoice(null)
+
+    void getRepoWorktreeBootstrapPreview(repoId, controller.signal)
+      .then((result) => {
+        if (ignore) return
+        setBootstrapPreview(result.ok ? result.preview : null)
+        setBootstrapPreviewError(!result.ok)
+      })
+      .catch(() => {
+        if (ignore) return
+        setBootstrapPreview(null)
+        setBootstrapPreviewError(true)
+      })
+      .finally(() => {
+        if (ignore) return
+        setBootstrapPreviewLoading(false)
+      })
+
+    return () => {
+      ignore = true
+      controller.abort()
+    }
+  }, [liveRepo, repoId, repoInstanceId])
+
+  if (!liveRepo || !branchReadModel) return null
+
+  const bootstrapConfigHash = bootstrapPreview?.configHash ?? null
+  const serverConfigTrusted = resolveConfigTrusted({
+    repoSettings: settingsSnapshot?.repoSettings ?? [],
+    repoId,
+    configHash: bootstrapConfigHash,
+    configTrustChoice: null,
+  })
+  const configTrusted = settingsSnapshot
+    ? resolveConfigTrusted({
+        repoSettings: settingsSnapshot.repoSettings,
+        repoId,
+        configHash: bootstrapConfigHash,
+        configTrustChoice,
+      })
+    : false
+  const worktreeBootstrapTrustLoading = isConfigTrustStateLoading({
+    preview: bootstrapPreview,
+    settingsReady: settingsSnapshot !== undefined,
+  })
+  const worktreeBootstrap = {
+    loading: bootstrapPreviewLoading || worktreeBootstrapTrustLoading,
+    preview: bootstrapPreview,
+    error: bootstrapPreviewError,
+    configTrusted,
+    onConfigTrustedChange: (next: boolean) => {
+      setConfigTrustChoice((currentChoice) =>
+        resolveNextConfigTrustChoice({
+          next,
+          currentTrusted: configTrusted,
+          serverTrusted: serverConfigTrusted,
+          currentChoice,
+        }),
+      )
+    },
+  }
+
+  function currentWorktreeBootstrapDecision(): WorktreeBootstrapDecision {
+    return resolveWorktreeBootstrapDecision({
+      preview: bootstrapPreview,
+      repoSettings: settingsSnapshot?.repoSettings ?? [],
+      repoId,
+      configTrustChoice,
+    })
+  }
+
+  function handleCreateWorktree(request: CreateWorktreeRequest): boolean {
+    const currentRepo = useReposStore.getState().repos[repoId]
+    if (!currentRepo || currentRepo.instanceId !== liveRepo.instanceId) return false
+    if (currentRepo.operations.branchAction.phase !== 'idle' || worktreeBootstrap.loading) return false
+    submitBranchAction(
+      repoId,
+      { kind: 'createWorktree', input: request.input, worktreeBootstrap: currentWorktreeBootstrapDecision() },
+      { repoInstanceId: liveRepo.instanceId, refreshOnError: false },
+    )
+    return true
+  }
+
+  return (
+    <>
+      <WorkspaceChrome trafficLightOffset={trafficLightOffset} />
+      <ScrollPane>
+        <CreateWorktreePageSurface
+          repo={{ ...liveRepo, branchModel: branchReadModel }}
+          worktreeBootstrap={worktreeBootstrap}
+          onCancel={onCancel}
+          onCreate={handleCreateWorktree}
+        />
+      </ScrollPane>
+    </>
+  )
+}

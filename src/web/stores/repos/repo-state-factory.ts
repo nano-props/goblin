@@ -19,7 +19,6 @@ export function emptyRepo(id: string, name: string, instanceId: string): RepoSta
     dataLoads: emptyRepoDataLoadBundle(),
     operations: emptyRepoOperations(),
     ui: {
-      selectedBranch: null,
       branchViewMode: 'all',
       preferredWorkspacePaneTabByTarget: {},
     },

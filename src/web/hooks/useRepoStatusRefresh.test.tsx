@@ -14,8 +14,8 @@ import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-dat
 
 const originalRefreshStatus = useReposStore.getState().refreshStatus
 
-function Harness() {
-  useRepoStatusRefresh()
+function Harness({ repoId = '/repo-a', branchName = 'main' }: { repoId?: string | null; branchName?: string | null } = {}) {
+  useRepoStatusRefresh({ hydratedRouteRepoId: repoId, currentBranchName: branchName })
   return null
 }
 
@@ -41,7 +41,6 @@ function createRepo(
   const worktreePath = `${id}/main`
   const branches = [createRepoBranch('main', { worktree: { path: worktreePath } })]
   repo.instanceId = id === '/repo-a' ? 'repo-instance-test-a' : 'repo-instance-test-b'
-  repo.ui.selectedBranch = 'main'
   setRepoSnapshotQueryData(id, repo.instanceId, {
     current: 'main',
     branches,
@@ -138,21 +137,21 @@ describe('useRepoStatusRefresh', () => {
     ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false
   })
 
-  test('refreshes status when switching to another active repo', async () => {
+  test('refreshes status when switching to another current repo', async () => {
     const repoA = createRepo('/repo-a')
     const repoB = createRepo('/repo-b')
     await act(async () => {
       useReposStore.setState({
         repos: { '/repo-a': repoA, '/repo-b': repoB },
         order: ['/repo-a', '/repo-b'],
-        activeId: '/repo-a',
+        restoredRepoId: '/repo-a',
       })
-      root.render(<Harness />)
+      root.render(<Harness repoId="/repo-a" />)
     })
     refreshStatus.mockClear()
 
     await act(async () => {
-      useReposStore.setState({ activeId: '/repo-b' })
+      root.render(<Harness repoId="/repo-b" />)
     })
 
     expect(refreshStatus).toHaveBeenCalledWith('/repo-b', { repoInstanceId: 'repo-instance-test-b' })
@@ -164,14 +163,14 @@ describe('useRepoStatusRefresh', () => {
       useReposStore.setState({
         repos: { '/repo-a': repo },
         order: ['/repo-a'],
-        activeId: '/repo-a',
+        restoredRepoId: '/repo-a',
       })
       root.render(<Harness />)
     })
     refreshStatus.mockClear()
 
     await act(async () => {
-      useReposStore.getState().setWorkspacePaneTab('/repo-a', 'status')
+      useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'status')
     })
 
     expect(refreshStatus).toHaveBeenCalledWith('/repo-a', { repoInstanceId: 'repo-instance-test-a' })
@@ -183,14 +182,14 @@ describe('useRepoStatusRefresh', () => {
       useReposStore.setState({
         repos: { '/repo-a': repo },
         order: ['/repo-a'],
-        activeId: '/repo-a',
+        restoredRepoId: '/repo-a',
       })
       root.render(<Harness />)
     })
     refreshStatus.mockClear()
 
     await act(async () => {
-      useReposStore.getState().setWorkspacePaneTab('/repo-a', 'changes')
+      useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'changes')
     })
 
     expect(refreshStatus).toHaveBeenCalledWith('/repo-a', { repoInstanceId: 'repo-instance-test-a' })
@@ -198,24 +197,23 @@ describe('useRepoStatusRefresh', () => {
 
   test('refreshes status when reopening the status tab after bouncing through terminal', async () => {
     const repo = createRepo('/repo-a', { preferredWorkspacePaneTab: 'status' })
-    repo.ui.selectedBranch = 'main'
     await act(async () => {
       useReposStore.setState({
         repos: { '/repo-a': repo },
         order: ['/repo-a'],
-        activeId: '/repo-a',
+        restoredRepoId: '/repo-a',
       })
       root.render(<Harness />)
     })
     refreshStatus.mockClear()
 
     await act(async () => {
-      useReposStore.getState().setWorkspacePaneTab('/repo-a', 'terminal')
+      useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'terminal')
     })
     expect(refreshStatus).not.toHaveBeenCalled()
 
     await act(async () => {
-      useReposStore.getState().setWorkspacePaneTab('/repo-a', 'status')
+      useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'status')
     })
     expect(refreshStatus).toHaveBeenCalledWith('/repo-a', { repoInstanceId: 'repo-instance-test-a' })
   })
@@ -226,14 +224,14 @@ describe('useRepoStatusRefresh', () => {
       useReposStore.setState({
         repos: { '/repo-a': repo },
         order: ['/repo-a'],
-        activeId: '/repo-a',
+        restoredRepoId: '/repo-a',
       })
       root.render(<Harness />)
     })
     refreshStatus.mockClear()
 
     await act(async () => {
-      useReposStore.getState().setWorkspacePaneTab('/repo-a', 'status')
+      useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'status')
     })
 
     expect(refreshStatus).not.toHaveBeenCalled()
@@ -245,14 +243,14 @@ describe('useRepoStatusRefresh', () => {
       useReposStore.setState({
         repos: { '/repo-a': repo },
         order: ['/repo-a'],
-        activeId: '/repo-a',
+        restoredRepoId: '/repo-a',
       })
       root.render(<Harness />)
     })
     refreshStatus.mockClear()
 
     await act(async () => {
-      useReposStore.getState().setWorkspacePaneTab('/repo-a', 'status')
+      useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'status')
     })
 
     expect(refreshStatus).not.toHaveBeenCalled()
@@ -260,27 +258,15 @@ describe('useRepoStatusRefresh', () => {
 
   test('does not treat branch selection changes as refresh triggers', async () => {
     const repo = createRepo('/repo-a', { preferredWorkspacePaneTab: 'status' })
-    repo.ui.selectedBranch = 'feature/a'
     await act(async () => {
       useReposStore.setState({
         repos: { '/repo-a': repo },
         order: ['/repo-a'],
-        activeId: '/repo-a',
+        restoredRepoId: '/repo-a',
       })
       root.render(<Harness />)
     })
     refreshStatus.mockClear()
-
-    await act(async () => {
-      useReposStore.setState((state) => ({
-        repos: {
-          ...state.repos,
-          '/repo-a': replaceRepo(state.repos['/repo-a']!, (draft) => {
-            draft.ui.selectedBranch = 'feature/b'
-          }),
-        },
-      }))
-    })
 
     expect(refreshStatus).not.toHaveBeenCalled()
   })

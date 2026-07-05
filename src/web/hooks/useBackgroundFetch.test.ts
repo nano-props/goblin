@@ -3,7 +3,7 @@ import { backgroundSyncRepoIdsFromStore } from '#/web/hooks/useBackgroundFetch.t
 import type { RepoState } from '#/web/stores/repos/types.ts'
 
 describe('backgroundSyncRepoIdsFromStore', () => {
-  test('keeps the active remotely backed repo registered while local refresh data loads are busy', () => {
+  test('keeps the visible remotely backed repo registered while local refresh data loads are busy', () => {
     const repo = createRepo({
       id: '/repo',
       remote: { hasRemotes: true, hasGitHubRemote: true },
@@ -14,10 +14,10 @@ describe('backgroundSyncRepoIdsFromStore', () => {
     repo.operations.snapshot.phase = 'running'
     repo.operations.status.phase = 'running'
 
-    expect(backgroundSyncRepoIdsFromStore({ activeId: '/repo', repos: { '/repo': repo } })).toEqual(['/repo'])
+    expect(backgroundSyncRepoIdsFromStore({ repos: { '/repo': repo } }, '/repo')).toEqual(['/repo'])
   })
 
-  test('only registers the active repo and excludes local-only and unavailable repos', () => {
+  test('only registers the current repo and excludes local-only and unavailable repos', () => {
     const localOnly = createRepo({
       id: '/local',
       remote: { hasRemotes: false, hasGitHubRemote: false },
@@ -31,15 +31,13 @@ describe('backgroundSyncRepoIdsFromStore', () => {
 
     expect(
       backgroundSyncRepoIdsFromStore({
-        activeId: '/local',
         repos: { '/local': localOnly, '/down': unavailable },
-      }),
+      }, '/local'),
     ).toEqual([])
     expect(
       backgroundSyncRepoIdsFromStore({
-        activeId: '/down',
         repos: { '/local': localOnly, '/down': unavailable },
-      }),
+      }, '/down'),
     ).toEqual([])
   })
 })
@@ -118,7 +116,7 @@ function createRepo(input: {
       pullRequestsByBranch: {},
     },
     ui: {
-      selectedBranch: null,
+      currentBranchName: null,
       branchViewMode: 'all',
       workspacePaneTabsByBranch: {},
       preferredWorkspacePaneTabByTarget: {},

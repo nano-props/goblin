@@ -42,6 +42,7 @@ const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
 interface Options {
   navigation: PrimaryWindowNavigationActions
   currentRepoId: string | null
+  currentBranchName?: string | null
   onShowHelp: () => void
   /** Returns true when workspace shortcuts should not affect the repo view. */
   isWorkspaceShortcutSuppressed: () => boolean
@@ -90,7 +91,7 @@ function nextIndex(current: number, length: number, direction: MoveDirection): n
 function moveBranchSelection(
   input: {
     repo: RepoState
-    selectBranch: (repoId: string, branch: string) => void
+    currentBranchName: string | null
   },
   direction: MoveDirection,
   navigation: PrimaryWindowNavigationActions,
@@ -102,7 +103,7 @@ function moveBranchSelection(
     viewMode: input.repo.ui.branchViewMode,
   })
   if (branches.length === 0) return false
-  const index = branches.findIndex((branch) => branch.name === input.repo.ui.selectedBranch)
+  const index = branches.findIndex((branch) => branch.name === input.currentBranchName)
   const next = branches[nextIndex(index, branches.length, direction)]
   if (!next) return false
   navigation.selectRepoBranch(input.repo.id, next.name)
@@ -112,6 +113,7 @@ function moveBranchSelection(
 export function useKeyboard({
   navigation,
   currentRepoId,
+  currentBranchName = null,
   onShowHelp,
   isWorkspaceShortcutSuppressed,
   isSettingsOpen,
@@ -126,12 +128,14 @@ export function useKeyboard({
   const isSettingsOpenRef = useRef(isSettingsOpen)
   const onExitSettingsRef = useRef(onExitSettings)
   const currentRepoIdRef = useRef(currentRepoId)
+  const currentBranchNameRef = useRef(currentBranchName)
   const openCreateWorktreeRef = useRef(openCreateWorktree)
   onShowHelpRef.current = onShowHelp
   isWorkspaceShortcutSuppressedRef.current = isWorkspaceShortcutSuppressed
   isSettingsOpenRef.current = isSettingsOpen
   onExitSettingsRef.current = onExitSettings
   currentRepoIdRef.current = currentRepoId
+  currentBranchNameRef.current = currentBranchName
   openCreateWorktreeRef.current = openCreateWorktree
 
   useEffect(() => {
@@ -156,7 +160,7 @@ export function useKeyboard({
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyT') {
           e.preventDefault()
           // Cmd+T is a generic entry → new terminal appends to the end.
-          void runNewTerminalTabCommand({ repoId, navigation, t: translate })
+          void runNewTerminalTabCommand({ repoId, branchName: currentBranchNameRef.current, navigation, t: translate })
           return
         }
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyN') {
@@ -172,12 +176,12 @@ export function useKeyboard({
         }
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyW') {
           e.preventDefault()
-          void runCloseWorkspacePaneTabOrWindowCommand({ repoId, navigation })
+          void runCloseWorkspacePaneTabOrWindowCommand({ repoId, branchName: currentBranchNameRef.current, navigation })
           return
         }
         const tabIndex = !e.shiftKey ? digitShortcutIndex(e) : null
         if (tabIndex !== null) {
-          if (runSelectWorkspacePaneTabByIndexCommand({ repoId, tabIndex, navigation })) e.preventDefault()
+          if (runSelectWorkspacePaneTabByIndexCommand({ repoId, branchName: currentBranchNameRef.current, tabIndex, navigation })) e.preventDefault()
           return
         }
       }
@@ -212,27 +216,28 @@ export function useKeyboard({
         }
         case 'pull':
         case 'push': {
-          if (overlayOpen || !repo || !repo.ui.selectedBranch) break
+          if (overlayOpen || !repo || !currentBranchNameRef.current) break
           e.preventDefault()
           runBranchActionShortcut(action)
           break
         }
         case 'next-branch': {
           if (overlayOpen || !repo) break
-          if (moveBranchSelection({ repo, selectBranch: state.selectBranch }, 1, navigation)) e.preventDefault()
+          if (moveBranchSelection({ repo, currentBranchName: currentBranchNameRef.current }, 1, navigation)) e.preventDefault()
           break
         }
         case 'prev-branch': {
           if (overlayOpen || !repo) break
-          if (moveBranchSelection({ repo, selectBranch: state.selectBranch }, -1, navigation)) e.preventDefault()
+          if (moveBranchSelection({ repo, currentBranchName: currentBranchNameRef.current }, -1, navigation)) e.preventDefault()
           break
         }
         case 'next-workspace-pane-tab':
         case 'prev-workspace-pane-tab': {
-          if (overlayOpen || !repo || !repo.ui.selectedBranch) break
+          if (overlayOpen || !repo || !currentBranchNameRef.current) break
           if (
             runMoveWorkspacePaneTabCommand({
               repoId: repo.id,
+              branchName: currentBranchNameRef.current,
               direction: action === 'next-workspace-pane-tab' ? 1 : -1,
               navigation,
             })

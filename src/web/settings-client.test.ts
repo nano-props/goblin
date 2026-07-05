@@ -66,7 +66,7 @@ describe('settings-client', () => {
           lanEnabled: false,
           session: {
             openRepoEntries: [],
-            activeRepoId: null,
+            restoredRepoId: null,
             zenMode: true,
             workspacePaneSize: 50,
             selectedTerminalSessionIdByTerminalWorktree: {},

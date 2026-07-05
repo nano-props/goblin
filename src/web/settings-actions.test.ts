@@ -141,7 +141,7 @@ describe('settings actions', () => {
     const session = {
       ...defaultWorkspaceSessionState(),
       openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo-a' }],
-      activeRepoId: '/tmp/repo-a',
+      restoredRepoId: '/tmp/repo-a',
     }
     appDataClientMocks.saveSession.mockResolvedValue(session)
     const { persistWorkspaceSessionState } = await import('#/web/settings-actions.ts')

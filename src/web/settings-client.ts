@@ -149,11 +149,14 @@ export async function setRecentWorkspaceExternalApp(input: {
   >('/api/settings/repo-external-app-recent', input)
 }
 
-export async function saveSession(session: WorkspaceSessionState): Promise<WorkspaceSessionState> {
+export async function saveSession(
+  session: WorkspaceSessionState,
+  options?: { keepalive?: boolean },
+): Promise<WorkspaceSessionState> {
   const result = await postServerJson<
     { session: WorkspaceSessionState },
     { ok: boolean; session: WorkspaceSessionState }
-  >('/api/settings/session', { session })
+  >('/api/settings/session', { session }, { keepalive: options?.keepalive })
   return result.session
 }
 

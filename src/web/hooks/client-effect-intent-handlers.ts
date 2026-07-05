@@ -38,6 +38,7 @@ interface TerminalBellIntentDeps {
 interface SharedClientIntentDeps {
   navigation: PrimaryWindowNavigationActions
   currentRepoId: string | null
+  currentBranchName: string | null
   closeAllOverlays: () => void
   openRepoPathDialog: () => void
   openCloneRepo: () => void
@@ -71,9 +72,6 @@ export function handleTerminalBellClickIntent(
     case 'show-worktree-terminal':
       deps.setSelectedTerminal(plan.terminalWorktreeKey, plan.terminalSessionId)
       deps.navigation.showRepoBranchWorkspacePaneTab(plan.repoId, plan.branch, 'terminal')
-      return
-    case 'show-repo-terminal':
-      deps.navigation.showRepoWorkspacePaneTab(plan.repoId, 'terminal')
       return
   }
 }
@@ -166,11 +164,16 @@ export async function handleWorkspaceClientIntent(
       // anchored to the currently-active tab.
       return await runNewTerminalTabCommand({
         repoId: plan.repoId,
+        branchName: deps.currentBranchName,
         navigation: deps.navigation,
         t: deps.t,
       })
     case 'close-workspace-pane-tab-or-window':
-      return await runCloseWorkspacePaneTabOrWindowCommand({ repoId: plan.repoId, navigation: deps.navigation })
+      return await runCloseWorkspacePaneTabOrWindowCommand({
+        repoId: plan.repoId,
+        branchName: deps.currentBranchName,
+        navigation: deps.navigation,
+      })
     case 'close-repo':
       deps.navigation.closeRepo(plan.repoId)
       return true
@@ -190,12 +193,14 @@ export async function handleWorkspaceClientIntent(
     case 'show-workspace-pane-tab':
       return await runShowWorkspacePaneTabCommand({
         repoId: plan.repoId,
+        branchName: deps.currentBranchName,
         tab: plan.tab,
         navigation: deps.navigation,
       })
     case 'terminal-primary-action':
       return await runTerminalPrimaryActionCommand({
         repoId: plan.repoId,
+        branchName: deps.currentBranchName,
         navigation: deps.navigation,
         t: deps.t,
       })

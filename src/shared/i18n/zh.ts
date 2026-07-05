@@ -187,6 +187,7 @@ export const zh: Record<DictKey, string> = {
   'repo-picker.recent-save-failed': '仓库已打开，但最近记录未更新',
 
   // ---- Workspace pane tabs ------------------------------------------------
+  'repo.dashboard': '仪表盘',
   'tab.branches': '分支',
   'tab.repo-workspace': '仓库工作区',
   'tab.status': '状态',

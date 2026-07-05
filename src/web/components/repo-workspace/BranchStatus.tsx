@@ -38,12 +38,12 @@ import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { PROTECTED_BRANCHES, branchPullRequestBelongsToBranch } from '#/shared/git-types.ts'
 import { openUpstreamBranchExternalTarget } from '#/web/hooks/openBranchExternalTarget.ts'
-import type { SelectedRepoWorkspace } from '#/web/components/repo-workspace/model.ts'
+import type { CurrentRepoWorkspace } from '#/web/components/repo-workspace/model.ts'
 import { CommitHashLink } from '#/web/components/repo-workspace/repo-link-actions.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
 interface Props {
-  detail: SelectedRepoWorkspace
+  detail: CurrentRepoWorkspace
 }
 
 function SyncValue({

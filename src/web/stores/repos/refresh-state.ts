@@ -1,5 +1,4 @@
 import { markRepoAvailable } from '#/web/stores/repos/availability.ts'
-import { selectedBranchForBranchSet } from '#/web/stores/repos/branch-view-mode.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import { pruneRepoOperationViewsForBranches } from '#/web/stores/repos/operations.ts'
 import {
@@ -46,22 +45,11 @@ export function applySnapshotToRepoProjection(
   validBranches: Set<string>,
   previousSnapshotBranches: RepoSnapshot['branches'] | null,
 ): void {
-  const selectedWorktreeRetarget = selectedWorktreeBranchRetarget({
-    previousBranches: previousSnapshotBranches,
-    nextBranches: snap.branches,
-    selectedBranch: r.ui.selectedBranch,
-  })
-  const selected = selectedBranchForBranchSet({
-    branches: snap.branches,
-    currentBranch: snap.current,
-    selectedBranch: selectedWorktreeRetarget?.toBranchName ?? r.ui.selectedBranch,
-    viewMode: r.ui.branchViewMode,
-  })
+  void previousSnapshotBranches
   r.dataLoads.pullRequestsByBranch = Object.fromEntries(
     Object.entries(r.dataLoads.pullRequestsByBranch).filter(([branch]) => validBranches.has(branch)),
   )
   pruneRepoOperationViewsForBranches(r.operations, validBranches)
-  r.ui.selectedBranch = selected
   if (snap.remote) {
     r.remote.remotes = snap.remote.remotes.map((remote) => remote.name)
     r.remote.remoteDetails = snap.remote.remotes
@@ -79,21 +67,6 @@ export function applySnapshotToRepoProjection(
   r.projection.source = 'fresh'
   r.projection.savedAt = null
   finishDataLoadSuccess(r.dataLoads.snapshot)
-}
-
-function selectedWorktreeBranchRetarget(input: {
-  previousBranches: RepoSnapshot['branches'] | null
-  nextBranches: RepoSnapshot['branches']
-  selectedBranch: string | null
-}): { fromBranchName: string; toBranchName: string } | null {
-  if (!input.selectedBranch) return null
-  if (!input.previousBranches) return null
-  const previousWorktreePath = input.previousBranches.find((branch) => branch.name === input.selectedBranch)?.worktree
-    ?.path
-  if (!previousWorktreePath) return null
-  const nextBranch = input.nextBranches.find((branch) => branch.worktree?.path === previousWorktreePath)
-  if (!nextBranch || nextBranch.name === input.selectedBranch) return null
-  return { fromBranchName: input.selectedBranch, toBranchName: nextBranch.name }
 }
 
 export function startPullRequestRefreshDataLoads(

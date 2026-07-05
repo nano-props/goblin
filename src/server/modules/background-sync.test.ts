@@ -87,7 +87,7 @@ describe('server background sync scheduler', () => {
 
     await vi.advanceTimersByTimeAsync(1000)
     await setBackgroundSyncRepos(['/tmp/repo-a'])
-    await vi.runOnlyPendingTimersAsync()
+    await Promise.resolve()
     expect(mocks.fetchRepo).toHaveBeenCalledTimes(2)
 
     const now = Date.now()

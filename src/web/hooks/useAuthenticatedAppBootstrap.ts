@@ -1,6 +1,6 @@
 // Authenticated bootstrap primes query state from the server transport before
 // feature stores start reading it.
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import { normalizeWorkspaceSessionLayoutState } from '#/shared/workspace-layout.ts'
 import { bootstrapLog } from '#/web/logger.ts'
@@ -19,8 +19,11 @@ import {
   type RestoreWorkspacePaneTabsFromSessionResult,
 } from '#/web/workspace-pane/workspace-pane-session-tabs-restore.ts'
 
-export function useAuthenticatedAppBootstrap() {
+export type AuthenticatedAppBootstrapState = 'booting' | 'ready'
+
+export function useAuthenticatedAppBootstrap(): AuthenticatedAppBootstrapState {
   const hydratedRef = useRef(false)
+  const [state, setState] = useState<AuthenticatedAppBootstrapState>('booting')
 
   useEffect(() => {
     // StrictMode double-invoke guard: React 19 dev runs every effect
@@ -36,8 +39,12 @@ export function useAuthenticatedAppBootstrap() {
       bootstrapLog.warn('settings priming failed', { err })
     })
     void hydrateNonCriticalAuthenticatedState(settingsSnapshot)
-    void restoreBootSession(settingsSnapshot)
+    void restoreBootSession(settingsSnapshot).finally(() => {
+      setState('ready')
+    })
   }, [])
+
+  return state
 }
 
 async function hydrateNonCriticalAuthenticatedState(settingsSnapshot: Promise<SettingsSnapshot>): Promise<void> {
@@ -65,7 +72,7 @@ async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>): 
     restoreFiletreeViewStateFromSession(session.filetreeViewStateByWorktreeByRepo)
     applySessionLayoutState(normalizedLayout)
     applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalSessionIdByTerminalWorktree)
-    await hydrateRepoSession(session.openRepoEntries, session.activeRepoId, {
+    await hydrateRepoSession(session.openRepoEntries, session.restoredRepoId, {
       workspacePaneRestoreState: {
         workspacePaneTabsByTargetByRepo: restoredWorkspaceState.workspacePaneTabsByTargetByRepo,
         preferredWorkspacePaneTabByTargetByRepo: restoredWorkspaceState.preferredWorkspacePaneTabByTargetByRepo,

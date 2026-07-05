@@ -1,6 +1,6 @@
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
-import { activeWorkspacePaneTabTarget } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { hasFreshRepoInstance, type RepoInstanceHandle } from '#/web/stores/repos/repo-guards.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
@@ -17,8 +17,8 @@ export type WorkspacePaneTabOpenerRecordResult = 'recorded' | 'missing' | 'stale
  *  must capture this *before* switching into the newly-opened tab (e.g.
  *  before calling `runShowWorkspacePaneTabCommand`), otherwise the "opener"
  *  would incorrectly resolve to the new tab itself. */
-export function captureWorkspacePaneActiveTabIdentity(repoId: string): string | null {
-  return activeWorkspacePaneTabTarget(repoId)?.activeTab?.identity ?? null
+export function captureWorkspacePaneActiveTabIdentity(repoId: string, branchName: string): string | null {
+  return workspacePaneTabTargetForBranch(repoId, branchName)?.activeTab?.identity ?? null
 }
 
 /** Records that `childIdentity` (any static or terminal tab identity) was
@@ -29,7 +29,7 @@ export function captureWorkspacePaneActiveTabIdentity(repoId: string): string | 
  *
  *  `branchName` must be the branch the operation actually targets, captured
  *  by the caller *before* any `await` — not re-derived from "the repo's
- *  currently selected branch" at call time, which could have changed across
+ *  current route branch" at call time, which could have changed across
  *  an intervening async gap (e.g. the user switched branches while a tab
  *  commit was in flight) and would silently record into the wrong scope. */
 export function recordWorkspacePaneTabOpener(

@@ -2,9 +2,9 @@ import { useId } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
-  getSelectedRepoWorkspacePresentation,
+  getCurrentRepoWorkspacePresentation,
   type RepoWorkspaceRepo,
-  type SelectedRepoWorkspacePresentation,
+  type CurrentRepoWorkspacePresentation,
 } from '#/web/components/repo-workspace/model.ts'
 import { RepoWorkspaceToolbar } from '#/web/components/repo-workspace/RepoWorkspaceToolbar.tsx'
 import { RepoWorkspaceContent } from '#/web/components/repo-workspace/RepoWorkspaceContent.tsx'
@@ -18,9 +18,10 @@ import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
 interface Props {
   repoId: string
-  selectedBranchName?: string | null
+  currentBranchName?: string | null
   shortcutsEnabled?: boolean
   toolbarTrafficLightOffset?: boolean
+  onBackToRepoDashboard?: () => void
 }
 
 // Keep this equality in sync with fields read by RepoWorkspace children.
@@ -36,7 +37,7 @@ function repoWorkspaceRepoShellEqual(
       !!b &&
       a.id === b.id &&
       a.instanceId === b.instanceId &&
-      a.ui.selectedBranch === b.ui.selectedBranch &&
+      a.ui.currentBranchName === b.ui.currentBranchName &&
       a.ui.preferredWorkspacePaneTabByTarget === b.ui.preferredWorkspacePaneTabByTarget &&
       a.dataLoads.status === b.dataLoads.status &&
       a.dataLoads.pullRequests === b.dataLoads.pullRequests &&
@@ -52,26 +53,23 @@ function repoWorkspaceRepoShellEqual(
 
 export function RepoWorkspace({
   repoId,
-  selectedBranchName,
+  currentBranchName,
   shortcutsEnabled = true,
   toolbarTrafficLightOffset = false,
+  onBackToRepoDashboard,
 }: Props) {
   const workspacePaneId = useId()
   const repoShell = useStoreWithEqualityFn(
     useReposStore,
     (s) => {
       const repo = s.repos[repoId]
-      const selectedBranch = repo
-        ? selectedBranchName === undefined
-          ? repo.ui.selectedBranch
-          : selectedBranchName
-        : null
+      const currentBranch = repo ? (currentBranchName ?? null) : null
       return repo
         ? {
             id: repo.id,
             instanceId: repo.instanceId,
             ui: {
-              selectedBranch,
+              currentBranchName: currentBranch,
               preferredWorkspacePaneTabByTarget: repo.ui.preferredWorkspacePaneTabByTarget,
             },
             dataLoads: {
@@ -97,12 +95,13 @@ export function RepoWorkspace({
   if (!repoShell) return null
 
   return (
-    <RepoWorkspaceLoaded
-      repoShell={repoShell}
-      workspacePaneId={workspacePaneId}
-      shortcutsEnabled={shortcutsEnabled}
-      toolbarTrafficLightOffset={toolbarTrafficLightOffset}
-    />
+      <RepoWorkspaceLoaded
+        repoShell={repoShell}
+        workspacePaneId={workspacePaneId}
+        shortcutsEnabled={shortcutsEnabled}
+        toolbarTrafficLightOffset={toolbarTrafficLightOffset}
+        onBackToRepoDashboard={onBackToRepoDashboard}
+      />
   )
 }
 
@@ -111,21 +110,23 @@ function RepoWorkspaceLoaded({
   workspacePaneId,
   shortcutsEnabled,
   toolbarTrafficLightOffset,
+  onBackToRepoDashboard,
 }: {
   repoShell: RepoWorkspaceRepoShell
   workspacePaneId: string
   shortcutsEnabled: boolean
   toolbarTrafficLightOffset: boolean
+  onBackToRepoDashboard?: () => void
 }) {
   const statusReadModel = useRepoStatusReadModel(repoShell.id, repoShell.instanceId, true)
   const branchReadModel = useRepoBranchReadModel(repoShell.id, repoShell.instanceId, true)
-  const selectedBranchName = repoShell.ui.selectedBranch
+  const currentBranchName = repoShell.ui.currentBranchName
   const pullRequestsReadModel = useRepoPullRequestsReadModel(
     repoShell.id,
     repoShell.instanceId,
-    selectedBranchName ? [selectedBranchName] : undefined,
+    currentBranchName ? [currentBranchName] : undefined,
     'full',
-    !!selectedBranchName,
+    !!currentBranchName,
   )
   if (!branchReadModel || !statusReadModel.data) {
     return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
@@ -135,12 +136,12 @@ function RepoWorkspaceLoaded({
     status: statusReadModel.data,
     statusReady: statusReadModel.isSuccess,
   }
-  if (selectedBranchName && Array.isArray(pullRequestsReadModel.data)) {
-    const pullRequest = pullRequestsReadModel.data.find((entry) => entry.branch === selectedBranchName)?.pullRequest
+  if (currentBranchName && Array.isArray(pullRequestsReadModel.data)) {
+    const pullRequest = pullRequestsReadModel.data.find((entry) => entry.branch === currentBranchName)?.pullRequest
     presentationBranchModel = {
       ...presentationBranchModel,
       branches: presentationBranchModel.branches.map((branch) => {
-        if (branch.name !== selectedBranchName) return branch
+        if (branch.name !== currentBranchName) return branch
         if (pullRequest) return { ...branch, pullRequest }
         const { pullRequest: _pullRequest, ...branchWithoutPullRequest } = branch
         return branchWithoutPullRequest
@@ -148,7 +149,7 @@ function RepoWorkspaceLoaded({
     }
   }
   const presentationRepo: RepoWorkspaceRepo = { ...repoShell, branchModel: presentationBranchModel }
-  const detail = getSelectedRepoWorkspacePresentation(presentationRepo)
+  const detail = getCurrentRepoWorkspacePresentation(presentationRepo)
 
   return (
     <section className="flex min-h-0 flex-1 flex-col bg-background">
@@ -160,6 +161,7 @@ function RepoWorkspaceLoaded({
           workspacePaneId={workspacePaneId}
           shortcutsEnabled={shortcutsEnabled}
           toolbarTrafficLightOffset={toolbarTrafficLightOffset}
+          onBackToRepoDashboard={onBackToRepoDashboard}
         />
       ) : (
         <RepoWorkspacePane
@@ -167,6 +169,7 @@ function RepoWorkspaceLoaded({
           detail={detail}
           workspacePaneId={workspacePaneId}
           toolbarTrafficLightOffset={toolbarTrafficLightOffset}
+          onBackToRepoDashboard={onBackToRepoDashboard}
         />
       )}
     </section>
@@ -175,10 +178,11 @@ function RepoWorkspaceLoaded({
 
 interface RepoWorkspacePaneProps {
   repo: RepoWorkspaceRepo
-  detail: SelectedRepoWorkspacePresentation
+  detail: CurrentRepoWorkspacePresentation
   workspacePaneId: string
   toolbarTrafficLightOffset?: boolean
   branchActions?: BranchActions
+  onBackToRepoDashboard?: () => void
 }
 
 function RepoWorkspacePane({
@@ -187,6 +191,7 @@ function RepoWorkspacePane({
   workspacePaneId,
   toolbarTrafficLightOffset = false,
   branchActions,
+  onBackToRepoDashboard,
 }: RepoWorkspacePaneProps) {
   const workspacePaneTabModel = useRepoWorkspaceTabModel(repo, detail)
 
@@ -199,6 +204,7 @@ function RepoWorkspacePane({
         trafficLightOffset={toolbarTrafficLightOffset}
         workspacePaneTabModel={workspacePaneTabModel}
         branchActions={branchActions}
+        onBackToRepoDashboard={onBackToRepoDashboard}
       />
       <RepoWorkspaceContent
         repo={repo}
@@ -212,11 +218,12 @@ function RepoWorkspacePane({
 
 interface BranchActionWorkspacePaneProps {
   repo: RepoWorkspaceRepo
-  detail: SelectedRepoWorkspacePresentation
-  branch: NonNullable<SelectedRepoWorkspacePresentation['branch']>
+  detail: CurrentRepoWorkspacePresentation
+  branch: NonNullable<CurrentRepoWorkspacePresentation['branch']>
   workspacePaneId: string
   shortcutsEnabled: boolean
   toolbarTrafficLightOffset?: boolean
+  onBackToRepoDashboard?: () => void
 }
 
 function BranchActionWorkspacePane({
@@ -226,6 +233,7 @@ function BranchActionWorkspacePane({
   workspacePaneId,
   shortcutsEnabled,
   toolbarTrafficLightOffset = false,
+  onBackToRepoDashboard,
 }: BranchActionWorkspacePaneProps) {
   const branchActions = useBranchActions(repo, branch)
   const actions = useBranchActionItems(repo, branch, branchActions)
@@ -239,6 +247,7 @@ function BranchActionWorkspacePane({
         workspacePaneId={workspacePaneId}
         toolbarTrafficLightOffset={toolbarTrafficLightOffset}
         branchActions={branchActions}
+        onBackToRepoDashboard={onBackToRepoDashboard}
       />
     </BranchActionSurfaceContext>
   )

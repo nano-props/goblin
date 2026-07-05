@@ -15,7 +15,7 @@ describe('RepoPicker', () => {
     render(
       <RepoPicker
         repos={[repo('Repo-A', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
-        activeId="/tmp/repo-a"
+        currentRepoId="/tmp/repo-a"
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
@@ -38,7 +38,7 @@ describe('RepoPicker', () => {
     render(
       <RepoPicker
         repos={[repo('Repo-A', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
-        activeId="/tmp/repo-a"
+        currentRepoId="/tmp/repo-a"
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
@@ -63,7 +63,7 @@ describe('RepoPicker', () => {
     render(
       <RepoPicker
         repos={[repo('Repo-A', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
-        activeId="/tmp/repo-a"
+        currentRepoId="/tmp/repo-a"
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
@@ -95,7 +95,7 @@ describe('RepoPicker', () => {
     render(
       <RepoPicker
         repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
-        activeId="/tmp/repo-a"
+        currentRepoId="/tmp/repo-a"
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
@@ -126,7 +126,7 @@ describe('RepoPicker', () => {
     render(
       <RepoPicker
         repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
-        activeId="/tmp/repo-a"
+        currentRepoId="/tmp/repo-a"
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
@@ -160,7 +160,7 @@ describe('RepoPicker', () => {
           repo('repo-b', '/tmp/repo-b', { terminalBellCount: 2 }),
           repo('repo-c', '/tmp/repo-c', { terminalBellCount: 1 }),
         ]}
-        activeId="/tmp/repo-a"
+        currentRepoId="/tmp/repo-a"
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
@@ -191,13 +191,13 @@ describe('RepoPicker', () => {
     expect(repoCRow?.querySelector('.bg-notification')?.textContent).toBe('1')
   })
 
-  test('renders only the active repo button when multiple repos are open, with the rest in the popover', () => {
+  test('renders only the current repo button when multiple repos are open, with the rest in the popover', () => {
     vi.stubGlobal('matchMedia', createMatchMedia(false))
 
     render(
       <RepoPicker
         repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b'), repo('repo-c', '/tmp/repo-c')]}
-        activeId="/tmp/repo-b"
+        currentRepoId="/tmp/repo-b"
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
@@ -218,7 +218,7 @@ describe('RepoPicker', () => {
     render(
       <RepoPicker
         repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
-        activeId="/tmp/repo-a"
+        currentRepoId="/tmp/repo-a"
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
@@ -285,7 +285,7 @@ describe('RepoPicker', () => {
     render(
       <RepoPicker
         repos={[]}
-        activeId={null}
+        currentRepoId={null}
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}
@@ -318,7 +318,7 @@ describe('RepoPicker', () => {
     render(
       <RepoPicker
         repos={[]}
-        activeId={null}
+        currentRepoId={null}
         labels={labels}
         onActivate={() => {}}
         onClose={() => {}}

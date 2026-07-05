@@ -1,13 +1,12 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
   createPrimaryWindowNavigationActions,
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation-actions.ts'
 import { primaryWindowNavigationStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
-import { navigationWorkspaceStateEqual, navigationWorkspaceStateFromStore } from '#/web/stores/repos/selector-state.ts'
+import { usePrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 export type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
 
 const PrimaryWindowNavigationContext = createContext<PrimaryWindowNavigationActions | null>(null)
@@ -24,27 +23,24 @@ export function PrimaryWindowNavigationProvider({
 
 export function usePrimaryWindowNavigation(): PrimaryWindowNavigationActions {
   const context = useContext(PrimaryWindowNavigationContext)
-  const { activeId, order } = useStoreWithEqualityFn(
-    useReposStore,
-    navigationWorkspaceStateFromStore,
-    navigationWorkspaceStateEqual,
-  )
-  const { setActive, closeRepo, cycleActive, selectBranch, setWorkspacePaneTab } = useReposStore(
+  if (context) return context
+
+  const order = useReposStore((s) => s.order)
+  const { closeRepo, setWorkspacePaneTab } = useReposStore(
     useShallow(primaryWindowNavigationStoreActionsFromStore),
   )
+  const routeNavigation = usePrimaryWindowRouteNavigation()
   const fallbackNavigation = useMemo(
     () =>
       createPrimaryWindowNavigationActions({
-        activeId,
+        currentRepoId: null,
         order,
-        setActive,
         closeRepo,
-        cycleActive,
-        selectBranch,
         setWorkspacePaneTab,
+        routeNavigation,
       }),
-    [activeId, closeRepo, cycleActive, order, selectBranch, setActive, setWorkspacePaneTab],
+    [closeRepo, order, routeNavigation, setWorkspacePaneTab],
   )
 
-  return context ?? fallbackNavigation
+  return fallbackNavigation
 }

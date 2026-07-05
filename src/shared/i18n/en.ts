@@ -204,6 +204,7 @@ export const en = {
   'repo-picker.recent-save-failed': 'Repository opened, but recent history was not updated',
 
   // ---- Workspace pane tabs -----------------------------------------------
+  'repo.dashboard': 'Dashboard',
   'tab.branches': 'Branches',
   'tab.repo-workspace': 'Repo workspace',
   'tab.status': 'Status',

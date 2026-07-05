@@ -6,12 +6,10 @@ import {
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState, ReposGet } from '#/web/stores/repos/types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { invalidateRepoDataQueries } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
@@ -40,25 +38,27 @@ export interface RepoStatusRefreshSnapshot {
 }
 
 export function repoStatusRefreshSnapshot(repo: RepoState): RepoStatusRefreshSnapshot {
-  const branchModel = readRepoBranchQueryProjection(repo)
-  const selectedTarget = branchModel
-    ? workspacePaneTabsTargetForRepoBranch(
-        { repoRoot: repo.id, branches: branchModel.branches },
-        repo.ui.selectedBranch,
-      )
-    : null
   return {
     id: repo.id,
     repoInstanceId: repo.instanceId,
-    preferredWorkspacePaneTab: preferredWorkspacePaneTabForTarget(repo.ui, selectedTarget),
-    statusViewOpen: workspacePaneStaticTabsFromEntries(
-      readWorkspacePaneTabsForTarget({
-        repoRoot: repo.id,
-        repoInstanceId: repo.instanceId,
-        branchName: selectedTarget?.branchName ?? null,
-        worktreePath: selectedTarget?.worktreePath ?? null,
-      }),
-    ).includes('status'),
+    preferredWorkspacePaneTab: preferredWorkspacePaneTabForTarget(repo.ui, null),
+    statusViewOpen: false,
+    unavailable: isRepoUnavailable(repo),
+    statusPhase: repo.dataLoads.status.phase,
+  }
+}
+
+export function currentRepoStatusRefreshSnapshot(repo: RepoState, branchName: string | null): RepoStatusRefreshSnapshot {
+  const branchModel = readRepoBranchQueryProjection(repo)
+  const target = branchModel && branchName
+    ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branchName)
+    : null
+  const preferredWorkspacePaneTab = preferredWorkspacePaneTabForTarget(repo.ui, target)
+  return {
+    id: repo.id,
+    repoInstanceId: repo.instanceId,
+    preferredWorkspacePaneTab,
+    statusViewOpen: preferredWorkspacePaneTab === 'status' || preferredWorkspacePaneTab === 'changes',
     unavailable: isRepoUnavailable(repo),
     statusPhase: repo.dataLoads.status.phase,
   }
@@ -80,7 +80,6 @@ async function runVisiblePullRequestRefresh(
 
 async function runVisibleStatusRefresh(get: ReposGet, id: string, repoInstanceId: string): Promise<void> {
   const state = get()
-  if (state.activeId !== id) return
   const repo = state.repos[id]
   if (!repo || repo.instanceId !== repoInstanceId) return
   if (!isRepoStatusRefreshable(repoStatusRefreshSnapshot(repo))) return

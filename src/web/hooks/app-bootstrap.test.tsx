@@ -61,7 +61,7 @@ describe('app bootstrap hooks', () => {
     const hydrateTheme = vi.spyOn(useThemeStore.getState(), 'hydrate').mockResolvedValue(undefined)
     const hydrateSessionRestore = vi.spyOn(useSessionRestoreStore.getState(), 'hydrate').mockResolvedValue({
       openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
-      activeRepoId: '/tmp/repo',
+      restoredRepoId: '/tmp/repo',
       zenMode: true,
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalWorktree: {},
@@ -86,7 +86,7 @@ describe('app bootstrap hooks', () => {
     const targetKey = branchTargetKey('/tmp/repo', 'main')
     const session = {
       openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
-      activeRepoId: '/tmp/repo',
+      restoredRepoId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 45,
       selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'session-2' },
@@ -147,7 +147,7 @@ describe('app bootstrap hooks', () => {
   test('restores the boot session when non-critical authenticated hydrates fail', async () => {
     const session = {
       openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
-      activeRepoId: '/tmp/repo',
+      restoredRepoId: '/tmp/repo',
       zenMode: true,
       workspacePaneSize: 55,
       selectedTerminalSessionIdByTerminalWorktree: {},
@@ -179,7 +179,7 @@ describe('app bootstrap hooks', () => {
     const targetKey = branchTargetKey('/tmp/repo', 'main')
     const session = {
       openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
-      activeRepoId: '/tmp/repo',
+      restoredRepoId: '/tmp/repo',
       zenMode: true,
       workspacePaneSize: 55,
       selectedTerminalSessionIdByTerminalWorktree: {},
@@ -220,7 +220,7 @@ describe('app bootstrap hooks', () => {
     const targetKey = branchTargetKey('/tmp/repo', 'main')
     const session = {
       openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
-      activeRepoId: '/tmp/repo',
+      restoredRepoId: '/tmp/repo',
       zenMode: true,
       workspacePaneSize: 55,
       selectedTerminalSessionIdByTerminalWorktree: {},
@@ -252,7 +252,7 @@ describe('app bootstrap hooks', () => {
   test('blocks persistence when repo session hydration fails', async () => {
     const session = {
       openRepoEntries: [{ kind: 'local' as const, id: '/tmp/missing-repo' }],
-      activeRepoId: '/tmp/missing-repo',
+      restoredRepoId: '/tmp/missing-repo',
       zenMode: true,
       workspacePaneSize: 55,
       selectedTerminalSessionIdByTerminalWorktree: {},
@@ -279,7 +279,7 @@ describe('app bootstrap hooks', () => {
     const targetKey = branchTargetKey('/tmp/repo', 'main')
     const session = {
       openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
-      activeRepoId: '/tmp/repo',
+      restoredRepoId: '/tmp/repo',
       zenMode: true,
       workspacePaneSize: 55,
       selectedTerminalSessionIdByTerminalWorktree: {},

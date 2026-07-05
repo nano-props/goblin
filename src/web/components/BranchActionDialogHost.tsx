@@ -13,8 +13,8 @@
 // `useBranchActionDialogDisplay`. The user can open a confirmation
 // for a non-selected branch row (e.g. a row in the zen-mode
 // HoverCard popover) and confirm against the right branch data, not
-// the workspace's selected branch. When the user switches active
-// repo or selected branch, the `closeStaleDialogs` effect below
+// the workspace's current route branch. When the user switches current
+// repo or current branch, the `closeStaleDialogs` effect below
 // closes any open dialog whose `(repoId, branchName)` no longer
 // matches — no stale "Delete worktree for branch X" dialog can be
 // confirmed against repo B's cwd.
@@ -52,19 +52,19 @@ import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 
 interface Props {
   /**
-   * The currently active `(repoId, branchName)`. Used as the key for
-   * `closeStaleDialogs`. Pass `null` when no repo is active — the
+   * The current route `(repoId, branchName)`. Used as the key for
+   * `closeStaleDialogs`. Pass `null` when no repo is current — the
    * host closes any stale dialog before rendering.
    */
-  activeRepoId: string | null
-  activeBranchName: string | null
+  currentRepoId: string | null
+  currentBranchName: string | null
 }
 
 function hasUpstream(branch: RepoBranchState): boolean {
   return !!branch.tracking && !branch.trackingGone
 }
 
-export function BranchActionDialogHost({ activeRepoId, activeBranchName }: Props) {
+export function BranchActionDialogHost({ currentRepoId, currentBranchName }: Props) {
   const t = useT()
 
   // One subscription per slot — re-renders are scoped to the dialog
@@ -113,14 +113,14 @@ export function BranchActionDialogHost({ activeRepoId, activeBranchName }: Props
     : false
 
   // Auto-close any dialog whose (repoId, branchName) no longer
-  // matches the active workspace. The effect's deps include the
+  // matches the current workspace route. The effect's deps include the
   // `closeStaleDialogs` action reference for exhaustive-deps; the
   // action function is a stable zustand reference, so the effect
-  // still fires exactly when `activeRepoId` or `activeBranchName`
+  // still fires exactly when `currentRepoId` or `currentBranchName`
   // changes — not when the user opens or closes a dialog.
   useEffect(() => {
-    closeStaleDialogs(activeRepoId ?? '', activeBranchName ?? '')
-  }, [activeRepoId, activeBranchName, closeStaleDialogs])
+    closeStaleDialogs(currentRepoId ?? '', currentBranchName ?? '')
+  }, [currentRepoId, currentBranchName, closeStaleDialogs])
 
   return (
     <>

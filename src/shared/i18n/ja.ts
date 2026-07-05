@@ -202,6 +202,7 @@ export const ja: Record<DictKey, string> = {
   'repo-picker.recent-save-failed': 'リポジトリは開きましたが、最近使った項目は更新されませんでした',
 
   // ---- Workspace pane tabs ------------------------------------------------
+  'repo.dashboard': 'ダッシュボード',
   'tab.branches': 'ブランチ',
   'tab.repo-workspace': 'リポジトリワークスペース',
   'tab.status': 'ステータス',

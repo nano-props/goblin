@@ -26,7 +26,7 @@ function installBridge(sessionOverrides: Record<string, unknown> = {}) {
             lanEnabled: false,
             session: {
               openRepoEntries: [],
-              activeRepoId: null,
+              restoredRepoId: null,
               zenMode: true,
               workspacePaneSize: 0.5,
               selectedTerminalSessionIdByTerminalWorktree: {},
@@ -73,7 +73,7 @@ describe('session restore store', () => {
 
     expect(useSessionRestoreStore.getState().bootSessionSnapshot).toMatchObject({
       openRepoEntries: [],
-      activeRepoId: null,
+      restoredRepoId: null,
       workspacePaneSize: 0.5,
     })
   })
@@ -81,7 +81,7 @@ describe('session restore store', () => {
   test('consumeBootSessionSnapshot returns the hydrated session snapshot once and then clears it', async () => {
     installBridge({
       openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
-      activeRepoId: '/tmp/repo',
+      restoredRepoId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 0.4,
     })
@@ -90,14 +90,14 @@ describe('session restore store', () => {
 
     expect(useSessionRestoreStore.getState().consumeBootSessionSnapshot()).toMatchObject({
       openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
-      activeRepoId: '/tmp/repo',
+      restoredRepoId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 0.4,
     })
     expect(useSessionRestoreStore.getState().bootSessionSnapshot).toBeNull()
     expect(useSessionRestoreStore.getState().consumeBootSessionSnapshot()).toMatchObject({
       openRepoEntries: [],
-      activeRepoId: null,
+      restoredRepoId: null,
       zenMode: false,
       workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     })

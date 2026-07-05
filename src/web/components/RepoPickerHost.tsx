@@ -79,7 +79,7 @@ export function RepoPickerHost({
   return (
     <RepoPicker
       repos={summariesWithTerminalBells}
-      activeId={currentRepoId}
+      currentRepoId={currentRepoId}
       labels={{
         repositories: t('repo-picker.repos'),
         closeWithName: (name) => t('repo-picker.close-named', { name }),

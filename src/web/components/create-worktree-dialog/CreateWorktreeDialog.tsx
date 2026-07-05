@@ -57,7 +57,7 @@ type ContentProps = Omit<Props, 'repo'> & {
   repo: CreateWorktreeDialogRepo
 }
 
-interface WorktreeBootstrapPromptState {
+export interface WorktreeBootstrapPromptState {
   loading: boolean
   preview: WorktreeBootstrapPreview | null
   error: boolean
@@ -81,18 +81,81 @@ export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, o
 
 function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, onCreate }: ContentProps) {
   const t = useT()
+
+  return (
+    <FormDialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose()
+      }}
+      title={t('action.create-worktree-title')}
+      description={t('action.create-worktree-hint')}
+    >
+      <CreateWorktreeFormSurface
+        active={open}
+        repo={repo}
+        worktreeBootstrap={worktreeBootstrap}
+        onCancel={onClose}
+        onCreate={onCreate}
+      />
+    </FormDialog>
+  )
+}
+
+export function CreateWorktreePageSurface({
+  repo,
+  worktreeBootstrap,
+  onCancel,
+  onCreate,
+}: Omit<CreateWorktreeFormSurfaceProps, 'active'>) {
+  const t = useT()
+
+  return (
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 p-6">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-sm leading-tight font-semibold">{t('action.create-worktree-title')}</h1>
+        <p className="text-sm text-muted-foreground">{t('action.create-worktree-hint')}</p>
+      </div>
+      <CreateWorktreeFormSurface
+        active
+        repo={repo}
+        worktreeBootstrap={worktreeBootstrap}
+        onCancel={onCancel}
+        onCreate={onCreate}
+      />
+    </div>
+  )
+}
+
+interface CreateWorktreeFormSurfaceProps {
+  active: boolean
+  repo: CreateWorktreeDialogRepo
+  worktreeBootstrap?: WorktreeBootstrapPromptState
+  onCancel: () => void
+  onCreate: (request: CreateWorktreeRequest) => boolean | void | Promise<boolean | void>
+}
+
+export function CreateWorktreeFormSurface({
+  active,
+  repo,
+  worktreeBootstrap,
+  onCancel,
+  onCreate,
+}: CreateWorktreeFormSurfaceProps) {
+  const t = useT()
   const compact = useIsCompactUi()
 
   const [mode, setMode] = useState<CreateWorktreeDialogMode>('newBranch')
-  const [base, setBase] = useState<string>('')
+  const initialBase = repo.branchModel.currentBranch || repo.branchModel.branches[0]?.name || ''
+  const [base, setBase] = useState<string>(initialBase)
   const [branch, setBranch] = useState('')
-  const [existingBranch, setExistingBranch] = useState('')
+  const [existingBranch, setExistingBranch] = useState(initialBase)
   const [remoteRef, setRemoteRef] = useState('')
   const [localBranch, setLocalBranch] = useState('')
   const [worktreePath, setWorktreePath] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const remoteBranchesQuery = useRepoRemoteBranchesQuery(repo.id, repo.instanceId, {
-    enabled: open && mode === 'trackRemoteBranch',
+    enabled: active && mode === 'trackRemoteBranch',
   })
   const remoteBranches = remoteBranchesQuery.data ?? []
   const remoteBranchesLoading = remoteBranchesQuery.isLoading
@@ -103,10 +166,9 @@ function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, o
   // first render with open=true still triggers the reset.
   const previousOpenRef = useRef(false)
   useEffect(() => {
-    const wasClosed = !previousOpenRef.current && open
-    previousOpenRef.current = open
+    const wasClosed = !previousOpenRef.current && active
+    previousOpenRef.current = active
     if (!wasClosed) return
-    const initialBase = repo.branchModel.currentBranch || repo.branchModel.branches[0]?.name || ''
     setMode('newBranch')
     setBase(initialBase)
     setBranch('')
@@ -115,7 +177,7 @@ function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, o
     setLocalBranch('')
     setWorktreePath('')
     setSubmitting(false)
-  }, [open, repo.branchModel.branches, repo.branchModel.currentBranch])
+  }, [active, repo.branchModel.branches, repo.branchModel.currentBranch])
 
   const remoteTarget = remoteRepoTarget(repo.id, repo.remote.lifecycle)
   const derived = deriveCreateWorktreeForm(
@@ -140,25 +202,18 @@ function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, o
     } finally {
       setSubmitting(false)
     }
-    if (shouldClose) onClose()
+    if (shouldClose) onCancel()
   }
 
   const remotePathSuggestions = useRemotePathSuggestions({
-    enabled: open && !!remoteTarget && derived.pathName.length > 0,
+    enabled: active && !!remoteTarget && derived.pathName.length > 0,
     alias: remoteTarget?.alias ?? '',
     remotePath: remoteTarget?.remotePath ?? '/',
     prefix: worktreePath,
   })
 
   return (
-    <FormDialog
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) onClose()
-      }}
-      title={t('action.create-worktree-title')}
-      description={t('action.create-worktree-hint')}
-    >
+    <div>
       <form
         className="space-y-3"
         onSubmit={(e) => {
@@ -364,7 +419,7 @@ function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, o
         <WorktreeBootstrapTrustCheckbox state={worktreeBootstrap} />
 
         <DialogFooter className="gap-2 pt-2">
-          <Button type="button" variant="outline" className={cn(compact && 'w-full')} onClick={onClose}>
+          <Button type="button" variant="outline" className={cn(compact && 'w-full')} onClick={onCancel}>
             {t('dialog.cancel')}
           </Button>
           <Button type="submit" className={cn('min-w-28', compact && 'w-full min-w-0')} disabled={!canSubmit}>
@@ -372,7 +427,7 @@ function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, o
           </Button>
         </DialogFooter>
       </form>
-    </FormDialog>
+    </div>
   )
 }
 

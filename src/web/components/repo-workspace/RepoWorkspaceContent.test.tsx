@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoWorkspaceContent } from '#/web/components/repo-workspace/RepoWorkspaceContent.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
-import { getSelectedRepoWorkspacePresentation, type RepoWorkspaceRepo } from '#/web/components/repo-workspace/model.ts'
+import { getCurrentRepoWorkspacePresentation, type RepoWorkspaceRepo } from '#/web/components/repo-workspace/model.ts'
 import { useRepoWorkspaceTabModel } from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { BranchCopyPatchAction } from '#/web/hooks/branch-action-state.ts'
@@ -77,7 +77,11 @@ function RepoWorkspaceContentInner(props: RepoWorkspaceContentHarnessProps) {
 function repoWorkspaceRepo(repo: RepoState): RepoWorkspaceRepo {
   const branchModel = readRepoBranchQueryProjection(repo)
   if (!branchModel) throw new Error('missing branch read model')
-  return { ...repo, branchModel: { ...branchModel, statusReady: true } }
+  return {
+    ...repo,
+    ui: { ...repo.ui, currentBranchName: branchModel.branches[0]?.name ?? null },
+    branchModel: { ...branchModel, statusReady: true },
+  }
 }
 
 beforeEach(() => {
@@ -131,7 +135,7 @@ describe('RepoWorkspaceContent', () => {
           worktree: { path: worktreePath, summary: { dirty: true, changeCount: 4 } },
         }),
       ],
-      selectedBranch: 'feature/changes',
+      currentBranchName: 'feature/changes',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
         'feature/changes': [staticEntry('status'), staticEntry('changes')],
@@ -150,7 +154,7 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -192,7 +196,7 @@ describe('RepoWorkspaceContent', () => {
           worktree: { path: worktreePath, summary: { dirty: true, changeCount: 1 } },
         }),
       ],
-      selectedBranch: 'feature/copy-success',
+      currentBranchName: 'feature/copy-success',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
         'feature/copy-success': [staticEntry('status')],
@@ -206,7 +210,7 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     const onCopyPatch = vi.fn().mockResolvedValue(true)
 
     const { container } = renderInJsdom(
@@ -255,14 +259,14 @@ describe('RepoWorkspaceContent', () => {
           worktree: { path: worktreePath, summary: { dirty: false, changeCount: 0 } },
         }),
       ],
-      selectedBranch: 'feature/clean',
+      currentBranchName: 'feature/clean',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
         'feature/clean': [staticEntry('status')],
       },
       status: [{ path: worktreePath, branch: 'feature/clean', isMain: false, entries: [] }],
     })
-    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -296,7 +300,7 @@ describe('RepoWorkspaceContent', () => {
           worktree: { path: worktreePath, summary: { dirty: true, changeCount: 18 } },
         }),
       ],
-      selectedBranch: 'feature/status-links',
+      currentBranchName: 'feature/status-links',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
         'feature/status-links': [staticEntry('status'), staticEntry('changes'), staticEntry('files')],
@@ -310,7 +314,7 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <PrimaryWindowNavigationProvider value={navigationWith({ showRepoBranchWorkspacePaneTab })}>
@@ -358,7 +362,7 @@ describe('RepoWorkspaceContent', () => {
           lastCommitMessage: 'Unify repo status link actions',
         }),
       ],
-      selectedBranch: 'feature/open-links',
+      currentBranchName: 'feature/open-links',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
         'feature/open-links': [staticEntry('status')],
@@ -372,7 +376,7 @@ describe('RepoWorkspaceContent', () => {
         hasGitHubRemote: true,
       },
     })
-    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -419,7 +423,7 @@ describe('RepoWorkspaceContent', () => {
           worktree: { path: worktreePath, summary: { dirty: true, changeCount: 1 } },
         }),
       ],
-      selectedBranch: 'feature/hidden',
+      currentBranchName: 'feature/hidden',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
         'feature/hidden': [staticEntry('status')],
@@ -433,7 +437,7 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -464,7 +468,7 @@ describe('RepoWorkspaceContent', () => {
           worktree: { path: worktreePath, summary: { dirty: true, changeCount: 2 } },
         }),
       ],
-      selectedBranch: 'feature/changes-panel',
+      currentBranchName: 'feature/changes-panel',
       preferredWorkspacePaneTab: 'changes',
       workspacePaneTabsByBranch: {
         'feature/changes-panel': [staticEntry('status'), staticEntry('changes')],
@@ -481,7 +485,7 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -514,10 +518,10 @@ describe('RepoWorkspaceContent', () => {
           lastCommitDate: '2026-01-01T00:00:00.000Z',
         }),
       ],
-      selectedBranch: 'feature/no-worktree',
+      currentBranchName: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'status',
     })
-    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -546,11 +550,11 @@ describe('RepoWorkspaceContent', () => {
           lastCommitDate: '2026-01-01T00:00:00.000Z',
         }),
       ],
-      selectedBranch: 'feature/no-worktree',
+      currentBranchName: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: { 'feature/no-worktree': [] },
     })
-    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -566,11 +570,11 @@ describe('RepoWorkspaceContent', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
-      selectedBranch: 'feature/no-worktree',
+      currentBranchName: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/no-worktree': [staticEntry('status')] },
     })
-    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -593,12 +597,12 @@ describe('RepoWorkspaceContent', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-empty', { worktree: { path: worktreePath } })],
-      selectedBranch: 'feature/terminal-empty',
+      currentBranchName: 'feature/terminal-empty',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/terminal-empty': [staticEntry('status')] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceId)
-    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -623,12 +627,12 @@ describe('RepoWorkspaceContent', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-pending', { worktree: { path: worktreePath } })],
-      selectedBranch: 'feature/terminal-pending',
+      currentBranchName: 'feature/terminal-pending',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/terminal-pending': [staticEntry('status')] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceId)
-    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     const registerHost = vi.fn()
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
@@ -665,13 +669,13 @@ describe('RepoWorkspaceContent', () => {
     const seededRepo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
-      selectedBranch: branchName,
+      currentBranchName: branchName,
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { [branchName]: [] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, seededRepo.instanceId)
     const repo = useReposStore.getState().repos[REPO_ID]!
-    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     const registerHost = vi.fn()
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
@@ -702,11 +706,11 @@ describe('RepoWorkspaceContent', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-loading', { worktree: { path: worktreePath } })],
-      selectedBranch: 'feature/terminal-loading',
+      currentBranchName: 'feature/terminal-loading',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/terminal-loading': [staticEntry('status')] },
     })
-    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     const createTerminal = vi.fn(async () => 'session-1')
     const registerHost = vi.fn()
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
@@ -744,14 +748,14 @@ describe('RepoWorkspaceContent', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/terminal-reordered', { worktree: { path: worktreePath } })],
-      selectedBranch: 'feature/terminal-reordered',
+      currentBranchName: 'feature/terminal-reordered',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
         'feature/terminal-reordered': [terminalEntry('t2'), staticEntry('status'), terminalEntry('t1')],
       },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceId)
-    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     const registerHost = vi.fn()
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
@@ -800,15 +804,15 @@ describe('RepoWorkspaceContent', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
-      selectedBranch: branchName,
+      currentBranchName: branchName,
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: { [branchName]: [staticEntry('files'), staticEntry('status')] },
     })
     useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceId)
-    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     const createTerminal = vi.fn(async () => 'session-1')
     const writeInput = vi.fn()
-    const showRepoWorkspacePaneTab = vi.fn()
+    const showRepoBranchWorkspacePaneTab = vi.fn()
     let resolveViewer!: (value: { viewer: 'bat'; shell: 'posix' }) => void
     filetreeClientMocks.getRepositoryFileViewer.mockImplementationOnce(
       () =>
@@ -820,7 +824,7 @@ describe('RepoWorkspaceContent', () => {
 
     renderInJsdom(
       <QueryClientProvider client={queryClient}>
-        <PrimaryWindowNavigationProvider value={navigationWith({ showRepoWorkspacePaneTab })}>
+        <PrimaryWindowNavigationProvider value={navigationWith({ showRepoBranchWorkspacePaneTab })}>
           <TerminalSessionContext value={terminalCommandContextWith({ createTerminal, writeInput })}>
             <TerminalSessionReadContext value={emptyTerminalReadContext}>
               <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
@@ -849,13 +853,13 @@ describe('RepoWorkspaceContent', () => {
       await Promise.resolve()
     })
     expect(filetreeClientMocks.getRepositoryFileViewer).toHaveBeenCalledTimes(1)
-    useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'status')
+    useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/changes', 'status')
     await act(async () => {
       resolveViewer({ viewer: 'bat', shell: 'posix' })
       await Promise.resolve()
     })
 
-    expect(showRepoWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'terminal')
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/filetree-open', 'terminal')
     expect(createTerminal).toHaveBeenCalledWith(
       { repoRoot: REPO_ID, repoInstanceId: repo.instanceId, branch: branchName, worktreePath },
       {
@@ -877,13 +881,13 @@ describe('RepoWorkspaceContent', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/a'), createRepoBranch('feature/b')],
-      selectedBranch: 'feature/b',
+      currentBranchName: 'feature/b',
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: {
         'feature/a': [staticEntry('status'), staticEntry('history')],
       },
     })
-    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -928,11 +932,11 @@ describe('RepoWorkspaceContent', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/history')],
-      selectedBranch: 'feature/history',
+      currentBranchName: 'feature/history',
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
     })
-    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -976,11 +980,11 @@ describe('RepoWorkspaceContent', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/history', { worktree: { path: '/tmp/history-worktree' } })],
-      selectedBranch: 'feature/history',
+      currentBranchName: 'feature/history',
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: { 'feature/history': [staticEntry('status'), staticEntry('history')] },
     })
-    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -999,11 +1003,11 @@ describe('RepoWorkspaceContent', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/history')],
-      selectedBranch: 'feature/history',
+      currentBranchName: 'feature/history',
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: { 'feature/history': [staticEntry('history')] },
     })
-    const detail = getSelectedRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -1082,9 +1086,9 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
     closeRepo: () => {},
     cycleRepo: () => {},
     selectRepoBranch: () => {},
-    showRepoWorkspacePaneTab: () => {},
     showRepoBranchWorkspacePaneTab: () => {},
     openSettings: () => {},
+    openCreateWorktree: () => {},
     ...overrides,
   }
 }

@@ -1,7 +1,5 @@
 import type { ReposStore } from '#/web/stores/repos/types.ts'
 
-interface RestorableWorkspaceViewportStoreActions extends Pick<ReposStore, 'setActive' | 'cycleActive'> {}
-
 interface RestorableWorkspaceLayoutStoreActions extends Pick<
   ReposStore,
   'resetLayout' | 'setSelectedTerminal' | 'toggleZenMode'
@@ -16,18 +14,15 @@ interface RuntimeCoherentRepoOpenStoreActions extends Pick<ReposStore, 'ensureWo
 
 interface RuntimeCoherentRepoNavigationStoreActions extends Pick<
   ReposStore,
-  'closeRepo' | 'selectBranch' | 'setWorkspacePaneTab'
+  'closeRepo' | 'setWorkspacePaneTab'
 > {}
 
 interface RuntimeCoherentRepoProjectionStoreActions extends Pick<
   ReposStore,
-  'ensureWorkspaceOpen' | 'closeRepo' | 'selectBranch' | 'setWorkspacePaneTab'
+  'ensureWorkspaceOpen' | 'closeRepo' | 'setWorkspacePaneTab'
 > {}
 
-interface PrimaryWindowNavigationStoreActions extends Pick<
-  ReposStore,
-  'setActive' | 'closeRepo' | 'cycleActive' | 'selectBranch' | 'setWorkspacePaneTab'
-> {}
+interface PrimaryWindowNavigationStoreActions extends Pick<ReposStore, 'closeRepo' | 'setWorkspacePaneTab'> {}
 
 interface RepoPickerStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
 
@@ -35,15 +30,6 @@ interface ClientEffectIntentStoreActions extends Pick<
   ReposStore,
   'ensureWorkspaceOpen' | 'setSelectedTerminal' | 'resetLayout' | 'toggleZenMode'
 > {}
-
-export function restorableWorkspaceViewportStoreActionsFromStore(
-  state: Pick<ReposStore, 'setActive' | 'cycleActive'>,
-): RestorableWorkspaceViewportStoreActions {
-  return {
-    setActive: state.setActive,
-    cycleActive: state.cycleActive,
-  }
-}
 
 export function runtimeCoherentRepoOpenStoreActionsFromStore(
   state: Pick<ReposStore, 'ensureWorkspaceOpen'>,
@@ -54,11 +40,10 @@ export function runtimeCoherentRepoOpenStoreActionsFromStore(
 }
 
 export function runtimeCoherentRepoNavigationStoreActionsFromStore(
-  state: Pick<ReposStore, 'closeRepo' | 'selectBranch' | 'setWorkspacePaneTab'>,
+  state: Pick<ReposStore, 'closeRepo' | 'setWorkspacePaneTab'>,
 ): RuntimeCoherentRepoNavigationStoreActions {
   return {
     closeRepo: state.closeRepo,
-    selectBranch: state.selectBranch,
     setWorkspacePaneTab: state.setWorkspacePaneTab,
   }
 }
@@ -84,39 +69,29 @@ export function restorableWorkspaceLayoutPreferenceStoreActionsFromStore(
 }
 
 export function runtimeCoherentRepoProjectionStoreActionsFromStore(
-  state: Pick<ReposStore, 'ensureWorkspaceOpen' | 'closeRepo' | 'selectBranch' | 'setWorkspacePaneTab'>,
+  state: Pick<ReposStore, 'ensureWorkspaceOpen' | 'closeRepo' | 'setWorkspacePaneTab'>,
 ): RuntimeCoherentRepoProjectionStoreActions {
   const open = runtimeCoherentRepoOpenStoreActionsFromStore({ ensureWorkspaceOpen: state.ensureWorkspaceOpen })
   const navigation = runtimeCoherentRepoNavigationStoreActionsFromStore({
     closeRepo: state.closeRepo,
-    selectBranch: state.selectBranch,
     setWorkspacePaneTab: state.setWorkspacePaneTab,
   })
   return {
     ensureWorkspaceOpen: open.ensureWorkspaceOpen,
     closeRepo: navigation.closeRepo,
-    selectBranch: navigation.selectBranch,
     setWorkspacePaneTab: navigation.setWorkspacePaneTab,
   }
 }
 
 export function primaryWindowNavigationStoreActionsFromStore(
-  state: Pick<ReposStore, 'setActive' | 'cycleActive' | 'closeRepo' | 'selectBranch' | 'setWorkspacePaneTab'>,
+  state: Pick<ReposStore, 'closeRepo' | 'setWorkspacePaneTab'>,
 ): PrimaryWindowNavigationStoreActions {
-  const restorable = restorableWorkspaceViewportStoreActionsFromStore({
-    setActive: state.setActive,
-    cycleActive: state.cycleActive,
-  })
   const runtimeCoherent = runtimeCoherentRepoNavigationStoreActionsFromStore({
     closeRepo: state.closeRepo,
-    selectBranch: state.selectBranch,
     setWorkspacePaneTab: state.setWorkspacePaneTab,
   })
   return {
-    setActive: restorable.setActive,
     closeRepo: runtimeCoherent.closeRepo,
-    cycleActive: restorable.cycleActive,
-    selectBranch: runtimeCoherent.selectBranch,
     setWorkspacePaneTab: runtimeCoherent.setWorkspacePaneTab,
   }
 }

@@ -5,6 +5,7 @@ import { RepoPickerHost } from '#/web/components/RepoPickerHost.tsx'
 import {
   BranchFilterAction,
   CreateWorktreeRowAction,
+  DashboardRowAction,
   RepoSyncAction,
 } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
 import { useT } from '#/web/stores/i18n.ts'
@@ -23,6 +24,12 @@ interface RepoShellSidebarProps {
   branchContent?: ReactNode
   chromeRegion?: RepoShellSidebarChromeRegion
   onOpenSettings?: () => void
+  onSelectBranch?: (branch: string) => void
+  onCreateWorktree?: () => void
+  onOpenDashboard?: () => void
+  dashboardSelected?: boolean
+  newWorktreeSelected?: boolean
+  currentBranchName?: string | null
 }
 
 export function RepoLayoutSidebar({
@@ -31,6 +38,12 @@ export function RepoLayoutSidebar({
   branchContent,
   chromeRegion = 'drag',
   onOpenSettings,
+  onSelectBranch,
+  onCreateWorktree,
+  onOpenDashboard,
+  dashboardSelected = false,
+  newWorktreeSelected = false,
+  currentBranchName,
 }: RepoShellSidebarProps) {
   const t = useT()
   return (
@@ -49,11 +62,21 @@ export function RepoLayoutSidebar({
             style={{ height: TITLE_BAR_HEIGHT_PX }}
           />
         ))}
-      <RepoShellPrimaryActions repoId={repoId} />
+      <RepoShellPrimaryActions
+        repoId={repoId}
+        onCreateWorktree={onCreateWorktree}
+        onOpenDashboard={onOpenDashboard}
+        dashboardSelected={dashboardSelected}
+        newWorktreeSelected={newWorktreeSelected}
+      />
       {repoId ? (
         <>
           <RepoShellBranchHeader repoId={repoId} title={t('tab.branches')} />
-          <div className="flex min-h-0 flex-1 bg-card">{branchContent ?? <BranchNavigator repoId={repoId} />}</div>
+          <div className="flex min-h-0 flex-1 bg-card">
+            {branchContent ?? (
+              <BranchNavigator repoId={repoId} onSelectBranch={onSelectBranch} currentBranchName={currentBranchName} />
+            )}
+          </div>
         </>
       ) : (
         <div className="flex min-h-0 flex-1 bg-card" />
@@ -63,12 +86,33 @@ export function RepoLayoutSidebar({
   )
 }
 
-function RepoShellPrimaryActions({ repoId }: { repoId?: string }) {
+function RepoShellPrimaryActions({
+  repoId,
+  onCreateWorktree,
+  onOpenDashboard,
+  dashboardSelected,
+  newWorktreeSelected,
+}: {
+  repoId?: string
+  onCreateWorktree?: () => void
+  onOpenDashboard?: () => void
+  dashboardSelected?: boolean
+  newWorktreeSelected?: boolean
+}) {
   return (
     <div className="shrink-0 px-3 pt-4">
-      <div className="flex min-w-0 flex-col gap-0">
+      <div className="flex min-w-0 flex-col gap-1">
         <RepoPickerRow repoId={repoId} />
-        {repoId ? <CreateWorktreeRowAction repoId={repoId} /> : null}
+        {repoId ? (
+          <>
+            <DashboardRowAction repoId={repoId} selected={dashboardSelected} onOpenDashboard={onOpenDashboard} />
+            <CreateWorktreeRowAction
+              repoId={repoId}
+              selected={newWorktreeSelected}
+              onCreateWorktree={onCreateWorktree}
+            />
+          </>
+        ) : null}
       </div>
     </div>
   )
