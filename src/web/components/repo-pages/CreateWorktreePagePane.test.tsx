@@ -6,7 +6,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { CreateWorktreePagePane } from '#/web/components/repo-pages/CreateWorktreePagePane.tsx'
 import { resetReposStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { CreateWorktreeRequest } from '#/web/components/create-worktree-dialog/create-worktree-dialog.logic.ts'
+import type { CreateWorktreeRequest } from '#/web/components/create-worktree/create-worktree.logic.ts'
 
 const surfaceMocks = vi.hoisted(() => ({
   createRequest: {
@@ -14,7 +14,7 @@ const surfaceMocks = vi.hoisted(() => ({
   } satisfies CreateWorktreeRequest,
 }))
 
-vi.mock('#/web/components/create-worktree-dialog/CreateWorktreeDialog.tsx', () => ({
+vi.mock('#/web/components/create-worktree/CreateWorktreeSurface.tsx', () => ({
   CreateWorktreePageSurface: ({
     worktreeBootstrap,
     onCreate,

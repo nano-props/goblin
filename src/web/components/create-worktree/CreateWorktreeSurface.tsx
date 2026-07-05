@@ -11,10 +11,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { GitBranch, GitBranchPlus, RadioTower, type LucideIcon } from 'lucide-react'
-import { DialogFooter } from '#/web/components/ui/dialog.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/web/components/ui/select.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
-import { FormDialog } from '#/web/components/ui/form-dialog.tsx'
 import { Field, FieldDescription, FieldError, FieldLabel } from '#/web/components/ui/field.tsx'
 import { AnimateHeight } from '#/web/components/ui/animate-height.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
@@ -27,13 +25,13 @@ import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useRepoRemoteBranchesQuery } from '#/web/repo-data-query.ts'
-import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
+import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import { cn } from '#/web/lib/cn.ts'
 import {
   deriveCreateWorktreeForm,
   type CreateWorktreeMode,
   type CreateWorktreeRequest,
-} from '#/web/components/create-worktree-dialog/create-worktree-dialog.logic.ts'
+} from '#/web/components/create-worktree/create-worktree.logic.ts'
 import type { WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
 
 const MODE_OPTIONS = [
@@ -42,20 +40,7 @@ const MODE_OPTIONS = [
   { id: 'trackRemoteBranch', labelKey: 'action.create-worktree-mode-remote', icon: RadioTower },
 ] satisfies Array<{ id: CreateWorktreeMode; labelKey: string; icon: LucideIcon }>
 
-type CreateWorktreeRepoShell = RepoState
 type CreateWorktreeRepo = RepoState & { branchModel: RepoBranchReadModelData }
-
-interface Props {
-  open: boolean
-  repo: CreateWorktreeRepoShell
-  worktreeBootstrap?: WorktreeBootstrapPromptState
-  onClose: () => void
-  onCreate: (request: CreateWorktreeRequest) => boolean | void | Promise<boolean | void>
-}
-
-type ContentProps = Omit<Props, 'repo'> & {
-  repo: CreateWorktreeRepo
-}
 
 export interface WorktreeBootstrapPromptState {
   loading: boolean
@@ -63,43 +48,6 @@ export interface WorktreeBootstrapPromptState {
   error: boolean
   configTrusted: boolean
   onConfigTrustedChange: (trust: boolean) => void
-}
-
-export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, onCreate }: Props) {
-  const branchReadModel = useRepoBranchReadModel(repo.id, repo.instanceId, true)
-  if (!branchReadModel) return null
-  return (
-    <CreateWorktreeDialogContent
-      open={open}
-      repo={{ ...repo, branchModel: branchReadModel }}
-      worktreeBootstrap={worktreeBootstrap}
-      onClose={onClose}
-      onCreate={onCreate}
-    />
-  )
-}
-
-function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, onCreate }: ContentProps) {
-  const t = useT()
-
-  return (
-    <FormDialog
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) onClose()
-      }}
-      title={t('action.create-worktree-title')}
-      description={t('action.create-worktree-hint')}
-    >
-      <CreateWorktreeFormSurface
-        active={open}
-        repo={repo}
-        worktreeBootstrap={worktreeBootstrap}
-        onCancel={onClose}
-        onCreate={onCreate}
-      />
-    </FormDialog>
-  )
 }
 
 export function CreateWorktreePageSurface({
@@ -160,10 +108,10 @@ export function CreateWorktreeFormSurface({
   const remoteBranches = remoteBranchesQuery.data ?? []
   const remoteBranchesLoading = remoteBranchesQuery.isLoading
 
-  // Reset on the rising edge of `open` only. A guard ref prevents snapshot
+  // Reset on the rising edge of `active` only. A guard ref prevents snapshot
   // refreshes (which change repo.branchModel.branches / currentBranch) from wiping
-  // user input while the dialog stays open. The ref starts false so the
-  // first render with open=true still triggers the reset.
+  // user input while the surface stays active. The ref starts false so the
+  // first render with active=true still triggers the reset.
   const previousOpenRef = useRef(false)
   useEffect(() => {
     const wasClosed = !previousOpenRef.current && active
@@ -418,14 +366,14 @@ export function CreateWorktreeFormSurface({
 
         <WorktreeBootstrapTrustCheckbox state={worktreeBootstrap} />
 
-        <DialogFooter className="gap-2 pt-2">
+        <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="outline" className={cn(compact && 'w-full')} onClick={onCancel}>
             {t('dialog.cancel')}
           </Button>
           <Button type="submit" className={cn('min-w-28', compact && 'w-full min-w-0')} disabled={!canSubmit}>
             {t('action.create-worktree-confirm')}
           </Button>
-        </DialogFooter>
+        </div>
       </form>
     </div>
   )

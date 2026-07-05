@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { GitBranchPlus } from 'lucide-react'
-import { CreateWorktreePageSurface } from '#/web/components/create-worktree-dialog/CreateWorktreeDialog.tsx'
-import type { CreateWorktreeRequest } from '#/web/components/create-worktree-dialog/create-worktree-dialog.logic.ts'
+import { CreateWorktreePageSurface } from '#/web/components/create-worktree/CreateWorktreeSurface.tsx'
+import type { CreateWorktreeRequest } from '#/web/components/create-worktree/create-worktree.logic.ts'
 import {
   isConfigTrustStateLoading,
   resolveConfigTrusted,
   resolveNextConfigTrustChoice,
   resolveWorktreeBootstrapDecision,
-} from '#/web/components/create-worktree-dialog/create-worktree-bootstrap-host.logic.ts'
+} from '#/web/components/create-worktree/create-worktree-bootstrap-host.logic.ts'
 import { ScrollPane } from '#/web/components/Layout.tsx'
 import { RepoPageToolbar } from '#/web/components/repo-pages/RepoPageToolbar.tsx'
 import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
