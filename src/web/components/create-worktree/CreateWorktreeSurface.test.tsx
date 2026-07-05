@@ -162,8 +162,8 @@ describe('CreateWorktreePageBody', () => {
     })
   })
 
-  test('reserves the trust prompt row even when the prompt is hidden', () => {
-    const { container } = render(
+  test('hides the trust prompt row entirely when neither loading nor needed', () => {
+    render(
       <CreateWorktreePageBody
         repo={createRepo()}
         worktreeBootstrap={{
@@ -178,11 +178,10 @@ describe('CreateWorktreePageBody', () => {
       />,
     )
 
-    expect(container.querySelector('.min-h-6')).not.toBeNull()
-    expect(screen.queryByText(/action.create-worktree-bootstrap-config-trusted/i)).not.toBeNull()
+    expect(screen.queryByText(/action.create-worktree-bootstrap-config-trusted/i)).toBeNull()
   })
 
-  test('shows the trust prompt in the reserved row when bootstrap operations are present', () => {
+  test('shows the trust prompt when bootstrap operations are present', () => {
     const preview = {
       hasOperations: true,
       configHash: 'config-hash',

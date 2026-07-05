@@ -12,7 +12,7 @@ import { ScrollPane } from '#/web/components/Layout.tsx'
 import { RepoPageLoadingBody, RepoPagePane } from '#/web/components/repo-pages/RepoPagePane.tsx'
 import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
 import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
-import { useSettingsSnapshotReadModel } from '#/web/settings-queries.ts'
+import { useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
@@ -40,7 +40,8 @@ export function CreateWorktreePagePane({
   const [bootstrapPreviewError, setBootstrapPreviewError] = useState(false)
   const [bootstrapPreviewLoading, setBootstrapPreviewLoading] = useState(false)
   const [configTrustChoice, setConfigTrustChoice] = useState<boolean | null>(null)
-  const settingsSnapshot = useSettingsSnapshotReadModel()
+  const settingsQuery = useSettingsSnapshotQuery()
+  const settingsSnapshot = settingsQuery.data
 
   const repoInstanceId = liveRepo?.instanceId ?? null
 
@@ -82,7 +83,19 @@ export function CreateWorktreePagePane({
     }
   }, [repoId, repoInstanceId])
 
-  if (!liveRepo || !branchReadModel) {
+  // Page-level readiness: gate the whole form on every fetch we depend on, so
+  // the trust prompt never has to fade in *after* the body is already on screen.
+  // A failed preview is allowed through so a preview error doesn't trap the
+  // user in a skeleton forever.
+  const bootstrapReady = bootstrapPreview !== null || bootstrapPreviewError
+  const settingsReady = settingsSnapshot !== undefined || settingsQuery.isError
+  const worktreeBootstrapTrustLoading = isConfigTrustStateLoading({
+    preview: bootstrapPreview,
+    settingsReady,
+  })
+  const pageReady = !!liveRepo && !!branchReadModel && bootstrapReady && !worktreeBootstrapTrustLoading
+
+  if (!pageReady) {
     return (
       <CreateWorktreePageShell compact={compact} trafficLightOffset={trafficLightOffset} onBack={onCancel}>
         <RepoPageLoadingBody />
@@ -105,10 +118,6 @@ export function CreateWorktreePagePane({
         configTrustChoice,
       })
     : false
-  const worktreeBootstrapTrustLoading = isConfigTrustStateLoading({
-    preview: bootstrapPreview,
-    settingsReady: settingsSnapshot !== undefined,
-  })
   const worktreeBootstrap = {
     loading: bootstrapPreviewLoading || worktreeBootstrapTrustLoading,
     preview: bootstrapPreview,

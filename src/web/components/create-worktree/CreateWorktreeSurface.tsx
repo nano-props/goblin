@@ -15,7 +15,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#
 import { Button } from '#/web/components/ui/button.tsx'
 import { Field, FieldDescription, FieldError, FieldLabel } from '#/web/components/ui/field.tsx'
 import { CollapseTransition } from '#/web/components/ui/collapse-transition.tsx'
-import { ReservedFadeSlot } from '#/web/components/ui/reserved-fade-slot.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
 import { RemotePathSuggestions } from '#/web/components/ui/remote-path-suggestions.tsx'
 import { ToggleGroup, ToggleGroupItem } from '#/web/components/ui/toggle-group.tsx'
@@ -117,7 +116,6 @@ export function CreateWorktreeForm({
   const branchActionBusy = repo.operations.branchAction.phase !== 'idle'
   const bootstrapBusy = worktreeBootstrap?.loading === true
   const canSubmit = !!derived.input && derived.validPath && !branchActionBusy && !bootstrapBusy && !submitting
-  const showBootstrapTrust = shouldShowWorktreeBootstrapTrust(worktreeBootstrap)
 
   async function handleSubmit(): Promise<void> {
     const nextInput = derived.input
@@ -343,9 +341,7 @@ export function CreateWorktreeForm({
           </FieldDescription>
         </Field>
 
-        <CreateWorktreeReservedFadeSlot present={showBootstrapTrust}>
-          <WorktreeBootstrapTrustCheckbox state={worktreeBootstrap} />
-        </CreateWorktreeReservedFadeSlot>
+        <WorktreeBootstrapTrustRow state={worktreeBootstrap} />
 
         <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
           <Button type="button" variant="outline" className={cn(compact && 'w-full')} onClick={onCancel}>
@@ -364,12 +360,13 @@ function CreateWorktreeAnimatedSection({ children, present = true }: { children:
   return <CollapseTransition present={present}>{children}</CollapseTransition>
 }
 
-function CreateWorktreeReservedFadeSlot({ children, present }: { children: React.ReactNode; present: boolean }) {
-  return (
-    <ReservedFadeSlot present={present} className="min-h-6">
-      {children}
-    </ReservedFadeSlot>
-  )
+function WorktreeBootstrapTrustRow({ state }: { state: WorktreeBootstrapPromptState | undefined }) {
+  // Page-level readiness in CreateWorktreePagePane already holds the whole
+  // form in a skeleton until the bootstrap preview and settings both settle,
+  // so this row never has to render during loading. Anything that should
+  // appear under the path field resolves at the same instant the form does.
+  if (!shouldShowWorktreeBootstrapTrust(state)) return null
+  return <WorktreeBootstrapTrustCheckbox state={state} />
 }
 
 function WorktreeBootstrapTrustCheckbox({ state }: { state: WorktreeBootstrapPromptState | undefined }) {
