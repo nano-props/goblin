@@ -16,7 +16,7 @@ interface TerminalActionDialogsState {
 interface TerminalActionDialogsActions {
   openCloseConfirm: (payload: TerminalCloseConfirmPayload) => void
   closeCloseConfirm: () => void
-  closeStaleDialogs: (activeRepoId: string) => void
+  closeStaleDialogs: (currentRepoId: string) => void
 }
 
 type TerminalActionDialogsStore = TerminalActionDialogsState & TerminalActionDialogsActions
@@ -29,10 +29,10 @@ export const useTerminalActionDialogsStore = create<TerminalActionDialogsStore>(
   ...INITIAL_STATE,
   openCloseConfirm: (payload) => set({ closeConfirm: payload }),
   closeCloseConfirm: () => set({ closeConfirm: null }),
-  closeStaleDialogs: (activeRepoId) =>
+  closeStaleDialogs: (currentRepoId) =>
     set((state) => {
       if (!state.closeConfirm) return state
-      return state.closeConfirm.repoId === activeRepoId ? state : { closeConfirm: null }
+      return state.closeConfirm.repoId === currentRepoId ? state : { closeConfirm: null }
     }),
 }))
 

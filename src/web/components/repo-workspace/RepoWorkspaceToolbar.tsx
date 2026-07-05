@@ -20,12 +20,11 @@ import {
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
-import type { RepoWorkspaceRepo, SelectedRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
+import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import type { RepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useIsInitialSyncInFlight } from '#/web/stores/repo-sync.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
@@ -50,11 +49,12 @@ import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/worksp
 
 interface Props {
   repo: RepoWorkspaceRepo
-  detail: SelectedRepoWorkspacePresentation
+  detail: CurrentRepoWorkspacePresentation
   workspacePaneId: string
   workspacePaneTabModel: RepoWorkspaceTabModel
   trafficLightOffset?: boolean
   branchActions?: BranchActions
+  onBackToBranchNavigator?: () => void
 }
 
 export function RepoWorkspaceToolbar({
@@ -64,15 +64,15 @@ export function RepoWorkspaceToolbar({
   workspacePaneTabModel,
   trafficLightOffset = false,
   branchActions,
+  onBackToBranchNavigator,
 }: Props) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
   const compact = useIsCompactUi()
-  const clearSelectedBranch = useReposStore((s) => s.clearSelectedBranch)
   // While the first server-side session list for this repo is in flight,
   // keep the New Terminal affordance visible but busy. Hooks into the
   // repo-sync store which the Provider updates via markReady() at the end
-  // of every syncServerSessions.
+  // of every successful terminal session reconcile.
   const isInitialSyncInFlight = useIsInitialSyncInFlight(repo.id)
   const branchName = detail.branch?.name ?? null
   const workspacePaneTabTargetKey = branchName
@@ -113,14 +113,14 @@ export function RepoWorkspaceToolbar({
   // the shared workspace pane tab model — we only assert user intent here.
   const enterTerminalTab = useCallback(() => {
     if (preferredWorkspacePaneTab !== 'terminal') {
-      navigation.showRepoWorkspacePaneTab(repo.id, 'terminal')
+      if (branchName) navigation.showRepoBranchWorkspacePaneTab(repo.id, branchName, 'terminal')
     }
-  }, [navigation, repo.id, preferredWorkspacePaneTab])
+  }, [branchName, navigation, repo.id, preferredWorkspacePaneTab])
 
   const handleNewTerminal = useCallback(() => {
     if (!terminalBase) return
     // "+" is a generic entry → don't anchor; opener only drives close-back.
-    const openerIdentity = captureWorkspacePaneActiveTabIdentity(repo.id)
+    const openerIdentity = captureWorkspacePaneActiveTabIdentity(repo.id, terminalBase.branch)
     void runCreateTerminalTabCommand({
       base: terminalBase,
       createTerminal,
@@ -134,7 +134,7 @@ export function RepoWorkspaceToolbar({
   const showWorkspacePaneTabItem = useCallback(
     (item: WorkspacePaneTabItem) => {
       if (isStaticWorkspacePaneTabItem(item)) {
-        navigation.showRepoWorkspacePaneTab(repo.id, item.staticTabType)
+        if (branchName) navigation.showRepoBranchWorkspacePaneTab(repo.id, branchName, item.staticTabType)
         return
       }
       if (isTerminalWorkspacePaneTabItem(item)) {
@@ -143,7 +143,7 @@ export function RepoWorkspaceToolbar({
         return
       }
     },
-    [enterTerminalTab, navigation, repo.id, selectTerminal],
+    [branchName, enterTerminalTab, navigation, repo.id, selectTerminal],
   )
 
   const handleScrollToBottom = useCallback(
@@ -260,14 +260,15 @@ export function RepoWorkspaceToolbar({
       if (isPendingWorkspacePaneTabItem(item)) return
       void runCloseWorkspacePaneTabCommand({
         repoId: repo.id,
+        branchName,
         targetIdentity: item.identity,
         navigation,
       })
     },
-    [navigation, repo.id],
+    [branchName, navigation, repo.id],
   )
 
-  // No selected branch means there is no tab/action target; keep the
+  // No current branch means there is no tab/action target; keep the
   // workspace chrome mounted so the right pane still contributes a
   // draggable top region.
   if (!detail.branch) {
@@ -280,14 +281,14 @@ export function RepoWorkspaceToolbar({
   }
 
   const backLabel = t('workspace.back-to-branch-navigator')
-  const handleBackToBranchNavigator = () => clearSelectedBranch(repo.id)
   const repoWorkspaceBackAction = compact ? (
     <Tip label={backLabel}>
       <Button
         variant="ghost"
         size="icon"
         className="h-7 w-7 shrink-0"
-        onClick={handleBackToBranchNavigator}
+        onClick={onBackToBranchNavigator}
+        disabled={!onBackToBranchNavigator}
         aria-label={backLabel}
         title={backLabel}
       >

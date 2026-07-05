@@ -529,9 +529,9 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
     closeRepo: () => {},
     cycleRepo: () => {},
     selectRepoBranch: () => {},
-    showRepoWorkspacePaneTab: () => {},
     showRepoBranchWorkspacePaneTab: () => {},
     openSettings: () => {},
+    openCreateWorktree: () => {},
     ...overrides,
   }
 }

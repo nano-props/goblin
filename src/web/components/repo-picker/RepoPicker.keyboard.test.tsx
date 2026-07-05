@@ -21,7 +21,7 @@ describe('RepoPicker keyboard navigation', () => {
     renderInJsdom(
       <RepoPicker
         repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
-        activeId="/tmp/repo-a"
+        currentRepoId="/tmp/repo-a"
         labels={labels}
         onActivate={onActivate}
         onClose={() => {}}
@@ -49,7 +49,7 @@ describe('RepoPicker keyboard navigation', () => {
     renderInJsdom(
       <RepoPicker
         repos={[repo('repo-a', '/tmp/repo-a'), repo('repo-b', '/tmp/repo-b')]}
-        activeId="/tmp/repo-a"
+        currentRepoId="/tmp/repo-a"
         labels={labels}
         onActivate={onActivate}
         onClose={() => {}}

@@ -22,7 +22,7 @@ describe('RepoToolbarActions', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
-      selectedBranch: 'feature/query',
+      currentBranchName: 'feature/query',
     })
     setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
       current: 'feature/query',
@@ -42,7 +42,7 @@ describe('RepoToolbarActions', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
-      selectedBranch: '',
+      currentBranchName: '',
     })
 
     renderInJsdom(

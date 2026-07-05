@@ -1,7 +1,6 @@
 import { LRUCache } from 'lru-cache'
 import * as v from 'valibot'
 import type { ReposSet } from '#/web/stores/repos/types.ts'
-import { selectedBranchForBranchSet } from '#/web/stores/repos/branch-view-mode.ts'
 import type { RepoSnapshotCacheEntry, RepoState } from '#/web/stores/repos/types.ts'
 import { finishDataLoadSuccess } from '#/web/stores/repos/repo-data-load-state.ts'
 import { stripBranchWorktreeMetadata } from '#/web/stores/repos/worktree-state.ts'
@@ -40,7 +39,6 @@ const RepoSnapshotCacheEntrySchema = v.object({
     currentBranch: v.string(),
   }),
   ui: v.object({
-    selectedBranch: v.nullable(v.string()),
     branchViewMode: v.picklist(['all', 'worktrees']),
   }),
 })
@@ -52,12 +50,6 @@ function cachedBranches(
 }
 
 function restoreProjectionFromSnapshot(repo: RepoState, snapshot: RepoSnapshotCacheEntry): RepoState {
-  const selectedBranch = selectedBranchForBranchSet({
-    branches: snapshot.data.branches,
-    currentBranch: snapshot.data.currentBranch,
-    selectedBranch: snapshot.ui.selectedBranch,
-    viewMode: snapshot.ui.branchViewMode,
-  })
   const dataLoads = {
     ...repo.dataLoads,
     snapshot: { ...repo.dataLoads.snapshot },
@@ -69,7 +61,6 @@ function restoreProjectionFromSnapshot(repo: RepoState, snapshot: RepoSnapshotCa
     dataLoads,
     ui: {
       ...repo.ui,
-      selectedBranch,
       branchViewMode: snapshot.ui.branchViewMode,
     },
     projection: {
@@ -139,7 +130,6 @@ function repoSnapshotCacheEntryFromRepo(
       currentBranch: branchModel.currentBranch,
     },
     ui: {
-      selectedBranch: repo.ui.selectedBranch,
       branchViewMode: repo.ui.branchViewMode,
     },
   }
@@ -169,7 +159,6 @@ function normalizeRepoSnapshotCacheEntry(value: unknown): RepoSnapshotCacheEntry
       branches: cachedBranches(snapshot.data.branches),
     },
     ui: {
-      selectedBranch: snapshot.ui.selectedBranch,
       branchViewMode: snapshot.ui.branchViewMode,
     },
   }

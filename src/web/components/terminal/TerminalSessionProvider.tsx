@@ -26,15 +26,11 @@ import type { TerminalSessionContextValue, TerminalSessionReadContextValue } fro
 
 interface TerminalSessionProviderProps {
   children: ReactNode
+  currentRepoId: string | null
 }
 
-export function TerminalSessionProvider({ children }: TerminalSessionProviderProps) {
+export function TerminalSessionProvider({ children, currentRepoId }: TerminalSessionProviderProps) {
   const repoIndex = useTerminalRepoIndex()
-  // The provider lives at the router root (above the per-route App), so it
-  // reads the active repo directly from the repos store rather than via a
-  // prop. This keeps the terminal session projection alive across settings
-  // → workspace round-trips.
-  const currentRepoId = useReposStore((s) => s.activeId)
   const currentRepoInstanceId = currentRepoId ? (repoIndex[currentRepoId]?.instanceId ?? null) : null
   const selectedTerminalSessionIdByTerminalWorktree = useReposStore(
     (s) => s.selectedTerminalSessionIdByTerminalWorktree,
@@ -72,23 +68,23 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   // reach the singleton without re-calling the getter on every render.
   const projectionRef = useRef<TerminalSessionProjection | null>(null)
   if (!projectionRef.current) {
-      projectionRef.current = getTerminalSessionProjection({
-        onSelectedWorktreeChange: setSelectedTerminal,
-        onWorkspaceTabsChanged: (base, tabs) => {
-          if (typeof base.repoInstanceId !== 'string') return
-          setWorkspacePaneTabsForTargetQueryData({
-            repoRoot: base.repoRoot,
-            repoInstanceId: base.repoInstanceId,
-            branchName: base.branch,
-            worktreePath: base.worktreePath,
-            tabs,
-          })
-        },
+    projectionRef.current = getTerminalSessionProjection({
+      onSelectedWorktreeChange: setSelectedTerminal,
+      onWorkspaceTabsChanged: (base, tabs) => {
+        if (typeof base.repoInstanceId !== 'string') return
+        setWorkspacePaneTabsForTargetQueryData({
+          repoRoot: base.repoRoot,
+          repoInstanceId: base.repoInstanceId,
+          branchName: base.branch,
+          worktreePath: base.worktreePath,
+          tabs,
+        })
+      },
     })
   }
   const projection = projectionRef.current
 
-  const syncServerSessions = useCallback(
+  const reconcileTerminalSessionsFromServer = useCallback(
     async (repoRoot: string) => {
       const repo = repoIndexRef.current[repoRoot]
       if (!repoRoot || !repo) return
@@ -99,7 +95,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
         projection.reconcileServerSessions(repoRoot, serverSessions, clientId)
         useRepoSyncStore.getState().markReady(repoRoot, repo.instanceId)
       } catch (err) {
-        terminalSessionProviderLog.debug('failed to sync server sessions', { err })
+        terminalSessionProviderLog.debug('failed to reconcile terminal sessions from server', { err })
       }
     },
     [projection],
@@ -196,17 +192,18 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     }
   }, [projection])
 
-  // Server sync (initial + focus + external session changes)
+  // Terminal sessions are runtime state owned by the server. Keep the client
+  // projection reconciled on route entry, focus recovery, and server-pushed
+  // terminal session changes without feeding back into repo routing/read models.
   useEffect(() => {
     if (!currentRepoId) return
     const repoRoot = currentRepoId
-    void syncServerSessions(repoRoot)
+    void reconcileTerminalSessionsFromServer(repoRoot)
 
     const handleFocus = () => {
-      const focusedRepoRoot = useReposStore.getState().activeId
-      if (!focusedRepoRoot) return
-      if (!useRepoSyncStore.getState().shouldSync(focusedRepoRoot)) return
-      void syncServerSessions(focusedRepoRoot)
+      if (!currentRepoId) return
+      if (!useRepoSyncStore.getState().shouldSync(currentRepoId)) return
+      void reconcileTerminalSessionsFromServer(currentRepoId)
     }
     window.addEventListener('focus', handleFocus)
 
@@ -221,7 +218,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
         if (disposed) return
         const repoRoots = Array.from(pendingRepoRoots)
         pendingRepoRoots.clear()
-        for (const nextRepoRoot of repoRoots) void syncServerSessions(nextRepoRoot)
+        for (const nextRepoRoot of repoRoots) void reconcileTerminalSessionsFromServer(nextRepoRoot)
       }, 0)
     }
     const offSessionsChanged = terminalClient.onSessionsChanged(scheduleServerSync)
@@ -238,7 +235,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       offSessionsChanged()
       offWorkspaceTabsChanged()
     }
-  }, [currentRepoId, currentRepoInstanceId, syncServerSessions])
+  }, [currentRepoId, currentRepoInstanceId, reconcileTerminalSessionsFromServer])
 
   const commandValue = useMemo<TerminalSessionContextValue>(
     () => ({

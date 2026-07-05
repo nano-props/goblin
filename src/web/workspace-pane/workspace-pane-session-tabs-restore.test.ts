@@ -57,7 +57,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
-      selectedBranch: 'feature/no-worktree',
+      currentBranchName: 'feature/no-worktree',
       workspacePaneTabsByBranch: {
         'feature/no-worktree': [workspacePaneStaticTabEntry('status')],
       },
@@ -167,7 +167,7 @@ function seedRepo(): void {
   seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-    selectedBranch: 'feature/worktree',
+    currentBranchName: 'feature/worktree',
     workspacePaneTabsByBranch: {
       'feature/worktree': [workspacePaneStaticTabEntry('status')],
     },

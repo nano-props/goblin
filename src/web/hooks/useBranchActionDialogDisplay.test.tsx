@@ -83,7 +83,7 @@ function setupRepo(): void {
         worktree: { path: '/tmp/y' },
       }),
     ],
-    selectedBranch: 'main',
+    currentBranchName: 'main',
   })
 }
 
@@ -138,7 +138,7 @@ describe('useBranchActionDialogDisplay', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
-      selectedBranch: 'feature/query',
+      currentBranchName: 'feature/query',
     })
     setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
       current: 'feature/query',
@@ -328,12 +328,12 @@ describe('useBranchActionDialogDisplay', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('main')],
-      selectedBranch: 'main',
+      currentBranchName: 'main',
     })
     seedRepoWithReadModelForTest({
       id: OTHER_REPO_ID,
       branches: [createRepoBranch('main')],
-      selectedBranch: 'main',
+      currentBranchName: 'main',
     })
 
     const entry: BranchActionDialogEntry<string> = {

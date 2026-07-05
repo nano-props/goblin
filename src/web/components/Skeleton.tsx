@@ -57,8 +57,8 @@ export function StatusListSkeleton({ rows = 6 }: RowCountProps) {
   )
 }
 
-// RepoWorkspaceLayoutSkeleton renders the branch navigator + workspace pane while
-// a repo is being hydrated. The active repo shell owns the sidebar
+// RepoWorkspaceLayoutSkeleton renders the sidebar + workspace pane while
+// a repo is being hydrated. The current repo shell owns the sidebar
 // chrome, so the workspace skeleton just shows the panes.
 export function RepoWorkspaceLayoutSkeleton({
   singlePane = false,
@@ -70,7 +70,7 @@ export function RepoWorkspaceLayoutSkeleton({
       {repoWorkspaceState === 'content' ? <RepoWorkspaceSkeleton /> : <RepoWorkspaceEmptySkeleton />}
     </RepoWorkspacePane>
   )
-  const branchNavigatorPane = (
+  const sidebarPane = (
     <RepoWorkspacePane>
       <BranchNavigatorSkeleton />
     </RepoWorkspacePane>
@@ -79,14 +79,14 @@ export function RepoWorkspaceLayoutSkeleton({
   if (singlePane) {
     return (
       <section className="flex min-w-0 flex-1 flex-col">
-        {singlePaneView === 'workspace' ? repoWorkspacePane : branchNavigatorPane}
+        {singlePaneView === 'workspace' ? repoWorkspacePane : sidebarPane}
       </section>
     )
   }
 
   return (
     <section className="flex min-w-0 flex-1 flex-col">
-      <RepoWorkspace mode="split" branchNavigatorPane={branchNavigatorPane} repoWorkspacePane={repoWorkspacePane} />
+      <RepoWorkspace mode="split" sidebarPane={sidebarPane} repoWorkspacePane={repoWorkspacePane} />
     </section>
   )
 }

@@ -47,7 +47,7 @@ export const useRepoSyncStore = create<RepoSyncState>((set, get) => ({
 
 // T6.1: reactive flag used by repo toolbar surfaces to show 3 placeholder
 // chips while the first server-side session list is in flight. Returns
-// true until the provider's first successful `syncServerSessions`
+// true until the provider's first successful terminal session reconcile
 // call has completed for the given repo. Reads from
 // `useRepoSyncStore.ready`; subscribing to the store gives us reactive
 // re-renders when the flag flips without a separate context.

@@ -204,6 +204,7 @@ export const en = {
   'repo-picker.recent-save-failed': 'Repository opened, but recent history was not updated',
 
   // ---- Workspace pane tabs -----------------------------------------------
+  'repo.dashboard': 'Dashboard',
   'tab.branches': 'Branches',
   'tab.repo-workspace': 'Repo workspace',
   'tab.status': 'Status',
@@ -467,6 +468,7 @@ export const en = {
   'action.create-worktree-path-disabled-hint': 'Choose a branch or remote ref to auto-fill the path.',
   'action.create-worktree-base-current': 'current',
   'action.create-worktree-confirm': 'Create worktree',
+  'action.create-worktree-cancel': 'Cancel',
   'action.create-worktree-has-worktree': 'Branch "{branch}" already has a worktree',
   'action.create-worktree-busy': 'A branch action is in progress. Wait for it to finish before creating a worktree.',
   'action.create-worktree-bootstrap-config-trusted': 'Trust this config',

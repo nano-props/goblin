@@ -19,7 +19,7 @@ describe('restorable-workspace-state', () => {
     const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
         'feature/worktree': [workspacePaneStaticTabEntry('status')],
@@ -31,7 +31,7 @@ describe('restorable-workspace-state', () => {
         repos: { [repo.id]: repo },
         restorableWorkspaceState: {
           order: [repo.id],
-          activeId: repo.id,
+          restoredRepoId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalSessionIdByTerminalWorktree: {
@@ -41,7 +41,7 @@ describe('restorable-workspace-state', () => {
       }),
     ).toEqual({
       openRepoEntries: [localRepoSessionEntry('/tmp/repo')],
-      activeRepoId: '/tmp/repo',
+      restoredRepoId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 55,
       selectedTerminalSessionIdByTerminalWorktree: {
@@ -63,7 +63,7 @@ describe('restorable-workspace-state', () => {
         repos: { [repo.id]: repo },
         restorableWorkspaceState: {
           order: [repo.id],
-          activeId: repo.id,
+          restoredRepoId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalSessionIdByTerminalWorktree: {},
@@ -71,7 +71,7 @@ describe('restorable-workspace-state', () => {
       }),
     ).toEqual({
       openRepoEntries: [localRepoSessionEntry(repo.id)],
-      activeRepoId: repo.id,
+      restoredRepoId: repo.id,
       zenMode: false,
       workspacePaneSize: 55,
       selectedTerminalSessionIdByTerminalWorktree: {},
@@ -86,7 +86,7 @@ describe('restorable-workspace-state', () => {
     const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'changes',
       workspacePaneTabsByBranch: {
         'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('changes')],
@@ -98,7 +98,7 @@ describe('restorable-workspace-state', () => {
         repos: { [repo.id]: repo },
         restorableWorkspaceState: {
           order: [repo.id],
-          activeId: repo.id,
+          restoredRepoId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalSessionIdByTerminalWorktree: {},
@@ -119,7 +119,7 @@ describe('restorable-workspace-state', () => {
     const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: {
         'feature/worktree': [workspacePaneStaticTabEntry('status')],
@@ -131,7 +131,7 @@ describe('restorable-workspace-state', () => {
         repos: { [repo.id]: repo },
         restorableWorkspaceState: {
           order: [repo.id],
-          activeId: repo.id,
+          restoredRepoId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalSessionIdByTerminalWorktree: {},
@@ -150,7 +150,7 @@ describe('restorable-workspace-state', () => {
     expect(
       restoreRestorableWorkspaceStateFromSession({
         openRepoEntries: [localRepoSessionEntry('/tmp/repo')],
-        activeRepoId: '/tmp/repo',
+        restoredRepoId: '/tmp/repo',
         zenMode: false,
         workspacePaneSize: 40,
         selectedTerminalSessionIdByTerminalWorktree: {
@@ -165,7 +165,7 @@ describe('restorable-workspace-state', () => {
         filetreeViewStateByWorktreeByRepo: {},
       }),
     ).toEqual({
-      activeId: '/tmp/repo',
+      restoredRepoId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 40,
       selectedTerminalSessionIdByTerminalWorktree: {
@@ -185,7 +185,7 @@ describe('restorable-workspace-state', () => {
     const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
         'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
@@ -197,7 +197,7 @@ describe('restorable-workspace-state', () => {
         repos: { [repo.id]: repo },
         restorableWorkspaceState: {
           order: [repo.id],
-          activeId: repo.id,
+          restoredRepoId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalSessionIdByTerminalWorktree: {},
@@ -218,7 +218,7 @@ describe('restorable-workspace-state', () => {
     const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
         'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
@@ -229,7 +229,7 @@ describe('restorable-workspace-state', () => {
       repos: { [repo.id]: repo },
       restorableWorkspaceState: {
         order: [repo.id],
-        activeId: repo.id,
+        restoredRepoId: repo.id,
         zenMode: false,
         workspacePaneSize: 55,
         selectedTerminalSessionIdByTerminalWorktree: {},
@@ -250,7 +250,7 @@ describe('restorable-workspace-state', () => {
     const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
     })
 
     expect(
@@ -258,7 +258,7 @@ describe('restorable-workspace-state', () => {
         repos: { [repo.id]: repo },
         restorableWorkspaceState: {
           order: [repo.id],
-          activeId: repo.id,
+          restoredRepoId: repo.id,
           zenMode: false,
           workspacePaneSize: 55,
           selectedTerminalSessionIdByTerminalWorktree: {},

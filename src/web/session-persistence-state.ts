@@ -28,8 +28,8 @@ interface WorkspaceSessionRepoProjection {
 type WorkspaceSessionRepoProjectionWithUi = WorkspaceSessionRepoProjection &
   Required<Pick<WorkspaceSessionRepoProjection, 'ui'>>
 
-export function persistedActiveRepoIdForSession(activeId: string | null): string | null {
-  return activeId
+export function persistedRestoredRepoIdForSession(restoredRepoId: string | null): string | null {
+  return restoredRepoId
 }
 
 export function persistedPreferredWorkspacePaneTabByTargetByRepoForSession(

@@ -1,77 +1,143 @@
 import { describe, expect, test, vi } from 'vitest'
 import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
+import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 
 describe('createPrimaryWindowNavigationActions', () => {
-  test('mutates store directly for repo workspace navigation', () => {
-    const setActive = vi.fn()
-    const selectBranch = vi.fn()
+  test('updates branch workspace tab preference explicitly', () => {
     const setWorkspacePaneTab = vi.fn()
     const actions = createPrimaryWindowNavigationActions({
-      activeId: '/tmp/repo-a',
+      currentRepoId: '/tmp/repo-a',
       order: ['/tmp/repo-a', '/tmp/repo-b'],
-      setActive,
       closeRepo: vi.fn(),
-      cycleActive: vi.fn(),
-      selectBranch,
       setWorkspacePaneTab,
-      onOpenSettings: vi.fn(),
+      routeNavigation: routeNavigation(),
     })
 
     actions.showRepoBranchWorkspacePaneTab('/tmp/repo-b', 'feature/test', 'terminal')
 
-    expect(setActive).toHaveBeenCalledWith('/tmp/repo-b')
-    expect(selectBranch).toHaveBeenCalledWith('/tmp/repo-b', 'feature/test')
-    expect(setWorkspacePaneTab).toHaveBeenCalledWith('/tmp/repo-b', 'terminal')
+    expect(setWorkspacePaneTab).toHaveBeenCalledWith('/tmp/repo-b', 'feature/test', 'terminal')
   })
 
-  test('workspace pane navigation updates the preferred workspace pane tab', () => {
-    const setWorkspacePaneTab = vi.fn()
+  test('cycles repos by navigating from the current repo', () => {
+    const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
-      activeId: '/tmp/repo-a',
-      order: ['/tmp/repo-a'],
-      setActive: vi.fn(),
-      closeRepo: vi.fn(),
-      cycleActive: vi.fn(),
-      selectBranch: vi.fn(),
-      setWorkspacePaneTab,
-    })
-
-    actions.showRepoWorkspacePaneTab('/tmp/repo-a', 'changes')
-
-    expect(setWorkspacePaneTab).toHaveBeenCalledWith('/tmp/repo-a', 'changes')
-  })
-
-  test('cycles repos through the store action', () => {
-    const cycleActive = vi.fn()
-    const actions = createPrimaryWindowNavigationActions({
-      activeId: '/tmp/repo-a',
+      currentRepoId: '/tmp/repo-a',
       order: ['/tmp/repo-a', '/tmp/repo-b', '/tmp/repo-c'],
-      setActive: vi.fn(),
       closeRepo: vi.fn(),
-      cycleActive,
-      selectBranch: vi.fn(),
       setWorkspacePaneTab: vi.fn(),
+      routeNavigation: navigation,
     })
 
     actions.cycleRepo(1)
 
-    expect(cycleActive).toHaveBeenCalledWith(1)
+    expect(navigation.openRepoDashboard).toHaveBeenCalledWith('/tmp/repo-b')
   })
 
-  test('closes the repo through the store action', () => {
-    const closeRepo = vi.fn()
+  test('cycles repos backward and wraps around', () => {
+    const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
-      activeId: '/tmp/repo-b',
+      currentRepoId: '/tmp/repo-a',
       order: ['/tmp/repo-a', '/tmp/repo-b', '/tmp/repo-c'],
-      setActive: vi.fn(),
-      closeRepo,
-      cycleActive: vi.fn(),
-      selectBranch: vi.fn(),
+      closeRepo: vi.fn(),
       setWorkspacePaneTab: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    actions.cycleRepo(-1)
+
+    expect(navigation.openRepoDashboard).toHaveBeenCalledWith('/tmp/repo-c')
+  })
+
+  test('closes the repo through the store action without navigation when it is not current', () => {
+    const closeRepo = vi.fn()
+    const navigation = routeNavigation()
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: '/tmp/repo-a',
+      order: ['/tmp/repo-a', '/tmp/repo-b', '/tmp/repo-c'],
+      closeRepo,
+      setWorkspacePaneTab: vi.fn(),
+      routeNavigation: navigation,
     })
 
     actions.closeRepo('/tmp/repo-b')
 
     expect(closeRepo).toHaveBeenCalledWith('/tmp/repo-b')
+    expect(navigation.openRepoDashboard).not.toHaveBeenCalled()
+  })
+
+  test('closes the current repo and navigates to the next repo dashboard', () => {
+    const closeRepo = vi.fn()
+    const navigation = routeNavigation()
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: '/tmp/repo-b',
+      order: ['/tmp/repo-a', '/tmp/repo-b', '/tmp/repo-c'],
+      closeRepo,
+      setWorkspacePaneTab: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    actions.closeRepo('/tmp/repo-b')
+
+    expect(closeRepo).toHaveBeenCalledWith('/tmp/repo-b')
+    expect(navigation.openRepoDashboard).toHaveBeenCalledWith('/tmp/repo-c')
+  })
+
+  test('closes the final current repo and navigates home', () => {
+    const navigation = routeNavigation()
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: '/tmp/repo-a',
+      order: ['/tmp/repo-a'],
+      closeRepo: vi.fn(),
+      setWorkspacePaneTab: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    actions.closeRepo('/tmp/repo-a')
+
+    expect(navigation.openHome).toHaveBeenCalled()
+  })
+
+  test('opens create worktree for the current repo', () => {
+    const navigation = routeNavigation()
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: '/tmp/repo-a',
+      order: ['/tmp/repo-a'],
+      closeRepo: vi.fn(),
+      setWorkspacePaneTab: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    actions.openCreateWorktree()
+
+    expect(navigation.openRepoNewWorktree).toHaveBeenCalledWith('/tmp/repo-a')
+  })
+
+  test('does not open create worktree without a current repo', () => {
+    const navigation = routeNavigation()
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: null,
+      order: [],
+      closeRepo: vi.fn(),
+      setWorkspacePaneTab: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    actions.openCreateWorktree()
+
+    expect(navigation.openRepoNewWorktree).not.toHaveBeenCalled()
   })
 })
+
+function routeNavigation(): PrimaryWindowRouteNavigation {
+  return {
+    repoSlugForId: vi.fn(() => 'repo-slug'),
+    openHome: vi.fn(),
+    openSettings: vi.fn(),
+    closeSettings: vi.fn(),
+    openRepoRoot: vi.fn(),
+    openRepoDashboard: vi.fn(),
+    openRepoBranch: vi.fn(),
+    openRepoNewWorktree: vi.fn(),
+    cancelRepoNewWorktree: vi.fn(),
+  }
+}

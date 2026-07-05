@@ -1,6 +1,6 @@
-// Derived state, validation, and input construction for CreateWorktreeDialog.
+// Derived state, validation, and input construction for Create Worktree surfaces.
 //
-// Keeping this separate from the component lets the dialog focus on UX state
+// Keeping this separate from the component lets the UI surface focus on UX state
 // (mode, field values, remote branch loading) while this file owns the
 // decision-heavy rules: path defaults, branch validation, and whether the
 // current fields constitute a submittable CreateWorktreeInput.
@@ -11,10 +11,10 @@ import { isResolvableRemotePathInput, type RemoteRepoTarget } from '#/shared/rem
 import { deriveLocalBranchFromRemoteRef, type CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 
-export type CreateWorktreeDialogMode = CreateWorktreeInput['mode']['kind']
+export type CreateWorktreeMode = CreateWorktreeInput['mode']['kind']
 
 interface CreateWorktreeFormState {
-  mode: CreateWorktreeDialogMode
+  mode: CreateWorktreeMode
   base: string
   branch: string
   existingBranch: string
@@ -207,7 +207,7 @@ function buildCreateWorktreeInput(state: CreateWorktreeFormState, ctx: BuildInpu
 }
 
 function worktreePathName(input: {
-  mode: CreateWorktreeDialogMode
+  mode: CreateWorktreeMode
   branchTrimmed: string
   existingBranch: string
   trackLocalBranch: string

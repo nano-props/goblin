@@ -36,7 +36,7 @@ function navigatedRepoId(
 
 interface RepoPickerProps {
   repos: RepoPickerRepo[]
-  activeId: string | null
+  currentRepoId: string | null
   labels: RepoPickerLabels
   onActivate: (id: string) => void
   onClose: (id: string) => void
@@ -74,7 +74,7 @@ function RepoSwitcherAction({
 
 function RepoMenuContent({
   repos,
-  activeId,
+  currentRepoId,
   labels,
   onSelectRepo,
   onClose,
@@ -84,7 +84,7 @@ function RepoMenuContent({
   onSelectAction,
 }: {
   repos: RepoPickerRepo[]
-  activeId: string | null
+  currentRepoId: string | null
   labels: RepoPickerLabels
   onSelectRepo: (id: string) => void
   onClose: (id: string) => void
@@ -114,7 +114,7 @@ function RepoMenuContent({
           <ScrollArea className="max-h-80" scrollbarMode="compact">
             <div className="space-y-0.5 p-1" role="list">
               {repos.map((repo) => {
-                const selected = repo.id === activeId
+                const selected = repo.id === currentRepoId
                 const RepoIcon = isRemoteRepoId(repo.id) ? Server : FolderGit2
                 const remoteTarget = remoteRepoConnectionTarget(repo.lifecycle)
                 return (
@@ -212,7 +212,7 @@ function RepoMenuContent({
 
 export function RepoPicker({
   repos,
-  activeId,
+  currentRepoId,
   labels,
   onActivate,
   onClose,
@@ -226,15 +226,15 @@ export function RepoPicker({
 
   const handleClose = useCallback(
     (id: string) => {
-      const isActive = id === activeId
+      const isCurrent = id === currentRepoId
       const idx = repos.findIndex((r) => r.id === id)
       const nextId = repos[idx + 1]?.id ?? repos[idx - 1]?.id ?? null
       onClose(id)
-      if (isActive && nextId) {
+      if (isCurrent && nextId) {
         focusRegistry.focus(nextId)
       }
     },
-    [repos, activeId, onClose, focusRegistry],
+    [repos, currentRepoId, onClose, focusRegistry],
   )
 
   const handleKeyboardNavigate = (id: string, direction: 'prev' | 'next' | 'first' | 'last') => {
@@ -244,7 +244,7 @@ export function RepoPicker({
     focusRegistry.focus(nextId)
   }
 
-  const currentRepo = repos.find((r) => r.id === activeId) ?? repos[0] ?? null
+  const currentRepo = repos.find((r) => r.id === currentRepoId) ?? repos[0] ?? null
   const totalTerminalBellCount = repos.reduce((count, repo) => count + (repo.terminalBellCount ?? 0), 0)
 
   return (
@@ -268,7 +268,7 @@ export function RepoPicker({
                 <ToolbarTabList role="tablist" aria-orientation="horizontal" data-current-repo-group className="flex-1">
                   <CurrentRepoToolbarButton
                     repo={currentRepo}
-                    isCurrent={currentRepo.id === activeId}
+                    isCurrent={currentRepo.id === currentRepoId}
                     focusRegistry={focusRegistry}
                     onActivate={onActivate}
                     onKeyboardNavigate={handleKeyboardNavigate}
@@ -304,7 +304,7 @@ export function RepoPicker({
         )}
         <RepoMenuContent
           repos={repos}
-          activeId={activeId}
+          currentRepoId={currentRepoId}
           labels={labels}
           onSelectRepo={(id) => {
             setMenuOpen(false)

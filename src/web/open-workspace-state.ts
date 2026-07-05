@@ -38,25 +38,28 @@ export function persistedOpenWorkspaceEntries(
   })
 }
 
-export function nextActiveRepoIdAfterWorkspaceClose(
+export function nextRestoredRepoIdAfterWorkspaceClose(
   order: string[],
-  activeId: string | null,
+  restoredRepoId: string | null,
   closedId: string,
 ): string | null {
-  if (activeId !== closedId) return activeId
+  if (restoredRepoId !== closedId) return restoredRepoId
   const idx = order.indexOf(closedId)
   if (idx === -1) return null
   return order[idx + 1] ?? order[idx - 1] ?? null
 }
 
-export function activeRepoIdAfterWorkspaceHydration(
-  currentActiveId: string | null,
+export function restoredRepoIdAfterWorkspaceHydration(
+  currentRestoredRepoId: string | null,
   repos: Record<string, unknown>,
   order: string[],
   preferredActiveRepoId: string | null,
-  managedActiveId: string | null,
+  managedRestoredRepoId: string | null,
 ): string | null {
-  if (currentActiveId && currentActiveId !== managedActiveId && repos[currentActiveId]) return currentActiveId
+  if (currentRestoredRepoId && currentRestoredRepoId !== managedRestoredRepoId && repos[currentRestoredRepoId]) {
+    return currentRestoredRepoId
+  }
   if (preferredActiveRepoId && repos[preferredActiveRepoId]) return preferredActiveRepoId
+  if (preferredActiveRepoId) return null
   return order[0] ?? null
 }

@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'vitest'
-import { persistedActiveRepoIdForSession } from '#/web/session-persistence-state.ts'
+import { persistedRestoredRepoIdForSession } from '#/web/session-persistence-state.ts'
 
-describe('persistedActiveRepoIdForSession', () => {
+describe('persistedRestoredRepoIdForSession', () => {
   test('persists the store active id directly', () => {
-    expect(persistedActiveRepoIdForSession('/tmp/repo-a')).toBe('/tmp/repo-a')
+    expect(persistedRestoredRepoIdForSession('/tmp/repo-a')).toBe('/tmp/repo-a')
   })
 
-  test('returns null when there is no active repo', () => {
-    expect(persistedActiveRepoIdForSession(null)).toBeNull()
+  test('returns null when there is no restored repo', () => {
+    expect(persistedRestoredRepoIdForSession(null)).toBeNull()
   })
 })

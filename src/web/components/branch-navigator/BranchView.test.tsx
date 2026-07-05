@@ -23,9 +23,9 @@ const navigation: PrimaryWindowNavigationActions = {
   closeRepo: vi.fn(),
   cycleRepo: vi.fn(),
   selectRepoBranch: vi.fn(),
-  showRepoWorkspacePaneTab: vi.fn(),
   showRepoBranchWorkspacePaneTab: vi.fn(),
   openSettings: vi.fn(),
+  openCreateWorktree: vi.fn(),
 }
 
 const terminalReadContext: TerminalSessionReadContextValue = {
@@ -56,7 +56,7 @@ describe('BranchView', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
-      selectedBranch: 'feature/query',
+      currentBranchName: 'feature/query',
     })
     setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
       current: 'feature/query',
@@ -73,7 +73,7 @@ describe('BranchView', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
-      selectedBranch: 'feature/dirty',
+      currentBranchName: 'feature/dirty',
     })
     setRepoStatusQueryData(REPO_ID, repo.instanceId, [
       { path: WORKTREE_PATH, branch: 'feature/dirty', isMain: false, entries: [{ x: 'M', y: ' ', path: 'dirty.ts' }] },
@@ -88,7 +88,7 @@ describe('BranchView', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
-      selectedBranch: 'feature/query-dirty',
+      currentBranchName: 'feature/query-dirty',
     })
     setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
       current: 'feature/query-dirty',

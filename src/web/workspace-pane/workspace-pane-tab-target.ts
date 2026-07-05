@@ -12,21 +12,6 @@ export type WorkspacePaneTabTargetResolution =
   | { kind: 'missing' }
   | { kind: 'unavailable'; reason: 'branch-read-model-unavailable' }
 
-/** Resolves the tab model for whichever branch is currently selected on
- *  `repoId`. Shared by command entry points that need to read/act on "the
- *  tab strip the user is currently looking at" without knowing the branch
- *  name themselves. */
-export function activeWorkspacePaneTabTarget(repoId: string): RepoWorkspaceTabModel | null {
-  const resolution = activeWorkspacePaneTabTargetResolution(repoId)
-  return resolution.kind === 'ready' ? resolution.target : null
-}
-
-export function activeWorkspacePaneTabTargetResolution(repoId: string): WorkspacePaneTabTargetResolution {
-  const repo = useReposStore.getState().repos[repoId]
-  if (!repo?.ui.selectedBranch) return { kind: 'missing' }
-  return resolveWorkspacePaneTabTargetForBranch(repoId, repo.ui.selectedBranch)
-}
-
 export function workspacePaneTabTargetForBranch(repoId: string, branchName: string): RepoWorkspaceTabModel | null {
   const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, branchName)
   return resolution.kind === 'ready' ? resolution.target : null

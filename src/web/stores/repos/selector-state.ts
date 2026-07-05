@@ -1,21 +1,8 @@
-import type {
-  RepoState,
-  ReposStore,
-  RestorableWorkspaceState,
-  RuntimeCoherentRepoProjectionState,
-} from '#/web/stores/repos/types.ts'
-
-interface PrimaryWindowWorkspaceState extends Pick<ReposStore, 'activeId' | 'order' | 'sessionReady' | 'zenMode'> {}
-
-interface PrimaryWindowNavigationState extends Pick<ReposStore, 'activeId' | 'order'> {}
+import type { RepoState, ReposStore, RestorableWorkspaceState, RuntimeCoherentRepoProjectionState } from '#/web/stores/repos/types.ts'
 
 interface KeyboardRuntimeState {
   repo: RepoState | null
 }
-
-interface RestorableWorkspaceViewportState extends Pick<ReposStore, 'activeId' | 'order' | 'zenMode'> {}
-
-interface RestorableWorkspaceNavigationState extends Pick<ReposStore, 'activeId' | 'order'> {}
 
 export function runtimeCoherentRepoProjectionStateFromStore(
   state: Pick<ReposStore, 'repos'>,
@@ -28,82 +15,16 @@ export function runtimeCoherentRepoProjectionStateFromStore(
 export function restorableWorkspaceStateFromStore(
   state: Pick<
     ReposStore,
-    'order' | 'activeId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalSessionIdByTerminalWorktree'
+    'order' | 'restoredRepoId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalSessionIdByTerminalWorktree'
   >,
 ): RestorableWorkspaceState {
   return {
     order: state.order,
-    activeId: state.activeId,
+    restoredRepoId: state.restoredRepoId,
     zenMode: state.zenMode,
     workspacePaneSize: state.workspacePaneSize,
     selectedTerminalSessionIdByTerminalWorktree: state.selectedTerminalSessionIdByTerminalWorktree,
   }
-}
-
-function restorableWorkspaceViewportStateFromStore(
-  state: Pick<ReposStore, 'activeId' | 'order' | 'zenMode'>,
-): RestorableWorkspaceViewportState {
-  return {
-    activeId: state.activeId,
-    order: state.order,
-    zenMode: state.zenMode,
-  }
-}
-
-export function restorableWorkspaceNavigationStateFromStore(
-  state: Pick<ReposStore, 'activeId' | 'order'>,
-): RestorableWorkspaceNavigationState {
-  return {
-    activeId: state.activeId,
-    order: state.order,
-  }
-}
-
-export function primaryWindowWorkspaceStateFromStore(
-  state: Pick<ReposStore, 'activeId' | 'order' | 'sessionReady' | 'zenMode'>,
-): PrimaryWindowWorkspaceState {
-  const restorable = restorableWorkspaceViewportStateFromStore(state)
-  return {
-    activeId: restorable.activeId,
-    order: restorable.order,
-    zenMode: restorable.zenMode,
-    sessionReady: state.sessionReady,
-  }
-}
-
-export function navigationWorkspaceStateFromStore(
-  state: Pick<ReposStore, 'activeId' | 'order'>,
-): PrimaryWindowNavigationState {
-  const restorable = restorableWorkspaceNavigationStateFromStore(state)
-  return {
-    activeId: restorable.activeId,
-    order: restorable.order,
-  }
-}
-
-export function primaryWindowWorkspaceStateEqual(
-  a: PrimaryWindowWorkspaceState,
-  b: PrimaryWindowWorkspaceState,
-): boolean {
-  return (
-    a.activeId === b.activeId &&
-    a.sessionReady === b.sessionReady &&
-    a.zenMode === b.zenMode &&
-    arraysEqual(a.order, b.order)
-  )
-}
-
-export function navigationWorkspaceStateEqual(
-  a: PrimaryWindowNavigationState,
-  b: PrimaryWindowNavigationState,
-): boolean {
-  return a.activeId === b.activeId && arraysEqual(a.order, b.order)
-}
-
-export function activeRepoFromStore(state: Pick<ReposStore, 'activeId' | 'repos'>): RepoState | null {
-  const activeId = state.activeId
-  if (!activeId) return null
-  return runtimeCoherentRepoProjectionStateFromStore({ repos: state.repos }).repos[activeId] ?? null
 }
 
 export function keyboardRuntimeStateFromStore(
@@ -114,8 +35,4 @@ export function keyboardRuntimeStateFromStore(
   return {
     repo,
   }
-}
-
-function arraysEqual<T>(a: readonly T[], b: readonly T[]): boolean {
-  return a.length === b.length && a.every((value, index) => value === b[index])
 }

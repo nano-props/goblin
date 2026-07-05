@@ -2,11 +2,12 @@
 // absolute path (the toplevel returned by `git rev-parse --show-toplevel`,
 // so opening a subdirectory dedupes against an already-open root).
 //
-// `order` controls repository switcher order; `activeId` is the visible
-// repo on the right. `repos[id]` owns the runtime shell, UI intent,
-// operations, loading metadata, and session-local state. Repo domain read
-// data such as branches, status, and worktrees is server/React Query
-// authoritative and is composed into presentation models at the UI edge.
+// `order` controls repository switcher order; `restoredRepoId` is the repo
+// restored from the previous session for `/` startup routing. Route state owns
+// the repo currently visible on the right. `repos[id]` owns the runtime
+// shell, UI intent, operations, loading metadata, and session-local state. Repo
+// domain read data such as branches, status, and worktrees is server/React
+// Query authoritative and is composed into presentation models at the UI edge.
 //
 // Race-condition defenses
 //   - `instanceId`: every time a repo is created/reset we mint a new
@@ -102,7 +103,7 @@ export const useReposStore = create<ReposStore>()(
 
       // Restorable workspace state.
       order: [],
-      activeId: null,
+      restoredRepoId: null,
       zenMode: DEFAULT_ZEN_MODE,
       workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
       selectedTerminalSessionIdByTerminalWorktree: {},

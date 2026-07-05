@@ -208,7 +208,7 @@ const FiletreeSessionViewStateSchema = v.object({
 })
 const WorkspaceSessionStateSchema = v.object({
   openRepoEntries: v.array(RepoSessionEntrySchema),
-  activeRepoId: v.nullable(v.string()),
+  restoredRepoId: v.nullable(v.string()),
   zenMode: v.boolean(),
   workspacePaneSize: v.number(),
   selectedTerminalSessionIdByTerminalWorktree: v.record(v.string(), v.string()),

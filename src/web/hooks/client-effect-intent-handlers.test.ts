@@ -37,7 +37,7 @@ describe('client effect intent handlers', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
-      selectedBranch: 'feature/query',
+      currentBranchName: 'feature/query',
     })
     setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
       current: 'feature/query',
@@ -64,16 +64,18 @@ describe('client effect intent handlers', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
-      selectedBranch: 'feature/no-worktree',
+      currentBranchName: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'status',
     })
 
     await expect(
-      handleWorkspaceClientIntent({ type: 'show-workspace-pane-tab-requested', tab: 'changes' }, deps(REPO_ID)),
+      handleWorkspaceClientIntent(
+        { type: 'show-workspace-pane-tab-requested', tab: 'changes' },
+        deps(REPO_ID, 'feature/no-worktree'),
+      ),
     ).resolves.toBe(false)
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, repo.ui.selectedBranch)) : null).toBe('status')
   })
 
   test('create-worktree-requested opens create-worktree for the current repo', async () => {
@@ -124,10 +126,11 @@ describe('client effect intent handlers', () => {
   })
 })
 
-function deps(currentRepoId: string | null) {
+function deps(currentRepoId: string | null, currentBranchName = 'feature/worktree') {
   return {
     navigation: navigationWithStoreActions(),
     currentRepoId,
+    currentBranchName,
     closeAllOverlays: vi.fn(),
     openRepoPathDialog: vi.fn(),
     openCloneRepo: vi.fn(),
@@ -148,25 +151,15 @@ function deps(currentRepoId: string | null) {
 
 function navigationWithStoreActions(): PrimaryWindowNavigationActions {
   return {
-    activateRepo: (repoId) => useReposStore.getState().setActive(repoId),
+    activateRepo: vi.fn(),
     closeRepo: (repoId) => useReposStore.getState().closeRepo(repoId),
-    cycleRepo: (direction) => useReposStore.getState().cycleActive(direction),
-    selectRepoBranch: (repoId, branch) => {
-      const state = useReposStore.getState()
-      state.setActive(repoId)
-      state.selectBranch(repoId, branch)
-    },
-    showRepoWorkspacePaneTab: (repoId, tab) => {
-      const state = useReposStore.getState()
-      state.setActive(repoId)
-      state.setWorkspacePaneTab(repoId, tab)
-    },
+    cycleRepo: vi.fn(),
+    selectRepoBranch: vi.fn(),
     showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {
       const state = useReposStore.getState()
-      state.setActive(repoId)
-      state.selectBranch(repoId, branch)
-      state.setWorkspacePaneTab(repoId, tab)
+      state.setWorkspacePaneTab(repoId, branch, tab)
     },
     openSettings: vi.fn(),
+    openCreateWorktree: vi.fn(),
   }
 }

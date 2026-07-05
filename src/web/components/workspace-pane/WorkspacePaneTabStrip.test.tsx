@@ -167,7 +167,7 @@ describe('WorkspacePaneTabStrip', () => {
     expect(closeButton?.className).not.toContain('group-hover:opacity-100')
   })
 
-  test('keeps the collapsed new-terminal action available while terminal creation is busy', async () => {
+  test('disables the collapsed new-terminal action while terminal creation is busy', async () => {
     const onNew = vi.fn()
     render(
       <TestWorkspacePaneTabStrip
@@ -202,7 +202,7 @@ describe('WorkspacePaneTabStrip', () => {
       newTerminalAction?.click()
     })
 
-    expect(onNew).toHaveBeenCalledTimes(1)
+    expect(onNew).not.toHaveBeenCalled()
   })
 
   test('collapsed terminal tab only navigates out on arrow keys', () => {
@@ -1205,7 +1205,7 @@ describe('WorkspacePaneTabStrip', () => {
     expect(busyNewButton).not.toBeNull()
     expect(busyNewButton?.getAttribute('aria-label')).toBe('terminal.new')
     expect(busyNewButton?.getAttribute('aria-busy')).toBe('true')
-    expect(busyNewButton?.disabled).toBe(false)
+    expect(busyNewButton?.disabled).toBe(true)
     expect(busyNewButton?.querySelector('.animate-spin')).toBeNull()
   })
 

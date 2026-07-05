@@ -26,7 +26,7 @@ export function EmptyRepoView({ onOpenSettings }: EmptyRepoViewProps) {
       workspacePaneSize={workspacePaneSize}
       onWorkspacePaneSizeChange={setWorkspacePaneSize}
       zenModeToggleEnabled={false}
-      branchNavigatorPane={
+      sidebarPane={
         <RepoWorkspacePane>
           <RepoLayoutSidebar compact={compact} onOpenSettings={onOpenSettings} />
         </RepoWorkspacePane>

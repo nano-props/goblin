@@ -1,6 +1,6 @@
 // Shared branch-list data layer for BranchNavigator. The persistent
 // sidebar and zen-mode reveal drawer both render that same pane, so
-// branches, current/selected branch, view-mode, branch action state,
+// branches, route-current branch, view-mode, branch action state,
 // and remote metadata stay on one selector.
 
 import { useStoreWithEqualityFn } from 'zustand/traditional'
@@ -14,7 +14,7 @@ import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo
 // remote shell fields for the list.
 export type BranchListRepo = BranchActionRepo & {
   branchModel: Pick<RepoBranchReadModelData, 'branches' | 'currentBranch' | 'status' | 'worktreesByPath'>
-  ui: Pick<RepoUiState, 'selectedBranch' | 'branchViewMode'>
+  ui: Pick<RepoUiState, 'branchViewMode'>
 }
 
 type BranchListRepoShell = Omit<BranchListRepo, 'branchModel'>
@@ -32,7 +32,6 @@ function branchListRepoShellEqual(a: BranchListRepoShell | undefined, b: BranchL
   if (!a || !b) return false
   for (const field of branchListRepoShellEqualFields) {
     if (field === 'ui') {
-      if (a.ui.selectedBranch !== b.ui.selectedBranch) return false
       if (a.ui.branchViewMode !== b.ui.branchViewMode) return false
     } else if (field === 'remote') {
       const ra = a.remote
@@ -65,7 +64,6 @@ export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
             id: repo.id,
             instanceId: repo.instanceId,
             ui: {
-              selectedBranch: repo.ui.selectedBranch,
               branchViewMode: repo.ui.branchViewMode,
             },
             operations: {

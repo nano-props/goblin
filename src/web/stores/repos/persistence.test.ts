@@ -20,7 +20,6 @@ function cachedRepo(savedAt: number): RepoSnapshotCacheEntry {
       currentBranch: '',
     },
     ui: {
-      selectedBranch: null,
       branchViewMode: 'all',
     },
   }
@@ -77,7 +76,7 @@ describe('persistRepoSnapshotCacheEntry', () => {
       instanceId: 'repo-instance-test',
       branches: [createRepoBranch('main')],
       currentBranch: 'main',
-      selectedBranch: 'main',
+      currentBranchName: 'main',
     })
     seedRepoWithReadModelForTest({ id: '/repo', instanceId: 'repo-instance-test-2' })
 
@@ -111,7 +110,7 @@ describe('persistRepoSnapshotCacheEntry', () => {
         }),
       ],
       currentBranch: 'feature/a',
-      selectedBranch: 'feature/a',
+      currentBranchName: 'feature/a',
     })
 
     persistRepoSnapshotCacheEntry(useReposStore.setState, repo, 'repo-instance-test')
@@ -127,7 +126,7 @@ describe('persistRepoSnapshotCacheEntry', () => {
       instanceId: 'repo-instance-test',
       branches: [createRepoBranch('main')],
       currentBranch: 'main',
-      selectedBranch: 'main',
+      currentBranchName: 'main',
     })
     setRepoSnapshotQueryData('/repo', repo.instanceId, {
       current: 'feature/query',
@@ -143,11 +142,10 @@ describe('persistRepoSnapshotCacheEntry', () => {
 })
 
 describe('restoreRepoProjectionFromCacheEntry', () => {
-  test('restores only shell metadata and UI selection from cache', () => {
+  test('restores only shell metadata from cache', () => {
     const now = Date.now()
     const cached = cachedRepo(now)
     cached.name = 'cached-name'
-    cached.ui.selectedBranch = 'feature/a'
     cached.data.branches = [
       createBranchSnapshot('feature/a', {
         worktree: { path: '/tmp/worktree-a' },
@@ -164,7 +162,6 @@ describe('restoreRepoProjectionFromCacheEntry', () => {
     const repo = restoreRepoProjectionFromCacheEntry(emptyRepo('/repo', 'repo', 'repo-instance-test'), cached)
 
     expect(repo.name).toBe('cached-name')
-    expect(repo.ui.selectedBranch).toBe('feature/a')
     expect(repo.projection).toEqual({ source: 'cache', savedAt: now })
   })
 

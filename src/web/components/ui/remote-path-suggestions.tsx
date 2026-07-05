@@ -1,10 +1,10 @@
 // Typeable path input with a styled suggestion dropdown. Replaces the
 // HTML5 <datalist> autocomplete used by OpenRemoteRepositoryDialog and
-// CreateWorktreeDialog — <datalist> renders with browser-native chrome
+// Create Worktree surfaces — <datalist> renders with browser-native chrome
 // that ignores our design tokens and varies across Electron versions.
 //
 // Visual + interaction parity with the Select dropdown used by
-// CreateWorktreeDialog's branch pickers:
+// Create Worktree branch pickers:
 //   • floating surface shares the same border, shadow, and p-1 inner
 //     padding rhythm
 //   • rows use the SelectItem layout verbatim: pr-8 / pl-2, rounded-sm,

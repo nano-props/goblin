@@ -1,6 +1,6 @@
 import { useT } from '#/web/stores/i18n.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
-import type { RepoWorkspaceRepo, SelectedRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
+import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import type {
   RepoWorkspaceTabModel,
@@ -16,7 +16,7 @@ import { renderRepoWorkspacePanePanel } from '#/web/components/repo-workspace/pa
 
 interface Props {
   repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'branchModel' | 'ui'>
-  detail: SelectedRepoWorkspacePresentation
+  detail: CurrentRepoWorkspacePresentation
   workspacePaneId: string
   workspacePaneTabModel: RepoWorkspaceTabModel
 }

@@ -81,7 +81,7 @@ export function repoPresentationFromQueryForTest(repo: RepoState): RepoPresentat
 export function seedRepoShellForTest(options: {
   id: string
   name?: string
-  selectedBranch?: string | null
+  currentBranchName?: string | null
   preferredWorkspacePaneTabByTarget?: Record<string, WorkspacePaneTabType>
   instanceId?: string
   remote?: Partial<RepoState['remote']>
@@ -91,7 +91,6 @@ export function seedRepoShellForTest(options: {
     ...base,
     ui: {
       ...base.ui,
-      selectedBranch: options.selectedBranch ?? base.ui.selectedBranch,
       preferredWorkspacePaneTabByTarget:
         options.preferredWorkspacePaneTabByTarget ?? base.ui.preferredWorkspacePaneTabByTarget,
     },
@@ -104,7 +103,7 @@ export function seedRepoShellForTest(options: {
     repos: { [options.id]: repo },
     repoSnapshotCache: {},
     order: [options.id],
-    activeId: options.id,
+    restoredRepoId: options.id,
     sessionReady: true,
     sessionPersistenceReady: true,
     sessionRestoreError: null,
@@ -345,7 +344,7 @@ export function resetReposStore(): void {
     repos: {},
     repoSnapshotCache: {},
     order: [],
-    activeId: null,
+    restoredRepoId: null,
     sessionReady: false,
     sessionPersistenceReady: false,
     sessionRestoreError: null,
@@ -781,7 +780,7 @@ export function seedRepoWithReadModelForTest(options: {
   branches?: RepoBranchState[]
   branchSnapshots?: BranchSnapshotInfo[]
   currentBranch?: string
-  selectedBranch?: string | null
+  currentBranchName?: string | null
   preferredWorkspacePaneTab?: WorkspacePaneTabType
   preferredWorkspacePaneTabByTarget?: Record<string, WorkspacePaneTabType>
   workspacePaneTabsByBranch?: Record<string, WorkspacePaneTabEntry[]>
@@ -792,15 +791,15 @@ export function seedRepoWithReadModelForTest(options: {
   const branchesWithSnapshotWorktreeMetadata = options.branchSnapshots ?? options.branches ?? []
   const branches = options.branches ?? stripBranchWorktreeMetadata(branchesWithSnapshotWorktreeMetadata)
   const status = options.status ?? []
-  const selectedBranch = options.selectedBranch ?? null
+  const currentBranchName = options.currentBranchName ?? null
   const preferredWorkspacePaneTabByTarget =
     options.preferredWorkspacePaneTabByTarget ??
-    (selectedBranch && options.preferredWorkspacePaneTab !== undefined
+    (currentBranchName && options.preferredWorkspacePaneTab !== undefined
       ? {
           [workspacePaneTabsTargetIdentityKey({
             repoRoot: options.id,
-            branchName: selectedBranch,
-            worktreePath: branches.find((branch) => branch.name === selectedBranch)?.worktree?.path ?? null,
+            branchName: currentBranchName,
+            worktreePath: branches.find((branch) => branch.name === currentBranchName)?.worktree?.path ?? null,
           })]: options.preferredWorkspacePaneTab,
         }
       : undefined)
@@ -808,7 +807,7 @@ export function seedRepoWithReadModelForTest(options: {
     id: options.id,
     name: options.name,
     instanceId: options.instanceId,
-    selectedBranch,
+    currentBranchName,
     ...(preferredWorkspacePaneTabByTarget ? { preferredWorkspacePaneTabByTarget } : {}),
     remote: options.remote,
   })

@@ -195,6 +195,7 @@ export const ko: Record<DictKey, string> = {
   'repo-picker.recent-save-failed': '리포지토리는 열렸지만 최근 기록은 업데이트되지 않았습니다',
 
   // ---- Workspace pane tabs ------------------------------------------------
+  'repo.dashboard': '대시보드',
   'tab.branches': '브랜치',
   'tab.repo-workspace': '리포지토리 작업 공간',
   'tab.status': '상태',
@@ -455,6 +456,7 @@ export const ko: Record<DictKey, string> = {
   'action.create-worktree-path-disabled-hint': '브랜치나 원격 참조를 선택하면 경로가 자동 채워집니다.',
   'action.create-worktree-base-current': '현재',
   'action.create-worktree-confirm': '워크트리 만들기',
+  'action.create-worktree-cancel': '취소',
   'action.create-worktree-has-worktree': '브랜치 "{branch}"에 이미 워크트리가 있음',
   'action.create-worktree-busy': '브랜치 작업이 진행 중입니다. 워크트리를 만들려면 작업이 완료될 때까지 기다리세요.',
   'action.create-worktree-bootstrap-config-trusted': '현재 구성 신뢰',

@@ -58,7 +58,6 @@ export interface RepoWorktreeState {
 }
 
 export interface RepoUiState {
-  selectedBranch: string | null
   branchViewMode: BranchViewMode
   /** Target-scoped selected workspace pane tab. Worktree-backed panes are keyed by
    *  worktree path; branch-only panes are keyed by branch name. */
@@ -106,7 +105,7 @@ export interface RepoSnapshotCacheEntry {
     branches: RepoBranchState[]
     currentBranch: string
   }
-  ui: Pick<RepoUiState, 'selectedBranch' | 'branchViewMode'>
+  ui: Pick<RepoUiState, 'branchViewMode'>
 }
 
 export interface RepoState {
@@ -140,8 +139,11 @@ export interface RestorableWorkspaceState {
    *  shared state. */
   /** Open repository order restored from WorkspaceSessionState.openRepoEntries. */
   order: string[]
-  /** Active repository restored from WorkspaceSessionState.activeRepoId. */
-  activeId: string | null
+  /**
+   * Session repo restored from WorkspaceSessionState.restoredRepoId.
+   * The route owns the current repo.
+   */
+  restoredRepoId: string | null
   /** Large-screen Zen Mode restored from WorkspaceSessionState. Compact UI is stronger and always shows one pane at a time. */
   zenMode: boolean
   workspacePaneSize: number
@@ -194,7 +196,6 @@ interface LocalWorkspaceActions {
 }
 
 interface RestorableWorkspaceActions {
-  setActive: (id: string) => void
   applySessionLayoutState: (layout: Pick<WorkspaceSessionState, 'zenMode' | 'workspacePaneSize'>) => void
   applySessionSelectedTerminalState: (selectedTerminalSessionIdByTerminalWorktree: Record<string, string>) => void
   setZenMode: (enabled: boolean) => void
@@ -202,7 +203,6 @@ interface RestorableWorkspaceActions {
   setWorkspacePaneSize: (size: number) => void
   resetLayout: () => void
   setSelectedTerminal: (terminalWorktreeKey: string, terminalSessionId: string | null) => void
-  cycleActive: (direction: 1 | -1) => void
 }
 
 interface RuntimeCoherentRepoProjectionActions {
@@ -223,10 +223,8 @@ interface RuntimeCoherentRepoProjectionActions {
    *  against terminal session count, worktree presence, or opened workspace pane tabs;
    *  the UI resolves the active pane at read time so session restore preserves
    *  target-scoped user intent. */
-  setWorkspacePaneTab: (id: string, tab: WorkspacePaneTabType) => void
+  setWorkspacePaneTab: (id: string, branch: string, tab: WorkspacePaneTabType) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
-  selectBranch: (id: string, branch: string) => void
-  clearSelectedBranch: (id: string) => void
   refreshSnapshot: (id: string, options?: { skipLogBackfill?: boolean; repoInstanceId?: string }) => Promise<void>
   refreshSnapshotAndStatus: (
     id: string,
@@ -247,7 +245,7 @@ interface RuntimeCoherentRepoProjectionActions {
   clearEvents: (id: string, eventIds: number[]) => void
   hydrateRepoSession: (
     openRepoEntries: RepoSessionEntry[],
-    activeRepoId: string | null,
+    restoredRepoId: string | null,
     options?: RepoSessionHydrationOptions,
   ) => Promise<void>
   /** Clear the fetchFailed flag — called by manual fetch success and

@@ -2,8 +2,8 @@
 // a fixed-duration exit animation when the user deselects a branch
 // (or selects a different one) — for `WORKSPACE_PANE_TRANSITION_MS`
 // the workspace content is still showing the OLD branch while the
-// live store has moved to the NEW branch. The keyboard handler
-// reads `repo.ui.selectedBranch` (the live value) by default, so
+// live route has moved to the NEW branch. The keyboard handler
+// receives the current route branch from `Layout`, so
 // during that 240 ms window pressing a branch-action shortcut would
 // act on the new branch while the user sees the old one.
 //

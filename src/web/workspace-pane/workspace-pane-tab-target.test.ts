@@ -25,7 +25,7 @@ describe('workspace pane tab target read model', () => {
     useReposStore.setState((s) => ({
       repos: { ...s.repos, [REPO_ID]: repo },
       order: [...s.order, REPO_ID],
-      activeId: REPO_ID,
+      restoredRepoId: REPO_ID,
     }))
 
     expect(resolveWorkspacePaneTabTargetForBranch(REPO_ID, 'feature/query')).toEqual({
@@ -39,7 +39,7 @@ describe('workspace pane tab target read model', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
-      selectedBranch: 'feature/query',
+      currentBranchName: 'feature/query',
       preferredWorkspacePaneTab: 'status',
     })
     setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
@@ -58,7 +58,7 @@ describe('workspace pane tab target read model', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
-      selectedBranch: 'feature/query',
+      currentBranchName: 'feature/query',
     })
     setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
       current: 'feature/query',
@@ -79,7 +79,7 @@ describe('workspace pane tab target read model', () => {
     useReposStore.setState((s) => ({
       repos: { ...s.repos, [REPO_ID]: repo },
       order: [...s.order, REPO_ID],
-      activeId: REPO_ID,
+      restoredRepoId: REPO_ID,
     }))
 
     expect(

@@ -15,11 +15,33 @@ import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 
 interface AppProps {
   routeSettingsPage?: SettingsPage | null
+  routeRepoView?: RepoRouteView | null
   onRouteSettingsPageChange?: (page: SettingsPage | null) => void
+  onOpenRepoRoot?: (repoId: string) => void
+  onOpenRepoDashboard?: (repoId: string) => void
+  onOpenRepoBranch?: (repoId: string, branchName: string) => void
+  onOpenRepoNewWorktree?: (repoId: string) => void
+  onCancelRepoNewWorktree?: (repoId: string) => void
+  onReplaceRepoBranch?: (repoId: string, branchName: string) => void
 }
 
-export function App({ routeSettingsPage = null, onRouteSettingsPageChange }: AppProps) {
-  const activeId = useReposStore((s) => s.activeId)
+export type RepoRouteView =
+  | { kind: 'empty'; repoId: string }
+  | { kind: 'dashboard'; repoId: string }
+  | { kind: 'branch'; repoId: string; branchName: string }
+  | { kind: 'newWorktree'; repoId: string }
+
+export function App({
+  routeSettingsPage = null,
+  routeRepoView = null,
+  onRouteSettingsPageChange,
+  onOpenRepoRoot,
+  onOpenRepoDashboard,
+  onOpenRepoBranch,
+  onOpenRepoNewWorktree,
+  onCancelRepoNewWorktree,
+  onReplaceRepoBranch,
+}: AppProps) {
   const sessionReady = useReposStore((s) => s.sessionReady)
   const zenMode = useReposStore((s) => s.zenMode)
   const uiMode = useResponsiveUiMode()
@@ -40,9 +62,19 @@ export function App({ routeSettingsPage = null, onRouteSettingsPageChange }: App
 
   return (
     <main className="flex flex-1 min-h-0 min-w-0">
-      <ErrorBoundary resetKey={activeId}>
-        {activeId ? (
-          <RepoView repoId={activeId} onOpenSettings={() => onRouteSettingsPageChange?.('general')} />
+      <ErrorBoundary resetKey={routeRepoView?.repoId ?? 'empty'}>
+        {routeRepoView ? (
+          <RepoView
+            repoId={routeRepoView.repoId}
+            routeView={routeRepoView}
+            onOpenSettings={() => onRouteSettingsPageChange?.('general')}
+            onOpenRepoRoot={onOpenRepoRoot}
+            onOpenRepoDashboard={onOpenRepoDashboard}
+            onOpenRepoBranch={onOpenRepoBranch}
+            onOpenRepoNewWorktree={onOpenRepoNewWorktree}
+            onCancelRepoNewWorktree={onCancelRepoNewWorktree}
+            onReplaceRepoBranch={onReplaceRepoBranch}
+          />
         ) : !sessionReady ? (
           <RepoWorkspaceLayoutSkeleton
             singlePane={bootWorkspaceBehavior.singlePane}

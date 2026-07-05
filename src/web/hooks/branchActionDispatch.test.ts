@@ -36,7 +36,7 @@ describe('branch action dispatch', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
         'feature/worktree': [
@@ -98,7 +98,7 @@ describe('branch action dispatch', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
         'feature/worktree': [
@@ -138,7 +138,7 @@ describe('branch action dispatch', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {},
     })
@@ -164,7 +164,7 @@ describe('branch action dispatch', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
         'feature/worktree': [
@@ -204,7 +204,7 @@ describe('branch action dispatch', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree')],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
         'feature/worktree': [
@@ -248,7 +248,7 @@ describe('branch action dispatch', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree')],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
         'feature/worktree': [

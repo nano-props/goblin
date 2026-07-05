@@ -177,14 +177,14 @@ describe('BranchActionDialogHost', () => {
     })
 
     // Mount the host. Active workspace = (repo, branch).
-    render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+    render(<BranchActionDialogHost currentRepoId={repo.id} currentBranchName={branch.name} />)
     expect(document.body.textContent).toContain('action.confirm-remove-worktree-title')
 
     // (b) + (c) Unmount + remount — the popover went away and came back.
     act(() => {
       cleanup()
     })
-    render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+    render(<BranchActionDialogHost currentRepoId={repo.id} currentBranchName={branch.name} />)
 
     // (d) Dialog still rendered, store still holds the entry.
     expect(document.body.textContent).toContain('action.confirm-remove-worktree-title')
@@ -201,7 +201,7 @@ describe('BranchActionDialogHost', () => {
     act(() => {
       useReposStore.setState((state) => ({
         repos: { ...state.repos, [REPO_ID]: repoA },
-        activeId: REPO_ID,
+        restoredRepoId: REPO_ID,
       }))
     })
 
@@ -217,19 +217,19 @@ describe('BranchActionDialogHost', () => {
     })
 
     // Mount the host with active = repoA/feature/host. Dialog should render.
-    const { rerender } = render(<BranchActionDialogHost activeRepoId={repoA.id} activeBranchName={branchA.name} />)
+    const { rerender } = render(<BranchActionDialogHost currentRepoId={repoA.id} currentBranchName={branchA.name} />)
     expect(document.body.textContent).toContain('action.confirm-remove-worktree-title')
 
     // Switch the active workspace to repoB. The host's
     // closeStaleDialogs effect fires, which closes the open dialog
     // because (repoA, feature/host) != (repoB, main).
-    rerender(<BranchActionDialogHost activeRepoId={repoBId} activeBranchName="main" />)
+    rerender(<BranchActionDialogHost currentRepoId={repoBId} currentBranchName="main" />)
 
     expect(useBranchActionDialogsStore.getState().removeConfirm).toBeNull()
     expect(document.body.textContent).not.toContain('action.confirm-remove-worktree-title')
   })
 
-  test('regression: closeStaleDialogs clears a dialog whose branch does not match the new selected branch', () => {
+  test('regression: closeStaleDialogs clears a dialog whose branch does not match the new current branch', () => {
     const { repo, branch: branchX } = setupRepo()
     const branchY = createRepoBranch('feature/y', { worktree: { path: '/tmp/y' } })
     setBranchSnapshotForRepo(REPO_ID, [branchX, branchY])
@@ -245,12 +245,12 @@ describe('BranchActionDialogHost', () => {
       )
     })
 
-    const { rerender } = render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branchX.name} />)
+    const { rerender } = render(<BranchActionDialogHost currentRepoId={repo.id} currentBranchName={branchX.name} />)
     expect(document.body.textContent).toContain('action.confirm-remove-worktree-title')
 
-    // Switch selected branch in the same repo. The dialog is for X
+    // Switch current route branch in the same repo. The dialog is for X
     // and the new active is Y; closeStaleDialogs should close it.
-    rerender(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branchY.name} />)
+    rerender(<BranchActionDialogHost currentRepoId={repo.id} currentBranchName={branchY.name} />)
 
     expect(useBranchActionDialogsStore.getState().removeConfirm).toBeNull()
   })
@@ -332,7 +332,7 @@ describe('BranchActionDialogHost', () => {
     // dialog for a non-selected branch row (e.g. a row in the
     // zen-mode HoverCard popover) and the Confirm click dispatches
     // against that branch's data, not the workspace's
-    // `(activeRepoId, activeBranchName)`.
+    // `(currentRepoId, currentBranchName)`.
     const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
     const repoA = setupRepo().repo
     const repoBId = '/tmp/gbl-other-repo'
@@ -340,14 +340,14 @@ describe('BranchActionDialogHost', () => {
     act(() => {
       useReposStore.setState((state) => ({
         repos: { ...state.repos, [REPO_ID]: repoA },
-        activeId: REPO_ID,
+        restoredRepoId: REPO_ID,
       }))
     })
 
     // Mount the host FIRST with workspace = repoA / feature/host. The
     // closeStaleDialogs effect runs on mount and finds no stale
     // dialogs to close (nothing is open yet).
-    render(<BranchActionDialogHost activeRepoId={REPO_ID} activeBranchName="feature/host" />)
+    render(<BranchActionDialogHost currentRepoId={REPO_ID} currentBranchName="feature/host" />)
 
     // NOW open a delete dialog for repo B's main branch while the
     // workspace is still on repo A — the popover use case. The
@@ -392,7 +392,7 @@ describe('BranchActionDialogHost', () => {
       })
       useBranchActionDialogsStore.getState().setDeleteAlsoUpstream(repo.id, branch.name, true)
     })
-    render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+    render(<BranchActionDialogHost currentRepoId={repo.id} currentBranchName={branch.name} />)
 
     const confirmButton = findButtonByText('action.confirm-delete-branch-confirm')
     act(() => {
@@ -412,7 +412,7 @@ describe('BranchActionDialogHost', () => {
         payload: branch.name,
       })
     })
-    render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+    render(<BranchActionDialogHost currentRepoId={repo.id} currentBranchName={branch.name} />)
 
     const confirmButton = findButtonByText('action.confirm-force-delete-unmerged-confirm')
     act(() => {
@@ -432,7 +432,7 @@ describe('BranchActionDialogHost', () => {
         payload: branch.name,
       })
     })
-    render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+    render(<BranchActionDialogHost currentRepoId={repo.id} currentBranchName={branch.name} />)
 
     const confirmButton = findButtonByText('action.confirm-push-confirm')
     act(() => {
@@ -459,7 +459,7 @@ describe('BranchActionDialogHost', () => {
           { isProtectedBranch: false },
         )
     })
-    render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+    render(<BranchActionDialogHost currentRepoId={repo.id} currentBranchName={branch.name} />)
 
     const confirmButton = findButtonByText('action.confirm-remove-worktree-confirm')
     act(() => {
@@ -479,7 +479,7 @@ describe('BranchActionDialogHost', () => {
         payload: { branch: branch.name, path: branch.worktree!.path },
       })
     })
-    render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+    render(<BranchActionDialogHost currentRepoId={repo.id} currentBranchName={branch.name} />)
 
     const confirmButton = findButtonByText('action.confirm-force-delete-branch-confirm')
     act(() => {
@@ -505,7 +505,7 @@ describe('BranchActionDialogHost', () => {
         payload: branch.name,
       })
     })
-    render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+    render(<BranchActionDialogHost currentRepoId={repo.id} currentBranchName={branch.name} />)
 
     const cancelButton = findButtonByText('dialog.cancel')
     act(() => {
@@ -529,7 +529,7 @@ describe('BranchActionDialogHost', () => {
       useBranchActionDialogsStore.getState().setRemoveAlsoDeletes(repo.id, branch.name, true)
       useBranchActionDialogsStore.getState().setRemoveAlsoUpstream(repo.id, branch.name, true)
     })
-    render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+    render(<BranchActionDialogHost currentRepoId={repo.id} currentBranchName={branch.name} />)
 
     const confirmButton = findButtonByText('action.confirm-remove-worktree-confirm')
     act(() => {
@@ -571,7 +571,7 @@ describe('BranchActionDialogHost', () => {
         payload: branch.name,
       })
     })
-    render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+    render(<BranchActionDialogHost currentRepoId={repo.id} currentBranchName={branch.name} />)
 
     const confirmButton = findButtonByText('action.confirm-force-delete-unmerged-confirm')
     act(() => {
@@ -607,7 +607,7 @@ describe('BranchActionDialogHost', () => {
         payload: branch.name,
       })
     })
-    render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+    render(<BranchActionDialogHost currentRepoId={repo.id} currentBranchName={branch.name} />)
 
     const confirmButton = findButtonByText('action.confirm-push-confirm')
     act(() => {
@@ -657,7 +657,7 @@ describe('BranchActionDialogHost', () => {
             { isProtectedBranch: false },
           )
       })
-      render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+      render(<BranchActionDialogHost currentRepoId={repo.id} currentBranchName={branch.name} />)
       // Pre-close: title is the static i18n key.
       expect(titlePropsByDialog.removeConfirm.title).toBe('action.confirm-remove-worktree-title')
 
@@ -684,7 +684,7 @@ describe('BranchActionDialogHost', () => {
           payload: branch.name,
         })
       })
-      render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+      render(<BranchActionDialogHost currentRepoId={repo.id} currentBranchName={branch.name} />)
       expect(titlePropsByDialog.deleteConfirm.title).toBe('action.confirm-delete-branch-title')
 
       act(() => {
@@ -704,7 +704,7 @@ describe('BranchActionDialogHost', () => {
           payload: branch.name,
         })
       })
-      render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+      render(<BranchActionDialogHost currentRepoId={repo.id} currentBranchName={branch.name} />)
       expect(titlePropsByDialog.forceDeleteConfirm.title).toBe('action.confirm-force-delete-unmerged-title')
 
       act(() => {
@@ -725,7 +725,7 @@ describe('BranchActionDialogHost', () => {
           payload,
         })
       })
-      render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+      render(<BranchActionDialogHost currentRepoId={repo.id} currentBranchName={branch.name} />)
       expect(titlePropsByDialog.forceRemoveConfirm.title).toBe('action.confirm-force-delete-branch-title')
 
       act(() => {
@@ -764,7 +764,7 @@ describe('BranchActionDialogHost', () => {
             { isProtectedBranch: false },
           )
       })
-      render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+      render(<BranchActionDialogHost currentRepoId={repo.id} currentBranchName={branch.name} />)
       // Pre-close: message is the full body (a React element, not
       // the empty string).
       expect(titlePropsByDialog.removeConfirm.message).toBeTruthy()
@@ -791,7 +791,7 @@ describe('BranchActionDialogHost', () => {
           payload: branch.name,
         })
       })
-      render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+      render(<BranchActionDialogHost currentRepoId={repo.id} currentBranchName={branch.name} />)
       expect(titlePropsByDialog.deleteConfirm.message).toBeTruthy()
       expect(titlePropsByDialog.deleteConfirm.message).not.toBe('')
 
@@ -814,7 +814,7 @@ describe('BranchActionDialogHost', () => {
           payload,
         })
       })
-      render(<BranchActionDialogHost activeRepoId={repo.id} activeBranchName={branch.name} />)
+      render(<BranchActionDialogHost currentRepoId={repo.id} currentBranchName={branch.name} />)
       expect(titlePropsByDialog.forceRemoveConfirm.message).toBeTruthy()
       expect(titlePropsByDialog.forceRemoveConfirm.message).not.toBe('')
 

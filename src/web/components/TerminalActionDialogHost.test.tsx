@@ -41,7 +41,7 @@ afterEach(() => {
 
 describe('TerminalActionDialogHost', () => {
   test('retains the process message while the close animation runs after store state is cleared', () => {
-    renderInJsdom(<TerminalActionDialogHost activeRepoId="/repo" navigation={{} as PrimaryWindowNavigationActions} />)
+    renderInJsdom(<TerminalActionDialogHost currentRepoId="/repo" navigation={{} as PrimaryWindowNavigationActions} />)
 
     act(() => {
       useTerminalActionDialogsStore.getState().openCloseConfirm({

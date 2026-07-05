@@ -187,6 +187,7 @@ export const zh: Record<DictKey, string> = {
   'repo-picker.recent-save-failed': '仓库已打开，但最近记录未更新',
 
   // ---- Workspace pane tabs ------------------------------------------------
+  'repo.dashboard': '仪表盘',
   'tab.branches': '分支',
   'tab.repo-workspace': '仓库工作区',
   'tab.status': '状态',
@@ -443,6 +444,7 @@ export const zh: Record<DictKey, string> = {
   'action.create-worktree-path-disabled-hint': '选择分支或远程引用后自动填充路径。',
   'action.create-worktree-base-current': '当前',
   'action.create-worktree-confirm': '创建工作树',
+  'action.create-worktree-cancel': '取消',
   'action.create-worktree-has-worktree': '分支 "{branch}" 已有工作树',
   'action.create-worktree-busy': '正在执行分支操作，请等待完成后再新建工作树。',
   'action.create-worktree-bootstrap-config-trusted': '信任当前 goblin.toml 配置',

@@ -1,8 +1,8 @@
-// React error boundary for the active-repo body. Without this, a render
+// React error boundary for the current repo body. Without this, a render
 // crash inside any repo workspace view (BranchNavigator / StatusList / commit
 // detail) would unmount the whole shell and show a blank window.
 //
-// We re-mount on `resetKey` change — App.tsx passes the active repoId
+// We re-mount on `resetKey` change — App.tsx passes the current repo id
 // as the key, so navigating to a different repo clears any prior crash
 // without the user having to restart the app.
 
@@ -15,7 +15,7 @@ import { gblLog } from '#/web/logger.ts'
 import { markReactRenderErrorLogged } from '#/web/react-error-logging.ts'
 
 interface Props {
-  /** When this prop changes (e.g. activeRepoId), state is reset. */
+  /** When this prop changes (e.g. route identity), state is reset. */
   resetKey?: string | null
   children: ReactNode
 }

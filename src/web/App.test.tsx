@@ -47,10 +47,10 @@ describe('App boot skeleton', () => {
     expect(container.querySelector('[data-testid="repo-view"]')).toBeNull()
   })
 
-  test('renders the active repository shell when a repository is open', () => {
+  test('renders the current repository shell when a repository is open', () => {
     seedRepoShellForTest({ id: '/tmp/repo' })
 
-    const { container } = render(<App />)
+    const { container } = render(<App routeRepoView={{ kind: 'dashboard', repoId: '/tmp/repo' }} />)
 
     expect(container.querySelector('[data-testid="repo-view"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="empty-repo-view"]')).toBeNull()

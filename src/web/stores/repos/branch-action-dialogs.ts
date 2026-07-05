@@ -16,9 +16,9 @@
 //   * Dialog state is keyed by (repoId, branchName) so two rows in
 //     the same repo, or two repos' branch lists, can carry their
 //     own dialog payload + checkbox state without colliding.
-//   * `closeStaleDialogs(activeRepoId, activeBranchName)` is the
+//   * `closeStaleDialogs(currentRepoId, currentBranchName)` is the
 //     single cleanup hook used by the Layout-level host to clear
-//     any dialog that no longer belongs to the active workspace.
+//     any dialog that no longer belongs to the current workspace route.
 
 import { create } from 'zustand'
 
@@ -111,13 +111,13 @@ interface BranchActionDialogsActions {
   closeDialog: (key: BranchActionDialogKey) => void
   /**
    * Close any dialog whose (repoId, branchName) does not match
-   * `activeRepoId` / `activeBranchName`. Called by the host on
+   * `currentRepoId` / `currentBranchName`. Called by the host on
    * workspace change so that a dialog opened in repo A is dismissed
    * when the user switches to repo B, and a dialog opened for a
-   * non-selected branch in repo A is dismissed when the user changes
-   * the selected branch.
+   * non-current branch in repo A is dismissed when the user changes
+   * the current route branch.
    */
-  closeStaleDialogs: (activeRepoId: string, activeBranchName: string) => void
+  closeStaleDialogs: (currentRepoId: string, currentBranchName: string) => void
   setRemoveAlsoDeletes: (repoId: string, branchName: string, value: boolean) => void
   setRemoveAlsoUpstream: (repoId: string, branchName: string, value: boolean) => void
   setDeleteAlsoUpstream: (repoId: string, branchName: string, value: boolean) => void
@@ -253,12 +253,12 @@ export const useBranchActionDialogsStore = create<BranchActionDialogsStore>()((s
       }
     }),
 
-  closeStaleDialogs: (activeRepoId, activeBranchName) =>
+  closeStaleDialogs: (currentRepoId, currentBranchName) =>
     set((state) => {
       let next: Partial<BranchActionDialogsState> | null = null
       for (const key of DIALOG_KEYS) {
         const slot = state[key]
-        if (slot && (slot.repoId !== activeRepoId || slot.branchName !== activeBranchName)) {
+        if (slot && (slot.repoId !== currentRepoId || slot.branchName !== currentBranchName)) {
           next ??= {}
           next[key] = null
         }

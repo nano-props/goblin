@@ -4,9 +4,8 @@ import { act } from '@testing-library/react'
 import { useState } from 'react'
 import { beforeEach, describe, expect, test } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import { resetReposStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
+import { type AppOverlayKey, useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
+import { resetReposStore } from '#/web/test-utils/bridge.ts'
 
 function Harness() {
   const overlays = useAppOverlays()
@@ -19,23 +18,18 @@ function Harness() {
       <button id="open-repo" type="button" onClick={overlays.openRepoPathDialog}>
         open repo
       </button>
-      <button id="open-create-worktree" type="button" onClick={overlays.openCreateWorktree}>
-        open create worktree
-      </button>
       <button id="close-all" type="button" onClick={overlays.closeAllOverlays}>
         close all
       </button>
       <output id="clone-open">{overlays.state.clone.open ? 'open' : 'closed'}</output>
       <output id="open-repo-open">{overlays.state.openRepo.open ? 'open' : 'closed'}</output>
-      <output id="create-worktree-open">{overlays.state.createWorktree.open ? 'open' : 'closed'}</output>
-      <output id="create-worktree-repo-id">{overlays.state.createWorktree.repoId ?? ''}</output>
       <output id="any-open">{overlays.anyOpen ? 'open' : 'closed'}</output>
     </>
   )
 }
 
 function RoutedHarness() {
-  const [overlay, setOverlay] = useState<'clone' | 'openRepo' | 'openRemoteRepo' | 'createWorktree' | null>(null)
+  const [overlay, setOverlay] = useState<AppOverlayKey | null>(null)
   const overlays = useAppOverlays({
     routeOverlay: overlay,
     onRouteOverlayChange: setOverlay,
@@ -49,16 +43,11 @@ function RoutedHarness() {
       <button id="open-repo" type="button" onClick={overlays.openRepoPathDialog}>
         open repo
       </button>
-      <button id="open-create-worktree" type="button" onClick={overlays.openCreateWorktree}>
-        open create worktree
-      </button>
       <button id="close-all" type="button" onClick={overlays.closeAllOverlays}>
         close all
       </button>
       <output id="clone-open">{overlays.state.clone.open ? 'open' : 'closed'}</output>
       <output id="open-repo-open">{overlays.state.openRepo.open ? 'open' : 'closed'}</output>
-      <output id="create-worktree-open">{overlays.state.createWorktree.open ? 'open' : 'closed'}</output>
-      <output id="create-worktree-repo-id">{overlays.state.createWorktree.repoId ?? ''}</output>
       <output id="any-open">{overlays.anyOpen ? 'open' : 'closed'}</output>
     </>
   )
@@ -70,24 +59,17 @@ beforeEach(() => {
 
 describe('useAppOverlays', () => {
   test('tracks non-settings overlays centrally and resets all overlays together', () => {
-    // Seed an active repo so the openCreateWorktree defensive
-    // guard (in production) does not short-circuit the test.
-    seedRepoShellForTest({ id: '/tmp/gbl-overlay-test' })
-
     const { container } = renderInJsdom(<Harness />)
 
     click(container, '#open-clone')
     click(container, '#open-repo')
-    click(container, '#open-create-worktree')
     expect(text(container, '#clone-open')).toBe('open')
     expect(text(container, '#open-repo-open')).toBe('open')
-    expect(text(container, '#create-worktree-open')).toBe('open')
     expect(text(container, '#any-open')).toBe('open')
 
     click(container, '#close-all')
     expect(text(container, '#clone-open')).toBe('closed')
     expect(text(container, '#open-repo-open')).toBe('closed')
-    expect(text(container, '#create-worktree-open')).toBe('closed')
     expect(text(container, '#any-open')).toBe('closed')
   })
 
@@ -109,69 +91,6 @@ describe('useAppOverlays', () => {
     expect(text(container, '#any-open')).toBe('closed')
   })
 
-  test('can derive route-driven create-worktree state from the active repo', () => {
-    const repoId = '/tmp/gbl-route-overlay-repo'
-    seedRepoShellForTest({ id: repoId })
-    const { container } = renderInJsdom(<RoutedHarness />)
-
-    click(container, '#open-create-worktree')
-    expect(text(container, '#create-worktree-open')).toBe('open')
-    expect(text(container, '#create-worktree-repo-id')).toBe(repoId)
-    expect(text(container, '#any-open')).toBe('open')
-
-    act(() => {
-      useReposStore.setState({ repos: {}, order: [], activeId: null })
-    })
-
-    expect(text(container, '#create-worktree-open')).toBe('closed')
-    expect(text(container, '#create-worktree-repo-id')).toBe(repoId)
-    expect(text(container, '#any-open')).toBe('closed')
-  })
-
-  test('openCreateWorktree no-ops when no active repo (defensive guard)', () => {
-    // The create-worktree dialog is repo-scoped — it renders nothing
-    // when no active repo. If a future surface (e.g. command-palette
-    // entry) calls openCreateWorktree with no active repo, the
-    // naive behaviour is `state.createWorktree.open = true` with no
-    // dialog visible, and a later `useEffect([activeId])` clears it
-    // when a repo is finally activated. The guard short-circuits at
-    // the action so the intent is never silently lost.
-
-    // Active repo is null (resetReposStore in beforeEach).
-    const { container, rerender } = renderInJsdom(<Harness />)
-
-    click(container, '#open-create-worktree')
-    expect(text(container, '#create-worktree-open')).toBe('closed')
-    expect(text(container, '#any-open')).toBe('closed')
-
-    // Now seed an active repo; opening should now work.
-    act(() => {
-      seedRepoShellForTest({ id: '/tmp/gbl-overlay-test' })
-    })
-    rerender(<Harness />)
-    click(container, '#open-create-worktree')
-    expect(text(container, '#create-worktree-open')).toBe('open')
-  })
-
-  test('create-worktree captures the opening repo and closes when the active repo changes', () => {
-    const repoA = '/tmp/gbl-overlay-repo-a'
-    const repoB = '/tmp/gbl-overlay-repo-b'
-    seedRepoShellForTest({ id: repoA })
-    const { container } = renderInJsdom(<Harness />)
-
-    click(container, '#open-create-worktree')
-    expect(text(container, '#create-worktree-open')).toBe('open')
-    expect(text(container, '#create-worktree-repo-id')).toBe(repoA)
-    expect(text(container, '#any-open')).toBe('open')
-
-    act(() => {
-      seedRepoShellForTest({ id: repoB })
-    })
-
-    expect(text(container, '#create-worktree-open')).toBe('closed')
-    expect(text(container, '#create-worktree-repo-id')).toBe(repoA)
-    expect(text(container, '#any-open')).toBe('closed')
-  })
 })
 
 function click(container: HTMLElement, selector: string) {

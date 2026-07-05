@@ -79,7 +79,7 @@ describe('settings routes', () => {
   test('delegates session writes to the settings command handler layer', async () => {
     const session = {
       openRepoEntries: [],
-      activeRepoId: null,
+      restoredRepoId: null,
       zenMode: true,
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalWorktree: {},
@@ -114,7 +114,7 @@ describe('settings routes', () => {
     })
     const session = {
       openRepoEntries: [],
-      activeRepoId: null,
+      restoredRepoId: null,
       zenMode: true,
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalWorktree: {},

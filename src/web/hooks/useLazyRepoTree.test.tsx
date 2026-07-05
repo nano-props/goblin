@@ -354,7 +354,7 @@ describe('useLazyRepoTree', () => {
     expect(signal.aborted).toBe(true)
   })
 
-  test('refetches when a repo-snapshot invalidation arrives for the active repo', async () => {
+  test('refetches when a repo-snapshot invalidation arrives for the current repo', async () => {
     mocks.getRepositoryTree.mockResolvedValue({ nodes: [], truncated: false })
 
     await render({

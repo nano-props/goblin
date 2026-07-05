@@ -1,4 +1,3 @@
-import { selectedBranchForBranchSet } from '#/web/stores/repos/branch-view-mode.ts'
 import { replaceRepoState } from '#/web/stores/repos/repo-state-factory.ts'
 import { persistRepoSnapshotCacheEntry } from '#/web/stores/repos/persistence.ts'
 import {
@@ -16,10 +15,8 @@ import {
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { requireRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
-type RestorableWorkspaceSelectionActions = Pick<
+type RestorableWorkspaceActions = Pick<
   ReposStore,
-  | 'setActive'
-  | 'cycleActive'
   | 'applySessionLayoutState'
   | 'applySessionSelectedTerminalState'
   | 'setZenMode'
@@ -29,26 +26,10 @@ type RestorableWorkspaceSelectionActions = Pick<
   | 'setSelectedTerminal'
 >
 
-type RuntimeCoherentSelectionActions = Pick<
-  ReposStore,
-  'setBranchViewMode' | 'setWorkspacePaneTab' | 'selectBranch' | 'clearSelectedBranch'
->
+type RuntimeWorkspacePreferenceActions = Pick<ReposStore, 'setBranchViewMode' | 'setWorkspacePaneTab'>
 
-function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet): RestorableWorkspaceSelectionActions {
+function createRestorableWorkspaceActions(set: ReposSet, get: ReposGet): RestorableWorkspaceActions {
   return {
-    setActive(id: string) {
-      set((s) => (s.repos[id] && s.activeId !== id ? { activeId: id } : s))
-    },
-
-    cycleActive(direction: 1 | -1) {
-      const { order, activeId } = get()
-      if (order.length === 0) return
-      const idx = activeId ? order.indexOf(activeId) : -1
-      const nextIdx = idx === -1 ? 0 : (idx + direction + order.length) % order.length
-      const next = order[nextIdx]
-      if (next && next !== activeId) set({ activeId: next })
-    },
-
     applySessionLayoutState(layoutState: Parameters<ReposStore['applySessionLayoutState']>[0]) {
       // One-shot boot/session restore of restorable layout fields. Runtime
       // edits are persisted later through useSessionPersistence.
@@ -131,11 +112,10 @@ function createRestorableWorkspaceSelectionActions(set: ReposSet, get: ReposGet)
   }
 }
 
-function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): RuntimeCoherentSelectionActions {
-  // Shared post-write effects for actions that may have updated preferred workspace pane tab/branch:
-  // persist the warm-restore snapshot and refresh the visible branch's pull
-  // request. Centralized so every selection-changing action stays consistent.
-  function afterSelectionChange(id: string, repoInstanceId: string, branchForPullRequest: string | null): void {
+function createRuntimeWorkspacePreferenceActions(set: ReposSet, get: ReposGet): RuntimeWorkspacePreferenceActions {
+  // Shared post-write effects for view preferences that affect warm restore or
+  // visible branch data. Centralized so each preference write stays coherent.
+  function afterWorkspacePreferenceChange(id: string, repoInstanceId: string, branchForPullRequest: string | null): void {
     const repo = get().repos[id]
     if (!repo) return
     persistRepoSnapshotCacheEntry(set, repo, repoInstanceId)
@@ -150,34 +130,23 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
   return {
     setBranchViewMode(id: string, viewMode: BranchViewMode) {
       let changed = false
-      let selectedForPullRequest: string | null = null
       let repoInstanceId: string | undefined
       set((s) => {
         const repo = s.repos[id]
         if (!repo || repo.ui.branchViewMode === viewMode) return s
-        const branchModel = requireRepoBranchQueryProjection(repo)
         changed = true
         repoInstanceId = repo.instanceId
-        const selectedBranch = selectedBranchForBranchSet({
-          branches: branchModel.branches,
-          currentBranch: branchModel.currentBranch,
-          selectedBranch: repo.ui.selectedBranch,
-          viewMode,
-        })
-        const selectionChanged = selectedBranch !== repo.ui.selectedBranch
-        selectedForPullRequest = selectionChanged ? selectedBranch : null
         return replaceRepoState(s, repo, (r) => {
           r.ui.branchViewMode = viewMode
-          r.ui.selectedBranch = selectedBranch
         })
       })
-      if (changed && repoInstanceId !== undefined) afterSelectionChange(id, repoInstanceId, selectedForPullRequest)
+      if (changed && repoInstanceId !== undefined) afterWorkspacePreferenceChange(id, repoInstanceId, null)
     },
 
-    setWorkspacePaneTab(id: string, tab: WorkspacePaneTabType) {
+    setWorkspacePaneTab(id: string, branch: string, tab: WorkspacePaneTabType) {
       // Persists the user's target-scoped preferred tab type verbatim.
       // Opening/closing branch tabs is owned by explicit open/close actions;
-      // this action only changes selection intent.
+      // this action only changes the target-scoped preferred tab.
       let changed = false
       let repoInstanceId: string | undefined
       set((s) => {
@@ -186,7 +155,7 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         const branchModel = requireRepoBranchQueryProjection(repo)
         const target = workspacePaneTabsTargetForRepoBranch(
           { repoRoot: repo.id, branches: branchModel.branches },
-          repo.ui.selectedBranch,
+          branch,
         )
         const current = preferredWorkspacePaneTabForTarget(repo.ui, target)
         if (!target || current === tab) return s
@@ -203,56 +172,21 @@ function createRuntimeCoherentSelectionActions(set: ReposSet, get: ReposGet): Ru
         repo && branchModel
           ? workspacePaneTabsTargetForRepoBranch(
               { repoRoot: repo.id, branches: branchModel.branches },
-              repo.ui.selectedBranch,
+              branch,
             )
           : null
-      afterSelectionChange(
+      afterWorkspacePreferenceChange(
         id,
         repoInstanceId,
-        repo && target && preferredWorkspacePaneTabForTarget(repo.ui, target) === 'status'
-          ? repo.ui.selectedBranch
-          : null,
+        repo && target && preferredWorkspacePaneTabForTarget(repo.ui, target) === 'status' ? branch : null,
       )
-    },
-
-    selectBranch(id: string, branch: string) {
-      let changed = false
-      let repoInstanceId: string | undefined
-      set((s) => {
-        const repo = s.repos[id]
-        if (!repo) return s
-        const branchModel = requireRepoBranchQueryProjection(repo)
-        if (!branchModel.branches.some((b) => b.name === branch)) return s
-        if (repo.ui.selectedBranch === branch) return s
-        changed = true
-        repoInstanceId = repo.instanceId
-        return replaceRepoState(s, repo, (r) => {
-          r.ui.selectedBranch = branch
-        })
-      })
-      if (changed && repoInstanceId !== undefined) afterSelectionChange(id, repoInstanceId, branch)
-    },
-
-    clearSelectedBranch(id: string) {
-      let changed = false
-      let repoInstanceId: string | undefined
-      set((s) => {
-        const repo = s.repos[id]
-        if (!repo || repo.ui.selectedBranch === null) return s
-        changed = true
-        repoInstanceId = repo.instanceId
-        return replaceRepoState(s, repo, (r) => {
-          r.ui.selectedBranch = null
-        })
-      })
-      if (changed && repoInstanceId !== undefined) afterSelectionChange(id, repoInstanceId, null)
     },
   }
 }
 
 export function createSelectionActions(set: ReposSet, get: ReposGet) {
   return {
-    ...createRestorableWorkspaceSelectionActions(set, get),
-    ...createRuntimeCoherentSelectionActions(set, get),
+    ...createRestorableWorkspaceActions(set, get),
+    ...createRuntimeWorkspacePreferenceActions(set, get),
   }
 }

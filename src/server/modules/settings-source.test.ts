@@ -40,7 +40,7 @@ test('initializes user-settings.json with defaults when no persisted settings ex
   })
   expect(await mod.getServerSessionState()).toMatchObject({
     openRepoEntries: [],
-    activeRepoId: null,
+    restoredRepoId: null,
   })
   expect(await mod.getServerRecentRepos()).toEqual([])
   expect(await mod.getServerRepoSettings()).toEqual([])
@@ -73,7 +73,7 @@ test('persists updates and notifies subscribers from the server settings store',
   await mod.setServerSessionState({
     ...defaultWorkspaceSessionState(),
     openRepoEntries: [{ kind: 'local', id: '/repo-b' }],
-    activeRepoId: '/repo-b',
+    restoredRepoId: '/repo-b',
     selectedTerminalSessionIdByTerminalWorktree: { '/repo-b\0/worktree': 'session-2' },
     workspacePaneTabsByTargetByRepo: {
       '/repo-b': {
@@ -106,7 +106,7 @@ test('persists updates and notifies subscribers from the server settings store',
   })
   expect(await reloaded.getServerSessionState()).toMatchObject({
     openRepoEntries: [{ kind: 'local', id: '/repo-b' }],
-    activeRepoId: '/repo-b',
+    restoredRepoId: '/repo-b',
     selectedTerminalSessionIdByTerminalWorktree: { '/repo-b\0/worktree': 'session-2' },
     workspacePaneTabsByTargetByRepo: {
       '/repo-b': {
@@ -224,7 +224,7 @@ test('normalizes target-scoped workspace pane tab preferences in server sessions
       { kind: 'local', id: '/repo-b' },
       { kind: 'local', id: '/repo-array' },
     ],
-    activeRepoId: '/repo-b',
+    restoredRepoId: '/repo-b',
     preferredWorkspacePaneTabByTargetByRepo: {
       '/repo-b': {
         [mainTargetKey]: 'history',
@@ -276,7 +276,7 @@ test('normalizes workspace pane tab list in server sessions', async () => {
       { kind: 'local', id: '/repo-b' },
       { kind: 'local', id: '/repo-array' },
     ],
-    activeRepoId: '/repo-b',
+    restoredRepoId: '/repo-b',
     workspacePaneTabsByTargetByRepo: {
       '/repo-b': {
         [mainTargetKey]: [
@@ -331,7 +331,7 @@ test('normalizes file tree view state in server sessions', async () => {
       { kind: 'local', id: '/repo-b' },
       { kind: 'local', id: '/repo-array' },
     ],
-    activeRepoId: '/repo-b',
+    restoredRepoId: '/repo-b',
     filetreeViewStateByWorktreeByRepo: {
       '/repo-b': {
         '/worktree': {

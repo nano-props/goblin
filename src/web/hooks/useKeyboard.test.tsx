@@ -28,6 +28,7 @@ const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
 interface HookHostOptions {
   currentRepoId: string | null
+  currentBranchName: string | null
   isWorkspaceShortcutSuppressed: () => boolean
   isSettingsOpen: () => boolean
   onExitSettings: () => void
@@ -66,14 +67,14 @@ describe('useKeyboard', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
         'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')],
       },
     })
     const selectTerminal = vi.fn()
-    const showRepoWorkspacePaneTab = vi.fn()
+    const showRepoBranchWorkspacePaneTab = vi.fn()
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => terminalWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'session-1'),
@@ -81,7 +82,8 @@ describe('useKeyboard', () => {
     })
     await renderHookHost({
       currentRepoId: REPO_ID,
-      navigation: navigationWith({ showRepoWorkspacePaneTab }),
+      currentBranchName: 'feature/worktree',
+      navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
     })
 
     await act(async () => {
@@ -89,7 +91,7 @@ describe('useKeyboard', () => {
       await Promise.resolve()
     })
 
-    expect(showRepoWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'terminal')
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'terminal')
     expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'session-1')
   })
 
@@ -97,7 +99,7 @@ describe('useKeyboard', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/no-worktree')],
-      selectedBranch: 'feature/no-worktree',
+      currentBranchName: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
         'feature/no-worktree': [
@@ -106,12 +108,13 @@ describe('useKeyboard', () => {
         ],
       },
     })
-    const showRepoWorkspacePaneTab = vi.fn((repoId, tab) => {
-      useReposStore.getState().setWorkspacePaneTab(repoId, tab)
+    const showRepoBranchWorkspacePaneTab = vi.fn((repoId, tab) => {
+      useReposStore.getState().setWorkspacePaneTab(repoId, 'feature/no-worktree', tab)
     })
     await renderHookHost({
       currentRepoId: REPO_ID,
-      navigation: navigationWith({ showRepoWorkspacePaneTab }),
+      currentBranchName: 'feature/no-worktree',
+      navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
     })
 
     await act(async () => {
@@ -119,14 +122,14 @@ describe('useKeyboard', () => {
       await Promise.resolve()
     })
 
-    expect(showRepoWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'history')
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/no-worktree', 'history')
   })
 
   test('branch navigation shortcuts use the React Query snapshot read model for branch order', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
-      selectedBranch: 'main',
+      currentBranchName: 'main',
     })
     setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
       current: 'main',
@@ -135,6 +138,7 @@ describe('useKeyboard', () => {
     const selectRepoBranch = vi.fn()
     await renderHookHost({
       currentRepoId: REPO_ID,
+      currentBranchName: 'main',
       navigation: navigationWith({ selectRepoBranch }),
     })
 
@@ -152,14 +156,14 @@ describe('useKeyboard', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
         'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')],
       },
     })
     const selectTerminal = vi.fn()
-    const showRepoWorkspacePaneTab = vi.fn()
+    const showRepoBranchWorkspacePaneTab = vi.fn()
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => terminalWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'session-1'),
@@ -167,7 +171,8 @@ describe('useKeyboard', () => {
     })
     await renderHookHost({
       currentRepoId: REPO_ID,
-      navigation: navigationWith({ showRepoWorkspacePaneTab }),
+      currentBranchName: 'feature/worktree',
+      navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
     })
     const terminalHost = document.createElement('div')
     terminalHost.className = 'goblin-managed-terminal-host'
@@ -180,7 +185,7 @@ describe('useKeyboard', () => {
       await Promise.resolve()
     })
 
-    expect(showRepoWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'terminal')
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'terminal')
     expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'session-1')
     terminalHost.remove()
   })
@@ -190,7 +195,7 @@ describe('useKeyboard', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
         'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')],
@@ -202,7 +207,7 @@ describe('useKeyboard', () => {
       createTerminal,
       selectTerminal: vi.fn(),
     })
-    await renderHookHost({ currentRepoId: REPO_ID })
+    await renderHookHost({ currentRepoId: REPO_ID, currentBranchName: 'feature/worktree' })
 
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 't', code: 'KeyT', ctrlKey: true, bubbles: true }))
@@ -217,7 +222,7 @@ describe('useKeyboard', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
     })
     const openCreateWorktree = vi.fn()
     await renderHookHost({ currentRepoId: REPO_ID, openCreateWorktree })
@@ -231,7 +236,7 @@ describe('useKeyboard', () => {
     expect(toast.error).not.toHaveBeenCalled()
   })
 
-  test('primary modifier plus n no-ops when there is no active repo', async () => {
+  test('primary modifier plus n no-ops when there is no current repo', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     const openCreateWorktree = vi.fn()
     await renderHookHost({ currentRepoId: null, openCreateWorktree })
@@ -250,7 +255,7 @@ describe('useKeyboard', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
     })
     const openCreateWorktree = vi.fn()
     await renderHookHost({ currentRepoId: REPO_ID, openCreateWorktree, isWorkspaceShortcutSuppressed: () => true })
@@ -268,7 +273,7 @@ describe('useKeyboard', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
     })
     useReposStore.setState((state) => {
       const repo = state.repos[REPO_ID]
@@ -309,7 +314,7 @@ describe('useKeyboard', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
         'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')],
@@ -344,7 +349,7 @@ describe('useKeyboard', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
         'feature/worktree': [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')],
@@ -357,7 +362,7 @@ describe('useKeyboard', () => {
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
     })
-    await renderHookHost({ currentRepoId: REPO_ID })
+    await renderHookHost({ currentRepoId: REPO_ID, currentBranchName: 'feature/worktree' })
 
     await act(async () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', code: 'KeyW', ctrlKey: true, bubbles: true }))
@@ -380,6 +385,7 @@ function HookHost(overrides: Partial<HookHostOptions>) {
   useKeyboard({
     navigation: overrides.navigation ?? navigationWith(),
     currentRepoId: overrides.currentRepoId ?? null,
+    currentBranchName: overrides.currentBranchName ?? null,
     onShowHelp: () => {},
     isWorkspaceShortcutSuppressed: overrides.isWorkspaceShortcutSuppressed ?? (() => false),
     isSettingsOpen: overrides.isSettingsOpen ?? (() => false),
@@ -395,9 +401,9 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
     closeRepo: () => {},
     cycleRepo: () => {},
     selectRepoBranch: () => {},
-    showRepoWorkspacePaneTab: () => {},
     showRepoBranchWorkspacePaneTab: () => {},
     openSettings: () => {},
+    openCreateWorktree: () => {},
     ...overrides,
   }
 }

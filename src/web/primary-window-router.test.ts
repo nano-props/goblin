@@ -1,0 +1,82 @@
+import { describe, expect, test } from 'vitest'
+import { initialRepoRouteSlugFromStore, repoRouteViewFromChildRoute } from '#/web/primary-window-router.tsx'
+import { repoSlugFromId } from '#/web/repo-route-slugs.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { repoRouteContextFromMatches } from '#/web/Layout.tsx'
+
+describe('primary window initial route', () => {
+  test('prefers the restored repo over the first repo in order', () => {
+    const repoA = emptyRepo('/repo-a', 'repo-a', 'repo-instance-a')
+    const repoB = emptyRepo('/repo-b', 'repo-b', 'repo-instance-b')
+
+    expect(
+      initialRepoRouteSlugFromStore({
+        restoredRepoId: '/repo-b',
+        order: ['/repo-a', '/repo-b'],
+        repos: { '/repo-a': repoA, '/repo-b': repoB },
+        sessionReady: true,
+      }),
+    ).toBe(repoSlugFromId('/repo-b'))
+  })
+
+  test('waits for session restore instead of routing to the first partial repo', () => {
+    const repoA = emptyRepo('/repo-a', 'repo-a', 'repo-instance-a')
+
+    expect(
+      initialRepoRouteSlugFromStore({
+        restoredRepoId: null,
+        order: ['/repo-a'],
+        repos: { '/repo-a': repoA },
+        sessionReady: false,
+      }),
+    ).toBeNull()
+  })
+
+  test('falls back to the first ordered repo when restore has settled without a restored repo', () => {
+    const repoA = emptyRepo('/repo-a', 'repo-a', 'repo-instance-a')
+
+    expect(
+      initialRepoRouteSlugFromStore({
+        restoredRepoId: '/missing',
+        order: ['/repo-a'],
+        repos: { '/repo-a': repoA },
+        sessionReady: true,
+      }),
+    ).toBe(repoSlugFromId('/repo-a'))
+  })
+})
+
+describe('repo route view derivation', () => {
+  test('uses the repo root as an empty route view', () => {
+    expect(repoRouteViewFromChildRoute('/repo', { dashboard: false, branchSlug: null, newWorktree: false })).toEqual({
+      kind: 'empty',
+      repoId: '/repo',
+    })
+  })
+
+  test('maps repo child routes to stable repo route views', () => {
+    expect(repoRouteViewFromChildRoute('/repo', { dashboard: true, branchSlug: null, newWorktree: false })).toEqual({
+      kind: 'dashboard',
+      repoId: '/repo',
+    })
+    expect(repoRouteViewFromChildRoute('/repo', { dashboard: false, branchSlug: null, newWorktree: true })).toEqual({
+      kind: 'newWorktree',
+      repoId: '/repo',
+    })
+    expect(repoRouteViewFromChildRoute('/repo', { dashboard: false, branchSlug: 'ZmVhdHVyZS9h', newWorktree: false })).toEqual({
+      kind: 'branch',
+      repoId: '/repo',
+      branchName: 'feature/a',
+    })
+  })
+})
+
+describe('repo route context derivation', () => {
+  test('keeps repo context when a branch slug is malformed', () => {
+    expect(
+      repoRouteContextFromMatches([
+        { routeId: '/repo/$repoSlug/branch/$branchSlug', params: { repoSlug: 'L3JlcG8', branchSlug: '%' } },
+      ]),
+    ).toEqual({ kind: 'empty', repoSlug: 'L3JlcG8' })
+  })
+})

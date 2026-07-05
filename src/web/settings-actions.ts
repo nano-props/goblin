@@ -50,6 +50,12 @@ export async function persistWorkspaceSessionState(session: WorkspaceSessionStat
   updateRestorableWorkspaceSessionStateCache(primaryWindowQueryClient, savedSession)
 }
 
+export function persistWorkspaceSessionStateOnUnload(session: WorkspaceSessionState): void {
+  void saveSession(session, { keepalive: true }).catch((err) => {
+    settingsLog.warn('failed to flush session during unload', { err })
+  })
+}
+
 export async function setFetchInterval(sec: number): Promise<number> {
   const fetchIntervalSec = await setSettingsFetchInterval(sec)
   updateRuntimeSettingsSnapshotCache(primaryWindowQueryClient, (current) => ({ ...current, fetchIntervalSec }))

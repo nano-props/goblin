@@ -4,7 +4,7 @@ import {
   resolveConfigTrusted,
   resolveNextConfigTrustChoice,
   resolveWorktreeBootstrapDecision,
-} from '#/web/components/create-worktree-dialog/create-worktree-bootstrap-host.logic.ts'
+} from '#/web/components/create-worktree/create-worktree-bootstrap-host.logic.ts'
 
 const REPO_ID = '/tmp/create-worktree-bootstrap-host-logic'
 const CONFIG_HASH = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'

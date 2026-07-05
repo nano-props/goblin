@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import type { RepoWorkspaceRepo, SelectedRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
+import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import {
   createRepoWorkspaceTabModel,
   type RepoWorkspaceTabModel,
@@ -25,7 +25,7 @@ export interface RepoWorkspaceTabModelInputState {
 
 export function useRepoWorkspaceTabModel(
   repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'ui'>,
-  detail: SelectedRepoWorkspacePresentation,
+  detail: CurrentRepoWorkspacePresentation,
 ) {
   const { input, selectedTerminalSessionId } = useRepoWorkspaceTabModelInput(repo, detail)
   const model = useMemo(() => createRepoWorkspaceTabModel(input), [input])
@@ -40,7 +40,7 @@ export function useRepoWorkspaceTabModel(
  */
 export function useRepoWorkspaceTabModelInput(
   repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'ui'>,
-  detail: SelectedRepoWorkspacePresentation,
+  detail: CurrentRepoWorkspacePresentation,
 ): RepoWorkspaceTabModelInputState {
   const { branch } = detail
   const branchName = branch?.name ?? null

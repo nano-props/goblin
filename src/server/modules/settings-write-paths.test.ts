@@ -74,7 +74,7 @@ describe('settings command handlers', () => {
   test('persists session state without publishing settings invalidation', async () => {
     const session: WorkspaceSessionState = {
       openRepoEntries: [],
-      activeRepoId: null,
+      restoredRepoId: null,
       zenMode: true,
       workspacePaneSize: 50,
       selectedTerminalSessionIdByTerminalWorktree: {},
@@ -119,7 +119,7 @@ describe('settings command handlers', () => {
     const parsed = parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
       session: {
         openRepoEntries: [],
-        activeRepoId: null,
+        restoredRepoId: null,
         zenMode: true,
         workspacePaneSize: 42.5,
         selectedTerminalSessionIdByTerminalWorktree: {},
@@ -141,7 +141,7 @@ describe('settings command handlers', () => {
       parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
         session: {
           openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
-          activeRepoId: '/tmp/repo',
+          restoredRepoId: '/tmp/repo',
           zenMode: true,
           workspacePaneSize: 42.5,
           selectedTerminalSessionIdByTerminalWorktree: {},
@@ -168,7 +168,7 @@ describe('settings command handlers', () => {
 
     const session = {
       openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
-      activeRepoId: '/tmp/repo',
+      restoredRepoId: '/tmp/repo',
       zenMode: true,
       workspacePaneSize: 42.5,
       selectedTerminalSessionIdByTerminalWorktree: {},

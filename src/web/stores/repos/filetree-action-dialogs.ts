@@ -14,7 +14,7 @@ interface FiletreeActionDialogsState {
 interface FiletreeActionDialogsActions {
   openTrashFileConfirm: (payload: FiletreeTrashFilePayload) => void
   closeTrashFileConfirm: () => void
-  closeStaleDialogs: (activeRepoId: string) => void
+  closeStaleDialogs: (currentRepoId: string) => void
 }
 
 type FiletreeActionDialogsStore = FiletreeActionDialogsState & FiletreeActionDialogsActions
@@ -27,10 +27,10 @@ export const useFiletreeActionDialogsStore = create<FiletreeActionDialogsStore>(
   ...INITIAL_STATE,
   openTrashFileConfirm: (payload) => set({ trashFileConfirm: payload }),
   closeTrashFileConfirm: () => set({ trashFileConfirm: null }),
-  closeStaleDialogs: (activeRepoId) =>
+  closeStaleDialogs: (currentRepoId) =>
     set((state) => {
       if (!state.trashFileConfirm) return state
-      return state.trashFileConfirm.repoId === activeRepoId ? state : { trashFileConfirm: null }
+      return state.trashFileConfirm.repoId === currentRepoId ? state : { trashFileConfirm: null }
     }),
 }))
 

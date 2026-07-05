@@ -28,7 +28,7 @@ describe('repo session hydration', () => {
       .hydrateRepoSession([localRepoSessionEntry(REPO_A), localRepoSessionEntry(REPO_B)], REPO_B)
 
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
-    expect(useReposStore.getState().activeId).toBe(REPO_B)
+    expect(useReposStore.getState().restoredRepoId).toBe(REPO_B)
     expect(useReposStore.getState().sessionReady).toBe(true)
     expect(calls.recent).toEqual([])
     await vi.waitFor(() => {
@@ -67,7 +67,6 @@ describe('repo session hydration', () => {
             currentBranch: 'cached',
           },
           ui: {
-            selectedBranch: 'cached',
             branchViewMode: 'all',
           },
         },
@@ -98,7 +97,6 @@ describe('repo session hydration', () => {
     expect(cachedRepo ? getRepoSnapshotQueryData(cachedRepo.id, cachedRepo.instanceId)?.branches.map((b) => b.name) : null).toEqual([
       'cached',
     ])
-    expect(cachedRepo?.ui.selectedBranch).toBe('cached')
     expect(cachedRepo?.projection.source).toBe('cache')
     expect(cachedRepo?.dataLoads.snapshot.phase).toBe('refreshing')
     expect(cachedRepo?.projection.savedAt).toBe(savedAt)
@@ -127,7 +125,6 @@ describe('repo session hydration', () => {
             currentBranch: 'cached',
           },
           ui: {
-            selectedBranch: 'cached',
             branchViewMode: 'all',
           },
         },
@@ -173,7 +170,7 @@ describe('repo session hydration', () => {
       // Local repos read as 'connected' under deriveConnectivity; the
       // meaningful invariant is just that the repo stays in the store.
       expect(deriveConnectivity(repo!)).toBe('connected')
-      expect(useReposStore.getState().activeId).toBe(REPO_A)
+      expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
       expect(useReposStore.getState().sessionReady).toBe(false)
     })
 
@@ -199,7 +196,6 @@ describe('repo session hydration', () => {
             currentBranch: 'main',
           },
           ui: {
-            selectedBranch: 'main',
             branchViewMode: 'all',
           },
         },
@@ -238,15 +234,15 @@ describe('repo session hydration', () => {
     expect(repo?.ui.preferredWorkspacePaneTabByTarget).toEqual({})
   })
 
-  test('hydrateRepoSession keeps a user-selected active repo when boot probing settles later', async () => {
+  test('hydrateRepoSession keeps the restored repo when boot probing settles later', async () => {
     installGoblin()
     const result = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
-    if (result.ok) useReposStore.getState().setActive(result.id)
+    if (result.ok) useReposStore.setState({ restoredRepoId: result.id })
 
     await useReposStore.getState().hydrateRepoSession([localRepoSessionEntry(REPO_B)], REPO_B)
 
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
-    expect(useReposStore.getState().activeId).toBe(REPO_A)
+    expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
   })
 
   test('hydrateRepoSession flips sessionReady even when openRepoEntries is empty', async () => {
@@ -258,7 +254,7 @@ describe('repo session hydration', () => {
     await useReposStore.getState().hydrateRepoSession([], null)
 
     expect(useReposStore.getState().order).toEqual([])
-    expect(useReposStore.getState().activeId).toBeNull()
+    expect(useReposStore.getState().restoredRepoId).toBeNull()
     expect(useReposStore.getState().sessionReady).toBe(true)
   })
 
@@ -296,7 +292,7 @@ describe('repo session hydration', () => {
     ).rejects.toThrow('session repo restore failed')
 
     expect(useReposStore.getState().order).toEqual([REPO_A])
-    expect(useReposStore.getState().activeId).toBe(REPO_A)
+    expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
     expect(useReposStore.getState().repos['/missing']).toBeUndefined()
   })
 
@@ -403,7 +399,7 @@ describe('repo session hydration', () => {
     await useReposStore.getState().hydrateRepoSession([remoteRepoSessionEntry(target!)], target!.id)
 
     expect(useReposStore.getState().repos[target!.id]?.remote.lifecycle).toEqual({ kind: 'ready', target })
-    expect(useReposStore.getState().activeId).toBe(target!.id)
+    expect(useReposStore.getState().restoredRepoId).toBe(target!.id)
   })
 
   test('hydrateRepoSession keeps resolved remote target metadata when remote probe reports a missing path', async () => {

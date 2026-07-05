@@ -5,7 +5,7 @@ export interface RepoWorkspaceBehavior {
   singlePane: boolean
   compact: boolean
   zenMode: boolean
-  branchNavigatorCollapsed: boolean
+  sidebarCollapsed: boolean
 }
 
 export function repoWorkspaceBehavior({
@@ -17,13 +17,13 @@ export function repoWorkspaceBehavior({
   zenMode?: boolean
   repoWorkspaceActive?: boolean
 }): RepoWorkspaceBehavior {
-  const branchNavigatorCollapsed = !compact && zenMode && repoWorkspaceActive
+  const sidebarCollapsed = !compact && zenMode && repoWorkspaceActive
   const singlePane = compact || (zenMode && !repoWorkspaceActive)
   return {
     mode: singlePane ? 'single-pane' : 'split',
     singlePane,
     compact,
     zenMode,
-    branchNavigatorCollapsed,
+    sidebarCollapsed,
   }
 }

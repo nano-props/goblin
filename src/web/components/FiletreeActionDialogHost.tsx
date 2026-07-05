@@ -7,10 +7,10 @@ import { useT } from '#/web/stores/i18n.ts'
 import { useFiletreeActionDialogsStore } from '#/web/stores/repos/filetree-action-dialogs.ts'
 
 interface Props {
-  readonly activeRepoId: string | null
+  readonly currentRepoId: string | null
 }
 
-export function FiletreeActionDialogHost({ activeRepoId }: Props) {
+export function FiletreeActionDialogHost({ currentRepoId }: Props) {
   const t = useT()
   const trashFileConfirm = useFiletreeActionDialogsStore((s) => s.trashFileConfirm)
   const closeTrashFileConfirm = useFiletreeActionDialogsStore((s) => s.closeTrashFileConfirm)
@@ -18,8 +18,8 @@ export function FiletreeActionDialogHost({ activeRepoId }: Props) {
   const displayTrashFileConfirm = useLastNonNull(trashFileConfirm)
 
   useEffect(() => {
-    closeStaleDialogs(activeRepoId ?? '')
-  }, [activeRepoId, closeStaleDialogs])
+    closeStaleDialogs(currentRepoId ?? '')
+  }, [currentRepoId, closeStaleDialogs])
 
   return (
     <ConfirmDialog

@@ -20,6 +20,7 @@ import { clientEffectIntentStoreActionsFromStore } from '#/web/stores/repos/sele
 interface ClientEffectIntentRouterOptions {
   navigation: PrimaryWindowNavigationActions
   currentRepoId: string | null
+  currentBranchName?: string | null
   closeAllOverlays: () => void
   openRepoPathDialog: () => void
   openCloneRepo: () => void
@@ -32,6 +33,7 @@ interface ClientEffectIntentRouterOptions {
 export function useClientEffectIntentRouter({
   navigation,
   currentRepoId,
+  currentBranchName = null,
   closeAllOverlays,
   openRepoPathDialog,
   openCloneRepo,
@@ -49,12 +51,14 @@ export function useClientEffectIntentRouter({
   const t = useT()
   const navigationRef = useRef(navigation)
   const currentRepoIdRef = useRef(currentRepoId)
+  const currentBranchNameRef = useRef(currentBranchName)
   const isOverlayOpenRef = useRef(isOverlayOpen)
   const isWorkspaceShortcutSuppressedRef = useRef(isWorkspaceShortcutSuppressed)
   const tRef = useRef(t)
   const ensureWorkspaceOpenRef = useRef(ensureWorkspaceOpen)
   navigationRef.current = navigation
   currentRepoIdRef.current = currentRepoId
+  currentBranchNameRef.current = currentBranchName
   isOverlayOpenRef.current = isOverlayOpen
   isWorkspaceShortcutSuppressedRef.current = isWorkspaceShortcutSuppressed
   tRef.current = t
@@ -72,6 +76,7 @@ export function useClientEffectIntentRouter({
     const sharedDeps = () => ({
       navigation: navigationRef.current,
       currentRepoId: currentRepoIdRef.current,
+      currentBranchName: currentBranchNameRef.current,
       closeAllOverlays,
       openRepoPathDialog,
       openCloneRepo,

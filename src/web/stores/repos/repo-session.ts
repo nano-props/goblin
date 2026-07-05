@@ -11,7 +11,7 @@ import {
   type RuntimeOpenResolvedRepo,
 } from '#/web/stores/repos/repo-session-write-paths.ts'
 import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-orchestrator.ts'
-import { activeRepoIdAfterWorkspaceHydration } from '#/web/open-workspace-state.ts'
+import { restoredRepoIdAfterWorkspaceHydration } from '#/web/open-workspace-state.ts'
 import { isRemoteRepoId, localRepoSessionEntry, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { restoreSessionWorkspacePaneStateInRepos } from '#/web/stores/repos/workspace-pane-session-restore.ts'
 
@@ -28,11 +28,11 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
   return {
     async hydrateRepoSession(
       openRepoEntries: RepoSessionEntry[],
-      activeRepoId: string | null,
+      restoredRepoId: string | null,
       options?: RepoSessionHydrationOptions,
     ) {
       const { signal, workspacePaneRestoreState } = options ?? {}
-      // Boot/session restore of workspace membership and active repository. This
+      // Boot/session restore of workspace membership and restored repository. This
       // reopens what WorkspaceSessionState described, but does not subscribe the repos
       // store to future session writes from persistence.
       //
@@ -72,7 +72,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         return created
       }
 
-      let managedActiveId: string | null = null
+      let managedRestoredRepoId: string | null = null
       const failedOpenEntryIds = new Set<string>()
       let workspacePaneRestoreFailed = false
       const markOpenEntryFailed = (entry: RepoSessionEntry): void => {
@@ -121,16 +121,18 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
               nextRepos = restoreResult.repos
               changedRepos = true
             }
-            const nextActiveId = activeRepoIdAfterWorkspaceHydration(
-              s.activeId,
+            const nextRestoredRepoId = restoredRepoIdAfterWorkspaceHydration(
+              s.restoredRepoId,
               nextRepos,
               order,
-              activeRepoId,
-              managedActiveId,
+              restoredRepoId,
+              managedRestoredRepoId,
             )
-            if (s.activeId === null || s.activeId === managedActiveId) managedActiveId = nextActiveId
-            if (!changedRepos && nextActiveId === s.activeId) return s
-            return { repos: nextRepos, order, activeId: nextActiveId }
+            if (s.restoredRepoId === null || s.restoredRepoId === managedRestoredRepoId) {
+              managedRestoredRepoId = nextRestoredRepoId
+            }
+            if (!changedRepos && nextRestoredRepoId === s.restoredRepoId) return s
+            return { repos: nextRepos, order, restoredRepoId: nextRestoredRepoId }
           })
         }),
       )
@@ -154,23 +156,24 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
               // connecting → server boundary → ready/failed → initial refresh.
               const outcome = await runRemoteRepoConnection(set, get, entry.id, { signal })
               if (signal?.aborted) return
-              // Hydration must keep the user-selected active repo
-              // in sync with the orchestrator's writes. The
+              // Hydration must keep the restored repo id in sync with the orchestrator's writes. The
               // orchestrator updates the store directly; we just
-              // re-derive the activeId after each settlement.
+              // re-derive the restored repo id after each settlement.
               if (outcome) {
                 set((s) => {
                   const { repos, order } = s
-                  const activeId = activeRepoIdAfterWorkspaceHydration(
-                    s.activeId,
+                  const nextRestoredRepoId = restoredRepoIdAfterWorkspaceHydration(
+                    s.restoredRepoId,
                     repos,
                     order,
-                    activeRepoId,
-                    managedActiveId,
+                    restoredRepoId,
+                    managedRestoredRepoId,
                   )
-                  if (s.activeId === null || s.activeId === managedActiveId) managedActiveId = activeId
-                  if (repos === s.repos && order === s.order && activeId === s.activeId) return s
-                  return { repos, order, activeId }
+                  if (s.restoredRepoId === null || s.restoredRepoId === managedRestoredRepoId) {
+                    managedRestoredRepoId = nextRestoredRepoId
+                  }
+                  if (repos === s.repos && order === s.order && nextRestoredRepoId === s.restoredRepoId) return s
+                  return { repos, order, restoredRepoId: nextRestoredRepoId }
                 })
               }
               return
@@ -197,16 +200,18 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
               // action.
               const repo = repos[resolvedRepo.id]
               if (repo) initialRefresh = { id: repo.id, repoInstanceId: repo.instanceId }
-              const activeId = activeRepoIdAfterWorkspaceHydration(
-                s.activeId,
+              const nextRestoredRepoId = restoredRepoIdAfterWorkspaceHydration(
+                s.restoredRepoId,
                 repos,
                 order,
-                activeRepoId,
-                managedActiveId,
+                restoredRepoId,
+                managedRestoredRepoId,
               )
-              if (s.activeId === null || s.activeId === managedActiveId) managedActiveId = activeId
-              if (repos === s.repos && order === s.order && activeId === s.activeId) return s
-              return { repos, order, activeId }
+              if (s.restoredRepoId === null || s.restoredRepoId === managedRestoredRepoId) {
+                managedRestoredRepoId = nextRestoredRepoId
+              }
+              if (repos === s.repos && order === s.order && nextRestoredRepoId === s.restoredRepoId) return s
+              return { repos, order, restoredRepoId: nextRestoredRepoId }
             })
             // See `openRepo`: status backs the selected-branch repo workspace badge,
             // so we hydrate it for every restored repo, not just the active
@@ -217,7 +222,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       )
       await placeholderReady
       // Flip sessionReady unconditionally once placeholders are ready.
-      // With open repositories, the boot skeleton (shown only when no activeId) gives
+      // With open repositories, the boot skeleton gives
       // way to a real workspace immediately — the per-repo body keeps
       // showing its own skeleton until each snapshot resolves. With no open
       // repositories (openRepoEntries was empty), there's nothing else to compute but
@@ -225,17 +230,34 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       set((s) => {
         if (s.sessionReady) return s
         if (s.order.length === 0) return { sessionReady: true }
-        const activeId = activeRepoIdAfterWorkspaceHydration(
-          s.activeId,
+        const nextRestoredRepoId = restoredRepoIdAfterWorkspaceHydration(
+          s.restoredRepoId,
           s.repos,
           s.order,
-          activeRepoId,
-          managedActiveId,
+          restoredRepoId,
+          managedRestoredRepoId,
         )
-        if (s.activeId === null || s.activeId === managedActiveId) managedActiveId = activeId
-        return { activeId, sessionReady: true }
+        if (s.restoredRepoId === null || s.restoredRepoId === managedRestoredRepoId) {
+          managedRestoredRepoId = nextRestoredRepoId
+        }
+        return { restoredRepoId: nextRestoredRepoId, sessionReady: true }
       })
       await probeWork
+      if (restoredRepoId && !get().repos[restoredRepoId]) {
+        set((s) => {
+          const nextRestoredRepoId = restoredRepoIdAfterWorkspaceHydration(
+            s.restoredRepoId,
+            s.repos,
+            s.order,
+            null,
+            managedRestoredRepoId,
+          )
+          if (s.restoredRepoId === null || s.restoredRepoId === managedRestoredRepoId) {
+            managedRestoredRepoId = nextRestoredRepoId
+          }
+          return nextRestoredRepoId === s.restoredRepoId ? s : { restoredRepoId: nextRestoredRepoId }
+        })
+      }
       const restoreError =
         failedOpenEntryIds.size > 0
           ? new Error('session repo restore failed')

@@ -22,7 +22,7 @@ describe('RepoWorkspaceLayoutSkeleton', () => {
     expect(container.querySelector('[data-testid="repo-workspace-empty-skeleton"]')).not.toBeNull()
     expect(container.querySelector('[data-testid="repo-workspace-skeleton"]')).toBeNull()
     expect(container.querySelector('[data-testid="repo-workspace-skeleton-action"]')).toBeNull()
-    // The active repo shell owns the sidebar chrome, so the
+    // The current repo shell owns the sidebar chrome, so the
     // workspace skeleton no longer carries repo-level controls —
     // including the worktree-filter and layout-control slots.
     expect(container.querySelector('[data-testid="repo-toolbar-skeleton-branch-view"]')).toBeNull()

@@ -13,7 +13,7 @@ import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspac
 
 const DEFAULT_RESTORABLE_SESSION_STATE: WorkspaceSessionState = {
   openRepoEntries: [],
-  activeRepoId: null,
+  restoredRepoId: null,
   zenMode: DEFAULT_ZEN_MODE,
   workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
   selectedTerminalSessionIdByTerminalWorktree: {},

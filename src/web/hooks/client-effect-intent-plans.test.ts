@@ -14,7 +14,7 @@ describe('client effect intent plans', () => {
     const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       currentBranch: 'main',
-      selectedBranch: 'main',
+      currentBranchName: 'main',
       branchSnapshots: [
         createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-main' } }),
         createBranchSnapshot('feature/test', { worktree: { path: '/tmp/repo-feature' } }),
@@ -136,7 +136,7 @@ describe('client effect intent plans', () => {
     expect(plan).toEqual({ kind: 'new-terminal-tab', repoId: '/tmp/repo' })
   })
 
-  test('creates a refresh plan from the current visible repo instance id', () => {
+  test('creates a refresh plan from the current repo instance id', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'repo-refresh-requested' },
       {

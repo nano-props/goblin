@@ -9,14 +9,13 @@
 // obvious branch / ref name problems up front; anything else stays
 // git's responsibility.
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { GitBranch, GitBranchPlus, RadioTower, type LucideIcon } from 'lucide-react'
-import { DialogFooter } from '#/web/components/ui/dialog.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '#/web/components/ui/select.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
-import { FormDialog } from '#/web/components/ui/form-dialog.tsx'
 import { Field, FieldDescription, FieldError, FieldLabel } from '#/web/components/ui/field.tsx'
-import { AnimateHeight } from '#/web/components/ui/animate-height.tsx'
+import { CollapseTransition } from '#/web/components/ui/collapse-transition.tsx'
+import { ReservedFadeSlot } from '#/web/components/ui/reserved-fade-slot.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
 import { RemotePathSuggestions } from '#/web/components/ui/remote-path-suggestions.tsx'
 import { ToggleGroup, ToggleGroupItem } from '#/web/components/ui/toggle-group.tsx'
@@ -27,37 +26,24 @@ import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useRepoRemoteBranchesQuery } from '#/web/repo-data-query.ts'
-import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
+import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import { cn } from '#/web/lib/cn.ts'
 import {
   deriveCreateWorktreeForm,
-  type CreateWorktreeDialogMode,
+  type CreateWorktreeMode,
   type CreateWorktreeRequest,
-} from '#/web/components/create-worktree-dialog/create-worktree-dialog.logic.ts'
+} from '#/web/components/create-worktree/create-worktree.logic.ts'
 import type { WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
 
 const MODE_OPTIONS = [
   { id: 'newBranch', labelKey: 'action.create-worktree-mode-new', icon: GitBranchPlus },
   { id: 'existingBranch', labelKey: 'action.create-worktree-mode-existing', icon: GitBranch },
   { id: 'trackRemoteBranch', labelKey: 'action.create-worktree-mode-remote', icon: RadioTower },
-] satisfies Array<{ id: CreateWorktreeDialogMode; labelKey: string; icon: LucideIcon }>
+] satisfies Array<{ id: CreateWorktreeMode; labelKey: string; icon: LucideIcon }>
 
-type CreateWorktreeDialogRepoShell = RepoState
-type CreateWorktreeDialogRepo = RepoState & { branchModel: RepoBranchReadModelData }
+type CreateWorktreeRepo = RepoState & { branchModel: RepoBranchReadModelData }
 
-interface Props {
-  open: boolean
-  repo: CreateWorktreeDialogRepoShell
-  worktreeBootstrap?: WorktreeBootstrapPromptState
-  onClose: () => void
-  onCreate: (request: CreateWorktreeRequest) => boolean | void | Promise<boolean | void>
-}
-
-type ContentProps = Omit<Props, 'repo'> & {
-  repo: CreateWorktreeDialogRepo
-}
-
-interface WorktreeBootstrapPromptState {
+export interface WorktreeBootstrapPromptState {
   loading: boolean
   preview: WorktreeBootstrapPreview | null
   error: boolean
@@ -65,57 +51,60 @@ interface WorktreeBootstrapPromptState {
   onConfigTrustedChange: (trust: boolean) => void
 }
 
-export function CreateWorktreeDialog({ open, repo, worktreeBootstrap, onClose, onCreate }: Props) {
-  const branchReadModel = useRepoBranchReadModel(repo.id, repo.instanceId, true)
-  if (!branchReadModel) return null
+export function CreateWorktreePageBody({
+  repo,
+  worktreeBootstrap,
+  onCancel,
+  onCreate,
+}: CreateWorktreeFormProps) {
+  const t = useT()
+
   return (
-    <CreateWorktreeDialogContent
-      open={open}
-      repo={{ ...repo, branchModel: branchReadModel }}
-      worktreeBootstrap={worktreeBootstrap}
-      onClose={onClose}
-      onCreate={onCreate}
-    />
+    <div className="flex w-full flex-col gap-4 p-6">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-sm leading-tight font-semibold">{t('action.create-worktree-title')}</h1>
+        <p className="text-sm text-muted-foreground">{t('action.create-worktree-hint')}</p>
+      </div>
+      <CreateWorktreeForm
+        repo={repo}
+        worktreeBootstrap={worktreeBootstrap}
+        onCancel={onCancel}
+        onCreate={onCreate}
+      />
+    </div>
   )
 }
 
-function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, onCreate }: ContentProps) {
+interface CreateWorktreeFormProps {
+  repo: CreateWorktreeRepo
+  worktreeBootstrap?: WorktreeBootstrapPromptState
+  onCancel: () => void
+  onCreate: (request: CreateWorktreeRequest) => boolean | void | Promise<boolean | void>
+}
+
+export function CreateWorktreeForm({
+  repo,
+  worktreeBootstrap,
+  onCancel,
+  onCreate,
+}: CreateWorktreeFormProps) {
   const t = useT()
   const compact = useIsCompactUi()
 
-  const [mode, setMode] = useState<CreateWorktreeDialogMode>('newBranch')
-  const [base, setBase] = useState<string>('')
+  const [mode, setMode] = useState<CreateWorktreeMode>('newBranch')
+  const initialBase = repo.branchModel.currentBranch || repo.branchModel.branches[0]?.name || ''
+  const [base, setBase] = useState<string>(initialBase)
   const [branch, setBranch] = useState('')
-  const [existingBranch, setExistingBranch] = useState('')
+  const [existingBranch, setExistingBranch] = useState(initialBase)
   const [remoteRef, setRemoteRef] = useState('')
   const [localBranch, setLocalBranch] = useState('')
   const [worktreePath, setWorktreePath] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const remoteBranchesQuery = useRepoRemoteBranchesQuery(repo.id, repo.instanceId, {
-    enabled: open && mode === 'trackRemoteBranch',
+    enabled: mode === 'trackRemoteBranch',
   })
   const remoteBranches = remoteBranchesQuery.data ?? []
   const remoteBranchesLoading = remoteBranchesQuery.isLoading
-
-  // Reset on the rising edge of `open` only. A guard ref prevents snapshot
-  // refreshes (which change repo.branchModel.branches / currentBranch) from wiping
-  // user input while the dialog stays open. The ref starts false so the
-  // first render with open=true still triggers the reset.
-  const previousOpenRef = useRef(false)
-  useEffect(() => {
-    const wasClosed = !previousOpenRef.current && open
-    previousOpenRef.current = open
-    if (!wasClosed) return
-    const initialBase = repo.branchModel.currentBranch || repo.branchModel.branches[0]?.name || ''
-    setMode('newBranch')
-    setBase(initialBase)
-    setBranch('')
-    setExistingBranch(initialBase)
-    setRemoteRef('')
-    setLocalBranch('')
-    setWorktreePath('')
-    setSubmitting(false)
-  }, [open, repo.branchModel.branches, repo.branchModel.currentBranch])
 
   const remoteTarget = remoteRepoTarget(repo.id, repo.remote.lifecycle)
   const derived = deriveCreateWorktreeForm(
@@ -128,6 +117,7 @@ function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, o
   const branchActionBusy = repo.operations.branchAction.phase !== 'idle'
   const bootstrapBusy = worktreeBootstrap?.loading === true
   const canSubmit = !!derived.input && derived.validPath && !branchActionBusy && !bootstrapBusy && !submitting
+  const showBootstrapTrust = shouldShowWorktreeBootstrapTrust(worktreeBootstrap)
 
   async function handleSubmit(): Promise<void> {
     const nextInput = derived.input
@@ -140,25 +130,18 @@ function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, o
     } finally {
       setSubmitting(false)
     }
-    if (shouldClose) onClose()
+    if (shouldClose) onCancel()
   }
 
   const remotePathSuggestions = useRemotePathSuggestions({
-    enabled: open && !!remoteTarget && derived.pathName.length > 0,
+    enabled: !!remoteTarget && derived.pathName.length > 0,
     alias: remoteTarget?.alias ?? '',
     remotePath: remoteTarget?.remotePath ?? '/',
     prefix: worktreePath,
   })
 
   return (
-    <FormDialog
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) onClose()
-      }}
-      title={t('action.create-worktree-title')}
-      description={t('action.create-worktree-hint')}
-    >
+    <div>
       <form
         className="space-y-3"
         onSubmit={(e) => {
@@ -172,7 +155,7 @@ function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, o
             type="single"
             value={mode}
             onValueChange={(next) => {
-              if (next) setMode(next as CreateWorktreeDialogMode)
+              if (next) setMode(next as CreateWorktreeMode)
             }}
             variant="outline"
             size="sm"
@@ -195,7 +178,7 @@ function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, o
           </ToggleGroup>
         </Field>
 
-        <AnimateHeight>
+        <CreateWorktreeAnimatedSection>
           <div className="space-y-3">
             {mode === 'newBranch' && (
               <>
@@ -232,7 +215,6 @@ function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, o
                   <FieldLabel htmlFor="cwt-branch">{t('action.create-worktree-branch-label')}</FieldLabel>
                   <Input
                     id="cwt-branch"
-                    autoFocus
                     className="h-10 text-sm"
                     value={branch}
                     onChange={(e) => setBranch(e.target.value)}
@@ -323,7 +305,7 @@ function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, o
               </>
             )}
           </div>
-        </AnimateHeight>
+        </CreateWorktreeAnimatedSection>
 
         <Field className="gap-2">
           <FieldLabel htmlFor="cwt-path">{t('action.create-worktree-path-label')}</FieldLabel>
@@ -361,26 +343,38 @@ function CreateWorktreeDialogContent({ open, repo, worktreeBootstrap, onClose, o
           </FieldDescription>
         </Field>
 
-        <WorktreeBootstrapTrustCheckbox state={worktreeBootstrap} />
+        <CreateWorktreeReservedFadeSlot present={showBootstrapTrust}>
+          <WorktreeBootstrapTrustCheckbox state={worktreeBootstrap} />
+        </CreateWorktreeReservedFadeSlot>
 
-        <DialogFooter className="gap-2 pt-2">
-          <Button type="button" variant="outline" className={cn(compact && 'w-full')} onClick={onClose}>
-            {t('dialog.cancel')}
+        <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+          <Button type="button" variant="outline" className={cn(compact && 'w-full')} onClick={onCancel}>
+            {t('action.create-worktree-cancel')}
           </Button>
           <Button type="submit" className={cn('min-w-28', compact && 'w-full min-w-0')} disabled={!canSubmit}>
             {t('action.create-worktree-confirm')}
           </Button>
-        </DialogFooter>
+        </div>
       </form>
-    </FormDialog>
+    </div>
+  )
+}
+
+function CreateWorktreeAnimatedSection({ children, present = true }: { children: React.ReactNode; present?: boolean }) {
+  return <CollapseTransition present={present}>{children}</CollapseTransition>
+}
+
+function CreateWorktreeReservedFadeSlot({ children, present }: { children: React.ReactNode; present: boolean }) {
+  return (
+    <ReservedFadeSlot present={present} className="min-h-6">
+      {children}
+    </ReservedFadeSlot>
   )
 }
 
 function WorktreeBootstrapTrustCheckbox({ state }: { state: WorktreeBootstrapPromptState | undefined }) {
   const t = useT()
-  const preview = state?.preview ?? null
-  const showPrompt = !state?.loading && !state?.error && preview?.hasOperations === true && !!preview.configHash
-  if (!state || !showPrompt) return null
+  if (!state) return null
 
   return (
     <div className="pt-0.5 text-sm">
@@ -389,4 +383,9 @@ function WorktreeBootstrapTrustCheckbox({ state }: { state: WorktreeBootstrapPro
       </ConfirmCheckbox>
     </div>
   )
+}
+
+function shouldShowWorktreeBootstrapTrust(state: WorktreeBootstrapPromptState | undefined): boolean {
+  const preview = state?.preview ?? null
+  return !state?.loading && !state?.error && preview?.hasOperations === true && !!preview.configHash
 }

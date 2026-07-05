@@ -10,7 +10,7 @@ export const compositeFocusRing =
 // Inset box-shadow focus rings — drawn *inside* the border box, so they
 // belong to the element's own rendering and survive any ancestor
 // overflow:hidden / clip-path / scroll-container. Concentric outer rings
-// are fundamentally clip-fragile (the AnimateHeight height transition
+// are fundamentally clip-fragile (the CollapseTransition height transition
 // was clipping Input's left/right focus halo because the input sits
 // flush against the clipping edge).
 //

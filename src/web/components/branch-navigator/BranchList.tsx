@@ -12,8 +12,7 @@
 //     ⇒ close the menu" invariant lives next to the rows that draw it
 //   • uses useLayoutEffect to scroll the highlighted row into view
 //     before paint, so the pane doesn't flash to the top first
-//   • the highlight comes from the same single store field
-//     (`ui.selectedBranch`) through the data wrapper
+//   • the highlight comes from route context through the data wrapper
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { BranchListRow } from '#/web/components/branch-navigator/BranchListRow.tsx'
@@ -26,9 +25,7 @@ interface Props {
    *  through to the empty-state slot in that case. */
   repo: BranchListRepo | null
   branches: RepoBranchState[]
-  /** Name of the branch to mark as selected/highlighted in the list.
-   *  Derived from `ui.selectedBranch` by the data wrapper so callers do
-   *  not need a per-surface resolver. */
+  /** Name of the branch to mark as selected/highlighted in the list. */
   highlightedBranch: string | null
   onSelectBranch: (branch: string) => void
   onOpenBranchStatus: (branch: string) => void

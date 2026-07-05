@@ -27,7 +27,6 @@ function selectBranchForTest(branch: string): void {
     repos: {
       ...s.repos,
       [REPO_ID]: replaceRepo(s.repos[REPO_ID]!, (repo) => {
-        repo.ui.selectedBranch = branch
       }),
     },
   }))
@@ -135,7 +134,6 @@ describe('refreshPullRequests', () => {
     expect(cached?.name).toBe('repo')
     expect(cached?.data.currentBranch).toBe('feature/a')
     expect(cached?.data.branches.map((b) => b.name)).toEqual(['feature/a'])
-    expect(cached?.ui.selectedBranch).toBeNull()
   })
 
   test('writes returned pull requests to the React Query read model', async () => {
@@ -361,9 +359,8 @@ describe('refreshPullRequests', () => {
     })
   })
 
-  test('snapshot refresh performs summary lookup then selected full lookup for visible detail', async () => {
+  test('snapshot refresh performs summary lookup without guessing visible detail branch', async () => {
     const repoInstanceId = seedRepo([branch('feature/a')])
-    selectBranchForTest('feature/a')
     const calls: Array<{ branches?: string[]; mode?: string; loadingAtStart?: boolean }> = []
     ipcHandlers['repo.snapshot'] = async () => ({
       branches: [branch('feature/a'), branch('feature/b')],
@@ -383,14 +380,12 @@ describe('refreshPullRequests', () => {
 
     expect(calls).toEqual([
       { branches: ['feature/a', 'feature/b'], mode: 'summary', loadingAtStart: true },
-      { branches: ['feature/a'], mode: 'full', loadingAtStart: true },
     ])
   })
 
-  test('snapshot refresh retries visible full lookup when query merge status is still pending', async () => {
+  test('snapshot refresh leaves visible full lookup to route-visible refresh intents', async () => {
     vi.useFakeTimers()
     const repoInstanceId = seedRepo([branch('feature/a')])
-    selectBranchForTest('feature/a')
     const calls: Array<{ branches?: string[]; mode?: string }> = []
     let fullCalls = 0
     ipcHandlers['repo.snapshot'] = async () => ({
@@ -414,12 +409,7 @@ describe('refreshPullRequests', () => {
 
     expect(calls).toEqual([
       { branches: ['feature/a'], mode: 'summary' },
-      { branches: ['feature/a'], mode: 'full' },
-      { branches: ['feature/a'], mode: 'full' },
     ])
-    expect(
-      primaryWindowQueryClient.getQueryData(repoPullRequestsQueryKey(REPO_ID, repoInstanceId, ['feature/a'], 'full')),
-    ).toEqual([{ branch: 'feature/a', pullRequest: pullRequest(1, { mergeable: 'MERGEABLE' }) }])
   })
 
   test('snapshot refresh skips selected full lookup when status detail is not visible', async () => {
@@ -432,7 +422,7 @@ describe('refreshPullRequests', () => {
             repo.ui,
             {
               repoRoot: REPO_ID,
-              branchName: repo.ui.selectedBranch ?? 'feature/a',
+              branchName: 'feature/a',
               worktreePath: '/tmp/feature-a-worktree',
             },
             'terminal',

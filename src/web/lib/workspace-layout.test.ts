@@ -7,20 +7,20 @@ describe('repoWorkspaceBehavior', () => {
       mode: 'split',
       singlePane: false,
       zenMode: false,
-      branchNavigatorCollapsed: false,
+      sidebarCollapsed: false,
     })
   })
 
-  test('uses Branch Navigator as the single pane when large-screen Zen Mode has no active repo workspace', () => {
+  test('uses the sidebar as the single pane when large-screen Zen Mode has no current repo workspace', () => {
     expect(repoWorkspaceBehavior({ compact: false, zenMode: true })).toMatchObject({
       mode: 'single-pane',
       singlePane: true,
       zenMode: true,
-      branchNavigatorCollapsed: false,
+      sidebarCollapsed: false,
     })
   })
 
-  test('collapses Branch Navigator inside split layout when large-screen Zen Mode has an active repo workspace', () => {
+  test('collapses the sidebar inside split layout when large-screen Zen Mode has a current repo workspace', () => {
     expect(
       repoWorkspaceBehavior({
         compact: false,
@@ -31,7 +31,7 @@ describe('repoWorkspaceBehavior', () => {
       mode: 'split',
       singlePane: false,
       zenMode: true,
-      branchNavigatorCollapsed: true,
+      sidebarCollapsed: true,
     })
   })
 
@@ -41,11 +41,11 @@ describe('repoWorkspaceBehavior', () => {
       singlePane: true,
       compact: true,
       zenMode: false,
-      branchNavigatorCollapsed: false,
+      sidebarCollapsed: false,
     })
   })
 
-  test('hides Branch Navigator in compact mode once a repo workspace is active', () => {
+  test('hides the sidebar in compact mode once a repo workspace is active', () => {
     expect(
       repoWorkspaceBehavior({
         compact: true,
@@ -56,7 +56,7 @@ describe('repoWorkspaceBehavior', () => {
       mode: 'single-pane',
       singlePane: true,
       compact: true,
-      branchNavigatorCollapsed: false,
+      sidebarCollapsed: false,
     })
   })
 })

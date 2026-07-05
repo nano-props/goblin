@@ -27,7 +27,6 @@ type ClientWorkspaceIntent = Extract<
 export type TerminalBellIntentPlan =
   | { kind: 'noop' }
   | { kind: 'unavailable'; reason: 'branch-read-model-unavailable' }
-  | { kind: 'show-repo-terminal'; repoId: string }
   | {
       kind: 'show-worktree-terminal'
       repoId: string
@@ -96,7 +95,7 @@ export function createTerminalBellIntentPlan(
       }
     }
   }
-  return { kind: 'show-repo-terminal', repoId: repo.id }
+  return { kind: 'noop' }
 }
 
 export function createAppLevelIntentPlan(

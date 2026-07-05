@@ -24,15 +24,18 @@ import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-dat
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 
 const persistWorkspaceSessionStateMock = vi.fn(async (_session: unknown) => {})
+const persistWorkspaceSessionStateOnUnloadMock = vi.fn((_session: unknown) => {})
 
 vi.mock('#/web/settings-actions.ts', () => ({
   persistWorkspaceSessionState: (session: unknown) => persistWorkspaceSessionStateMock(session),
+  persistWorkspaceSessionStateOnUnload: (session: unknown) => persistWorkspaceSessionStateOnUnloadMock(session),
 }))
 
 beforeEach(() => {
   resetReposStore()
   resetFiletreeInteractionStore()
   persistWorkspaceSessionStateMock.mockReset()
+  persistWorkspaceSessionStateOnUnloadMock.mockReset()
 })
 
 describe('useSessionPersistence', () => {
@@ -41,7 +44,7 @@ describe('useSessionPersistence', () => {
     useReposStore.setState({
       repos: { [repo.id]: repo },
       order: [repo.id],
-      activeId: repo.id,
+      restoredRepoId: repo.id,
       sessionReady: true,
       sessionPersistenceReady: true,
     })
@@ -50,7 +53,7 @@ describe('useSessionPersistence', () => {
     expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         openRepoEntries: [{ kind: 'local', id: repo.id }],
-        activeRepoId: repo.id,
+        restoredRepoId: repo.id,
         selectedTerminalSessionIdByTerminalWorktree: {},
         preferredWorkspacePaneTabByTargetByRepo: {},
         workspacePaneTabsByTargetByRepo: {},
@@ -64,7 +67,7 @@ describe('useSessionPersistence', () => {
     const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
         'feature/worktree': [workspacePaneStaticTabEntry('status')],
@@ -73,7 +76,7 @@ describe('useSessionPersistence', () => {
     useReposStore.setState({
       repos: { [repo.id]: repo },
       order: [repo.id],
-      activeId: repo.id,
+      restoredRepoId: repo.id,
       sessionReady: true,
       sessionPersistenceReady: true,
       selectedTerminalSessionIdByTerminalWorktree: {
@@ -86,7 +89,7 @@ describe('useSessionPersistence', () => {
     expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
-        activeRepoId: '/tmp/repo',
+        restoredRepoId: '/tmp/repo',
         selectedTerminalSessionIdByTerminalWorktree: {
           '/tmp/repo\0/tmp/worktree': 'session-2',
         },
@@ -99,12 +102,84 @@ describe('useSessionPersistence', () => {
     )
   })
 
+  test('persists the routed repo as the restored session repo', () => {
+    const inactiveRepo = emptyRepo('/tmp/inactive-repo', 'inactive-repo', 'inactive-repo-instance')
+    const visibleRepo = emptyRepo('/tmp/visible-repo', 'visible-repo', 'visible-repo-instance')
+    useReposStore.setState({
+      repos: { [inactiveRepo.id]: inactiveRepo, [visibleRepo.id]: visibleRepo },
+      order: [inactiveRepo.id, visibleRepo.id],
+      restoredRepoId: inactiveRepo.id,
+      sessionReady: true,
+      sessionPersistenceReady: true,
+    })
+
+    renderInJsdom(<Harness routedRepoId={visibleRepo.id} />)
+
+    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        restoredRepoId: visibleRepo.id,
+      }),
+    )
+  })
+
+  test('keeps the last routed repo restored while rendering a non-repo route', async () => {
+    const inactiveRepo = emptyRepo('/tmp/inactive-repo', 'inactive-repo', 'inactive-repo-instance')
+    const visibleRepo = emptyRepo('/tmp/visible-repo', 'visible-repo', 'visible-repo-instance')
+    useReposStore.setState({
+      repos: { [inactiveRepo.id]: inactiveRepo, [visibleRepo.id]: visibleRepo },
+      order: [inactiveRepo.id, visibleRepo.id],
+      restoredRepoId: inactiveRepo.id,
+      sessionReady: true,
+      sessionPersistenceReady: true,
+    })
+
+    const result = renderInJsdom(<Harness routedRepoId={visibleRepo.id} />)
+    persistWorkspaceSessionStateMock.mockClear()
+
+    result.rerender(<Harness routedRepoId={null} />)
+    act(() => {
+      useReposStore.setState({ zenMode: true })
+    })
+
+    await vi.waitFor(() => {
+      expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          restoredRepoId: visibleRepo.id,
+          zenMode: true,
+        }),
+      )
+    })
+  })
+
+  test('flushes the latest route-visible session during unload', () => {
+    const inactiveRepo = emptyRepo('/tmp/inactive-repo', 'inactive-repo', 'inactive-repo-instance')
+    const visibleRepo = emptyRepo('/tmp/visible-repo', 'visible-repo', 'visible-repo-instance')
+    useReposStore.setState({
+      repos: { [inactiveRepo.id]: inactiveRepo, [visibleRepo.id]: visibleRepo },
+      order: [inactiveRepo.id, visibleRepo.id],
+      restoredRepoId: inactiveRepo.id,
+      sessionReady: true,
+      sessionPersistenceReady: true,
+    })
+
+    renderInJsdom(<Harness routedRepoId={visibleRepo.id} />)
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'))
+    })
+
+    expect(persistWorkspaceSessionStateOnUnloadMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        restoredRepoId: visibleRepo.id,
+      }),
+    )
+  })
+
   test('persists explicitly closed workspace pane tabs as empty arrays', () => {
     const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
     const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
         'feature/worktree': [],
@@ -129,7 +204,7 @@ describe('useSessionPersistence', () => {
     const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'history',
     })
     setWorkspacePaneTabsForTargetQueryData({
@@ -163,12 +238,12 @@ describe('useSessionPersistence', () => {
     const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
     })
     useReposStore.setState({
       repos: { [repo.id]: repo },
       order: [repo.id],
-      activeId: repo.id,
+      restoredRepoId: repo.id,
       sessionReady: true,
       sessionPersistenceReady: true,
     })
@@ -205,7 +280,7 @@ describe('useSessionPersistence', () => {
     const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('main')],
-      selectedBranch: 'main',
+      currentBranchName: 'main',
       preferredWorkspacePaneTab: 'history',
     })
     setRepoSnapshotQueryData(repo.id, repo.instanceId, {
@@ -242,7 +317,7 @@ describe('useSessionPersistence', () => {
       id: '/tmp/repo',
       instanceId: oldInstanceId,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
     })
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: repo.id,
@@ -289,13 +364,13 @@ describe('useSessionPersistence', () => {
     const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
     })
     const scopeKey = filetreeInteractionScopeKey(repo.id, '/tmp/worktree')
     useReposStore.setState({
       repos: { [repo.id]: repo },
       order: [repo.id],
-      activeId: repo.id,
+      restoredRepoId: repo.id,
       sessionReady: true,
       sessionPersistenceReady: true,
     })
@@ -328,12 +403,12 @@ describe('useSessionPersistence', () => {
     const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
     })
     useReposStore.setState({
       repos: { [repo.id]: repo },
       order: [repo.id],
-      activeId: repo.id,
+      restoredRepoId: repo.id,
       sessionReady: true,
       sessionPersistenceReady: false,
     })
@@ -359,7 +434,7 @@ describe('useSessionPersistence', () => {
     const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       workspacePaneTabsByBranch: {
         'feature/worktree': [workspacePaneStaticTabEntry('status')],
       },
@@ -367,7 +442,7 @@ describe('useSessionPersistence', () => {
     useReposStore.setState({
       repos: { [repo.id]: repo },
       order: [repo.id],
-      activeId: repo.id,
+      restoredRepoId: repo.id,
       sessionReady: true,
       sessionPersistenceReady: true,
     })
@@ -402,7 +477,7 @@ describe('useSessionPersistence', () => {
     const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
-      selectedBranch: 'feature/worktree',
+      currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
         'feature/worktree': [workspacePaneStaticTabEntry('status')],
@@ -411,7 +486,7 @@ describe('useSessionPersistence', () => {
     useReposStore.setState({
       repos: { [repo.id]: repo },
       order: [repo.id],
-      activeId: repo.id,
+      restoredRepoId: repo.id,
       sessionReady: true,
       sessionPersistenceReady: true,
     })
@@ -439,8 +514,8 @@ describe('useSessionPersistence', () => {
   })
 })
 
-function Harness() {
-  useSessionPersistence()
+function Harness({ routedRepoId = null }: { routedRepoId?: string | null }) {
+  useSessionPersistence({ routedRepoId })
   return null
 }
 

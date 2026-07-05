@@ -1,62 +1,74 @@
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
+import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 
 export interface PrimaryWindowNavigationActions {
   activateRepo: (repoId: string) => void
   closeRepo: (repoId: string) => void
   cycleRepo: (direction: 1 | -1) => void
   selectRepoBranch: (repoId: string, branch: string) => void
-  showRepoWorkspacePaneTab: (repoId: string, tab: WorkspacePaneTabType) => void
   showRepoBranchWorkspacePaneTab: (repoId: string, branch: string, tab: WorkspacePaneTabType) => void
   openSettings: (page: SettingsPage) => void
+  openCreateWorktree: () => void
 }
 
 interface CreatePrimaryWindowNavigationActionsOptions {
-  activeId: string | null
+  currentRepoId: string | null
   order: string[]
-  setActive: (repoId: string) => void
   closeRepo: (repoId: string) => void
-  cycleActive: (direction: 1 | -1) => void
-  selectBranch: (repoId: string, branch: string) => void
-  setWorkspacePaneTab: (repoId: string, tab: WorkspacePaneTabType) => void
-  onOpenSettings?: (page: SettingsPage) => void
+  setWorkspacePaneTab: (repoId: string, branch: string, tab: WorkspacePaneTabType) => void
+  routeNavigation: PrimaryWindowRouteNavigation
 }
 
 export function createPrimaryWindowNavigationActions({
-  activeId,
+  currentRepoId,
   order,
-  setActive,
   closeRepo,
-  cycleActive,
-  selectBranch,
   setWorkspacePaneTab,
-  onOpenSettings,
+  routeNavigation,
 }: CreatePrimaryWindowNavigationActionsOptions): PrimaryWindowNavigationActions {
   return {
     activateRepo(repoId) {
-      setActive(repoId)
+      routeNavigation.openRepoDashboard(repoId)
     },
     closeRepo(repoId) {
+      const nextRepoId = repoId === currentRepoId ? nextNavigationRepoIdAfterClose(order, repoId) : null
       closeRepo(repoId)
+      if (repoId !== currentRepoId) return
+      if (nextRepoId) routeNavigation.openRepoDashboard(nextRepoId)
+      else routeNavigation.openHome()
     },
     cycleRepo(direction) {
-      cycleActive(direction)
+      const repoId = nextNavigationRepoId(order, currentRepoId, direction)
+      if (repoId) routeNavigation.openRepoDashboard(repoId)
     },
     selectRepoBranch(repoId, branch) {
-      if (repoId !== activeId) setActive(repoId)
-      selectBranch(repoId, branch)
-    },
-    showRepoWorkspacePaneTab(repoId, tab) {
-      if (repoId !== activeId) setActive(repoId)
-      setWorkspacePaneTab(repoId, tab)
+      routeNavigation.openRepoBranch(repoId, branch)
     },
     showRepoBranchWorkspacePaneTab(repoId, branch, tab) {
-      if (repoId !== activeId) setActive(repoId)
-      selectBranch(repoId, branch)
-      setWorkspacePaneTab(repoId, tab)
+      routeNavigation.openRepoBranch(repoId, branch)
+      setWorkspacePaneTab(repoId, branch, tab)
     },
     openSettings(page) {
-      onOpenSettings?.(page)
+      routeNavigation.openSettings(page)
+    },
+    openCreateWorktree() {
+      if (!currentRepoId) return
+      routeNavigation.openRepoNewWorktree(currentRepoId)
     },
   }
+}
+
+function nextNavigationRepoIdAfterClose(order: string[], closingRepoId: string): string | null {
+  const currentIndex = order.indexOf(closingRepoId)
+  if (currentIndex === -1) return order[0] ?? null
+  return order[currentIndex + 1] ?? order[currentIndex - 1] ?? null
+}
+
+function nextNavigationRepoId(order: string[], currentRepoId: string | null, direction: 1 | -1): string | null {
+  if (order.length === 0) return null
+  if (!currentRepoId) return order[0] ?? null
+  const currentIndex = order.indexOf(currentRepoId)
+  if (currentIndex === -1) return order[0] ?? null
+  return order[(currentIndex + direction + order.length) % order.length] ?? null
 }
