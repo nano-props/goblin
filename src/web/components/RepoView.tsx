@@ -197,6 +197,7 @@ export function RepoView({
         <RepoWorkspacePane>
           {routeView?.kind === 'dashboard' ? (
             <RepoDashboardPane
+              repoId={repoId}
               compact={compact}
               trafficLightOffset={workspaceTrafficLightOffset}
               onBack={() => onOpenRepoRoot?.(repo.id)}

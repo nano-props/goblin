@@ -96,6 +96,19 @@ vi.mock('#/web/components/repo-pages/CreateWorktreePagePane.tsx', () => ({
   ),
 }))
 
+vi.mock('#/web/components/repo-pages/RepoDashboardPane.tsx', () => ({
+  RepoDashboardPane: ({ compact, onBack }: { compact?: boolean; onBack?: () => void }) => (
+    <div data-testid="repo-dashboard-page" data-compact={compact ? 'true' : 'false'}>
+      <button
+        type="button"
+        data-testid="repo-dashboard-back"
+        aria-label="workspace.back-to-branch-navigator"
+        onClick={onBack}
+      />
+    </div>
+  ),
+}))
+
 vi.mock('#/web/components/RepoPickerHost.tsx', () => ({
   RepoPickerHost: () => <div data-testid="repo-picker" />,
 }))
