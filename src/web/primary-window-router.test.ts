@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'vitest'
-import { initialRepoRouteSlugFromStore, repoRouteViewFromChildRoute } from '#/web/primary-window-router.tsx'
+import {
+  initialRepoRouteSlugFromStore,
+  repoRouteViewFromChildRoute,
+  repoRouteViewFromSlugChildRoute,
+} from '#/web/primary-window-router.tsx'
 import { repoSlugFromId } from '#/web/repo-route-slugs.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { repoRouteContextFromMatches } from '#/web/Layout.tsx'
@@ -14,12 +18,12 @@ describe('primary window initial route', () => {
         restoredRepoId: '/repo-b',
         order: ['/repo-a', '/repo-b'],
         repos: { '/repo-a': repoA, '/repo-b': repoB },
-        sessionReady: true,
+        workspaceMembershipReady: true,
       }),
     ).toBe(repoSlugFromId('/repo-b'))
   })
 
-  test('waits for session restore instead of routing to the first partial repo', () => {
+  test('waits for workspace membership restore instead of routing to the first partial repo', () => {
     const repoA = emptyRepo('/repo-a', 'repo-a', 'repo-instance-a')
 
     expect(
@@ -27,7 +31,7 @@ describe('primary window initial route', () => {
         restoredRepoId: null,
         order: ['/repo-a'],
         repos: { '/repo-a': repoA },
-        sessionReady: false,
+        workspaceMembershipReady: false,
       }),
     ).toBeNull()
   })
@@ -40,13 +44,26 @@ describe('primary window initial route', () => {
         restoredRepoId: '/missing',
         order: ['/repo-a'],
         repos: { '/repo-a': repoA },
-        sessionReady: true,
+        workspaceMembershipReady: true,
       }),
     ).toBe(repoSlugFromId('/repo-a'))
   })
 })
 
 describe('repo route view derivation', () => {
+  test('derives a routed repo view directly from the URL slug without store hydration', () => {
+    const repoSlug = repoSlugFromId('/deep-link/repo')
+
+    expect(repoRouteViewFromSlugChildRoute(repoSlug, { dashboard: true, branchSlug: null, newWorktree: false })).toEqual({
+      kind: 'dashboard',
+      repoId: '/deep-link/repo',
+    })
+  })
+
+  test('returns null only when the repo slug itself is invalid', () => {
+    expect(repoRouteViewFromSlugChildRoute('%', { dashboard: true, branchSlug: null, newWorktree: false })).toBeNull()
+  })
+
   test('uses the repo root as an empty route view', () => {
     expect(repoRouteViewFromChildRoute('/repo', { dashboard: false, branchSlug: null, newWorktree: false })).toEqual({
       kind: 'empty',

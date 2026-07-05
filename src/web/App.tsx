@@ -42,7 +42,7 @@ export function App({
   onCancelRepoNewWorktree,
   onReplaceRepoBranch,
 }: AppProps) {
-  const sessionReady = useReposStore((s) => s.sessionReady)
+  const workspaceMembershipReady = useReposStore((s) => s.workspaceMembershipReady)
   const zenMode = useReposStore((s) => s.zenMode)
   const uiMode = useResponsiveUiMode()
   const bootWorkspaceBehavior = repoWorkspaceBehavior({
@@ -75,7 +75,7 @@ export function App({
             onCancelRepoNewWorktree={onCancelRepoNewWorktree}
             onReplaceRepoBranch={onReplaceRepoBranch}
           />
-        ) : !sessionReady ? (
+        ) : !workspaceMembershipReady ? (
           <RepoWorkspaceLayoutSkeleton
             singlePane={bootWorkspaceBehavior.singlePane}
             singlePaneView="navigator"

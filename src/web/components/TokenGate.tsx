@@ -2,6 +2,10 @@ import { useActionState, useState, type ReactNode } from 'react'
 import { useAuth } from '#/web/auth/AuthProvider.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { postServerJson } from '#/web/lib/server-fetch.ts'
+import { createTimeoutAbortController } from '#/web/lib/abort.ts'
+import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
+
+const LOGIN_TIMEOUT_MS = 15_000
 
 /**
  * Auth gate for the client. Mounts above the app's normal
@@ -36,11 +40,7 @@ export function TokenGate({ children }: { children: ReactNode }) {
 }
 
 function CheckingPlaceholder() {
-  return (
-    <div className="flex h-full items-center justify-center text-muted-foreground">
-      <span>…</span>
-    </div>
-  )
+  return <CenteredLoadingStatus label="Checking authentication" />
 }
 
 function LoginForm({ onSuccess }: { onSuccess: () => void }) {
@@ -50,12 +50,15 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
     async (_previous: { error: string | null }, formData: FormData): Promise<{ error: string | null }> => {
       const trimmed = String(formData.get('token') ?? '').trim()
       if (trimmed.length === 0) return { error: t('auth.gate.error-empty') }
+      const timeout = createTimeoutAbortController(LOGIN_TIMEOUT_MS, `login timed out after ${LOGIN_TIMEOUT_MS}ms`)
       try {
-        await postServerJson<{ token: string }, { ok: true }>('/api/login', { token: trimmed })
+        await postServerJson<{ token: string }, { ok: true }>('/api/login', { token: trimmed }, { signal: timeout.signal })
         onSuccess()
         return { error: null }
       } catch (err) {
         return { error: err instanceof Error ? err.message : t('auth.gate.error-failed') }
+      } finally {
+        timeout.dispose()
       }
     },
     { error: null },

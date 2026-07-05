@@ -37,9 +37,9 @@ beforeEach(() => {
   resetReposStore()
 })
 
-describe('App boot skeleton', () => {
+describe('App workspace membership skeleton', () => {
   test('renders the empty repo shell while no repository is open', () => {
-    useReposStore.setState({ sessionReady: true })
+    useReposStore.setState({ workspaceMembershipReady: true })
 
     const { container } = render(<App />)
 
@@ -56,7 +56,7 @@ describe('App boot skeleton', () => {
     expect(container.querySelector('[data-testid="empty-repo-view"]')).toBeNull()
   })
 
-  test('uses a single-pane navigator skeleton in compact mode before session restore is ready', () => {
+  test('uses a single-pane navigator skeleton in compact mode before workspace membership is ready', () => {
     responsiveMocks.mode = 'compact'
 
     const { container } = render(<App />)

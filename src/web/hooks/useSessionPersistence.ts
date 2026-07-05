@@ -12,7 +12,7 @@ import {
 const SESSION_SAVE_DEBOUNCE_MS = 200
 
 interface SessionPersistenceInput {
-  sessionReady: boolean
+  workspaceMembershipReady: boolean
   sessionPersistenceReady: boolean
   repos: ReturnType<typeof useReposStore.getState>['repos']
   order: string[]
@@ -31,7 +31,7 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
   const selectedTerminalSessionIdByTerminalWorktree = useReposStore(
     (s) => s.selectedTerminalSessionIdByTerminalWorktree,
   )
-  const sessionReady = useReposStore((s) => s.sessionReady)
+  const workspaceMembershipReady = useReposStore((s) => s.workspaceMembershipReady)
   const sessionPersistenceReady = useReposStore((s) => s.sessionPersistenceReady)
   const repos = useReposStore((s) => s.repos)
   const workspacePaneTabsVersion = useWorkspacePaneTabsCacheVersion()
@@ -73,7 +73,7 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
   useLayoutEffect(() => {
     if (routedRepoId) lastRoutedRepoIdRef.current = routedRepoId
     latestInputRef.current = {
-      sessionReady,
+      workspaceMembershipReady,
       sessionPersistenceReady,
       repos,
       order,
@@ -91,15 +91,15 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
     routedRepoId,
     selectedTerminalSessionIdByTerminalWorktree,
     sessionPersistenceReady,
-    sessionReady,
+    workspaceMembershipReady,
     workspacePaneSize,
     zenMode,
   ])
 
   useEffect(() => {
-    // Client -> persistence only. Boot restore runs elsewhere first. sessionReady
-    // gates the UI skeleton; sessionPersistenceReady waits for boot-restored
-    // server-owned workspace tabs to converge back into the client store.
+    // Client -> persistence only. Boot restore runs elsewhere first.
+    // workspaceMembershipReady gates the UI skeleton; sessionPersistenceReady waits
+    // for boot-restored server-owned workspace tabs to converge back into the client store.
     let session: ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState> | null
     try {
       session = sessionFromPersistenceInput(latestInputRef.current, lastRoutedRepoIdRef.current)
@@ -131,7 +131,7 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
     const timeout = window.setTimeout(save, SESSION_SAVE_DEBOUNCE_MS)
     return () => window.clearTimeout(timeout)
   }, [
-    sessionReady,
+    workspaceMembershipReady,
     sessionPersistenceReady,
     order,
     restoredRepoId,
@@ -171,7 +171,7 @@ function sessionFromPersistenceInput(
   input: SessionPersistenceInput | null,
   lastRoutedRepoId: string | null,
 ): ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState> | null {
-  if (!input?.sessionReady || !input.sessionPersistenceReady) return null
+  if (!input?.workspaceMembershipReady || !input.sessionPersistenceReady) return null
   return workspaceSessionStateFromRestorableWorkspaceState({
     repos: input.repos,
     restorableWorkspaceState: restorableWorkspaceStateFromStore({

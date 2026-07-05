@@ -195,6 +195,45 @@ afterEach(() => {
 })
 
 describe('RepoView workspace navigation', () => {
+  test('keeps a routed repo on the restore skeleton until workspace membership is ready', () => {
+    resetReposStore()
+
+    const { container } = render(
+      <RepoView repoId={REPO_ID} routeView={{ kind: 'branch', repoId: REPO_ID, branchName: 'feature/a' }} />,
+    )
+
+    expect(container.querySelector('[data-testid="repo-workspace-skeleton"]')).not.toBeNull()
+    expect(container.textContent).not.toContain('repo-route.not-found-title')
+  })
+
+  test('shows an explicit not-found state after membership restore settles without the routed repo', () => {
+    resetReposStore()
+    useReposStore.setState({ workspaceMembershipReady: true })
+
+    const { container } = render(<RepoView repoId={REPO_ID} routeView={{ kind: 'dashboard', repoId: REPO_ID }} />)
+
+    expect(container.textContent).toContain('repo-route.not-found-title')
+    expect(container.textContent).toContain(REPO_ID)
+  })
+
+  test('moves a missing routed repo from restore skeleton to not-found when membership settles', () => {
+    resetReposStore()
+
+    const result = render(
+      <RepoView repoId={REPO_ID} routeView={{ kind: 'dashboard', repoId: REPO_ID }} />,
+    )
+
+    expect(result.container.querySelector('[data-testid="repo-workspace-empty-skeleton"]')).not.toBeNull()
+    expect(result.container.textContent).not.toContain('repo-route.not-found-title')
+
+    act(() => {
+      useReposStore.setState({ workspaceMembershipReady: true })
+    })
+
+    expect(result.container.querySelector('[data-testid="repo-workspace-empty-skeleton"]')).toBeNull()
+    expect(result.container.textContent).toContain('repo-route.not-found-title')
+  })
+
   test('large-screen branch activation keeps the Branch Navigator visible', () => {
     const { container } = render(branchRepoView())
 

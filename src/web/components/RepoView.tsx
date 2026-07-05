@@ -5,6 +5,7 @@ import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import { RepoWorkspace } from '#/web/components/RepoWorkspace.tsx'
 import {
   BranchNavigatorSkeleton,
+  RepoWorkspaceLayoutSkeleton,
   RepoWorkspaceEmptySkeleton,
   RepoWorkspaceSkeleton,
 } from '#/web/components/Skeleton.tsx'
@@ -22,6 +23,7 @@ import { RepoLayoutWorkspaceShell } from '#/web/components/repo-layout/RepoLayou
 import { RepoDashboardPane } from '#/web/components/repo-pages/RepoDashboardPane.tsx'
 import { CreateWorktreePagePane } from '#/web/components/repo-pages/CreateWorktreePagePane.tsx'
 import type { RepoRouteView } from '#/web/App.tsx'
+import { useT } from '#/web/stores/i18n.ts'
 
 function EmptyRepoWorkspacePane({ trafficLightOffset }: { trafficLightOffset: boolean }) {
   return (
@@ -64,6 +66,7 @@ export function RepoView({
       return {
         exists: presentation.exists,
         initialLoading: presentation.initialLoading,
+        workspaceMembershipReady: s.workspaceMembershipReady,
         zenMode: s.zenMode,
         workspacePaneSize: s.workspacePaneSize,
       }
@@ -107,7 +110,18 @@ export function RepoView({
     return () => window.clearTimeout(timeout)
   }, [compactWorkspaceTransitioning, setCompactWorkspaceTransitioning])
 
-  if (!view.exists || !repo) return <div />
+  if (!view.exists || !repo) {
+    if (!view.workspaceMembershipReady) {
+      return (
+        <RepoWorkspaceLayoutSkeleton
+          singlePane={compact}
+          singlePaneView={singlePane}
+          repoWorkspaceState={currentBranchName ? 'content' : 'empty'}
+        />
+      )
+    }
+    return <RoutedRepoNotFound repoId={repoId} />
+  }
 
   const zenModeCollapsed = !compact && view.zenMode && repoWorkspaceActive
   const workspaceTrafficLightOffset = zenModeCollapsed
@@ -228,5 +242,19 @@ export function RepoView({
       singlePaneActivePane={singlePane}
       onOpenSettings={onOpenSettings}
     />
+  )
+}
+
+function RoutedRepoNotFound({ repoId }: { repoId: string }) {
+  const t = useT()
+  return (
+    <section className="flex min-h-0 flex-1 flex-col bg-background">
+      <div className="flex flex-1 items-center justify-center p-6 text-center">
+        <div className="flex max-w-sm flex-col gap-2">
+          <h1 className="text-sm font-medium text-foreground">{t('repo-route.not-found-title')}</h1>
+          <p className="break-all text-sm text-muted-foreground">{repoId}</p>
+        </div>
+      </div>
+    </section>
   )
 }

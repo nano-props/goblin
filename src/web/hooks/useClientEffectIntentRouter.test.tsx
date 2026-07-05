@@ -269,7 +269,7 @@ describe('useClientEffectIntentRouter', () => {
       },
       order: [restoredRepo.id, visibleRepo.id],
       restoredRepoId: restoredRepo.id,
-      sessionReady: true,
+      workspaceMembershipReady: true,
     }))
     currentRepoId = visibleRepo.id
 

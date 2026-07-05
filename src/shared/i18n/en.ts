@@ -196,6 +196,7 @@ export const en = {
   // ---- Empty state --------------------------------------------------------
   'empty.title': 'No repository open',
   'empty.body': 'Choose a repository from the sidebar, or drop a Git folder here.',
+  'repo-route.not-found-title': 'Repository not found',
 
   // ---- Drag and drop ------------------------------------------------------
   'drop.title': 'Drop to open local repository',

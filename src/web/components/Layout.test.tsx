@@ -100,8 +100,8 @@ describe('authenticatedAppShellMode', () => {
   })
 
   test('workspace routes wait for authenticated boot before mounting runtime', () => {
-    expect(authenticatedAppShellMode('/', 'booting')).toBe('workspace-boot')
-    expect(authenticatedAppShellMode('/repo/repo/dashboard', 'booting')).toBe('workspace-boot')
+    expect(authenticatedAppShellMode('/', 'booting')).toBe('workspace-restore')
+    expect(authenticatedAppShellMode('/repo/repo/dashboard', 'booting')).toBe('workspace-restore')
     expect(authenticatedAppShellMode('/repo/repo/dashboard', 'ready')).toBe('workspace-ready')
   })
 })
