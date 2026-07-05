@@ -1,4 +1,3 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import {
   MAX_IPC_PATH_LENGTH,
@@ -7,7 +6,11 @@ import {
   toSafeSessionRepoEntry,
 } from '#/shared/input-validation.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
-import { serverDataFile } from '#/shared/data-dir.ts'
+import {
+  readUserSettingsJson,
+  resetUserSettingsPersistenceForTests,
+  writeUserSettingsJson,
+} from '#/server/modules/settings-persistence.ts'
 import type {
   FiletreeSessionViewState,
   LangPref,
@@ -75,6 +78,7 @@ export type UserSettingsPatch = Partial<UserSettings>
 
 let cachedFetchIntervalSec = DEFAULT_FETCH_INTERVAL_SEC
 let settingsPromise: Promise<UserSettingsData> | null = null
+let settingsMutationPromise: Promise<void> = Promise.resolve()
 const listeners = new Set<FetchIntervalListener>()
 
 function normalizeFetchInterval(value: unknown): number {
@@ -414,32 +418,27 @@ function cloneRepoSettings(repoSettings: readonly RepoSettingsEntry[]): RepoSett
 }
 
 async function readUserSettingsFile(): Promise<UserSettingsData | null> {
-  try {
-    const raw = await readFile(serverDataFile('user-settings.json'), 'utf-8')
-    const parsed = JSON.parse(raw) as Partial<UserSettingsData>
-    return {
-      lang: normalizeLangPref(parsed.lang),
-      theme: normalizeThemePref(parsed.theme),
-      colorTheme: normalizeColorTheme(parsed.colorTheme),
-      fetchIntervalSec: normalizeFetchInterval(parsed.fetchIntervalSec),
-      terminalNotificationsEnabled: normalizeTerminalNotificationsEnabled(parsed.terminalNotificationsEnabled),
-      shortcutsDisabled: parsed.shortcutsDisabled === true,
-      globalShortcutDisabled: parsed.globalShortcutDisabled === true,
-      globalShortcut: normalizeGlobalShortcut(parsed.globalShortcut),
-      lanEnabled: normalizeLanEnabled(parsed.lanEnabled),
-      session: normalizeSession(parsed.session),
-      recentRepos: normalizeRecentRepos(parsed.recentRepos),
-      repoSettings: normalizeRepoSettings(parsed.repoSettings),
-    }
-  } catch {
-    return null
+  const raw = await readUserSettingsJson()
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const parsed = raw as Partial<UserSettingsData>
+  return {
+    lang: normalizeLangPref(parsed.lang),
+    theme: normalizeThemePref(parsed.theme),
+    colorTheme: normalizeColorTheme(parsed.colorTheme),
+    fetchIntervalSec: normalizeFetchInterval(parsed.fetchIntervalSec),
+    terminalNotificationsEnabled: normalizeTerminalNotificationsEnabled(parsed.terminalNotificationsEnabled),
+    shortcutsDisabled: parsed.shortcutsDisabled === true,
+    globalShortcutDisabled: parsed.globalShortcutDisabled === true,
+    globalShortcut: normalizeGlobalShortcut(parsed.globalShortcut),
+    lanEnabled: normalizeLanEnabled(parsed.lanEnabled),
+    session: normalizeSession(parsed.session),
+    recentRepos: normalizeRecentRepos(parsed.recentRepos),
+    repoSettings: normalizeRepoSettings(parsed.repoSettings),
   }
 }
 
 async function writeUserSettingsFile(data: UserSettingsData): Promise<void> {
-  const file = serverDataFile('user-settings.json')
-  await mkdir(path.dirname(file), { recursive: true })
-  await writeFile(file, JSON.stringify(data, null, 2), 'utf-8')
+  await writeUserSettingsJson(data)
 }
 
 async function loadUserSettings(): Promise<UserSettingsData> {
@@ -456,6 +455,21 @@ async function loadUserSettings(): Promise<UserSettingsData> {
     return data
   })()
   return await settingsPromise
+}
+
+async function mutateUserSettings<T>(mutation: (data: UserSettingsData) => Promise<T> | T): Promise<T> {
+  let result!: T
+  const run = settingsMutationPromise
+    .catch(() => {})
+    .then(async () => {
+      result = await mutation(await loadUserSettings())
+    })
+  settingsMutationPromise = run.then(
+    () => {},
+    () => {},
+  )
+  await run
+  return result!
 }
 
 /**
@@ -497,62 +511,64 @@ export function subscribeServerFetchInterval(listener: FetchIntervalListener): (
 }
 
 export async function setServerFetchIntervalSec(sec: number): Promise<number> {
-  const data = await loadUserSettings()
-  const next = normalizeFetchInterval(sec)
-  if (data.fetchIntervalSec !== next) {
-    data.fetchIntervalSec = next
-    await writeUserSettingsFile(data)
-  }
-  if (cachedFetchIntervalSec !== next) {
-    cachedFetchIntervalSec = next
-    for (const listener of listeners) listener(next)
-  }
-  return next
+  return await mutateUserSettings(async (data) => {
+    const next = normalizeFetchInterval(sec)
+    if (data.fetchIntervalSec !== next) {
+      data.fetchIntervalSec = next
+      await writeUserSettingsFile(data)
+    }
+    if (cachedFetchIntervalSec !== next) {
+      cachedFetchIntervalSec = next
+      for (const listener of listeners) listener(next)
+    }
+    return next
+  })
 }
 
 export async function updateUserSettings(patch: UserSettingsPatch): Promise<UserSettings> {
-  const data = await loadUserSettings()
-  const nextLang = patch.lang === undefined ? data.lang : normalizeLangPref(patch.lang)
-  const nextTheme = patch.theme === undefined ? data.theme : normalizeThemePref(patch.theme)
-  const nextColorTheme = patch.colorTheme === undefined ? data.colorTheme : normalizeColorTheme(patch.colorTheme)
-  const nextFetchIntervalSec =
-    patch.fetchIntervalSec === undefined ? data.fetchIntervalSec : normalizeFetchInterval(patch.fetchIntervalSec)
-  const nextTerminalNotificationsEnabled =
-    patch.terminalNotificationsEnabled === undefined
-      ? data.terminalNotificationsEnabled
-      : normalizeTerminalNotificationsEnabled(patch.terminalNotificationsEnabled)
-  const nextShortcutsDisabled =
-    patch.shortcutsDisabled === undefined ? data.shortcutsDisabled : patch.shortcutsDisabled === true
-  const nextGlobalShortcutDisabled =
-    patch.globalShortcutDisabled === undefined ? data.globalShortcutDisabled : patch.globalShortcutDisabled === true
-  const nextGlobalShortcut =
-    patch.globalShortcut === undefined ? data.globalShortcut : normalizeGlobalShortcut(patch.globalShortcut)
-  const nextLanEnabled = patch.lanEnabled === undefined ? data.lanEnabled : normalizeLanEnabled(patch.lanEnabled)
-  const changed =
-    data.lang !== nextLang ||
-    data.theme !== nextTheme ||
-    data.colorTheme !== nextColorTheme ||
-    data.fetchIntervalSec !== nextFetchIntervalSec ||
-    data.terminalNotificationsEnabled !== nextTerminalNotificationsEnabled ||
-    data.shortcutsDisabled !== nextShortcutsDisabled ||
-    data.globalShortcutDisabled !== nextGlobalShortcutDisabled ||
-    data.globalShortcut !== nextGlobalShortcut ||
-    data.lanEnabled !== nextLanEnabled
-  data.lang = nextLang
-  data.theme = nextTheme
-  data.colorTheme = nextColorTheme
-  data.fetchIntervalSec = nextFetchIntervalSec
-  data.terminalNotificationsEnabled = nextTerminalNotificationsEnabled
-  data.shortcutsDisabled = nextShortcutsDisabled
-  data.globalShortcutDisabled = nextGlobalShortcutDisabled
-  data.globalShortcut = nextGlobalShortcut
-  data.lanEnabled = nextLanEnabled
-  if (changed) await writeUserSettingsFile(data)
-  if (cachedFetchIntervalSec !== nextFetchIntervalSec) {
-    cachedFetchIntervalSec = nextFetchIntervalSec
-    for (const listener of listeners) listener(nextFetchIntervalSec)
-  }
-  return userSettingsFromData(data)
+  return await mutateUserSettings(async (data) => {
+    const nextLang = patch.lang === undefined ? data.lang : normalizeLangPref(patch.lang)
+    const nextTheme = patch.theme === undefined ? data.theme : normalizeThemePref(patch.theme)
+    const nextColorTheme = patch.colorTheme === undefined ? data.colorTheme : normalizeColorTheme(patch.colorTheme)
+    const nextFetchIntervalSec =
+      patch.fetchIntervalSec === undefined ? data.fetchIntervalSec : normalizeFetchInterval(patch.fetchIntervalSec)
+    const nextTerminalNotificationsEnabled =
+      patch.terminalNotificationsEnabled === undefined
+        ? data.terminalNotificationsEnabled
+        : normalizeTerminalNotificationsEnabled(patch.terminalNotificationsEnabled)
+    const nextShortcutsDisabled =
+      patch.shortcutsDisabled === undefined ? data.shortcutsDisabled : patch.shortcutsDisabled === true
+    const nextGlobalShortcutDisabled =
+      patch.globalShortcutDisabled === undefined ? data.globalShortcutDisabled : patch.globalShortcutDisabled === true
+    const nextGlobalShortcut =
+      patch.globalShortcut === undefined ? data.globalShortcut : normalizeGlobalShortcut(patch.globalShortcut)
+    const nextLanEnabled = patch.lanEnabled === undefined ? data.lanEnabled : normalizeLanEnabled(patch.lanEnabled)
+    const changed =
+      data.lang !== nextLang ||
+      data.theme !== nextTheme ||
+      data.colorTheme !== nextColorTheme ||
+      data.fetchIntervalSec !== nextFetchIntervalSec ||
+      data.terminalNotificationsEnabled !== nextTerminalNotificationsEnabled ||
+      data.shortcutsDisabled !== nextShortcutsDisabled ||
+      data.globalShortcutDisabled !== nextGlobalShortcutDisabled ||
+      data.globalShortcut !== nextGlobalShortcut ||
+      data.lanEnabled !== nextLanEnabled
+    data.lang = nextLang
+    data.theme = nextTheme
+    data.colorTheme = nextColorTheme
+    data.fetchIntervalSec = nextFetchIntervalSec
+    data.terminalNotificationsEnabled = nextTerminalNotificationsEnabled
+    data.shortcutsDisabled = nextShortcutsDisabled
+    data.globalShortcutDisabled = nextGlobalShortcutDisabled
+    data.globalShortcut = nextGlobalShortcut
+    data.lanEnabled = nextLanEnabled
+    if (changed) await writeUserSettingsFile(data)
+    if (cachedFetchIntervalSec !== nextFetchIntervalSec) {
+      cachedFetchIntervalSec = nextFetchIntervalSec
+      for (const listener of listeners) listener(nextFetchIntervalSec)
+    }
+    return userSettingsFromData(data)
+  })
 }
 
 export async function getServerSessionState(): Promise<WorkspaceSessionState> {
@@ -560,11 +576,12 @@ export async function getServerSessionState(): Promise<WorkspaceSessionState> {
 }
 
 export async function setServerSessionState(session: WorkspaceSessionState): Promise<WorkspaceSessionState> {
-  const data = await loadUserSettings()
-  const next = normalizeSession(session)
-  data.session = next
-  await writeUserSettingsFile(data)
-  return next
+  return await mutateUserSettings(async (data) => {
+    const next = normalizeSession(session)
+    data.session = next
+    await writeUserSettingsFile(data)
+    return next
+  })
 }
 
 export async function getServerRecentRepos(): Promise<RepoSessionEntry[]> {
@@ -579,46 +596,48 @@ export async function trustServerRepoWorktreeBootstrapConfig(input: {
   repoId: string
   configHash: string
 }): Promise<RepoSettingsEntry[]> {
-  const data = await loadUserSettings()
-  const repoId = toSafeRepoLocator(input.repoId)
-  if (!repoId || !isWorktreeBootstrapConfigHash(input.configHash)) return cloneRepoSettings(data.repoSettings)
-  const worktreeBootstrapTrust: WorktreeBootstrapTrust = {
-    configHash: input.configHash,
-    trustedAt: new Date().toISOString(),
-  }
-  if (
-    updateRepoSettingsEntry(data, repoId, (existing) => ({
-      repoId,
-      ...existing,
-      worktreeBootstrapTrust,
-    }))
-  ) {
-    await writeUserSettingsFile(data)
-  }
-  return cloneRepoSettings(data.repoSettings)
+  return await mutateUserSettings(async (data) => {
+    const repoId = toSafeRepoLocator(input.repoId)
+    if (!repoId || !isWorktreeBootstrapConfigHash(input.configHash)) return cloneRepoSettings(data.repoSettings)
+    const worktreeBootstrapTrust: WorktreeBootstrapTrust = {
+      configHash: input.configHash,
+      trustedAt: new Date().toISOString(),
+    }
+    if (
+      updateRepoSettingsEntry(data, repoId, (existing) => ({
+        repoId,
+        ...existing,
+        worktreeBootstrapTrust,
+      }))
+    ) {
+      await writeUserSettingsFile(data)
+    }
+    return cloneRepoSettings(data.repoSettings)
+  })
 }
 
 export async function untrustServerRepoWorktreeBootstrapConfig(input: {
   repoId: string
   configHash: string
 }): Promise<boolean> {
-  const data = await loadUserSettings()
-  const repoId = toSafeRepoLocator(input.repoId)
-  if (!repoId || !isWorktreeBootstrapConfigHash(input.configHash)) return false
-  const existingIndex = data.repoSettings.findIndex((entry) => entry.repoId === repoId)
-  if (existingIndex < 0) return false
-  const existing = data.repoSettings[existingIndex]
-  if (existing.worktreeBootstrapTrust?.configHash !== input.configHash) return false
+  return await mutateUserSettings(async (data) => {
+    const repoId = toSafeRepoLocator(input.repoId)
+    if (!repoId || !isWorktreeBootstrapConfigHash(input.configHash)) return false
+    const existingIndex = data.repoSettings.findIndex((entry) => entry.repoId === repoId)
+    if (existingIndex < 0) return false
+    const existing = data.repoSettings[existingIndex]
+    if (existing.worktreeBootstrapTrust?.configHash !== input.configHash) return false
 
-  const nextEntry: RepoSettingsEntry = { ...existing }
-  delete nextEntry.worktreeBootstrapTrust
-  if (nextEntry.workspaceExternalAppRecent) {
-    data.repoSettings = data.repoSettings.map((entry, index) => (index === existingIndex ? nextEntry : entry))
-  } else {
-    data.repoSettings = data.repoSettings.filter((_, index) => index !== existingIndex)
-  }
-  await writeUserSettingsFile(data)
-  return true
+    const nextEntry: RepoSettingsEntry = { ...existing }
+    delete nextEntry.worktreeBootstrapTrust
+    if (nextEntry.workspaceExternalAppRecent) {
+      data.repoSettings = data.repoSettings.map((entry, index) => (index === existingIndex ? nextEntry : entry))
+    } else {
+      data.repoSettings = data.repoSettings.filter((_, index) => index !== existingIndex)
+    }
+    await writeUserSettingsFile(data)
+    return true
+  })
 }
 
 /**
@@ -633,31 +652,32 @@ export async function setServerRepoWorkspaceExternalAppRecent(input: {
   worktreePath: string | null
   itemId: string
 }): Promise<RepoSettingsEntry[]> {
-  const data = await loadUserSettings()
-  const repoId = toSafeRepoLocator(input.repoId)
-  // Validate the worktree key: `null`/`undefined` collapses to "" (bare
-  // repo); otherwise the path must be a normalized absolute path with
-  // no NULs. `toSafeSessionPath` encodes the same validation used
-  // elsewhere in the codebase, so the rules can't drift.
-  const isBareRepoScope = input.worktreePath === null || input.worktreePath === undefined
-  const safeWorktreePath = isBareRepoScope ? null : toSafeSessionPath(input.worktreePath)
-  if (!repoId || (!isBareRepoScope && safeWorktreePath === null) || !isKnownWorkspaceExternalAppItemId(input.itemId)) {
-    return cloneRepoSettings(data.repoSettings)
-  }
-  const worktreeKey = workspaceExternalAppRecentKey(safeWorktreePath)
-  // No-op when the value hasn't changed — keeps a no-op click from
-  // triggering a full user-settings.json rewrite.
-  const updated = updateRepoSettingsEntry(data, repoId, (existing) => {
-    const existingByWorktree = existing?.workspaceExternalAppRecent?.byWorktree ?? {}
-    if (existingByWorktree[worktreeKey] === input.itemId) return null
-    return {
-      repoId,
-      ...existing,
-      workspaceExternalAppRecent: { byWorktree: { ...existingByWorktree, [worktreeKey]: input.itemId } },
+  return await mutateUserSettings(async (data) => {
+    const repoId = toSafeRepoLocator(input.repoId)
+    // Validate the worktree key: `null`/`undefined` collapses to "" (bare
+    // repo); otherwise the path must be a normalized absolute path with
+    // no NULs. `toSafeSessionPath` encodes the same validation used
+    // elsewhere in the codebase, so the rules can't drift.
+    const isBareRepoScope = input.worktreePath === null || input.worktreePath === undefined
+    const safeWorktreePath = isBareRepoScope ? null : toSafeSessionPath(input.worktreePath)
+    if (!repoId || (!isBareRepoScope && safeWorktreePath === null) || !isKnownWorkspaceExternalAppItemId(input.itemId)) {
+      return cloneRepoSettings(data.repoSettings)
     }
+    const worktreeKey = workspaceExternalAppRecentKey(safeWorktreePath)
+    // No-op when the value hasn't changed — keeps a no-op click from
+    // triggering a full user-settings.json rewrite.
+    const updated = updateRepoSettingsEntry(data, repoId, (existing) => {
+      const existingByWorktree = existing?.workspaceExternalAppRecent?.byWorktree ?? {}
+      if (existingByWorktree[worktreeKey] === input.itemId) return null
+      return {
+        repoId,
+        ...existing,
+        workspaceExternalAppRecent: { byWorktree: { ...existingByWorktree, [worktreeKey]: input.itemId } },
+      }
+    })
+    if (updated) await writeUserSettingsFile(data)
+    return cloneRepoSettings(data.repoSettings)
   })
-  if (updated) await writeUserSettingsFile(data)
-  return cloneRepoSettings(data.repoSettings)
 }
 
 /**
@@ -669,57 +689,62 @@ export async function pruneServerRepoSettingsForRemovedWorktree(input: {
   repoId: string
   worktreePath: string
 }): Promise<boolean> {
-  const data = await loadUserSettings()
-  const repoId = toSafeRepoLocator(input.repoId)
-  const safeWorktreePath = toSafeSessionPath(input.worktreePath)
-  if (!repoId || safeWorktreePath === null) return false
-  const worktreeKey = workspaceExternalAppRecentKey(safeWorktreePath)
-  const existingIndex = data.repoSettings.findIndex((entry) => entry.repoId === repoId)
-  if (existingIndex < 0) return false
-  const existing = data.repoSettings[existingIndex]
-  const existingByWorktree = existing.workspaceExternalAppRecent?.byWorktree
-  if (!existingByWorktree || !(worktreeKey in existingByWorktree)) return false
+  return await mutateUserSettings(async (data) => {
+    const repoId = toSafeRepoLocator(input.repoId)
+    const safeWorktreePath = toSafeSessionPath(input.worktreePath)
+    if (!repoId || safeWorktreePath === null) return false
+    const worktreeKey = workspaceExternalAppRecentKey(safeWorktreePath)
+    const existingIndex = data.repoSettings.findIndex((entry) => entry.repoId === repoId)
+    if (existingIndex < 0) return false
+    const existing = data.repoSettings[existingIndex]
+    const existingByWorktree = existing.workspaceExternalAppRecent?.byWorktree
+    if (!existingByWorktree || !(worktreeKey in existingByWorktree)) return false
 
-  const nextByWorktree = { ...existingByWorktree }
-  delete nextByWorktree[worktreeKey]
-  const nextEntry: RepoSettingsEntry = { ...existing }
-  if (Object.keys(nextByWorktree).length > 0) {
-    nextEntry.workspaceExternalAppRecent = { byWorktree: nextByWorktree }
-  } else {
-    delete nextEntry.workspaceExternalAppRecent
-  }
+    const nextByWorktree = { ...existingByWorktree }
+    delete nextByWorktree[worktreeKey]
+    const nextEntry: RepoSettingsEntry = { ...existing }
+    if (Object.keys(nextByWorktree).length > 0) {
+      nextEntry.workspaceExternalAppRecent = { byWorktree: nextByWorktree }
+    } else {
+      delete nextEntry.workspaceExternalAppRecent
+    }
 
-  if (nextEntry.worktreeBootstrapTrust || nextEntry.workspaceExternalAppRecent) {
-    data.repoSettings = data.repoSettings.map((entry, index) => (index === existingIndex ? nextEntry : entry))
-  } else {
-    data.repoSettings = data.repoSettings.filter((_, index) => index !== existingIndex)
-  }
-  await writeUserSettingsFile(data)
-  return true
+    if (nextEntry.worktreeBootstrapTrust || nextEntry.workspaceExternalAppRecent) {
+      data.repoSettings = data.repoSettings.map((entry, index) => (index === existingIndex ? nextEntry : entry))
+    } else {
+      data.repoSettings = data.repoSettings.filter((_, index) => index !== existingIndex)
+    }
+    await writeUserSettingsFile(data)
+    return true
+  })
 }
 
 export async function addServerRecentRepo(repo: RepoSessionEntry): Promise<RepoSessionEntry[]> {
-  const data = await loadUserSettings()
-  const safeRepo = toSafeSessionRepoEntry(repo)
-  if (!safeRepo) return [...data.recentRepos]
-  const safeId = repoSessionEntryId(safeRepo)
-  data.recentRepos = [safeRepo, ...data.recentRepos.filter((entry) => repoSessionEntryId(entry) !== safeId)].slice(
-    0,
-    MAX_RECENT_REPOS,
-  )
-  await writeUserSettingsFile(data)
-  return [...data.recentRepos]
+  return await mutateUserSettings(async (data) => {
+    const safeRepo = toSafeSessionRepoEntry(repo)
+    if (!safeRepo) return [...data.recentRepos]
+    const safeId = repoSessionEntryId(safeRepo)
+    data.recentRepos = [safeRepo, ...data.recentRepos.filter((entry) => repoSessionEntryId(entry) !== safeId)].slice(
+      0,
+      MAX_RECENT_REPOS,
+    )
+    await writeUserSettingsFile(data)
+    return [...data.recentRepos]
+  })
 }
 
 export async function clearServerRecentRepos(): Promise<void> {
-  const data = await loadUserSettings()
-  if (data.recentRepos.length === 0) return
-  data.recentRepos = []
-  await writeUserSettingsFile(data)
+  await mutateUserSettings(async (data) => {
+    if (data.recentRepos.length === 0) return
+    data.recentRepos = []
+    await writeUserSettingsFile(data)
+  })
 }
 
 export function resetServerSettingsSourceForTests(): void {
   settingsPromise = null
+  settingsMutationPromise = Promise.resolve()
   listeners.clear()
   cachedFetchIntervalSec = DEFAULT_FETCH_INTERVAL_SEC
+  resetUserSettingsPersistenceForTests()
 }
