@@ -482,10 +482,11 @@ function WorkspacePaneTabSwitcherPopover({
               className={cn(
                 'flex h-7 w-full items-center gap-2 rounded-sm px-2 text-left text-sm text-popover-foreground outline-none transition-colors duration-100',
                 newTerminalBusy
-                  ? 'cursor-pointer opacity-70 hover:bg-accent hover:text-accent-foreground'
+                  ? 'cursor-not-allowed opacity-70'
                   : 'cursor-pointer hover:bg-accent hover:text-accent-foreground',
               )}
               onClick={selectNew}
+              disabled={newTerminalBusy}
               aria-busy={newTerminalBusy ? 'true' : undefined}
             >
               <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
@@ -985,6 +986,7 @@ function WorkspacePaneNewButton({
       className={cn('h-7 w-7 shrink-0', compact && 'w-7')}
       id={id}
       onClick={onClick}
+      disabled={busy}
       aria-busy={busy ? 'true' : undefined}
       aria-label={label}
       title={label}

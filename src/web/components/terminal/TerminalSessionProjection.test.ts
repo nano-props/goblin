@@ -56,6 +56,7 @@ function makeServerSession(
     terminalSessionId,
     repoInstanceId: 'repo-instance-test',
     repoRoot: REPO_ROOT,
+    branch: BRANCH,
     worktreePath: WORKTREE_PATH,
     cwd: WORKTREE_PATH,
     controller: overrides.controller ?? null,

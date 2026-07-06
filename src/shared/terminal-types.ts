@@ -250,6 +250,7 @@ export interface TerminalSessionSummary {
   terminalSessionId: string
   repoInstanceId: string
   repoRoot: string
+  branch: string
   worktreePath: string
   cwd: string
   controller: TerminalController | null

@@ -643,6 +643,76 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
+  test('realtime list-workspace-tabs materializes missing terminal tabs and broadcasts invalidation', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_a', USER_1, socket)
+    const created = await host.create('client_a', USER_1, {
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'additional',
+      cols: 80,
+      rows: 24,
+      clientId: 'client_a',
+    })
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+    await expect(
+      host.replaceTabs('client_a', USER_1, {
+        repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
+        branchName: 'feature',
+        worktreePath: '/repo-linked',
+        tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
+      }),
+    ).resolves.toEqual([{ type: 'status', tabId: 'workspace-pane:status' }])
+    socket.send.mockClear()
+
+    host.handleRealtimeMessage(
+      'client_a',
+      USER_1,
+      socket,
+      JSON.stringify({
+        type: 'request',
+        requestId: 'req_list_workspace_tabs',
+        action: 'list-workspace-tabs',
+        input: { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
+      }),
+    )
+
+    await vi.waitFor(() => {
+      const messages = sentSocketMessages(socket)
+      expect(messages.some((message) => message.type === 'workspace-tabs-changed')).toBe(true)
+      expect(
+        messages.some((message) => message.type === 'response' && message.requestId === 'req_list_workspace_tabs'),
+      ).toBe(true)
+    })
+    const response = sentSocketMessages(socket).find(
+      (message) => message.type === 'response' && message.requestId === 'req_list_workspace_tabs',
+    )
+    expect(response).toMatchObject({
+      type: 'response',
+      ok: true,
+      action: 'list-workspace-tabs',
+      payload: [
+        {
+          repoRoot: REPO_ROOT,
+          branchName: 'feature',
+          worktreePath: '/repo-linked',
+          tabs: [
+            { type: 'status', tabId: 'workspace-pane:status' },
+            { type: 'terminal', terminalSessionId: created.terminalSessionId },
+          ],
+        },
+      ],
+    })
+
+    host.unregisterSocket('client_a', USER_1, socket)
+    shutdown()
+  })
+
   test('unregisters a buffered socket when raw send fails during broadcast', async () => {
     const { host, shutdown, isClientOnline } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }

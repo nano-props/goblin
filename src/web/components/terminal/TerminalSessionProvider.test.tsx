@@ -266,6 +266,7 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
 })
 
 const REPO_ID = '/tmp/gbl-terminal-provider-repo'
+const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/gbl-terminal-provider-worktree'
 const SECOND_REPO_ID = '/tmp/gbl-terminal-provider-repo-2'
 const SECOND_WORKTREE_PATH = '/tmp/gbl-terminal-provider-worktree-2'
@@ -286,8 +287,8 @@ let sessionClosedHandler:
       worktreePath: string
     }) => void)
   | null = null
-type TestTerminalSessionSummary = Omit<TerminalSessionSummary, 'repoInstanceId' | 'repoRoot' | 'worktreePath'> &
-  Partial<Pick<TerminalSessionSummary, 'repoInstanceId' | 'repoRoot' | 'worktreePath'>>
+type TestTerminalSessionSummary = Omit<TerminalSessionSummary, 'repoInstanceId' | 'repoRoot' | 'branch' | 'worktreePath'> &
+  Partial<Pick<TerminalSessionSummary, 'repoInstanceId' | 'repoRoot' | 'branch' | 'worktreePath'>>
 const listSessionsMock = vi.fn<
   (...args: Array<{ repoRoot: string; repoInstanceId?: string }>) => Promise<TestTerminalSessionSummary[]>
 >(async () => [])
@@ -304,6 +305,7 @@ function completeServerSession(session: TestTerminalSessionSummary): TerminalSes
     terminalSessionId: normalizeTestSessionId(session.terminalSessionId),
     repoInstanceId: session.repoInstanceId ?? 'repo-instance-test',
     repoRoot: session.repoRoot ?? REPO_ID,
+    branch: session.branch ?? BRANCH_NAME,
     worktreePath: session.worktreePath ?? WORKTREE_PATH,
   }
 }

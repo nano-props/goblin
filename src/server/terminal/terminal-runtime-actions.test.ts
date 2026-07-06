@@ -36,6 +36,7 @@ function makeActions(
             terminalSessionId: 'terminal-session-1',
             repoInstanceId: REPO_INSTANCE_ID,
             repoRoot: options.getSlotScope(userId, terminalRuntimeSessionId),
+            branch: 'feature/worktree',
             worktreePath: '/repo',
             cwd: '/repo',
             controller: null,

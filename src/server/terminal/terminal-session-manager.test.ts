@@ -11,6 +11,7 @@ import { TerminalSessionManager } from '#/server/terminal/terminal-session-manag
 const USER_ID = 'user_terminal_session_manager'
 const CLIENT_ID = 'client_terminal_session_manager'
 const SCOPE = '/repo'
+const BRANCH_NAME = 'feature/test'
 const WORKTREE_PATH = '/repo'
 const TERMINAL_SESSION_ID = 'session-1'
 
@@ -115,7 +116,8 @@ async function createSession(
       scope: SCOPE,
       repoRoot: SCOPE,
       repoInstanceId: 'repo-instance-test',
-    terminalSessionId: TERMINAL_SESSION_ID,
+      branch: BRANCH_NAME,
+      terminalSessionId: TERMINAL_SESSION_ID,
     worktreePath: WORKTREE_PATH,
     cwd: '/tmp',
     cols: 80,
@@ -139,6 +141,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
       scope: SCOPE,
       repoRoot: SCOPE,
       repoInstanceId: 'repo-instance-test',
+      branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
       cwd: '/tmp',
@@ -151,6 +154,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
       scope: SCOPE,
       repoRoot: SCOPE,
       repoInstanceId: 'repo-instance-test',
+      branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
       cwd: '/tmp',
@@ -176,6 +180,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
       scope: SCOPE,
       repoRoot: SCOPE,
       repoInstanceId: 'repo-instance-test',
+      branch: BRANCH_NAME,
       terminalSessionId: TERMINAL_SESSION_ID,
       worktreePath: WORKTREE_PATH,
       cwd: '/tmp',
