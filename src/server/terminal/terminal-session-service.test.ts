@@ -31,7 +31,7 @@ const REMOTE_RUNTIME_SCOPE = terminalSessionRuntimeScope(REMOTE_REPO_ROOT, REMOT
 const REMOTE_WORKTREE_PATH = '/srv/repo'
 const REMOTE_BRANCH_NAME = 'feature/remote'
 
-describe('terminal session service workspace tabs', () => {
+describe('terminal session service facade', () => {
   test('create returns canonical tabs without pre-existing stale terminal tabs', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
@@ -212,6 +212,61 @@ describe('terminal session service workspace tabs', () => {
     expect(workspaceTabs.tabsForScope({ userId: USER_ID, scope: RUNTIME_SCOPE })).toEqual([])
   })
 
+  test('ensureOrRestore reports created reused and restored from matching session state', async () => {
+    const ensureSession = vi.fn(async (input) => terminalAttachResult(input))
+    const ensureInput = {
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
+      branch: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      terminalSessionId: 'session-action',
+      cols: 80,
+      rows: 24,
+    }
+
+    const createdService = createService({
+      sessions: [],
+      workspaceTabs: createWorkspacePaneTabsRuntime<string>(),
+      ensureSession,
+    })
+    await expect(
+      createdService.ensureOrRestore('client_terminal_service', USER_ID, ensureInput),
+    ).resolves.toMatchObject({
+      ok: true,
+      action: 'created',
+      terminalSessionId: 'session-action',
+    })
+
+    const reusedService = createService({
+      sessions: [terminalSession('session-action')],
+      workspaceTabs: createWorkspacePaneTabsRuntime<string>(),
+      ensureSession,
+    })
+    await expect(reusedService.ensureOrRestore('client_terminal_service', USER_ID, ensureInput)).resolves.toMatchObject({
+      ok: true,
+      action: 'reused',
+      terminalSessionId: 'session-action',
+    })
+
+    const restoredService = createService({
+      sessions: [
+        {
+          ...terminalSession('session-action'),
+          controller: { clientId: 'client_existing_controller', status: 'connected' },
+        },
+      ],
+      workspaceTabs: createWorkspacePaneTabsRuntime<string>(),
+      ensureSession,
+    })
+    await expect(
+      restoredService.ensureOrRestore('client_terminal_service', USER_ID, ensureInput),
+    ).resolves.toMatchObject({
+      ok: true,
+      action: 'restored',
+      terminalSessionId: 'session-action',
+    })
+  })
+
   test('replaceTabs drops stale terminal tabs without appending missing live terminals', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     const service = createService({
@@ -337,6 +392,58 @@ describe('terminal session service workspace tabs', () => {
     ])
   })
 
+  test('listWorkspaceTabs reconciles multiple worktrees with one projection broadcast', async () => {
+    const otherWorktreePath = '/repo/other-worktree'
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: RUNTIME_SCOPE,
+      branchName: BRANCH_NAME,
+      worktreePath: path.resolve(WORKTREE_PATH),
+      tabs: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneTerminalTabEntry('session-stale'),
+        workspacePaneTerminalTabEntry('session-live'),
+      ],
+    })
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: RUNTIME_SCOPE,
+      branchName: 'feature/other-worktree',
+      worktreePath: path.resolve(otherWorktreePath),
+      tabs: [workspacePaneStaticTabEntry('history')],
+    })
+    const broadcastWorkspaceTabsChanged = vi.fn()
+    const service = createService({
+      sessions: [
+        terminalSession('session-live'),
+        terminalSession('session-other-worktree', {
+          branch: 'feature/other-worktree',
+          worktreePath: path.resolve(otherWorktreePath),
+        }),
+      ],
+      workspaceTabs,
+      broadcastWorkspaceTabsChanged,
+    })
+
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).resolves.toEqual([
+      {
+        repoRoot: REPO_ROOT,
+        branchName: BRANCH_NAME,
+        worktreePath: path.resolve(WORKTREE_PATH),
+        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')],
+      },
+      {
+        repoRoot: REPO_ROOT,
+        branchName: 'feature/other-worktree',
+        worktreePath: path.resolve(otherWorktreePath),
+        tabs: [workspacePaneStaticTabEntry('history'), workspacePaneTerminalTabEntry('session-other-worktree')],
+      },
+    ])
+    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledTimes(1)
+    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith(USER_ID, REPO_ROOT)
+  })
+
   test('preserves live terminal tabs after list canonicalization and later reorder operations', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
@@ -447,7 +554,9 @@ describe('terminal session service workspace tabs', () => {
       workspaceTabs,
     })
 
-    await expect(service.reconcileTerminalTabsForSession(USER_ID, terminalSession('session-closed'))).resolves.toBeUndefined()
+    await expect(
+      service.reconcileTerminalTabsForSession(USER_ID, terminalSession('session-closed')),
+    ).resolves.toBeUndefined()
     expect(
       workspaceTabs.tabs({
         userId: USER_ID,
@@ -472,7 +581,9 @@ describe('terminal session service workspace tabs', () => {
       workspaceTabs,
     })
 
-    await expect(service.reconcileTerminalTabsForSession(USER_ID, terminalSession('session-live'))).resolves.toBeUndefined()
+    await expect(
+      service.reconcileTerminalTabsForSession(USER_ID, terminalSession('session-live')),
+    ).resolves.toBeUndefined()
     expect(
       workspaceTabs.tabs({
         userId: USER_ID,
@@ -819,8 +930,8 @@ function createService(options: {
           ok: false as const,
           message: 'unused',
         })),
-      listSessionsForUser: vi.fn(async () =>
-        await (typeof options.sessions === 'function' ? options.sessions() : options.sessions),
+      listSessionsForUser: vi.fn(
+        async () => await (typeof options.sessions === 'function' ? options.sessions() : options.sessions),
       ),
       closeSession: options.closeSession ?? vi.fn(),
     },

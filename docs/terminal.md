@@ -90,6 +90,7 @@ The terminal feature spans `shared`, `server`, and `web`, but it still behaves a
 - Owns business state for sessions, control, session service behavior, connection tracking, and realtime dispatch.
 - Exposes the terminal host boundary used by routes and realtime transport.
 - Treats PTY execution as a dependency, not as the place where product behavior lives.
+- Keeps `TerminalSessionService` as the public facade. Focused server modules own create orchestration, session ensure, prune, and workspace-tab projection details.
 
 ### PTY supervisor layer
 
@@ -115,12 +116,13 @@ The terminal feature spans `shared`, `server`, and `web`, but it still behaves a
 At a high level, the lifecycle is:
 
 1. A client requests create or restore for a worktree terminal.
-2. The server session service resolves whether that request means create, reuse, or restore.
-3. The session manager ensures a session exists and that a PTY is running for it.
-4. The client attaches a local view to the session.
-5. Realtime output, title, exit, and identity events keep clients up to date.
-6. Detach removes a local view without necessarily killing the session.
-7. Close or TTL cleanup ends the session and frees PTY resources.
+2. The server session service validates the request and delegates create orchestration.
+3. The create path resolves whether the request means create, reuse, or restore.
+4. The session manager ensures a session exists and that a PTY is running for it.
+5. The client attaches a local view to the session.
+6. Realtime output, title, exit, and identity events keep clients up to date.
+7. Detach removes a local view without necessarily killing the session.
+8. Close or TTL cleanup ends the session and frees PTY resources.
 
 The important design rule is that **session lifecycle is independent from view lifecycle**.
 

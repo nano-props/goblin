@@ -245,13 +245,19 @@ The client should not have to infer hidden lifecycle meaning from missing PTY st
 ## Workspace-pane tab projection
 
 Workspace-pane terminal tabs are a server-side projection of live terminal
-sessions. The canonical boundary is `listWorkspaceTabs` in the terminal session
-service:
+sessions. The public canonical boundary is still `listWorkspaceTabs`, but the
+projection implementation is split out of the terminal session service:
 
 - every live terminal session must materialize a matching `{ type: 'terminal', terminalSessionId }` tab entry
 - stale terminal tab entries must be pruned when no matching live session exists
 - existing static tabs and user-managed ordering are preserved where possible
 - the server broadcasts `workspace-tabs-changed` when read-side canonicalization changes the projection
+
+The server-side ownership is:
+
+- `src/server/terminal/terminal-workspace-tabs-projection.ts` owns the pure prune/materialize/dedupe rules
+- `src/server/terminal/terminal-workspace-tabs-coordinator.ts` owns queueing, live-session lookup, runtime writes, and read-side canonicalization
+- `src/server/terminal/terminal-session-service.ts` remains the public facade that validates requests and delegates to the coordinator
 
 This keeps the client from inventing fallback rendering rules such as "show a
 terminal tab if a live terminal view exists but the tab list forgot it". The UI

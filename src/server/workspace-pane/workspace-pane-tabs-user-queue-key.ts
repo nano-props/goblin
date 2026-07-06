@@ -1,8 +1,8 @@
 import { workspacePaneTabsTargetIdentityKeyFromIdentity } from '#/shared/workspace-pane-tabs-target.ts'
 
 /**
- * Per-(user, target) identifier for `terminal-session-service`'s
- * workspace-pane-tabs operation queue. The web-side queue
+ * Per-(user, target) identifier for the server-side workspace-pane-tabs
+ * operation queue. The web-side queue
  * (`web/workspace-pane/workspace-pane-tabs-operation-queue.ts`) does not
  * include `userId` because the web queue is per-session, not per-user.
  */
