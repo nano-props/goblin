@@ -39,8 +39,9 @@ A terminal session in Goblin has at most one effective controller
 attachment at a time — the online `clientId` whose keystrokes reach
 the shell. If stored controller intent is absent or offline, the
 effective controller is `null` and clients project the role as
-`unowned`. All other windows are _viewers_: they see the same screen,
-they read the same output, but their input is dropped at the boundary.
+`unowned`. All other windows are _viewers_: they see a readonly session
+projection and can request takeover, but they do not consume the live
+xterm output stream; their input is dropped at the boundary.
 
 This isn't a security boundary; it's a coordination boundary. If
 two windows typed at once, the user's mental model of the shell
@@ -105,18 +106,19 @@ and the previous terminal state was still mine" works. The user
 sticky bit carries the claim across window lifetimes. The window
 identity is ephemeral; the user identity is durable.
 
-## Output fans out; only input is exclusive
+## Server output is shared; rendered output is not
 
-Control applies to **writing**, not reading. Every open window —
-controller and viewers alike — sees the same PTY output.
-Switching devices never costs the user the screen they were
-looking at.
+Control applies to **writing**, not to the server's output stream. The
+server owns PTY output history and the headless render snapshot, but the
+live xterm output consumer is the current controller view. A viewer sees
+session metadata and a takeover path; after takeover, the new controller
+paints from a fresh server snapshot instead of trusting a viewer-owned
+render buffer.
 
-The asymmetry is intentional: reading from a shell is a passive
-broadcast, but writing is a single-stream commitment the shell
-itself makes (every keystroke is appended to one input pipe). The
-model has to match what the underlying PTY actually does, not
-impose a richer contract than the OS provides.
+The asymmetry is intentional: the PTY still produces one server-owned
+output stream, while each browser xterm is an ephemeral render target.
+The model has to match that ownership split instead of treating a viewer
+DOM buffer as protocol authority.
 
 ## Why a same-window reconnect is non-disruptive
 

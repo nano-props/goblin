@@ -11,6 +11,7 @@ describe('TerminalSessionRuntime', () => {
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
+        outputEra: 0,
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',
@@ -44,6 +45,7 @@ describe('TerminalSessionRuntime', () => {
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
+        outputEra: 0,
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',
@@ -59,13 +61,14 @@ describe('TerminalSessionRuntime', () => {
 
     expect(runtime.snapshot().attachment).toMatchObject({ active: false, canTakeover: true })
 
-    runtime.beginReplay(2)
+    runtime.beginReplay({ outputEra: 0, seq: 2 })
     expect(
       runtime.handleOutput({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalSessionId: 'pty_session_1_aaaaaaaaa',
         data: 'old',
         seq: 1,
+        outputEra: 0,
         processName: 'zsh',
       }),
     ).toEqual({
@@ -78,6 +81,7 @@ describe('TerminalSessionRuntime', () => {
         terminalSessionId: 'pty_session_1_aaaaaaaaa',
         data: 'new',
         seq: 3,
+        outputEra: 0,
         processName: 'bash',
       }),
     ).toEqual({
@@ -91,12 +95,13 @@ describe('TerminalSessionRuntime', () => {
         terminalSessionId: 'pty_session_1_aaaaaaaaa',
         data: 'new',
         seq: 3,
+        outputEra: 0,
         processName: 'bash',
       },
     ])
   })
 
-  test('drops realtime output already covered by an attach snapshot outside replay', () => {
+  test('does not own rendered-output dedupe outside replay', () => {
     const runtime = new TerminalSessionRuntime()
     runtime.applyAttachResult(
       {
@@ -104,6 +109,7 @@ describe('TerminalSessionRuntime', () => {
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: 'prompt',
         snapshotSeq: 1,
+        outputEra: 0,
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',
@@ -123,21 +129,23 @@ describe('TerminalSessionRuntime', () => {
         terminalSessionId: 'session-1',
         data: 'prompt',
         seq: 1,
+        outputEra: 0,
         processName: 'zsh',
       }),
-    ).toEqual({ changed: false, output: null })
+    ).toEqual({ changed: false, output: 'prompt' })
     expect(
       runtime.handleOutput({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalSessionId: 'session-1',
         data: 'next',
         seq: 2,
+        outputEra: 0,
         processName: 'zsh',
       }),
     ).toEqual({ changed: false, output: 'next' })
   })
 
-  test('keeps output sequencing across metadata hydration and resets it when sessions change', () => {
+  test('keeps metadata hydration independent from rendered-output checkpoints', () => {
     const runtime = new TerminalSessionRuntime()
     runtime.applyAttachResult(
       {
@@ -145,6 +153,7 @@ describe('TerminalSessionRuntime', () => {
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: 'prompt',
         snapshotSeq: 1,
+        outputEra: 0,
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',
@@ -164,6 +173,7 @@ describe('TerminalSessionRuntime', () => {
         terminalSessionId: 'session-1',
         data: 'next',
         seq: 2,
+        outputEra: 0,
         processName: 'zsh',
       }),
     ).toEqual({ changed: false, output: 'next' })
@@ -183,9 +193,10 @@ describe('TerminalSessionRuntime', () => {
         terminalSessionId: 'session-1',
         data: 'next-again',
         seq: 2,
+        outputEra: 0,
         processName: 'zsh',
       }),
-    ).toEqual({ changed: false, output: null })
+    ).toEqual({ changed: false, output: 'next-again' })
 
     runtime.hydrateRepoSession({
       terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
@@ -203,6 +214,7 @@ describe('TerminalSessionRuntime', () => {
         terminalSessionId: 'session-1',
         data: 'new-session-output',
         seq: 1,
+        outputEra: 0,
         processName: 'zsh',
       }),
     ).toEqual({ changed: false, output: 'new-session-output' })
@@ -220,6 +232,7 @@ describe('TerminalSessionRuntime', () => {
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
+        outputEra: 0,
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',
@@ -233,12 +246,13 @@ describe('TerminalSessionRuntime', () => {
       { cols: 100, rows: 30 },
     )
 
-    runtime.beginReplay(2)
+    runtime.beginReplay({ outputEra: 0, seq: 2 })
     runtime.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalSessionId: 'pty_session_1_aaaaaaaaa',
       data: 'new',
       seq: 3,
+      outputEra: 0,
       processName: 'bash',
     })
     runtime.drainReplay()
@@ -262,6 +276,7 @@ describe('TerminalSessionRuntime', () => {
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
+        outputEra: 0,
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',
@@ -277,12 +292,13 @@ describe('TerminalSessionRuntime', () => {
 
     // Preload window: events arrive during the server-snapshot write.
     // The boundary is the server snapshot's seq.
-    runtime.beginReplay(2)
+    runtime.beginReplay({ outputEra: 0, seq: 2 })
     runtime.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalSessionId: 'pty_session_1_aaaaaaaaa',
       data: 'preload-old',
       seq: 3,
+      outputEra: 0,
       processName: 'bash',
     })
     runtime.handleOutput({
@@ -290,17 +306,19 @@ describe('TerminalSessionRuntime', () => {
       terminalSessionId: 'pty_session_1_aaaaaaaaa',
       data: 'preload-new',
       seq: 6,
+      outputEra: 0,
       processName: 'bash',
     })
 
     // Post-attach window: the new snapshot is at seq=5. Update the
     // boundary; the buffer is preserved across the call.
-    runtime.beginReplay(5)
+    runtime.beginReplay({ outputEra: 0, seq: 5 })
     runtime.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalSessionId: 'pty_session_1_aaaaaaaaa',
       data: 'post-attach',
       seq: 7,
+      outputEra: 0,
       processName: 'bash',
     })
 
@@ -320,6 +338,7 @@ describe('TerminalSessionRuntime', () => {
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
+        outputEra: 0,
         processName: 'zsh',
         canonicalTitle: '~/Developer/goblin — npm run dev',
         phase: 'open',
@@ -372,6 +391,7 @@ describe('TerminalSessionRuntime', () => {
         terminalSessionId: 'session-remote',
         data: 'tick',
         seq: 1,
+        outputEra: 0,
         processName: 'node',
       }),
     ).toEqual({

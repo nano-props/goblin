@@ -64,6 +64,7 @@ export function projectCreateResultForClient(
           terminalRuntimeSessionId: result.terminalRuntimeSessionId,
           snapshot: result.snapshot,
           snapshotSeq: result.snapshotSeq,
+          outputEra: result.outputEra,
         },
       ],
     ]),
@@ -105,6 +106,7 @@ export function projectServerTerminalSession(input: {
       canonicalRows: input.serverSession.rows,
       snapshot: input.serverSnapshot?.snapshot ?? '',
       snapshotSeq: input.serverSnapshot?.snapshotSeq ?? 0,
+      outputEra: input.serverSnapshot?.outputEra ?? 0,
     },
     controlsTerminal: input.serverSession.controller?.clientId === input.clientId,
   }

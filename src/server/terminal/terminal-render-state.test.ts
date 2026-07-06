@@ -315,6 +315,7 @@ describe('terminal-render-state', () => {
       await expect(withSnapshotTimeout(snapshotPromise)).resolves.toEqual({
         snapshot: 'fresh',
         snapshotSeq: 1,
+        outputEra: 1,
         snapshotTruncated: false,
       })
     })
@@ -324,7 +325,7 @@ describe('terminal-render-state', () => {
       appendOutput(state, 'a')
       appendOutput(state, 'b')
       const snap = await takeSnapshot(state)
-      expect(snap).toEqual({ snapshot: 'ab', snapshotSeq: 2, snapshotTruncated: false })
+      expect(snap).toEqual({ snapshot: 'ab', snapshotSeq: 2, outputEra: 0, snapshotTruncated: false })
     })
 
     test('serializes zsh prompt end-marker repaint as the final screen, not raw replay bytes', async () => {
@@ -371,7 +372,7 @@ describe('terminal-render-state', () => {
 
       const snap = await takeSnapshot(state)
 
-      expect(snap).toEqual({ snapshot: 'prompt', snapshotSeq: 1, snapshotTruncated: false })
+      expect(snap).toEqual({ snapshot: 'prompt', snapshotSeq: 1, outputEra: 0, snapshotTruncated: false })
     })
   })
 

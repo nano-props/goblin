@@ -85,14 +85,15 @@ export interface TerminalRestartInput {
 /**
  * Successful `takeover` result.
  *
- * First-frame contract: takeover is the authoritative handshake for
- * the new controller's view. The client applies the response
+ * Control-frame contract: takeover is the authoritative handshake for
+ * the new controller role/lifecycle state. The client applies the response
  * synchronously and does not need to wait for a follow-up realtime
- * `identity` event before painting the post-takeover frame. The
- * fields mirror `TerminalFirstFrame` minus the snapshot fields
- * (`snapshot`, `snapshotSeq`) — takeover does not return a fresh
- * snapshot because the new controller keeps the buffer the viewer
- * was already showing (no re-fetch needed).
+ * `identity` event before enabling the controller view. The fields mirror
+ * `TerminalFirstFrame` minus the render-snapshot fields (`snapshot`,
+ * `snapshotSeq`, `outputEra`).
+ * A viewer is a metadata/readonly projection, not an owner of the
+ * terminal render buffer; the controller view fetches a fresh
+ * first-frame snapshot after takeover when it needs to paint xterm.
  *
  * The realtime `identity` event still has a real job on the
  * non-takeover controller-change paths (controller crash, grace
@@ -117,10 +118,10 @@ export type TerminalTakeoverResult =
 /**
  * Successful attach/restart result.
  *
- * `snapshot`/`snapshotSeq` are the session's server-side serialized
- * xterm screen and the last PTY output sequence included in that screen.
- * The client hydrates from these and re-replays any post-snapshot
- * events the runtime captures.
+ * `snapshot`/`snapshotSeq`/`outputEra` are the session's server-side
+ * serialized xterm screen, the last PTY output sequence included in that
+ * screen, and the reset era that sequence belongs to. The client hydrates
+ * from these and re-replays any post-snapshot events the runtime captures.
  *
  * First-frame contract: a successful `attach`/`restart` response is
  * the authoritative handshake for that session's frame state. All
@@ -140,6 +141,7 @@ export type TerminalAttachResult =
       message: string | null
       snapshot: string
       snapshotSeq: number
+      outputEra: number
       controller: TerminalController | null
       canonicalCols: number
       canonicalRows: number
@@ -162,6 +164,7 @@ export interface TerminalFirstFrame {
   message: string | null
   snapshot: string
   snapshotSeq: number
+  outputEra: number
   controller: TerminalController | null
   canonicalCols: number
   canonicalRows: number
@@ -266,6 +269,7 @@ export interface TerminalHydrationSnapshot {
   terminalRuntimeSessionId: string
   snapshot: string
   snapshotSeq: number
+  outputEra: number
 }
 
 export type TerminalMutationResult = boolean
@@ -287,6 +291,7 @@ export interface TerminalOutputEvent {
   terminalRuntimeSessionId: string
   terminalSessionId: string
   data: string
+  outputEra: number
   seq: number
   processName: string
 }

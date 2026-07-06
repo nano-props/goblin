@@ -1315,6 +1315,7 @@ describe('TerminalSession', () => {
       canonicalRows: 40,
       snapshot: 'hydrated-screen',
       snapshotSeq: 5,
+    outputEra: 0,
     })
     session.attach(host)
     await flushTerminalStart()
@@ -1343,11 +1344,13 @@ describe('TerminalSession', () => {
       canonicalRows: 40,
       snapshot: 'hydrated-screen',
       snapshotSeq: 5,
+      outputEra: 0,
     })
     // Sanity-check the leak precondition: hydrate() populated the field.
     expect(
-      (session as unknown as { hydratedSnapshot: { snapshot: string; snapshotSeq: number } }).hydratedSnapshot,
-    ).toEqual({ snapshot: 'hydrated-screen', snapshotSeq: 5 })
+      (session as unknown as { hydratedSnapshot: { snapshot: string; snapshotSeq: number; outputEra: number } })
+        .hydratedSnapshot,
+    ).toEqual({ snapshot: 'hydrated-screen', snapshotSeq: 5, outputEra: 0 })
 
     session.attach(host)
     await flushTerminalStart()
@@ -1356,7 +1359,7 @@ describe('TerminalSession', () => {
     // After the write resolves, the field should be reset
     // to the empty sentinel so we don't keep a stale up-to-16 MiB copy
     // around until the next hydrate().
-    expect(hydratedSnapshot(session)).toEqual({ snapshot: '', snapshotSeq: 0 })
+    expect(hydratedSnapshot(session)).toEqual({ snapshot: '', snapshotSeq: 0, outputEra: 0 })
   })
 
   test('clears hydratedSnapshot after applyHydratedSnapshotToActiveView writes the snapshot to the term', async () => {
@@ -1385,6 +1388,7 @@ describe('TerminalSession', () => {
       canonicalRows: 40,
       snapshot: 'rehydrated',
       snapshotSeq: 7,
+      outputEra: 0,
     })
 
     expect(term.write).toHaveBeenCalledWith('rehydrated', expect.any(Function))
@@ -1393,7 +1397,7 @@ describe('TerminalSession', () => {
     // cleared. The mock invokes the callback via queueMicrotask, so
     // draining microtasks is enough to observe the post-callback state.
     await flushResizeDispatch()
-    expect(hydratedSnapshot(session)).toEqual({ snapshot: '', snapshotSeq: 0 })
+    expect(hydratedSnapshot(session)).toEqual({ snapshot: '', snapshotSeq: 0, outputEra: 0 })
   })
 
   test('resets an existing terminal view when hydrate switches to a different session id', async () => {
@@ -1420,6 +1424,7 @@ describe('TerminalSession', () => {
       canonicalRows: 40,
       snapshot: 'remote-screen',
       snapshotSeq: 5,
+      outputEra: 0,
     })
     await flushTerminalStart()
 
@@ -1428,6 +1433,46 @@ describe('TerminalSession', () => {
     // so it can clear the field after the write resolves.
     expect(term.write).toHaveBeenCalledWith('remote-screen', expect.any(Function))
     expect(session.currentTerminalRuntimeSessionId()).toBe('session-remote')
+  })
+
+  test('drops pending live output when hydrate switches to a different session id', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    const term = xtermMocks.terminals[0]!
+    term.write.mockClear()
+
+    session.handleOutput({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'session-1',
+      data: 'old-pending-output',
+      seq: 1,
+      outputEra: 0,
+      processName: 'zsh',
+    })
+    expect(term.write).not.toHaveBeenCalled()
+
+    session.hydrate({
+      terminalRuntimeSessionId: 'session-remote',
+      phase: 'open',
+      message: null,
+      processName: 'node',
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalCols: 120,
+      canonicalRows: 40,
+      snapshot: 'remote-screen',
+      snapshotSeq: 5,
+      outputEra: 0,
+    })
+    await flushTerminalStart()
+
+    expect(term.write.mock.calls.map(([data]: unknown[]) => data)).toEqual(['remote-screen'])
   })
 
   test('does not rewrite an existing terminal view when hydrate refreshes the same session snapshot', async () => {
@@ -1454,6 +1499,7 @@ describe('TerminalSession', () => {
       canonicalRows: 30,
       snapshot: 'fresher-same-session-screen',
       snapshotSeq: 99,
+      outputEra: 0,
     })
     await flushTerminalStart()
 
@@ -1488,6 +1534,7 @@ describe('TerminalSession', () => {
       canonicalRows: 30,
       snapshot: 'older-replay',
       snapshotSeq: 10,
+    outputEra: 0,
     })
     session.hydrate({
       terminalRuntimeSessionId: 'pty_session_3_aaaaaaaaa',
@@ -1500,6 +1547,7 @@ describe('TerminalSession', () => {
       canonicalRows: 30,
       snapshot: 'newer-replay',
       snapshotSeq: 11,
+    outputEra: 0,
     })
 
     xtermMocks.flushNextDeferredWriteCallback()
@@ -1548,6 +1596,7 @@ describe('TerminalSession', () => {
       terminalSessionId: 'pty_session_1_aaaaaaaaa',
       data: 'prompt',
       seq: 1,
+      outputEra: 0,
       processName: 'zsh',
     })
     await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
@@ -1725,6 +1774,7 @@ describe('TerminalSession', () => {
         canonicalRows: 24,
         snapshot: 'post-takeover-screen',
         snapshotSeq: 8,
+      outputEra: 0,
       }),
     )
     const host = document.createElement('div')
@@ -1806,6 +1856,7 @@ describe('TerminalSession', () => {
         canonicalRows: 30,
         snapshot: 'reclaimed-after-hydrate',
         snapshotSeq: 10,
+      outputEra: 0,
       }),
     )
     const host = document.createElement('div')
@@ -1834,6 +1885,7 @@ describe('TerminalSession', () => {
       canonicalRows: 40,
       snapshot: '',
       snapshotSeq: 0,
+    outputEra: 0,
     })
     await flushTerminalStart()
 
@@ -1997,6 +2049,7 @@ describe('TerminalSession', () => {
           canonicalRows: 30,
           snapshot: 'reclaimed-screen',
           snapshotSeq: 9,
+        outputEra: 0,
         }),
       )
     const host = document.createElement('div')
@@ -2081,7 +2134,7 @@ describe('TerminalSession', () => {
 
   test('drops terminal-emulator input while replay is being written', async () => {
     terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'history', snapshotSeq: 1 }),
+      attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'history', snapshotSeq: 1, outputEra: 0 }),
     )
     xtermMocks.deferWriteCallbacks(true)
     const host = document.createElement('div')
@@ -2102,7 +2155,7 @@ describe('TerminalSession', () => {
 
   test('forwards xterm core-attributed user input while replay is being written', async () => {
     terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'history', snapshotSeq: 1 }),
+      attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'history', snapshotSeq: 1, outputEra: 0 }),
     )
     xtermMocks.deferWriteCallbacks(true)
     const host = document.createElement('div')
@@ -2126,7 +2179,7 @@ describe('TerminalSession', () => {
 
   test('forwards xterm binary mouse input while replay is being written', async () => {
     terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'history', snapshotSeq: 1 }),
+      attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'history', snapshotSeq: 1, outputEra: 0 }),
     )
     xtermMocks.deferWriteCallbacks(true)
     const host = document.createElement('div')
@@ -2150,7 +2203,7 @@ describe('TerminalSession', () => {
 
   test('resets the terminal before replaying the snapshot', async () => {
     terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'tail', snapshotSeq: 1 }),
+      attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'tail', snapshotSeq: 1, outputEra: 0 }),
     )
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -2165,7 +2218,7 @@ describe('TerminalSession', () => {
 
   test('does not write realtime output already covered by the attached snapshot', async () => {
     terminalCalls.attach.mockResolvedValueOnce(
-      attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'prompt', snapshotSeq: 1 }),
+      attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'prompt', snapshotSeq: 1, outputEra: 0 }),
     )
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -2182,6 +2235,7 @@ describe('TerminalSession', () => {
       terminalSessionId: 'session-1',
       data: 'prompt',
       seq: 1,
+      outputEra: 0,
       processName: 'zsh',
     })
     session.handleOutput({
@@ -2189,12 +2243,13 @@ describe('TerminalSession', () => {
       terminalSessionId: 'session-1',
       data: 'next',
       seq: 2,
+      outputEra: 0,
       processName: 'zsh',
     })
     await flushTerminalStart()
 
     expect(term.write).toHaveBeenCalledTimes(1)
-    expect(term.write).toHaveBeenCalledWith('next')
+    expect(term.write).toHaveBeenCalledWith('next', expect.any(Function))
   })
 
   test('batches terminal output writes on animation frames', async () => {
@@ -2213,6 +2268,7 @@ describe('TerminalSession', () => {
       terminalSessionId: 'other-session',
       data: 'ignored',
       seq: 1,
+      outputEra: 0,
       processName: 'zsh',
     })
     session.handleOutput({
@@ -2220,6 +2276,7 @@ describe('TerminalSession', () => {
       terminalSessionId: 'pty_session_1_aaaaaaaaa',
       data: 'first',
       seq: 1,
+      outputEra: 0,
       processName: 'zsh',
     })
     session.handleOutput({
@@ -2227,6 +2284,7 @@ describe('TerminalSession', () => {
       terminalSessionId: 'pty_session_1_aaaaaaaaa',
       data: 'second',
       seq: 2,
+      outputEra: 0,
       processName: 'zsh',
     })
 
@@ -2236,7 +2294,7 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
 
     expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledTimes(1)
-    expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledWith('firstsecond')
+    expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledWith('firstsecond', expect.any(Function))
   })
 
   test('flushes matching terminal exits before the provider dismisses the session', async () => {
@@ -2253,6 +2311,7 @@ describe('TerminalSession', () => {
       terminalSessionId: 'pty_session_1_aaaaaaaaa',
       data: 'before exit',
       seq: 1,
+      outputEra: 0,
       processName: 'zsh',
     })
     expect(session.handleExit({ terminalRuntimeSessionId: 'other-session', terminalSessionId: 'other-session' })).toBe(
@@ -2266,7 +2325,7 @@ describe('TerminalSession', () => {
     ).toBe(true)
     session.dispose()
 
-    expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledWith('before exit')
+    expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledWith('before exit', expect.any(Function))
     expect(session.snapshot()).toEqual({ phase: 'open', message: null, processName: 'zsh', canonicalTitle: null })
     expect(terminalCalls.close).not.toHaveBeenCalled()
   })
@@ -2710,6 +2769,7 @@ function createFirstFrame(
     terminalRuntimeSessionId,
     snapshot: '',
     snapshotSeq: 0,
+    outputEra: 0,
     processName: 'zsh',
     canonicalTitle: null,
     phase: 'open',
@@ -2730,6 +2790,7 @@ function attachResult(
     terminalRuntimeSessionId,
     snapshot: '',
     snapshotSeq: 0,
+    outputEra: 0,
     processName: 'zsh',
     canonicalTitle: null,
     phase: 'open',
@@ -2788,12 +2849,14 @@ function hydrateManagedSession(
     canonicalRows: 30,
     snapshot: '',
     snapshotSeq: 0,
+    outputEra: 0,
     ...overrides,
   })
 }
 
-function hydratedSnapshot(session: TerminalSession): { snapshot: string; snapshotSeq: number } {
-  return (session as unknown as { hydratedSnapshot: { snapshot: string; snapshotSeq: number } }).hydratedSnapshot
+function hydratedSnapshot(session: TerminalSession): { snapshot: string; snapshotSeq: number; outputEra: number } {
+  return (session as unknown as { hydratedSnapshot: { snapshot: string; snapshotSeq: number; outputEra: number } })
+    .hydratedSnapshot
 }
 
 function deferred<T>() {

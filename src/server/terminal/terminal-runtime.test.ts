@@ -440,7 +440,7 @@ describe('server terminal runtime', () => {
       .find((message) => message.type === 'output')
     expect(outputMessage).toMatchObject({
       type: 'output',
-      event: { terminalRuntimeSessionId, terminalSessionId: expect.any(String), data: 'hello', seq: 1 },
+      event: { terminalRuntimeSessionId, terminalSessionId: expect.any(String), data: 'hello', outputEra: 0, seq: 1 },
     })
 
     socket.send.mockClear()
@@ -1132,7 +1132,13 @@ describe('server terminal runtime', () => {
     })
     expect(messages[outputIndex]).toMatchObject({
       type: 'output',
-      event: { terminalRuntimeSessionId, terminalSessionId: expect.any(String), data: 'during-attach', seq: 1 },
+      event: {
+        terminalRuntimeSessionId,
+        terminalSessionId: expect.any(String),
+        data: 'during-attach',
+        outputEra: 0,
+        seq: 1,
+      },
     })
 
     host.unregisterSocket('client_a', USER_1, socket)
@@ -1188,6 +1194,7 @@ describe('server terminal runtime', () => {
         processName: 'zsh',
         snapshot: expect.any(String),
         snapshotSeq: expect.any(Number),
+        outputEra: 0,
         canonicalCols: 80,
         canonicalRows: 24,
       },
@@ -1247,6 +1254,7 @@ describe('server terminal runtime', () => {
         ok: true,
         snapshot: expect.stringContaining('during-create'),
         snapshotSeq: 1,
+      outputEra: 0,
       },
     })
 
@@ -1259,6 +1267,7 @@ describe('server terminal runtime', () => {
         terminalSessionId: createdPayload.terminalSessionId,
         data: 'during-create',
         seq: 1,
+      outputEra: 0,
       },
     })
 

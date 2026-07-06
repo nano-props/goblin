@@ -174,6 +174,7 @@ const TerminalFirstFrameSchemaEntries = {
   message: v.nullable(v.string()),
   snapshot: v.string(),
   snapshotSeq: v.number(),
+  outputEra: v.number(),
   controller: v.nullable(TerminalControllerSchema),
   canonicalCols: TerminalColsSchema,
   canonicalRows: TerminalRowsSchema,
@@ -196,6 +197,7 @@ const TerminalOutputEventSchema = v.object({
   terminalRuntimeSessionId: v.string(),
   terminalSessionId: v.string(),
   data: v.string(),
+  outputEra: v.number(),
   seq: v.number(),
   processName: v.string(),
 })

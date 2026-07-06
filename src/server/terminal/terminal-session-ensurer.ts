@@ -40,6 +40,7 @@ export type TerminalSessionEnsureResult =
       message: string | null
       snapshot: string
       snapshotSeq: number
+      outputEra: number
       controller: { clientId: string; status: Exclude<TerminalControllerStatus, 'none'> } | null
       canonicalCols: number
       canonicalRows: number
@@ -199,6 +200,7 @@ function toEnsureResult(
     message: snapshotResult.message,
     snapshot: snapshotResult.snapshot,
     snapshotSeq: snapshotResult.snapshotSeq,
+    outputEra: snapshotResult.outputEra,
     controller: snapshotResult.controller,
     canonicalCols: snapshotResult.canonicalCols,
     canonicalRows: snapshotResult.canonicalRows,

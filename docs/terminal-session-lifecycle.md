@@ -116,6 +116,7 @@ The combined symptom list across the root causes:
    - `message`
    - `snapshot`
    - `snapshotSeq`
+   - `outputEra`
    - `controller`
    - `canonicalCols`
    - `canonicalRows`
@@ -134,8 +135,8 @@ The combined symptom list across the root causes:
 
 ### `create.sessions` is projection data, not the success oracle
 
-- `create.terminalRuntimeSessionId` + `snapshot` + `snapshotSeq` are the
-  **authoritative first-frame handshake**.
+- `create.terminalRuntimeSessionId` + `snapshot` + `snapshotSeq` +
+  `outputEra` are the **authoritative first-frame handshake**.
 - `create.sessions` is **projection / directory data**.
 
 `create.sessions` is useful for tab-strip updates, terminal count,
@@ -153,7 +154,8 @@ toast.
 
 The client was doing an overly strict validation step:
 
-- required `terminalRuntimeSessionId`, `snapshot`, `snapshotSeq` from `create`, **and**
+- required `terminalRuntimeSessionId`, `snapshot`, `snapshotSeq`, `outputEra`
+  from `create`, **and**
 - required the returned `sessions` list to already include the
   created session.
 
@@ -174,8 +176,8 @@ runtime crash.
 1. A `TerminalFirstFrame` interface is the single source of truth for
    the first-frame handshake. It lifts every field that R0 made
    required (`terminalRuntimeSessionId`, `processName`, `canonicalTitle`, `phase`,
-   `message`, `snapshot`, `snapshotSeq`, `controller`, `canonicalCols`,
-   `canonicalRows`).
+   `message`, `snapshot`, `snapshotSeq`, `outputEra`, `controller`,
+   `canonicalCols`, `canonicalRows`).
 2. `TerminalAttachResult` no longer accepts optional `canonicalCols` /
    `canonicalRows` — both are required.
 3. `TerminalCreateResult` intersects with `TerminalFirstFrame`
@@ -415,12 +417,12 @@ report.
 ### Status
 
 Implemented. The `terminal.takeover` response is now the
-authoritative handshake for the new controller's view; the realtime
+authoritative handshake for the new controller role/lifecycle state; the realtime
 `identity` event keeps the same shape (and the same authority role)
 for the _other_ control-change paths (controller crash, sibling
 auto-claim after disconnect, fresh attach). The client no longer
-waits for a follow-up `identity` event before painting the
-post-takeover frame.
+waits for a follow-up `identity` event before enabling the controller view;
+xterm paint still comes from the normal server snapshot path.
 
 ### The two-step handshake that was
 
@@ -444,13 +446,14 @@ response.
 
 ### What changed
 
-1. `TerminalTakeoverResult` carries the full first-frame payload on
+1. `TerminalTakeoverResult` carries an authoritative control-frame payload on
    the success branch — `role`, `controllerStatus`, `canonicalCols`,
    `canonicalRows`, `phase`, alongside the existing `controller`. The
-   shape mirrors `TerminalFirstFrame` minus the snapshot fields
-   (`snapshot`, `snapshotSeq`) — takeover doesn't return a fresh
-   snapshot because the new controller keeps whatever the viewer
-   was already showing.
+   shape intentionally excludes the snapshot fields (`snapshot`,
+   `snapshotSeq`, `outputEra`) — takeover changes control ownership, not
+   render ownership. A viewer is a readonly metadata projection; after
+   takeover, the controller paints xterm from the server snapshot path
+   instead of trusting a viewer-owned render buffer.
 2. `TerminalIdentityEvent` and the client-side
    `TerminalIdentityViewModel` keep the same role/geometry shape
    as the takeover response. Both surfaces carry the same fields,
@@ -466,8 +469,9 @@ response.
    a role change at the apply boundary.
 5. The client awaits the takeover response and applies it through
    `runtime.applyTakeover(result)`, which feeds the response into
-   the identity + lifecycle apply path in one shot. Takeover
-   failures are logged instead of swallowed.
+   the identity + lifecycle apply path in one shot. The controller view
+   then starts/reattaches through the normal server snapshot path when it
+   needs to paint xterm. Takeover failures are logged instead of swallowed.
 6. The client conversion and the runtime's identity handler are
    aligned to route role/status/geometry through the identity
    channel and phase/message through the lifecycle channel.
@@ -511,8 +515,9 @@ arrive at the same final state.
 ### Out of scope
 
 - No restructuring of who-emits-when for the realtime event.
-- `TerminalFirstFrame` is unchanged — takeover borrows its shape
-  but doesn't need to extend it.
+- `TerminalFirstFrame` is unchanged — takeover deliberately does not extend it,
+  because snapshot paint remains owned by the attach/restart/create first-frame
+  paths.
 
 ---
 
@@ -542,7 +547,8 @@ order would have been:
 
 - **R0**: provider tests supply the new first-frame hydration fields
   on both `created` and `reused` paths; projection tests cover the
-  `create.terminalRuntimeSessionId` + `snapshot` + `snapshotSeq` rule.
+  `create.terminalRuntimeSessionId` + `snapshot` + `snapshotSeq` + `outputEra`
+  rule.
 - **R1**: projection durable-close tests cover awaiting an in-flight
   close before creating, in-flight close failures allowing the queued
   create to proceed afterward, deduplicating concurrent enqueues,
@@ -585,9 +591,9 @@ These rules are derived from the symptom family and should outlive
 any individual implementation:
 
 1. **Do not use `create.sessions` as the success criterion for first
-   paint.** `create.terminalRuntimeSessionId` + `snapshot` + `snapshotSeq` are the
-   authoritative created-session handshake. `create.sessions` is
-   projection data.
+   paint.** `create.terminalRuntimeSessionId` + `snapshot` + `snapshotSeq` +
+   `outputEra` are the authoritative created-session handshake.
+   `create.sessions` is projection data.
 2. **Keep `create`, `attach`, and `restart` aligned in first-frame
    semantics.** All three produce a terminal frame the user can
    immediately see; they all owe the same atomic handshake.

@@ -46,6 +46,7 @@ describe('terminal session projection helpers', () => {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         snapshot: 'server-snap',
         snapshotSeq: 9,
+      outputEra: 0,
       },
     })
 
@@ -71,6 +72,7 @@ describe('terminal session projection helpers', () => {
         canonicalRows: 40,
         snapshot: 'server-snap',
         snapshotSeq: 9,
+      outputEra: 0,
       },
       controlsTerminal: true,
     })
@@ -146,6 +148,7 @@ describe('terminal session projection helpers', () => {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
+        outputEra: 0,
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',
@@ -177,6 +180,7 @@ describe('terminal session projection helpers', () => {
         message: null,
         snapshot: 'first-frame',
         snapshotSeq: 3,
+        outputEra: 0,
         controller: { clientId: 'client_a', status: 'connected' },
         canonicalCols: 120,
         canonicalRows: 40,
@@ -205,6 +209,7 @@ describe('terminal session projection helpers', () => {
       terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
       snapshot: 'first-frame',
       snapshotSeq: 3,
+    outputEra: 0,
     })
   })
 
@@ -241,6 +246,7 @@ describe('terminal session projection helpers', () => {
         message: null,
         snapshot: '',
         snapshotSeq: 0,
+        outputEra: 0,
         controller: { clientId: 'client_a', status: 'connected' },
         canonicalCols: 120,
         canonicalRows: 40,
@@ -295,6 +301,7 @@ describe('terminal session projection helpers', () => {
         message: null,
         snapshot: 'restored-frame',
         snapshotSeq: 4,
+        outputEra: 0,
         controller: { clientId: 'client_a', status: 'connected' },
         canonicalCols: 120,
         canonicalRows: 40,

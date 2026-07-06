@@ -211,6 +211,7 @@ describe('shared terminal validators', () => {
         message: null,
         snapshot: 'first frame',
         snapshotSeq: 1,
+        outputEra: 0,
         controller: { clientId: 'client_a', status: 'connected' },
         canonicalCols: 120,
         canonicalRows: 40,
@@ -220,6 +221,7 @@ describe('shared terminal validators', () => {
       terminalSessionId: 'session-1',
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       snapshotSeq: 1,
+    outputEra: 0,
     })
 
     expect(
@@ -246,6 +248,7 @@ describe('shared terminal validators', () => {
           terminalSessionId: 'session-1',
           data: 'hi',
           seq: 1,
+          outputEra: 0,
           processName: 'zsh',
         },
       }),
@@ -256,6 +259,7 @@ describe('shared terminal validators', () => {
         terminalSessionId: 'session-1',
         data: 'hi',
         seq: 1,
+        outputEra: 0,
         processName: 'zsh',
       },
     })

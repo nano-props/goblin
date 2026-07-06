@@ -171,6 +171,7 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
     message: null,
     snapshot: '',
     snapshotSeq: 0,
+    outputEra: 0,
     controller: { clientId: 'client_local', status: 'connected' as const },
     canonicalCols: 101,
     canonicalRows: 31,

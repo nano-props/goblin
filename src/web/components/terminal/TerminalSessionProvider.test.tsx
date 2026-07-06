@@ -354,6 +354,7 @@ function attachResult(): TerminalAttachResult {
     terminalRuntimeSessionId: 'unused',
     snapshot: '',
     snapshotSeq: 0,
+    outputEra: 0,
     processName: 'zsh',
     canonicalTitle: null,
     phase: 'open',
@@ -416,6 +417,7 @@ beforeEach(() => {
         terminalRuntimeSessionId: reused?.terminalRuntimeSessionId ?? 'session-1',
         snapshot: '',
         snapshotSeq: 0,
+        outputEra: 0,
         processName: reused?.processName ?? 'zsh',
         canonicalTitle: reused?.canonicalTitle ?? null,
         phase: reused?.phase ?? 'open',
@@ -461,6 +463,7 @@ beforeEach(() => {
       terminalRuntimeSessionId: terminalSessionId,
       snapshot: '',
       snapshotSeq: 0,
+      outputEra: 0,
       processName: 'zsh',
       canonicalTitle: null,
       phase: 'open',
@@ -498,6 +501,7 @@ beforeEach(() => {
           terminalRuntimeSessionId: 'unused',
           snapshot: '',
           snapshotSeq: 0,
+          outputEra: 0,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'open',
@@ -511,6 +515,7 @@ beforeEach(() => {
           terminalRuntimeSessionId: 'unused',
           snapshot: '',
           snapshotSeq: 0,
+          outputEra: 0,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'open',
@@ -966,6 +971,7 @@ describe('TerminalSessionProvider', () => {
           terminalSessionId: 'session-1',
           data: 'hello',
           seq: 1,
+          outputEra: 0,
           processName: 'zsh',
         })
         titleHandler?.({
@@ -998,6 +1004,7 @@ describe('TerminalSessionProvider', () => {
         terminalSessionId: 'session-1',
         data: 'hello',
         seq: 1,
+        outputEra: 0,
         processName: 'zsh',
       })
       expect(first.handleServerTitle).toHaveBeenCalledTimes(1)
@@ -1141,6 +1148,7 @@ describe('TerminalSessionProvider', () => {
           canonicalRows: 40,
           snapshot: '',
           snapshotSeq: 0,
+        outputEra: 0,
         }),
       )
 
@@ -1704,6 +1712,7 @@ describe('TerminalSessionProvider', () => {
         expect.objectContaining({
           snapshot: '',
           snapshotSeq: 0,
+        outputEra: 0,
         }),
       )
     } finally {
@@ -1821,6 +1830,7 @@ describe('TerminalSessionProvider', () => {
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       snapshot: '',
       snapshotSeq: 0,
+      outputEra: 0,
       processName: 'zsh',
       canonicalTitle: null,
       phase: 'open' as const,
@@ -1892,6 +1902,7 @@ describe('TerminalSessionProvider', () => {
           terminalRuntimeSessionId: 'session-1',
           snapshot: '',
           snapshotSeq: 0,
+          outputEra: 0,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'open' as const,
@@ -1995,6 +2006,7 @@ describe('TerminalSessionProvider', () => {
           terminalRuntimeSessionId: 'session-1',
           snapshot: '',
           snapshotSeq: 0,
+          outputEra: 0,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'open' as const,

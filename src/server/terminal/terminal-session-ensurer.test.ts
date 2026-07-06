@@ -252,6 +252,8 @@ function attachResult(
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
     snapshot: '',
     snapshotSeq: 0,
+   outputEra: 0,
+
     processName: 'zsh',
     canonicalTitle: null,
     phase: 'open',

@@ -37,6 +37,7 @@ import {
   type AuthorizationDenialReason,
   type TerminalAuthorityGate,
 } from '#/web/components/terminal/authority-gate.ts'
+import type { TerminalOutputCheckpoint } from '#/web/components/terminal/terminal-session-state.ts'
 import { WRITE_BLOCKED_KEY_BY_REASON } from '#/web/components/terminal/authority-denial-feedback.ts'
 import { terminalLog } from '#/web/logger.ts'
 import { t } from 'i18next'
@@ -51,6 +52,15 @@ import type {
 const EMPTY_SEARCH_RESULT: TerminalSearchResult = { resultIndex: -1, resultCount: 0, found: false }
 
 export type TerminalNotifyReason = 'metadata'
+
+interface RenderedOutputCheckpoint extends TerminalOutputCheckpoint {
+  terminalRuntimeSessionId: string
+}
+
+interface PendingOutputWrite {
+  data: string
+  checkpoint: RenderedOutputCheckpoint
+}
 
 export class TerminalSession {
   descriptor: TerminalDescriptor
@@ -70,7 +80,7 @@ export class TerminalSession {
   private outputFlushFrame: number | null = null
 
   private pendingResize: { cols: number; rows: number } | null = null
-  private pendingOutput: string[] = []
+  private pendingOutput: PendingOutputWrite[] = []
   private pendingWriteBuffer = ''
   private inputFlushScheduled = false
   private externalCommandGateTerminalRuntimeSessionId: string | null = null
@@ -79,7 +89,12 @@ export class TerminalSession {
   // An empty snapshot string is the "no preload" sentinel — the hydration
   // input always carries the field, so the runtime type can stay
   // non-nullable and consumers branch on `.snapshot.length`.
-  private hydratedSnapshot: { snapshot: string; snapshotSeq: number } = { snapshot: '', snapshotSeq: 0 }
+  private hydratedSnapshot: { snapshot: string; snapshotSeq: number; outputEra: number } = {
+    snapshot: '',
+    snapshotSeq: 0,
+    outputEra: 0,
+  }
+  private renderedOutputCheckpoint: RenderedOutputCheckpoint | null = null
   private disposed = false
 
   constructor(
@@ -375,10 +390,11 @@ export class TerminalSession {
 
   hydrate(input: TerminalSessionHydrationInput): void {
     const previousTerminalRuntimeSessionId = this.runtime.currentTerminalRuntimeSessionId()
-    this.hydratedSnapshot = { snapshot: input.snapshot, snapshotSeq: input.snapshotSeq }
-    const snapshotBecomesLocalBaseline =
-      terminalSnapshotHasOutput(input.snapshot, input.snapshotSeq) &&
-      (previousTerminalRuntimeSessionId !== input.terminalRuntimeSessionId || !this.view.currentTerminal())
+    this.hydratedSnapshot = {
+      snapshot: input.snapshot,
+      snapshotSeq: input.snapshotSeq,
+      outputEra: input.outputEra,
+    }
     const changed = this.runtime.hydrateRepoSession({
       terminalRuntimeSessionId: input.terminalRuntimeSessionId,
       phase: input.phase,
@@ -389,7 +405,6 @@ export class TerminalSession {
       controllerStatus: input.controllerStatus,
       canonicalCols: input.canonicalCols,
       canonicalRows: input.canonicalRows,
-      ...(snapshotBecomesLocalBaseline ? { snapshotSeq: input.snapshotSeq } : {}),
     })
     this.syncExternalCommandGate(
       input.terminalRuntimeSessionId,
@@ -406,10 +421,11 @@ export class TerminalSession {
   }
 
   handleOutput(event: TerminalOutputEvent): void {
+    if (this.isOutputAlreadyRendered(event)) return
     const result = this.runtime.handleOutput(event)
     if (result.changed) this.notify('metadata')
     if (result.output && this.runtime.isController()) {
-      this.queueOutput(result.output)
+      this.queueOutput(result.output, this.checkpointFromOutputEvent(event))
       this.markExternalCommandGateOutputObserved(event.terminalRuntimeSessionId)
     }
   }
@@ -496,7 +512,7 @@ export class TerminalSession {
 
   handleExit(event: TerminalExitEvent): boolean {
     if (!this.runtime.handleExit(event)) return false
-    this.flushOutput()
+    this.flushOutput(event.terminalRuntimeSessionId)
     this.clearExternalCommandGate()
     this.clearTerminalFocusIfOwned()
     this.view.blurIfFocused()
@@ -745,7 +761,11 @@ export class TerminalSession {
         this.queueResize(term.cols, term.rows)
       }
     }
-    await this.replayActiveView(epoch, term, result.snapshot, result.snapshotSeq)
+    await this.replayActiveView(epoch, term, result.snapshot, {
+      terminalRuntimeSessionId: result.terminalRuntimeSessionId,
+      outputEra: result.outputEra,
+      seq: result.snapshotSeq,
+    })
     this.assertCurrentStart(epoch, term)
     return changed
   }
@@ -782,14 +802,22 @@ export class TerminalSession {
     return projectTerminalAttachResultForClient(result, clientId)
   }
 
-  private async replayActiveView(epoch: number, term: XTermTerminal, replay: string, replaySeq: number): Promise<void> {
-    const replayGeneration = this.runtime.beginReplay(replaySeq)
+  private async replayActiveView(
+    epoch: number,
+    term: XTermTerminal,
+    replay: string,
+    replayCheckpoint: RenderedOutputCheckpoint,
+  ): Promise<void> {
+    const replayGeneration = this.runtime.beginReplay(replayCheckpoint)
     try {
       term.reset()
       if (replay) await termWrite(term, replay)
+      if (this.isCurrentStart(epoch, term)) this.markOutputRendered(replayCheckpoint)
     } finally {
       if (this.isCurrentStart(epoch, term)) {
-        for (const event of this.runtime.finishReplay(replayGeneration)) this.queueOutput(event.data)
+        for (const event of this.runtime.finishReplay(replayGeneration)) {
+          this.queueOutput(event.data, this.checkpointFromOutputEvent(event))
+        }
       } else {
         this.runtime.drainReplay(replayGeneration)
       }
@@ -804,7 +832,8 @@ export class TerminalSession {
     // the term for nothing.
     if (hydratedSnapshot.snapshot.length === 0 || !this.isCurrentStart(epoch, term)) return null
     // Open the replay window — see state.beginReplay for the preload+post-attach contract.
-    const replayGeneration = this.runtime.beginReplay(hydratedSnapshot.snapshotSeq)
+    const replayCheckpoint = this.checkpointFromHydratedSnapshot(hydratedSnapshot)
+    const replayGeneration = this.runtime.beginReplay(replayCheckpoint)
     try {
       term.reset()
       if (hydratedSnapshot.snapshot) await termWrite(term, hydratedSnapshot.snapshot)
@@ -824,12 +853,13 @@ export class TerminalSession {
       // with a fresher value. Clearing in that case would discard it;
       // we leave the new value for its own write path to clear.
       if (stillCurrent && this.hydratedSnapshot === hydratedSnapshot) {
-        this.hydratedSnapshot = { snapshot: '', snapshotSeq: 0 }
+        this.hydratedSnapshot = { snapshot: '', snapshotSeq: 0, outputEra: 0 }
       }
       if (!stillCurrent) {
         this.runtime.drainReplay(replayGeneration)
         return null
       }
+      this.markOutputRendered(replayCheckpoint)
       return replayGeneration
     } catch (err) {
       // Term write failed — drop the replay window so the boundary
@@ -843,11 +873,13 @@ export class TerminalSession {
     const term = this.view.currentTerminal()
     const hydratedSnapshot = this.hydratedSnapshot
     if (!term) return
-    const replayGeneration = this.runtime.beginReplay(hydratedSnapshot.snapshotSeq)
+    this.clearPendingOutput()
+    const replayCheckpoint = this.checkpointFromHydratedSnapshot(hydratedSnapshot)
+    const replayGeneration = this.runtime.beginReplay(replayCheckpoint)
     try {
       term.reset()
       if (hydratedSnapshot.snapshot.length === 0) {
-        this.finishActiveHydratedSnapshotReplay(term, hydratedSnapshot, replayGeneration)
+        this.finishActiveHydratedSnapshotReplay(term, hydratedSnapshot, replayCheckpoint, replayGeneration)
         return
       }
       term.write(hydratedSnapshot.snapshot, () => {
@@ -860,7 +892,7 @@ export class TerminalSession {
           this.runtime.drainReplay(replayGeneration)
           return
         }
-        this.finishActiveHydratedSnapshotReplay(term, hydratedSnapshot, replayGeneration)
+        this.finishActiveHydratedSnapshotReplay(term, hydratedSnapshot, replayCheckpoint, replayGeneration)
       })
     } catch (err) {
       this.runtime.drainReplay(replayGeneration)
@@ -870,11 +902,15 @@ export class TerminalSession {
 
   private finishActiveHydratedSnapshotReplay(
     term: XTermTerminal,
-    hydratedSnapshot: { snapshot: string; snapshotSeq: number },
+    hydratedSnapshot: { snapshot: string; snapshotSeq: number; outputEra: number },
+    replayCheckpoint: RenderedOutputCheckpoint,
     replayGeneration: number,
   ): void {
     if (this.view.currentTerminal() === term) {
-      for (const event of this.runtime.finishReplay(replayGeneration)) this.queueOutput(event.data)
+      this.markOutputRendered(replayCheckpoint)
+      for (const event of this.runtime.finishReplay(replayGeneration)) {
+        this.queueOutput(event.data, this.checkpointFromOutputEvent(event))
+      }
     } else {
       this.runtime.drainReplay(replayGeneration)
     }
@@ -883,7 +919,7 @@ export class TerminalSession {
     // captured the local reference; only clear if it still points
     // at the snapshot we just wrote.
     if (this.hydratedSnapshot === hydratedSnapshot) {
-      this.hydratedSnapshot = { snapshot: '', snapshotSeq: 0 }
+      this.hydratedSnapshot = { snapshot: '', snapshotSeq: 0, outputEra: 0 }
     }
   }
 
@@ -909,9 +945,9 @@ export class TerminalSession {
     this.resizeFlushScheduled = false
   }
 
-  private queueOutput(data: string): void {
+  private queueOutput(data: string, checkpoint: RenderedOutputCheckpoint): void {
     if (!this.view.currentTerminal()) return
-    this.pendingOutput.push(data)
+    this.pendingOutput.push({ data, checkpoint })
     if (this.outputFlushFrame !== null) return
     this.outputFlushFrame = requestAnimationFrame(() => {
       this.outputFlushFrame = null
@@ -919,15 +955,77 @@ export class TerminalSession {
     })
   }
 
-  private flushOutput(): void {
+  private flushOutput(terminalRuntimeSessionId: string | null = this.runtime.currentTerminalRuntimeSessionId()): void {
     if (this.outputFlushFrame !== null) {
       cancelScheduledAnimationFrame(this.outputFlushFrame)
       this.outputFlushFrame = null
     }
     if (!this.pendingOutput.length) return
-    const output = this.pendingOutput.join('')
+    const pendingOutput = this.pendingOutput
     this.pendingOutput = []
-    this.view.currentTerminal()?.write(output)
+    if (!terminalRuntimeSessionId) return
+    const currentOutput = pendingOutput.filter(
+      (entry) => entry.checkpoint.terminalRuntimeSessionId === terminalRuntimeSessionId,
+    )
+    if (!currentOutput.length) return
+    const output = currentOutput.map((entry) => entry.data).join('')
+    const checkpoint = latestCheckpoint(currentOutput.map((entry) => entry.checkpoint))
+    const term = this.view.currentTerminal()
+    if (!term || !checkpoint) return
+    term.write(output, () => {
+      if (this.disposed || this.view.currentTerminal() !== term) return
+      this.markOutputRendered(checkpoint)
+    })
+  }
+
+  private clearPendingOutput(): void {
+    if (this.outputFlushFrame !== null) {
+      cancelScheduledAnimationFrame(this.outputFlushFrame)
+      this.outputFlushFrame = null
+    }
+    this.pendingOutput = []
+  }
+
+  private isOutputAlreadyRendered(event: TerminalOutputEvent): boolean {
+    const checkpoint = this.renderedOutputCheckpoint
+    if (!checkpoint || checkpoint.terminalRuntimeSessionId !== event.terminalRuntimeSessionId) return false
+    if (event.outputEra !== checkpoint.outputEra) return event.outputEra < checkpoint.outputEra
+    return event.seq <= checkpoint.seq
+  }
+
+  private markOutputRendered(checkpoint: RenderedOutputCheckpoint): void {
+    if (this.runtime.currentTerminalRuntimeSessionId() !== checkpoint.terminalRuntimeSessionId) return
+    const current = this.renderedOutputCheckpoint
+    if (!current || current.terminalRuntimeSessionId !== checkpoint.terminalRuntimeSessionId) {
+      this.renderedOutputCheckpoint = normalizeRenderedOutputCheckpoint(checkpoint)
+      return
+    }
+    if (checkpoint.outputEra < current.outputEra) return
+    if (checkpoint.outputEra > current.outputEra) {
+      this.renderedOutputCheckpoint = normalizeRenderedOutputCheckpoint(checkpoint)
+      return
+    }
+    if (checkpoint.seq > current.seq) this.renderedOutputCheckpoint = normalizeRenderedOutputCheckpoint(checkpoint)
+  }
+
+  private checkpointFromOutputEvent(event: TerminalOutputEvent): RenderedOutputCheckpoint {
+    return {
+      terminalRuntimeSessionId: event.terminalRuntimeSessionId,
+      outputEra: event.outputEra,
+      seq: event.seq,
+    }
+  }
+
+  private checkpointFromHydratedSnapshot(snapshot: {
+    outputEra: number
+    snapshotSeq: number
+  }): RenderedOutputCheckpoint {
+    const terminalRuntimeSessionId = this.runtime.currentTerminalRuntimeSessionId()
+    return {
+      terminalRuntimeSessionId: terminalRuntimeSessionId ?? '',
+      outputEra: snapshot.outputEra,
+      seq: snapshot.snapshotSeq,
+    }
   }
 
   private shouldQueueExternalCommandInput(input: TerminalInput, terminalRuntimeSessionId: string): boolean {
@@ -976,12 +1074,8 @@ export class TerminalSession {
     this.geometryAbortController?.abort()
     this.geometryAbortController = null
     this.cancelResizeFlush()
-    if (this.outputFlushFrame !== null) {
-      cancelScheduledAnimationFrame(this.outputFlushFrame)
-      this.outputFlushFrame = null
-    }
+    this.clearPendingOutput()
     this.pendingResize = null
-    this.pendingOutput = []
     this.pendingWriteBuffer = ''
     this.inputFlushScheduled = false
     this.clearExternalCommandGate()
@@ -1063,6 +1157,29 @@ function cancelScheduledAnimationFrame(frame: number): void {
 
 function terminalSnapshotHasOutput(snapshot: string, snapshotSeq: number): boolean {
   return snapshot.length > 0 || snapshotSeq > 0
+}
+
+function latestCheckpoint(checkpoints: RenderedOutputCheckpoint[]): RenderedOutputCheckpoint | null {
+  return checkpoints.reduce<RenderedOutputCheckpoint | null>((latest, checkpoint) => {
+    if (!latest) return checkpoint
+    if (checkpoint.terminalRuntimeSessionId !== latest.terminalRuntimeSessionId) return latest
+    if (checkpoint.outputEra > latest.outputEra) return checkpoint
+    if (checkpoint.outputEra < latest.outputEra) return latest
+    return checkpoint.seq > latest.seq ? checkpoint : latest
+  }, null)
+}
+
+function normalizeRenderedOutputCheckpoint(checkpoint: RenderedOutputCheckpoint): RenderedOutputCheckpoint {
+  return {
+    terminalRuntimeSessionId: checkpoint.terminalRuntimeSessionId,
+    outputEra: normalizeOutputNumber(checkpoint.outputEra),
+    seq: normalizeOutputNumber(checkpoint.seq),
+  }
+}
+
+function normalizeOutputNumber(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.floor(value))
 }
 
 function isHttpExternalUrl(value: string): boolean {

@@ -50,6 +50,8 @@ const headlessModule = ('default' in xtermHeadlessImport ? xtermHeadlessImport.d
 const HeadlessTerminal = headlessModule.Terminal
 
 export interface TerminalRenderState {
+  /** Server-owned output stream generation. Restart/reset starts a fresh seq space. */
+  outputEra: number
   sequence: number
   /** Concatenated raw PTY output retained for diagnostics and bounded fallback state. */
   buffer: string
@@ -66,6 +68,7 @@ export function createEmptyTerminalRenderState(
   rows: number = DEFAULT_ROWS,
 ): TerminalRenderState {
   return {
+    outputEra: 0,
     sequence: 0,
     buffer: '',
     bufferTruncated: false,
@@ -76,6 +79,7 @@ export function createEmptyTerminalRenderState(
 }
 
 export interface AppendTerminalOutputResult {
+  outputEra: number
   seq: number
   controlEvents: TerminalControlSequenceEvent[]
 }
@@ -96,6 +100,7 @@ export function appendOutput(state: TerminalRenderState, data: string): AppendTe
   const control = scanTerminalControlSequences(data, state.controlScanner)
   queueScreenWrite(state.screen, data, seq)
   return {
+    outputEra: state.outputEra,
     seq,
     controlEvents: control.events,
   }
@@ -110,6 +115,8 @@ export interface RenderSnapshot {
   snapshot: string
   /** Last sequence included in the serialized headless screen. Client dedup boundary. */
   snapshotSeq: number
+  /** Output stream generation for `snapshotSeq`. */
+  outputEra: number
   /** True iff the buffer was ever truncated; client should reset its xterm. */
   snapshotTruncated: boolean
 }
@@ -128,6 +135,7 @@ export async function replaySnapshot(state: TerminalRenderState): Promise<Render
     return {
       snapshot: screen.serializer.serialize(),
       snapshotSeq: screen.appliedSeq,
+      outputEra: state.outputEra,
       snapshotTruncated: state.bufferTruncated,
     }
   }
@@ -150,6 +158,7 @@ export function resetRender(
   rows: number = DEFAULT_ROWS,
 ): void {
   disposeScreenState(state.screen)
+  state.outputEra += 1
   state.sequence = 0
   state.buffer = ''
   state.bufferTruncated = false
