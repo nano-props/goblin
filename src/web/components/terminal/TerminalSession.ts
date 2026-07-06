@@ -78,6 +78,76 @@ type TerminalRenderQueueEntry =
       checkpoint: RenderedOutputCheckpoint
     }
 
+interface TerminalRenderQueueOptions {
+  isCurrentTerm: (term: XTermTerminal) => boolean
+  isCheckpointRendered: (checkpoint: RenderedOutputCheckpoint) => boolean
+  markOutputRendered: (checkpoint: RenderedOutputCheckpoint) => void
+}
+
+class TerminalRenderQueue {
+  private running = false
+  private entries: TerminalRenderQueueEntry[] = []
+  private readonly options: TerminalRenderQueueOptions
+
+  constructor(options: TerminalRenderQueueOptions) {
+    this.options = options
+  }
+
+  replace(term: XTermTerminal, data: string, checkpoint: RenderedOutputCheckpoint): Promise<boolean> {
+    this.clear()
+    return new Promise<boolean>((resolve, reject) => {
+      this.entries.push({ kind: 'replace', term, data, checkpoint, resolve, reject })
+      this.pump()
+    })
+  }
+
+  append(term: XTermTerminal, data: string, checkpoint: RenderedOutputCheckpoint): void {
+    if (!data) return
+    this.entries.push({ kind: 'append', term, data, checkpoint })
+    this.pump()
+  }
+
+  clear(): void {
+    const queued = this.entries.splice(0)
+    for (const entry of queued) {
+      if (entry.kind === 'replace') entry.resolve(false)
+    }
+  }
+
+  private pump(): void {
+    if (this.running) return
+    const entry = this.entries.shift()
+    if (!entry) return
+    this.running = true
+    void this.run(entry)
+      .then((applied) => {
+        if (entry.kind === 'replace') entry.resolve(applied)
+      })
+      .catch((err) => {
+        if (entry.kind === 'replace') entry.reject(err)
+        else terminalLog.warn('failed to append terminal output', { err })
+      })
+      .finally(() => {
+        this.running = false
+        this.pump()
+      })
+  }
+
+  private async run(entry: TerminalRenderQueueEntry): Promise<boolean> {
+    if (!this.options.isCurrentTerm(entry.term)) return false
+    if (entry.kind === 'replace') {
+      entry.term.reset()
+      if (entry.data) await termWrite(entry.term, entry.data)
+      if (this.options.isCurrentTerm(entry.term)) this.options.markOutputRendered(entry.checkpoint)
+      return this.options.isCurrentTerm(entry.term)
+    }
+    if (this.options.isCheckpointRendered(entry.checkpoint)) return true
+    await termWrite(entry.term, entry.data)
+    if (this.options.isCurrentTerm(entry.term)) this.options.markOutputRendered(entry.checkpoint)
+    return this.options.isCurrentTerm(entry.term)
+  }
+}
+
 export class TerminalSession {
   descriptor: TerminalDescriptor
   private readonly notify: (reason: TerminalNotifyReason) => void
@@ -94,11 +164,10 @@ export class TerminalSession {
   private geometryAbortController: AbortController | null = null
   private resizeFlushScheduled = false
   private outputFlushFrame: number | null = null
-  private renderQueueRunning = false
+  private readonly renderQueue: TerminalRenderQueue
 
   private pendingResize: { cols: number; rows: number } | null = null
   private pendingOutput: PendingOutputWrite[] = []
-  private renderQueue: TerminalRenderQueueEntry[] = []
   private pendingWriteBuffer = ''
   private inputFlushScheduled = false
   private externalCommandGateTerminalRuntimeSessionId: string | null = null
@@ -136,6 +205,11 @@ export class TerminalSession {
       onSearchResult: (event) => this.updateSearchResult(event),
       onProgress: (state, value) => this.updateProgress(state, value),
       onOpenExternalLink: (uri) => this.openExternalLink(uri),
+    })
+    this.renderQueue = new TerminalRenderQueue({
+      isCurrentTerm: (term) => !this.disposed && this.view.currentTerminal() === term,
+      isCheckpointRendered: (checkpoint) => this.isCheckpointRendered(checkpoint),
+      markOutputRendered: (checkpoint) => this.markOutputRendered(checkpoint),
     })
   }
 
@@ -1012,56 +1086,15 @@ export class TerminalSession {
     checkpoint: RenderedOutputCheckpoint,
   ): Promise<boolean> {
     this.clearPendingOutput()
-    return new Promise<boolean>((resolve, reject) => {
-      this.renderQueue.push({ kind: 'replace', term, data, checkpoint, resolve, reject })
-      this.pumpRenderQueue()
-    })
+    return this.renderQueue.replace(term, data, checkpoint)
   }
 
   private enqueueRenderAppend(term: XTermTerminal, data: string, checkpoint: RenderedOutputCheckpoint): void {
-    if (!data) return
-    this.renderQueue.push({ kind: 'append', term, data, checkpoint })
-    this.pumpRenderQueue()
-  }
-
-  private pumpRenderQueue(): void {
-    if (this.renderQueueRunning) return
-    const entry = this.renderQueue.shift()
-    if (!entry) return
-    this.renderQueueRunning = true
-    void this.runRenderQueueEntry(entry)
-      .then((applied) => {
-        if (entry.kind === 'replace') entry.resolve(applied)
-      })
-      .catch((err) => {
-        if (entry.kind === 'replace') entry.reject(err)
-        else terminalLog.warn('failed to append terminal output', { err })
-      })
-      .finally(() => {
-        this.renderQueueRunning = false
-        this.pumpRenderQueue()
-      })
-  }
-
-  private async runRenderQueueEntry(entry: TerminalRenderQueueEntry): Promise<boolean> {
-    if (this.disposed || this.view.currentTerminal() !== entry.term) return false
-    if (entry.kind === 'replace') {
-      entry.term.reset()
-      if (entry.data) await termWrite(entry.term, entry.data)
-      if (!this.disposed && this.view.currentTerminal() === entry.term) this.markOutputRendered(entry.checkpoint)
-      return !this.disposed && this.view.currentTerminal() === entry.term
-    }
-    if (this.isCheckpointRendered(entry.checkpoint)) return true
-    await termWrite(entry.term, entry.data)
-    if (!this.disposed && this.view.currentTerminal() === entry.term) this.markOutputRendered(entry.checkpoint)
-    return !this.disposed && this.view.currentTerminal() === entry.term
+    this.renderQueue.append(term, data, checkpoint)
   }
 
   private clearRenderQueue(): void {
-    const queued = this.renderQueue.splice(0)
-    for (const entry of queued) {
-      if (entry.kind === 'replace') entry.resolve(false)
-    }
+    this.renderQueue.clear()
   }
 
   private isOutputAlreadyRendered(event: TerminalOutputEvent): boolean {
