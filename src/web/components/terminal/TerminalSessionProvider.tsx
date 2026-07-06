@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
 
 import '#/web/components/terminal/terminal-session.css'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
+import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { terminalClient } from '#/web/terminal.ts'
 import { terminalSessionProviderLog } from '#/web/logger.ts'
 import {
@@ -35,6 +35,7 @@ export function TerminalSessionProvider({ children, currentRepoId }: TerminalSes
   const selectedTerminalSessionIdByTerminalWorktree = useReposStore(
     (s) => s.selectedTerminalSessionIdByTerminalWorktree,
   )
+  const workspaceMembershipReady = useReposStore((s) => s.workspaceMembershipReady)
   const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
   const repoIndexRef = useRef(repoIndex)
   repoIndexRef.current = repoIndex
@@ -85,17 +86,27 @@ export function TerminalSessionProvider({ children, currentRepoId }: TerminalSes
   const projection = projectionRef.current
 
   const reconcileTerminalSessionsFromServer = useCallback(
-    async (repoRoot: string) => {
+    async (
+      repoRoot: string,
+      expectedRepoInstanceId?: string,
+      options?: { markInitialHydrationFailure?: boolean },
+    ): Promise<void> => {
       const repo = repoIndexRef.current[repoRoot]
       if (!repoRoot || !repo) return
+      if (expectedRepoInstanceId && repo.instanceId !== expectedRepoInstanceId) return
       try {
         const clientId = readOrCreateWebTerminalClientId()
         const serverSessions = await loadTerminalSessions(repoRoot, repo.instanceId)
         if (repoIndexRef.current[repoRoot]?.instanceId !== repo.instanceId) return
         projection.reconcileServerSessions(repoRoot, serverSessions, clientId)
-        useRepoSyncStore.getState().markReady(repoRoot, repo.instanceId)
+        useTerminalProjectionHydrationStore.getState().markProjectionReady(repoRoot, repo.instanceId)
       } catch (err) {
         terminalSessionProviderLog.debug('failed to reconcile terminal sessions from server', { err })
+        if (options?.markInitialHydrationFailure && repoIndexRef.current[repoRoot]?.instanceId === repo.instanceId) {
+          useTerminalProjectionHydrationStore
+            .getState()
+            .markProjectionFailed(repoRoot, repo.instanceId, projectionHydrationFailureMessage(err))
+        }
       }
     },
     [projection],
@@ -196,46 +207,48 @@ export function TerminalSessionProvider({ children, currentRepoId }: TerminalSes
   // projection reconciled on route entry, focus recovery, and server-pushed
   // terminal session changes without feeding back into repo routing/read models.
   useEffect(() => {
-    if (!currentRepoId) return
+    if (!workspaceMembershipReady || !currentRepoId || !currentRepoInstanceId) return
     const repoRoot = currentRepoId
-    void reconcileTerminalSessionsFromServer(repoRoot)
+    const repoInstanceId = currentRepoInstanceId
+    let disposed = false
+    useTerminalProjectionHydrationStore.getState().beginProjectionHydration(repoRoot, repoInstanceId)
+    void reconcileTerminalSessionsFromServer(repoRoot, repoInstanceId, { markInitialHydrationFailure: true })
 
     const handleFocus = () => {
       if (!currentRepoId) return
-      if (!useRepoSyncStore.getState().shouldSync(currentRepoId)) return
+      if (!useTerminalProjectionHydrationStore.getState().shouldRefreshProjection(currentRepoId)) return
       void reconcileTerminalSessionsFromServer(currentRepoId)
     }
     window.addEventListener('focus', handleFocus)
 
-    const pendingRepoRoots = new Set<string>()
-    let syncTimer: number | null = null
-    let disposed = false
-    const scheduleServerSync = (repoRoot: string) => {
-      pendingRepoRoots.add(repoRoot)
-      if (syncTimer !== null) return
-      syncTimer = window.setTimeout(() => {
-        syncTimer = null
+    const pendingProjectionRefreshRepoRoots = new Set<string>()
+    let projectionRefreshTimer: number | null = null
+    const scheduleProjectionRefresh = (repoRoot: string) => {
+      pendingProjectionRefreshRepoRoots.add(repoRoot)
+      if (projectionRefreshTimer !== null) return
+      projectionRefreshTimer = window.setTimeout(() => {
+        projectionRefreshTimer = null
         if (disposed) return
-        const repoRoots = Array.from(pendingRepoRoots)
-        pendingRepoRoots.clear()
+        const repoRoots = Array.from(pendingProjectionRefreshRepoRoots)
+        pendingProjectionRefreshRepoRoots.clear()
         for (const nextRepoRoot of repoRoots) void reconcileTerminalSessionsFromServer(nextRepoRoot)
       }, 0)
     }
-    const offSessionsChanged = terminalClient.onSessionsChanged(scheduleServerSync)
+    const offSessionsChanged = terminalClient.onSessionsChanged(scheduleProjectionRefresh)
     const offWorkspaceTabsChanged = terminalClient.onWorkspaceTabsChanged((repoRoot) => {
       const repoInstanceId = repoIndexRef.current[repoRoot]?.instanceId
       if (typeof repoInstanceId === 'string') refreshWorkspacePaneTabs(repoRoot, repoInstanceId)
-      scheduleServerSync(repoRoot)
+      scheduleProjectionRefresh(repoRoot)
     })
 
     return () => {
       disposed = true
-      if (syncTimer !== null) window.clearTimeout(syncTimer)
+      if (projectionRefreshTimer !== null) window.clearTimeout(projectionRefreshTimer)
       window.removeEventListener('focus', handleFocus)
       offSessionsChanged()
       offWorkspaceTabsChanged()
     }
-  }, [currentRepoId, currentRepoInstanceId, reconcileTerminalSessionsFromServer])
+  }, [workspaceMembershipReady, currentRepoId, currentRepoInstanceId, reconcileTerminalSessionsFromServer])
 
   const commandValue = useMemo<TerminalSessionContextValue>(
     () => ({
@@ -278,4 +291,10 @@ export function TerminalSessionProvider({ children, currentRepoId }: TerminalSes
       <TerminalSessionReadContext value={readValue}>{children}</TerminalSessionReadContext>
     </TerminalSessionContext>
   )
+}
+
+function projectionHydrationFailureMessage(err: unknown): string {
+  if (err instanceof Error && err.message) return err.message
+  if (typeof err === 'string') return err
+  return 'error.unknown'
 }

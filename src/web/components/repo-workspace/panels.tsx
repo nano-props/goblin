@@ -16,6 +16,7 @@ import type { RepoTreeNode } from '#/shared/api-types.ts'
 import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
@@ -41,7 +42,8 @@ export interface WorkspacePanePanelRenderInput {
   detail: CurrentRepoWorkspacePresentation
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
-  terminalSyncReady: boolean
+  terminalProjectionPhase: TerminalProjectionHydrationPhase
+  terminalProjectionErrorMessage?: string
 }
 
 interface WorkspacePanePanelProps extends Omit<WorkspacePanePanelRenderInput, 'type'> {}
@@ -117,7 +119,8 @@ function TerminalWorkspacePanePanel({
   detail,
   workspacePaneId,
   panelLabel,
-  terminalSyncReady,
+  terminalProjectionPhase,
+  terminalProjectionErrorMessage,
 }: WorkspacePanePanelProps) {
   const branch = detail.branch
   if (!branch?.worktree?.path) return null
@@ -127,7 +130,8 @@ function TerminalWorkspacePanePanel({
       panelLabel={panelLabel}
       repoId={repo.id}
       repoInstanceId={repo.instanceId}
-      terminalSyncReady={terminalSyncReady}
+      terminalProjectionPhase={terminalProjectionPhase}
+      terminalProjectionErrorMessage={terminalProjectionErrorMessage}
       branch={branch}
     />
   )
@@ -395,14 +399,16 @@ function BranchTerminalTab({
   panelLabel,
   repoId,
   repoInstanceId,
-  terminalSyncReady,
+  terminalProjectionPhase,
+  terminalProjectionErrorMessage,
   branch,
 }: {
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
   repoId: string
   repoInstanceId: string
-  terminalSyncReady: boolean
+  terminalProjectionPhase: TerminalProjectionHydrationPhase
+  terminalProjectionErrorMessage?: string
   branch: RepoWorkspaceBranch
 }) {
   const { createTerminal, createOwnedTerminal } = useTerminalSessionContext()
@@ -432,7 +438,8 @@ function BranchTerminalTab({
         repoInstanceId={repoInstanceId}
         branch={branch.name}
         worktreePath={branch.worktree?.path}
-        syncReady={terminalSyncReady}
+        projectionPhase={terminalProjectionPhase}
+        projectionErrorMessage={terminalProjectionErrorMessage}
         createTerminalForSlot={createTerminalForSlot}
       />
     </BranchTabPanel>

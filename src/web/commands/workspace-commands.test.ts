@@ -34,7 +34,7 @@ import {
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
+import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
@@ -64,7 +64,7 @@ beforeEach(() => {
   resetReposStore()
   installWorkspacePaneTabsTestBridge()
   resetTerminalActionDialogsStore()
-  useRepoSyncStore.setState({ ready: new Map(), timestamps: new Map() })
+  useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
 })
 
 afterEach(() => {
@@ -1236,7 +1236,7 @@ describe('workspace commands', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/worktree': [] },
     })
-    useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
     const closeTerminalByDescriptor = vi.fn(async () => true)
     const closeWindow = vi.fn()
     setTerminalSessionCommandBridge({
@@ -1292,7 +1292,7 @@ describe('workspace commands', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/worktree': [staticEntry('status')] },
     })
-    useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
     const closeWindow = vi.fn()
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), pendingCreate: true }),
@@ -1447,7 +1447,7 @@ describe('workspace commands', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/worktree': [staticEntry('status')] },
     })
-    useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
     const showRepoBranchWorkspacePaneTab = vi.fn((repoId, branch, tab) => {
       useReposStore.getState().setWorkspacePaneTab(repoId, branch, tab)
     })

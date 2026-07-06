@@ -28,7 +28,7 @@ import {
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
+import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type {
   TerminalDescriptor,
   TerminalIdentityRealtimeEvent,
@@ -462,7 +462,7 @@ beforeEach(() => {
     }
   })
   resetReposStore()
-  useRepoSyncStore.setState(useRepoSyncStore.getInitialState())
+  useTerminalProjectionHydrationStore.setState(useTerminalProjectionHydrationStore.getInitialState())
   window.sessionStorage.setItem('goblin:terminal-client-id', 'client_local')
   primaryWindowQueryClient.clear()
   primaryWindowQueryClient.setQueryData(
@@ -1242,6 +1242,52 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
+  test('waits for workspace membership before hydrating terminal server projection', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: 'feature/worktree',
+      preferredWorkspacePaneTab: 'terminal',
+    })
+    useReposStore.setState({ workspaceMembershipReady: false })
+    serverSessions = [
+      {
+        terminalRuntimeSessionId: 'server_session_1',
+        terminalSessionId: 'session-1',
+        processName: 'zsh',
+        canonicalTitle: null,
+        cwd: WORKTREE_PATH,
+        controller: null,
+        phase: 'open',
+        message: null,
+        cols: 80,
+        rows: 24,
+      },
+    ]
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
+    const { getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
+
+    try {
+      expect(listSessionsMock).not.toHaveBeenCalled()
+      expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)?.instanceId).not.toBe(
+        repo.instanceId,
+      )
+
+      await act(async () => {
+        useReposStore.setState({ workspaceMembershipReady: true })
+      })
+
+      await vi.waitFor(() => expect(getProbe().terminalIds).toEqual(['session-1']))
+      expect(listSessionsMock).toHaveBeenCalledTimes(1)
+      expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
+        instanceId: repo.instanceId,
+        phase: 'ready',
+      })
+    } finally {
+      await unmount()
+    }
+  })
+
   test('coalesces session and workspace tabs change broadcasts', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -1452,7 +1498,7 @@ describe('TerminalSessionProvider', () => {
       },
       order: [REPO_ID, SECOND_REPO_ID],
     }))
-    useRepoSyncStore.setState({ cooldownMs: 0 })
+    useTerminalProjectionHydrationStore.setState({ refreshCooldownMs: 0 })
     const { unmount } = await renderProviderWithProbe(formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH))
 
     try {
@@ -1502,7 +1548,7 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
-  test('failed session sync does not mark the repo ready', async () => {
+  test('failed session projection hydrate marks the repo failed', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1514,7 +1560,43 @@ describe('TerminalSessionProvider', () => {
 
     try {
       await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
-      expect(useRepoSyncStore.getState().ready.get(REPO_ID)).not.toBe(repo.instanceId)
+      expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
+        instanceId: repo.instanceId,
+        phase: 'failed',
+        errorMessage: 'error.repo-instance-stale',
+      })
+    } finally {
+      await unmount()
+    }
+  })
+
+  test('failed focus projection refresh does not replace an already ready hydrate', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: 'feature/worktree',
+      preferredWorkspacePaneTab: 'terminal',
+    })
+    useTerminalProjectionHydrationStore.setState({ refreshCooldownMs: 0 })
+    const { unmount } = await renderProviderWithProbe(formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH))
+
+    try {
+      await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
+      expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
+        instanceId: repo.instanceId,
+        phase: 'ready',
+      })
+
+      listSessionsMock.mockRejectedValueOnce(new Error('error.network'))
+      listSessionsMock.mockClear()
+      await act(async () => {
+        window.dispatchEvent(new Event('focus'))
+      })
+      await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
+      expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
+        instanceId: repo.instanceId,
+        phase: 'ready',
+      })
     } finally {
       await unmount()
     }

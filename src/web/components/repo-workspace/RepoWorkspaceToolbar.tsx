@@ -24,7 +24,7 @@ import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/
 import type { RepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
-import { useIsInitialSyncInFlight } from '#/web/stores/repo-sync.ts'
+import { useIsInitialTerminalProjectionHydrating } from '#/web/stores/terminal-projection-hydration.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
@@ -71,9 +71,9 @@ export function RepoWorkspaceToolbar({
   const compact = useIsCompactUi()
   // While the first server-side session list for this repo is in flight,
   // keep the New Terminal affordance visible but busy. Hooks into the
-  // repo-sync store which the Provider updates via markReady() at the end
-  // of every successful terminal session reconcile.
-  const isInitialSyncInFlight = useIsInitialSyncInFlight(repo.id)
+  // terminal projection readiness store which the Provider updates after a
+  // successful server -> client terminal session projection hydrate.
+  const isInitialSyncInFlight = useIsInitialTerminalProjectionHydrating(repo.id, repo.instanceId)
   const branchName = detail.branch?.name ?? null
   const workspacePaneTabTargetKey = branchName
     ? workspacePaneTabsTargetIdentityKey({
@@ -201,7 +201,7 @@ export function RepoWorkspaceToolbar({
           const label = terminalWorkspacePaneTabProvider.pendingLabel({
             t,
             terminalCreatePending: workspacePaneTabModel.terminalCreatePending,
-            terminalSyncReady: workspacePaneTabModel.terminalSyncReady,
+            terminalProjectionPhase: workspacePaneTabModel.terminalProjectionPhase,
           })
           return createPendingWorkspacePaneTabItem({
             type: tab.type,
@@ -229,7 +229,7 @@ export function RepoWorkspaceToolbar({
       detail.statusCount,
       t,
       workspacePaneTabModel.terminalCreatePending,
-      workspacePaneTabModel.terminalSyncReady,
+      workspacePaneTabModel.terminalProjectionPhase,
       workspacePaneTabModel.tabs,
       workspacePaneId,
     ],

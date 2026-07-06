@@ -30,7 +30,7 @@ function terminalCreateErrorMessage(error: unknown): string {
 function isTerminalConnectionFailure(message: string): boolean {
   return (
     message === 'Terminal socket unavailable' ||
-    message === 'Terminal socket closed before open' ||
+    message.startsWith('Terminal socket closed before open') ||
     message === 'Terminal socket error before open' ||
     message === 'Terminal socket closed' ||
     message === 'Terminal socket error' ||

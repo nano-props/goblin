@@ -32,7 +32,7 @@ import {
 } from '#/web/primary-window-navigation.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
+import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import {
   createRepoBranch,
@@ -152,10 +152,10 @@ beforeEach(() => {
   resetReposStore()
   installWorkspacePaneTabsTestBridge()
   // T6.1: the toolbar reads `isInitialSyncInFlight` from
-  // useRepoSyncStore; existing tests assume the repo has been
+  // useTerminalProjectionHydrationStore; existing tests assume the repo has been
   // synced. Mark ready by default so the "+ New" button renders; the
   // loading-state test skips this and expects the same button to be busy.
-  useRepoSyncStore.setState({ ready: new Map(), timestamps: new Map() })
+  useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
 })
 
 afterEach(() => {
@@ -1062,12 +1062,27 @@ describe('RepoWorkspaceToolbar', () => {
     expect(busyNewButton?.disabled).toBe(true)
     expect(busyNewButton?.querySelector('.animate-spin')).toBeNull()
 
-    // Once the provider calls markReady() (which the real Provider
+    // Once the provider calls markProjectionReady() (which the real Provider
     // does at the end of a successful terminal session reconcile), the
     // busy state clears and the real button appears.
-    useRepoSyncStore.getState().markReady(REPO_ID, 'repo-instance-test')
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, 'repo-instance-test')
     await flush()
     expect(c.querySelector('button[aria-label="terminal.new"]')).not.toBeNull()
+  })
+
+  test('keeps the new-terminal button busy when only a stale repo instance is hydrated', () => {
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, 'repo-instance-old')
+    const { container: c } = renderToolbar({
+      terminalCount: 0,
+      navigation: navigationWith({}),
+      loading: true,
+      repoInstanceId: 'repo-instance-new',
+    })
+
+    const busyNewButton = c.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
+    expect(busyNewButton).not.toBeNull()
+    expect(busyNewButton?.getAttribute('aria-busy')).toBe('true')
+    expect(busyNewButton?.disabled).toBe(true)
   })
 
   test('does not create another terminal while terminal creation is already pending', async () => {
@@ -1154,6 +1169,7 @@ function renderToolbar(options: {
   pendingCreate?: boolean
   trafficLightOffset?: boolean
   remote?: Partial<RepoState['remote']>
+  repoInstanceId?: string
   /**
    * When true, do NOT mark the repo ready before mounting. The toolbar
    * reads `isInitialSyncInFlight` from the store and renders the
@@ -1179,15 +1195,11 @@ function renderToolbar(options: {
     showRepoBranchWorkspacePaneTab: ReturnType<typeof vi.fn>
   }
 } {
-  // Mark the repo as already-synced so the toolbar renders the normal
-  // "+ New" button. Loading-state tests pass `loading: true` to skip this.
-  if (!options.loading) {
-    useRepoSyncStore.getState().markReady(REPO_ID, 'repo-instance-test')
-  }
   const branchName = options.worktree === false ? 'feature/no-worktree' : 'feature/worktree'
   const branch = createRepoBranch(branchName, options.worktree === false ? {} : { worktree: { path: WORKTREE_PATH } })
   const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
+    instanceId: options.repoInstanceId,
     branches: [branch],
     currentBranchName: branchName,
     preferredWorkspacePaneTab: options.preferredWorkspacePaneTab ?? 'status',
@@ -1215,6 +1227,11 @@ function renderToolbar(options: {
         : [],
     remote: options.remote,
   })
+  // Mark the repo as already-synced so the toolbar renders the normal
+  // "+ New" button. Loading-state tests pass `loading: true` to skip this.
+  if (!options.loading) {
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
+  }
   const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
   const sessions: TerminalSessionSummary[] = Array.from({ length: options.terminalCount }, (_, index) => ({
     type: 'terminal',

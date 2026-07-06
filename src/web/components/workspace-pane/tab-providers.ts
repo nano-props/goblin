@@ -13,6 +13,7 @@ import {
 } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
 
 type T = (key: string, params?: Record<string, string | number>) => string
 
@@ -22,7 +23,7 @@ export interface WorkspacePaneTabAvailabilityContext {
   hasWorktree: boolean
   terminalSessionCount?: number
   terminalCreatePending?: boolean
-  terminalSyncReady?: boolean
+  terminalProjectionPhase?: TerminalProjectionHydrationPhase
 }
 
 export interface WorkspacePaneStaticTabMetadataInput {
@@ -41,7 +42,7 @@ export interface WorkspacePaneRuntimeTabMetadataInput {
 export interface WorkspacePanePendingTabMetadataInput {
   t: T
   terminalCreatePending: boolean
-  terminalSyncReady: boolean
+  terminalProjectionPhase: TerminalProjectionHydrationPhase
 }
 
 export interface WorkspacePanePanelLabel {
@@ -221,7 +222,7 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneTabProvider<'
 
   override isRenderable(context: WorkspacePaneTabAvailabilityContext): boolean {
     if (!this.canOpen(context)) return false
-    if (!context.terminalSyncReady || context.terminalCreatePending) return true
+    if (context.terminalProjectionPhase !== 'ready' || context.terminalCreatePending) return true
     return (context.terminalSessionCount ?? 0) > 0
   }
 
@@ -247,7 +248,11 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneTabProvider<'
 
   pendingLabel(input: WorkspacePanePendingTabMetadataInput): string {
     const pendingLabelKey =
-      input.terminalCreatePending || input.terminalSyncReady ? 'terminal.opening' : 'terminal.loading'
+      input.terminalProjectionPhase === 'failed'
+        ? 'terminal.load-failed'
+        : input.terminalCreatePending || input.terminalProjectionPhase === 'ready'
+          ? 'terminal.opening'
+          : 'terminal.loading'
     return input.t(pendingLabelKey)
   }
 

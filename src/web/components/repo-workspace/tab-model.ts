@@ -6,6 +6,7 @@ import type {
 import { resolveRenderableWorkspacePaneTab } from '#/web/lib/workspace-pane-tab.ts'
 import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
 import {
   PENDING_TERMINAL_WORKSPACE_PANE_TAB_IDENTITY,
   isTerminalWorkspacePaneTab,
@@ -73,7 +74,8 @@ export interface RepoWorkspaceTabModel {
   terminalWorktreeKey: string | null
   terminalBase: TerminalSessionBase | null
   terminalCreatePending: boolean
-  terminalSyncReady: boolean
+  terminalProjectionPhase: TerminalProjectionHydrationPhase
+  terminalProjectionErrorMessage?: string
   /** Single target-scoped mixed workspace pane tab list. */
   tabEntries: WorkspacePaneTabEntry[]
   /** Open static workspace pane tabs derived from tabEntries. */
@@ -97,7 +99,8 @@ export interface RepoWorkspaceTabModelInput {
   tabEntries: readonly WorkspacePaneTabEntry[]
   runtimeTerminalViews: readonly WorkspacePaneTabSummary[]
   terminalCreatePending?: boolean
-  terminalSyncReady: boolean
+  terminalProjectionPhase: TerminalProjectionHydrationPhase
+  terminalProjectionErrorMessage?: string
   /**
    * Selected terminal session id for the current worktree from the repos store.
    * The model uses this as the canonical source for which terminal tab is
@@ -124,7 +127,7 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
     hasWorktree: !!terminalWorktreeKey,
     terminalSessionCount: materializedTerminalCount,
     terminalCreatePending: input.terminalCreatePending,
-    terminalSyncReady: input.terminalSyncReady,
+    terminalProjectionPhase: input.terminalProjectionPhase,
   })
   const materializedActiveTab = candidateTab
     ? activeRepoWorkspaceTab(materializedTabs, candidateTab, input.selectedTerminalSessionId)
@@ -142,7 +145,8 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
     terminalBase:
       input.branchName && worktreePath ? { repoRoot: input.repoId, branch: input.branchName, worktreePath } : null,
     terminalCreatePending: input.terminalCreatePending ?? false,
-    terminalSyncReady: input.terminalSyncReady,
+    terminalProjectionPhase: input.terminalProjectionPhase,
+    terminalProjectionErrorMessage: input.terminalProjectionErrorMessage,
     tabEntries,
     staticTabs,
     terminalViews,
