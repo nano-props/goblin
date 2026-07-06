@@ -27,7 +27,7 @@ export interface WebSocketLifecycleOptions<TConnection> {
     entry: WebSocketLifecycleEntry<TConnection>,
     context: WebSocketLifecycleDisconnectContext,
   ) => void
-  onForgetUnavailable?: (entry: WebSocketLifecycleEntry<TConnection>) => void
+  onUnavailableSocketDropped?: (entry: WebSocketLifecycleEntry<TConnection>) => void
 }
 
 export interface WebSocketLifecycle<TConnection> {
@@ -124,7 +124,7 @@ export function createWebSocketLifecycle<TConnection>(
     if (entry.socket.readyState !== WebSocket.CLOSING && entry.socket.readyState !== WebSocket.CLOSED) return
     activeEntry = null
     entry.phase = 'closing'
-    options.onForgetUnavailable?.(entry)
+    options.onUnavailableSocketDropped?.(entry)
   }
 
   function closeAndForget(): void {

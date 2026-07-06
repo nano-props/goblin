@@ -93,7 +93,7 @@ export function createTerminalSocketConnection(options: TerminalSocketConnection
       }
       scheduleReconnect()
     },
-    onForgetUnavailable() {
+    onUnavailableSocketDropped() {
       stopHeartbeat()
       clearPendingHealthProbes()
     },
