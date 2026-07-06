@@ -112,6 +112,46 @@
   background: var(--goblin-terminal-background, var(--color-terminal-background)) !important;
 }
 
+/* xterm 6.0 scrollbar-width compatibility layer.
+   Remove this entire block after xterm exposes a width-only scrollbar option,
+   then set that option from `createTerminalSizingOptions` instead. The current
+   @xterm/xterm@6.0.0 only exposes `overviewRuler.width`, and the WIP
+   `scrollbar.width` API still couples scrollbar width to overview-ruler
+   rendering, so these scoped overrides keep the visual tweak terminal-local
+   without enabling extra xterm UI. */
+.goblin-managed-terminal-host {
+  --goblin-terminal-xterm-scrollbar-width: 6px;
+}
+
+.goblin-managed-terminal-host .xterm-viewport {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-terminal-foreground) 28%, transparent) transparent;
+}
+
+.goblin-managed-terminal-host .xterm-viewport::-webkit-scrollbar {
+  width: var(--goblin-terminal-xterm-scrollbar-width);
+}
+
+.goblin-managed-terminal-host .xterm-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.goblin-managed-terminal-host .xterm-viewport::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--color-terminal-foreground) 28%, transparent);
+}
+
+.goblin-managed-terminal-host .xterm-scrollable-element > .scrollbar.vertical,
+.goblin-managed-terminal-host .xterm-scrollable-element > .xterm-scrollbar.xterm-vertical {
+  width: var(--goblin-terminal-xterm-scrollbar-width) !important;
+}
+
+.goblin-managed-terminal-host .xterm-scrollable-element > .scrollbar.vertical > .slider,
+.goblin-managed-terminal-host .xterm-scrollable-element > .xterm-scrollbar.xterm-vertical > .xterm-slider {
+  width: var(--goblin-terminal-xterm-scrollbar-width) !important;
+}
+/* End xterm 6.0 scrollbar-width compatibility layer. */
+
 .goblin-terminal-session__search {
   position: absolute;
   top: var(--goblin-terminal-float-offset);
