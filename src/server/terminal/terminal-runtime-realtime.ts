@@ -7,8 +7,9 @@ import type {
   TerminalSocketResponseMessage,
   TerminalSocketResponseOutputs,
 } from '#/shared/terminal-socket.ts'
+import { WORKSPACE_PANE_TABS_SOCKET_ACTIONS } from '#/shared/workspace-pane-tabs.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
-import type { TerminalRealtimeSocket } from '#/server/terminal/terminal-realtime-broker.ts'
+import type { RealtimeSocket } from '#/server/realtime/realtime-broker.ts'
 
 type MaybePromise<T> = T | Promise<T>
 
@@ -47,16 +48,16 @@ export function createTerminalRealtimeHandlers(host: ServerTerminalHost): {
     'list-sessions'(clientId, userId, input) {
       return host.listSessions(clientId, userId, input)
     },
-    'list-workspace-tabs'(clientId, userId, input) {
+    [WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list](clientId, userId, input) {
       return host.listWorkspaceTabs(clientId, userId, input)
     },
     create(clientId, userId, input) {
       return host.create(clientId, userId, { ...input, clientId })
     },
-    'replace-tabs'(clientId, userId, input) {
+    [WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace](clientId, userId, input) {
       return host.replaceTabs(clientId, userId, input)
     },
-    'update-tabs'(clientId, userId, input) {
+    [WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update](clientId, userId, input) {
       return host.updateTabs(clientId, userId, input)
     },
     prune(clientId, userId, input) {
@@ -75,7 +76,7 @@ export async function handleTerminalRealtimeRequestMessage(
   },
   clientId: string,
   userId: string,
-  socket: TerminalRealtimeSocket,
+  socket: RealtimeSocket,
   bufferedSocket: BufferedTerminalSocket | undefined,
   message: TerminalSocketRequestMessage,
 ): Promise<void> {
@@ -109,7 +110,7 @@ export async function handleTerminalRealtimeRequestMessage(
   if (shouldPauseRealtimeRequest(message.action)) bufferedSocket?.resume(outputFlushBoundaryFromResponse(response))
 }
 
-function sendRealtimeResponse(socket: TerminalRealtimeSocket, message: TerminalSocketResponseMessage): boolean {
+function sendRealtimeResponse(socket: RealtimeSocket, message: TerminalSocketResponseMessage): boolean {
   try {
     socket.send(JSON.stringify(message))
     return true

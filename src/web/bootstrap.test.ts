@@ -226,6 +226,12 @@ describe('client bootstrap', () => {
         onWorkspaceTabsChanged: () => () => {},
         onSessionClosed: () => () => {},
       }),
+      workspacePaneTabs: () => ({
+        replace: async (input) => input.tabs,
+        update: async () => [],
+        list: async () => [],
+        onChanged: () => () => {},
+      }),
     })
 
     const { getInitialBootstrap } = await import('#/web/bootstrap.ts')

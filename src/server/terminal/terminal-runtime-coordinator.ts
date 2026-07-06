@@ -1,7 +1,8 @@
 import { TerminalDetachedUserTimer } from '#/server/terminal/terminal-detached-user-timer.ts'
-import { TerminalRealtimeBroker } from '#/server/terminal/terminal-realtime-broker.ts'
+import { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import type { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import type { WorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
+import type { TerminalRealtimeMessage } from '#/shared/terminal-socket.ts'
 
 export interface TerminalRuntimeCoordinatorOptions {
   manager: TerminalSessionManager<string>
@@ -10,7 +11,7 @@ export interface TerminalRuntimeCoordinatorOptions {
 }
 
 export interface TerminalRuntimeCoordinator {
-  broker: TerminalRealtimeBroker
+  broker: RealtimeBroker<TerminalRealtimeMessage>
   shutdown(): void
 }
 
@@ -26,11 +27,12 @@ export function createTerminalRuntimeCoordinator(
     detachedTtlMs,
     onUserExpired(userId) {
       manager.closeSessionsForUser(userId)
-      workspaceTabs.closeSessionsForUser(userId)
+      workspaceTabs.closeTabsForUser(userId)
     },
   })
 
-  const broker = new TerminalRealtimeBroker({
+  const broker = new RealtimeBroker<TerminalRealtimeMessage>({
+    heartbeatTimeoutReason: 'terminal heartbeat timeout',
     onClientPresenceChanged(event) {
       if (event.online) detachedUsers.clearUserDetachedTimer(event.userId)
       else detachedUsers.scheduleUserDetachedTimer(event.userId, () => broker.hasOnlineUserClients(event.userId))

@@ -18,7 +18,7 @@ import type {
   WorkspacePaneTabEntry,
   WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type {
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
@@ -740,7 +740,7 @@ describe('RepoWorkspaceToolbar', () => {
     // terminal session projection is still hydrating (`preferredWorkspacePaneTab =
     // 'terminal'`, no materialized terminal tabs), the toolbar's
     // `activeTabIdentity` is null because the tab-model's selection is
-    // `terminal-host` with `tab: null`. The compact layout must still be
+    // `runtime-host` with no materialized tab. The compact layout must still be
     // used (a structural choice driven by screen size) — otherwise the
     // strip falls through to the scrollable layout, which renders fixed
     // `w-36` tabs and the busy `+ New` button. The compact body shows an
@@ -1418,7 +1418,7 @@ function staticEntry(type: WorkspacePaneStaticTabType): WorkspacePaneTabEntry {
 }
 
 function terminalEntry(id: string): WorkspacePaneTabEntry {
-  return workspacePaneTerminalTabEntry(id)
+  return workspacePaneRuntimeTabEntry('terminal', id)
 }
 
 /**

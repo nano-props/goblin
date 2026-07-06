@@ -8,8 +8,8 @@ import type { RenderResult } from '@testing-library/react'
 import { WorkspacePaneTabStrip } from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
 import {
   createPendingWorkspacePaneTabItem,
-  createTerminalWorkspacePaneTabItem,
-  isTerminalWorkspacePaneTabItem,
+  createRuntimeWorkspacePaneTabItem,
+  isRuntimeWorkspacePaneTabItem,
   type WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/components/workspace-pane/tab-providers.ts'
@@ -1215,7 +1215,7 @@ describe('WorkspacePaneTabStrip', () => {
       fullTitle: 'terminal',
       originalTitle: null,
     }
-    const item = createTerminalWorkspacePaneTabItem({
+    const item = createRuntimeWorkspacePaneTabItem({
       view: placeholderView,
       label: '',
       tooltip: 'terminal.opening',
@@ -1224,15 +1224,14 @@ describe('WorkspacePaneTabStrip', () => {
 
     render(
       <WorkspacePaneTabStrip
-        terminalWorktreeKey="/repo\0/repo/worktree"
+        createAction={{ label: 'terminal.new', onCreate: () => {} }}
         workspacePaneTabTargetKey="/repo\0branch\0main"
         workspacePaneId="workspace"
         panelActive
         items={[item]}
         activeTabIdentity={terminalWorkspacePaneTabProvider.identity(placeholderView.terminalSessionId)}
-        onNew={() => {}}
         onSelect={() => {}}
-        onScrollToBottom={() => {}}
+        onReselect={() => {}}
         onClose={() => {}}
         onReorder={() => {}}
       />,
@@ -1264,9 +1263,9 @@ function TestWorkspacePaneTabStrip(props: {
   onNavigateOut?: (direction: 'prev' | 'next' | 'first' | 'last') => void
 }) {
   const selected = props.sessions.find((candidate) => candidate.selected) ?? null
-  const { sessions, ...workspacePaneProps } = props
+  const { sessions, terminalWorktreeKey, newTerminalBusy, onNew, onScrollToBottom, ...workspacePaneProps } = props
   const items: WorkspacePaneTabItem[] = sessions.map((tab) =>
-    createTerminalWorkspacePaneTabItem({
+    createRuntimeWorkspacePaneTabItem({
       view: tab,
       label: tab.originalTitle ?? tab.fullTitle ?? tab.title,
       tooltip: tab.originalTitle ?? tab.fullTitle ?? tab.title,
@@ -1285,14 +1284,32 @@ function TestWorkspacePaneTabStrip(props: {
   return (
     <WorkspacePaneTabStrip
       {...workspacePaneProps}
+      createAction={
+        terminalWorktreeKey
+          ? {
+              label: 'terminal.new',
+              busy: newTerminalBusy ?? false,
+              onCreate: onNew,
+            }
+          : null
+      }
       workspacePaneTabTargetKey={props.workspacePaneTabTargetKey ?? '/repo\0branch\0main'}
       items={items}
       activeTabIdentity={selected ? terminalWorkspacePaneTabProvider.identity(selected.terminalSessionId) : null}
       onSelect={(item) => {
-        if (isTerminalWorkspacePaneTabItem(item)) props.onSelect(props.terminalWorktreeKey, item.view)
+        if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
+          props.onSelect(terminalWorktreeKey, item.view)
+        }
+      }}
+      onReselect={(item) => {
+        if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
+          onScrollToBottom(item.view.terminalSessionId)
+        }
       }}
       onClose={(item) => {
-        if (isTerminalWorkspacePaneTabItem(item)) props.onClose(item.view)
+        if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
+          props.onClose(item.view)
+        }
       }}
     />
   )

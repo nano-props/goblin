@@ -3,13 +3,16 @@ import {
   changesWorkspacePaneTabProvider,
   filesWorkspacePaneTabProvider,
   historyWorkspacePaneTabProvider,
+  isWorkspacePaneRuntimeTabProvider,
   statusWorkspacePaneTabProvider,
   terminalWorkspacePaneTabProvider,
+  workspacePaneRuntimeTabProvider,
+  workspacePaneRuntimeTabProviders,
   workspacePaneStaticTabProvider,
   workspacePaneTabProviders,
   workspacePaneTabProvider,
 } from '#/web/components/workspace-pane/tab-providers.ts'
-import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
+import type { WorkspacePaneTabSummary } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
 import {
   WORKSPACE_PANE_BRANCH_TAB_TYPES,
   WORKSPACE_PANE_STATIC_TAB_IDS,
@@ -19,10 +22,28 @@ import {
   workspacePaneStaticTabEntry,
   workspacePaneStaticTabScope,
   workspacePaneTabScope,
-  workspacePaneTerminalTabEntry,
+  workspacePaneRuntimeTabEntry,
 } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 
 const t = (key: string, params?: Record<string, string | number>) => (params ? `${key}:${JSON.stringify(params)}` : key)
+
+function renderability(input: {
+  sessionCount?: number
+  createPending?: boolean
+  projectionPhase?: WorkspacePaneRuntimeProjectionPhase
+}) {
+  return {
+    hasWorktree: true,
+    runtimeTabAvailabilityByType: {
+      terminal: {
+        sessionCount: input.sessionCount ?? 0,
+        createPending: input.createPending ?? false,
+        projectionPhase: input.projectionPhase ?? 'ready',
+      },
+    },
+  }
+}
 
 const terminalView: WorkspacePaneTabSummary = {
   type: 'terminal',
@@ -60,6 +81,12 @@ describe('workspace pane tab providers', () => {
     expect(workspacePaneTabProviders.map((provider) => provider.type)).toEqual([...WORKSPACE_PANE_TAB_TYPES])
   })
 
+  test('registers runtime tab providers separately from static providers', () => {
+    expect(workspacePaneRuntimeTabProviders().map((provider) => provider.type)).toEqual(['terminal'])
+    expect(workspacePaneRuntimeTabProvider('terminal')).toBe(terminalWorkspacePaneTabProvider)
+    expect(isWorkspacePaneRuntimeTabProvider(workspacePaneTabProvider('terminal'))).toBe(true)
+  })
+
   test('derives shared static scope lists from the static scope map', () => {
     const branchTabs = WORKSPACE_PANE_STATIC_TAB_TYPES.filter((type) => workspacePaneStaticTabScope(type) === 'branch')
     const worktreeTabs = WORKSPACE_PANE_STATIC_TAB_TYPES.filter(
@@ -80,33 +107,16 @@ describe('workspace pane tab providers', () => {
 
   test('keeps terminal renderability tied to sync and session truth', () => {
     expect(
-      terminalWorkspacePaneTabProvider.isRenderable({
-        hasWorktree: true,
-        terminalProjectionPhase: 'pending',
-        terminalSessionCount: 0,
-      }),
+      terminalWorkspacePaneTabProvider.isRenderable(renderability({ projectionPhase: 'pending', sessionCount: 0 })),
     ).toBe(true)
     expect(
-      terminalWorkspacePaneTabProvider.isRenderable({
-        hasWorktree: true,
-        terminalProjectionPhase: 'ready',
-        terminalCreatePending: true,
-        terminalSessionCount: 0,
-      }),
+      terminalWorkspacePaneTabProvider.isRenderable(renderability({ projectionPhase: 'ready', createPending: true })),
     ).toBe(true)
     expect(
-      terminalWorkspacePaneTabProvider.isRenderable({
-        hasWorktree: true,
-        terminalProjectionPhase: 'ready',
-        terminalSessionCount: 0,
-      }),
+      terminalWorkspacePaneTabProvider.isRenderable(renderability({ projectionPhase: 'ready', sessionCount: 0 })),
     ).toBe(false)
     expect(
-      terminalWorkspacePaneTabProvider.isRenderable({
-        hasWorktree: true,
-        terminalProjectionPhase: 'ready',
-        terminalSessionCount: 1,
-      }),
+      terminalWorkspacePaneTabProvider.isRenderable(renderability({ projectionPhase: 'ready', sessionCount: 1 })),
     ).toBe(true)
   })
 
@@ -114,24 +124,32 @@ describe('workspace pane tab providers', () => {
     expect(
       terminalWorkspacePaneTabProvider.pendingLabel({
         t,
-        terminalCreatePending: false,
-        terminalProjectionPhase: 'pending',
+        createPending: false,
+        projectionPhase: 'pending',
       }),
     ).toBe('terminal.loading')
     expect(
       terminalWorkspacePaneTabProvider.pendingLabel({
         t,
-        terminalCreatePending: false,
-        terminalProjectionPhase: 'failed',
+        createPending: false,
+        projectionPhase: 'failed',
       }),
     ).toBe('terminal.load-failed')
     expect(
       terminalWorkspacePaneTabProvider.pendingLabel({
         t,
-        terminalCreatePending: true,
-        terminalProjectionPhase: 'failed',
+        createPending: true,
+        projectionPhase: 'failed',
       }),
     ).toBe('terminal.load-failed')
+  })
+
+  test('exposes terminal bell state as runtime tab attention metadata', () => {
+    expect(terminalWorkspacePaneTabProvider.attention({ view: terminalView })).toEqual({ attention: false })
+    expect(terminalWorkspacePaneTabProvider.attention({ view: { ...terminalView, hasBell: true } })).toEqual({
+      attention: true,
+      attentionLabelKey: 'terminal.bell-unread',
+    })
   })
 
   test('builds stable identities, tab entries, and labels', () => {
@@ -142,7 +160,7 @@ describe('workspace pane tab providers', () => {
     expect(terminalWorkspacePaneTabProvider.identity('session-1')).toBe('terminal:session-1')
     expect(terminalWorkspacePaneTabProvider.buttonId('workspace-pane', 0)).toBe('workspace-pane-workspace-pane-tab')
     expect(terminalWorkspacePaneTabProvider.buttonId('workspace-pane', 2)).toBe('workspace-pane-workspace-pane-tab-2')
-    expect(terminalWorkspacePaneTabProvider.tabEntry('session-1')).toEqual(workspacePaneTerminalTabEntry('session-1'))
+    expect(terminalWorkspacePaneTabProvider.tabEntry('session-1')).toEqual(workspacePaneRuntimeTabEntry('terminal', 'session-1'))
     expect(changesWorkspacePaneTabProvider.label({ t, branchName: 'main', statusCount: 3 })).toBe(
       'tab.changes-with-count:{"count":3}',
     )
@@ -221,7 +239,7 @@ describe('workspace pane tab providers', () => {
       terminalWorkspacePaneTabProvider.close({
         repoId: '/repo',
         branchName: 'main',
-        terminalSessionId: 'session-1',
+        runtimeSessionId: 'session-1',
         terminalBase,
         closeTerminalByDescriptor,
       }),

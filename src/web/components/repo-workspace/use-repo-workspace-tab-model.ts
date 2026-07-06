@@ -2,39 +2,38 @@ import { useEffect, useMemo } from 'react'
 import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import {
   createRepoWorkspaceTabModel,
+  repoWorkspaceRuntimeTabSessionId,
   type RepoWorkspaceTabModel,
   type RepoWorkspaceTabModelInput,
 } from '#/web/components/repo-workspace/tab-model.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
-import {
-  useTerminalRepoProjectionHydrationEntry,
-  useTerminalSessionSummaries,
-  useTerminalWorktreePendingCreate,
-} from '#/web/components/terminal/terminal-session-store.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
   useWorkspacePaneTabsQuery,
   workspacePaneTabsForTargetFromQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import {
+  useWorkspacePaneRuntimeTabTargetProjection,
+  type WorkspacePaneRuntimeTabTargetProjectionHookResult,
+} from '#/web/workspace-pane/use-workspace-pane-runtime-tab-target-projection.ts'
 
 export interface RepoWorkspaceTabModelInputState {
   input: RepoWorkspaceTabModelInput
-  selectedTerminalSessionId: string | undefined
+  selectedSessionIdByRuntimeType: WorkspacePaneRuntimeTabTargetProjectionHookResult['selectedSessionIdByRuntimeType']
 }
 
 export function useRepoWorkspaceTabModel(
   repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'ui'>,
   detail: CurrentRepoWorkspacePresentation,
 ) {
-  const { input, selectedTerminalSessionId } = useRepoWorkspaceTabModelInput(repo, detail)
+  const { input, selectedSessionIdByRuntimeType } = useRepoWorkspaceTabModelInput(repo, detail)
   const model = useMemo(() => createRepoWorkspaceTabModel(input), [input])
-  useSyncRepoWorkspaceTerminalSelection(model, selectedTerminalSessionId)
+  useSyncRepoWorkspaceRuntimeTabSelection(model, selectedSessionIdByRuntimeType)
   return model
 }
 
 /**
- * Reads repo and terminal-runtime state and packages the pure tab-model input.
+ * Reads repo and runtime-tab state and packages the pure tab-model input.
  * No writes happen here; this is the data boundary into the workspace pane tab
  * projection.
  */
@@ -45,16 +44,12 @@ export function useRepoWorkspaceTabModelInput(
   const { branch } = detail
   const branchName = branch?.name ?? null
   const worktreePath = branch?.worktree?.path ?? null
-  const terminalWorktreeKey = worktreePath ? formatTerminalWorktreeKey(repo.id, worktreePath) : null
-
-  const terminalSessionSummaries = useTerminalSessionSummaries(terminalWorktreeKey)
-  const terminalCreatePending = useTerminalWorktreePendingCreate(terminalWorktreeKey)
-  const terminalProjectionHydration = useTerminalRepoProjectionHydrationEntry(repo.id)
-  const terminalProjectionPhase = terminalProjectionHydration.phase
+  const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
+    repoRoot: repo.id,
+    repoInstanceId: repo.instanceId,
+    worktreePath,
+  })
   const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(repo.id, repo.instanceId)
-  const selectedTerminalSessionId = useReposStore((s) =>
-    terminalWorktreeKey ? s.selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] : undefined,
-  )
 
   const workspacePaneTabEntries = useMemo(
     () =>
@@ -72,8 +67,6 @@ export function useRepoWorkspaceTabModelInput(
     [repo.ui.preferredWorkspacePaneTabByTarget, repo.id, branchName, worktreePath],
   )
 
-  const modelSelectedTerminalSessionId = terminalWorktreeKey ? (selectedTerminalSessionId ?? null) : null
-
   const input = useMemo<RepoWorkspaceTabModelInput>(
     () => ({
       repoId: repo.id,
@@ -81,11 +74,8 @@ export function useRepoWorkspaceTabModelInput(
       worktreePath,
       preferredTab,
       tabEntries: workspacePaneTabEntries,
-      runtimeTerminalViews: terminalSessionSummaries,
-      terminalCreatePending,
-      terminalProjectionPhase,
-      terminalProjectionErrorMessage: terminalProjectionHydration.errorMessage,
-      selectedTerminalSessionId: modelSelectedTerminalSessionId,
+      runtimeTabViews: runtimeProjection.runtimeTabViews,
+      runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
     }),
     [
       repo.id,
@@ -93,32 +83,33 @@ export function useRepoWorkspaceTabModelInput(
       worktreePath,
       preferredTab,
       workspacePaneTabEntries,
-      terminalSessionSummaries,
-      terminalCreatePending,
-      terminalProjectionPhase,
-      terminalProjectionHydration.errorMessage,
-      modelSelectedTerminalSessionId,
+      runtimeProjection.runtimeTabViews,
+      runtimeProjection.runtimeTabStateByType,
     ],
   )
 
-  return useMemo(() => ({ input, selectedTerminalSessionId }), [input, selectedTerminalSessionId])
+  return useMemo(
+    () => ({ input, selectedSessionIdByRuntimeType: runtimeProjection.selectedSessionIdByRuntimeType }),
+    [input, runtimeProjection.selectedSessionIdByRuntimeType],
+  )
 }
 
 /**
- * Mirrors the model's resolved active terminal into the repos store. Keeping
+ * Mirrors the model's resolved active runtime selection into the backing runtime store. Keeping
  * this separate from input collection makes the single write-side effect in
  * the tab-model hook explicit.
  */
-export function useSyncRepoWorkspaceTerminalSelection(
-  model: Pick<RepoWorkspaceTabModel, 'activeTab' | 'terminalWorktreeKey'>,
-  selectedTerminalSessionId: string | undefined,
+export function useSyncRepoWorkspaceRuntimeTabSelection(
+  model: Pick<RepoWorkspaceTabModel, 'activeTab' | 'runtimeTabTargetKey'>,
+  selectedSessionIdByRuntimeType: WorkspacePaneRuntimeTabTargetProjectionHookResult['selectedSessionIdByRuntimeType'],
 ): void {
   const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
-  const activeTerminalSessionId = model.activeTab?.kind === 'terminal' ? model.activeTab.terminalSessionId : null
+  const activeTerminalSessionId = repoWorkspaceRuntimeTabSessionId(model.activeTab, 'terminal')
+  const selectedTerminalSessionId = selectedSessionIdByRuntimeType.terminal ?? undefined
 
   useEffect(() => {
-    if (!model.terminalWorktreeKey || !activeTerminalSessionId) return
+    if (!model.runtimeTabTargetKey || !activeTerminalSessionId) return
     if (activeTerminalSessionId === selectedTerminalSessionId) return
-    setSelectedTerminal(model.terminalWorktreeKey, activeTerminalSessionId)
-  }, [activeTerminalSessionId, model.terminalWorktreeKey, selectedTerminalSessionId, setSelectedTerminal])
+    setSelectedTerminal(model.runtimeTabTargetKey, activeTerminalSessionId)
+  }, [activeTerminalSessionId, model.runtimeTabTargetKey, selectedTerminalSessionId, setSelectedTerminal])
 }

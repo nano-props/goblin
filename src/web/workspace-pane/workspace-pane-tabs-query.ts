@@ -1,16 +1,16 @@
 import { useEffect } from 'react'
 import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query'
-import type { WorkspacePaneTabsEntry } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
 import {
   type WorkspacePaneTabsTarget,
   workspacePaneTabsEntryMatchesTarget,
   workspacePaneTabsTargetIdentityKey,
 } from '#/shared/workspace-pane-tabs-target.ts'
-import { terminalClient } from '#/web/terminal.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { defaultWorkspacePaneTabs, normalizeWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { gblLog } from '#/web/logger.ts'
+import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
 
 export type WorkspacePaneTabsQueryData = WorkspacePaneTabsEntry[]
 
@@ -207,7 +207,7 @@ async function fetchWorkspacePaneTabsQueryData(
   repoRoot: string,
   repoInstanceId: string,
 ): Promise<WorkspacePaneTabsQueryData> {
-  return normalizeWorkspacePaneTabsQueryData(await terminalClient.listWorkspaceTabs({ repoRoot, repoInstanceId }))
+  return normalizeWorkspacePaneTabsQueryData(await workspacePaneTabsClient.list({ repoRoot, repoInstanceId }))
 }
 
 function updateWorkspacePaneTabsQueryData(

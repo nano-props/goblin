@@ -12,10 +12,17 @@ import type {
   TerminalSessionPhase,
   TerminalSessionSummary,
   TerminalTestNotificationInput,
-  WorkspacePaneTabsEntry,
 } from '#/shared/terminal-types.ts'
-import { WORKSPACE_PANE_STATIC_TAB_IDS, WORKSPACE_PANE_STATIC_TAB_TYPES } from '#/shared/workspace-pane.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
+import { WORKSPACE_PANE_TABS_REALTIME_EVENTS, WORKSPACE_PANE_TABS_SOCKET_ACTIONS } from '#/shared/workspace-pane-tabs.ts'
+import {
+  WorkspacePaneOptionalTabIdentitySchema,
+  WorkspacePaneTabEntrySchema,
+  WorkspacePaneTabsEntrySchema,
+  WorkspacePaneTabsListInputSchema,
+  WorkspacePaneTabsReplaceInputSchema,
+  WorkspacePaneTabsUpdateInputSchema,
+} from '#/shared/workspace-pane-tabs-validators.ts'
 
 const MIN_TERMINAL_COLS = 1
 const MAX_TERMINAL_COLS = 500
@@ -35,10 +42,10 @@ const TERMINAL_SOCKET_ACTIONS = [
   'takeover',
   'close',
   'list-sessions',
-  'list-workspace-tabs',
+  WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+  WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
+  WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
   'create',
-  'replace-tabs',
-  'update-tabs',
   'prune',
 ] as const satisfies TerminalSocketRequestAction[]
 const TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES = ['connected'] satisfies Exclude<TerminalControllerStatus, 'none'>[]
@@ -81,17 +88,7 @@ const TerminalSessionInputSchema = v.object({
   terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
 })
 const RepoInstanceIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
-const WorkspacePaneTabIdentitySchema = v.pipe(
-  v.string(),
-  v.minLength(1),
-  v.check((value) => !value.includes('\0'), 'Invalid workspace pane tab identity'),
-)
-const WorkspacePaneOptionalTabIdentitySchema = v.optional(v.nullable(WorkspacePaneTabIdentitySchema))
 const TerminalListSessionsInputSchema = v.object({
-  repoRoot: v.string(),
-  repoInstanceId: RepoInstanceIdSchema,
-})
-const TerminalListWorkspaceTabsInputSchema = v.object({
   repoRoot: v.string(),
   repoInstanceId: RepoInstanceIdSchema,
 })
@@ -110,46 +107,6 @@ const TerminalCreateInputSchema = v.object({
 const TerminalPruneInputSchema = v.object({
   repoRoot: v.string(),
   repoInstanceId: RepoInstanceIdSchema,
-})
-const WorkspacePaneStaticTabEntrySchema = v.variant('type', [
-  v.object({ type: v.literal('status'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.status) }),
-  v.object({ type: v.literal('changes'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.changes) }),
-  v.object({ type: v.literal('history'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.history) }),
-  v.object({ type: v.literal('files'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.files) }),
-])
-const WorkspacePaneStaticTabTypeSchema = v.picklist(WORKSPACE_PANE_STATIC_TAB_TYPES)
-const WorkspacePaneTerminalTabEntrySchema = v.object({
-  type: v.literal('terminal'),
-  terminalSessionId: v.pipe(v.string(), v.minLength(1)),
-})
-const TerminalReplaceWorkspaceTabsInputSchema = v.object({
-  repoRoot: v.string(),
-  repoInstanceId: RepoInstanceIdSchema,
-  branchName: v.string(),
-  worktreePath: v.nullable(v.string()),
-  tabs: v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneTerminalTabEntrySchema])),
-})
-const TerminalUpdateWorkspaceTabsInputSchema = v.object({
-  repoRoot: v.string(),
-  repoInstanceId: RepoInstanceIdSchema,
-  branchName: v.string(),
-  worktreePath: v.nullable(v.string()),
-  operation: v.variant('type', [
-    v.object({
-      type: v.literal('open-static'),
-      tabType: WorkspacePaneStaticTabTypeSchema,
-      insertAfterIdentity: WorkspacePaneOptionalTabIdentitySchema,
-    }),
-    v.object({ type: v.literal('close-static'), tabType: WorkspacePaneStaticTabTypeSchema }),
-    v.object({ type: v.literal('reorder'), tabIdentities: v.array(WorkspacePaneTabIdentitySchema) }),
-  ]),
-})
-const WorkspacePaneTabEntrySchema = v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneTerminalTabEntrySchema])
-const WorkspacePaneTabsEntrySchema = v.object({
-  repoRoot: v.string(),
-  branchName: v.string(),
-  worktreePath: v.nullable(v.string()),
-  tabs: v.array(WorkspacePaneTabEntrySchema),
 })
 const TerminalSessionSummarySchema = v.object({
   terminalRuntimeSessionId: v.string(),
@@ -285,7 +242,7 @@ const TerminalRealtimeMessageVariants = [
   v.object({ type: v.literal('identity'), event: TerminalIdentityEventSchema }),
   v.object({ type: v.literal('lifecycle'), event: TerminalLifecycleEventSchema }),
   v.object({ type: v.literal('sessions-changed'), repoRoot: v.string() }),
-  v.object({ type: v.literal('workspace-tabs-changed'), repoRoot: v.string() }),
+  v.object({ type: v.literal(WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed), repoRoot: v.string() }),
   TerminalSessionClosedEventSchema,
 ] as const
 const TerminalRealtimeMessageSchema = v.variant('type', TerminalRealtimeMessageVariants)
@@ -356,8 +313,8 @@ const TerminalClientMessageSchema = v.variant('type', [
   v.object({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
-    action: v.literal('list-workspace-tabs'),
-    input: TerminalListWorkspaceTabsInputSchema,
+    action: v.literal(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list),
+    input: WorkspacePaneTabsListInputSchema,
   }),
   v.object({
     type: v.literal('request'),
@@ -368,14 +325,14 @@ const TerminalClientMessageSchema = v.variant('type', [
   v.object({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
-    action: v.literal('replace-tabs'),
-    input: TerminalReplaceWorkspaceTabsInputSchema,
+    action: v.literal(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace),
+    input: WorkspacePaneTabsReplaceInputSchema,
   }),
   v.object({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
-    action: v.literal('update-tabs'),
-    input: TerminalUpdateWorkspaceTabsInputSchema,
+    action: v.literal(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update),
+    input: WorkspacePaneTabsUpdateInputSchema,
   }),
   v.object({
     type: v.literal('request'),
@@ -487,11 +444,6 @@ export function normalizeTerminalCreateResult(value: unknown): TerminalCreateRes
   return parsed.success ? parsed.output : null
 }
 
-export function normalizeWorkspacePaneTabsEntryList(value: unknown): WorkspacePaneTabsEntry[] | null {
-  const parsed = v.safeParse(v.array(WorkspacePaneTabsEntrySchema), value)
-  return parsed.success ? parsed.output : null
-}
-
 export function normalizeTerminalRealtimeMessage(value: unknown): TerminalRealtimeMessage | null {
   const parsed = v.safeParse(TerminalRealtimeMessageSchema, value)
   return parsed.success ? parsed.output : null
@@ -528,12 +480,12 @@ function normalizeTerminalSocketResponsePayload(action: TerminalSocketRequestAct
       return normalizeWithSchema(TerminalTakeoverResultSchema, payload)
     case 'list-sessions':
       return normalizeWithSchema(v.array(TerminalSessionSummarySchema), payload)
-    case 'list-workspace-tabs':
+    case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list:
       return normalizeWithSchema(v.array(WorkspacePaneTabsEntrySchema), payload)
     case 'create':
       return normalizeWithSchema(TerminalCreateResultSchema, payload)
-    case 'replace-tabs':
-    case 'update-tabs':
+    case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace:
+    case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update:
       return normalizeWithSchema(v.array(WorkspacePaneTabEntrySchema), payload)
     case 'prune':
       return normalizeWithSchema(TerminalPruneResultSchema, payload)
@@ -552,3 +504,5 @@ export function normalizeTerminalClientMessage(value: unknown): TerminalClientMe
   const parsed = v.safeParse(TerminalClientMessageSchema, value)
   return parsed.success ? parsed.output : null
 }
+
+export { normalizeWorkspacePaneTabsEntryList } from '#/shared/workspace-pane-tabs-validators.ts'

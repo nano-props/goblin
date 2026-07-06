@@ -244,21 +244,27 @@ It mainly needs:
 
 The client should not have to infer hidden lifecycle meaning from missing PTY state.
 
-## Workspace-pane tab projection
+## Workspace-pane runtime tab projection
 
-Workspace-pane terminal tabs are a server-side projection of live terminal
-sessions. The public canonical boundary is still `listWorkspaceTabs`, but the
-projection implementation is split out of the terminal session service:
+Workspace-pane runtime tabs are a server-side projection of live runtime
+sessions. Terminal is one runtime provider. The public canonical boundary is
+the workspace pane tabs API (`workspace-pane-tabs.list` over the socket and
+`listWorkspaceTabs` in the host interface), but the projection implementation
+is split out of the terminal session service:
 
-- every live terminal session must materialize a matching `{ type: 'terminal', terminalSessionId }` tab entry
+- every live terminal session must materialize a matching
+  `{ type: 'terminal', runtimeSessionId: terminalSessionId }` tab entry
 - stale terminal tab entries must be pruned when no matching live session exists
 - existing static tabs and user-managed ordering are preserved where possible
-- the server broadcasts `workspace-tabs-changed` when read-side canonicalization changes the projection
+- the server broadcasts `workspace-pane-tabs.changed` when read-side
+  canonicalization changes the projection
 
 The server-side ownership is:
 
-- `src/server/terminal/terminal-workspace-tabs-projection.ts` owns the pure prune/materialize/dedupe rules
-- `src/server/terminal/terminal-workspace-tabs-coordinator.ts` owns queueing, live-session lookup, runtime writes, and read-side canonicalization
+- `src/server/workspace-pane/workspace-pane-runtime-tabs-projection.ts` owns
+  the pure prune/materialize/dedupe rules for runtime sessions
+- `src/server/workspace-pane/workspace-pane-tabs-coordinator.ts` owns
+  queueing, live-session lookup, runtime writes, and read-side canonicalization
 - `src/server/terminal/terminal-session-service.ts` remains the public facade that validates requests and delegates to the coordinator
 
 This keeps the client from inventing fallback rendering rules such as "show a

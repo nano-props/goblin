@@ -39,7 +39,7 @@ import type { PrimaryWindowNavigationActions } from '#/web/primary-window-naviga
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
@@ -1670,7 +1670,7 @@ function staticEntry(type: WorkspacePaneStaticTabType) {
 }
 
 function terminalEntry(id: string) {
-  return workspacePaneTerminalTabEntry(id)
+  return workspacePaneRuntimeTabEntry('terminal', id)
 }
 
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {}): PrimaryWindowNavigationActions {

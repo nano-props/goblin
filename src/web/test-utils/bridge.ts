@@ -42,15 +42,18 @@ import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspac
 import type {
   TerminalAttachResult,
   TerminalCreateResult,
-  TerminalListWorkspaceTabsInput,
-  TerminalReplaceWorkspaceTabsInput,
   TerminalMutationResult,
   TerminalSessionSummary,
-  TerminalUpdateWorkspaceTabsInput,
-  WorkspacePaneTabsEntry,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import type {
+  WorkspacePaneTabsEntry,
+  WorkspacePaneTabsListInput,
+  WorkspacePaneTabsReplaceInput,
+  WorkspacePaneTabsUpdateInput,
+} from '#/shared/workspace-pane-tabs.ts'
+import { WORKSPACE_PANE_TABS_SOCKET_ACTIONS } from '#/shared/workspace-pane-tabs.ts'
 import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
 import { vi } from 'vitest'
 import { installWebSocketMock } from '#/web/test-utils/websocket-mock.ts'
@@ -145,11 +148,11 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalClien
       return 'terminal.close'
     case 'create':
       return 'terminal.create'
-    case 'replace-tabs':
+    case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace:
       return 'terminal.replaceWorkspaceTabs'
-    case 'update-tabs':
+    case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update:
       return 'terminal.updateWorkspaceTabs'
-    case 'list-workspace-tabs':
+    case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list:
       return 'terminal.listWorkspaceTabs'
     case 'prune':
       return 'terminal.prune'
@@ -192,13 +195,13 @@ export function createPullRequest(number: number, options: Partial<PullRequestIn
 export function installWorkspacePaneTabsTestBridge(
   options: {
     replaceWorkspaceTabs?: (
-      input: TerminalReplaceWorkspaceTabsInput,
+      input: WorkspacePaneTabsReplaceInput,
     ) => WorkspacePaneTabEntry[] | Promise<WorkspacePaneTabEntry[]>
     updateWorkspaceTabs?: (
-      input: TerminalUpdateWorkspaceTabsInput,
+      input: WorkspacePaneTabsUpdateInput,
     ) => WorkspacePaneTabEntry[] | Promise<WorkspacePaneTabEntry[]>
     listWorkspaceTabs?: (
-      input: TerminalListWorkspaceTabsInput,
+      input: WorkspacePaneTabsListInput,
     ) => WorkspacePaneTabsEntry[] | Promise<WorkspacePaneTabsEntry[]>
   } = {},
 ): void {
@@ -287,10 +290,25 @@ export function installWorkspacePaneTabsTestBridge(
       onWorkspaceTabsChanged: () => () => {},
       onSessionClosed: () => () => {},
     }),
+    workspacePaneTabs: () => ({
+      replace: async (input) => {
+        if (options.replaceWorkspaceTabs) return await options.replaceWorkspaceTabs(input)
+        return [...input.tabs]
+      },
+      update: async (input) => {
+        if (options.updateWorkspaceTabs) return await options.updateWorkspaceTabs(input)
+        return defaultWorkspacePaneTabsOperationResult(input)
+      },
+      list: async (input) => {
+        if (options.listWorkspaceTabs) return await options.listWorkspaceTabs(input)
+        return []
+      },
+      onChanged: () => () => {},
+    }),
   } satisfies ClientBridge)
 }
 
-function defaultWorkspacePaneTabsOperationResult(input: TerminalUpdateWorkspaceTabsInput): WorkspacePaneTabEntry[] {
+function defaultWorkspacePaneTabsOperationResult(input: WorkspacePaneTabsUpdateInput): WorkspacePaneTabEntry[] {
   const currentTabs = readWorkspacePaneTabsForTarget(input)
   switch (input.operation.type) {
     case 'open-static':
@@ -304,7 +322,7 @@ function defaultWorkspacePaneTabsOperationResult(input: TerminalUpdateWorkspaceT
   }
 }
 
-function isTerminalUpdateWorkspaceTabsInput(value: unknown): value is TerminalUpdateWorkspaceTabsInput {
+function isWorkspacePaneTabsUpdateInput(value: unknown): value is WorkspacePaneTabsUpdateInput {
   if (!value || typeof value !== 'object') return false
   const input = value as { repoRoot?: unknown; branchName?: unknown; worktreePath?: unknown; operation?: unknown }
   return (
@@ -499,7 +517,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
             ? ([...(payload as { tabs: WorkspacePaneTabEntry[] }).tabs] satisfies WorkspacePaneTabEntry[])
             : []
         case 'terminal.updateWorkspaceTabs':
-          return isTerminalUpdateWorkspaceTabsInput(payload) ? defaultWorkspacePaneTabsOperationResult(payload) : []
+          return isWorkspacePaneTabsUpdateInput(payload) ? defaultWorkspacePaneTabsOperationResult(payload) : []
         case 'terminal.listWorkspaceTabs':
           return []
         case 'terminal.listSessions':
@@ -629,6 +647,12 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       onSessionsChanged: () => () => {},
       onWorkspaceTabsChanged: () => () => {},
       onSessionClosed: () => () => {},
+    }),
+    workspacePaneTabs: () => ({
+      replace: async (input) => callTerminalHandler('terminal.replaceWorkspaceTabs', input),
+      update: async (input) => callTerminalHandler('terminal.updateWorkspaceTabs', input),
+      list: async (input) => callTerminalHandler('terminal.listWorkspaceTabs', input),
+      onChanged: () => () => {},
     }),
   })
   vi.stubGlobal(

@@ -624,6 +624,12 @@ beforeEach(() => {
       onWorkspaceTabsChanged: vi.fn(() => () => {}),
       onSessionClosed: vi.fn(() => () => {}),
     }),
+    workspacePaneTabs: () => ({
+      replace: vi.fn(async (input) => input.tabs),
+      update: vi.fn(async () => []),
+      list: vi.fn(async () => []),
+      onChanged: vi.fn(() => () => {}),
+    }),
   })
 })
 

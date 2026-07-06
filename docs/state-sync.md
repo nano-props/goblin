@@ -53,7 +53,7 @@ Notes:
 - Runtime-coherent repo actions should prefer orchestration entrypoints plus focused helper modules for projection/state transitions and sync pipelines.
 - Settings truth lives on the server; clients read it through query snapshots or specialized runtime projections.
 - Settings writes belong in `src/web/settings-actions.ts`. `src/web/settings-client.ts` is the transport boundary, not a UI mutation API. UI stores may keep local projections such as theme/i18n state, but their server write-through path should use settings actions so the settings query cache stays coherent.
-- Workspace pane tabs truth lives in the terminal/server runtime. React Query caches the runtime projection. Reorder may use a short-lived optimistic query update, but success must replace it with server-returned tabs and failure must rollback or invalidate.
+- Workspace pane tabs truth lives in the server workspace-pane runtime. React Query caches the runtime projection. Reorder may use a short-lived optimistic query update, but success must replace it with server-returned tabs and failure must rollback or invalidate.
 - Runtime-coherent state may use invalidation plus refetch or realtime streaming.
 - For runtime correctness boundaries, prefer server-owned fast fail over client guards. A mutation that no longer matches the live runtime instance should be rejected by the server, not locally guessed away by the client.
 - Do not mirror authoritative runtime membership from the client back into the server with whole-snapshot sync. Use server-owned open/close transitions and let the server mint runtime identities.

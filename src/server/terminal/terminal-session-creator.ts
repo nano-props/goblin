@@ -8,15 +8,15 @@ import type {
   TerminalSessionEnsureResult,
 } from '#/server/terminal/terminal-session-ensurer.ts'
 import type { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
-import type { createTerminalWorkspaceTabsCoordinator } from '#/server/terminal/terminal-workspace-tabs-coordinator.ts'
+import type { createWorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 
 type TerminalSessionCreateCoordinator = ReturnType<typeof createTerminalSessionCreateCoordinator>
-type TerminalWorkspaceTabsCoordinator = ReturnType<typeof createTerminalWorkspaceTabsCoordinator>
+type WorkspacePaneTabsCoordinator = ReturnType<typeof createWorkspacePaneTabsCoordinator>
 type TerminalCreateFailure = Extract<TerminalCreateResult, { ok: false }>
 
 interface TerminalSessionCreatorOptions {
   createCoordinator: TerminalSessionCreateCoordinator
-  workspaceTabsCoordinator: TerminalWorkspaceTabsCoordinator
+  workspaceTabsCoordinator: WorkspacePaneTabsCoordinator
   ensureOrRestore(
     clientId: string,
     userId: string,
@@ -81,12 +81,13 @@ class TerminalSessionCreator {
         if (staleAfterList) return staleAfterList
         const createdSession = sessions.find((session) => session.terminalSessionId === createResult.terminalSessionId)
         const tabsResult = createdSession
-          ? await this.options.workspaceTabsCoordinator.ensureTerminalTabForSession({
+          ? await this.options.workspaceTabsCoordinator.ensureRuntimeTabForSession({
               userId: input.userId,
               scope: sessionScope,
               branchName: input.request.branch,
               worktreePath: createdSession.worktreePath,
-              terminalSessionId: createResult.terminalSessionId,
+              runtimeType: 'terminal',
+              sessionId: createResult.terminalSessionId,
               insertAfterIdentity: input.request.insertAfterIdentity ?? null,
               guardBeforeWrite: () =>
                 this.options.rejectStaleCreateIfNeeded(

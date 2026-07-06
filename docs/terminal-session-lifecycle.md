@@ -72,7 +72,7 @@ The combined symptom list across the root causes:
 - **Multi-window drift**: terminal disappears from window A but window
   B keeps showing it until the next reconcile (R2 — missing broadcast).
 - **Refresh loses terminal tab**: the PTY and terminal session are still
-  live, but the workspace-pane tab strip has no terminal tab entry to render.
+  live, but the workspace-pane tab strip has no terminal runtime tab entry to render.
 
 ## Root causes, briefly
 
@@ -97,7 +97,7 @@ The combined symptom list across the root causes:
 - **R4 — Workspace-pane tab projection could drift from live sessions.**
   Terminal sessions and workspace-pane tabs are separate server runtimes.
   After reload/restore, the session list could recover while the tab list
-  lacked `{ type: 'terminal', terminalSessionId }`, so the UI had no tab to
+  lacked `{ type: 'terminal', runtimeSessionId: terminalSessionId }`, so the UI had no tab to
   render even though the PTY was alive.
 
 ---
@@ -201,7 +201,9 @@ That distinction matters most on restart failure:
 - writes and resizes are still rejected because the server checks phase,
   controller authority, and PTY binding state before touching a PTY.
 
-The durable identity for a terminal tab is still `terminalSessionId`.
+The durable identity for a terminal business session is still
+`terminalSessionId`. A workspace-pane runtime tab stores that value in the
+generic `runtimeSessionId` field.
 The lower-level live resource is the supervisor PTY handle. Keeping these
 three concepts separate prevents restart failures from accidentally
 turning into session deletion.
@@ -214,10 +216,10 @@ sessions and the workspace-pane tab strip.
 When the server lists workspace tabs it reconciles against live terminal
 sessions for the same user and repo instance:
 
-- live sessions materialize missing terminal tab entries
-- stale terminal tab entries are removed
+- live sessions materialize missing terminal runtime tab entries
+- stale terminal runtime tab entries are removed
 - static tabs and existing order are preserved where possible
-- any self-healing write broadcasts `workspace-tabs-changed`
+- any self-healing write broadcasts `workspace-pane-tabs.changed`
 
 Terminal sessions store their target `branch` at creation time. This is
 intentional: branch is runtime metadata for the terminal business object, not

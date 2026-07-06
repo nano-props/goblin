@@ -20,6 +20,10 @@ import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.
 import { HEARTBEAT_DEADLINE_MS, HEARTBEAT_INTERVAL_MS } from '#/server/terminal/terminal-realtime-broker.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
+import {
+  WORKSPACE_PANE_TABS_REALTIME_EVENTS,
+  WORKSPACE_PANE_TABS_SOCKET_ACTIONS,
+} from '#/shared/workspace-pane-tabs.ts'
 
 // Under method 2 the host threads `userId` (derived from the
 // access token) alongside `clientId` (per-tab routing). Tests use
@@ -585,13 +589,15 @@ describe('server terminal runtime', () => {
     })
     expect(created.ok).toBe(true)
     if (!created.ok) return
-    expect(created.tabs).toContainEqual({ type: 'terminal', terminalSessionId: created.terminalSessionId })
+    expect(created.tabs).toContainEqual({ type: 'terminal', runtimeSessionId: created.terminalSessionId })
     socket.send.mockClear()
 
     mockPtys[0]?.emitExit()
 
     await vi.waitFor(() => {
-      expect(sentSocketMessages(socket).some((message) => message.type === 'workspace-tabs-changed')).toBe(true)
+      expect(
+        sentSocketMessages(socket).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+      ).toBe(true)
     })
     expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
     await expect(
@@ -633,7 +639,9 @@ describe('server terminal runtime', () => {
     ).resolves.toEqual({ pruned: 1, remaining: 0 })
 
     await vi.waitFor(() => {
-      expect(sentSocketMessages(socket).some((message) => message.type === 'workspace-tabs-changed')).toBe(true)
+      expect(
+        sentSocketMessages(socket).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+      ).toBe(true)
     })
     expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
     await expect(
@@ -651,7 +659,7 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('realtime list-workspace-tabs materializes missing terminal tabs and broadcasts invalidation', async () => {
+  test('realtime workspace pane tabs list materializes missing terminal tabs and broadcasts invalidation', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
@@ -685,14 +693,14 @@ describe('server terminal runtime', () => {
       JSON.stringify({
         type: 'request',
         requestId: 'req_list_workspace_tabs',
-        action: 'list-workspace-tabs',
+        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
         input: { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
       }),
     )
 
     await vi.waitFor(() => {
       const messages = sentSocketMessages(socket)
-      expect(messages.some((message) => message.type === 'workspace-tabs-changed')).toBe(true)
+      expect(messages.some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed)).toBe(true)
       expect(
         messages.some((message) => message.type === 'response' && message.requestId === 'req_list_workspace_tabs'),
       ).toBe(true)
@@ -703,7 +711,7 @@ describe('server terminal runtime', () => {
     expect(response).toMatchObject({
       type: 'response',
       ok: true,
-      action: 'list-workspace-tabs',
+      action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
       payload: [
         {
           repoRoot: REPO_ROOT,
@@ -711,7 +719,7 @@ describe('server terminal runtime', () => {
           worktreePath: '/repo-linked',
           tabs: [
             { type: 'status', tabId: 'workspace-pane:status' },
-            { type: 'terminal', terminalSessionId: created.terminalSessionId },
+            { type: 'terminal', runtimeSessionId: created.terminalSessionId },
           ],
         },
       ],
@@ -817,7 +825,7 @@ describe('server terminal runtime', () => {
       }),
     ).resolves.toEqual([
       { type: 'status', tabId: 'workspace-pane:status' },
-      { type: 'terminal', terminalSessionId: first.terminalSessionId },
+      { type: 'terminal', runtimeSessionId: first.terminalSessionId },
       { type: 'history', tabId: 'workspace-pane:history' },
     ])
 

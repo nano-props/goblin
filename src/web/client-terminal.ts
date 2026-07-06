@@ -1,8 +1,12 @@
 import {
   normalizeTerminalCreateResult,
   normalizeTerminalSessionSummaryList,
-  normalizeWorkspacePaneTabsEntryList,
 } from '#/shared/terminal-validators.ts'
+import { normalizeWorkspacePaneTabsEntryList } from '#/shared/workspace-pane-tabs-validators.ts'
+import {
+  WORKSPACE_PANE_TABS_REALTIME_EVENTS,
+  WORKSPACE_PANE_TABS_SOCKET_ACTIONS,
+} from '#/shared/workspace-pane-tabs.ts'
 import { resolveTerminalController } from '#/shared/terminal-controller.ts'
 import type { TerminalRealtimeMessage } from '#/shared/terminal-socket.ts'
 import type {
@@ -14,7 +18,7 @@ import type {
   TerminalTestNotificationInput,
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
-import type { ClientTerminal } from '#/web/client-bridge-types.ts'
+import type { ClientTerminal, ClientWorkspacePaneTabs } from '#/web/client-bridge-types.ts'
 import type { TerminalIdentityRealtimeEvent, TerminalLifecycleRealtimeEvent } from '#/web/components/terminal/types.ts'
 import {
   createTerminalSocketConnection,
@@ -24,11 +28,24 @@ import type { TerminalNotificationProvider } from '#/web/terminal-notification-p
 
 export type ClientServerTerminalConfig = TerminalSocketServerConfig
 
+export interface ClientServerTerminalClients {
+  terminal: ClientTerminal
+  workspacePaneTabs: ClientWorkspacePaneTabs
+}
+
 export function createServerTerminalClient(options: {
   getServerConfig: () => ClientServerTerminalConfig
   notificationProvider: TerminalNotificationProvider
   setBadge?: (count: number) => void
 }): ClientTerminal {
+  return createServerTerminalClients(options).terminal
+}
+
+export function createServerTerminalClients(options: {
+  getServerConfig: () => ClientServerTerminalConfig
+  notificationProvider: TerminalNotificationProvider
+  setBadge?: (count: number) => void
+}): ClientServerTerminalClients {
   const outputSubscribers = new Set<(event: TerminalOutputEvent) => void>()
   const bellSubscribers = new Set<(event: TerminalBellRealtimeEvent) => void>()
   const titleSubscribers = new Set<(event: TerminalTitleEvent) => void>()
@@ -52,7 +69,7 @@ export function createServerTerminalClient(options: {
     onRealtimeMessage: handleRealtimeMessage,
   })
 
-  return {
+  const terminal: ClientTerminal = {
     attach(input) {
       return connection.request('attach', input)
     },
@@ -79,10 +96,10 @@ export function createServerTerminalClient(options: {
       })
     },
     replaceWorkspaceTabs(input) {
-      return connection.request('replace-tabs', input)
+      return connection.request(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace, input)
     },
     updateWorkspaceTabs(input) {
-      return connection.request('update-tabs', input)
+      return connection.request(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update, input)
     },
     pruneTerminals(repoRoot, repoInstanceId) {
       return connection.request('prune', { repoRoot, repoInstanceId })
@@ -95,7 +112,7 @@ export function createServerTerminalClient(options: {
       })
     },
     listWorkspaceTabs(input) {
-      return connection.request('list-workspace-tabs', input).then((value) => {
+      return connection.request(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list, input).then((value) => {
         const tabs = normalizeWorkspacePaneTabsEntryList(value)
         if (!tabs) throw new Error('Terminal socket response failed: invalid workspace tabs response')
         return tabs
@@ -190,6 +207,27 @@ export function createServerTerminalClient(options: {
     },
   }
 
+  const workspacePaneTabs: ClientWorkspacePaneTabs = {
+    replace(input) {
+      return connection.request(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace, input)
+    },
+    update(input) {
+      return connection.request(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update, input)
+    },
+    list(input) {
+      return connection.request(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list, input).then((value) => {
+        const tabs = normalizeWorkspacePaneTabsEntryList(value)
+        if (!tabs) throw new Error('Terminal socket response failed: invalid workspace tabs response')
+        return tabs
+      })
+    },
+    onChanged(cb) {
+      return terminal.onWorkspaceTabsChanged(cb)
+    },
+  }
+
+  return { terminal, workspacePaneTabs }
+
   function hasRealtimeSubscribers(): boolean {
     return (
       outputSubscribers.size > 0 ||
@@ -221,7 +259,7 @@ export function createServerTerminalClient(options: {
       case 'sessions-changed':
         for (const subscriber of sessionsChangedSubscribers) subscriber(message.repoRoot)
         return
-      case 'workspace-tabs-changed':
+      case WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed:
         for (const subscriber of workspaceTabsChangedSubscribers) subscriber(message.repoRoot)
         return
       case 'session-closed':

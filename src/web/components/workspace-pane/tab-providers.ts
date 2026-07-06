@@ -1,29 +1,40 @@
 import { Diff, FolderTree, GitBranch, History, Terminal, type LucideIcon } from 'lucide-react'
 import type {
+  WorkspacePaneRuntimeTabType,
   WorkspacePaneStaticTabType,
   WorkspacePaneTabEntry,
   WorkspacePaneTabType,
   WorkspacePaneTabScope,
 } from '#/shared/workspace-pane.ts'
 import {
+  isWorkspacePaneRuntimeTabType,
+  workspacePaneRuntimeTabEntry,
+  workspacePaneRuntimeTabIdentity,
   workspacePaneTabScope,
   workspacePaneStaticTabId,
   workspacePaneStaticTabEntry,
-  workspacePaneTerminalTabEntry,
 } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
+import type { WorkspacePaneTabSummary } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
-import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
+import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 
 type T = (key: string, params?: Record<string, string | number>) => string
 
 export type WorkspacePaneTabProviderKind = 'static' | 'runtime'
 
+export interface WorkspacePaneRuntimeTabAvailability {
+  sessionCount: number
+  createPending: boolean
+  projectionPhase: WorkspacePaneRuntimeProjectionPhase
+}
+
+export type WorkspacePaneRuntimeTabAvailabilityByType = Partial<
+  Record<WorkspacePaneRuntimeTabType, WorkspacePaneRuntimeTabAvailability>
+>
+
 export interface WorkspacePaneTabAvailabilityContext {
   hasWorktree: boolean
-  terminalSessionCount?: number
-  terminalCreatePending?: boolean
-  terminalProjectionPhase?: TerminalProjectionHydrationPhase
+  runtimeTabAvailabilityByType?: WorkspacePaneRuntimeTabAvailabilityByType
 }
 
 export interface WorkspacePaneStaticTabMetadataInput {
@@ -32,17 +43,30 @@ export interface WorkspacePaneStaticTabMetadataInput {
   statusCount: number
 }
 
-export interface WorkspacePaneRuntimeTabMetadataInput {
+export interface WorkspacePaneRuntimeTabMetadataInput<
+  TType extends WorkspacePaneRuntimeTabType = WorkspacePaneRuntimeTabType,
+> {
   t: T
   branchName: string
   statusCount: number
-  view: WorkspacePaneTabSummary
+  view: Extract<WorkspacePaneTabSummary, { type: TType }>
 }
 
 export interface WorkspacePanePendingTabMetadataInput {
   t: T
-  terminalCreatePending: boolean
-  terminalProjectionPhase: TerminalProjectionHydrationPhase
+  createPending: boolean
+  projectionPhase: WorkspacePaneRuntimeProjectionPhase
+}
+
+export interface WorkspacePaneRuntimeTabAttention {
+  attention: boolean
+  attentionLabelKey?: string
+}
+
+export interface WorkspacePaneRuntimeTabAttentionInput<
+  TType extends WorkspacePaneRuntimeTabType = WorkspacePaneRuntimeTabType,
+> {
+  view: Extract<WorkspacePaneTabSummary, { type: TType }>
 }
 
 export interface WorkspacePanePanelLabel {
@@ -53,7 +77,7 @@ export interface WorkspacePanePanelLabel {
 export interface WorkspacePaneTabCloseInput {
   repoId: string
   branchName: string | null
-  terminalSessionId?: string
+  runtimeSessionId?: string
   terminalBase?: TerminalSessionBase | null
   closeStaticTab?: (
     repoId: string,
@@ -138,6 +162,33 @@ export abstract class WorkspacePaneStaticTabProvider<
   }
 }
 
+export abstract class WorkspacePaneRuntimeTabProvider<
+  TType extends WorkspacePaneRuntimeTabType = WorkspacePaneRuntimeTabType,
+> extends WorkspacePaneTabProvider<TType> {
+  readonly kind = 'runtime' as const
+
+  override identity(sessionId: string): string {
+    return workspacePaneRuntimeTabIdentity(this.type, sessionId)
+  }
+
+  buttonId(workspacePaneId: string, index: number): string {
+    return index <= 0 ? `${workspacePaneId}-${this.type}-tab` : `${workspacePaneId}-${this.type}-tab-${index}`
+  }
+
+  tabEntry(sessionId: string): Extract<WorkspacePaneTabEntry, { type: TType }> {
+    return workspacePaneRuntimeTabEntry(this.type, sessionId) as Extract<WorkspacePaneTabEntry, { type: TType }>
+  }
+
+  abstract label(input: WorkspacePaneRuntimeTabMetadataInput<TType>): string
+  abstract tooltip(input: WorkspacePaneRuntimeTabMetadataInput<TType>): string
+  abstract closeLabel(input: WorkspacePaneRuntimeTabMetadataInput<TType>): string
+  abstract pendingLabel(input: WorkspacePanePendingTabMetadataInput): string
+
+  attention(_input: WorkspacePaneRuntimeTabAttentionInput<TType>): WorkspacePaneRuntimeTabAttention {
+    return { attention: false }
+  }
+}
+
 class StatusWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'status'> {
   readonly refreshOnOpen = true
 
@@ -206,26 +257,22 @@ class FilesWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'file
   }
 }
 
-export class TerminalWorkspacePaneTabProvider extends WorkspacePaneTabProvider<'terminal'> {
-  readonly kind = 'runtime' as const
+export class TerminalWorkspacePaneTabProvider extends WorkspacePaneRuntimeTabProvider<'terminal'> {
   readonly refreshOnOpen = false
 
   constructor() {
     super({ type: 'terminal', icon: Terminal })
   }
 
-  tabEntry(terminalSessionId: string): Extract<WorkspacePaneTabEntry, { type: 'terminal' }> {
-    return workspacePaneTerminalTabEntry(terminalSessionId)
-  }
-
-  buttonId(workspacePaneId: string, index: number): string {
+  override buttonId(workspacePaneId: string, index: number): string {
     return index <= 0 ? `${workspacePaneId}-workspace-pane-tab` : `${workspacePaneId}-workspace-pane-tab-${index}`
   }
 
   override isRenderable(context: WorkspacePaneTabAvailabilityContext): boolean {
     if (!this.canOpen(context)) return false
-    if (context.terminalProjectionPhase !== 'ready' || context.terminalCreatePending) return true
-    return (context.terminalSessionCount ?? 0) > 0
+    const availability = runtimeTabAvailability(context, this.type)
+    if (availability.projectionPhase !== 'ready' || availability.createPending) return true
+    return availability.sessionCount > 0
   }
 
   label(input: WorkspacePaneRuntimeTabMetadataInput): string {
@@ -250,17 +297,22 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneTabProvider<'
 
   pendingLabel(input: WorkspacePanePendingTabMetadataInput): string {
     const pendingLabelKey =
-      input.terminalProjectionPhase === 'failed'
+      input.projectionPhase === 'failed'
         ? 'terminal.load-failed'
-        : input.terminalCreatePending || input.terminalProjectionPhase === 'ready'
+        : input.createPending || input.projectionPhase === 'ready'
           ? 'terminal.opening'
           : 'terminal.loading'
     return input.t(pendingLabelKey)
   }
 
+  override attention(input: WorkspacePaneRuntimeTabAttentionInput<'terminal'>): WorkspacePaneRuntimeTabAttention {
+    if (input.view.hasBell) return { attention: true, attentionLabelKey: 'terminal.bell-unread' }
+    return { attention: false }
+  }
+
   async close(input: WorkspacePaneTabCloseInput): Promise<boolean> {
-    if (!input.terminalSessionId || !input.terminalBase || !input.closeTerminalByDescriptor) return false
-    return await input.closeTerminalByDescriptor(input.terminalSessionId, input.terminalBase)
+    if (!input.runtimeSessionId || !input.terminalBase || !input.closeTerminalByDescriptor) return false
+    return await input.closeTerminalByDescriptor(input.runtimeSessionId, input.terminalBase)
   }
 
   override async closeWorktree(input: WorkspacePaneTabCloseInput): Promise<boolean> {
@@ -305,9 +357,16 @@ const STATIC_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE: Record<WorkspacePaneStaticTabT
   files: filesWorkspacePaneTabProvider,
 }
 
+const RUNTIME_WORKSPACE_PANE_TAB_PROVIDERS = [terminalWorkspacePaneTabProvider] as const
+
+const RUNTIME_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE: Record<WorkspacePaneRuntimeTabType, WorkspacePaneRuntimeTabProvider> =
+  {
+    terminal: terminalWorkspacePaneTabProvider,
+  }
+
 export const workspacePaneTabProviders = [
   ...STATIC_WORKSPACE_PANE_TAB_PROVIDERS,
-  terminalWorkspacePaneTabProvider,
+  ...RUNTIME_WORKSPACE_PANE_TAB_PROVIDERS,
 ] as const
 
 export function workspacePaneStaticTabProviders(): readonly WorkspacePaneStaticTabProvider[] {
@@ -318,8 +377,16 @@ export function workspacePaneStaticTabProvider(type: WorkspacePaneStaticTabType)
   return STATIC_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE[type]
 }
 
+export function workspacePaneRuntimeTabProviders(): readonly WorkspacePaneRuntimeTabProvider[] {
+  return RUNTIME_WORKSPACE_PANE_TAB_PROVIDERS
+}
+
+export function workspacePaneRuntimeTabProvider(type: WorkspacePaneRuntimeTabType): WorkspacePaneRuntimeTabProvider {
+  return RUNTIME_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE[type]
+}
+
 export function workspacePaneTabProvider(type: WorkspacePaneTabType): WorkspacePaneTabProvider {
-  if (type === 'terminal') return terminalWorkspacePaneTabProvider
+  if (isWorkspacePaneRuntimeTabType(type)) return workspacePaneRuntimeTabProvider(type)
   return workspacePaneStaticTabProvider(type)
 }
 
@@ -327,4 +394,23 @@ export function isWorkspacePaneStaticTabProvider(
   provider: WorkspacePaneTabProvider,
 ): provider is WorkspacePaneStaticTabProvider {
   return provider.kind === 'static'
+}
+
+export function isWorkspacePaneRuntimeTabProvider(
+  provider: WorkspacePaneTabProvider,
+): provider is WorkspacePaneRuntimeTabProvider {
+  return provider.kind === 'runtime'
+}
+
+function runtimeTabAvailability(
+  context: WorkspacePaneTabAvailabilityContext,
+  type: WorkspacePaneRuntimeTabType,
+): WorkspacePaneRuntimeTabAvailability {
+  const availability = context.runtimeTabAvailabilityByType?.[type]
+  if (availability) return availability
+  return {
+    sessionCount: 0,
+    createPending: false,
+    projectionPhase: 'ready',
+  }
 }

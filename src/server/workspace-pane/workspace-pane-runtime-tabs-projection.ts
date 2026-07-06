@@ -1,37 +1,43 @@
-import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import {
+  isWorkspacePaneRuntimeTabEntry,
+  type WorkspacePaneRuntimeTabType,
   type WorkspacePaneTabEntry,
+  workspacePaneRuntimeTabEntry,
+  workspacePaneRuntimeTabSessionId,
   workspacePaneStaticTabEntry,
   workspacePaneTabEntryIdentity,
-  workspacePaneTerminalTabEntry,
 } from '#/shared/workspace-pane.ts'
 
-export interface TerminalWorkspaceTabsProjectionEntry {
+export interface WorkspacePaneRuntimeTabsProjectionEntry {
   branchName: string
   worktreePath: string | null
   tabs: readonly WorkspacePaneTabEntry[]
 }
 
-export interface TerminalWorkspaceTabsProjectionReplacement {
+export interface WorkspacePaneRuntimeTabsProjectionReplacement {
   branchName: string
   worktreePath: string
   tabs: WorkspacePaneTabEntry[]
 }
 
-export type TerminalWorkspaceTabsProjectionSession = Pick<TerminalSessionSummary, 'terminalSessionId' | 'branch'>
+export interface WorkspacePaneRuntimeTabsProjectionSession {
+  sessionId: string
+  branch: string
+}
 
 const DEFAULT_WORKTREE_TABS: readonly WorkspacePaneTabEntry[] = [workspacePaneStaticTabEntry('status')]
 
-export function projectWorkspaceTerminalTabsForWorktree(input: {
-  entries: readonly TerminalWorkspaceTabsProjectionEntry[]
+export function projectWorkspaceRuntimeTabsForWorktree(input: {
+  runtimeType: WorkspacePaneRuntimeTabType
+  entries: readonly WorkspacePaneRuntimeTabsProjectionEntry[]
   worktreePath: string
-  liveSessions: readonly TerminalWorkspaceTabsProjectionSession[]
-}): TerminalWorkspaceTabsProjectionReplacement[] {
-  const replacements: TerminalWorkspaceTabsProjectionReplacement[] = []
-  const liveTerminalSessionIds = input.liveSessions.map((session) => session.terminalSessionId)
+  liveSessions: readonly WorkspacePaneRuntimeTabsProjectionSession[]
+}): WorkspacePaneRuntimeTabsProjectionReplacement[] {
+  const replacements: WorkspacePaneRuntimeTabsProjectionReplacement[] = []
+  const liveSessionIds = input.liveSessions.map((session) => session.sessionId)
   for (const entry of input.entries) {
     if (entry.worktreePath !== input.worktreePath) continue
-    const nextTabs = workspaceTabsWithoutStaleTerminalEntries(entry.tabs, liveTerminalSessionIds)
+    const nextTabs = workspaceTabsWithoutStaleRuntimeEntries(entry.tabs, input.runtimeType, liveSessionIds)
     if (workspacePaneTabEntryArraysEqual(entry.tabs, nextTabs)) continue
     replacements.push({
       branchName: entry.branchName,
@@ -50,17 +56,21 @@ export function projectWorkspaceTerminalTabsForWorktree(input: {
     replacements.find((replacement) => replacement.branchName === branchName)?.tabs ??
     input.entries.find((entry) => entry.worktreePath === input.worktreePath && entry.branchName === branchName)?.tabs ??
     DEFAULT_WORKTREE_TABS
-  const existingTerminalSessionIds = new Set(
-    currentTabs.flatMap((entry) => (entry.type === 'terminal' ? [entry.terminalSessionId] : [])),
+  const existingSessionIds = new Set(
+    currentTabs.flatMap((entry) =>
+      isWorkspacePaneRuntimeTabEntry(entry) && entry.type === input.runtimeType
+        ? [workspacePaneRuntimeTabSessionId(entry)]
+        : [],
+    ),
   )
-  const missingTerminalSessionIds = input.liveSessions
-    .map((session) => session.terminalSessionId)
-    .filter((terminalSessionId) => !existingTerminalSessionIds.has(terminalSessionId))
-  if (missingTerminalSessionIds.length === 0) return replacements
+  const missingSessionIds = input.liveSessions
+    .map((session) => session.sessionId)
+    .filter((sessionId) => !existingSessionIds.has(sessionId))
+  if (missingSessionIds.length === 0) return replacements
 
   const nextTabs = [
     ...currentTabs,
-    ...missingTerminalSessionIds.map((terminalSessionId) => workspacePaneTerminalTabEntry(terminalSessionId)),
+    ...missingSessionIds.map((sessionId) => workspacePaneRuntimeTabEntry(input.runtimeType, sessionId)),
   ]
   const existingReplacementIndex = replacements.findIndex((replacement) => replacement.branchName === branchName)
   if (existingReplacementIndex === -1) {
@@ -75,17 +85,21 @@ export function projectWorkspaceTerminalTabsForWorktree(input: {
   return replacements
 }
 
-export function workspaceTabsWithoutStaleTerminalEntries(
+export function workspaceTabsWithoutStaleRuntimeEntries(
   tabs: readonly WorkspacePaneTabEntry[],
-  liveTerminalSessionIds: readonly string[],
+  runtimeType: WorkspacePaneRuntimeTabType,
+  liveSessionIds: readonly string[],
 ): WorkspacePaneTabEntry[] {
-  const liveTerminalSessionIdsSet = new Set(
-    liveTerminalSessionIds.filter((terminalSessionId) => terminalSessionId.length > 0),
-  )
+  const liveSessionIdsSet = new Set(liveSessionIds.filter((sessionId) => sessionId.length > 0))
   const seen = new Set<string>()
   const next: WorkspacePaneTabEntry[] = []
   for (const entry of tabs) {
-    if (entry.type === 'terminal' && !liveTerminalSessionIdsSet.has(entry.terminalSessionId)) continue
+    if (
+      isWorkspacePaneRuntimeTabEntry(entry) &&
+      entry.type === runtimeType &&
+      !liveSessionIdsSet.has(workspacePaneRuntimeTabSessionId(entry))
+    )
+      continue
     const identity = workspacePaneTabEntryIdentity(entry)
     if (seen.has(identity)) continue
     seen.add(identity)

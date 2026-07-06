@@ -10,24 +10,26 @@ import type {
   TerminalCreateInput,
   TerminalExitEvent,
   TerminalListSessionsInput,
-  TerminalListWorkspaceTabsInput,
   TerminalMutationResult,
   TerminalNotifyBellInput,
   TerminalOutputEvent,
   TerminalResizeInput,
-  TerminalReplaceWorkspaceTabsInput,
   TerminalRestartInput,
   TerminalSessionSummary,
   TerminalSessionInput,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalTestNotificationInput,
-  TerminalUpdateWorkspaceTabsInput,
-  WorkspacePaneTabsEntry,
   TerminalTitleEvent,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import type {
+  WorkspacePaneTabsEntry,
+  WorkspacePaneTabsListInput,
+  WorkspacePaneTabsReplaceInput,
+  WorkspacePaneTabsUpdateInput,
+} from '#/shared/workspace-pane-tabs.ts'
 import type { TerminalIdentityRealtimeEvent, TerminalLifecycleRealtimeEvent } from '#/web/components/terminal/types.ts'
 
 export interface ClientTerminal {
@@ -38,11 +40,11 @@ export interface ClientTerminal {
   takeover: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>
   close: (input: TerminalSessionInput) => Promise<TerminalMutationResult>
   create: (input: TerminalCreateInput) => Promise<TerminalCreateResult>
-  replaceWorkspaceTabs: (input: TerminalReplaceWorkspaceTabsInput) => Promise<WorkspacePaneTabEntry[]>
-  updateWorkspaceTabs: (input: TerminalUpdateWorkspaceTabsInput) => Promise<WorkspacePaneTabEntry[]>
+  replaceWorkspaceTabs: (input: WorkspacePaneTabsReplaceInput) => Promise<WorkspacePaneTabEntry[]>
+  updateWorkspaceTabs: (input: WorkspacePaneTabsUpdateInput) => Promise<WorkspacePaneTabEntry[]>
   pruneTerminals: (repoRoot: string, repoInstanceId: string) => Promise<{ pruned: number; remaining: number }>
   listSessions: (input: TerminalListSessionsInput) => Promise<TerminalSessionSummary[]>
-  listWorkspaceTabs: (input: TerminalListWorkspaceTabsInput) => Promise<WorkspacePaneTabsEntry[]>
+  listWorkspaceTabs: (input: WorkspacePaneTabsListInput) => Promise<WorkspacePaneTabsEntry[]>
   /**
    * Open the underlying WebSocket (if not already open) and resolve
    * once it reaches the OPEN state. Used as a T1.2 prewarm when the
@@ -94,6 +96,13 @@ export interface ClientTerminal {
   ) => () => void
 }
 
+export interface ClientWorkspacePaneTabs {
+  list: (input: WorkspacePaneTabsListInput) => Promise<WorkspacePaneTabsEntry[]>
+  replace: (input: WorkspacePaneTabsReplaceInput) => Promise<WorkspacePaneTabEntry[]>
+  update: (input: WorkspacePaneTabsUpdateInput) => Promise<WorkspacePaneTabEntry[]>
+  onChanged: (cb: (repoRoot: string) => void) => () => void
+}
+
 export interface ClientHostBridge {
   openSettingsWindow: (input?: { page?: SettingsPage }) => Promise<boolean>
   openExternalUrl: (input: { url: string; allowHttp?: boolean }) => Promise<ExecResult>
@@ -131,4 +140,5 @@ export interface ClientBridge {
   rotateAccessToken?(): Promise<{ accessToken: string }>
   host(): ClientHostBridge | null
   terminal(): ClientTerminal
+  workspacePaneTabs(): ClientWorkspacePaneTabs
 }

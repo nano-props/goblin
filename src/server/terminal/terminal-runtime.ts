@@ -15,9 +15,11 @@ import { normalizeTerminalClientMessage } from '#/shared/terminal-validators.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { createTerminalSessionService } from '#/server/terminal/terminal-session-service.ts'
 import { createWorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
-import type { TerminalRealtimeBroker, TerminalRealtimeSocket } from '#/server/terminal/terminal-realtime-broker.ts'
+import type { RealtimeBroker, RealtimeSocket } from '#/server/realtime/realtime-broker.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { createTerminalRuntimeCoordinator } from '#/server/terminal/terminal-runtime-coordinator.ts'
+import { createWorkspacePaneTabsActions } from '#/server/workspace-pane/workspace-pane-tabs-actions.ts'
+import { broadcastWorkspacePaneTabsChanged } from '#/server/workspace-pane/workspace-pane-tabs-realtime.ts'
 import {
   createTerminalRealtimeHandlers,
   handleTerminalRealtimeRequestMessage,
@@ -29,6 +31,7 @@ import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import type { TerminalRealtimeMessage } from '#/shared/terminal-socket.ts'
 import { isCurrentRepoRuntimeInstance, onRepoRuntimeInstanceClosed } from '#/server/modules/repo-runtime-instances.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 
@@ -61,7 +64,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   // live output event reaches a sibling tab (different `clientId`,
   // same `userId`) without an extra attach roundtrip. See
   // `identity.ts` for the model.
-  let broker: TerminalRealtimeBroker
+  let broker: RealtimeBroker<TerminalRealtimeMessage>
   let sessionService: ReturnType<typeof createTerminalSessionService>
   const manager = new TerminalSessionManager<string>(
     ptySupervisor,
@@ -114,18 +117,24 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   const unsubscribeRepoRuntimeInstanceClosed = onRepoRuntimeInstanceClosed((event) => {
     const scope = terminalSessionRuntimeScope(event.repoRoot, event.repoInstanceId)
     manager.closeSessionsForRepo(event.userId, scope)
-    workspaceTabs.closeSessionsForScope(event.userId, scope)
+    workspaceTabs.closeTabsForScope(event.userId, scope)
     broadcastRepoSessionsChanged(event.userId, event.repoRoot)
     broadcastRepoWorkspaceTabsChanged(event.userId, event.repoRoot)
   })
 
-  const bufferedSocketByRawSocket = new WeakMap<TerminalRealtimeSocket, BufferedTerminalSocket>()
+  const bufferedSocketByRawSocket = new WeakMap<RealtimeSocket, BufferedTerminalSocket>()
   let shuttingDown = false
   const actions = createTerminalRuntimeActions({
     manager,
     broker,
     sessionService,
     isValidTerminalClientId,
+  })
+  const workspacePaneTabsActions = createWorkspacePaneTabsActions({
+    sessionService,
+    isValidClientId: isValidTerminalClientId,
+    isCurrentRepoInstance: isCurrentRepoRuntimeInstance,
+    broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
   })
 
   const host: ServerTerminalHost = {
@@ -153,7 +162,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         socket.close(1008, 'invalid client id')
         return
       }
-      const rawSocket = socket as TerminalRealtimeSocket
+      const rawSocket = socket as RealtimeSocket
       let buffered: BufferedTerminalSocket
       buffered = new BufferedTerminalSocket(rawSocket, () => {
         broker.unregisterSocket(buffered)
@@ -164,10 +173,10 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     },
     unregisterSocket(_clientId, _userId, socket) {
       const buffered =
-        bufferedSocketByRawSocket.get(socket as TerminalRealtimeSocket) ?? (socket as TerminalRealtimeSocket)
+        bufferedSocketByRawSocket.get(socket as RealtimeSocket) ?? (socket as RealtimeSocket)
       if (buffered instanceof BufferedTerminalSocket) buffered.deactivate()
       broker.unregisterSocket(buffered)
-      bufferedSocketByRawSocket.delete(socket as TerminalRealtimeSocket)
+      bufferedSocketByRawSocket.delete(socket as RealtimeSocket)
     },
     async attach(clientId, userId, input) {
       return await actions.attach(clientId, userId, input)
@@ -191,16 +200,16 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       return await actions.listSessions(clientId, userId, input)
     },
     async listWorkspaceTabs(clientId, userId, input) {
-      return await actions.listWorkspaceTabs(clientId, userId, input)
+      return await workspacePaneTabsActions.listWorkspaceTabs(clientId, userId, input)
     },
     async create(clientId, userId, input) {
       return await actions.create(clientId, userId, input)
     },
     async replaceTabs(clientId, userId, input) {
-      return await actions.replaceTabs(clientId, userId, input)
+      return await workspacePaneTabsActions.replaceTabs(clientId, userId, input)
     },
     async updateTabs(clientId, userId, input) {
-      return await actions.updateTabs(clientId, userId, input)
+      return await workspacePaneTabsActions.updateTabs(clientId, userId, input)
     },
     async prune(clientId, userId, input) {
       return await actions.prune(clientId, userId, input)
@@ -240,7 +249,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       }
       if (message.type === 'ping') {
         broker.recordHeartbeat(userId, clientId)
-        const rawSocket = socket as TerminalRealtimeSocket
+        const rawSocket = socket as RealtimeSocket
         try {
           rawSocket.send(JSON.stringify({ type: 'pong', requestId: message.requestId }))
         } catch {
@@ -248,13 +257,13 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         }
         return
       }
-      const bufferedSocket = bufferedSocketByRawSocket.get(socket as TerminalRealtimeSocket)
+      const bufferedSocket = bufferedSocketByRawSocket.get(socket as RealtimeSocket)
       if (shouldPauseRealtimeRequest(message.action)) bufferedSocket?.pause()
       void handleTerminalRealtimeRequestMessage(
         realtimeHandlers,
         clientId,
         userId,
-        socket as TerminalRealtimeSocket,
+        socket as RealtimeSocket,
         bufferedSocket,
         message,
       )
@@ -285,7 +294,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   }
 
   function broadcastRepoWorkspaceTabsChanged(userId: string, repoRoot: string): void {
-    broker.broadcastToUser(userId, { type: 'workspace-tabs-changed', repoRoot })
+    broadcastWorkspacePaneTabsChanged(broker, userId, repoRoot)
   }
 
   function handleSessionClosed(userId: string, session: TerminalSessionSummary): void {

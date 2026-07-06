@@ -1,6 +1,3 @@
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
-import { isShellProcessName } from '#/shared/terminal-process-name.ts'
-import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useTerminalActionDialogsStore } from '#/web/stores/repos/terminal-action-dialogs.ts'
@@ -11,18 +8,37 @@ import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import {
   adjacentRepoWorkspaceTab,
+  isRepoWorkspaceRuntimeTab,
   nextRepoWorkspaceTabAfterClose,
   type RepoWorkspaceTab,
   type RepoWorkspaceTabModel,
 } from '#/web/components/repo-workspace/tab-model.ts'
-import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import {
   isWorkspacePaneStaticTabProvider,
-  terminalWorkspacePaneTabProvider,
   workspacePaneTabProvider,
 } from '#/web/components/workspace-pane/tab-providers.ts'
+import { selectWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-actions.ts'
+import { readWorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-action-context.ts'
+import {
+  confirmWorkspacePaneRuntimeTabClose,
+  workspacePaneRuntimeTabCloseConfirmRequest,
+  type WorkspacePaneRuntimeTabCloseConfirmRequest,
+  workspacePaneRuntimeTabConfirmedCloseBranchName,
+  workspacePaneRuntimeTabConfirmedCloseIdentity,
+  type ConfirmedWorkspacePaneRuntimeTabClose,
+} from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
+import {
+  canConfirmWorkspacePaneRuntimeTabCloseWithContext,
+  readWorkspacePaneRuntimeTabCloseContext,
+} from '#/web/workspace-pane/workspace-pane-runtime-tab-close-context.ts'
+import {
+  runWorkspacePaneRuntimeNewAction,
+  runWorkspacePaneRuntimePrimaryAction,
+} from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
+import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
 import { beginWorkspacePaneTabClose } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
+import { terminalBaseForWorkspacePaneTarget } from '#/web/workspace-pane/workspace-pane-terminal-target.ts'
 import {
   resolveWorkspacePaneTabTargetForBranch,
   workspacePaneTabTargetForBranch,
@@ -32,7 +48,6 @@ import {
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
-  captureWorkspacePaneActiveTabIdentity,
   clearWorkspacePaneTabOpener,
   workspacePaneTabOpener,
 } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
@@ -67,6 +82,7 @@ interface WorkspacePaneTabCommandTargetOptions {
 
 interface CloseWorkspacePaneTabCommandOptions extends WorkspacePaneTabCommandTargetOptions {
   skipTerminalCloseConfirm?: boolean
+  skipRuntimeCloseConfirm?: boolean
 }
 
 interface ConfirmedTerminalClose {
@@ -139,45 +155,17 @@ export async function runTerminalPrimaryActionCommand({
   t,
 }: TerminalPrimaryActionCommandOptions): Promise<boolean> {
   if (!repoId || !branchName) return false
-  const openerIdentity = captureWorkspacePaneActiveTabIdentity(repoId, branchName)
-  const enterTerminalTab = enterTerminalWorkspacePaneTab(repoId, branchName, navigation)
-  const base = selectedTerminalBase(repoId, branchName)
-  if (!base) {
-    await enterTerminalTab()
-    return true
-  }
-  const bridge = readTerminalSessionCommandBridge()
-  if (!bridge) {
-    await enterTerminalTab()
-    return true
-  }
-  const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
-  // Synchronous local-state read (no network round trip), so there's no
-  // responsiveness cost to deciding *before* switching views — switching is
-  // handled per-branch below instead of eagerly up front.
-  const worktree = bridge.terminalWorktreeSnapshot(terminalWorktreeKey)
-  if (worktree.count > 0) {
-    // The user expects "click the Terminal menu" to land them on a working
-    // terminal session: focus the first existing session instead of leaving
-    // the selection on whatever the user had open before.
-    await enterTerminalTab()
-    const firstSession = worktree.sessions[0]
-    if (firstSession) bridge.selectTerminal(terminalWorktreeKey, firstSession.terminalSessionId)
-    return true
-  }
-  // "Click the Terminal menu" is a generic entry — the new terminal should
-  // append to the end of the strip rather than being anchored to whatever
-  // tab happens to be active.
-  const result = await runCreateTerminalTabCommand({
-    base,
-    createTerminal: bridge.createTerminal,
-    createOwnedTerminal: bridge.createOwnedTerminal,
-    openerIdentity,
-    enterTerminalTab,
-    t,
-    logMessage: 'terminal primary action create failed',
-  })
-  return result.ok
+  return await runWorkspacePaneRuntimePrimaryAction(
+    'terminal',
+    workspacePaneRuntimeTabCommandContext({
+      repoId,
+      branchName,
+      enterRuntimeTab: async (type) => {
+        await runShowWorkspacePaneTabCommand({ repoId, branchName, tab: type, navigation })
+      },
+      terminalCreateTranslator: t,
+    }),
+  )
 }
 
 export async function runNewTerminalTabCommand({
@@ -187,24 +175,17 @@ export async function runNewTerminalTabCommand({
   t,
 }: NewTerminalTabCommandOptions): Promise<boolean> {
   if (!repoId || !branchName) return false
-  const base = selectedTerminalBase(repoId, branchName)
-  if (!base) return false
-  const openerIdentity = captureWorkspacePaneActiveTabIdentity(repoId, branchName)
-  const enterTerminalTab = enterTerminalWorkspacePaneTab(repoId, branchName, navigation)
-  const bridge = readTerminalSessionCommandBridge()
-  if (!bridge) {
-    await enterTerminalTab()
-    return true
-  }
-  const result = await runCreateTerminalTabCommand({
-    base,
-    createTerminal: bridge.createTerminal,
-    createOwnedTerminal: bridge.createOwnedTerminal,
-    openerIdentity,
-    enterTerminalTab,
-    t,
-  })
-  return result.ok
+  return await runWorkspacePaneRuntimeNewAction(
+    'terminal',
+    workspacePaneRuntimeTabCommandContext({
+      repoId,
+      branchName,
+      enterRuntimeTab: async (type) => {
+        await runShowWorkspacePaneTabCommand({ repoId, branchName, tab: type, navigation })
+      },
+      terminalCreateTranslator: t,
+    }),
+  )
 }
 
 export async function runCloseWorkspacePaneTabCommand(options: CloseWorkspacePaneTabCommandOptions): Promise<boolean> {
@@ -218,22 +199,23 @@ export async function runConfirmCloseTerminalWorkspacePaneTabCommand(
 }
 
 async function closeWorkspacePaneTabCommand(options: CloseWorkspacePaneTabCommandOptions): Promise<boolean> {
-  const { repoId, navigation, targetIdentity, skipTerminalCloseConfirm } = options
+  const { repoId, navigation, targetIdentity } = options
+  const skipRuntimeCloseConfirm = options.skipRuntimeCloseConfirm ?? options.skipTerminalCloseConfirm ?? false
   const target = repoId && options.branchName ? workspacePaneTabTargetForBranch(repoId, options.branchName) : null
   if (!target) return false
   const tab = targetIdentity
     ? (target?.tabs.find((candidate) => candidate.identity === targetIdentity) ?? null)
     : (target?.activeTab ?? null)
   if (!tab) return false
-  if (!skipTerminalCloseConfirm && tab.kind === 'terminal' && shouldConfirmTerminalClose(tab) && target.terminalBase) {
-    useTerminalActionDialogsStore.getState().openCloseConfirm({
-      repoId: target.repoId,
-      targetIdentity: tab.identity,
-      terminalSessionId: tab.terminalSessionId,
-      terminalBase: target.terminalBase,
-      processName: tab.view.processName?.trim() || 'terminal',
+  if (!skipRuntimeCloseConfirm && isRepoWorkspaceRuntimeTab(tab)) {
+    const closeConfirm = workspacePaneRuntimeTabCloseConfirmRequest({
+      type: tab.runtimeType,
+      identity: tab.identity,
+      sessionId: tab.sessionId,
+      view: tab.view,
+      terminalBase: terminalBaseForWorkspacePaneTarget(target),
     })
-    return true
+    if (openWorkspacePaneRuntimeCloseConfirm(target.repoId, closeConfirm)) return true
   }
 
   const closingIdentity = tab.identity
@@ -269,39 +251,57 @@ function preferredWorkspacePaneTab(repoId: string, branchName: string): Workspac
 
 function closeConfirmedTerminalWorkspacePaneTab(options: ConfirmCloseTerminalWorkspacePaneTabCommandOptions): boolean {
   const { repoId, navigation, targetIdentity, confirmedTerminal } = options
+  const confirmed: ConfirmedWorkspacePaneRuntimeTabClose = {
+    type: 'terminal',
+    sessionId: confirmedTerminal.terminalSessionId,
+    terminalBase: confirmedTerminal.base,
+  }
+  const confirmedBranchName = workspacePaneRuntimeTabConfirmedCloseBranchName(confirmed)
+  if (!confirmedBranchName) return false
   const target = repoId && options.branchName ? workspacePaneTabTargetForBranch(repoId, options.branchName) : null
   const tab = targetIdentity ? (target?.tabs.find((candidate) => candidate.identity === targetIdentity) ?? null) : null
   const wasActive = !!target && !!tab && target.activeTab?.identity === tab.identity
-  // Read the opener scoped by the terminal's actual branch (from the
-  // confirmed-close payload), not `target.branchName` — the current route
+  // Read the opener scoped by the runtime tab's actual branch from the
+  // confirmed-close payload, not `target.branchName` — the current route
   // branch may have changed since the confirm dialog was opened.
   const openerIdentity =
     wasActive && target && tab
-      ? workspacePaneTabOpener(target.repoId, confirmedTerminal.base.branch, tab.identity)
+      ? workspacePaneTabOpener(target.repoId, confirmedBranchName, tab.identity)
       : null
   const nextTab =
     wasActive && target && tab ? nextRepoWorkspaceTabAfterClose(target.tabs, tab.identity, openerIdentity) : null
-  const closeTerminalByDescriptor = readTerminalSessionCommandBridge()?.closeTerminalByDescriptor
-  if (!closeTerminalByDescriptor) return false
+  const closeContext = readWorkspacePaneRuntimeTabCloseContext()
+  if (!canConfirmWorkspacePaneRuntimeTabCloseWithContext(confirmed, closeContext)) return false
   observeWorkspacePaneTabClose(
-    closeTerminalByDescriptor(confirmedTerminal.terminalSessionId, confirmedTerminal.base),
+    confirmWorkspacePaneRuntimeTabClose(confirmed, closeContext),
     repoId,
-    // The confirmed-close base carries the branch the terminal actually
+    // The confirmed-close payload carries the branch the runtime tab actually
     // belongs to — more reliable than `target.branchName`, which reflects
-    // whatever branch is *currently* selected and may have changed since
+    // whatever branch is currently selected and may have changed since
     // the confirm dialog was opened.
-    confirmedTerminal.base.branch,
-    targetIdentity ?? terminalWorkspacePaneTabProvider.identity(confirmedTerminal.terminalSessionId),
+    confirmedBranchName,
+    targetIdentity ?? workspacePaneRuntimeTabConfirmedCloseIdentity(confirmed),
   )
   if (target && nextTab) showWorkspacePaneCommandTab(target, nextTab, navigation)
   return true
 }
 
-function shouldConfirmTerminalClose(tab: Extract<RepoWorkspaceTab, { kind: 'terminal' }>): boolean {
-  if (tab.view.phase !== 'open') return false
-  const processName = tab.view.processName?.trim()
-  if (!processName) return false
-  return !isShellProcessName(processName)
+function openWorkspacePaneRuntimeCloseConfirm(
+  repoId: string,
+  request: WorkspacePaneRuntimeTabCloseConfirmRequest | null,
+): boolean {
+  if (!request) return false
+  if (request.type === 'terminal' && request.terminalBase && request.processName) {
+    useTerminalActionDialogsStore.getState().openCloseConfirm({
+      repoId,
+      targetIdentity: request.identity,
+      terminalSessionId: request.sessionId,
+      terminalBase: request.terminalBase,
+      processName: request.processName,
+    })
+    return true
+  }
+  return false
 }
 
 export async function runCloseWorkspacePaneTabOrWindowCommand({
@@ -347,28 +347,6 @@ export function runMoveWorkspacePaneTabCommand({
   return true
 }
 
-function selectedTerminalBase(repoId: string, branchName: string): TerminalSessionBase | null {
-  const repo = useReposStore.getState().repos[repoId]
-  const target = selectedRepoWorkspaceTarget(repoId, branchName)
-  if (!repo || !target?.worktreePath) return null
-  return {
-    repoRoot: repoId,
-    repoInstanceId: repo.instanceId,
-    branch: target.branchName,
-    worktreePath: target.worktreePath,
-  }
-}
-
-function enterTerminalWorkspacePaneTab(
-  repoId: string,
-  branchName: string,
-  navigation: PrimaryWindowNavigationActions,
-): () => Promise<void> {
-  return async () => {
-    await runShowWorkspacePaneTabCommand({ repoId, branchName, tab: 'terminal', navigation })
-  }
-}
-
 function selectedRepoWorkspaceTarget(
   repoId: string,
   branchName: string,
@@ -384,11 +362,18 @@ function showWorkspacePaneCommandTab(
   tab: RepoWorkspaceTab,
   navigation: PrimaryWindowNavigationActions,
 ): void {
-  if (!target.branchName) return
-  navigation.showRepoBranchWorkspacePaneTab(target.repoId, target.branchName, tab.type)
-  if (tab.kind === 'terminal' && target.terminalWorktreeKey) {
-    readTerminalSessionCommandBridge()?.selectTerminal(target.terminalWorktreeKey, tab.terminalSessionId)
+  const branchName = target.branchName
+  if (!branchName) return
+  if (isRepoWorkspaceRuntimeTab(tab)) {
+    selectWorkspacePaneRuntimeTab(
+      tab.view,
+      readWorkspacePaneRuntimeTabActionContext({
+        enterRuntimeTab: (type) => navigation.showRepoBranchWorkspacePaneTab(target.repoId, branchName, type),
+      }),
+    )
+    return
   }
+  navigation.showRepoBranchWorkspacePaneTab(target.repoId, branchName, tab.type)
 }
 
 function observeWorkspacePaneTabClose(
@@ -425,6 +410,6 @@ function resolveCloseWorkspaceSurfaceIntent(options: CloseWorkspacePaneTabComman
       : { kind: 'noop' }
   }
   if (target.activeTab) return { kind: 'close-tab' }
-  if (target.selection?.kind === 'terminal-host') return { kind: 'noop' }
+  if (target.selection?.kind === 'runtime-host') return { kind: 'noop' }
   return { kind: 'close-window' }
 }

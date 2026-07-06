@@ -46,9 +46,9 @@ import type {
   TerminalOutputEvent,
   TerminalSessionSummary,
   TerminalTitleEvent,
-  WorkspacePaneTabsEntry,
 } from '#/shared/terminal-types.ts'
-import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
+import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import {
   readWorkspacePaneTabsForTarget,
@@ -319,7 +319,7 @@ function completeServerSessions(sessions: TestTerminalSessionSummary[]): Termina
 }
 
 function workspaceTabsWithTerminal(terminalSessionId: string) {
-  return [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry(terminalSessionId)]
+  return [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)]
 }
 
 function tabsFor(repoRoot: string, branchName: string): WorkspacePaneTabEntry[] {
@@ -696,6 +696,17 @@ beforeEach(() => {
           }
         },
       ),
+    }),
+    workspacePaneTabs: () => ({
+      replace: vi.fn(async (input) => input.tabs),
+      update: vi.fn(async () => []),
+      list: async (input) => await listWorkspaceTabsMock(input),
+      onChanged: vi.fn((cb: (repoRoot: string) => void) => {
+        workspaceTabsChangedHandler = cb
+        return () => {
+          if (workspaceTabsChangedHandler === cb) workspaceTabsChangedHandler = null
+        }
+      }),
     }),
   })
 })
@@ -1170,7 +1181,7 @@ describe('TerminalSessionProvider', () => {
       workspacePaneTabsByBranch: {
         'feature/worktree': [
           workspacePaneStaticTabEntry('status'),
-          workspacePaneTerminalTabEntry('session-1'),
+          workspacePaneRuntimeTabEntry('terminal', 'session-1'),
           workspacePaneStaticTabEntry('history'),
         ],
       },
@@ -1182,7 +1193,7 @@ describe('TerminalSessionProvider', () => {
       worktreePath: WORKTREE_PATH,
       tabs: [
         workspacePaneStaticTabEntry('status'),
-        workspacePaneTerminalTabEntry('session-1'),
+        workspacePaneRuntimeTabEntry('terminal', 'session-1'),
         workspacePaneStaticTabEntry('history'),
       ],
     })
@@ -1216,7 +1227,7 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
-  test('refreshes workspace tabs query from workspace-tabs-changed broadcasts', async () => {
+  test('refreshes workspace tabs query from workspace pane tab broadcasts', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1931,6 +1942,12 @@ describe('TerminalSessionProvider', () => {
         onWorkspaceTabsChanged: () => () => {},
         onSessionClosed: () => () => {},
       }),
+      workspacePaneTabs: () => ({
+        replace: vi.fn(async (input) => input.tabs),
+        update: vi.fn(async () => []),
+        list: vi.fn(async () => []),
+        onChanged: () => () => {},
+      }),
     })
 
     const result = renderTerminalProvider(<span>probe</span>, { currentRepoId: null })
@@ -2034,6 +2051,12 @@ describe('TerminalSessionProvider', () => {
         onSessionsChanged: () => () => {},
         onWorkspaceTabsChanged: () => () => {},
         onSessionClosed: () => () => {},
+      }),
+      workspacePaneTabs: () => ({
+        replace: vi.fn(async (input) => input.tabs),
+        update: vi.fn(async () => []),
+        list: vi.fn(async () => []),
+        onChanged: () => () => {},
       }),
     })
 

@@ -5,6 +5,10 @@ import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { installWebSocketMock, type WebSocketMockHandle } from '#/web/test-utils/websocket-mock.ts'
 import { installHostBootstrap } from '#/web/test-utils/host-bootstrap.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
+import {
+  WORKSPACE_PANE_TABS_REALTIME_EVENTS,
+  WORKSPACE_PANE_TABS_SOCKET_ACTIONS,
+} from '#/shared/workspace-pane-tabs.ts'
 let wsMock: WebSocketMockHandle
 const REPO_INSTANCE_ID = 'repo-instance-test'
 describe('terminal web host client', () => {
@@ -267,6 +271,39 @@ describe('terminal web host client', () => {
     await expect(listPromise).rejects.toThrow('Invalid terminal socket response payload')
     expect(fetchMock).not.toHaveBeenCalled()
     dispose()
+  })
+
+  test('loads workspace pane tabs through namespaced websocket actions', async () => {
+    const fetchMock = mockFetch()
+    const { workspacePaneTabsClient } = await import('#/web/workspace-pane/workspace-pane-tabs-client.ts')
+
+    const listPromise = workspacePaneTabsClient.list({ repoRoot: '/tmp/repo', repoInstanceId: REPO_INSTANCE_ID })
+    const socket = wsMock.instances[0]
+    socket?.emitOpen()
+    await Promise.resolve()
+    const request = socket?.sent
+      .map((payload) => JSON.parse(payload))
+      .find((message) => message.action === WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list)
+    expect(request).toMatchObject({
+      type: 'request',
+      action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+      input: {
+        repoRoot: '/tmp/repo',
+        repoInstanceId: REPO_INSTANCE_ID,
+      },
+    })
+    socket?.emitMessage(
+      JSON.stringify({
+        type: 'response',
+        requestId: request?.requestId,
+        ok: true,
+        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+        payload: [],
+      }),
+    )
+
+    await expect(listPromise).resolves.toEqual([])
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   test('opens a fresh socket for a request when the tracked socket is already closed', async () => {
@@ -770,7 +807,7 @@ describe('terminal web host client', () => {
     )
     socket.emitMessage(
       JSON.stringify({
-        type: 'workspace-tabs-changed',
+        type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
         repoRoot: '/tmp/repo',
       }),
     )

@@ -7,12 +7,23 @@ import {
   workspacePaneTabScope,
   type WorkspacePaneRenderabilityContext,
 } from '#/web/lib/workspace-pane-tab.ts'
+import type { WorkspacePaneRuntimeTabAvailability } from '#/web/components/workspace-pane/tab-providers.ts'
+
+function terminalAvailability(
+  overrides: Partial<WorkspacePaneRuntimeTabAvailability> = {},
+): WorkspacePaneRuntimeTabAvailability {
+  return {
+    sessionCount: 0,
+    createPending: false,
+    projectionPhase: 'ready',
+    ...overrides,
+  }
+}
 
 function ctx(overrides: Partial<WorkspacePaneRenderabilityContext> = {}): WorkspacePaneRenderabilityContext {
   return {
     hasWorktree: true,
-    terminalSessionCount: 0,
-    terminalProjectionPhase: 'ready',
+    runtimeTabAvailabilityByType: { terminal: terminalAvailability() },
     ...overrides,
   }
 }
@@ -26,52 +37,130 @@ describe('resolveRenderableWorkspacePaneTab', () => {
 
   test('keeps a changes preference even when the worktree is clean', () => {
     expect(resolveRenderableWorkspacePaneTab('changes', ctx())).toBe('changes')
-    expect(resolveRenderableWorkspacePaneTab('changes', ctx({ terminalSessionCount: 7 }))).toBe('changes')
+    expect(
+      resolveRenderableWorkspacePaneTab('changes', ctx({ runtimeTabAvailabilityByType: { terminal: terminalAvailability({ sessionCount: 7 }) } })),
+    ).toBe('changes')
   })
 
   test('returns null for worktree-scoped preferences when no worktree exists', () => {
     expect(resolveRenderableWorkspacePaneTab('changes', ctx({ hasWorktree: false }))).toBeNull()
     expect(resolveRenderableWorkspacePaneTab('terminal', ctx({ hasWorktree: false }))).toBeNull()
     expect(
-      resolveRenderableWorkspacePaneTab('terminal', ctx({ hasWorktree: false, terminalSessionCount: 5 })),
+      resolveRenderableWorkspacePaneTab(
+        'terminal',
+        ctx({
+          hasWorktree: false,
+          runtimeTabAvailabilityByType: { terminal: terminalAvailability({ sessionCount: 5 }) },
+        }),
+      ),
     ).toBeNull()
     expect(resolveRenderableWorkspacePaneTab('history', ctx({ hasWorktree: false }))).toBe('history')
   })
 
   test('preserves the terminal preference while sync is unresolved', () => {
-    expect(resolveRenderableWorkspacePaneTab('terminal', ctx({ terminalProjectionPhase: 'pending' }))).toBe('terminal')
+    expect(
+      resolveRenderableWorkspacePaneTab(
+        'terminal',
+        ctx({ runtimeTabAvailabilityByType: { terminal: terminalAvailability({ projectionPhase: 'pending' }) } }),
+      ),
+    ).toBe('terminal')
   })
 
   test('preserves the terminal preference while terminal creation is pending', () => {
-    expect(resolveRenderableWorkspacePaneTab('terminal', ctx({ terminalCreatePending: true }))).toBe('terminal')
+    expect(
+      resolveRenderableWorkspacePaneTab(
+        'terminal',
+        ctx({ runtimeTabAvailabilityByType: { terminal: terminalAvailability({ createPending: true }) } }),
+      ),
+    ).toBe('terminal')
   })
 
   test('keeps the terminal preference when the active worktree has at least one session', () => {
-    expect(resolveRenderableWorkspacePaneTab('terminal', ctx({ terminalSessionCount: 1 }))).toBe('terminal')
-    expect(resolveRenderableWorkspacePaneTab('terminal', ctx({ terminalSessionCount: 7 }))).toBe('terminal')
+    expect(
+      resolveRenderableWorkspacePaneTab(
+        'terminal',
+        ctx({ runtimeTabAvailabilityByType: { terminal: terminalAvailability({ sessionCount: 1 }) } }),
+      ),
+    ).toBe('terminal')
+    expect(
+      resolveRenderableWorkspacePaneTab(
+        'terminal',
+        ctx({ runtimeTabAvailabilityByType: { terminal: terminalAvailability({ sessionCount: 7 }) } }),
+      ),
+    ).toBe('terminal')
+  })
+
+  test('uses runtime availability when it is provided', () => {
+    expect(
+      resolveRenderableWorkspacePaneTab(
+        'terminal',
+        ctx({
+          runtimeTabAvailabilityByType: {
+            terminal: {
+              sessionCount: 1,
+              createPending: false,
+              projectionPhase: 'ready',
+            },
+          },
+        }),
+      ),
+    ).toBe('terminal')
   })
 
   test('returns null for terminal after sync confirms the worktree has no terminal sessions', () => {
-    expect(resolveRenderableWorkspacePaneTab('terminal', ctx({ terminalSessionCount: 0 }))).toBeNull()
+    expect(
+      resolveRenderableWorkspacePaneTab(
+        'terminal',
+        ctx({ runtimeTabAvailabilityByType: { terminal: terminalAvailability({ sessionCount: 0 }) } }),
+      ),
+    ).toBeNull()
   })
 
   test('does not dismiss terminal when sync settled with non-zero sessions', () => {
-    expect(resolveRenderableWorkspacePaneTab('terminal', ctx({ terminalSessionCount: 1 }))).toBe('terminal')
+    expect(
+      resolveRenderableWorkspacePaneTab(
+        'terminal',
+        ctx({ runtimeTabAvailabilityByType: { terminal: terminalAvailability({ sessionCount: 1 }) } }),
+      ),
+    ).toBe('terminal')
   })
 
   test('is total over the inputs', () => {
     const cases: Array<[WorkspacePaneTabType, WorkspacePaneRenderabilityContext, WorkspacePaneTabType | null]> = [
       ['status', ctx(), 'status'],
-      ['status', ctx({ hasWorktree: false, terminalProjectionPhase: 'pending' }), 'status'],
+      [
+        'status',
+        ctx({
+          hasWorktree: false,
+          runtimeTabAvailabilityByType: { terminal: terminalAvailability({ projectionPhase: 'pending' }) },
+        }),
+        'status',
+      ],
       ['history', ctx(), 'history'],
       ['history', ctx({ hasWorktree: false }), 'history'],
       ['changes', ctx(), 'changes'],
       ['changes', ctx({ hasWorktree: false }), null],
       ['terminal', ctx({ hasWorktree: false }), null],
-      ['terminal', ctx({ terminalProjectionPhase: 'pending' }), 'terminal'],
-      ['terminal', ctx({ terminalCreatePending: true }), 'terminal'],
-      ['terminal', ctx({ terminalSessionCount: 0 }), null],
-      ['terminal', ctx({ terminalSessionCount: 3 }), 'terminal'],
+      [
+        'terminal',
+        ctx({ runtimeTabAvailabilityByType: { terminal: terminalAvailability({ projectionPhase: 'pending' }) } }),
+        'terminal',
+      ],
+      [
+        'terminal',
+        ctx({ runtimeTabAvailabilityByType: { terminal: terminalAvailability({ createPending: true }) } }),
+        'terminal',
+      ],
+      [
+        'terminal',
+        ctx({ runtimeTabAvailabilityByType: { terminal: terminalAvailability({ sessionCount: 0 }) } }),
+        null,
+      ],
+      [
+        'terminal',
+        ctx({ runtimeTabAvailabilityByType: { terminal: terminalAvailability({ sessionCount: 3 }) } }),
+        'terminal',
+      ],
     ]
     for (const [preferred, context, expected] of cases) {
       expect(resolveRenderableWorkspacePaneTab(preferred, context)).toBe(expected)

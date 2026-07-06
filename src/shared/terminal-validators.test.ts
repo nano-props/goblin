@@ -13,6 +13,10 @@ import {
   terminalUtf8ByteLength,
   TERMINAL_WS_MESSAGE_LIMIT_BYTES,
 } from '#/shared/terminal-validators.ts'
+import {
+  WORKSPACE_PANE_TABS_REALTIME_EVENTS,
+  WORKSPACE_PANE_TABS_SOCKET_ACTIONS,
+} from '#/shared/workspace-pane-tabs.ts'
 
 describe('shared terminal validators', () => {
   test('normalizes terminal sizes within supported bounds', () => {
@@ -109,14 +113,44 @@ describe('shared terminal validators', () => {
     expect(
       normalizeTerminalClientMessage({
         type: 'request',
+        requestId: 'request_runtime_session_id',
+        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
+        input: {
+          repoRoot: '/repo',
+          repoInstanceId: 'repo-instance-test',
+          branchName: 'main',
+          worktreePath: '/repo',
+          tabs: [{ type: 'terminal', runtimeSessionId: 'session-1' }],
+        },
+      }),
+    ).toMatchObject({ type: 'request', action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace })
+
+    expect(
+      normalizeTerminalClientMessage({
+        type: 'request',
         requestId: 'request_123',
-        action: 'replace-tabs',
+        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
         input: {
           repoRoot: '/repo',
           repoInstanceId: 'repo-instance-test',
           branchName: 'main',
           worktreePath: '/repo',
           tabs: [{ type: 'terminal', terminalSessionId: '' }],
+        },
+      }),
+    ).toBeNull()
+
+    expect(
+      normalizeTerminalClientMessage({
+        type: 'request',
+        requestId: 'request_123',
+        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
+        input: {
+          repoRoot: '/repo',
+          repoInstanceId: 'repo-instance-test',
+          branchName: 'main',
+          worktreePath: '/repo',
+          tabs: [{ type: 'terminal', runtimeSessionId: '' }],
         },
       }),
     ).toBeNull()
@@ -127,6 +161,21 @@ describe('shared terminal validators', () => {
       normalizeTerminalClientMessage({
         type: 'request',
         requestId: 'request_123',
+        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
+        input: {
+          repoRoot: '/repo',
+          repoInstanceId: 'repo-instance-test',
+          branchName: 'main',
+          worktreePath: '/repo',
+          operation: { type: 'open-static', tabType: 'history' },
+        },
+      }),
+    ).toMatchObject({ type: 'request', action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update })
+
+    expect(
+      normalizeTerminalClientMessage({
+        type: 'request',
+        requestId: 'request_legacy_tabs',
         action: 'update-tabs',
         input: {
           repoRoot: '/repo',
@@ -136,13 +185,13 @@ describe('shared terminal validators', () => {
           operation: { type: 'open-static', tabType: 'history' },
         },
       }),
-    ).toMatchObject({ type: 'request', action: 'update-tabs' })
+    ).toBeNull()
 
     expect(
       normalizeTerminalClientMessage({
         type: 'request',
         requestId: 'request_124',
-        action: 'update-tabs',
+        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
         input: {
           repoRoot: '/repo',
           repoInstanceId: 'repo-instance-test',
@@ -277,6 +326,22 @@ describe('shared terminal validators', () => {
         action: 'attach',
       }),
     ).toBeNull()
+
+    expect(
+      normalizeTerminalSocketServerMessage({
+        type: 'response',
+        requestId: 'req_workspace_tabs',
+        ok: true,
+        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+        payload: [],
+      }),
+    ).toMatchObject({
+      type: 'response',
+      requestId: 'req_workspace_tabs',
+      ok: true,
+      action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+      payload: [],
+    })
   })
 
   test('validates terminal socket success response payloads by action', () => {
@@ -389,12 +454,19 @@ describe('shared terminal validators', () => {
   test('normalizes workspace tabs changed realtime messages', () => {
     expect(
       normalizeTerminalSocketServerMessage({
-        type: 'workspace-tabs-changed',
+        type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
         repoRoot: '/repo',
       }),
     ).toEqual({
-      type: 'workspace-tabs-changed',
+      type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
       repoRoot: '/repo',
     })
+
+    expect(
+      normalizeTerminalSocketServerMessage({
+        type: 'workspace-tabs-changed',
+        repoRoot: '/repo',
+      }),
+    ).toBeNull()
   })
 })

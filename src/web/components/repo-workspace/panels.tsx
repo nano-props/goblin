@@ -10,17 +10,17 @@ import { useRepoLogQuery } from '#/web/repo-data-query.ts'
 import { BranchStatus } from '#/web/components/repo-workspace/BranchStatus.tsx'
 import { FiletreeNoWorktreeView, FiletreeView } from '#/web/components/repo-workspace/FiletreeView.tsx'
 import { useLazyRepoTree } from '#/web/hooks/useLazyRepoTree.ts'
-import { TerminalSessionView } from '#/web/components/terminal/TerminalSessionView.tsx'
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { RepoTreeNode } from '#/shared/api-types.ts'
 import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
-import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
-import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
+import type { WorkspacePaneStaticTabType, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import { isWorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
+import type { RepoWorkspaceRuntimeTabStateByType } from '#/web/components/repo-workspace/tab-model.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import type { WorkspacePanePanelLabel } from '#/web/components/workspace-pane/tab-providers.ts'
+import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { useFiletreeActionDialogsStore } from '#/web/stores/repos/filetree-action-dialogs.ts'
 import {
@@ -31,6 +31,7 @@ import {
 import { getRepositoryFileViewer } from '#/web/filetree-client.ts'
 import { absoluteFilePathForTerminal, fileReadCommand } from '#/web/components/repo-workspace/file-read-command.ts'
 import { HistoryCommitGraph, HistoryCommitGraphSkeleton } from '#/web/components/repo-workspace/HistoryCommitGraph.tsx'
+import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 
 const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
 
@@ -42,44 +43,52 @@ export interface WorkspacePanePanelRenderInput {
   detail: CurrentRepoWorkspacePresentation
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
-  terminalProjectionPhase: TerminalProjectionHydrationPhase
-  terminalProjectionErrorMessage?: string
+  runtimeTabStateByType: RepoWorkspaceRuntimeTabStateByType
 }
 
 interface WorkspacePanePanelProps extends Omit<WorkspacePanePanelRenderInput, 'type'> {}
 
-interface TabPanelProps {
-  id: string
-  labelledById?: string
-  label?: string
-  busy?: boolean
-  children: ReactNode
-}
-
 type RepoWorkspaceBranch = NonNullable<CurrentRepoWorkspacePresentation['branch']>
-type WorkspacePanePanelComponent = (props: WorkspacePanePanelProps) => ReactNode
+type WorkspacePaneStaticPanelComponent = (props: WorkspacePanePanelProps) => ReactNode
 
-const REPO_WORKSPACE_PANE_PANEL_BY_TYPE: Partial<Record<WorkspacePaneTabType, WorkspacePanePanelComponent>> = {
+const REPO_WORKSPACE_STATIC_PANEL_BY_TYPE: Record<WorkspacePaneStaticTabType, WorkspacePaneStaticPanelComponent> = {
   status: StatusWorkspacePanePanel,
   changes: ChangesWorkspacePanePanel,
   history: HistoryWorkspacePanePanel,
   files: FilesWorkspacePanePanel,
-  terminal: TerminalWorkspacePanePanel,
 }
 
 export function renderRepoWorkspacePanePanel(input: WorkspacePanePanelRenderInput): ReactNode {
-  const Panel = REPO_WORKSPACE_PANE_PANEL_BY_TYPE[input.type]
-  if (!Panel) return null
-  return <Panel {...input} />
+  const { type, ...panelProps } = input
+  if (isWorkspacePaneRuntimeTabType(type)) {
+    const runtimeState = input.runtimeTabStateByType[type]
+    return renderWorkspacePaneRuntimeTabPanel({
+      type,
+      workspacePaneId: input.workspacePaneId,
+      panelLabel: input.panelLabel,
+      target: {
+        repoRoot: input.repo.id,
+        repoInstanceId: input.repo.instanceId,
+        branchName: input.detail.branch?.name ?? null,
+        worktreePath: input.detail.branch?.worktree?.path ?? null,
+      },
+      runtimeState: {
+        projectionPhase: runtimeState.projectionPhase,
+        projectionErrorMessage: runtimeState.projectionErrorMessage,
+      },
+    })
+  }
+  const Panel = REPO_WORKSPACE_STATIC_PANEL_BY_TYPE[type]
+  return <Panel {...panelProps} />
 }
 
 function StatusWorkspacePanePanel({ workspacePaneId, panelLabel, detail }: WorkspacePanePanelProps) {
   return (
-    <BranchTabPanel id={`${workspacePaneId}-status-panel`} {...panelLabel} busy={detail.loading.pullRequests}>
+    <WorkspacePanePanelFrame id={`${workspacePaneId}-status-panel`} {...panelLabel} busy={detail.loading.pullRequests}>
       <ScrollPane>
         <BranchStatus detail={detail} />
       </ScrollPane>
-    </BranchTabPanel>
+    </WorkspacePanePanelFrame>
   )
 }
 
@@ -114,48 +123,25 @@ function ChangesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }
   )
 }
 
-function TerminalWorkspacePanePanel({
-  repo,
-  detail,
-  workspacePaneId,
-  panelLabel,
-  terminalProjectionPhase,
-  terminalProjectionErrorMessage,
-}: WorkspacePanePanelProps) {
-  const branch = detail.branch
-  if (!branch?.worktree?.path) return null
-  return (
-    <BranchTerminalTab
-      workspacePaneId={workspacePaneId}
-      panelLabel={panelLabel}
-      repoId={repo.id}
-      repoInstanceId={repo.instanceId}
-      terminalProjectionPhase={terminalProjectionPhase}
-      terminalProjectionErrorMessage={terminalProjectionErrorMessage}
-      branch={branch}
-    />
-  )
-}
-
 function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: WorkspacePanePanelProps) {
   const branch = detail.branch
   const worktreePath = branch?.worktree?.path
   if (!worktreePath) {
     return (
-      <BranchTabPanel id={`${workspacePaneId}-files-panel`} {...panelLabel}>
+      <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} {...panelLabel}>
         <FiletreeNoWorktreeView />
-      </BranchTabPanel>
+      </WorkspacePanePanelFrame>
     )
   }
   return (
-    <BranchTabPanel id={`${workspacePaneId}-files-panel`} {...panelLabel}>
+    <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} {...panelLabel}>
       <FiletreeTab
         repoId={repo.id}
         repoInstanceId={repo.instanceId}
         branchName={branch.name}
         worktreePath={worktreePath}
       />
-    </BranchTabPanel>
+    </WorkspacePanePanelFrame>
   )
 }
 
@@ -341,21 +327,6 @@ function usePendingKeySet() {
   return { pendingKeys, beginPending, endPending }
 }
 
-function BranchTabPanel({ id, labelledById, label, busy = false, children }: TabPanelProps) {
-  return (
-    <div
-      id={id}
-      role="tabpanel"
-      aria-busy={busy || undefined}
-      aria-labelledby={labelledById}
-      aria-label={labelledById ? undefined : label}
-      className="flex min-h-0 flex-1 flex-col"
-    >
-      {children}
-    </div>
-  )
-}
-
 function BranchHistoryTab({
   repoId,
   repoInstanceId,
@@ -378,7 +349,7 @@ function BranchHistoryTab({
     historyQuery.error instanceof Error ? historyQuery.error.message : DEFAULT_BRANCH_HISTORY_ERROR_KEY
 
   return (
-    <BranchTabPanel id={`${workspacePaneId}-history-panel`} {...panelLabel} busy={historyQuery.isLoading}>
+    <WorkspacePanePanelFrame id={`${workspacePaneId}-history-panel`} {...panelLabel} busy={historyQuery.isLoading}>
       {historyQuery.isLoading ? (
         <HistoryCommitGraphSkeleton rows={8} />
       ) : historyQuery.isError ? (
@@ -390,59 +361,7 @@ function BranchHistoryTab({
           <HistoryCommitGraph repoId={repoId} entries={entries} />
         </ScrollPane>
       )}
-    </BranchTabPanel>
-  )
-}
-
-function BranchTerminalTab({
-  workspacePaneId,
-  panelLabel,
-  repoId,
-  repoInstanceId,
-  terminalProjectionPhase,
-  terminalProjectionErrorMessage,
-  branch,
-}: {
-  workspacePaneId: string
-  panelLabel: WorkspacePanePanelLabel
-  repoId: string
-  repoInstanceId: string
-  terminalProjectionPhase: TerminalProjectionHydrationPhase
-  terminalProjectionErrorMessage?: string
-  branch: RepoWorkspaceBranch
-}) {
-  const { createTerminal, createOwnedTerminal } = useTerminalSessionContext()
-  const t = useT()
-  const createTerminalForSlot = useCallback(
-    async (base: TerminalSessionBase) => {
-      await runCreateTerminalTabCommand({
-        base,
-        createTerminal,
-        createOwnedTerminal,
-        openerIdentity: null,
-        // No switch needed: this is the empty-state CTA rendered *inside*
-        // the terminal tab itself (no worktree terminal exists yet), not a
-        // "switch away from another tab" gesture.
-        enterTerminalTab: () => {},
-        t,
-        logMessage: 'workspace pane terminal create failed',
-      })
-    },
-    [createOwnedTerminal, createTerminal, t],
-  )
-  if (!branch.worktree?.path) return null
-  return (
-    <BranchTabPanel id={`${workspacePaneId}-terminal-panel`} {...panelLabel}>
-      <TerminalSessionView
-        repoRoot={repoId}
-        repoInstanceId={repoInstanceId}
-        branch={branch.name}
-        worktreePath={branch.worktree?.path}
-        projectionPhase={terminalProjectionPhase}
-        projectionErrorMessage={terminalProjectionErrorMessage}
-        createTerminalForSlot={createTerminalForSlot}
-      />
-    </BranchTabPanel>
+    </WorkspacePanePanelFrame>
   )
 }
 
@@ -469,7 +388,7 @@ function BranchChangesTab({
   const totalEntries = currentBranchStatus.reduce((n, wt) => n + wt.entries.length, 0)
 
   return (
-    <BranchTabPanel id={`${workspacePaneId}-changes-panel`} {...panelLabel} busy={statusLoading}>
+    <WorkspacePanePanelFrame id={`${workspacePaneId}-changes-panel`} {...panelLabel} busy={statusLoading}>
       {branch.worktree?.path && statusLoading && !repo.branchModel.statusReady ? (
         <StatusListSkeleton rows={8} />
       ) : branch.worktree?.path && !repo.branchModel.statusReady && statusError ? (
@@ -492,7 +411,7 @@ function BranchChangesTab({
           body={t('status.no-worktree-body')}
         />
       )}
-    </BranchTabPanel>
+    </WorkspacePanePanelFrame>
   )
 }
 

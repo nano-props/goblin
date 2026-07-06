@@ -6,10 +6,11 @@
 
 import { useMemo } from 'react'
 import { create } from 'zustand'
+import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 
 const DEFAULT_REFRESH_COOLDOWN_MS = 2000
 
-export type TerminalProjectionHydrationPhase = 'pending' | 'ready' | 'failed'
+export type TerminalProjectionHydrationPhase = WorkspacePaneRuntimeProjectionPhase
 
 export interface TerminalProjectionHydrationEntry {
   instanceId: string

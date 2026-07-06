@@ -92,7 +92,9 @@ Do not use `runtime` for a queue or scheduler that is not actually a runtime fac
 Terminal terminology has hard boundaries:
 
 - `session` is the terminal business object.
-- `terminalSessionId` is the persistent identity for a terminal session and for its terminal workspace-pane tab entry.
+- `terminalSessionId` is the persistent identity for a terminal business
+  session. Terminal workspace-pane runtime tabs store this value as
+  `runtimeSessionId`.
 - `terminalWorktreeKey` is only the repo/worktree grouping key.
 - `tabId` is for fixed static workspace-pane tabs.
 - control ownership is described as `controller`, `viewer`, `unowned`, or `controller role`.
@@ -109,6 +111,7 @@ Canonical terminal terms:
 | Per-session client runtime  | `TerminalSessionRuntime`                      | `TerminalSlotRuntime`                            |
 | Workspace pane tab runtime  | `WorkspacePaneTabsRuntime`                    | terminal-only or worktree-only tab list runtimes |
 | Terminal session identity   | `terminalSessionId`                           | old composite terminal identity names            |
+| Runtime workspace tab id    | `runtimeSessionId`                            | terminal-specific tab entry id fields            |
 | Terminal worktree grouping  | `terminalWorktreeKey` / `TerminalWorktreeKey` | old workspace-pane identity names                |
 | Session lifecycle event     | `session-closed`                              | `slot-closed`                                    |
 | Session id validator        | `isValidTerminalSessionId`                    | `isValidSlotId`                                  |
@@ -118,7 +121,9 @@ Naming consequences:
 - Do not use `slot` for a terminal business object.
 - Do not use `session` to mean controller ownership.
 - If you mean a static Workspace Pane tab, use `tabId`.
-- If you mean a terminal Workspace Pane tab, use `terminalSessionId`.
+- If you mean a runtime Workspace Pane tab entry, use `runtimeSessionId`.
+- If you mean the terminal business session represented by a terminal runtime
+  tab, use `terminalSessionId`.
 - If you mean the repo/worktree grouping bucket for terminal tabs, use `terminalWorktreeKey`.
 
 ### Repo / workspace

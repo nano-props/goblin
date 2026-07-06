@@ -1,20 +1,52 @@
 import { describe, expect, test } from 'vitest'
 import {
+  isWorkspacePaneRuntimeTabType,
   type WorkspacePaneTabEntry,
+  workspacePaneRuntimeTabEntry,
+  workspacePaneRuntimeTabIdentity,
+  workspacePaneRuntimeTabSessionId,
   workspacePaneStaticTabEntry,
   workspacePaneStaticTabId,
+  workspacePaneTabEntryFromUnknown,
+  workspacePaneTabEntryIdentity,
   workspacePaneTabsInsertAfterIdentity,
-  workspacePaneTerminalTabEntry,
 } from '#/shared/workspace-pane.ts'
+
+describe('workspace pane runtime tab helpers', () => {
+  test('normalizes terminal as the current runtime tab type', () => {
+    const entry = workspacePaneRuntimeTabEntry('terminal', 'session-A')
+
+    expect(entry).toEqual({ type: 'terminal', runtimeSessionId: 'session-A' })
+    expect(isWorkspacePaneRuntimeTabType('terminal')).toBe(true)
+    expect(workspacePaneRuntimeTabSessionId(entry)).toBe('session-A')
+    expect(workspacePaneRuntimeTabIdentity('terminal', 'session-A')).toBe('terminal:session-A')
+    expect(workspacePaneTabEntryIdentity(entry)).toBe('terminal:session-A')
+  })
+
+  test('parses runtime tab entries through the shared tab parser', () => {
+    expect(workspacePaneTabEntryFromUnknown({ type: 'terminal', terminalSessionId: 'session-A' })).toBeNull()
+    expect(workspacePaneTabEntryFromUnknown({ type: 'terminal', runtimeSessionId: 'session-A' })).toEqual(
+      workspacePaneRuntimeTabEntry('terminal', 'session-A'),
+    )
+    expect(
+      workspacePaneRuntimeTabSessionId({
+        type: 'terminal',
+        runtimeSessionId: 'session-A',
+      }),
+    ).toBe('session-A')
+    expect(workspacePaneTabEntryFromUnknown({ type: 'terminal', terminalSessionId: '' })).toBeNull()
+    expect(workspacePaneTabEntryFromUnknown({ type: 'terminal', runtimeSessionId: '' })).toBeNull()
+  })
+})
 
 describe('workspacePaneTabsInsertAfterIdentity', () => {
   const status = workspacePaneStaticTabEntry('status')
   const changes = workspacePaneStaticTabEntry('changes')
   const history = workspacePaneStaticTabEntry('history')
   const files = workspacePaneStaticTabEntry('files')
-  const termA = workspacePaneTerminalTabEntry('session-A')
-  const termB = workspacePaneTerminalTabEntry('session-B')
-  const termC = workspacePaneTerminalTabEntry('session-C')
+  const termA = workspacePaneRuntimeTabEntry('terminal', 'session-A')
+  const termB = workspacePaneRuntimeTabEntry('terminal', 'session-B')
+  const termC = workspacePaneRuntimeTabEntry('terminal', 'session-C')
 
   test('appends when anchor is null', () => {
     const current: WorkspacePaneTabEntry[] = [status, files, termA]

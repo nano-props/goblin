@@ -63,7 +63,7 @@ export function isClientEffectIntent(event: unknown): event is ClientEffectInten
     case 'terminal-bell-click':
       return (
         typeof event.repoRoot === 'string' &&
-        // Temporary guard for the terminalSessionId rename; remove once the new intent shape has stabilized.
+        // Reject the old generic key payload; bell routing needs explicit terminal identifiers.
         !Object.prototype.hasOwnProperty.call(event, 'key') &&
         (event.terminalSessionId === undefined || typeof event.terminalSessionId === 'string') &&
         (event.terminalWorktreeKey === undefined || typeof event.terminalWorktreeKey === 'string')

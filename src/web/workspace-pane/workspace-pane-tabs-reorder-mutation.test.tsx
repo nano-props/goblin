@@ -16,9 +16,9 @@ import {
   type WorkspacePaneTabsReorderMutationResult,
   useWorkspacePaneTabsReorderMutation,
 } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
-import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import type { TerminalUpdateWorkspaceTabsInput, WorkspacePaneTabsEntry } from '#/shared/terminal-types.ts'
+import type { WorkspacePaneTabsEntry, WorkspacePaneTabsUpdateInput } from '#/shared/workspace-pane-tabs.ts'
 import { clearWorkspacePaneTabsOperationQueuesForTests } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 
 const REPO_ROOT = '/tmp/workspace-pane-tabs-reorder-mutation-repo'
@@ -28,7 +28,7 @@ const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/workspace-pane-tabs-reorder-mutation-worktree'
 
 interface DeferredUpdateWorkspaceTabsRequest {
-  input: TerminalUpdateWorkspaceTabsInput
+  input: WorkspacePaneTabsUpdateInput
   resolve: (tabs: WorkspacePaneTabEntry[]) => void
   reject: (err: unknown) => void
 }
@@ -312,7 +312,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
   })
 
   test('uses the latest repo runtime instance when the repo instance changes', async () => {
-    const updateWorkspaceTabs = vi.fn(async (_input: TerminalUpdateWorkspaceTabsInput) => [
+    const updateWorkspaceTabs = vi.fn(async (_input: WorkspacePaneTabsUpdateInput) => [
       staticEntry('status'),
       terminalEntry('session-1'),
     ])
@@ -420,7 +420,7 @@ function installDeferredUpdateWorkspaceTabs(): DeferredUpdateWorkspaceTabsReques
 }
 
 function terminalEntry(sessionId: string): WorkspacePaneTabEntry {
-  return workspacePaneTerminalTabEntry(sessionId)
+  return workspacePaneRuntimeTabEntry('terminal', sessionId)
 }
 
 function staticEntry(type: Parameters<typeof workspacePaneStaticTabEntry>[0]): WorkspacePaneTabEntry {

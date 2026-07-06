@@ -6,24 +6,21 @@ import type {
   TerminalCreateInput,
   TerminalListSessionsInput,
   TerminalPruneInput,
-  TerminalListWorkspaceTabsInput,
   TerminalMutationResult,
-  TerminalReplaceWorkspaceTabsInput,
   TerminalRestartInput,
   TerminalResizeInput,
   TerminalSessionInput,
   TerminalSessionSummary,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
-  TerminalUpdateWorkspaceTabsInput,
-  WorkspacePaneTabsEntry,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { isValidTerminalRuntimeSessionId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
-import type { TerminalRealtimeBroker } from '#/server/terminal/terminal-realtime-broker.ts'
+import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import { isCurrentRepoRuntimeInstance } from '#/server/modules/repo-runtime-instances.ts'
+import { broadcastWorkspacePaneTabsChanged } from '#/server/workspace-pane/workspace-pane-tabs-realtime.ts'
+import type { TerminalRealtimeMessage } from '#/shared/terminal-socket.ts'
 
 interface TerminalSessionServiceLike {
   create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCreateResult>
@@ -34,14 +31,11 @@ interface TerminalSessionServiceLike {
     repoInstanceId: string,
   ): Promise<{ pruned: number; remaining: number }>
   listSessions(userId: string, repoRoot: string, repoInstanceId: string): Promise<TerminalSessionSummary[]>
-  listWorkspaceTabs(userId: string, repoRoot: string, repoInstanceId: string): Promise<WorkspacePaneTabsEntry[]>
-  replaceTabs(userId: string, input: TerminalReplaceWorkspaceTabsInput): Promise<WorkspacePaneTabEntry[]>
-  updateTabs(userId: string, input: TerminalUpdateWorkspaceTabsInput): Promise<WorkspacePaneTabEntry[]>
 }
 
 interface TerminalRuntimeActionDependencies {
   manager: TerminalSessionManager<string>
-  broker: Pick<TerminalRealtimeBroker, 'broadcastToUser'>
+  broker: Pick<RealtimeBroker<TerminalRealtimeMessage>, 'broadcastToUser'>
   sessionService: TerminalSessionServiceLike
   isValidTerminalClientId(value: unknown): value is string
 }
@@ -110,34 +104,6 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       const result = await sessionService.create(clientId, userId, input)
       if (result.ok) broadcastRepoWorkspaceTabsChanged(userId, input.repoRoot)
       return result
-    },
-
-    async replaceTabs(
-      clientId: string,
-      userId: string,
-      input: TerminalReplaceWorkspaceTabsInput,
-    ): Promise<WorkspacePaneTabEntry[]> {
-      if (!isValidTerminalClientId(clientId)) return []
-      if (!isValidRepoLocator(input?.repoRoot)) return []
-      if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return []
-      assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
-      const tabs = await sessionService.replaceTabs(userId, input)
-      broadcastRepoWorkspaceTabsChanged(userId, input.repoRoot)
-      return tabs
-    },
-
-    async updateTabs(
-      clientId: string,
-      userId: string,
-      input: TerminalUpdateWorkspaceTabsInput,
-    ): Promise<WorkspacePaneTabEntry[]> {
-      if (!isValidTerminalClientId(clientId)) return []
-      if (!isValidRepoLocator(input?.repoRoot)) return []
-      if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return []
-      assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
-      const tabs = await sessionService.updateTabs(userId, input)
-      broadcastRepoWorkspaceTabsChanged(userId, input.repoRoot)
-      return tabs
     },
 
     async prune(
@@ -223,17 +189,6 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
       return await sessionService.listSessions(userId, input.repoRoot, input.repoInstanceId)
     },
-
-    async listWorkspaceTabs(
-      clientId: string,
-      userId: string,
-      input: TerminalListWorkspaceTabsInput,
-    ): Promise<WorkspacePaneTabsEntry[]> {
-      if (!isValidTerminalClientId(clientId)) return []
-      if (!isValidRepoLocator(input.repoRoot)) return []
-      assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
-      return await sessionService.listWorkspaceTabs(userId, input.repoRoot, input.repoInstanceId)
-    },
   }
 
   function broadcastRepoSessionsChanged(userId: string, repoRoot: string): void {
@@ -241,7 +196,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
   }
 
   function broadcastRepoWorkspaceTabsChanged(userId: string, repoRoot: string): void {
-    broker.broadcastToUser(userId, { type: 'workspace-tabs-changed', repoRoot })
+    broadcastWorkspacePaneTabsChanged(broker, userId, repoRoot)
   }
 
   function assertCurrentRepoInstance(userId: string, repoRoot: string, repoInstanceId: string): void {

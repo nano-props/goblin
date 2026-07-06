@@ -34,7 +34,7 @@ const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 
 type WorkspacePaneTabsRuntimeLike<TUser extends string | number> = Pick<
   WorkspacePaneTabsRuntime<TUser>,
-  'terminalSessionIds'
+  'runtimeSessionIds'
 >
 
 interface TerminalPtyAttachResult {
@@ -401,7 +401,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     const terminalSessionByTerminalSessionId = new Map(sessions.map((session) => [session.terminalSessionId, session]))
     const seen = new Set<string>()
     const tabListedSessions: TerminalSessionView<TUser>[] = []
-    for (const terminalSessionId of this.workspaceTabs.terminalSessionIds({ userId, scope, worktreePath })) {
+    for (const terminalSessionId of this.workspaceTabs.runtimeSessionIds({ userId, scope, worktreePath }, 'terminal')) {
       const session = terminalSessionByTerminalSessionId.get(terminalSessionId)
       if (!session || seen.has(terminalSessionId)) continue
       seen.add(terminalSessionId)

@@ -7,7 +7,7 @@ import {
   createWorkspacePaneTabsRuntime,
   type WorkspacePaneTabsRuntime,
 } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
-import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalAttachResult, TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 
@@ -39,7 +39,7 @@ describe('terminal session service facade', () => {
       scope: RUNTIME_SCOPE,
       branchName: BRANCH_NAME,
       worktreePath: path.resolve(WORKTREE_PATH),
-      tabs: [workspacePaneTerminalTabEntry('session-stale'), workspacePaneStaticTabEntry('status')],
+      tabs: [workspacePaneRuntimeTabEntry('terminal', 'session-stale'), workspacePaneStaticTabEntry('status')],
     })
     let createdTerminalSessionId: string | null = null
     const service = createService({
@@ -79,7 +79,7 @@ describe('terminal session service facade', () => {
     if (!result.ok) return
     expect(result.tabs).toEqual([
       workspacePaneStaticTabEntry('status'),
-      workspacePaneTerminalTabEntry(result.terminalSessionId),
+      workspacePaneRuntimeTabEntry('terminal', result.terminalSessionId),
     ])
   })
 
@@ -287,12 +287,12 @@ describe('terminal session service facade', () => {
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         tabs: [
-          workspacePaneTerminalTabEntry('session-stale'),
+          workspacePaneRuntimeTabEntry('terminal', 'session-stale'),
           workspacePaneStaticTabEntry('status'),
-          workspacePaneTerminalTabEntry('session-live'),
+          workspacePaneRuntimeTabEntry('terminal', 'session-live'),
         ],
       }),
-    ).resolves.toEqual([workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')])
+    ).resolves.toEqual([workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-live')])
 
     expect(
       workspaceTabs.tabs({
@@ -301,7 +301,7 @@ describe('terminal session service facade', () => {
         branchName: BRANCH_NAME,
         worktreePath: path.resolve(WORKTREE_PATH),
       }),
-    ).toEqual([workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')])
+    ).toEqual([workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-live')])
 
     await expect(
       service.replaceTabs(USER_ID, {
@@ -339,7 +339,7 @@ describe('terminal session service facade', () => {
         repoInstanceId: REPO_INSTANCE_ID,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
-        tabs: [workspacePaneStaticTabEntry('history'), workspacePaneTerminalTabEntry('session-live')],
+        tabs: [workspacePaneStaticTabEntry('history'), workspacePaneRuntimeTabEntry('terminal', 'session-live')],
       }),
     ).rejects.toThrow('error.repo-instance-stale')
 
@@ -362,8 +362,8 @@ describe('terminal session service facade', () => {
       worktreePath: path.resolve(WORKTREE_PATH),
       tabs: [
         workspacePaneStaticTabEntry('status'),
-        workspacePaneTerminalTabEntry('session-stale'),
-        workspacePaneTerminalTabEntry('session-live'),
+        workspacePaneRuntimeTabEntry('terminal', 'session-stale'),
+        workspacePaneRuntimeTabEntry('terminal', 'session-live'),
       ],
     })
     const service = createService({
@@ -376,7 +376,7 @@ describe('terminal session service facade', () => {
         repoRoot: REPO_ROOT,
         branchName: BRANCH_NAME,
         worktreePath: path.resolve(WORKTREE_PATH),
-        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')],
+        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-live')],
       },
     ])
 
@@ -393,7 +393,7 @@ describe('terminal session service facade', () => {
         repoRoot: REPO_ROOT,
         branchName: 'feature/static-only',
         worktreePath: path.resolve(WORKTREE_PATH),
-        tabs: [workspacePaneStaticTabEntry('history'), workspacePaneTerminalTabEntry('session-live')],
+        tabs: [workspacePaneStaticTabEntry('history'), workspacePaneRuntimeTabEntry('terminal', 'session-live')],
       },
     ])
   })
@@ -408,8 +408,8 @@ describe('terminal session service facade', () => {
       worktreePath: path.resolve(WORKTREE_PATH),
       tabs: [
         workspacePaneStaticTabEntry('status'),
-        workspacePaneTerminalTabEntry('session-stale'),
-        workspacePaneTerminalTabEntry('session-live'),
+        workspacePaneRuntimeTabEntry('terminal', 'session-stale'),
+        workspacePaneRuntimeTabEntry('terminal', 'session-live'),
       ],
     })
     workspaceTabs.replaceTabs({
@@ -437,13 +437,13 @@ describe('terminal session service facade', () => {
         repoRoot: REPO_ROOT,
         branchName: BRANCH_NAME,
         worktreePath: path.resolve(WORKTREE_PATH),
-        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')],
+        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-live')],
       },
       {
         repoRoot: REPO_ROOT,
         branchName: 'feature/other-worktree',
         worktreePath: path.resolve(otherWorktreePath),
-        tabs: [workspacePaneStaticTabEntry('history'), workspacePaneTerminalTabEntry('session-other-worktree')],
+        tabs: [workspacePaneStaticTabEntry('history'), workspacePaneRuntimeTabEntry('terminal', 'session-other-worktree')],
       },
     ])
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledTimes(1)
@@ -458,7 +458,7 @@ describe('terminal session service facade', () => {
       branchName: BRANCH_NAME,
       worktreePath: path.resolve(WORKTREE_PATH),
       tabs: [
-        workspacePaneTerminalTabEntry('session-live'),
+        workspacePaneRuntimeTabEntry('terminal', 'session-live'),
         workspacePaneStaticTabEntry('status'),
         workspacePaneStaticTabEntry('history'),
       ],
@@ -474,7 +474,7 @@ describe('terminal session service facade', () => {
         branchName: BRANCH_NAME,
         worktreePath: path.resolve(WORKTREE_PATH),
         tabs: [
-          workspacePaneTerminalTabEntry('session-live'),
+          workspacePaneRuntimeTabEntry('terminal', 'session-live'),
           workspacePaneStaticTabEntry('status'),
           workspacePaneStaticTabEntry('history'),
         ],
@@ -492,7 +492,7 @@ describe('terminal session service facade', () => {
     ).resolves.toEqual([
       workspacePaneStaticTabEntry('history'),
       workspacePaneStaticTabEntry('status'),
-      workspacePaneTerminalTabEntry('session-live'),
+      workspacePaneRuntimeTabEntry('terminal', 'session-live'),
     ])
   })
 
@@ -536,7 +536,7 @@ describe('terminal session service facade', () => {
         repoRoot: REPO_ROOT,
         branchName: BRANCH_NAME,
         worktreePath: path.resolve(WORKTREE_PATH),
-        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')],
+        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-live')],
       },
     ])
   })
@@ -549,10 +549,10 @@ describe('terminal session service facade', () => {
       branchName: BRANCH_NAME,
       worktreePath: path.resolve(WORKTREE_PATH),
       tabs: [
-        workspacePaneTerminalTabEntry('session-closed'),
-        workspacePaneTerminalTabEntry('session-stale'),
+        workspacePaneRuntimeTabEntry('terminal', 'session-closed'),
+        workspacePaneRuntimeTabEntry('terminal', 'session-stale'),
         workspacePaneStaticTabEntry('status'),
-        workspacePaneTerminalTabEntry('session-live'),
+        workspacePaneRuntimeTabEntry('terminal', 'session-live'),
       ],
     })
     const service = createService({
@@ -570,7 +570,7 @@ describe('terminal session service facade', () => {
         branchName: BRANCH_NAME,
         worktreePath: path.resolve(WORKTREE_PATH),
       }),
-    ).toEqual([workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')])
+    ).toEqual([workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-live')])
   })
 
   test('reconcileTerminalTabsForSession keeps the closed session id when it is still live', async () => {
@@ -580,7 +580,7 @@ describe('terminal session service facade', () => {
       scope: RUNTIME_SCOPE,
       branchName: BRANCH_NAME,
       worktreePath: path.resolve(WORKTREE_PATH),
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')],
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-live')],
     })
     const service = createService({
       sessions: [terminalSession('session-live')],
@@ -597,7 +597,7 @@ describe('terminal session service facade', () => {
         branchName: BRANCH_NAME,
         worktreePath: path.resolve(WORKTREE_PATH),
       }),
-    ).toEqual([workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')])
+    ).toEqual([workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-live')])
   })
 
   test('serializes terminal tab reconciliation with later workspace tab reorder operations', async () => {
@@ -608,7 +608,7 @@ describe('terminal session service facade', () => {
       branchName: BRANCH_NAME,
       worktreePath: path.resolve(WORKTREE_PATH),
       tabs: [
-        workspacePaneTerminalTabEntry('session-closed'),
+        workspacePaneRuntimeTabEntry('terminal', 'session-closed'),
         workspacePaneStaticTabEntry('status'),
         workspacePaneStaticTabEntry('history'),
       ],
@@ -668,7 +668,7 @@ describe('terminal session service facade', () => {
         worktreePath: null,
         tabs: [
           workspacePaneStaticTabEntry('status'),
-          workspacePaneTerminalTabEntry('session-stale'),
+          workspacePaneRuntimeTabEntry('terminal', 'session-stale'),
           workspacePaneStaticTabEntry('files'),
         ],
       }),
@@ -692,7 +692,7 @@ describe('terminal session service facade', () => {
       branchName: BRANCH_NAME,
       worktreePath: path.resolve(WORKTREE_PATH),
       tabs: [
-        workspacePaneTerminalTabEntry('session-live'),
+        workspacePaneRuntimeTabEntry('terminal', 'session-live'),
         workspacePaneStaticTabEntry('history'),
         workspacePaneStaticTabEntry('status'),
       ],
@@ -710,7 +710,7 @@ describe('terminal session service facade', () => {
         worktreePath: WORKTREE_PATH,
         operation: { type: 'close-static', tabType: 'history' },
       }),
-    ).resolves.toEqual([workspacePaneTerminalTabEntry('session-live'), workspacePaneStaticTabEntry('status')])
+    ).resolves.toEqual([workspacePaneRuntimeTabEntry('terminal', 'session-live'), workspacePaneStaticTabEntry('status')])
 
     await expect(
       service.updateTabs(USER_ID, {
@@ -723,7 +723,7 @@ describe('terminal session service facade', () => {
           tabIdentities: ['workspace-pane:history', 'workspace-pane:status', 'terminal:session-live'],
         },
       }),
-    ).resolves.toEqual([workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')])
+    ).resolves.toEqual([workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-live')])
   })
 
   test('updateTabs retargets worktree tabs when the worktree branch changes', async () => {
@@ -733,7 +733,7 @@ describe('terminal session service facade', () => {
       scope: RUNTIME_SCOPE,
       branchName: 'feature/old',
       worktreePath: path.resolve(WORKTREE_PATH),
-      tabs: [workspacePaneTerminalTabEntry('session-live'), workspacePaneStaticTabEntry('status')],
+      tabs: [workspacePaneRuntimeTabEntry('terminal', 'session-live'), workspacePaneStaticTabEntry('status')],
     })
     const service = createService({
       sessions: [terminalSession('session-live')],
@@ -749,7 +749,7 @@ describe('terminal session service facade', () => {
         operation: { type: 'open-static', tabType: 'history' },
       }),
     ).resolves.toEqual([
-      workspacePaneTerminalTabEntry('session-live'),
+      workspacePaneRuntimeTabEntry('terminal', 'session-live'),
       workspacePaneStaticTabEntry('status'),
       workspacePaneStaticTabEntry('history'),
     ])
@@ -760,7 +760,7 @@ describe('terminal session service facade', () => {
         branchName: 'feature/new',
         worktreePath: path.resolve(WORKTREE_PATH),
         tabs: [
-          workspacePaneTerminalTabEntry('session-live'),
+          workspacePaneRuntimeTabEntry('terminal', 'session-live'),
           workspacePaneStaticTabEntry('status'),
           workspacePaneStaticTabEntry('history'),
         ],
@@ -787,7 +787,7 @@ describe('terminal session service facade', () => {
         repoRoot: REPO_ROOT,
         branchName: 'feature/new',
         worktreePath: path.resolve(WORKTREE_PATH),
-        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')],
+        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-live')],
       },
     ])
   })
@@ -813,7 +813,7 @@ describe('terminal session service facade', () => {
         repoRoot: REPO_ROOT,
         branchName: BRANCH_NAME,
         worktreePath: path.resolve(WORKTREE_PATH),
-        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')],
+        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-live')],
       },
     ])
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith(USER_ID, REPO_ROOT)
@@ -884,7 +884,7 @@ describe('terminal session service facade', () => {
         repoRoot: REMOTE_REPO_ROOT,
         branchName: REMOTE_BRANCH_NAME,
         worktreePath: REMOTE_WORKTREE_PATH,
-        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-remote')],
+        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-remote')],
       },
     ])
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith(USER_ID, REMOTE_REPO_ROOT)
@@ -897,7 +897,7 @@ describe('terminal session service facade', () => {
       scope: RUNTIME_SCOPE,
       branchName: BRANCH_NAME,
       worktreePath: path.resolve(WORKTREE_PATH),
-      tabs: [workspacePaneTerminalTabEntry('session-stale'), workspacePaneStaticTabEntry('status')],
+      tabs: [workspacePaneRuntimeTabEntry('terminal', 'session-stale'), workspacePaneStaticTabEntry('status')],
     })
     const broadcastWorkspaceTabsChanged = vi.fn()
     const service = createService({

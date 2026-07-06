@@ -1,12 +1,19 @@
 import type { ClientNativeCapability } from '#/shared/bootstrap.ts'
 import type { IpcEvent, IpcRequest } from '#/shared/api-types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import type { ClientHostBridge, ClientBridge, ClientTerminal } from '#/web/client-bridge-types.ts'
+import type {
+  ClientHostBridge,
+  ClientBridge,
+} from '#/web/client-bridge-types.ts'
 import { readNativeBridge } from '#/web/native-bridge.ts'
 import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
 import { normalizeClientServerClientId, readWebBootstrap } from '#/web/client-bootstrap-bridge.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
-import { createServerTerminalClient, type ClientServerTerminalConfig } from '#/web/client-terminal.ts'
+import {
+  createServerTerminalClients,
+  type ClientServerTerminalClients,
+  type ClientServerTerminalConfig,
+} from '#/web/client-terminal.ts'
 import { createTerminalNotificationProvider } from '#/web/terminal-notification-provider.ts'
 
 /**
@@ -86,10 +93,10 @@ function readServerTerminalConfig(): ClientServerTerminalConfig | null {
 // `goblinNative` on each invocation — that's the lazy hook that lets
 // bell-state tests swap the preload between cases without rebuilding
 // the WebSocket layer.
-let memoizedTerminalClient: ClientTerminal | null = null
-function getOrCreateTerminalClient(): ClientTerminal {
-  if (memoizedTerminalClient) return memoizedTerminalClient
-  memoizedTerminalClient = createServerTerminalClient({
+let memoizedTerminalClients: ClientServerTerminalClients | null = null
+function getOrCreateTerminalClients(): ClientServerTerminalClients {
+  if (memoizedTerminalClients) return memoizedTerminalClients
+  memoizedTerminalClients = createServerTerminalClients({
     getServerConfig() {
       const server = readServerTerminalConfig()
       if (!server) throw new Error('Client terminal client is unavailable')
@@ -100,7 +107,7 @@ function getOrCreateTerminalClient(): ClientTerminal {
       readNativeBridge()?.terminal?.setBadge?.(count)
     },
   })
-  return memoizedTerminalClient
+  return memoizedTerminalClients
 }
 
 /**
@@ -135,7 +142,7 @@ function createClientBridge(): ClientBridge {
     })
   })()
 
-  const terminalClient = getOrCreateTerminalClient()
+  const terminalClients = getOrCreateTerminalClients()
 
   return {
     kind() {
@@ -203,7 +210,10 @@ function createClientBridge(): ClientBridge {
       return readNativeBridge()?.host ?? null
     },
     terminal() {
-      return terminalClient
+      return terminalClients.terminal
+    },
+    workspacePaneTabs() {
+      return terminalClients.workspacePaneTabs
     },
   }
 }

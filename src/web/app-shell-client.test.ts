@@ -42,6 +42,9 @@ function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
     terminal: (() => {
       throw new Error('unused terminal client')
     }) as never,
+    workspacePaneTabs: (() => {
+      throw new Error('unused workspace pane tabs client')
+    }) as never,
     ...overrides,
   }
 }

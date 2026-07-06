@@ -4,10 +4,10 @@ import path from 'node:path'
 import { describe, expect, test, vi } from 'vitest'
 import { createTerminalSessionCreator } from '#/server/terminal/terminal-session-creator.ts'
 import { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
-import { createTerminalWorkspaceTabsCoordinator } from '#/server/terminal/terminal-workspace-tabs-coordinator.ts'
+import { createWorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { createWorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
-import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalCreateInput, TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import type { TerminalSessionEnsureResult } from '#/server/terminal/terminal-session-ensurer.ts'
 
@@ -32,7 +32,7 @@ describe('terminal session creator', () => {
       scope: SCOPE,
       branchName: BRANCH_NAME,
       worktreePath: path.resolve(WORKTREE_PATH),
-      tabs: [workspacePaneTerminalTabEntry('session-stale'), workspacePaneStaticTabEntry('status')],
+      tabs: [workspacePaneRuntimeTabEntry('terminal', 'session-stale'), workspacePaneStaticTabEntry('status')],
     })
     const ensureOrRestore = vi.fn(async (_clientId, _userId, input) => {
       sessions.push(terminalSession(input.terminalSessionId ?? 'session-created'))
@@ -43,7 +43,10 @@ describe('terminal session creator', () => {
         manager,
         createSessionId: () => 'session-created',
       }),
-      workspaceTabsCoordinator: createTerminalWorkspaceTabsCoordinator({ manager, workspaceTabs }),
+      workspaceTabsCoordinator: createWorkspacePaneTabsCoordinator({
+        workspaceTabs,
+        runtimeProviders: [terminalRuntimeTabsProvider(manager)],
+      }),
       ensureOrRestore,
       isCurrentRepoInstance: vi.fn(() => true),
       rejectStaleCreateIfNeeded: vi.fn(() => null),
@@ -70,7 +73,7 @@ describe('terminal session creator', () => {
     expect(result.sessions).toEqual([terminalSession('session-created')])
     expect(result.tabs).toEqual([
       workspacePaneStaticTabEntry('status'),
-      workspacePaneTerminalTabEntry('session-created'),
+      workspacePaneRuntimeTabEntry('terminal', 'session-created'),
     ])
   })
 
@@ -84,9 +87,9 @@ describe('terminal session creator', () => {
         manager,
         createSessionId: () => 'session-created',
       }),
-      workspaceTabsCoordinator: createTerminalWorkspaceTabsCoordinator({
-        manager,
+      workspaceTabsCoordinator: createWorkspacePaneTabsCoordinator({
         workspaceTabs: createWorkspacePaneTabsRuntime<string>(),
+        runtimeProviders: [terminalRuntimeTabsProvider(manager)],
       }),
       ensureOrRestore,
       isCurrentRepoInstance: vi.fn(() => false),
@@ -121,7 +124,10 @@ describe('terminal session creator', () => {
         manager,
         createSessionId: () => 'session-created',
       }),
-      workspaceTabsCoordinator: createTerminalWorkspaceTabsCoordinator({ manager, workspaceTabs }),
+      workspaceTabsCoordinator: createWorkspacePaneTabsCoordinator({
+        workspaceTabs,
+        runtimeProviders: [terminalRuntimeTabsProvider(manager)],
+      }),
       ensureOrRestore,
       isCurrentRepoInstance: vi.fn(() => true),
       rejectStaleCreateIfNeeded,
@@ -190,5 +196,20 @@ function ensureResult(terminalSessionId: string): Extract<TerminalSessionEnsureR
     controller: null,
     canonicalCols: 80,
     canonicalRows: 24,
+  }
+}
+
+function terminalRuntimeTabsProvider(manager: {
+  listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
+}) {
+  return {
+    type: 'terminal' as const,
+    async listSessionsForUser(userId: string, scope: string) {
+      return (await manager.listSessionsForUser(userId, scope)).map((session) => ({
+        sessionId: session.terminalSessionId,
+        branch: session.branch,
+        worktreePath: session.worktreePath,
+      }))
+    },
   }
 }

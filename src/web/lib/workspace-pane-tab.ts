@@ -7,8 +7,10 @@ import {
   workspacePaneTabRequiresWorktree as sharedWorkspacePaneTabRequiresWorktree,
   workspacePaneTabScope as sharedWorkspacePaneTabScope,
 } from '#/shared/workspace-pane.ts'
-import { workspacePaneTabProvider } from '#/web/components/workspace-pane/tab-providers.ts'
-import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
+import {
+  workspacePaneTabProvider,
+  type WorkspacePaneRuntimeTabAvailabilityByType,
+} from '#/web/components/workspace-pane/tab-providers.ts'
 
 export type BranchLevelWorkspacePaneTab = WorkspacePaneBranchTabType
 export type WorktreeLevelWorkspacePaneTab = Exclude<WorkspacePaneTabType, BranchLevelWorkspacePaneTab>
@@ -42,12 +44,8 @@ export function workspacePaneTabRequiresWorktree(tab: WorkspacePaneTabType): boo
 export interface WorkspacePaneRenderabilityContext {
   /** Whether the selected branch has a worktree on disk. */
   hasWorktree: boolean
-  /** Number of open terminal sessions for the worktree. */
-  terminalSessionCount: number
-  /** Whether a new terminal is queued and waiting for mount geometry. */
-  terminalCreatePending?: boolean
-  /** Server -> client terminal projection hydration phase for this repo instance. */
-  terminalProjectionPhase: TerminalProjectionHydrationPhase
+  /** Runtime-tab lifecycle and session-count state keyed by runtime type. */
+  runtimeTabAvailabilityByType?: WorkspacePaneRuntimeTabAvailabilityByType
 }
 
 /**

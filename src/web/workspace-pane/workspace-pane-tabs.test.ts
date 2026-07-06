@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import {
   orderWorkspacePaneItemsByTabEntries,
@@ -39,7 +39,7 @@ describe('workspacePaneTabsWithDraggedOrder', () => {
 })
 
 function terminalEntry(sessionId: string): WorkspacePaneTabEntry {
-  return workspacePaneTerminalTabEntry(sessionId)
+  return workspacePaneRuntimeTabEntry('terminal', sessionId)
 }
 
 function staticEntry(type: Parameters<typeof workspacePaneStaticTabEntry>[0]): WorkspacePaneTabEntry {

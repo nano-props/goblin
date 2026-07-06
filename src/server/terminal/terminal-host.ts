@@ -6,19 +6,21 @@ import type {
   TerminalListSessionsInput,
   TerminalPruneInput,
   TerminalMutationResult,
-  TerminalListWorkspaceTabsInput,
-  TerminalReplaceWorkspaceTabsInput,
   TerminalResizeInput,
   TerminalRestartInput,
   TerminalSessionInput,
   TerminalSessionSummary,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
-  TerminalUpdateWorkspaceTabsInput,
-  WorkspacePaneTabsEntry,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import type {
+  WorkspacePaneTabsEntry,
+  WorkspacePaneTabsListInput,
+  WorkspacePaneTabsReplaceInput,
+  WorkspacePaneTabsUpdateInput,
+} from '#/shared/workspace-pane-tabs.ts'
 
 type MaybePromise<T> = T | Promise<T>
 
@@ -27,9 +29,9 @@ type MaybePromise<T> = T | Promise<T>
 // for a realtime socket is the same as the broker's contract for
 // one. Defining the alias here (instead of duplicating the shape)
 // keeps the two layers in lockstep when the wire protocol grows.
-import type { TerminalRealtimeSocket } from '#/server/terminal/terminal-realtime-broker.ts'
-export type { TerminalRealtimeSocket }
-export type ServerTerminalSocket = TerminalRealtimeSocket
+import type { RealtimeSocket } from '#/server/realtime/realtime-broker.ts'
+export type TerminalRealtimeSocket = RealtimeSocket
+export type ServerTerminalSocket = RealtimeSocket
 
 export type ServerTerminalHostState = 'running' | 'shutting-down'
 
@@ -111,18 +113,18 @@ export interface ServerTerminalHost {
   listWorkspaceTabs(
     clientId: string,
     userId: string,
-    input: TerminalListWorkspaceTabsInput,
+    input: WorkspacePaneTabsListInput,
   ): MaybePromise<WorkspacePaneTabsEntry[]>
   create(clientId: string, userId: string, input: TerminalCreateInput): MaybePromise<TerminalCreateResult>
   replaceTabs(
     clientId: string,
     userId: string,
-    input: TerminalReplaceWorkspaceTabsInput,
+    input: WorkspacePaneTabsReplaceInput,
   ): MaybePromise<WorkspacePaneTabEntry[]>
   updateTabs(
     clientId: string,
     userId: string,
-    input: TerminalUpdateWorkspaceTabsInput,
+    input: WorkspacePaneTabsUpdateInput,
   ): MaybePromise<WorkspacePaneTabEntry[]>
   prune(
     clientId: string,

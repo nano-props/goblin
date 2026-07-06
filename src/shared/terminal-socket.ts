@@ -8,23 +8,26 @@ import type {
   TerminalLifecycleEvent,
   TerminalListSessionsInput,
   TerminalPruneInput,
-  TerminalListWorkspaceTabsInput,
   TerminalMutationResult,
   TerminalOutputEvent,
-  TerminalReplaceWorkspaceTabsInput,
   TerminalResizeInput,
   TerminalRestartInput,
   TerminalSessionInput,
   TerminalSessionSummary,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
-  TerminalUpdateWorkspaceTabsInput,
-  WorkspacePaneTabsEntry,
   TerminalTitleEvent,
   TerminalExitEvent,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import type {
+  WorkspacePaneTabsEntry,
+  WorkspacePaneTabsListInput,
+  WorkspacePaneTabsReplaceInput,
+  WorkspacePaneTabsUpdateInput,
+  WorkspacePaneTabsRealtimeMessage,
+} from '#/shared/workspace-pane-tabs.ts'
 
 export type TerminalRealtimeMessage =
   | { type: 'output'; event: TerminalOutputEvent }
@@ -39,7 +42,7 @@ export type TerminalRealtimeMessage =
   | { type: 'identity'; event: TerminalIdentityEvent }
   | { type: 'lifecycle'; event: TerminalLifecycleEvent }
   | { type: 'sessions-changed'; repoRoot: string }
-  | { type: 'workspace-tabs-changed'; repoRoot: string }
+  | WorkspacePaneTabsRealtimeMessage
   // Targeted per-session close. Emitted by the server after a
   // successful `close` request, alongside the existing
   // `sessions-changed` global broadcast. Multi-window clients use
@@ -63,10 +66,10 @@ export interface TerminalSocketRequestInputs {
   takeover: TerminalTakeoverInput
   close: TerminalSessionInput
   'list-sessions': TerminalListSessionsInput
-  'list-workspace-tabs': TerminalListWorkspaceTabsInput
+  'workspace-pane-tabs.list': WorkspacePaneTabsListInput
+  'workspace-pane-tabs.replace': WorkspacePaneTabsReplaceInput
+  'workspace-pane-tabs.update': WorkspacePaneTabsUpdateInput
   create: TerminalCreateInput
-  'replace-tabs': TerminalReplaceWorkspaceTabsInput
-  'update-tabs': TerminalUpdateWorkspaceTabsInput
   prune: TerminalPruneInput
 }
 
@@ -78,10 +81,10 @@ export interface TerminalSocketResponseOutputs {
   takeover: TerminalTakeoverResult
   close: TerminalMutationResult
   'list-sessions': TerminalSessionSummary[]
-  'list-workspace-tabs': WorkspacePaneTabsEntry[]
+  'workspace-pane-tabs.list': WorkspacePaneTabsEntry[]
+  'workspace-pane-tabs.replace': WorkspacePaneTabEntry[]
+  'workspace-pane-tabs.update': WorkspacePaneTabEntry[]
   create: TerminalCreateResult
-  'replace-tabs': WorkspacePaneTabEntry[]
-  'update-tabs': WorkspacePaneTabEntry[]
   prune: { pruned: number; remaining: number }
 }
 

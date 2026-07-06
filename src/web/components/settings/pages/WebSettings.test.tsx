@@ -111,6 +111,12 @@ function seedElectronBootstrap() {
       onWorkspaceTabsChanged: () => () => {},
       onSessionClosed: () => () => {},
     }),
+    workspacePaneTabs: () => ({
+      replace: vi.fn(async (input) => input.tabs),
+      update: vi.fn(async () => []),
+      list: vi.fn(async () => []),
+      onChanged: () => () => {},
+    }),
     rotateAccessToken: vi.fn(async () => ({ accessToken: 'rotated-secret' })),
   })
 }
@@ -185,6 +191,12 @@ function seedWebBootstrap() {
       onSessionsChanged: () => () => {},
       onWorkspaceTabsChanged: () => () => {},
       onSessionClosed: () => () => {},
+    }),
+    workspacePaneTabs: () => ({
+      replace: vi.fn(async (input) => input.tabs),
+      update: vi.fn(async () => []),
+      list: vi.fn(async () => []),
+      onChanged: () => () => {},
     }),
   })
 }

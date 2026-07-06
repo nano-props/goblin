@@ -41,7 +41,7 @@ describe('branch action dispatch', () => {
       workspacePaneTabsByBranch: {
         'feature/worktree': [
           workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', terminalSessionId: 'session-1' },
+          { type: 'terminal', runtimeSessionId: 'session-1' },
         ],
       },
     })
@@ -103,7 +103,7 @@ describe('branch action dispatch', () => {
       workspacePaneTabsByBranch: {
         'feature/worktree': [
           workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', terminalSessionId: 'session-1' },
+          { type: 'terminal', runtimeSessionId: 'session-1' },
         ],
       },
     })
@@ -169,7 +169,7 @@ describe('branch action dispatch', () => {
       workspacePaneTabsByBranch: {
         'feature/worktree': [
           workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', terminalSessionId: 'session-1' },
+          { type: 'terminal', runtimeSessionId: 'session-1' },
         ],
       },
     })
@@ -209,7 +209,7 @@ describe('branch action dispatch', () => {
       workspacePaneTabsByBranch: {
         'feature/worktree': [
           workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', terminalSessionId: 'session-1' },
+          { type: 'terminal', runtimeSessionId: 'session-1' },
         ],
       },
     })
@@ -253,7 +253,7 @@ describe('branch action dispatch', () => {
       workspacePaneTabsByBranch: {
         'feature/worktree': [
           workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', terminalSessionId: 'session-1' },
+          { type: 'terminal', runtimeSessionId: 'session-1' },
         ],
       },
     })

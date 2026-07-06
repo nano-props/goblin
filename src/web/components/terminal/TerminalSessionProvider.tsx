@@ -16,6 +16,7 @@ import {
   refreshWorkspacePaneTabs,
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
 import {
   TerminalSessionProjection,
   getTerminalSessionProjection,
@@ -235,7 +236,7 @@ export function TerminalSessionProvider({ children, currentRepoId }: TerminalSes
       }, 0)
     }
     const offSessionsChanged = terminalClient.onSessionsChanged(scheduleProjectionRefresh)
-    const offWorkspaceTabsChanged = terminalClient.onWorkspaceTabsChanged((repoRoot) => {
+    const offWorkspaceTabsChanged = workspacePaneTabsClient.onChanged((repoRoot) => {
       const repoInstanceId = repoIndexRef.current[repoRoot]?.instanceId
       if (typeof repoInstanceId === 'string') refreshWorkspacePaneTabs(repoRoot, repoInstanceId)
       scheduleProjectionRefresh(repoRoot)

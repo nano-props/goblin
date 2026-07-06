@@ -175,8 +175,6 @@ export interface TerminalSessionSummary {
   hasRecentOutput: boolean
 }
 
-export type WorkspacePaneTabSummary = TerminalSessionSummary
-
 export interface TerminalWorktreeSnapshot {
   terminalWorktreeKey: string
   selectedDescriptor: TerminalDescriptor | null

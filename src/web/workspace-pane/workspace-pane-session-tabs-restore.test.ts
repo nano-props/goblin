@@ -10,7 +10,7 @@ import {
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
@@ -32,7 +32,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
     installWorkspacePaneTabsTestBridge({
       replaceWorkspaceTabs: async () => [
         workspacePaneStaticTabEntry('status'),
-        workspacePaneTerminalTabEntry('session-live'),
+        workspacePaneRuntimeTabEntry('terminal', 'session-live'),
       ],
     })
 
@@ -41,7 +41,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
         [REPO_ID]: {
           [worktreeTargetKey()]: [
             workspacePaneStaticTabEntry('status'),
-            workspacePaneTerminalTabEntry('session-stale'),
+            workspacePaneRuntimeTabEntry('terminal', 'session-stale'),
           ],
         },
       }),
@@ -49,7 +49,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
 
     expect(readTabsFor('feature/worktree', WORKTREE_PATH)).toEqual([
       workspacePaneStaticTabEntry('status'),
-      workspacePaneTerminalTabEntry('session-live'),
+      workspacePaneRuntimeTabEntry('terminal', 'session-live'),
     ])
   })
 
@@ -70,7 +70,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
         [REPO_ID]: {
           [branchTargetKey('feature/no-worktree')]: [
             workspacePaneStaticTabEntry('status'),
-            workspacePaneTerminalTabEntry('session-stale'),
+            workspacePaneRuntimeTabEntry('terminal', 'session-stale'),
           ],
         },
       }),
@@ -81,7 +81,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
       repoInstanceId: useReposStore.getState().repos[REPO_ID]!.instanceId,
       branchName: 'feature/no-worktree',
       worktreePath: null,
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-stale')],
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-stale')],
     })
     expect(readTabsFor('feature/no-worktree', null)).toEqual([workspacePaneStaticTabEntry('status')])
   })

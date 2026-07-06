@@ -116,6 +116,7 @@ describe('settings command handlers', () => {
   test('schema accepts well-formed session state via the perimeter', async () => {
     const { SETTINGS_PATCH_SCHEMAS } = await import('#/shared/procedure-schemas.ts')
     const { parseHttpInput } = await import('#/server/common/http-validate.ts')
+    const targetKey = branchTargetKey('/tmp/repo', 'main')
     const parsed = parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
       session: {
         openRepoEntries: [],
@@ -124,7 +125,11 @@ describe('settings command handlers', () => {
         workspacePaneSize: 42.5,
         selectedTerminalSessionIdByTerminalWorktree: {},
         preferredWorkspacePaneTabByTargetByRepo: {},
-        workspacePaneTabsByTargetByRepo: {},
+        workspacePaneTabsByTargetByRepo: {
+          '/tmp/repo': {
+            [targetKey]: [{ type: 'terminal', runtimeSessionId: 'session-1' }],
+          },
+        },
         filetreeViewStateByWorktreeByRepo: {},
       },
     })
@@ -200,6 +205,18 @@ describe('settings command handlers', () => {
           workspacePaneTabsByTargetByRepo: {
             '/tmp/repo': {
               [targetKey]: [{ type: 'terminal', terminalSessionId: '' }],
+            },
+          },
+        },
+      }),
+    ).toThrow()
+    expect(() =>
+      parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
+        session: {
+          ...session,
+          workspacePaneTabsByTargetByRepo: {
+            '/tmp/repo': {
+              [targetKey]: [{ type: 'terminal', runtimeSessionId: '' }],
             },
           },
         },
