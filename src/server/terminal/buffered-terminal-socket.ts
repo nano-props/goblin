@@ -17,13 +17,21 @@
 // `registerSocket`.
 
 import type { TerminalRealtimeSocket } from '#/server/terminal/terminal-realtime-broker.ts'
+import type { TerminalRealtimeMessage } from '#/shared/terminal-socket.ts'
 
 type BufferedEntry = { type: 'send'; payload: string } | { type: 'close'; code?: number; reason?: string }
+
+export interface TerminalOutputFlushBoundary {
+  terminalRuntimeSessionId: string
+  outputEra: number
+  seq: number
+}
 
 export class BufferedTerminalSocket implements TerminalRealtimeSocket {
   private paused = 0
   private active = true
   private readonly buffer: BufferedEntry[] = []
+  private readonly flushBoundaryByTerminalRuntimeSessionId = new Map<string, TerminalOutputFlushBoundary>()
   private readonly socket: TerminalRealtimeSocket
   private readonly onDeactivate?: () => void
 
@@ -61,8 +69,9 @@ export class BufferedTerminalSocket implements TerminalRealtimeSocket {
     this.paused += 1
   }
 
-  resume(): void {
+  resume(boundary?: TerminalOutputFlushBoundary | null): void {
     if (this.paused === 0 || !this.active) return
+    if (boundary) this.recordFlushBoundary(boundary)
     this.paused -= 1
     if (this.paused > 0) return
     this.flushBuffer()
@@ -73,6 +82,7 @@ export class BufferedTerminalSocket implements TerminalRealtimeSocket {
     this.active = false
     this.paused = 0
     this.buffer.length = 0
+    this.flushBoundaryByTerminalRuntimeSessionId.clear()
     this.onDeactivate?.()
   }
 
@@ -87,20 +97,81 @@ export class BufferedTerminalSocket implements TerminalRealtimeSocket {
   private closeNow(code?: number, reason?: string): void {
     this.active = false
     this.buffer.length = 0
+    this.flushBoundaryByTerminalRuntimeSessionId.clear()
     try {
       this.socket.close(code, reason)
     } catch {}
+  }
+
+  private recordFlushBoundary(boundary: TerminalOutputFlushBoundary): void {
+    const current = this.flushBoundaryByTerminalRuntimeSessionId.get(boundary.terminalRuntimeSessionId)
+    if (!current || isCheckpointAfter(boundary, current)) {
+      this.flushBoundaryByTerminalRuntimeSessionId.set(boundary.terminalRuntimeSessionId, normalizeBoundary(boundary))
+    }
   }
 
   private flushBuffer(): void {
     for (const entry of this.buffer.splice(0)) {
       if (!this.active) break
       if (entry.type === 'send') {
+        if (this.isOutputCoveredByFlushBoundary(entry.payload)) continue
         this.sendNow(entry.payload)
         continue
       }
       this.closeNow(entry.code, entry.reason)
       break
     }
+    this.flushBoundaryByTerminalRuntimeSessionId.clear()
   }
+
+  private isOutputCoveredByFlushBoundary(payload: string): boolean {
+    const message = parseTerminalRealtimeMessage(payload)
+    const event = message?.type === 'output' ? message.event : null
+    if (!event) return false
+    const boundary = this.flushBoundaryByTerminalRuntimeSessionId.get(event.terminalRuntimeSessionId)
+    if (!boundary) return false
+    if (event.outputEra !== boundary.outputEra) return event.outputEra < boundary.outputEra
+    return event.seq <= boundary.seq
+  }
+}
+
+function parseTerminalRealtimeMessage(payload: string): TerminalRealtimeMessage | null {
+  try {
+    const parsed = JSON.parse(payload) as TerminalRealtimeMessage
+    if (!parsed || typeof parsed !== 'object') return null
+    if (parsed.type === 'output' && !isTerminalOutputMessage(parsed)) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function isTerminalOutputMessage(message: TerminalRealtimeMessage): message is Extract<TerminalRealtimeMessage, { type: 'output' }> {
+  if (message.type !== 'output') return false
+  const event = message.event
+  return (
+    event !== null &&
+    typeof event === 'object' &&
+    typeof event.terminalRuntimeSessionId === 'string' &&
+    typeof event.outputEra === 'number' &&
+    typeof event.seq === 'number'
+  )
+}
+
+function normalizeBoundary(boundary: TerminalOutputFlushBoundary): TerminalOutputFlushBoundary {
+  return {
+    terminalRuntimeSessionId: boundary.terminalRuntimeSessionId,
+    outputEra: normalizeOutputNumber(boundary.outputEra),
+    seq: normalizeOutputNumber(boundary.seq),
+  }
+}
+
+function isCheckpointAfter(next: TerminalOutputFlushBoundary, current: TerminalOutputFlushBoundary): boolean {
+  if (next.outputEra !== current.outputEra) return next.outputEra > current.outputEra
+  return next.seq > current.seq
+}
+
+function normalizeOutputNumber(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.floor(value))
 }

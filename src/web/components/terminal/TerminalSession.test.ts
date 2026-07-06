@@ -1393,10 +1393,11 @@ describe('TerminalSession', () => {
 
     expect(term.write).toHaveBeenCalledWith('rehydrated', expect.any(Function))
 
-    // After the term.write callback fires, the field is
-    // cleared. The mock invokes the callback via queueMicrotask, so
-    // draining microtasks is enough to observe the post-callback state.
-    await flushResizeDispatch()
+    // After the render queue observes the term.write callback, the
+    // field is cleared. The queue adds one promise boundary on top of
+    // xterm's callback, so wait for the observable state instead of a
+    // fixed microtask count.
+    await flushUntil(() => hydratedSnapshot(session).snapshot.length === 0)
     expect(hydratedSnapshot(session)).toEqual({ snapshot: '', snapshotSeq: 0, outputEra: 0 })
   })
 
@@ -2250,6 +2251,51 @@ describe('TerminalSession', () => {
 
     expect(term.write).toHaveBeenCalledTimes(1)
     expect(term.write).toHaveBeenCalledWith('next', expect.any(Function))
+  })
+
+  test('does not let a superseded active output append advance the rendered checkpoint', async () => {
+    const attach = deferred<TerminalAttachResult>()
+    terminalCalls.attach.mockReturnValueOnce(attach.promise)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushUntil(() => terminalCalls.attach.mock.calls.length === 1)
+
+    const term = xtermMocks.terminals[0]!
+    xtermMocks.deferWriteCallbacks(true)
+    session.handleOutput({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'session-1',
+      data: 'live-2',
+      seq: 2,
+      outputEra: 0,
+      processName: 'zsh',
+    })
+    await flushTerminalStart()
+    expect(term.write).toHaveBeenCalledWith('live-2', expect.any(Function))
+
+    attach.resolve(attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'snapshot-1', snapshotSeq: 1, outputEra: 0 }))
+    await flushResizeDispatch()
+    xtermMocks.flushNextDeferredWriteCallback()
+    await flushUntil(() => term.write.mock.calls.some((call: unknown[]) => call[0] === 'snapshot-1'))
+    xtermMocks.flushNextDeferredWriteCallback()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    term.write.mockClear()
+    xtermMocks.deferWriteCallbacks(false)
+    session.handleOutput({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'session-1',
+      data: 'live-2-again',
+      seq: 2,
+      outputEra: 0,
+      processName: 'zsh',
+    })
+    await flushTerminalStart()
+
+    expect(term.write).toHaveBeenCalledWith('live-2-again', expect.any(Function))
   })
 
   test('batches terminal output writes on animation frames', async () => {
