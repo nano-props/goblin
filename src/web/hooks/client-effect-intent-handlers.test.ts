@@ -159,6 +159,8 @@ function navigationWithStoreActions(): PrimaryWindowNavigationActions {
       const state = useReposStore.getState()
       state.setWorkspacePaneTab(repoId, branch, tab)
     },
+    goBack: vi.fn(),
+    goForward: vi.fn(),
     openSettings: vi.fn(),
     openCreateWorktree: vi.fn(),
   }

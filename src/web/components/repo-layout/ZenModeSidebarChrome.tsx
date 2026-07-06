@@ -8,7 +8,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react'
-import { WorkspaceZenModeToggle } from '#/web/components/WorkspaceZenModeToggle.tsx'
+import { WorkspaceNavigationControls } from '#/web/components/WorkspaceNavigationControls.tsx'
 import { RepoLayoutSidebar } from '#/web/components/repo-layout/RepoLayoutSidebar.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import {
@@ -50,6 +50,7 @@ interface ZenModeSidebarRevealProps {
 }
 
 interface ZenModeSidebarRevealTriggerProps {
+  repoId?: string
   revealEnabled?: boolean
   onMouseEnter?: () => void
 }
@@ -153,13 +154,21 @@ export function ZenModeSidebarChrome({
         />
       ) : null}
       {zenModeToggleEnabled ? (
-        <ZenModeSidebarRevealTriggerLayer revealEnabled={revealEnabled} onMouseEnter={reveal.onTriggerEnter} />
+        <ZenModeSidebarRevealTriggerLayer
+          repoId={repoId}
+          revealEnabled={revealEnabled}
+          onMouseEnter={reveal.onTriggerEnter}
+        />
       ) : null}
     </>
   )
 }
 
-function ZenModeSidebarRevealTriggerLayer({ revealEnabled = false, onMouseEnter }: ZenModeSidebarRevealTriggerProps) {
+function ZenModeSidebarRevealTriggerLayer({
+  repoId,
+  revealEnabled = false,
+  onMouseEnter,
+}: ZenModeSidebarRevealTriggerProps) {
   return (
     <div
       data-testid="zen-mode-toggle-overlay"
@@ -167,19 +176,18 @@ function ZenModeSidebarRevealTriggerLayer({ revealEnabled = false, onMouseEnter 
       className="goblin-zen-reveal-trigger-layer pointer-events-none absolute left-0 top-0 z-40 flex items-center bg-transparent"
       style={{ height: TITLE_BAR_HEIGHT_PX }}
     >
-      <ZenModeSidebarRevealTrigger revealEnabled={revealEnabled} onMouseEnter={onMouseEnter} />
+      <ZenModeSidebarRevealTrigger repoId={repoId} revealEnabled={revealEnabled} onMouseEnter={onMouseEnter} />
     </div>
   )
 }
 
-function ZenModeSidebarRevealTrigger({ revealEnabled = false, onMouseEnter }: ZenModeSidebarRevealTriggerProps) {
+function ZenModeSidebarRevealTrigger({ repoId, revealEnabled = false, onMouseEnter }: ZenModeSidebarRevealTriggerProps) {
   return (
-    <TitleBarInteractiveRegion asChild>
-      <WorkspaceZenModeToggle
-        data-zen-reveal-surface={revealEnabled ? '' : undefined}
-        data-testid="zen-mode-sidebar-trigger"
-        className="pointer-events-auto"
-        onMouseEnter={revealEnabled ? onMouseEnter : undefined}
+    <TitleBarInteractiveRegion>
+      <WorkspaceNavigationControls
+        repoId={repoId}
+        revealEnabled={revealEnabled}
+        onRevealEnter={onMouseEnter}
       />
     </TitleBarInteractiveRegion>
   )

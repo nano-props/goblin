@@ -36,7 +36,9 @@ import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowNavigationStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
 import { branchNameFromSlug, repoIdFromSlug } from '#/web/repo-route-slugs.ts'
-import { usePrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
+import { returnToFromHref, usePrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
+import { useWorkspaceNavigationHistory } from '#/web/workspace-navigation-history.ts'
+import type { WorkspaceNavigationRouteContext } from '#/web/workspace-navigation-history.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 
 const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapState>({ status: 'restoring-workspace' })
@@ -95,6 +97,7 @@ function AuthenticatedSettingsShell() {
 function AuthenticatedWorkspaceShell() {
   const navigate = useNavigate()
   const routeMatches = useRouterState({ select: (s) => s.matches })
+  const routeHref = useRouterState({ select: (s) => s.location.href })
 
   const overlays = useAppOverlays()
   const modalOpen = overlays.anyOpen
@@ -111,7 +114,12 @@ function AuthenticatedWorkspaceShell() {
   })
   const currentBranchName = routeContext?.kind === 'branch' ? (routeContext.branchName ?? null) : null
   const order = useReposStore((s) => s.order)
-  const { closeRepo, setWorkspacePaneTab } = useReposStore(
+  const {
+    closeRepo,
+    setWorkspacePaneTab,
+    goBackInWorkspaceNavigation,
+    goForwardInWorkspaceNavigation,
+  } = useReposStore(
     useShallow(primaryWindowNavigationStoreActionsFromStore),
   )
   const routeNavigation = usePrimaryWindowRouteNavigation()
@@ -122,9 +130,19 @@ function AuthenticatedWorkspaceShell() {
         order,
         closeRepo,
         setWorkspacePaneTab,
+        goBackInWorkspaceNavigation,
+        goForwardInWorkspaceNavigation,
         routeNavigation,
       }),
-    [closeRepo, order, routeNavigation, setWorkspacePaneTab, hydratedRouteRepoId],
+    [
+      closeRepo,
+      goBackInWorkspaceNavigation,
+      goForwardInWorkspaceNavigation,
+      order,
+      routeNavigation,
+      setWorkspacePaneTab,
+      hydratedRouteRepoId,
+    ],
   )
 
   const repoDrop = useRepoDrop({ blocked: modalOpen })
@@ -135,6 +153,7 @@ function AuthenticatedWorkspaceShell() {
         routedRepoId={routedRepoId}
         hydratedRouteRepoId={hydratedRouteRepoId}
         currentBranchName={currentBranchName}
+        routeContext={workspaceNavigationRouteContext(routeContext, routeHref)}
         navigation={navigation}
         closeAllOverlays={overlays.closeAllOverlays}
         openRepoPathDialog={overlays.openRepoPathDialog}
@@ -266,6 +285,7 @@ function AuthenticatedWorkspaceSideEffects({
   routedRepoId,
   hydratedRouteRepoId,
   currentBranchName,
+  routeContext,
   navigation,
   closeAllOverlays,
   openRepoPathDialog,
@@ -279,6 +299,7 @@ function AuthenticatedWorkspaceSideEffects({
   routedRepoId: string | null
   hydratedRouteRepoId: string | null
   currentBranchName: string | null
+  routeContext: WorkspaceNavigationRouteContext | null
   navigation: PrimaryWindowNavigationActions
   closeAllOverlays: () => void
   openRepoPathDialog: () => void
@@ -315,10 +336,27 @@ function AuthenticatedWorkspaceSideEffects({
   })
 
   useSessionPersistence({ routedRepoId })
+  useWorkspaceNavigationHistory({ routeContext })
   useBackgroundFetch({ hydratedRouteRepoId })
   useRepoStatusRefresh({ hydratedRouteRepoId, currentBranchName })
   useNetworkReconnect()
   useRepoStoreInvalidationRefresh()
   useSettingsQueryInvalidationSync()
   return null
+}
+
+function workspaceNavigationRouteContext(
+  routeContext: RepoRouteContext | null,
+  routeHref: string | null,
+): WorkspaceNavigationRouteContext | null {
+  if (!routeContext) return null
+  const repoId = repoIdFromSlug(routeContext.repoSlug)
+  if (!repoId) return null
+  if (routeContext.kind === 'branch') {
+    return null
+  }
+  if (routeContext.kind === 'newWorktree') {
+    return { kind: 'newWorktree', repoId, returnTo: returnToFromHref(routeHref) }
+  }
+  return { kind: routeContext.kind, repoId }
 }

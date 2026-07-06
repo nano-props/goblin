@@ -118,6 +118,8 @@ describe('repo selectors', () => {
     ).toEqual({
       closeRepo: fnA,
       setWorkspacePaneTab: fnA,
+      goBackInWorkspaceNavigation: expect.any(Function),
+      goForwardInWorkspaceNavigation: expect.any(Function),
     })
     expect(
       repoPickerStoreActionsFromStore({

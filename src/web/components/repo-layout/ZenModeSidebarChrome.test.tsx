@@ -3,15 +3,35 @@
 import { userEvent } from '@testing-library/user-event'
 import { act, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { ComponentProps } from 'react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { ZenModeSidebarChrome } from '#/web/components/repo-layout/ZenModeSidebarChrome.tsx'
 
-vi.mock('#/web/components/WorkspaceZenModeToggle.tsx', () => ({
-  WorkspaceZenModeToggle: (props: ComponentProps<'button'>) => (
-    <button type="button" {...props}>
-      zen
-    </button>
+vi.mock('#/web/components/WorkspaceNavigationControls.tsx', () => ({
+  WorkspaceNavigationControls: ({
+    revealEnabled,
+    onRevealEnter,
+    repoId,
+  }: {
+    revealEnabled?: boolean
+    onRevealEnter?: () => void
+    repoId?: string
+  }) => (
+    <div
+      data-testid="mock-workspace-navigation-controls"
+      data-repo-id={repoId}
+      data-zen-reveal-surface={revealEnabled ? '' : undefined}
+      onMouseEnter={onRevealEnter}
+    >
+      <button type="button" data-testid="zen-mode-sidebar-trigger">
+        zen
+      </button>
+      <button type="button" disabled>
+        back
+      </button>
+      <button type="button" disabled>
+        forward
+      </button>
+    </div>
   ),
 }))
 
@@ -59,6 +79,28 @@ beforeEach(() => {
 })
 
 describe('ZenModeSidebarChrome', () => {
+  test('uses the whole navigation control group as the reveal trigger surface', () => {
+    const { container } = renderInJsdom(
+      <ZenModeSidebarChrome
+        repoId="/tmp/repo"
+        zenModeToggleEnabled
+        revealEnabled
+        sidebarSize={36}
+        onSidebarSizeChange={() => {}}
+      />,
+    )
+
+    const controls = screen.getByTestId('mock-workspace-navigation-controls')
+    expect(controls.dataset.repoId).toBe('/tmp/repo')
+    expect(controls.hasAttribute('data-zen-reveal-surface')).toBe(true)
+    expect(controls.closest('[data-title-bar-chrome-region="interactive"]')).not.toBeNull()
+
+    act(() => {
+      controls.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    })
+    expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
+  })
+
   test('keeps the reveal open while a descendant Popover is open', async () => {
     const user = userEvent.setup()
     const { container } = renderInJsdom(

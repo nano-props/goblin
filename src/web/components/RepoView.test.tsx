@@ -128,6 +128,36 @@ vi.mock('#/web/components/WorkspaceZenModeToggle.tsx', () => ({
   ),
 }))
 
+vi.mock('#/web/components/WorkspaceNavigationControls.tsx', () => ({
+  WorkspaceNavigationControls: ({
+    repoId,
+    revealEnabled,
+    onRevealEnter,
+  }: {
+    repoId?: string
+    revealEnabled?: boolean
+    onRevealEnter?: () => void
+  }) => (
+    <div
+      data-testid="workspace-navigation-controls"
+      data-repo-id={repoId}
+      data-zen-reveal-surface={revealEnabled ? '' : undefined}
+      className="pointer-events-auto"
+      onMouseEnter={revealEnabled ? onRevealEnter : undefined}
+    >
+      <button type="button" data-testid="zen-mode-sidebar-trigger">
+        zen
+      </button>
+      <button type="button" disabled>
+        back
+      </button>
+      <button type="button" disabled>
+        forward
+      </button>
+    </div>
+  ),
+}))
+
 vi.mock('#/web/components/Layout.tsx', () => ({
   RepoWorkspace: ({
     mode,
@@ -451,7 +481,7 @@ describe('RepoView workspace navigation', () => {
     expect(floatingSidebarTop?.hasAttribute('data-interactive')).toBe(false)
     expect(floatingSidebarTop?.dataset.titleBarChromeRegion).toBe('drag')
     expect(floatingSidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
-    expect(zenModeSidebarTrigger(container)?.dataset.titleBarChromeRegion).toBe('interactive')
+    expect(workspaceNavigationControls(container)?.closest('[data-title-bar-chrome-region="interactive"]')).not.toBeNull()
     expect(zenModeSidebarTrigger(container)?.tagName).toBe('BUTTON')
   })
 
@@ -472,8 +502,8 @@ describe('RepoView workspace navigation', () => {
     expect(revealLayer!.compareDocumentPosition(toggleOverlay!) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     )
-    expect(zenModeSidebarTrigger(container)?.hasAttribute('data-interactive')).toBe(true)
-    expect(zenModeSidebarTrigger(container)?.dataset.titleBarChromeRegion).toBe('interactive')
+    expect(workspaceNavigationControls(container)?.closest('[data-title-bar-chrome-region="interactive"]')).not.toBeNull()
+    expect(workspaceNavigationControls(container)?.hasAttribute('data-zen-reveal-surface')).toBe(true)
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
 
     act(() => {
@@ -540,7 +570,7 @@ describe('RepoView workspace navigation', () => {
     const { container } = render(branchRepoView())
 
     const trigger = zenModeSidebarTrigger(container)
-    expect(trigger?.hasAttribute('data-zen-reveal-surface')).toBe(true)
+    expect(workspaceNavigationControls(container)?.hasAttribute('data-zen-reveal-surface')).toBe(true)
 
     act(() => {
       trigger?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
@@ -970,6 +1000,10 @@ function zenModeSidebarResizeHandle(container: HTMLElement): HTMLElement | null 
 
 function zenModeSidebarTrigger(container: HTMLElement): HTMLElement | null {
   return container.querySelector<HTMLElement>('[data-testid="zen-mode-sidebar-trigger"]')
+}
+
+function workspaceNavigationControls(container: HTMLElement): HTMLElement | null {
+  return container.querySelector<HTMLElement>('[data-testid="workspace-navigation-controls"]')
 }
 
 function zenModeToggleOverlay(container: HTMLElement): HTMLElement | null {

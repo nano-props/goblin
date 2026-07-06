@@ -256,6 +256,8 @@ export const ko: Record<DictKey, string> = {
   'branches.filter-tooltip.worktrees': '워크트리 브랜치',
   'workspace.zen-mode-toggle-label': '젠 모드 전환',
   'workspace.zen-mode-toggle-tooltip.enable': '젠 모드',
+  'workspace.navigation-back': '뒤로',
+  'workspace.navigation-forward': '앞으로',
   'workspace.back-to-branch-navigator': 'Branch Navigator로 돌아가기',
   'workspace.open-externally.open': '외부에서 열기',
   'branches.gone': '원격 사라짐',

@@ -177,7 +177,9 @@ function removeRepoFromSessionState(s: ReposStore, id: string): Partial<ReposSto
   const repos = { ...s.repos }
   const selectedTerminalSessionIdByTerminalWorktree = { ...s.selectedTerminalSessionIdByTerminalWorktree }
   const tabOpenerIdentityByScope = { ...s.tabOpenerIdentityByScope }
+  const navigationHistoryByRepo = { ...s.navigationHistoryByRepo }
   delete repos[id]
+  delete navigationHistoryByRepo[id]
   for (const terminalWorktreeKey of Object.keys(selectedTerminalSessionIdByTerminalWorktree)) {
     if (terminalWorktreeKey.startsWith(`${id}\0`)) delete selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]
   }
@@ -190,6 +192,7 @@ function removeRepoFromSessionState(s: ReposStore, id: string): Partial<ReposSto
     repos,
     selectedTerminalSessionIdByTerminalWorktree,
     tabOpenerIdentityByScope,
+    navigationHistoryByRepo,
     order,
     restoredRepoId,
   }

@@ -71,6 +71,8 @@ const navigation: PrimaryWindowNavigationActions = {
   cycleRepo: vi.fn(),
   selectRepoBranch: vi.fn(),
   showRepoBranchWorkspacePaneTab: vi.fn(),
+  goBack: vi.fn(),
+  goForward: vi.fn(),
   openSettings: vi.fn(),
   openCreateWorktree: vi.fn(),
 }

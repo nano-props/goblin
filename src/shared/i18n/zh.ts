@@ -248,6 +248,8 @@ export const zh: Record<DictKey, string> = {
   'branches.filter-tooltip.worktrees': '工作树分支',
   'workspace.zen-mode-toggle-label': '切换禅模式',
   'workspace.zen-mode-toggle-tooltip.enable': '禅模式',
+  'workspace.navigation-back': '后退',
+  'workspace.navigation-forward': '前进',
   'workspace.back-to-branch-navigator': '返回 Branch Navigator',
   'workspace.open-externally.open': '在外部打开',
   'branches.gone': '已失联',

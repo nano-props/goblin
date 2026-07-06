@@ -66,6 +66,8 @@ beforeEach(() => {
       const state = useReposStore.getState()
       state.setWorkspacePaneTab(repoId, branch, tab)
     },
+    goBack: () => {},
+    goForward: () => {},
     openSettings: () => {},
     openCreateWorktree: () => {},
   }

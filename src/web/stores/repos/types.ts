@@ -151,6 +151,29 @@ export interface RestorableWorkspaceState {
   selectedTerminalSessionIdByTerminalWorktree: Record<string, string>
 }
 
+export type WorkspaceNavigationHistoryRoute =
+  | { kind: 'empty' }
+  | { kind: 'dashboard' }
+  | { kind: 'newWorktree'; returnTo: string | null }
+  | {
+      kind: 'branch'
+      branchName: string
+      workspacePaneTab: WorkspacePaneTabType | null
+      terminalWorktreeKey: string | null
+      terminalSessionId: string | null
+    }
+
+export interface WorkspaceNavigationHistoryEntry {
+  repoId: string
+  route: WorkspaceNavigationHistoryRoute
+}
+
+export interface WorkspaceNavigationHistoryRepoState {
+  current: WorkspaceNavigationHistoryEntry | null
+  backStack: WorkspaceNavigationHistoryEntry[]
+  forwardStack: WorkspaceNavigationHistoryEntry[]
+}
+
 export interface SessionWorkspacePaneRestoreState {
   workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>
   preferredWorkspacePaneTabByTargetByRepo: Record<string, Record<string, WorkspacePaneSessionTabType>>
@@ -186,6 +209,10 @@ interface LocalWorkspaceState {
    *  repo/branch, unlike terminal identities. Session-local only — openers
    *  don't need to survive reload/restart. */
   tabOpenerIdentityByScope: Record<string, Record<string, string>>
+  /** Session-only app navigation history, scoped by repo. The route owns
+   *  the visible repo/branch, while this store keeps enough local context
+   *  to restore branch-level workspace tab and terminal selection. */
+  navigationHistoryByRepo: Record<string, WorkspaceNavigationHistoryRepoState>
 }
 
 interface LocalWorkspaceActions {
@@ -195,6 +222,9 @@ interface LocalWorkspaceActions {
   setTabOpener: (scopeKey: string, childIdentity: string, openerIdentity: string) => void
   /** Clears a tab's recorded opener within a scope, e.g. once the tab has closed. */
   clearTabOpener: (scopeKey: string, childIdentity: string) => void
+  recordWorkspaceNavigation: (entry: WorkspaceNavigationHistoryEntry) => void
+  goBackInWorkspaceNavigation: (repoId: string) => WorkspaceNavigationHistoryEntry | null
+  goForwardInWorkspaceNavigation: (repoId: string) => WorkspaceNavigationHistoryEntry | null
 }
 
 interface RestorableWorkspaceActions {

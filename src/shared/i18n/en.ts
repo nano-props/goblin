@@ -265,6 +265,8 @@ export const en = {
   'branches.filter-tooltip.worktrees': 'Worktree branches',
   'workspace.zen-mode-toggle-label': 'Toggle Zen Mode',
   'workspace.zen-mode-toggle-tooltip.enable': 'Zen Mode',
+  'workspace.navigation-back': 'Back',
+  'workspace.navigation-forward': 'Forward',
   'workspace.back-to-branch-navigator': 'Back to Branch Navigator',
   'workspace.open-externally.open': 'Open externally',
   'branches.gone': 'gone',

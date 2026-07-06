@@ -352,6 +352,7 @@ export function resetReposStore(): void {
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     selectedTerminalSessionIdByTerminalWorktree: {},
     tabOpenerIdentityByScope: {},
+    navigationHistoryByRepo: {},
   })
 }
 

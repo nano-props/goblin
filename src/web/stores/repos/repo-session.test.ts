@@ -343,4 +343,28 @@ describe('repo lifecycle', () => {
     expect(openers[tabOpenerScopeKey(REPO_A, 'feature/a')]).toBeUndefined()
     expect(openers[tabOpenerScopeKey(REPO_B, 'feature/b')]?.['workspace-pane:changes']).toBe('workspace-pane:status')
   })
+
+  test('closeRepo clears workspace navigation history scoped to that repo', () => {
+    const repoA = seedRepoWithReadModelForTest({ id: REPO_A, branches: [createRepoBranch('feature/a')], currentBranchName: 'feature/a' })
+    const repoB = seedRepoWithReadModelForTest({ id: REPO_B, branches: [createRepoBranch('feature/b')], currentBranchName: 'feature/b' })
+    useReposStore.setState({
+      repos: { [REPO_A]: repoA, [REPO_B]: repoB },
+      order: [REPO_A, REPO_B],
+      restoredRepoId: REPO_A,
+    })
+    useReposStore.getState().recordWorkspaceNavigation({ repoId: REPO_A, route: { kind: 'dashboard' } })
+    useReposStore.getState().recordWorkspaceNavigation({
+      repoId: REPO_B,
+      route: { kind: 'newWorktree', returnTo: '/repo/repo-b/dashboard' },
+    })
+
+    useReposStore.getState().closeRepo(REPO_A)
+
+    const history = useReposStore.getState().navigationHistoryByRepo
+    expect(history[REPO_A]).toBeUndefined()
+    expect(history[REPO_B]?.current).toEqual({
+      repoId: REPO_B,
+      route: { kind: 'newWorktree', returnTo: '/repo/repo-b/dashboard' },
+    })
+  })
 })

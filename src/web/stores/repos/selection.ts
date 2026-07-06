@@ -6,6 +6,8 @@ import {
   normalizeWorkspaceSessionLayoutState,
 } from '#/shared/workspace-layout.ts'
 import type { BranchViewMode, RepoState, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
+import type { WorkspaceNavigationHistoryRepoState } from '#/web/stores/repos/types.ts'
+import { workspaceNavigationHistoryEntryEqual } from '#/web/stores/repos/navigation-history-entry.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
@@ -27,6 +29,12 @@ type RestorableWorkspaceActions = Pick<
 >
 
 type RuntimeWorkspacePreferenceActions = Pick<ReposStore, 'setBranchViewMode' | 'setWorkspacePaneTab'>
+type WorkspaceNavigationHistoryActions = Pick<
+  ReposStore,
+  'recordWorkspaceNavigation' | 'goBackInWorkspaceNavigation' | 'goForwardInWorkspaceNavigation'
+>
+
+const MAX_WORKSPACE_NAVIGATION_HISTORY_ENTRIES = 50
 
 function createRestorableWorkspaceActions(set: ReposSet, get: ReposGet): RestorableWorkspaceActions {
   return {
@@ -184,9 +192,100 @@ function createRuntimeWorkspacePreferenceActions(set: ReposSet, get: ReposGet): 
   }
 }
 
+function createWorkspaceNavigationHistoryActions(
+  set: ReposSet,
+  get: ReposGet,
+): WorkspaceNavigationHistoryActions {
+  return {
+    recordWorkspaceNavigation(entry) {
+      set((s) => {
+        const currentRepoHistory = navigationHistoryForRepo(s.navigationHistoryByRepo[entry.repoId])
+        if (workspaceNavigationHistoryEntryEqual(currentRepoHistory.current, entry)) return s
+
+        const nextRepoHistory: WorkspaceNavigationHistoryRepoState = {
+          current: entry,
+          backStack: currentRepoHistory.current
+            ? [...currentRepoHistory.backStack, currentRepoHistory.current].slice(
+                -MAX_WORKSPACE_NAVIGATION_HISTORY_ENTRIES,
+              )
+            : currentRepoHistory.backStack,
+          forwardStack: [],
+        }
+
+        return {
+          navigationHistoryByRepo: {
+            ...s.navigationHistoryByRepo,
+            [entry.repoId]: nextRepoHistory,
+          },
+        }
+      })
+    },
+
+    goBackInWorkspaceNavigation(repoId) {
+      const history = navigationHistoryForRepo(get().navigationHistoryByRepo[repoId])
+      const target = history.backStack.at(-1) ?? null
+      if (!target || !history.current) return null
+
+      set((s) => {
+        const currentRepoHistory = navigationHistoryForRepo(s.navigationHistoryByRepo[repoId])
+        const nextTarget = currentRepoHistory.backStack.at(-1) ?? null
+        if (!nextTarget || !currentRepoHistory.current) return s
+        return {
+          navigationHistoryByRepo: {
+            ...s.navigationHistoryByRepo,
+            [repoId]: {
+              current: nextTarget,
+              backStack: currentRepoHistory.backStack.slice(0, -1),
+              forwardStack: [currentRepoHistory.current, ...currentRepoHistory.forwardStack].slice(
+                0,
+                MAX_WORKSPACE_NAVIGATION_HISTORY_ENTRIES,
+              ),
+            },
+          },
+        }
+      })
+
+      return target
+    },
+
+    goForwardInWorkspaceNavigation(repoId) {
+      const history = navigationHistoryForRepo(get().navigationHistoryByRepo[repoId])
+      const target = history.forwardStack[0] ?? null
+      if (!target || !history.current) return null
+
+      set((s) => {
+        const currentRepoHistory = navigationHistoryForRepo(s.navigationHistoryByRepo[repoId])
+        const nextTarget = currentRepoHistory.forwardStack[0] ?? null
+        if (!nextTarget || !currentRepoHistory.current) return s
+        return {
+          navigationHistoryByRepo: {
+            ...s.navigationHistoryByRepo,
+            [repoId]: {
+              current: nextTarget,
+              backStack: [...currentRepoHistory.backStack, currentRepoHistory.current].slice(
+                -MAX_WORKSPACE_NAVIGATION_HISTORY_ENTRIES,
+              ),
+              forwardStack: currentRepoHistory.forwardStack.slice(1),
+            },
+          },
+        }
+      })
+
+      return target
+    },
+  }
+}
+
+function navigationHistoryForRepo(
+  state: WorkspaceNavigationHistoryRepoState | undefined,
+): WorkspaceNavigationHistoryRepoState {
+  return state ?? { current: null, backStack: [], forwardStack: [] }
+}
+
 export function createSelectionActions(set: ReposSet, get: ReposGet) {
   return {
     ...createRestorableWorkspaceActions(set, get),
     ...createRuntimeWorkspacePreferenceActions(set, get),
+    ...createWorkspaceNavigationHistoryActions(set, get),
   }
 }

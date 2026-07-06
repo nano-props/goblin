@@ -113,6 +113,7 @@ export const useReposStore = create<ReposStore>()(
       sessionPersistenceReady: false,
       sessionRestoreError: null,
       tabOpenerIdentityByScope: {},
+      navigationHistoryByRepo: {},
 
       ...createRepoSessionActions(set, get),
       ...createSelectionActions(set, get),

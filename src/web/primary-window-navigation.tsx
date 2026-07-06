@@ -26,7 +26,12 @@ export function usePrimaryWindowNavigation(): PrimaryWindowNavigationActions {
   if (context) return context
 
   const order = useReposStore((s) => s.order)
-  const { closeRepo, setWorkspacePaneTab } = useReposStore(
+  const {
+    closeRepo,
+    setWorkspacePaneTab,
+    goBackInWorkspaceNavigation,
+    goForwardInWorkspaceNavigation,
+  } = useReposStore(
     useShallow(primaryWindowNavigationStoreActionsFromStore),
   )
   const routeNavigation = usePrimaryWindowRouteNavigation()
@@ -37,9 +42,18 @@ export function usePrimaryWindowNavigation(): PrimaryWindowNavigationActions {
         order,
         closeRepo,
         setWorkspacePaneTab,
+        goBackInWorkspaceNavigation,
+        goForwardInWorkspaceNavigation,
         routeNavigation,
       }),
-    [closeRepo, order, routeNavigation, setWorkspacePaneTab],
+    [
+      closeRepo,
+      goBackInWorkspaceNavigation,
+      goForwardInWorkspaceNavigation,
+      order,
+      routeNavigation,
+      setWorkspacePaneTab,
+    ],
   )
 
   return fallbackNavigation

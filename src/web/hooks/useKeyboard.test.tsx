@@ -150,6 +150,28 @@ describe('useKeyboard', () => {
     expect(selectRepoBranch).toHaveBeenCalledWith(REPO_ID, 'feature/query')
   })
 
+  test('alt-arrow navigates workspace history', async () => {
+    const goBack = vi.fn()
+    const goForward = vi.fn()
+    await renderHookHost({
+      currentRepoId: REPO_ID,
+      navigation: navigationWith({ goBack, goForward }),
+    })
+
+    await act(async () => {
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowLeft', code: 'ArrowLeft', altKey: true, bubbles: true }),
+      )
+      window.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowRight', code: 'ArrowRight', altKey: true, bubbles: true }),
+      )
+      await Promise.resolve()
+    })
+
+    expect(goBack).toHaveBeenCalledWith(REPO_ID)
+    expect(goForward).toHaveBeenCalledWith(REPO_ID)
+  })
+
   test('primary modifier plus number selects workspace pane tabs even while terminal is focused', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     installNativeBridgeStub()
@@ -402,6 +424,8 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
     cycleRepo: () => {},
     selectRepoBranch: () => {},
     showRepoBranchWorkspacePaneTab: () => {},
+    goBack: () => {},
+    goForward: () => {},
     openSettings: () => {},
     openCreateWorktree: () => {},
     ...overrides,
