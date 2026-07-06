@@ -125,9 +125,9 @@ export function RepoWorkspaceToolbar({
 
   const enterAgentTab = useCallback(() => {
     if (preferredWorkspacePaneTab !== 'agent') {
-      navigation.showRepoWorkspacePaneTab(repo.id, 'agent')
+      if (branchName) navigation.showRepoBranchWorkspacePaneTab(repo.id, branchName, 'agent')
     }
-  }, [navigation, preferredWorkspacePaneTab, repo.id])
+  }, [branchName, navigation, preferredWorkspacePaneTab, repo.id])
 
   const handleNewTerminal = useCallback(() => {
     if (!terminalBase) return
@@ -145,7 +145,7 @@ export function RepoWorkspaceToolbar({
 
   const handleNewAgent = useCallback(() => {
     if (!terminalBase) return
-    const openerIdentity = captureWorkspacePaneActiveTabIdentity(repo.id)
+    const openerIdentity = captureWorkspacePaneActiveTabIdentity(repo.id, terminalBase.branch)
     void runCreateAgentTabCommand({
       base: { ...terminalBase, repoInstanceId: repo.instanceId },
       openerIdentity,

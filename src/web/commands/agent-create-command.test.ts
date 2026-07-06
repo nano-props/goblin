@@ -131,7 +131,7 @@ function seedAgentRepo(): AgentSessionBase {
   seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches: [createRepoBranch(BRANCH, { worktree: { path: WORKTREE_PATH } })],
-    selectedBranch: BRANCH,
+    currentBranchName: BRANCH,
     preferredWorkspacePaneTab: 'status',
     workspacePaneTabsByBranch: { [BRANCH]: [] },
   })

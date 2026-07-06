@@ -939,13 +939,13 @@ describe('RepoWorkspaceToolbar', () => {
   })
 
   test('clicking an unselected agent tab navigates and selects it', async () => {
-    const showRepoWorkspacePaneTab = vi.fn()
+    const showRepoBranchWorkspacePaneTab = vi.fn()
     const { container: c } = renderToolbar({
       terminalCount: 0,
       preferredWorkspacePaneTab: 'agent',
       workspacePaneTabs: [agentEntry('agent-1'), agentEntry('agent-2')],
       agentSessions: [agentSession('agent-1'), agentSession('agent-2')],
-      navigation: navigationWith({ showRepoWorkspacePaneTab }),
+      navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
     })
 
     const unselectedTab = c.querySelector<HTMLButtonElement>(
@@ -958,7 +958,7 @@ describe('RepoWorkspaceToolbar', () => {
     })
     await flush()
 
-    expect(showRepoWorkspacePaneTab).not.toHaveBeenCalled()
+    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(useReposStore.getState().selectedAgentSessionIdByAgentWorktree[`${REPO_ID}\0${WORKTREE_PATH}`]).toBe(
       'agent-2',
     )
