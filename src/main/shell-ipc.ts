@@ -52,8 +52,7 @@ export function wireShellIpc(): void {
     },
   )
 
-  ipcMain.handle(
-    HOST_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL,
-    async (event): Promise<string[]> => (isTrustedIpcEvent(event) ? consumeExternalOpenPaths() : []),
+  ipcMain.handle(HOST_CONSUME_EXTERNAL_OPEN_PATHS_CHANNEL, async (event): Promise<string[]> =>
+    isTrustedIpcEvent(event) ? consumeExternalOpenPaths() : [],
   )
 }

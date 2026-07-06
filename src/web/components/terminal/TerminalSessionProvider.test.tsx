@@ -89,7 +89,13 @@ vi.mock('#/web/components/terminal/terminal-geometry.ts', async () => {
 function selectedWorkspacePaneTab(repoId: string, branchName = 'feature/worktree') {
   const repo = useReposStore.getState().repos[repoId]
   return repo
-    ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, branchName))
+    ? preferredWorkspacePaneTabForTarget(
+        repo.ui,
+        workspacePaneTabsTargetForRepoBranch(
+          { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+          branchName,
+        ),
+      )
     : null
 }
 
@@ -282,7 +288,10 @@ let sessionClosedHandler:
       worktreePath: string
     }) => void)
   | null = null
-type TestTerminalSessionSummary = Omit<TerminalSessionSummary, 'repoInstanceId' | 'repoRoot' | 'branch' | 'worktreePath'> &
+type TestTerminalSessionSummary = Omit<
+  TerminalSessionSummary,
+  'repoInstanceId' | 'repoRoot' | 'branch' | 'worktreePath'
+> &
   Partial<Pick<TerminalSessionSummary, 'repoInstanceId' | 'repoRoot' | 'branch' | 'worktreePath'>>
 const listSessionsMock = vi.fn<
   (...args: Array<{ repoRoot: string; repoInstanceId?: string }>) => Promise<TestTerminalSessionSummary[]>
@@ -315,7 +324,12 @@ function workspaceTabsWithTerminal(terminalSessionId: string) {
 
 function tabsFor(repoRoot: string, branchName: string): WorkspacePaneTabEntry[] {
   const repo = useReposStore.getState().repos[repoRoot]
-  const target = repo ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, branchName) : null
+  const target = repo
+    ? workspacePaneTabsTargetForRepoBranch(
+        { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+        branchName,
+      )
+    : null
   return target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : []
 }
 
@@ -1033,16 +1047,16 @@ describe('TerminalSessionProvider', () => {
         await getContext().createTerminal(base)
       })
 
-	      await act(async () => {
-	        useReposStore.setState((state) => ({
-	          repos: {
-	            ...state.repos,
-	            [REPO_ID]: state.repos[REPO_ID]
-	              ? {
-	                  ...state.repos[REPO_ID],
-	                  ui: {
-	                    ...state.repos[REPO_ID]!.ui,
-	                    currentBranchName: 'feature/renamed',
+      await act(async () => {
+        useReposStore.setState((state) => ({
+          repos: {
+            ...state.repos,
+            [REPO_ID]: state.repos[REPO_ID]
+              ? {
+                  ...state.repos[REPO_ID],
+                  ui: {
+                    ...state.repos[REPO_ID]!.ui,
+                    currentBranchName: 'feature/renamed',
                   },
                 }
               : state.repos[REPO_ID],
@@ -1424,25 +1438,25 @@ describe('TerminalSessionProvider', () => {
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
     })
-	    const secondRepo = {
-	      ...firstRepo,
-	      id: SECOND_REPO_ID,
-	      instanceId: 'repo-instance-second',
-	      ui: {
-	        ...firstRepo.ui,
+    const secondRepo = {
+      ...firstRepo,
+      id: SECOND_REPO_ID,
+      instanceId: 'repo-instance-second',
+      ui: {
+        ...firstRepo.ui,
         preferredWorkspacePaneTabByTarget: preferredWorkspacePaneTabByTargetRecordWith(
           firstRepo.ui,
           { repoRoot: SECOND_REPO_ID, branchName: 'feature/other', worktreePath: SECOND_WORKTREE_PATH },
           'terminal',
         ),
       },
-	    } satisfies RepoState
-	    setRepoSnapshotQueryData(SECOND_REPO_ID, secondRepo.instanceId, {
-	      current: 'feature/other',
-	      branches: [createRepoBranch('feature/other', { worktree: { path: SECOND_WORKTREE_PATH } })],
-	    })
-	    setRepoStatusQueryData(SECOND_REPO_ID, secondRepo.instanceId, [])
-	    useReposStore.setState((state) => ({
+    } satisfies RepoState
+    setRepoSnapshotQueryData(SECOND_REPO_ID, secondRepo.instanceId, {
+      current: 'feature/other',
+      branches: [createRepoBranch('feature/other', { worktree: { path: SECOND_WORKTREE_PATH } })],
+    })
+    setRepoStatusQueryData(SECOND_REPO_ID, secondRepo.instanceId, [])
+    useReposStore.setState((state) => ({
       ...state,
       repos: {
         ...state.repos,
@@ -1467,25 +1481,25 @@ describe('TerminalSessionProvider', () => {
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
     })
-	    const secondRepo = {
-	      ...firstRepo,
-	      id: SECOND_REPO_ID,
-	      instanceId: 'repo-instance-second',
-	      ui: {
-	        ...firstRepo.ui,
+    const secondRepo = {
+      ...firstRepo,
+      id: SECOND_REPO_ID,
+      instanceId: 'repo-instance-second',
+      ui: {
+        ...firstRepo.ui,
         preferredWorkspacePaneTabByTarget: preferredWorkspacePaneTabByTargetRecordWith(
           firstRepo.ui,
           { repoRoot: SECOND_REPO_ID, branchName: 'feature/other', worktreePath: SECOND_WORKTREE_PATH },
           'terminal',
         ),
       },
-	    } satisfies RepoState
-	    setRepoSnapshotQueryData(SECOND_REPO_ID, secondRepo.instanceId, {
-	      current: 'feature/other',
-	      branches: [createRepoBranch('feature/other', { worktree: { path: SECOND_WORKTREE_PATH } })],
-	    })
-	    setRepoStatusQueryData(SECOND_REPO_ID, secondRepo.instanceId, [])
-	    useReposStore.setState((state) => ({
+    } satisfies RepoState
+    setRepoSnapshotQueryData(SECOND_REPO_ID, secondRepo.instanceId, {
+      current: 'feature/other',
+      branches: [createRepoBranch('feature/other', { worktree: { path: SECOND_WORKTREE_PATH } })],
+    })
+    setRepoStatusQueryData(SECOND_REPO_ID, secondRepo.instanceId, [])
+    useReposStore.setState((state) => ({
       ...state,
       repos: {
         ...state.repos,

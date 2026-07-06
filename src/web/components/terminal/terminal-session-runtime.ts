@@ -264,7 +264,11 @@ export class TerminalSessionRuntime {
   }
 
   terminalRuntimeSessionIdsForClose(): string[] {
-    return Array.from(new Set([this.terminalRuntimeSessionId, this.pendingRestartTerminalRuntimeSessionId].filter((id): id is string => !!id)))
+    return Array.from(
+      new Set(
+        [this.terminalRuntimeSessionId, this.pendingRestartTerminalRuntimeSessionId].filter((id): id is string => !!id),
+      ),
+    )
   }
 
   disposeTerminalRuntimeSessionIds(): string[] {

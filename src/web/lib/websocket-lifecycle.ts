@@ -23,10 +23,7 @@ export interface WebSocketLifecycleOptions<TConnection> {
   errorReason?: string
   onOpen?: (entry: WebSocketLifecycleEntry<TConnection>) => void
   onMessage?: (event: MessageEvent, entry: WebSocketLifecycleEntry<TConnection>) => void
-  onDisconnect?: (
-    entry: WebSocketLifecycleEntry<TConnection>,
-    context: WebSocketLifecycleDisconnectContext,
-  ) => void
+  onDisconnect?: (entry: WebSocketLifecycleEntry<TConnection>, context: WebSocketLifecycleDisconnectContext) => void
   onUnavailableSocketDropped?: (entry: WebSocketLifecycleEntry<TConnection>) => void
 }
 

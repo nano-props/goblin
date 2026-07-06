@@ -29,7 +29,10 @@ export function WorkspaceNavigationControls({
   return (
     <div
       {...props}
-      className={cn('goblin-workspace-navigation-controls pointer-events-auto flex h-full items-center gap-1', className)}
+      className={cn(
+        'goblin-workspace-navigation-controls pointer-events-auto flex h-full items-center gap-1',
+        className,
+      )}
     >
       <span
         className="inline-flex"

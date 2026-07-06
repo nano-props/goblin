@@ -28,7 +28,9 @@ describe('primary window route navigation helpers', () => {
   })
 
   test('preserves an existing return target while navigating inside a route family', () => {
-    expect(routeReturnSearch('/settings/general?returnTo=%2Frepo%2Frepo-slug%2Fdashboard', '/settings', '/settings')).toEqual({
+    expect(
+      routeReturnSearch('/settings/general?returnTo=%2Frepo%2Frepo-slug%2Fdashboard', '/settings', '/settings'),
+    ).toEqual({
       returnTo: '/repo/repo-slug/dashboard',
     })
   })

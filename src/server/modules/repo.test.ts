@@ -631,17 +631,15 @@ describe('repo mutation invalidation publishing', () => {
     mocks.createWorktree
       .mockImplementationOnce(async () => await firstCreate.promise)
       .mockImplementationOnce(async () => await secondCreate.promise)
-    mocks.getServerRepoSettings
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        {
-          repoId: '/tmp/repo',
-          worktreeBootstrapTrust: {
-            configHash,
-            trustedAt: '2026-06-26T00:00:00.000Z',
-          },
+    mocks.getServerRepoSettings.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      {
+        repoId: '/tmp/repo',
+        worktreeBootstrapTrust: {
+          configHash,
+          trustedAt: '2026-06-26T00:00:00.000Z',
         },
-      ])
+      },
+    ])
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
     const first = createRepoWorktree(

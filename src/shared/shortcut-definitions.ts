@@ -3,15 +3,10 @@ import type { DictKey } from '#/shared/i18n/dictionaries.ts'
 
 export type BranchActionShortcutAction = 'pull' | 'push'
 export type ClientNavigationShortcutAction =
-  | 'next-branch'
-  | 'prev-branch'
-  | 'next-workspace-pane-tab'
-  | 'prev-workspace-pane-tab'
+  'next-branch' | 'prev-branch' | 'next-workspace-pane-tab' | 'prev-workspace-pane-tab'
 export type ClientAppShortcutAction = 'show-help' | 'dismiss'
 export type ClientKeyboardShortcutAction =
-  | BranchActionShortcutAction
-  | ClientNavigationShortcutAction
-  | ClientAppShortcutAction
+  BranchActionShortcutAction | ClientNavigationShortcutAction | ClientAppShortcutAction
 export type ClientMenuCommandId =
   | 'app-settings'
   | 'file-new-terminal-tab'

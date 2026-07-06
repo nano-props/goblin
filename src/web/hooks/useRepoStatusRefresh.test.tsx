@@ -14,7 +14,10 @@ import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-dat
 
 const originalRefreshStatus = useReposStore.getState().refreshStatus
 
-function Harness({ repoId = '/repo-a', branchName = 'main' }: { repoId?: string | null; branchName?: string | null } = {}) {
+function Harness({
+  repoId = '/repo-a',
+  branchName = 'main',
+}: { repoId?: string | null; branchName?: string | null } = {}) {
   useRepoStatusRefresh({ hydratedRouteRepoId: repoId, currentBranchName: branchName })
   return null
 }

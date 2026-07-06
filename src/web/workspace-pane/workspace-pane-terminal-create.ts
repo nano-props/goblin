@@ -6,7 +6,5 @@ export async function createWorkspacePaneTerminalTab(input: {
   createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
   options?: TerminalCreateOptions
 }): Promise<string> {
-  return input.options
-    ? await input.createTerminal(input.base, input.options)
-    : await input.createTerminal(input.base)
+  return input.options ? await input.createTerminal(input.base, input.options) : await input.createTerminal(input.base)
 }

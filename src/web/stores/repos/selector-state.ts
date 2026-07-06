@@ -1,4 +1,9 @@
-import type { RepoState, ReposStore, RestorableWorkspaceState, RuntimeCoherentRepoProjectionState } from '#/web/stores/repos/types.ts'
+import type {
+  RepoState,
+  ReposStore,
+  RestorableWorkspaceState,
+  RuntimeCoherentRepoProjectionState,
+} from '#/web/stores/repos/types.ts'
 
 export type WorkspaceRestoreStatus = 'restoring-membership' | 'restoring-runtime-state' | 'ready' | 'blocked'
 

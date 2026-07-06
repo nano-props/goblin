@@ -21,9 +21,7 @@ describe('architecture boundary rules', () => {
           source: "import { getSettingsSnapshot, setThemePref } from '#/web/settings-client.ts'\n",
         },
       ]),
-    ).toEqual([
-      expect.stringContaining('/src/web/settings-queries.ts: disallowed import "#/web/settings-client.ts"'),
-    ])
+    ).toEqual([expect.stringContaining('/src/web/settings-queries.ts: disallowed import "#/web/settings-client.ts"')])
   })
 
   test('rejects settings-client imports from unapproved web files', () => {

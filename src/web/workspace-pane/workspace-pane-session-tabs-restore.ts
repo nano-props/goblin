@@ -1,7 +1,10 @@
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneTabsTargetForRepoTargetKey } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import { commitWorkspacePaneTabs, type WorkspacePaneTabsMutationResult } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
+import {
+  commitWorkspacePaneTabs,
+  type WorkspacePaneTabsMutationResult,
+} from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { getRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 
 interface WorkspacePaneTabsRestoreDetails {

@@ -73,9 +73,7 @@ describe('workspace pane tabs runtime', () => {
       tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')],
     })
 
-    expect(
-      runtime.ensureTerminalTab(target(), 'session-2', { insertAfterIdentity: 'terminal:missing' }),
-    ).toEqual([
+    expect(runtime.ensureTerminalTab(target(), 'session-2', { insertAfterIdentity: 'terminal:missing' })).toEqual([
       workspacePaneStaticTabEntry('status'),
       workspacePaneTerminalTabEntry('session-1'),
       workspacePaneTerminalTabEntry('session-2'),
@@ -141,9 +139,7 @@ describe('workspace pane tabs runtime', () => {
       tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-1')],
     })
 
-    expect(
-      runtime.openStaticTab(target(), 'files', { insertAfterIdentity: 'terminal:missing-session' }),
-    ).toEqual([
+    expect(runtime.openStaticTab(target(), 'files', { insertAfterIdentity: 'terminal:missing-session' })).toEqual([
       workspacePaneStaticTabEntry('status'),
       workspacePaneTerminalTabEntry('session-1'),
       workspacePaneStaticTabEntry('files'),

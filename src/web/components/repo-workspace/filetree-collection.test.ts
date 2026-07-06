@@ -54,10 +54,7 @@ describe('buildFiletreeCollection', () => {
   })
 
   test('keeps children hidden when their directory is not expanded', () => {
-    const collection = buildFiletreeCollection(
-      aggregate([dirNode('src'), fileNode('src/index.ts', 'src')]),
-      new Set(),
-    )
+    const collection = buildFiletreeCollection(aggregate([dirNode('src'), fileNode('src/index.ts', 'src')]), new Set())
 
     expect(collection.rows.map((row) => row.id)).toEqual(['src'])
     expect(collection.childIdsByParentId.get('src')).toEqual(['src/index.ts'])
@@ -65,11 +62,7 @@ describe('buildFiletreeCollection', () => {
 
   test('guards against cyclic node data', () => {
     const collection = buildFiletreeCollection(
-      aggregate([
-        dirNode('src'),
-        dirNode('src/util', 'src'),
-        { ...dirNode('src'), parentId: 'src/util' },
-      ]),
+      aggregate([dirNode('src'), dirNode('src/util', 'src'), { ...dirNode('src'), parentId: 'src/util' }]),
       new Set(['src', 'src/util']),
     )
 

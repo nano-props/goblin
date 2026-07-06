@@ -205,7 +205,15 @@ export function useKeyboard({
         }
         const tabIndex = !e.shiftKey ? digitShortcutIndex(e) : null
         if (tabIndex !== null) {
-          if (runSelectWorkspacePaneTabByIndexCommand({ repoId, branchName: currentBranchNameRef.current, tabIndex, navigation })) e.preventDefault()
+          if (
+            runSelectWorkspacePaneTabByIndexCommand({
+              repoId,
+              branchName: currentBranchNameRef.current,
+              tabIndex,
+              navigation,
+            })
+          )
+            e.preventDefault()
           return
         }
       }
@@ -247,12 +255,14 @@ export function useKeyboard({
         }
         case 'next-branch': {
           if (overlayOpen || !repo) break
-          if (moveBranchSelection({ repo, currentBranchName: currentBranchNameRef.current }, 1, navigation)) e.preventDefault()
+          if (moveBranchSelection({ repo, currentBranchName: currentBranchNameRef.current }, 1, navigation))
+            e.preventDefault()
           break
         }
         case 'prev-branch': {
           if (overlayOpen || !repo) break
-          if (moveBranchSelection({ repo, currentBranchName: currentBranchNameRef.current }, -1, navigation)) e.preventDefault()
+          if (moveBranchSelection({ repo, currentBranchName: currentBranchNameRef.current }, -1, navigation))
+            e.preventDefault()
           break
         }
         case 'next-workspace-pane-tab':

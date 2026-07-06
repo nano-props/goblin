@@ -164,7 +164,6 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
       worktreePath: input.worktreePath,
     })
   }
-
 }
 
 export function createWorkspacePaneTabsRuntime<TUser extends string | number>(): WorkspacePaneTabsRuntime<TUser> {

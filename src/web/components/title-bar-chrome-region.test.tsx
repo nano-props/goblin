@@ -20,9 +20,7 @@ describe('window chrome regions', () => {
   })
 
   test('marks an unpadded drag region for toolbar remainder space', () => {
-    const { container } = renderInJsdom(
-      <TitleBarDragRegion reserveWindowControls={false} data-testid="chrome" />,
-    )
+    const { container } = renderInJsdom(<TitleBarDragRegion reserveWindowControls={false} data-testid="chrome" />)
 
     const chrome = container.querySelector<HTMLElement>('[data-testid="chrome"]')
     expect(chrome?.dataset.titleBarChromeRegion).toBe('drag')
@@ -45,9 +43,7 @@ describe('window chrome regions', () => {
   })
 
   test('marks an interactive region as no-drag without adding layout chrome', () => {
-    const { container } = renderInJsdom(
-      <TitleBarInteractiveRegion data-testid="interactive" className="flex-1" />,
-    )
+    const { container } = renderInJsdom(<TitleBarInteractiveRegion data-testid="interactive" className="flex-1" />)
 
     const interactive = container.querySelector<HTMLElement>('[data-testid="interactive"]')
     expect(interactive?.dataset.titleBarChromeRegion).toBe('interactive')

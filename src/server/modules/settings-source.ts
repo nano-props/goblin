@@ -707,7 +707,11 @@ export async function setServerRepoWorkspaceExternalAppRecent(input: {
     // elsewhere in the codebase, so the rules can't drift.
     const isBareRepoScope = input.worktreePath === null || input.worktreePath === undefined
     const safeWorktreePath = isBareRepoScope ? null : toSafeSessionPath(input.worktreePath)
-    if (!repoId || (!isBareRepoScope && safeWorktreePath === null) || !isKnownWorkspaceExternalAppItemId(input.itemId)) {
+    if (
+      !repoId ||
+      (!isBareRepoScope && safeWorktreePath === null) ||
+      !isKnownWorkspaceExternalAppItemId(input.itemId)
+    ) {
       return unchangedUserSettings(data, cloneRepoSettings(data.repoSettings))
     }
     const worktreeKey = workspaceExternalAppRecentKey(safeWorktreePath)
@@ -760,9 +764,10 @@ export async function pruneServerRepoSettingsForRemovedWorktree(input: {
       delete nextEntry.workspaceExternalAppRecent
     }
 
-    const repoSettings = nextEntry.worktreeBootstrapTrust || nextEntry.workspaceExternalAppRecent
-      ? data.repoSettings.map((entry, index) => (index === existingIndex ? nextEntry : entry))
-      : data.repoSettings.filter((_, index) => index !== existingIndex)
+    const repoSettings =
+      nextEntry.worktreeBootstrapTrust || nextEntry.workspaceExternalAppRecent
+        ? data.repoSettings.map((entry, index) => (index === existingIndex ? nextEntry : entry))
+        : data.repoSettings.filter((_, index) => index !== existingIndex)
     return { next: { ...data, repoSettings }, result: true }
   })
 }

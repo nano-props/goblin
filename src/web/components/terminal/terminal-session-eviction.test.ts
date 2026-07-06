@@ -9,8 +9,7 @@ describe('terminal session eviction helpers', () => {
     const orphaned = countOrphanedTerminalSessionIds({
       repoRoot: '/repo',
       localTerminalSessionIds: ['session-a', 'session-b', 'session-c'],
-      getRepoRootForTerminalSessionId: (terminalSessionId) =>
-        terminalSessionId === 'session-c' ? '/other' : '/repo',
+      getRepoRootForTerminalSessionId: (terminalSessionId) => (terminalSessionId === 'session-c' ? '/other' : '/repo'),
       hasTerminalRuntimeSessionIdForTerminalSessionId: (terminalSessionId) => terminalSessionId !== 'session-b',
       serverTerminalSessionIds: new Set(['session-a']),
     })
@@ -19,8 +18,7 @@ describe('terminal session eviction helpers', () => {
     const orphaned2 = countOrphanedTerminalSessionIds({
       repoRoot: '/repo',
       localTerminalSessionIds: ['session-a', 'session-b', 'session-c'],
-      getRepoRootForTerminalSessionId: (terminalSessionId) =>
-        terminalSessionId === 'session-c' ? '/other' : '/repo',
+      getRepoRootForTerminalSessionId: (terminalSessionId) => (terminalSessionId === 'session-c' ? '/other' : '/repo'),
       hasTerminalRuntimeSessionIdForTerminalSessionId: (terminalSessionId) => terminalSessionId === 'session-b',
       serverTerminalSessionIds: new Set(['session-a']),
     })

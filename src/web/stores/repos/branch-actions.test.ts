@@ -179,7 +179,9 @@ describe('branch action capabilities', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
-      branchSnapshots: [createBranchSnapshot('feature/main-worktree', { worktree: { path: REPO_ID, isPrimary: true } })],
+      branchSnapshots: [
+        createBranchSnapshot('feature/main-worktree', { worktree: { path: REPO_ID, isPrimary: true } }),
+      ],
       currentBranch: 'main',
     })
 
@@ -670,7 +672,9 @@ describe('runBranchAction', () => {
       'repo.createWorktree': async () => ({ ok: false, message: 'error.invalid-path' }),
     })
 
-    await useReposStore.getState().runBranchAction(REPO_ID, createWorktreeAction(), { repoInstanceId: 'repo-instance-test', refreshOnError: false })
+    await useReposStore
+      .getState()
+      .runBranchAction(REPO_ID, createWorktreeAction(), { repoInstanceId: 'repo-instance-test', refreshOnError: false })
 
     expect(useReposStore.getState().repos[REPO_ID]?.events.at(-1)).toMatchObject({
       kind: 'result',
@@ -687,7 +691,9 @@ describe('runBranchAction', () => {
     setBranchViewModeForTest('all')
     installSuccessfulCreateWorktreeBridge()
 
-    await useReposStore.getState().runBranchAction(REPO_ID, createWorktreeAction(), { repoInstanceId: 'repo-instance-test' })
+    await useReposStore
+      .getState()
+      .runBranchAction(REPO_ID, createWorktreeAction(), { repoInstanceId: 'repo-instance-test' })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.branchViewMode).toBe('all')
@@ -697,7 +703,9 @@ describe('runBranchAction', () => {
     setBranchViewModeForTest('worktrees')
     installSuccessfulCreateWorktreeBridgeWithExistingWorktree()
 
-    await useReposStore.getState().runBranchAction(REPO_ID, createWorktreeAction(), { repoInstanceId: 'repo-instance-test' })
+    await useReposStore
+      .getState()
+      .runBranchAction(REPO_ID, createWorktreeAction(), { repoInstanceId: 'repo-instance-test' })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.branchViewMode).toBe('worktrees')
@@ -712,7 +720,9 @@ describe('runBranchAction', () => {
       'repo.createWorktree': async () => result,
     })
 
-    await useReposStore.getState().runBranchAction(REPO_ID, createWorktreeAction(), { repoInstanceId: 'repo-instance-test', refreshOnError: false })
+    await useReposStore
+      .getState()
+      .runBranchAction(REPO_ID, createWorktreeAction(), { repoInstanceId: 'repo-instance-test', refreshOnError: false })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.branchViewMode).toBe('worktrees')
@@ -732,7 +742,9 @@ describe('runBranchAction', () => {
       },
     })
 
-    await useReposStore.getState().runBranchAction(REPO_ID, createWorktreeAction(), { repoInstanceId: 'repo-instance-test' })
+    await useReposStore
+      .getState()
+      .runBranchAction(REPO_ID, createWorktreeAction(), { repoInstanceId: 'repo-instance-test' })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.instanceId).toBe('repo-instance-test-2')
@@ -798,7 +810,11 @@ describe('runBranchAction', () => {
 
     await useReposStore
       .getState()
-      .runBranchAction(REPO_ID, { kind: 'deleteBranch', branch: 'feature/b', force: false }, { repoInstanceId: 'repo-instance-test' })
+      .runBranchAction(
+        REPO_ID,
+        { kind: 'deleteBranch', branch: 'feature/b', force: false },
+        { repoInstanceId: 'repo-instance-test' },
+      )
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.branchViewMode).toBe('worktrees')

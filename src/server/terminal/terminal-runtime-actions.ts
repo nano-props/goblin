@@ -63,7 +63,13 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         return { ok: false, message: 'error.invalid-arguments' }
       }
       const terminalClientId = input.clientId ?? clientId
-      const result = await manager.attachSession(userId, input.terminalRuntimeSessionId, input.cols, input.rows, terminalClientId)
+      const result = await manager.attachSession(
+        userId,
+        input.terminalRuntimeSessionId,
+        input.cols,
+        input.rows,
+        terminalClientId,
+      )
       return result
     },
 
@@ -78,7 +84,13 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       }
       const session = manager.getSessionSummaryForUser(userId, terminalRuntimeSessionId)
       const terminalClientId = input.clientId ?? clientId
-      const result = await manager.restartSession(userId, terminalRuntimeSessionId, input.cols, input.rows, terminalClientId)
+      const result = await manager.restartSession(
+        userId,
+        terminalRuntimeSessionId,
+        input.cols,
+        input.rows,
+        terminalClientId,
+      )
       if (session) broadcastRepoSessionsChanged(userId, session.repoRoot)
       return result
     },
@@ -128,7 +140,11 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       return tabs
     },
 
-    async prune(clientId: string, userId: string, input: TerminalPruneInput): Promise<{ pruned: number; remaining: number }> {
+    async prune(
+      clientId: string,
+      userId: string,
+      input: TerminalPruneInput,
+    ): Promise<{ pruned: number; remaining: number }> {
       if (!isValidTerminalClientId(clientId)) return { pruned: 0, remaining: 0 }
       if (!isValidRepoLocator(input.repoRoot)) return { pruned: 0, remaining: 0 }
       assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
@@ -146,7 +162,10 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
 
     resize(clientId: string, userId: string, input: TerminalResizeInput): TerminalMutationResult {
       if (!isValidTerminalClientId(clientId)) return false
-      if (!isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId) || !isValidTerminalSize(input?.cols, input?.rows)) {
+      if (
+        !isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId) ||
+        !isValidTerminalSize(input?.cols, input?.rows)
+      ) {
         return false
       }
       const terminalClientId = input.clientId ?? clientId
@@ -184,14 +203,21 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
 
     takeover(clientId: string, userId: string, input: TerminalTakeoverInput): TerminalTakeoverResult {
       if (!isValidTerminalClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
-      if (!isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId) || !isValidTerminalSize(input?.cols, input?.rows)) {
+      if (
+        !isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId) ||
+        !isValidTerminalSize(input?.cols, input?.rows)
+      ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
       const terminalClientId = input.clientId ?? clientId
       return manager.takeoverSession(userId, input.terminalRuntimeSessionId, input.cols, input.rows, terminalClientId)
     },
 
-    async listSessions(clientId: string, userId: string, input: TerminalListSessionsInput): Promise<TerminalSessionSummary[]> {
+    async listSessions(
+      clientId: string,
+      userId: string,
+      input: TerminalListSessionsInput,
+    ): Promise<TerminalSessionSummary[]> {
       if (!isValidTerminalClientId(clientId)) return []
       if (!isValidRepoLocator(input.repoRoot)) return []
       assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
@@ -208,7 +234,6 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
       return await sessionService.listWorkspaceTabs(userId, input.repoRoot, input.repoInstanceId)
     },
-
   }
 
   function broadcastRepoSessionsChanged(userId: string, repoRoot: string): void {

@@ -48,11 +48,15 @@ export function repoStatusRefreshSnapshot(repo: RepoState): RepoStatusRefreshSna
   }
 }
 
-export function currentRepoStatusRefreshSnapshot(repo: RepoState, branchName: string | null): RepoStatusRefreshSnapshot {
+export function currentRepoStatusRefreshSnapshot(
+  repo: RepoState,
+  branchName: string | null,
+): RepoStatusRefreshSnapshot {
   const branchModel = readRepoBranchQueryProjection(repo)
-  const target = branchModel && branchName
-    ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branchName)
-    : null
+  const target =
+    branchModel && branchName
+      ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branchName)
+      : null
   const preferredWorkspacePaneTab = preferredWorkspacePaneTabForTarget(repo.ui, target)
   return {
     id: repo.id,

@@ -95,7 +95,10 @@ export class TerminalSessionProjection {
   private readonly startupGeometryHintByWorktree = new Map<string, { cols: number; rows: number }>()
   // Owns pending create and durable close promises. The projection decides
   // when to drain them; the helper owns dedupe and settle mechanics.
-  private readonly lifecycleQueues = new TerminalSessionLifecycleQueues<TerminalSessionBase, PendingTerminalCreateRequest>()
+  private readonly lifecycleQueues = new TerminalSessionLifecycleQueues<
+    TerminalSessionBase,
+    PendingTerminalCreateRequest
+  >()
   // Durable close queue rationale. `TerminalSession.dispose` used to fire
   // `terminalClient.close({ terminalRuntimeSessionId })` as a `void ... .catch(() => {})`
   // — if the WebSocket was already closing (or `closeSocketIfIdle` raced
@@ -381,7 +384,10 @@ export class TerminalSessionProjection {
       const descriptor = projected.descriptor
       const session = this.ensureSession(descriptor)
       session.hydrate(projected.hydrateInput)
-      this.syncTerminalRuntimeSessionIdIndex(descriptor.terminalSessionId, projected.hydrateInput.terminalRuntimeSessionId)
+      this.syncTerminalRuntimeSessionIdIndex(
+        descriptor.terminalSessionId,
+        projected.hydrateInput.terminalRuntimeSessionId,
+      )
       const pendingBell = this.pendingServerBellByTerminalSessionId.get(descriptor.terminalSessionId)
       if (pendingBell) this.applyServerBell(session, pendingBell)
       if (projected.controlsTerminal)
@@ -530,7 +536,11 @@ export class TerminalSessionProjection {
       throw new Error(result.message)
     }
     const snapshotTerminalRuntimeSessionId = result.terminalRuntimeSessionId
-    if (!snapshotTerminalRuntimeSessionId || typeof result.snapshot !== 'string' || typeof result.snapshotSeq !== 'number') {
+    if (
+      !snapshotTerminalRuntimeSessionId ||
+      typeof result.snapshot !== 'string' ||
+      typeof result.snapshotSeq !== 'number'
+    ) {
       throw new Error('error.terminal-create-failed')
     }
     if (request.owner && !request.owner.isFresh()) {
@@ -570,8 +580,7 @@ export class TerminalSessionProjection {
       terminalWorktreeKey,
       base,
       options: request,
-      isSameRequest: (existing, next) =>
-        existing.dedupeKey !== null && existing.dedupeKey === next.dedupeKey,
+      isSameRequest: (existing, next) => existing.dedupeKey !== null && existing.dedupeKey === next.dedupeKey,
       flush: (key) => {
         void this.flushPendingCreate(key)
       },
@@ -622,10 +631,7 @@ export class TerminalSessionProjection {
   // a `restart` and a `dispose` can both call this for the same
   // terminalRuntimeSessionId in quick succession. The first call owns the request;
   // the second is a no-op and just observes the same outcome.
-  enqueueDurableClose(input: {
-    terminalRuntimeSessionId: string
-    terminalWorktreeKey: string
-  }): Promise<void> {
+  enqueueDurableClose(input: { terminalRuntimeSessionId: string; terminalWorktreeKey: string }): Promise<void> {
     return this.lifecycleQueues.enqueueClose(input, async (closeInput) => await this.performDurableClose(closeInput))
   }
 
@@ -643,9 +649,7 @@ export class TerminalSessionProjection {
     await Promise.allSettled(pendingForWorktree.map((entry) => entry.promise))
   }
 
-  private async performDurableClose(input: {
-    terminalRuntimeSessionId: string
-  }): Promise<void> {
+  private async performDurableClose(input: { terminalRuntimeSessionId: string }): Promise<void> {
     const { terminalRuntimeSessionId } = input
     try {
       await terminalClient.close({ terminalRuntimeSessionId })
@@ -1110,7 +1114,9 @@ export class TerminalSessionProjection {
       current.updateDescriptor(descriptor)
       this.syncTerminalRuntimeSessionIdIndex(
         descriptor.terminalSessionId,
-        current.currentTerminalRuntimeSessionId() ?? this.terminalRuntimeSessionIdByTerminalSessionId.get(descriptor.terminalSessionId) ?? null,
+        current.currentTerminalRuntimeSessionId() ??
+          this.terminalRuntimeSessionIdByTerminalSessionId.get(descriptor.terminalSessionId) ??
+          null,
       )
       this.notifyWorktree(descriptor.terminalWorktreeKey)
       return current

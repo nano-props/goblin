@@ -368,9 +368,7 @@ describe('refreshPullRequests', () => {
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
-    expect(calls).toEqual([
-      { branches: ['feature/a', 'feature/b'], mode: 'summary', loadingAtStart: true },
-    ])
+    expect(calls).toEqual([{ branches: ['feature/a', 'feature/b'], mode: 'summary', loadingAtStart: true }])
   })
 
   test('snapshot refresh leaves visible full lookup to route-visible refresh intents', async () => {
@@ -397,9 +395,7 @@ describe('refreshPullRequests', () => {
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
     await vi.advanceTimersByTimeAsync(PULL_REQUEST_UNKNOWN_RETRY_DELAY_MS + 1)
 
-    expect(calls).toEqual([
-      { branches: ['feature/a'], mode: 'summary' },
-    ])
+    expect(calls).toEqual([{ branches: ['feature/a'], mode: 'summary' }])
   })
 
   test('snapshot refresh skips selected full lookup when status detail is not visible', async () => {

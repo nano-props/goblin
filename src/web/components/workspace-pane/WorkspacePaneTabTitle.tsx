@@ -1,5 +1,8 @@
 import { cn } from '#/web/lib/cn.ts'
-import { isPendingWorkspacePaneTabItem, type WorkspacePaneTabItem } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
+import {
+  isPendingWorkspacePaneTabItem,
+  type WorkspacePaneTabItem,
+} from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 
 // Non-breaking space: keeps the title slot a stable size during the busy/pending
 // phase so the icon and close button don't shift when the title fades in.
@@ -16,12 +19,7 @@ export function WorkspacePaneTabTitle({ item }: { item: WorkspacePaneTabItem }) 
   const busy = isPendingWorkspacePaneTabItem(item) && item.busy
   const ready = !busy && Boolean(item.label)
   return (
-    <span
-      className={cn(
-        'truncate transition-opacity duration-150 ease-out',
-        ready ? 'opacity-100' : 'opacity-0',
-      )}
-    >
+    <span className={cn('truncate transition-opacity duration-150 ease-out', ready ? 'opacity-100' : 'opacity-0')}>
       {ready ? item.label : TITLE_PLACEHOLDER}
     </span>
   )

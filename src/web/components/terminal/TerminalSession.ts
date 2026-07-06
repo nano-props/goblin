@@ -179,7 +179,9 @@ export class TerminalSession {
   async closeServerResourcesAndWait(): Promise<void> {
     if (this.disposed) return
     const terminalRuntimeSessionIds = this.runtime.terminalRuntimeSessionIdsForClose()
-    await Promise.all(terminalRuntimeSessionIds.map((terminalRuntimeSessionId) => this.requestDurableClose(terminalRuntimeSessionId)))
+    await Promise.all(
+      terminalRuntimeSessionIds.map((terminalRuntimeSessionId) => this.requestDurableClose(terminalRuntimeSessionId)),
+    )
   }
 
   snapshot() {
@@ -280,7 +282,8 @@ export class TerminalSession {
           return
         }
         return terminalClient.resize({ terminalRuntimeSessionId, cols, rows }).then((ok) => {
-          if (ok && this.runtime.currentTerminalRuntimeSessionId() === terminalRuntimeSessionId) this.runtime.acknowledgeResize(cols, rows)
+          if (ok && this.runtime.currentTerminalRuntimeSessionId() === terminalRuntimeSessionId)
+            this.runtime.acknowledgeResize(cols, rows)
         })
       })
       .catch((err) => {
@@ -356,7 +359,8 @@ export class TerminalSession {
           // xterm's own cols/rows above become authoritative.
           return this.runtime.currentCanonicalSize()
         },
-        isSessionAlive: (terminalRuntimeSessionId) => !this.disposed && this.runtime.currentTerminalRuntimeSessionId() === terminalRuntimeSessionId,
+        isSessionAlive: (terminalRuntimeSessionId) =>
+          !this.disposed && this.runtime.currentTerminalRuntimeSessionId() === terminalRuntimeSessionId,
         onPromoted: (result) => {
           // Mirror the runtime's `applyTakeover` so the new
           // controller's view (cols/rows/phase) is applied
@@ -383,13 +387,17 @@ export class TerminalSession {
       canonicalCols: input.canonicalCols,
       canonicalRows: input.canonicalRows,
     })
-    this.syncExternalCommandGate(input.terminalRuntimeSessionId, terminalSnapshotHasOutput(input.snapshot, input.snapshotSeq))
+    this.syncExternalCommandGate(
+      input.terminalRuntimeSessionId,
+      terminalSnapshotHasOutput(input.snapshot, input.snapshotSeq),
+    )
     // Keep the write-side authority cache aligned with hydration.
     if (changed) this.authority().setRole(input.role)
     if (changed && input.phase === 'open' && input.role === 'unowned' && this.view.isConnected()) {
       this.start()
     }
-    if (previousTerminalRuntimeSessionId && previousTerminalRuntimeSessionId !== input.terminalRuntimeSessionId) this.applyHydratedSnapshotToActiveView()
+    if (previousTerminalRuntimeSessionId && previousTerminalRuntimeSessionId !== input.terminalRuntimeSessionId)
+      this.applyHydratedSnapshotToActiveView()
     if (changed) this.notify('metadata')
   }
 
@@ -626,9 +634,8 @@ export class TerminalSession {
         throw err
       }
       if (this.geometryAbortController === geometryAbortController) this.geometryAbortController = null
-      const term = this.view.openTerminal(
-        { cols: DEFAULT_TERMINAL_COLS, rows: DEFAULT_TERMINAL_ROWS },
-        (input) => this.writeInput(input),
+      const term = this.view.openTerminal({ cols: DEFAULT_TERMINAL_COLS, rows: DEFAULT_TERMINAL_ROWS }, (input) =>
+        this.writeInput(input),
       )
       await waitForTerminalLayout()
       this.assertCurrentStart(epoch, term)
@@ -655,7 +662,9 @@ export class TerminalSession {
 
   private async ipcPhase(epoch: number, term: XTermTerminal): Promise<TerminalAttachResultWithController> {
     const restart = this.runtime.consumeRestartFlag()
-    const terminalRuntimeSessionId = restart ? this.runtime.restartingTerminalRuntimeSessionId() : this.runtime.currentTerminalRuntimeSessionId()
+    const terminalRuntimeSessionId = restart
+      ? this.runtime.restartingTerminalRuntimeSessionId()
+      : this.runtime.currentTerminalRuntimeSessionId()
     if (!terminalRuntimeSessionId) {
       this.destroyActiveView()
       if (this.runtime.failAttachAttempt('error.invalid-arguments')) this.notify('metadata')
@@ -700,7 +709,10 @@ export class TerminalSession {
     }
     const projected = this.withLocalController(result)
     const changed = this.runtime.applyAttachResult(projected, fallbackSize)
-    this.syncExternalCommandGate(projected.terminalRuntimeSessionId, terminalSnapshotHasOutput(projected.snapshot, projected.snapshotSeq))
+    this.syncExternalCommandGate(
+      projected.terminalRuntimeSessionId,
+      terminalSnapshotHasOutput(projected.snapshot, projected.snapshotSeq),
+    )
     this.authority().setRole(projected.role)
     if (changed) this.notify('metadata')
   }
@@ -711,7 +723,10 @@ export class TerminalSession {
     result: TerminalAttachResultWithController,
   ): Promise<boolean> {
     const changed = this.runtime.applyAttachResult(result, { cols: term.cols, rows: term.rows })
-    this.syncExternalCommandGate(result.terminalRuntimeSessionId, terminalSnapshotHasOutput(result.snapshot, result.snapshotSeq))
+    this.syncExternalCommandGate(
+      result.terminalRuntimeSessionId,
+      terminalSnapshotHasOutput(result.snapshot, result.snapshotSeq),
+    )
     // Sync the gate. Without this, a controller→unowned→recreate
     // cycle leaves the gate at 'viewer' even though the runtime
     // already reflects 'controller', and the next write would

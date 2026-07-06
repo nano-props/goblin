@@ -14,7 +14,10 @@ export async function openBranchExternalTarget(
 
 export async function openUpstreamBranchExternalTarget(repoId: string, tracking: string): Promise<ExecResult> {
   const repo = useReposStore.getState().repos[repoId]
-  const remoteName = resolveTrackingRemoteName(tracking, repo?.remote.remotes ?? Object.keys(repo?.remote.remoteProviders ?? {}))
+  const remoteName = resolveTrackingRemoteName(
+    tracking,
+    repo?.remote.remotes ?? Object.keys(repo?.remote.remoteProviders ?? {}),
+  )
   if (!remoteName) {
     return { ok: false, message: 'error.invalid-upstream-ref' }
   }

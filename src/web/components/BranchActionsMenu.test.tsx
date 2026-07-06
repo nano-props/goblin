@@ -19,7 +19,9 @@ beforeEach(() => {
 })
 
 function renderPopover(item: BranchActionItem, open?: boolean, onOpenChange?: (open: boolean) => void) {
-  renderInJsdom(<BranchActionsPopover mainItems={[item]} destructiveItems={[]} open={open} onOpenChange={onOpenChange} />)
+  renderInJsdom(
+    <BranchActionsPopover mainItems={[item]} destructiveItems={[]} open={open} onOpenChange={onOpenChange} />,
+  )
 }
 
 describe('BranchActionsPopover', () => {
@@ -54,14 +56,18 @@ describe('BranchActionsPopover', () => {
     const user = userEvent.setup()
     const onSelect = vi.fn()
     const onOpenChange = vi.fn()
-    renderPopover({
-      id: 'status',
-      label: 'Status',
-      disabled: false,
-      visible: true,
-      icon: <span aria-hidden="true" />,
-      onSelect,
-    }, true, onOpenChange)
+    renderPopover(
+      {
+        id: 'status',
+        label: 'Status',
+        disabled: false,
+        visible: true,
+        icon: <span aria-hidden="true" />,
+        onSelect,
+      },
+      true,
+      onOpenChange,
+    )
 
     const item = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).find(
       (button) => button.textContent === 'Status',

@@ -78,9 +78,7 @@ export function getDictionary(): Record<DictKey, string> {
  * and other platforms get the generic fallback label.
  */
 export function openDataFolderMenuKey():
-  | 'menu.file.open-data-folder.mac'
-  | 'menu.file.open-data-folder.win'
-  | 'menu.file.open-data-folder' {
+  'menu.file.open-data-folder.mac' | 'menu.file.open-data-folder.win' | 'menu.file.open-data-folder' {
   if (process.platform === 'darwin') return 'menu.file.open-data-folder.mac'
   if (process.platform === 'win32') return 'menu.file.open-data-folder.win'
   return 'menu.file.open-data-folder'

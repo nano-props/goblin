@@ -28,11 +28,7 @@ export interface RemoveWorktreeDialogPayload {
 }
 
 type BranchActionDialogKey =
-  | 'pushConfirm'
-  | 'deleteConfirm'
-  | 'forceDeleteConfirm'
-  | 'removeConfirm'
-  | 'forceRemoveConfirm'
+  'pushConfirm' | 'deleteConfirm' | 'forceDeleteConfirm' | 'removeConfirm' | 'forceRemoveConfirm'
 
 export interface BranchActionDialogEntry<P> {
   repoId: string

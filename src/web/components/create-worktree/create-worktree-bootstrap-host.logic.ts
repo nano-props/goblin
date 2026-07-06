@@ -9,8 +9,7 @@ export function resolveConfigTrusted(input: {
   configTrustChoice: boolean | null
 }): boolean {
   return (
-    input.configTrustChoice ??
-    isRepoWorktreeBootstrapConfigTrusted(input.repoSettings, input.repoId, input.configHash)
+    input.configTrustChoice ?? isRepoWorktreeBootstrapConfigTrusted(input.repoSettings, input.repoId, input.configHash)
   )
 }
 

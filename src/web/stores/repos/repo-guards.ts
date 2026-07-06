@@ -91,10 +91,7 @@ export function hasFreshRepoInstance(
   return state.repos[handle.id]?.instanceId === handle.repoInstanceId
 }
 
-export function currentRepoInstanceId(
-  state: Pick<ReposStore, 'repos'>,
-  repoRoot: string,
-): string | null {
+export function currentRepoInstanceId(state: Pick<ReposStore, 'repos'>, repoRoot: string): string | null {
   return state.repos[repoRoot]?.instanceId ?? null
 }
 

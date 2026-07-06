@@ -144,12 +144,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     })
   }
 
-  function applyPullRequestRefreshError(
-    id: string,
-    repoInstanceId: string,
-    branchNames: string[],
-    err: unknown,
-  ): void {
+  function applyPullRequestRefreshError(id: string, repoInstanceId: string, branchNames: string[], err: unknown): void {
     const message = err instanceof Error ? err.message : String(err)
     const existingBranches = currentBranchNamesFromReadModel(id, repoInstanceId)
     refreshPullRequestsLog.warn('failed', { err })

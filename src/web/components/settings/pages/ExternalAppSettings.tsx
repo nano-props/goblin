@@ -3,16 +3,8 @@ import { RotateCw, SquareTerminal } from 'lucide-react'
 import type { EditorApp } from '#/shared/api-types.ts'
 import { Badge } from '#/web/components/ui/badge.tsx'
 import { Button } from '#/web/components/ui/button.tsx'
-import {
-  AppleTerminalIcon,
-  GhosttyIcon,
-  VSCodeIcon,
-} from '#/web/components/ExternalAppIcon/index.tsx'
-import {
-  SettingsCard,
-  SettingsGroup,
-  SettingsListItem,
-} from '#/web/components/settings/SettingsPrimitives.tsx'
+import { AppleTerminalIcon, GhosttyIcon, VSCodeIcon } from '#/web/components/ExternalAppIcon/index.tsx'
+import { SettingsCard, SettingsGroup, SettingsListItem } from '#/web/components/settings/SettingsPrimitives.tsx'
 import { useHostInfoStore, type ClientPlatform } from '#/web/stores/host-info.ts'
 import { useExternalAppsQuery } from '#/web/settings-queries.ts'
 import { useExternalAppSettingsController } from '#/web/runtime-settings-external-apps.ts'

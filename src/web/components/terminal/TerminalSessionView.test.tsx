@@ -139,7 +139,12 @@ async function renderTerminalSession() {
   const { container, unmount } = renderInJsdom(
     <TerminalSessionContext value={context}>
       <TerminalSessionReadContext value={readContext}>
-        <TerminalSessionView repoRoot="/repo" repoInstanceId={'repo-instance-test'} branch="feature" worktreePath="/worktree" />
+        <TerminalSessionView
+          repoRoot="/repo"
+          repoInstanceId={'repo-instance-test'}
+          branch="feature"
+          worktreePath="/worktree"
+        />
       </TerminalSessionReadContext>
     </TerminalSessionContext>,
   )
@@ -285,7 +290,12 @@ describe('TerminalSessionView', () => {
     const { unmount } = renderInJsdom(
       <TerminalSessionContext value={context}>
         <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView repoRoot="/repo" repoInstanceId={'repo-instance-test'} branch="feature" worktreePath="/worktree" />
+          <TerminalSessionView
+            repoRoot="/repo"
+            repoInstanceId={'repo-instance-test'}
+            branch="feature"
+            worktreePath="/worktree"
+          />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )
@@ -396,7 +406,12 @@ describe('TerminalSessionView', () => {
     const { container, unmount } = renderInJsdom(
       <TerminalSessionContext value={context}>
         <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView repoRoot="/repo" repoInstanceId={'repo-instance-test'} branch="feature" worktreePath="/worktree" />
+          <TerminalSessionView
+            repoRoot="/repo"
+            repoInstanceId={'repo-instance-test'}
+            branch="feature"
+            worktreePath="/worktree"
+          />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )
@@ -462,7 +477,12 @@ describe('TerminalSessionView', () => {
     const tree = (
       <TerminalSessionContext value={context}>
         <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView repoRoot="/repo" repoInstanceId={'repo-instance-test'} branch="feature" worktreePath="/worktree" />
+          <TerminalSessionView
+            repoRoot="/repo"
+            repoInstanceId={'repo-instance-test'}
+            branch="feature"
+            worktreePath="/worktree"
+          />
         </TerminalSessionReadContext>
       </TerminalSessionContext>
     )
@@ -537,7 +557,12 @@ describe('TerminalSessionView', () => {
     const { container, unmount } = renderInJsdom(
       <TerminalSessionContext value={context}>
         <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView repoRoot="/repo" repoInstanceId={'repo-instance-test'} branch="feature" worktreePath="/worktree" />
+          <TerminalSessionView
+            repoRoot="/repo"
+            repoInstanceId={'repo-instance-test'}
+            branch="feature"
+            worktreePath="/worktree"
+          />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )
@@ -688,7 +713,12 @@ describe('TerminalSessionView', () => {
     const tree = () => (
       <TerminalSessionContext value={context}>
         <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView repoRoot="/repo" repoInstanceId={'repo-instance-test'} branch="feature" worktreePath="/worktree" />
+          <TerminalSessionView
+            repoRoot="/repo"
+            repoInstanceId={'repo-instance-test'}
+            branch="feature"
+            worktreePath="/worktree"
+          />
         </TerminalSessionReadContext>
       </TerminalSessionContext>
     )
@@ -792,7 +822,12 @@ describe('TerminalSessionView', () => {
     const tree = () => (
       <TerminalSessionContext value={context}>
         <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView repoRoot="/repo" repoInstanceId={'repo-instance-test'} branch="feature" worktreePath="/worktree" />
+          <TerminalSessionView
+            repoRoot="/repo"
+            repoInstanceId={'repo-instance-test'}
+            branch="feature"
+            worktreePath="/worktree"
+          />
         </TerminalSessionReadContext>
       </TerminalSessionContext>
     )
@@ -902,7 +937,12 @@ describe('TerminalSessionView', () => {
     const { container, unmount } = renderInJsdom(
       <TerminalSessionContext value={context}>
         <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView repoRoot="/repo" repoInstanceId={'repo-instance-test'} branch="feature" worktreePath="/worktree" />
+          <TerminalSessionView
+            repoRoot="/repo"
+            repoInstanceId={'repo-instance-test'}
+            branch="feature"
+            worktreePath="/worktree"
+          />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )
@@ -1014,7 +1054,12 @@ describe('TerminalSessionView', () => {
     const { container, unmount } = renderInJsdom(
       <TerminalSessionContext value={context}>
         <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView repoRoot="/repo" repoInstanceId={'repo-instance-test'} branch="feature" worktreePath="/worktree" />
+          <TerminalSessionView
+            repoRoot="/repo"
+            repoInstanceId={'repo-instance-test'}
+            branch="feature"
+            worktreePath="/worktree"
+          />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )
@@ -1138,7 +1183,12 @@ describe('TerminalSessionView', () => {
     const { container, unmount } = renderInJsdom(
       <TerminalSessionContext value={context}>
         <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView repoRoot="/repo" repoInstanceId={'repo-instance-test'} branch="feature" worktreePath="/worktree" />
+          <TerminalSessionView
+            repoRoot="/repo"
+            repoInstanceId={'repo-instance-test'}
+            branch="feature"
+            worktreePath="/worktree"
+          />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )
@@ -1261,7 +1311,12 @@ describe('TerminalSessionView', () => {
     const { container, unmount } = renderInJsdom(
       <TerminalSessionContext value={context}>
         <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView repoRoot="/repo" repoInstanceId={'repo-instance-test'} branch="feature" worktreePath="/worktree" />
+          <TerminalSessionView
+            repoRoot="/repo"
+            repoInstanceId={'repo-instance-test'}
+            branch="feature"
+            worktreePath="/worktree"
+          />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )
@@ -1371,7 +1426,12 @@ describe('TerminalSessionView', () => {
     const { container, unmount } = renderInJsdom(
       <TerminalSessionContext value={context}>
         <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView repoRoot="/repo" repoInstanceId={'repo-instance-test'} branch="feature" worktreePath="/worktree" />
+          <TerminalSessionView
+            repoRoot="/repo"
+            repoInstanceId={'repo-instance-test'}
+            branch="feature"
+            worktreePath="/worktree"
+          />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )
@@ -1492,7 +1552,12 @@ describe('TerminalSessionView', () => {
     const { container, unmount } = renderInJsdom(
       <TerminalSessionContext value={context}>
         <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView repoRoot="/repo" repoInstanceId={'repo-instance-test'} branch="feature" worktreePath="/worktree" />
+          <TerminalSessionView
+            repoRoot="/repo"
+            repoInstanceId={'repo-instance-test'}
+            branch="feature"
+            worktreePath="/worktree"
+          />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )
@@ -1769,7 +1834,12 @@ describe('TerminalSessionView', () => {
     const { container, unmount } = renderInJsdom(
       <TerminalSessionContext value={context}>
         <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView repoRoot="/repo" repoInstanceId={'repo-instance-test'} branch="feature" worktreePath="/worktree" />
+          <TerminalSessionView
+            repoRoot="/repo"
+            repoInstanceId={'repo-instance-test'}
+            branch="feature"
+            worktreePath="/worktree"
+          />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )
@@ -1932,7 +2002,12 @@ describe('TerminalSessionView', () => {
     const { container, rerender, unmount } = renderInJsdom(
       <TerminalSessionContext value={context}>
         <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView repoRoot="/repo" repoInstanceId={'repo-instance-test'} branch="feature" worktreePath="/worktree" />
+          <TerminalSessionView
+            repoRoot="/repo"
+            repoInstanceId={'repo-instance-test'}
+            branch="feature"
+            worktreePath="/worktree"
+          />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )
@@ -1962,7 +2037,12 @@ describe('TerminalSessionView', () => {
       rerender(
         <TerminalSessionContext value={context}>
           <TerminalSessionReadContext value={readContext}>
-            <TerminalSessionView repoRoot="/repo" repoInstanceId={'repo-instance-test'} branch="feature" worktreePath="/worktree-other" />
+            <TerminalSessionView
+              repoRoot="/repo"
+              repoInstanceId={'repo-instance-test'}
+              branch="feature"
+              worktreePath="/worktree-other"
+            />
           </TerminalSessionReadContext>
         </TerminalSessionContext>,
       )
@@ -2031,7 +2111,12 @@ describe('TerminalSessionView', () => {
     const { container, unmount } = renderInJsdom(
       <TerminalSessionContext value={context}>
         <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView repoRoot="/repo" repoInstanceId={'repo-instance-test'} branch="feature" worktreePath="/worktree" />
+          <TerminalSessionView
+            repoRoot="/repo"
+            repoInstanceId={'repo-instance-test'}
+            branch="feature"
+            worktreePath="/worktree"
+          />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )
@@ -2114,7 +2199,12 @@ describe('TerminalSessionView', () => {
     const { container, unmount } = renderInJsdom(
       <TerminalSessionContext value={context}>
         <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView repoRoot="/repo" repoInstanceId={'repo-instance-test'} branch="feature" worktreePath="/worktree" />
+          <TerminalSessionView
+            repoRoot="/repo"
+            repoInstanceId={'repo-instance-test'}
+            branch="feature"
+            worktreePath="/worktree"
+          />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
     )

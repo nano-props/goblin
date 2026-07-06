@@ -34,7 +34,7 @@ export function useRepoDrop({ blocked }: Options) {
   const [active, setDropActive] = useState(false)
 
   // If a modal opens mid-drag, the gate stops reacting to enter/over/
-    // drop but `setDropActive(false)` would never fire on its own. Force-clear
+  // drop but `setDropActive(false)` would never fire on its own. Force-clear
   // when blocked flips on so the dashed border doesn't stay painted
   // over the modal.
   useEffect(() => {

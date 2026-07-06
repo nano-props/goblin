@@ -49,7 +49,11 @@ export function buildFiletreeCollection(
   pushRows(null, 1)
 
   const childIdsByParentId = new Map<string | null, readonly string[]>()
-  for (const [parentId, nodes] of childrenByParent) childIdsByParentId.set(parentId, nodes.map((node) => node.id))
+  for (const [parentId, nodes] of childrenByParent)
+    childIdsByParentId.set(
+      parentId,
+      nodes.map((node) => node.id),
+    )
   return { rows, byId, childIdsByParentId }
 }
 

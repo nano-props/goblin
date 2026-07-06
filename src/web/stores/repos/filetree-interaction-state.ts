@@ -16,11 +16,7 @@ interface FiletreeInteractionActions {
   readonly setExpandedKey: (scopeKey: string, key: string, expanded: boolean) => void
   readonly setTopVisibleRowIndex: (scopeKey: string, topVisibleRowIndex: number) => void
   readonly restoreViewState: (interactionByScope: Readonly<Record<string, FiletreeInteractionSnapshot>>) => void
-  readonly pruneKeys: (
-    scopeKey: string,
-    validKeys: ReadonlySet<string>,
-    loadedPrefixes?: ReadonlySet<string>,
-  ) => void
+  readonly pruneKeys: (scopeKey: string, validKeys: ReadonlySet<string>, loadedPrefixes?: ReadonlySet<string>) => void
 }
 
 type FiletreeInteractionStore = FiletreeInteractionState & FiletreeInteractionActions

@@ -21,35 +21,35 @@ export function useAsyncPending<T>({ resetKey }: { resetKey?: string } = {}) {
   const mountedRef = useRef(true)
   const pending = pendingState && pendingState.resetKey === resetKey ? pendingState.id : null
 
-  useEffect(
-    () => {
-      mountedRef.current = true
-      return () => {
-        mountedRef.current = false
-      }
-    },
-    [],
-  )
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   // Keep sync throws synchronous. Promise rejections are intentionally left to
   // callers so each action boundary can decide whether to show a toast, surface
   // a dialog error, or let the error propagate. Pending is only tracked for
   // async work; duplicate async triggers are dropped until the in-flight action
   // settles.
-  const run = useCallback((id: T, fn: () => void | Promise<unknown>) => {
-    if (pendingRef.current !== null && pendingRef.current.resetKey === resetKey) return
-    const result = fn()
-    if (!isPromiseLike(result)) return result
-    const operationId = nextOperationIdRef.current + 1
-    nextOperationIdRef.current = operationId
-    pendingRef.current = { id, resetKey, operationId }
-    setPendingState({ id, resetKey })
-    return Promise.resolve(result).finally(() => {
-      if (pendingRef.current?.operationId !== operationId) return
-      pendingRef.current = null
-      if (mountedRef.current) setPendingState(null)
-    })
-  }, [resetKey])
+  const run = useCallback(
+    (id: T, fn: () => void | Promise<unknown>) => {
+      if (pendingRef.current !== null && pendingRef.current.resetKey === resetKey) return
+      const result = fn()
+      if (!isPromiseLike(result)) return result
+      const operationId = nextOperationIdRef.current + 1
+      nextOperationIdRef.current = operationId
+      pendingRef.current = { id, resetKey, operationId }
+      setPendingState({ id, resetKey })
+      return Promise.resolve(result).finally(() => {
+        if (pendingRef.current?.operationId !== operationId) return
+        pendingRef.current = null
+        if (mountedRef.current) setPendingState(null)
+      })
+    },
+    [resetKey],
+  )
 
   return {
     pending,

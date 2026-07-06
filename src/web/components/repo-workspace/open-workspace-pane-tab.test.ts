@@ -275,10 +275,7 @@ describe('openWorkspacePaneTab', () => {
   test('records the opener under the branch the operation targeted, even if the user switches branches while the commit is in flight', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [
-        createRepoBranch('feature/a', { worktree: { path: WORKTREE_PATH } }),
-        createRepoBranch('feature/b'),
-      ],
+      branches: [createRepoBranch('feature/a', { worktree: { path: WORKTREE_PATH } }), createRepoBranch('feature/b')],
       currentBranchName: 'feature/a',
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -308,7 +305,11 @@ describe('openWorkspacePaneTab', () => {
     })
     await commitStarted
 
-    resolveCommit([workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files'), workspacePaneStaticTabEntry('changes')])
+    resolveCommit([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('files'),
+      workspacePaneStaticTabEntry('changes'),
+    ])
     await openPromise
 
     const openers = useReposStore.getState().tabOpenerIdentityByScope
@@ -353,7 +354,11 @@ describe('openWorkspacePaneTab', () => {
     await commitStarted
 
     useReposStore.getState().closeRepo(REPO_ID)
-    resolveCommit([workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files'), workspacePaneStaticTabEntry('changes')])
+    resolveCommit([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('files'),
+      workspacePaneStaticTabEntry('changes'),
+    ])
     await expect(openPromise).resolves.toBe(false)
 
     expect(useReposStore.getState().tabOpenerIdentityByScope[tabOpenerScopeKey(REPO_ID, 'feature/a')]).toBeUndefined()
@@ -517,7 +522,12 @@ function seedWorktreeRepo(preferredWorkspacePaneTab: WorkspacePaneStaticTabType)
 
 function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
   const repo = useReposStore.getState().repos[REPO_ID]
-  const target = repo ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, branchName) : null
+  const target = repo
+    ? workspacePaneTabsTargetForRepoBranch(
+        { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+        branchName,
+      )
+    : null
   return workspacePaneStaticTabsFromEntries(
     target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : [],
   )
@@ -526,14 +536,17 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
 function preferredWorkspacePaneTab(branchName = 'feature/worktree') {
   const repo = useReposStore.getState().repos[REPO_ID]
   return repo
-    ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, branchName))
+    ? preferredWorkspacePaneTabForTarget(
+        repo.ui,
+        workspacePaneTabsTargetForRepoBranch(
+          { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+          branchName,
+        ),
+      )
     : null
 }
 
-function navigationWithStoreActions(): Pick<
-  PrimaryWindowNavigationActions,
-  'showRepoBranchWorkspacePaneTab'
-> {
+function navigationWithStoreActions(): Pick<PrimaryWindowNavigationActions, 'showRepoBranchWorkspacePaneTab'> {
   return {
     showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {
       const state = useReposStore.getState()

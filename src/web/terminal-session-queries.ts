@@ -11,6 +11,9 @@ import { terminalClient } from '#/web/terminal.ts'
 // already drives the refetch lifecycle on its own. Keeping the
 // loader as a plain async function means there is no second
 // client-side state surface to keep in sync with the projection.
-export async function loadTerminalSessions(repoRoot: string, repoInstanceId: string): Promise<TerminalSessionSummary[]> {
+export async function loadTerminalSessions(
+  repoRoot: string,
+  repoInstanceId: string,
+): Promise<TerminalSessionSummary[]> {
   return await terminalClient.listSessions({ repoRoot, repoInstanceId })
 }

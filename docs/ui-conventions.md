@@ -60,6 +60,7 @@ Use this doc for UI language and presentation rules.
   Do **not** add a third `cond && '…'` clause to an existing
   `cn(...)` — that patches the same class name twice and buries the
   visibility policy. Add the new condition to the boolean instead.
+
 - Transient status chips (e.g. terminal "Opening…", "Syncing worktree…",
   "Pushing…") must NOT mimic button affordance — no `border`,
   `background`, `box-shadow`, or hover styles. Users will try to click

@@ -311,7 +311,9 @@ describe('terminal web host client', () => {
     expect(wsMock.instances).toHaveLength(1)
     socket.emitOpen()
     await Promise.resolve()
-    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'list-sessions')
+    const request = socket.sent
+      .map((payload) => JSON.parse(payload))
+      .find((message) => message.action === 'list-sessions')
     expect(request).toMatchObject({ action: 'list-sessions' })
     socket.emitMessage(
       JSON.stringify({
@@ -705,7 +707,13 @@ describe('terminal web host client', () => {
     socket.emitMessage(
       JSON.stringify({
         type: 'output',
-        event: { terminalRuntimeSessionId: 'pty_1', terminalSessionId: 'terminal_1', data: 'hello', seq: 1, processName: 'zsh' },
+        event: {
+          terminalRuntimeSessionId: 'pty_1',
+          terminalSessionId: 'terminal_1',
+          data: 'hello',
+          seq: 1,
+          processName: 'zsh',
+        },
       }),
     )
     socket.emitMessage(
@@ -935,7 +943,13 @@ describe('terminal web host client', () => {
     socket.emitMessage(
       JSON.stringify({
         type: 'output',
-        event: { terminalRuntimeSessionId: 'pty_1', terminalSessionId: 'terminal_1', data: 'hello', seq: 1, processName: 'zsh' },
+        event: {
+          terminalRuntimeSessionId: 'pty_1',
+          terminalSessionId: 'terminal_1',
+          data: 'hello',
+          seq: 1,
+          processName: 'zsh',
+        },
       }),
     )
 

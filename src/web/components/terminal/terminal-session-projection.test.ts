@@ -42,7 +42,11 @@ describe('terminal session projection helpers', () => {
         cols: 120,
         rows: 40,
       },
-      serverSnapshot: { terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa', snapshot: 'server-snap', snapshotSeq: 9 },
+      serverSnapshot: {
+        terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
+        snapshot: 'server-snap',
+        snapshotSeq: 9,
+      },
     })
 
     expect(projected).toEqual({
@@ -265,7 +269,7 @@ describe('terminal session projection helpers', () => {
       repoInstanceId: REPO_INSTANCE_ID,
       repoRoot: REPO_ROOT,
       branch: 'main',
-        worktreePath: WORKTREE_PATH,
+      worktreePath: WORKTREE_PATH,
       cwd: WORKTREE_PATH,
       controller: { clientId: 'client_old', status: 'connected' as const },
       processName: 'old-shell',

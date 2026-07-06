@@ -142,9 +142,7 @@ describe('workspace pane tab providers', () => {
     expect(terminalWorkspacePaneTabProvider.identity('session-1')).toBe('terminal:session-1')
     expect(terminalWorkspacePaneTabProvider.buttonId('workspace-pane', 0)).toBe('workspace-pane-workspace-pane-tab')
     expect(terminalWorkspacePaneTabProvider.buttonId('workspace-pane', 2)).toBe('workspace-pane-workspace-pane-tab-2')
-    expect(terminalWorkspacePaneTabProvider.tabEntry('session-1')).toEqual(
-      workspacePaneTerminalTabEntry('session-1'),
-    )
+    expect(terminalWorkspacePaneTabProvider.tabEntry('session-1')).toEqual(workspacePaneTerminalTabEntry('session-1'))
     expect(changesWorkspacePaneTabProvider.label({ t, branchName: 'main', statusCount: 3 })).toBe(
       'tab.changes-with-count:{"count":3}',
     )

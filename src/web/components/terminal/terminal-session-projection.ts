@@ -58,7 +58,14 @@ export function projectCreateResultForClient(
   return {
     serverSessions,
     snapshotByTerminalRuntimeSessionId: new Map<string, TerminalHydrationSnapshot>([
-      [result.terminalRuntimeSessionId, { terminalRuntimeSessionId: result.terminalRuntimeSessionId, snapshot: result.snapshot, snapshotSeq: result.snapshotSeq }],
+      [
+        result.terminalRuntimeSessionId,
+        {
+          terminalRuntimeSessionId: result.terminalRuntimeSessionId,
+          snapshot: result.snapshot,
+          snapshotSeq: result.snapshotSeq,
+        },
+      ],
     ]),
   }
 }

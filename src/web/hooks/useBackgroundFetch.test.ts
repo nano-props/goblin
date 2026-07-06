@@ -30,14 +30,20 @@ describe('backgroundSyncRepoIdsFromStore', () => {
     })
 
     expect(
-      backgroundSyncRepoIdsFromStore({
-        repos: { '/local': localOnly, '/down': unavailable },
-      }, '/local'),
+      backgroundSyncRepoIdsFromStore(
+        {
+          repos: { '/local': localOnly, '/down': unavailable },
+        },
+        '/local',
+      ),
     ).toEqual([])
     expect(
-      backgroundSyncRepoIdsFromStore({
-        repos: { '/local': localOnly, '/down': unavailable },
-      }, '/down'),
+      backgroundSyncRepoIdsFromStore(
+        {
+          repos: { '/local': localOnly, '/down': unavailable },
+        },
+        '/down',
+      ),
     ).toEqual([])
   })
 })

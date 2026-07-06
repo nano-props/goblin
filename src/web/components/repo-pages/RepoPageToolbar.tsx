@@ -24,7 +24,13 @@ interface RepoPageToolbarProps {
   onBack?: () => void
 }
 
-export function RepoPageToolbar({ icon: Icon, label, compact = false, trafficLightOffset = false, onBack }: RepoPageToolbarProps) {
+export function RepoPageToolbar({
+  icon: Icon,
+  label,
+  compact = false,
+  trafficLightOffset = false,
+  onBack,
+}: RepoPageToolbarProps) {
   const t = useT()
   const backLabel = t('workspace.back-to-branch-navigator')
   const tab = (

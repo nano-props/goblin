@@ -15,10 +15,7 @@ interface AttachClientSurfaceWindowOptions {
   surface: ClientSurfaceSpec
 }
 
-export function attachClientSurfaceWindow(
-  win: BrowserWindow,
-  { surface }: AttachClientSurfaceWindowOptions,
-): void {
+export function attachClientSurfaceWindow(win: BrowserWindow, { surface }: AttachClientSurfaceWindowOptions): void {
   configureTrustedBrowserWindow(win)
   registerClientWindowSurface(win, surface)
 }

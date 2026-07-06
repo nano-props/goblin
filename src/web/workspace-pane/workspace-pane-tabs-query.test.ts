@@ -46,9 +46,7 @@ describe('workspace pane tabs query cache', () => {
     ).toEqual([workspacePaneStaticTabEntry('status')])
     expect(
       queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, REPO_INSTANCE_ID)),
-    ).toEqual([
-      entry('feature/no-worktree', null, [workspacePaneStaticTabEntry('status')]),
-    ])
+    ).toEqual([entry('feature/no-worktree', null, [workspacePaneStaticTabEntry('status')])])
   })
 
   test('dedupes polluted branch cache entries on write', () => {

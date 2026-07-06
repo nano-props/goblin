@@ -38,8 +38,7 @@ export interface WorktreeBootstrapPreview {
 }
 
 export type WorktreeBootstrapPreviewResult =
-  | { ok: true; preview: WorktreeBootstrapPreview }
-  | { ok: false; message: string }
+  { ok: true; preview: WorktreeBootstrapPreview } | { ok: false; message: string }
 
 interface WorktreeBootstrapConfigLike {
   copy: readonly string[]

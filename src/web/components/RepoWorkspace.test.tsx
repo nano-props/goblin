@@ -18,9 +18,18 @@ import {
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import { createPullRequest, createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import {
+  createPullRequest,
+  createRepoBranch,
+  resetReposStore,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoPullRequestsQueryData, setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
+import {
+  setRepoPullRequestsQueryData,
+  setRepoSnapshotQueryData,
+  setRepoStatusQueryData,
+} from '#/web/repo-data-query.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 const REPO_ID = '/tmp/repo-workspace-container-repo'

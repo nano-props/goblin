@@ -123,7 +123,11 @@ function createRestorableWorkspaceActions(set: ReposSet): RestorableWorkspaceAct
 function createRuntimeWorkspacePreferenceActions(set: ReposSet, get: ReposGet): RuntimeWorkspacePreferenceActions {
   // Shared post-write effects for view preferences that affect warm restore or
   // visible branch data. Centralized so each preference write stays coherent.
-  function afterWorkspacePreferenceChange(id: string, repoInstanceId: string, branchForPullRequest: string | null): void {
+  function afterWorkspacePreferenceChange(
+    id: string,
+    repoInstanceId: string,
+    branchForPullRequest: string | null,
+  ): void {
     const repo = get().repos[id]
     if (!repo) return
     persistRepoSnapshotCacheEntry(set, repo, repoInstanceId)
@@ -178,10 +182,7 @@ function createRuntimeWorkspacePreferenceActions(set: ReposSet, get: ReposGet): 
       const branchModel = repo ? requireRepoBranchQueryProjection(repo) : null
       const target =
         repo && branchModel
-          ? workspacePaneTabsTargetForRepoBranch(
-              { repoRoot: repo.id, branches: branchModel.branches },
-              branch,
-            )
+          ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branch)
           : null
       afterWorkspacePreferenceChange(
         id,
@@ -192,10 +193,7 @@ function createRuntimeWorkspacePreferenceActions(set: ReposSet, get: ReposGet): 
   }
 }
 
-function createWorkspaceNavigationHistoryActions(
-  set: ReposSet,
-  get: ReposGet,
-): WorkspaceNavigationHistoryActions {
+function createWorkspaceNavigationHistoryActions(set: ReposSet, get: ReposGet): WorkspaceNavigationHistoryActions {
   return {
     recordWorkspaceNavigation(entry) {
       set((s) => {

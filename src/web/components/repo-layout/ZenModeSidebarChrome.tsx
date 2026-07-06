@@ -481,12 +481,7 @@ function ZenModeSidebarReveal({
         onMouseLeave={panelInteractive ? handleSurfaceLeave : undefined}
       >
         <FloatingSurfaceBoundary onPinnedChange={handleDescendantSurfacePinnedChange}>
-          <RepoLayoutSidebar
-            repoId={repoId}
-            compact={false}
-            chromeRegion="none"
-            onOpenSettings={onOpenSettings}
-          />
+          <RepoLayoutSidebar repoId={repoId} compact={false} chromeRegion="none" onOpenSettings={onOpenSettings} />
           <ZenModeSidebarResizeRail
             interactive={panelInteractive}
             resizeRailState={resizeRailState}
@@ -496,11 +491,7 @@ function ZenModeSidebarReveal({
           />
         </FloatingSurfaceBoundary>
       </div>
-      <ZenModeSidebarDragPlate
-        mounted={panelInteractive}
-        style={dragPlateStyle}
-        onSurfaceEnter={onSurfaceEnter}
-      />
+      <ZenModeSidebarDragPlate mounted={panelInteractive} style={dragPlateStyle} onSurfaceEnter={onSurfaceEnter} />
     </div>
   )
 }

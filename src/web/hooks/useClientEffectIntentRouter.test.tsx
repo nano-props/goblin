@@ -11,7 +11,10 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { createBranchSnapshot, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
-import { preferredWorkspacePaneTabForTarget, workspacePaneTabsTargetForRepoBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import {
+  preferredWorkspacePaneTabForTarget,
+  workspacePaneTabsTargetForRepoBranch,
+} from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 const appDataClientMocks = vi.hoisted(() => ({
@@ -402,7 +405,15 @@ describe('useClientEffectIntentRouter', () => {
 
 function preferredWorkspacePaneTab(repoId: string) {
   const repo = useReposStore.getState().repos[repoId]
-  return repo ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, 'main')) : null
+  return repo
+    ? preferredWorkspacePaneTabForTarget(
+        repo.ui,
+        workspacePaneTabsTargetForRepoBranch(
+          { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+          'main',
+        ),
+      )
+    : null
 }
 
 async function renderHookHost() {

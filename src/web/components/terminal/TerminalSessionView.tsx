@@ -272,8 +272,7 @@ export function TerminalSessionView({
   // which is the standard polite-live-region contract.
   const projectionPending = projectionPhase === 'pending'
   const projectionFailed = projectionPhase === 'failed'
-  const showEmptyCta =
-    sessionPhase === 'opening' && !hasSessions && projectionPhase === 'ready' && !pendingCreate
+  const showEmptyCta = sessionPhase === 'opening' && !hasSessions && projectionPhase === 'ready' && !pendingCreate
   const showStatusOverlay = isAttaching && !showEmptyCta
   const statusOverlayLabel =
     sessionPhase === 'restarting'
@@ -284,7 +283,7 @@ export function TerminalSessionView({
           ? projectionErrorMessage
             ? `${t('terminal.load-failed')} (${projectionErrorMessage})`
             : t('terminal.load-failed')
-        : t('terminal.opening')
+          : t('terminal.opening')
   const progressVariant =
     progress?.state === 2 ? 'error' : progress?.state === 4 ? 'warning' : progress?.state === 3 ? 'indeterminate' : ''
   const readyFocusedKeyRef = useRef<string | null>(null)
@@ -633,12 +632,7 @@ const STATUS_DOT_CLASS = cn('goblin-terminal-session__status-dot', 'animate-puls
 // re-announce per the polite-live-region default).
 function StatusOverlay({ label }: StatusOverlayProps) {
   return (
-    <div
-      className="goblin-terminal-session__status-overlay"
-      role="status"
-      aria-live="polite"
-      aria-busy="true"
-    >
+    <div className="goblin-terminal-session__status-overlay" role="status" aria-live="polite" aria-busy="true">
       <span className={STATUS_DOT_CLASS} />
       <span>{label}</span>
     </div>

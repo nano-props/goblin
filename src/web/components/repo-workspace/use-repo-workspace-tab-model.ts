@@ -68,10 +68,7 @@ export function useRepoWorkspaceTabModelInput(
 
   const preferredTab = useMemo(
     () =>
-      preferredWorkspacePaneTabForTarget(
-        repo.ui,
-        branchName ? { repoRoot: repo.id, branchName, worktreePath } : null,
-      ),
+      preferredWorkspacePaneTabForTarget(repo.ui, branchName ? { repoRoot: repo.id, branchName, worktreePath } : null),
     [repo.ui.preferredWorkspacePaneTabByTarget, repo.id, branchName, worktreePath],
   )
 

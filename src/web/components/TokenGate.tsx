@@ -52,7 +52,11 @@ function LoginForm({ onSuccess }: { onSuccess: () => void }) {
       if (trimmed.length === 0) return { error: t('auth.gate.error-empty') }
       const timeout = createTimeoutAbortController(LOGIN_TIMEOUT_MS, `login timed out after ${LOGIN_TIMEOUT_MS}ms`)
       try {
-        await postServerJson<{ token: string }, { ok: true }>('/api/login', { token: trimmed }, { signal: timeout.signal })
+        await postServerJson<{ token: string }, { ok: true }>(
+          '/api/login',
+          { token: trimmed },
+          { signal: timeout.signal },
+        )
         onSuccess()
         return { error: null }
       } catch (err) {

@@ -12,10 +12,7 @@ interface RestorableWorkspaceLayoutPreferenceStoreActions extends Pick<
 
 interface RuntimeCoherentRepoOpenStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
 
-interface RuntimeCoherentRepoNavigationStoreActions extends Pick<
-  ReposStore,
-  'closeRepo' | 'setWorkspacePaneTab'
-> {}
+interface RuntimeCoherentRepoNavigationStoreActions extends Pick<ReposStore, 'closeRepo' | 'setWorkspacePaneTab'> {}
 
 interface RuntimeCoherentRepoProjectionStoreActions extends Pick<
   ReposStore,

@@ -1,10 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, test, vi } from 'vitest'
-import {
-  clearRepoRuntimeInstancesForUser,
-  openRepoRuntimeInstance,
-} from '#/server/modules/repo-runtime-instances.ts'
+import { clearRepoRuntimeInstancesForUser, openRepoRuntimeInstance } from '#/server/modules/repo-runtime-instances.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 
 const CLIENT_ID = 'client_terminal_actions'

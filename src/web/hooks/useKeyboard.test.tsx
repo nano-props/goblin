@@ -102,10 +102,7 @@ describe('useKeyboard', () => {
       currentBranchName: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
-        'feature/no-worktree': [
-          workspacePaneStaticTabEntry('status'),
-          workspacePaneStaticTabEntry('history'),
-        ],
+        'feature/no-worktree': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
       },
     })
     const showRepoBranchWorkspacePaneTab = vi.fn((repoId, tab) => {

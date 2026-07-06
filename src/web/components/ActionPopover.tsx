@@ -103,7 +103,8 @@ export function ActionPopoverItem({
       className={cn(
         'flex h-8 w-full cursor-pointer items-center gap-2 rounded-sm py-1 pl-2 pr-2 text-left text-sm outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-50',
         'focus:bg-accent focus:text-accent-foreground',
-        destructive && 'text-danger hover:bg-danger-surface hover:text-danger focus:bg-danger-surface focus:text-danger',
+        destructive &&
+          'text-danger hover:bg-danger-surface hover:text-danger focus:bg-danger-surface focus:text-danger',
         shortcut && 'whitespace-nowrap',
       )}
     >

@@ -261,9 +261,9 @@ describe('repo lifecycle', () => {
     expect(useReposStore.getState().repos[target!.id]?.name).toBe('example:repo')
     await vi.waitFor(() => {
       const repo = useReposStore.getState().repos[target!.id]
-      expect(repo ? getRepoSnapshotQueryData(repo.id, repo.instanceId)?.branches.map((branch) => branch.name) : null).toEqual(
-        [],
-      )
+      expect(
+        repo ? getRepoSnapshotQueryData(repo.id, repo.instanceId)?.branches.map((branch) => branch.name) : null,
+      ).toEqual([])
     })
   })
 
@@ -323,8 +323,16 @@ describe('repo lifecycle', () => {
   test('closeRepo clears recorded tab openers scoped to that repo, but leaves other repos untouched', () => {
     // seedRepoWithReadModelForTest replaces the whole `repos` map, so seed both repos
     // before merging them back together into one multi-repo store state.
-    const repoA = seedRepoWithReadModelForTest({ id: REPO_A, branches: [createRepoBranch('feature/a')], currentBranchName: 'feature/a' })
-    const repoB = seedRepoWithReadModelForTest({ id: REPO_B, branches: [createRepoBranch('feature/b')], currentBranchName: 'feature/b' })
+    const repoA = seedRepoWithReadModelForTest({
+      id: REPO_A,
+      branches: [createRepoBranch('feature/a')],
+      currentBranchName: 'feature/a',
+    })
+    const repoB = seedRepoWithReadModelForTest({
+      id: REPO_B,
+      branches: [createRepoBranch('feature/b')],
+      currentBranchName: 'feature/b',
+    })
     useReposStore.setState({
       repos: { [REPO_A]: repoA, [REPO_B]: repoB },
       order: [REPO_A, REPO_B],
@@ -345,8 +353,16 @@ describe('repo lifecycle', () => {
   })
 
   test('closeRepo clears workspace navigation history scoped to that repo', () => {
-    const repoA = seedRepoWithReadModelForTest({ id: REPO_A, branches: [createRepoBranch('feature/a')], currentBranchName: 'feature/a' })
-    const repoB = seedRepoWithReadModelForTest({ id: REPO_B, branches: [createRepoBranch('feature/b')], currentBranchName: 'feature/b' })
+    const repoA = seedRepoWithReadModelForTest({
+      id: REPO_A,
+      branches: [createRepoBranch('feature/a')],
+      currentBranchName: 'feature/a',
+    })
+    const repoB = seedRepoWithReadModelForTest({
+      id: REPO_B,
+      branches: [createRepoBranch('feature/b')],
+      currentBranchName: 'feature/b',
+    })
     useReposStore.setState({
       repos: { [REPO_A]: repoA, [REPO_B]: repoB },
       order: [REPO_A, REPO_B],

@@ -67,10 +67,7 @@ describe('repo workspace pane tab model', () => {
       selectedTerminalSessionId: 'session-2',
     })
 
-    expect(model.tabs.map((tab) => tab.identity)).toEqual([
-      'workspace-pane:status',
-      'terminal:session-2',
-    ])
+    expect(model.tabs.map((tab) => tab.identity)).toEqual(['workspace-pane:status', 'terminal:session-2'])
     expect(model.activeTab?.identity).toBe('terminal:session-2')
   })
 
@@ -410,9 +407,9 @@ describe('repo workspace pane tab model', () => {
       selectedTerminalSessionId: 'session-1',
     })
 
-    expect(
-      nextRepoWorkspaceTabAfterClose(model.tabs, 'terminal:session-1', 'workspace-pane:changes')?.identity,
-    ).toBe('workspace-pane:changes')
+    expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'terminal:session-1', 'workspace-pane:changes')?.identity).toBe(
+      'workspace-pane:changes',
+    )
   })
 
   test('falls back to the adjacent tab when the opener tab no longer exists', () => {
@@ -427,9 +424,9 @@ describe('repo workspace pane tab model', () => {
       selectedTerminalSessionId: 'session-1',
     })
 
-    expect(
-      nextRepoWorkspaceTabAfterClose(model.tabs, 'terminal:session-1', 'terminal:missing-opener')?.identity,
-    ).toBe('workspace-pane:changes')
+    expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'terminal:session-1', 'terminal:missing-opener')?.identity).toBe(
+      'workspace-pane:changes',
+    )
   })
 
   test('skips pending terminal tabs when resolving the next tab after close', () => {
@@ -454,7 +451,12 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabEntries: [staticEntry('status'), terminalEntry('session-1'), terminalEntry('session-2'), staticEntry('changes')],
+      tabEntries: [
+        staticEntry('status'),
+        terminalEntry('session-1'),
+        terminalEntry('session-2'),
+        staticEntry('changes'),
+      ],
       runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, false)],
       terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: 'session-2',

@@ -204,12 +204,8 @@ describe('settings actions', () => {
     appDataClientMocks.setShortcutsDisabled.mockResolvedValue(false)
     appDataClientMocks.setGlobalShortcutDisabled.mockResolvedValue(false)
     appDataClientMocks.setLanEnabled.mockResolvedValue(false)
-    const {
-      setTerminalNotificationsEnabled,
-      setShortcutsDisabled,
-      setGlobalShortcutDisabled,
-      setLanEnabled,
-    } = await import('#/web/settings-actions.ts')
+    const { setTerminalNotificationsEnabled, setShortcutsDisabled, setGlobalShortcutDisabled, setLanEnabled } =
+      await import('#/web/settings-actions.ts')
 
     await setTerminalNotificationsEnabled(true)
     await setShortcutsDisabled(true)

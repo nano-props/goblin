@@ -3,11 +3,7 @@ import { execa } from 'execa'
 const USER_SHELL_COMMAND_TIMEOUT_MS = 5_000
 const COMMAND_NAME_RE = /^[A-Za-z0-9._+-]+$/
 
-export async function userShellCommandExists(
-  commandName: string,
-  cwd: string,
-  signal?: AbortSignal,
-): Promise<boolean> {
+export async function userShellCommandExists(commandName: string, cwd: string, signal?: AbortSignal): Promise<boolean> {
   if (!COMMAND_NAME_RE.test(commandName)) return false
   if (signal?.aborted) return false
 

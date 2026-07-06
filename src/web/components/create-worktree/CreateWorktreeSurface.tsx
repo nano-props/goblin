@@ -50,12 +50,7 @@ export interface WorktreeBootstrapPromptState {
   onConfigTrustedChange: (trust: boolean) => void
 }
 
-export function CreateWorktreePageBody({
-  repo,
-  worktreeBootstrap,
-  onCancel,
-  onCreate,
-}: CreateWorktreeFormProps) {
+export function CreateWorktreePageBody({ repo, worktreeBootstrap, onCancel, onCreate }: CreateWorktreeFormProps) {
   const t = useT()
 
   return (
@@ -64,12 +59,7 @@ export function CreateWorktreePageBody({
         <h1 className="text-sm leading-tight font-semibold">{t('action.create-worktree-title')}</h1>
         <p className="text-sm text-muted-foreground">{t('action.create-worktree-hint')}</p>
       </div>
-      <CreateWorktreeForm
-        repo={repo}
-        worktreeBootstrap={worktreeBootstrap}
-        onCancel={onCancel}
-        onCreate={onCreate}
-      />
+      <CreateWorktreeForm repo={repo} worktreeBootstrap={worktreeBootstrap} onCancel={onCancel} onCreate={onCreate} />
     </div>
   )
 }
@@ -81,12 +71,7 @@ interface CreateWorktreeFormProps {
   onCreate: (request: CreateWorktreeRequest) => boolean | void | Promise<boolean | void>
 }
 
-export function CreateWorktreeForm({
-  repo,
-  worktreeBootstrap,
-  onCancel,
-  onCreate,
-}: CreateWorktreeFormProps) {
+export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate }: CreateWorktreeFormProps) {
   const t = useT()
   const compact = useIsCompactUi()
 

@@ -6,11 +6,7 @@ interface CollapseTransitionProps {
   present?: boolean
 }
 
-export function CollapseTransition({
-  children,
-  duration = 200,
-  present = true,
-}: CollapseTransitionProps) {
+export function CollapseTransition({ children, duration = 200, present = true }: CollapseTransitionProps) {
   const outerRef = useRef<HTMLDivElement>(null)
   const innerRef = useRef<HTMLDivElement>(null)
   const initial = useRef(true)
@@ -66,7 +62,6 @@ export function CollapseTransition({
     } else if (!present) {
       setRenderedChildren(null)
     }
-
   }, [duration, present, renderedChildren])
 
   useLayoutEffect(() => {

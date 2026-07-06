@@ -242,11 +242,13 @@ describe('terminal session service facade', () => {
       workspaceTabs: createWorkspacePaneTabsRuntime<string>(),
       ensureSession,
     })
-    await expect(reusedService.ensureOrRestore('client_terminal_service', USER_ID, ensureInput)).resolves.toMatchObject({
-      ok: true,
-      action: 'reused',
-      terminalSessionId: 'session-action',
-    })
+    await expect(reusedService.ensureOrRestore('client_terminal_service', USER_ID, ensureInput)).resolves.toMatchObject(
+      {
+        ok: true,
+        action: 'reused',
+        terminalSessionId: 'session-action',
+      },
+    )
 
     const restoredService = createService({
       sessions: [

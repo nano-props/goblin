@@ -98,7 +98,9 @@ describe('workspace commands', () => {
     })
     const navigation = navigationWith()
 
-    await expect(runShowWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', tab: 'status', navigation })).resolves.toBe(true)
+    await expect(
+      runShowWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', tab: 'status', navigation }),
+    ).resolves.toBe(true)
     expect(preferredWorkspacePaneTab()).toBe('status')
     expect(openTabsFor('feature/worktree')).toEqual(['status'])
   })
@@ -126,7 +128,9 @@ describe('workspace commands', () => {
     })
     const navigation = navigationWith()
 
-    await expect(runShowWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', tab: 'history', navigation })).resolves.toBe(true)
+    await expect(
+      runShowWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', tab: 'history', navigation }),
+    ).resolves.toBe(true)
     expect(preferredWorkspacePaneTab()).toBe('history')
     expect(openTabsFor('feature/worktree')).toEqual(['status', 'history'])
   })
@@ -154,7 +158,9 @@ describe('workspace commands', () => {
     })
     const navigation = navigationWith()
 
-    await expect(runShowWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', tab: 'changes', navigation })).resolves.toBe(true)
+    await expect(
+      runShowWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', tab: 'changes', navigation }),
+    ).resolves.toBe(true)
     expect(preferredWorkspacePaneTab()).toBe('changes')
     expect(openTabsFor('feature/worktree')).toEqual(['changes'])
   })
@@ -175,7 +181,9 @@ describe('workspace commands', () => {
     })
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab })
 
-    await expect(runShowWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', tab: 'changes', navigation })).resolves.toBe(true)
+    await expect(
+      runShowWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', tab: 'changes', navigation }),
+    ).resolves.toBe(true)
 
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'changes')
   })
@@ -210,7 +218,12 @@ describe('workspace commands', () => {
       })
 
       await expect(
-        runShowWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', tab, navigation: navigationWith() }),
+        runShowWorkspacePaneTabCommand({
+          repoId: REPO_ID,
+          branchName: 'feature/worktree',
+          tab,
+          navigation: navigationWith(),
+        }),
       ).resolves.toBe(true)
 
       expect(refreshStatus).toHaveBeenCalledWith(REPO_ID, { repoInstanceId })
@@ -239,7 +252,14 @@ describe('workspace commands', () => {
     })
     const navigation = navigationWith()
 
-    await expect(runShowWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/no-worktree', tab: 'changes', navigation })).resolves.toBe(false)
+    await expect(
+      runShowWorkspacePaneTabCommand({
+        repoId: REPO_ID,
+        branchName: 'feature/no-worktree',
+        tab: 'changes',
+        navigation,
+      }),
+    ).resolves.toBe(false)
     expect(preferredWorkspacePaneTab('feature/no-worktree')).toBe('terminal')
     expect(openTabsFor('feature/no-worktree')).toEqual(['status'])
   })
@@ -266,7 +286,9 @@ describe('workspace commands', () => {
     })
     const navigation = navigationWith()
 
-    await expect(runShowWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', tab: 'status', navigation })).resolves.toBe(true)
+    await expect(
+      runShowWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', tab: 'status', navigation }),
+    ).resolves.toBe(true)
     expect(preferredWorkspacePaneTab()).toBe('status')
   })
 
@@ -411,7 +433,9 @@ describe('workspace commands', () => {
 
     // Closing it should reactivate "status" (its opener), not "changes"
     // (the spatial neighbor the generic fallback would otherwise pick).
-    expect(await runCloseWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', navigation })).toBe(true)
+    expect(await runCloseWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', navigation })).toBe(
+      true,
+    )
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenLastCalledWith(REPO_ID, 'feature/worktree', 'status')
     expect(preferredWorkspacePaneTab()).toBe('status')
   })
@@ -553,7 +577,11 @@ describe('workspace commands', () => {
       selectTerminal: vi.fn(),
     })
 
-    const command = runNewTerminalTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', navigation: navigationWith() })
+    const command = runNewTerminalTabCommand({
+      repoId: REPO_ID,
+      branchName: 'feature/worktree',
+      navigation: navigationWith(),
+    })
     await vi.waitFor(() => expect(createTerminal).toHaveBeenCalledTimes(1))
 
     // Simulate the user clicking a different tab while the create is in flight.
@@ -589,7 +617,11 @@ describe('workspace commands', () => {
       selectTerminal: vi.fn(),
     })
 
-    const command = runNewTerminalTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', navigation: navigationWith() })
+    const command = runNewTerminalTabCommand({
+      repoId: REPO_ID,
+      branchName: 'feature/worktree',
+      navigation: navigationWith(),
+    })
     useReposStore.getState().closeRepo(REPO_ID)
     seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -626,7 +658,12 @@ describe('workspace commands', () => {
     })
 
     expect(
-      await runCloseWorkspacePaneTabOrWindowCommand({ repoId: REPO_ID, branchName: 'feature/worktree', navigation: navigationWith(), closeWindow }),
+      await runCloseWorkspacePaneTabOrWindowCommand({
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        navigation: navigationWith(),
+        closeWindow,
+      }),
     ).toBe(true)
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-1', {
@@ -659,7 +696,12 @@ describe('workspace commands', () => {
     })
 
     expect(
-      await runCloseWorkspacePaneTabOrWindowCommand({ repoId: REPO_ID, branchName: 'feature/worktree', navigation: navigationWith(), closeWindow }),
+      await runCloseWorkspacePaneTabOrWindowCommand({
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        navigation: navigationWith(),
+        closeWindow,
+      }),
     ).toBe(true)
 
     expect(closeTerminalByDescriptor).not.toHaveBeenCalled()
@@ -802,8 +844,8 @@ describe('workspace commands', () => {
 
     let settled = false
     const closePromise = runCloseWorkspacePaneTabOrWindowCommand({
-        repoId: REPO_ID,
-        branchName: 'feature/worktree',
+      repoId: REPO_ID,
+      branchName: 'feature/worktree',
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
       closeWindow,
     }).then((result) => {
@@ -859,15 +901,15 @@ describe('workspace commands', () => {
     })
 
     const firstClose = runCloseWorkspacePaneTabOrWindowCommand({
-        repoId: REPO_ID,
-        branchName: 'feature/worktree',
+      repoId: REPO_ID,
+      branchName: 'feature/worktree',
       navigation: navigationWith(),
       closeWindow,
     })
 
     const secondClose = runCloseWorkspacePaneTabOrWindowCommand({
-        repoId: REPO_ID,
-        branchName: 'feature/worktree',
+      repoId: REPO_ID,
+      branchName: 'feature/worktree',
       navigation: navigationWith(),
       closeWindow,
     })
@@ -911,7 +953,12 @@ describe('workspace commands', () => {
     })
 
     expect(
-      await runCloseWorkspacePaneTabOrWindowCommand({ repoId: REPO_ID, branchName: 'feature/worktree', navigation: navigationWith(), closeWindow }),
+      await runCloseWorkspacePaneTabOrWindowCommand({
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        navigation: navigationWith(),
+        closeWindow,
+      }),
     ).toBe(true)
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-2', {
@@ -985,7 +1032,11 @@ describe('workspace commands', () => {
     })
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab })
 
-    const closePromise = runCloseWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', navigation })
+    const closePromise = runCloseWorkspacePaneTabCommand({
+      repoId: REPO_ID,
+      branchName: 'feature/worktree',
+      navigation,
+    })
     await commitStarted
     navigation.showRepoBranchWorkspacePaneTab(REPO_ID, 'feature/worktree', 'status')
     showRepoBranchWorkspacePaneTab.mockClear()
@@ -1219,11 +1270,20 @@ describe('workspace commands', () => {
     })
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab })
 
-    expect(await runShowWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', tab: 'history', navigation })).toBe(true)
+    expect(
+      await runShowWorkspacePaneTabCommand({
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        tab: 'history',
+        navigation,
+      }),
+    ).toBe(true)
     expect(openTabsFor('feature/worktree')).toEqual(['status', 'changes', 'files', 'history'])
     expect(preferredWorkspacePaneTab()).toBe('history')
 
-    expect(await runCloseWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', navigation })).toBe(true)
+    expect(await runCloseWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', navigation })).toBe(
+      true,
+    )
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenLastCalledWith(REPO_ID, 'feature/worktree', 'status')
     expect(preferredWorkspacePaneTab()).toBe('status')
   })
@@ -1247,7 +1307,12 @@ describe('workspace commands', () => {
     })
 
     expect(
-      await runCloseWorkspacePaneTabOrWindowCommand({ repoId: REPO_ID, branchName: 'feature/worktree', navigation: navigationWith(), closeWindow }),
+      await runCloseWorkspacePaneTabOrWindowCommand({
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        navigation: navigationWith(),
+        closeWindow,
+      }),
     ).toBe(true)
 
     expect(closeTerminalByDescriptor).not.toHaveBeenCalled()
@@ -1302,7 +1367,12 @@ describe('workspace commands', () => {
     })
 
     expect(
-      await runCloseWorkspacePaneTabOrWindowCommand({ repoId: REPO_ID, branchName: 'feature/worktree', navigation: navigationWith(), closeWindow }),
+      await runCloseWorkspacePaneTabOrWindowCommand({
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        navigation: navigationWith(),
+        closeWindow,
+      }),
     ).toBe(true)
 
     expect(closeWindow).not.toHaveBeenCalled()
@@ -1327,7 +1397,12 @@ describe('workspace commands', () => {
     })
 
     expect(
-      await runCloseWorkspacePaneTabOrWindowCommand({ repoId: REPO_ID, branchName: 'feature/worktree', navigation: navigationWith(), closeWindow }),
+      await runCloseWorkspacePaneTabOrWindowCommand({
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        navigation: navigationWith(),
+        closeWindow,
+      }),
     ).toBe(true)
 
     expect(closeWindow).not.toHaveBeenCalled()
@@ -1431,8 +1506,22 @@ describe('workspace commands', () => {
     })
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab })
 
-    expect(runSelectWorkspacePaneTabByIndexCommand({ repoId: REPO_ID, branchName: 'feature/worktree', tabIndex: 2, navigation })).toBe(true)
-    expect(runSelectWorkspacePaneTabByIndexCommand({ repoId: REPO_ID, branchName: 'feature/worktree', tabIndex: 3, navigation })).toBe(true)
+    expect(
+      runSelectWorkspacePaneTabByIndexCommand({
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        tabIndex: 2,
+        navigation,
+      }),
+    ).toBe(true)
+    expect(
+      runSelectWorkspacePaneTabByIndexCommand({
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        tabIndex: 3,
+        navigation,
+      }),
+    ).toBe(true)
 
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'terminal')
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'changes')
@@ -1458,7 +1547,14 @@ describe('workspace commands', () => {
     })
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab })
 
-    expect(runSelectWorkspacePaneTabByIndexCommand({ repoId: REPO_ID, branchName: 'feature/worktree', tabIndex: 2, navigation })).toBe(false)
+    expect(
+      runSelectWorkspacePaneTabByIndexCommand({
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        tabIndex: 2,
+        navigation,
+      }),
+    ).toBe(false)
 
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
   })
@@ -1484,8 +1580,12 @@ describe('workspace commands', () => {
     })
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab })
 
-    expect(runMoveWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', direction: 1, navigation })).toBe(true)
-    expect(runMoveWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', direction: 1, navigation })).toBe(true)
+    expect(
+      runMoveWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', direction: 1, navigation }),
+    ).toBe(true)
+    expect(
+      runMoveWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/worktree', direction: 1, navigation }),
+    ).toBe(true)
 
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(1, REPO_ID, 'feature/worktree', 'terminal')
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'changes')
@@ -1505,7 +1605,9 @@ describe('workspace commands', () => {
     })
     const navigation = navigationWith({ showRepoBranchWorkspacePaneTab })
 
-    expect(runMoveWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/no-worktree', direction: 1, navigation })).toBe(true)
+    expect(
+      runMoveWorkspacePaneTabCommand({ repoId: REPO_ID, branchName: 'feature/no-worktree', direction: 1, navigation }),
+    ).toBe(true)
 
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/no-worktree', 'history')
     expect(preferredWorkspacePaneTab('feature/no-worktree')).toBe('history')
@@ -1515,7 +1617,13 @@ describe('workspace commands', () => {
 function preferredWorkspacePaneTab(branch = 'feature/worktree') {
   const repo = useReposStore.getState().repos[REPO_ID]
   return repo
-    ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, branch))
+    ? preferredWorkspacePaneTabForTarget(
+        repo.ui,
+        workspacePaneTabsTargetForRepoBranch(
+          { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+          branch,
+        ),
+      )
     : null
 }
 
@@ -1525,7 +1633,12 @@ function openTabsFor(branch: string) {
 
 function tabsFor(branch: string): WorkspacePaneTabEntry[] {
   const repo = useReposStore.getState().repos[REPO_ID]
-  const target = repo ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, branch) : null
+  const target = repo
+    ? workspacePaneTabsTargetForRepoBranch(
+        { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+        branch,
+      )
+    : null
   return target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : []
 }
 

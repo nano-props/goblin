@@ -43,9 +43,7 @@ export class TerminalSessionLifecycleQueues<TBase, TOptions> {
     const existing = this.pendingCreateByWorktree.get(input.terminalWorktreeKey)
     if (existing) {
       if (input.isSameRequest(existing.options, input.options)) return existing.promise
-      return existing.promise
-        .catch(() => undefined)
-        .then(() => this.enqueueCreate(input))
+      return existing.promise.catch(() => undefined).then(() => this.enqueueCreate(input))
     }
     let resolve!: (terminalSessionId: string) => void
     let reject!: (error: unknown) => void

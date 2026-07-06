@@ -132,7 +132,9 @@ export abstract class WorkspacePaneStaticTabProvider<
 
   close(input: WorkspacePaneTabCloseInput): Promise<boolean> {
     if (!input.branchName || !input.closeStaticTab) return Promise.resolve(false)
-    return Promise.resolve(input.closeStaticTab(input.repoId, this.type, input.branchName)).then((result) => result !== false)
+    return Promise.resolve(input.closeStaticTab(input.repoId, this.type, input.branchName)).then(
+      (result) => result !== false,
+    )
   }
 }
 

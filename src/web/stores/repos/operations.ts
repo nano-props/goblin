@@ -1,19 +1,9 @@
 import type { RepoBranchActionKind } from '#/web/stores/repos/branch-action-types.ts'
 export type RepoOperationPhase = 'idle' | 'queued' | 'running'
 export type RepoOperationKey =
-  | 'fetch'
-  | 'manualRefresh'
-  | 'snapshot'
-  | 'status'
-  | 'pullRequests'
-  | 'branchAction'
-  | `pullRequest:${string}`
+  'fetch' | 'manualRefresh' | 'snapshot' | 'status' | 'pullRequests' | 'branchAction' | `pullRequest:${string}`
 export type RepoBranchActionReason =
-  | 'branch:pull'
-  | 'branch:push'
-  | 'branch:createWorktree'
-  | 'branch:deleteBranch'
-  | 'branch:removeWorktree'
+  'branch:pull' | 'branch:push' | 'branch:createWorktree' | 'branch:deleteBranch' | 'branch:removeWorktree'
 export type RepoPullRequestReason = 'summary' | 'full'
 export type RepoOperationReason =
   | 'fetch'

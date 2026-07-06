@@ -207,7 +207,8 @@ export class TerminalSessionManager<TUser extends string | number> {
     rows: number,
     clientId: string,
   ): Promise<TerminalAttachResult> {
-    if (!isValidTerminalRuntimeSessionId(terminalRuntimeSessionId)) return { ok: false, message: 'error.invalid-arguments' }
+    if (!isValidTerminalRuntimeSessionId(terminalRuntimeSessionId))
+      return { ok: false, message: 'error.invalid-arguments' }
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
     const session = this.getSession(userId, terminalRuntimeSessionId)
@@ -220,7 +221,13 @@ export class TerminalSessionManager<TUser extends string | number> {
     return await this.attachResult(session)
   }
 
-  resizeSession(userId: TUser, terminalRuntimeSessionId: string, cols: number, rows: number, clientId: string): boolean {
+  resizeSession(
+    userId: TUser,
+    terminalRuntimeSessionId: string,
+    cols: number,
+    rows: number,
+    clientId: string,
+  ): boolean {
     if (!isValidTerminalRuntimeSessionId(terminalRuntimeSessionId)) return false
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return false
@@ -238,7 +245,8 @@ export class TerminalSessionManager<TUser extends string | number> {
     rows: number,
     clientId: string,
   ): TerminalTakeoverResult {
-    if (!isValidTerminalRuntimeSessionId(terminalRuntimeSessionId)) return { ok: false, message: 'error.invalid-arguments' }
+    if (!isValidTerminalRuntimeSessionId(terminalRuntimeSessionId))
+      return { ok: false, message: 'error.invalid-arguments' }
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
     const session = this.getSession(userId, terminalRuntimeSessionId)
@@ -262,7 +270,8 @@ export class TerminalSessionManager<TUser extends string | number> {
     rows: number,
     clientId: string,
   ): Promise<TerminalAttachResult> {
-    if (!isValidTerminalRuntimeSessionId(terminalRuntimeSessionId)) return { ok: false, message: 'error.invalid-arguments' }
+    if (!isValidTerminalRuntimeSessionId(terminalRuntimeSessionId))
+      return { ok: false, message: 'error.invalid-arguments' }
     const size = normalizeTerminalSize(cols, rows)
     if (!size) return { ok: false, message: 'error.invalid-arguments' }
     const session = this.getSession(userId, terminalRuntimeSessionId)
@@ -295,7 +304,9 @@ export class TerminalSessionManager<TUser extends string | number> {
     const closedSession = this.sessionSummary(session)
     this.sessionsByTerminalRuntimeSessionId.delete(terminalRuntimeSessionId)
     const userTerminalSessionIndex = this.formatUserTerminalSessionIndex(session.userId, session.terminalSessionId)
-    if (this.terminalRuntimeSessionIdByUserTerminalSessionIndex.get(userTerminalSessionIndex) === terminalRuntimeSessionId)
+    if (
+      this.terminalRuntimeSessionIdByUserTerminalSessionIndex.get(userTerminalSessionIndex) === terminalRuntimeSessionId
+    )
       this.terminalRuntimeSessionIdByUserTerminalSessionIndex.delete(userTerminalSessionIndex)
     session.ptyBinding.dispose(session)
     this.sink.onSessionClosed?.(session.userId, closedSession)
@@ -324,7 +335,8 @@ export class TerminalSessionManager<TUser extends string | number> {
   }
 
   closeAll(): void {
-    for (const terminalRuntimeSessionId of Array.from(this.sessionsByTerminalRuntimeSessionId.keys())) this.closeSession(terminalRuntimeSessionId)
+    for (const terminalRuntimeSessionId of Array.from(this.sessionsByTerminalRuntimeSessionId.keys()))
+      this.closeSession(terminalRuntimeSessionId)
   }
 
   async listSessionsForUser(userId: TUser, scope: string): Promise<TerminalSessionSummary[]> {

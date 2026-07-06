@@ -18,18 +18,9 @@ describe('orderWorkspacePaneItemsByTabEntries', () => {
       item('terminal-2', terminalTwo),
     ]
 
-    const ordered = orderWorkspacePaneItemsByTabEntries(
-      items,
-      [status, terminalTwo],
-      (candidate) => candidate.entry,
-    )
+    const ordered = orderWorkspacePaneItemsByTabEntries(items, [status, terminalTwo], (candidate) => candidate.entry)
 
-    expect(ordered.map((candidate) => candidate.key)).toEqual([
-      'status',
-      'terminal-2',
-      'terminal-1',
-      'pending',
-    ])
+    expect(ordered.map((candidate) => candidate.key)).toEqual(['status', 'terminal-2', 'terminal-1', 'pending'])
   })
 })
 

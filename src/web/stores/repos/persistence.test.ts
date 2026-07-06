@@ -6,7 +6,12 @@ import {
   seedRepoSnapshotQueryFromCacheEntry,
 } from '#/web/stores/repos/persistence.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
-import { createBranchSnapshot, createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import {
+  createBranchSnapshot,
+  createRepoBranch,
+  resetReposStore,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoSnapshotCacheEntry } from '#/web/stores/repos/types.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'

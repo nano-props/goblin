@@ -217,9 +217,8 @@ function updateWorkspacePaneTabsQueryData(
   update: (current: WorkspacePaneTabsQueryData | undefined) => readonly WorkspacePaneTabsEntry[],
 ): void {
   const key = workspacePaneTabsProjectionKey(repoRoot, repoInstanceId)
-  queryClient.setQueryData<WorkspacePaneTabsQueryData>(
-    workspacePaneTabsQueryKey(repoRoot, repoInstanceId),
-    (current) => normalizeWorkspacePaneTabsQueryData(update(current)),
+  queryClient.setQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(repoRoot, repoInstanceId), (current) =>
+    normalizeWorkspacePaneTabsQueryData(update(current)),
   )
   workspacePaneTabsProjectionGeneration.set(key, (workspacePaneTabsProjectionGeneration.get(key) ?? 0) + 1)
   notifyWorkspacePaneTabsPersistenceChanged()

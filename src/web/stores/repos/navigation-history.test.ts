@@ -70,10 +70,7 @@ function history() {
 
 function entry(kind: 'dashboard' | 'newWorktree'): WorkspaceNavigationHistoryEntry
 function entry(kind: 'branch', branchName: string): WorkspaceNavigationHistoryEntry
-function entry(
-  kind: 'dashboard' | 'newWorktree' | 'branch',
-  branchName?: string,
-): WorkspaceNavigationHistoryEntry {
+function entry(kind: 'dashboard' | 'newWorktree' | 'branch', branchName?: string): WorkspaceNavigationHistoryEntry {
   if (kind === 'branch') {
     return {
       repoId: REPO_ID,

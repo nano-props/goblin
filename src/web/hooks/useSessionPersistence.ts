@@ -25,7 +25,9 @@ interface SessionPersistenceInput {
   zenMode: boolean
   workspacePaneSize: number
   selectedTerminalSessionIdByTerminalWorktree: Record<string, string>
-  filetreeInteractionByScope: Parameters<typeof workspaceSessionStateFromRestorableWorkspaceState>[0]['filetreeInteractionByScope']
+  filetreeInteractionByScope: Parameters<
+    typeof workspaceSessionStateFromRestorableWorkspaceState
+  >[0]['filetreeInteractionByScope']
 }
 
 export function useSessionPersistence({ routedRepoId }: { routedRepoId: string | null }) {

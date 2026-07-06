@@ -138,12 +138,11 @@ vi.mock('#/web/components/WorkspaceNavigationControls.tsx', () => ({
     zenRevealTriggerEnabled?: boolean
     onZenRevealTriggerEnter?: () => void
   }) => (
-    <div
-      data-testid="workspace-navigation-controls"
-      data-repo-id={repoId}
-      className="pointer-events-auto"
-    >
-      <span data-testid="zen-mode-sidebar-trigger-surface" data-zen-reveal-surface={zenRevealTriggerEnabled ? '' : undefined}>
+    <div data-testid="workspace-navigation-controls" data-repo-id={repoId} className="pointer-events-auto">
+      <span
+        data-testid="zen-mode-sidebar-trigger-surface"
+        data-zen-reveal-surface={zenRevealTriggerEnabled ? '' : undefined}
+      >
         <button type="button" data-testid="zen-mode-sidebar-trigger" onMouseEnter={onZenRevealTriggerEnter}>
           zen
         </button>
@@ -261,9 +260,7 @@ describe('RepoView workspace navigation', () => {
   test('moves a missing routed repo from restore skeleton to not-found when membership settles', () => {
     resetReposStore()
 
-    const result = render(
-      <RepoView repoId={REPO_ID} routeView={{ kind: 'dashboard', repoId: REPO_ID }} />,
-    )
+    const result = render(<RepoView repoId={REPO_ID} routeView={{ kind: 'dashboard', repoId: REPO_ID }} />)
 
     expect(result.container.querySelector('[data-testid="repo-workspace-empty-skeleton"]')).not.toBeNull()
     expect(result.container.textContent).not.toContain('repo-route.not-found-title')
@@ -297,7 +294,6 @@ describe('RepoView workspace navigation', () => {
     expect(() =>
       render(<RepoView repoId={REPO_ID} routeView={{ kind: 'branch', repoId: REPO_ID, branchName: 'feature/a' }} />),
     ).not.toThrow()
-
   })
 
   test('route branch view uses the URL branch as the displayed workspace branch', () => {
@@ -310,7 +306,6 @@ describe('RepoView workspace navigation', () => {
 
   test('route branch view leaves store selection unchanged when read model is ready', () => {
     render(<RepoView repoId={REPO_ID} routeView={{ kind: 'branch', repoId: REPO_ID, branchName: 'feature/a' }} />)
-
   })
 
   test('new worktree page cancel returns to the stored source route', () => {
@@ -395,11 +390,7 @@ describe('RepoView workspace navigation', () => {
     const onOpenRepoRoot = vi.fn()
 
     const { container } = render(
-      <RepoView
-        repoId={REPO_ID}
-        routeView={{ kind: 'dashboard', repoId: REPO_ID }}
-        onOpenRepoRoot={onOpenRepoRoot}
-      />,
+      <RepoView repoId={REPO_ID} routeView={{ kind: 'dashboard', repoId: REPO_ID }} onOpenRepoRoot={onOpenRepoRoot} />,
     )
 
     expect(compactWorkspace(container)?.dataset.activePane).toBe('workspace')
@@ -414,9 +405,7 @@ describe('RepoView workspace navigation', () => {
   test('compact new worktree page shows the workspace pane with compact page chrome', () => {
     responsiveMocks.mode = 'compact'
 
-    const { container } = render(
-      <RepoView repoId={REPO_ID} routeView={{ kind: 'newWorktree', repoId: REPO_ID }} />,
-    )
+    const { container } = render(<RepoView repoId={REPO_ID} routeView={{ kind: 'newWorktree', repoId: REPO_ID }} />)
 
     expect(compactWorkspace(container)?.dataset.activePane).toBe('workspace')
     expect(container.querySelector<HTMLElement>('[data-testid="create-worktree-page"]')?.dataset.compact).toBe('true')
@@ -477,7 +466,9 @@ describe('RepoView workspace navigation', () => {
     expect(zenModeSidebarHitArea(container)?.dataset.titleBarChromeRegion).toBeUndefined()
     expect(zenModeSidebarHitArea(container)?.className).toContain('pointer-events-auto')
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
-    expect(workspaceNavigationControls(container)?.closest('[data-title-bar-chrome-region="interactive"]')).not.toBeNull()
+    expect(
+      workspaceNavigationControls(container)?.closest('[data-title-bar-chrome-region="interactive"]'),
+    ).not.toBeNull()
     expect(zenModeSidebarTrigger(container)?.tagName).toBe('BUTTON')
   })
 
@@ -499,7 +490,9 @@ describe('RepoView workspace navigation', () => {
     expect(revealLayer!.compareDocumentPosition(toggleOverlay!) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     )
-    expect(workspaceNavigationControls(container)?.closest('[data-title-bar-chrome-region="interactive"]')).not.toBeNull()
+    expect(
+      workspaceNavigationControls(container)?.closest('[data-title-bar-chrome-region="interactive"]'),
+    ).not.toBeNull()
     expect(workspaceNavigationControls(container)?.hasAttribute('data-zen-reveal-surface')).toBe(false)
     expect(zenModeSidebarTriggerSurface(container)?.hasAttribute('data-zen-reveal-surface')).toBe(true)
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
@@ -520,9 +513,9 @@ describe('RepoView workspace navigation', () => {
     expect(dragPlate?.hasAttribute('data-interactive')).toBe(false)
     expect(dragPlate?.hasAttribute('data-zen-reveal-surface')).toBe(true)
     expect(dragPlate?.className).toContain('pointer-events-auto')
-    expect(zenModeSidebarReveal(container)!.compareDocumentPosition(dragPlate!) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING,
-    )
+    expect(
+      zenModeSidebarReveal(container)!.compareDocumentPosition(dragPlate!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     const floatingSidebarTop = zenModeSidebarReveal(container)?.querySelector<HTMLElement>(
       '[data-testid="repo-shell-sidebar-top"]',
     )
@@ -857,8 +850,7 @@ describe('RepoView workspace navigation', () => {
     responsiveMocks.mode = 'compact'
     const { container } = render(branchRepoView())
 
-    act(() => {
-    })
+    act(() => {})
 
     expect(compactWorkspace(container)?.dataset.activePane).toBe('workspace')
     expect(compactPane(container, 'navigator')?.getAttribute('aria-hidden')).toBe('true')

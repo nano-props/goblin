@@ -56,7 +56,8 @@ export const useTerminalProjectionHydrationStore = create<TerminalProjectionHydr
   },
   markProjectionFailed: (repoRoot, instanceId, errorMessage) => {
     const current = get().hydrationByRepo.get(repoRoot)
-    if (current?.instanceId === instanceId && current.phase === 'failed' && current.errorMessage === errorMessage) return
+    if (current?.instanceId === instanceId && current.phase === 'failed' && current.errorMessage === errorMessage)
+      return
     set((s) => {
       const hydrationByRepo = new Map(s.hydrationByRepo)
       hydrationByRepo.set(repoRoot, { instanceId, phase: 'failed', errorMessage })

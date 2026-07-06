@@ -156,10 +156,7 @@ function removeBranchFromReadModel(repoId: string, branchName: string): void {
   const repo = useReposStore.getState().repos[repoId]
   if (!repo) throw new Error(`missing test repo: ${repoId}`)
   const readModel = readRepoBranchQueryProjection(repo)
-  setBranchSnapshotForRepo(
-    repoId,
-    readModel?.branches.filter((branch) => branch.name !== branchName) ?? [],
-  )
+  setBranchSnapshotForRepo(repoId, readModel?.branches.filter((branch) => branch.name !== branchName) ?? [])
 }
 
 describe('BranchActionDialogHost', () => {

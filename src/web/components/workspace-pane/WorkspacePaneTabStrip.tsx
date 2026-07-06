@@ -174,12 +174,11 @@ function useWorkspacePaneTabStripAutoScroll({
   getTabElement: (identity: string) => HTMLButtonElement | null
 }) {
   const activeRenderableTabIdentity = activeTabIdentity
-    ? (items.find((item) => item.identity === activeTabIdentity && !isPendingWorkspacePaneTabItem(item))?.identity ?? null)
+    ? (items.find((item) => item.identity === activeTabIdentity && !isPendingWorkspacePaneTabItem(item))?.identity ??
+      null)
     : null
   const lastRenderableTabIdentity =
-    items
-      .filter((item) => !isPendingWorkspacePaneTabItem(item))
-      .at(-1)?.identity ?? null
+    items.filter((item) => !isPendingWorkspacePaneTabItem(item)).at(-1)?.identity ?? null
   const lastScrolledActiveIdentityRef = useRef<string | null>(null)
   const lastWorkspacePaneTabTargetKeyRef = useRef<string | null>(null)
   const awaitingTargetBaselineRef = useRef(false)

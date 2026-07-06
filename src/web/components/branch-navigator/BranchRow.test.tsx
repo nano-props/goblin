@@ -39,7 +39,6 @@ vi.mock(import('#/web/stores/i18n.ts'), async (importOriginal) => {
   }
 })
 
-
 import { createRef } from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'

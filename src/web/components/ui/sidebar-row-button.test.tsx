@@ -6,9 +6,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 
 describe('SidebarRowButton', () => {
   test('uses compact full-width chrome without growing in a vertical flex stack', () => {
-    const { container } = renderInJsdom(
-      <SidebarRowButton aria-label="Sidebar row">Sidebar row</SidebarRowButton>,
-    )
+    const { container } = renderInJsdom(<SidebarRowButton aria-label="Sidebar row">Sidebar row</SidebarRowButton>)
 
     const button = container.querySelector('button[aria-label="Sidebar row"]')
     if (!(button instanceof HTMLButtonElement)) throw new Error('missing sidebar row button')

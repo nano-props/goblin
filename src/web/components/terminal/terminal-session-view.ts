@@ -446,7 +446,6 @@ export class TerminalSessionView {
     window.clearTimeout(this.fitFlushTimer)
     this.fitFlushTimer = null
   }
-
 }
 
 interface XtermCoreUserInputService {

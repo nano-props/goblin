@@ -2,7 +2,14 @@ import type { StatusTone } from '#/web/components/ui/status-tones.ts'
 
 export type HistoryRefDisplay =
   | { kind: 'single'; refName: string; tone: StatusTone }
-  | { kind: 'mergedRemote'; refName: string; label: string; tone: StatusTone; remoteNames: string[]; remoteRefs: string[] }
+  | {
+      kind: 'mergedRemote'
+      refName: string
+      label: string
+      tone: StatusTone
+      remoteNames: string[]
+      remoteRefs: string[]
+    }
 
 interface ParsedRemoteRef {
   refName: string
@@ -59,7 +66,8 @@ export function historyRefDisplays(refs: string[]): HistoryRefDisplay[] {
     )
   }
   for (const remote of remoteRefs) {
-    if (!emittedRemoteRefs.has(remote.refName)) displays.push({ kind: 'single', refName: remote.refName, tone: 'warning' })
+    if (!emittedRemoteRefs.has(remote.refName))
+      displays.push({ kind: 'single', refName: remote.refName, tone: 'warning' })
   }
   return displays
 }

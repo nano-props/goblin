@@ -687,7 +687,6 @@ describe('RepoWorkspaceToolbar', () => {
     act(() => {
       back?.click()
     })
-
   })
 
   test('compact UI keeps the back button visible when the tab strip is empty', () => {
@@ -1405,7 +1404,12 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
 
 function tabsFor(branchName: string): WorkspacePaneTabEntry[] {
   const repo = useReposStore.getState().repos[REPO_ID]
-  const target = repo ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, branchName) : null
+  const target = repo
+    ? workspacePaneTabsTargetForRepoBranch(
+        { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+        branchName,
+      )
+    : null
   return target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : []
 }
 

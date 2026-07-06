@@ -27,7 +27,10 @@ import {
   resolveWorkspacePaneTabTargetForBranch,
   workspacePaneTabTargetForBranch,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { preferredWorkspacePaneTabForTarget, workspacePaneTabsTargetForRepoBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import {
+  preferredWorkspacePaneTabForTarget,
+  workspacePaneTabsTargetForRepoBranch,
+} from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
   captureWorkspacePaneActiveTabIdentity,
   clearWorkspacePaneTabOpener,
@@ -244,7 +247,8 @@ async function closeWorkspacePaneTabCommand(options: CloseWorkspacePaneTabComman
   observeWorkspacePaneTabClose(close.completion, target.repoId, target.branchName, closingIdentity)
   if (tab.kind === 'static') {
     if (!(await close.completion)) return false
-    if (target.branchName && preferredWorkspacePaneTab(target.repoId, target.branchName) !== preferredBeforeClose) return true
+    if (target.branchName && preferredWorkspacePaneTab(target.repoId, target.branchName) !== preferredBeforeClose)
+      return true
   }
 
   if (nextTab) {
@@ -365,7 +369,10 @@ function enterTerminalWorkspacePaneTab(
   }
 }
 
-function selectedRepoWorkspaceTarget(repoId: string, branchName: string): { branchName: string; worktreePath: string | null } | null {
+function selectedRepoWorkspaceTarget(
+  repoId: string,
+  branchName: string,
+): { branchName: string; worktreePath: string | null } | null {
   const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, branchName)
   if (resolution.kind !== 'ready') return null
   if (!resolution.target.branchName) return null

@@ -68,9 +68,7 @@ export function useWorkspacePaneTabsReorderMutation(
         const nextTabs = workspacePaneTabsWithDraggedOrder(currentTabs, draggedTabs)
         if (workspacePaneTabEntryListIdentity(nextTabs) === workspacePaneTabEntryListIdentity(currentTabs)) return
         const previousTargetEntry = queryClient
-          .getQueryData<WorkspacePaneTabsQueryData>(
-            workspacePaneTabsQueryKey(target.repoRoot, target.repoInstanceId),
-          )
+          .getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(target.repoRoot, target.repoInstanceId))
           ?.find((entry) => workspacePaneTabsEntryMatchesTarget(entry, target))
         // Optimistic cache only: server runtime remains canonical. Success
         // below replaces this projection with server-returned tabs; failure

@@ -12,11 +12,7 @@ import { App, type RepoRouteView } from '#/web/App.tsx'
 import { Layout, WorkspaceSessionRestoreGate } from '#/web/Layout.tsx'
 import { isSettingsPage } from '#/shared/settings-pages.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
-import {
-  branchNameFromSlug,
-  repoIdFromSlug,
-  repoSlugFromId,
-} from '#/web/repo-route-slugs.ts'
+import { branchNameFromSlug, repoIdFromSlug, repoSlugFromId } from '#/web/repo-route-slugs.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { ReposStore } from '#/web/stores/repos/types.ts'
 import { usePrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
@@ -147,7 +143,8 @@ function useRepoRouteNavigation() {
     onOpenRepoBranch: (repoId: string, branchName: string) => routeNavigation.openRepoBranch(repoId, branchName),
     onOpenRepoNewWorktree: (repoId: string) => routeNavigation.openRepoNewWorktree(repoId),
     onCancelRepoNewWorktree: (repoId: string) => routeNavigation.cancelRepoNewWorktree(repoId),
-    onReplaceRepoBranch: (repoId: string, branchName: string) => routeNavigation.openRepoBranch(repoId, branchName, { replace: true }),
+    onReplaceRepoBranch: (repoId: string, branchName: string) =>
+      routeNavigation.openRepoBranch(repoId, branchName, { replace: true }),
   }
 }
 

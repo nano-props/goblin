@@ -22,9 +22,12 @@ const surfaceMocks = vi.hoisted(() => ({
   createRequest: {
     input: { worktreePath: '/repo-feature', mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'main' } },
   } satisfies CreateWorktreeRequest,
-  branchReadModel: { branches: [{ name: 'main' }], currentBranch: 'main', status: [], worktreesByPath: {} } as
-    | { branches: Array<{ name: string }>; currentBranch: string; status: never[]; worktreesByPath: Record<string, never> }
-    | null,
+  branchReadModel: { branches: [{ name: 'main' }], currentBranch: 'main', status: [], worktreesByPath: {} } as {
+    branches: Array<{ name: string }>
+    currentBranch: string
+    status: never[]
+    worktreesByPath: Record<string, never>
+  } | null,
 }))
 
 vi.mock('#/web/components/create-worktree/CreateWorktreeSurface.tsx', () => ({
@@ -69,8 +72,16 @@ beforeEach(() => {
   vi.clearAllMocks()
   primaryWindowQueryClient.clear()
   resetReposStore()
-  surfaceMocks.branchReadModel = { branches: [{ name: 'main' }], currentBranch: 'main', status: [], worktreesByPath: {} }
-  vi.mocked(getRepoWorktreeBootstrapPreview).mockImplementation(async () => ({ ok: false, message: 'error.failed-read-repo' }))
+  surfaceMocks.branchReadModel = {
+    branches: [{ name: 'main' }],
+    currentBranch: 'main',
+    status: [],
+    worktreesByPath: {},
+  }
+  vi.mocked(getRepoWorktreeBootstrapPreview).mockImplementation(async () => ({
+    ok: false,
+    message: 'error.failed-read-repo',
+  }))
   primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ repoSettings: [] }))
   seedRepoShellForTest({ id: REPO_ID, instanceId: REPO_INSTANCE_ID })
 })
@@ -134,7 +145,7 @@ describe('CreateWorktreePagePane', () => {
 
   test('waits for the full bootstrap load before showing the form', async () => {
     let resolvePreview!: (value: {
-      ok: true,
+      ok: true
       preview: {
         hasConfig: boolean
         hasOperations: boolean
@@ -211,7 +222,9 @@ describe('CreateWorktreePagePane', () => {
       ),
     })
 
-    const { container } = renderPane(<CreateWorktreePagePane repoId={REPO_ID} onCancel={onCancel} onCreated={onCreated} />)
+    const { container } = renderPane(
+      <CreateWorktreePagePane repoId={REPO_ID} onCancel={onCancel} onCreated={onCreated} />,
+    )
 
     await waitFor(() => {
       expect(button(container).dataset.loading).toBe('false')
@@ -255,7 +268,9 @@ describe('CreateWorktreePagePane', () => {
     const onCreated = vi.fn()
     useReposStore.setState({ runBranchAction: vi.fn(async () => ({ ok: false, message: 'error.invalid-path' })) })
 
-    const { container } = renderPane(<CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={onCreated} />)
+    const { container } = renderPane(
+      <CreateWorktreePagePane repoId={REPO_ID} onCancel={vi.fn()} onCreated={onCreated} />,
+    )
 
     await waitFor(() => {
       expect(button(container).dataset.loading).toBe('false')

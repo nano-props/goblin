@@ -18,71 +18,73 @@ export interface PrimaryWindowRouteNavigation {
 
 export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation {
   const router = useRouter({ warn: false })
-  return useMemo(() => ({
-    repoSlugForId(repoId) {
-      const repo = useReposStore.getState().repos[repoId]
-      return repo ? repoSlugFromId(repo.id) : null
-    },
-    openHome() {
-      void router?.navigate({ to: '/' })
-    },
-    openSettings(page) {
-      const href = router?.state.location.href ?? null
-      void router?.navigate({
-        to: '/settings/$page',
-        params: { page },
-        search: routeReturnSearch(href, '/settings', '/settings'),
-      })
-    },
-    closeSettings() {
-      const href = returnToFromHref(router?.state.location.href ?? null)
-      if (href) router?.history.push(href)
-      else void router?.navigate({ to: '/' })
-    },
-    openRepoRoot(repoId) {
-      const repoSlug = repoSlugForId(repoId)
-      if (repoSlug) void router?.navigate({ to: '/repo/$repoSlug', params: { repoSlug } })
-    },
-    openRepoDashboard(repoId) {
-      const repoSlug = repoSlugForId(repoId)
-      if (repoSlug) void router?.navigate({ to: '/repo/$repoSlug/dashboard', params: { repoSlug } })
-    },
-    openRepoBranch(repoId, branchName, options) {
-      const repoSlug = repoSlugForId(repoId)
-      if (!repoSlug) return
-      void router?.navigate({
-        to: '/repo/$repoSlug/branch/$branchSlug',
-        params: { repoSlug, branchSlug: branchSlugFromName(branchName) },
-        replace: options?.replace,
-      })
-    },
-    openRepoNewWorktree(repoId, options) {
-      const repoSlug = repoSlugForId(repoId)
-      const href = router?.state.location.href ?? null
-      if (repoSlug) {
-        const targetPath = `/repo/${repoSlug}/worktree/new`
-        const search =
-          options
+  return useMemo(
+    () => ({
+      repoSlugForId(repoId) {
+        const repo = useReposStore.getState().repos[repoId]
+        return repo ? repoSlugFromId(repo.id) : null
+      },
+      openHome() {
+        void router?.navigate({ to: '/' })
+      },
+      openSettings(page) {
+        const href = router?.state.location.href ?? null
+        void router?.navigate({
+          to: '/settings/$page',
+          params: { page },
+          search: routeReturnSearch(href, '/settings', '/settings'),
+        })
+      },
+      closeSettings() {
+        const href = returnToFromHref(router?.state.location.href ?? null)
+        if (href) router?.history.push(href)
+        else void router?.navigate({ to: '/' })
+      },
+      openRepoRoot(repoId) {
+        const repoSlug = repoSlugForId(repoId)
+        if (repoSlug) void router?.navigate({ to: '/repo/$repoSlug', params: { repoSlug } })
+      },
+      openRepoDashboard(repoId) {
+        const repoSlug = repoSlugForId(repoId)
+        if (repoSlug) void router?.navigate({ to: '/repo/$repoSlug/dashboard', params: { repoSlug } })
+      },
+      openRepoBranch(repoId, branchName, options) {
+        const repoSlug = repoSlugForId(repoId)
+        if (!repoSlug) return
+        void router?.navigate({
+          to: '/repo/$repoSlug/branch/$branchSlug',
+          params: { repoSlug, branchSlug: branchSlugFromName(branchName) },
+          replace: options?.replace,
+        })
+      },
+      openRepoNewWorktree(repoId, options) {
+        const repoSlug = repoSlugForId(repoId)
+        const href = router?.state.location.href ?? null
+        if (repoSlug) {
+          const targetPath = `/repo/${repoSlug}/worktree/new`
+          const search = options
             ? options.returnTo
               ? { returnTo: options.returnTo }
               : {}
             : routeReturnSearch(href, targetPath)
-        void router?.navigate({
-          to: '/repo/$repoSlug/worktree/new',
-          params: { repoSlug },
-          search,
-        })
-      }
-    },
-    cancelRepoNewWorktree(repoId) {
-      const href = returnToFromHref(router?.state.location.href ?? null)
-      if (href) router?.history.push(href)
-      else {
-        const repoSlug = repoSlugForId(repoId)
-        if (repoSlug) void router?.navigate({ to: '/repo/$repoSlug', params: { repoSlug } })
-      }
-    },
-  }), [router])
+          void router?.navigate({
+            to: '/repo/$repoSlug/worktree/new',
+            params: { repoSlug },
+            search,
+          })
+        }
+      },
+      cancelRepoNewWorktree(repoId) {
+        const href = returnToFromHref(router?.state.location.href ?? null)
+        if (href) router?.history.push(href)
+        else {
+          const repoSlug = repoSlugForId(repoId)
+          if (repoSlug) void router?.navigate({ to: '/repo/$repoSlug', params: { repoSlug } })
+        }
+      },
+    }),
+    [router],
+  )
 }
 
 function repoSlugForId(repoId: string): string | null {

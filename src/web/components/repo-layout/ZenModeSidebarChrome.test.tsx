@@ -17,10 +17,7 @@ vi.mock('#/web/components/WorkspaceNavigationControls.tsx', () => ({
     onZenRevealTriggerEnter?: () => void
     repoId?: string
   }) => (
-    <div
-      data-testid="mock-workspace-navigation-controls"
-      data-repo-id={repoId}
-    >
+    <div data-testid="mock-workspace-navigation-controls" data-repo-id={repoId}>
       <span data-testid="mock-zen-reveal-surface" data-zen-reveal-surface={zenRevealTriggerEnabled ? '' : undefined}>
         <button type="button" data-testid="zen-mode-sidebar-trigger" onMouseEnter={onZenRevealTriggerEnter}>
           zen

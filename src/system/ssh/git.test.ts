@@ -747,11 +747,9 @@ describe('getRemoteStatusAndWorktrees', () => {
     const result = await getRemoteStatusAndWorktrees(TARGET, { run: run as any })
 
     expect(run).toHaveBeenCalledTimes(1)
-    expect(run).toHaveBeenCalledWith(
-      { type: 'gitWorktreeListAndStatus', path: '/srv/repo' },
-      TARGET,
-      { signal: undefined },
-    )
+    expect(run).toHaveBeenCalledWith({ type: 'gitWorktreeListAndStatus', path: '/srv/repo' }, TARGET, {
+      signal: undefined,
+    })
     expect(result.worktrees).toHaveLength(2)
     expect(result.worktrees[0]).toMatchObject({ path: '/srv/repo', branch: 'main', isPrimary: true, isBare: false })
     expect(result.worktrees[1]).toMatchObject({ path: '/srv/repo-feature', branch: 'feature/test', isPrimary: false })
@@ -851,9 +849,7 @@ describe('getRemoteTreeWalk knownWorktrees path', () => {
   })
 
   test('rejects a request for an unknown worktree path even when knownWorktrees is supplied', async () => {
-    const knownWorktrees: WorktreeInfo[] = [
-      { path: '/srv/repo', branch: 'main', isBare: false, isPrimary: true },
-    ]
+    const knownWorktrees: WorktreeInfo[] = [{ path: '/srv/repo', branch: 'main', isBare: false, isPrimary: true }]
     const run = vi.fn()
     const result = await getRemoteTreeWalk(TARGET, '/srv/repo-missing', {
       run: run as any,
@@ -887,11 +883,7 @@ describe('resolveRemoteWorktree', () => {
       'ssh unavailable',
     )
 
-    expect(run).toHaveBeenCalledWith(
-      { type: 'gitWorktreeList', path: '/srv/repo' },
-      TARGET,
-      { signal: undefined },
-    )
+    expect(run).toHaveBeenCalledWith({ type: 'gitWorktreeList', path: '/srv/repo' }, TARGET, { signal: undefined })
   })
 })
 
@@ -911,11 +903,9 @@ describe('remoteCommandExists', () => {
     })
 
     expect(result).toBe(true)
-    expect(run).toHaveBeenCalledWith(
-      { type: 'commandExists', path: '/srv/repo-feature', commandName: 'bat' },
-      TARGET,
-      { signal: undefined },
-    )
+    expect(run).toHaveBeenCalledWith({ type: 'commandExists', path: '/srv/repo-feature', commandName: 'bat' }, TARGET, {
+      signal: undefined,
+    })
     expect(run).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: 'gitWorktreeList' }),
       expect.anything(),
@@ -938,11 +928,9 @@ describe('remoteCommandExists', () => {
     })
 
     expect(result).toBe(true)
-    expect(run).toHaveBeenCalledWith(
-      { type: 'commandExists', path: '/srv/repo-feature', commandName: 'bat' },
-      TARGET,
-      { signal: undefined },
-    )
+    expect(run).toHaveBeenCalledWith({ type: 'commandExists', path: '/srv/repo-feature', commandName: 'bat' }, TARGET, {
+      signal: undefined,
+    })
   })
 
   test('returns false for unsafe command names without touching the remote', async () => {

@@ -84,7 +84,9 @@ describe('useBranchActions', () => {
     mocks.openRemoteRepositoryTerminal.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(<BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />)
+    renderInJsdom(
+      <BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />,
+    )
 
     await act(async () => {
       await actions?.openTerminal?.('ghostty')
@@ -108,7 +110,9 @@ describe('useBranchActions', () => {
     })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(<BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />)
+    renderInJsdom(
+      <BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />,
+    )
 
     let result = false
     await act(async () => {
@@ -146,7 +150,9 @@ describe('useBranchActions', () => {
     mocks.openRemoteRepositoryEditor.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(<BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />)
+    renderInJsdom(
+      <BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />,
+    )
 
     await act(async () => {
       await actions?.openEditor?.('vscode')
@@ -183,7 +189,9 @@ describe('useBranchActions', () => {
     mocks.openRemoteRepositoryEditor.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(<BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />)
+    renderInJsdom(
+      <BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />,
+    )
 
     await act(async () => {
       await actions?.openTerminal?.('ghostty')
@@ -207,7 +215,9 @@ describe('useBranchActions', () => {
     mocks.openRepoTerminal.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(<BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />)
+    renderInJsdom(
+      <BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />,
+    )
 
     await act(async () => {
       await actions?.openTerminal?.('ghostty')
@@ -226,7 +236,9 @@ describe('useBranchActions', () => {
     mocks.openRepoEditor.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(<BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />)
+    renderInJsdom(
+      <BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />,
+    )
 
     await act(async () => {
       await actions?.openEditor?.('vscode')
@@ -245,7 +257,9 @@ describe('useBranchActions', () => {
     mocks.openRepoInFinder.mockResolvedValue({ ok: true, message: '/tmp/local-feature' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
-    renderInJsdom(<BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />)
+    renderInJsdom(
+      <BranchActionsHarness repo={repoPresentationFromQueryForTest(repo)} onReady={(value) => (actions = value)} />,
+    )
 
     await act(async () => {
       await actions?.openFinder?.()

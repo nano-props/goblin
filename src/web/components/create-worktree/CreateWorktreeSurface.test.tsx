@@ -77,7 +77,9 @@ describe('CreateWorktreePageBody', () => {
     await user.type(screen.getByRole('textbox', { name: /action.create-worktree-branch-label/i }), 'main')
 
     await waitFor(() => {
-      expect(screen.getByRole('textbox', { name: /action.create-worktree-branch-label/i }).getAttribute('aria-invalid')).toBe('true')
+      expect(
+        screen.getByRole('textbox', { name: /action.create-worktree-branch-label/i }).getAttribute('aria-invalid'),
+      ).toBe('true')
     })
   })
 
@@ -108,7 +110,9 @@ describe('CreateWorktreePageBody', () => {
 
     await user.click(screen.getByRole('radio', { name: /action.create-worktree-mode-existing/i }))
     await waitFor(() => {
-      expect((screen.getByRole('button', { name: /action.create-worktree-confirm/i }) as HTMLButtonElement).disabled).toBe(false)
+      expect(
+        (screen.getByRole('button', { name: /action.create-worktree-confirm/i }) as HTMLButtonElement).disabled,
+      ).toBe(false)
     })
     await user.click(screen.getByRole('button', { name: /action.create-worktree-confirm/i }))
 
@@ -215,7 +219,13 @@ function createRepo(): RepoPresentationForTest {
 }
 
 function createRemoteRepo(): RepoPresentationForTest {
-  const target = normalizeRemoteTarget({ alias: 'dev', remotePath: '/srv/repo', host: 'example.test', user: 'dev', port: 22 })
+  const target = normalizeRemoteTarget({
+    alias: 'dev',
+    remotePath: '/srv/repo',
+    host: 'example.test',
+    user: 'dev',
+    port: 22,
+  })
   if (!target) throw new Error('invalid target')
   const repo = createRepo()
   return { ...repo, remote: { ...repo.remote, lifecycle: { kind: 'ready', target } } }

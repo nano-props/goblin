@@ -4,7 +4,9 @@ export function syncTerminalRuntimeSessionIdIndex(input: {
   terminalRuntimeSessionIdByTerminalSessionId: Map<string, string>
   terminalSessionIdByTerminalRuntimeSessionId: Map<string, string>
 }): void {
-  const previousTerminalRuntimeSessionId = input.terminalRuntimeSessionIdByTerminalSessionId.get(input.terminalSessionId)
+  const previousTerminalRuntimeSessionId = input.terminalRuntimeSessionIdByTerminalSessionId.get(
+    input.terminalSessionId,
+  )
   if (
     previousTerminalRuntimeSessionId &&
     previousTerminalRuntimeSessionId !== input.terminalRuntimeSessionId &&

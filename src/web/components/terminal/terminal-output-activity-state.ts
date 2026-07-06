@@ -74,7 +74,8 @@ export function createTerminalOutputActivityState(
       deleteRecord(terminalSessionId, record)
       return
     }
-    if (record.lastActivityAt - record.pendingSince >= ACTIVITY_CONFIRM_DELAY_MS) activateActivity(terminalSessionId, record)
+    if (record.lastActivityAt - record.pendingSince >= ACTIVITY_CONFIRM_DELAY_MS)
+      activateActivity(terminalSessionId, record)
   }
 
   function expireIdleActivity(terminalSessionId: string): void {

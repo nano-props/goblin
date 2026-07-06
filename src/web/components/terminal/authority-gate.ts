@@ -48,16 +48,10 @@ import type { TerminalTakeoverResult } from '#/shared/terminal-types.ts'
  *   `message` field carries the server's i18n key.
  */
 export type AuthorizationDenialReason =
-  | 'session-closed'
-  | 'no-client'
-  | 'session-unknown'
-  | 'client-offline'
-  | 'takeover-rejected'
+  'session-closed' | 'no-client' | 'session-unknown' | 'client-offline' | 'takeover-rejected'
 
 export type AuthorizationResult =
-  | { kind: 'allowed' }
-  | { kind: 'promoted' }
-  | { kind: 'denied'; reason: AuthorizationDenialReason; message?: string }
+  { kind: 'allowed' } | { kind: 'promoted' } | { kind: 'denied'; reason: AuthorizationDenialReason; message?: string }
 
 export interface TerminalAuthorityGate {
   /** True when the cached role says we're the controller. */
@@ -177,7 +171,9 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
     terminalLog.warn('authority gate: takeover denied', {
       reason,
       stage,
-      ...(extra.terminalRuntimeSessionId !== undefined ? { terminalRuntimeSessionId: extra.terminalRuntimeSessionId } : {}),
+      ...(extra.terminalRuntimeSessionId !== undefined
+        ? { terminalRuntimeSessionId: extra.terminalRuntimeSessionId }
+        : {}),
       ...(extra.message !== undefined ? { message: extra.message } : {}),
       ...(extra.err !== undefined ? { err: extra.err } : {}),
     })
@@ -187,7 +183,8 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
   async function doTakeover(): Promise<AuthorizationResult> {
     const terminalRuntimeSessionId = opts.getTerminalRuntimeSessionId()
     if (!terminalRuntimeSessionId) return deny('session-closed', 'preflight')
-    if (!opts.isSessionAlive(terminalRuntimeSessionId)) return deny('session-closed', 'isSessionAlive', { terminalRuntimeSessionId })
+    if (!opts.isSessionAlive(terminalRuntimeSessionId))
+      return deny('session-closed', 'isSessionAlive', { terminalRuntimeSessionId })
     let size: { cols: number; rows: number }
     try {
       size = await opts.resolveSize()

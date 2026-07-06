@@ -22,9 +22,7 @@ interface WorkspaceNavigationHistoryOptions {
 let restoreRecordingSuppressed = false
 let restoreRecordingSuppressionTimer: ReturnType<typeof setTimeout> | null = null
 
-export function useWorkspaceNavigationHistory({
-  routeContext,
-}: WorkspaceNavigationHistoryOptions): void {
+export function useWorkspaceNavigationHistory({ routeContext }: WorkspaceNavigationHistoryOptions): void {
   const entry = useWorkspaceNavigationHistoryEntry(routeContext)
   const recordWorkspaceNavigation = useReposStore((s) => s.recordWorkspaceNavigation)
 
@@ -177,9 +175,7 @@ export function restoreWorkspaceNavigationEntry(
         useReposStore.getState().setWorkspacePaneTab(entry.repoId, entry.route.branchName, entry.route.workspacePaneTab)
       }
       if (entry.route.terminalWorktreeKey) {
-        useReposStore
-          .getState()
-          .setSelectedTerminal(entry.route.terminalWorktreeKey, entry.route.terminalSessionId)
+        useReposStore.getState().setSelectedTerminal(entry.route.terminalWorktreeKey, entry.route.terminalSessionId)
       }
       return
   }

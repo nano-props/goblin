@@ -50,7 +50,13 @@ export async function openWorkspacePaneTab(input: {
   if (!committed.ok) return false
   if (!hasFreshRepoInstance(useReposStore.getState(), repoInstance)) return false
   if (openerIdentity) {
-    recordWorkspacePaneTabOpener(input.repoId, branchName, workspacePaneStaticTabId(input.type), openerIdentity, repoInstance)
+    recordWorkspacePaneTabOpener(
+      input.repoId,
+      branchName,
+      workspacePaneStaticTabId(input.type),
+      openerIdentity,
+      repoInstance,
+    )
   }
   showWorkspacePaneTab(input)
   if (provider.refreshOnOpen) requestVisibleRepoStatusRefresh(useReposStore.getState, input.repoId)

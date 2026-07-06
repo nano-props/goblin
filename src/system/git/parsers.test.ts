@@ -93,9 +93,7 @@ describe('parseBranches', () => {
     const out = [
       ['main', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'a', 's', 'd', 'a1', '', ''].join(SEP),
       ['dev', 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'b', 's', 'd', 'a1', '', ''].join(SEP),
-    ].join(
-      '\n',
-    )
+    ].join('\n')
     const result = parseBranches(out, 'dev')
     expect(result.find((b) => b.name === 'main')?.isCurrent).toBe(false)
     expect(result.find((b) => b.name === 'dev')?.isCurrent).toBe(true)
@@ -354,11 +352,7 @@ describe('parseWorktreeStatusBatch', () => {
   })
 
   test('segments multiple worktrees via the empty-record boundary', () => {
-    const stream = [
-      `/wt1${NUL}M  a.ts${NUL}${NUL}`,
-      `/wt2${NUL}?? new.txt${NUL}${NUL}`,
-      `/wt3${NUL}${NUL}`,
-    ].join('')
+    const stream = [`/wt1${NUL}M  a.ts${NUL}${NUL}`, `/wt2${NUL}?? new.txt${NUL}${NUL}`, `/wt3${NUL}${NUL}`].join('')
     const result = parseWorktreeStatusBatch(stream)
     expect(result.size).toBe(3)
     expect(result.get('/wt1')?.map((e) => e.path)).toEqual(['a.ts'])

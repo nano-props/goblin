@@ -68,7 +68,16 @@ describe('useBranchActionItems', () => {
       actionIds = visibleBranchActionItems(actions).map((item) => item.id)
     })
 
-    expect(actionIds).toEqual(['pull', 'push', 'status', 'changes', 'files', 'history', 'removeWorktree', 'deleteBranch'])
+    expect(actionIds).toEqual([
+      'pull',
+      'push',
+      'status',
+      'changes',
+      'files',
+      'history',
+      'removeWorktree',
+      'deleteBranch',
+    ])
   })
 
   test('exposes copy patch as a changes-tab action instead of a menu item', async () => {

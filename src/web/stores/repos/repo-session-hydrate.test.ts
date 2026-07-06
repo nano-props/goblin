@@ -94,9 +94,9 @@ describe('repo session hydration', () => {
 
     const cachedRepo = useReposStore.getState().repos[REPO_A]
     expect(cachedRepo?.name).toBe('cached-a')
-    expect(cachedRepo ? getRepoSnapshotQueryData(cachedRepo.id, cachedRepo.instanceId)?.branches.map((b) => b.name) : null).toEqual([
-      'cached',
-    ])
+    expect(
+      cachedRepo ? getRepoSnapshotQueryData(cachedRepo.id, cachedRepo.instanceId)?.branches.map((b) => b.name) : null,
+    ).toEqual(['cached'])
     expect(cachedRepo?.projection.source).toBe('cache')
     expect(cachedRepo?.dataLoads.snapshot.phase).toBe('refreshing')
     expect(cachedRepo?.projection.savedAt).toBe(savedAt)

@@ -63,7 +63,7 @@ describe('ToolbarTabStrip', () => {
     expect(styles).toContain('.title-bar-scroll-region {')
     expect(styles).toContain('-webkit-app-region: no-drag;')
     expect(styles).toContain('.title-bar-scroll-region button')
-    expect(styles).toContain("-webkit-app-region: initial;")
+    expect(styles).toContain('-webkit-app-region: initial;')
   })
 })
 

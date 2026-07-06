@@ -515,13 +515,16 @@ function remoteTrashFileScript(worktreePath: string, filePath: string): string {
 
 function remoteTreeChildrenScript(rootPath: string, prefix: string | undefined): string {
   const root = shellQuote(rootPath)
-  const normalizedPrefix = (prefix ?? '').replace(/^\.\/+/, '').replace(/^\/+/, '').replace(/\/+$/u, '')
+  const normalizedPrefix = (prefix ?? '')
+    .replace(/^\.\/+/, '')
+    .replace(/^\/+/, '')
+    .replace(/\/+$/u, '')
   const dir = normalizedPrefix ? `${root}/${shellQuote(normalizedPrefix)}` : root
   return [
     `root=${root}`,
     `dir=${dir}`,
     'test -d "$dir" || exit 0',
-    "find \"$dir\" -mindepth 1 -maxdepth 1 ! -name .git -exec sh -c '",
+    'find "$dir" -mindepth 1 -maxdepth 1 ! -name .git -exec sh -c \'',
     'root=$1',
     'shift',
     'for entry do',
@@ -535,7 +538,7 @@ function remoteTreeChildrenScript(rootPath: string, prefix: string | undefined):
     '    printf "%s\\0" "$rel"',
     '  fi',
     'done',
-    "' sh \"$root\" {} +",
+    '\' sh "$root" {} +',
   ].join('\n')
 }
 

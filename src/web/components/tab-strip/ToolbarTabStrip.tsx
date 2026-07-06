@@ -1,9 +1,6 @@
 import type { ComponentPropsWithoutRef, ReactNode, Ref, UIEventHandler } from 'react'
 import { ScrollArea } from '#/web/components/ui/scroll-area.tsx'
-import {
-  TitleBarDragRegion,
-  TitleBarScrollableInteractiveRegion,
-} from '#/web/components/title-bar-chrome-region.tsx'
+import { TitleBarDragRegion, TitleBarScrollableInteractiveRegion } from '#/web/components/title-bar-chrome-region.tsx'
 import { cn } from '#/web/lib/cn.ts'
 
 interface ToolbarTabStripProps {

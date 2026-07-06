@@ -90,7 +90,6 @@ describe('useAppOverlays', () => {
     expect(text(container, '#open-repo-open')).toBe('closed')
     expect(text(container, '#any-open')).toBe('closed')
   })
-
 })
 
 function click(container: HTMLElement, selector: string) {

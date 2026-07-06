@@ -11,7 +11,12 @@ import {
 } from '#/web/primary-window-navigation.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
-import { createBranchSnapshot, createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import {
+  createBranchSnapshot,
+  createRepoBranch,
+  resetReposStore,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/bridge.ts'
 import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 

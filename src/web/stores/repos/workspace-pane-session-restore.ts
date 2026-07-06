@@ -42,7 +42,8 @@ export function restoreSessionWorkspacePaneStateInRepos(
       : { status: 'restored' as const, preferredWorkspacePaneTabByTarget: repo.ui.preferredWorkspacePaneTabByTarget }
     if (restoredPreferred.status === 'failed') {
       if (restoredPreferred.reason === 'snapshot') missingSnapshots.push(id)
-      else unresolvedTargets.push({ repoId: id, targetKey: restoredPreferred.targetKey, reason: restoredPreferred.reason })
+      else
+        unresolvedTargets.push({ repoId: id, targetKey: restoredPreferred.targetKey, reason: restoredPreferred.reason })
       continue
     }
     const nextPreferredTabByTarget = restoredPreferred.preferredWorkspacePaneTabByTarget

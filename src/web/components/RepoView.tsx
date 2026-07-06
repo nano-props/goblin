@@ -174,9 +174,7 @@ export function RepoView({
         repoWorkspaceActive={repoWorkspaceActive}
         workspacePaneSize={view.workspacePaneSize}
         onWorkspacePaneSizeChange={setWorkspacePaneSize}
-        sidebarPane={renderSidebarPane(
-          compact && currentBranchName ? undefined : <BranchNavigatorSkeleton />,
-        )}
+        sidebarPane={renderSidebarPane(compact && currentBranchName ? undefined : <BranchNavigatorSkeleton />)}
         repoWorkspacePane={
           <RepoWorkspacePane>
             {currentBranchName ? (

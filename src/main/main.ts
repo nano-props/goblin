@@ -126,7 +126,11 @@ function handleTrustedClientQuitDrainBoundary(
   finish: (drain: ClientQuitDrain) => void,
 ): boolean {
   if (!isTrustedIpcEvent(event)) return false
-  finish(isAppQuitDrainResult(result) ? result : { ok: false, error: { name: 'Error', message: 'Malformed quit drain result' } })
+  finish(
+    isAppQuitDrainResult(result)
+      ? result
+      : { ok: false, error: { name: 'Error', message: 'Malformed quit drain result' } },
+  )
   return true
 }
 

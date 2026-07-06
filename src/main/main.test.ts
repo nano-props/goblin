@@ -213,9 +213,10 @@ describe('native host startup lifecycle', () => {
       expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({ type: 'app-quitting' })
     })
 
-    await mocks.ipcHandlers
-      .get('goblin:app-quit-drained')
-      ?.(null, { ok: false, error: { name: 'Error', message: 'disk full' } })
+    await mocks.ipcHandlers.get('goblin:app-quit-drained')?.(null, {
+      ok: false,
+      error: { name: 'Error', message: 'disk full' },
+    })
     await quitting
 
     expect(mocks.flushWindowState).toHaveBeenCalledTimes(1)
@@ -235,7 +236,10 @@ describe('native host startup lifecycle', () => {
     })
 
     mocks.isTrustedIpcEvent.mockReturnValueOnce(false)
-    const untrustedResult = await mocks.ipcHandlers.get('goblin:app-quit-drained')?.({ sender: { id: 99 } }, { ok: true })
+    const untrustedResult = await mocks.ipcHandlers.get('goblin:app-quit-drained')?.(
+      { sender: { id: 99 } },
+      { ok: true },
+    )
     expect(untrustedResult).toBe(false)
     expect(mocks.flushWindowState).not.toHaveBeenCalled()
 

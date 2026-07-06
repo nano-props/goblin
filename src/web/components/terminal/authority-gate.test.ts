@@ -11,13 +11,9 @@ import type { ClientTerminal } from '#/web/client-bridge-types.ts'
 // branches and ordering contracts are pinned here without booting a
 // full TerminalSession.
 
-function makeBridge(
-  takeoverImpl?: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>,
-): ClientTerminal {
+function makeBridge(takeoverImpl?: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>): ClientTerminal {
   return {
-    takeover: takeoverImpl
-      ? vi.fn<ClientTerminal['takeover']>(takeoverImpl)
-      : vi.fn<ClientTerminal['takeover']>(),
+    takeover: takeoverImpl ? vi.fn<ClientTerminal['takeover']>(takeoverImpl) : vi.fn<ClientTerminal['takeover']>(),
   } as unknown as ClientTerminal
 }
 

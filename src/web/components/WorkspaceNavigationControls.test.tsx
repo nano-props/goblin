@@ -46,7 +46,9 @@ describe('WorkspaceNavigationControls', () => {
 
     act(() => {
       useReposStore.getState().recordWorkspaceNavigation({ repoId: REPO_ID, route: { kind: 'dashboard' } })
-      useReposStore.getState().recordWorkspaceNavigation({ repoId: REPO_ID, route: { kind: 'newWorktree', returnTo: null } })
+      useReposStore
+        .getState()
+        .recordWorkspaceNavigation({ repoId: REPO_ID, route: { kind: 'newWorktree', returnTo: null } })
     })
 
     expect(workspaceNavigationControls(container)?.className).toContain('goblin-workspace-navigation-controls')
@@ -69,7 +71,9 @@ describe('WorkspaceNavigationControls', () => {
 
     act(() => {
       useReposStore.getState().recordWorkspaceNavigation({ repoId: REPO_ID, route: { kind: 'dashboard' } })
-      useReposStore.getState().recordWorkspaceNavigation({ repoId: REPO_ID, route: { kind: 'newWorktree', returnTo: null } })
+      useReposStore
+        .getState()
+        .recordWorkspaceNavigation({ repoId: REPO_ID, route: { kind: 'newWorktree', returnTo: null } })
     })
 
     await user.click(backButton())

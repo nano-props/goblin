@@ -258,7 +258,10 @@ export function createTerminalSocketConnection(options: TerminalSocketConnection
     clearTimeout(pending.timeout)
   }
 
-  function forceSocketReconnect(reason: string, currentSocket: WebSocket | null = socketLifecycle.active()?.socket ?? null): void {
+  function forceSocketReconnect(
+    reason: string,
+    currentSocket: WebSocket | null = socketLifecycle.active()?.socket ?? null,
+  ): void {
     if (!currentSocket) return
     socketLifecycle.disconnect(reason, currentSocket)
   }
@@ -335,7 +338,8 @@ export function createTerminalSocketConnection(options: TerminalSocketConnection
     return new Promise<WebSocket>((resolve, reject) => {
       let timeout: ReturnType<typeof setTimeout> | null = setTimeout(() => {
         settle(() => {
-          if (socketLifecycle.active() === current) socketLifecycle.disconnect('Terminal socket open timed out', currentSocket)
+          if (socketLifecycle.active() === current)
+            socketLifecycle.disconnect('Terminal socket open timed out', currentSocket)
           reject(new Error('Terminal socket open timed out'))
         })
       }, TERMINAL_SOCKET_OPEN_TIMEOUT_MS)
@@ -345,7 +349,8 @@ export function createTerminalSocketConnection(options: TerminalSocketConnection
       }
       const handleOpen = () => {
         settle(() => {
-          if (socketLifecycle.active() === current && currentSocket.readyState === WebSocket.OPEN) resolve(currentSocket)
+          if (socketLifecycle.active() === current && currentSocket.readyState === WebSocket.OPEN)
+            resolve(currentSocket)
           else reject(new Error('Terminal socket replaced before open'))
         })
       }
@@ -366,7 +371,6 @@ export function createTerminalSocketConnection(options: TerminalSocketConnection
       currentSocket.addEventListener('error', handleError)
     })
   }
-
 }
 
 function formatSocketClosedBeforeOpenMessage(event: CloseEvent): string {

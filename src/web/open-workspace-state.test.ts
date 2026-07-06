@@ -53,7 +53,11 @@ describe('nextRestoredRepoIdAfterWorkspaceClose', () => {
 
   test('slides to the right neighbor, then the left, then null', () => {
     expect(
-      nextRestoredRepoIdAfterWorkspaceClose(['/tmp/repo-a', '/tmp/repo-b', '/tmp/repo-c'], '/tmp/repo-b', '/tmp/repo-b'),
+      nextRestoredRepoIdAfterWorkspaceClose(
+        ['/tmp/repo-a', '/tmp/repo-b', '/tmp/repo-c'],
+        '/tmp/repo-b',
+        '/tmp/repo-b',
+      ),
     ).toBe('/tmp/repo-c')
     expect(nextRestoredRepoIdAfterWorkspaceClose(['/tmp/repo-a', '/tmp/repo-b'], '/tmp/repo-b', '/tmp/repo-b')).toBe(
       '/tmp/repo-a',

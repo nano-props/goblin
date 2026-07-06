@@ -911,7 +911,10 @@ describe('TerminalSession', () => {
 
       // Rapid Safari shift keys are batched into a single write via queueMicrotask.
       expect(terminalCalls.write).toHaveBeenCalledTimes(1)
-      expect(terminalCalls.write).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', data: '?!' })
+      expect(terminalCalls.write).toHaveBeenCalledWith({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        data: '?!',
+      })
     } finally {
       Object.defineProperty(window.navigator, 'userAgent', { configurable: true, value: savedUserAgent })
     }
@@ -955,7 +958,10 @@ describe('TerminalSession', () => {
       await flushTerminalStart()
 
       expect(terminalCalls.write).toHaveBeenCalledTimes(1)
-      expect(terminalCalls.write).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', data: '：' })
+      expect(terminalCalls.write).toHaveBeenCalledWith({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        data: '：',
+      })
     } finally {
       Object.defineProperty(window.navigator, 'userAgent', { configurable: true, value: savedUserAgent })
     }
@@ -1144,7 +1150,10 @@ describe('TerminalSession', () => {
     xtermMocks.terminals[0]!.emitData('input')
     await flushTerminalStart()
 
-    expect(terminalCalls.write).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', data: 'input' })
+    expect(terminalCalls.write).toHaveBeenCalledWith({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      data: 'input',
+    })
     expect(session.snapshot().phase).toBe('open')
   })
 
@@ -1166,7 +1175,10 @@ describe('TerminalSession', () => {
     await flushTerminalStart()
 
     expect(terminalCalls.write).toHaveBeenCalledTimes(1)
-    expect(terminalCalls.write).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', data: 'clear' })
+    expect(terminalCalls.write).toHaveBeenCalledWith({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      data: 'clear',
+    })
   })
 
   test('drops buffered input after dispose', async () => {
@@ -1515,7 +1527,10 @@ describe('TerminalSession', () => {
     xtermMocks.terminals[0]!.emitData('hello')
     await flushUntil(() => terminalCalls.write.mock.calls.length > 0)
 
-    expect(terminalCalls.write).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', data: 'hello' })
+    expect(terminalCalls.write).toHaveBeenCalledWith({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      data: 'hello',
+    })
     expect(notify).not.toHaveBeenCalled()
   })
 
@@ -2127,7 +2142,10 @@ describe('TerminalSession', () => {
     await flushUntil(() => session.snapshot().phase === 'open')
     await flushTerminalStart()
 
-    expect(terminalCalls.write).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', data: '\x1b[M ##' })
+    expect(terminalCalls.write).toHaveBeenCalledWith({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      data: '\x1b[M ##',
+    })
   })
 
   test('resets the terminal before replaying the snapshot', async () => {
@@ -2203,9 +2221,14 @@ describe('TerminalSession', () => {
       seq: 1,
       processName: 'zsh',
     })
-    expect(session.handleExit({ terminalRuntimeSessionId: 'other-session', terminalSessionId: 'other-session' })).toBe(false)
+    expect(session.handleExit({ terminalRuntimeSessionId: 'other-session', terminalSessionId: 'other-session' })).toBe(
+      false,
+    )
     expect(
-      session.handleExit({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', terminalSessionId: 'pty_session_1_aaaaaaaaa' }),
+      session.handleExit({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalSessionId: 'pty_session_1_aaaaaaaaa',
+      }),
     ).toBe(true)
     session.dispose()
 

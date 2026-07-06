@@ -17,10 +17,7 @@ import { settingsSnapshotQueryOptions } from '#/web/settings-queries.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
-import type {
-  WorktreeBootstrapDecision,
-  WorktreeBootstrapPreviewResult,
-} from '#/shared/worktree-bootstrap-summary.ts'
+import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 
 type ConfigTrustChoice = { key: string; value: boolean } | null
 type BootstrapLoad = {
@@ -88,7 +85,9 @@ export function CreateWorktreePagePane({
   const bootstrapPreview = bootstrapPreviewResult?.ok ? bootstrapPreviewResult.preview : null
   const bootstrapPreviewError = bootstrapPreviewResult?.ok === false
   const bootstrapConfigHash = bootstrapPreview?.configHash ?? null
-  const bootstrapTrustKey = bootstrapConfigHash ? `${repoId}\u0000${repoInstanceId ?? ''}\u0000${bootstrapConfigHash}` : null
+  const bootstrapTrustKey = bootstrapConfigHash
+    ? `${repoId}\u0000${repoInstanceId ?? ''}\u0000${bootstrapConfigHash}`
+    : null
   const effectiveConfigTrustChoice =
     configTrustChoice && configTrustChoice.key === bootstrapTrustKey ? configTrustChoice.value : null
   const settingsSnapshot = activeBootstrapLoad?.settingsSnapshot
@@ -216,11 +215,7 @@ function createWorktreeTargetBranch(input: CreateWorktreeRequest['input']): stri
   return exhaustive
 }
 
-function isBootstrapLoadForRepo(
-  load: BootstrapLoad | null,
-  repoId: string,
-  repoInstanceId: string,
-): boolean {
+function isBootstrapLoadForRepo(load: BootstrapLoad | null, repoId: string, repoInstanceId: string): boolean {
   return load?.repoId === repoId && load.repoInstanceId === repoInstanceId
 }
 

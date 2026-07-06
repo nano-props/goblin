@@ -55,7 +55,13 @@ type InternalRepoOperationOptions<T> =
   | (RunLatestOperationOptions<T> & { policy: 'latest-wins' })
   | (RunExclusiveOperationOptions<T> & { policy: 'exclusive' })
 
-function operationCurrent(get: ReposGet, id: string, repoInstanceId: string, operationId: number, target: RepoOperationTarget) {
+function operationCurrent(
+  get: ReposGet,
+  id: string,
+  repoInstanceId: string,
+  operationId: number,
+  target: RepoOperationTarget,
+) {
   const repo = get().repos[id]
   return !!repo && repo.instanceId === repoInstanceId && repoOperationCurrent(id, target.key, operationId)
 }

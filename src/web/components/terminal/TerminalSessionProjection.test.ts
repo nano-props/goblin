@@ -324,11 +324,17 @@ describe('TerminalSessionProjection', () => {
       const session = (projection as any).sessions.get(terminalSessionId)
       const handleExitSpy = vi.spyOn(session, 'handleExit').mockReturnValue(true)
 
-      projection.handleExit({ terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa', terminalSessionId: 'unrouted-terminal-session' })
+      projection.handleExit({
+        terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
+        terminalSessionId: 'unrouted-terminal-session',
+      })
       expect(handleExitSpy).toHaveBeenCalledTimes(1)
 
       handleExitSpy.mockClear()
-      projection.handleExit({ terminalRuntimeSessionId: 'pty_session_b_aaaaaaaaa', terminalSessionId: 'unrouted-terminal-session' })
+      projection.handleExit({
+        terminalRuntimeSessionId: 'pty_session_b_aaaaaaaaa',
+        terminalSessionId: 'unrouted-terminal-session',
+      })
       expect(handleExitSpy).not.toHaveBeenCalled()
     })
 

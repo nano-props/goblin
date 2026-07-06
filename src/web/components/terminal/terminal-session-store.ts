@@ -7,11 +7,7 @@ import {
   type TerminalProjectionHydrationPhase,
 } from '#/web/stores/terminal-projection-hydration.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type {
-  TerminalSnapshot,
-  TerminalDescriptor,
-  TerminalSessionSummary,
-} from '#/web/components/terminal/types.ts'
+import type { TerminalSnapshot, TerminalDescriptor, TerminalSessionSummary } from '#/web/components/terminal/types.ts'
 
 const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = { phase: 'opening', message: null, processName: 'terminal' }
 const EMPTY_TERMINAL_SESSION_SUMMARIES: TerminalSessionSummary[] = []
@@ -117,7 +113,8 @@ export function useTerminalSessionSummaries(terminalWorktreeKey: string | null):
     [terminalWorktreeKey, subscribeTerminalWorktree],
   )
   const getSnapshot = useCallback(
-    () => (terminalWorktreeKey ? terminalWorktreeSnapshot(terminalWorktreeKey).sessions : EMPTY_TERMINAL_SESSION_SUMMARIES),
+    () =>
+      terminalWorktreeKey ? terminalWorktreeSnapshot(terminalWorktreeKey).sessions : EMPTY_TERMINAL_SESSION_SUMMARIES,
     [terminalWorktreeKey, terminalWorktreeSnapshot],
   )
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)

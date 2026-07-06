@@ -300,7 +300,14 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     mocks.getRepositoryTree.mockResolvedValueOnce({
       nodes: [
         { id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' },
-        { id: 'src/index.ts', path: 'src/index.ts', name: 'index.ts', parentId: 'src', kind: 'file', status: 'modified' },
+        {
+          id: 'src/index.ts',
+          path: 'src/index.ts',
+          name: 'index.ts',
+          parentId: 'src',
+          kind: 'file',
+          status: 'modified',
+        },
       ],
       truncated: false,
     })
@@ -316,11 +323,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     const json = (await response.json()) as { nodes: Array<{ id: string }>; truncated: boolean }
     expect(json.nodes.map((n) => n.id)).toEqual(['src', 'src/index.ts'])
     expect(json.truncated).toBe(false)
-    expect(mocks.getRepositoryTree).toHaveBeenCalledWith(
-      '/tmp/repo',
-      '/tmp/repo/.worktrees/feature',
-      { prefix: 'src' },
-    )
+    expect(mocks.getRepositoryTree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo/.worktrees/feature', { prefix: 'src' })
   })
 
   test('does not pass the HTTP request signal into /tree reads', async () => {
@@ -699,7 +702,11 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(mocks.openRepoUrl).toHaveBeenCalledWith('/tmp/repo', { type: 'commit', hash: 'abcdef1' }, expect.any(AbortSignal))
+    expect(mocks.openRepoUrl).toHaveBeenCalledWith(
+      '/tmp/repo',
+      { type: 'commit', hash: 'abcdef1' },
+      expect.any(AbortSignal),
+    )
   })
 
   test('forwards external workspace app open routes', async () => {

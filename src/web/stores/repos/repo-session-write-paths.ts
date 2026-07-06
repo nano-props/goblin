@@ -181,7 +181,8 @@ function removeRepoFromSessionState(s: ReposStore, id: string): Partial<ReposSto
   delete repos[id]
   delete navigationHistoryByRepo[id]
   for (const terminalWorktreeKey of Object.keys(selectedTerminalSessionIdByTerminalWorktree)) {
-    if (terminalWorktreeKey.startsWith(`${id}\0`)) delete selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]
+    if (terminalWorktreeKey.startsWith(`${id}\0`))
+      delete selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]
   }
   for (const scopeKey of Object.keys(tabOpenerIdentityByScope)) {
     if (scopeKey.startsWith(`${id}\0`)) delete tabOpenerIdentityByScope[scopeKey]

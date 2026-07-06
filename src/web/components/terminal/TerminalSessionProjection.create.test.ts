@@ -282,10 +282,7 @@ describe('TerminalSessionProjection create flow', () => {
     document.body.appendChild(host)
     projection.registerHost(WORKTREE_KEY, host)
 
-    await projection.createTerminal(
-      terminalBase(),
-      { startupShellCommand: "bat '/repo/README.md'\r" },
-    )
+    await projection.createTerminal(terminalBase(), { startupShellCommand: "bat '/repo/README.md'\r" })
 
     expect(mocks.createMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
@@ -361,16 +358,10 @@ describe('TerminalSessionProjection create flow', () => {
     mocks.createMock.mockReset()
     mocks.createMock.mockReturnValueOnce(first.promise).mockResolvedValueOnce(secondResult)
 
-    const firstCreate = projection.createTerminal(
-      terminalBase(),
-      { startupShellCommand: "bat '/repo/a.ts'\r" },
-    )
+    const firstCreate = projection.createTerminal(terminalBase(), { startupShellCommand: "bat '/repo/a.ts'\r" })
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
 
-    const secondCreate = projection.createTerminal(
-      terminalBase(),
-      { startupShellCommand: "bat '/repo/b.ts'\r" },
-    )
+    const secondCreate = projection.createTerminal(terminalBase(), { startupShellCommand: "bat '/repo/b.ts'\r" })
     await Promise.resolve()
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
 
@@ -420,9 +411,7 @@ describe('TerminalSessionProjection create flow', () => {
     document.body.appendChild(host)
     projection.registerHost(WORKTREE_KEY, host)
 
-    await expect(
-      projection.createTerminal(terminalBase()),
-    ).rejects.toThrow('boom')
+    await expect(projection.createTerminal(terminalBase())).rejects.toThrow('boom')
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
   })
@@ -432,13 +421,10 @@ describe('TerminalSessionProjection create flow', () => {
     const create = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
     mocks.createMock.mockReturnValueOnce(create.promise)
 
-    const pending = projection.createOwnedTerminal(
-      terminalBase(),
-      {
-        key: 'repo-instance-1',
-        isFresh: () => fresh,
-      },
-    )
+    const pending = projection.createOwnedTerminal(terminalBase(), {
+      key: 'repo-instance-1',
+      isFresh: () => fresh,
+    })
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
     fresh = false
     create.resolve(makeCreateResult())
@@ -567,9 +553,7 @@ describe('TerminalSessionProjection create flow', () => {
   test('closeTerminalsForWorktree returns true when no terminal sessions exist', async () => {
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
 
-    await expect(
-      projection.closeTerminalsForWorktree(terminalBase()),
-    ).resolves.toBe(true)
+    await expect(projection.closeTerminalsForWorktree(terminalBase())).resolves.toBe(true)
 
     expect(mocks.closeMock).not.toHaveBeenCalled()
   })
@@ -768,7 +752,10 @@ describe('TerminalSessionProjection create flow', () => {
 
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
 
-    projection.handleSessionClosed({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', terminalSessionId: 'session-1' })
+    projection.handleSessionClosed({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'session-1',
+    })
 
     // The local session is gone; the worktree snapshot is empty.
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
@@ -782,7 +769,10 @@ describe('TerminalSessionProjection create flow', () => {
 
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
 
-    projection.handleSessionClosed({ terminalRuntimeSessionId: 'pty_session_missing_aaaaaaaaa', terminalSessionId: 'session-1' })
+    projection.handleSessionClosed({
+      terminalRuntimeSessionId: 'pty_session_missing_aaaaaaaaa',
+      terminalSessionId: 'session-1',
+    })
 
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
   })

@@ -96,23 +96,25 @@ export function useClientEffectIntentRouter({
     // one-line `subscribe*(dispatch)` below — no copy of the
     // switch / handler chain.
     const dispatch = (intent: ClientEffectIntent) => {
-      intentQueue = intentQueue.catch(() => undefined).then(async () => {
-        if (disposed) return
-        try {
-          switch (intent.type) {
-            case 'terminal-bell-click':
-              handleTerminalBellClickIntent(intent, sharedDeps())
-              return
-            case 'external-open-enqueued':
-              externalOpenDrainer.drain()
-              return
+      intentQueue = intentQueue
+        .catch(() => undefined)
+        .then(async () => {
+          if (disposed) return
+          try {
+            switch (intent.type) {
+              case 'terminal-bell-click':
+                handleTerminalBellClickIntent(intent, sharedDeps())
+                return
+              case 'external-open-enqueued':
+                externalOpenDrainer.drain()
+                return
+            }
+            if (await handleAppLevelClientIntent(intent, sharedDeps())) return
+            if (await handleWorkspaceClientIntent(intent, sharedDeps())) return
+          } catch (err) {
+            intentLog.warn(`${intent.type} failed`, { err })
           }
-          if (await handleAppLevelClientIntent(intent, sharedDeps())) return
-          if (await handleWorkspaceClientIntent(intent, sharedDeps())) return
-        } catch (err) {
-          intentLog.warn(`${intent.type} failed`, { err })
-        }
-      })
+        })
     }
 
     const offIntent = subscribeClientEffectIntent(dispatch)

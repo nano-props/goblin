@@ -47,24 +47,24 @@ If a name fails any step above, rename it before adding more code around it.
 
 ## Canonical cross-cutting terms
 
-| Concept | Canonical | Rule |
-| --- | --- | --- |
-| Browser/Electron UI side | `client` | Use `client` as the architecture term even though code lives in `src/web/`. |
-| Electron main-process side | `native host` | Use `native host` in names and docs; keep `src/main/` only for alias stability. |
-| Server spawned by the native host | `embedded server` | Do not introduce `local server` as a competing term. |
-| Aggregate runtime object | `runtime` | Reserve for a facade that wires a feature or app runtime together. |
-| Authoritative persistence / IO layer | `source` | Prefer `repo-source.ts` over `repo-backend.ts`. |
-| Outside-UI intent envelope | `client effect intent` | Use the existing term consistently. |
+| Concept                              | Canonical              | Rule                                                                            |
+| ------------------------------------ | ---------------------- | ------------------------------------------------------------------------------- |
+| Browser/Electron UI side             | `client`               | Use `client` as the architecture term even though code lives in `src/web/`.     |
+| Electron main-process side           | `native host`          | Use `native host` in names and docs; keep `src/main/` only for alias stability. |
+| Server spawned by the native host    | `embedded server`      | Do not introduce `local server` as a competing term.                            |
+| Aggregate runtime object             | `runtime`              | Reserve for a facade that wires a feature or app runtime together.              |
+| Authoritative persistence / IO layer | `source`               | Prefer `repo-source.ts` over `repo-backend.ts`.                                 |
+| Outside-UI intent envelope           | `client effect intent` | Use the existing term consistently.                                             |
 
 ## State classes
 
 Goblin uses three state classes:
 
-| Class | Meaning | Typical names |
-| --- | --- | --- |
-| Local | State that never needs to converge across windows | React state, `*Query`, `open`, `pending` |
-| Runtime-coherent | State that should converge during the current run and is server-owned | `*Projection`, `*Snapshot`, `Runtime*` |
-| Restorable | State that survives relaunch without live sync | `*Cache`, `Restorable*`, `WorkspaceSessionState` |
+| Class            | Meaning                                                               | Typical names                                    |
+| ---------------- | --------------------------------------------------------------------- | ------------------------------------------------ |
+| Local            | State that never needs to converge across windows                     | React state, `*Query`, `open`, `pending`         |
+| Runtime-coherent | State that should converge during the current run and is server-owned | `*Projection`, `*Snapshot`, `Runtime*`           |
+| Restorable       | State that survives relaunch without live sync                        | `*Cache`, `Restorable*`, `WorkspaceSessionState` |
 
 Rules:
 
@@ -75,13 +75,13 @@ Rules:
 
 Within a feature, use these layer names when they fit:
 
-| Layer | Typical forms |
-| --- | --- |
-| Boundary | `src/server/routes/<feature>.ts`, `src/web/<feature>-client.ts` |
-| Read | `src/web/<feature>-queries.ts`, `src/web/<feature>-snapshot.ts`, `src/server/modules/<feature>-read.ts` |
-| Write | `src/server/modules/<feature>-write-paths.ts`, `src/web/<feature>-write-paths.ts` |
-| Source | `src/server/modules/<feature>-source.ts` |
-| Runtime | `runtime-<feature>*` only when the file truly exposes a read+write facade |
+| Layer    | Typical forms                                                                                           |
+| -------- | ------------------------------------------------------------------------------------------------------- |
+| Boundary | `src/server/routes/<feature>.ts`, `src/web/<feature>-client.ts`                                         |
+| Read     | `src/web/<feature>-queries.ts`, `src/web/<feature>-snapshot.ts`, `src/server/modules/<feature>-read.ts` |
+| Write    | `src/server/modules/<feature>-write-paths.ts`, `src/web/<feature>-write-paths.ts`                       |
+| Source   | `src/server/modules/<feature>-source.ts`                                                                |
+| Runtime  | `runtime-<feature>*` only when the file truly exposes a read+write facade                               |
 
 Do not use `runtime` for a queue or scheduler that is not actually a runtime facade.
 
@@ -99,19 +99,19 @@ Terminal terminology has hard boundaries:
 
 Canonical terminal terms:
 
-| Concept | Canonical | Deprecated |
-| --- | --- | --- |
-| Server-side business object | `TerminalSession` | `TerminalSlot` |
-| Server state owner | `TerminalSessionManager` | `TerminalSlotManager` |
-| Client singleton projection | `TerminalSessionProjection` | `TerminalSlotRegistry` |
-| Per-session client view | `TerminalSessionView` | `TerminalSlotView` |
-| Per-session client state | `TerminalSessionState` | `TerminalSlotState` |
-| Per-session client runtime | `TerminalSessionRuntime` | `TerminalSlotRuntime` |
-| Workspace pane tab runtime | `WorkspacePaneTabsRuntime` | terminal-only or worktree-only tab list runtimes |
-| Terminal session identity | `terminalSessionId` | old composite terminal identity names |
-| Terminal worktree grouping | `terminalWorktreeKey` / `TerminalWorktreeKey` | old workspace-pane identity names |
-| Session lifecycle event | `session-closed` | `slot-closed` |
-| Session id validator | `isValidTerminalSessionId` | `isValidSlotId` |
+| Concept                     | Canonical                                     | Deprecated                                       |
+| --------------------------- | --------------------------------------------- | ------------------------------------------------ |
+| Server-side business object | `TerminalSession`                             | `TerminalSlot`                                   |
+| Server state owner          | `TerminalSessionManager`                      | `TerminalSlotManager`                            |
+| Client singleton projection | `TerminalSessionProjection`                   | `TerminalSlotRegistry`                           |
+| Per-session client view     | `TerminalSessionView`                         | `TerminalSlotView`                               |
+| Per-session client state    | `TerminalSessionState`                        | `TerminalSlotState`                              |
+| Per-session client runtime  | `TerminalSessionRuntime`                      | `TerminalSlotRuntime`                            |
+| Workspace pane tab runtime  | `WorkspacePaneTabsRuntime`                    | terminal-only or worktree-only tab list runtimes |
+| Terminal session identity   | `terminalSessionId`                           | old composite terminal identity names            |
+| Terminal worktree grouping  | `terminalWorktreeKey` / `TerminalWorktreeKey` | old workspace-pane identity names                |
+| Session lifecycle event     | `session-closed`                              | `slot-closed`                                    |
+| Session id validator        | `isValidTerminalSessionId`                    | `isValidSlotId`                                  |
 
 Naming consequences:
 
@@ -131,18 +131,18 @@ Repo naming rules:
 
 Canonical examples:
 
-| Concept | Canonical | Deprecated |
-| --- | --- | --- |
-| Authoritative repo accessor | `RepoSource` / `repo-source.ts` | `RepoBackend` / `repo-backend.ts` |
-| Snapshot read | `getRepoSnapshot` | `getRepositorySnapshot` |
-| Status read | `getRepoStatus` | `getRepositoryStatus` |
-| Log read | `getRepoLog` | `getRepositoryLog` |
-| Bulk read | `RepoBulkReadResult` / `readRepoBulk` | `RepositoryComposite` / `getRepositoryComposite` |
-| Operation scheduler | `RepoOperationScheduler` | `RepoRuntime` |
-| Operation lane | `RepoOperationLane` | `RepoTaskLane`, `RepoLane` |
-| Data load state | `RepoDataLoadState` | `RepoResourcesState` |
-| Right-pane surface | `RepoWorkspace` | `branch-workspace/` |
-| Workspace-pane tab type | `WorkspacePaneTabType` | `WorkspacePaneView` |
+| Concept                     | Canonical                             | Deprecated                                       |
+| --------------------------- | ------------------------------------- | ------------------------------------------------ |
+| Authoritative repo accessor | `RepoSource` / `repo-source.ts`       | `RepoBackend` / `repo-backend.ts`                |
+| Snapshot read               | `getRepoSnapshot`                     | `getRepositorySnapshot`                          |
+| Status read                 | `getRepoStatus`                       | `getRepositoryStatus`                            |
+| Log read                    | `getRepoLog`                          | `getRepositoryLog`                               |
+| Bulk read                   | `RepoBulkReadResult` / `readRepoBulk` | `RepositoryComposite` / `getRepositoryComposite` |
+| Operation scheduler         | `RepoOperationScheduler`              | `RepoRuntime`                                    |
+| Operation lane              | `RepoOperationLane`                   | `RepoTaskLane`, `RepoLane`                       |
+| Data load state             | `RepoDataLoadState`                   | `RepoResourcesState`                             |
+| Right-pane surface          | `RepoWorkspace`                       | `branch-workspace/`                              |
+| Workspace-pane tab type     | `WorkspacePaneTabType`                | `WorkspacePaneView`                              |
 
 ### Settings / server
 
@@ -154,11 +154,11 @@ Canonical rules:
 
 Selected mappings:
 
-| Concept | Canonical | Deprecated |
-| --- | --- | --- |
-| User-configurable preferences | `UserSettings` | `SettingsPrefs` |
-| Prefs PATCH body key | `prefs` | `settings` |
-| Persisted workspace session | `WorkspaceSessionState` | `SessionState` |
+| Concept                            | Canonical                         | Deprecated            |
+| ---------------------------------- | --------------------------------- | --------------------- |
+| User-configurable preferences      | `UserSettings`                    | `SettingsPrefs`       |
+| Prefs PATCH body key               | `prefs`                           | `settings`            |
+| Persisted workspace session        | `WorkspaceSessionState`           | `SessionState`        |
 | Native shortcut registration state | `NativeShortcutRegistrationState` | `ServerSettingsState` |
 
 ### Native host
@@ -172,16 +172,16 @@ Canonical rules:
 
 Selected mappings:
 
-| Concept | Canonical | Deprecated |
-| --- | --- | --- |
-| Primary window | `primaryWindow` / `activatePrimaryWindow` | `mainWindow` / `activateMainWindow` |
-| Client surface registry | `client-surface-registry.ts` | `window-registry.ts` |
-| Window security policy | `window-security.ts` | `window-shell.ts` |
-| Embedded server lifecycle | `embedded-server-lifecycle.ts` | `server-manager.ts` |
-| Native host IPC router | `native-host-ipc-router.ts` | `ipc.ts` |
-| Clipboard IPC handler | `clipboard-ipc.ts` | `clipboard-bridge.ts` |
-| Access-token IPC handler | `access-token-ipc.ts` | `access-token-bridge.ts` |
-| Server-to-native projection | `native-host-projection.ts` | `native-shell-projection.ts` |
+| Concept                     | Canonical                                 | Deprecated                          |
+| --------------------------- | ----------------------------------------- | ----------------------------------- |
+| Primary window              | `primaryWindow` / `activatePrimaryWindow` | `mainWindow` / `activateMainWindow` |
+| Client surface registry     | `client-surface-registry.ts`              | `window-registry.ts`                |
+| Window security policy      | `window-security.ts`                      | `window-shell.ts`                   |
+| Embedded server lifecycle   | `embedded-server-lifecycle.ts`            | `server-manager.ts`                 |
+| Native host IPC router      | `native-host-ipc-router.ts`               | `ipc.ts`                            |
+| Clipboard IPC handler       | `clipboard-ipc.ts`                        | `clipboard-bridge.ts`               |
+| Access-token IPC handler    | `access-token-ipc.ts`                     | `access-token-bridge.ts`            |
+| Server-to-native projection | `native-host-projection.ts`               | `native-shell-projection.ts`        |
 
 ## Review checklist
 

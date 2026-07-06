@@ -127,7 +127,11 @@ export async function runRemoteRepoConnection(
       if (outcome.kind === 'ready' && outcome.target) {
         const refreshHolder: { value: InitialRepoRefresh | null } = { value: null }
         set((s) => {
-          const result = addResolvedRepo(s, { id: outcome.repoId, name: outcome.name, target: outcome.target! }, repoInstanceId)
+          const result = addResolvedRepo(
+            s,
+            { id: outcome.repoId, name: outcome.name, target: outcome.target! },
+            repoInstanceId,
+          )
           if (!result.changed) return s
           const repo = result.repos[outcome.repoId]
           if (repo) refreshHolder.value = { id: repo.id, repoInstanceId: repo.instanceId }

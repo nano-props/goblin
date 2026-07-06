@@ -91,7 +91,10 @@ describe('repo-client', () => {
       json: async () => ({ ok: true, message: 'https://github.com/acme/repo/tree/feature/test' }),
     }))
     const { openRepoUrl } = await import('#/web/repo-client.ts')
-    await expect(openRepoUrl('/tmp/repo', { type: 'branch', branch: 'feature/test' })).resolves.toEqual({ ok: true, message: '' })
+    await expect(openRepoUrl('/tmp/repo', { type: 'branch', branch: 'feature/test' })).resolves.toEqual({
+      ok: true,
+      message: '',
+    })
     expect(openExternalUrl).toHaveBeenCalledWith({
       url: 'https://github.com/acme/repo/tree/feature/test',
       allowHttp: true,
@@ -131,7 +134,10 @@ describe('repo-client', () => {
     }))
     const { openRepoUrl } = await import('#/web/repo-client.ts')
 
-    await expect(openRepoUrl('/tmp/repo', { type: 'commit', hash: 'abcdef1' })).resolves.toEqual({ ok: true, message: '' })
+    await expect(openRepoUrl('/tmp/repo', { type: 'commit', hash: 'abcdef1' })).resolves.toEqual({
+      ok: true,
+      message: '',
+    })
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:32100/api/repo/open-url',
       expect.objectContaining({
@@ -140,7 +146,10 @@ describe('repo-client', () => {
         body: JSON.stringify({ cwd: '/tmp/repo', target: { type: 'commit', hash: 'abcdef1' } }),
       }),
     )
-    expect(openExternalUrl).toHaveBeenCalledWith({ url: 'https://github.com/acme/repo/commit/abcdef1', allowHttp: true })
+    expect(openExternalUrl).toHaveBeenCalledWith({
+      url: 'https://github.com/acme/repo/commit/abcdef1',
+      allowHttp: true,
+    })
   })
 
   test('clones repositories through the embedded server when no Electron bridge exists', async () => {

@@ -41,7 +41,9 @@ import { useWorkspaceNavigationHistory } from '#/web/workspace-navigation-histor
 import type { WorkspaceNavigationRouteContext } from '#/web/workspace-navigation-history.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 
-const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapState>({ status: 'restoring-workspace' })
+const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapState>({
+  status: 'restoring-workspace',
+})
 
 export type AuthenticatedAppShellMode = 'settings' | 'workspace-restore' | 'workspace-ready'
 
@@ -114,12 +116,7 @@ function AuthenticatedWorkspaceShell() {
   })
   const currentBranchName = routeContext?.kind === 'branch' ? (routeContext.branchName ?? null) : null
   const order = useReposStore((s) => s.order)
-  const {
-    closeRepo,
-    setWorkspacePaneTab,
-    goBackInWorkspaceNavigation,
-    goForwardInWorkspaceNavigation,
-  } = useReposStore(
+  const { closeRepo, setWorkspacePaneTab, goBackInWorkspaceNavigation, goForwardInWorkspaceNavigation } = useReposStore(
     useShallow(primaryWindowNavigationStoreActionsFromStore),
   )
   const routeNavigation = usePrimaryWindowRouteNavigation()
@@ -213,7 +210,9 @@ interface RepoRouteContext {
   branchName?: string
 }
 
-export function repoRouteContextFromMatches(matches: Array<{ routeId: string; params: Record<string, string> }>): RepoRouteContext | null {
+export function repoRouteContextFromMatches(
+  matches: Array<{ routeId: string; params: Record<string, string> }>,
+): RepoRouteContext | null {
   const repoMatch = [...matches].reverse().find((match) => typeof match.params.repoSlug === 'string')
   if (!repoMatch) return null
 

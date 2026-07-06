@@ -38,16 +38,12 @@ describe('client effect intent plans', () => {
   })
 
   test('marks worktree terminal bell intent unavailable when the branch read model is missing', () => {
-    const plan = createTerminalBellIntentPlan(
-      { id: '/tmp/repo' },
-      null,
-      {
-        type: 'terminal-bell-click',
-        repoRoot: '/tmp/repo',
-        terminalSessionId: 'session-2',
-        terminalWorktreeKey: '/tmp/repo\0/tmp/repo-feature',
-      },
-    )
+    const plan = createTerminalBellIntentPlan({ id: '/tmp/repo' }, null, {
+      type: 'terminal-bell-click',
+      repoRoot: '/tmp/repo',
+      terminalSessionId: 'session-2',
+      terminalWorktreeKey: '/tmp/repo\0/tmp/repo-feature',
+    })
 
     expect(plan).toEqual({ kind: 'unavailable', reason: 'branch-read-model-unavailable' })
   })

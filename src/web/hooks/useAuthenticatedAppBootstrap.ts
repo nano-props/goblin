@@ -20,9 +20,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-session-tabs-restore.ts'
 import { createTimeoutAbortController } from '#/web/lib/abort.ts'
 
-export type AuthenticatedAppBootstrapState =
-  | { status: 'restoring-workspace' }
-  | { status: 'ready' }
+export type AuthenticatedAppBootstrapState = { status: 'restoring-workspace' } | { status: 'ready' }
 
 const RESTORING_WORKSPACE_BOOTSTRAP_STATE: AuthenticatedAppBootstrapState = { status: 'restoring-workspace' }
 const READY_BOOTSTRAP_STATE: AuthenticatedAppBootstrapState = { status: 'ready' }
@@ -81,17 +79,27 @@ function startAuthenticatedWorkspaceRestoreRun(onReady: () => void): Authenticat
   }
 }
 
-async function hydrateNonCriticalAuthenticatedState(settingsSnapshot: Promise<SettingsSnapshot>, signal: AbortSignal): Promise<void> {
+async function hydrateNonCriticalAuthenticatedState(
+  settingsSnapshot: Promise<SettingsSnapshot>,
+  signal: AbortSignal,
+): Promise<void> {
   await Promise.all([
-    runOptionalBootstrapTask('theme hydrate', async () => {
-      await useThemeStore.getState().hydrateFromSettingsSnapshot(await settingsSnapshot)
-    }, signal),
+    runOptionalBootstrapTask(
+      'theme hydrate',
+      async () => {
+        await useThemeStore.getState().hydrateFromSettingsSnapshot(await settingsSnapshot)
+      },
+      signal,
+    ),
     runOptionalBootstrapTask('i18n hydrate', () => useI18nStore.getState().hydrate({ signal }), signal),
     runOptionalBootstrapTask('host-info hydrate', () => useHostInfoStore.getState().hydrate({ signal }), signal),
   ])
 }
 
-async function restoreBootSession(settingsSnapshot: Promise<SettingsSnapshot>, signal: AbortSignal): Promise<WorkspaceRestoreOutcome> {
+async function restoreBootSession(
+  settingsSnapshot: Promise<SettingsSnapshot>,
+  signal: AbortSignal,
+): Promise<WorkspaceRestoreOutcome> {
   try {
     useReposStore.setState({ sessionPersistenceReady: false, sessionRestoreError: null })
     useSessionRestoreStore.getState().hydrateFromSettingsSnapshot(await abortable(settingsSnapshot, signal))
@@ -217,7 +225,10 @@ async function runOptionalBootstrapTask(label: string, task: () => Promise<void>
  * log on failure - the client's boot must not be blocked by a
  * settings fetch outage.
  */
-async function primeSettingsQueryCache(settingsSnapshot: Promise<SettingsSnapshot>, signal: AbortSignal): Promise<void> {
+async function primeSettingsQueryCache(
+  settingsSnapshot: Promise<SettingsSnapshot>,
+  signal: AbortSignal,
+): Promise<void> {
   // `getSettingsSnapshot()` / `getExternalAppsSnapshot()` can throw
   // synchronously when the bootstrap is missing (the request never
   // reaches `fetch`). Wrap each one individually so the other can

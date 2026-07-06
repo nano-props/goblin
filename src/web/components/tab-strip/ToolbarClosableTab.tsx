@@ -100,7 +100,9 @@ function toolbarTabCloseVisibilityClassName(visible: boolean): string {
     : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100'
 }
 
-function stopToolbarTabCloseDragStart(event: ReactPointerEvent<HTMLButtonElement> | ReactMouseEvent<HTMLButtonElement>) {
+function stopToolbarTabCloseDragStart(
+  event: ReactPointerEvent<HTMLButtonElement> | ReactMouseEvent<HTMLButtonElement>,
+) {
   event.stopPropagation()
 }
 

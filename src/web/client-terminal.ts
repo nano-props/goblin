@@ -38,7 +38,12 @@ export function createServerTerminalClient(options: {
   const sessionsChangedSubscribers = new Set<(repoRoot: string) => void>()
   const workspaceTabsChangedSubscribers = new Set<(repoRoot: string) => void>()
   const sessionClosedSubscribers = new Set<
-    (event: { terminalRuntimeSessionId: string; terminalSessionId: string; repoRoot: string; worktreePath: string }) => void
+    (event: {
+      terminalRuntimeSessionId: string
+      terminalSessionId: string
+      repoRoot: string
+      worktreePath: string
+    }) => void
   >()
 
   const connection = createTerminalSocketConnection({
@@ -67,13 +72,11 @@ export function createServerTerminalClient(options: {
       return connection.request('close', input)
     },
     create(input) {
-      return connection
-        .request('create', input satisfies TerminalCreateInput)
-        .then((value) => {
-          const result = normalizeTerminalCreateResult(value)
-          if (!result) throw new Error('Terminal socket response failed: invalid terminal create response')
-          return result
-        })
+      return connection.request('create', input satisfies TerminalCreateInput).then((value) => {
+        const result = normalizeTerminalCreateResult(value)
+        if (!result) throw new Error('Terminal socket response failed: invalid terminal create response')
+        return result
+      })
     },
     replaceWorkspaceTabs(input) {
       return connection.request('replace-tabs', input)
@@ -85,22 +88,18 @@ export function createServerTerminalClient(options: {
       return connection.request('prune', { repoRoot, repoInstanceId })
     },
     listSessions(input) {
-      return connection
-        .request('list-sessions', input)
-        .then((value) => {
-          const sessions = normalizeTerminalSessionSummaryList(value)
-          if (!sessions) throw new Error('Terminal socket response failed: invalid terminal sessions response')
-          return sessions
-        })
+      return connection.request('list-sessions', input).then((value) => {
+        const sessions = normalizeTerminalSessionSummaryList(value)
+        if (!sessions) throw new Error('Terminal socket response failed: invalid terminal sessions response')
+        return sessions
+      })
     },
     listWorkspaceTabs(input) {
-      return connection
-        .request('list-workspace-tabs', input)
-        .then((value) => {
-          const tabs = normalizeWorkspacePaneTabsEntryList(value)
-          if (!tabs) throw new Error('Terminal socket response failed: invalid workspace tabs response')
-          return tabs
-        })
+      return connection.request('list-workspace-tabs', input).then((value) => {
+        const tabs = normalizeWorkspacePaneTabsEntryList(value)
+        if (!tabs) throw new Error('Terminal socket response failed: invalid workspace tabs response')
+        return tabs
+      })
     },
     prewarm() {
       return connection.prewarm()

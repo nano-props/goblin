@@ -111,13 +111,13 @@ async function createSession(
   manager: TerminalSessionManager<string>,
   supervisor: ReturnType<typeof createDeferredPtySupervisor>,
 ): Promise<Extract<TerminalAttachResult, { ok: true }>> {
-    const pending = manager.ensureSession({
-      userId: USER_ID,
-      scope: SCOPE,
-      repoRoot: SCOPE,
-      repoInstanceId: 'repo-instance-test',
-      branch: BRANCH_NAME,
-      terminalSessionId: TERMINAL_SESSION_ID,
+  const pending = manager.ensureSession({
+    userId: USER_ID,
+    scope: SCOPE,
+    repoRoot: SCOPE,
+    repoInstanceId: 'repo-instance-test',
+    branch: BRANCH_NAME,
+    terminalSessionId: TERMINAL_SESSION_ID,
     worktreePath: WORKTREE_PATH,
     cwd: '/tmp',
     cols: 80,

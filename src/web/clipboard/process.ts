@@ -49,10 +49,7 @@ export interface DropInputs {
  * before any async work runs.
  */
 export type PastePreview =
-  | { kind: 'no-op' }
-  | { kind: 'too-large' }
-  | { kind: 'text'; text: string }
-  | { kind: 'files' }
+  { kind: 'no-op' } | { kind: 'too-large' } | { kind: 'text'; text: string } | { kind: 'files' }
 
 /**
  * Decide which channel wins when both `text/plain` and `Files` are

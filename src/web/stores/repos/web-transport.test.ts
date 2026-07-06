@@ -43,7 +43,10 @@ describe('repo web transport helpers', () => {
     }))
     const { openRepoUrl } = await import('#/web/repo-client.ts')
 
-    await expect(openRepoUrl('/tmp/repo', { type: 'branch', branch: 'feature/a' })).resolves.toEqual({ ok: true, message: '' })
+    await expect(openRepoUrl('/tmp/repo', { type: 'branch', branch: 'feature/a' })).resolves.toEqual({
+      ok: true,
+      message: '',
+    })
     expect(window.open).toHaveBeenCalledWith('https://example.com/repo/tree/feature/a', '_blank', 'noopener,noreferrer')
   })
 

@@ -86,7 +86,11 @@ describe('useAccessTokenStatus', () => {
 
     renderInJsdom(<Harness />)
 
-    expect(postServerJson).toHaveBeenCalledWith('/api/login', { token: 'url-token' }, { signal: expect.any(AbortSignal) })
+    expect(postServerJson).toHaveBeenCalledWith(
+      '/api/login',
+      { token: 'url-token' },
+      { signal: expect.any(AbortSignal) },
+    )
     expect(window.location.search).toBe('?x=1')
 
     await act(async () => {

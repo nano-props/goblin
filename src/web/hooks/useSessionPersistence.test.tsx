@@ -531,7 +531,9 @@ describe('useSessionPersistence', () => {
     persistWorkspaceSessionStateMock.mockClear()
 
     flushSync(() => {
-      useReposStore.setState({ selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'session-2' } })
+      useReposStore.setState({
+        selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'session-2' },
+      })
     })
     expect(persistWorkspaceSessionStateMock).not.toHaveBeenCalled()
 
@@ -546,7 +548,6 @@ describe('useSessionPersistence', () => {
       }),
     )
   })
-
 })
 
 function Harness({ routedRepoId = null }: { routedRepoId?: string | null }) {

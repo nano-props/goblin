@@ -105,10 +105,7 @@ function hasUsableWorktreePath(worktreePath: string): boolean {
  *  segments do not sneak past. Shape validation (empty / NUL) is
  *  performed up front in `getRepositoryTree` so this function only
  *  deals with membership. */
-function matchesKnownWorktree(
-  worktrees: ReadonlyArray<WorktreeInfo> | undefined,
-  worktreePath: string,
-): boolean {
+function matchesKnownWorktree(worktrees: ReadonlyArray<WorktreeInfo> | undefined, worktreePath: string): boolean {
   const resolved = path.resolve(worktreePath)
   if (worktrees) {
     for (const wt of worktrees) {

@@ -184,7 +184,9 @@ function historyCommitNode(entry: LogEntry, index: number): HistoryCommitNode {
 }
 
 function historyRefKey(refDisplay: HistoryRefDisplay): string {
-  return refDisplay.kind === 'mergedRemote' ? `${refDisplay.refName}:${refDisplay.remoteRefs.join('|')}` : refDisplay.refName
+  return refDisplay.kind === 'mergedRemote'
+    ? `${refDisplay.refName}:${refDisplay.remoteRefs.join('|')}`
+    : refDisplay.refName
 }
 
 function historyLogLine(entry: LogEntry): string {

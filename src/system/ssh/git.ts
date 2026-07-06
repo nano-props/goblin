@@ -140,11 +140,9 @@ export async function getRemoteStatusAndWorktrees(
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<{ statuses: WorktreeStatus[]; worktrees: WorktreeInfo[] }> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
-  const result = await run(
-    { type: 'gitWorktreeListAndStatus', path: target.remotePath },
-    target,
-    { signal: options.signal },
-  )
+  const result = await run({ type: 'gitWorktreeListAndStatus', path: target.remotePath }, target, {
+    signal: options.signal,
+  })
   if (options.signal?.aborted) return { statuses: [], worktrees: [] }
   if (!result.ok) return { statuses: [], worktrees: [] }
 

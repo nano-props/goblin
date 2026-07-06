@@ -263,7 +263,8 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       const restoreError =
         failedOpenEntryIds.size > 0
           ? new Error('session repo restore failed')
-          : workspacePaneRestoreFailed || unresolvedPreferredRestoreRepoIds(get().repos, workspacePaneRestoreState).length > 0
+          : workspacePaneRestoreFailed ||
+              unresolvedPreferredRestoreRepoIds(get().repos, workspacePaneRestoreState).length > 0
             ? new Error('workspace pane preferred tab restore failed')
             : null
       if (restoreError) throw restoreError

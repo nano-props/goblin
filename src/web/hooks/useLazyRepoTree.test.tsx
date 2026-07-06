@@ -145,9 +145,7 @@ describe('useLazyRepoTree', () => {
       truncated: false,
     })
     queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', '/repo-a', '/repo-a/main', 'src'], {
-      nodes: [
-        { id: 'src/web', path: 'src/web', name: 'web', parentId: 'src', kind: 'directory', status: 'clean' },
-      ],
+      nodes: [{ id: 'src/web', path: 'src/web', name: 'web', parentId: 'src', kind: 'directory', status: 'clean' }],
       truncated: false,
     })
     queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', '/repo-a', '/repo-a/main', 'src/web'], {
@@ -327,9 +325,7 @@ describe('useLazyRepoTree', () => {
     // Resolving the second promise applies the new state.
     await act(async () => {
       second.resolve({
-        nodes: [
-          { id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' },
-        ],
+        nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
         truncated: false,
       })
     })
@@ -431,7 +427,14 @@ describe('useLazyRepoTree', () => {
       })
       .mockResolvedValueOnce({
         nodes: [
-          { id: 'src/index.ts', path: 'src/index.ts', name: 'index.ts', parentId: 'src', kind: 'file', status: 'clean' },
+          {
+            id: 'src/index.ts',
+            path: 'src/index.ts',
+            name: 'index.ts',
+            parentId: 'src',
+            kind: 'file',
+            status: 'clean',
+          },
         ],
         truncated: false,
       })
@@ -497,7 +500,14 @@ describe('useLazyRepoTree', () => {
     await act(async () => {
       child.resolve({
         nodes: [
-          { id: 'src/index.ts', path: 'src/index.ts', name: 'index.ts', parentId: 'src', kind: 'file', status: 'clean' },
+          {
+            id: 'src/index.ts',
+            path: 'src/index.ts',
+            name: 'index.ts',
+            parentId: 'src',
+            kind: 'file',
+            status: 'clean',
+          },
         ],
         truncated: false,
       })
@@ -516,7 +526,14 @@ describe('useLazyRepoTree', () => {
       })
       .mockResolvedValueOnce({
         nodes: [
-          { id: 'src/index.ts', path: 'src/index.ts', name: 'index.ts', parentId: 'src', kind: 'file', status: 'clean' },
+          {
+            id: 'src/index.ts',
+            path: 'src/index.ts',
+            name: 'index.ts',
+            parentId: 'src',
+            kind: 'file',
+            status: 'clean',
+          },
         ],
         truncated: false,
       })
@@ -566,9 +583,7 @@ describe('useLazyRepoTree', () => {
   test('invalidating after a successful read refreshes the cached tree', async () => {
     mocks.getRepositoryTree
       .mockResolvedValueOnce({
-        nodes: [
-          { id: 'first.ts', path: 'first.ts', name: 'first.ts', parentId: null, kind: 'file', status: 'clean' },
-        ],
+        nodes: [{ id: 'first.ts', path: 'first.ts', name: 'first.ts', parentId: null, kind: 'file', status: 'clean' }],
         truncated: false,
       })
       .mockResolvedValueOnce({

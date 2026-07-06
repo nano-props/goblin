@@ -54,7 +54,9 @@ describe('repo route view derivation', () => {
   test('derives a routed repo view directly from the URL slug without store hydration', () => {
     const repoSlug = repoSlugFromId('/deep-link/repo')
 
-    expect(repoRouteViewFromSlugChildRoute(repoSlug, { dashboard: true, branchSlug: null, newWorktree: false })).toEqual({
+    expect(
+      repoRouteViewFromSlugChildRoute(repoSlug, { dashboard: true, branchSlug: null, newWorktree: false }),
+    ).toEqual({
       kind: 'dashboard',
       repoId: '/deep-link/repo',
     })
@@ -80,7 +82,9 @@ describe('repo route view derivation', () => {
       kind: 'newWorktree',
       repoId: '/repo',
     })
-    expect(repoRouteViewFromChildRoute('/repo', { dashboard: false, branchSlug: 'ZmVhdHVyZS9h', newWorktree: false })).toEqual({
+    expect(
+      repoRouteViewFromChildRoute('/repo', { dashboard: false, branchSlug: 'ZmVhdHVyZS9h', newWorktree: false }),
+    ).toEqual({
       kind: 'branch',
       repoId: '/repo',
       branchName: 'feature/a',

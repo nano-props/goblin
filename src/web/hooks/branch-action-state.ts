@@ -3,15 +3,7 @@ import { branchActionKindFromReason, isBranchActionReason } from '#/web/stores/r
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 export type BranchActionItemId =
-  | 'status'
-  | 'history'
-  | 'changes'
-  | 'files'
-  | 'copyPatch'
-  | 'pull'
-  | 'push'
-  | 'deleteBranch'
-  | 'removeWorktree'
+  'status' | 'history' | 'changes' | 'files' | 'copyPatch' | 'pull' | 'push' | 'deleteBranch' | 'removeWorktree'
 
 export interface BranchCopyPatchAction {
   label: string

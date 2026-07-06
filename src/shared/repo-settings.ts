@@ -44,12 +44,7 @@ export const WORKTREE_BOOTSTRAP_CONFIG_HASH_RE = /^sha256:[a-f0-9]{64}$/
  * (and vice versa) — that's by design, leave the guard in place.
  * ============================================================================
  */
-export const WORKSPACE_EXTERNAL_APP_IDS = [
-  'terminal:ghostty',
-  'terminal:terminal',
-  'editor:vscode',
-  'finder',
-] as const
+export const WORKSPACE_EXTERNAL_APP_IDS = ['terminal:ghostty', 'terminal:terminal', 'editor:vscode', 'finder'] as const
 
 export type WorkspaceExternalAppId = (typeof WORKSPACE_EXTERNAL_APP_IDS)[number]
 

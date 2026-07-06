@@ -73,18 +73,14 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
   const deps: RemoteRepoConnectionDeps = {
     resolveTarget: async ({ alias, remotePath }) => {
       const result = handlers['remote.resolveTarget']?.({ alias, remotePath }) as
-        | { target: RemoteRepoTarget; error?: undefined }
-        | { error: string; target?: undefined }
-        | undefined
+        { target: RemoteRepoTarget; error?: undefined } | { error: string; target?: undefined } | undefined
       if (!result) return { error: 'missing-resolve-target' }
       if ('target' in result && result.target !== undefined) return { target: result.target }
       return { error: result.error ?? 'resolve-target-error' }
     },
     probeRemote: async (target, { signal: _signal }) => {
       const parsed = handlers['repo.probe']?.({ cwd: target.remotePath }) as
-        | { ok: true; root?: string; name?: string }
-        | { ok: false; message: string }
-        | undefined
+        { ok: true; root?: string; name?: string } | { ok: false; message: string } | undefined
       if (!parsed) return { ok: false, message: 'missing-probe' }
       if (!parsed.ok) return { ok: false, message: parsed.message }
       return { ok: true }

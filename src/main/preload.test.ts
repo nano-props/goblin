@@ -322,7 +322,8 @@ describe('preload goblinNative bridge', () => {
       [HOST_IPC_ABORT_CHANNEL]: 'paired with HOST_IPC_CALL_CHANNEL for cancellation',
       [HOST_IPC_EVENT_CHANNEL]: 'main → client event broadcast (Electron-only transport)',
       [CLIENT_EFFECT_INTENT_CHANNEL]: 'client effect intent dispatch (paired with the IPC dispatch channel)',
-      [APP_QUIT_DRAINED_CHANNEL]: 'renderer → main quit drain acknowledgement — main owns native app/server shutdown ordering',
+      [APP_QUIT_DRAINED_CHANNEL]:
+        'renderer → main quit drain acknowledgement — main owns native app/server shutdown ordering',
       [HOST_OPEN_SETTINGS_WINDOW_CHANNEL]: 'BrowserWindow management — open the settings window as its own OS window',
       [HOST_OPEN_EXTERNAL_URL_CHANNEL]:
         'Electron shell.openExternal — protocol-handler restrictions the browser API cannot enforce',

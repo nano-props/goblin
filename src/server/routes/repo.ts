@@ -127,10 +127,7 @@ export function createRepoRoutes() {
   app.post('/file-viewer', async (c) => {
     const { cwd, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fileViewer, c)
     return c.json(
-      await readJsonOrThrow(
-        () => getRepositoryFileViewer(cwd, worktreePath, c.req.raw.signal),
-        'file-viewer',
-      ),
+      await readJsonOrThrow(() => getRepositoryFileViewer(cwd, worktreePath, c.req.raw.signal), 'file-viewer'),
     )
   })
   app.post('/trash-file', async (c) => {

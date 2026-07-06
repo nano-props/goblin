@@ -39,13 +39,11 @@ describe('openRepoFromDialog', () => {
     installGoblinTestBridge({
       'repo.openDialog': () => '/tmp/repo',
     })
-    const ensureWorkspaceOpen = vi.fn(
-      async (): Promise<OpenRepoResult> => ({
-        ok: true,
-        id: '/tmp/repo',
-        postOpenEffects: Promise.resolve([{ kind: 'recent-repo', message: 'recent write failed' }]),
-      }),
-    )
+    const ensureWorkspaceOpen = vi.fn(async (): Promise<OpenRepoResult> => ({
+      ok: true,
+      id: '/tmp/repo',
+      postOpenEffects: Promise.resolve([{ kind: 'recent-repo', message: 'recent write failed' }]),
+    }))
     const activateRepo = vi.fn()
 
     await openRepoFromDialog({
@@ -65,9 +63,10 @@ describe('openRepoFromDialog', () => {
     installGoblinTestBridge({
       'repo.openDialog': () => '/tmp/repo',
     })
-    const ensureWorkspaceOpen = vi.fn(
-      async (): Promise<OpenRepoResult> => ({ ok: false, message: 'error.not-git-repo' }),
-    )
+    const ensureWorkspaceOpen = vi.fn(async (): Promise<OpenRepoResult> => ({
+      ok: false,
+      message: 'error.not-git-repo',
+    }))
     const activateRepo = vi.fn()
 
     await openRepoFromDialog({
