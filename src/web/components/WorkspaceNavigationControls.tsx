@@ -10,14 +10,14 @@ import { cn } from '#/web/lib/cn.ts'
 
 interface WorkspaceNavigationControlsProps extends Omit<ComponentProps<'div'>, 'children'> {
   repoId?: string
-  revealEnabled?: boolean
-  onRevealEnter?: () => void
+  zenRevealTriggerEnabled?: boolean
+  onZenRevealTriggerEnter?: () => void
 }
 
 export function WorkspaceNavigationControls({
   repoId,
-  revealEnabled = false,
-  onRevealEnter,
+  zenRevealTriggerEnabled = false,
+  onZenRevealTriggerEnter,
   className,
   ...props
 }: WorkspaceNavigationControlsProps) {
@@ -30,11 +30,15 @@ export function WorkspaceNavigationControls({
   return (
     <div
       {...props}
-      data-zen-reveal-surface={revealEnabled ? '' : undefined}
       className={cn('goblin-workspace-navigation-controls pointer-events-auto flex h-full items-center gap-1', className)}
-      onMouseEnter={revealEnabled ? onRevealEnter : undefined}
     >
-      <WorkspaceZenModeToggle data-testid="zen-mode-sidebar-trigger" />
+      <span
+        className="inline-flex"
+        data-zen-reveal-surface={zenRevealTriggerEnabled ? '' : undefined}
+        onMouseEnter={zenRevealTriggerEnabled ? onZenRevealTriggerEnter : undefined}
+      >
+        <WorkspaceZenModeToggle data-testid="zen-mode-sidebar-trigger" />
+      </span>
       <Tip label={t('workspace.navigation-back')}>
         <span className="inline-flex">
           <Button

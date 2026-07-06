@@ -8,23 +8,23 @@ import { ZenModeSidebarChrome } from '#/web/components/repo-layout/ZenModeSideba
 
 vi.mock('#/web/components/WorkspaceNavigationControls.tsx', () => ({
   WorkspaceNavigationControls: ({
-    revealEnabled,
-    onRevealEnter,
+    zenRevealTriggerEnabled,
+    onZenRevealTriggerEnter,
     repoId,
   }: {
-    revealEnabled?: boolean
-    onRevealEnter?: () => void
+    zenRevealTriggerEnabled?: boolean
+    onZenRevealTriggerEnter?: () => void
     repoId?: string
   }) => (
     <div
       data-testid="mock-workspace-navigation-controls"
       data-repo-id={repoId}
-      data-zen-reveal-surface={revealEnabled ? '' : undefined}
-      onMouseEnter={onRevealEnter}
     >
-      <button type="button" data-testid="zen-mode-sidebar-trigger">
-        zen
-      </button>
+      <span data-testid="mock-zen-reveal-surface" data-zen-reveal-surface={zenRevealTriggerEnabled ? '' : undefined}>
+        <button type="button" data-testid="zen-mode-sidebar-trigger" onMouseEnter={onZenRevealTriggerEnter}>
+          zen
+        </button>
+      </span>
       <button type="button" disabled>
         back
       </button>
@@ -79,7 +79,7 @@ beforeEach(() => {
 })
 
 describe('ZenModeSidebarChrome', () => {
-  test('uses the whole navigation control group as the reveal trigger surface', () => {
+  test('uses the zen control as the reveal trigger surface', () => {
     const { container } = renderInJsdom(
       <ZenModeSidebarChrome
         repoId="/tmp/repo"
@@ -91,12 +91,20 @@ describe('ZenModeSidebarChrome', () => {
     )
 
     const controls = screen.getByTestId('mock-workspace-navigation-controls')
+    const zenSurface = screen.getByTestId('mock-zen-reveal-surface')
     expect(controls.dataset.repoId).toBe('/tmp/repo')
-    expect(controls.hasAttribute('data-zen-reveal-surface')).toBe(true)
+    expect(controls.hasAttribute('data-zen-reveal-surface')).toBe(false)
+    expect(zenSurface.hasAttribute('data-zen-reveal-surface')).toBe(true)
     expect(controls.closest('[data-title-bar-chrome-region="interactive"]')).not.toBeNull()
+    expect(zenModeSidebarHitArea(container)?.hasAttribute('data-zen-reveal-surface')).toBe(false)
 
     act(() => {
-      controls.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      zenModeSidebarHitArea(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    })
+    expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
+
+    act(() => {
+      screen.getByTestId('zen-mode-sidebar-trigger').dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
   })
@@ -114,7 +122,7 @@ describe('ZenModeSidebarChrome', () => {
     )
 
     act(() => {
-      zenModeSidebarHitArea(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      screen.getByTestId('zen-mode-sidebar-trigger').dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 

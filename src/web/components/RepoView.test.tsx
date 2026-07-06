@@ -131,23 +131,23 @@ vi.mock('#/web/components/WorkspaceZenModeToggle.tsx', () => ({
 vi.mock('#/web/components/WorkspaceNavigationControls.tsx', () => ({
   WorkspaceNavigationControls: ({
     repoId,
-    revealEnabled,
-    onRevealEnter,
+    zenRevealTriggerEnabled,
+    onZenRevealTriggerEnter,
   }: {
     repoId?: string
-    revealEnabled?: boolean
-    onRevealEnter?: () => void
+    zenRevealTriggerEnabled?: boolean
+    onZenRevealTriggerEnter?: () => void
   }) => (
     <div
       data-testid="workspace-navigation-controls"
       data-repo-id={repoId}
-      data-zen-reveal-surface={revealEnabled ? '' : undefined}
       className="pointer-events-auto"
-      onMouseEnter={revealEnabled ? onRevealEnter : undefined}
     >
-      <button type="button" data-testid="zen-mode-sidebar-trigger">
-        zen
-      </button>
+      <span data-testid="zen-mode-sidebar-trigger-surface" data-zen-reveal-surface={zenRevealTriggerEnabled ? '' : undefined}>
+        <button type="button" data-testid="zen-mode-sidebar-trigger" onMouseEnter={onZenRevealTriggerEnter}>
+          zen
+        </button>
+      </span>
       <button type="button" disabled>
         back
       </button>
@@ -453,7 +453,7 @@ describe('RepoView workspace navigation', () => {
     expect(closedRevealTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
   })
 
-  test('large-screen collapsed Zen Mode reveals the sidebar on left-edge hover', () => {
+  test('large-screen collapsed Zen Mode does not reveal the sidebar on left-edge hover', () => {
     useReposStore.getState().setZenMode(true)
     useReposStore.getState().setWorkspacePaneSize(55)
     const { container } = render(branchRepoView())
@@ -471,16 +471,9 @@ describe('RepoView workspace navigation', () => {
       zenModeSidebarHitArea(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
 
-    expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
-    expect(zenModeSidebarReveal(container)?.dataset.interactive).toBe('true')
-    expect(zenModeSidebarReveal(container)?.getAttribute('aria-hidden')).toBeNull()
-    expect(zenModeSidebarReveal(container)?.hasAttribute('inert')).toBe(false)
-    const floatingSidebarTop = zenModeSidebarReveal(container)?.querySelector<HTMLElement>(
-      '[data-testid="repo-shell-sidebar-top"]',
-    )
-    expect(floatingSidebarTop?.hasAttribute('data-interactive')).toBe(false)
-    expect(floatingSidebarTop?.dataset.titleBarChromeRegion).toBe('drag')
-    expect(floatingSidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
+    expect(zenModeSidebarHitArea(container)?.hasAttribute('data-zen-reveal-surface')).toBe(false)
+    expect(zenModeSidebarHitArea(container)?.className).toContain('pointer-events-none')
+    expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
     expect(workspaceNavigationControls(container)?.closest('[data-title-bar-chrome-region="interactive"]')).not.toBeNull()
     expect(zenModeSidebarTrigger(container)?.tagName).toBe('BUTTON')
   })
@@ -493,7 +486,7 @@ describe('RepoView workspace navigation', () => {
     const toggleOverlay = zenModeToggleOverlay(container)
     expect(zenModeToggleOverlay(container)?.hasAttribute('data-interactive')).toBe(false)
     expect(zenModeToggleOverlay(container)?.dataset.titleBarChromeRegion).toBeUndefined()
-    expect(zenModeToggleOverlay(container)?.hasAttribute('data-zen-reveal-surface')).toBe(true)
+    expect(zenModeToggleOverlay(container)?.hasAttribute('data-zen-reveal-surface')).toBe(false)
     expect(zenModeToggleOverlay(container)?.className).toContain('goblin-zen-reveal-trigger-layer')
     expect(zenModeToggleOverlay(container)?.className).not.toContain('title-bar-chrome')
     expect(zenModeToggleOverlay(container)?.className).not.toContain('app-drag-region')
@@ -503,7 +496,8 @@ describe('RepoView workspace navigation', () => {
       Node.DOCUMENT_POSITION_FOLLOWING,
     )
     expect(workspaceNavigationControls(container)?.closest('[data-title-bar-chrome-region="interactive"]')).not.toBeNull()
-    expect(workspaceNavigationControls(container)?.hasAttribute('data-zen-reveal-surface')).toBe(true)
+    expect(workspaceNavigationControls(container)?.hasAttribute('data-zen-reveal-surface')).toBe(false)
+    expect(zenModeSidebarTriggerSurface(container)?.hasAttribute('data-zen-reveal-surface')).toBe(true)
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
 
     act(() => {
@@ -511,6 +505,15 @@ describe('RepoView workspace navigation', () => {
     })
 
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
+    expect(zenModeSidebarReveal(container)?.dataset.interactive).toBe('true')
+    expect(zenModeSidebarReveal(container)?.getAttribute('aria-hidden')).toBeNull()
+    expect(zenModeSidebarReveal(container)?.hasAttribute('inert')).toBe(false)
+    const floatingSidebarTop = zenModeSidebarReveal(container)?.querySelector<HTMLElement>(
+      '[data-testid="repo-shell-sidebar-top"]',
+    )
+    expect(floatingSidebarTop?.hasAttribute('data-interactive')).toBe(false)
+    expect(floatingSidebarTop?.dataset.titleBarChromeRegion).toBe('drag')
+    expect(floatingSidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
   })
 
   test('large-screen collapsed Zen Mode keeps the sidebar open across the title-bar-chrome reveal surface', () => {
@@ -531,12 +534,12 @@ describe('RepoView workspace navigation', () => {
       zenModeSidebarReveal(container)?.dispatchEvent(
         new MouseEvent('mouseout', {
           bubbles: true,
-          relatedTarget: zenModeToggleOverlay(container),
+          relatedTarget: zenModeSidebarTriggerSurface(container),
           clientX: 355,
           clientY: 24,
         }),
       )
-      zenModeToggleOverlay(container)?.dispatchEvent(
+      zenModeSidebarTriggerSurface(container)?.dispatchEvent(
         new PointerEvent('pointermove', { bubbles: true, clientX: 355, clientY: 24 }),
       )
     })
@@ -570,7 +573,8 @@ describe('RepoView workspace navigation', () => {
     const { container } = render(branchRepoView())
 
     const trigger = zenModeSidebarTrigger(container)
-    expect(workspaceNavigationControls(container)?.hasAttribute('data-zen-reveal-surface')).toBe(true)
+    expect(workspaceNavigationControls(container)?.hasAttribute('data-zen-reveal-surface')).toBe(false)
+    expect(zenModeSidebarTriggerSurface(container)?.hasAttribute('data-zen-reveal-surface')).toBe(true)
 
     act(() => {
       trigger?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
@@ -633,7 +637,7 @@ describe('RepoView workspace navigation', () => {
       const { container } = render(branchRepoView())
 
       act(() => {
-        zenModeSidebarHitArea(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+        zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
       })
       expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 
@@ -661,7 +665,7 @@ describe('RepoView workspace navigation', () => {
     const { container } = render(branchRepoView())
 
     act(() => {
-      zenModeSidebarHitArea(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 
@@ -688,7 +692,7 @@ describe('RepoView workspace navigation', () => {
     })
 
     act(() => {
-      zenModeSidebarHitArea(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
 
     act(() => {
@@ -718,7 +722,7 @@ describe('RepoView workspace navigation', () => {
     })
 
     act(() => {
-      zenModeSidebarHitArea(result.container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      zenModeSidebarTrigger(result.container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
 
     act(() => {
@@ -745,7 +749,7 @@ describe('RepoView workspace navigation', () => {
       const { container } = render(branchRepoView())
 
       act(() => {
-        zenModeSidebarHitArea(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+        zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
       })
       expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 
@@ -786,7 +790,7 @@ describe('RepoView workspace navigation', () => {
       const { container } = render(branchRepoView())
 
       act(() => {
-        zenModeSidebarHitArea(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+        zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
       })
       expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
 
@@ -1000,6 +1004,10 @@ function zenModeSidebarResizeHandle(container: HTMLElement): HTMLElement | null 
 
 function zenModeSidebarTrigger(container: HTMLElement): HTMLElement | null {
   return container.querySelector<HTMLElement>('[data-testid="zen-mode-sidebar-trigger"]')
+}
+
+function zenModeSidebarTriggerSurface(container: HTMLElement): HTMLElement | null {
+  return container.querySelector<HTMLElement>('[data-testid="zen-mode-sidebar-trigger-surface"]')
 }
 
 function workspaceNavigationControls(container: HTMLElement): HTMLElement | null {

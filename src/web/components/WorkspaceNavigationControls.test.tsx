@@ -17,19 +17,25 @@ beforeEach(() => {
 })
 
 describe('WorkspaceNavigationControls', () => {
-  test('keeps the whole control group available as the zen reveal surface', () => {
-    const onRevealEnter = vi.fn()
-    const { container } = renderControls({ revealEnabled: true, onRevealEnter })
+  test('uses only the zen control as the reveal surface', () => {
+    const onZenRevealTriggerEnter = vi.fn()
+    const { container } = renderControls({ zenRevealTriggerEnabled: true, onZenRevealTriggerEnter })
 
     const controls = workspaceNavigationControls(container)
-    expect(controls?.hasAttribute('data-zen-reveal-surface')).toBe(true)
+    expect(controls?.hasAttribute('data-zen-reveal-surface')).toBe(false)
     expect(controls?.className).toContain('goblin-workspace-navigation-controls')
+    expect(zenRevealSurface(container)?.contains(zenButton())).toBe(true)
 
     act(() => {
-      controls?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+      backButton().dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    })
+    expect(onZenRevealTriggerEnter).not.toHaveBeenCalled()
+
+    act(() => {
+      zenButton().dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
 
-    expect(onRevealEnter).toHaveBeenCalledTimes(1)
+    expect(onZenRevealTriggerEnter).toHaveBeenCalledTimes(1)
   })
 
   test('disables history buttons at stack boundaries and enables them when history is present', () => {
@@ -80,18 +86,22 @@ describe('WorkspaceNavigationControls', () => {
 
 function renderControls({
   repoId = REPO_ID,
-  revealEnabled = false,
-  onRevealEnter,
+  zenRevealTriggerEnabled = false,
+  onZenRevealTriggerEnter,
   navigation = navigationWith(),
 }: {
   repoId?: string
-  revealEnabled?: boolean
-  onRevealEnter?: () => void
+  zenRevealTriggerEnabled?: boolean
+  onZenRevealTriggerEnter?: () => void
   navigation?: PrimaryWindowNavigationActions
 } = {}) {
   return renderInJsdom(
     <PrimaryWindowNavigationProvider value={navigation}>
-      <WorkspaceNavigationControls repoId={repoId} revealEnabled={revealEnabled} onRevealEnter={onRevealEnter} />
+      <WorkspaceNavigationControls
+        repoId={repoId}
+        zenRevealTriggerEnabled={zenRevealTriggerEnabled}
+        onZenRevealTriggerEnter={onZenRevealTriggerEnter}
+      />
     </PrimaryWindowNavigationProvider>,
   )
 }
@@ -113,6 +123,14 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
 
 function workspaceNavigationControls(container: HTMLElement): HTMLElement | null {
   return container.querySelector<HTMLElement>('.goblin-workspace-navigation-controls')
+}
+
+function zenRevealSurface(container: HTMLElement): HTMLElement | null {
+  return container.querySelector<HTMLElement>('[data-zen-reveal-surface]')
+}
+
+function zenButton(): HTMLButtonElement {
+  return screen.getByRole('button', { name: 'workspace.zen-mode-toggle-label' })
 }
 
 function backButton(): HTMLButtonElement {

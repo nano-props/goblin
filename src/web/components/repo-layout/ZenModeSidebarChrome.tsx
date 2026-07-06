@@ -51,8 +51,8 @@ interface ZenModeSidebarRevealProps {
 
 interface ZenModeSidebarRevealTriggerProps {
   repoId?: string
-  revealEnabled?: boolean
-  onMouseEnter?: () => void
+  zenRevealTriggerEnabled?: boolean
+  onZenRevealTriggerEnter?: () => void
 }
 
 interface ZenModeSidebarChromeProps {
@@ -156,8 +156,8 @@ export function ZenModeSidebarChrome({
       {zenModeToggleEnabled ? (
         <ZenModeSidebarRevealTriggerLayer
           repoId={repoId}
-          revealEnabled={revealEnabled}
-          onMouseEnter={reveal.onTriggerEnter}
+          zenRevealTriggerEnabled={revealEnabled}
+          onZenRevealTriggerEnter={reveal.onTriggerEnter}
         />
       ) : null}
     </>
@@ -166,28 +166,35 @@ export function ZenModeSidebarChrome({
 
 function ZenModeSidebarRevealTriggerLayer({
   repoId,
-  revealEnabled = false,
-  onMouseEnter,
+  zenRevealTriggerEnabled = false,
+  onZenRevealTriggerEnter,
 }: ZenModeSidebarRevealTriggerProps) {
   return (
     <div
       data-testid="zen-mode-toggle-overlay"
-      data-zen-reveal-surface={revealEnabled ? '' : undefined}
       className="goblin-zen-reveal-trigger-layer pointer-events-none absolute left-0 top-0 z-40 flex items-center bg-transparent"
       style={{ height: TITLE_BAR_HEIGHT_PX }}
     >
-      <ZenModeSidebarRevealTrigger repoId={repoId} revealEnabled={revealEnabled} onMouseEnter={onMouseEnter} />
+      <ZenModeSidebarRevealTrigger
+        repoId={repoId}
+        zenRevealTriggerEnabled={zenRevealTriggerEnabled}
+        onZenRevealTriggerEnter={onZenRevealTriggerEnter}
+      />
     </div>
   )
 }
 
-function ZenModeSidebarRevealTrigger({ repoId, revealEnabled = false, onMouseEnter }: ZenModeSidebarRevealTriggerProps) {
+function ZenModeSidebarRevealTrigger({
+  repoId,
+  zenRevealTriggerEnabled = false,
+  onZenRevealTriggerEnter,
+}: ZenModeSidebarRevealTriggerProps) {
   return (
     <TitleBarInteractiveRegion>
       <WorkspaceNavigationControls
         repoId={repoId}
-        revealEnabled={revealEnabled}
-        onRevealEnter={onMouseEnter}
+        zenRevealTriggerEnabled={zenRevealTriggerEnabled}
+        onZenRevealTriggerEnter={onZenRevealTriggerEnter}
       />
     </TitleBarInteractiveRegion>
   )
@@ -437,12 +444,9 @@ function ZenModeSidebarReveal({
     >
       <div
         ref={hitAreaRef}
-        data-zen-reveal-surface=""
         data-testid="zen-mode-sidebar-hit-area"
-        className={cn('absolute bottom-0 left-0 w-3', interactive ? 'pointer-events-auto' : 'pointer-events-none')}
+        className="pointer-events-none absolute bottom-0 left-0 w-3"
         style={{ top: TITLE_BAR_HEIGHT_PX }}
-        onMouseEnter={interactive ? onSurfaceEnter : undefined}
-        onMouseLeave={interactive ? handleSurfaceLeave : undefined}
         aria-hidden
       />
       <div
