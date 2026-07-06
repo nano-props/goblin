@@ -21,10 +21,14 @@ import { FloatingSurfaceBoundary } from '#/web/components/ui/floating-surface-bo
 import { useElementInlineSize } from '#/web/hooks/useElementInlineSize.ts'
 import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
-import { TitleBarInteractiveRegion } from '#/web/components/title-bar-chrome-region.tsx'
+import { NativeDragPlate, TitleBarInteractiveRegion } from '#/web/components/title-bar-chrome-region.tsx'
 
 const ZEN_REVEAL_SURFACE_SELECTOR = '[data-floating-surface],[data-zen-reveal-surface]'
 const ZEN_REVEAL_CLOSE_MS = 260
+const ZEN_REVEAL_RESIZE_HIT_TARGET_STYLE = {
+  top: TITLE_BAR_HEIGHT_PX,
+  height: `calc(100% - ${TITLE_BAR_HEIGHT_PX}px)`,
+} satisfies CSSProperties
 type ResizeRailState = 'idle' | 'hover' | 'active'
 type RevealPanelState = 'closed' | 'opening' | 'open' | 'closing'
 
@@ -62,6 +66,14 @@ interface ZenModeSidebarChromeProps {
   sidebarSize: number
   onSidebarSizeChange: (sidebarSize: number) => void
   onOpenSettings?: () => void
+}
+
+interface ZenModeSidebarResizeRailProps {
+  interactive: boolean
+  resizeRailState: ResizeRailState
+  onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void
+  onMouseEnter: () => void
+  onMouseLeave: () => void
 }
 
 function useZenModeSidebarReveal(enabled: boolean): ZenModeSidebarRevealState {
@@ -238,6 +250,10 @@ function ZenModeSidebarReveal({
   const width = measuredWidthPx === null ? repoSidebarWidthExpression(sidebarSize) : `${measuredWidthPx}px`
   const style = {
     width,
+  } as CSSProperties
+  const dragPlateStyle = {
+    width,
+    height: TITLE_BAR_HEIGHT_PX,
   } as CSSProperties
   const panelInteractive = open && interactive
   const setPanelVisualState = useCallback((next: RevealPanelState) => {
@@ -445,8 +461,9 @@ function ZenModeSidebarReveal({
       <div
         ref={hitAreaRef}
         data-testid="zen-mode-sidebar-hit-area"
-        className="pointer-events-none absolute bottom-0 left-0 w-3"
+        className={cn('absolute bottom-0 left-0 w-3', interactive ? 'pointer-events-auto' : 'pointer-events-none')}
         style={{ top: TITLE_BAR_HEIGHT_PX }}
+        onMouseEnter={interactive ? onSurfaceEnter : undefined}
         aria-hidden
       />
       <div
@@ -454,7 +471,7 @@ function ZenModeSidebarReveal({
         data-zen-reveal-surface={panelInteractive ? '' : undefined}
         data-testid="zen-mode-sidebar-reveal"
         data-open={open ? 'true' : 'false'}
-        data-interactive={panelInteractive ? 'true' : 'false'}
+        data-panel-interactive={panelInteractive ? 'true' : 'false'}
         data-state={panelState}
         aria-hidden={panelInteractive ? undefined : true}
         inert={panelInteractive ? undefined : true}
@@ -467,28 +484,81 @@ function ZenModeSidebarReveal({
           <RepoLayoutSidebar
             repoId={repoId}
             compact={false}
-            chromeRegion={panelInteractive ? 'drag' : 'none'}
+            chromeRegion="none"
             onOpenSettings={onOpenSettings}
           />
-          <TitleBarInteractiveRegion
-            data-testid="zen-mode-sidebar-resize-handle"
-            data-separator={resizeRailState === 'idle' ? undefined : resizeRailState}
-            role="separator"
-            aria-orientation="vertical"
-            className={cn(
-              resizeHandleClassNames.hitTarget,
-              resizeHandleClassNames.horizontal,
-              'absolute inset-y-0 right-0 z-20',
-            )}
-            onPointerDown={panelInteractive ? handleResizePointerDown : undefined}
-            onMouseEnter={panelInteractive ? handleResizeRailMouseEnter : undefined}
-            onMouseLeave={panelInteractive ? handleResizeRailMouseLeave : undefined}
-          >
-            <ResizeHandleLine />
-          </TitleBarInteractiveRegion>
+          <ZenModeSidebarResizeRail
+            interactive={panelInteractive}
+            resizeRailState={resizeRailState}
+            onPointerDown={handleResizePointerDown}
+            onMouseEnter={handleResizeRailMouseEnter}
+            onMouseLeave={handleResizeRailMouseLeave}
+          />
         </FloatingSurfaceBoundary>
       </div>
+      <ZenModeSidebarDragPlate
+        mounted={panelInteractive}
+        style={dragPlateStyle}
+        onSurfaceEnter={onSurfaceEnter}
+      />
     </div>
+  )
+}
+
+function ZenModeSidebarDragPlate({
+  mounted,
+  style,
+  onSurfaceEnter,
+}: {
+  mounted: boolean
+  style: CSSProperties
+  onSurfaceEnter: () => void
+}) {
+  if (!mounted) return null
+
+  return (
+    <NativeDragPlate
+      data-testid="zen-mode-sidebar-drag-plate"
+      data-zen-reveal-surface=""
+      className="z-30"
+      style={style}
+      onMouseEnter={onSurfaceEnter}
+    />
+  )
+}
+
+function ZenModeSidebarResizeRail({
+  interactive,
+  resizeRailState,
+  onPointerDown,
+  onMouseEnter,
+  onMouseLeave,
+}: ZenModeSidebarResizeRailProps) {
+  const separatorState = resizeRailState === 'idle' ? undefined : resizeRailState
+  const handleProps = {
+    'data-testid': 'zen-mode-sidebar-resize-handle',
+    'data-separator': separatorState,
+    role: 'separator' as const,
+    'aria-orientation': 'vertical' as const,
+    style: ZEN_REVEAL_RESIZE_HIT_TARGET_STYLE,
+    className: cn(resizeHandleClassNames.hitTarget, resizeHandleClassNames.horizontal, 'absolute right-0 z-20'),
+    onPointerDown,
+    onMouseEnter,
+    onMouseLeave,
+  }
+
+  return (
+    <>
+      <div
+        data-testid="zen-mode-sidebar-resize-visual"
+        data-separator={separatorState}
+        aria-hidden
+        className="group pointer-events-none absolute inset-y-0 right-0 z-20 w-px"
+      >
+        <ResizeHandleLine />
+      </div>
+      {interactive ? <TitleBarInteractiveRegion {...handleProps} /> : <div {...handleProps} />}
+    </>
   )
 }
 
