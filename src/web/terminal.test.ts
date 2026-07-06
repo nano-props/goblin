@@ -264,7 +264,7 @@ describe('terminal web host client', () => {
       }),
     )
 
-    await expect(listPromise).rejects.toThrow('invalid terminal sessions response')
+    await expect(listPromise).rejects.toThrow('Invalid terminal socket response payload')
     expect(fetchMock).not.toHaveBeenCalled()
     dispose()
   })
@@ -668,7 +668,7 @@ describe('terminal web host client', () => {
       }),
     )
 
-    await expect(createPromise).rejects.toThrow('invalid terminal create response')
+    await expect(createPromise).rejects.toThrow('Invalid terminal socket response payload')
     dispose()
   })
 

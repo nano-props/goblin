@@ -23,6 +23,7 @@ const MIN_TERMINAL_ROWS = 1
 const MAX_TERMINAL_ROWS = 300
 export const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 export const TERMINAL_WS_MESSAGE_LIMIT_BYTES = MAX_TERMINAL_WRITE_CHARS
+const TERMINAL_SOCKET_INVALID_RESPONSE_PAYLOAD_ERROR = 'Invalid terminal socket response payload'
 const TERMINAL_RUNTIME_SESSION_ID_RE = /^[A-Za-z0-9_-]{16,64}$/
 const TERMINAL_CLIENT_ID_RE = /^[A-Za-z0-9_-]{1,128}$/
 const TERMINAL_REQUEST_ID_RE = /^[A-Za-z0-9_-]{1,128}$/
@@ -193,6 +194,37 @@ const TerminalCreateResultSchema = v.variant('ok', [
     message: v.string(),
   }),
 ])
+const TerminalAttachResultSchema = v.variant('ok', [
+  v.object({
+    ok: v.literal(true),
+    ...TerminalFirstFrameSchemaEntries,
+  }),
+  v.object({
+    ok: v.literal(false),
+    message: v.string(),
+  }),
+])
+const TerminalTakeoverResultSchema = v.variant('ok', [
+  v.object({
+    ok: v.literal(true),
+    terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
+    role: v.picklist(['controller', 'viewer', 'unowned']),
+    controllerStatus: v.picklist(['connected', 'none']),
+    controller: v.nullable(TerminalControllerSchema),
+    canonicalCols: TerminalColsSchema,
+    canonicalRows: TerminalRowsSchema,
+    phase: v.picklist(TERMINAL_SESSION_PHASE_VALUES),
+  }),
+  v.object({
+    ok: v.literal(false),
+    message: v.string(),
+  }),
+])
+const TerminalMutationResultSchema = v.boolean()
+const TerminalPruneResultSchema = v.object({
+  pruned: v.number(),
+  remaining: v.number(),
+})
 const TerminalOutputEventSchema = v.object({
   terminalRuntimeSessionId: v.string(),
   terminalSessionId: v.string(),
@@ -467,7 +499,53 @@ export function normalizeTerminalRealtimeMessage(value: unknown): TerminalRealti
 
 export function normalizeTerminalSocketServerMessage(value: unknown): TerminalSocketServerMessage | null {
   const parsed = v.safeParse(TerminalSocketServerMessageSchema, value)
-  return parsed.success ? (parsed.output as TerminalSocketServerMessage) : null
+  if (!parsed.success) return null
+  const message = parsed.output
+  if (message.type !== 'response' || !message.ok) return message as TerminalSocketServerMessage
+  const payload = normalizeTerminalSocketResponsePayload(message.action, message.payload)
+  if (payload === null) {
+    return {
+      type: 'response',
+      requestId: message.requestId,
+      ok: false,
+      action: message.action,
+      error: TERMINAL_SOCKET_INVALID_RESPONSE_PAYLOAD_ERROR,
+    } as TerminalSocketServerMessage
+  }
+  return { ...message, payload } as TerminalSocketServerMessage
+}
+
+function normalizeTerminalSocketResponsePayload(action: TerminalSocketRequestAction, payload: unknown): unknown | null {
+  switch (action) {
+    case 'attach':
+    case 'restart':
+      return normalizeWithSchema(TerminalAttachResultSchema, payload)
+    case 'write':
+    case 'resize':
+    case 'close':
+      return normalizeWithSchema(TerminalMutationResultSchema, payload)
+    case 'takeover':
+      return normalizeWithSchema(TerminalTakeoverResultSchema, payload)
+    case 'list-sessions':
+      return normalizeWithSchema(v.array(TerminalSessionSummarySchema), payload)
+    case 'list-workspace-tabs':
+      return normalizeWithSchema(v.array(WorkspacePaneTabsEntrySchema), payload)
+    case 'create':
+      return normalizeWithSchema(TerminalCreateResultSchema, payload)
+    case 'replace-tabs':
+    case 'update-tabs':
+      return normalizeWithSchema(v.array(WorkspacePaneTabEntrySchema), payload)
+    case 'prune':
+      return normalizeWithSchema(TerminalPruneResultSchema, payload)
+  }
+}
+
+function normalizeWithSchema<TSchema extends v.BaseSchema<unknown, unknown, v.BaseIssue<unknown>>>(
+  schema: TSchema,
+  value: unknown,
+): v.InferOutput<TSchema> | null {
+  const parsed = v.safeParse(schema, value)
+  return parsed.success ? parsed.output : null
 }
 
 export function normalizeTerminalClientMessage(value: unknown): TerminalClientMessage | null {
