@@ -31,7 +31,7 @@ const REMOTE_RUNTIME_SCOPE = terminalSessionRuntimeScope(REMOTE_REPO_ROOT, REMOT
 const REMOTE_WORKTREE_PATH = '/srv/repo'
 const REMOTE_BRANCH_NAME = 'feature/remote'
 
-describe('terminal session service workspace tabs', () => {
+describe('terminal session service facade', () => {
   test('create returns canonical tabs without pre-existing stale terminal tabs', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
@@ -447,7 +447,9 @@ describe('terminal session service workspace tabs', () => {
       workspaceTabs,
     })
 
-    await expect(service.reconcileTerminalTabsForSession(USER_ID, terminalSession('session-closed'))).resolves.toBeUndefined()
+    await expect(
+      service.reconcileTerminalTabsForSession(USER_ID, terminalSession('session-closed')),
+    ).resolves.toBeUndefined()
     expect(
       workspaceTabs.tabs({
         userId: USER_ID,
@@ -472,7 +474,9 @@ describe('terminal session service workspace tabs', () => {
       workspaceTabs,
     })
 
-    await expect(service.reconcileTerminalTabsForSession(USER_ID, terminalSession('session-live'))).resolves.toBeUndefined()
+    await expect(
+      service.reconcileTerminalTabsForSession(USER_ID, terminalSession('session-live')),
+    ).resolves.toBeUndefined()
     expect(
       workspaceTabs.tabs({
         userId: USER_ID,
@@ -819,8 +823,8 @@ function createService(options: {
           ok: false as const,
           message: 'unused',
         })),
-      listSessionsForUser: vi.fn(async () =>
-        await (typeof options.sessions === 'function' ? options.sessions() : options.sessions),
+      listSessionsForUser: vi.fn(
+        async () => await (typeof options.sessions === 'function' ? options.sessions() : options.sessions),
       ),
       closeSession: options.closeSession ?? vi.fn(),
     },

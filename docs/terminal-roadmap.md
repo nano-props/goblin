@@ -108,6 +108,22 @@ This is manageable now, but it will become a maintenance bottleneck as the featu
 - terminal mutation handlers / write paths
 - realtime request dispatch adapter
 
+## P1.6: Split terminal session service responsibilities (completed)
+
+**Status: completed.** `TerminalSessionService` is now a public facade for
+validation and repo-instance guard wiring. The previously inline
+responsibilities are split into focused server modules:
+
+- `terminal-session-creator.ts` owns create orchestration
+- `terminal-session-create-coordinator.ts` owns per-worktree create queueing and terminal session id allocation
+- `terminal-session-ensurer.ts` owns local/remote session ensure input construction
+- `terminal-session-pruner.ts` owns removed-worktree session pruning
+- `terminal-workspace-tabs-coordinator.ts` owns workspace tab operation queueing and read-side canonicalization
+- `terminal-workspace-tabs-projection.ts` owns pure workspace tab prune/materialize/dedupe rules
+
+The public behavior remains server-first: clients use server-returned canonical
+tabs/sessions and do not infer terminal-tab projection state locally.
+
 ## P1.7: Decouple terminal runtime lifetime from React provider lifetime (completed)
 
 **Status: completed.** `TerminalSessionProjection` is now a client-level
