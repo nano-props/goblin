@@ -26,6 +26,7 @@ import {
   type WorkspacePaneRuntimeTabCloseConfirmRequest,
   workspacePaneRuntimeTabConfirmedCloseBranchName,
   workspacePaneRuntimeTabConfirmedCloseIdentity,
+  terminalBaseForRuntimeTabCloseTarget,
   type ConfirmedWorkspacePaneRuntimeTabClose,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
 import {
@@ -38,7 +39,6 @@ import {
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
 import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
 import { beginWorkspacePaneTabClose } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
-import { terminalBaseForWorkspacePaneTarget } from '#/web/workspace-pane/workspace-pane-terminal-target.ts'
 import {
   resolveWorkspacePaneTabTargetForBranch,
   workspacePaneTabTargetForBranch,
@@ -213,7 +213,11 @@ async function closeWorkspacePaneTabCommand(options: CloseWorkspacePaneTabComman
       identity: tab.identity,
       sessionId: tab.sessionId,
       view: tab.view,
-      terminalBase: terminalBaseForWorkspacePaneTarget(target),
+      target: {
+        repoRoot: target.repoId,
+        branchName: target.branchName,
+        worktreePath: target.worktreePath,
+      },
     })
     if (openWorkspacePaneRuntimeCloseConfirm(target.repoId, closeConfirm)) return true
   }
@@ -254,7 +258,11 @@ function closeConfirmedTerminalWorkspacePaneTab(options: ConfirmCloseTerminalWor
   const confirmed: ConfirmedWorkspacePaneRuntimeTabClose = {
     type: 'terminal',
     sessionId: confirmedTerminal.terminalSessionId,
-    terminalBase: confirmedTerminal.base,
+    target: {
+      repoRoot: confirmedTerminal.base.repoRoot,
+      branchName: confirmedTerminal.base.branch,
+      worktreePath: confirmedTerminal.base.worktreePath,
+    },
   }
   const confirmedBranchName = workspacePaneRuntimeTabConfirmedCloseBranchName(confirmed)
   if (!confirmedBranchName) return false
@@ -291,12 +299,13 @@ function openWorkspacePaneRuntimeCloseConfirm(
   request: WorkspacePaneRuntimeTabCloseConfirmRequest | null,
 ): boolean {
   if (!request) return false
-  if (request.type === 'terminal' && request.terminalBase && request.processName) {
+  const terminalBase = request.type === 'terminal' ? terminalBaseForRuntimeTabCloseTarget(request.target) : null
+  if (request.type === 'terminal' && terminalBase && request.processName) {
     useTerminalActionDialogsStore.getState().openCloseConfirm({
       repoId,
       targetIdentity: request.identity,
       terminalSessionId: request.sessionId,
-      terminalBase: request.terminalBase,
+      terminalBase,
       processName: request.processName,
     })
     return true

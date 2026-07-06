@@ -43,7 +43,7 @@ interface WorkspacePaneTabsTarget {
   worktreePath: string | null
 }
 
-class WorkspacePaneTabsCoordinator {
+export class WorkspacePaneTabsCoordinator {
   private readonly runtimeProviders: readonly WorkspacePaneRuntimeTabsProvider[]
   private readonly workspaceTabs: WorkspacePaneTabsCoordinatorRuntime
   private readonly operationQueuesByTarget = new Map<string, PQueue>()

@@ -5,11 +5,11 @@ import {
   parseTerminalSocketServerMessage,
 } from '#/web/client-terminal-socket-utils.ts'
 import type {
-  TerminalRealtimeMessage,
-  TerminalSocketRequestInputs,
-  TerminalSocketResponseOutputs,
-  TerminalSocketServerMessage,
-} from '#/shared/terminal-socket.ts'
+  AppRealtimeMessage,
+  AppRealtimeRequestInputs,
+  AppRealtimeResponseOutputs,
+  AppRealtimeSocketServerMessage,
+} from '#/shared/app-realtime-socket.ts'
 import {
   createClientRealtimeSocketConnection,
   type ClientRealtimeSocketConnection,
@@ -24,20 +24,20 @@ export interface TerminalSocketServerConfig {
 interface TerminalSocketConnectionOptions {
   getServerConfig: () => TerminalSocketServerConfig
   hasRealtimeSubscribers: () => boolean
-  onRealtimeMessage(message: TerminalRealtimeMessage, currentClientId: string): void
+  onRealtimeMessage(message: AppRealtimeMessage, currentClientId: string): void
 }
 
 export type TerminalSocketConnection = ClientRealtimeSocketConnection<
-  TerminalSocketRequestInputs,
-  TerminalSocketResponseOutputs
+  AppRealtimeRequestInputs,
+  AppRealtimeResponseOutputs
 >
 
 export function createTerminalSocketConnection(options: TerminalSocketConnectionOptions): TerminalSocketConnection {
   return createClientRealtimeSocketConnection<
-    TerminalSocketRequestInputs,
-    TerminalSocketResponseOutputs,
-    TerminalSocketServerMessage,
-    TerminalRealtimeMessage
+    AppRealtimeRequestInputs,
+    AppRealtimeResponseOutputs,
+    AppRealtimeSocketServerMessage,
+    AppRealtimeMessage
   >({
     resolveConnection() {
       try {

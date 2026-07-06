@@ -7,8 +7,7 @@ import type {
   TerminalSocketResponseMessage,
   TerminalSocketResponseOutputs,
 } from '#/shared/terminal-socket.ts'
-import { WORKSPACE_PANE_TABS_SOCKET_ACTIONS } from '#/shared/workspace-pane-tabs.ts'
-import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
+import type { ServerTerminalActionHost } from '#/server/terminal/terminal-host.ts'
 import type { RealtimeSocket } from '#/server/realtime/realtime-broker.ts'
 
 type MaybePromise<T> = T | Promise<T>
@@ -19,7 +18,7 @@ type MaybePromise<T> = T | Promise<T>
 // `clientId` it didn't ask the client to provide); `userId` is
 // threaded through to the host unchanged. See `identity.ts` for
 // the routing-vs-identity distinction.
-export function createTerminalRealtimeHandlers(host: ServerTerminalHost): {
+export function createTerminalRealtimeHandlers(host: ServerTerminalActionHost): {
   [TAction in TerminalSocketRequestAction]: (
     clientId: string,
     userId: string,
@@ -48,17 +47,8 @@ export function createTerminalRealtimeHandlers(host: ServerTerminalHost): {
     'list-sessions'(clientId, userId, input) {
       return host.listSessions(clientId, userId, input)
     },
-    [WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list](clientId, userId, input) {
-      return host.listWorkspaceTabs(clientId, userId, input)
-    },
     create(clientId, userId, input) {
       return host.create(clientId, userId, { ...input, clientId })
-    },
-    [WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace](clientId, userId, input) {
-      return host.replaceTabs(clientId, userId, input)
-    },
-    [WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update](clientId, userId, input) {
-      return host.updateTabs(clientId, userId, input)
     },
     prune(clientId, userId, input) {
       return host.prune(clientId, userId, input)

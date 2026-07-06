@@ -18,7 +18,7 @@ import { createRealtimeRoutes } from '#/server/routes/realtime.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
 import { createRepoViewRoutes } from '#/server/routes/repo-view.ts'
 import { createSettingsRoutes } from '#/server/routes/settings.ts'
-import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
+import type { ServerRealtimeHost } from '#/server/terminal/terminal-host.ts'
 import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
 import { MAX_PASTE_BATCH_BYTES } from '#/shared/clipboard-paste.ts'
@@ -33,7 +33,7 @@ export interface ServerAppOptions {
    * the Electron main reads, so the two processes see the same value.
    */
   accessToken: string
-  terminalHost: ServerTerminalHost
+  terminalHost: ServerRealtimeHost
   /**
    * The actual host the server is listening on. Used by the CORS
    * origin predicate to allow same-machine browsers. Defaults to

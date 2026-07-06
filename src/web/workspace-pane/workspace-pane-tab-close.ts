@@ -13,7 +13,10 @@ import {
   canCloseWorkspacePaneRuntimeTabWithContext,
   readWorkspacePaneRuntimeTabCloseContext,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-context.ts'
-import { terminalBaseForWorkspacePaneTarget } from '#/web/workspace-pane/workspace-pane-terminal-target.ts'
+import {
+  closeWorkspacePaneRuntimeTabsForWorktree,
+  confirmWorkspacePaneRuntimeTabClose,
+} from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
 
 interface CloseWorkspacePaneTabsForWorktreeOptions {
   repoId: string
@@ -31,30 +34,43 @@ export function beginWorkspacePaneTabClose(
   if (tab.kind === 'pending') return { accepted: false, completion: null }
   const provider = workspacePaneTabProvider(tab.type)
   const closeContext = readWorkspacePaneRuntimeTabCloseContext()
-  const terminalBase = terminalBaseForWorkspacePaneTarget(target)
+  const closeTarget = {
+    repoRoot: target.repoId,
+    branchName: target.branchName,
+    worktreePath: target.worktreePath,
+  }
   if (tab.kind === 'static' && !target.branchName) return { accepted: false, completion: null }
   if (
     isRepoWorkspaceRuntimeTab(tab) &&
     !canCloseWorkspacePaneRuntimeTabWithContext(
       {
         type: tab.runtimeType,
-        terminalBase,
+        target: closeTarget,
       },
       closeContext,
     )
   ) {
     return { accepted: false, completion: null }
   }
+  if (isRepoWorkspaceRuntimeTab(tab)) {
+    return {
+      accepted: true,
+      completion: confirmWorkspacePaneRuntimeTabClose(
+        {
+          type: tab.runtimeType,
+          sessionId: tab.sessionId,
+          target: closeTarget,
+        },
+        closeContext,
+      ),
+    }
+  }
   return {
     accepted: true,
     completion: provider.close({
       repoId: target.repoId,
       branchName: target.branchName,
-      runtimeSessionId: isRepoWorkspaceRuntimeTab(tab) ? tab.sessionId : undefined,
-      terminalBase,
       closeStaticTab: closeStaticTabWithCommit(target.worktreePath),
-      closeTerminalByDescriptor: closeContext.terminal?.closeTerminalByDescriptor,
-      closeTerminalsForWorktree: closeContext.terminal?.closeTerminalsForWorktree,
     }),
   }
 }
@@ -66,8 +82,6 @@ export async function closeWorkspacePaneTabsForWorktree({
 }: CloseWorkspacePaneTabsForWorktreeOptions): Promise<boolean> {
   const target = workspacePaneTabTargetForBranch(repoId, branchName)
   if (target && target.worktreePath !== worktreePath) return true
-  const terminalBase =
-    (target ? terminalBaseForWorkspacePaneTarget(target) : null) ?? { repoRoot: repoId, branch: branchName, worktreePath }
   const openStaticWorktreeTabs = new Set(
     (target?.tabs ?? []).flatMap((tab) => {
       if (tab.kind !== 'static') return []
@@ -76,19 +90,24 @@ export async function closeWorkspacePaneTabsForWorktree({
     }),
   )
   const closeContext = readWorkspacePaneRuntimeTabCloseContext()
+  const runtimeCloseTarget = {
+    repoRoot: repoId,
+    branchName,
+    worktreePath,
+  }
   const closeInput = {
     repoId,
     branchName,
-    terminalBase,
     closeStaticTab: closeStaticTabWithCommit(worktreePath),
-    closeTerminalByDescriptor: closeContext.terminal?.closeTerminalByDescriptor,
-    closeTerminalsForWorktree: closeContext.terminal?.closeTerminalsForWorktree,
   }
   const worktreeProviders = workspacePaneTabProviders.filter((provider) => provider.scope === 'worktree')
   try {
     const results = await Promise.all(
       worktreeProviders.map((provider) => {
         if (isWorkspacePaneStaticTabProvider(provider) && !openStaticWorktreeTabs.has(provider.type)) return true
+        if (!isWorkspacePaneStaticTabProvider(provider)) {
+          return closeWorkspacePaneRuntimeTabsForWorktree(provider.type, runtimeCloseTarget, closeContext)
+        }
         return provider.closeWorktree(closeInput)
       }),
     )

@@ -10,11 +10,18 @@
 // to the route layer.
 
 import { BufferedTerminalSocket } from '#/server/terminal/buffered-terminal-socket.ts'
-import type { TerminalClientMessage } from '#/shared/terminal-socket.ts'
-import { normalizeTerminalClientMessage } from '#/shared/terminal-validators.ts'
+import type { AppRealtimeClientMessage, AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
+import {
+  isAppRealtimeWorkspacePaneTabsAction,
+  normalizeAppRealtimeClientMessage,
+} from '#/shared/app-realtime-validators.ts'
 import { serverLogger } from '#/server/logger.ts'
-import { createTerminalSessionService } from '#/server/terminal/terminal-session-service.ts'
+import {
+  createTerminalSessionService,
+  terminalWorkspacePaneRuntimeTabsProvider,
+} from '#/server/terminal/terminal-session-service.ts'
 import { createWorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
+import { createWorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import type { RealtimeBroker, RealtimeSocket } from '#/server/realtime/realtime-broker.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { createTerminalRuntimeCoordinator } from '#/server/terminal/terminal-runtime-coordinator.ts'
@@ -25,13 +32,19 @@ import {
   handleTerminalRealtimeRequestMessage,
   shouldPauseRealtimeRequest,
 } from '#/server/terminal/terminal-runtime-realtime.ts'
+import {
+  createWorkspacePaneTabsRealtimeHandlers,
+  handleWorkspacePaneTabsRealtimeRequestMessage,
+  type WorkspacePaneTabsRealtimeRequestMessage,
+} from '#/server/workspace-pane/workspace-pane-tabs-runtime-realtime.ts'
+import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { isValidTerminalClientId, isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
-import type { TerminalRealtimeMessage } from '#/shared/terminal-socket.ts'
+import type { TerminalSocketRequestMessage } from '#/shared/terminal-socket.ts'
 import { isCurrentRepoRuntimeInstance, onRepoRuntimeInstanceClosed } from '#/server/modules/repo-runtime-instances.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 
@@ -64,7 +77,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   // live output event reaches a sibling tab (different `clientId`,
   // same `userId`) without an extra attach roundtrip. See
   // `identity.ts` for the model.
-  let broker: RealtimeBroker<TerminalRealtimeMessage>
+  let broker: RealtimeBroker<AppRealtimeMessage>
   let sessionService: ReturnType<typeof createTerminalSessionService>
   const manager = new TerminalSessionManager<string>(
     ptySupervisor,
@@ -100,11 +113,16 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     detachedTtlMs: TERMINAL_DETACHED_TTL_MS,
   })
   broker = coordinator.broker
+  const workspaceTabsCoordinator = createWorkspacePaneTabsCoordinator({
+    workspaceTabs,
+    runtimeProviders: [terminalWorkspacePaneRuntimeTabsProvider(manager)],
+  })
   sessionService = createTerminalSessionService({
     isValidClientId: isValidTerminalClientId,
     isValidTerminalSessionId,
     manager,
     workspaceTabs,
+    workspaceTabsCoordinator,
     isCurrentRepoInstance: isCurrentRepoRuntimeInstance,
     broadcastSessionsChanged(userId, repoRoot) {
       broadcastRepoSessionsChanged(userId, repoRoot)
@@ -136,6 +154,17 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     isCurrentRepoInstance: isCurrentRepoRuntimeInstance,
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
   })
+  const workspacePaneTabsHost: ServerWorkspacePaneTabsHost = {
+    async listWorkspaceTabs(clientId, userId, input) {
+      return await workspacePaneTabsActions.listWorkspaceTabs(clientId, userId, input)
+    },
+    async replaceTabs(clientId, userId, input) {
+      return await workspacePaneTabsActions.replaceTabs(clientId, userId, input)
+    },
+    async updateTabs(clientId, userId, input) {
+      return await workspacePaneTabsActions.updateTabs(clientId, userId, input)
+    },
+  }
 
   const host: ServerTerminalHost = {
     isValidClientId(value) {
@@ -199,17 +228,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     async listSessions(clientId, userId, input) {
       return await actions.listSessions(clientId, userId, input)
     },
-    async listWorkspaceTabs(clientId, userId, input) {
-      return await workspacePaneTabsActions.listWorkspaceTabs(clientId, userId, input)
-    },
     async create(clientId, userId, input) {
       return await actions.create(clientId, userId, input)
-    },
-    async replaceTabs(clientId, userId, input) {
-      return await workspacePaneTabsActions.replaceTabs(clientId, userId, input)
-    },
-    async updateTabs(clientId, userId, input) {
-      return await workspacePaneTabsActions.updateTabs(clientId, userId, input)
     },
     async prune(clientId, userId, input) {
       return await actions.prune(clientId, userId, input)
@@ -228,9 +248,9 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         terminalRuntimeLogger.warn({ clientId }, 'invalid realtime message: missing userId from auth context')
         return
       }
-      let message: TerminalClientMessage | null = null
+      let message: AppRealtimeClientMessage | null = null
       try {
-        message = normalizeTerminalClientMessage(JSON.parse(payload))
+        message = normalizeAppRealtimeClientMessage(JSON.parse(payload))
       } catch (err) {
         terminalRuntimeLogger.warn({ clientId, err }, 'invalid realtime message: parse/normalize failed')
         return
@@ -258,14 +278,25 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         return
       }
       const bufferedSocket = bufferedSocketByRawSocket.get(socket as RealtimeSocket)
-      if (shouldPauseRealtimeRequest(message.action)) bufferedSocket?.pause()
+      if (isAppRealtimeWorkspacePaneTabsAction(message.action)) {
+        void handleWorkspacePaneTabsRealtimeRequestMessage(
+          workspacePaneTabsRealtimeHandlers,
+          clientId,
+          userId,
+          socket as RealtimeSocket,
+          message as WorkspacePaneTabsRealtimeRequestMessage,
+        )
+        return
+      }
+      const terminalMessage = message as TerminalSocketRequestMessage
+      if (shouldPauseRealtimeRequest(terminalMessage.action)) bufferedSocket?.pause()
       void handleTerminalRealtimeRequestMessage(
         realtimeHandlers,
         clientId,
         userId,
         socket as RealtimeSocket,
         bufferedSocket,
-        message,
+        terminalMessage,
       )
     },
     shutdown() {
@@ -279,6 +310,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   }
 
   const realtimeHandlers = createTerminalRealtimeHandlers(host)
+  const workspacePaneTabsRealtimeHandlers = createWorkspacePaneTabsRealtimeHandlers(workspacePaneTabsHost)
 
   terminalRuntimeLogger.info({ ptyMode: ptySupervisor.getDiagnostics().mode }, 'server terminal runtime created')
 

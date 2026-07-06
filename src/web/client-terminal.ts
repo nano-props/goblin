@@ -8,7 +8,7 @@ import {
   WORKSPACE_PANE_TABS_SOCKET_ACTIONS,
 } from '#/shared/workspace-pane-tabs.ts'
 import { resolveTerminalController } from '#/shared/terminal-controller.ts'
-import type { TerminalRealtimeMessage } from '#/shared/terminal-socket.ts'
+import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import type {
   TerminalBellRealtimeEvent,
   TerminalCreateInput,
@@ -242,7 +242,7 @@ export function createServerTerminalClients(options: {
     )
   }
 
-  function handleRealtimeMessage(message: TerminalRealtimeMessage, currentClientId: string): void {
+  function handleRealtimeMessage(message: AppRealtimeMessage, currentClientId: string): void {
     switch (message.type) {
       case 'output':
         for (const subscriber of outputSubscribers) subscriber(message.event)

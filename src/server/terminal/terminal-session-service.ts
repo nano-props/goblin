@@ -14,8 +14,8 @@ import { createTerminalSessionId } from '#/server/terminal/terminal-session-ids.
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type { WorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import {
-  createWorkspacePaneTabsCoordinator,
   isValidWorkspacePaneTabsOperation,
+  type WorkspacePaneTabsCoordinator,
   type WorkspacePaneRuntimeTabsProvider,
 } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
@@ -40,14 +40,9 @@ interface TerminalSessionServiceOptions {
   manager: TerminalSessionServiceManager
   workspaceTabs: Pick<
     WorkspacePaneTabsRuntime<string>,
-    | 'closeStaticTab'
-    | 'ensureRuntimeTab'
-    | 'openStaticTab'
-    | 'reorderTabsByIdentity'
-    | 'replaceTabs'
-    | 'tabsForScope'
-    | 'closeTabsForScope'
+    'closeTabsForScope'
   >
+  workspaceTabsCoordinator: WorkspacePaneTabsCoordinator
   broadcastSessionsChanged(userId: string, repoRoot: string): void
   broadcastWorkspaceTabsChanged(userId: string, repoRoot: string): void
   isCurrentRepoInstance(userId: string, repoRoot: string, repoInstanceId: string): boolean
@@ -58,8 +53,6 @@ type TerminalSessionCreateCoordinator = ReturnType<typeof createTerminalSessionC
 type TerminalSessionCreator = ReturnType<typeof createTerminalSessionCreator>
 type TerminalSessionEnsurer = ReturnType<typeof createTerminalSessionEnsurer>
 type TerminalSessionPruner = ReturnType<typeof createTerminalSessionPruner>
-type WorkspacePaneTabsCoordinator = ReturnType<typeof createWorkspacePaneTabsCoordinator>
-
 class TerminalSessionService {
   private readonly options: TerminalSessionServiceOptions
   private readonly createCoordinator: TerminalSessionCreateCoordinator
@@ -77,10 +70,7 @@ class TerminalSessionService {
       gCommand: options.gCommand,
     })
     this.pruner = createTerminalSessionPruner({ manager: options.manager })
-    this.workspaceTabsCoordinator = createWorkspacePaneTabsCoordinator({
-      workspaceTabs: options.workspaceTabs,
-      runtimeProviders: [terminalWorkspacePaneRuntimeTabsProvider(options.manager)],
-    })
+    this.workspaceTabsCoordinator = options.workspaceTabsCoordinator
     this.creator = createTerminalSessionCreator({
       createCoordinator: this.createCoordinator,
       workspaceTabsCoordinator: this.workspaceTabsCoordinator,
@@ -250,7 +240,7 @@ function terminalWorktreePath(repoRoot: string, worktreePath: string): string {
   return isRemoteRepoId(repoRoot) ? worktreePath : path.resolve(worktreePath)
 }
 
-function terminalWorkspacePaneRuntimeTabsProvider(
+export function terminalWorkspacePaneRuntimeTabsProvider(
   manager: Pick<TerminalSessionServiceManager, 'listSessionsForUser'>,
 ): WorkspacePaneRuntimeTabsProvider {
   return {

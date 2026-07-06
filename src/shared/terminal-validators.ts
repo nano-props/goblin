@@ -14,14 +14,9 @@ import type {
   TerminalTestNotificationInput,
 } from '#/shared/terminal-types.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
-import { WORKSPACE_PANE_TABS_REALTIME_EVENTS, WORKSPACE_PANE_TABS_SOCKET_ACTIONS } from '#/shared/workspace-pane-tabs.ts'
 import {
   WorkspacePaneOptionalTabIdentitySchema,
   WorkspacePaneTabEntrySchema,
-  WorkspacePaneTabsEntrySchema,
-  WorkspacePaneTabsListInputSchema,
-  WorkspacePaneTabsReplaceInputSchema,
-  WorkspacePaneTabsUpdateInputSchema,
 } from '#/shared/workspace-pane-tabs-validators.ts'
 
 const MIN_TERMINAL_COLS = 1
@@ -42,9 +37,6 @@ const TERMINAL_SOCKET_ACTIONS = [
   'takeover',
   'close',
   'list-sessions',
-  WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
-  WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
-  WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
   'create',
   'prune',
 ] as const satisfies TerminalSocketRequestAction[]
@@ -242,7 +234,6 @@ const TerminalRealtimeMessageVariants = [
   v.object({ type: v.literal('identity'), event: TerminalIdentityEventSchema }),
   v.object({ type: v.literal('lifecycle'), event: TerminalLifecycleEventSchema }),
   v.object({ type: v.literal('sessions-changed'), repoRoot: v.string() }),
-  v.object({ type: v.literal(WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed), repoRoot: v.string() }),
   TerminalSessionClosedEventSchema,
 ] as const
 const TerminalRealtimeMessageSchema = v.variant('type', TerminalRealtimeMessageVariants)
@@ -261,10 +252,6 @@ const TerminalSocketServerMessageSchema = v.variant('type', [
     ok: v.literal(false),
     action: v.picklist(TERMINAL_SOCKET_ACTIONS),
     error: v.string(),
-  }),
-  v.object({
-    type: v.literal('pong'),
-    requestId: TerminalRequestIdSchema,
   }),
 ])
 const TerminalClientMessageSchema = v.variant('type', [
@@ -313,39 +300,14 @@ const TerminalClientMessageSchema = v.variant('type', [
   v.object({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
-    action: v.literal(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list),
-    input: WorkspacePaneTabsListInputSchema,
-  }),
-  v.object({
-    type: v.literal('request'),
-    requestId: TerminalRequestIdSchema,
     action: v.literal('create'),
     input: TerminalCreateInputSchema,
   }),
   v.object({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
-    action: v.literal(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace),
-    input: WorkspacePaneTabsReplaceInputSchema,
-  }),
-  v.object({
-    type: v.literal('request'),
-    requestId: TerminalRequestIdSchema,
-    action: v.literal(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update),
-    input: WorkspacePaneTabsUpdateInputSchema,
-  }),
-  v.object({
-    type: v.literal('request'),
-    requestId: TerminalRequestIdSchema,
     action: v.literal('prune'),
     input: TerminalPruneInputSchema,
-  }),
-  v.object({
-    type: v.literal('heartbeat'),
-  }),
-  v.object({
-    type: v.literal('ping'),
-    requestId: TerminalRequestIdSchema,
   }),
 ])
 
@@ -480,13 +442,8 @@ function normalizeTerminalSocketResponsePayload(action: TerminalSocketRequestAct
       return normalizeWithSchema(TerminalTakeoverResultSchema, payload)
     case 'list-sessions':
       return normalizeWithSchema(v.array(TerminalSessionSummarySchema), payload)
-    case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list:
-      return normalizeWithSchema(v.array(WorkspacePaneTabsEntrySchema), payload)
     case 'create':
       return normalizeWithSchema(TerminalCreateResultSchema, payload)
-    case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace:
-    case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update:
-      return normalizeWithSchema(v.array(WorkspacePaneTabEntrySchema), payload)
     case 'prune':
       return normalizeWithSchema(TerminalPruneResultSchema, payload)
   }
@@ -504,5 +461,3 @@ export function normalizeTerminalClientMessage(value: unknown): TerminalClientMe
   const parsed = v.safeParse(TerminalClientMessageSchema, value)
   return parsed.success ? parsed.output : null
 }
-
-export { normalizeWorkspacePaneTabsEntryList } from '#/shared/workspace-pane-tabs-validators.ts'

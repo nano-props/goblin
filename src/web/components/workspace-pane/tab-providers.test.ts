@@ -231,36 +231,13 @@ describe('workspace pane tab providers', () => {
     expect(closeStaticTab).not.toHaveBeenCalled()
   })
 
-  test('closes terminal tabs through the terminal lifecycle callback', async () => {
-    const closeTerminalByDescriptor = vi.fn(async () => true)
-    const terminalBase = { repoRoot: '/repo', branch: 'main', worktreePath: '/repo-worktree' }
-
+  test('runtime provider close is delegated to runtime close actions', async () => {
     await expect(
       terminalWorkspacePaneTabProvider.close({
         repoId: '/repo',
         branchName: 'main',
         runtimeSessionId: 'session-1',
-        terminalBase,
-        closeTerminalByDescriptor,
       }),
-    ).resolves.toBe(true)
-
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-1', terminalBase)
-  })
-
-  test('closes terminal worktree resources through the worktree lifecycle callback', async () => {
-    const closeTerminalsForWorktree = vi.fn(async () => true)
-    const terminalBase = { repoRoot: '/repo', branch: 'main', worktreePath: '/repo-worktree' }
-
-    await expect(
-      terminalWorkspacePaneTabProvider.closeWorktree({
-        repoId: '/repo',
-        branchName: 'main',
-        terminalBase,
-        closeTerminalsForWorktree,
-      }),
-    ).resolves.toBe(true)
-
-    expect(closeTerminalsForWorktree).toHaveBeenCalledWith(terminalBase)
+    ).resolves.toBe(false)
   })
 })

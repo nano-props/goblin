@@ -15,7 +15,6 @@ import {
   workspacePaneStaticTabEntry,
 } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabSummary } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 
 type T = (key: string, params?: Record<string, string | number>) => string
@@ -78,14 +77,11 @@ export interface WorkspacePaneTabCloseInput {
   repoId: string
   branchName: string | null
   runtimeSessionId?: string
-  terminalBase?: TerminalSessionBase | null
   closeStaticTab?: (
     repoId: string,
     type: WorkspacePaneStaticTabType,
     branchName: string,
   ) => boolean | void | Promise<boolean | void>
-  closeTerminalByDescriptor?: (terminalSessionId: string, base: TerminalSessionBase) => Promise<boolean>
-  closeTerminalsForWorktree?: (base: TerminalSessionBase) => Promise<boolean>
 }
 
 export abstract class WorkspacePaneTabProvider<TType extends WorkspacePaneTabType = WorkspacePaneTabType> {
@@ -310,15 +306,8 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneRuntimeTabPro
     return { attention: false }
   }
 
-  async close(input: WorkspacePaneTabCloseInput): Promise<boolean> {
-    if (!input.runtimeSessionId || !input.terminalBase || !input.closeTerminalByDescriptor) return false
-    return await input.closeTerminalByDescriptor(input.runtimeSessionId, input.terminalBase)
-  }
-
-  override async closeWorktree(input: WorkspacePaneTabCloseInput): Promise<boolean> {
-    if (!input.terminalBase) return true
-    if (!input.closeTerminalsForWorktree) return true
-    return await input.closeTerminalsForWorktree(input.terminalBase)
+  close(_input: WorkspacePaneTabCloseInput): Promise<boolean> {
+    return Promise.resolve(false)
   }
 }
 

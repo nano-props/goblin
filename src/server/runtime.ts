@@ -1,13 +1,13 @@
 import type { Hono } from 'hono'
 import { createApp, type ServerAppOptions } from '#/server/app-factory.ts'
 import { stopBackgroundSync } from '#/server/modules/background-sync.ts'
-import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
+import type { ServerRealtimeHost } from '#/server/terminal/terminal-host.ts'
 import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
 import { WorkerBackedPtySupervisor } from '#/server/terminal/pty-supervisor-worker.ts'
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
 
 export interface ServerRuntimeOptions extends Omit<ServerAppOptions, 'terminalHost' | 'serverHost' | 'serverPort'> {
-  terminalHost?: ServerTerminalHost
+  terminalHost?: ServerRealtimeHost
   /**
    * On-disk path of the bundled PTY worker entry. When provided, the
    * runtime uses a dedicated subprocess for node-pty work, so a PTY
@@ -24,7 +24,7 @@ export interface ServerRuntimeOptions extends Omit<ServerAppOptions, 'terminalHo
 
 export interface ServerRuntime {
   app: Hono
-  terminalHost: ServerTerminalHost
+  terminalHost: ServerRealtimeHost
   shutdown(): void
 }
 
@@ -55,7 +55,7 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
             }
           : undefined,
       })
-  const terminalHost = providedTerminalHost ?? (runtime?.host as ServerTerminalHost)
+  const terminalHost = providedTerminalHost ?? (runtime?.host as ServerRealtimeHost)
   // `appOptions` carries `accessToken` (renamed from the pre-PR
   // `internalSecret`); it's forwarded straight to `createApp`.
   const app = createApp({ ...appOptions, terminalHost, serverHost, serverPort })

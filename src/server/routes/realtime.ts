@@ -14,11 +14,11 @@ import { createAccessTokenMiddleware } from '#/server/common/auth.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import { errorJson } from '#/server/common/responses.ts'
 import { isTerminalWsMessageWithinLimit } from '#/shared/terminal-validators.ts'
-import type { ServerTerminalHost, ServerTerminalSocket } from '#/server/terminal/terminal-host.ts'
+import type { ServerRealtimeHost, ServerTerminalSocket } from '#/server/terminal/terminal-host.ts'
 
 interface RealtimeRouteOptions {
   accessToken: string
-  terminalHost: ServerTerminalHost
+  terminalHost: ServerRealtimeHost
 }
 
 // Cap each terminal WS message. Real terminal input is a keystroke

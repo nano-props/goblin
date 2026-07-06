@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useMemo } from 'react'
 import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import {
   createRepoWorkspaceTabModel,
@@ -6,7 +6,6 @@ import {
   type RepoWorkspaceTabModel,
   type RepoWorkspaceTabModelInput,
 } from '#/web/components/repo-workspace/tab-model.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
   useWorkspacePaneTabsQuery,
@@ -16,6 +15,7 @@ import {
   useWorkspacePaneRuntimeTabTargetProjection,
   type WorkspacePaneRuntimeTabTargetProjectionHookResult,
 } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-target-projection.ts'
+import { useSyncWorkspacePaneRuntimeTabProviderSelection } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
 
 export interface RepoWorkspaceTabModelInputState {
   input: RepoWorkspaceTabModelInput
@@ -100,16 +100,20 @@ export function useRepoWorkspaceTabModelInput(
  * the tab-model hook explicit.
  */
 export function useSyncRepoWorkspaceRuntimeTabSelection(
-  model: Pick<RepoWorkspaceTabModel, 'activeTab' | 'runtimeTabTargetKey'>,
+  model: Pick<RepoWorkspaceTabModel, 'activeTab' | 'runtimeTabTargetKeyByType'>,
   selectedSessionIdByRuntimeType: WorkspacePaneRuntimeTabTargetProjectionHookResult['selectedSessionIdByRuntimeType'],
 ): void {
-  const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
-  const activeTerminalSessionId = repoWorkspaceRuntimeTabSessionId(model.activeTab, 'terminal')
-  const selectedTerminalSessionId = selectedSessionIdByRuntimeType.terminal ?? undefined
-
-  useEffect(() => {
-    if (!model.runtimeTabTargetKey || !activeTerminalSessionId) return
-    if (activeTerminalSessionId === selectedTerminalSessionId) return
-    setSelectedTerminal(model.runtimeTabTargetKey, activeTerminalSessionId)
-  }, [activeTerminalSessionId, model.runtimeTabTargetKey, selectedTerminalSessionId, setSelectedTerminal])
+  const activeSessionIdByRuntimeType = useMemo(
+    () => ({
+      terminal: repoWorkspaceRuntimeTabSessionId(model.activeTab, 'terminal'),
+    }),
+    [model.activeTab],
+  )
+  useSyncWorkspacePaneRuntimeTabProviderSelection(
+    {
+      activeSessionIdByRuntimeType,
+      runtimeTabTargetKeyByType: model.runtimeTabTargetKeyByType,
+    },
+    selectedSessionIdByRuntimeType,
+  )
 }

@@ -7,11 +7,17 @@ import {
   canConfirmWorkspacePaneRuntimeTabCloseWithContext,
   readWorkspacePaneRuntimeTabCloseContext,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-context.ts'
+import { terminalRuntimeTabCloseContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
 
 const terminalBase: TerminalSessionBase = {
   repoRoot: '/repo',
   branch: 'main',
   worktreePath: '/repo-worktree',
+}
+const closeTarget = {
+  repoRoot: terminalBase.repoRoot,
+  branchName: terminalBase.branch,
+  worktreePath: terminalBase.worktreePath,
 }
 
 afterEach(() => {
@@ -28,18 +34,19 @@ describe('workspace pane runtime tab close context', () => {
 
     expect(
       canCloseWorkspacePaneRuntimeTabWithContext(
-        { type: 'terminal', terminalBase },
+        { type: 'terminal', target: closeTarget },
         context,
       ),
     ).toBe(true)
     expect(
       canConfirmWorkspacePaneRuntimeTabCloseWithContext(
-        { type: 'terminal', sessionId: 'session-1', terminalBase },
+        { type: 'terminal', sessionId: 'session-1', target: closeTarget },
         context,
       ),
     ).toBe(true)
-    await expect(context.terminal?.closeTerminalByDescriptor?.('session-1', terminalBase)).resolves.toBe(true)
-    await expect(context.terminal?.closeTerminalsForWorktree?.(terminalBase)).resolves.toBe(true)
+    const terminalContext = terminalRuntimeTabCloseContext(context)
+    await expect(terminalContext?.closeTerminalByDescriptor?.('session-1', terminalBase)).resolves.toBe(true)
+    await expect(terminalContext?.closeTerminalsForWorktree?.(terminalBase)).resolves.toBe(true)
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-1', terminalBase)
     expect(closeTerminalsForWorktree).toHaveBeenCalledWith(terminalBase)
   })
@@ -47,11 +54,11 @@ describe('workspace pane runtime tab close context', () => {
   test('rejects confirmed close when terminal capability is unavailable', () => {
     const context = readWorkspacePaneRuntimeTabCloseContext()
 
-    expect(context.terminal).toBeUndefined()
-    expect(canCloseWorkspacePaneRuntimeTabWithContext({ type: 'terminal', terminalBase }, context)).toBe(false)
+    expect(terminalRuntimeTabCloseContext(context)).toBeUndefined()
+    expect(canCloseWorkspacePaneRuntimeTabWithContext({ type: 'terminal', target: closeTarget }, context)).toBe(false)
     expect(
       canConfirmWorkspacePaneRuntimeTabCloseWithContext(
-        { type: 'terminal', sessionId: 'session-1', terminalBase },
+        { type: 'terminal', sessionId: 'session-1', target: closeTarget },
         context,
       ),
     ).toBe(false)
@@ -62,9 +69,18 @@ describe('workspace pane runtime tab close context', () => {
     setTerminalSessionCommandBridge(terminalCommandBridge({ closeTerminalByDescriptor }))
     const context = readWorkspacePaneRuntimeTabCloseContext()
 
-    expect(canCloseWorkspacePaneRuntimeTabWithContext({ type: 'terminal' }, context)).toBe(false)
-    expect(canConfirmWorkspacePaneRuntimeTabCloseWithContext({ type: 'terminal', sessionId: 'session-1' }, context))
-      .toBe(false)
+    expect(
+      canCloseWorkspacePaneRuntimeTabWithContext(
+        { type: 'terminal', target: { ...closeTarget, worktreePath: null } },
+        context,
+      ),
+    ).toBe(false)
+    expect(
+      canConfirmWorkspacePaneRuntimeTabCloseWithContext(
+        { type: 'terminal', sessionId: 'session-1', target: { ...closeTarget, worktreePath: null } },
+        context,
+      ),
+    ).toBe(false)
   })
 })
 

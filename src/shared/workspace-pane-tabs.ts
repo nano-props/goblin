@@ -10,6 +10,13 @@ export const WORKSPACE_PANE_TABS_SOCKET_ACTIONS = {
 export type WorkspacePaneTabsSocketAction =
   (typeof WORKSPACE_PANE_TABS_SOCKET_ACTIONS)[keyof typeof WORKSPACE_PANE_TABS_SOCKET_ACTIONS]
 
+export function isWorkspacePaneTabsSocketAction(value: unknown): value is WorkspacePaneTabsSocketAction {
+  return (
+    typeof value === 'string' &&
+    (Object.values(WORKSPACE_PANE_TABS_SOCKET_ACTIONS) as readonly string[]).includes(value)
+  )
+}
+
 export const WORKSPACE_PANE_TABS_REALTIME_EVENTS = {
   changed: 'workspace-pane-tabs.changed',
 } as const
@@ -49,4 +56,16 @@ export interface WorkspacePaneTabsUpdateInput extends WorkspacePaneTabsTarget, W
 
 export interface WorkspacePaneTabsEntry extends WorkspacePaneTabsTarget {
   tabs: WorkspacePaneTabEntry[]
+}
+
+export interface WorkspacePaneTabsSocketRequestInputs {
+  'workspace-pane-tabs.list': WorkspacePaneTabsListInput
+  'workspace-pane-tabs.replace': WorkspacePaneTabsReplaceInput
+  'workspace-pane-tabs.update': WorkspacePaneTabsUpdateInput
+}
+
+export interface WorkspacePaneTabsSocketResponseOutputs {
+  'workspace-pane-tabs.list': WorkspacePaneTabsEntry[]
+  'workspace-pane-tabs.replace': WorkspacePaneTabEntry[]
+  'workspace-pane-tabs.update': WorkspacePaneTabEntry[]
 }

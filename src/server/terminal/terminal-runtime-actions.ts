@@ -20,7 +20,7 @@ import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import { isCurrentRepoRuntimeInstance } from '#/server/modules/repo-runtime-instances.ts'
 import { broadcastWorkspacePaneTabsChanged } from '#/server/workspace-pane/workspace-pane-tabs-realtime.ts'
-import type { TerminalRealtimeMessage } from '#/shared/terminal-socket.ts'
+import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 
 interface TerminalSessionServiceLike {
   create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCreateResult>
@@ -35,7 +35,7 @@ interface TerminalSessionServiceLike {
 
 interface TerminalRuntimeActionDependencies {
   manager: TerminalSessionManager<string>
-  broker: Pick<RealtimeBroker<TerminalRealtimeMessage>, 'broadcastToUser'>
+  broker: Pick<RealtimeBroker<AppRealtimeMessage>, 'broadcastToUser'>
   sessionService: TerminalSessionServiceLike
   isValidTerminalClientId(value: unknown): value is string
 }

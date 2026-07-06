@@ -2,7 +2,9 @@ import { describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTerminalTabSummary } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
 import {
+  closeWorkspacePaneRuntimeTabsForWorktree,
   confirmWorkspacePaneRuntimeTabClose,
+  terminalBaseForRuntimeTabCloseTarget,
   workspacePaneRuntimeTabCloseConfirmRequest,
   workspacePaneRuntimeTabConfirmedCloseBranchName,
   workspacePaneRuntimeTabConfirmedCloseIdentity,
@@ -12,6 +14,11 @@ const terminalBase: TerminalSessionBase = {
   repoRoot: '/repo',
   branch: 'main',
   worktreePath: '/repo-worktree',
+}
+const closeTarget = {
+  repoRoot: terminalBase.repoRoot,
+  branchName: terminalBase.branch,
+  worktreePath: terminalBase.worktreePath,
 }
 
 const terminalView: WorkspacePaneTerminalTabSummary = {
@@ -37,13 +44,13 @@ describe('workspace pane runtime tab close actions', () => {
         identity: 'terminal:session-1',
         sessionId: 'session-1',
         view: terminalView,
-        terminalBase,
+        target: closeTarget,
       }),
     ).toEqual({
       type: 'terminal',
       identity: 'terminal:session-1',
       sessionId: 'session-1',
-      terminalBase,
+      target: closeTarget,
       processName: 'node',
     })
   })
@@ -55,7 +62,7 @@ describe('workspace pane runtime tab close actions', () => {
         identity: 'terminal:session-1',
         sessionId: 'session-1',
         view: { ...terminalView, processName: 'zsh' },
-        terminalBase,
+        target: closeTarget,
       }),
     ).toBeNull()
   })
@@ -65,17 +72,34 @@ describe('workspace pane runtime tab close actions', () => {
 
     await expect(
       confirmWorkspacePaneRuntimeTabClose(
-        { type: 'terminal', sessionId: 'session-1', terminalBase },
-        { terminal: { closeTerminalByDescriptor } },
+        { type: 'terminal', sessionId: 'session-1', target: closeTarget },
+        { byType: { terminal: { closeTerminalByDescriptor } } },
       ),
     ).resolves.toBe(true)
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-1', terminalBase)
     expect(
-      workspacePaneRuntimeTabConfirmedCloseBranchName({ type: 'terminal', sessionId: 'session-1', terminalBase }),
+      workspacePaneRuntimeTabConfirmedCloseBranchName({ type: 'terminal', sessionId: 'session-1', target: closeTarget }),
     ).toBe('main')
-    expect(workspacePaneRuntimeTabConfirmedCloseIdentity({ type: 'terminal', sessionId: 'session-1' })).toBe(
-      'terminal:session-1',
-    )
+    expect(
+      workspacePaneRuntimeTabConfirmedCloseIdentity({ type: 'terminal', sessionId: 'session-1', target: closeTarget }),
+    ).toBe('terminal:session-1')
+  })
+
+  test('closes terminal worktree sessions through the runtime close registry', async () => {
+    const closeTerminalsForWorktree = vi.fn(async () => true)
+
+    await expect(
+      closeWorkspacePaneRuntimeTabsForWorktree('terminal', closeTarget, {
+        byType: { terminal: { closeTerminalsForWorktree } },
+      }),
+    ).resolves.toBe(true)
+
+    expect(closeTerminalsForWorktree).toHaveBeenCalledWith(terminalBase)
+  })
+
+  test('builds terminal bases from runtime close targets', () => {
+    expect(terminalBaseForRuntimeTabCloseTarget(closeTarget)).toEqual(terminalBase)
+    expect(terminalBaseForRuntimeTabCloseTarget({ ...closeTarget, worktreePath: null })).toBeNull()
   })
 })

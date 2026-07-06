@@ -162,6 +162,35 @@ function sentSocketMessages(socket: {
   return socket.send.mock.calls.map(([payload]) => JSON.parse(String(payload)))
 }
 
+async function requestWorkspacePaneTabs(
+  host: ServerTerminalHost,
+  socket: { send: ReturnType<typeof vi.fn>; close?: ReturnType<typeof vi.fn> },
+  action: (typeof WORKSPACE_PANE_TABS_SOCKET_ACTIONS)[keyof typeof WORKSPACE_PANE_TABS_SOCKET_ACTIONS],
+  input: unknown,
+  requestId: string,
+): Promise<unknown> {
+  host.handleRealtimeMessage(
+    'client_a',
+    USER_1,
+    socket as Parameters<ServerTerminalHost['handleRealtimeMessage']>[2],
+    JSON.stringify({
+      type: 'request',
+      requestId,
+      action,
+      input,
+    }),
+  )
+  await vi.waitFor(() => {
+    expect(sentSocketMessages(socket).some((message) => message.type === 'response' && message.requestId === requestId))
+      .toBe(true)
+  })
+  const response = sentSocketMessages(socket).find(
+    (message) => message.type === 'response' && message.requestId === requestId,
+  )
+  expect(response).toMatchObject({ type: 'response', ok: true, action })
+  return response?.payload
+}
+
 async function createTerminalSession(host: ServerTerminalHost, clientId: string, userId = USER_1): Promise<string> {
   const result = await host.create(clientId, userId, {
     repoRoot: REPO_ROOT,
@@ -601,7 +630,13 @@ describe('server terminal runtime', () => {
     })
     expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
     await expect(
-      host.listWorkspaceTabs('client_a', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID }),
+      requestWorkspacePaneTabs(
+        host,
+        socket,
+        WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+        { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
+        'req_list_after_exit',
+      ),
     ).resolves.toEqual([
       {
         repoRoot: REPO_ROOT,
@@ -645,7 +680,13 @@ describe('server terminal runtime', () => {
     })
     expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
     await expect(
-      host.listWorkspaceTabs('client_a', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID }),
+      requestWorkspacePaneTabs(
+        host,
+        socket,
+        WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+        { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
+        'req_list_after_prune',
+      ),
     ).resolves.toEqual([
       {
         repoRoot: REPO_ROOT,
@@ -676,13 +717,19 @@ describe('server terminal runtime', () => {
     expect(created.ok).toBe(true)
     if (!created.ok) return
     await expect(
-      host.replaceTabs('client_a', USER_1, {
+      requestWorkspacePaneTabs(
+        host,
+        socket,
+        WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
+        {
         repoRoot: REPO_ROOT,
         repoInstanceId: REPO_INSTANCE_ID,
         branchName: 'feature',
         worktreePath: '/repo-linked',
         tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
-      }),
+        },
+        'req_replace_workspace_tabs',
+      ),
     ).resolves.toEqual([
       { type: 'status', tabId: 'workspace-pane:status' },
       { type: 'terminal', runtimeSessionId: created.terminalSessionId },
@@ -822,14 +869,21 @@ describe('server terminal runtime', () => {
     })
     expect(first.ok).toBe(true)
     if (!first.ok) return
+    const socket = { send: vi.fn(), close: vi.fn() }
     await expect(
-      host.updateTabs('client_a', USER_1, {
+      requestWorkspacePaneTabs(
+        host,
+        socket,
+        WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
+        {
         repoRoot: REPO_ROOT,
         repoInstanceId: REPO_INSTANCE_ID,
         branchName: 'feature',
         worktreePath: '/repo-linked',
         operation: { type: 'open-static', tabType: 'history' },
-      }),
+        },
+        'req_update_before_repo_close',
+      ),
     ).resolves.toEqual([
       { type: 'status', tabId: 'workspace-pane:status' },
       { type: 'terminal', runtimeSessionId: first.terminalSessionId },
@@ -843,7 +897,13 @@ describe('server terminal runtime', () => {
       host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: nextRepoInstanceId }),
     ).resolves.toEqual([])
     await expect(
-      host.listWorkspaceTabs('client_a', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: nextRepoInstanceId }),
+      requestWorkspacePaneTabs(
+        host,
+        socket,
+        WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+        { repoRoot: REPO_ROOT, repoInstanceId: nextRepoInstanceId },
+        'req_list_after_repo_reopen',
+      ),
     ).resolves.toEqual([])
 
     const second = await host.create('client_a', USER_1, {

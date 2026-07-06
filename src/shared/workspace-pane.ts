@@ -19,6 +19,9 @@ export const WORKSPACE_PANE_STATIC_TAB_SCOPES = {
   history: 'branch',
   files: 'worktree',
 } as const satisfies Record<WorkspacePaneStaticTabType, WorkspacePaneTabScope>
+export const WORKSPACE_PANE_RUNTIME_TAB_SCOPES = {
+  terminal: 'worktree',
+} as const satisfies Record<WorkspacePaneRuntimeTabType, WorkspacePaneTabScope>
 type WorkspacePaneStaticTabTypeWithScope<TScope extends WorkspacePaneTabScope> = {
   [TType in WorkspacePaneStaticTabType]: (typeof WORKSPACE_PANE_STATIC_TAB_SCOPES)[TType] extends TScope ? TType : never
 }[WorkspacePaneStaticTabType]
@@ -78,8 +81,12 @@ export function workspacePaneStaticTabScope(tab: WorkspacePaneStaticTabType): Wo
   return WORKSPACE_PANE_STATIC_TAB_SCOPES[tab]
 }
 
+export function workspacePaneRuntimeTabScope(tab: WorkspacePaneRuntimeTabType): WorkspacePaneTabScope {
+  return WORKSPACE_PANE_RUNTIME_TAB_SCOPES[tab]
+}
+
 export function workspacePaneTabScope(tab: WorkspacePaneTabType): WorkspacePaneTabScope {
-  return isWorkspacePaneRuntimeTabType(tab) ? 'worktree' : workspacePaneStaticTabScope(tab)
+  return isWorkspacePaneRuntimeTabType(tab) ? workspacePaneRuntimeTabScope(tab) : workspacePaneStaticTabScope(tab)
 }
 
 export function workspacePaneTabRequiresWorktree(tab: WorkspacePaneTabType): boolean {

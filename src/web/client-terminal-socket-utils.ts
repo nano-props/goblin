@@ -1,7 +1,7 @@
 import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
-import type { TerminalClientMessage, TerminalSocketServerMessage } from '#/shared/terminal-socket.ts'
-import { normalizeTerminalSocketServerMessage } from '#/shared/terminal-validators.ts'
+import type { AppRealtimeClientMessage, AppRealtimeSocketServerMessage } from '#/shared/app-realtime-socket.ts'
+import { normalizeAppRealtimeSocketServerMessage } from '#/shared/app-realtime-validators.ts'
 import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 
 export function createTerminalWebSocketUrl(baseUrl: string, accessToken: string, clientId: string): string {
@@ -18,15 +18,15 @@ export function createTerminalWebSocketUrl(baseUrl: string, accessToken: string,
   return httpUrl.toString()
 }
 
-export function parseTerminalSocketServerMessage(data: unknown): TerminalSocketServerMessage | null {
+export function parseTerminalSocketServerMessage(data: unknown): AppRealtimeSocketServerMessage | null {
   if (typeof data !== 'string') return null
   try {
-    return normalizeTerminalSocketServerMessage(JSON.parse(data))
+    return normalizeAppRealtimeSocketServerMessage(JSON.parse(data))
   } catch {}
   return null
 }
 
-export function encodeClientMessage(message: TerminalClientMessage): string {
+export function encodeClientMessage(message: AppRealtimeClientMessage): string {
   return JSON.stringify(message)
 }
 

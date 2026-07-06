@@ -2,11 +2,15 @@
 
 import path from 'node:path'
 import { describe, expect, test, vi } from 'vitest'
-import { createTerminalSessionService } from '#/server/terminal/terminal-session-service.ts'
+import {
+  createTerminalSessionService,
+  terminalWorkspacePaneRuntimeTabsProvider,
+} from '#/server/terminal/terminal-session-service.ts'
 import {
   createWorkspacePaneTabsRuntime,
   type WorkspacePaneTabsRuntime,
 } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
+import { createWorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalAttachResult, TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
@@ -926,22 +930,28 @@ function createService(options: {
   isCurrentRepoInstance?: (userId: string, repoRoot: string, repoInstanceId: string) => boolean
   broadcastWorkspaceTabsChanged?: (userId: string, repoRoot: string) => void
 }) {
+  const manager = {
+    ensureSession:
+      options.ensureSession ??
+      (async () => ({
+        ok: false as const,
+        message: 'unused',
+      })),
+    listSessionsForUser: vi.fn(
+      async () => await (typeof options.sessions === 'function' ? options.sessions() : options.sessions),
+    ),
+    closeSession: options.closeSession ?? vi.fn(),
+  }
+  const workspaceTabsCoordinator = createWorkspacePaneTabsCoordinator({
+    workspaceTabs: options.workspaceTabs,
+    runtimeProviders: [terminalWorkspacePaneRuntimeTabsProvider(manager)],
+  })
   return createTerminalSessionService({
     isValidClientId: (value): value is string => typeof value === 'string',
     isValidTerminalSessionId: (value): value is string => typeof value === 'string' && value.length > 0,
-    manager: {
-      ensureSession:
-        options.ensureSession ??
-        (async () => ({
-          ok: false as const,
-          message: 'unused',
-        })),
-      listSessionsForUser: vi.fn(
-        async () => await (typeof options.sessions === 'function' ? options.sessions() : options.sessions),
-      ),
-      closeSession: options.closeSession ?? vi.fn(),
-    },
+    manager,
     workspaceTabs: options.workspaceTabs,
+    workspaceTabsCoordinator,
     isCurrentRepoInstance: options.isCurrentRepoInstance ?? (() => true),
     broadcastSessionsChanged: vi.fn(),
     broadcastWorkspaceTabsChanged: options.broadcastWorkspaceTabsChanged ?? vi.fn(),

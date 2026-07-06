@@ -30,6 +30,10 @@ import {
   workspacePaneTabProvider,
 } from '#/web/components/workspace-pane/tab-providers.ts'
 import { workspacePaneRuntimeTabTargetKey } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-key.ts'
+import {
+  workspacePaneRuntimeTabTargetKeyByType,
+  type WorkspacePaneRuntimeTabTargetKeyByType,
+} from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
 
 export type RepoWorkspaceTabKind = 'static' | 'runtime' | 'pending'
 
@@ -105,6 +109,7 @@ export interface RepoWorkspaceTabModel {
   repoId: string
   branchName: string | null
   worktreePath: string | null
+  runtimeTabTargetKeyByType: WorkspacePaneRuntimeTabTargetKeyByType
   runtimeTabTargetKey: string | null
   /** Runtime-tab lifecycle, pending, and selection state keyed by runtime type. */
   runtimeTabStateByType: RepoWorkspaceRuntimeTabStateByType
@@ -138,18 +143,20 @@ export interface RepoWorkspaceTabModelInput {
 export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): RepoWorkspaceTabModel {
   const tabEntries = input.branchName ? normalizeWorkspacePaneTabs(input.tabEntries) : []
   const worktreePath = input.branchName ? input.worktreePath : null
+  const runtimeTabTargetKeyByType = workspacePaneRuntimeTabTargetKeyByType({ repoRoot: input.repoId, worktreePath })
   const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey({ repoRoot: input.repoId, worktreePath })
+  const hasWorktree = !!worktreePath
   const runtimeTabStateByType = runtimeTabStateByTypeFromInput(input)
-  const runtimeViews = runtimeTabTargetKey ? [...input.runtimeTabViews] : []
+  const runtimeViews = input.runtimeTabViews.filter((view) => !!runtimeTabTargetKeyByType[view.type])
   const runtimeViewsByType = runtimeViewsByTypeFromViews(runtimeViews)
   const materializedTabs = materializedWorkspacePaneTabs({
     tabEntries,
     runtimeViews,
-    hasWorktree: !!runtimeTabTargetKey,
+    hasWorktree,
   })
   const staticTabs = materializedTabs.flatMap((tab) => (tab.kind === 'static' ? [tab.type] : []))
   const candidateTab = resolveRenderableWorkspacePaneTab(input.preferredTab, {
-    hasWorktree: !!runtimeTabTargetKey,
+    hasWorktree,
     runtimeTabAvailabilityByType: runtimeTabAvailabilityByTypeForTabs(materializedTabs, runtimeTabStateByType),
   })
   const materializedActiveTab = candidateTab
@@ -166,6 +173,7 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
     repoId: input.repoId,
     branchName: input.branchName,
     worktreePath,
+    runtimeTabTargetKeyByType,
     runtimeTabTargetKey,
     runtimeTabStateByType,
     runtimeViewsByType,

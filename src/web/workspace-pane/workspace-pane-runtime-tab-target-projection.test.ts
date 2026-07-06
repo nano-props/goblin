@@ -15,15 +15,19 @@ afterEach(() => {
 describe('workspace pane runtime tab target projection', () => {
   test('builds terminal runtime projection from explicit runtime inputs', () => {
     const projection = workspacePaneRuntimeTabTargetProjection({
-      repoRoot: '/repo',
-      repoInstanceId: 'repo-instance-1',
-      worktreePath: '/repo-worktree',
-      selectedSessionIdByRuntimeType: { terminal: 'session-1' },
-      terminal: {
-        views: [terminalView('session-1')],
-        createPending: true,
-        projectionState: { phase: 'ready' },
-      },
+      providers: [
+        {
+          type: 'terminal',
+          targetKey: '/repo\0/repo-worktree',
+          views: [terminalView('session-1')],
+          selectedSessionId: 'session-1',
+          state: {
+            createPending: true,
+            projectionPhase: 'ready',
+            selectedSessionId: 'session-1',
+          },
+        },
+      ],
     })
 
     expect(projection.runtimeTabViews).toEqual([terminalView('session-1')])
@@ -37,14 +41,18 @@ describe('workspace pane runtime tab target projection', () => {
 
   test('clears runtime views and selection when no worktree target exists', () => {
     const projection = workspacePaneRuntimeTabTargetProjection({
-      repoRoot: '/repo',
-      repoInstanceId: 'repo-instance-1',
-      worktreePath: null,
-      selectedSessionIdByRuntimeType: { terminal: 'session-1' },
-      terminal: {
-        views: [terminalView('session-1')],
-        projectionState: { phase: 'ready' },
-      },
+      providers: [
+        {
+          type: 'terminal',
+          targetKey: null,
+          views: [],
+          selectedSessionId: null,
+          state: {
+            projectionPhase: 'ready',
+            selectedSessionId: null,
+          },
+        },
+      ],
     })
 
     expect(projection.runtimeTabViews).toEqual([])

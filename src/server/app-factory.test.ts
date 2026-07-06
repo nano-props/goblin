@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
+import type { ServerRealtimeHost } from '#/server/terminal/terminal-host.ts'
 
 const mocks = vi.hoisted(() => ({
   access: vi.fn(async () => undefined),
@@ -58,21 +58,9 @@ const terminalHostStub = {
   })),
   registerSocket: vi.fn(),
   unregisterSocket: vi.fn(),
-  attach: vi.fn(),
-  restart: vi.fn(),
-  write: vi.fn(),
-  resize: vi.fn(),
-  takeover: vi.fn(),
-  close: vi.fn(),
-  listSessions: vi.fn(),
-  listWorkspaceTabs: vi.fn(() => []),
-  create: vi.fn(),
-  replaceTabs: vi.fn(() => []),
-  updateTabs: vi.fn(() => []),
-  prune: vi.fn(),
   handleRealtimeMessage: vi.fn(),
   shutdown: vi.fn(),
-} satisfies ServerTerminalHost
+} satisfies ServerRealtimeHost
 
 // The clipboard write-paths module imports mkdir / writeFile /
 // readdir / rm from node:fs/promises. The earlier two-method mock

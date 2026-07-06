@@ -2,13 +2,18 @@ import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type {
   ConfirmedWorkspacePaneRuntimeTabClose,
+  TerminalWorkspacePaneRuntimeTabCloseContext,
+  WorkspacePaneRuntimeTabCloseTarget,
   WorkspacePaneRuntimeTabCloseContext,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import {
+  terminalBaseForRuntimeTabCloseTarget,
+  terminalRuntimeTabCloseContext,
+} from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
 
 export interface WorkspacePaneRuntimeTabCloseCapabilityInput {
   type: WorkspacePaneRuntimeTabType
-  terminalBase?: TerminalSessionBase | null
+  target: WorkspacePaneRuntimeTabCloseTarget
 }
 
 interface WorkspacePaneRuntimeTabCloseContextResolver {
@@ -35,7 +40,7 @@ const WORKSPACE_PANE_RUNTIME_TAB_CLOSE_CONTEXT_RESOLVERS_BY_TYPE: Record<
 }
 
 export function readWorkspacePaneRuntimeTabCloseContext(): WorkspacePaneRuntimeTabCloseContext {
-  const context: WorkspacePaneRuntimeTabCloseContext = {}
+  const context: WorkspacePaneRuntimeTabCloseContext = { byType: {} }
   for (const resolver of Object.values(WORKSPACE_PANE_RUNTIME_TAB_CLOSE_CONTEXT_RESOLVERS_BY_TYPE)) {
     resolver.assign(context)
   }
@@ -59,10 +64,10 @@ export function canCloseWorkspacePaneRuntimeTabWithContext(
 function assignTerminalRuntimeTabCloseContext(context: WorkspacePaneRuntimeTabCloseContext): void {
   const bridge = readTerminalSessionCommandBridge()
   if (!bridge?.closeTerminalByDescriptor && !bridge?.closeTerminalsForWorktree) return
-  context.terminal = {
+  context.byType.terminal = {
     closeTerminalByDescriptor: bridge.closeTerminalByDescriptor,
     closeTerminalsForWorktree: bridge.closeTerminalsForWorktree,
-  }
+  } satisfies TerminalWorkspacePaneRuntimeTabCloseContext
 }
 
 function canCloseTerminalRuntimeTab(
@@ -70,7 +75,7 @@ function canCloseTerminalRuntimeTab(
   context: WorkspacePaneRuntimeTabCloseContext,
 ): boolean {
   if (input.type !== 'terminal') return false
-  return !!input.terminalBase && !!context.terminal?.closeTerminalByDescriptor
+  return !!terminalBaseForRuntimeTabCloseTarget(input.target) && !!terminalRuntimeTabCloseContext(context)?.closeTerminalByDescriptor
 }
 
 function canConfirmTerminalRuntimeTabClose(
@@ -81,7 +86,7 @@ function canConfirmTerminalRuntimeTabClose(
   return canCloseTerminalRuntimeTab(
     {
       type: confirmed.type,
-      terminalBase: confirmed.terminalBase,
+      target: confirmed.target,
     },
     context,
   )

@@ -1,16 +1,15 @@
 import { useMemo } from 'react'
 import {
-  useTerminalRepoProjectionHydrationEntry,
-  useTerminalSessionSummaries,
-  useTerminalWorktreeCreatePending,
-} from '#/web/components/terminal/terminal-session-store.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import {
   type WorkspacePaneRuntimeTabTargetProjection,
   type WorkspacePaneRuntimeTabTargetSelectionByType,
   workspacePaneRuntimeTabTargetProjection,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 import { workspacePaneRuntimeTabTargetKey } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-key.ts'
+import {
+  useWorkspacePaneRuntimeTabProviderProjections,
+  workspacePaneRuntimeTabTargetKeyByType,
+  type WorkspacePaneRuntimeTabTargetKeyByType,
+} from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
 
 export interface UseWorkspacePaneRuntimeTabTargetProjectionInput {
   repoRoot: string
@@ -21,6 +20,7 @@ export interface UseWorkspacePaneRuntimeTabTargetProjectionInput {
 export interface WorkspacePaneRuntimeTabTargetProjectionHookResult
   extends WorkspacePaneRuntimeTabTargetProjection {
   runtimeTabTargetKey: string | null
+  runtimeTabTargetKeyByType: WorkspacePaneRuntimeTabTargetKeyByType
   selectedSessionIdByRuntimeType: WorkspacePaneRuntimeTabTargetSelectionByType
 }
 
@@ -30,55 +30,35 @@ export function useWorkspacePaneRuntimeTabTargetProjection({
   worktreePath,
 }: UseWorkspacePaneRuntimeTabTargetProjectionInput): WorkspacePaneRuntimeTabTargetProjectionHookResult {
   const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey({ repoRoot, worktreePath })
-
-  const terminalSessionSummaries = useTerminalSessionSummaries(runtimeTabTargetKey)
-  const terminalCreatePending = useTerminalWorktreeCreatePending(runtimeTabTargetKey)
-  const terminalProjectionHydration = useTerminalRepoProjectionHydrationEntry(repoRoot)
-  const selectedTerminalSessionId = useReposStore((s) =>
-    runtimeTabTargetKey ? s.selectedTerminalSessionIdByTerminalWorktree[runtimeTabTargetKey] : undefined,
+  const runtimeTabTargetKeyByType = useMemo(
+    () => workspacePaneRuntimeTabTargetKeyByType({ repoRoot, worktreePath }),
+    [repoRoot, worktreePath],
   )
+  const providerProjections = useWorkspacePaneRuntimeTabProviderProjections({ repoRoot, repoInstanceId, worktreePath })
 
   const selectedSessionIdByRuntimeType = useMemo<WorkspacePaneRuntimeTabTargetSelectionByType>(
-    () => ({
-      terminal: runtimeTabTargetKey ? (selectedTerminalSessionId ?? null) : null,
-    }),
-    [runtimeTabTargetKey, selectedTerminalSessionId],
+    () =>
+      Object.fromEntries(
+        providerProjections.map((provider) => [provider.type, provider.selectedSessionId]),
+      ) as WorkspacePaneRuntimeTabTargetSelectionByType,
+    [providerProjections],
   )
 
   const projection = useMemo(
     () =>
       workspacePaneRuntimeTabTargetProjection({
-        repoRoot,
-        repoInstanceId,
-        worktreePath,
-        selectedSessionIdByRuntimeType,
-        terminal: {
-          views: terminalSessionSummaries,
-          createPending: terminalCreatePending,
-          projectionState: {
-            phase: terminalProjectionHydration.phase,
-            errorMessage: terminalProjectionHydration.errorMessage,
-          },
-        },
+        providers: providerProjections,
       }),
-    [
-      repoRoot,
-      repoInstanceId,
-      worktreePath,
-      selectedSessionIdByRuntimeType,
-      terminalSessionSummaries,
-      terminalCreatePending,
-      terminalProjectionHydration.phase,
-      terminalProjectionHydration.errorMessage,
-    ],
+    [providerProjections],
   )
 
   return useMemo(
     () => ({
       ...projection,
       runtimeTabTargetKey,
+      runtimeTabTargetKeyByType,
       selectedSessionIdByRuntimeType,
     }),
-    [projection, runtimeTabTargetKey, selectedSessionIdByRuntimeType],
+    [projection, runtimeTabTargetKey, runtimeTabTargetKeyByType, selectedSessionIdByRuntimeType],
   )
 }

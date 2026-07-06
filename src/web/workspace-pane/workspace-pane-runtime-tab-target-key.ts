@@ -1,4 +1,4 @@
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { workspacePaneRuntimeTabTargetKeyForType } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
 
 export interface WorkspacePaneRuntimeTabTargetKeyInput {
   repoRoot: string
@@ -6,5 +6,5 @@ export interface WorkspacePaneRuntimeTabTargetKeyInput {
 }
 
 export function workspacePaneRuntimeTabTargetKey(input: WorkspacePaneRuntimeTabTargetKeyInput): string | null {
-  return input.worktreePath ? formatTerminalWorktreeKey(input.repoRoot, input.worktreePath) : null
+  return workspacePaneRuntimeTabTargetKeyForType('terminal', input)
 }

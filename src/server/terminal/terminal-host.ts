@@ -14,13 +14,6 @@ import type {
   TerminalTakeoverResult,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import type {
-  WorkspacePaneTabsEntry,
-  WorkspacePaneTabsListInput,
-  WorkspacePaneTabsReplaceInput,
-  WorkspacePaneTabsUpdateInput,
-} from '#/shared/workspace-pane-tabs.ts'
 
 type MaybePromise<T> = T | Promise<T>
 
@@ -81,7 +74,7 @@ export interface ServerTerminalHostDiagnostics {
   maxRingBufferChars: number
 }
 
-export interface ServerTerminalHost {
+export interface ServerRealtimeHost {
   isValidClientId(value: unknown): value is string
   getDiagnostics(): ServerTerminalHostDiagnostics
   /**
@@ -99,6 +92,12 @@ export interface ServerTerminalHost {
   // boundary so the two identifiers cannot be conflated.
   registerSocket(clientId: string, userId: string, socket: ServerTerminalSocket): void
   unregisterSocket(clientId: string, userId: string, socket: ServerTerminalSocket): void
+  /** Handle an incoming realtime message from a client socket. */
+  handleRealtimeMessage(clientId: string, userId: string, socket: ServerTerminalSocket, message: string): void
+  shutdown(): void
+}
+
+export interface ServerTerminalActionHost {
   attach(clientId: string, userId: string, input: TerminalAttachInput): MaybePromise<TerminalAttachResult>
   restart(clientId: string, userId: string, input: TerminalRestartInput): MaybePromise<TerminalAttachResult>
   write(clientId: string, userId: string, input: TerminalWriteInput): MaybePromise<TerminalMutationResult>
@@ -110,28 +109,12 @@ export interface ServerTerminalHost {
     userId: string,
     input: TerminalListSessionsInput,
   ): MaybePromise<TerminalSessionSummary[]>
-  listWorkspaceTabs(
-    clientId: string,
-    userId: string,
-    input: WorkspacePaneTabsListInput,
-  ): MaybePromise<WorkspacePaneTabsEntry[]>
   create(clientId: string, userId: string, input: TerminalCreateInput): MaybePromise<TerminalCreateResult>
-  replaceTabs(
-    clientId: string,
-    userId: string,
-    input: WorkspacePaneTabsReplaceInput,
-  ): MaybePromise<WorkspacePaneTabEntry[]>
-  updateTabs(
-    clientId: string,
-    userId: string,
-    input: WorkspacePaneTabsUpdateInput,
-  ): MaybePromise<WorkspacePaneTabEntry[]>
   prune(
     clientId: string,
     userId: string,
     input: TerminalPruneInput,
   ): MaybePromise<{ pruned: number; remaining: number }>
-  /** Handle an incoming realtime message from a client socket. */
-  handleRealtimeMessage(clientId: string, userId: string, socket: ServerTerminalSocket, message: string): void
-  shutdown(): void
 }
+
+export interface ServerTerminalHost extends ServerRealtimeHost, ServerTerminalActionHost {}

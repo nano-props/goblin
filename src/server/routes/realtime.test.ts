@@ -1,8 +1,8 @@
 import { describe, expect, test, vi } from 'vitest'
-import type { ServerTerminalHost, ServerTerminalSocket } from '#/server/terminal/terminal-host.ts'
+import type { ServerRealtimeHost, ServerTerminalSocket } from '#/server/terminal/terminal-host.ts'
 import { createRealtimeRoutes } from '#/server/routes/realtime.ts'
 
-function makeTerminalHost(overrides: Partial<ServerTerminalHost> = {}): ServerTerminalHost {
+function makeTerminalHost(overrides: Partial<ServerRealtimeHost> = {}): ServerRealtimeHost {
   // `isValidClientId` is a type predicate; the test override has
   // to keep the signature compatible.
   const isValidClientId = ((value: unknown): value is string => typeof value === 'string') as never
@@ -12,29 +12,17 @@ function makeTerminalHost(overrides: Partial<ServerTerminalHost> = {}): ServerTe
     getDiagnostics: vi.fn(() => ({}) as never),
     registerSocket: vi.fn(),
     unregisterSocket: vi.fn(),
-    attach: vi.fn(async () => ({ ok: true }) as never),
-    restart: vi.fn(async () => ({ ok: true }) as never),
-    write: vi.fn(async () => ({ ok: true }) as never),
-    resize: vi.fn(async () => ({ ok: true }) as never),
-    takeover: vi.fn(async () => ({ ok: true }) as never),
-    close: vi.fn(async () => ({ ok: true }) as never),
-    listSessions: vi.fn(async () => []),
-    listWorkspaceTabs: vi.fn(async () => []),
-    create: vi.fn(async () => ({ ok: true }) as never),
-    replaceTabs: vi.fn(async () => []),
-    updateTabs: vi.fn(async () => []),
-    prune: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
     handleRealtimeMessage: vi.fn(),
     shutdown: vi.fn(),
     ...overrides,
   }
 }
 
-function acceptAll(): ServerTerminalHost['isValidClientId'] {
+function acceptAll(): ServerRealtimeHost['isValidClientId'] {
   return ((value: unknown): value is string => typeof value === 'string') as never
 }
 
-function acceptOnly(allowed: string): ServerTerminalHost['isValidClientId'] {
+function acceptOnly(allowed: string): ServerRealtimeHost['isValidClientId'] {
   return ((value: unknown): value is string => value === allowed) as never
 }
 
