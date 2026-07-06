@@ -10,6 +10,7 @@ import {
   restoreWorkspacePaneTabsTargetQueryData,
   setWorkspacePaneTabsForTargetQueryData,
   workspacePaneTabsQueryKey,
+  workspacePaneTabsTargetVersion,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   reportWorkspacePaneTabsFailure,
@@ -84,6 +85,7 @@ export function useWorkspacePaneTabsReorderMutation(
           },
           queryClient,
         )
+        const optimisticTargetVersion = workspacePaneTabsTargetVersion(target)
         try {
           const serverTabs = await updateWorkspacePaneTabsOnServer({
             repoRoot: target.repoRoot,
@@ -110,6 +112,7 @@ export function useWorkspacePaneTabsReorderMutation(
               branchName: target.branchName,
               worktreePath: target.worktreePath,
               previousTargetEntry,
+              expectedTargetVersion: optimisticTargetVersion,
             },
             queryClient,
           )

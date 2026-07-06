@@ -56,7 +56,7 @@ const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
 const EMPTY_SERVER_SNAPSHOTS = new Map<string, TerminalHydrationSnapshot>()
 const MAX_PENDING_SERVER_BELLS = 99
 
-interface PendingTerminalCreateRequest {
+interface TerminalCreateQueueRequest {
   createOptions: TerminalCreateOptions
   owner: TerminalCreateOwner | null
   dedupeKey: string | null
@@ -97,7 +97,7 @@ export class TerminalSessionProjection {
   // when to drain them; the helper owns dedupe and settle mechanics.
   private readonly lifecycleQueues = new TerminalSessionLifecycleQueues<
     TerminalSessionBase,
-    PendingTerminalCreateRequest
+    TerminalCreateQueueRequest
   >()
   // Durable close queue rationale. `TerminalSession.dispose` used to fire
   // `terminalClient.close({ terminalRuntimeSessionId })` as a `void ... .catch(() => {})`
@@ -108,7 +108,7 @@ export class TerminalSessionProjection {
   // line a second time.
   //
   // Enqueue stores a promise, the background close settles it, and
-  // `flushPendingCreate` awaits closes for the same worktree before
+  // `flushCreateRequest` awaits closes for the same worktree before
   // creating so the session service cannot reattach to an orphan.
   // Failures are logged (the old path swallowed them silently) so any
   // future regression is visible in `terminalLog` rather than invisible
@@ -453,7 +453,7 @@ export class TerminalSessionProjection {
   }
 
   createTerminal = (base: TerminalSessionBase, options: TerminalCreateOptions = {}): Promise<string> =>
-    this.enqueuePendingCreate(base, formatTerminalWorktreeKey(base.repoRoot, base.worktreePath), {
+    this.enqueueCreateRequest(base, formatTerminalWorktreeKey(base.repoRoot, base.worktreePath), {
       createOptions: options,
       owner: null,
       dedupeKey: terminalCreateDedupeKey(options),
@@ -464,7 +464,7 @@ export class TerminalSessionProjection {
     owner: TerminalCreateOwner,
     options: TerminalCreateOptions = {},
   ): Promise<string> =>
-    this.enqueuePendingCreate(base, formatTerminalWorktreeKey(base.repoRoot, base.worktreePath), {
+    this.enqueueCreateRequest(base, formatTerminalWorktreeKey(base.repoRoot, base.worktreePath), {
       createOptions: options,
       owner,
       dedupeKey: null,
@@ -487,7 +487,7 @@ export class TerminalSessionProjection {
   private async performCreateTerminal(
     base: TerminalSessionBase,
     geometry: { cols: number; rows: number },
-    request: PendingTerminalCreateRequest,
+    request: TerminalCreateQueueRequest,
   ): Promise<string> {
     const repoInstanceId = requireRepoInstanceId(base)
     return await runWorkspacePaneTabsOperation(
@@ -504,7 +504,7 @@ export class TerminalSessionProjection {
   private async performCreateTerminalNow(
     base: TerminalSessionBase,
     geometry: { cols: number; rows: number },
-    request: PendingTerminalCreateRequest,
+    request: TerminalCreateQueueRequest,
   ): Promise<string> {
     if (request.owner && !request.owner.isFresh()) {
       throw new Error('terminal create request canceled')
@@ -571,10 +571,10 @@ export class TerminalSessionProjection {
     )
   }
 
-  private enqueuePendingCreate(
+  private enqueueCreateRequest(
     base: TerminalSessionBase,
     terminalWorktreeKey: string,
-    request: PendingTerminalCreateRequest,
+    request: TerminalCreateQueueRequest,
   ): Promise<string> {
     const promise = this.lifecycleQueues.enqueueCreate({
       terminalWorktreeKey,
@@ -582,25 +582,25 @@ export class TerminalSessionProjection {
       options: request,
       isSameRequest: (existing, next) => existing.dedupeKey !== null && existing.dedupeKey === next.dedupeKey,
       flush: (key) => {
-        void this.flushPendingCreate(key)
+        void this.flushCreateRequest(key)
       },
     })
     this.notifyWorktree(terminalWorktreeKey)
     return promise
   }
 
-  private async flushPendingCreate(terminalWorktreeKey: string): Promise<void> {
+  private async flushCreateRequest(terminalWorktreeKey: string): Promise<void> {
     const pending = this.lifecycleQueues.getCreate(terminalWorktreeKey)
     if (!pending || pending.flushing) return
-    // Synchronous claim: enqueuePendingCreate, registerHost, and a
+    // Synchronous claim: enqueueCreateRequest, registerHost, and a
     // StrictMode double-invoke can all arrive here while a prior flush
     // is still awaiting. The first one through sets the flag; the rest
     // bail and observe the same pending promise.
     pending.flushing = true
     try {
       // Close-drain lives here (not at the top of `createTerminal`) so
-      // `enqueuePendingCreate` puts the entry into the map first and
-      // emits the synchronous `pendingCreate: true` snapshot.
+      // `enqueueCreateRequest` puts the entry into the map first and
+      // emits the synchronous `createPending: true` snapshot.
       await this.flushPendingClosesForWorktree(terminalWorktreeKey)
       if (this.lifecycleQueues.getCreate(terminalWorktreeKey) !== pending) {
         throw new Error('terminal create request canceled')
@@ -676,7 +676,7 @@ export class TerminalSessionProjection {
     }
   }
 
-  private async settlePendingCreateForWorktree(terminalWorktreeKey: string): Promise<void> {
+  private async settleCreateRequestForWorktree(terminalWorktreeKey: string): Promise<void> {
     const pending = this.lifecycleQueues.getCreate(terminalWorktreeKey)
     if (!pending) return
     if (!pending.creating) {
@@ -731,7 +731,7 @@ export class TerminalSessionProjection {
     const snapshot = buildTerminalWorktreeSnapshot({
       terminalWorktreeKey,
       selectedDescriptor: this.selectedDescriptor(terminalWorktreeKey),
-      pendingCreate: this.lifecycleQueues.hasCreate(terminalWorktreeKey),
+      createPending: this.lifecycleQueues.hasCreate(terminalWorktreeKey),
       sessions: this.visibleSessionsForWorktree(terminalWorktreeKey),
       selectedTerminalSessionId: this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) ?? null,
       getCachedSnapshot: (terminalSessionId) => this.snapshotCache.get(terminalSessionId) ?? null,
@@ -810,7 +810,7 @@ export class TerminalSessionProjection {
 
   closeTerminalsForWorktree = async (base: TerminalSessionBase): Promise<boolean> => {
     const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
-    await this.settlePendingCreateForWorktree(terminalWorktreeKey)
+    await this.settleCreateRequestForWorktree(terminalWorktreeKey)
     const terminalSessionIds = this.sessionsForWorktreeList(terminalWorktreeKey).map(
       (session) => session.descriptor.terminalSessionId,
     )

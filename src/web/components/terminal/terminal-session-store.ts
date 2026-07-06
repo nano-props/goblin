@@ -26,7 +26,7 @@ export function useTerminalWorktreeCount(terminalWorktreeKey: string | null): nu
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
-export function useTerminalWorktreePendingCreate(terminalWorktreeKey: string | null): boolean {
+export function useTerminalWorktreeCreatePending(terminalWorktreeKey: string | null): boolean {
   const { terminalWorktreeSnapshot, subscribeTerminalWorktree } = useTerminalSessionReadContext()
   const subscribe = useCallback(
     (listener: () => void) =>
@@ -34,7 +34,7 @@ export function useTerminalWorktreePendingCreate(terminalWorktreeKey: string | n
     [terminalWorktreeKey, subscribeTerminalWorktree],
   )
   const getSnapshot = useCallback(
-    () => (terminalWorktreeKey ? terminalWorktreeSnapshot(terminalWorktreeKey).pendingCreate : false),
+    () => (terminalWorktreeKey ? terminalWorktreeSnapshot(terminalWorktreeKey).createPending : false),
     [terminalWorktreeKey, terminalWorktreeSnapshot],
   )
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)

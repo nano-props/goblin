@@ -91,7 +91,7 @@ describe('workspace commands', () => {
         count: 0,
         bellCount: 0,
         outputActiveCount: 0,
-        pendingCreate: false,
+        createPending: false,
       }),
       createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal: vi.fn(),
@@ -121,7 +121,7 @@ describe('workspace commands', () => {
         count: 0,
         bellCount: 0,
         outputActiveCount: 0,
-        pendingCreate: false,
+        createPending: false,
       }),
       createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal: vi.fn(),
@@ -151,7 +151,7 @@ describe('workspace commands', () => {
         count: 0,
         bellCount: 0,
         outputActiveCount: 0,
-        pendingCreate: false,
+        createPending: false,
       }),
       createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal: vi.fn(),
@@ -206,7 +206,7 @@ describe('workspace commands', () => {
           count: 0,
           bellCount: 0,
           outputActiveCount: 0,
-          pendingCreate: false,
+          createPending: false,
         }),
         createTerminal: vi.fn(async () => 'session-1'),
         selectTerminal: vi.fn(),
@@ -245,7 +245,7 @@ describe('workspace commands', () => {
         count: 0,
         bellCount: 0,
         outputActiveCount: 0,
-        pendingCreate: false,
+        createPending: false,
       }),
       createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal: vi.fn(),
@@ -279,7 +279,7 @@ describe('workspace commands', () => {
         count: 0,
         bellCount: 0,
         outputActiveCount: 0,
-        pendingCreate: false,
+        createPending: false,
       }),
       createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal: vi.fn(),
@@ -309,7 +309,7 @@ describe('workspace commands', () => {
         count: 0,
         bellCount: 0,
         outputActiveCount: 0,
-        pendingCreate: false,
+        createPending: false,
       }),
       createTerminal,
       selectTerminal: vi.fn(),
@@ -370,7 +370,7 @@ describe('workspace commands', () => {
         count: 2,
         bellCount: 0,
         outputActiveCount: 0,
-        pendingCreate: false,
+        createPending: false,
       }),
       createTerminal,
       selectTerminal,
@@ -1360,7 +1360,7 @@ describe('workspace commands', () => {
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
     const closeWindow = vi.fn()
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), pendingCreate: true }),
+      terminalWorktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), createPending: true }),
       createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
@@ -1462,7 +1462,7 @@ describe('workspace commands', () => {
     })
     const closeTerminalsForWorktree = vi.fn(async () => true)
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), pendingCreate: true }),
+      terminalWorktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), createPending: true }),
       createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor: vi.fn(async () => true),
@@ -1541,7 +1541,7 @@ describe('workspace commands', () => {
       useReposStore.getState().setWorkspacePaneTab(repoId, branch, tab)
     })
     setTerminalSessionCommandBridge({
-      terminalWorktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), pendingCreate: true }),
+      terminalWorktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), createPending: true }),
       createTerminal: vi.fn(async () => 'session-1'),
       selectTerminal: vi.fn(),
     })
@@ -1721,7 +1721,7 @@ function worktreeSnapshotWithTerminal(options: { processName?: string } = {}): T
     count: 1,
     bellCount: 0,
     outputActiveCount: 0,
-    pendingCreate: false,
+    createPending: false,
   }
 }
 
@@ -1733,7 +1733,7 @@ function emptyWorktreeSnapshot(): TerminalWorktreeSnapshot {
     count: 0,
     bellCount: 0,
     outputActiveCount: 0,
-    pendingCreate: false,
+    createPending: false,
   }
 }
 
@@ -1767,7 +1767,7 @@ function worktreeSnapshotForSessions(terminalSessionIds: string[]): TerminalWork
     count: sessions.length,
     bellCount: 0,
     outputActiveCount: 0,
-    pendingCreate: false,
+    createPending: false,
   }
 }
 
@@ -1809,6 +1809,6 @@ function worktreeSnapshotWithSecondTerminalSelected(): TerminalWorktreeSnapshot 
     count: 2,
     bellCount: 0,
     outputActiveCount: 0,
-    pendingCreate: false,
+    createPending: false,
   }
 }

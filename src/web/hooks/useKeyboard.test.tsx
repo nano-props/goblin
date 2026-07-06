@@ -468,6 +468,6 @@ function terminalWorktreeSnapshot(): TerminalWorktreeSnapshot {
     count: 1,
     bellCount: 0,
     outputActiveCount: 0,
-    pendingCreate: false,
+    createPending: false,
   }
 }

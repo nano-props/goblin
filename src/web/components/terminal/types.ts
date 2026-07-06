@@ -182,7 +182,7 @@ export interface TerminalWorktreeSnapshot {
   count: number
   bellCount: number
   outputActiveCount: number
-  pendingCreate: boolean
+  createPending: boolean
 }
 
 export interface TerminalSessionContextValue {

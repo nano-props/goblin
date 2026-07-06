@@ -48,7 +48,7 @@ export function readWorkspacePaneRuntimeTabTargetProjection(input: {
     selectedSessionIdByRuntimeType: input.selectedSessionIdByRuntimeType,
     terminal: {
       views: snapshot?.sessions ?? [],
-      createPending: snapshot?.pendingCreate ?? false,
+      createPending: snapshot?.createPending ?? false,
       projectionState: readTerminalRuntimeProjectionState(input.repoRoot, input.repoInstanceId),
     },
   })

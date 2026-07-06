@@ -43,7 +43,7 @@ const terminalReadContext: TerminalSessionReadContextValue = {
     count: 0,
     bellCount: 0,
     outputActiveCount: 0,
-    pendingCreate: false,
+    createPending: false,
   }),
   subscribeTerminalWorktree: () => () => {},
   repoBellCount: () => 0,

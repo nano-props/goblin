@@ -60,7 +60,7 @@ describe('workspace pane runtime tab target projection', () => {
       count: 1,
       bellCount: 0,
       outputActiveCount: 0,
-      pendingCreate: true,
+      createPending: true,
     }))
     useTerminalProjectionHydrationStore.getState().markProjectionReady('/repo', 'repo-instance-1')
     setTerminalSessionCommandBridge({

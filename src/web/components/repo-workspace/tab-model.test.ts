@@ -360,7 +360,7 @@ describe('repo workspace pane tab model', () => {
     // When the user is actively creating a new terminal, the model keeps
     // the runtime-host view so the new-terminal affordance remains
     // reachable. preferred=terminal, no materialized terminal, but
-    // pendingCreate=true, so the runtime-host is preserved.
+    // createPending=true, so the runtime-host is preserved.
     const model = createModel({
       repoId: REPO_ID,
       branchName: 'feature/model',

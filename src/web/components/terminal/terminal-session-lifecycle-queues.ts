@@ -11,7 +11,7 @@
  * Close requests are deduped by terminalRuntimeSessionId and are awaited by later creates
  * for the same worktree so a fresh create cannot race an orphan close.
  */
-export interface PendingTerminalCreate<TBase, TOptions> {
+export interface TerminalCreateQueueEntry<TBase, TOptions> {
   base: TBase
   options: TOptions
   promise: Promise<string>
@@ -30,7 +30,7 @@ export interface PendingTerminalClose {
 }
 
 export class TerminalSessionLifecycleQueues<TBase, TOptions> {
-  private readonly pendingCreateByWorktree = new Map<string, PendingTerminalCreate<TBase, TOptions>>()
+  private readonly createEntryByWorktree = new Map<string, TerminalCreateQueueEntry<TBase, TOptions>>()
   private readonly pendingCloseByTerminalRuntimeSessionId = new Map<string, PendingTerminalClose>()
 
   enqueueCreate(input: {
@@ -40,7 +40,7 @@ export class TerminalSessionLifecycleQueues<TBase, TOptions> {
     isSameRequest: (existing: TOptions, next: TOptions) => boolean
     flush: (terminalWorktreeKey: string) => void
   }): Promise<string> {
-    const existing = this.pendingCreateByWorktree.get(input.terminalWorktreeKey)
+    const existing = this.createEntryByWorktree.get(input.terminalWorktreeKey)
     if (existing) {
       if (input.isSameRequest(existing.options, input.options)) return existing.promise
       return existing.promise.catch(() => undefined).then(() => this.enqueueCreate(input))
@@ -51,7 +51,7 @@ export class TerminalSessionLifecycleQueues<TBase, TOptions> {
       resolve = innerResolve
       reject = innerReject
     })
-    this.pendingCreateByWorktree.set(input.terminalWorktreeKey, {
+    this.createEntryByWorktree.set(input.terminalWorktreeKey, {
       base: input.base,
       options: input.options,
       promise,
@@ -64,17 +64,17 @@ export class TerminalSessionLifecycleQueues<TBase, TOptions> {
     return promise
   }
 
-  getCreate(terminalWorktreeKey: string): PendingTerminalCreate<TBase, TOptions> | undefined {
-    return this.pendingCreateByWorktree.get(terminalWorktreeKey)
+  getCreate(terminalWorktreeKey: string): TerminalCreateQueueEntry<TBase, TOptions> | undefined {
+    return this.createEntryByWorktree.get(terminalWorktreeKey)
   }
 
   hasCreate(terminalWorktreeKey: string): boolean {
-    return this.pendingCreateByWorktree.has(terminalWorktreeKey)
+    return this.createEntryByWorktree.has(terminalWorktreeKey)
   }
 
-  deleteCreate(terminalWorktreeKey: string, expected?: PendingTerminalCreate<TBase, TOptions>): boolean {
-    if (expected && this.pendingCreateByWorktree.get(terminalWorktreeKey) !== expected) return false
-    return this.pendingCreateByWorktree.delete(terminalWorktreeKey)
+  deleteCreate(terminalWorktreeKey: string, expected?: TerminalCreateQueueEntry<TBase, TOptions>): boolean {
+    if (expected && this.createEntryByWorktree.get(terminalWorktreeKey) !== expected) return false
+    return this.createEntryByWorktree.delete(terminalWorktreeKey)
   }
 
   enqueueClose(
@@ -110,9 +110,9 @@ export class TerminalSessionLifecycleQueues<TBase, TOptions> {
   }
 
   rejectAll(error: unknown): void {
-    for (const pending of this.pendingCreateByWorktree.values()) pending.reject(error)
+    for (const pending of this.createEntryByWorktree.values()) pending.reject(error)
     for (const pending of this.pendingCloseByTerminalRuntimeSessionId.values()) pending.reject(error)
-    this.pendingCreateByWorktree.clear()
+    this.createEntryByWorktree.clear()
     this.pendingCloseByTerminalRuntimeSessionId.clear()
   }
 

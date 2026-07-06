@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import {
   useTerminalRepoProjectionHydrationEntry,
   useTerminalSessionSummaries,
-  useTerminalWorktreePendingCreate,
+  useTerminalWorktreeCreatePending,
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
@@ -32,7 +32,7 @@ export function useWorkspacePaneRuntimeTabTargetProjection({
   const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey({ repoRoot, worktreePath })
 
   const terminalSessionSummaries = useTerminalSessionSummaries(runtimeTabTargetKey)
-  const terminalCreatePending = useTerminalWorktreePendingCreate(runtimeTabTargetKey)
+  const terminalCreatePending = useTerminalWorktreeCreatePending(runtimeTabTargetKey)
   const terminalProjectionHydration = useTerminalRepoProjectionHydrationEntry(repoRoot)
   const selectedTerminalSessionId = useReposStore((s) =>
     runtimeTabTargetKey ? s.selectedTerminalSessionIdByTerminalWorktree[runtimeTabTargetKey] : undefined,

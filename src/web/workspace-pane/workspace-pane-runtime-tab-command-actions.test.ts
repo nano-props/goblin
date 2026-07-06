@@ -28,7 +28,7 @@ describe('workspace pane runtime tab command actions', () => {
         count: 2,
         bellCount: 0,
         outputActiveCount: 0,
-        pendingCreate: false,
+        createPending: false,
       }),
       createTerminal,
       selectTerminal,

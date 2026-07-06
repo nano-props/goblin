@@ -397,23 +397,23 @@ describe('TerminalSessionProjection create flow', () => {
     const pending = projection.createTerminal(terminalBase())
 
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
 
     resolve(makeCreateResult())
     await expect(pending).resolves.toBe('session-1')
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
   })
 
-  test('clears pendingCreate when create rejects', async () => {
+  test('clears createPending when create rejects', async () => {
     mocks.createMock.mockRejectedValueOnce(new Error('boom'))
     const host = document.createElement('div')
     document.body.appendChild(host)
     projection.registerHost(WORKTREE_KEY, host)
 
     await expect(projection.createTerminal(terminalBase())).rejects.toThrow('boom')
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
   })
 
@@ -498,7 +498,7 @@ describe('TerminalSessionProjection create flow', () => {
   test('creates with default startup geometry when no host geometry is available yet', async () => {
     const pending = projection.createTerminal(terminalBase())
 
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
 
     await expect(pending).resolves.toBe('session-1')
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
@@ -519,7 +519,7 @@ describe('TerminalSessionProjection create flow', () => {
     mocks.createMock.mockReturnValueOnce(promise)
     const pending = projection.createTerminal(terminalBase())
 
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
     expect((projection as any).lifecycleQueues.hasCreate(WORKTREE_KEY)).toBe(true)
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
 
@@ -530,7 +530,7 @@ describe('TerminalSessionProjection create flow', () => {
     projection.destroy()
     await expectation
     expect((projection as any).lifecycleQueues.hasCreate(WORKTREE_KEY)).toBe(false)
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
   })
 
   test('closeTerminalsForWorktree waits for an in-flight create before closing it', async () => {
@@ -538,7 +538,7 @@ describe('TerminalSessionProjection create flow', () => {
     mocks.createMock.mockReturnValueOnce(promise)
     const pending = projection.createTerminal(terminalBase())
 
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(true)
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
 
     const closePromise = projection.closeTerminalsForWorktree(terminalBase())
@@ -547,7 +547,7 @@ describe('TerminalSessionProjection create flow', () => {
     await expect(pending).resolves.toBe('session-1')
     await expect(closePromise).resolves.toBe(true)
     expect((projection as any).lifecycleQueues.hasCreate(WORKTREE_KEY)).toBe(false)
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
   })
 
@@ -579,7 +579,7 @@ describe('TerminalSessionProjection create flow', () => {
       rows: 24,
       clientId: 'client_local',
     })
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
     await expect(pending).resolves.toBe('session-1')
   })
 
@@ -596,7 +596,7 @@ describe('TerminalSessionProjection create flow', () => {
     const pending = projection.createTerminal(terminalBase())
 
     await expect(pending).resolves.toBe('session-1')
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).pendingCreate).toBe(false)
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
     expect(mocks.createMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
       repoInstanceId: REPO_INSTANCE_ID,

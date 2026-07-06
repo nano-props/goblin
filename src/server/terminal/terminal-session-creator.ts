@@ -1,7 +1,11 @@
 import path from 'node:path'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import type { TerminalCreateInput, TerminalCreateResult, TerminalSessionSummary } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import {
+  isWorkspacePaneRuntimeTabEntry,
+  type WorkspacePaneTabEntry,
+  workspacePaneRuntimeTabSessionId,
+} from '#/shared/workspace-pane.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type {
   TerminalSessionEnsureInput,
@@ -105,6 +109,7 @@ class TerminalSessionCreator {
           createResult.terminalRuntimeSessionId,
         )
         if (staleAfterTabs) return staleAfterTabs
+        const responseSessions = terminalSessionsWithWorkspaceTabOrder(sessions, createdSession?.worktreePath, tabs)
         return {
           ok: true,
           action: createResult.action,
@@ -121,7 +126,7 @@ class TerminalSessionCreator {
           controller: createResult.controller,
           canonicalCols: createResult.canonicalCols,
           canonicalRows: createResult.canonicalRows,
-          sessions,
+          sessions: responseSessions,
         }
       },
     )
@@ -140,4 +145,38 @@ function isTerminalCreateFailure(
 
 function terminalWorktreePath(repoRoot: string, worktreePath: string): string {
   return isRemoteRepoId(repoRoot) ? worktreePath : path.resolve(worktreePath)
+}
+
+function terminalSessionsWithWorkspaceTabOrder(
+  sessions: readonly TerminalSessionSummary[],
+  worktreePath: string | null | undefined,
+  tabs: readonly WorkspacePaneTabEntry[],
+): TerminalSessionSummary[] {
+  if (!worktreePath) return [...sessions]
+
+  const sessionsById = new Map(sessions.map((session) => [session.terminalSessionId, session]))
+  const usedSessionIds = new Set<string>()
+  const orderedWorktreeSessions: TerminalSessionSummary[] = []
+
+  for (const tab of tabs) {
+    if (!isWorkspacePaneRuntimeTabEntry(tab) || tab.type !== 'terminal') continue
+    const sessionId = workspacePaneRuntimeTabSessionId(tab)
+    if (usedSessionIds.has(sessionId)) continue
+    const session = sessionsById.get(sessionId)
+    if (!session || session.worktreePath !== worktreePath) continue
+    orderedWorktreeSessions.push(session)
+    usedSessionIds.add(sessionId)
+  }
+
+  for (const session of sessions) {
+    if (session.worktreePath !== worktreePath || usedSessionIds.has(session.terminalSessionId)) continue
+    orderedWorktreeSessions.push(session)
+    usedSessionIds.add(session.terminalSessionId)
+  }
+
+  let orderedWorktreeIndex = 0
+  return sessions.map((session) => {
+    if (session.worktreePath !== worktreePath) return session
+    return orderedWorktreeSessions[orderedWorktreeIndex++] ?? session
+  })
 }

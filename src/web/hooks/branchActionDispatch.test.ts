@@ -318,7 +318,7 @@ function emptyWorktreeSnapshot(): TerminalWorktreeSnapshot {
     count: 0,
     bellCount: 0,
     outputActiveCount: 0,
-    pendingCreate: false,
+    createPending: false,
   }
 }
 
@@ -349,6 +349,6 @@ function worktreeSnapshotWithTerminal(): TerminalWorktreeSnapshot {
     count: 1,
     bellCount: 0,
     outputActiveCount: 0,
-    pendingCreate: false,
+    createPending: false,
   }
 }

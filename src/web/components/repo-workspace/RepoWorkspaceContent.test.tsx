@@ -637,7 +637,7 @@ describe('RepoWorkspaceContent', () => {
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
       terminalWorktreeKey,
-      pendingCreate: true,
+      createPending: true,
     }
     const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
@@ -680,7 +680,7 @@ describe('RepoWorkspaceContent', () => {
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
       terminalWorktreeKey,
-      pendingCreate: true,
+      createPending: true,
     }
     const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
@@ -716,7 +716,7 @@ describe('RepoWorkspaceContent', () => {
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
       terminalWorktreeKey,
-      pendingCreate: false,
+      createPending: false,
     }
     const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
@@ -1030,7 +1030,7 @@ const emptyWorktreeSnapshot: TerminalWorktreeSnapshot = {
   count: 0,
   bellCount: 0,
   outputActiveCount: 0,
-  pendingCreate: false,
+  createPending: false,
 }
 
 const emptyTerminalReadContext: TerminalSessionReadContextValue = {

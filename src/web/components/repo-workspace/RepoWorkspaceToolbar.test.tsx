@@ -776,7 +776,7 @@ describe('RepoWorkspaceToolbar', () => {
       terminalCount: 0,
       preferredWorkspacePaneTab: 'terminal',
       navigation: navigationWith({}),
-      pendingCreate: true,
+      createPending: true,
     })
 
     const pendingView = c.querySelector('[data-workspace-pane-pending-tab="terminal"]')
@@ -796,7 +796,7 @@ describe('RepoWorkspaceToolbar', () => {
       terminalCount: 0,
       preferredWorkspacePaneTab: 'terminal',
       navigation: navigationWith({}),
-      pendingCreate: true,
+      createPending: true,
     })
 
     const pendingView = c.querySelector('[data-workspace-pane-pending-tab="terminal"]')
@@ -1091,7 +1091,7 @@ describe('RepoWorkspaceToolbar', () => {
     const { container: c, mocks } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
-      pendingCreate: true,
+      createPending: true,
     })
 
     expect(c.querySelector('[data-workspace-pane-skeleton-chip=""]')).toBeNull()
@@ -1113,7 +1113,7 @@ describe('RepoWorkspaceToolbar', () => {
     const { container: c, mocks } = renderToolbar({
       terminalCount: 1,
       navigation: navigationWith({}),
-      pendingCreate: true,
+      createPending: true,
     })
 
     expect(c.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:t1"]')).not.toBeNull()
@@ -1168,7 +1168,7 @@ function renderToolbar(options: {
   workspacePaneTabs?: WorkspacePaneTabEntry[]
   worktree?: boolean
   collapsed?: boolean
-  pendingCreate?: boolean
+  createPending?: boolean
   trafficLightOffset?: boolean
   remote?: Partial<RepoState['remote']>
   repoInstanceId?: string
@@ -1264,7 +1264,7 @@ function renderToolbar(options: {
     count: options.terminalCount,
     bellCount: sessions.filter((session) => session.hasBell).length,
     outputActiveCount: 0,
-    pendingCreate: options.pendingCreate ?? false,
+    createPending: options.createPending ?? false,
   }
   const terminalSnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
   const readContext: TerminalSessionReadContextValue = {
@@ -1356,7 +1356,7 @@ function renderToolbar(options: {
         ? '[data-workspace-pane-tab-tooltip-id="terminal:t1"] button[role="tab"]'
         : 'button[aria-label="terminal.new"]'
   const tab = container.querySelector<HTMLButtonElement>(tabSelector)
-  if (!tab && !options.loading && !options.pendingCreate) throw new Error('missing terminal tab')
+  if (!tab && !options.loading && !options.createPending) throw new Error('missing terminal tab')
   return {
     container,
     terminalTab: tab as HTMLButtonElement,

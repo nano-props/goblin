@@ -9,7 +9,7 @@ import type {
 export function buildTerminalWorktreeSnapshot(input: {
   terminalWorktreeKey: string
   selectedDescriptor: TerminalWorktreeSnapshot['selectedDescriptor']
-  pendingCreate: boolean
+  createPending: boolean
   sessions: TerminalSessionLike[]
   selectedTerminalSessionId: string | null
   getCachedSnapshot: (terminalSessionId: string) => TerminalSnapshot | null
@@ -27,7 +27,7 @@ export function buildTerminalWorktreeSnapshot(input: {
     count: sessions.length,
     bellCount,
     outputActiveCount,
-    pendingCreate: input.pendingCreate,
+    createPending: input.createPending,
   }
 }
 

@@ -77,6 +77,62 @@ describe('terminal session creator', () => {
     ])
   })
 
+  test('orders returned sessions by the canonical workspace tab order after insert', async () => {
+    const sessions: TerminalSessionSummary[] = [terminalSession('session-1'), terminalSession('session-2')]
+    const manager = {
+      listSessionsForUser: vi.fn(async () => sessions),
+    }
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: SCOPE,
+      branchName: BRANCH_NAME,
+      worktreePath: path.resolve(WORKTREE_PATH),
+      tabs: [
+        workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+        workspacePaneRuntimeTabEntry('terminal', 'session-2'),
+      ],
+    })
+    const ensureOrRestore = vi.fn(async (_clientId, _userId, input) => {
+      sessions.push(terminalSession(input.terminalSessionId ?? 'session-3'))
+      return ensureResult(input.terminalSessionId ?? 'session-3')
+    })
+    const creator = createTerminalSessionCreator({
+      createCoordinator: createTerminalSessionCreateCoordinator({
+        manager,
+        createSessionId: () => 'session-3',
+      }),
+      workspaceTabsCoordinator: createWorkspacePaneTabsCoordinator({
+        workspaceTabs,
+        runtimeProviders: [terminalRuntimeTabsProvider(manager)],
+      }),
+      ensureOrRestore,
+      isCurrentRepoInstance: vi.fn(() => true),
+      rejectStaleCreateIfNeeded: vi.fn(() => null),
+      listSessions: vi.fn(async () => sessions),
+    })
+
+    const result = await creator.create({
+      clientId: CLIENT_ID,
+      terminalClientId: TERMINAL_CLIENT_ID,
+      userId: USER_ID,
+      request: createRequest({ insertAfterIdentity: 'terminal:session-1' }),
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.tabs).toEqual([
+      workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+      workspacePaneRuntimeTabEntry('terminal', 'session-3'),
+      workspacePaneRuntimeTabEntry('terminal', 'session-2'),
+    ])
+    expect(result.sessions.map((session) => session.terminalSessionId)).toEqual([
+      'session-1',
+      'session-3',
+      'session-2',
+    ])
+  })
+
   test('rejects before ensuring when the repo instance is already stale', async () => {
     const manager = {
       listSessionsForUser: vi.fn(async () => []),
@@ -191,7 +247,7 @@ function ensureResult(terminalSessionId: string): Extract<TerminalSessionEnsureR
     message: null,
     snapshot: '',
     snapshotSeq: 0,
-   outputEra: 0,
+    outputEra: 0,
 
     controller: null,
     canonicalCols: 80,

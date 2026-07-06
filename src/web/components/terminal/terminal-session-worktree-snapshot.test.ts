@@ -59,7 +59,7 @@ describe('terminal session worktree snapshot helper', () => {
     const snapshot = buildTerminalWorktreeSnapshot({
       terminalWorktreeKey: descriptor.terminalWorktreeKey,
       selectedDescriptor: descriptor,
-      pendingCreate: false,
+      createPending: false,
       sessions: [session],
       selectedTerminalSessionId: descriptor.terminalSessionId,
       getCachedSnapshot: (terminalSessionId) => cache.get(terminalSessionId) ?? null,
@@ -85,14 +85,14 @@ describe('terminal session worktree snapshot helper', () => {
       count: 1,
       bellCount: 1,
       outputActiveCount: 1,
-      pendingCreate: false,
+      createPending: false,
     })
     expect(session.snapshotSpy).toHaveBeenCalledTimes(1)
 
     buildTerminalWorktreeSnapshot({
       terminalWorktreeKey: descriptor.terminalWorktreeKey,
       selectedDescriptor: descriptor,
-      pendingCreate: false,
+      createPending: false,
       sessions: [session],
       selectedTerminalSessionId: descriptor.terminalSessionId,
       getCachedSnapshot: (terminalSessionId) => cache.get(terminalSessionId) ?? null,

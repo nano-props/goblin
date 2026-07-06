@@ -41,7 +41,7 @@ const emptyWorktreeSnapshot: TerminalWorktreeSnapshot = {
   count: 0,
   bellCount: 0,
   outputActiveCount: 0,
-  pendingCreate: false,
+  createPending: false,
 }
 
 const terminalReadContext: TerminalSessionReadContextValue = {

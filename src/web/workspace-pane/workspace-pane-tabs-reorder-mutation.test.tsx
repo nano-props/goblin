@@ -242,6 +242,43 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     })
   })
 
+  test('does not roll cache back over a newer same-target projection after server reject', async () => {
+    const requests = installDeferredUpdateWorkspaceTabs()
+    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
+    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
+    const newerProjectionTabs = [staticEntry('history'), terminalEntry('session-2')]
+    seedWorkspacePaneTabs(sourceTabs)
+    renderMutationHook({ canonicalTabs: sourceTabs })
+
+    act(() => {
+      currentControls().reorderTabs(reorderedTabs)
+    })
+    await vi.waitFor(() => {
+      expect(readWorkspacePaneTabs()).toEqual(reorderedTabs)
+      expect(requests).toHaveLength(1)
+    })
+
+    setWorkspacePaneTabsForTargetQueryData(
+      {
+        repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        tabs: newerProjectionTabs,
+      },
+      queryClient,
+    )
+
+    await act(async () => {
+      requests[0]!.reject(new Error('server unavailable'))
+      await flushMicrotasks()
+    })
+
+    await vi.waitFor(() => {
+      expect(readWorkspacePaneTabs()).toEqual(newerProjectionTabs)
+    })
+  })
+
   test('rolls back only the failed branch when another branch updates while reorder is pending', async () => {
     const requests = installDeferredUpdateWorkspaceTabs()
     const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]

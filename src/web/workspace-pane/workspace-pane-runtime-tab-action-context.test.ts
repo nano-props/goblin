@@ -67,7 +67,7 @@ function terminalCommandBridge({
       count: 0,
       bellCount: 0,
       outputActiveCount: 0,
-      pendingCreate: false,
+      createPending: false,
     }),
     createTerminal: vi.fn(async () => 'session-1'),
     selectTerminal,
