@@ -103,6 +103,38 @@ describe('terminal session projection helpers', () => {
     expect(projected?.controlsTerminal).toBe(false)
   })
 
+  test('uses server session branch metadata when the repo branch index is not loaded', () => {
+    const projected = projectServerTerminalSession({
+      repoIndex: {
+        [REPO_ROOT]: {
+          instanceId: REPO_INSTANCE_ID,
+          branchByWorktreePath: {},
+        },
+      },
+      repoRoot: REPO_ROOT,
+      clientId: 'client_b',
+      index: 1,
+      serverSession: {
+        terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
+        terminalSessionId: 'session-1',
+        repoInstanceId: REPO_INSTANCE_ID,
+        repoRoot: REPO_ROOT,
+        branch: 'feature/restored',
+        worktreePath: WORKTREE_PATH,
+        cwd: WORKTREE_PATH,
+        controller: null,
+        processName: 'bash',
+        canonicalTitle: null,
+        phase: 'open',
+        message: null,
+        cols: 80,
+        rows: 24,
+      },
+    })
+
+    expect(projected?.descriptor.branch).toBe('feature/restored')
+  })
+
   test('projects attach results into local controller state for the active attachment', () => {
     const projected = projectTerminalAttachResultForClient(
       {

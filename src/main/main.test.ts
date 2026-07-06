@@ -50,6 +50,7 @@ const mocks = vi.hoisted(() => {
     wireTerminalIpc: vi.fn(),
     wireClipboardIpc: vi.fn(),
     wireAccessTokenIpc: vi.fn(),
+    isTrustedIpcEvent: vi.fn(() => true),
     resetReady() {
       whenReadyPromise = new Promise<void>((resolve) => {
         resolveReady = resolve
@@ -156,6 +157,10 @@ vi.mock('#/main/access-token-ipc.ts', () => ({
   wireAccessTokenIpc: mocks.wireAccessTokenIpc,
 }))
 
+vi.mock('#/main/ipc/trusted-webcontents.ts', () => ({
+  isTrustedIpcEvent: mocks.isTrustedIpcEvent,
+}))
+
 vi.mock('#/main/shortcuts.ts', () => ({
   syncGlobalShortcuts: mocks.syncGlobalShortcuts,
   unregisterAppShortcuts: mocks.unregisterAppShortcuts,
@@ -171,6 +176,7 @@ describe('native host startup lifecycle', () => {
     vi.clearAllMocks()
     mocks.handlers.clear()
     mocks.ipcHandlers.clear()
+    mocks.isTrustedIpcEvent.mockReturnValue(true)
     mocks.resetReady()
     mocks.getSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
   })
@@ -217,6 +223,27 @@ describe('native host startup lifecycle', () => {
     mocks.timeouts.values().next().value?.()
     expect(mocks.flushWindowState).toHaveBeenCalledTimes(1)
     expect(mocks.exit).toHaveBeenCalledTimes(1)
+  })
+
+  test('ignores untrusted client quit drain acknowledgements', async () => {
+    await import('#/main/main.ts')
+
+    const event = { preventDefault: vi.fn() }
+    const quitting = emit('before-quit', event)
+    await vi.waitFor(() => {
+      expect(mocks.broadcastClientEffectIntent).toHaveBeenCalledWith({ type: 'app-quitting' })
+    })
+
+    mocks.isTrustedIpcEvent.mockReturnValueOnce(false)
+    const untrustedResult = await mocks.ipcHandlers.get('goblin:app-quit-drained')?.({ sender: { id: 99 } }, { ok: true })
+    expect(untrustedResult).toBe(false)
+    expect(mocks.flushWindowState).not.toHaveBeenCalled()
+
+    await mocks.ipcHandlers.get('goblin:app-quit-drained')?.({ sender: { id: 1 } }, { ok: true })
+    await quitting
+
+    expect(mocks.flushWindowState).toHaveBeenCalledTimes(1)
+    expect(mocks.exit).toHaveBeenCalledWith(0)
   })
 
   test('defers second-instance activation until startup initialization finishes', async () => {

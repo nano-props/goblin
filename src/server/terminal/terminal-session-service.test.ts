@@ -702,6 +702,43 @@ describe('terminal session service workspace tabs', () => {
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith(USER_ID, REPO_ROOT)
   })
 
+  test('listWorkspaceTabs does not materialize terminal tabs after repo instance goes stale during projection', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: RUNTIME_SCOPE,
+      branchName: BRANCH_NAME,
+      worktreePath: path.resolve(WORKTREE_PATH),
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    let current = true
+    let listCount = 0
+    const broadcastWorkspaceTabsChanged = vi.fn()
+    const service = createService({
+      sessions: () => {
+        listCount += 1
+        if (listCount === 2) current = false
+        return [terminalSession('session-live')]
+      },
+      workspaceTabs,
+      isCurrentRepoInstance: () => current,
+      broadcastWorkspaceTabsChanged,
+    })
+
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).rejects.toThrow(
+      'error.repo-instance-stale',
+    )
+    expect(
+      workspaceTabs.tabs({
+        userId: USER_ID,
+        scope: RUNTIME_SCOPE,
+        branchName: BRANCH_NAME,
+        worktreePath: path.resolve(WORKTREE_PATH),
+      }),
+    ).toEqual([workspacePaneStaticTabEntry('status')])
+    expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
+  })
+
   test('listWorkspaceTabs materializes remote terminal tabs from session branch metadata', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({

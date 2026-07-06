@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useSyncExternalStore } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useSyncExternalStore } from 'react'
 import { persistWorkspaceSessionState, persistWorkspaceSessionStateOnUnload } from '#/web/settings-actions.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
@@ -45,7 +45,6 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
   const lastSavedRef = useRef<string | null>(null)
   const lastImmediateKeyRef = useRef<string | null>(null)
   const lastRoutedRepoIdRef = useRef<string | null>(null)
-  const latestInputRef = useRef<SessionPersistenceInput | null>(null)
   const queuedSaveRef = useRef<{
     session: ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState>
     serialized: string
@@ -94,60 +93,60 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
     return saveDrainRef.current
   }
 
+  const latestSessionSaveCandidate = useEffectEvent(() => {
+    const session = sessionFromPersistenceInput(
+      {
+        workspaceMembershipReady,
+        sessionPersistenceReady,
+        sessionRestoreError,
+        repos,
+        order,
+        restoredRepoId,
+        zenMode,
+        workspacePaneSize,
+        selectedTerminalSessionIdByTerminalWorktree,
+        filetreeInteractionByScope,
+      },
+      routedRepoId ?? lastRoutedRepoIdRef.current,
+    )
+    if (!session) return null
+    return { session, serialized: JSON.stringify(session) }
+  })
+
+  const drainNativeQuitPersistenceBoundary = useEffectEvent(async () => {
+    if (debounceTimerRef.current !== null) {
+      window.clearTimeout(debounceTimerRef.current)
+      debounceTimerRef.current = null
+    }
+    const latest = latestSessionSaveCandidate()
+    if (!latest) return
+    latestSaveRef.current = latest
+    if (lastSavedRef.current === latest.serialized) return
+    await enqueueSave(latest.session, latest.serialized, { throwOnFailure: true })
+  })
+
   useLayoutEffect(() => {
     if (routedRepoId) lastRoutedRepoIdRef.current = routedRepoId
-    latestInputRef.current = {
-      workspaceMembershipReady,
-      sessionPersistenceReady,
-      sessionRestoreError,
-      repos,
-      order,
-      restoredRepoId,
-      zenMode,
-      workspacePaneSize,
-      selectedTerminalSessionIdByTerminalWorktree,
-      filetreeInteractionByScope,
-    }
-  }, [
-    restoredRepoId,
-    filetreeInteractionByScope,
-    order,
-    repos,
-    routedRepoId,
-    selectedTerminalSessionIdByTerminalWorktree,
-    sessionPersistenceReady,
-    sessionRestoreError,
-    workspaceMembershipReady,
-    workspacePaneSize,
-    zenMode,
-  ])
+  }, [routedRepoId])
 
   useEffect(() => {
-    return subscribeAppQuitting(async () => {
-      if (debounceTimerRef.current !== null) {
-        window.clearTimeout(debounceTimerRef.current)
-        debounceTimerRef.current = null
-      }
-      const latest = latestSaveRef.current
-      if (!latest || lastSavedRef.current === latest.serialized) return
-      await enqueueSave(latest.session, latest.serialized, { throwOnFailure: true })
-    })
+    return subscribeAppQuitting(drainNativeQuitPersistenceBoundary)
   }, [])
 
   useEffect(() => {
     // Client -> persistence only. Boot restore runs elsewhere first.
     // workspaceMembershipReady gates the UI skeleton; sessionPersistenceReady waits
     // for boot-restored server-owned workspace tabs to converge back into the client store.
-    let session: ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState> | null
+    let latest: ReturnType<typeof latestSessionSaveCandidate>
     try {
-      session = sessionFromPersistenceInput(latestInputRef.current, lastRoutedRepoIdRef.current)
-      if (!session) return
+      latest = latestSessionSaveCandidate()
+      if (!latest) return
     } catch (err) {
       sessionLog.warn('save blocked', { err })
       return
     }
-    const serialized = JSON.stringify(session)
-    latestSaveRef.current = { session, serialized }
+    const { session, serialized } = latest
+    latestSaveRef.current = latest
     // Restorable session writes should be immediate only for coarse
     // workspace-structure changes. High-frequency runtime churn such as
     // terminal selection and workspace-tab mutation is still restorable, but
@@ -196,8 +195,8 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
   useEffect(() => {
     const flushLatestSession = () => {
       try {
-        const session = sessionFromPersistenceInput(latestInputRef.current, lastRoutedRepoIdRef.current)
-        if (session) persistWorkspaceSessionStateOnUnload(session)
+        const latest = latestSessionSaveCandidate()
+        if (latest) persistWorkspaceSessionStateOnUnload(latest.session)
       } catch (err) {
         sessionLog.warn('unload save blocked', { err })
       }

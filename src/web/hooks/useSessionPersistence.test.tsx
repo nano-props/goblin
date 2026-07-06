@@ -2,6 +2,7 @@
 
 import { act } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
+import { flushSync } from 'react-dom'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useSessionPersistence } from '#/web/hooks/useSessionPersistence.ts'
@@ -529,7 +530,7 @@ describe('useSessionPersistence', () => {
     renderInJsdom(<Harness />)
     persistWorkspaceSessionStateMock.mockClear()
 
-    act(() => {
+    flushSync(() => {
       useReposStore.setState({ selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'session-2' } })
     })
     expect(persistWorkspaceSessionStateMock).not.toHaveBeenCalled()

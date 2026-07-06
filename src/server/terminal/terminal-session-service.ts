@@ -321,7 +321,23 @@ class TerminalSessionService {
   async listWorkspaceTabs(userId: string, repoRoot: string, repoInstanceId: string): Promise<WorkspacePaneTabsEntry[]> {
     if (!isValidRepoLocator(repoRoot)) return []
     const scope = terminalSessionRuntimeScope(repoRoot, repoInstanceId)
+    await this.reconcileWorkspaceTabsProjectionBoundary(userId, repoRoot, repoInstanceId, scope)
+    return this.options.workspaceTabs.tabsForScope({ userId, scope }).map((entry) => ({
+      repoRoot,
+      branchName: entry.branchName,
+      worktreePath: entry.worktreePath,
+      tabs: entry.tabs,
+    }))
+  }
+
+  private async reconcileWorkspaceTabsProjectionBoundary(
+    userId: string,
+    repoRoot: string,
+    repoInstanceId: string,
+    scope: string,
+  ): Promise<void> {
     const liveSessions = await this.options.manager.listSessionsForUser(userId, scope)
+    this.assertCurrentRepoInstance(userId, repoRoot, repoInstanceId)
     const worktreePaths = new Set(
       this.options.workspaceTabs
         .tabsForScope({ userId, scope })
@@ -332,25 +348,24 @@ class TerminalSessionService {
     // Read-side canonicalization boundary: workspace pane terminal tabs are a
     // projection of live terminal sessions. Listing tabs self-heals missing
     // terminal entries so reload/restore always returns a coherent tab strip.
+    const assertCurrent = () => this.assertCurrentRepoInstance(userId, repoRoot, repoInstanceId)
     for (const worktreePath of worktreePaths) {
-      changed = (await this.projectWorkspaceTerminalTabsForWorktree(userId, scope, worktreePath)) || changed
+      assertCurrent()
+      changed = (await this.projectWorkspaceTerminalTabsForWorktree(userId, scope, worktreePath, assertCurrent)) || changed
+      assertCurrent()
     }
     if (changed) this.options.broadcastWorkspaceTabsChanged(userId, repoRoot)
-    return this.options.workspaceTabs.tabsForScope({ userId, scope }).map((entry) => ({
-      repoRoot,
-      branchName: entry.branchName,
-      worktreePath: entry.worktreePath,
-      tabs: entry.tabs,
-    }))
   }
 
   private async projectWorkspaceTerminalTabsForWorktree(
     userId: string,
     scope: string,
     worktreePath: string,
+    assertCurrent?: () => void,
   ): Promise<boolean> {
     return await this.runWorkspaceTabsWorktreeOperation(userId, scope, worktreePath, async () => {
       const liveSessions = await this.liveTerminalSessionsForWorktree(userId, scope, worktreePath)
+      assertCurrent?.()
       const liveTerminalSessionIds = liveSessions.map((session) => session.terminalSessionId)
       const pruned = this.pruneWorkspaceTabsForWorktree({
         userId,
