@@ -234,7 +234,14 @@ export type TerminalUpdateWorkspaceTabsOperation =
       tabType: WorkspacePaneStaticTabType
       insertAfterIdentity?: string | null
     }
+  | {
+      type: 'open-agent'
+      agentSessionId: string
+      insertAfterIdentity?: string | null
+    }
   | { type: 'close-static'; tabType: WorkspacePaneStaticTabType }
+  | { type: 'close-agent'; agentSessionId: string }
+  | { type: 'close-agent-worktree' }
   | { type: 'reorder'; tabIdentities: string[] }
 
 export interface TerminalUpdateWorkspaceTabsInput extends WorkspacePaneTabsTarget, RepoInstanceRuntimeInput {

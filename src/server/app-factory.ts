@@ -10,6 +10,7 @@ import { applyApiSecurityHeaders, buildCorsOriginPredicate } from '#/server/comm
 import { accessLog } from '#/server/common/access-log.ts'
 import { errorJson } from '#/server/common/responses.ts'
 import { createAuthRoutes } from '#/server/routes/auth.ts'
+import { createAgentRoutes } from '#/server/routes/agent.ts'
 import { createClipboardRoutes } from '#/server/routes/clipboard.ts'
 import { createHealthRoutes } from '#/server/routes/health.ts'
 import { createHostRoutes } from '#/server/routes/host.ts'
@@ -19,6 +20,7 @@ import { createRepoRoutes } from '#/server/routes/repo.ts'
 import { createRepoViewRoutes } from '#/server/routes/repo-view.ts'
 import { createSettingsRoutes } from '#/server/routes/settings.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
+import { createAgentSessionService, type AgentSessionService } from '#/server/agent/agent-session-service.ts'
 import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
 import { MAX_PASTE_BATCH_BYTES } from '#/shared/clipboard-paste.ts'
@@ -34,6 +36,7 @@ export interface ServerAppOptions {
    */
   accessToken: string
   terminalHost: ServerTerminalHost
+  agentSessionService?: AgentSessionService
   /**
    * The actual host the server is listening on. Used by the CORS
    * origin predicate to allow same-machine browsers. Defaults to
@@ -83,6 +86,7 @@ function isServerRoutePath(requestPath: string): boolean {
 
 export function createApp(options: ServerAppOptions): Hono {
   const settingsState = createNativeShortcutRegistrationState()
+  const agentSessionService = options.agentSessionService ?? createAgentSessionService()
   const app = new Hono()
   app.use('*', accessLog())
   const serverHost = options.serverHost ?? '127.0.0.1'
@@ -217,6 +221,15 @@ export function createApp(options: ServerAppOptions): Hono {
   app.route('/api/remote', createRemoteRoutes())
   app.route('/api/repo', createRepoRoutes())
   app.route('/api/repo', createRepoViewRoutes())
+  app.use('/api/agent/*', createAccessTokenMiddleware(options.accessToken))
+  app.use(
+    '/api/agent/*',
+    bodyLimit({
+      maxSize: API_BODY_LIMIT_BYTES,
+      onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
+    }),
+  )
+  app.route('/api/agent', createAgentRoutes(agentSessionService))
   app.route('/api/clipboard', createClipboardRoutes())
   app.route('/ws', createRealtimeRoutes({ accessToken: options.accessToken, terminalHost: options.terminalHost }))
 

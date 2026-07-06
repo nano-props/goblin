@@ -2,6 +2,7 @@ import {
   type WorkspacePaneStaticTabType,
   type WorkspacePaneTabEntry,
   workspacePaneStaticTabEntry,
+  workspacePaneAgentTabEntry,
   workspacePaneTabEntryIdentity,
   workspacePaneTabsInsertAfterIdentity,
   workspacePaneTabRequiresWorktree,
@@ -88,6 +89,26 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     })
   }
 
+  ensureAgentTab(
+    input: WorkspacePaneTabsTargetInput<TUser>,
+    agentSessionId: string,
+    options?: { insertAfterIdentity?: string | null },
+  ): WorkspacePaneTabEntry[] {
+    const current = this.tabs(input)
+    if (input.worktreePath === null || agentSessionId.length === 0) return current
+    if (current.some((entry) => entry.type === 'agent' && entry.agentSessionId === agentSessionId)) {
+      return current
+    }
+    return this.replaceTabs({
+      ...input,
+      tabs: workspacePaneTabsInsertAfterIdentity(
+        current,
+        workspacePaneAgentTabEntry(agentSessionId),
+        options?.insertAfterIdentity,
+      ),
+    })
+  }
+
   openStaticTab(
     input: WorkspacePaneTabsTargetInput<TUser>,
     tabType: WorkspacePaneStaticTabType,
@@ -142,6 +163,13 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     )
   }
 
+  agentSessionIds(input: WorkspacePaneTabsWorktreeInput<TUser>): string[] {
+    const entries = this.tabsForScope({ userId: input.userId, scope: input.scope }).filter(
+      (entry) => entry.worktreePath === input.worktreePath,
+    )
+    return entries.flatMap((entry) => entry.tabs.flatMap((tab) => (tab.type === 'agent' ? [tab.agentSessionId] : [])))
+  }
+
   closeSessionsForUser(userId: TUser): void {
     const prefix = workspacePaneTabsRuntimeUserPrefixKey(userId)
     for (const key of Array.from(this.tabsByTarget.keys())) {
@@ -182,6 +210,8 @@ function normalizeWorkspacePaneTabs(
     const normalized =
       entry.type === 'terminal'
         ? workspacePaneTerminalTabEntry(entry.terminalSessionId)
+        : entry.type === 'agent'
+          ? workspacePaneAgentTabEntry(entry.agentSessionId)
         : workspacePaneStaticTabEntry(entry.type)
     const identity = workspacePaneTabEntryIdentity(normalized)
     if (seen.has(identity)) continue

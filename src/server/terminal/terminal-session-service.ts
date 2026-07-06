@@ -102,6 +102,7 @@ interface TerminalSessionServiceOptions {
   workspaceTabs: Pick<
     WorkspacePaneTabsRuntime<string>,
     | 'closeStaticTab'
+    | 'ensureAgentTab'
     | 'ensureTerminalTab'
     | 'openStaticTab'
     | 'reorderTabsByIdentity'
@@ -464,8 +465,19 @@ class TerminalSessionService {
         return this.options.workspaceTabs.openStaticTab(target, operation.tabType, {
           insertAfterIdentity: operation.insertAfterIdentity,
         })
+      case 'open-agent':
+        if (target.worktreePath === null) return this.options.workspaceTabs.tabs(target)
+        return this.options.workspaceTabs.ensureAgentTab(target, operation.agentSessionId, {
+          insertAfterIdentity: operation.insertAfterIdentity,
+        })
       case 'close-static':
         return this.options.workspaceTabs.closeStaticTab(target, operation.tabType)
+      case 'close-agent':
+        return this.options.workspaceTabs
+          .tabs(target)
+          .filter((entry) => entry.type !== 'agent' || entry.agentSessionId !== operation.agentSessionId)
+      case 'close-agent-worktree':
+        return this.options.workspaceTabs.tabs(target).filter((entry) => entry.type !== 'agent')
       case 'reorder':
         return this.options.workspaceTabs.reorderTabsByIdentity(target, operation.tabIdentities)
     }
@@ -837,6 +849,7 @@ function isValidWorkspacePaneTabsOperation(value: unknown): value is TerminalUpd
   const operation = value as {
     type?: unknown
     tabType?: unknown
+    agentSessionId?: unknown
     tabIdentities?: unknown
     insertAfterIdentity?: unknown
   }
@@ -853,6 +866,23 @@ function isValidWorkspacePaneTabsOperation(value: unknown): value is TerminalUpd
   }
   if (operation.type === 'close-static') {
     return typeof operation.tabType === 'string' && isWorkspacePaneStaticTabType(operation.tabType)
+  }
+  if (operation.type === 'open-agent') {
+    return (
+      typeof operation.agentSessionId === 'string' &&
+      operation.agentSessionId.length > 0 &&
+      (operation.insertAfterIdentity === undefined ||
+        operation.insertAfterIdentity === null ||
+        (typeof operation.insertAfterIdentity === 'string' &&
+          operation.insertAfterIdentity.length > 0 &&
+          !operation.insertAfterIdentity.includes('\0')))
+    )
+  }
+  if (operation.type === 'close-agent') {
+    return typeof operation.agentSessionId === 'string' && operation.agentSessionId.length > 0
+  }
+  if (operation.type === 'close-agent-worktree') {
+    return true
   }
   if (operation.type === 'reorder') {
     return (

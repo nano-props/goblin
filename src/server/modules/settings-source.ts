@@ -343,7 +343,7 @@ function normalizeSession(value: unknown): WorkspaceSessionState {
 }
 
 function workspacePaneStaticTabs(tabs: readonly WorkspacePaneTabEntry[]): WorkspacePaneStaticTabType[] {
-  return tabs.flatMap((entry) => (entry.type === 'terminal' ? [] : [entry.type]))
+  return tabs.flatMap((entry) => (entry.type === 'terminal' || entry.type === 'agent' ? [] : [entry.type]))
 }
 
 function normalizeRecentRepos(value: unknown): RepoSessionEntry[] {

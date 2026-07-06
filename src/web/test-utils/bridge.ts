@@ -36,7 +36,11 @@ import {
   workspacePaneTabsWithoutStaticTab,
 } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import { workspacePaneTabEntryIdentity } from '#/shared/workspace-pane.ts'
+import {
+  workspacePaneAgentTabEntry,
+  workspacePaneTabEntryIdentity,
+  workspacePaneTabsInsertAfterIdentity,
+} from '#/shared/workspace-pane.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import type {
@@ -298,6 +302,23 @@ function defaultWorkspacePaneTabsOperationResult(input: TerminalUpdateWorkspaceT
       })
     case 'close-static':
       return workspacePaneTabsWithoutStaticTab(currentTabs, input.operation.tabType)
+    case 'open-agent': {
+      const { agentSessionId, insertAfterIdentity } = input.operation
+      if (currentTabs.some((tab) => tab.type === 'agent' && tab.agentSessionId === agentSessionId)) {
+        return [...currentTabs]
+      }
+      return workspacePaneTabsInsertAfterIdentity(
+        currentTabs,
+        workspacePaneAgentTabEntry(agentSessionId),
+        insertAfterIdentity,
+      )
+    }
+    case 'close-agent': {
+      const { agentSessionId } = input.operation
+      return currentTabs.filter((tab) => tab.type !== 'agent' || tab.agentSessionId !== agentSessionId)
+    }
+    case 'close-agent-worktree':
+      return currentTabs.filter((tab) => tab.type !== 'agent')
     case 'reorder':
       return workspacePaneTabsWithIdentityOrder(currentTabs, input.operation.tabIdentities)
   }
@@ -351,6 +372,7 @@ export function resetReposStore(): void {
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     selectedTerminalSessionIdByTerminalWorktree: {},
+    selectedAgentSessionIdByAgentWorktree: {},
     tabOpenerIdentityByScope: {},
     navigationHistoryByRepo: {},
   })

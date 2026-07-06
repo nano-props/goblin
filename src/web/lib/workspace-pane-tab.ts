@@ -44,6 +44,8 @@ export interface WorkspacePaneRenderabilityContext {
   hasWorktree: boolean
   /** Number of open terminal sessions for the worktree. */
   terminalSessionCount: number
+  /** Number of open agent sessions for the worktree. */
+  agentSessionCount?: number
   /** Whether a new terminal is queued and waiting for mount geometry. */
   terminalCreatePending?: boolean
   /** Server -> client terminal projection hydration phase for this repo instance. */

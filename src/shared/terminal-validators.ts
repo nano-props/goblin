@@ -121,12 +121,21 @@ const WorkspacePaneTerminalTabEntrySchema = v.object({
   type: v.literal('terminal'),
   terminalSessionId: v.pipe(v.string(), v.minLength(1)),
 })
+const WorkspacePaneAgentTabEntrySchema = v.object({
+  type: v.literal('agent'),
+  agentSessionId: v.pipe(v.string(), v.minLength(1)),
+})
+const WorkspacePaneTabEntrySchema = v.union([
+  WorkspacePaneStaticTabEntrySchema,
+  WorkspacePaneTerminalTabEntrySchema,
+  WorkspacePaneAgentTabEntrySchema,
+])
 const TerminalReplaceWorkspaceTabsInputSchema = v.object({
   repoRoot: v.string(),
   repoInstanceId: RepoInstanceIdSchema,
   branchName: v.string(),
   worktreePath: v.nullable(v.string()),
-  tabs: v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneTerminalTabEntrySchema])),
+  tabs: v.array(WorkspacePaneTabEntrySchema),
 })
 const TerminalUpdateWorkspaceTabsInputSchema = v.object({
   repoRoot: v.string(),
@@ -139,11 +148,17 @@ const TerminalUpdateWorkspaceTabsInputSchema = v.object({
       tabType: WorkspacePaneStaticTabTypeSchema,
       insertAfterIdentity: WorkspacePaneOptionalTabIdentitySchema,
     }),
+    v.object({
+      type: v.literal('open-agent'),
+      agentSessionId: v.pipe(v.string(), v.minLength(1)),
+      insertAfterIdentity: WorkspacePaneOptionalTabIdentitySchema,
+    }),
     v.object({ type: v.literal('close-static'), tabType: WorkspacePaneStaticTabTypeSchema }),
+    v.object({ type: v.literal('close-agent'), agentSessionId: v.pipe(v.string(), v.minLength(1)) }),
+    v.object({ type: v.literal('close-agent-worktree') }),
     v.object({ type: v.literal('reorder'), tabIdentities: v.array(WorkspacePaneTabIdentitySchema) }),
   ]),
 })
-const WorkspacePaneTabEntrySchema = v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneTerminalTabEntrySchema])
 const WorkspacePaneTabsEntrySchema = v.object({
   repoRoot: v.string(),
   branchName: v.string(),

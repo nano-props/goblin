@@ -6,6 +6,7 @@ import type {
   TerminalSessionBase,
   TerminalSessionPhase,
 } from '#/shared/terminal-types.ts'
+import type { AgentSessionSummary } from '#/shared/agent-types.ts'
 import type { TerminalInput, TerminalUserInputSource } from '#/web/components/terminal/terminal-input.ts'
 
 export interface TerminalDescriptor {
@@ -174,7 +175,7 @@ export interface TerminalSessionSummary {
   hasRecentOutput: boolean
 }
 
-export type WorkspacePaneTabSummary = TerminalSessionSummary
+export type WorkspacePaneTabSummary = TerminalSessionSummary | AgentSessionSummary
 
 export interface TerminalWorktreeSnapshot {
   terminalWorktreeKey: string

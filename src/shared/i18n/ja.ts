@@ -232,6 +232,7 @@ export const ja: Record<DictKey, string> = {
   'tab.log': 'ログ',
   'tab.files': 'ファイル',
   'tab.terminal': 'ターミナル',
+  'tab.agent': 'Agent',
   'tab.fetching': 'fetch 中',
   'tab.fetching-title': 'バックグラウンドの fetch 実行中',
   'tab.refreshing-remote': 'リモートを同期中',
@@ -249,6 +250,7 @@ export const ja: Record<DictKey, string> = {
   'workspace-pane-tabs.status-tooltip': 'ステータス · {branch}',
   'workspace-pane-tabs.history-tooltip': '履歴 · {branch}',
   'workspace-pane-tabs.files-tooltip': 'ファイル · {branch}',
+  'workspace-pane-tabs.agent-tooltip': 'Agent · {name}',
   'tab.local-only': 'ローカルのみ',
   'tab.local-only-title': 'このリポジトリにはリモートがありません。リモート同期と PR チェックをスキップします。',
   'tab.fetch-failed': 'fetch 失敗',
@@ -391,6 +393,22 @@ export const ja: Record<DictKey, string> = {
   'terminal.paste-file-too-large':
     'ファイルが大きすぎて貼り付けできません。scp、rsync、またはファイルマネージャをご利用ください。',
   'terminal.paste-file-overflow': '貼り付けたパスが長すぎてターミナルに送信できません。',
+
+  // ---- Agent -------------------------------------------------------------
+  'agent.new': '新しい Agent チャット',
+  'agent.create-failed': 'Agent チャットを作成できませんでした',
+  'agent.send-failed': 'メッセージを送信できませんでした',
+  'agent.input-placeholder': 'coding agent にこのワークツリーの確認や変更を依頼...',
+  'agent.input-label': 'Agent メッセージ',
+  'agent.send': 'メッセージを送信',
+  'agent.ready': '準備完了',
+  'agent.running': '作業中',
+  'agent.empty': 'まだメッセージはありません。',
+  'agent.thinking': '作業中...',
+  'agent.adapter-unavailable': 'Agent adapter を利用できません。',
+  'agent.session-not-found': 'Agent セッションが見つかりません。',
+  'agent.message-empty': 'メッセージが空です。',
+  'agent.message-failed': 'Agent メッセージに失敗しました。',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': 'Finder',

@@ -56,6 +56,7 @@ describe('server runtime', () => {
       serverHost: '127.0.0.1',
       serverPort: 32100,
       terminalHost,
+      agentSessionService: expect.objectContaining({ shutdown: expect.any(Function) }),
     })
   })
 
@@ -84,6 +85,7 @@ describe('server runtime', () => {
       serverHost: '127.0.0.1',
       serverPort: 32100,
       terminalHost: runtime.terminalHost,
+      agentSessionService: expect.objectContaining({ shutdown: expect.any(Function) }),
     })
   })
 

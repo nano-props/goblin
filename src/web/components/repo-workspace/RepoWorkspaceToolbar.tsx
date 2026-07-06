@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { useT } from '#/web/stores/i18n.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
@@ -10,9 +11,11 @@ import {
 } from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
 import {
   createPendingWorkspacePaneTabItem,
+  createAgentWorkspacePaneTabItem,
   createStaticWorkspacePaneTabItem,
   createTerminalWorkspacePaneTabItem,
   isPendingWorkspacePaneTabItem,
+  isAgentWorkspacePaneTabItem,
   isStaticWorkspacePaneTabItem,
   isTerminalWorkspacePaneTabItem,
   type WorkspacePaneTabItem,
@@ -28,10 +31,12 @@ import { useIsInitialTerminalProjectionHydrating } from '#/web/stores/terminal-p
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
+import { runCreateAgentTabCommand } from '#/web/commands/agent-create-command.ts'
 import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import {
   terminalWorkspacePaneTabProvider,
+  agentWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
 } from '#/web/components/workspace-pane/tab-providers.ts'
 import { useWorkspacePaneTabDragPreview } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
@@ -69,6 +74,7 @@ export function RepoWorkspaceToolbar({
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
   const compact = useIsCompactUi()
+  const setSelectedAgent = useReposStore((s) => s.setSelectedAgent)
   // While the first server-side session list for this repo is in flight,
   // keep the New Terminal affordance visible but busy. Hooks into the
   // terminal projection readiness store which the Provider updates after a
@@ -117,6 +123,12 @@ export function RepoWorkspaceToolbar({
     }
   }, [branchName, navigation, repo.id, preferredWorkspacePaneTab])
 
+  const enterAgentTab = useCallback(() => {
+    if (preferredWorkspacePaneTab !== 'agent') {
+      navigation.showRepoWorkspacePaneTab(repo.id, 'agent')
+    }
+  }, [navigation, preferredWorkspacePaneTab, repo.id])
+
   const handleNewTerminal = useCallback(() => {
     if (!terminalBase) return
     // "+" is a generic entry → don't anchor; opener only drives close-back.
@@ -131,6 +143,17 @@ export function RepoWorkspaceToolbar({
     })
   }, [createOwnedTerminal, createTerminal, terminalBase, repo.id, enterTerminalTab, t])
 
+  const handleNewAgent = useCallback(() => {
+    if (!terminalBase) return
+    const openerIdentity = captureWorkspacePaneActiveTabIdentity(repo.id)
+    void runCreateAgentTabCommand({
+      base: { ...terminalBase, repoInstanceId: repo.instanceId },
+      openerIdentity,
+      enterAgentTab,
+      t,
+    })
+  }, [enterAgentTab, repo.id, repo.instanceId, terminalBase, t])
+
   const showWorkspacePaneTabItem = useCallback(
     (item: WorkspacePaneTabItem) => {
       if (isStaticWorkspacePaneTabItem(item)) {
@@ -142,8 +165,24 @@ export function RepoWorkspaceToolbar({
         selectTerminal(item.view.terminalWorktreeKey, item.view.terminalSessionId)
         return
       }
+      if (isAgentWorkspacePaneTabItem(item)) {
+        if (workspacePaneTabModel.agentWorktreeKey) {
+          setSelectedAgent(workspacePaneTabModel.agentWorktreeKey, item.view.agentSessionId)
+        }
+        enterAgentTab()
+        return
+      }
     },
-    [branchName, enterTerminalTab, navigation, repo.id, selectTerminal],
+    [
+      branchName,
+      enterAgentTab,
+      enterTerminalTab,
+      navigation,
+      repo.id,
+      selectTerminal,
+      setSelectedAgent,
+      workspacePaneTabModel.agentWorktreeKey,
+    ],
   )
 
   const handleScrollToBottom = useCallback(
@@ -208,6 +247,21 @@ export function RepoWorkspaceToolbar({
             label,
             tooltip: label,
             panelId: terminalWorkspacePaneTabProvider.panelId(workspacePaneId),
+          })
+        }
+        if (tab.kind === 'agent') {
+          const metadata = {
+            t,
+            branchName: branchName ?? '',
+            statusCount: detail.statusCount,
+            view: tab.view,
+          }
+          return createAgentWorkspacePaneTabItem({
+            view: tab.view,
+            label: agentWorkspacePaneTabProvider.label(metadata),
+            tooltip: agentWorkspacePaneTabProvider.tooltip(metadata),
+            closeLabel: agentWorkspacePaneTabProvider.closeLabel(metadata),
+            panelId: agentWorkspacePaneTabProvider.panelId(workspacePaneId),
           })
         }
         const metadata = {
@@ -324,6 +378,7 @@ export function RepoWorkspaceToolbar({
               // authority and either accepts, serializes, or rejects it.
               newTerminalBusy={isInitialSyncInFlight || workspacePaneTabModel.terminalCreatePending}
               onNew={handleNewTerminal}
+              onNewAgent={handleNewAgent}
               onSelect={handleSelectWorkspacePaneTabItem}
               onScrollToBottom={handleScrollToBottom}
               onClose={handleCloseWorkspacePaneTab}

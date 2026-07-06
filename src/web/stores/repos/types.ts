@@ -187,6 +187,8 @@ export interface RepoSessionHydrationOptions {
 interface LocalWorkspaceState {
   /** Client-only workspace UI state that should never be serialized into
    *  WorkspaceSessionState or treated as restorable workspace state. */
+  /** Client-local selected agent session per repo/worktree pair. */
+  selectedAgentSessionIdByAgentWorktree: Record<string, string>
   /** Workspace membership restore flag. True once boot session entries have
    *  produced the placeholder repo set (or proved there are no repos), so the
    *  workspace shell can render without overwriting the saved session with an
@@ -235,6 +237,7 @@ interface RestorableWorkspaceActions {
   setWorkspacePaneSize: (size: number) => void
   resetLayout: () => void
   setSelectedTerminal: (terminalWorktreeKey: string, terminalSessionId: string | null) => void
+  setSelectedAgent: (agentWorktreeKey: string, agentSessionId: string | null) => void
 }
 
 interface RuntimeCoherentRepoProjectionActions {

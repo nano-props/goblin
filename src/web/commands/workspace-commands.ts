@@ -382,6 +382,9 @@ function showWorkspacePaneCommandTab(
   if (tab.kind === 'terminal' && target.terminalWorktreeKey) {
     readTerminalSessionCommandBridge()?.selectTerminal(target.terminalWorktreeKey, tab.terminalSessionId)
   }
+  if (tab.kind === 'agent' && target.agentWorktreeKey) {
+    useReposStore.getState().setSelectedAgent(target.agentWorktreeKey, tab.agentSessionId)
+  }
 }
 
 function observeWorkspacePaneTabClose(

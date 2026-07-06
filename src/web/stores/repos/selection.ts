@@ -26,6 +26,7 @@ type RestorableWorkspaceActions = Pick<
   | 'setWorkspacePaneSize'
   | 'resetLayout'
   | 'setSelectedTerminal'
+  | 'setSelectedAgent'
 >
 
 type RuntimeWorkspacePreferenceActions = Pick<ReposStore, 'setBranchViewMode' | 'setWorkspacePaneTab'>
@@ -115,6 +116,25 @@ function createRestorableWorkspaceActions(set: ReposSet, get: ReposGet): Restora
         const selectedTerminalSessionIdByTerminalWorktree = { ...s.selectedTerminalSessionIdByTerminalWorktree }
         delete selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]
         return { selectedTerminalSessionIdByTerminalWorktree }
+      })
+    },
+
+    setSelectedAgent(agentWorktreeKey: string, agentSessionId: string | null) {
+      set((s) => {
+        const current = s.selectedAgentSessionIdByAgentWorktree[agentWorktreeKey]
+        if (agentSessionId) {
+          if (current === agentSessionId) return s
+          return {
+            selectedAgentSessionIdByAgentWorktree: {
+              ...s.selectedAgentSessionIdByAgentWorktree,
+              [agentWorktreeKey]: agentSessionId,
+            },
+          }
+        }
+        if (current === undefined) return s
+        const selectedAgentSessionIdByAgentWorktree = { ...s.selectedAgentSessionIdByAgentWorktree }
+        delete selectedAgentSessionIdByAgentWorktree[agentWorktreeKey]
+        return { selectedAgentSessionIdByAgentWorktree }
       })
     },
   }

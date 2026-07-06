@@ -6,6 +6,7 @@ import type {
 } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
 import {
+  agentWorkspacePaneTabProvider,
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
   workspacePaneTabProvider,
@@ -13,8 +14,9 @@ import {
 import { PENDING_TERMINAL_WORKSPACE_PANE_TAB_IDENTITY } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
 
 type TerminalWorkspacePaneTabSummary = Extract<WorkspacePaneTabSummary, { type: 'terminal' }>
+type AgentWorkspacePaneTabSummary = Extract<WorkspacePaneTabSummary, { type: 'agent' }>
 
-type WorkspacePaneTabKind = 'static' | 'terminal' | 'pending'
+type WorkspacePaneTabKind = 'static' | 'terminal' | 'agent' | 'pending'
 
 interface WorkspacePaneTabItemBase {
   identity: string
@@ -45,13 +47,23 @@ export interface WorkspacePaneTerminalTabItem extends WorkspacePaneSortableTabIt
   tabEntry: Extract<WorkspacePaneTabEntry, { type: 'terminal' }>
 }
 
+export interface WorkspacePaneAgentTabItem extends WorkspacePaneSortableTabItemBase {
+  kind: 'agent'
+  view: AgentWorkspacePaneTabSummary
+  closeLabel: string
+  tabEntry: Extract<WorkspacePaneTabEntry, { type: 'agent' }>
+}
+
 interface WorkspacePanePendingTabItem extends WorkspacePaneTabItemBase {
   kind: 'pending'
   busy: true
 }
 
 export type WorkspacePaneTabItem =
-  WorkspacePaneStaticTabItem | WorkspacePaneTerminalTabItem | WorkspacePanePendingTabItem
+  | WorkspacePaneStaticTabItem
+  | WorkspacePaneTerminalTabItem
+  | WorkspacePaneAgentTabItem
+  | WorkspacePanePendingTabItem
 
 export function createStaticWorkspacePaneTabItem(input: {
   type: WorkspacePaneStaticTabType
@@ -98,6 +110,28 @@ export function createTerminalWorkspacePaneTabItem(input: {
   }
 }
 
+export function createAgentWorkspacePaneTabItem(input: {
+  view: AgentWorkspacePaneTabSummary
+  label: string
+  tooltip: string
+  closeLabel: string
+  panelId?: string
+}): WorkspacePaneAgentTabItem {
+  return {
+    identity: agentWorkspacePaneTabProvider.identity(input.view.agentSessionId),
+    type: input.view.type,
+    kind: 'agent',
+    view: input.view,
+    label: input.label,
+    tooltip: input.tooltip,
+    closeLabel: input.closeLabel,
+    icon: agentWorkspacePaneTabProvider.icon,
+    panelId: input.panelId,
+    sortableId: agentWorkspacePaneTabProvider.identity(input.view.agentSessionId),
+    tabEntry: agentWorkspacePaneTabProvider.tabEntry(input.view.agentSessionId),
+  }
+}
+
 export function createPendingWorkspacePaneTabItem(input: {
   type: WorkspacePaneTabType
   label: string
@@ -123,6 +157,10 @@ export function isStaticWorkspacePaneTabItem(item: WorkspacePaneTabItem): item i
 
 export function isTerminalWorkspacePaneTabItem(item: WorkspacePaneTabItem): item is WorkspacePaneTerminalTabItem {
   return item.kind === 'terminal' && item.view.type === 'terminal'
+}
+
+export function isAgentWorkspacePaneTabItem(item: WorkspacePaneTabItem): item is WorkspacePaneAgentTabItem {
+  return item.kind === 'agent' && item.view.type === 'agent'
 }
 
 export function isPendingWorkspacePaneTabItem(item: WorkspacePaneTabItem): item is WorkspacePanePendingTabItem {

@@ -5,9 +5,15 @@ import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
 import { WorkerBackedPtySupervisor } from '#/server/terminal/pty-supervisor-worker.ts'
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
+import {
+  createAgentSessionService,
+  type AgentSessionService,
+} from '#/server/agent/agent-session-service.ts'
 
-export interface ServerRuntimeOptions extends Omit<ServerAppOptions, 'terminalHost' | 'serverHost' | 'serverPort'> {
+export interface ServerRuntimeOptions
+  extends Omit<ServerAppOptions, 'terminalHost' | 'agentSessionService' | 'serverHost' | 'serverPort'> {
   terminalHost?: ServerTerminalHost
+  agentSessionService?: AgentSessionService
   /**
    * On-disk path of the bundled PTY worker entry. When provided, the
    * runtime uses a dedicated subprocess for node-pty work, so a PTY
@@ -25,12 +31,14 @@ export interface ServerRuntimeOptions extends Omit<ServerAppOptions, 'terminalHo
 export interface ServerRuntime {
   app: Hono
   terminalHost: ServerTerminalHost
+  agentSessionService: AgentSessionService
   shutdown(): void
 }
 
 export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntime {
   const {
     terminalHost: providedTerminalHost,
+    agentSessionService: providedAgentSessionService,
     ptyWorkerEntry,
     gCommandEntry,
     gCommandBinDir,
@@ -56,17 +64,20 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
           : undefined,
       })
   const terminalHost = providedTerminalHost ?? (runtime?.host as ServerTerminalHost)
+  const agentSessionService = providedAgentSessionService ?? createAgentSessionService()
   // `appOptions` carries `accessToken` (renamed from the pre-PR
   // `internalSecret`); it's forwarded straight to `createApp`.
-  const app = createApp({ ...appOptions, terminalHost, serverHost, serverPort })
+  const app = createApp({ ...appOptions, terminalHost, agentSessionService, serverHost, serverPort })
   let stopped = false
   return {
     app,
     terminalHost,
+    agentSessionService,
     shutdown() {
       if (stopped) return
       stopped = true
       stopBackgroundSync()
+      agentSessionService.shutdown()
       if (runtime) {
         runtime.shutdown()
       } else {

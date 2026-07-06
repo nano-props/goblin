@@ -18,7 +18,11 @@ import type {
   WorkspacePaneTabEntry,
   WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
+import {
+  workspacePaneAgentTabEntry,
+  workspacePaneStaticTabEntry,
+  workspacePaneTerminalTabEntry,
+} from '#/shared/workspace-pane.ts'
 import type {
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
@@ -53,6 +57,8 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type { RepoSettingsEntry } from '#/shared/repo-settings.ts'
+import type { AgentSessionSummary } from '#/shared/agent-types.ts'
+import { agentSessionsQueryKey } from '#/web/agent-queries.ts'
 
 let compactUi = false
 const runtimeExternalAppSettings = vi.hoisted(() => ({
@@ -259,6 +265,17 @@ describe('RepoWorkspaceToolbar', () => {
     expect(emptyButton?.getAttribute('title')).toBe('terminal.new')
     expect(c.querySelector('[data-workspace-pane-tab-tooltip-id="workspace-pane:status"]')).not.toBeNull()
     expect(c.querySelector('[data-workspace-pane-tab-tooltip-id="workspace-pane:changes"]')).toBeNull()
+  })
+
+  test('keeps both runtime create actions available when the tab strip is empty', () => {
+    const { container: c } = renderToolbar({
+      terminalCount: 0,
+      workspacePaneTabs: [],
+      navigation: navigationWith({}),
+    })
+
+    expect(c.querySelector<HTMLButtonElement>('button[aria-label="terminal.new"]')).not.toBeNull()
+    expect(c.querySelector<HTMLButtonElement>('button[aria-label="agent.new"]')).not.toBeNull()
   })
 
   test('renders the external app launcher at the workspace toolbar right edge', async () => {
@@ -921,6 +938,32 @@ describe('RepoWorkspaceToolbar', () => {
     expect(mocks.selectTerminal).toHaveBeenCalledWith(`${REPO_ID}\0${WORKTREE_PATH}`, 't2')
   })
 
+  test('clicking an unselected agent tab navigates and selects it', async () => {
+    const showRepoWorkspacePaneTab = vi.fn()
+    const { container: c } = renderToolbar({
+      terminalCount: 0,
+      preferredWorkspacePaneTab: 'agent',
+      workspacePaneTabs: [agentEntry('agent-1'), agentEntry('agent-2')],
+      agentSessions: [agentSession('agent-1'), agentSession('agent-2')],
+      navigation: navigationWith({ showRepoWorkspacePaneTab }),
+    })
+
+    const unselectedTab = c.querySelector<HTMLButtonElement>(
+      '[data-workspace-pane-tab-tooltip-id="agent:agent-2"] button[role="tab"]',
+    )
+    expect(unselectedTab).not.toBeNull()
+
+    act(() => {
+      unselectedTab?.click()
+    })
+    await flush()
+
+    expect(showRepoWorkspacePaneTab).not.toHaveBeenCalled()
+    expect(useReposStore.getState().selectedAgentSessionIdByAgentWorktree[`${REPO_ID}\0${WORKTREE_PATH}`]).toBe(
+      'agent-2',
+    )
+  })
+
   test('does not show branch actions in the workspace bar (actions moved to branch rows)', () => {
     const { container: c } = renderToolbar({
       terminalCount: 0,
@@ -1170,6 +1213,7 @@ function renderToolbar(options: {
   trafficLightOffset?: boolean
   remote?: Partial<RepoState['remote']>
   repoInstanceId?: string
+  agentSessions?: AgentSessionSummary[]
   /**
    * When true, do NOT mark the repo ready before mounting. The toolbar
    * reads `isInitialSyncInFlight` from the store and renders the
@@ -1306,6 +1350,12 @@ function renderToolbar(options: {
   })
 
   const queryClient = new QueryClient()
+  if (options.agentSessions) {
+    queryClient.setQueryData(
+      agentSessionsQueryKey(REPO_ID, repo.instanceId),
+      options.agentSessions.map((session) => ({ ...session, repoInstanceId: repo.instanceId })),
+    )
+  }
   const workspacePaneTabs =
     options.workspacePaneTabs ??
     (options.workspacePaneStaticTabs || options.terminalCount > 0
@@ -1405,7 +1455,12 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
 
 function tabsFor(branchName: string): WorkspacePaneTabEntry[] {
   const repo = useReposStore.getState().repos[REPO_ID]
-  const target = repo ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, branchName) : null
+  const target = repo
+    ? workspacePaneTabsTargetForRepoBranch(
+        { repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] },
+        branchName,
+      )
+    : null
   return target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : []
 }
 
@@ -1415,6 +1470,26 @@ function staticEntry(type: WorkspacePaneStaticTabType): WorkspacePaneTabEntry {
 
 function terminalEntry(id: string): WorkspacePaneTabEntry {
   return workspacePaneTerminalTabEntry(id)
+}
+
+function agentEntry(id: string): WorkspacePaneTabEntry {
+  return workspacePaneAgentTabEntry(id)
+}
+
+function agentSession(agentSessionId: string): AgentSessionSummary {
+  return {
+    type: 'agent',
+    agentSessionId,
+    repoRoot: REPO_ID,
+    repoInstanceId: 'repo-instance-test',
+    branch: 'feature/worktree',
+    worktreePath: WORKTREE_PATH,
+    title: agentSessionId,
+    adapterKind: 'builtin',
+    phase: 'idle',
+    messageCount: 0,
+    updatedAt: 1,
+  }
 }
 
 /**

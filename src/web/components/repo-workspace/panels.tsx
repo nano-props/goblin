@@ -11,6 +11,7 @@ import { BranchStatus } from '#/web/components/repo-workspace/BranchStatus.tsx'
 import { FiletreeNoWorktreeView, FiletreeView } from '#/web/components/repo-workspace/FiletreeView.tsx'
 import { useLazyRepoTree } from '#/web/hooks/useLazyRepoTree.ts'
 import { TerminalSessionView } from '#/web/components/terminal/TerminalSessionView.tsx'
+import { AgentChatPanel } from '#/web/components/agent/AgentChatPanel.tsx'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { RepoTreeNode } from '#/shared/api-types.ts'
 import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
@@ -44,6 +45,7 @@ export interface WorkspacePanePanelRenderInput {
   panelLabel: WorkspacePanePanelLabel
   terminalProjectionPhase: TerminalProjectionHydrationPhase
   terminalProjectionErrorMessage?: string
+  agentSessionId?: string | null
 }
 
 interface WorkspacePanePanelProps extends Omit<WorkspacePanePanelRenderInput, 'type'> {}
@@ -65,6 +67,7 @@ const REPO_WORKSPACE_PANE_PANEL_BY_TYPE: Partial<Record<WorkspacePaneTabType, Wo
   history: HistoryWorkspacePanePanel,
   files: FilesWorkspacePanePanel,
   terminal: TerminalWorkspacePanePanel,
+  agent: AgentWorkspacePanePanel,
 }
 
 export function renderRepoWorkspacePanePanel(input: WorkspacePanePanelRenderInput): ReactNode {
@@ -133,6 +136,24 @@ function TerminalWorkspacePanePanel({
       terminalProjectionPhase={terminalProjectionPhase}
       terminalProjectionErrorMessage={terminalProjectionErrorMessage}
       branch={branch}
+    />
+  )
+}
+
+function AgentWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel, agentSessionId }: WorkspacePanePanelProps) {
+  const branch = detail.branch
+  if (!branch?.worktree?.path || !agentSessionId) return null
+  return (
+    <AgentChatPanel
+      workspacePaneId={workspacePaneId}
+      panelLabel={panelLabel}
+      base={{
+        repoRoot: repo.id,
+        repoInstanceId: repo.instanceId,
+        branch: branch.name,
+        worktreePath: branch.worktree.path,
+      }}
+      agentSessionId={agentSessionId}
     />
   )
 }

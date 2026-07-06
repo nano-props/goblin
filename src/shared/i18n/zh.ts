@@ -217,6 +217,7 @@ export const zh: Record<DictKey, string> = {
   'tab.log': '历史',
   'tab.files': '文件',
   'tab.terminal': '终端',
+  'tab.agent': 'Agent',
   'tab.fetching': '同步',
   'tab.fetching-title': '后台同步进行中',
   'tab.refreshing-remote': '同步远端',
@@ -234,6 +235,7 @@ export const zh: Record<DictKey, string> = {
   'workspace-pane-tabs.status-tooltip': '状态 · {branch}',
   'workspace-pane-tabs.history-tooltip': '历史 · {branch}',
   'workspace-pane-tabs.files-tooltip': '文件 · {branch}',
+  'workspace-pane-tabs.agent-tooltip': 'Agent · {name}',
   'tab.local-only': '仅本地',
   'tab.local-only-title': '这个仓库没有配置远端；会跳过远端同步和 PR 检查。',
   'tab.fetch-failed': '同步失败',
@@ -374,6 +376,22 @@ export const zh: Record<DictKey, string> = {
   'terminal.paste-file-unsafe': '部分粘贴路径包含终端控制字符,已跳过。',
   'terminal.paste-file-too-large': '文件过大,无法粘贴。请改用 scp、rsync 或文件管理器。',
   'terminal.paste-file-overflow': '粘贴的路径过长，无法发送到终端。',
+
+  // ---- Agent -------------------------------------------------------------
+  'agent.new': '新 Agent 聊天',
+  'agent.create-failed': '无法创建 Agent 聊天',
+  'agent.send-failed': '消息发送失败',
+  'agent.input-placeholder': '让 coding agent 检查或修改这个工作树...',
+  'agent.input-label': 'Agent 消息',
+  'agent.send': '发送消息',
+  'agent.ready': '就绪',
+  'agent.running': '工作中',
+  'agent.empty': '还没有消息。',
+  'agent.thinking': '工作中...',
+  'agent.adapter-unavailable': 'Agent adapter 不可用。',
+  'agent.session-not-found': '找不到 Agent 会话。',
+  'agent.message-empty': '消息为空。',
+  'agent.message-failed': 'Agent 消息处理失败。',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': '访达',

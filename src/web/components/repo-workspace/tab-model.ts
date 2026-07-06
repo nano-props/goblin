@@ -7,11 +7,14 @@ import { resolveRenderableWorkspacePaneTab } from '#/web/lib/workspace-pane-tab.
 import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
+import type { AgentSessionBase } from '#/shared/agent-types.ts'
 import {
   PENDING_TERMINAL_WORKSPACE_PANE_TAB_IDENTITY,
+  isAgentWorkspacePaneTab,
   isTerminalWorkspacePaneTab,
 } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { formatAgentWorktreeKey } from '#/shared/agent-worktree-key.ts'
 import { normalizeWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import {
   terminalWorkspacePaneTabProvider,
@@ -19,9 +22,10 @@ import {
   workspacePaneTabProvider,
 } from '#/web/components/workspace-pane/tab-providers.ts'
 
-export type RepoWorkspaceTabKind = 'static' | 'terminal' | 'pending'
+export type RepoWorkspaceTabKind = 'static' | 'terminal' | 'agent' | 'pending'
 
 type TerminalWorkspacePaneTabView = Extract<WorkspacePaneTabSummary, { type: 'terminal' }>
+type AgentWorkspacePaneTabView = Extract<WorkspacePaneTabSummary, { type: 'agent' }>
 
 interface RepoWorkspaceTabBase {
   identity: string
@@ -42,6 +46,13 @@ export interface RepoWorkspaceTerminalTab extends RepoWorkspaceTabBase {
   terminalSessionId: string
 }
 
+export interface RepoWorkspaceAgentTab extends RepoWorkspaceTabBase {
+  type: 'agent'
+  kind: 'agent'
+  view: AgentWorkspacePaneTabView
+  agentSessionId: string
+}
+
 export interface RepoWorkspacePendingTab extends RepoWorkspaceTabBase {
   identity: typeof PENDING_TERMINAL_WORKSPACE_PANE_TAB_IDENTITY
   type: 'terminal'
@@ -51,7 +62,7 @@ export interface RepoWorkspacePendingTab extends RepoWorkspaceTabBase {
   selected: true
 }
 
-export type RepoWorkspaceMaterializedTab = RepoWorkspaceStaticTab | RepoWorkspaceTerminalTab
+export type RepoWorkspaceMaterializedTab = RepoWorkspaceStaticTab | RepoWorkspaceTerminalTab | RepoWorkspaceAgentTab
 export type RepoWorkspaceTab = RepoWorkspaceMaterializedTab | RepoWorkspacePendingTab
 
 export type RepoWorkspaceSelection =
@@ -69,10 +80,13 @@ export type RepoWorkspaceSelection =
 
 export interface RepoWorkspaceTabModel {
   repoId: string
+  repoInstanceId: string
   branchName: string | null
   worktreePath: string | null
   terminalWorktreeKey: string | null
+  agentWorktreeKey: string | null
   terminalBase: TerminalSessionBase | null
+  agentBase: AgentSessionBase | null
   terminalCreatePending: boolean
   terminalProjectionPhase: TerminalProjectionHydrationPhase
   terminalProjectionErrorMessage?: string
@@ -82,6 +96,7 @@ export interface RepoWorkspaceTabModel {
   staticTabs: WorkspacePaneStaticTabType[]
   /** Live terminal views owned by the terminal runtime. */
   terminalViews: WorkspacePaneTabSummary[]
+  agentViews: AgentWorkspacePaneTabView[]
   tabs: RepoWorkspaceTab[]
   /** The render target for the workspace pane body. */
   selection: RepoWorkspaceSelection | null
@@ -93,11 +108,13 @@ export interface RepoWorkspaceTabModel {
 
 export interface RepoWorkspaceTabModelInput {
   repoId: string
+  repoInstanceId?: string
   branchName: string | null
   worktreePath: string | null
   preferredTab: WorkspacePaneTabType
   tabEntries: readonly WorkspacePaneTabEntry[]
   runtimeTerminalViews: readonly WorkspacePaneTabSummary[]
+  runtimeAgentViews?: readonly WorkspacePaneTabSummary[]
   terminalCreatePending?: boolean
   terminalProjectionPhase: TerminalProjectionHydrationPhase
   terminalProjectionErrorMessage?: string
@@ -109,28 +126,44 @@ export interface RepoWorkspaceTabModelInput {
    * the model falls back to the first available terminal tab.
    */
   selectedTerminalSessionId: string | null
+  selectedAgentSessionId?: string | null
 }
 
 export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): RepoWorkspaceTabModel {
+  const repoInstanceId = input.repoInstanceId ?? input.repoId
   const tabEntries = input.branchName ? normalizeWorkspacePaneTabs(input.tabEntries) : []
   const worktreePath = input.branchName ? input.worktreePath : null
   const terminalWorktreeKey = worktreePath ? formatTerminalWorktreeKey(input.repoId, worktreePath) : null
+  const agentWorktreeKey = worktreePath ? formatAgentWorktreeKey(input.repoId, worktreePath) : null
   const terminalViews = terminalWorktreeKey ? input.runtimeTerminalViews.filter(isTerminalWorkspacePaneTab) : []
+  const agentViews = agentWorktreeKey
+    ? (input.runtimeAgentViews ?? [])
+        .filter(isAgentWorkspacePaneTab)
+        .filter((view) => view.worktreePath === worktreePath)
+    : []
   const materializedTabs = materializedWorkspacePaneTabs({
     tabEntries,
     terminalViews,
+    agentViews,
     hasWorktree: !!terminalWorktreeKey,
   })
   const staticTabs = materializedTabs.flatMap((tab) => (tab.kind === 'static' ? [tab.type] : []))
   const materializedTerminalCount = materializedTabs.filter((tab) => tab.kind === 'terminal').length
+  const materializedAgentCount = materializedTabs.filter((tab) => tab.kind === 'agent').length
   const candidateTab = resolveRenderableWorkspacePaneTab(input.preferredTab, {
     hasWorktree: !!terminalWorktreeKey,
     terminalSessionCount: materializedTerminalCount,
+    agentSessionCount: materializedAgentCount,
     terminalCreatePending: input.terminalCreatePending,
     terminalProjectionPhase: input.terminalProjectionPhase,
   })
   const materializedActiveTab = candidateTab
-    ? activeRepoWorkspaceTab(materializedTabs, candidateTab, input.selectedTerminalSessionId)
+    ? activeRepoWorkspaceTab(
+        materializedTabs,
+        candidateTab,
+        input.selectedTerminalSessionId,
+        input.selectedAgentSessionId ?? null,
+      )
     : null
   const selection = workspacePaneSelection(candidateTab, materializedActiveTab, materializedTabs)
   const pendingTab =
@@ -139,17 +172,24 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
 
   return {
     repoId: input.repoId,
+    repoInstanceId,
     branchName: input.branchName,
     worktreePath,
     terminalWorktreeKey,
+    agentWorktreeKey,
     terminalBase:
       input.branchName && worktreePath ? { repoRoot: input.repoId, branch: input.branchName, worktreePath } : null,
+    agentBase:
+      input.branchName && worktreePath
+        ? { repoRoot: input.repoId, repoInstanceId, branch: input.branchName, worktreePath }
+        : null,
     terminalCreatePending: input.terminalCreatePending ?? false,
     terminalProjectionPhase: input.terminalProjectionPhase,
     terminalProjectionErrorMessage: input.terminalProjectionErrorMessage,
     tabEntries,
     staticTabs,
     terminalViews,
+    agentViews,
     tabs,
     selection,
     renderedTab: selection?.tab ?? null,
@@ -210,6 +250,16 @@ function terminalWorkspacePaneTab(view: TerminalWorkspacePaneTabView): RepoWorks
   }
 }
 
+function agentWorkspacePaneTab(view: AgentWorkspacePaneTabView): RepoWorkspaceAgentTab {
+  return {
+    identity: workspacePaneTabProvider('agent').identity(view.agentSessionId),
+    type: 'agent',
+    kind: 'agent',
+    view,
+    agentSessionId: view.agentSessionId,
+  }
+}
+
 function pendingTerminalWorkspacePaneTab(): RepoWorkspacePendingTab {
   return {
     identity: PENDING_TERMINAL_WORKSPACE_PANE_TAB_IDENTITY,
@@ -241,23 +291,34 @@ function isMaterializedRepoWorkspaceTab(tab: RepoWorkspaceTab): tab is RepoWorks
 function materializedWorkspacePaneTabs(input: {
   tabEntries: readonly WorkspacePaneTabEntry[]
   terminalViews: readonly TerminalWorkspacePaneTabView[]
+  agentViews: readonly AgentWorkspacePaneTabView[]
   hasWorktree: boolean
 }): RepoWorkspaceMaterializedTab[] {
   const terminalViewByTerminalSessionId = new Map(input.terminalViews.map((view) => [view.terminalSessionId, view]))
+  const agentViewByAgentSessionId = new Map(input.agentViews.map((view) => [view.agentSessionId, view]))
   const seenTerminals = new Set<string>()
+  const seenAgents = new Set<string>()
   const tabs: RepoWorkspaceMaterializedTab[] = []
 
   for (const entry of input.tabEntries) {
-    if (entry.type !== 'terminal') {
+    if (entry.type !== 'terminal' && entry.type !== 'agent') {
       if (!workspacePaneTabProvider(entry.type).canOpen({ hasWorktree: input.hasWorktree })) continue
       tabs.push(staticWorkspacePaneTab(entry.type))
       continue
     }
-    if (!terminalWorkspacePaneTabProvider.canOpen({ hasWorktree: input.hasWorktree })) continue
-    const terminal = terminalViewByTerminalSessionId.get(entry.terminalSessionId)
-    if (!terminal || seenTerminals.has(entry.terminalSessionId)) continue
-    seenTerminals.add(entry.terminalSessionId)
-    tabs.push(terminalWorkspacePaneTab(terminal))
+    if (entry.type === 'terminal') {
+      if (!terminalWorkspacePaneTabProvider.canOpen({ hasWorktree: input.hasWorktree })) continue
+      const terminal = terminalViewByTerminalSessionId.get(entry.terminalSessionId)
+      if (!terminal || seenTerminals.has(entry.terminalSessionId)) continue
+      seenTerminals.add(entry.terminalSessionId)
+      tabs.push(terminalWorkspacePaneTab(terminal))
+      continue
+    }
+    if (!workspacePaneTabProvider('agent').canOpen({ hasWorktree: input.hasWorktree })) continue
+    const agent = agentViewByAgentSessionId.get(entry.agentSessionId)
+    if (!agent || seenAgents.has(entry.agentSessionId)) continue
+    seenAgents.add(entry.agentSessionId)
+    tabs.push(agentWorkspacePaneTab(agent))
   }
 
   return tabs
@@ -286,6 +347,7 @@ function activeRepoWorkspaceTab(
   tabs: readonly RepoWorkspaceMaterializedTab[],
   renderableTab: WorkspacePaneTabType,
   selectedTerminalSessionId: string | null,
+  selectedAgentSessionId: string | null,
 ): RepoWorkspaceMaterializedTab | null {
   if (renderableTab === 'terminal') {
     if (selectedTerminalSessionId) {
@@ -295,6 +357,13 @@ function activeRepoWorkspaceTab(
       if (selected) return selected
     }
     return tabs.find((tab) => tab.kind === 'terminal') ?? null
+  }
+  if (renderableTab === 'agent') {
+    if (selectedAgentSessionId) {
+      const selected = tabs.find((tab) => tab.kind === 'agent' && tab.agentSessionId === selectedAgentSessionId)
+      if (selected) return selected
+    }
+    return tabs.find((tab) => tab.kind === 'agent') ?? null
   }
   return tabs.find((tab) => tab.type === renderableTab) ?? null
 }

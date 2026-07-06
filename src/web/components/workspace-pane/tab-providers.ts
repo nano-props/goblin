@@ -1,5 +1,6 @@
-import { Diff, FolderTree, GitBranch, History, Terminal, type LucideIcon } from 'lucide-react'
+import { Bot, Diff, FolderTree, GitBranch, History, Terminal, type LucideIcon } from 'lucide-react'
 import type {
+  WorkspacePaneAgentTabEntry,
   WorkspacePaneStaticTabType,
   WorkspacePaneTabEntry,
   WorkspacePaneTabType,
@@ -8,12 +9,14 @@ import type {
 import {
   workspacePaneTabScope,
   workspacePaneStaticTabId,
+  workspacePaneAgentTabEntry,
   workspacePaneStaticTabEntry,
   workspacePaneTerminalTabEntry,
 } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
+import type { TerminalSessionSummary, WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
+import type { AgentSessionBase, AgentSessionSummary } from '#/shared/agent-types.ts'
 
 type T = (key: string, params?: Record<string, string | number>) => string
 
@@ -22,6 +25,7 @@ export type WorkspacePaneTabProviderKind = 'static' | 'runtime'
 export interface WorkspacePaneTabAvailabilityContext {
   hasWorktree: boolean
   terminalSessionCount?: number
+  agentSessionCount?: number
   terminalCreatePending?: boolean
   terminalProjectionPhase?: TerminalProjectionHydrationPhase
 }
@@ -39,6 +43,14 @@ export interface WorkspacePaneRuntimeTabMetadataInput {
   view: WorkspacePaneTabSummary
 }
 
+export interface WorkspacePaneTerminalTabMetadataInput extends Omit<WorkspacePaneRuntimeTabMetadataInput, 'view'> {
+  view: TerminalSessionSummary
+}
+
+export interface WorkspacePaneAgentTabMetadataInput extends Omit<WorkspacePaneRuntimeTabMetadataInput, 'view'> {
+  view: AgentSessionSummary
+}
+
 export interface WorkspacePanePendingTabMetadataInput {
   t: T
   terminalCreatePending: boolean
@@ -54,7 +66,9 @@ export interface WorkspacePaneTabCloseInput {
   repoId: string
   branchName: string | null
   terminalSessionId?: string
+  agentSessionId?: string
   terminalBase?: TerminalSessionBase | null
+  agentBase?: AgentSessionBase | null
   closeStaticTab?: (
     repoId: string,
     type: WorkspacePaneStaticTabType,
@@ -62,6 +76,8 @@ export interface WorkspacePaneTabCloseInput {
   ) => boolean | void | Promise<boolean | void>
   closeTerminalByDescriptor?: (terminalSessionId: string, base: TerminalSessionBase) => Promise<boolean>
   closeTerminalsForWorktree?: (base: TerminalSessionBase) => Promise<boolean>
+  closeAgentSession?: (agentSessionId: string, base: AgentSessionBase) => Promise<boolean>
+  closeAgentSessionsForWorktree?: (base: AgentSessionBase) => Promise<boolean>
 }
 
 export abstract class WorkspacePaneTabProvider<TType extends WorkspacePaneTabType = WorkspacePaneTabType> {
@@ -226,7 +242,7 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneTabProvider<'
     return (context.terminalSessionCount ?? 0) > 0
   }
 
-  label(input: WorkspacePaneRuntimeTabMetadataInput): string {
+  label(input: WorkspacePaneTerminalTabMetadataInput): string {
     if (isPlaceholderTerminalTitle(input.view)) {
       // The server uses "terminal" as a short-lived process-name
       // placeholder before the shell reports its real name. Keep that
@@ -236,12 +252,12 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneTabProvider<'
     return input.view.title
   }
 
-  tooltip(input: WorkspacePaneRuntimeTabMetadataInput): string {
+  tooltip(input: WorkspacePaneTerminalTabMetadataInput): string {
     if (isPlaceholderTerminalTitle(input.view)) return input.t('terminal.opening')
     return input.view.originalTitle ?? input.view.fullTitle ?? input.view.title
   }
 
-  closeLabel(input: WorkspacePaneRuntimeTabMetadataInput): string {
+  closeLabel(input: WorkspacePaneTerminalTabMetadataInput): string {
     const name = isPlaceholderTerminalTitle(input.view) ? this.tooltip(input) : input.view.title
     return input.t('terminal.close-named', { name })
   }
@@ -268,6 +284,51 @@ export class TerminalWorkspacePaneTabProvider extends WorkspacePaneTabProvider<'
   }
 }
 
+export class AgentWorkspacePaneTabProvider extends WorkspacePaneTabProvider<'agent'> {
+  readonly kind = 'runtime' as const
+  readonly refreshOnOpen = false
+
+  constructor() {
+    super({ type: 'agent', icon: Bot })
+  }
+
+  tabEntry(agentSessionId: string): WorkspacePaneAgentTabEntry {
+    return workspacePaneAgentTabEntry(agentSessionId)
+  }
+
+  buttonId(workspacePaneId: string, index: number): string {
+    return index <= 0 ? `${workspacePaneId}-agent-tab` : `${workspacePaneId}-agent-tab-${index}`
+  }
+
+  label(input: WorkspacePaneAgentTabMetadataInput): string {
+    return input.view.title
+  }
+
+  override isRenderable(context: WorkspacePaneTabAvailabilityContext): boolean {
+    if (!this.canOpen(context)) return false
+    return (context.agentSessionCount ?? 0) > 0
+  }
+
+  tooltip(input: WorkspacePaneAgentTabMetadataInput): string {
+    return input.t('workspace-pane-tabs.agent-tooltip', { name: input.view.title })
+  }
+
+  closeLabel(input: WorkspacePaneAgentTabMetadataInput): string {
+    return input.t('workspace-pane-tabs.close-named', { name: this.label(input) })
+  }
+
+  async close(input: WorkspacePaneTabCloseInput): Promise<boolean> {
+    if (!input.agentSessionId || !input.agentBase || !input.closeAgentSession) return false
+    return await input.closeAgentSession(input.agentSessionId, input.agentBase)
+  }
+
+  override async closeWorktree(input: WorkspacePaneTabCloseInput): Promise<boolean> {
+    if (!input.agentBase) return true
+    if (!input.closeAgentSessionsForWorktree) return false
+    return await input.closeAgentSessionsForWorktree(input.agentBase)
+  }
+}
+
 const BRANCH_SCOPED_TAB_TOOLTIP_KEYS: Record<'status' | 'history', string> = {
   status: 'workspace-pane-tabs.status-tooltip',
   history: 'workspace-pane-tabs.history-tooltip',
@@ -284,6 +345,7 @@ export const changesWorkspacePaneTabProvider = new ChangesWorkspacePaneTabProvid
 export const historyWorkspacePaneTabProvider = new HistoryWorkspacePaneTabProvider()
 export const filesWorkspacePaneTabProvider = new FilesWorkspacePaneTabProvider()
 export const terminalWorkspacePaneTabProvider = new TerminalWorkspacePaneTabProvider()
+export const agentWorkspacePaneTabProvider = new AgentWorkspacePaneTabProvider()
 
 function isPlaceholderTerminalTitle(view: WorkspacePaneTabSummary): boolean {
   return view.type === 'terminal' && !view.originalTitle && view.title.trim().toLowerCase() === 'terminal'
@@ -306,6 +368,7 @@ const STATIC_WORKSPACE_PANE_TAB_PROVIDER_BY_TYPE: Record<WorkspacePaneStaticTabT
 export const workspacePaneTabProviders = [
   ...STATIC_WORKSPACE_PANE_TAB_PROVIDERS,
   terminalWorkspacePaneTabProvider,
+  agentWorkspacePaneTabProvider,
 ] as const
 
 export function workspacePaneStaticTabProviders(): readonly WorkspacePaneStaticTabProvider[] {
@@ -318,6 +381,7 @@ export function workspacePaneStaticTabProvider(type: WorkspacePaneStaticTabType)
 
 export function workspacePaneTabProvider(type: WorkspacePaneTabType): WorkspacePaneTabProvider {
   if (type === 'terminal') return terminalWorkspacePaneTabProvider
+  if (type === 'agent') return agentWorkspacePaneTabProvider
   return workspacePaneStaticTabProvider(type)
 }
 

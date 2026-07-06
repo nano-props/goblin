@@ -1,5 +1,5 @@
 export const WORKSPACE_PANE_STATIC_TAB_TYPES = ['status', 'changes', 'history', 'files'] as const
-export const WORKSPACE_PANE_TAB_TYPES = [...WORKSPACE_PANE_STATIC_TAB_TYPES, 'terminal'] as const
+export const WORKSPACE_PANE_TAB_TYPES = [...WORKSPACE_PANE_STATIC_TAB_TYPES, 'terminal', 'agent'] as const
 export const WORKSPACE_PANE_STATIC_TAB_IDS = {
   status: 'workspace-pane:status',
   changes: 'workspace-pane:changes',
@@ -22,7 +22,7 @@ type WorkspacePaneStaticTabTypeWithScope<TScope extends WorkspacePaneTabScope> =
 }[WorkspacePaneStaticTabType]
 export type WorkspacePaneBranchTabType = WorkspacePaneStaticTabTypeWithScope<'branch'>
 export type WorkspacePaneWorktreeStaticTabType = WorkspacePaneStaticTabTypeWithScope<'worktree'>
-export type WorkspacePaneWorktreeTabType = WorkspacePaneWorktreeStaticTabType | 'terminal'
+export type WorkspacePaneWorktreeTabType = WorkspacePaneWorktreeStaticTabType | 'terminal' | 'agent'
 export const WORKSPACE_PANE_BRANCH_TAB_TYPES = WORKSPACE_PANE_STATIC_TAB_TYPES.filter(
   (type): type is WorkspacePaneBranchTabType => WORKSPACE_PANE_STATIC_TAB_SCOPES[type] === 'branch',
 )
@@ -32,6 +32,7 @@ export const WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES = WORKSPACE_PANE_STATIC_TA
 export const WORKSPACE_PANE_WORKTREE_TAB_TYPES = [
   ...WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES,
   'terminal',
+  'agent',
 ] as readonly WorkspacePaneWorktreeTabType[]
 export const WORKSPACE_PANE_SESSION_TAB_TYPES = WORKSPACE_PANE_TAB_TYPES
 export type WorkspacePaneSessionTabType = (typeof WORKSPACE_PANE_SESSION_TAB_TYPES)[number]
@@ -46,7 +47,12 @@ export interface WorkspacePaneTerminalTabEntry {
   terminalSessionId: string
 }
 
-export type WorkspacePaneTabEntry = WorkspacePaneStaticTabEntry | WorkspacePaneTerminalTabEntry
+export interface WorkspacePaneAgentTabEntry {
+  type: 'agent'
+  agentSessionId: string
+}
+
+export type WorkspacePaneTabEntry = WorkspacePaneStaticTabEntry | WorkspacePaneTerminalTabEntry | WorkspacePaneAgentTabEntry
 
 export function isWorkspacePaneTabType(value: string | null | undefined): value is WorkspacePaneTabType {
   return typeof value === 'string' && (WORKSPACE_PANE_TAB_TYPES as readonly string[]).includes(value)
@@ -71,7 +77,7 @@ export function workspacePaneStaticTabScope(tab: WorkspacePaneStaticTabType): Wo
 }
 
 export function workspacePaneTabScope(tab: WorkspacePaneTabType): WorkspacePaneTabScope {
-  return tab === 'terminal' ? 'worktree' : workspacePaneStaticTabScope(tab)
+  return tab === 'terminal' || tab === 'agent' ? 'worktree' : workspacePaneStaticTabScope(tab)
 }
 
 export function workspacePaneTabRequiresWorktree(tab: WorkspacePaneTabType): boolean {
@@ -88,11 +94,16 @@ export function isWorkspacePaneTabEntry(value: unknown): value is WorkspacePaneT
 
 export function workspacePaneTabEntryFromUnknown(value: unknown): WorkspacePaneTabEntry | null {
   if (!value || typeof value !== 'object') return null
-  const entry = value as { type?: unknown; tabId?: unknown; terminalSessionId?: unknown }
+  const entry = value as { type?: unknown; tabId?: unknown; terminalSessionId?: unknown; agentSessionId?: unknown }
   const type = typeof entry.type === 'string' ? entry.type : null
   if (type === 'terminal') {
     return typeof entry.terminalSessionId === 'string' && entry.terminalSessionId.length > 0
       ? workspacePaneTerminalTabEntry(entry.terminalSessionId)
+      : null
+  }
+  if (type === 'agent') {
+    return typeof entry.agentSessionId === 'string' && entry.agentSessionId.length > 0
+      ? workspacePaneAgentTabEntry(entry.agentSessionId)
       : null
   }
   if (!isWorkspacePaneStaticTabType(type)) return null
@@ -109,8 +120,14 @@ export function workspacePaneTerminalTabEntry(terminalSessionId: string): Worksp
   return { type: 'terminal', terminalSessionId }
 }
 
+export function workspacePaneAgentTabEntry(agentSessionId: string): WorkspacePaneAgentTabEntry {
+  return { type: 'agent', agentSessionId }
+}
+
 export function workspacePaneTabEntryIdentity(entry: WorkspacePaneTabEntry): string {
-  return entry.type === 'terminal' ? `terminal:${entry.terminalSessionId}` : entry.tabId
+  if (entry.type === 'terminal') return `terminal:${entry.terminalSessionId}`
+  if (entry.type === 'agent') return `agent:${entry.agentSessionId}`
+  return entry.tabId
 }
 
 export function workspacePaneTabsInsertAfterIdentity<TEntry extends WorkspacePaneTabEntry>(

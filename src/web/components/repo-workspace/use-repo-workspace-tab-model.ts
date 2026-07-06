@@ -6,6 +6,7 @@ import {
   type RepoWorkspaceTabModelInput,
 } from '#/web/components/repo-workspace/tab-model.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { formatAgentWorktreeKey } from '#/shared/agent-worktree-key.ts'
 import {
   useTerminalRepoProjectionHydrationEntry,
   useTerminalSessionSummaries,
@@ -17,6 +18,7 @@ import {
   useWorkspacePaneTabsQuery,
   workspacePaneTabsForTargetFromQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { useAgentSessionsQuery } from '#/web/agent-queries.ts'
 
 export interface RepoWorkspaceTabModelInputState {
   input: RepoWorkspaceTabModelInput
@@ -46,14 +48,19 @@ export function useRepoWorkspaceTabModelInput(
   const branchName = branch?.name ?? null
   const worktreePath = branch?.worktree?.path ?? null
   const terminalWorktreeKey = worktreePath ? formatTerminalWorktreeKey(repo.id, worktreePath) : null
+  const agentWorktreeKey = worktreePath ? formatAgentWorktreeKey(repo.id, worktreePath) : null
 
   const terminalSessionSummaries = useTerminalSessionSummaries(terminalWorktreeKey)
+  const agentSessionsQuery = useAgentSessionsQuery(repo.id, repo.instanceId)
   const terminalCreatePending = useTerminalWorktreePendingCreate(terminalWorktreeKey)
   const terminalProjectionHydration = useTerminalRepoProjectionHydrationEntry(repo.id)
   const terminalProjectionPhase = terminalProjectionHydration.phase
   const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(repo.id, repo.instanceId)
   const selectedTerminalSessionId = useReposStore((s) =>
     terminalWorktreeKey ? s.selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] : undefined,
+  )
+  const selectedAgentSessionId = useReposStore((s) =>
+    agentWorktreeKey ? s.selectedAgentSessionIdByAgentWorktree[agentWorktreeKey] : undefined,
   )
 
   const workspacePaneTabEntries = useMemo(
@@ -76,31 +83,38 @@ export function useRepoWorkspaceTabModelInput(
   )
 
   const modelSelectedTerminalSessionId = terminalWorktreeKey ? (selectedTerminalSessionId ?? null) : null
+  const modelSelectedAgentSessionId = agentWorktreeKey ? (selectedAgentSessionId ?? null) : null
 
   const input = useMemo<RepoWorkspaceTabModelInput>(
     () => ({
       repoId: repo.id,
+      repoInstanceId: repo.instanceId,
       branchName,
       worktreePath,
       preferredTab,
       tabEntries: workspacePaneTabEntries,
       runtimeTerminalViews: terminalSessionSummaries,
+      runtimeAgentViews: agentSessionsQuery.data ?? [],
       terminalCreatePending,
       terminalProjectionPhase,
       terminalProjectionErrorMessage: terminalProjectionHydration.errorMessage,
       selectedTerminalSessionId: modelSelectedTerminalSessionId,
+      selectedAgentSessionId: modelSelectedAgentSessionId,
     }),
     [
       repo.id,
+      repo.instanceId,
       branchName,
       worktreePath,
       preferredTab,
       workspacePaneTabEntries,
       terminalSessionSummaries,
+      agentSessionsQuery.data,
       terminalCreatePending,
       terminalProjectionPhase,
       terminalProjectionHydration.errorMessage,
       modelSelectedTerminalSessionId,
+      modelSelectedAgentSessionId,
     ],
   )
 
@@ -113,15 +127,22 @@ export function useRepoWorkspaceTabModelInput(
  * the tab-model hook explicit.
  */
 export function useSyncRepoWorkspaceTerminalSelection(
-  model: Pick<RepoWorkspaceTabModel, 'activeTab' | 'terminalWorktreeKey'>,
+  model: Pick<RepoWorkspaceTabModel, 'activeTab' | 'terminalWorktreeKey' | 'agentWorktreeKey'>,
   selectedTerminalSessionId: string | undefined,
 ): void {
   const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
+  const setSelectedAgent = useReposStore((s) => s.setSelectedAgent)
   const activeTerminalSessionId = model.activeTab?.kind === 'terminal' ? model.activeTab.terminalSessionId : null
+  const activeAgentSessionId = model.activeTab?.kind === 'agent' ? model.activeTab.agentSessionId : null
 
   useEffect(() => {
     if (!model.terminalWorktreeKey || !activeTerminalSessionId) return
     if (activeTerminalSessionId === selectedTerminalSessionId) return
     setSelectedTerminal(model.terminalWorktreeKey, activeTerminalSessionId)
   }, [activeTerminalSessionId, model.terminalWorktreeKey, selectedTerminalSessionId, setSelectedTerminal])
+
+  useEffect(() => {
+    if (!model.agentWorktreeKey || !activeAgentSessionId) return
+    setSelectedAgent(model.agentWorktreeKey, activeAgentSessionId)
+  }, [activeAgentSessionId, model.agentWorktreeKey, setSelectedAgent])
 }

@@ -225,6 +225,7 @@ export const ko: Record<DictKey, string> = {
   'tab.log': '로그',
   'tab.files': '파일',
   'tab.terminal': '터미널',
+  'tab.agent': 'Agent',
   'tab.fetching': '동기화',
   'tab.fetching-title': '백그라운드에서 fetch 진행 중',
   'tab.refreshing-remote': '원격 동기화 중',
@@ -242,6 +243,7 @@ export const ko: Record<DictKey, string> = {
   'workspace-pane-tabs.status-tooltip': '상태 · {branch}',
   'workspace-pane-tabs.history-tooltip': '기록 · {branch}',
   'workspace-pane-tabs.files-tooltip': '파일 · {branch}',
+  'workspace-pane-tabs.agent-tooltip': 'Agent · {name}',
   'tab.local-only': '로컬 전용',
   'tab.local-only-title': '이 리포지토리에는 원격이 없습니다. 원격 동기화와 PR 확인을 건너뜁니다.',
   'tab.fetch-failed': '동기화 실패',
@@ -383,6 +385,22 @@ export const ko: Record<DictKey, string> = {
   'terminal.paste-file-unsafe': '일부 붙여넣은 경로에 터미널 제어 문자가 있어 건너뛰었습니다.',
   'terminal.paste-file-too-large': '파일이 너무 커서 붙여넣을 수 없습니다. scp, rsync 또는 파일 관리자를 사용하세요.',
   'terminal.paste-file-overflow': '붙여넣은 경로가 너무 길어 터미널로 보낼 수 없습니다.',
+
+  // ---- Agent -------------------------------------------------------------
+  'agent.new': '새 Agent 채팅',
+  'agent.create-failed': 'Agent 채팅을 만들 수 없습니다',
+  'agent.send-failed': '메시지를 보낼 수 없습니다',
+  'agent.input-placeholder': 'coding agent 에게 이 워크트리 확인 또는 변경 요청...',
+  'agent.input-label': 'Agent 메시지',
+  'agent.send': '메시지 보내기',
+  'agent.ready': '준비됨',
+  'agent.running': '작업 중',
+  'agent.empty': '아직 메시지가 없습니다.',
+  'agent.thinking': '작업 중...',
+  'agent.adapter-unavailable': 'Agent adapter 를 사용할 수 없습니다.',
+  'agent.session-not-found': 'Agent 세션을 찾을 수 없습니다.',
+  'agent.message-empty': '메시지가 비어 있습니다.',
+  'agent.message-failed': 'Agent 메시지 처리에 실패했습니다.',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) --
   'worktrees.reveal-title': 'Finder',

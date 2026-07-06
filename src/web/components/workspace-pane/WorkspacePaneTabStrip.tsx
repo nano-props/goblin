@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Plus, X } from 'lucide-react'
+import { Bot, Check, ChevronDown, Plus, X, type LucideIcon } from 'lucide-react'
 import {
   useCallback,
   useLayoutEffect,
@@ -39,14 +39,17 @@ import {
 import { useFocusRegistry, type FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useSortableTab } from '#/web/components/tab-strip/useSortableTab.ts'
 import {
+  agentWorkspacePaneTabProvider,
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
 } from '#/web/components/workspace-pane/tab-providers.ts'
 import {
   type WorkspacePaneStaticTabItem,
   type WorkspacePaneTabItem,
+  type WorkspacePaneAgentTabItem,
   type WorkspacePaneTerminalTabItem,
   isPendingWorkspacePaneTabItem,
+  isAgentWorkspacePaneTabItem,
   isStaticWorkspacePaneTabItem,
   isTerminalWorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
@@ -67,6 +70,7 @@ interface WorkspacePaneTabStripProps {
   /** Render the New Terminal affordance in a busy state. */
   newTerminalBusy?: boolean
   onNew: () => void
+  onNewAgent?: () => void
   onSelect: (item: WorkspacePaneTabItem) => void
   onScrollToBottom: (key: string) => void
   onClose: (item: WorkspacePaneTabItem) => void
@@ -174,12 +178,11 @@ function useWorkspacePaneTabStripAutoScroll({
   getTabElement: (identity: string) => HTMLButtonElement | null
 }) {
   const activeRenderableTabIdentity = activeTabIdentity
-    ? (items.find((item) => item.identity === activeTabIdentity && !isPendingWorkspacePaneTabItem(item))?.identity ?? null)
+    ? (items.find((item) => item.identity === activeTabIdentity && !isPendingWorkspacePaneTabItem(item))?.identity ??
+      null)
     : null
   const lastRenderableTabIdentity =
-    items
-      .filter((item) => !isPendingWorkspacePaneTabItem(item))
-      .at(-1)?.identity ?? null
+    items.filter((item) => !isPendingWorkspacePaneTabItem(item)).at(-1)?.identity ?? null
   const lastScrolledActiveIdentityRef = useRef<string | null>(null)
   const lastWorkspacePaneTabTargetKeyRef = useRef<string | null>(null)
   const awaitingTargetBaselineRef = useRef(false)
@@ -321,7 +324,7 @@ function useWorkspacePaneTabDnd({
   newButtonRef,
   onReorder,
 }: {
-  sortableItems: readonly (WorkspacePaneStaticTabItem | WorkspacePaneTerminalTabItem)[]
+  sortableItems: readonly (WorkspacePaneStaticTabItem | WorkspacePaneTerminalTabItem | WorkspacePaneAgentTabItem)[]
   newButtonRef: RefObject<HTMLButtonElement | null>
   onReorder: (tabs: WorkspacePaneTabEntry[]) => void
 }) {
@@ -374,9 +377,12 @@ interface WorkspacePaneTabSwitcherPopoverProps {
   activeTabIdentity: string | null
   label: string
   newLabel: string
+  newAgentLabel: string
   canCreateNew: boolean
+  canCreateAgent: boolean
   newTerminalBusy: boolean
   onNew: () => void
+  onNewAgent?: () => void
   onSelect: (identity: string) => void
   onClose: (event: React.MouseEvent, identity: string) => void
   t: WorkspacePaneT
@@ -387,9 +393,12 @@ function WorkspacePaneTabSwitcherPopover({
   activeTabIdentity,
   label,
   newLabel,
+  newAgentLabel,
   canCreateNew,
+  canCreateAgent,
   newTerminalBusy,
   onNew,
+  onNewAgent,
   onSelect,
   onClose,
   t,
@@ -405,6 +414,12 @@ function WorkspacePaneTabSwitcherPopover({
   const selectNew = () => {
     setOpen(false)
     onNew()
+  }
+
+  const selectNewAgent = () => {
+    if (!onNewAgent) return
+    setOpen(false)
+    onNewAgent()
   }
 
   return (
@@ -496,6 +511,20 @@ function WorkspacePaneTabSwitcherPopover({
             </button>
           </div>
         )}
+        {canCreateAgent && onNewAgent && (
+          <div className="border-t border-separator p-1">
+            <button
+              type="button"
+              className="flex h-7 w-full cursor-pointer items-center gap-2 rounded-sm px-2 text-left text-sm text-popover-foreground outline-none transition-colors duration-100 hover:bg-accent hover:text-accent-foreground"
+              onClick={selectNewAgent}
+            >
+              <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
+                <Bot size={14} />
+              </span>
+              <span className="min-w-0 flex-1 truncate">{newAgentLabel}</span>
+            </button>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   )
@@ -513,6 +542,7 @@ export function WorkspacePaneTabStrip({
   emptyFocusKey = EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY,
   newTerminalBusy = false,
   onNew,
+  onNewAgent,
   onSelect,
   onScrollToBottom,
   onClose,
@@ -522,8 +552,10 @@ export function WorkspacePaneTabStrip({
 }: WorkspacePaneTabStripProps) {
   const t = useT()
   const terminalItems = useMemo(() => items.filter(isTerminalWorkspacePaneTabItem), [items])
+  const agentItems = useMemo(() => items.filter(isAgentWorkspacePaneTabItem), [items])
   const sortableItems = useMemo(() => items.filter(isSortableWorkspacePaneTabItem), [items])
   const canCreateNew = terminalWorktreeKey !== null
+  const canCreateAgent = terminalWorktreeKey !== null && !!onNewAgent
   const showCollapsedTabs = !!responsiveCompact
   const activeItem = activeTabIdentity ? (items.find((item) => item.identity === activeTabIdentity) ?? null) : null
   const compactPendingItem = showCollapsedTabs ? (items.find(isPendingWorkspacePaneTabItem) ?? null) : null
@@ -561,6 +593,9 @@ export function WorkspacePaneTabStrip({
     scrollNewButtonIntoView()
     onNew()
   }, [onNew, scrollNewButtonIntoView])
+  const handleNewAgent = useCallback(() => {
+    onNewAgent?.()
+  }, [onNewAgent])
   const handleViewportScroll = useWorkspacePaneTabStripScrollMemory({
     workspacePaneTabTargetKey,
     enabled: !collapseToSelectedTab,
@@ -624,10 +659,14 @@ export function WorkspacePaneTabStrip({
         return workspacePaneStaticTabProvider(item.staticTabType).buttonId(workspacePaneId)
       }
       if (isPendingWorkspacePaneTabItem(item)) return `${workspacePaneId}-${item.type}-pending-tab`
+      if (isAgentWorkspacePaneTabItem(item)) {
+        const index = agentItems.findIndex((candidate) => candidate.identity === item.identity)
+        return agentWorkspacePaneTabProvider.buttonId(workspacePaneId, Math.max(0, index))
+      }
       const index = terminalItems.findIndex((candidate) => candidate.identity === item.identity)
       return terminalWorkspacePaneTabProvider.buttonId(workspacePaneId, Math.max(0, index))
     },
-    [workspacePaneId, terminalItems],
+    [agentItems, workspacePaneId, terminalItems],
   )
 
   const activateKeyboardNavigationTarget = useCallback(
@@ -702,15 +741,24 @@ export function WorkspacePaneTabStrip({
   }
 
   if (items.length === 0) {
-    if (!canCreateNew) return null
+    if (!canCreateNew && !canCreateAgent) return null
     return (
-      <WorkspacePaneNewButton
-        ref={focusRegistry.setRef(emptyFocusKey)}
-        id={`${workspacePaneId}-workspace-pane-tab-empty`}
-        onClick={handleNew}
-        busy={newTerminalBusy}
-        t={t}
-      />
+      <ToolbarTabStripBody className="flex-none">
+        {canCreateNew ? (
+          <WorkspacePaneNewButton
+            ref={focusRegistry.setRef(emptyFocusKey)}
+            id={`${workspacePaneId}-workspace-pane-tab-empty`}
+            onClick={handleNew}
+            busy={newTerminalBusy}
+            icon={Plus}
+            label={t('terminal.new')}
+            t={t}
+          />
+        ) : null}
+        {canCreateAgent ? (
+          <WorkspacePaneNewButton onClick={handleNewAgent} icon={Bot} label={t('agent.new')} t={t} />
+        ) : null}
+      </ToolbarTabStripBody>
     )
   }
 
@@ -724,8 +772,10 @@ export function WorkspacePaneTabStrip({
           workspacePaneId={workspacePaneId}
           context={tabBodyContext}
           canCreateNew={canCreateNew}
+          canCreateAgent={canCreateAgent}
           newTerminalBusy={newTerminalBusy}
           onNew={handleNew}
+          onNewAgent={handleNewAgent}
         />
       }
       scrollContent={
@@ -733,7 +783,9 @@ export function WorkspacePaneTabStrip({
           items={items}
           context={tabBodyContext}
           canCreateNew={canCreateNew}
+          canCreateAgent={canCreateAgent}
           onNew={handleNew}
+          onNewAgent={handleNewAgent}
           newTerminalBusy={newTerminalBusy}
           newButtonRef={newButtonRef}
           workspacePaneId={workspacePaneId}
@@ -769,8 +821,10 @@ interface WorkspacePaneCompactTabsBodyProps extends WorkspacePaneTabBodyCommonPr
   compactItem: WorkspacePaneTabItem | null
   workspacePaneId: string
   canCreateNew: boolean
+  canCreateAgent: boolean
   newTerminalBusy: boolean
   onNew: () => void
+  onNewAgent: () => void
 }
 
 function WorkspacePaneCompactTabsBody({
@@ -779,8 +833,10 @@ function WorkspacePaneCompactTabsBody({
   workspacePaneId,
   context,
   canCreateNew,
+  canCreateAgent,
   newTerminalBusy,
   onNew,
+  onNewAgent,
 }: WorkspacePaneCompactTabsBodyProps) {
   const {
     activeTabIdentity,
@@ -814,9 +870,11 @@ function WorkspacePaneCompactTabsBody({
             isSelected={compactItem.identity === activeTabIdentity}
             isFocusable={compactItem.identity === focusableTabIdentity}
             tabId={
-              isStaticWorkspacePaneTabItem(compactItem) || isPendingWorkspacePaneTabItem(compactItem)
-                ? tabIdForItem(compactItem)
-                : terminalWorkspacePaneTabProvider.buttonId(workspacePaneId, 0)
+              isAgentWorkspacePaneTabItem(compactItem)
+                ? agentWorkspacePaneTabProvider.buttonId(workspacePaneId, 0)
+                : isTerminalWorkspacePaneTabItem(compactItem)
+                  ? terminalWorkspacePaneTabProvider.buttonId(workspacePaneId, 0)
+                  : tabIdForItem(compactItem)
             }
             focusRegistry={focusRegistry}
             onSelect={onSelect}
@@ -839,9 +897,12 @@ function WorkspacePaneCompactTabsBody({
         activeTabIdentity={activeTabIdentity}
         label={t('workspace-pane-tabs.tabs')}
         newLabel={t('terminal.new')}
+        newAgentLabel={t('agent.new')}
         canCreateNew={canCreateNew}
+        canCreateAgent={canCreateAgent}
         newTerminalBusy={newTerminalBusy}
         onNew={onNew}
+        onNewAgent={onNewAgent}
         onSelect={onSelect}
         onClose={onClose}
         t={t}
@@ -852,7 +913,9 @@ function WorkspacePaneCompactTabsBody({
 
 interface WorkspacePaneScrollableTabsBodyProps extends WorkspacePaneTabBodyCommonProps {
   canCreateNew: boolean
+  canCreateAgent: boolean
   onNew: () => void
+  onNewAgent: () => void
   newTerminalBusy: boolean
   newButtonRef: RefObject<HTMLButtonElement | null>
   workspacePaneId: string
@@ -863,7 +926,9 @@ function WorkspacePaneScrollableTabsBody({
   items,
   context,
   canCreateNew,
+  canCreateAgent,
   onNew,
+  onNewAgent,
   newTerminalBusy,
   newButtonRef,
   workspacePaneId,
@@ -935,8 +1000,13 @@ function WorkspacePaneScrollableTabsBody({
             id={items.length === 0 ? `${workspacePaneId}-workspace-pane-tab-empty` : undefined}
             onClick={onNew}
             busy={newTerminalBusy}
+            icon={Plus}
+            label={t('terminal.new')}
             t={t}
           />
+        ) : null}
+        {canCreateAgent ? (
+          <WorkspacePaneNewButton onClick={onNewAgent} icon={Bot} label={t('agent.new')} t={t} />
         ) : null}
       </ToolbarTabStripBody>
     </DndContext>
@@ -966,6 +1036,8 @@ function WorkspacePaneNewButton({
   onClick,
   busy = false,
   compact = false,
+  icon: Icon = Plus,
+  label,
   t,
   ref,
 }: {
@@ -973,10 +1045,12 @@ function WorkspacePaneNewButton({
   onClick: () => void
   busy?: boolean
   compact?: boolean
+  icon?: LucideIcon
+  label?: string
   t: WorkspacePaneT
   ref?: Ref<HTMLButtonElement>
 }) {
-  const label = t('terminal.new')
+  const accessibleLabel = label ?? t('terminal.new')
   return (
     <Button
       ref={ref}
@@ -988,11 +1062,11 @@ function WorkspacePaneNewButton({
       onClick={onClick}
       disabled={busy}
       aria-busy={busy ? 'true' : undefined}
-      aria-label={label}
-      title={label}
+      aria-label={accessibleLabel}
+      title={accessibleLabel}
       data-workspace-pane-new-button=""
     >
-      <Plus size={14} />
+      <Icon size={14} />
     </Button>
   )
 }
@@ -1244,8 +1318,8 @@ function WorkspacePaneTabIcon({
 
 function isSortableWorkspacePaneTabItem(
   item: WorkspacePaneTabItem,
-): item is WorkspacePaneStaticTabItem | WorkspacePaneTerminalTabItem {
-  return item.kind === 'static' || item.kind === 'terminal'
+): item is WorkspacePaneStaticTabItem | WorkspacePaneTerminalTabItem | WorkspacePaneAgentTabItem {
+  return item.kind === 'static' || item.kind === 'terminal' || item.kind === 'agent'
 }
 
 function arrayMove<T>(array: T[], from: number, to: number): T[] {

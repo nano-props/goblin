@@ -62,6 +62,23 @@ const RepoRuntimeCloseSchema = v.object({
   repoInstanceId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
 })
 const EmptyBodySchema = v.optional(v.object({}))
+const AgentAdapterKindSchema = v.picklist(['builtin', 'acp'])
+const AgentSessionIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
+const AgentBaseSchema = v.object({
+  repoRoot: v.string(),
+  repoInstanceId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
+  branch: v.string(),
+  worktreePath: v.string(),
+})
+const AgentRepoInstanceSchema = v.object({
+  repoRoot: v.string(),
+  repoInstanceId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
+})
+const AgentSessionLookupSchema = v.object({
+  repoRoot: v.string(),
+  repoInstanceId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
+  agentSessionId: AgentSessionIdSchema,
+})
 
 export const REPO_PROCEDURE_SCHEMAS = {
   // Action endpoints — POST with a JSON body.
@@ -186,6 +203,25 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
   openTerminal: v.object({ repoId: v.string(), worktreePath: v.string(), app: TerminalAppSchema }),
 } as const
 
+export const AGENT_PROCEDURE_SCHEMAS = {
+  create: v.object({
+    ...AgentBaseSchema.entries,
+    title: v.optional(v.pipe(v.string(), v.maxLength(80))),
+    adapterKind: v.optional(AgentAdapterKindSchema),
+  }),
+  list: AgentRepoInstanceSchema,
+  get: AgentSessionLookupSchema,
+  sendMessage: v.object({
+    ...AgentSessionLookupSchema.entries,
+    content: v.pipe(v.string(), v.minLength(1), v.maxLength(60_000)),
+  }),
+  close: AgentSessionLookupSchema,
+  closeWorktree: v.object({
+    ...AgentRepoInstanceSchema.entries,
+    worktreePath: v.string(),
+  }),
+} as const
+
 // Schemas for the settings command handlers. Each shape matches the typed
 // input contract documented on `handle*` in
 // `#/server/modules/settings-write-paths.ts` — the route layer
@@ -201,6 +237,10 @@ const WorkspacePaneTerminalTabEntrySchema = v.object({
   type: v.literal('terminal'),
   terminalSessionId: v.pipe(v.string(), v.minLength(1)),
 })
+const WorkspacePaneAgentTabEntrySchema = v.object({
+  type: v.literal('agent'),
+  agentSessionId: v.pipe(v.string(), v.minLength(1)),
+})
 const FiletreeSessionViewStateSchema = v.object({
   selectedKeys: v.array(v.string()),
   expandedKeys: v.array(v.string()),
@@ -214,11 +254,14 @@ const WorkspaceSessionStateSchema = v.object({
   selectedTerminalSessionIdByTerminalWorktree: v.record(v.string(), v.string()),
   preferredWorkspacePaneTabByTargetByRepo: v.record(
     v.string(),
-    v.record(v.string(), v.picklist(['status', 'changes', 'history', 'files', 'terminal'])),
+    v.record(v.string(), v.picklist(['status', 'changes', 'history', 'files', 'terminal', 'agent'])),
   ),
   workspacePaneTabsByTargetByRepo: v.record(
     v.string(),
-    v.record(v.string(), v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneTerminalTabEntrySchema]))),
+    v.record(
+      v.string(),
+      v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneTerminalTabEntrySchema, WorkspacePaneAgentTabEntrySchema])),
+    ),
   ),
   filetreeViewStateByWorktreeByRepo: v.record(v.string(), v.record(v.string(), FiletreeSessionViewStateSchema)),
 })

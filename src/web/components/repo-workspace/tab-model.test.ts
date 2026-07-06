@@ -6,7 +6,11 @@ import {
 } from '#/web/components/repo-workspace/tab-model.ts'
 import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
+import {
+  workspacePaneAgentTabEntry,
+  workspacePaneStaticTabEntry,
+  workspacePaneTerminalTabEntry,
+} from '#/shared/workspace-pane.ts'
 
 const REPO_ID = '/tmp/gbl-repo-workspace-tab-model-repo'
 const WORKTREE_PATH = '/tmp/gbl-repo-workspace-tab-model-worktree'
@@ -55,6 +59,27 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab?.kind === 'terminal' ? model.activeTab.terminalSessionId : null).toBe('session-2')
   })
 
+  test('uses the selected agent from the store as the active agent tab', () => {
+    const model = createRepoWorkspaceTabModel({
+      repoId: REPO_ID,
+      repoInstanceId: 'repo-instance-test',
+      branchName: 'feature/model',
+      worktreePath: WORKTREE_PATH,
+      preferredTab: 'agent',
+      tabEntries: [staticEntry('status'), agentEntry('agent-1'), agentEntry('agent-2')],
+      runtimeTerminalViews: [],
+      runtimeAgentViews: [agentView('agent-1'), agentView('agent-2')],
+      terminalProjectionPhase: 'ready',
+      selectedTerminalSessionId: null,
+      selectedAgentSessionId: 'agent-2',
+    })
+
+    expect(model.renderedTab).toBe('agent')
+    expect(model.selection).toMatchObject({ kind: 'materialized-tab', tab: 'agent' })
+    expect(model.activeTab?.identity).toBe('agent:agent-2')
+    expect(model.activeTab?.kind === 'agent' ? model.activeTab.agentSessionId : null).toBe('agent-2')
+  })
+
   test('does not materialize runtime-only terminals outside the server tab list', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
@@ -67,10 +92,7 @@ describe('repo workspace pane tab model', () => {
       selectedTerminalSessionId: 'session-2',
     })
 
-    expect(model.tabs.map((tab) => tab.identity)).toEqual([
-      'workspace-pane:status',
-      'terminal:session-2',
-    ])
+    expect(model.tabs.map((tab) => tab.identity)).toEqual(['workspace-pane:status', 'terminal:session-2'])
     expect(model.activeTab?.identity).toBe('terminal:session-2')
   })
 
@@ -410,9 +432,9 @@ describe('repo workspace pane tab model', () => {
       selectedTerminalSessionId: 'session-1',
     })
 
-    expect(
-      nextRepoWorkspaceTabAfterClose(model.tabs, 'terminal:session-1', 'workspace-pane:changes')?.identity,
-    ).toBe('workspace-pane:changes')
+    expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'terminal:session-1', 'workspace-pane:changes')?.identity).toBe(
+      'workspace-pane:changes',
+    )
   })
 
   test('falls back to the adjacent tab when the opener tab no longer exists', () => {
@@ -427,9 +449,9 @@ describe('repo workspace pane tab model', () => {
       selectedTerminalSessionId: 'session-1',
     })
 
-    expect(
-      nextRepoWorkspaceTabAfterClose(model.tabs, 'terminal:session-1', 'terminal:missing-opener')?.identity,
-    ).toBe('workspace-pane:changes')
+    expect(nextRepoWorkspaceTabAfterClose(model.tabs, 'terminal:session-1', 'terminal:missing-opener')?.identity).toBe(
+      'workspace-pane:changes',
+    )
   })
 
   test('skips pending terminal tabs when resolving the next tab after close', () => {
@@ -454,7 +476,12 @@ describe('repo workspace pane tab model', () => {
       branchName: 'feature/model',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
-      tabEntries: [staticEntry('status'), terminalEntry('session-1'), terminalEntry('session-2'), staticEntry('changes')],
+      tabEntries: [
+        staticEntry('status'),
+        terminalEntry('session-1'),
+        terminalEntry('session-2'),
+        staticEntry('changes'),
+      ],
       runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, false)],
       terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: 'session-2',
@@ -491,6 +518,10 @@ function terminalEntry(id: string): WorkspacePaneTabEntry {
   return workspacePaneTerminalTabEntry(id)
 }
 
+function agentEntry(id: string): WorkspacePaneTabEntry {
+  return workspacePaneAgentTabEntry(id)
+}
+
 function terminalView(terminalSessionId: string, index: number, selected: boolean): WorkspacePaneTabSummary {
   return {
     type: 'terminal',
@@ -502,5 +533,21 @@ function terminalView(terminalSessionId: string, index: number, selected: boolea
     selected,
     hasBell: false,
     hasRecentOutput: false,
+  }
+}
+
+function agentView(agentSessionId: string): WorkspacePaneTabSummary {
+  return {
+    type: 'agent',
+    agentSessionId,
+    repoRoot: REPO_ID,
+    repoInstanceId: 'repo-instance-test',
+    branch: 'feature/model',
+    worktreePath: WORKTREE_PATH,
+    title: agentSessionId,
+    adapterKind: 'builtin',
+    phase: 'idle',
+    messageCount: 0,
+    updatedAt: 1,
   }
 }

@@ -9,6 +9,11 @@ import {
 } from '#/web/components/workspace-pane/tab-providers.ts'
 import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
+import {
+  closeAgentSessionAndRefresh,
+  closeAgentSessionsForWorktreeAndRefresh,
+} from '#/web/agent-queries.ts'
+import type { AgentSessionBase } from '#/shared/agent-types.ts'
 
 interface CloseWorkspacePaneTabsForWorktreeOptions {
   repoId: string
@@ -30,16 +35,21 @@ export function beginWorkspacePaneTabClose(
   if (tab.kind === 'terminal' && (!target.terminalBase || !bridge?.closeTerminalByDescriptor)) {
     return { accepted: false, completion: null }
   }
+  if (tab.kind === 'agent' && !target.agentBase) return { accepted: false, completion: null }
   return {
     accepted: true,
     completion: provider.close({
       repoId: target.repoId,
       branchName: target.branchName,
       terminalSessionId: tab.kind === 'terminal' ? tab.terminalSessionId : undefined,
+      agentSessionId: tab.kind === 'agent' ? tab.agentSessionId : undefined,
       terminalBase: target.terminalBase,
+      agentBase: target.agentBase,
       closeStaticTab: closeStaticTabWithCommit(target.worktreePath),
       closeTerminalByDescriptor: bridge?.closeTerminalByDescriptor,
       closeTerminalsForWorktree: bridge?.closeTerminalsForWorktree,
+      closeAgentSession: closeAgentWithCommit,
+      closeAgentSessionsForWorktree: closeAgentWorktreeWithCommit,
     }),
   }
 }
@@ -60,13 +70,19 @@ export async function closeWorkspacePaneTabsForWorktree({
     }),
   )
   const bridge = readTerminalSessionCommandBridge()
+  const repoInstanceId = useReposStore.getState().repos[repoId]?.instanceId
+  const hasAgentTabs = target?.tabs.some((tab) => tab.kind === 'agent') ?? false
   const closeInput = {
     repoId,
     branchName,
     terminalBase,
+    agentBase:
+      hasAgentTabs && repoInstanceId ? { repoRoot: repoId, repoInstanceId, branch: branchName, worktreePath } : undefined,
     closeStaticTab: closeStaticTabWithCommit(worktreePath),
     closeTerminalByDescriptor: bridge?.closeTerminalByDescriptor,
     closeTerminalsForWorktree: bridge?.closeTerminalsForWorktree,
+    closeAgentSession: closeAgentWithCommit,
+    closeAgentSessionsForWorktree: closeAgentWorktreeWithCommit,
   }
   const worktreeProviders = workspacePaneTabProviders.filter((provider) => provider.scope === 'worktree')
   try {
@@ -80,6 +96,38 @@ export async function closeWorkspacePaneTabsForWorktree({
   } catch {
     return false
   }
+}
+
+async function closeAgentWithCommit(agentSessionId: string, base: AgentSessionBase): Promise<boolean> {
+  const closed = await closeAgentSessionAndRefresh({
+    repoRoot: base.repoRoot,
+    repoInstanceId: base.repoInstanceId,
+    agentSessionId,
+  })
+  const result = await updateWorkspacePaneTabs({
+    repoRoot: base.repoRoot,
+    repoInstanceId: base.repoInstanceId,
+    branchName: base.branch,
+    worktreePath: base.worktreePath,
+    operation: { type: 'close-agent', agentSessionId },
+  })
+  return closed && result.ok
+}
+
+async function closeAgentWorktreeWithCommit(base: AgentSessionBase): Promise<boolean> {
+  const closed = await closeAgentSessionsForWorktreeAndRefresh({
+    repoRoot: base.repoRoot,
+    repoInstanceId: base.repoInstanceId,
+    worktreePath: base.worktreePath,
+  })
+  const result = await updateWorkspacePaneTabs({
+    repoRoot: base.repoRoot,
+    repoInstanceId: base.repoInstanceId,
+    branchName: base.branch,
+    worktreePath: base.worktreePath,
+    operation: { type: 'close-agent-worktree' },
+  })
+  return closed && result.ok
 }
 
 function closeStaticTabWithCommit(worktreePath: string | null) {

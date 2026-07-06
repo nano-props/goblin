@@ -8,6 +8,7 @@ import type {
   RepoWorkspaceSelection,
 } from '#/web/components/repo-workspace/tab-model.ts'
 import {
+  agentWorkspacePaneTabProvider,
   terminalWorkspacePaneTabProvider,
   workspacePaneStaticTabProvider,
   type WorkspacePanePanelLabel,
@@ -64,6 +65,10 @@ export function RepoWorkspaceContent({ repo, detail, workspacePaneId, workspaceP
             panelLabel,
             terminalProjectionPhase: workspacePaneTabModel.terminalProjectionPhase,
             terminalProjectionErrorMessage: workspacePaneTabModel.terminalProjectionErrorMessage,
+            agentSessionId:
+              workspacePaneTabModel.activeTab?.kind === 'agent'
+                ? workspacePaneTabModel.activeTab.agentSessionId
+                : null,
           })
         : null}
     </div>
@@ -88,6 +93,13 @@ function workspacePanePanelLabel(input: {
         input.workspacePaneId,
         input.compact ? 0 : Math.max(0, index),
       ),
+    }
+  }
+  if (tab?.kind === 'agent') {
+    const agentTabs = input.tabs.filter((candidate) => candidate.kind === 'agent')
+    const index = agentTabs.findIndex((candidate) => candidate.identity === tab.identity)
+    return {
+      labelledById: agentWorkspacePaneTabProvider.buttonId(input.workspacePaneId, input.compact ? 0 : Math.max(0, index)),
     }
   }
   if (tab?.kind === 'static') {

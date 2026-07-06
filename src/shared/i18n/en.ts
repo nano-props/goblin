@@ -234,6 +234,7 @@ export const en = {
   'tab.log': 'Log',
   'tab.files': 'Files',
   'tab.terminal': 'Terminal',
+  'tab.agent': 'Agent',
   'tab.fetching': 'fetch',
   'tab.fetching-title': 'Background fetch in progress',
   'tab.refreshing-remote': 'Fetching remote',
@@ -251,6 +252,7 @@ export const en = {
   'workspace-pane-tabs.status-tooltip': 'Status · {branch}',
   'workspace-pane-tabs.history-tooltip': 'History · {branch}',
   'workspace-pane-tabs.files-tooltip': 'Files · {branch}',
+  'workspace-pane-tabs.agent-tooltip': 'Agent · {name}',
   'tab.local-only': 'local only',
   'tab.local-only-title': 'This repository has no remotes; remote sync and PR checks are skipped.',
   'tab.fetch-failed': 'fetch failed',
@@ -395,6 +397,22 @@ export const en = {
   'terminal.paste-file-unsafe': 'Some pasted paths contain terminal control characters and were skipped.',
   'terminal.paste-file-too-large': 'File is too large to paste. Use scp, rsync, or a file manager instead.',
   'terminal.paste-file-overflow': 'Pasted paths are too long for the terminal.',
+
+  // ---- Agent --------------------------------------------------------------
+  'agent.new': 'New agent chat',
+  'agent.create-failed': 'Agent chat could not be created',
+  'agent.send-failed': 'Message could not be sent',
+  'agent.input-placeholder': 'Ask the coding agent to inspect or change this worktree...',
+  'agent.input-label': 'Agent message',
+  'agent.send': 'Send message',
+  'agent.ready': 'Ready',
+  'agent.running': 'Working',
+  'agent.empty': 'No messages yet.',
+  'agent.thinking': 'Working...',
+  'agent.adapter-unavailable': 'Agent adapter is not available.',
+  'agent.session-not-found': 'Agent session was not found.',
+  'agent.message-empty': 'Message is empty.',
+  'agent.message-failed': 'Agent message failed.',
 
   // ---- Worktree row actions (used by branch rows that have a worktree) ---
   'worktrees.reveal-title': 'Finder',
