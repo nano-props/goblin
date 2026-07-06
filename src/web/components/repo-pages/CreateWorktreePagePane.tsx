@@ -9,7 +9,12 @@ import {
   resolveWorktreeBootstrapDecision,
 } from '#/web/components/create-worktree/create-worktree-bootstrap-host.logic.ts'
 import { ScrollPane } from '#/web/components/Layout.tsx'
-import { RepoPageLoadingBody, RepoPagePane } from '#/web/components/repo-pages/RepoPagePane.tsx'
+import {
+  RepoPageLoadingBody,
+  RepoPagePane,
+  RepoPageQuietLoadingBody,
+} from '#/web/components/repo-pages/RepoPagePane.tsx'
+import { useLoadingVisibility } from '#/web/hooks/useLoadingVisibility.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
 import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
@@ -99,11 +104,13 @@ export function CreateWorktreePagePane({
   const bootstrapDecisionReady =
     !bootstrapLoading && (bootstrapPreviewError || (bootstrapPreview !== null && !worktreeBootstrapTrustLoading))
   const pageReady = !!liveRepo && !!branchReadModel && bootstrapDecisionReady
+  const showLoadingSkeleton = useLoadingVisibility(!pageReady)
+  const holdLoadingPage = !pageReady || showLoadingSkeleton
 
-  if (!pageReady) {
+  if (holdLoadingPage) {
     return (
       <CreateWorktreePageShell compact={compact} trafficLightOffset={trafficLightOffset} onBack={onCancel}>
-        <RepoPageLoadingBody />
+        {showLoadingSkeleton ? <RepoPageLoadingBody /> : <RepoPageQuietLoadingBody />}
       </CreateWorktreePageShell>
     )
   }

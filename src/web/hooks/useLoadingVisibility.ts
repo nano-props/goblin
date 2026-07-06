@@ -12,13 +12,16 @@ export function useLoadingVisibility(loading: boolean, options?: LoadingVisibili
   const minVisibleMs = options?.minVisibleMs ?? DEFAULT_MIN_LOADING_VISIBLE_MS
   const [visible, setVisible] = useState(false)
   const visibleRef = useRef(false)
+  const loadingRef = useRef(loading)
   const shownAtRef = useRef<number | null>(null)
+  loadingRef.current = loading
 
   useEffect(() => {
     let timer: number | undefined
     if (loading) {
       if (visibleRef.current) return
       timer = window.setTimeout(() => {
+        if (!loadingRef.current) return
         shownAtRef.current = Date.now()
         visibleRef.current = true
         setVisible(true)
