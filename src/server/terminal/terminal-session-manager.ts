@@ -5,6 +5,7 @@ import {
   type TerminalController,
   type TerminalExitEvent,
   type TerminalIdentityEvent,
+  type TerminalHydrationSnapshot,
   type TerminalLifecycleEvent,
   type TerminalOutputEvent,
   type TerminalSessionSummary,
@@ -366,6 +367,27 @@ export class TerminalSessionManager<TUser extends string | number> {
         rows: session.rows,
       })),
     )
+  }
+
+  async recoverSessionsForUser(
+    userId: TUser,
+    scope: string,
+  ): Promise<{ sessions: TerminalSessionSummary[]; snapshots: TerminalHydrationSnapshot[] }> {
+    const sessions = await this.listSessionsForUser(userId, scope)
+    const snapshots: TerminalHydrationSnapshot[] = []
+    for (const summary of sessions) {
+      const session = this.getSession(userId, summary.terminalRuntimeSessionId)
+      if (!session) continue
+      const snap = await replaySnapshot(session.render)
+      if (!snap) continue
+      snapshots.push({
+        terminalRuntimeSessionId: summary.terminalRuntimeSessionId,
+        snapshot: snap.snapshot,
+        snapshotSeq: snap.snapshotSeq,
+        outputEra: snap.outputEra,
+      })
+    }
+    return { sessions, snapshots }
   }
 
   getSessionSummaryForUser(userId: TUser, terminalRuntimeSessionId: string): TerminalSessionSummary | null {

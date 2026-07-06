@@ -245,6 +245,11 @@ export interface TerminalHydrationSnapshot {
   outputEra: number
 }
 
+export interface TerminalSessionsRecoveryResult {
+  sessions: TerminalSessionSummary[]
+  snapshots: TerminalHydrationSnapshot[]
+}
+
 export type TerminalMutationResult = boolean
 
 // All realtime events below are addressed by both `terminalRuntimeSessionId` and

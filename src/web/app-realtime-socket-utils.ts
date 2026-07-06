@@ -4,21 +4,17 @@ import type { AppRealtimeClientMessage, AppRealtimeSocketServerMessage } from '#
 import { normalizeAppRealtimeSocketServerMessage } from '#/shared/app-realtime-validators.ts'
 import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 
-export function createTerminalWebSocketUrl(baseUrl: string, accessToken: string, clientId: string): string {
-  const httpUrl = new URL('/ws/terminal', baseUrl)
+export function createAppRealtimeWebSocketUrl(baseUrl: string, accessToken: string, clientId: string): string {
+  const httpUrl = new URL('/ws/app', baseUrl)
   httpUrl.protocol = resolveWebSocketProtocol()
-  // `?t=` is the WebSocket auth channel for the access token. The
-  // browser path also sends the cookie (auto-attached on the WS
-  // upgrade), but `?t=` works for both browser and Electron — and
-  // it's the only way to authenticate a non-browser WS client (LAN
-  // CLI). The server middleware accepts all three channels
-  // (cookie / header / `?t=`).
+  // `?t=` is the WebSocket auth channel for non-browser clients. Browser
+  // clients also send the auth cookie during the upgrade.
   httpUrl.searchParams.set(ACCESS_TOKEN_QUERY, accessToken)
   httpUrl.searchParams.set('clientId', clientId)
   return httpUrl.toString()
 }
 
-export function parseTerminalSocketServerMessage(data: unknown): AppRealtimeSocketServerMessage | null {
+export function parseAppRealtimeSocketServerMessage(data: unknown): AppRealtimeSocketServerMessage | null {
   if (typeof data !== 'string') return null
   try {
     return normalizeAppRealtimeSocketServerMessage(JSON.parse(data))
@@ -26,10 +22,10 @@ export function parseTerminalSocketServerMessage(data: unknown): AppRealtimeSock
   return null
 }
 
-export function encodeClientMessage(message: AppRealtimeClientMessage): string {
+export function encodeAppRealtimeClientMessage(message: AppRealtimeClientMessage): string {
   return JSON.stringify(message)
 }
 
-export function createSocketRequestId(): string {
+export function createAppRealtimeRequestId(): string {
   return createOpaqueId('req')
 }

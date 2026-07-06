@@ -206,11 +206,9 @@ describe('client bootstrap', () => {
                 canonicalRows: 24,
                 sessions: [],
               },
-        replaceWorkspaceTabs: async (input) => input.tabs,
-        updateWorkspaceTabs: async () => [],
         pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
         listSessions: async () => [],
-        listWorkspaceTabs: async () => [],
+        recoverSessions: async () => ({ sessions: [], snapshots: [] }),
         prewarm: async () => {},
         kickReconnect: () => {},
         notifyBell: async () => false,
@@ -223,7 +221,7 @@ describe('client bootstrap', () => {
         onIdentity: () => () => {},
         onLifecycle: () => () => {},
         onSessionsChanged: () => () => {},
-        onWorkspaceTabsChanged: () => () => {},
+        onRecovered: () => () => {},
         onSessionClosed: () => () => {},
       }),
       workspacePaneTabs: () => ({
@@ -231,6 +229,7 @@ describe('client bootstrap', () => {
         update: async () => [],
         list: async () => [],
         onChanged: () => () => {},
+        onRecovered: () => () => {},
       }),
     })
 

@@ -420,7 +420,7 @@ export class TerminalSession {
     if (changed && input.phase === 'open' && input.role === 'unowned' && this.view.isConnected()) {
       this.start()
     }
-    if (previousTerminalRuntimeSessionId && previousTerminalRuntimeSessionId !== input.terminalRuntimeSessionId)
+    if (this.shouldApplyHydratedSnapshotToActiveView(previousTerminalRuntimeSessionId))
       this.applyHydratedSnapshotToActiveView()
     if (changed) this.notify('metadata')
   }
@@ -907,6 +907,18 @@ export class TerminalSession {
       this.runtime.drainReplay(replayGeneration)
       throw err
     }
+  }
+
+  private shouldApplyHydratedSnapshotToActiveView(previousTerminalRuntimeSessionId: string | null): boolean {
+    const term = this.view.currentTerminal()
+    if (!term) return false
+    if (this.hydratedSnapshot.snapshot.length === 0) return false
+    const currentTerminalRuntimeSessionId = this.runtime.currentTerminalRuntimeSessionId()
+    if (!currentTerminalRuntimeSessionId) return false
+    if (previousTerminalRuntimeSessionId && previousTerminalRuntimeSessionId !== currentTerminalRuntimeSessionId) {
+      return true
+    }
+    return !this.isCheckpointRendered(this.checkpointFromHydratedSnapshot(this.hydratedSnapshot))
   }
 
   private finishActiveHydratedSnapshotReplay(

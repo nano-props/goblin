@@ -3,7 +3,7 @@ import { createHealthRoutes } from '#/server/routes/health.ts'
 
 const mocks = vi.hoisted(() => ({
   getBackgroundSyncDiagnostics: vi.fn(),
-  terminalHost: {
+  appRealtimeHost: {
     getDiagnostics: vi.fn(),
   },
 }))
@@ -14,25 +14,27 @@ vi.mock('#/server/modules/background-sync.ts', () => ({
 
 describe('health routes', () => {
   test('returns terminal diagnostics under the health namespace', async () => {
-    mocks.terminalHost.getDiagnostics.mockReturnValue({
-      mode: 'worker-backed',
-      state: 'running',
-      workerRunning: true,
-      workerPid: 42,
-      workerStartedAt: 1_000,
-      workerUptimeMs: 300,
-      pendingRequests: 1,
-      registeredSockets: 2,
-      restartAttempts: 0,
-      restartScheduled: false,
-      shuttingDown: false,
-      lastSuccessfulResponseAt: 1_200,
-      lastExitCode: null,
-      lastExitSignal: null,
-      lastWorkerFailure: null,
+    mocks.appRealtimeHost.getDiagnostics.mockReturnValue({
+      terminal: {
+        mode: 'worker-backed',
+        state: 'running',
+        workerRunning: true,
+        workerPid: 42,
+        workerStartedAt: 1_000,
+        workerUptimeMs: 300,
+        pendingRequests: 1,
+        registeredSockets: 2,
+        restartAttempts: 0,
+        restartScheduled: false,
+        shuttingDown: false,
+        lastSuccessfulResponseAt: 1_200,
+        lastExitCode: null,
+        lastExitSignal: null,
+        lastWorkerFailure: null,
+      },
     })
 
-    const app = createHealthRoutes({ version: '0.1.0', startedAt: 123, terminalHost: mocks.terminalHost as any })
+    const app = createHealthRoutes({ version: '0.1.0', startedAt: 123, appRealtimeHost: mocks.appRealtimeHost as any })
     const response = await app.request('http://localhost/health/terminal')
     const json = await response.json()
 
@@ -70,7 +72,7 @@ describe('health routes', () => {
       ],
     })
 
-    const app = createHealthRoutes({ version: '0.1.0', startedAt: 123, terminalHost: mocks.terminalHost as any })
+    const app = createHealthRoutes({ version: '0.1.0', startedAt: 123, appRealtimeHost: mocks.appRealtimeHost as any })
     const response = await app.request('http://localhost/health/background-sync')
     const json = await response.json()
 

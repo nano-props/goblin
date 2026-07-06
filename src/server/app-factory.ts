@@ -18,7 +18,7 @@ import { createRealtimeRoutes } from '#/server/routes/realtime.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
 import { createRepoViewRoutes } from '#/server/routes/repo-view.ts'
 import { createSettingsRoutes } from '#/server/routes/settings.ts'
-import type { ServerRealtimeHost } from '#/server/terminal/terminal-host.ts'
+import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
 import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
 import { MAX_PASTE_BATCH_BYTES } from '#/shared/clipboard-paste.ts'
@@ -33,7 +33,7 @@ export interface ServerAppOptions {
    * the Electron main reads, so the two processes see the same value.
    */
   accessToken: string
-  terminalHost: ServerRealtimeHost
+  appRealtimeHost: ServerAppRealtimeHost
   /**
    * The actual host the server is listening on. Used by the CORS
    * origin predicate to allow same-machine browsers. Defaults to
@@ -123,7 +123,7 @@ export function createApp(options: ServerAppOptions): Hono {
   // by a gateway / reverse proxy when the server is bound to a LAN address.
   app.route(
     '/api',
-    createHealthRoutes({ version: options.version, startedAt: options.startedAt, terminalHost: options.terminalHost }),
+    createHealthRoutes({ version: options.version, startedAt: options.startedAt, appRealtimeHost: options.appRealtimeHost }),
   )
   // Login / logout / whoami. `whoami` is gated by the same middleware
   // the data routes use, but `login` and `logout` are intentionally
@@ -218,7 +218,7 @@ export function createApp(options: ServerAppOptions): Hono {
   app.route('/api/repo', createRepoRoutes())
   app.route('/api/repo', createRepoViewRoutes())
   app.route('/api/clipboard', createClipboardRoutes())
-  app.route('/ws', createRealtimeRoutes({ accessToken: options.accessToken, terminalHost: options.terminalHost }))
+  app.route('/ws', createRealtimeRoutes({ accessToken: options.accessToken, appRealtimeHost: options.appRealtimeHost }))
 
   // Periodic prune of clipboard temp dirs left by previous server
   // runs. The route factory's `pruneStaleClipboardTempDirs` call

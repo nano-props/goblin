@@ -10,6 +10,7 @@ import type {
   TerminalRestartInput,
   TerminalSessionInput,
   TerminalSessionSummary,
+  TerminalSessionsRecoveryResult,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalWriteInput,
@@ -22,9 +23,9 @@ type MaybePromise<T> = T | Promise<T>
 // for a realtime socket is the same as the broker's contract for
 // one. Defining the alias here (instead of duplicating the shape)
 // keeps the two layers in lockstep when the wire protocol grows.
-import type { RealtimeSocket } from '#/server/realtime/realtime-broker.ts'
-export type TerminalRealtimeSocket = RealtimeSocket
-export type ServerTerminalSocket = RealtimeSocket
+import type { ServerAppRealtimeHost, ServerAppRealtimeSocket } from '#/server/realtime/app-realtime-host.ts'
+export type TerminalRealtimeSocket = ServerAppRealtimeSocket
+export type ServerTerminalSocket = ServerAppRealtimeSocket
 
 export type ServerTerminalHostState = 'running' | 'shutting-down'
 
@@ -74,30 +75,9 @@ export interface ServerTerminalHostDiagnostics {
   maxRingBufferChars: number
 }
 
-export interface ServerRealtimeHost {
-  isValidClientId(value: unknown): value is string
-  getDiagnostics(): ServerTerminalHostDiagnostics
-  /**
-   * `true` when the realtime broker reports the `(userId, clientId)`
-   * presence online. A raw socket can remain registered while this is
-   * `false` if heartbeat deadlines have marked the client offline.
-   */
-  isClientOnline(userId: string, clientId: string): boolean
-  // `clientId` is a per-tab routing identifier (broker key, WS
-  // query param, sessionStorage value). `userId` is a per-token
-  // identity derived from the access token; it partitions the
-  // in-memory session store so the same token shared across
-  // browsers sees the same terminals. See `identity.ts` for the
-  // full model. Both must be threaded explicitly at the host
-  // boundary so the two identifiers cannot be conflated.
-  registerSocket(clientId: string, userId: string, socket: ServerTerminalSocket): void
-  unregisterSocket(clientId: string, userId: string, socket: ServerTerminalSocket): void
-  /** Handle an incoming realtime message from a client socket. */
-  handleRealtimeMessage(clientId: string, userId: string, socket: ServerTerminalSocket, message: string): void
-  shutdown(): void
-}
-
 export interface ServerTerminalActionHost {
+  /** Terminal lifecycle helper used by manager/tests; not part of the app realtime route contract. */
+  isClientOnline(userId: string, clientId: string): boolean
   attach(clientId: string, userId: string, input: TerminalAttachInput): MaybePromise<TerminalAttachResult>
   restart(clientId: string, userId: string, input: TerminalRestartInput): MaybePromise<TerminalAttachResult>
   write(clientId: string, userId: string, input: TerminalWriteInput): MaybePromise<TerminalMutationResult>
@@ -109,6 +89,11 @@ export interface ServerTerminalActionHost {
     userId: string,
     input: TerminalListSessionsInput,
   ): MaybePromise<TerminalSessionSummary[]>
+  recoverSessions(
+    clientId: string,
+    userId: string,
+    input: TerminalListSessionsInput,
+  ): MaybePromise<TerminalSessionsRecoveryResult>
   create(clientId: string, userId: string, input: TerminalCreateInput): MaybePromise<TerminalCreateResult>
   prune(
     clientId: string,
@@ -117,4 +102,4 @@ export interface ServerTerminalActionHost {
   ): MaybePromise<{ pruned: number; remaining: number }>
 }
 
-export interface ServerTerminalHost extends ServerRealtimeHost, ServerTerminalActionHost {}
+export interface ServerTerminalHost extends ServerAppRealtimeHost, ServerTerminalActionHost {}

@@ -557,7 +557,7 @@ describe('server terminal runtime', () => {
       type: 'exit',
       event: { terminalRuntimeSessionId, terminalSessionId: expect.any(String) },
     })
-    expect(host.getDiagnostics().pty.state).toBe('idle')
+    expect(host.getDiagnostics().terminal.pty.state).toBe('idle')
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
@@ -794,7 +794,7 @@ describe('server terminal runtime', () => {
 
     mockPtys[0]?.emitData('hello')
 
-    expect(host.getDiagnostics().registeredSockets).toBe(0)
+    expect(host.getDiagnostics().terminal.registeredSockets).toBe(0)
     expect(isClientOnline('client_a')).toBe(false)
     shutdown()
   })
@@ -1829,9 +1829,9 @@ describe('server terminal runtime', () => {
 
   test('exposes a closing-state supervisor after shutdown', async () => {
     const { host, shutdown } = buildRuntime()
-    expect(host.getDiagnostics().shuttingDown).toBe(false)
+    expect(host.getDiagnostics().terminal.shuttingDown).toBe(false)
     shutdown()
-    expect(host.getDiagnostics().shuttingDown).toBe(true)
+    expect(host.getDiagnostics().terminal.shuttingDown).toBe(true)
   })
 
   test('shutdown does not leave detached-user timers after closing registered sockets', () => {
@@ -1886,7 +1886,7 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     try {
       // Empty runtime: no sessions, no buffers.
-      let stats = host.getDiagnostics()
+      let stats = host.getDiagnostics().terminal
       expect(stats.liveSessionCount).toBe(0)
       expect(stats.totalRingBufferChars).toBe(0)
       expect(stats.maxRingBufferChars).toBe(0)
@@ -1894,7 +1894,7 @@ describe('server terminal runtime', () => {
       // Create two sessions; their buffers start empty.
       const sessionA = await createTerminalSession(host, 'client_1')
       const sessionB = await createTerminalSession(host, 'client_1')
-      stats = host.getDiagnostics()
+      stats = host.getDiagnostics().terminal
       expect(stats.liveSessionCount).toBe(2)
       expect(stats.totalRingBufferChars).toBe(0)
       expect(stats.maxRingBufferChars).toBe(0)
@@ -1904,7 +1904,7 @@ describe('server terminal runtime', () => {
       // appends to the per-session render buffer, which is what
       // the new diagnostic fields measure.
       mockPtys[0]?.emitData('aaaaa')
-      stats = host.getDiagnostics()
+      stats = host.getDiagnostics().terminal
       expect(stats.liveSessionCount).toBe(2)
       expect(stats.totalRingBufferChars).toBe(5)
       expect(stats.maxRingBufferChars).toBe(5)
@@ -1912,7 +1912,7 @@ describe('server terminal runtime', () => {
       // Emit more data into the second session. The max should
       // track the larger of the two; the total should sum both.
       mockPtys[1]?.emitData('bbbbbbbbbb')
-      stats = host.getDiagnostics()
+      stats = host.getDiagnostics().terminal
       expect(stats.liveSessionCount).toBe(2)
       expect(stats.totalRingBufferChars).toBe(15)
       expect(stats.maxRingBufferChars).toBe(10)
@@ -2104,13 +2104,13 @@ describe('server terminal runtime', () => {
       await createTerminalSession(host, 'client_half_open')
 
       vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
-      expect(host.getDiagnostics().registeredSockets).toBe(0)
+      expect(host.getDiagnostics().terminal.registeredSockets).toBe(0)
       expect(handle.isClientOnline('client_half_open')).toBe(false)
 
       await vi.advanceTimersByTimeAsync(DETACHED_TTL_MS + 1)
       await vi.runOnlyPendingTimersAsync()
 
-      expect(host.getDiagnostics().liveSessionCount).toBe(0)
+      expect(host.getDiagnostics().terminal.liveSessionCount).toBe(0)
       await expect(
         host.listSessions('client_half_open', USER_1, { repoRoot: '/repo', repoInstanceId: REPO_INSTANCE_ID }),
       ).resolves.toEqual([])
@@ -2140,7 +2140,7 @@ describe('server terminal runtime', () => {
       await vi.advanceTimersByTimeAsync(1_001)
       await vi.runOnlyPendingTimersAsync()
 
-      expect(host.getDiagnostics().liveSessionCount).toBe(0)
+      expect(host.getDiagnostics().terminal.liveSessionCount).toBe(0)
       await expect(
         host.listSessions('client_late_drain', USER_1, { repoRoot: '/repo', repoInstanceId: REPO_INSTANCE_ID }),
       ).resolves.toEqual([])

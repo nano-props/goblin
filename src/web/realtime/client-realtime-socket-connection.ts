@@ -46,6 +46,7 @@ export interface ClientRealtimeSocketConnectionOptions<
 > {
   resolveConnection: () => ClientRealtimeSocketConnectionConfig | null
   hasRealtimeSubscribers: () => boolean
+  onOpen?(currentClientId: string): void
   onRealtimeMessage(message: TRealtimeMessage, currentClientId: string): void
   parseServerMessage(data: unknown): TServerMessage | null
   encodeClientMessage(message: unknown): string
@@ -103,6 +104,7 @@ export function createClientRealtimeSocketConnection<
     errorReason: `${socketLabel} error`,
     onOpen(entry) {
       startHeartbeat(entry.socket, entry.generation)
+      options.onOpen?.(entry.connection.clientId)
     },
     onMessage(event, entry) {
       const message = options.parseServerMessage(event.data)

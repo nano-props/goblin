@@ -1,5 +1,8 @@
 import { describe, expect, test, vi } from 'vitest'
-import { createWorkspacePaneTabsRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-tabs-runtime-realtime.ts'
+import {
+  createWorkspacePaneTabsRealtimeHandlers,
+  handleWorkspacePaneTabsRealtimeRequestMessage,
+} from '#/server/workspace-pane/workspace-pane-tabs-runtime-realtime.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { WORKSPACE_PANE_TABS_SOCKET_ACTIONS } from '#/shared/workspace-pane-tabs.ts'
 
@@ -55,5 +58,36 @@ describe('createWorkspacePaneTabsRealtimeHandlers', () => {
       worktreePath: '/repo',
       operation: { type: 'open-static', tabType: 'history' },
     })
+  })
+
+  test('notifies the transport when sending a response fails', async () => {
+    const handlers = {
+      [WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list]: vi.fn(async () => []),
+      [WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace]: vi.fn(async () => []),
+      [WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update]: vi.fn(async () => []),
+    }
+    const socket = {
+      send: vi.fn(() => {
+        throw new Error('socket closed')
+      }),
+      close: vi.fn(),
+    }
+    const onSendFailed = vi.fn()
+
+    await handleWorkspacePaneTabsRealtimeRequestMessage(
+      handlers,
+      'client_a',
+      'user_a',
+      socket,
+      {
+        type: 'request',
+        requestId: 'request_1',
+        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+        input: { repoRoot: '/repo', repoInstanceId: 'repo-instance-test' },
+      },
+      onSendFailed,
+    )
+
+    expect(onSendFailed).toHaveBeenCalledTimes(1)
   })
 })

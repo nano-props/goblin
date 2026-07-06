@@ -548,7 +548,7 @@ beforeEach(() => {
         onIdentity: vi.fn(),
         onLifecycle: vi.fn(),
         onSessionsChanged: vi.fn(),
-        onWorkspaceTabsChanged: vi.fn(),
+        onRecovered: vi.fn(),
         onSessionClosed: vi.fn(),
       },
     },
@@ -604,11 +604,9 @@ beforeEach(() => {
               ok: true as const,
             },
       ),
-      replaceWorkspaceTabs: vi.fn(async (input) => input.tabs),
-      updateWorkspaceTabs: vi.fn(async () => []),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: vi.fn(async () => []),
-      listWorkspaceTabs: vi.fn(async () => []),
+      recoverSessions: vi.fn(async () => ({ sessions: [], snapshots: [] })),
       prewarm: vi.fn(async () => {}),
       kickReconnect: vi.fn(() => {}),
       notifyBell: terminalCalls.notifyBell.mockResolvedValue(true),
@@ -621,7 +619,7 @@ beforeEach(() => {
       onIdentity: vi.fn(() => () => {}),
       onLifecycle: vi.fn(() => () => {}),
       onSessionsChanged: vi.fn(() => () => {}),
-      onWorkspaceTabsChanged: vi.fn(() => () => {}),
+      onRecovered: vi.fn(() => () => {}),
       onSessionClosed: vi.fn(() => () => {}),
     }),
     workspacePaneTabs: () => ({
@@ -629,6 +627,7 @@ beforeEach(() => {
       update: vi.fn(async () => []),
       list: vi.fn(async () => []),
       onChanged: vi.fn(() => () => {}),
+      onRecovered: vi.fn(() => () => {}),
     }),
   })
 })
@@ -1482,7 +1481,7 @@ describe('TerminalSession', () => {
     expect(term.write.mock.calls.map(([data]: unknown[]) => data)).toEqual(['remote-screen'])
   })
 
-  test('does not rewrite an existing terminal view when hydrate refreshes the same session snapshot', async () => {
+  test('rewrites an existing terminal view when hydrate refreshes the same session with a newer snapshot', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new TerminalSession(descriptor, vi.fn())
@@ -1510,8 +1509,8 @@ describe('TerminalSession', () => {
     })
     await flushTerminalStart()
 
-    expect(term.reset).not.toHaveBeenCalled()
-    expect(term.write).not.toHaveBeenCalled()
+    expect(term.reset).toHaveBeenCalledTimes(1)
+    expect(term.write.mock.calls.map(([data]: unknown[]) => data)).toEqual(['fresher-same-session-screen'])
     expect(session.currentTerminalRuntimeSessionId()).toBe('pty_session_1_aaaaaaaaa')
   })
 

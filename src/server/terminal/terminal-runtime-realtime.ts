@@ -1,5 +1,8 @@
-import { BufferedTerminalSocket } from '#/server/terminal/buffered-terminal-socket.ts'
-import type { TerminalOutputFlushBoundary } from '#/server/terminal/buffered-terminal-socket.ts'
+import type {
+  AppRealtimeOutputFlushBoundary,
+  AppRealtimeOutputFlushBoundaryContext,
+  BufferedAppRealtimeSocket,
+} from '#/server/realtime/buffered-app-realtime-socket.ts'
 import type {
   TerminalSocketRequestAction,
   TerminalSocketRequestInputs,
@@ -47,6 +50,9 @@ export function createTerminalRealtimeHandlers(host: ServerTerminalActionHost): 
     'list-sessions'(clientId, userId, input) {
       return host.listSessions(clientId, userId, input)
     },
+    'recover-sessions'(clientId, userId, input) {
+      return host.recoverSessions(clientId, userId, input)
+    },
     create(clientId, userId, input) {
       return host.create(clientId, userId, { ...input, clientId })
     },
@@ -67,7 +73,7 @@ export async function handleTerminalRealtimeRequestMessage(
   clientId: string,
   userId: string,
   socket: RealtimeSocket,
-  bufferedSocket: BufferedTerminalSocket | undefined,
+  bufferedSocket: BufferedAppRealtimeSocket | undefined,
   message: TerminalSocketRequestMessage,
 ): Promise<void> {
   let response: TerminalSocketResponseMessage
@@ -122,11 +128,24 @@ function sendRealtimeResponse(socket: RealtimeSocket, message: TerminalSocketRes
 // the same socket must not observe the identity event before that
 // response settles.
 export function shouldPauseRealtimeRequest(action: TerminalSocketRequestAction): boolean {
-  return action === 'attach' || action === 'restart' || action === 'create' || action === 'takeover'
+  return (
+    action === 'attach' ||
+    action === 'restart' ||
+    action === 'create' ||
+    action === 'takeover' ||
+    action === 'recover-sessions'
+  )
 }
 
-function outputFlushBoundaryFromResponse(message: TerminalSocketResponseMessage): TerminalOutputFlushBoundary | null {
+function outputFlushBoundaryFromResponse(message: TerminalSocketResponseMessage): AppRealtimeOutputFlushBoundaryContext | null {
   if (!message.ok) return null
+  if (message.action === 'recover-sessions') {
+    return message.payload.snapshots.map((snapshot) => ({
+      terminalRuntimeSessionId: snapshot.terminalRuntimeSessionId,
+      outputEra: snapshot.outputEra,
+      seq: snapshot.snapshotSeq,
+    }))
+  }
   if (message.action !== 'attach' && message.action !== 'restart' && message.action !== 'create') return null
   const payload = message.payload
   if (!payload.ok) return null

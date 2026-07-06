@@ -7,8 +7,12 @@ const SERVER_ERROR_KEY_PATTERN = /^error\.[a-z0-9.-]+$/
 export function terminalCreateErrorKey(error: unknown): string {
   const message = terminalCreateErrorMessage(error)
   if (SERVER_ERROR_KEY_PATTERN.test(message)) return message
-  if (message === 'Terminal socket open timed out') return 'error.terminal-connection-timeout'
-  if (message === 'Terminal request timed out') return 'error.terminal-create-timeout'
+  if (message === 'Terminal socket open timed out' || message === 'App realtime socket open timed out') {
+    return 'error.terminal-connection-timeout'
+  }
+  if (message === 'Terminal request timed out' || message === 'App realtime request timed out') {
+    return 'error.terminal-create-timeout'
+  }
   if (isTerminalConnectionFailure(message)) return 'error.terminal-connection-unavailable'
   if (isTerminalHostGeometryFailure(message)) return 'error.terminal-host-not-measurable'
   return 'error.terminal-create-failed'
@@ -30,11 +34,17 @@ function terminalCreateErrorMessage(error: unknown): string {
 function isTerminalConnectionFailure(message: string): boolean {
   return (
     message === 'Terminal socket unavailable' ||
+    message === 'App realtime socket unavailable' ||
     message.startsWith('Terminal socket closed before open') ||
+    message.startsWith('App realtime socket closed before open') ||
     message === 'Terminal socket error before open' ||
+    message === 'App realtime socket error before open' ||
     message === 'Terminal socket closed' ||
+    message === 'App realtime socket closed' ||
     message === 'Terminal socket error' ||
-    message === 'Terminal heartbeat send failed'
+    message === 'App realtime socket error' ||
+    message === 'Terminal heartbeat send failed' ||
+    message === 'App realtime heartbeat send failed'
   )
 }
 

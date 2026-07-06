@@ -32,7 +32,7 @@ describe('terminal web host client', () => {
 
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
-    expect(socket?.url).toMatch(/^ws:\/\/127\.0\.0\.1:32100\/ws\/terminal\?t=secret&clientId=client_sharedterminal$/)
+    expect(socket?.url).toMatch(/^ws:\/\/127\.0\.0\.1:32100\/ws\/app\?t=secret&clientId=client_sharedterminal$/)
     const attachPromise = terminalClient.attach({
       terminalRuntimeSessionId: 'pty_1234567890123456',
       cols: 100,
@@ -168,7 +168,7 @@ describe('terminal web host client', () => {
 
     socket?.close()
 
-    await expect(attachPromise).rejects.toThrow('Terminal socket closed before open')
+    await expect(attachPromise).rejects.toThrow('App realtime socket closed before open')
     expect(fetchMock).not.toHaveBeenCalled()
     dispose()
   })
@@ -185,7 +185,7 @@ describe('terminal web host client', () => {
 
     socket?.close()
 
-    await expect(writePromise).rejects.toThrow('Terminal socket closed before open')
+    await expect(writePromise).rejects.toThrow('App realtime socket closed before open')
     expect(fetchMock).not.toHaveBeenCalled()
     dispose()
   })
@@ -383,7 +383,7 @@ describe('terminal web host client', () => {
 
     socket?.close()
 
-    await expect(createPromise).rejects.toThrow('Terminal socket closed before open')
+    await expect(createPromise).rejects.toThrow('App realtime socket closed before open')
     expect(fetchMock).not.toHaveBeenCalled()
     dispose()
   })
@@ -400,7 +400,7 @@ describe('terminal web host client', () => {
     })
     const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
-    const expectation = expect(createPromise).rejects.toThrow('Terminal socket error before open')
+    const expectation = expect(createPromise).rejects.toThrow('App realtime socket error before open')
 
     socket.emitError()
 
@@ -422,7 +422,7 @@ describe('terminal web host client', () => {
       })
       const socket = wsMock.instances[0]
       if (!socket) throw new Error('missing web terminal socket')
-      const expectation = expect(createPromise).rejects.toThrow('Terminal socket open timed out')
+      const expectation = expect(createPromise).rejects.toThrow('App realtime socket open timed out')
 
       await vi.advanceTimersByTimeAsync(10_000)
 
@@ -445,7 +445,7 @@ describe('terminal web host client', () => {
       })
       const socket = wsMock.instances[0]
       if (!socket) throw new Error('missing web terminal socket')
-      const expectation = expect(listPromise).rejects.toThrow('Terminal socket open timed out')
+      const expectation = expect(listPromise).rejects.toThrow('App realtime socket open timed out')
 
       await vi.advanceTimersByTimeAsync(10_000)
 
@@ -466,7 +466,7 @@ describe('terminal web host client', () => {
 
     socket?.close()
 
-    await expect(listPromise).rejects.toThrow('Terminal socket closed before open')
+    await expect(listPromise).rejects.toThrow('App realtime socket closed before open')
     expect(fetchMock).not.toHaveBeenCalled()
     dispose()
   })
@@ -480,7 +480,7 @@ describe('terminal web host client', () => {
 
     socket?.close()
 
-    await expect(prunePromise).rejects.toThrow('Terminal socket closed before open')
+    await expect(prunePromise).rejects.toThrow('App realtime socket closed before open')
     expect(fetchMock).not.toHaveBeenCalled()
     dispose()
   })
@@ -553,7 +553,7 @@ describe('terminal web host client', () => {
         action: 'prune',
         input: { repoRoot: '/tmp/repo', repoInstanceId: REPO_INSTANCE_ID },
       })
-      const expectation = expect(prunePromise).rejects.toThrow('Terminal request timed out')
+      const expectation = expect(prunePromise).rejects.toThrow('App realtime request timed out')
 
       await vi.advanceTimersByTimeAsync(30_000)
 
@@ -602,7 +602,7 @@ describe('terminal web host client', () => {
       socket.send = vi.fn(() => {
         throw new Error('send failed')
       })
-      const expectation = expect(prunePromise).rejects.toThrow('Terminal heartbeat send failed')
+      const expectation = expect(prunePromise).rejects.toThrow('App realtime heartbeat send failed')
 
       await vi.advanceTimersByTimeAsync(29_000)
 
@@ -634,7 +634,7 @@ describe('terminal web host client', () => {
         action: 'prune',
         input: { repoRoot: '/tmp/repo', repoInstanceId: REPO_INSTANCE_ID },
       })
-      const expectation = expect(prunePromise).rejects.toThrow('Terminal request timed out')
+      const expectation = expect(prunePromise).rejects.toThrow('App realtime request timed out')
 
       await vi.advanceTimersByTimeAsync(30_000)
       await expectation
@@ -711,6 +711,7 @@ describe('terminal web host client', () => {
 
   test('forwards terminal output, bell, title, and exit events from the web socket', async () => {
     const { terminalClient } = await import('#/web/terminal.ts')
+    const { workspacePaneTabsClient } = await import('#/web/workspace-pane/workspace-pane-tabs-client.ts')
     const onOutput = vi.fn()
     const onBell = vi.fn()
     const onTitle = vi.fn()
@@ -727,7 +728,7 @@ describe('terminal web host client', () => {
     const disposeIdentity = terminalClient.onIdentity(onIdentity)
     const disposeLifecycle = terminalClient.onLifecycle(onLifecycle)
     const disposeSessionsChanged = terminalClient.onSessionsChanged(onSessionsChanged)
-    const disposeWorkspaceTabsChanged = terminalClient.onWorkspaceTabsChanged(onWorkspaceTabsChanged)
+    const disposeWorkspaceTabsChanged = workspacePaneTabsClient.onChanged(onWorkspaceTabsChanged)
     const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
 

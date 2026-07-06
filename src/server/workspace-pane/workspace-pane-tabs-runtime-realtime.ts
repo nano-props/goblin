@@ -51,6 +51,7 @@ export async function handleWorkspacePaneTabsRealtimeRequestMessage(
   userId: string,
   socket: RealtimeSocket,
   message: WorkspacePaneTabsRealtimeRequestMessage,
+  onSendFailed?: () => void,
 ): Promise<void> {
   let response: AppRealtimeResponseMessage
   try {
@@ -78,5 +79,7 @@ export async function handleWorkspacePaneTabsRealtimeRequestMessage(
   }
   try {
     socket.send(JSON.stringify(response))
-  } catch {}
+  } catch {
+    onSendFailed?.()
+  }
 }

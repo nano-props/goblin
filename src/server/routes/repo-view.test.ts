@@ -2,16 +2,15 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { disconnectAllClientIntentSockets, registerClientIntentSocket } from '#/server/modules/client-intent-broker.ts'
 import { createRepoViewRoutes } from '#/server/routes/repo-view.ts'
 import { createApp } from '#/server/app-factory.ts'
-import type { ServerRealtimeHost } from '#/server/terminal/terminal-host.ts'
+import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
 
-// Minimal terminal host stub for the auth-integration `createApp()`
+// Minimal app realtime host stub for the auth-integration `createApp()`
 // tests. Mirrors the one in `app-factory.test.ts`; a future refactor
 // could extract it into a shared test helper if more test files need
 // the same shape.
-function makeTerminalHost(): ServerRealtimeHost {
+function makeAppRealtimeHost(): ServerAppRealtimeHost {
   return {
     isValidClientId: ((value: unknown): value is string => typeof value === 'string') as never,
-    isClientOnline: ((_userId: string, _clientId: string): boolean => true) as never,
     getDiagnostics: vi.fn(() => ({}) as never),
     registerSocket: vi.fn(),
     unregisterSocket: vi.fn(),
@@ -124,7 +123,7 @@ describe('POST /api/repo/view — auth integration via createApp()', () => {
       version: '0.1.0',
       startedAt: 0,
       accessToken: 'secret',
-      terminalHost: makeTerminalHost(),
+      appRealtimeHost: makeAppRealtimeHost(),
     })
     const res = await app.request(
       new Request('http://127.0.0.1:32100/api/repo/view', {
@@ -146,7 +145,7 @@ describe('POST /api/repo/view — auth integration via createApp()', () => {
       version: '0.1.0',
       startedAt: 0,
       accessToken: 'secret',
-      terminalHost: makeTerminalHost(),
+      appRealtimeHost: makeAppRealtimeHost(),
     })
     const res = await app.request(
       new Request('http://127.0.0.1:32100/api/repo/view', {

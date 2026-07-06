@@ -280,6 +280,7 @@ let identityHandler: ((event: TerminalIdentityRealtimeEvent) => void) | null = n
 let lifecycleHandler: ((event: TerminalLifecycleRealtimeEvent) => void) | null = null
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
 let workspaceTabsChangedHandler: ((repoRoot: string) => void) | null = null
+let recoveredHandler: ((clientId: string) => void) | null = null
 let sessionClosedHandler:
   | ((event: {
       terminalRuntimeSessionId: string
@@ -373,6 +374,7 @@ beforeEach(() => {
   identityHandler = null
   sessionsChangedHandler = null
   workspaceTabsChangedHandler = null
+  recoveredHandler = null
   sessionClosedHandler = null
   mockSessions.length = 0
   serverSessions = []
@@ -542,7 +544,10 @@ beforeEach(() => {
         create: createTerminalMock,
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
         listSessions: async (input: { repoRoot: string }) => completeServerSessions(await listSessionsMock(input)),
-        listWorkspaceTabs: async (input: { repoRoot: string }) => await listWorkspaceTabsMock(input),
+        recoverSessions: async (input: { repoRoot: string }) => ({
+          sessions: completeServerSessions(await listSessionsMock(input)),
+          snapshots: [],
+        }),
         onOutput: vi.fn((cb: (event: TerminalOutputEvent) => void) => {
           outputHandler = cb
           return () => {}
@@ -573,12 +578,25 @@ beforeEach(() => {
             if (sessionsChangedHandler === cb) sessionsChangedHandler = null
           }
         }),
-        onWorkspaceTabsChanged: vi.fn((cb: (repoRoot: string) => void) => {
+        onRecovered: vi.fn((cb: (clientId: string) => void) => {
+          recoveredHandler = cb
+          return () => {
+            if (recoveredHandler === cb) recoveredHandler = null
+          }
+        }),
+        onSessionClosed: vi.fn(() => () => {}),
+      },
+      workspacePaneTabs: {
+        replace: vi.fn(async (input: { tabs: unknown[] }) => input.tabs),
+        update: vi.fn(async () => []),
+        list: async (input: { repoRoot: string }) => await listWorkspaceTabsMock(input),
+        onChanged: vi.fn((cb: (repoRoot: string) => void) => {
           workspaceTabsChangedHandler = cb
           return () => {
             if (workspaceTabsChangedHandler === cb) workspaceTabsChangedHandler = null
           }
         }),
+        onRecovered: vi.fn(() => () => {}),
       },
     },
   })
@@ -635,11 +653,12 @@ beforeEach(() => {
       })),
       close: closeMock,
       create: createTerminalMock,
-      replaceWorkspaceTabs: vi.fn(async (input) => input.tabs),
-      updateWorkspaceTabs: vi.fn(async () => []),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: async (input) => completeServerSessions(await listSessionsMock(input)),
-      listWorkspaceTabs: async (input: { repoRoot: string }) => await listWorkspaceTabsMock(input),
+      recoverSessions: async (input) => ({
+        sessions: completeServerSessions(await listSessionsMock(input)),
+        snapshots: [],
+      }),
       prewarm: vi.fn(async () => {}),
       kickReconnect: vi.fn(() => {}),
       notifyBell: window.goblinNative.terminal.notifyBell ?? vi.fn(async () => true),
@@ -675,10 +694,10 @@ beforeEach(() => {
           if (sessionsChangedHandler === cb) sessionsChangedHandler = null
         }
       }),
-      onWorkspaceTabsChanged: vi.fn((cb: (repoRoot: string) => void) => {
-        workspaceTabsChangedHandler = cb
+      onRecovered: vi.fn((cb: (clientId: string) => void) => {
+        recoveredHandler = cb
         return () => {
-          if (workspaceTabsChangedHandler === cb) workspaceTabsChangedHandler = null
+          if (recoveredHandler === cb) recoveredHandler = null
         }
       }),
       onSessionClosed: vi.fn(
@@ -707,6 +726,7 @@ beforeEach(() => {
           if (workspaceTabsChangedHandler === cb) workspaceTabsChangedHandler = null
         }
       }),
+      onRecovered: vi.fn(() => () => {}),
     }),
   })
 })
@@ -1342,6 +1362,65 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
+  test('recovers terminal sessions and workspace tabs from server state when app realtime reconnects', async () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: 'feature/worktree',
+      preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status')],
+      },
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: REPO_ID,
+      repoInstanceId: useReposStore.getState().repos[REPO_ID]!.instanceId,
+      branchName: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
+    const { getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
+
+    try {
+      await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
+      listSessionsMock.mockClear()
+      listWorkspaceTabsMock.mockClear()
+      serverSessions = [
+        {
+          terminalRuntimeSessionId: 'server_session_1',
+          terminalSessionId: 'session-1',
+          processName: 'zsh',
+          canonicalTitle: null,
+          cwd: WORKTREE_PATH,
+          controller: null,
+          phase: 'open',
+          message: null,
+          cols: 80,
+          rows: 24,
+        },
+      ]
+      listWorkspaceTabsMock.mockResolvedValue([
+        {
+          repoRoot: REPO_ID,
+          branchName: 'feature/worktree',
+          worktreePath: WORKTREE_PATH,
+          tabs: [workspacePaneStaticTabEntry('history')],
+        },
+      ])
+
+      await act(async () => {
+        recoveredHandler?.('client_sharedterminal')
+      })
+
+      await vi.waitFor(() => expect(getProbe().terminalIds).toEqual(['session-1']))
+      await vi.waitFor(() => expect(listWorkspaceTabsMock).toHaveBeenCalledTimes(1))
+      expect(tabsFor(REPO_ID, 'feature/worktree')).toEqual([workspacePaneStaticTabEntry('history')])
+    } finally {
+      await unmount()
+    }
+  })
+
   test('keeps a newly created terminal active after session sync when create transfers controller control', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -1922,11 +2001,9 @@ describe('TerminalSessionProvider', () => {
           canonicalCols: 80,
           canonicalRows: 24,
         })),
-        replaceWorkspaceTabs: vi.fn(async (input) => input.tabs),
-        updateWorkspaceTabs: vi.fn(async () => []),
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
         listSessions: vi.fn(async () => []),
-        listWorkspaceTabs: vi.fn(async () => []),
+        recoverSessions: vi.fn(async () => ({ sessions: [], snapshots: [] })),
         prewarm,
         kickReconnect: vi.fn(() => {}),
         notifyBell: vi.fn(async () => false),
@@ -1939,7 +2016,7 @@ describe('TerminalSessionProvider', () => {
         onIdentity: () => () => {},
         onLifecycle: () => () => {},
         onSessionsChanged: () => () => {},
-        onWorkspaceTabsChanged: () => () => {},
+        onRecovered: () => () => {},
         onSessionClosed: () => () => {},
       }),
       workspacePaneTabs: () => ({
@@ -1947,6 +2024,7 @@ describe('TerminalSessionProvider', () => {
         update: vi.fn(async () => []),
         list: vi.fn(async () => []),
         onChanged: () => () => {},
+        onRecovered: () => () => {},
       }),
     })
 
@@ -2032,11 +2110,9 @@ describe('TerminalSessionProvider', () => {
           canonicalCols: 80,
           canonicalRows: 24,
         })),
-        replaceWorkspaceTabs: vi.fn(async (input) => input.tabs),
-        updateWorkspaceTabs: vi.fn(async () => []),
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
         listSessions: vi.fn(async () => []),
-        listWorkspaceTabs: vi.fn(async () => []),
+        recoverSessions: vi.fn(async () => ({ sessions: [], snapshots: [] })),
         prewarm: vi.fn(async () => {}),
         kickReconnect,
         notifyBell: vi.fn(async () => false),
@@ -2049,7 +2125,7 @@ describe('TerminalSessionProvider', () => {
         onIdentity: () => () => {},
         onLifecycle: () => () => {},
         onSessionsChanged: () => () => {},
-        onWorkspaceTabsChanged: () => () => {},
+        onRecovered: () => () => {},
         onSessionClosed: () => () => {},
       }),
       workspacePaneTabs: () => ({
@@ -2057,6 +2133,7 @@ describe('TerminalSessionProvider', () => {
         update: vi.fn(async () => []),
         list: vi.fn(async () => []),
         onChanged: () => () => {},
+        onRecovered: () => () => {},
       }),
     })
 

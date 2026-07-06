@@ -11,6 +11,7 @@ import type {
   TerminalResizeInput,
   TerminalSessionInput,
   TerminalSessionSummary,
+  TerminalSessionsRecoveryResult,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalWriteInput,
@@ -21,6 +22,7 @@ import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/
 import { isCurrentRepoRuntimeInstance } from '#/server/modules/repo-runtime-instances.ts'
 import { broadcastWorkspacePaneTabsChanged } from '#/server/workspace-pane/workspace-pane-tabs-realtime.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
+import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 
 interface TerminalSessionServiceLike {
   create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCreateResult>
@@ -188,6 +190,20 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       if (!isValidRepoLocator(input.repoRoot)) return []
       assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
       return await sessionService.listSessions(userId, input.repoRoot, input.repoInstanceId)
+    },
+
+    async recoverSessions(
+      clientId: string,
+      userId: string,
+      input: TerminalListSessionsInput,
+    ): Promise<TerminalSessionsRecoveryResult> {
+      if (!isValidTerminalClientId(clientId)) return { sessions: [], snapshots: [] }
+      if (!isValidRepoLocator(input.repoRoot)) return { sessions: [], snapshots: [] }
+      assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
+      return await manager.recoverSessionsForUser(
+        userId,
+        terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId),
+      )
     },
   }
 

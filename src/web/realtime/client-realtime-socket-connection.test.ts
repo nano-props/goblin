@@ -74,16 +74,29 @@ describe('client realtime socket connection', () => {
     expect(onRealtimeMessage).toHaveBeenCalledWith({ type: 'feature.changed', value: 'fresh' }, 'client_realtime')
     expect(socket?.sent.map((payload) => JSON.parse(payload))).toContainEqual({ type: 'heartbeat' })
   })
+
+  test('notifies callers when the socket opens with the current client id', () => {
+    const onOpen = vi.fn()
+    const connection = createTestConnection({ onRealtimeMessage: vi.fn(), onOpen })
+    connection.openForRealtime()
+    const socket = wsMock.instances[0]
+
+    socket?.emitOpen()
+
+    expect(onOpen).toHaveBeenCalledWith('client_realtime')
+  })
 })
 
 function createTestConnection(options: {
   onRealtimeMessage: (message: TestRealtimeMessage, currentClientId: string) => void
   hasRealtimeSubscribers?: () => boolean
+  onOpen?: (currentClientId: string) => void
 }) {
   return createClientRealtimeSocketConnection<TestInputs, TestOutputs, TestServerMessage, TestRealtimeMessage>({
     resolveConnection: () => ({ url: 'ws://example.test/ws/realtime', clientId: 'client_realtime' }),
     hasRealtimeSubscribers: options.hasRealtimeSubscribers ?? (() => false),
     onRealtimeMessage: options.onRealtimeMessage,
+    onOpen: options.onOpen,
     parseServerMessage(data) {
       if (typeof data !== 'string') return null
       return JSON.parse(data) as TestServerMessage

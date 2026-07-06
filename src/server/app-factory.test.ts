@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { ServerRealtimeHost } from '#/server/terminal/terminal-host.ts'
+import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
 
 const mocks = vi.hoisted(() => ({
   access: vi.fn(async () => undefined),
@@ -28,39 +28,40 @@ const mocks = vi.hoisted(() => ({
   })),
 }))
 
-const terminalHostStub = {
+const appRealtimeHostStub = {
   isValidClientId: (_value: unknown): _value is string => true,
-  isClientOnline: (_userId: string, _clientId: string): boolean => true,
   getDiagnostics: vi.fn(() => ({
-    mode: 'in-process' as const,
-    state: 'running' as const,
-    registeredSockets: 0,
-    shuttingDown: false,
-    pty: {
+    terminal: {
       mode: 'in-process' as const,
       state: 'running' as const,
-      workerRunning: false,
-      workerPid: null,
-      workerStartedAt: null,
-      workerUptimeMs: null,
-      pendingRequests: 0,
-      restartAttempts: 0,
-      restartScheduled: false,
+      registeredSockets: 0,
       shuttingDown: false,
-      lastSuccessfulResponseAt: null,
-      lastExitCode: null,
-      lastExitSignal: null,
-      lastFailure: null,
+      pty: {
+        mode: 'in-process' as const,
+        state: 'running' as const,
+        workerRunning: false,
+        workerPid: null,
+        workerStartedAt: null,
+        workerUptimeMs: null,
+        pendingRequests: 0,
+        restartAttempts: 0,
+        restartScheduled: false,
+        shuttingDown: false,
+        lastSuccessfulResponseAt: null,
+        lastExitCode: null,
+        lastExitSignal: null,
+        lastFailure: null,
+      },
+      liveSessionCount: 0,
+      totalRingBufferChars: 0,
+      maxRingBufferChars: 0,
     },
-    liveSessionCount: 0,
-    totalRingBufferChars: 0,
-    maxRingBufferChars: 0,
   })),
   registerSocket: vi.fn(),
   unregisterSocket: vi.fn(),
   handleRealtimeMessage: vi.fn(),
   shutdown: vi.fn(),
-} satisfies ServerRealtimeHost
+} satisfies ServerAppRealtimeHost
 
 // The clipboard write-paths module imports mkdir / writeFile /
 // readdir / rm from node:fs/promises. The earlier two-method mock
@@ -104,7 +105,7 @@ describe('server app body limit', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
-      terminalHost: terminalHostStub,
+      appRealtimeHost: appRealtimeHostStub,
     })
     const oversized = 'x'.repeat(2 * 1024 * 1024)
     const response = await app.request(
@@ -128,7 +129,7 @@ describe('server app body limit', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
-      terminalHost: terminalHostStub,
+      appRealtimeHost: appRealtimeHostStub,
     })
     // A small, well-formed body: validation will run after the body
     // limit middleware, so we expect 400 (BAD_REQUEST) — not 413.
@@ -179,7 +180,7 @@ describe('server app html static', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
-      terminalHost: terminalHostStub,
+      appRealtimeHost: appRealtimeHostStub,
     })
 
     const response = await app.request(new Request('http://127.0.0.1:32100/assets/missing-old-build.js'))
@@ -197,7 +198,7 @@ describe('server app html static', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
-      terminalHost: terminalHostStub,
+      appRealtimeHost: appRealtimeHostStub,
     })
 
     const response = await app.request(
@@ -228,7 +229,7 @@ describe('server app html static', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
-      terminalHost: terminalHostStub,
+      appRealtimeHost: appRealtimeHostStub,
     })
     for (const path of ['/repos/abc123', '/repos/abc123/changes', '/settings', '/settings/general']) {
       const response = await app.request(new Request(`http://127.0.0.1:32100${path}`))
@@ -250,7 +251,7 @@ describe('server app html static', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
-      terminalHost: terminalHostStub,
+      appRealtimeHost: appRealtimeHostStub,
     })
     const response = await app.request(new Request('http://127.0.0.1:32100/api/host'))
     expect(response.status).toBe(200)
@@ -267,7 +268,7 @@ describe('server app html static', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
-      terminalHost: terminalHostStub,
+      appRealtimeHost: appRealtimeHostStub,
     })
     const response = await app.request(new Request('http://127.0.0.1:32100/api/unknown'))
     expect(response.status).toBe(404)
@@ -305,7 +306,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
-      terminalHost: terminalHostStub,
+      appRealtimeHost: appRealtimeHostStub,
     })
     // 5 MiB body — well over the 1 MiB cap; Content-Length is set.
     const response = await app.request(
@@ -327,7 +328,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
-      terminalHost: terminalHostStub,
+      appRealtimeHost: appRealtimeHostStub,
     })
     const response = await app.request(
       new Request('http://127.0.0.1:32100/api/settings/prefs', {
@@ -358,7 +359,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
-      terminalHost: terminalHostStub,
+      appRealtimeHost: appRealtimeHostStub,
     })
     const form = new FormData()
     form.append('files', new File([new Uint8Array(8 * 1024 * 1024)], 'a.bin'))
@@ -387,7 +388,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
-      terminalHost: terminalHostStub,
+      appRealtimeHost: appRealtimeHostStub,
     })
     const response = await app.request(
       new Request('http://127.0.0.1:32100/api/clipboard/files', {
@@ -414,7 +415,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
-      terminalHost: terminalHostStub,
+      appRealtimeHost: appRealtimeHostStub,
     })
     const response = await app.request(
       new Request('http://127.0.0.1:32100/api/clipboard/files', {
@@ -436,7 +437,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       version: '0.1.0',
       startedAt: Date.now(),
       accessToken: 'secret',
-      terminalHost: terminalHostStub,
+      appRealtimeHost: appRealtimeHostStub,
     })
     // Two-kilobyte body to a hypothetical /api/health endpoint —
     // 1 KiB is plenty for the JSON requests health probes actually

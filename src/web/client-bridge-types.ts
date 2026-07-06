@@ -22,6 +22,7 @@ import type {
   TerminalTestNotificationInput,
   TerminalTitleEvent,
   TerminalWriteInput,
+  TerminalSessionsRecoveryResult,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type {
@@ -40,11 +41,9 @@ export interface ClientTerminal {
   takeover: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>
   close: (input: TerminalSessionInput) => Promise<TerminalMutationResult>
   create: (input: TerminalCreateInput) => Promise<TerminalCreateResult>
-  replaceWorkspaceTabs: (input: WorkspacePaneTabsReplaceInput) => Promise<WorkspacePaneTabEntry[]>
-  updateWorkspaceTabs: (input: WorkspacePaneTabsUpdateInput) => Promise<WorkspacePaneTabEntry[]>
   pruneTerminals: (repoRoot: string, repoInstanceId: string) => Promise<{ pruned: number; remaining: number }>
   listSessions: (input: TerminalListSessionsInput) => Promise<TerminalSessionSummary[]>
-  listWorkspaceTabs: (input: WorkspacePaneTabsListInput) => Promise<WorkspacePaneTabsEntry[]>
+  recoverSessions: (input: TerminalListSessionsInput) => Promise<TerminalSessionsRecoveryResult>
   /**
    * Open the underlying WebSocket (if not already open) and resolve
    * once it reaches the OPEN state. Used as a T1.2 prewarm when the
@@ -76,7 +75,7 @@ export interface ClientTerminal {
   onIdentity: (cb: (event: TerminalIdentityRealtimeEvent) => void) => () => void
   onLifecycle: (cb: (event: TerminalLifecycleRealtimeEvent) => void) => () => void
   onSessionsChanged: (cb: (repoRoot: string) => void) => () => void
-  onWorkspaceTabsChanged: (cb: (repoRoot: string) => void) => () => void
+  onRecovered: (cb: (clientId: string) => void) => () => void
   /**
    * Subscribe to per-session close broadcasts from the server. Emitted
    * after a successful `close` IPC alongside the broader
@@ -101,6 +100,7 @@ export interface ClientWorkspacePaneTabs {
   replace: (input: WorkspacePaneTabsReplaceInput) => Promise<WorkspacePaneTabEntry[]>
   update: (input: WorkspacePaneTabsUpdateInput) => Promise<WorkspacePaneTabEntry[]>
   onChanged: (cb: (repoRoot: string) => void) => () => void
+  onRecovered: (cb: (clientId: string) => void) => () => void
 }
 
 export interface ClientHostBridge {

@@ -1,12 +1,8 @@
 import {
   normalizeTerminalCreateResult,
+  normalizeTerminalSessionsRecoveryResult,
   normalizeTerminalSessionSummaryList,
 } from '#/shared/terminal-validators.ts'
-import { normalizeWorkspacePaneTabsEntryList } from '#/shared/workspace-pane-tabs-validators.ts'
-import {
-  WORKSPACE_PANE_TABS_REALTIME_EVENTS,
-  WORKSPACE_PANE_TABS_SOCKET_ACTIONS,
-} from '#/shared/workspace-pane-tabs.ts'
 import { resolveTerminalController } from '#/shared/terminal-controller.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import type {
@@ -18,34 +14,18 @@ import type {
   TerminalTestNotificationInput,
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
-import type { ClientTerminal, ClientWorkspacePaneTabs } from '#/web/client-bridge-types.ts'
+import type { ClientTerminal } from '#/web/client-bridge-types.ts'
 import type { TerminalIdentityRealtimeEvent, TerminalLifecycleRealtimeEvent } from '#/web/components/terminal/types.ts'
-import {
-  createTerminalSocketConnection,
-  type TerminalSocketServerConfig,
-} from '#/web/client-terminal-socket-connection.ts'
+import type { ClientAppRealtime, AppRealtimeServerConfig } from '#/web/app-realtime-client.ts'
 import type { TerminalNotificationProvider } from '#/web/terminal-notification-provider.ts'
 
-export type ClientServerTerminalConfig = TerminalSocketServerConfig
-
-export interface ClientServerTerminalClients {
-  terminal: ClientTerminal
-  workspacePaneTabs: ClientWorkspacePaneTabs
-}
+export type ClientServerTerminalConfig = AppRealtimeServerConfig
 
 export function createServerTerminalClient(options: {
-  getServerConfig: () => ClientServerTerminalConfig
+  realtime: ClientAppRealtime
   notificationProvider: TerminalNotificationProvider
   setBadge?: (count: number) => void
 }): ClientTerminal {
-  return createServerTerminalClients(options).terminal
-}
-
-export function createServerTerminalClients(options: {
-  getServerConfig: () => ClientServerTerminalConfig
-  notificationProvider: TerminalNotificationProvider
-  setBadge?: (count: number) => void
-}): ClientServerTerminalClients {
   const outputSubscribers = new Set<(event: TerminalOutputEvent) => void>()
   const bellSubscribers = new Set<(event: TerminalBellRealtimeEvent) => void>()
   const titleSubscribers = new Set<(event: TerminalTitleEvent) => void>()
@@ -53,7 +33,6 @@ export function createServerTerminalClients(options: {
   const identitySubscribers = new Set<(event: TerminalIdentityRealtimeEvent) => void>()
   const lifecycleSubscribers = new Set<(event: TerminalLifecycleRealtimeEvent) => void>()
   const sessionsChangedSubscribers = new Set<(repoRoot: string) => void>()
-  const workspaceTabsChangedSubscribers = new Set<(repoRoot: string) => void>()
   const sessionClosedSubscribers = new Set<
     (event: {
       terminalRuntimeSessionId: string
@@ -63,63 +42,53 @@ export function createServerTerminalClients(options: {
     }) => void
   >()
 
-  const connection = createTerminalSocketConnection({
-    getServerConfig: options.getServerConfig,
-    hasRealtimeSubscribers,
-    onRealtimeMessage: handleRealtimeMessage,
-  })
+  let realtimeUnsubscribe: (() => void) | null = null
 
   const terminal: ClientTerminal = {
     attach(input) {
-      return connection.request('attach', input)
+      return options.realtime.request('attach', input)
     },
     restart(input) {
-      return connection.request('restart', input)
+      return options.realtime.request('restart', input)
     },
     write(input) {
-      return connection.request('write', input)
+      return options.realtime.request('write', input)
     },
     resize(input) {
-      return connection.request('resize', input)
+      return options.realtime.request('resize', input)
     },
     takeover(input) {
-      return connection.request('takeover', input)
+      return options.realtime.request('takeover', input)
     },
     close(input) {
-      return connection.request('close', input)
+      return options.realtime.request('close', input)
     },
     create(input) {
-      return connection.request('create', input satisfies TerminalCreateInput).then((value) => {
+      return options.realtime.request('create', input satisfies TerminalCreateInput).then((value) => {
         const result = normalizeTerminalCreateResult(value)
         if (!result) throw new Error('Terminal socket response failed: invalid terminal create response')
         return result
       })
     },
-    replaceWorkspaceTabs(input) {
-      return connection.request(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace, input)
-    },
-    updateWorkspaceTabs(input) {
-      return connection.request(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update, input)
-    },
     pruneTerminals(repoRoot, repoInstanceId) {
-      return connection.request('prune', { repoRoot, repoInstanceId })
+      return options.realtime.request('prune', { repoRoot, repoInstanceId })
     },
     listSessions(input) {
-      return connection.request('list-sessions', input).then((value) => {
+      return options.realtime.request('list-sessions', input).then((value) => {
         const sessions = normalizeTerminalSessionSummaryList(value)
         if (!sessions) throw new Error('Terminal socket response failed: invalid terminal sessions response')
         return sessions
       })
     },
-    listWorkspaceTabs(input) {
-      return connection.request(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list, input).then((value) => {
-        const tabs = normalizeWorkspacePaneTabsEntryList(value)
-        if (!tabs) throw new Error('Terminal socket response failed: invalid workspace tabs response')
-        return tabs
+    recoverSessions(input) {
+      return options.realtime.request('recover-sessions', input).then((value) => {
+        const recovery = normalizeTerminalSessionsRecoveryResult(value)
+        if (!recovery) throw new Error('Terminal socket response failed: invalid terminal recovery response')
+        return recovery
       })
     },
     prewarm() {
-      return connection.prewarm()
+      return options.realtime.prewarm()
     },
     notifyBell(input: TerminalNotifyBellInput) {
       return options.notificationProvider.notifyBell(input)
@@ -132,101 +101,77 @@ export function createServerTerminalClients(options: {
     },
     onOutput(cb) {
       outputSubscribers.add(cb)
-      connection.openForRealtime()
+      ensureRealtimeSubscription()
       return () => {
         outputSubscribers.delete(cb)
-        connection.closeSocketIfIdle()
+        closeRealtimeSubscriptionIfIdle()
       }
     },
     onBell(cb) {
       bellSubscribers.add(cb)
-      connection.openForRealtime()
+      ensureRealtimeSubscription()
       return () => {
         bellSubscribers.delete(cb)
-        connection.closeSocketIfIdle()
+        closeRealtimeSubscriptionIfIdle()
       }
     },
     onTitle(cb) {
       titleSubscribers.add(cb)
-      connection.openForRealtime()
+      ensureRealtimeSubscription()
       return () => {
         titleSubscribers.delete(cb)
-        connection.closeSocketIfIdle()
+        closeRealtimeSubscriptionIfIdle()
       }
     },
     onExit(cb) {
       exitSubscribers.add(cb)
-      connection.openForRealtime()
+      ensureRealtimeSubscription()
       return () => {
         exitSubscribers.delete(cb)
-        connection.closeSocketIfIdle()
+        closeRealtimeSubscriptionIfIdle()
       }
     },
     onIdentity(cb) {
       identitySubscribers.add(cb)
-      connection.openForRealtime()
+      ensureRealtimeSubscription()
       return () => {
         identitySubscribers.delete(cb)
-        connection.closeSocketIfIdle()
+        closeRealtimeSubscriptionIfIdle()
       }
     },
     onLifecycle(cb) {
       lifecycleSubscribers.add(cb)
-      connection.openForRealtime()
+      ensureRealtimeSubscription()
       return () => {
         lifecycleSubscribers.delete(cb)
-        connection.closeSocketIfIdle()
+        closeRealtimeSubscriptionIfIdle()
       }
     },
     onSessionsChanged(cb) {
       sessionsChangedSubscribers.add(cb)
-      connection.openForRealtime()
+      ensureRealtimeSubscription()
       return () => {
         sessionsChangedSubscribers.delete(cb)
-        connection.closeSocketIfIdle()
-      }
-    },
-    onWorkspaceTabsChanged(cb) {
-      workspaceTabsChangedSubscribers.add(cb)
-      connection.openForRealtime()
-      return () => {
-        workspaceTabsChangedSubscribers.delete(cb)
-        connection.closeSocketIfIdle()
+        closeRealtimeSubscriptionIfIdle()
       }
     },
     onSessionClosed(cb) {
       sessionClosedSubscribers.add(cb)
-      connection.openForRealtime()
+      ensureRealtimeSubscription()
       return () => {
         sessionClosedSubscribers.delete(cb)
-        connection.closeSocketIfIdle()
+        closeRealtimeSubscriptionIfIdle()
       }
     },
+    onRecovered(cb) {
+      return options.realtime.onRecovered(cb)
+    },
     kickReconnect() {
-      connection.kickReconnect()
+      options.realtime.kickReconnect()
     },
   }
 
-  const workspacePaneTabs: ClientWorkspacePaneTabs = {
-    replace(input) {
-      return connection.request(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace, input)
-    },
-    update(input) {
-      return connection.request(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update, input)
-    },
-    list(input) {
-      return connection.request(WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list, input).then((value) => {
-        const tabs = normalizeWorkspacePaneTabsEntryList(value)
-        if (!tabs) throw new Error('Terminal socket response failed: invalid workspace tabs response')
-        return tabs
-      })
-    },
-    onChanged(cb) {
-      return terminal.onWorkspaceTabsChanged(cb)
-    },
-  }
-
-  return { terminal, workspacePaneTabs }
+  return terminal
 
   function hasRealtimeSubscribers(): boolean {
     return (
@@ -237,9 +182,19 @@ export function createServerTerminalClients(options: {
       identitySubscribers.size > 0 ||
       lifecycleSubscribers.size > 0 ||
       sessionsChangedSubscribers.size > 0 ||
-      workspaceTabsChangedSubscribers.size > 0 ||
       sessionClosedSubscribers.size > 0
     )
+  }
+
+  function ensureRealtimeSubscription(): void {
+    if (realtimeUnsubscribe) return
+    realtimeUnsubscribe = options.realtime.onMessage(handleRealtimeMessage)
+  }
+
+  function closeRealtimeSubscriptionIfIdle(): void {
+    if (hasRealtimeSubscribers() || !realtimeUnsubscribe) return
+    realtimeUnsubscribe()
+    realtimeUnsubscribe = null
   }
 
   function handleRealtimeMessage(message: AppRealtimeMessage, currentClientId: string): void {
@@ -258,9 +213,6 @@ export function createServerTerminalClients(options: {
         return
       case 'sessions-changed':
         for (const subscriber of sessionsChangedSubscribers) subscriber(message.repoRoot)
-        return
-      case WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed:
-        for (const subscriber of workspaceTabsChangedSubscribers) subscriber(message.repoRoot)
         return
       case 'session-closed':
         for (const subscriber of sessionClosedSubscribers)
@@ -284,6 +236,8 @@ export function createServerTerminalClients(options: {
       }
       case 'lifecycle':
         for (const subscriber of lifecycleSubscribers) subscriber(message.event)
+        return
+      default:
         return
     }
   }

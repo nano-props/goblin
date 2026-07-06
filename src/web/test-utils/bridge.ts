@@ -44,6 +44,7 @@ import type {
   TerminalCreateResult,
   TerminalMutationResult,
   TerminalSessionSummary,
+  TerminalSessionsRecoveryResult,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
@@ -124,12 +125,13 @@ interface TerminalClientTestOutputs {
   'terminal.takeover': TerminalTakeoverResult
   'terminal.close': TerminalMutationResult
   'terminal.create': TerminalCreateResult
-  'terminal.replaceWorkspaceTabs': WorkspacePaneTabEntry[]
-  'terminal.updateWorkspaceTabs': WorkspacePaneTabEntry[]
-  'terminal.listWorkspaceTabs': WorkspacePaneTabsEntry[]
   'terminal.prune': { pruned: number; remaining: number }
   'terminal.listSessions': TerminalSessionSummary[]
+  'terminal.recoverSessions': TerminalSessionsRecoveryResult
   'terminal.notifyBell': TerminalMutationResult
+  'workspacePaneTabs.replace': WorkspacePaneTabEntry[]
+  'workspacePaneTabs.update': WorkspacePaneTabEntry[]
+  'workspacePaneTabs.list': WorkspacePaneTabsEntry[]
 }
 
 function terminalHandlerNameForSocketAction(action: string): keyof TerminalClientTestOutputs | null {
@@ -149,15 +151,17 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalClien
     case 'create':
       return 'terminal.create'
     case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace:
-      return 'terminal.replaceWorkspaceTabs'
+      return 'workspacePaneTabs.replace'
     case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update:
-      return 'terminal.updateWorkspaceTabs'
+      return 'workspacePaneTabs.update'
     case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list:
-      return 'terminal.listWorkspaceTabs'
+      return 'workspacePaneTabs.list'
     case 'prune':
       return 'terminal.prune'
     case 'list-sessions':
       return 'terminal.listSessions'
+    case 'recover-sessions':
+      return 'terminal.recoverSessions'
     default:
       return null
   }
@@ -261,20 +265,9 @@ export function installWorkspacePaneTabsTestBridge(
         canonicalCols: 80,
         canonicalRows: 24,
       }),
-      replaceWorkspaceTabs: async (input) => {
-        if (options.replaceWorkspaceTabs) return await options.replaceWorkspaceTabs(input)
-        return [...input.tabs]
-      },
-      updateWorkspaceTabs: async (input) => {
-        if (options.updateWorkspaceTabs) return await options.updateWorkspaceTabs(input)
-        return defaultWorkspacePaneTabsOperationResult(input)
-      },
-      listWorkspaceTabs: async (input) => {
-        if (options.listWorkspaceTabs) return await options.listWorkspaceTabs(input)
-        return []
-      },
       pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
       listSessions: async () => [],
+      recoverSessions: async () => ({ sessions: [], snapshots: [] }),
       prewarm: async () => {},
       kickReconnect: () => {},
       notifyBell: async () => true,
@@ -287,7 +280,7 @@ export function installWorkspacePaneTabsTestBridge(
       onIdentity: () => () => {},
       onLifecycle: () => () => {},
       onSessionsChanged: () => () => {},
-      onWorkspaceTabsChanged: () => () => {},
+      onRecovered: () => () => {},
       onSessionClosed: () => () => {},
     }),
     workspacePaneTabs: () => ({
@@ -304,6 +297,7 @@ export function installWorkspacePaneTabsTestBridge(
         return []
       },
       onChanged: () => () => {},
+      onRecovered: () => () => {},
     }),
   } satisfies ClientBridge)
 }
@@ -434,9 +428,22 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           close: () => Promise.resolve(true),
           create: () => Promise.resolve({ ok: false, message: 'unhandled terminal create' }),
           pruneTerminals: () => Promise.resolve({ pruned: 0, remaining: 0 }),
+          listSessions: () => Promise.resolve([]),
+          recoverSessions: () => Promise.resolve({ sessions: [], snapshots: [] }),
+          prewarm: () => Promise.resolve(),
+          kickReconnect: () => {},
+          notifyBell: () => Promise.resolve(true),
+          sendTestNotification: () => Promise.resolve(true),
+          setBadge: () => {},
           onOutput: () => () => {},
           onBell: () => () => {},
+          onTitle: () => () => {},
           onExit: () => () => {},
+          onIdentity: () => () => {},
+          onLifecycle: () => () => {},
+          onSessionsChanged: () => () => {},
+          onRecovered: () => () => {},
+          onSessionClosed: () => () => {},
         },
       },
       location: {
@@ -460,22 +467,26 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
   function callTerminalHandler(name: 'terminal.close', payload: unknown): TerminalClientTestOutputs['terminal.close']
   function callTerminalHandler(name: 'terminal.create', payload: unknown): TerminalClientTestOutputs['terminal.create']
   function callTerminalHandler(
-    name: 'terminal.replaceWorkspaceTabs',
+    name: 'workspacePaneTabs.replace',
     payload: unknown,
-  ): TerminalClientTestOutputs['terminal.replaceWorkspaceTabs']
+  ): TerminalClientTestOutputs['workspacePaneTabs.replace']
   function callTerminalHandler(
-    name: 'terminal.updateWorkspaceTabs',
+    name: 'workspacePaneTabs.update',
     payload: unknown,
-  ): TerminalClientTestOutputs['terminal.updateWorkspaceTabs']
+  ): TerminalClientTestOutputs['workspacePaneTabs.update']
   function callTerminalHandler(
-    name: 'terminal.listWorkspaceTabs',
+    name: 'workspacePaneTabs.list',
     payload: unknown,
-  ): TerminalClientTestOutputs['terminal.listWorkspaceTabs']
+  ): TerminalClientTestOutputs['workspacePaneTabs.list']
   function callTerminalHandler(name: 'terminal.prune', payload: unknown): TerminalClientTestOutputs['terminal.prune']
   function callTerminalHandler(
     name: 'terminal.listSessions',
     payload: unknown,
   ): TerminalClientTestOutputs['terminal.listSessions']
+  function callTerminalHandler(
+    name: 'terminal.recoverSessions',
+    payload: unknown,
+  ): TerminalClientTestOutputs['terminal.recoverSessions']
   function callTerminalHandler(
     name: 'terminal.notifyBell',
     payload: unknown,
@@ -512,16 +523,18 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           }
         case 'terminal.prune':
           return { pruned: 0, remaining: 0 }
-        case 'terminal.replaceWorkspaceTabs':
+        case 'workspacePaneTabs.replace':
           return Array.isArray((payload as { tabs?: unknown } | undefined)?.tabs)
             ? ([...(payload as { tabs: WorkspacePaneTabEntry[] }).tabs] satisfies WorkspacePaneTabEntry[])
             : []
-        case 'terminal.updateWorkspaceTabs':
+        case 'workspacePaneTabs.update':
           return isWorkspacePaneTabsUpdateInput(payload) ? defaultWorkspacePaneTabsOperationResult(payload) : []
-        case 'terminal.listWorkspaceTabs':
+        case 'workspacePaneTabs.list':
           return []
         case 'terminal.listSessions':
           return []
+        case 'terminal.recoverSessions':
+          return { sessions: [], snapshots: [] }
         case 'terminal.create': {
           const terminalKind = (payload as { kind?: string } | undefined)?.kind
           const terminalRuntimeSessionId = terminalKind === 'primary' ? 'pty_test_1_aaaaaaaaa' : 'pty_test_2_aaaaaaaaa'
@@ -628,11 +641,9 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       takeover: async (input) => callTerminalHandler('terminal.takeover', input),
       close: async (input) => callTerminalHandler('terminal.close', input),
       create: async (input) => callTerminalHandler('terminal.create', input),
-      replaceWorkspaceTabs: async (input) => callTerminalHandler('terminal.replaceWorkspaceTabs', input),
-      updateWorkspaceTabs: async (input) => callTerminalHandler('terminal.updateWorkspaceTabs', input),
-      listWorkspaceTabs: async (input) => callTerminalHandler('terminal.listWorkspaceTabs', input),
       pruneTerminals: async (repoRoot) => callTerminalHandler('terminal.prune', { repoRoot }),
       listSessions: async (input) => callTerminalHandler('terminal.listSessions', input),
+      recoverSessions: async (input) => callTerminalHandler('terminal.recoverSessions', input),
       prewarm: async () => {},
       kickReconnect: () => {},
       notifyBell: async (input) => callTerminalHandler('terminal.notifyBell', input),
@@ -645,14 +656,15 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       onIdentity: () => () => {},
       onLifecycle: () => () => {},
       onSessionsChanged: () => () => {},
-      onWorkspaceTabsChanged: () => () => {},
+      onRecovered: () => () => {},
       onSessionClosed: () => () => {},
     }),
     workspacePaneTabs: () => ({
-      replace: async (input) => callTerminalHandler('terminal.replaceWorkspaceTabs', input),
-      update: async (input) => callTerminalHandler('terminal.updateWorkspaceTabs', input),
-      list: async (input) => callTerminalHandler('terminal.listWorkspaceTabs', input),
+      replace: async (input) => callTerminalHandler('workspacePaneTabs.replace', input),
+      update: async (input) => callTerminalHandler('workspacePaneTabs.update', input),
+      list: async (input) => callTerminalHandler('workspacePaneTabs.list', input),
       onChanged: () => () => {},
+      onRecovered: () => () => {},
     }),
   })
   vi.stubGlobal(

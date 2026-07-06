@@ -11,6 +11,7 @@ import type {
   TerminalNotifyBellInput,
   TerminalSessionPhase,
   TerminalSessionSummary,
+  TerminalSessionsRecoveryResult,
   TerminalTestNotificationInput,
 } from '#/shared/terminal-types.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
@@ -37,6 +38,7 @@ const TERMINAL_SOCKET_ACTIONS = [
   'takeover',
   'close',
   'list-sessions',
+  'recover-sessions',
   'create',
   'prune',
 ] as const satisfies TerminalSocketRequestAction[]
@@ -115,6 +117,16 @@ const TerminalSessionSummarySchema = v.object({
   message: v.nullable(v.string()),
   cols: v.number(),
   rows: v.number(),
+})
+const TerminalHydrationSnapshotSchema = v.object({
+  terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
+  snapshot: v.string(),
+  snapshotSeq: v.number(),
+  outputEra: v.number(),
+})
+const TerminalSessionsRecoveryResultSchema = v.object({
+  sessions: v.array(TerminalSessionSummarySchema),
+  snapshots: v.array(TerminalHydrationSnapshotSchema),
 })
 const TerminalFirstFrameSchemaEntries = {
   terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
@@ -300,6 +312,12 @@ const TerminalClientMessageSchema = v.variant('type', [
   v.object({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
+    action: v.literal('recover-sessions'),
+    input: TerminalListSessionsInputSchema,
+  }),
+  v.object({
+    type: v.literal('request'),
+    requestId: TerminalRequestIdSchema,
     action: v.literal('create'),
     input: TerminalCreateInputSchema,
   }),
@@ -401,6 +419,11 @@ export function normalizeTerminalSessionSummaryList(value: unknown): TerminalSes
   return parsed.success ? parsed.output : null
 }
 
+export function normalizeTerminalSessionsRecoveryResult(value: unknown): TerminalSessionsRecoveryResult | null {
+  const parsed = v.safeParse(TerminalSessionsRecoveryResultSchema, value)
+  return parsed.success ? parsed.output : null
+}
+
 export function normalizeTerminalCreateResult(value: unknown): TerminalCreateResult | null {
   const parsed = v.safeParse(TerminalCreateResultSchema, value)
   return parsed.success ? parsed.output : null
@@ -442,6 +465,8 @@ function normalizeTerminalSocketResponsePayload(action: TerminalSocketRequestAct
       return normalizeWithSchema(TerminalTakeoverResultSchema, payload)
     case 'list-sessions':
       return normalizeWithSchema(v.array(TerminalSessionSummarySchema), payload)
+    case 'recover-sessions':
+      return normalizeWithSchema(TerminalSessionsRecoveryResultSchema, payload)
     case 'create':
       return normalizeWithSchema(TerminalCreateResultSchema, payload)
     case 'prune':
