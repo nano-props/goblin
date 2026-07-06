@@ -345,6 +345,7 @@ export const ko: Record<DictKey, string> = {
   // ---- Terminal ----------------------------------------------------------
   'terminal.opening': '터미널 여는 중…',
   'terminal.loading': '터미널 불러오는 중…',
+  'terminal.load-failed': '터미널을 불러오지 못했습니다',
   'terminal.restarting': '터미널 다시 시작 중…',
   'terminal.restart': '터미널 다시 시작',
   'terminal.search-placeholder': '터미널 검색',

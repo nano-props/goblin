@@ -47,6 +47,7 @@ export interface TerminalEnsureSessionInput<TUser extends string | number> {
   scope: string
   repoRoot: string
   repoInstanceId: string
+  branch: string
   terminalSessionId: string
   worktreePath: string
   cwd: string
@@ -63,6 +64,7 @@ interface TerminalSessionView<TUser extends string | number> extends TerminalPty
   repoRoot: string
   repoInstanceId: string
   scope: string
+  branch: string
   terminalSessionId: string
   worktreePath: string
   ptyBinding: TerminalPtyBinding<TerminalSessionView<TUser>>
@@ -141,6 +143,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       repoRoot: input.repoRoot,
       repoInstanceId: input.repoInstanceId,
       scope: input.scope,
+      branch: input.branch,
       terminalSessionId: input.terminalSessionId,
       worktreePath,
       cwd,
@@ -339,6 +342,7 @@ export class TerminalSessionManager<TUser extends string | number> {
         terminalSessionId: session.terminalSessionId,
         repoInstanceId: session.repoInstanceId,
         repoRoot: session.repoRoot,
+        branch: session.branch,
         worktreePath: session.worktreePath,
         cwd: session.cwd,
         controller: this.effectiveController(session),
@@ -405,6 +409,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       terminalSessionId: session.terminalSessionId,
       repoInstanceId: session.repoInstanceId,
       repoRoot: session.repoRoot,
+      branch: session.branch,
       worktreePath: session.worktreePath,
       cwd: session.cwd,
       controller: this.effectiveController(session),

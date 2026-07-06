@@ -21,7 +21,7 @@ describe('repo workspace pane tab model', () => {
       preferredTab: 'status',
       tabEntries: [terminalEntry('session-1'), staticEntry('status'), staticEntry('changes'), staticEntry('history')],
       runtimeTerminalViews: [terminalView('session-1', 1, true)],
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: null,
     })
 
@@ -45,7 +45,7 @@ describe('repo workspace pane tab model', () => {
       preferredTab: 'terminal',
       tabEntries: [staticEntry('status'), terminalEntry('session-1'), terminalEntry('session-2')],
       runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, false)],
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: 'session-2',
     })
 
@@ -63,7 +63,7 @@ describe('repo workspace pane tab model', () => {
       preferredTab: 'terminal',
       tabEntries: [staticEntry('status'), terminalEntry('session-2')],
       runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, true)],
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: 'session-2',
     })
 
@@ -82,7 +82,7 @@ describe('repo workspace pane tab model', () => {
       preferredTab: 'terminal',
       tabEntries: [staticEntry('status')],
       runtimeTerminalViews: [terminalView('session-1', 1, true)],
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: 'session-1',
     })
 
@@ -99,7 +99,7 @@ describe('repo workspace pane tab model', () => {
       preferredTab: 'terminal',
       tabEntries: [terminalEntry('session-2'), staticEntry('status'), terminalEntry('session-1')],
       runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, true)],
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: 'session-2',
     })
 
@@ -120,7 +120,7 @@ describe('repo workspace pane tab model', () => {
       tabEntries: [staticEntry('status')],
       runtimeTerminalViews: [],
       terminalCreatePending: true,
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: null,
     })
 
@@ -142,7 +142,7 @@ describe('repo workspace pane tab model', () => {
       tabEntries: [staticEntry('status')],
       runtimeTerminalViews: [],
       terminalCreatePending: false,
-      terminalSyncReady: false,
+      terminalProjectionPhase: 'pending',
       selectedTerminalSessionId: null,
     })
 
@@ -160,7 +160,7 @@ describe('repo workspace pane tab model', () => {
       preferredTab: 'changes',
       tabEntries: [staticEntry('status')],
       runtimeTerminalViews: [],
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: null,
     })
 
@@ -186,7 +186,7 @@ describe('repo workspace pane tab model', () => {
       preferredTab: 'history',
       tabEntries: [staticEntry('status'), terminalEntry('session-1')],
       runtimeTerminalViews: [terminalView('session-1', 1, true)],
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: null,
     })
 
@@ -211,7 +211,7 @@ describe('repo workspace pane tab model', () => {
       preferredTab: 'status',
       tabEntries: [staticEntry('status'), staticEntry('changes'), terminalEntry('ignored')],
       runtimeTerminalViews: [terminalView('ignored', 1, true)],
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: null,
     })
 
@@ -234,7 +234,7 @@ describe('repo workspace pane tab model', () => {
       preferredTab: 'terminal',
       tabEntries: [staticEntry('status')],
       runtimeTerminalViews: [],
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: null,
     })
 
@@ -261,7 +261,7 @@ describe('repo workspace pane tab model', () => {
       preferredTab: 'terminal',
       tabEntries: [staticEntry('status'), terminalEntry('session-2')],
       runtimeTerminalViews: [terminalView('session-2', 2, true)],
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: 'session-2',
     })
 
@@ -287,7 +287,7 @@ describe('repo workspace pane tab model', () => {
       tabEntries: [staticEntry('status')],
       runtimeTerminalViews: [],
       terminalCreatePending: true,
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: null,
     })
 
@@ -308,7 +308,7 @@ describe('repo workspace pane tab model', () => {
       tabEntries: [],
       runtimeTerminalViews: [],
       terminalCreatePending: true,
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: null,
     })
 
@@ -331,7 +331,7 @@ describe('repo workspace pane tab model', () => {
       tabEntries: [staticEntry('status')],
       runtimeTerminalViews: [],
       terminalCreatePending: false,
-      terminalSyncReady: false,
+      terminalProjectionPhase: 'pending',
       selectedTerminalSessionId: null,
     })
 
@@ -348,7 +348,7 @@ describe('repo workspace pane tab model', () => {
       preferredTab: 'status',
       tabEntries: [staticEntry('status')],
       runtimeTerminalViews: [],
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: null,
     })
 
@@ -370,7 +370,7 @@ describe('repo workspace pane tab model', () => {
       preferredTab: 'terminal',
       tabEntries: [staticEntry('status')],
       runtimeTerminalViews: [],
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: null,
     })
 
@@ -389,7 +389,7 @@ describe('repo workspace pane tab model', () => {
       preferredTab: 'status',
       tabEntries: [staticEntry('status'), terminalEntry('session-1'), staticEntry('changes')],
       runtimeTerminalViews: [terminalView('session-1', 1, true)],
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: 'session-1',
     })
 
@@ -406,7 +406,7 @@ describe('repo workspace pane tab model', () => {
       preferredTab: 'status',
       tabEntries: [staticEntry('status'), terminalEntry('session-1'), staticEntry('changes')],
       runtimeTerminalViews: [terminalView('session-1', 1, true)],
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: 'session-1',
     })
 
@@ -423,7 +423,7 @@ describe('repo workspace pane tab model', () => {
       preferredTab: 'status',
       tabEntries: [staticEntry('status'), terminalEntry('session-1'), staticEntry('changes')],
       runtimeTerminalViews: [terminalView('session-1', 1, true)],
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: 'session-1',
     })
 
@@ -441,7 +441,7 @@ describe('repo workspace pane tab model', () => {
       tabEntries: [staticEntry('status')],
       runtimeTerminalViews: [],
       terminalCreatePending: true,
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: null,
     })
 
@@ -456,7 +456,7 @@ describe('repo workspace pane tab model', () => {
       preferredTab: 'terminal',
       tabEntries: [staticEntry('status'), terminalEntry('session-1'), terminalEntry('session-2'), staticEntry('changes')],
       runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, false)],
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: 'session-2',
     })
 
@@ -474,7 +474,7 @@ describe('repo workspace pane tab model', () => {
       preferredTab: 'terminal',
       tabEntries: [terminalEntry('session-1'), staticEntry('status'), terminalEntry('session-2')],
       runtimeTerminalViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, false)],
-      terminalSyncReady: true,
+      terminalProjectionPhase: 'ready',
       selectedTerminalSessionId: 'session-2',
     })
 

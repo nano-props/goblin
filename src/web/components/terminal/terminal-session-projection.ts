@@ -72,7 +72,9 @@ export function projectServerTerminalSession(input: {
   serverSnapshot?: TerminalHydrationSnapshot | null
 }): ProjectedServerTerminalSession | null {
   if (input.serverSession.repoRoot !== input.repoRoot) return null
-  const branch = branchForTerminalWorktree(input.repoIndex, input.serverSession.repoRoot, input.serverSession.worktreePath)
+  const branch =
+    input.serverSession.branch ||
+    branchForTerminalWorktree(input.repoIndex, input.serverSession.repoRoot, input.serverSession.worktreePath)
   if (!branch) return null
   const descriptor = terminalDescriptor(
     { repoRoot: input.serverSession.repoRoot, branch, worktreePath: input.serverSession.worktreePath },
@@ -111,6 +113,7 @@ function createSessionSummaryFromCreate(
     terminalSessionId: result.terminalSessionId,
     repoInstanceId: serverSession?.repoInstanceId ?? requireBaseRepoInstanceId(base),
     repoRoot: serverSession?.repoRoot ?? base.repoRoot,
+    branch: serverSession?.branch ?? base.branch,
     worktreePath: serverSession?.worktreePath ?? base.worktreePath,
     cwd: serverSession?.cwd ?? serverSession?.worktreePath ?? base.worktreePath,
     controller: result.controller,

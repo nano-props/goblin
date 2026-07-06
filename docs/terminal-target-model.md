@@ -30,6 +30,7 @@ A session is the long-lived terminal business object.
 It owns:
 
 - session identity
+- target metadata (`repoRoot`, `repoInstanceId`, `branch`, `worktreePath`)
 - worktree identity
 - canonical geometry
 - PTY lifecycle association
@@ -44,6 +45,11 @@ The server-owned session is authoritative for lifecycle, controller state,
 canonical PTY geometry, and the headless render state used to produce replay
 snapshots. It should not try to predict browser font metrics or local xterm
 layout details before a real view exists.
+
+The server-owned session is also authoritative for the terminal's workspace
+target metadata. `branch` is stored on the session at creation time for both
+local and remote sessions; workspace-pane tab recovery must not depend on a
+client-side repo snapshot or a local `git worktree` lookup to rediscover it.
 
 Server-owned runtime ids should also drive terminal writes. If a mutation
 targets a live session by `terminalRuntimeSessionId`, close/restart/takeover should be
@@ -88,6 +94,7 @@ publishes the resulting canonical geometry.
 At a high level, the server-side session model should evolve toward:
 
 - session identity and scope
+- target metadata: `repoRoot`, `repoInstanceId`, `branch`, `worktreePath`
 - lifecycle phase
 - canonical geometry
 - PTY binding information
@@ -234,6 +241,22 @@ It mainly needs:
 - lifecycle phase
 
 The client should not have to infer hidden lifecycle meaning from missing PTY state.
+
+## Workspace-pane tab projection
+
+Workspace-pane terminal tabs are a server-side projection of live terminal
+sessions. The canonical boundary is `listWorkspaceTabs` in the terminal session
+service:
+
+- every live terminal session must materialize a matching `{ type: 'terminal', terminalSessionId }` tab entry
+- stale terminal tab entries must be pruned when no matching live session exists
+- existing static tabs and user-managed ordering are preserved where possible
+- the server broadcasts `workspace-tabs-changed` when read-side canonicalization changes the projection
+
+This keeps the client from inventing fallback rendering rules such as "show a
+terminal tab if a live terminal view exists but the tab list forgot it". The UI
+renders the canonical workspace-pane tab projection, and the server is
+responsible for keeping that projection coherent with terminal runtime state.
 
 ## Migration direction
 

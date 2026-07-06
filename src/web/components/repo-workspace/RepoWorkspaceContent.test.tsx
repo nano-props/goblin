@@ -30,7 +30,7 @@ import {
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
-import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
+import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -87,7 +87,7 @@ function repoWorkspaceRepo(repo: RepoState): RepoWorkspaceRepo {
 beforeEach(() => {
   resetReposStore()
   installWorkspacePaneTabsTestBridge()
-  useRepoSyncStore.setState({ ready: new Map(), timestamps: new Map() })
+  useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
   repoClientMocks.getRepoLog.mockResolvedValue([])
   repoClientMocks.openRepoUrl.mockResolvedValue({ ok: true, message: '' })
   filetreeClientMocks.getRepositoryTree.mockResolvedValue({ nodes: [], truncated: false })
@@ -601,7 +601,7 @@ describe('RepoWorkspaceContent', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/terminal-empty': [staticEntry('status')] },
     })
-    useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
     const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
@@ -631,7 +631,7 @@ describe('RepoWorkspaceContent', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/terminal-pending': [staticEntry('status')] },
     })
-    useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
     const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     const registerHost = vi.fn()
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
@@ -673,7 +673,7 @@ describe('RepoWorkspaceContent', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { [branchName]: [] },
     })
-    useRepoSyncStore.getState().markReady(REPO_ID, seededRepo.instanceId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, seededRepo.instanceId)
     const repo = useReposStore.getState().repos[REPO_ID]!
     const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     const registerHost = vi.fn()
@@ -754,7 +754,7 @@ describe('RepoWorkspaceContent', () => {
         'feature/terminal-reordered': [terminalEntry('t2'), staticEntry('status'), terminalEntry('t1')],
       },
     })
-    useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
     const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     const registerHost = vi.fn()
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
@@ -808,7 +808,7 @@ describe('RepoWorkspaceContent', () => {
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: { [branchName]: [staticEntry('files'), staticEntry('status')] },
     })
-    useRepoSyncStore.getState().markReady(REPO_ID, repo.instanceId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
     const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     const createTerminal = vi.fn(async () => 'session-1')
     const writeInput = vi.fn()

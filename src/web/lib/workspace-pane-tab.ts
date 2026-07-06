@@ -8,6 +8,7 @@ import {
   workspacePaneTabScope as sharedWorkspacePaneTabScope,
 } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabProvider } from '#/web/components/workspace-pane/tab-providers.ts'
+import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
 
 export type BranchLevelWorkspacePaneTab = WorkspacePaneBranchTabType
 export type WorktreeLevelWorkspacePaneTab = Exclude<WorkspacePaneTabType, BranchLevelWorkspacePaneTab>
@@ -45,8 +46,8 @@ export interface WorkspacePaneRenderabilityContext {
   terminalSessionCount: number
   /** Whether a new terminal is queued and waiting for mount geometry. */
   terminalCreatePending?: boolean
-  /** Whether the terminal session projection has finished its first sync. */
-  terminalSyncReady: boolean
+  /** Server -> client terminal projection hydration phase for this repo instance. */
+  terminalProjectionPhase: TerminalProjectionHydrationPhase
 }
 
 /**

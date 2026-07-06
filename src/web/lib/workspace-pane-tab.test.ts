@@ -12,7 +12,7 @@ function ctx(overrides: Partial<WorkspacePaneRenderabilityContext> = {}): Worksp
   return {
     hasWorktree: true,
     terminalSessionCount: 0,
-    terminalSyncReady: true,
+    terminalProjectionPhase: 'ready',
     ...overrides,
   }
 }
@@ -39,7 +39,7 @@ describe('resolveRenderableWorkspacePaneTab', () => {
   })
 
   test('preserves the terminal preference while sync is unresolved', () => {
-    expect(resolveRenderableWorkspacePaneTab('terminal', ctx({ terminalSyncReady: false }))).toBe('terminal')
+    expect(resolveRenderableWorkspacePaneTab('terminal', ctx({ terminalProjectionPhase: 'pending' }))).toBe('terminal')
   })
 
   test('preserves the terminal preference while terminal creation is pending', () => {
@@ -62,13 +62,13 @@ describe('resolveRenderableWorkspacePaneTab', () => {
   test('is total over the inputs', () => {
     const cases: Array<[WorkspacePaneTabType, WorkspacePaneRenderabilityContext, WorkspacePaneTabType | null]> = [
       ['status', ctx(), 'status'],
-      ['status', ctx({ hasWorktree: false, terminalSyncReady: false }), 'status'],
+      ['status', ctx({ hasWorktree: false, terminalProjectionPhase: 'pending' }), 'status'],
       ['history', ctx(), 'history'],
       ['history', ctx({ hasWorktree: false }), 'history'],
       ['changes', ctx(), 'changes'],
       ['changes', ctx({ hasWorktree: false }), null],
       ['terminal', ctx({ hasWorktree: false }), null],
-      ['terminal', ctx({ terminalSyncReady: false }), 'terminal'],
+      ['terminal', ctx({ terminalProjectionPhase: 'pending' }), 'terminal'],
       ['terminal', ctx({ terminalCreatePending: true }), 'terminal'],
       ['terminal', ctx({ terminalSessionCount: 0 }), null],
       ['terminal', ctx({ terminalSessionCount: 3 }), 'terminal'],

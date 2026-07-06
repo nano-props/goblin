@@ -25,6 +25,11 @@ const REPO_INSTANCE_ID = 'repo-instance-test'
 const RUNTIME_SCOPE = terminalSessionRuntimeScope(REPO_ROOT, REPO_INSTANCE_ID)
 const WORKTREE_PATH = '/repo/worktree'
 const BRANCH_NAME = 'feature/worktree'
+const REMOTE_REPO_ROOT = 'ssh-config://prod/srv/repo'
+const REMOTE_REPO_INSTANCE_ID = 'repo-instance-remote-test'
+const REMOTE_RUNTIME_SCOPE = terminalSessionRuntimeScope(REMOTE_REPO_ROOT, REMOTE_REPO_INSTANCE_ID)
+const REMOTE_WORKTREE_PATH = '/srv/repo'
+const REMOTE_BRANCH_NAME = 'feature/remote'
 
 describe('terminal session service workspace tabs', () => {
   test('create returns canonical tabs without pre-existing stale terminal tabs', async () => {
@@ -287,7 +292,7 @@ describe('terminal session service workspace tabs', () => {
     ).toEqual([workspacePaneStaticTabEntry('status')])
   })
 
-  test('listWorkspaceTabs prunes stale terminal tabs without appending missing live terminals', async () => {
+  test('listWorkspaceTabs prunes stale terminal tabs and materializes live terminal tabs', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
       userId: USER_ID,
@@ -327,12 +332,12 @@ describe('terminal session service workspace tabs', () => {
         repoRoot: REPO_ROOT,
         branchName: 'feature/static-only',
         worktreePath: path.resolve(WORKTREE_PATH),
-        tabs: [workspacePaneStaticTabEntry('history')],
+        tabs: [workspacePaneStaticTabEntry('history'), workspacePaneTerminalTabEntry('session-live')],
       },
     ])
   })
 
-  test('serializes workspace tab list pruning with later workspace tab reorder operations', async () => {
+  test('preserves live terminal tabs after list canonicalization and later reorder operations', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
       userId: USER_ID,
@@ -345,29 +350,12 @@ describe('terminal session service workspace tabs', () => {
         workspacePaneStaticTabEntry('history'),
       ],
     })
-    const listSessionResolves: Array<(sessions: TerminalSessionSummary[]) => void> = []
     const service = createService({
-      sessions: () =>
-        new Promise<TerminalSessionSummary[]>((resolve) => {
-          listSessionResolves.push(resolve)
-        }),
+      sessions: [terminalSession('session-live')],
       workspaceTabs,
     })
 
-    const list = service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)
-    await vi.waitFor(() => expect(listSessionResolves).toHaveLength(1))
-
-    const reorder = service.updateTabs(USER_ID, {
-      repoRoot: REPO_ROOT,
-      repoInstanceId: REPO_INSTANCE_ID,
-      branchName: BRANCH_NAME,
-      worktreePath: WORKTREE_PATH,
-      operation: { type: 'reorder', tabIdentities: ['workspace-pane:history', 'workspace-pane:status'] },
-    })
-
-    expect(listSessionResolves).toHaveLength(1)
-    listSessionResolves[0]!([terminalSession('session-live')])
-    await expect(list).resolves.toEqual([
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).resolves.toEqual([
       {
         repoRoot: REPO_ROOT,
         branchName: BRANCH_NAME,
@@ -379,13 +367,64 @@ describe('terminal session service workspace tabs', () => {
         ],
       },
     ])
-    await vi.waitFor(() => expect(listSessionResolves).toHaveLength(2))
-    listSessionResolves[1]!([terminalSession('session-live')])
 
-    await expect(reorder).resolves.toEqual([
+    await expect(
+      service.updateTabs(USER_ID, {
+        repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        operation: { type: 'reorder', tabIdentities: ['workspace-pane:history', 'workspace-pane:status'] },
+      }),
+    ).resolves.toEqual([
       workspacePaneStaticTabEntry('history'),
       workspacePaneStaticTabEntry('status'),
       workspacePaneTerminalTabEntry('session-live'),
+    ])
+  })
+
+  test('listWorkspaceTabs projects terminal tabs from fresh worktree-scoped session state', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: RUNTIME_SCOPE,
+      branchName: BRANCH_NAME,
+      worktreePath: path.resolve(WORKTREE_PATH),
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    let sessionListCalls = 0
+    const service = createService({
+      sessions: () => {
+        sessionListCalls += 1
+        return sessionListCalls === 1 ? [terminalSession('session-closed')] : []
+      },
+      workspaceTabs,
+    })
+
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).resolves.toEqual([
+      {
+        repoRoot: REPO_ROOT,
+        branchName: BRANCH_NAME,
+        worktreePath: path.resolve(WORKTREE_PATH),
+        tabs: [workspacePaneStaticTabEntry('status')],
+      },
+    ])
+  })
+
+  test('listWorkspaceTabs materializes tabs for worktrees discovered before projection', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    const service = createService({
+      sessions: [terminalSession('session-live')],
+      workspaceTabs,
+    })
+
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).resolves.toEqual([
+      {
+        repoRoot: REPO_ROOT,
+        branchName: BRANCH_NAME,
+        worktreePath: path.resolve(WORKTREE_PATH),
+        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')],
+      },
     ])
   })
 
@@ -611,6 +650,155 @@ describe('terminal session service workspace tabs', () => {
       },
     ])
   })
+
+  test('listWorkspaceTabs materializes missing terminal tabs without reverting current worktree branch', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: RUNTIME_SCOPE,
+      branchName: 'feature/new',
+      worktreePath: path.resolve(WORKTREE_PATH),
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    const service = createService({
+      sessions: [terminalSession('session-live', { branch: 'feature/old' })],
+      workspaceTabs,
+    })
+
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).resolves.toEqual([
+      {
+        repoRoot: REPO_ROOT,
+        branchName: 'feature/new',
+        worktreePath: path.resolve(WORKTREE_PATH),
+        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')],
+      },
+    ])
+  })
+
+  test('listWorkspaceTabs materializes missing terminal tabs from live sessions', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: RUNTIME_SCOPE,
+      branchName: BRANCH_NAME,
+      worktreePath: path.resolve(WORKTREE_PATH),
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    const broadcastWorkspaceTabsChanged = vi.fn()
+    const service = createService({
+      sessions: [terminalSession('session-live')],
+      workspaceTabs,
+      broadcastWorkspaceTabsChanged,
+    })
+
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).resolves.toEqual([
+      {
+        repoRoot: REPO_ROOT,
+        branchName: BRANCH_NAME,
+        worktreePath: path.resolve(WORKTREE_PATH),
+        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-live')],
+      },
+    ])
+    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith(USER_ID, REPO_ROOT)
+  })
+
+  test('listWorkspaceTabs does not materialize terminal tabs after repo instance goes stale during projection', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: RUNTIME_SCOPE,
+      branchName: BRANCH_NAME,
+      worktreePath: path.resolve(WORKTREE_PATH),
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    let current = true
+    let listCount = 0
+    const broadcastWorkspaceTabsChanged = vi.fn()
+    const service = createService({
+      sessions: () => {
+        listCount += 1
+        if (listCount === 2) current = false
+        return [terminalSession('session-live')]
+      },
+      workspaceTabs,
+      isCurrentRepoInstance: () => current,
+      broadcastWorkspaceTabsChanged,
+    })
+
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).rejects.toThrow(
+      'error.repo-instance-stale',
+    )
+    expect(
+      workspaceTabs.tabs({
+        userId: USER_ID,
+        scope: RUNTIME_SCOPE,
+        branchName: BRANCH_NAME,
+        worktreePath: path.resolve(WORKTREE_PATH),
+      }),
+    ).toEqual([workspacePaneStaticTabEntry('status')])
+    expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
+  })
+
+  test('listWorkspaceTabs materializes remote terminal tabs from session branch metadata', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: REMOTE_RUNTIME_SCOPE,
+      branchName: REMOTE_BRANCH_NAME,
+      worktreePath: REMOTE_WORKTREE_PATH,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    const broadcastWorkspaceTabsChanged = vi.fn()
+    const service = createService({
+      sessions: [
+        terminalSession('session-remote', {
+          repoRoot: REMOTE_REPO_ROOT,
+          repoInstanceId: REMOTE_REPO_INSTANCE_ID,
+          branch: REMOTE_BRANCH_NAME,
+          worktreePath: REMOTE_WORKTREE_PATH,
+        }),
+      ],
+      workspaceTabs,
+      broadcastWorkspaceTabsChanged,
+    })
+
+    await expect(service.listWorkspaceTabs(USER_ID, REMOTE_REPO_ROOT, REMOTE_REPO_INSTANCE_ID)).resolves.toEqual([
+      {
+        repoRoot: REMOTE_REPO_ROOT,
+        branchName: REMOTE_BRANCH_NAME,
+        worktreePath: REMOTE_WORKTREE_PATH,
+        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry('session-remote')],
+      },
+    ])
+    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith(USER_ID, REMOTE_REPO_ROOT)
+  })
+
+  test('listWorkspaceTabs prunes stale terminal tabs from the canonical projection', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: RUNTIME_SCOPE,
+      branchName: BRANCH_NAME,
+      worktreePath: path.resolve(WORKTREE_PATH),
+      tabs: [workspacePaneTerminalTabEntry('session-stale'), workspacePaneStaticTabEntry('status')],
+    })
+    const broadcastWorkspaceTabsChanged = vi.fn()
+    const service = createService({
+      sessions: [],
+      workspaceTabs,
+      broadcastWorkspaceTabsChanged,
+    })
+
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).resolves.toEqual([
+      {
+        repoRoot: REPO_ROOT,
+        branchName: BRANCH_NAME,
+        worktreePath: path.resolve(WORKTREE_PATH),
+        tabs: [workspacePaneStaticTabEntry('status')],
+      },
+    ])
+    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith(USER_ID, REPO_ROOT)
+  })
 })
 
 function createService(options: {
@@ -619,6 +807,7 @@ function createService(options: {
   ensureSession?: (input: EnsureSessionInput) => Promise<TerminalAttachResult>
   closeSession?: (terminalRuntimeSessionId: string) => void
   isCurrentRepoInstance?: (userId: string, repoRoot: string, repoInstanceId: string) => boolean
+  broadcastWorkspaceTabsChanged?: (userId: string, repoRoot: string) => void
 }) {
   return createTerminalSessionService({
     isValidClientId: (value): value is string => typeof value === 'string',
@@ -638,6 +827,7 @@ function createService(options: {
     workspaceTabs: options.workspaceTabs,
     isCurrentRepoInstance: options.isCurrentRepoInstance ?? (() => true),
     broadcastSessionsChanged: vi.fn(),
+    broadcastWorkspaceTabsChanged: options.broadcastWorkspaceTabsChanged ?? vi.fn(),
   })
 }
 
@@ -647,14 +837,18 @@ interface EnsureSessionInput {
   rows: number
 }
 
-function terminalSession(terminalSessionId: string): TerminalSessionSummary {
+function terminalSession(
+  terminalSessionId: string,
+  overrides: Partial<Pick<TerminalSessionSummary, 'repoRoot' | 'repoInstanceId' | 'branch' | 'worktreePath'>> = {},
+): TerminalSessionSummary {
   return {
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
     terminalSessionId,
-    repoInstanceId: REPO_INSTANCE_ID,
-    repoRoot: path.resolve(REPO_ROOT),
-    worktreePath: path.resolve(WORKTREE_PATH),
-    cwd: path.resolve(WORKTREE_PATH),
+    repoInstanceId: overrides.repoInstanceId ?? REPO_INSTANCE_ID,
+    repoRoot: overrides.repoRoot ?? path.resolve(REPO_ROOT),
+    branch: overrides.branch ?? BRANCH_NAME,
+    worktreePath: overrides.worktreePath ?? path.resolve(WORKTREE_PATH),
+    cwd: overrides.worktreePath ?? path.resolve(WORKTREE_PATH),
     controller: null,
     processName: 'zsh',
     canonicalTitle: null,

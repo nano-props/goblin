@@ -553,6 +553,66 @@ describe('TerminalSessionView', () => {
     }
   })
 
+  test('shows terminal projection failure reason while opening without sessions', () => {
+    const terminalWorktreeSnapshot = {
+      terminalWorktreeKey: '/repo\0/worktree',
+      selectedDescriptor: null,
+      sessions: [],
+      count: 0,
+      pendingCreate: false,
+    }
+    const context: TerminalSessionContextValue = {
+      createTerminal: vi.fn(),
+      registerHost: vi.fn(),
+      unregisterHost: vi.fn(),
+      selectTerminal: vi.fn(),
+      scrollToBottom: vi.fn(),
+      scrollLines: vi.fn(),
+      clearBell: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(async () => true),
+      attach: vi.fn(),
+      detach: vi.fn(),
+      restart: vi.fn(),
+      isTerminalFocusTarget: vi.fn(() => false),
+      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      clearSearch: vi.fn(),
+      writeInput: vi.fn(),
+      takeover: vi.fn(),
+      focusTerminal: vi.fn(),
+    }
+    const readContext: TerminalSessionReadContextValue = {
+      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
+      subscribeTerminalWorktree: () => () => {},
+      repoBellCount: () => 0,
+      subscribeRepoBellCount: () => () => {},
+      snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
+      subscribeSnapshot: () => () => {},
+    }
+
+    const { container, unmount } = renderInJsdom(
+      <TerminalSessionContext value={context}>
+        <TerminalSessionReadContext value={readContext}>
+          <TerminalSessionView
+            repoRoot="/repo"
+            repoInstanceId="repo-instance-test"
+            branch="feature"
+            worktreePath="/worktree"
+            projectionPhase="failed"
+            projectionErrorMessage="error.repo-instance-stale"
+          />
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>,
+    )
+
+    try {
+      expect(container.textContent).toContain('terminal.load-failed')
+      expect(container.textContent).toContain('error.repo-instance-stale')
+    } finally {
+      unmount()
+    }
+  })
+
   test('focuses the controller terminal after the ready render shows the host', async () => {
     const descriptor = {
       terminalSessionId: 'session-1',

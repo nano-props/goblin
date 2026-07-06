@@ -354,6 +354,7 @@ export const en = {
   // ---- Terminal -----------------------------------------------------------
   'terminal.opening': 'Opening terminal…',
   'terminal.loading': 'Loading terminals…',
+  'terminal.load-failed': 'Could not load terminals',
   'terminal.restarting': 'Restarting terminal…',
   'terminal.restart': 'Restart terminal',
   'terminal.search-placeholder': 'Search terminal',

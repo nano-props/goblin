@@ -7,7 +7,7 @@ import {
 } from '#/web/components/repo-workspace/tab-model.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import {
-  useTerminalRepoSyncReady,
+  useTerminalRepoProjectionHydrationEntry,
   useTerminalSessionSummaries,
   useTerminalWorktreePendingCreate,
 } from '#/web/components/terminal/terminal-session-store.ts'
@@ -49,7 +49,8 @@ export function useRepoWorkspaceTabModelInput(
 
   const terminalSessionSummaries = useTerminalSessionSummaries(terminalWorktreeKey)
   const terminalCreatePending = useTerminalWorktreePendingCreate(terminalWorktreeKey)
-  const terminalSyncReady = useTerminalRepoSyncReady(repo.id)
+  const terminalProjectionHydration = useTerminalRepoProjectionHydrationEntry(repo.id)
+  const terminalProjectionPhase = terminalProjectionHydration.phase
   const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(repo.id, repo.instanceId)
   const selectedTerminalSessionId = useReposStore((s) =>
     terminalWorktreeKey ? s.selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] : undefined,
@@ -85,7 +86,8 @@ export function useRepoWorkspaceTabModelInput(
       tabEntries: workspacePaneTabEntries,
       runtimeTerminalViews: terminalSessionSummaries,
       terminalCreatePending,
-      terminalSyncReady,
+      terminalProjectionPhase,
+      terminalProjectionErrorMessage: terminalProjectionHydration.errorMessage,
       selectedTerminalSessionId: modelSelectedTerminalSessionId,
     }),
     [
@@ -96,7 +98,8 @@ export function useRepoWorkspaceTabModelInput(
       workspacePaneTabEntries,
       terminalSessionSummaries,
       terminalCreatePending,
-      terminalSyncReady,
+      terminalProjectionPhase,
+      terminalProjectionHydration.errorMessage,
       modelSelectedTerminalSessionId,
     ],
   )

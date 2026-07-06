@@ -267,6 +267,66 @@ describe('terminal web host client', () => {
     dispose()
   })
 
+  test('opens a fresh socket for a request when the tracked socket is already closed', async () => {
+    const fetchMock = mockFetch()
+    const { terminalClient } = await import('#/web/terminal.ts')
+    const dispose = terminalClient.onOutput(() => {})
+    const staleSocket = wsMock.instances[0]
+    if (!staleSocket) throw new Error('missing web terminal socket')
+
+    dispose()
+    staleSocket.readyState = wsMock.CLOSED
+
+    const listPromise = terminalClient.listSessions({ repoRoot: '/tmp/repo', repoInstanceId: REPO_INSTANCE_ID })
+    expect(wsMock.instances).toHaveLength(2)
+    const socket = wsMock.instances[1]
+    socket?.emitOpen()
+    await Promise.resolve()
+    const request = socket?.sent
+      .map((payload) => JSON.parse(payload))
+      .find((message) => message.action === 'list-sessions')
+    socket?.emitMessage(
+      JSON.stringify({
+        type: 'response',
+        requestId: request?.requestId,
+        ok: true,
+        action: 'list-sessions',
+        payload: [],
+      }),
+    )
+
+    await expect(listPromise).resolves.toEqual([])
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  test('request cancels a pending idle close on a connecting realtime socket', async () => {
+    const fetchMock = mockFetch()
+    const { terminalClient } = await import('#/web/terminal.ts')
+    const dispose = terminalClient.onOutput(() => {})
+    const socket = wsMock.instances[0]
+    if (!socket) throw new Error('missing web terminal socket')
+
+    dispose()
+    const listPromise = terminalClient.listSessions({ repoRoot: '/tmp/repo', repoInstanceId: REPO_INSTANCE_ID })
+    expect(wsMock.instances).toHaveLength(1)
+    socket.emitOpen()
+    await Promise.resolve()
+    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'list-sessions')
+    expect(request).toMatchObject({ action: 'list-sessions' })
+    socket.emitMessage(
+      JSON.stringify({
+        type: 'response',
+        requestId: request?.requestId,
+        ok: true,
+        action: 'list-sessions',
+        payload: [],
+      }),
+    )
+
+    await expect(listPromise).resolves.toEqual([])
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   test('does not fall back to http when create websocket cannot open', async () => {
     const fetchMock = mockFetch()
     const { terminalClient } = await import('#/web/terminal.ts')
@@ -843,6 +903,19 @@ describe('terminal web host client', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  test('kickReconnect replaces a closing terminal socket while realtime subscribers remain', async () => {
+    const { terminalClient } = await import('#/web/terminal.ts')
+    const dispose = terminalClient.onOutput(() => {})
+    const socket = wsMock.instances[0]
+    if (!socket) throw new Error('missing web terminal socket')
+    socket.readyState = wsMock.CLOSING
+
+    terminalClient.kickReconnect()
+
+    expect(wsMock.instances).toHaveLength(2)
+    dispose()
   })
 
   test('reuses a connecting terminal socket when subscribers briefly drop to zero', async () => {

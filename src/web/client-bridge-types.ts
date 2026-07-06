@@ -49,9 +49,10 @@ export interface ClientTerminal {
    * user enters a repo so they pay the DNS+TCP+TLS+WS handshake
    * before clicking a terminal view. Idempotent (already-open socket
    * resolves immediately) and best-effort (failures are swallowed;
-   * the next real `listSessions`/`attach` will retry and surface a
-   * real error if the server is unreachable). No parameters: the
-   * client maintains a single shared socket, not per-repo sockets.
+   * the next real `listSessions`/`attach` will open or reuse a valid
+   * connection and surface a real error if the server is unreachable).
+   * No parameters: the client maintains a single shared socket, not
+   * per-repo sockets.
    */
   prewarm: () => Promise<void>
   /**

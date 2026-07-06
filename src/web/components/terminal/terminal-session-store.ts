@@ -1,6 +1,11 @@
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
 import { useTerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
-import { useRepoSyncStore } from '#/web/stores/repo-sync.ts'
+import {
+  useTerminalProjectionHydrationEntry,
+  useTerminalProjectionHydrationPhase,
+  type TerminalProjectionHydrationEntry,
+  type TerminalProjectionHydrationPhase,
+} from '#/web/stores/terminal-projection-hydration.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type {
   TerminalSnapshot,
@@ -118,12 +123,18 @@ export function useTerminalSessionSummaries(terminalWorktreeKey: string | null):
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 }
 
-export function useTerminalRepoSyncReady(repoRoot: string | null): boolean {
+export function useTerminalRepoProjectionPhase(repoRoot: string | null): TerminalProjectionHydrationPhase {
   const instanceId = useReposStore((s) => (repoRoot ? s.repos[repoRoot]?.instanceId : undefined))
-  return useRepoSyncStore((s) => {
-    if (!repoRoot || typeof instanceId !== 'string') return false
-    return s.ready.get(repoRoot) === instanceId
-  })
+  return useTerminalProjectionHydrationPhase(repoRoot, instanceId)
+}
+
+export function useTerminalRepoProjectionHydrationEntry(repoRoot: string | null): TerminalProjectionHydrationEntry {
+  const instanceId = useReposStore((s) => (repoRoot ? s.repos[repoRoot]?.instanceId : undefined))
+  return useTerminalProjectionHydrationEntry(repoRoot, instanceId)
+}
+
+export function useTerminalRepoProjectionReady(repoRoot: string | null): boolean {
+  return useTerminalRepoProjectionPhase(repoRoot) === 'ready'
 }
 
 export function useTerminalSnapshot(terminalSessionId: string | null): TerminalSnapshot {

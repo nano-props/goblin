@@ -82,14 +82,14 @@ describe('workspace pane tab providers', () => {
     expect(
       terminalWorkspacePaneTabProvider.isRenderable({
         hasWorktree: true,
-        terminalSyncReady: false,
+        terminalProjectionPhase: 'pending',
         terminalSessionCount: 0,
       }),
     ).toBe(true)
     expect(
       terminalWorkspacePaneTabProvider.isRenderable({
         hasWorktree: true,
-        terminalSyncReady: true,
+        terminalProjectionPhase: 'ready',
         terminalCreatePending: true,
         terminalSessionCount: 0,
       }),
@@ -97,17 +97,41 @@ describe('workspace pane tab providers', () => {
     expect(
       terminalWorkspacePaneTabProvider.isRenderable({
         hasWorktree: true,
-        terminalSyncReady: true,
+        terminalProjectionPhase: 'ready',
         terminalSessionCount: 0,
       }),
     ).toBe(false)
     expect(
       terminalWorkspacePaneTabProvider.isRenderable({
         hasWorktree: true,
-        terminalSyncReady: true,
+        terminalProjectionPhase: 'ready',
         terminalSessionCount: 1,
       }),
     ).toBe(true)
+  })
+
+  test('labels terminal pending state by projection phase', () => {
+    expect(
+      terminalWorkspacePaneTabProvider.pendingLabel({
+        t,
+        terminalCreatePending: false,
+        terminalProjectionPhase: 'pending',
+      }),
+    ).toBe('terminal.loading')
+    expect(
+      terminalWorkspacePaneTabProvider.pendingLabel({
+        t,
+        terminalCreatePending: false,
+        terminalProjectionPhase: 'failed',
+      }),
+    ).toBe('terminal.load-failed')
+    expect(
+      terminalWorkspacePaneTabProvider.pendingLabel({
+        t,
+        terminalCreatePending: true,
+        terminalProjectionPhase: 'failed',
+      }),
+    ).toBe('terminal.load-failed')
   })
 
   test('builds stable identities, tab entries, and labels', () => {

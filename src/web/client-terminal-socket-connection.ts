@@ -42,6 +42,13 @@ type PendingSocketRequest = {
 
 type SocketConnectionConfig = { url: string; clientId: string }
 
+type ActiveSocket = {
+  socket: WebSocket
+  generation: number
+  connection: SocketConnectionConfig
+  closeWhenIdle: boolean
+}
+
 export interface TerminalSocketConnection {
   openForRealtime(): void
   closeSocketIfIdle(): void
@@ -54,10 +61,9 @@ export interface TerminalSocketConnection {
 }
 
 export function createTerminalSocketConnection(options: TerminalSocketConnectionOptions): TerminalSocketConnection {
-  let socket: WebSocket | null = null
+  let activeSocket: ActiveSocket | null = null
   let reconnectTimer: number | null = null
   let heartbeatTimer: ReturnType<typeof globalThis.setInterval> | null = null
-  let manualSocketClose = false
   let socketGeneration = 0
   let quitting = isAppQuitting()
   let pendingSocketOpenRequests = 0
@@ -69,21 +75,20 @@ export function createTerminalSocketConnection(options: TerminalSocketConnection
 
   subscribeAppQuitting(() => {
     quitting = true
-    manualSocketClose = true
     clearReconnectTimer()
     clearPendingHealthProbes()
     rejectPendingSocketRequests('Terminal socket closed')
-    const currentSocket = socket
-    socket = null
-    if (!currentSocket) return
+    const current = activeSocket
+    activeSocket = null
+    if (!current) return
     try {
-      currentSocket.close()
+      current.socket.close()
     } catch {}
   })
 
   return {
     openForRealtime() {
-      manualSocketClose = false
+      cancelIdleClose()
       ensureSocket()
     },
     closeSocketIfIdle,
@@ -101,7 +106,7 @@ export function createTerminalSocketConnection(options: TerminalSocketConnection
   }
 
   function isActiveSocket(currentSocket: WebSocket, generation: number): boolean {
-    return socket === currentSocket && socketGeneration === generation
+    return activeSocket?.socket === currentSocket && activeSocket.generation === generation
   }
 
   function clearReconnectTimer() {
@@ -143,8 +148,9 @@ export function createTerminalSocketConnection(options: TerminalSocketConnection
     if (quitting) return
     if (!options.hasRealtimeSubscribers()) return
     if (typeof WebSocket === 'undefined') return
-    const currentSocket = socket
-    if (!currentSocket || currentSocket.readyState === WebSocket.CLOSED) {
+    forgetUnavailableSocket()
+    const currentSocket = activeSocket?.socket ?? null
+    if (!currentSocket) {
       ensureSocket()
       return
     }
@@ -164,16 +170,17 @@ export function createTerminalSocketConnection(options: TerminalSocketConnection
   }
 
   function ensureSocket() {
-    if (socket || typeof WebSocket === 'undefined' || quitting) return
+    forgetUnavailableSocket()
+    if (activeSocket || typeof WebSocket === 'undefined' || quitting) return
     const connection = resolveSocketConnectionConfig()
     if (!connection) return
-    manualSocketClose = false
     const generation = (socketGeneration += 1)
     const currentSocket = new WebSocket(connection.url)
-    socket = currentSocket
+    const entry: ActiveSocket = { socket: currentSocket, generation, connection, closeWhenIdle: false }
+    activeSocket = entry
     currentSocket.addEventListener('open', () => {
       if (!isActiveSocket(currentSocket, generation)) return
-      if (manualSocketClose && !shouldKeepSocketOpen()) {
+      if (entry.closeWhenIdle && !shouldKeepSocketOpen()) {
         try {
           currentSocket.close()
         } catch {}
@@ -184,17 +191,17 @@ export function createTerminalSocketConnection(options: TerminalSocketConnection
     currentSocket.addEventListener('message', (event) => {
       if (!isActiveSocket(currentSocket, generation)) return
       const message = parseTerminalSocketServerMessage(event.data)
-      if (message) handleSocketMessage(message, connection.clientId)
+      if (message) handleSocketMessage(message, entry.connection.clientId)
     })
     currentSocket.addEventListener('close', () => {
       if (!isActiveSocket(currentSocket, generation)) return
       stopHeartbeat()
-      handleSocketDisconnection('Terminal socket closed')
+      handleSocketDisconnection(entry, 'Terminal socket closed')
     })
     currentSocket.addEventListener('error', () => {
       if (!isActiveSocket(currentSocket, generation)) return
       stopHeartbeat()
-      handleSocketDisconnection('Terminal socket error')
+      handleSocketDisconnection(entry, 'Terminal socket error')
     })
   }
 
@@ -262,25 +269,25 @@ export function createTerminalSocketConnection(options: TerminalSocketConnection
     clearTimeout(pending.timeout)
   }
 
-  function forceSocketReconnect(reason: string, currentSocket: WebSocket | null = socket): void {
+  function forceSocketReconnect(reason: string, currentSocket: WebSocket | null = activeSocket?.socket ?? null): void {
     if (!currentSocket) return
-    if (socket === currentSocket) {
+    const current = activeSocket
+    if (current?.socket === currentSocket) {
       stopHeartbeat()
       clearPendingHealthProbes()
-      handleSocketDisconnection(reason)
+      handleSocketDisconnection(current, reason)
     }
     try {
       currentSocket.close()
     } catch {}
   }
 
-  function handleSocketDisconnection(reason: string) {
-    const wasManual = manualSocketClose
+  function handleSocketDisconnection(entry: ActiveSocket, reason: string) {
+    const wasIdleClose = entry.closeWhenIdle
     clearPendingHealthProbes()
     rejectPendingSocketRequests(reason)
-    socket = null
-    manualSocketClose = false
-    if (wasManual) {
+    if (activeSocket === entry) activeSocket = null
+    if (wasIdleClose) {
       if (options.hasRealtimeSubscribers()) ensureSocket()
       return
     }
@@ -288,12 +295,13 @@ export function createTerminalSocketConnection(options: TerminalSocketConnection
   }
 
   function closeSocketIfIdle() {
-    if (shouldKeepSocketOpen() || !socket) return
-    manualSocketClose = true
+    const current = activeSocket
+    if (shouldKeepSocketOpen() || !current) return
+    current.closeWhenIdle = true
     clearReconnectTimer()
-    if (socket.readyState === WebSocket.CONNECTING) return
+    if (current.socket.readyState === WebSocket.CONNECTING) return
     try {
-      socket.close()
+      current.socket.close()
     } catch {}
   }
 
@@ -312,6 +320,7 @@ export function createTerminalSocketConnection(options: TerminalSocketConnection
     input: TerminalSocketRequestInputs[TAction],
   ): Promise<TerminalSocketResponseOutputs[TAction]> {
     pendingSocketOpenRequests += 1
+    cancelIdleClose()
     let ws: WebSocket
     try {
       ws = await waitForSocketOpen()
@@ -353,8 +362,9 @@ export function createTerminalSocketConnection(options: TerminalSocketConnection
   function waitForSocketOpen(): Promise<WebSocket> {
     if (typeof WebSocket === 'undefined') return Promise.reject(new Error('Terminal socket unavailable'))
     ensureSocket()
-    const currentSocket = socket
-    if (!currentSocket) return Promise.reject(new Error('Terminal socket unavailable'))
+    const current = activeSocket
+    if (!current) return Promise.reject(new Error('Terminal socket unavailable'))
+    const currentSocket = current.socket
     if (currentSocket.readyState === WebSocket.OPEN) return Promise.resolve(currentSocket)
     if (currentSocket.readyState === WebSocket.CLOSED || currentSocket.readyState === WebSocket.CLOSING) {
       return Promise.reject(new Error('Terminal socket closed before open'))
@@ -362,8 +372,8 @@ export function createTerminalSocketConnection(options: TerminalSocketConnection
     return new Promise<WebSocket>((resolve, reject) => {
       let timeout: ReturnType<typeof setTimeout> | null = setTimeout(() => {
         settle(() => {
-          if (socket === currentSocket) {
-            handleSocketDisconnection('Terminal socket open timed out')
+          if (activeSocket === current) {
+            handleSocketDisconnection(current, 'Terminal socket open timed out')
             try {
               currentSocket.close()
             } catch {}
@@ -377,11 +387,12 @@ export function createTerminalSocketConnection(options: TerminalSocketConnection
       }
       const handleOpen = () => {
         settle(() => {
-          if (socket === currentSocket && currentSocket.readyState === WebSocket.OPEN) resolve(currentSocket)
+          if (activeSocket === current && currentSocket.readyState === WebSocket.OPEN) resolve(currentSocket)
           else reject(new Error('Terminal socket replaced before open'))
         })
       }
-      const handleClose = () => settle(() => reject(new Error('Terminal socket closed before open')))
+      const handleClose = (event: CloseEvent) =>
+        settle(() => reject(new Error(formatSocketClosedBeforeOpenMessage(event))))
       const handleError = () => settle(() => reject(new Error('Terminal socket error before open')))
       const cleanup = () => {
         if (timeout !== null) {
@@ -397,4 +408,23 @@ export function createTerminalSocketConnection(options: TerminalSocketConnection
       currentSocket.addEventListener('error', handleError)
     })
   }
+
+  function forgetUnavailableSocket(): void {
+    if (typeof WebSocket === 'undefined') return
+    const current = activeSocket
+    if (!current) return
+    if (current.socket.readyState !== WebSocket.CLOSING && current.socket.readyState !== WebSocket.CLOSED) return
+    stopHeartbeat()
+    clearPendingHealthProbes()
+    activeSocket = null
+  }
+
+  function cancelIdleClose(): void {
+    if (activeSocket) activeSocket.closeWhenIdle = false
+  }
+}
+
+function formatSocketClosedBeforeOpenMessage(event: CloseEvent): string {
+  const detail = event.reason ? `${event.code}: ${event.reason}` : String(event.code)
+  return `Terminal socket closed before open (${detail})`
 }

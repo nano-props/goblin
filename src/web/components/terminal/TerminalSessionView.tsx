@@ -31,6 +31,7 @@ import {
 import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal-toolbar.tsx'
 import { isMobileDevice } from '#/web/components/terminal/mobile-detection.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
 import { showTerminalCreateErrorToast } from '#/web/components/terminal/terminal-create-feedback.ts'
 
 const DEFAULT_TERMINAL_ERROR_MESSAGE_KEY = 'error.unknown'
@@ -40,7 +41,8 @@ interface TerminalSessionViewProps {
   repoInstanceId: string
   branch: string
   worktreePath: string
-  syncReady?: boolean
+  projectionPhase?: TerminalProjectionHydrationPhase
+  projectionErrorMessage?: string
   createTerminalForSlot?: (base: TerminalSessionBase) => Promise<unknown>
 }
 
@@ -49,7 +51,8 @@ export function TerminalSessionView({
   repoInstanceId,
   branch,
   worktreePath,
-  syncReady = true,
+  projectionPhase = 'ready',
+  projectionErrorMessage,
   createTerminalForSlot,
 }: TerminalSessionViewProps) {
   const t = useT()
@@ -265,16 +268,22 @@ export function TerminalSessionView({
   // ↔ `hasSessions` flip during a normal terminal open. Stable mount
   // prevents mount-orchestrated aria-live re-announcement; text-change
   // re-announcement is still possible when the label transitions within
-  // the same node (e.g. `Loading…` → `Opening…` when `syncReady` flips),
+  // the same node (e.g. `Loading…` → `Opening…` when `projectionPhase` flips),
   // which is the standard polite-live-region contract.
+  const projectionPending = projectionPhase === 'pending'
+  const projectionFailed = projectionPhase === 'failed'
   const showEmptyCta =
-    sessionPhase === 'opening' && !hasSessions && syncReady && !pendingCreate
+    sessionPhase === 'opening' && !hasSessions && projectionPhase === 'ready' && !pendingCreate
   const showStatusOverlay = isAttaching && !showEmptyCta
   const statusOverlayLabel =
     sessionPhase === 'restarting'
       ? t('terminal.restarting')
-      : sessionPhase === 'opening' && !hasSessions && !syncReady
+      : sessionPhase === 'opening' && !hasSessions && projectionPending
         ? t('terminal.loading')
+        : sessionPhase === 'opening' && !hasSessions && projectionFailed
+          ? projectionErrorMessage
+            ? `${t('terminal.load-failed')} (${projectionErrorMessage})`
+            : t('terminal.load-failed')
         : t('terminal.opening')
   const progressVariant =
     progress?.state === 2 ? 'error' : progress?.state === 4 ? 'warning' : progress?.state === 3 ? 'indeterminate' : ''

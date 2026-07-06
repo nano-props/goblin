@@ -7,6 +7,7 @@ describe('terminalCreateErrorKey', () => {
     [new Error('Terminal socket open timed out'), 'error.terminal-connection-timeout'],
     [new Error('Terminal request timed out'), 'error.terminal-create-timeout'],
     [new Error('Terminal socket closed before open'), 'error.terminal-connection-unavailable'],
+    [new Error('Terminal socket closed before open (1006)'), 'error.terminal-connection-unavailable'],
     [new Error('Terminal socket error before open'), 'error.terminal-connection-unavailable'],
     [new Error('terminal create geometry wait timed out after 5000ms'), 'error.terminal-host-not-measurable'],
     [new Error('host is inside a display:none subtree'), 'error.terminal-host-not-measurable'],

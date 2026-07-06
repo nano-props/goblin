@@ -39,6 +39,7 @@ This document defines the contract that closes that gap.
 In scope:
 
 - `create` first-frame protocol.
+- Workspace-pane terminal tab materialization from live sessions.
 - Durable close on the client — every close must be tracked to server
   ack before a subsequent create in the same repo is allowed to race.
 - `session-closed` per-session broadcast — multi-window consistency
@@ -70,6 +71,8 @@ The combined symptom list across the root causes:
   open a new terminal (R3).
 - **Multi-window drift**: terminal disappears from window A but window
   B keeps showing it until the next reconcile (R2 — missing broadcast).
+- **Refresh loses terminal tab**: the PTY and terminal session are still
+  live, but the workspace-pane tab strip has no terminal tab entry to render.
 
 ## Root causes, briefly
 
@@ -91,6 +94,11 @@ The combined symptom list across the root causes:
 - **R3 — Empty-state session had no UI affordance.** `TerminalSessionView`
   rendered a bare host when `!hasSessions && sessionPhase === 'opening'`.
   The `terminal.empty` i18n key was defined but never rendered.
+- **R4 — Workspace-pane tab projection could drift from live sessions.**
+  Terminal sessions and workspace-pane tabs are separate server runtimes.
+  After reload/restore, the session list could recover while the tab list
+  lacked `{ type: 'terminal', terminalSessionId }`, so the UI had no tab to
+  render even though the PTY was alive.
 
 ---
 
@@ -195,6 +203,24 @@ The durable identity for a terminal tab is still `terminalSessionId`.
 The lower-level live resource is the supervisor PTY handle. Keeping these
 three concepts separate prevents restart failures from accidentally
 turning into session deletion.
+
+## R4: Workspace-pane terminal tab materialization
+
+`listWorkspaceTabs` is the canonical projection boundary between live terminal
+sessions and the workspace-pane tab strip.
+
+When the server lists workspace tabs it reconciles against live terminal
+sessions for the same user and repo instance:
+
+- live sessions materialize missing terminal tab entries
+- stale terminal tab entries are removed
+- static tabs and existing order are preserved where possible
+- any self-healing write broadcasts `workspace-tabs-changed`
+
+Terminal sessions store their target `branch` at creation time. This is
+intentional: branch is runtime metadata for the terminal business object, not
+something the client should reconstruct from a repo snapshot during refresh.
+The same invariant applies to local and remote terminals.
 
 ---
 

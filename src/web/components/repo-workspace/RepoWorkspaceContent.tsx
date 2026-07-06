@@ -13,6 +13,7 @@ import {
   type WorkspacePanePanelLabel,
 } from '#/web/components/workspace-pane/tab-providers.ts'
 import { renderRepoWorkspacePanePanel } from '#/web/components/repo-workspace/panels.tsx'
+import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
 
 interface Props {
   repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'branchModel' | 'ui'>
@@ -38,7 +39,7 @@ export function RepoWorkspaceContent({ repo, detail, workspacePaneId, workspaceP
     workspacePaneId,
     compact,
     t,
-    terminalSyncReady: workspacePaneTabModel.terminalSyncReady,
+    terminalProjectionPhase: workspacePaneTabModel.terminalProjectionPhase,
     terminalCreatePending: workspacePaneTabModel.terminalCreatePending,
   })
   const noBranchTitleKey = repo.branchModel.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty'
@@ -61,7 +62,8 @@ export function RepoWorkspaceContent({ repo, detail, workspacePaneId, workspaceP
             detail,
             workspacePaneId,
             panelLabel,
-            terminalSyncReady: workspacePaneTabModel.terminalSyncReady,
+            terminalProjectionPhase: workspacePaneTabModel.terminalProjectionPhase,
+            terminalProjectionErrorMessage: workspacePaneTabModel.terminalProjectionErrorMessage,
           })
         : null}
     </div>
@@ -74,7 +76,7 @@ function workspacePanePanelLabel(input: {
   workspacePaneId: string
   compact: boolean
   t: (key: string, params?: Record<string, string | number>) => string
-  terminalSyncReady: boolean
+  terminalProjectionPhase: TerminalProjectionHydrationPhase
   terminalCreatePending: boolean
 }): WorkspacePanePanelLabel {
   const tab = input.selection?.kind === 'materialized-tab' ? input.selection.materializedTab : null
@@ -99,7 +101,7 @@ function workspacePanePanelLabel(input: {
     label: terminalWorkspacePaneTabProvider.pendingLabel({
       t: input.t,
       terminalCreatePending: input.terminalCreatePending,
-      terminalSyncReady: input.terminalSyncReady,
+      terminalProjectionPhase: input.terminalProjectionPhase,
     }),
   }
 }

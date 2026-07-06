@@ -1,4 +1,5 @@
 import { app, dialog, ipcMain } from 'electron'
+import type { IpcMainInvokeEvent } from 'electron'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import { activatePrimaryWindow } from '#/main/window.ts'
 import { initTheme } from '#/main/theme.ts'
@@ -20,6 +21,7 @@ import { APP_QUIT_DRAINED_CHANNEL } from '#/shared/ipc-channels.ts'
 import { isAppQuitDrainResult, type AppQuitDrainResult } from '#/shared/app-quit-drain.ts'
 import { getSettingsSnapshot, setGlobalShortcutState } from '#/main/settings-server-client.ts'
 import { startEmbeddedServer, stopEmbeddedServer } from '#/main/embedded-server-lifecycle.ts'
+import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 
 function activatePrimaryWindowFromEvent(): void {
   void activationBarrier
@@ -112,11 +114,20 @@ async function waitForClientQuitDrain(): Promise<ClientQuitDrain> {
       resolve(drain)
     }
     const timeout = setTimeout(() => finish({ ok: false, timedOut: true }), CLIENT_QUIT_DRAIN_TIMEOUT_MS)
-    ipcMain.handle(APP_QUIT_DRAINED_CHANNEL, (_event, result: unknown) => {
-      finish(isAppQuitDrainResult(result) ? result : { ok: false, error: { name: 'Error', message: 'Malformed quit drain result' } })
-      return true
-    })
+    ipcMain.handle(APP_QUIT_DRAINED_CHANNEL, (event, result: unknown) =>
+      handleTrustedClientQuitDrainBoundary(event, result, finish),
+    )
   })
+}
+
+function handleTrustedClientQuitDrainBoundary(
+  event: IpcMainInvokeEvent,
+  result: unknown,
+  finish: (drain: ClientQuitDrain) => void,
+): boolean {
+  if (!isTrustedIpcEvent(event)) return false
+  finish(isAppQuitDrainResult(result) ? result : { ok: false, error: { name: 'Error', message: 'Malformed quit drain result' } })
+  return true
 }
 
 async function initializeNativeHost(): Promise<void> {

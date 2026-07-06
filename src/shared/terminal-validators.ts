@@ -155,6 +155,7 @@ const TerminalSessionSummarySchema = v.object({
   terminalSessionId: v.string(),
   repoInstanceId: RepoInstanceIdSchema,
   repoRoot: v.string(),
+  branch: v.string(),
   worktreePath: v.string(),
   cwd: v.string(),
   controller: v.nullable(TerminalControllerSchema),

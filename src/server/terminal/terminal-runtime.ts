@@ -109,6 +109,9 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     broadcastSessionsChanged(userId, repoRoot) {
       broadcastRepoSessionsChanged(userId, repoRoot)
     },
+    broadcastWorkspaceTabsChanged(userId, repoRoot) {
+      broadcastRepoWorkspaceTabsChanged(userId, repoRoot)
+    },
     gCommand: options.gCommand,
   })
   const unsubscribeRepoRuntimeInstanceClosed = onRepoRuntimeInstanceClosed((event) => {
