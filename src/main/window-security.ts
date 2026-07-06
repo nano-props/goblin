@@ -104,7 +104,7 @@ export function createBrowserEntryUrl({ entryHtml = 'index.html', routePath = '/
   return { url }
 }
 
-export function configureTrustedBrowserWindow(win: BrowserWindow, logLabel: string): void {
+export function configureTrustedBrowserWindow(win: BrowserWindow): void {
   win.webContents.on('will-navigate', (event, nextUrl) => {
     // Browser windows are expected to stay on their bootstrap entry and
     // route internally via app state / browser-history updates, not
@@ -117,10 +117,6 @@ export function configureTrustedBrowserWindow(win: BrowserWindow, logLabel: stri
   })
   win.webContents.setWindowOpenHandler(({ url: nextUrl }) => {
     void openHttpExternal(nextUrl).catch((err) => {
-      // Pre-bound `windowNodeLog` instead of `nodeLogger.child({ tag: logLabel })`
-      // so this hot click-path doesn't allocate a fresh child logger per
-      // navigation event. `logLabel` is preserved in the signature for
-      // future call sites; the only current caller passes `'window'`.
       windowNodeLog.warn({ err }, 'failed to open external window URL')
     })
     return { action: 'deny' }

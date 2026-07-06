@@ -1,8 +1,6 @@
 import type { FitAddon as XTermFitAddon } from '@xterm/addon-fit'
 import { FitAddon } from '@xterm/addon-fit'
-import type { ImageAddon as XTermImageAddon } from '@xterm/addon-image'
 import { ImageAddon } from '@xterm/addon-image'
-import type { ProgressAddon as XTermProgressAddon } from '@xterm/addon-progress'
 import { ProgressAddon } from '@xterm/addon-progress'
 import type { SearchAddon as XTermSearchAddon, ISearchOptions, ISearchResultChangeEvent } from '@xterm/addon-search'
 import { SearchAddon } from '@xterm/addon-search'
@@ -37,8 +35,6 @@ export class TerminalSessionView {
   private term: XTermTerminal | null = null
   private fitAddon: XTermFitAddon | null = null
   private searchAddon: XTermSearchAddon | null = null
-  private imageAddon: XTermImageAddon | null = null
-  private progressAddon: XTermProgressAddon | null = null
   private resizeObserver: ResizeObserver | null = null
   private disposables: Array<{ dispose: () => void }> = []
   private disposeThemeObserver: (() => void) | null = null
@@ -228,8 +224,6 @@ export class TerminalSessionView {
     this.pendingFallbackUserInput = []
     this.fitAddon = null
     this.searchAddon = null
-    this.imageAddon = null
-    this.progressAddon = null
     this.term?.dispose()
     this.term = null
     this.xtermHost.replaceChildren()
@@ -381,7 +375,6 @@ export class TerminalSessionView {
     try {
       const imageAddon = new ImageAddon()
       term.loadAddon(imageAddon)
-      this.imageAddon = imageAddon
     } catch (err) {
       terminalLog.warn('failed to load image addon', { err })
     }
@@ -392,7 +385,6 @@ export class TerminalSessionView {
       const progressAddon = new ProgressAddon()
       term.loadAddon(progressAddon)
       this.disposables.push(progressAddon.onChange(({ state, value }) => this.handlers.onProgress(state, value)))
-      this.progressAddon = progressAddon
     } catch (err) {
       terminalLog.warn('failed to load progress addon', { err })
     }

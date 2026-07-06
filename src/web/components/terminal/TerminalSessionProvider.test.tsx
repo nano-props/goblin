@@ -53,7 +53,6 @@ import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import {
   readWorkspacePaneTabsForTarget,
   setWorkspacePaneTabsForTargetQueryData,
-  workspacePaneTabsQueryKey,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
 
@@ -92,10 +91,6 @@ function selectedWorkspacePaneTab(repoId: string, branchName = 'feature/worktree
   return repo
     ? preferredWorkspacePaneTabForTarget(repo.ui, workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: readRepoBranchQueryProjection(repo)?.branches ?? [] }, branchName))
     : null
-}
-
-function workspaceTabsQueryKeyForRepo(repoId: string) {
-  return workspacePaneTabsQueryKey(repoId, useReposStore.getState().repos[repoId]!.instanceId)
 }
 
 function repoTerminalBase() {

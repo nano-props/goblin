@@ -1,5 +1,5 @@
 import { FolderTree } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Key } from 'react-aria-components'
 import { toast } from 'sonner'
 import { useT } from '#/web/stores/i18n.ts'

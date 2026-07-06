@@ -35,7 +35,6 @@ function AlertDialogContent({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Content> & {
   size?: 'default' | 'sm'
 }) {
-  const compact = useIsCompactUi()
   return (
     <AlertDialogPortal>
       <AlertDialogOverlay />

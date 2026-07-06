@@ -17,8 +17,10 @@ import { settingsSnapshotQueryOptions } from '#/web/settings-queries.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
-import type { WorktreeBootstrapDecision } from '#/shared/worktree-bootstrap-summary.ts'
-import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
+import type {
+  WorktreeBootstrapDecision,
+  WorktreeBootstrapPreviewResult,
+} from '#/shared/worktree-bootstrap-summary.ts'
 
 type ConfigTrustChoice = { key: string; value: boolean } | null
 type BootstrapLoad = {
@@ -44,7 +46,6 @@ export function CreateWorktreePagePane({
   onCancel,
   onCreated,
 }: CreateWorktreePagePaneProps) {
-  const t = useT()
   const liveRepo = useReposStore((s) => s.repos[repoId])
   const runBranchAction = useReposStore((s) => s.runBranchAction)
   const branchReadModel = useRepoBranchReadModel(liveRepo?.id ?? '', liveRepo?.instanceId ?? '', !!liveRepo)

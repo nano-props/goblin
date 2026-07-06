@@ -13,7 +13,6 @@ import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type { CreateWorktreeRequest } from '#/web/components/create-worktree/create-worktree.logic.ts'
 import type { ExecResult } from '#/web/types.ts'
-import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 
 const REPO_ID = '/repo'

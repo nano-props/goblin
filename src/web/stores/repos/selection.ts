@@ -5,7 +5,7 @@ import {
   normalizeWorkspacePaneSize,
   normalizeWorkspaceSessionLayoutState,
 } from '#/shared/workspace-layout.ts'
-import type { BranchViewMode, RepoState, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
+import type { BranchViewMode, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
 import type { WorkspaceNavigationHistoryRepoState } from '#/web/stores/repos/types.ts'
 import { workspaceNavigationHistoryEntryEqual } from '#/web/stores/repos/navigation-history-entry.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
@@ -36,7 +36,7 @@ type WorkspaceNavigationHistoryActions = Pick<
 
 const MAX_WORKSPACE_NAVIGATION_HISTORY_ENTRIES = 50
 
-function createRestorableWorkspaceActions(set: ReposSet, get: ReposGet): RestorableWorkspaceActions {
+function createRestorableWorkspaceActions(set: ReposSet): RestorableWorkspaceActions {
   return {
     applySessionLayoutState(layoutState: Parameters<ReposStore['applySessionLayoutState']>[0]) {
       // One-shot boot/session restore of restorable layout fields. Runtime
@@ -284,7 +284,7 @@ function navigationHistoryForRepo(
 
 export function createSelectionActions(set: ReposSet, get: ReposGet) {
   return {
-    ...createRestorableWorkspaceActions(set, get),
+    ...createRestorableWorkspaceActions(set),
     ...createRuntimeWorkspacePreferenceActions(set, get),
     ...createWorkspaceNavigationHistoryActions(set, get),
   }

@@ -14,12 +14,10 @@ vi.mock('sonner', () => ({
   },
 }))
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import { preferredWorkspacePaneTabForTarget, workspacePaneTabsTargetForRepoBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 const REPO_ID = '/tmp/gbl-client-intent-handlers-repo'
 
@@ -74,8 +72,6 @@ describe('client effect intent handlers', () => {
         deps(REPO_ID, 'feature/no-worktree'),
       ),
     ).resolves.toBe(false)
-
-    const repo = useReposStore.getState().repos[REPO_ID]
   })
 
   test('create-worktree-requested opens create-worktree for the current repo', async () => {

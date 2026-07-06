@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { RepoState, SessionWorkspacePaneRestoreState } from '#/web/stores/repos/types.ts'
+import type { SessionWorkspacePaneRestoreState } from '#/web/stores/repos/types.ts'
 import type {
   WorkspacePaneStaticTabType,
   WorkspacePaneTabEntry,
@@ -158,22 +158,26 @@ describe('setBranchViewMode', () => {
   })
 
   test('keeps the selected branch when it remains visible', () => {
-    seedRepo({ currentBranchName: 'feature/worktree' })
+    seedRepo({ currentBranch: 'feature/worktree', currentBranchName: 'feature/worktree' })
 
     useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
+    const repo = useReposStore.getState().repos[REPO_ID]
+    expect(repo?.ui.branchViewMode).toBe('worktrees')
+    expect(readRepoBranchQueryProjection(repo!)?.currentBranch).toBe('feature/worktree')
   })
 
-  test('clears the selection when the new view mode has no visible branches', () => {
+  test('keeps the selected branch when the new view mode has no visible branches', () => {
     seedRepo({ currentBranchName: 'main', branches: [branch('main')] })
 
     useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.branchViewMode).toBe('worktrees')
+    expect(readRepoBranchQueryProjection(repo!)?.currentBranch).toBe('main')
   })
 
-  test('uses the React Query snapshot read model when changing branch view mode', () => {
+  test('changes branch view mode without mutating the React Query snapshot read model', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
@@ -186,6 +190,13 @@ describe('setBranchViewMode', () => {
 
     useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
+    const updatedRepo = useReposStore.getState().repos[REPO_ID]
+    expect(updatedRepo?.ui.branchViewMode).toBe('worktrees')
+    expect(readRepoBranchQueryProjection(updatedRepo!)?.currentBranch).toBe('main')
+    expect(readRepoBranchQueryProjection(updatedRepo!)?.branches.map((repoBranch) => repoBranch.name)).toEqual([
+      'main',
+      'feature/plain',
+    ])
   })
 
   test('keeps the hidden repo workspace pane selection on that branch', () => {
@@ -197,7 +208,6 @@ describe('setBranchViewMode', () => {
 
     useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
 
-    const repo = useReposStore.getState().repos[REPO_ID]
     expect(preferredTabFor('feature/plain')).toBe('terminal')
     expect(preferredTabFor('main')).toBe('status')
   })

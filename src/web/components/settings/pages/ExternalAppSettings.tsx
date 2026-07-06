@@ -12,7 +12,6 @@ import {
   SettingsCard,
   SettingsGroup,
   SettingsListItem,
-  SettingsList,
 } from '#/web/components/settings/SettingsPrimitives.tsx'
 import { useHostInfoStore, type ClientPlatform } from '#/web/stores/host-info.ts'
 import { useExternalAppsQuery } from '#/web/settings-queries.ts'

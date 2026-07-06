@@ -226,8 +226,7 @@ beforeEach(() => {
     branches: [createRepoBranch('main'), createRepoBranch('feature/a')],
     currentBranchName: null,
   })
-  branchNavigatorMocks.activate.mockImplementation((repoId) => {
-  })
+  branchNavigatorMocks.activate.mockImplementation(() => {})
 })
 
 afterEach(() => {

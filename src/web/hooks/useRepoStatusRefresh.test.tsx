@@ -2,7 +2,7 @@
 import { act } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { emptyRepo, replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { isRepoStatusRefreshable, useRepoStatusRefresh } from '#/web/hooks/useRepoStatusRefresh.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { createRepoBranch, resetReposStore } from '#/web/test-utils/bridge.ts'
