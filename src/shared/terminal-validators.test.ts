@@ -211,6 +211,7 @@ describe('shared terminal validators', () => {
         message: null,
         snapshot: 'first frame',
         snapshotSeq: 1,
+        outputEra: 0,
         controller: { clientId: 'client_a', status: 'connected' },
         canonicalCols: 120,
         canonicalRows: 40,
@@ -220,6 +221,7 @@ describe('shared terminal validators', () => {
       terminalSessionId: 'session-1',
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       snapshotSeq: 1,
+      outputEra: 0,
     })
 
     expect(
@@ -246,6 +248,7 @@ describe('shared terminal validators', () => {
           terminalSessionId: 'session-1',
           data: 'hi',
           seq: 1,
+          outputEra: 0,
           processName: 'zsh',
         },
       }),
@@ -256,6 +259,7 @@ describe('shared terminal validators', () => {
         terminalSessionId: 'session-1',
         data: 'hi',
         seq: 1,
+        outputEra: 0,
         processName: 'zsh',
       },
     })
@@ -273,6 +277,95 @@ describe('shared terminal validators', () => {
         action: 'attach',
       }),
     ).toBeNull()
+  })
+
+  test('validates terminal socket success response payloads by action', () => {
+    expect(
+      normalizeTerminalSocketServerMessage({
+        type: 'response',
+        requestId: 'req_1',
+        ok: true,
+        action: 'attach',
+        payload: {
+          ok: true,
+          terminalRuntimeSessionId: 'pty_1234567890abcdef',
+          processName: 'zsh',
+          canonicalTitle: null,
+          phase: 'open',
+          message: null,
+          snapshot: 'prompt',
+          snapshotSeq: 1,
+          outputEra: 0,
+          controller: { clientId: 'client_a', status: 'connected' },
+          canonicalCols: 120,
+          canonicalRows: 40,
+        },
+      }),
+    ).toMatchObject({
+      type: 'response',
+      action: 'attach',
+      payload: { ok: true, outputEra: 0 },
+    })
+
+    expect(
+      normalizeTerminalSocketServerMessage({
+        type: 'response',
+        requestId: 'req_1',
+        ok: true,
+        action: 'attach',
+        payload: {
+          ok: true,
+          terminalRuntimeSessionId: 'pty_1234567890abcdef',
+          processName: 'zsh',
+          canonicalTitle: null,
+          phase: 'open',
+          message: null,
+          snapshot: 'prompt',
+          snapshotSeq: 1,
+          controller: { clientId: 'client_a', status: 'connected' },
+          canonicalCols: 120,
+          canonicalRows: 40,
+        },
+      }),
+    ).toMatchObject({
+      type: 'response',
+      requestId: 'req_1',
+      ok: false,
+      action: 'attach',
+      error: 'Invalid terminal socket response payload',
+    })
+
+    expect(
+      normalizeTerminalSocketServerMessage({
+        type: 'response',
+        requestId: 'req_1',
+        ok: true,
+        action: 'create',
+        payload: {
+          ok: true,
+          action: 'created',
+          terminalSessionId: 'session-1',
+          tabs: [],
+          sessions: [],
+          terminalRuntimeSessionId: 'pty_1234567890abcdef',
+          processName: 'zsh',
+          canonicalTitle: null,
+          phase: 'open',
+          message: null,
+          snapshot: 'prompt',
+          snapshotSeq: 1,
+          controller: { clientId: 'client_a', status: 'connected' },
+          canonicalCols: 120,
+          canonicalRows: 40,
+        },
+      }),
+    ).toMatchObject({
+      type: 'response',
+      requestId: 'req_1',
+      ok: false,
+      action: 'create',
+      error: 'Invalid terminal socket response payload',
+    })
   })
 
   test('normalizes targeted session-closed realtime messages', () => {

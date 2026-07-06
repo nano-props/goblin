@@ -60,11 +60,11 @@ local rendering and fitted geometry while mounted. It is disposable.
 3. Client waits for the visible host to become measurable.
 4. Client fits the live xterm and sends attach/restart with its `cols`/`rows`.
 5. Server validates attachment and control rules.
-6. Server returns role, lifecycle state, canonical geometry, `snapshot`, and
-   `snapshotSeq`.
+6. Server returns role, lifecycle state, canonical geometry, `snapshot`,
+   `snapshotSeq`, and `outputEra`.
 7. Client applies server authority, resets xterm, and writes the snapshot.
-8. Realtime output writes to the selected xterm while also updating server
-   render state.
+8. Realtime output writes to the selected controller xterm while also updating
+   server render state.
 
 The user may see a blank terminal until snapshot replay completes.
 

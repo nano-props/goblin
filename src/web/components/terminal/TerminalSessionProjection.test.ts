@@ -117,6 +117,7 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'unrouted-terminal-session',
         data: 'hello',
         seq: 1,
+        outputEra: 0,
         processName: 'bash',
       })
       expect(handleOutputSpy).toHaveBeenCalledTimes(1)
@@ -126,6 +127,7 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'unrouted-terminal-session',
         data: 'hello',
         seq: 1,
+        outputEra: 0,
         processName: 'bash',
       })
       expect(handleOutputSpy).toHaveBeenCalledTimes(1)
@@ -142,6 +144,7 @@ describe('TerminalSessionProjection', () => {
           terminalSessionId: 'session-1',
           data: 'before-index',
           seq: 1,
+          outputEra: 0,
           processName: 'bash',
         })
         expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions).toEqual([])
@@ -154,11 +157,13 @@ describe('TerminalSessionProjection', () => {
             }),
           ],
           'client_local',
-          new Map([[terminalRuntimeSessionId, { terminalRuntimeSessionId, snapshot: 'before-index', snapshotSeq: 1 }]]),
+          new Map([
+            [terminalRuntimeSessionId, { terminalRuntimeSessionId, snapshot: 'before-index', snapshotSeq: 1, outputEra: 0 }],
+          ]),
         )
 
         expect(hydrateSpy).toHaveBeenCalledWith(
-          expect.objectContaining({ terminalRuntimeSessionId, snapshot: 'before-index', snapshotSeq: 1 }),
+          expect.objectContaining({ terminalRuntimeSessionId, snapshot: 'before-index', snapshotSeq: 1, outputEra: 0 }),
         )
         expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]?.terminalSessionId).toBe('session-1')
       } finally {
@@ -186,6 +191,7 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'unrouted-terminal-session',
         data: '',
         seq: 1,
+        outputEra: 0,
         processName: 'bash',
       })
       vi.advanceTimersByTime(5000)
@@ -194,6 +200,7 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'unrouted-terminal-session',
         data: '',
         seq: 2,
+        outputEra: 0,
         processName: 'bash',
       })
 
@@ -219,6 +226,7 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'session-1',
         data: 'stale output',
         seq: 1,
+        outputEra: 0,
         processName: 'bash',
       })
 
@@ -366,6 +374,7 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId: 'session-1',
         data: 'hello',
         seq: 1,
+        outputEra: 0,
         processName: 'bash',
       })
       expect(handleOutputSpy).toHaveBeenCalledTimes(1)

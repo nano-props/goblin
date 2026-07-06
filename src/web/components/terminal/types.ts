@@ -94,6 +94,7 @@ export interface TerminalSessionHydrationInput extends TerminalIdentityViewModel
   canonicalTitle?: string | null
   snapshot: string
   snapshotSeq: number
+  outputEra: number
 }
 
 export interface TerminalSnapshot {

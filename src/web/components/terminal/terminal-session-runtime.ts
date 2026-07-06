@@ -6,6 +6,7 @@ import type {
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
 import { TerminalSessionState } from '#/web/components/terminal/terminal-session-state.ts'
+import type { TerminalOutputCheckpoint } from '#/web/components/terminal/terminal-session-state.ts'
 import type {
   TerminalIdentityViewModel,
   TerminalLifecycleViewModel,
@@ -240,8 +241,8 @@ export class TerminalSessionRuntime {
     return true
   }
 
-  beginReplay(replaySeq: number): number {
-    return this.state.beginReplay(replaySeq)
+  beginReplay(replayBoundary: TerminalOutputCheckpoint): number {
+    return this.state.beginReplay(replayBoundary)
   }
 
   finishReplay(replayGeneration?: number): TerminalOutputEvent[] {

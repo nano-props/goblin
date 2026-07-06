@@ -116,6 +116,7 @@ class TerminalSessionCreator {
           message: createResult.message,
           snapshot: createResult.snapshot,
           snapshotSeq: createResult.snapshotSeq,
+          outputEra: createResult.outputEra,
           controller: createResult.controller,
           canonicalCols: createResult.canonicalCols,
           canonicalRows: createResult.canonicalRows,

@@ -247,6 +247,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
         this.events.emitOutput(session, {
           terminalRuntimeSessionId: session.id,
           data,
+          outputEra: output.outputEra,
           seq: output.seq,
           processName: processNameAfterData,
         })

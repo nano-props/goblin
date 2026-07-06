@@ -32,15 +32,15 @@ export class TerminalSessionState {
     canonicalSize: { cols: 0, rows: 0 },
     takeoverPending: false,
   }
-  /** Client-only replay bookkeeping used to merge buffered output around
+  /** Client-only replay buffering used to merge output around
    *  attaches/replays. This is transient buffering, not server runtime
    *  identity and not persisted workspace state. */
-  private replayBufferState: {
-    replayBoundarySeq: number | null
+  private outputSequencingState: {
+    replayBoundary: TerminalOutputCheckpoint | null
     replayPendingOutput: TerminalOutputEvent[]
     replayGeneration: number
   } = {
-    replayBoundarySeq: null,
+    replayBoundary: null,
     replayPendingOutput: [],
     replayGeneration: 0,
   }
@@ -224,52 +224,53 @@ export class TerminalSessionState {
   // seq) followed by a post-attach window (new server snapshot's seq)
   // shares the same buffer; the post-attach `finishReplay` filters
   // by the new boundary.
-  beginReplay(replaySeq: number): number {
-    this.replayBufferState.replayBoundarySeq = replaySeq
-    this.replayBufferState.replayGeneration += 1
-    return this.replayBufferState.replayGeneration
+  beginReplay(replayBoundary: TerminalOutputCheckpoint): number {
+    this.outputSequencingState.replayBoundary = normalizeOutputCheckpoint(replayBoundary)
+    this.outputSequencingState.replayGeneration += 1
+    return this.outputSequencingState.replayGeneration
   }
 
   captureReplayOutput(event: TerminalOutputEvent): boolean {
-    if (this.replayBufferState.replayBoundarySeq === null) return false
-    this.replayBufferState.replayPendingOutput.push(event)
+    if (this.outputSequencingState.replayBoundary === null) return false
+    this.outputSequencingState.replayPendingOutput.push(event)
     return true
   }
 
   isReplaying(): boolean {
-    return this.replayBufferState.replayBoundarySeq !== null
+    return this.outputSequencingState.replayBoundary !== null
   }
 
   finishReplay(replayGeneration?: number): TerminalOutputEvent[] {
-    if (replayGeneration !== undefined && this.replayBufferState.replayGeneration !== replayGeneration) {
+    if (replayGeneration !== undefined && this.outputSequencingState.replayGeneration !== replayGeneration) {
       return []
     }
-    const replaySeq = this.replayBufferState.replayBoundarySeq
-    const pendingOutput = this.replayBufferState.replayPendingOutput.splice(0)
-    this.replayBufferState.replayBoundarySeq = null
-    if (replaySeq === null) return []
-    return pendingOutput.filter((event) => event.seq > replaySeq)
+    const replayBoundary = this.outputSequencingState.replayBoundary
+    const pendingOutput = this.outputSequencingState.replayPendingOutput.splice(0)
+    this.outputSequencingState.replayBoundary = null
+    if (replayBoundary === null) return []
+    return pendingOutput.filter((event) => isOutputAfterCheckpoint(event, replayBoundary))
   }
 
   // Clears the replay buffer and boundary without queueing to the
   // term or appending to the output summary. Cheaper than
   // `finishReplay` because it skips the splice + filter.
   discardReplay(replayGeneration?: number): void {
-    if (replayGeneration !== undefined && this.replayBufferState.replayGeneration !== replayGeneration) {
+    if (replayGeneration !== undefined && this.outputSequencingState.replayGeneration !== replayGeneration) {
       return
     }
-    this.replayBufferState.replayBoundarySeq = null
-    this.replayBufferState.replayPendingOutput = []
+    this.outputSequencingState.replayBoundary = null
+    this.outputSequencingState.replayPendingOutput = []
   }
 
   resetTransientState(): boolean {
     const hadReplay =
-      this.replayBufferState.replayBoundarySeq !== null || this.replayBufferState.replayPendingOutput.length > 0
+      this.outputSequencingState.replayBoundary !== null ||
+      this.outputSequencingState.replayPendingOutput.length > 0
     const hadSearch = this.transientViewState.searchResult !== null
     const hadProgress = this.transientViewState.progressState !== null
     const changed = hadReplay || hadSearch || hadProgress
-    this.replayBufferState.replayBoundarySeq = null
-    this.replayBufferState.replayPendingOutput = []
+    this.outputSequencingState.replayBoundary = null
+    this.outputSequencingState.replayPendingOutput = []
     this.transientViewState.searchResult = null
     this.transientViewState.progressState = null
     return changed
@@ -329,4 +330,26 @@ function normalizeTerminalTitle(title: string | null | undefined): string | null
   if (typeof title !== 'string') return null
   const normalized = title.replace(/\s+/g, ' ').trim()
   return normalized.length > 0 ? normalized : null
+}
+
+export interface TerminalOutputCheckpoint {
+  outputEra: number
+  seq: number
+}
+
+function normalizeOutputCheckpoint(checkpoint: TerminalOutputCheckpoint): TerminalOutputCheckpoint {
+  return {
+    outputEra: normalizeOutputSeq(checkpoint.outputEra),
+    seq: normalizeOutputSeq(checkpoint.seq),
+  }
+}
+
+function isOutputAfterCheckpoint(event: TerminalOutputEvent, checkpoint: TerminalOutputCheckpoint): boolean {
+  if (event.outputEra !== checkpoint.outputEra) return event.outputEra > checkpoint.outputEra
+  return event.seq > checkpoint.seq
+}
+
+function normalizeOutputSeq(seq: number): number {
+  if (!Number.isFinite(seq)) return 0
+  return Math.max(0, Math.floor(seq))
 }

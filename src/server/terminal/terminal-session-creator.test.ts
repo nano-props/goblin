@@ -185,6 +185,8 @@ function ensureResult(terminalSessionId: string): Extract<TerminalSessionEnsureR
     message: null,
     snapshot: '',
     snapshotSeq: 0,
+   outputEra: 0,
+
     controller: null,
     canonicalCols: 80,
     canonicalRows: 24,

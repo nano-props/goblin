@@ -186,7 +186,9 @@ That keeps the UI simple while keeping the business model accurate.
 
 - takeover is an explicit control transition
 - takeover should update canonical geometry coherently with the new controller
-- client optimism should stay minimal; server identity events remain authoritative
+- client optimism should stay minimal; the takeover response is authoritative
+  for that transition, and server identity events remain authoritative for
+  non-takeover controller changes
 
 ## Geometry in the target model
 
@@ -237,7 +239,7 @@ It mainly needs:
 - session summary
 - current control projection for this attachment
 - canonical geometry
-- replay snapshot
+- replay snapshot and its `outputEra` / `snapshotSeq` boundary
 - lifecycle phase
 
 The client should not have to infer hidden lifecycle meaning from missing PTY state.

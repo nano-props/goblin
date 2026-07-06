@@ -477,6 +477,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       terminalRuntimeSessionId: session.id,
       snapshot: snap.snapshot,
       snapshotSeq: snap.snapshotSeq,
+      outputEra: snap.outputEra,
       processName: session.ptyBinding.processName(),
       canonicalTitle: session.render.title,
       phase: session.phase,

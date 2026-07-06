@@ -186,7 +186,8 @@ Control is a business concept, not just a transport detail.
 ### Roles
 
 - **controller**: may write input and resize the PTY
-- **viewer**: may observe output but not control the session
+- **viewer**: may observe session metadata and request takeover, but does not
+  control the session or consume the live xterm output stream
 - **unowned**: no controller is currently active
 
 ### Rules
@@ -280,7 +281,8 @@ They should therefore share the same high-level rule:
 
 For `create` specifically:
 
-- `terminalRuntimeSessionId` plus `snapshot` / `snapshotSeq` are the authoritative created-session handshake
+- `terminalRuntimeSessionId` plus `snapshot` / `snapshotSeq` / `outputEra`
+  are the authoritative created-session handshake
 - any returned `sessions` list is useful for tab-strip and projection updates, but is not the created session's primary truth source
 
 This keeps `create`, `attach`, and `restart` aligned and prevents prompt tearing and false create failures caused by projection lag. A selected view may still be blank while the fresh xterm is created and the server-authored snapshot is replayed.
@@ -306,7 +308,10 @@ The terminal feature uses realtime transport for continuous, UX-critical flows.
 ### Design rule
 
 Use realtime streaming where the user experience requires continuity.
-Use targeted request/response flows for mutations; when a mutation opens or replaces a visible frame, its response carries the server-authored snapshot.
+Use targeted request/response flows for mutations; when a snapshot-carrying
+mutation opens or replaces a visible frame, its response carries the
+server-authored snapshot. Control-only mutations such as takeover apply
+role/lifecycle state first, then paint xterm through the server snapshot path.
 
 ## State model
 

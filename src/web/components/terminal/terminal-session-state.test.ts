@@ -223,12 +223,13 @@ describe('TerminalSessionState', () => {
       canonicalCols: 120,
       canonicalRows: 40,
     })
-    state.beginReplay(1)
+    state.beginReplay({ outputEra: 0, seq: 1 })
     state.captureReplayOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       terminalSessionId: 'pty_session_1_aaaaaaaaa',
       data: 'live',
       seq: 2,
+      outputEra: 0,
       processName: 'zsh',
     })
     state.setSearchResult({ resultIndex: 0, resultCount: 1, found: true })
