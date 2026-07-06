@@ -1,7 +1,6 @@
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import type { ComponentProps } from 'react'
 import { Button } from '#/web/components/ui/button.tsx'
-import { Tip } from '#/web/components/Tip.tsx'
 import { WorkspaceZenModeToggle } from '#/web/components/WorkspaceZenModeToggle.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -39,38 +38,30 @@ export function WorkspaceNavigationControls({
       >
         <WorkspaceZenModeToggle data-testid="zen-mode-sidebar-trigger" />
       </span>
-      <Tip label={t('workspace.navigation-back')}>
-        <span className="inline-flex">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-lg"
-            disabled={!repoId || !canGoBack}
-            aria-label={t('workspace.navigation-back')}
-            onClick={() => {
-              if (repoId) navigation.goBack(repoId)
-            }}
-          >
-            <ArrowLeft />
-          </Button>
-        </span>
-      </Tip>
-      <Tip label={t('workspace.navigation-forward')}>
-        <span className="inline-flex">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-lg"
-            disabled={!repoId || !canGoForward}
-            aria-label={t('workspace.navigation-forward')}
-            onClick={() => {
-              if (repoId) navigation.goForward(repoId)
-            }}
-          >
-            <ArrowRight />
-          </Button>
-        </span>
-      </Tip>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-lg"
+        disabled={!repoId || !canGoBack}
+        aria-label={t('workspace.navigation-back')}
+        onClick={() => {
+          if (repoId) navigation.goBack(repoId)
+        }}
+      >
+        <ArrowLeft />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-lg"
+        disabled={!repoId || !canGoForward}
+        aria-label={t('workspace.navigation-forward')}
+        onClick={() => {
+          if (repoId) navigation.goForward(repoId)
+        }}
+      >
+        <ArrowRight />
+      </Button>
     </div>
   )
 }
