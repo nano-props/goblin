@@ -58,3 +58,7 @@ export function RepoPageLoadingBody() {
     </ScrollPane>
   )
 }
+
+export function RepoPageQuietLoadingBody() {
+  return <div data-testid="repo-page-quiet-loading" className="min-h-0 flex-1" aria-busy="true" />
+}
