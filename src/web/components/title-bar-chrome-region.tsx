@@ -10,6 +10,8 @@ interface TitleBarDragRegionProps extends ComponentProps<'div'> {
   reserveWindowControls?: boolean
 }
 
+type NativeDragPlateProps = Omit<TitleBarDragRegionProps, 'reserveWindowControls'>
+
 export function TitleBarDragRegion({
   reserveWindowControls = true,
   className,
@@ -22,6 +24,21 @@ export function TitleBarDragRegion({
       {...props}
       data-title-bar-chrome-region="drag"
       className={cn(reserveWindowControls ? 'title-bar-chrome' : 'app-drag-region', className)}
+    />
+  )
+}
+
+export function NativeDragPlate({ className, ref, ...props }: NativeDragPlateProps) {
+  // Electron app-region hit-testing is native region composition, not normal
+  // DOM hit-testing. Use this for final transparent drag surfaces that must sit
+  // above layered no-drag UI such as tab strips, floating panels, or overlays.
+  return (
+    <TitleBarDragRegion
+      ref={ref}
+      aria-hidden
+      {...props}
+      reserveWindowControls={false}
+      className={cn('pointer-events-auto absolute left-0 top-0 bg-transparent', className)}
     />
   )
 }

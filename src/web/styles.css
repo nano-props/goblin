@@ -111,9 +111,10 @@ button,
   -webkit-app-region: initial;
 }
 
-/* Zen-mode overlay is only a layout/hit-test surface. The underlying
- * workspace toolbar or revealed sidebar owns blank-space dragging; the child
- * trigger opts out through an interactive chrome region. */
+/* Zen-mode overlay is only a layout/hit-test surface for the navigation
+ * controls. Blank-space dragging is owned by the workspace toolbar or the
+ * revealed sidebar's dedicated drag plate; the child trigger opts out through
+ * an interactive chrome region. */
 .goblin-zen-reveal-trigger-layer {
   width: calc(var(--goblin-title-bar-chrome-left) + var(--goblin-workspace-navigation-controls-width));
   padding-left: var(--goblin-title-bar-chrome-left);
@@ -317,7 +318,7 @@ button,
   box-shadow: 8px 0 24px rgb(15 23 42 / 14%);
 }
 
-.goblin-zen-reveal-panel[data-state='open'][data-interactive='true'] {
+.goblin-zen-reveal-panel[data-state='open'][data-panel-interactive='true'] {
   pointer-events: auto;
 }
 
@@ -331,7 +332,7 @@ html[data-theme='dark'] .goblin-zen-reveal-panel[data-state='open'] {
   transition: none;
 }
 
-.goblin-zen-reveal-panel[data-state='opening'][data-interactive='true'] {
+.goblin-zen-reveal-panel[data-state='opening'][data-panel-interactive='true'] {
   pointer-events: auto;
 }
 

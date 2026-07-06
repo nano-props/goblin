@@ -5,6 +5,7 @@ import { act, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { ZenModeSidebarChrome } from '#/web/components/repo-layout/ZenModeSidebarChrome.tsx'
+import { TITLE_BAR_HEIGHT_PX } from '#/shared/title-bar-chrome.ts'
 
 vi.mock('#/web/components/WorkspaceNavigationControls.tsx', () => ({
   WorkspaceNavigationControls: ({
@@ -96,17 +97,86 @@ describe('ZenModeSidebarChrome', () => {
     expect(controls.hasAttribute('data-zen-reveal-surface')).toBe(false)
     expect(zenSurface.hasAttribute('data-zen-reveal-surface')).toBe(true)
     expect(controls.closest('[data-title-bar-chrome-region="interactive"]')).not.toBeNull()
-    expect(zenModeSidebarHitArea(container)?.hasAttribute('data-zen-reveal-surface')).toBe(false)
-
-    act(() => {
-      zenModeSidebarHitArea(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
-    })
-    expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
-
     act(() => {
       screen.getByTestId('zen-mode-sidebar-trigger').dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     })
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
+  })
+
+  test('reveals from the left-edge hit area below the draggable titlebar', () => {
+    const { container } = renderInJsdom(
+      <ZenModeSidebarChrome
+        repoId="/tmp/repo"
+        zenModeToggleEnabled
+        revealEnabled
+        sidebarSize={36}
+        onSidebarSizeChange={() => {}}
+      />,
+    )
+
+    const hitArea = zenModeSidebarHitArea(container)
+    expect(hitArea?.className).toContain('pointer-events-auto')
+    expect(hitArea?.style.top).toBe(`${TITLE_BAR_HEIGHT_PX}px`)
+    expect(hitArea?.hasAttribute('data-interactive')).toBe(false)
+    expect(hitArea?.dataset.titleBarChromeRegion).toBeUndefined()
+    expect(hitArea?.hasAttribute('data-zen-reveal-surface')).toBe(false)
+
+    act(() => {
+      hitArea?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    })
+    expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
+  })
+
+  test('uses a top-level drag plate for the revealed sidebar titlebar', () => {
+    renderInJsdom(
+      <ZenModeSidebarChrome
+        repoId="/tmp/repo"
+        zenModeToggleEnabled
+        revealEnabled
+        sidebarSize={36}
+        onSidebarSizeChange={() => {}}
+      />,
+    )
+
+    expect(screen.queryByTestId('zen-mode-sidebar-drag-plate')).toBeNull()
+
+    act(() => {
+      screen.getByTestId('zen-mode-sidebar-trigger').dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    })
+
+    const dragPlate = screen.getByTestId('zen-mode-sidebar-drag-plate')
+    expect(dragPlate.dataset.titleBarChromeRegion).toBe('drag')
+    expect(dragPlate.hasAttribute('data-interactive')).toBe(false)
+    expect(dragPlate.hasAttribute('data-zen-reveal-surface')).toBe(true)
+    expect(dragPlate.className).toContain('pointer-events-auto')
+    expect(dragPlate.style.height).toBe(`${TITLE_BAR_HEIGHT_PX}px`)
+  })
+
+  test('keeps the resize visual full-height while the hit target stays below the draggable reveal titlebar', () => {
+    const { container } = renderInJsdom(
+      <ZenModeSidebarChrome
+        repoId="/tmp/repo"
+        zenModeToggleEnabled
+        revealEnabled
+        sidebarSize={36}
+        onSidebarSizeChange={() => {}}
+      />,
+    )
+
+    act(() => {
+      screen.getByTestId('zen-mode-sidebar-trigger').dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    })
+
+    const resizeVisual = screen.getByTestId('zen-mode-sidebar-resize-visual')
+    const resizeHandle = screen.getByTestId('zen-mode-sidebar-resize-handle')
+    expect(resizeVisual.className).toContain('pointer-events-none')
+    expect(resizeVisual.className).toContain('inset-y-0')
+    expect(resizeVisual.dataset.titleBarChromeRegion).toBeUndefined()
+    expect(resizeVisual.hasAttribute('data-interactive')).toBe(false)
+    expect(resizeVisual.querySelector('span')).not.toBeNull()
+    expect(resizeHandle.dataset.titleBarChromeRegion).toBe('interactive')
+    expect(resizeHandle.style.top).toBe(`${TITLE_BAR_HEIGHT_PX}px`)
+    expect(resizeHandle.style.height).toBe(`calc(100% - ${TITLE_BAR_HEIGHT_PX}px)`)
   })
 
   test('keeps the reveal open while a descendant Popover is open', async () => {

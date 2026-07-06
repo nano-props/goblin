@@ -2,6 +2,7 @@
 
 import { describe, expect, test } from 'vitest'
 import {
+  NativeDragPlate,
   TitleBarDragRegion,
   TitleBarInteractiveRegion,
   TitleBarNoDragRegion,
@@ -27,6 +28,20 @@ describe('window chrome regions', () => {
     expect(chrome?.dataset.titleBarChromeRegion).toBe('drag')
     expect(chrome?.className).toContain('app-drag-region')
     expect(chrome?.className).not.toContain('title-bar-chrome')
+  })
+
+  test('marks a transparent native drag plate without reserving window controls', () => {
+    const { container } = renderInJsdom(<NativeDragPlate data-testid="plate" className="z-30" />)
+
+    const plate = container.querySelector<HTMLElement>('[data-testid="plate"]')
+    expect(plate?.dataset.titleBarChromeRegion).toBe('drag')
+    expect(plate?.getAttribute('aria-hidden')).toBe('true')
+    expect(plate?.className).toContain('app-drag-region')
+    expect(plate?.className).toContain('pointer-events-auto')
+    expect(plate?.className).toContain('absolute')
+    expect(plate?.className).toContain('bg-transparent')
+    expect(plate?.className).toContain('z-30')
+    expect(plate?.className).not.toContain('title-bar-chrome')
   })
 
   test('marks an interactive region as no-drag without adding layout chrome', () => {

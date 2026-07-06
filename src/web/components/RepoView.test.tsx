@@ -448,12 +448,14 @@ describe('RepoView workspace navigation', () => {
       '[data-testid="repo-shell-sidebar-top"]',
     )
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
-    expect(zenModeSidebarReveal(container)?.dataset.interactive).toBe('false')
+    expect(zenModeSidebarReveal(container)?.dataset.panelInteractive).toBe('false')
+    expect(zenModeSidebarReveal(container)?.hasAttribute('data-interactive')).toBe(false)
+    expect(zenModeSidebarDragPlate(container)).toBeNull()
     expect(closedRevealTop?.dataset.titleBarChromeRegion).toBeUndefined()
     expect(closedRevealTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
   })
 
-  test('large-screen collapsed Zen Mode does not reveal the sidebar on left-edge hover', () => {
+  test('large-screen collapsed Zen Mode reveals the sidebar on left-edge hover below the titlebar', () => {
     useReposStore.getState().setZenMode(true)
     useReposStore.getState().setWorkspacePaneSize(55)
     const { container } = render(branchRepoView())
@@ -472,8 +474,10 @@ describe('RepoView workspace navigation', () => {
     })
 
     expect(zenModeSidebarHitArea(container)?.hasAttribute('data-zen-reveal-surface')).toBe(false)
-    expect(zenModeSidebarHitArea(container)?.className).toContain('pointer-events-none')
-    expect(zenModeSidebarReveal(container)?.dataset.open).toBe('false')
+    expect(zenModeSidebarHitArea(container)?.hasAttribute('data-interactive')).toBe(false)
+    expect(zenModeSidebarHitArea(container)?.dataset.titleBarChromeRegion).toBeUndefined()
+    expect(zenModeSidebarHitArea(container)?.className).toContain('pointer-events-auto')
+    expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
     expect(workspaceNavigationControls(container)?.closest('[data-title-bar-chrome-region="interactive"]')).not.toBeNull()
     expect(zenModeSidebarTrigger(container)?.tagName).toBe('BUTTON')
   })
@@ -488,6 +492,7 @@ describe('RepoView workspace navigation', () => {
     expect(zenModeToggleOverlay(container)?.dataset.titleBarChromeRegion).toBeUndefined()
     expect(zenModeToggleOverlay(container)?.hasAttribute('data-zen-reveal-surface')).toBe(false)
     expect(zenModeToggleOverlay(container)?.className).toContain('goblin-zen-reveal-trigger-layer')
+    expect(zenModeToggleOverlay(container)?.className).toContain('z-40')
     expect(zenModeToggleOverlay(container)?.className).not.toContain('title-bar-chrome')
     expect(zenModeToggleOverlay(container)?.className).not.toContain('app-drag-region')
     expect(revealLayer).not.toBeNull()
@@ -505,14 +510,25 @@ describe('RepoView workspace navigation', () => {
     })
 
     expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
-    expect(zenModeSidebarReveal(container)?.dataset.interactive).toBe('true')
+    expect(zenModeToggleOverlay(container)?.className).toContain('z-40')
+    expect(zenModeToggleOverlay(container)?.className).not.toContain('z-20')
+    expect(zenModeSidebarReveal(container)?.dataset.panelInteractive).toBe('true')
+    expect(zenModeSidebarReveal(container)?.hasAttribute('data-interactive')).toBe(false)
     expect(zenModeSidebarReveal(container)?.getAttribute('aria-hidden')).toBeNull()
     expect(zenModeSidebarReveal(container)?.hasAttribute('inert')).toBe(false)
+    const dragPlate = zenModeSidebarDragPlate(container)
+    expect(dragPlate?.dataset.titleBarChromeRegion).toBe('drag')
+    expect(dragPlate?.hasAttribute('data-interactive')).toBe(false)
+    expect(dragPlate?.hasAttribute('data-zen-reveal-surface')).toBe(true)
+    expect(dragPlate?.className).toContain('pointer-events-auto')
+    expect(zenModeSidebarReveal(container)!.compareDocumentPosition(dragPlate!) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
     const floatingSidebarTop = zenModeSidebarReveal(container)?.querySelector<HTMLElement>(
       '[data-testid="repo-shell-sidebar-top"]',
     )
     expect(floatingSidebarTop?.hasAttribute('data-interactive')).toBe(false)
-    expect(floatingSidebarTop?.dataset.titleBarChromeRegion).toBe('drag')
+    expect(floatingSidebarTop?.dataset.titleBarChromeRegion).toBeUndefined()
     expect(floatingSidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
   })
 
@@ -759,7 +775,8 @@ describe('RepoView workspace navigation', () => {
 
       expect(workspace(container)?.dataset.sidebarCollapsed).toBe('false')
       expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
-      expect(zenModeSidebarReveal(container)?.dataset.interactive).toBe('false')
+      expect(zenModeSidebarReveal(container)?.dataset.panelInteractive).toBe('false')
+      expect(zenModeSidebarReveal(container)?.hasAttribute('data-interactive')).toBe(false)
       expect(zenModeSidebarReveal(container)?.getAttribute('aria-hidden')).toBe('true')
       expect(zenModeSidebarReveal(container)?.hasAttribute('inert')).toBe(true)
       const retainedSidebarTop = zenModeSidebarReveal(container)?.querySelector<HTMLElement>(
@@ -801,7 +818,8 @@ describe('RepoView workspace navigation', () => {
       })
 
       expect(zenModeSidebarReveal(container)?.dataset.open).toBe('true')
-      expect(zenModeSidebarReveal(container)?.dataset.interactive).toBe('false')
+      expect(zenModeSidebarReveal(container)?.dataset.panelInteractive).toBe('false')
+      expect(zenModeSidebarReveal(container)?.hasAttribute('data-interactive')).toBe(false)
       expect(zenModeSidebarHitArea(container)?.className).toContain('pointer-events-none')
 
       act(() => {
@@ -988,6 +1006,10 @@ function compactPane(container: HTMLElement, pane: 'navigator' | 'workspace'): H
 
 function zenModeSidebarHitArea(container: HTMLElement): HTMLElement | null {
   return container.querySelector<HTMLElement>('[data-testid="zen-mode-sidebar-hit-area"]')
+}
+
+function zenModeSidebarDragPlate(container: HTMLElement): HTMLElement | null {
+  return container.querySelector<HTMLElement>('[data-testid="zen-mode-sidebar-drag-plate"]')
 }
 
 function zenModeSidebarReveal(container: HTMLElement): HTMLElement | null {
