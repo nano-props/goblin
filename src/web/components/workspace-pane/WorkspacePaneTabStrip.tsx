@@ -291,29 +291,37 @@ function workspacePaneTabScrollTarget(tab: HTMLButtonElement): HTMLElement {
   return tab.closest<HTMLElement>(WORKSPACE_PANE_TAB_SCROLL_TARGET_SELECTOR) ?? tab
 }
 
-function useDeferredWorkspacePaneTabFocus({
+function useDeferredActiveWorkspacePaneTabFocusAfterClose({
+  activeTabIdentity,
   items,
   focusRegistry,
 }: {
+  activeTabIdentity: string | null
   items: readonly WorkspacePaneTabItem[]
   focusRegistry: FocusRegistry<string, HTMLButtonElement>
 }) {
-  const pendingFocusIdentityRef = useRef<string | null>(null)
+  const closingActiveIdentityRef = useRef<string | null>(null)
   const [focusRequestVersion, setFocusRequestVersion] = useState(0)
 
   useLayoutEffect(() => {
-    const pendingFocusIdentity = pendingFocusIdentityRef.current
-    if (!pendingFocusIdentity) return
-    if (!items.some((item) => item.identity === pendingFocusIdentity)) {
-      pendingFocusIdentityRef.current = null
+    const closingIdentity = closingActiveIdentityRef.current
+    if (!closingIdentity) return
+    if (activeTabIdentity === closingIdentity) return
+    if (!activeTabIdentity) {
+      if (!items.some((item) => item.identity === closingIdentity)) closingActiveIdentityRef.current = null
       return
     }
-    focusRegistry.focus(pendingFocusIdentity, { preventScroll: true })
-    pendingFocusIdentityRef.current = null
-  }, [focusRegistry, focusRequestVersion, items])
+    const activeItem = items.find((item) => item.identity === activeTabIdentity)
+    if (!activeItem || isPendingWorkspacePaneTabItem(activeItem)) {
+      if (!items.some((item) => item.identity === closingIdentity)) closingActiveIdentityRef.current = null
+      return
+    }
+    focusRegistry.focus(activeTabIdentity, { preventScroll: true })
+    closingActiveIdentityRef.current = null
+  }, [activeTabIdentity, focusRegistry, focusRequestVersion, items])
 
-  return useCallback((identity: string) => {
-    pendingFocusIdentityRef.current = identity
+  return useCallback((closingIdentity: string) => {
+    closingActiveIdentityRef.current = closingIdentity
     setFocusRequestVersion((version) => version + 1)
   }, [])
 }
@@ -534,7 +542,11 @@ export function WorkspacePaneTabStrip({
   const prefersReducedMotion = usePrefersReducedMotion()
   const scrollBehavior: ScrollBehavior = prefersReducedMotion ? 'auto' : 'smooth'
   const [hoveredTabIdentity, setHoveredTabIdentity] = useState<string | null>(null)
-  const requestFocusAfterRender = useDeferredWorkspacePaneTabFocus({ items, focusRegistry })
+  const focusActiveTabAfterClose = useDeferredActiveWorkspacePaneTabFocusAfterClose({
+    activeTabIdentity,
+    items,
+    focusRegistry,
+  })
   const tabDnd = useWorkspacePaneTabDnd({
     sortableItems,
     newButtonRef,
@@ -599,21 +611,12 @@ export function WorkspacePaneTabStrip({
       if (!item) return
       if (isPendingWorkspacePaneTabItem(item)) return
       const isActive = item.identity === activeTabIdentity
-      const idx = items.findIndex((candidate) => candidate.identity === identity)
-      const nextItem =
-        items.slice(idx + 1).find((candidate) => !isPendingWorkspacePaneTabItem(candidate)) ??
-        items
-          .slice(0, idx)
-          .reverse()
-          .find((candidate) => !isPendingWorkspacePaneTabItem(candidate)) ??
-        null
-      const nextKey = nextItem?.identity ?? null
 
       setHoveredTabIdentity(null)
-      if (isActive && nextKey) requestFocusAfterRender(nextKey)
+      if (isActive) focusActiveTabAfterClose(identity)
       onClose(item)
     },
-    [activeTabIdentity, items, onClose, requestFocusAfterRender],
+    [activeTabIdentity, focusActiveTabAfterClose, items, onClose],
   )
 
   const tabIdForItem = useCallback(

@@ -78,4 +78,72 @@ describe('workspace pane tabs coordinator', () => {
       workspacePaneRuntimeTabEntry('terminal', 'session-live'),
     ])
   })
+
+  test('materializes missing live runtime sessions when replacing workspace tabs', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      runtimeProviders: [
+        {
+          type: 'terminal',
+          listSessionsForUser: vi.fn(async () => [
+            { sessionId: 'session-live', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+          ]),
+        },
+      ],
+    })
+
+    await expect(
+      coordinator.replaceTabs({
+        userId: USER_ID,
+        scope: SCOPE,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        tabs: [workspacePaneStaticTabEntry('status')],
+        assertCurrent: () => {},
+      }),
+    ).resolves.toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneRuntimeTabEntry('terminal', 'session-live'),
+    ])
+    expect(workspaceTabs.tabs({ userId: USER_ID, scope: SCOPE, branchName: BRANCH_NAME, worktreePath: WORKTREE_PATH }))
+      .toEqual([workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-live')])
+  })
+
+  test('materializes missing live runtime sessions when updating workspace tabs', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: SCOPE,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      runtimeProviders: [
+        {
+          type: 'terminal',
+          listSessionsForUser: vi.fn(async () => [
+            { sessionId: 'session-live', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+          ]),
+        },
+      ],
+    })
+
+    await expect(
+      coordinator.updateTabs({
+        userId: USER_ID,
+        scope: SCOPE,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        operation: { type: 'open-static', tabType: 'history' },
+        assertCurrent: () => {},
+      }),
+    ).resolves.toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('history'),
+      workspacePaneRuntimeTabEntry('terminal', 'session-live'),
+    ])
+  })
 })

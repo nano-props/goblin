@@ -238,7 +238,7 @@ export function RepoWorkspaceToolbar({
       ),
     [canonicalWorkspacePaneTabItems, visualWorkspacePaneTabs],
   )
-  const activeTabIdentity = workspacePaneTabModel.activeTab?.identity ?? null
+  const activeTabIdentity = workspacePaneTabModel.activeTab?.identity ?? activePendingTabIdentity(workspacePaneTabModel)
   const handleSelectWorkspacePaneTabItem = useCallback(
     (item: WorkspacePaneTabItem) => {
       if (isPendingWorkspacePaneTabItem(item)) return
@@ -339,4 +339,11 @@ export function RepoWorkspaceToolbar({
 
 function workspacePaneTabEntryForItem(item: WorkspacePaneTabItem): WorkspacePaneTabEntry | null {
   return isPendingWorkspacePaneTabItem(item) ? null : item.tabEntry
+}
+
+function activePendingTabIdentity(model: RepoWorkspaceTabModel): string | null {
+  const selection = model.selection
+  if (selection?.kind !== 'runtime-host') return null
+  const runtimeType = selection.runtimeType
+  return model.tabs.find((tab) => tab.kind === 'pending' && tab.runtimeType === runtimeType)?.identity ?? null
 }

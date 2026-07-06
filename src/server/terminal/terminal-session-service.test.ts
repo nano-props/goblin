@@ -273,7 +273,7 @@ describe('terminal session service facade', () => {
     })
   })
 
-  test('replaceTabs drops stale terminal tabs without appending missing live terminals', async () => {
+  test('replaceTabs drops stale terminal tabs and materializes missing live terminals', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     const service = createService({
       sessions: [terminalSession('session-live')],
@@ -311,7 +311,7 @@ describe('terminal session service facade', () => {
         worktreePath: WORKTREE_PATH,
         tabs: [workspacePaneStaticTabEntry('status')],
       }),
-    ).resolves.toEqual([workspacePaneStaticTabEntry('status')])
+    ).resolves.toEqual([workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-live')])
   })
 
   test('replaceTabs rejects before writing when the repo instance goes stale during live-session lookup', async () => {

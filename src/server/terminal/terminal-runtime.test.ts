@@ -659,7 +659,7 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('realtime workspace pane tabs list materializes missing terminal tabs and broadcasts invalidation', async () => {
+  test('realtime workspace pane tabs replace materializes missing terminal tabs and list returns canonical tabs', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
@@ -683,7 +683,15 @@ describe('server terminal runtime', () => {
         worktreePath: '/repo-linked',
         tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
       }),
-    ).resolves.toEqual([{ type: 'status', tabId: 'workspace-pane:status' }])
+    ).resolves.toEqual([
+      { type: 'status', tabId: 'workspace-pane:status' },
+      { type: 'terminal', runtimeSessionId: created.terminalSessionId },
+    ])
+    await vi.waitFor(() => {
+      expect(
+        sentSocketMessages(socket).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+      ).toBe(true)
+    })
     socket.send.mockClear()
 
     host.handleRealtimeMessage(
@@ -700,7 +708,6 @@ describe('server terminal runtime', () => {
 
     await vi.waitFor(() => {
       const messages = sentSocketMessages(socket)
-      expect(messages.some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed)).toBe(true)
       expect(
         messages.some((message) => message.type === 'response' && message.requestId === 'req_list_workspace_tabs'),
       ).toBe(true)

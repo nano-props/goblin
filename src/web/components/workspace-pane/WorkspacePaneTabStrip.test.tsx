@@ -930,6 +930,48 @@ describe('WorkspacePaneTabStrip', () => {
     expect(scrollIntoView).toHaveBeenLastCalledWith({ inline: 'end', block: 'nearest', behavior: 'smooth' })
   })
 
+  test('focuses the actual active tab after closing the active tab', () => {
+    function CloseActiveSelectsLeftHarness() {
+      const [sessions, setSessions] = useState([
+        session({ terminalSessionId: 't1', title: 'term-1', selected: false }),
+        session({ terminalSessionId: 't2', title: 'term-2', selected: true }),
+        session({ terminalSessionId: 't3', title: 'term-3', selected: false }),
+      ])
+
+      return (
+        <TestWorkspacePaneTabStrip
+          terminalWorktreeKey="/repo\0/repo/worktree"
+          workspacePaneId="workspace"
+          sessions={sessions}
+          onNew={() => {}}
+          onSelect={() => {}}
+          onScrollToBottom={() => {}}
+          onClose={(closed) => {
+            setSessions((current) =>
+              current
+                .filter((candidate) => candidate.terminalSessionId !== closed.terminalSessionId)
+                .map((candidate) => ({
+                  ...candidate,
+                  selected: candidate.terminalSessionId === 't1',
+                })),
+            )
+          }}
+          onReorder={() => {}}
+        />
+      )
+    }
+
+    render(<CloseActiveSelectsLeftHarness />)
+    const closeButton = document.body.querySelector<HTMLButtonElement>('button[aria-label="close term-2"]')
+    expect(closeButton).not.toBeNull()
+
+    act(() => {
+      closeButton?.click()
+    })
+
+    expect(document.activeElement?.textContent).toContain('term-1')
+  })
+
   test('does not scroll when the active tab stays visible after a non-active terminal session is removed', () => {
     function CloseInactiveHarness() {
       const [sessions, setSessions] = useState([

@@ -75,8 +75,7 @@ class WorkspacePaneTabsCoordinator {
       input.branchName,
       input.worktreePath,
       async () => {
-        const liveSessionIds = await this.liveSessionIdsForWorktree(
-          input.runtimeType,
+        const liveSessionsByProvider = await this.liveSessionsByProviderForWorktree(
           input.userId,
           input.scope,
           input.worktreePath,
@@ -88,7 +87,14 @@ class WorkspacePaneTabsCoordinator {
         })
         return this.workspaceTabs.replaceTabs({
           ...target,
-          tabs: workspaceTabsWithoutStaleRuntimeEntries(tabs, input.runtimeType, liveSessionIds),
+          tabs: this.canonicalRuntimeTabsForTargetWithLiveSessions(
+            {
+              branchName: input.branchName,
+              worktreePath: input.worktreePath,
+              tabs,
+            },
+            liveSessionsByProvider,
+          ),
         })
       },
     )
@@ -109,7 +115,7 @@ class WorkspacePaneTabsCoordinator {
       input.worktreePath,
       async () => {
         input.assertCurrent()
-        const tabs = await this.tabsWithoutStaleRuntimeEntriesForTarget(input)
+        const tabs = await this.canonicalRuntimeTabsForTarget(input)
         input.assertCurrent()
         return this.workspaceTabs.replaceTabs({
           userId: input.userId,
@@ -144,7 +150,7 @@ class WorkspacePaneTabsCoordinator {
           worktreePath: input.worktreePath,
         }
         const updatedTabs = this.applyWorkspacePaneTabsOperation(target, input.operation)
-        const tabs = await this.tabsWithoutStaleRuntimeEntriesForTarget({ ...input, tabs: updatedTabs })
+        const tabs = await this.canonicalRuntimeTabsForTarget({ ...input, tabs: updatedTabs })
         input.assertCurrent()
         return this.workspaceTabs.replaceTabs({ ...target, tabs })
       },
@@ -202,23 +208,61 @@ class WorkspacePaneTabsCoordinator {
     }))
   }
 
-  private async tabsWithoutStaleRuntimeEntriesForTarget(input: {
+  private async canonicalRuntimeTabsForTarget(input: {
     userId: string
     scope: string
+    branchName: string
     worktreePath: string | null
     tabs: readonly WorkspacePaneTabEntry[]
   }): Promise<WorkspacePaneTabEntry[]> {
+    if (input.worktreePath === null) {
+      let tabs = [...input.tabs]
+      for (const provider of this.runtimeProviders) {
+        tabs = workspaceTabsWithoutStaleRuntimeEntries(tabs, provider.type, [])
+      }
+      return tabs
+    }
+    const worktreePath = input.worktreePath
+    return this.canonicalRuntimeTabsForTargetWithLiveSessions(
+      { branchName: input.branchName, worktreePath, tabs: input.tabs },
+      await this.liveSessionsByProviderForWorktree(input.userId, input.scope, worktreePath),
+    )
+  }
+
+  private canonicalRuntimeTabsForTargetWithLiveSessions(
+    input: {
+      branchName: string
+      worktreePath: string
+      tabs: readonly WorkspacePaneTabEntry[]
+    },
+    liveSessionsByProvider: ReadonlyMap<WorkspacePaneRuntimeTabsProvider, WorkspacePaneRuntimeTabsLiveSession[]>,
+  ): WorkspacePaneTabEntry[] {
     let tabs = [...input.tabs]
     for (const provider of this.runtimeProviders) {
-      const liveSessionIds =
-        input.worktreePath === null
-          ? []
-          : (await this.liveSessionsForWorktree(provider, input.userId, input.scope, input.worktreePath)).map(
-              (session) => session.sessionId,
-            )
-      tabs = workspaceTabsWithoutStaleRuntimeEntries(tabs, provider.type, liveSessionIds)
+      const liveSessions = liveSessionsByProvider.get(provider) ?? []
+      const replacements = projectWorkspaceRuntimeTabsForWorktree({
+        runtimeType: provider.type,
+        entries: [{ branchName: input.branchName, worktreePath: input.worktreePath, tabs }],
+        worktreePath: input.worktreePath,
+        liveSessions,
+      })
+      tabs = replacements[0]?.tabs ?? tabs
     }
     return tabs
+  }
+
+  private async liveSessionsByProviderForWorktree(
+    userId: string,
+    scope: string,
+    worktreePath: string,
+  ): Promise<Map<WorkspacePaneRuntimeTabsProvider, WorkspacePaneRuntimeTabsLiveSession[]>> {
+    const liveSessionsByProvider = new Map<WorkspacePaneRuntimeTabsProvider, WorkspacePaneRuntimeTabsLiveSession[]>()
+    await Promise.all(
+      this.runtimeProviders.map(async (provider) => {
+        liveSessionsByProvider.set(provider, await this.liveSessionsForWorktree(provider, userId, scope, worktreePath))
+      }),
+    )
+    return liveSessionsByProvider
   }
 
   private async reconcileWorkspaceTabsProjectionBoundary(input: {
@@ -268,17 +312,6 @@ class WorkspacePaneTabsCoordinator {
       case 'reorder':
         return this.workspaceTabs.reorderTabsByIdentity(target, operation.tabIdentities)
     }
-  }
-
-  private async liveSessionIdsForWorktree(
-    runtimeType: WorkspacePaneRuntimeTabType,
-    userId: string,
-    scope: string,
-    worktreePath: string,
-  ): Promise<string[]> {
-    const provider = this.runtimeProviders.find((candidate) => candidate.type === runtimeType)
-    if (!provider) return []
-    return (await this.liveSessionsForWorktree(provider, userId, scope, worktreePath)).map((session) => session.sessionId)
   }
 
   private async liveSessionsForWorktree(
