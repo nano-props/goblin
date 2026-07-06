@@ -70,6 +70,10 @@ function primaryModifierPressed(event: KeyboardEvent): boolean {
   return isMac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey
 }
 
+function macPrimaryModifierPressed(event: KeyboardEvent): boolean {
+  return /\bMac|iPhone|iPad|iPod/.test(globalThis.navigator?.platform ?? '') && event.metaKey && !event.ctrlKey
+}
+
 function digitShortcutIndex(event: KeyboardEvent): number | null {
   if (!/^Digit[1-9]$/.test(event.code)) return null
   return Number(event.code.slice('Digit'.length))
@@ -152,6 +156,26 @@ export function useKeyboard({
         e.preventDefault()
         onExitSettingsRef.current()
         return
+      }
+
+      if (!workspaceShortcutsSuppressed && !isTypingTarget(e.target)) {
+        const repoId = currentRepoIdRef.current
+        const navigationDirection =
+          e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.code === 'ArrowLeft'
+            ? -1
+            : e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.code === 'ArrowRight'
+              ? 1
+              : macPrimaryModifierPressed(e) && !e.altKey && !e.shiftKey && e.code === 'BracketLeft'
+                ? -1
+                : macPrimaryModifierPressed(e) && !e.altKey && !e.shiftKey && e.code === 'BracketRight'
+                  ? 1
+                  : 0
+        if (repoId && navigationDirection !== 0) {
+          e.preventDefault()
+          if (navigationDirection === -1) navigation.goBack(repoId)
+          else navigation.goForward(repoId)
+          return
+        }
       }
 
       if (primaryModifierPressed(e) && !e.altKey && !workspaceShortcutsSuppressed) {

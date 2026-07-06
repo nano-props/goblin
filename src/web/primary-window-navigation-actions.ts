@@ -1,6 +1,8 @@
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
+import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/repos/types.ts'
+import { restoreWorkspaceNavigationEntry } from '#/web/workspace-navigation-history.ts'
 
 export interface PrimaryWindowNavigationActions {
   activateRepo: (repoId: string) => void
@@ -8,6 +10,8 @@ export interface PrimaryWindowNavigationActions {
   cycleRepo: (direction: 1 | -1) => void
   selectRepoBranch: (repoId: string, branch: string) => void
   showRepoBranchWorkspacePaneTab: (repoId: string, branch: string, tab: WorkspacePaneTabType) => void
+  goBack: (repoId: string) => void
+  goForward: (repoId: string) => void
   openSettings: (page: SettingsPage) => void
   openCreateWorktree: () => void
 }
@@ -17,6 +21,8 @@ interface CreatePrimaryWindowNavigationActionsOptions {
   order: string[]
   closeRepo: (repoId: string) => void
   setWorkspacePaneTab: (repoId: string, branch: string, tab: WorkspacePaneTabType) => void
+  goBackInWorkspaceNavigation?: (repoId: string) => WorkspaceNavigationHistoryEntry | null
+  goForwardInWorkspaceNavigation?: (repoId: string) => WorkspaceNavigationHistoryEntry | null
   routeNavigation: PrimaryWindowRouteNavigation
 }
 
@@ -25,6 +31,8 @@ export function createPrimaryWindowNavigationActions({
   order,
   closeRepo,
   setWorkspacePaneTab,
+  goBackInWorkspaceNavigation,
+  goForwardInWorkspaceNavigation,
   routeNavigation,
 }: CreatePrimaryWindowNavigationActionsOptions): PrimaryWindowNavigationActions {
   return {
@@ -48,6 +56,14 @@ export function createPrimaryWindowNavigationActions({
     showRepoBranchWorkspacePaneTab(repoId, branch, tab) {
       routeNavigation.openRepoBranch(repoId, branch)
       setWorkspacePaneTab(repoId, branch, tab)
+    },
+    goBack(repoId) {
+      const target = goBackInWorkspaceNavigation?.(repoId) ?? null
+      if (target) restoreWorkspaceNavigationEntry(target, routeNavigation)
+    },
+    goForward(repoId) {
+      const target = goForwardInWorkspaceNavigation?.(repoId) ?? null
+      if (target) restoreWorkspaceNavigationEntry(target, routeNavigation)
     },
     openSettings(page) {
       routeNavigation.openSettings(page)

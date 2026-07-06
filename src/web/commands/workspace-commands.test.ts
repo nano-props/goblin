@@ -1571,6 +1571,8 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
       useReposStore.setState({ restoredRepoId: repoId })
       state.setWorkspacePaneTab(repoId, branch, tab)
     },
+    goBack: () => {},
+    goForward: () => {},
     openSettings: () => {},
     openCreateWorktree: () => {},
     ...overrides,

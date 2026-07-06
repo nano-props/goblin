@@ -112,6 +112,29 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(navigation.openRepoNewWorktree).toHaveBeenCalledWith('/tmp/repo-a')
   })
 
+  test('restores a saved new-worktree return target when navigating workspace history', () => {
+    const navigation = routeNavigation()
+    const goBackInWorkspaceNavigation = vi.fn(() => ({
+      repoId: '/tmp/repo-a',
+      route: { kind: 'newWorktree' as const, returnTo: '/repo/repo-a/branch/main' },
+    }))
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: '/tmp/repo-a',
+      order: ['/tmp/repo-a'],
+      closeRepo: vi.fn(),
+      setWorkspacePaneTab: vi.fn(),
+      goBackInWorkspaceNavigation,
+      routeNavigation: navigation,
+    })
+
+    actions.goBack('/tmp/repo-a')
+
+    expect(goBackInWorkspaceNavigation).toHaveBeenCalledWith('/tmp/repo-a')
+    expect(navigation.openRepoNewWorktree).toHaveBeenCalledWith('/tmp/repo-a', {
+      returnTo: '/repo/repo-a/branch/main',
+    })
+  })
+
   test('does not open create worktree without a current repo', () => {
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({

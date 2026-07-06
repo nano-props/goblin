@@ -263,6 +263,8 @@ export const ja: Record<DictKey, string> = {
   'branches.filter-tooltip.worktrees': 'ワークツリーブランチ',
   'workspace.zen-mode-toggle-label': '禅モードを切り替え',
   'workspace.zen-mode-toggle-tooltip.enable': '禅モード',
+  'workspace.navigation-back': '戻る',
+  'workspace.navigation-forward': '進む',
   'workspace.back-to-branch-navigator': 'Branch Navigator に戻る',
   'workspace.open-externally.open': '外部で開く',
   'branches.gone': '消失',

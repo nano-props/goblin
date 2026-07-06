@@ -59,6 +59,8 @@ body,
 html {
   --goblin-title-bar-chrome-left: 16px;
   --goblin-title-bar-chrome-right: 16px;
+  --goblin-workspace-navigation-controls-width: 6.5rem;
+  --goblin-workspace-navigation-controls-reserved-width: 7rem;
 }
 
 html[data-host='electron']:not([data-chrome='overlay']) {
@@ -113,8 +115,9 @@ button,
  * workspace toolbar or revealed sidebar owns blank-space dragging; the child
  * trigger opts out through an interactive chrome region. */
 .goblin-zen-reveal-trigger-layer {
+  width: calc(var(--goblin-title-bar-chrome-left) + var(--goblin-workspace-navigation-controls-width));
   padding-left: var(--goblin-title-bar-chrome-left);
-  padding-right: var(--goblin-title-bar-chrome-right);
+  padding-right: 0;
 }
 
 /* Visible focus ring for keyboard users. Tailwind v4 preflight removes
@@ -280,7 +283,7 @@ button,
 }
 
 .goblin-workspace-toolbar__leading-spacer--reserved {
-  width: 2.5rem;
+  width: var(--goblin-workspace-navigation-controls-reserved-width);
 }
 
 /* Traffic-light offset for the workspace toolbar. Applied when zen-mode
@@ -290,6 +293,11 @@ button,
    trailing actions (e.g. open-external button group) don't shift. */
 .goblin-workspace-toolbar--traffic-offset {
   padding-left: var(--goblin-title-bar-chrome-left);
+}
+
+.goblin-workspace-navigation-controls {
+  flex: 0 0 var(--goblin-workspace-navigation-controls-width);
+  width: var(--goblin-workspace-navigation-controls-width);
 }
 
 .goblin-zen-reveal-panel {

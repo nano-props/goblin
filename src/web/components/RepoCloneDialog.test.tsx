@@ -128,6 +128,8 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
     cycleRepo: () => {},
     selectRepoBranch: () => {},
     showRepoBranchWorkspacePaneTab: () => {},
+    goBack: () => {},
+    goForward: () => {},
     openSettings: () => {},
     openCreateWorktree: () => {},
     ...overrides,

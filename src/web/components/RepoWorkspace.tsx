@@ -16,6 +16,8 @@ import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/bran
 import { useRepoPullRequestsReadModel, useRepoStatusReadModel } from '#/web/repo-data-query.ts'
 import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
+import { useWorkspaceNavigationHistory } from '#/web/workspace-navigation-history.ts'
+
 interface Props {
   repoId: string
   currentBranchName?: string | null
@@ -95,13 +97,13 @@ export function RepoWorkspace({
   if (!repoShell) return null
 
   return (
-      <RepoWorkspaceLoaded
-        repoShell={repoShell}
-        workspacePaneId={workspacePaneId}
-        shortcutsEnabled={shortcutsEnabled}
-        toolbarTrafficLightOffset={toolbarTrafficLightOffset}
-        onBackToBranchNavigator={onBackToBranchNavigator}
-      />
+    <RepoWorkspaceLoaded
+      repoShell={repoShell}
+      workspacePaneId={workspacePaneId}
+      shortcutsEnabled={shortcutsEnabled}
+      toolbarTrafficLightOffset={toolbarTrafficLightOffset}
+      onBackToBranchNavigator={onBackToBranchNavigator}
+    />
   )
 }
 
@@ -128,6 +130,20 @@ function RepoWorkspaceLoaded({
     'full',
     !!currentBranchName,
   )
+  const historyBranch = currentBranchName
+    ? branchReadModel?.branches.find((branch) => branch.name === currentBranchName)
+    : null
+  useWorkspaceNavigationHistory({
+    routeContext:
+      currentBranchName && historyBranch
+        ? {
+            kind: 'branch',
+            repoId: repoShell.id,
+            branchName: currentBranchName,
+            worktreePath: historyBranch.worktree?.path ?? null,
+          }
+        : null,
+  })
   if (!branchReadModel || !statusReadModel.data) {
     return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
   }

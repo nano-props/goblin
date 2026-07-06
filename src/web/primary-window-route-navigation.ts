@@ -12,7 +12,7 @@ export interface PrimaryWindowRouteNavigation {
   openRepoRoot: (repoId: string) => void
   openRepoDashboard: (repoId: string) => void
   openRepoBranch: (repoId: string, branchName: string, options?: { replace?: boolean }) => void
-  openRepoNewWorktree: (repoId: string) => void
+  openRepoNewWorktree: (repoId: string, options?: { returnTo: string | null }) => void
   cancelRepoNewWorktree: (repoId: string) => void
 }
 
@@ -56,14 +56,21 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
         replace: options?.replace,
       })
     },
-    openRepoNewWorktree(repoId) {
+    openRepoNewWorktree(repoId, options) {
       const repoSlug = repoSlugForId(repoId)
       const href = router?.state.location.href ?? null
       if (repoSlug) {
+        const targetPath = `/repo/${repoSlug}/worktree/new`
+        const search =
+          options
+            ? options.returnTo
+              ? { returnTo: options.returnTo }
+              : {}
+            : routeReturnSearch(href, targetPath)
         void router?.navigate({
           to: '/repo/$repoSlug/worktree/new',
           params: { repoSlug },
-          search: routeReturnSearch(href, `/repo/${repoSlug}/worktree/new`),
+          search,
         })
       }
     },

@@ -242,7 +242,7 @@ export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
     { type: 'cycle-repo-requested', direction: 1 },
     {
       helpLabelKey: 'help.row.next-repo',
-      accelerator: 'CmdOrCtrl+]',
+      accelerator: 'CmdOrCtrl+Shift+]',
     },
   ),
   clientMenuCommand(
@@ -251,7 +251,7 @@ export const CLIENT_MENU_COMMANDS: ClientMenuCommandDefinition[] = [
     { type: 'cycle-repo-requested', direction: -1 },
     {
       helpLabelKey: 'help.row.prev-repo',
-      accelerator: 'CmdOrCtrl+[',
+      accelerator: 'CmdOrCtrl+Shift+[',
     },
   ),
   clientMenuCommand('window-reset-layout', 'menu.window.reset-window', { type: 'layout-reset-requested' }),
