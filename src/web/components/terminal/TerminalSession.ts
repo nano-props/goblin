@@ -88,12 +88,14 @@ class TerminalRenderQueue {
   private running = false
   private entries: TerminalRenderQueueEntry[] = []
   private readonly options: TerminalRenderQueueOptions
+  private generation = 0
 
   constructor(options: TerminalRenderQueueOptions) {
     this.options = options
   }
 
   replace(term: XTermTerminal, data: string, checkpoint: RenderedOutputCheckpoint): Promise<boolean> {
+    this.generation += 1
     this.clear()
     return new Promise<boolean>((resolve, reject) => {
       this.entries.push({ kind: 'replace', term, data, checkpoint, resolve, reject })
@@ -108,6 +110,7 @@ class TerminalRenderQueue {
   }
 
   clear(): void {
+    this.generation += 1
     const queued = this.entries.splice(0)
     for (const entry of queued) {
       if (entry.kind === 'replace') entry.resolve(false)
@@ -119,7 +122,8 @@ class TerminalRenderQueue {
     const entry = this.entries.shift()
     if (!entry) return
     this.running = true
-    void this.run(entry)
+    const generation = this.generation
+    void this.run(entry, generation)
       .then((applied) => {
         if (entry.kind === 'replace') entry.resolve(applied)
       })
@@ -133,18 +137,22 @@ class TerminalRenderQueue {
       })
   }
 
-  private async run(entry: TerminalRenderQueueEntry): Promise<boolean> {
+  private async run(entry: TerminalRenderQueueEntry, generation: number): Promise<boolean> {
     if (!this.options.isCurrentTerm(entry.term)) return false
     if (entry.kind === 'replace') {
       entry.term.reset()
       if (entry.data) await termWrite(entry.term, entry.data)
-      if (this.options.isCurrentTerm(entry.term)) this.options.markOutputRendered(entry.checkpoint)
-      return this.options.isCurrentTerm(entry.term)
+      if (this.isCurrentEntry(entry.term, generation)) this.options.markOutputRendered(entry.checkpoint)
+      return this.isCurrentEntry(entry.term, generation)
     }
     if (this.options.isCheckpointRendered(entry.checkpoint)) return true
     await termWrite(entry.term, entry.data)
-    if (this.options.isCurrentTerm(entry.term)) this.options.markOutputRendered(entry.checkpoint)
-    return this.options.isCurrentTerm(entry.term)
+    if (this.isCurrentEntry(entry.term, generation)) this.options.markOutputRendered(entry.checkpoint)
+    return this.isCurrentEntry(entry.term, generation)
+  }
+
+  private isCurrentEntry(term: XTermTerminal, generation: number): boolean {
+    return this.generation === generation && this.options.isCurrentTerm(term)
   }
 }
 
