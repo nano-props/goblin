@@ -1094,7 +1094,7 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('sends attach response before flushing buffered output emitted during the attach request', async () => {
+  test('drops buffered output covered by the attach response snapshot', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
@@ -1116,30 +1116,23 @@ describe('server terminal runtime', () => {
 
     await vi.waitFor(() => {
       expect(socket.send.mock.calls.some(([payload]) => JSON.parse(String(payload)).type === 'response')).toBe(true)
-      expect(socket.send.mock.calls.some(([payload]) => JSON.parse(String(payload)).type === 'output')).toBe(true)
     })
 
     const messages = socket.send.mock.calls.map(([payload]) => JSON.parse(String(payload)))
     const responseIndex = messages.findIndex((message) => message.type === 'response')
-    const outputIndex = messages.findIndex((message) => message.type === 'output')
     expect(responseIndex).toBeGreaterThanOrEqual(0)
-    expect(outputIndex).toBeGreaterThan(responseIndex)
     expect(messages[responseIndex]).toMatchObject({
       type: 'response',
       requestId: 'req_attach',
       ok: true,
       action: 'attach',
-    })
-    expect(messages[outputIndex]).toMatchObject({
-      type: 'output',
-      event: {
-        terminalRuntimeSessionId,
-        terminalSessionId: expect.any(String),
-        data: 'during-attach',
-        outputEra: 0,
-        seq: 1,
+      payload: {
+        ok: true,
+        snapshot: expect.stringContaining('during-attach'),
+        snapshotSeq: 1,
       },
     })
+    expect(messages.some((message) => message.type === 'output')).toBe(false)
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
@@ -1204,7 +1197,7 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('sends create response before flushing buffered output emitted during the create request', async () => {
+  test('drops buffered output covered by the create response snapshot', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
@@ -1233,16 +1226,13 @@ describe('server terminal runtime', () => {
     await vi.waitFor(() => {
       const messages = sentSocketMessages(socket)
       expect(messages.some((message) => message.type === 'response')).toBe(true)
-      expect(messages.some((message) => message.type === 'output')).toBe(true)
     })
 
     const messages = sentSocketMessages(socket)
     const responseIndex = messages.findIndex(
       (message) => message.type === 'response' && message.requestId === 'req_create_buffered_output',
     )
-    const outputIndex = messages.findIndex((message) => message.type === 'output')
     expect(responseIndex).toBeGreaterThanOrEqual(0)
-    expect(outputIndex).toBeGreaterThan(responseIndex)
 
     const response = messages[responseIndex]
     expect(response).toMatchObject({
@@ -1254,22 +1244,10 @@ describe('server terminal runtime', () => {
         ok: true,
         snapshot: expect.stringContaining('during-create'),
         snapshotSeq: 1,
-      outputEra: 0,
+        outputEra: 0,
       },
     })
-
-    const output = messages[outputIndex]
-    const createdPayload = response.payload as { terminalRuntimeSessionId: string; terminalSessionId: string }
-    expect(output).toMatchObject({
-      type: 'output',
-      event: {
-        terminalRuntimeSessionId: createdPayload.terminalRuntimeSessionId,
-        terminalSessionId: createdPayload.terminalSessionId,
-        data: 'during-create',
-        seq: 1,
-      outputEra: 0,
-      },
-    })
+    expect(messages.some((message) => message.type === 'output')).toBe(false)
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()

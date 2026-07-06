@@ -54,6 +54,58 @@ describe('terminal realtime broker', () => {
     expect(broker.hasUserSockets(USER_A)).toBe(false)
   })
 
+  test('buffered socket drops output covered by a first-frame flush boundary', () => {
+    const rawSocket = { send: vi.fn(), close: vi.fn() }
+    const bufferedSocket = new BufferedTerminalSocket(rawSocket)
+    bufferedSocket.pause()
+
+    bufferedSocket.send(
+      JSON.stringify({
+        type: 'output',
+        event: {
+          terminalRuntimeSessionId: 's_1',
+          terminalSessionId: 'terminal_1',
+          data: 'covered',
+          outputEra: 0,
+          seq: 1,
+          processName: 'zsh',
+        },
+      }),
+    )
+    bufferedSocket.send(
+      JSON.stringify({
+        type: 'output',
+        event: {
+          terminalRuntimeSessionId: 's_1',
+          terminalSessionId: 'terminal_1',
+          data: 'after',
+          outputEra: 0,
+          seq: 2,
+          processName: 'zsh',
+        },
+      }),
+    )
+    bufferedSocket.send(
+      JSON.stringify({
+        type: 'output',
+        event: {
+          terminalRuntimeSessionId: 's_2',
+          terminalSessionId: 'terminal_2',
+          data: 'other-session',
+          outputEra: 0,
+          seq: 1,
+          processName: 'zsh',
+        },
+      }),
+    )
+
+    bufferedSocket.resume({ terminalRuntimeSessionId: 's_1', outputEra: 0, seq: 1 })
+
+    expect(rawSocket.send).toHaveBeenCalledTimes(2)
+    const messages = rawSocket.send.mock.calls.map(([payload]) => JSON.parse(String(payload)))
+    expect(messages.map((message) => message.event.data)).toEqual(['after', 'other-session'])
+  })
+
   test('broadcastToUser fans out to every clientId sharing the same userId', () => {
     const broker = createBroker()
     const electronSocket = { send: vi.fn(), close: vi.fn() }

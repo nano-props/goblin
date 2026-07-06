@@ -1,4 +1,5 @@
 import { BufferedTerminalSocket } from '#/server/terminal/buffered-terminal-socket.ts'
+import type { TerminalOutputFlushBoundary } from '#/server/terminal/buffered-terminal-socket.ts'
 import type {
   TerminalSocketRequestAction,
   TerminalSocketRequestInputs,
@@ -105,7 +106,7 @@ export async function handleTerminalRealtimeRequestMessage(
   if (!sendRealtimeResponse(socket, response)) {
     bufferedSocket?.deactivate()
   }
-  if (shouldPauseRealtimeRequest(message.action)) bufferedSocket?.resume()
+  if (shouldPauseRealtimeRequest(message.action)) bufferedSocket?.resume(outputFlushBoundaryFromResponse(response))
 }
 
 function sendRealtimeResponse(socket: TerminalRealtimeSocket, message: TerminalSocketResponseMessage): boolean {
@@ -131,4 +132,16 @@ function sendRealtimeResponse(socket: TerminalRealtimeSocket, message: TerminalS
 // response settles.
 export function shouldPauseRealtimeRequest(action: TerminalSocketRequestAction): boolean {
   return action === 'attach' || action === 'restart' || action === 'create' || action === 'takeover'
+}
+
+function outputFlushBoundaryFromResponse(message: TerminalSocketResponseMessage): TerminalOutputFlushBoundary | null {
+  if (!message.ok) return null
+  if (message.action !== 'attach' && message.action !== 'restart' && message.action !== 'create') return null
+  const payload = message.payload
+  if (!payload.ok) return null
+  return {
+    terminalRuntimeSessionId: payload.terminalRuntimeSessionId,
+    outputEra: payload.outputEra,
+    seq: payload.snapshotSeq,
+  }
 }

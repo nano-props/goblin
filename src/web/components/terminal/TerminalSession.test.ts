@@ -1393,10 +1393,11 @@ describe('TerminalSession', () => {
 
     expect(term.write).toHaveBeenCalledWith('rehydrated', expect.any(Function))
 
-    // After the term.write callback fires, the field is
-    // cleared. The mock invokes the callback via queueMicrotask, so
-    // draining microtasks is enough to observe the post-callback state.
-    await flushResizeDispatch()
+    // After the render queue observes the term.write callback, the
+    // field is cleared. The queue adds one promise boundary on top of
+    // xterm's callback, so wait for the observable state instead of a
+    // fixed microtask count.
+    await flushUntil(() => hydratedSnapshot(session).snapshot.length === 0)
     expect(hydratedSnapshot(session)).toEqual({ snapshot: '', snapshotSeq: 0, outputEra: 0 })
   })
 
