@@ -97,6 +97,7 @@ export class TerminalSessionRuntime {
   ): boolean {
     this.pendingRestartTerminalRuntimeSessionId = null
     this.terminalRuntimeSessionId = result.terminalRuntimeSessionId
+    this.state.setLastAppliedOutputSeq(result.snapshotSeq)
     return this.state.applyOpenResult({
       phase: result.phase,
       message: result.message,
@@ -119,11 +120,14 @@ export class TerminalSessionRuntime {
     controllerStatus: TerminalIdentityViewModel['controllerStatus']
     canonicalCols: number
     canonicalRows: number
+    snapshotSeq?: number
   }): boolean {
     const sessionChanged = this.terminalRuntimeSessionId !== input.terminalRuntimeSessionId
     this.pendingRestartTerminalRuntimeSessionId = null
     this.restartOnStart = false
     this.terminalRuntimeSessionId = input.terminalRuntimeSessionId
+    const snapshotSeq = input.snapshotSeq ?? (sessionChanged ? 0 : undefined)
+    if (snapshotSeq !== undefined) this.state.setLastAppliedOutputSeq(snapshotSeq)
     const metadataChanged = this.state.applyOpenResult({
       phase: input.phase,
       message: input.message,
@@ -185,8 +189,10 @@ export class TerminalSessionRuntime {
 
   handleOutput(event: TerminalOutputEvent): { changed: boolean; output: string | null } {
     if (event.terminalRuntimeSessionId !== this.terminalRuntimeSessionId) return { changed: false, output: null }
+    if (this.state.isOutputAlreadyApplied(event)) return { changed: false, output: null }
     const changed = this.state.setProcessName(event.processName)
     if (this.state.captureReplayOutput(event)) return { changed, output: null }
+    this.state.advanceLastAppliedOutputSeq(event.seq)
     return { changed, output: event.data }
   }
 

@@ -376,6 +376,9 @@ export class TerminalSession {
   hydrate(input: TerminalSessionHydrationInput): void {
     const previousTerminalRuntimeSessionId = this.runtime.currentTerminalRuntimeSessionId()
     this.hydratedSnapshot = { snapshot: input.snapshot, snapshotSeq: input.snapshotSeq }
+    const snapshotBecomesLocalBaseline =
+      terminalSnapshotHasOutput(input.snapshot, input.snapshotSeq) &&
+      (previousTerminalRuntimeSessionId !== input.terminalRuntimeSessionId || !this.view.currentTerminal())
     const changed = this.runtime.hydrateRepoSession({
       terminalRuntimeSessionId: input.terminalRuntimeSessionId,
       phase: input.phase,
@@ -386,6 +389,7 @@ export class TerminalSession {
       controllerStatus: input.controllerStatus,
       canonicalCols: input.canonicalCols,
       canonicalRows: input.canonicalRows,
+      ...(snapshotBecomesLocalBaseline ? { snapshotSeq: input.snapshotSeq } : {}),
     })
     this.syncExternalCommandGate(
       input.terminalRuntimeSessionId,

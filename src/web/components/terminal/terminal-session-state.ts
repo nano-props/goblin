@@ -32,14 +32,17 @@ export class TerminalSessionState {
     canonicalSize: { cols: 0, rows: 0 },
     takeoverPending: false,
   }
-  /** Client-only replay bookkeeping used to merge buffered output around
-   *  attaches/replays. This is transient buffering, not server runtime
-   *  identity and not persisted workspace state. */
-  private replayBufferState: {
+  /** Client-only output sequencing used to merge buffered output around
+   *  attaches/replays. `lastAppliedOutputSeq` is the local view's highest
+   *  applied server-output sequence; replay fields are transient buffering.
+   *  None of this is server runtime identity or persisted workspace state. */
+  private outputSequencingState: {
+    lastAppliedOutputSeq: number
     replayBoundarySeq: number | null
     replayPendingOutput: TerminalOutputEvent[]
     replayGeneration: number
   } = {
+    lastAppliedOutputSeq: 0,
     replayBoundarySeq: null,
     replayPendingOutput: [],
     replayGeneration: 0,
@@ -219,57 +222,79 @@ export class TerminalSessionState {
     return true
   }
 
+  setLastAppliedOutputSeq(seq: number): void {
+    this.outputSequencingState.lastAppliedOutputSeq = normalizeOutputSeq(seq)
+    this.outputSequencingState.replayPendingOutput = this.outputSequencingState.replayPendingOutput.filter(
+      (event) => event.seq > this.outputSequencingState.lastAppliedOutputSeq,
+    )
+  }
+
+  advanceLastAppliedOutputSeq(seq: number): void {
+    this.outputSequencingState.lastAppliedOutputSeq = Math.max(
+      this.outputSequencingState.lastAppliedOutputSeq,
+      normalizeOutputSeq(seq),
+    )
+  }
+
+  isOutputAlreadyApplied(event: TerminalOutputEvent): boolean {
+    return event.seq <= this.outputSequencingState.lastAppliedOutputSeq
+  }
+
   // Updates the replay boundary. The pending-output buffer is
   // preserved across calls, so a preload window (server snapshot's
   // seq) followed by a post-attach window (new server snapshot's seq)
   // shares the same buffer; the post-attach `finishReplay` filters
   // by the new boundary.
   beginReplay(replaySeq: number): number {
-    this.replayBufferState.replayBoundarySeq = replaySeq
-    this.replayBufferState.replayGeneration += 1
-    return this.replayBufferState.replayGeneration
+    this.outputSequencingState.replayBoundarySeq = replaySeq
+    this.outputSequencingState.replayGeneration += 1
+    return this.outputSequencingState.replayGeneration
   }
 
   captureReplayOutput(event: TerminalOutputEvent): boolean {
-    if (this.replayBufferState.replayBoundarySeq === null) return false
-    this.replayBufferState.replayPendingOutput.push(event)
+    if (this.outputSequencingState.replayBoundarySeq === null) return false
+    this.outputSequencingState.replayPendingOutput.push(event)
     return true
   }
 
   isReplaying(): boolean {
-    return this.replayBufferState.replayBoundarySeq !== null
+    return this.outputSequencingState.replayBoundarySeq !== null
   }
 
   finishReplay(replayGeneration?: number): TerminalOutputEvent[] {
-    if (replayGeneration !== undefined && this.replayBufferState.replayGeneration !== replayGeneration) {
+    if (replayGeneration !== undefined && this.outputSequencingState.replayGeneration !== replayGeneration) {
       return []
     }
-    const replaySeq = this.replayBufferState.replayBoundarySeq
-    const pendingOutput = this.replayBufferState.replayPendingOutput.splice(0)
-    this.replayBufferState.replayBoundarySeq = null
+    const replaySeq = this.outputSequencingState.replayBoundarySeq
+    const pendingOutput = this.outputSequencingState.replayPendingOutput.splice(0)
+    this.outputSequencingState.replayBoundarySeq = null
     if (replaySeq === null) return []
-    return pendingOutput.filter((event) => event.seq > replaySeq)
+    const output = pendingOutput.filter((event) => event.seq > replaySeq)
+    const lastOutputSeq = output.reduce((seq, event) => Math.max(seq, event.seq), replaySeq)
+    this.advanceLastAppliedOutputSeq(lastOutputSeq)
+    return output
   }
 
   // Clears the replay buffer and boundary without queueing to the
   // term or appending to the output summary. Cheaper than
   // `finishReplay` because it skips the splice + filter.
   discardReplay(replayGeneration?: number): void {
-    if (replayGeneration !== undefined && this.replayBufferState.replayGeneration !== replayGeneration) {
+    if (replayGeneration !== undefined && this.outputSequencingState.replayGeneration !== replayGeneration) {
       return
     }
-    this.replayBufferState.replayBoundarySeq = null
-    this.replayBufferState.replayPendingOutput = []
+    this.outputSequencingState.replayBoundarySeq = null
+    this.outputSequencingState.replayPendingOutput = []
   }
 
   resetTransientState(): boolean {
     const hadReplay =
-      this.replayBufferState.replayBoundarySeq !== null || this.replayBufferState.replayPendingOutput.length > 0
+      this.outputSequencingState.replayBoundarySeq !== null ||
+      this.outputSequencingState.replayPendingOutput.length > 0
     const hadSearch = this.transientViewState.searchResult !== null
     const hadProgress = this.transientViewState.progressState !== null
     const changed = hadReplay || hadSearch || hadProgress
-    this.replayBufferState.replayBoundarySeq = null
-    this.replayBufferState.replayPendingOutput = []
+    this.outputSequencingState.replayBoundarySeq = null
+    this.outputSequencingState.replayPendingOutput = []
     this.transientViewState.searchResult = null
     this.transientViewState.progressState = null
     return changed
@@ -329,4 +354,9 @@ function normalizeTerminalTitle(title: string | null | undefined): string | null
   if (typeof title !== 'string') return null
   const normalized = title.replace(/\s+/g, ' ').trim()
   return normalized.length > 0 ? normalized : null
+}
+
+function normalizeOutputSeq(seq: number): number {
+  if (!Number.isFinite(seq)) return 0
+  return Math.max(0, Math.floor(seq))
 }

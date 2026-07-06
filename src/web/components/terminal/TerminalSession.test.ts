@@ -2163,6 +2163,40 @@ describe('TerminalSession', () => {
     expect(xtermMocks.terminals[0]!.write).toHaveBeenCalledWith('tail', expect.any(Function))
   })
 
+  test('does not write realtime output already covered by the attached snapshot', async () => {
+    terminalCalls.attach.mockResolvedValueOnce(
+      attachResult('pty_session_1_aaaaaaaaa', { snapshot: 'prompt', snapshotSeq: 1 }),
+    )
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn())
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    const term = xtermMocks.terminals[0]!
+    term.write.mockClear()
+
+    session.handleOutput({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'session-1',
+      data: 'prompt',
+      seq: 1,
+      processName: 'zsh',
+    })
+    session.handleOutput({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'session-1',
+      data: 'next',
+      seq: 2,
+      processName: 'zsh',
+    })
+    await flushTerminalStart()
+
+    expect(term.write).toHaveBeenCalledTimes(1)
+    expect(term.write).toHaveBeenCalledWith('next')
+  })
+
   test('batches terminal output writes on animation frames', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)

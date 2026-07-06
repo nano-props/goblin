@@ -96,6 +96,118 @@ describe('TerminalSessionRuntime', () => {
     ])
   })
 
+  test('drops realtime output already covered by an attach snapshot outside replay', () => {
+    const runtime = new TerminalSessionRuntime()
+    runtime.applyAttachResult(
+      {
+        ok: true,
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        snapshot: 'prompt',
+        snapshotSeq: 1,
+        processName: 'zsh',
+        canonicalTitle: null,
+        phase: 'open',
+        message: null,
+        controller: { clientId: 'client_local', status: 'connected' },
+        role: 'controller',
+        controllerStatus: 'connected',
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+      { cols: 100, rows: 30 },
+    )
+
+    expect(
+      runtime.handleOutput({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalSessionId: 'session-1',
+        data: 'prompt',
+        seq: 1,
+        processName: 'zsh',
+      }),
+    ).toEqual({ changed: false, output: null })
+    expect(
+      runtime.handleOutput({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalSessionId: 'session-1',
+        data: 'next',
+        seq: 2,
+        processName: 'zsh',
+      }),
+    ).toEqual({ changed: false, output: 'next' })
+  })
+
+  test('keeps output sequencing across metadata hydration and resets it when sessions change', () => {
+    const runtime = new TerminalSessionRuntime()
+    runtime.applyAttachResult(
+      {
+        ok: true,
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        snapshot: 'prompt',
+        snapshotSeq: 1,
+        processName: 'zsh',
+        canonicalTitle: null,
+        phase: 'open',
+        message: null,
+        controller: { clientId: 'client_local', status: 'connected' },
+        role: 'controller',
+        controllerStatus: 'connected',
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+      { cols: 100, rows: 30 },
+    )
+
+    expect(
+      runtime.handleOutput({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalSessionId: 'session-1',
+        data: 'next',
+        seq: 2,
+        processName: 'zsh',
+      }),
+    ).toEqual({ changed: false, output: 'next' })
+    runtime.hydrateRepoSession({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      phase: 'open',
+      message: null,
+      processName: 'zsh',
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalCols: 120,
+      canonicalRows: 40,
+    })
+    expect(
+      runtime.handleOutput({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalSessionId: 'session-1',
+        data: 'next-again',
+        seq: 2,
+        processName: 'zsh',
+      }),
+    ).toEqual({ changed: false, output: null })
+
+    runtime.hydrateRepoSession({
+      terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
+      phase: 'open',
+      message: null,
+      processName: 'zsh',
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalCols: 120,
+      canonicalRows: 40,
+    })
+    expect(
+      runtime.handleOutput({
+        terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
+        terminalSessionId: 'session-1',
+        data: 'new-session-output',
+        seq: 1,
+        processName: 'zsh',
+      }),
+    ).toEqual({ changed: false, output: 'new-session-output' })
+  })
+
   test('drainReplay discards the replay buffer without surfacing captured events', () => {
     // The error / cancellation path in `TerminalSession` calls
     // `drainReplay` to clear the preload's replay window when the
