@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-export const DEFAULT_LOADING_DELAY_MS = 150
-export const DEFAULT_MIN_LOADING_VISIBLE_MS = 300
+export const DEFAULT_LOADING_DELAY_MS = 120
+export const DEFAULT_MIN_LOADING_VISIBLE_MS = 250
 
 interface LoadingVisibilityOptions {
   delayMs?: number
