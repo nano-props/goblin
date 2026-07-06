@@ -6,8 +6,8 @@
 //   - Lazy: opens on the first subscriber, closes when the last
 //     subscriber unsubscribes.
 //   - Auto-reconnects with a fixed delay after an unexpected close.
-//   - Tracks a `socketGeneration` so a stale socket's events (open
-//     / message / close) can never win against a fresher one.
+//   - Uses the shared WebSocket lifecycle so stale socket events and
+//     idle-close intent are scoped to the active socket generation.
 //   - Shuts down cleanly when the app quits.
 //
 // The two consumers today are
@@ -20,6 +20,7 @@ import { isAppQuitting, subscribeAppQuitting } from '#/web/app-lifecycle.ts'
 import { resolveWebSocketProtocol } from '#/web/lib/websocket-url.ts'
 import { ACCESS_TOKEN_QUERY } from '#/shared/access-token.ts'
 import { resolveClientServerConfig } from '#/web/lib/server-config.ts'
+import { createWebSocketLifecycle } from '#/web/lib/websocket-lifecycle.ts'
 
 export interface ServerWebSocketIngressConfig<T> {
   /** WebSocket path on the server, e.g. `/ws/invalidation`. */
@@ -41,10 +42,36 @@ export function createServerWebSocketIngress<T>(config: ServerWebSocketIngressCo
   const { path, parseMessage, reconnectDelayMs = 300 } = config
 
   const listeners = new Set<(message: T) => void>()
-  let socket: WebSocket | null = null
-  let manualSocketClose = false
-  let socketGeneration = 0
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+
+  const socketLifecycle = createWebSocketLifecycle({
+    resolveConnection() {
+      const server = resolveClientServerConfig()
+      if (!server) return null
+      return { url: createSocketUrl(server.url, server.accessToken || null) }
+    },
+    createSocket(connection) {
+      return new WebSocket(connection.url)
+    },
+    shouldOpen() {
+      return typeof WebSocket !== 'undefined' && listeners.size > 0 && !isAppQuitting()
+    },
+    shouldKeepOpen() {
+      return listeners.size > 0
+    },
+    onMessage(event) {
+      const message = parseMessage(event.data)
+      if (message === null || message === undefined) return
+      for (const listener of listeners) listener(message)
+    },
+    onDisconnect(_entry, context) {
+      if (context.idleClose) {
+        if (listeners.size > 0) ensureSocket()
+        return
+      }
+      scheduleReconnect()
+    },
+  })
 
   function createSocketUrl(baseUrl: string, accessToken: string | null): string {
     const httpUrl = new URL(path, baseUrl)
@@ -72,61 +99,19 @@ export function createServerWebSocketIngress<T>(config: ServerWebSocketIngressCo
   }
 
   function ensureSocket(): void {
-    const server = resolveClientServerConfig()
-    if (!server || typeof WebSocket === 'undefined' || socket || listeners.size === 0 || isAppQuitting()) return
     clearReconnectTimer()
-    manualSocketClose = false
-    const generation = (socketGeneration += 1)
-    const currentSocket = new WebSocket(createSocketUrl(server.url, server.accessToken || null))
-    socket = currentSocket
-    currentSocket.addEventListener('open', () => {
-      if (socket !== currentSocket || socketGeneration !== generation) return
-      if (manualSocketClose && listeners.size === 0) {
-        try {
-          currentSocket.close()
-        } catch {}
-      }
-    })
-    currentSocket.addEventListener('message', (event) => {
-      if (socket !== currentSocket || socketGeneration !== generation) return
-      const message = parseMessage(event.data)
-      if (message === null || message === undefined) return
-      for (const listener of listeners) listener(message)
-    })
-    const cleanup = () => {
-      if (socket !== currentSocket || socketGeneration !== generation) return
-      const wasManual = manualSocketClose
-      socket = null
-      manualSocketClose = false
-      if (wasManual) {
-        if (listeners.size > 0) ensureSocket()
-        return
-      }
-      scheduleReconnect()
-    }
-    currentSocket.addEventListener('close', cleanup)
-    currentSocket.addEventListener('error', cleanup)
+    socketLifecycle.ensureSocket()
   }
 
   function maybeCloseSocket(): void {
-    if (listeners.size > 0 || !socket) return
-    manualSocketClose = true
+    if (listeners.size > 0) return
     clearReconnectTimer()
-    if (socket.readyState === WebSocket.CONNECTING) return
-    try {
-      socket.close()
-    } catch {}
+    socketLifecycle.requestIdleClose()
   }
 
   function closeSocketForQuit(): void {
-    manualSocketClose = true
     clearReconnectTimer()
-    const currentSocket = socket
-    socket = null
-    if (!currentSocket) return
-    try {
-      currentSocket.close()
-    } catch {}
+    socketLifecycle.closeAndForget()
   }
 
   subscribeAppQuitting(closeSocketForQuit)
@@ -134,7 +119,7 @@ export function createServerWebSocketIngress<T>(config: ServerWebSocketIngressCo
   return {
     subscribe(listener) {
       listeners.add(listener)
-      manualSocketClose = false
+      socketLifecycle.cancelIdleClose()
       ensureSocket()
       return () => {
         listeners.delete(listener)
@@ -143,14 +128,8 @@ export function createServerWebSocketIngress<T>(config: ServerWebSocketIngressCo
     },
     resetForTests() {
       listeners.clear()
-      manualSocketClose = false
       clearReconnectTimer()
-      if (socket) {
-        try {
-          socket.close()
-        } catch {}
-      }
-      socket = null
+      socketLifecycle.closeAndForget()
     },
   }
 }
