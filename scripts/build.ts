@@ -169,7 +169,7 @@ function planDarwin(): PlatformPlan {
       const candidate = path.join(repoRoot, 'release', hostDir, `${APP_NAME}.app`)
       return existsSync(candidate) ? candidate : null
     },
-    installDestination(hostArch) {
+    installDestination(_hostArch) {
       const appsDir = path.join(os.homedir(), 'Applications')
       mkdirSync(appsDir, { recursive: true })
       return path.join(appsDir, `${APP_NAME}.app`)

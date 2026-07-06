@@ -43,7 +43,6 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
-  const compact = useIsCompactUi()
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay />

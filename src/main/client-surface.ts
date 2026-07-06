@@ -12,15 +12,14 @@ import {
 import { configureTrustedBrowserWindow } from '#/main/window-security.ts'
 
 interface AttachClientSurfaceWindowOptions {
-  logLabel: string
   surface: ClientSurfaceSpec
 }
 
 export function attachClientSurfaceWindow(
   win: BrowserWindow,
-  { logLabel, surface }: AttachClientSurfaceWindowOptions,
+  { surface }: AttachClientSurfaceWindowOptions,
 ): void {
-  configureTrustedBrowserWindow(win, logLabel)
+  configureTrustedBrowserWindow(win)
   registerClientWindowSurface(win, surface)
 }
 

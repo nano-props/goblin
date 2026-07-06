@@ -177,7 +177,7 @@ describe('useSessionPersistence', () => {
 
   test('persists explicitly closed workspace pane tabs as empty arrays', () => {
     const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
-    const repo = seedRepoWithReadModelForTest({
+    seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       currentBranchName: 'feature/worktree',

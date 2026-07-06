@@ -143,7 +143,7 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
       role = next
     },
 
-    async authorize(action) {
+    async authorize(_action) {
       if (role === 'controller') return { kind: 'allowed' }
       if (role === 'unowned') return { kind: 'denied', reason: 'session-closed' }
       // role === 'viewer': auto-promote

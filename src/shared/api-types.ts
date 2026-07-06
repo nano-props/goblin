@@ -15,15 +15,12 @@ import type {
 } from '#/shared/git-types.ts'
 import type { WorkspacePaneSessionTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
-import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type {
-  EditorApp,
   EditorAppAvailability,
   Lang,
   LangPref,
   ResolvedTheme,
   UserSettings,
-  TerminalApp,
   TerminalAppAvailability,
   ThemePref,
 } from '#/shared/settings.ts'
@@ -34,7 +31,6 @@ import type {
   RepoSessionEntry,
   RemoteRepoTarget,
   ResolvedRemoteTarget,
-  SshConfigHost,
   SshConfigHostsResult,
 } from '#/shared/remote-repo.ts'
 import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidation.ts'
@@ -364,7 +360,6 @@ export type NativeHostIpcPath = {
   [NS in keyof NativeHostIpcHandlers]: `${Extract<NS, string>}.${Extract<keyof NativeHostIpcHandlers[NS], string>}`
 }[keyof NativeHostIpcHandlers]
 
-const EmptyInput = v.optional(v.void())
 const FiniteNumber = v.pipe(v.number(), v.finite())
 const PortNumber = v.pipe(FiniteNumber, v.integer(), v.minValue(1), v.maxValue(65535))
 

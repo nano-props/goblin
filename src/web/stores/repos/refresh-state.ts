@@ -164,7 +164,6 @@ export function applyPullRequestRefreshErrorState(
   r: RepoState,
   branchNames: string[],
   existingBranches: ReadonlySet<string>,
-  mode: PullRequestFetchMode,
   message: string,
 ): void {
   finishPullRequestDataLoadError(r.dataLoads.pullRequests, message)

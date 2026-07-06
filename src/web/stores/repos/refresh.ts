@@ -148,14 +148,13 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     id: string,
     repoInstanceId: string,
     branchNames: string[],
-    mode: PullRequestFetchMode,
     err: unknown,
   ): void {
     const message = err instanceof Error ? err.message : String(err)
     const existingBranches = currentBranchNamesFromReadModel(id, repoInstanceId)
     refreshPullRequestsLog.warn('failed', { err })
     updateIfFresh(set, id, repoInstanceId, (r) => {
-      applyPullRequestRefreshErrorState(r, branchNames, existingBranches, mode, message)
+      applyPullRequestRefreshErrorState(r, branchNames, existingBranches, message)
       r.events = appendRepoEvent(r.events, errorEvent(message))
     })
   }
@@ -245,7 +244,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
           applyPullRequestRefreshStale(id, repoInstanceId, branchNames, mode, ctx.operationId)
         },
         onError: (message) => {
-          applyPullRequestRefreshError(id, repoInstanceId, branchNames, mode, message)
+          applyPullRequestRefreshError(id, repoInstanceId, branchNames, message)
         },
       })
     },

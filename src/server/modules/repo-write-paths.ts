@@ -19,7 +19,7 @@ import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 import { checkGitAvailable } from '#/system/git/git-exec.ts'
 import { isValidCwd, isValidRepoLocator, toSafeRepoLocator } from '#/shared/input-validation.ts'
 import { isRepoWorktreeBootstrapConfigTrusted } from '#/shared/repo-settings.ts'
-import { type CloneRepoResult, type ProbeResult } from '#/shared/api-types.ts'
+import { type CloneRepoResult } from '#/shared/api-types.ts'
 import { normalizeCreateWorktreeInput, type CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import { constants as fsConstants, promises as fs } from 'node:fs'
 import type { WorktreeBootstrapDecision } from '#/shared/worktree-bootstrap-summary.ts'
@@ -35,17 +35,6 @@ const INVALIDATION_SOURCE_TOKEN_RE = /^[A-Za-z0-9_-]{1,128}$/
 const activeCloneControllers = new Map<string, AbortController>()
 const activeBackgroundFetches = new Map<string, Promise<{ ok: boolean; message: string }>>()
 const createWorktreeOperationQueuesByRepo = new Map<string, PQueue>()
-
-async function probeReadableDirectory(cwd: string): Promise<ProbeAvailability> {
-  try {
-    const stat = await fs.stat(cwd)
-    if (!stat.isDirectory()) return { ok: false, message: 'error.path-not-directory' }
-    await fs.access(cwd, fsConstants.R_OK)
-    return { ok: true }
-  } catch (err) {
-    return { ok: false, message: classifyPathProbeError(err) }
-  }
-}
 
 async function probeWritableDirectory(cwd: string): Promise<ProbeAvailability> {
   try {

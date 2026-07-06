@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
-import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 
 const mocks = vi.hoisted(() => ({
   probeRepo: vi.fn(),
@@ -81,28 +80,6 @@ vi.mock('#/server/common/identity.ts', () => ({
 beforeEach(() => {
   vi.clearAllMocks()
 })
-
-const terminalHostStub: ServerTerminalHost = {
-  isValidClientId: ((value: unknown): value is string => typeof value === 'string') as never,
-  isClientOnline: vi.fn(() => true),
-  getDiagnostics: vi.fn(() => ({}) as never),
-  registerSocket: vi.fn(),
-  unregisterSocket: vi.fn(),
-  attach: vi.fn(async () => ({ ok: true }) as never),
-  restart: vi.fn(async () => ({ ok: true }) as never),
-  write: vi.fn(async () => ({ ok: true }) as never),
-  resize: vi.fn(async () => ({ ok: true }) as never),
-  takeover: vi.fn(async () => ({ ok: true }) as never),
-  close: vi.fn(async () => ({ ok: true }) as never),
-  listSessions: vi.fn(async () => []),
-  listWorkspaceTabs: vi.fn(async () => []),
-  create: vi.fn(async () => ({ ok: true }) as never),
-  replaceTabs: vi.fn(async () => []),
-  updateTabs: vi.fn(async () => []),
-  prune: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
-  handleRealtimeMessage: vi.fn(),
-  shutdown: vi.fn(),
-}
 
 function createTestRepoRoutes() {
   return createRepoRoutes()

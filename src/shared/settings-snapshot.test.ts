@@ -4,7 +4,6 @@ import {
   buildRuntimeSettingsSnapshot,
   buildSettingsSnapshot,
   restorableWorkspaceSessionStateFromSettingsSnapshot,
-  runtimeRecentReposStateFromSettingsSnapshot,
   runtimeSettingsSnapshotFromSettingsSnapshot,
 } from '#/shared/settings-snapshot.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
@@ -105,9 +104,6 @@ describe('settings snapshot partitions', () => {
 
     expect(runtimeSettingsSnapshotFromSettingsSnapshot(snapshot)).toMatchObject({
       globalShortcutRegistered: false,
-    })
-    expect(runtimeRecentReposStateFromSettingsSnapshot(snapshot)).toEqual({
-      recentRepos: [{ kind: 'local', id: '/tmp/repo-b' }],
     })
     expect(restorableWorkspaceSessionStateFromSettingsSnapshot(snapshot)).toEqual({
       openRepoEntries: [{ kind: 'local', id: '/tmp/repo-b' }],

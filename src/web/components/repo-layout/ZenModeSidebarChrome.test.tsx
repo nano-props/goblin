@@ -153,7 +153,7 @@ describe('ZenModeSidebarChrome', () => {
   })
 
   test('keeps the resize visual full-height while the hit target stays below the draggable reveal titlebar', () => {
-    const { container } = renderInJsdom(
+    renderInJsdom(
       <ZenModeSidebarChrome
         repoId="/tmp/repo"
         zenModeToggleEnabled

@@ -59,7 +59,7 @@ function updateRepoForTest(
   })
 }
 
-function setSelectionForTest(currentBranchName: string, branchViewMode: BranchViewMode) {
+function setBranchViewModeForTest(branchViewMode: BranchViewMode) {
   updateRepoForTest((repo) => {
     repo.ui.branchViewMode = branchViewMode
   })
@@ -684,7 +684,7 @@ describe('runBranchAction', () => {
   })
 
   test('keeps the current branch selection after creating a worktree', async () => {
-    setSelectionForTest('feature/a', 'all')
+    setBranchViewModeForTest('all')
     installSuccessfulCreateWorktreeBridge()
 
     await useReposStore.getState().runBranchAction(REPO_ID, createWorktreeAction(), { repoInstanceId: 'repo-instance-test' })
@@ -694,7 +694,7 @@ describe('runBranchAction', () => {
   })
 
   test('keeps worktrees filtering after creating a worktree', async () => {
-    setSelectionForTest('feature/a', 'worktrees')
+    setBranchViewModeForTest('worktrees')
     installSuccessfulCreateWorktreeBridgeWithExistingWorktree()
 
     await useReposStore.getState().runBranchAction(REPO_ID, createWorktreeAction(), { repoInstanceId: 'repo-instance-test' })
@@ -707,7 +707,7 @@ describe('runBranchAction', () => {
     ['failed', { ok: false, message: 'error.invalid-path' }],
     ['cancelled', { ok: false, message: 'cancelled' }],
   ])('keeps the current branch selection when create worktree is %s', async (_label, result) => {
-    setSelectionForTest('feature/a', 'worktrees')
+    setBranchViewModeForTest('worktrees')
     installGoblinTestBridge({
       'repo.createWorktree': async () => result,
     })
@@ -719,7 +719,7 @@ describe('runBranchAction', () => {
   })
 
   test('does not let stale create worktree refresh results change selection', async () => {
-    setSelectionForTest('feature/a', 'worktrees')
+    setBranchViewModeForTest('worktrees')
     installSuccessfulCreateWorktreeBridge({
       onSnapshot: () => {
         seedRepoWithReadModelForTest({
@@ -728,7 +728,7 @@ describe('runBranchAction', () => {
           branches: [createRepoBranch('feature/a'), createRepoBranch('feature/new')],
           currentBranchName: 'feature/a',
         })
-        setSelectionForTest('feature/a', 'worktrees')
+        setBranchViewModeForTest('worktrees')
       },
     })
 
@@ -782,7 +782,7 @@ describe('runBranchAction', () => {
   })
 
   test('keeps selection after non-create branch actions refresh', async () => {
-    setSelectionForTest('feature/a', 'worktrees')
+    setBranchViewModeForTest('worktrees')
     installGoblinTestBridge({
       'repo.deleteBranch': async () => ({ ok: true, message: 'ok' }),
       'repo.snapshot': async () => ({

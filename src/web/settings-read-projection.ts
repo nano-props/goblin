@@ -3,12 +3,10 @@ import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import { useSettingsSnapshotQuery } from '#/web/settings-queries.ts'
 import type {
   ExternalAppsSnapshot,
-  RuntimeRecentReposState,
   RuntimeSettingsSnapshot,
   SettingsSnapshot,
 } from '#/shared/api-types.ts'
 import {
-  runtimeRecentReposStateFromSettingsSnapshot,
   runtimeSettingsSnapshotFromSettingsSnapshot,
 } from '#/shared/settings-snapshot.ts'
 
@@ -26,24 +24,9 @@ export function currentRuntimeSettingsSnapshot(): RuntimeSettingsSnapshot | unde
   return runtimeSettingsSnapshotOrUndefined(currentSettingsSnapshot())
 }
 
-function runtimeRecentReposStateOrUndefined(
-  snapshot: SettingsSnapshot | undefined,
-): RuntimeRecentReposState | undefined {
-  return snapshot ? runtimeRecentReposStateFromSettingsSnapshot(snapshot) : undefined
-}
-
-function currentRuntimeRecentReposState(): RuntimeRecentReposState | undefined {
-  return runtimeRecentReposStateOrUndefined(currentSettingsSnapshot())
-}
-
 export function useRuntimeSettingsSnapshot(): RuntimeSettingsSnapshot | undefined {
   const { data } = useSettingsSnapshotQuery()
   return runtimeSettingsSnapshotOrUndefined(data)
-}
-
-function useRuntimeRecentReposState(): RuntimeRecentReposState | undefined {
-  const { data } = useSettingsSnapshotQuery()
-  return runtimeRecentReposStateOrUndefined(data)
 }
 
 export function readRuntimeShortcutSettings(data: RuntimeSettingsSnapshot | undefined) {
@@ -82,5 +65,6 @@ export function readRuntimeLanSettings(data: RuntimeSettingsSnapshot | undefined
 }
 
 export function useRuntimeRecentRepos() {
-  return useRuntimeRecentReposState()?.recentRepos ?? []
+  const { data } = useSettingsSnapshotQuery()
+  return data?.recentRepos ?? []
 }

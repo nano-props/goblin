@@ -120,7 +120,7 @@ async function createPrimaryWindow(): Promise<BrowserWindow> {
   win.webContents.on('render-process-gone', (_event, details) => {
     clientNodeLog.error({ details }, 'process gone')
   })
-  attachClientSurfaceWindow(win, { logLabel: 'window', surface: PRIMARY_WINDOW_SURFACE })
+  attachClientSurfaceWindow(win, { surface: PRIMARY_WINDOW_SURFACE })
   const { url } = createBrowserEntryUrl({ routePath: '/' })
   allowBrowserWindowEntryUrl(win, url.toString())
   // Plant the auth cookie on the client's session BEFORE

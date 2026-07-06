@@ -146,10 +146,7 @@ function updateCheckbox(
  * action to enforce the single-dialog-at-a-time invariant without each
  * call site having to remember to null the others.
  */
-function closeOtherSlots(
-  state: BranchActionDialogsState,
-  except: BranchActionDialogKey,
-): Partial<BranchActionDialogsState> {
+function closeOtherSlots(except: BranchActionDialogKey): Partial<BranchActionDialogsState> {
   const next: Partial<Record<BranchActionDialogKey, null>> = {}
   for (const key of DIALOG_KEYS) {
     if (key !== except) {
@@ -172,14 +169,14 @@ export const useBranchActionDialogsStore = create<BranchActionDialogsStore>()((s
   ...INITIAL_STATE,
 
   openPushConfirm: (entry) =>
-    set((state) => ({
-      ...closeOtherSlots(state, 'pushConfirm'),
+    set({
+      ...closeOtherSlots('pushConfirm'),
       pushConfirm: entry,
-    })),
+    }),
 
   openDeleteConfirm: (entry) =>
     set((state) => ({
-      ...closeOtherSlots(state, 'deleteConfirm'),
+      ...closeOtherSlots('deleteConfirm'),
       deleteConfirm: entry,
       // Reset the upstream-delete checkbox on each new entry-point
       // open. Pre-PR behaviour: `setDeleteAlsoUpstream(false)` at the
@@ -192,8 +189,8 @@ export const useBranchActionDialogsStore = create<BranchActionDialogsStore>()((s
     })),
 
   openForceDeleteConfirm: (entry) =>
-    set((state) => ({
-      ...closeOtherSlots(state, 'forceDeleteConfirm'),
+    set({
+      ...closeOtherSlots('forceDeleteConfirm'),
       forceDeleteConfirm: entry,
       // Preserve all of the user's existing checkbox choices from
       // the regular `deleteConfirm` — including `deleteAlsoUpstream`.
@@ -201,7 +198,7 @@ export const useBranchActionDialogsStore = create<BranchActionDialogsStore>()((s
       // same semantics: checkbox state was shared across the regular
       // and force confirm dialogs, with only `requestDeleteBranch`
       // resetting it on entry.
-    })),
+    }),
 
   openRemoveWorktreeConfirm: (entry, options) =>
     set((state) => {
@@ -218,7 +215,7 @@ export const useBranchActionDialogsStore = create<BranchActionDialogsStore>()((s
         deleteAlsoUpstream: false,
       }
       return {
-        ...closeOtherSlots(state, 'removeConfirm'),
+        ...closeOtherSlots('removeConfirm'),
         removeConfirm: entry,
         checkboxStateByBranch: {
           ...state.checkboxStateByBranch,
@@ -228,14 +225,14 @@ export const useBranchActionDialogsStore = create<BranchActionDialogsStore>()((s
     }),
 
   openForceRemoveWorktreeConfirm: (entry) =>
-    set((state) => ({
-      ...closeOtherSlots(state, 'forceRemoveConfirm'),
+    set({
+      ...closeOtherSlots('forceRemoveConfirm'),
       forceRemoveConfirm: entry,
       // No checkbox state reset: removeAlsoDeletes / removeAlsoUpstream
       // are shared with the regular `removeConfirm` (single useState in
       // pre-PR code), and `deleteAlsoUpstream` was deliberately not
       // reset by pre-PR's `forceRemoveConfirm.openWith(target)` either.
-    })),
+    }),
 
   closeDialog: (key) =>
     set(() => {

@@ -22,16 +22,6 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-function selectBranchForTest(branch: string): void {
-  useReposStore.setState((s) => ({
-    repos: {
-      ...s.repos,
-      [REPO_ID]: replaceRepo(s.repos[REPO_ID]!, (repo) => {
-      }),
-    },
-  }))
-}
-
 function readModelBranchesForTest() {
   const repo = useReposStore.getState().repos[REPO_ID]
   return repo ? (readRepoBranchQueryProjection(repo)?.branches ?? []) : []

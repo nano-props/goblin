@@ -80,7 +80,7 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
       if ('target' in result && result.target !== undefined) return { target: result.target }
       return { error: result.error ?? 'resolve-target-error' }
     },
-    probeRemote: async (target, { signal }) => {
+    probeRemote: async (target, { signal: _signal }) => {
       const parsed = handlers['repo.probe']?.({ cwd: target.remotePath }) as
         | { ok: true; root?: string; name?: string }
         | { ok: false; message: string }

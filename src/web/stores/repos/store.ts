@@ -120,7 +120,7 @@ export const useReposStore = create<ReposStore>()(
       ...createTabOpenerActions(set),
       ...createRefreshActions(set, get),
       ...createBranchActions(set, get),
-      ...createCommitActions(set, get),
+      ...createCommitActions(set),
     }),
     {
       name: 'goblin.repos-store',

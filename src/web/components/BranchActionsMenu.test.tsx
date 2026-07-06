@@ -1,16 +1,14 @@
 // @vitest-environment jsdom
 import { userEvent } from '@testing-library/user-event'
-import { waitFor, type RenderResult } from '@testing-library/react'
+import { waitFor } from '@testing-library/react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { BranchActionsPopover } from '#/web/components/BranchActionsMenu.tsx'
 import type { BranchActionItem } from '#/web/hooks/useBranchActionItems.ts'
 
 vi.mock('#/web/stores/i18n.ts', () => ({
   useT: () => (key: string) => key,
 }))
-
-let renderResult: RenderResult | null = null
 
 beforeEach(() => {
   const win = window as typeof window & { PointerEvent?: typeof PointerEvent }
@@ -20,14 +18,8 @@ beforeEach(() => {
   globalThis.cancelAnimationFrame ??= (id: number) => window.clearTimeout(id)
 })
 
-afterEach(() => {
-  renderResult = null
-})
-
 function renderPopover(item: BranchActionItem, open?: boolean, onOpenChange?: (open: boolean) => void) {
-  renderResult = renderInJsdom(
-    <BranchActionsPopover mainItems={[item]} destructiveItems={[]} open={open} onOpenChange={onOpenChange} />,
-  )
+  renderInJsdom(<BranchActionsPopover mainItems={[item]} destructiveItems={[]} open={open} onOpenChange={onOpenChange} />)
 }
 
 describe('BranchActionsPopover', () => {

@@ -60,7 +60,6 @@ describe('repo selectors', () => {
 
   test('compares action bundles by function identity', () => {
     const fnA = () => {}
-    const fnB = () => {}
     expect(
       restorableWorkspaceLayoutStoreActionsFromStore({
         toggleZenMode: fnA as never,

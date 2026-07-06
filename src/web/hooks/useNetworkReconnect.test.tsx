@@ -293,6 +293,3 @@ describe('useNetworkReconnect', () => {
     expect(lifecycle?.kind).toBe('ready')
   })
 })
-
-const _unused = {} as ReposGet
-void _unused

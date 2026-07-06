@@ -10,11 +10,6 @@ function repoFresh(get: ReposGet, id: string, repoInstanceId: string): boolean {
   return !!repo && repo.instanceId === repoInstanceId
 }
 
-function pullRequestRefreshFailed(get: ReposGet, id: string, repoInstanceId: string): boolean {
-  const repo = get().repos[id]
-  return !!repo && repo.instanceId === repoInstanceId && repo.dataLoads.pullRequests.error !== null
-}
-
 async function refreshPullRequestSummaryAfterSnapshot(
   get: ReposGet,
   options: { id: string; repoInstanceId: string; branchNames: string[]; isSnapshotCurrent: () => boolean },

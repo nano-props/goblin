@@ -312,7 +312,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
   })
 
   test('uses the latest repo runtime instance when the repo instance changes', async () => {
-    const updateWorkspaceTabs = vi.fn(async (input: TerminalUpdateWorkspaceTabsInput) => [
+    const updateWorkspaceTabs = vi.fn(async (_input: TerminalUpdateWorkspaceTabsInput) => [
       staticEntry('status'),
       terminalEntry('session-1'),
     ])
