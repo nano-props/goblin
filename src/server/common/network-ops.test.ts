@@ -71,4 +71,63 @@ describe('server network operation registry projection', () => {
       },
     })
   })
+
+  test('caller abort stops a queued user operation while preserving the active background operation', async () => {
+    let resolveBackground!: (value: { ok: true; message: string }) => void
+    const background = runServerCancellable(
+      '/tmp/repo',
+      'background',
+      () =>
+        new Promise((resolve) => {
+          resolveBackground = resolve
+        }),
+      { operationKind: 'fetch' },
+    )
+    await vi.waitFor(() => {
+      expect(listRepoServerOperations({ repoId: '/tmp/repo' })[0]).toMatchObject({
+        kind: 'fetch',
+        phase: 'running',
+        source: 'background',
+      })
+    })
+
+    const caller = new AbortController()
+    const userTask = vi.fn(async () => ({ ok: true as const, message: 'user fetch' }))
+    const user = runServerCancellable('/tmp/repo', 'user', userTask, {
+      operationKind: 'fetch',
+      callerSignal: caller.signal,
+    })
+    await vi.waitFor(() => {
+      expect(listRepoServerOperations({ repoId: '/tmp/repo' })).toEqual(expect.arrayContaining([
+        expect.objectContaining({ source: 'user', phase: 'queued' }),
+        expect.objectContaining({ source: 'background', phase: 'running' }),
+      ]))
+    })
+
+    caller.abort()
+
+    await expect(user).resolves.toEqual({ ok: false, message: 'cancelled' })
+    expect(userTask).not.toHaveBeenCalled()
+    expect(listRepoServerOperations({ repoId: '/tmp/repo' })[0]).toMatchObject({
+      source: 'background',
+      phase: 'running',
+    })
+    expect(listRepoServerOperations({ repoId: '/tmp/repo', includeSettled: true })).toContainEqual(
+      expect.objectContaining({
+        source: 'user',
+        phase: 'failed',
+        cancellation: expect.objectContaining({
+          underlyingRequested: false,
+          lastWaitCancellationReason: 'caller-abort',
+          waitCancelledCount: 1,
+        }),
+        error: expect.objectContaining({
+          reason: 'caller-abort',
+        }),
+      }),
+    )
+
+    resolveBackground({ ok: true, message: 'background fetch' })
+    await expect(background).resolves.toEqual({ ok: true, message: 'background fetch' })
+  })
 })

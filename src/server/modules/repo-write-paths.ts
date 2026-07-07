@@ -211,6 +211,7 @@ async function runUserNetworkMutation(
     }, {
       operationKind,
       target,
+      callerSignal: signal,
     }),
     sourceToken,
   )
@@ -354,7 +355,7 @@ export async function fetchRepo(
           return await task(mergedSignal ?? networkSignal)
         })
       },
-      { operationId, operationKind: 'fetch' },
+      { operationId, operationKind: 'fetch', callerSignal: signal },
     )
     if (result.ok) publishRepoSnapshotInvalidation(cwd, sourceToken)
     return result

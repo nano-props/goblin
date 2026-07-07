@@ -2,6 +2,7 @@ import type { ExecResult } from '#/shared/git-types.ts'
 import type { NetworkOpKind, RepoServerOperationKind, RepoServerOperationTarget } from '#/shared/api-types.ts'
 import {
   beginRepoServerOperation,
+  recordRepoServerOperationWaitCancellation,
   requestRepoServerOperationCancel,
   settleRepoServerOperation,
   startRepoServerOperation,
@@ -20,9 +21,44 @@ interface RunServerCancellableOptions {
   target?: RepoServerOperationTarget | null
   repoInstanceId?: string | null
   deadlineAt?: number | null
+  callerSignal?: AbortSignal
 }
 
 const activeNetworkOps = new Map<string, ActiveNetworkOp>()
+
+async function waitForActiveNetworkOp(
+  active: ActiveNetworkOp,
+  callerSignal: AbortSignal | undefined,
+  operationId: string,
+): Promise<boolean> {
+  if (!callerSignal) {
+    await active.done
+    return true
+  }
+  if (callerSignal.aborted) {
+    recordRepoServerOperationWaitCancellation(operationId, 'caller-abort')
+    return false
+  }
+  return await new Promise<boolean>((resolve) => {
+    let settled = false
+    const cleanup = () => callerSignal.removeEventListener('abort', abort)
+    const finish = (value: boolean) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      resolve(value)
+    }
+    const abort = () => {
+      recordRepoServerOperationWaitCancellation(operationId, 'caller-abort')
+      finish(false)
+    }
+    callerSignal.addEventListener('abort', abort, { once: true })
+    active.done.then(
+      () => finish(true),
+      () => finish(true),
+    )
+  })
+}
 
 export async function runServerCancellable(
   repoId: string,
@@ -43,7 +79,12 @@ export async function runServerCancellable(
   let active = activeNetworkOps.get(repoId)
   if (active) {
     if (kind === 'user' && active.kind === 'background') {
-      await active.done
+      const canContinue = await waitForActiveNetworkOp(active, options.callerSignal, operation.id)
+      if (!canContinue) {
+        const result = { ok: false, message: 'cancelled' }
+        settleRepoServerOperation(operation.id, result)
+        return result
+      }
       active = activeNetworkOps.get(repoId)
     }
     if (active) {
