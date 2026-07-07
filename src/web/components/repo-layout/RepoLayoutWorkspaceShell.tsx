@@ -3,7 +3,7 @@ import { ZenModeSidebarChrome } from '#/web/components/repo-layout/ZenModeSideba
 import { CompactRepoWorkspace, RepoWorkspace } from '#/web/components/Layout.tsx'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 
-interface RepoWorkspaceShellProps {
+interface RepoWorkspaceShellBaseProps {
   repoId?: string
   compact: boolean
   zenMode: boolean
@@ -11,11 +11,21 @@ interface RepoWorkspaceShellProps {
   workspacePaneSize: number
   onWorkspacePaneSizeChange: (size: number) => void
   sidebarPane: ReactNode
-  zenRevealSidebarPane?: ReactNode
   repoWorkspacePane: ReactNode
   singlePaneActivePane?: 'navigator' | 'workspace'
-  zenModeToggleEnabled?: boolean
 }
+
+type RepoWorkspaceShellProps = RepoWorkspaceShellBaseProps &
+  (
+    | {
+        zenModeToggleEnabled?: true
+        zenRevealSidebarPane: ReactNode
+      }
+    | {
+        zenModeToggleEnabled: false
+        zenRevealSidebarPane?: never
+      }
+  )
 
 export function RepoLayoutWorkspaceShell({
   repoId,
@@ -72,11 +82,11 @@ export function RepoLayoutWorkspaceShell({
   return (
     <section className="relative flex min-w-0 flex-1 flex-col">
       {renderWorkspaceBody(repoWorkspacePane, sidebarPane)}
-      {!compact ? (
+      {!compact && zenModeToggleEnabled ? (
         <ZenModeSidebarChrome
           repoId={repoId}
-          sidebarPane={zenRevealSidebarPane ?? sidebarPane}
-          zenModeToggleEnabled={zenModeToggleEnabled}
+          sidebarPane={zenRevealSidebarPane}
+          zenModeToggleEnabled
           revealEnabled={zenRevealEnabled}
           sidebarSize={sidebarPaneSize}
           onSidebarSizeChange={(nextSidebarSize) => onWorkspacePaneSizeChange(100 - nextSidebarSize)}
