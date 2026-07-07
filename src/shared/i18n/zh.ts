@@ -499,6 +499,7 @@ export const zh: Record<DictKey, string> = {
   'error.repo-instance-stale': '仓库实例已失效',
   'error.not-controller': '此终端正由另一个会话控制',
   'error.network-op-in-progress': '另一个 git 网络操作正在进行中。',
+  'error.request-timeout': '请求超时，请重试。',
   'error.branch-action-wait-timeout': '等待仓库刷新完成超时。',
   'error.unknown': '未知错误',
   'error.cannot-delete-current-branch': '不能删除当前分支',

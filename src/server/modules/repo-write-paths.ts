@@ -36,6 +36,8 @@ const activeCloneControllers = new Map<string, AbortController>()
 const activeBackgroundFetches = new Map<string, Promise<{ ok: boolean; message: string }>>()
 const createWorktreeOperationQueuesByRepo = new Map<string, PQueue>()
 
+type RepoExecResult = { ok: boolean; message: string }
+
 async function probeWritableDirectory(cwd: string): Promise<ProbeAvailability> {
   try {
     const stat = await fs.stat(cwd)
@@ -152,6 +154,29 @@ async function withMergedAbortSignal<T>(
   }
 }
 
+async function waitForResultOrCallerAbort<T extends RepoExecResult>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return await promise
+  if (signal.aborted) return { ok: false, message: 'cancelled' } as T
+  return await new Promise<T>((resolve, reject) => {
+    const cleanup = () => signal.removeEventListener('abort', abort)
+    const abort = () => {
+      cleanup()
+      resolve({ ok: false, message: 'cancelled' } as T)
+    }
+    signal.addEventListener('abort', abort, { once: true })
+    promise.then(
+      (result) => {
+        cleanup()
+        resolve(result)
+      },
+      (err) => {
+        cleanup()
+        reject(err)
+      },
+    )
+  })
+}
+
 async function runUserNetworkMutation(
   cwd: string,
   signal: AbortSignal | undefined,
@@ -172,6 +197,7 @@ export async function cloneRepo(
   url: string,
   parentPath: string,
   directoryName: string,
+  signal?: AbortSignal,
 ): Promise<CloneRepoResult> {
   if (!isValidCloneOperationId(operationId)) return { ok: false, message: 'error.invalid-arguments' }
   const repoUrl = typeof url === 'string' ? url.trim() : ''
@@ -181,15 +207,20 @@ export async function cloneRepo(
     return { ok: false, message: 'error.invalid-arguments' }
   }
   if (!isValidCwd(targetParent)) return { ok: false, message: 'error.invalid-path' }
+  if (signal?.aborted) return { ok: false, message: 'cancelled' }
   const gitAvailable = await checkGitAvailable()
   if (!gitAvailable.ok) return gitAvailable
+  if (signal?.aborted) return { ok: false, message: 'cancelled' }
   const writable = await ensureWritableDirectory(targetParent)
   if (!writable.ok) return writable
+  if (signal?.aborted) return { ok: false, message: 'cancelled' }
   if (activeCloneControllers.has(operationId)) return { ok: false, message: 'error.network-op-in-progress' }
   const ctrl = new AbortController()
   activeCloneControllers.set(operationId, ctrl)
   try {
-    return await cloneGitRepo(targetParent, targetName, repoUrl, ctrl.signal)
+    return await withMergedAbortSignal([signal, ctrl.signal], async (mergedSignal) => {
+      return await cloneGitRepo(targetParent, targetName, repoUrl, mergedSignal)
+    })
   } finally {
     if (activeCloneControllers.get(operationId) === ctrl) activeCloneControllers.delete(operationId)
   }
@@ -207,9 +238,14 @@ export async function fetchRepo(
   cwd: string,
   kind: NetworkOpKind = 'user',
   sourceToken?: string,
+  signal?: AbortSignal,
 ): Promise<{ ok: boolean; message: string }> {
   async function runFetch(task: (signal: AbortSignal) => Promise<{ ok: boolean; message: string }>) {
-    const result = await runServerCancellable(cwd, kind, task)
+    const result = await runServerCancellable(cwd, kind, async (networkSignal) => {
+      return await withMergedAbortSignal([signal, networkSignal], async (mergedSignal) => {
+        return await task(mergedSignal ?? networkSignal)
+      })
+    })
     if (result.ok) publishRepoSnapshotInvalidation(cwd, sourceToken)
     return result
   }
@@ -219,12 +255,12 @@ export async function fetchRepo(
 
   if (kind === 'user') {
     const backgroundFetch = activeBackgroundFetches.get(cwd)
-    if (backgroundFetch) return await backgroundFetch
+    if (backgroundFetch) return await waitForResultOrCallerAbort(backgroundFetch, signal)
     return await executeFetch()
   }
 
   const existingBackgroundFetch = activeBackgroundFetches.get(cwd)
-  if (existingBackgroundFetch) return await existingBackgroundFetch
+  if (existingBackgroundFetch) return await waitForResultOrCallerAbort(existingBackgroundFetch, signal)
   const backgroundFetch = executeFetch().finally(() => {
     if (activeBackgroundFetches.get(cwd) === backgroundFetch) activeBackgroundFetches.delete(cwd)
   })

@@ -1,5 +1,5 @@
 import { openExternalUrl } from '#/web/app-shell-client.ts'
-import { postServerJson } from '#/web/lib/server-fetch.ts'
+import { SERVER_REQUEST_TIMEOUT_ERROR, postServerJson } from '#/web/lib/server-fetch.ts'
 import type {
   CloneRepoResult,
   PullRequestEntry,
@@ -15,6 +15,15 @@ import type { ProbeResult } from '#/shared/api-types.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 
+const REPO_REQUEST_TIMEOUT_MS = {
+  gitNetwork: 240_000,
+  clone: 360_000,
+  branchMutation: 240_000,
+  removeWorktree: 10 * 60_000,
+  worktreeCreate: 15 * 60_000,
+  patch: 15 * 60_000,
+} as const
+
 export async function probeRepo(cwd: string, signal?: AbortSignal): Promise<ProbeResult> {
   return await postServerJson('/api/repo/probe', { cwd }, { signal })
 }
@@ -25,7 +34,15 @@ export async function cloneRepository(input: {
   parentPath: string
   directoryName: string
 }): Promise<CloneRepoResult> {
-  return await postServerJson('/api/repo/clone', input)
+  try {
+    return await postServerJson('/api/repo/clone', input, { timeoutMs: REPO_REQUEST_TIMEOUT_MS.clone })
+  } catch (err) {
+    if (err instanceof Error && err.message === SERVER_REQUEST_TIMEOUT_ERROR) {
+      void abortCloneOperation(input.operationId).catch(() => {})
+      return { ok: false, message: SERVER_REQUEST_TIMEOUT_ERROR }
+    }
+    throw err
+  }
 }
 
 export async function abortCloneOperation(operationId: string): Promise<boolean> {
@@ -78,7 +95,10 @@ export async function fetchRepo(
   signal?: AbortSignal,
   sourceToken?: string,
 ): Promise<{ ok: boolean; message: string }> {
-  return await postServerJson('/api/repo/fetch', kind ? { cwd, kind, sourceToken } : { cwd, sourceToken }, { signal })
+  return await postServerJson('/api/repo/fetch', kind ? { cwd, kind, sourceToken } : { cwd, sourceToken }, {
+    signal,
+    timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
+  })
 }
 
 export async function pullRepoBranch(
@@ -88,7 +108,11 @@ export async function pullRepoBranch(
   signal?: AbortSignal,
   sourceToken?: string,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/pull', { cwd, branch, worktreePath, sourceToken }, { signal })
+  return await postServerJson(
+    '/api/repo/pull',
+    { cwd, branch, worktreePath, sourceToken },
+    { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork },
+  )
 }
 
 export async function pushRepoBranch(
@@ -97,7 +121,10 @@ export async function pushRepoBranch(
   signal?: AbortSignal,
   sourceToken?: string,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/push', { cwd, branch, sourceToken }, { signal })
+  return await postServerJson('/api/repo/push', { cwd, branch, sourceToken }, {
+    signal,
+    timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
+  })
 }
 
 export async function createRepoWorktree(
@@ -110,7 +137,7 @@ export async function createRepoWorktree(
   return await postServerJson(
     '/api/repo/create-worktree',
     { cwd, ...input, sourceToken, worktreeBootstrap },
-    { signal },
+    { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.worktreeCreate },
   )
 }
 
@@ -131,7 +158,7 @@ export async function deleteRepoBranch(
   return await postServerJson(
     '/api/repo/delete-branch',
     { cwd, branch, force: options?.force, alsoDeleteUpstream: options?.alsoDeleteUpstream, sourceToken },
-    { signal },
+    { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.branchMutation },
   )
 }
 
@@ -147,11 +174,14 @@ export async function removeRepoWorktree(
   signal?: AbortSignal,
   sourceToken?: string,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/remove-worktree', { cwd, ...options, sourceToken }, { signal })
+  return await postServerJson('/api/repo/remove-worktree', { cwd, ...options, sourceToken }, {
+    signal,
+    timeoutMs: REPO_REQUEST_TIMEOUT_MS.removeWorktree,
+  })
 }
 
 export async function getRepoPatch(cwd: string, worktreePath: string, signal?: AbortSignal): Promise<ExecResult> {
-  return await postServerJson('/api/repo/patch', { cwd, worktreePath }, { signal })
+  return await postServerJson('/api/repo/patch', { cwd, worktreePath }, { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.patch })
 }
 
 interface RepoBulkReadResult {

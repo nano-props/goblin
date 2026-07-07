@@ -671,6 +671,20 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     expect(response.status).toBe(400)
   })
 
+  test('fetch route forwards the request abort signal', async () => {
+    mocks.fetchRepo.mockResolvedValue({ ok: true, message: 'ok' })
+    const app = createTestRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/fetch', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', kind: 'user' }),
+      }),
+    )
+    expect(response.status).toBe(200)
+    expect(mocks.fetchRepo).toHaveBeenCalledWith('/tmp/repo', 'user', undefined, expect.any(AbortSignal))
+  })
+
   test('clone route forwards operationId/url/parentPath/directoryName', async () => {
     mocks.cloneRepo.mockResolvedValue({ ok: true, message: 'ok', path: '/tmp/repo' })
     const app = createTestRepoRoutes()
@@ -687,7 +701,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       }),
     )
     expect(response.status).toBe(200)
-    expect(mocks.cloneRepo).toHaveBeenCalledWith('op_1', 'https://example.com/r.git', '/tmp', 'r')
+    expect(mocks.cloneRepo).toHaveBeenCalledWith('op_1', 'https://example.com/r.git', '/tmp', 'r', expect.any(AbortSignal))
   })
 
   test('open-url route forwards repo URL targets', async () => {

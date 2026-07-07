@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   getWorktrees: vi.fn(),
   isAncestor: vi.fn(),
   fetchAll: vi.fn(),
+  cloneGitRepo: vi.fn(),
   getBackgroundSyncRepos: vi.fn(),
   pullBranch: vi.fn(),
   pushBranch: vi.fn(),
@@ -58,6 +59,10 @@ vi.mock('#/system/git/branches.ts', () => ({
 
 vi.mock('#/system/git/git-exec.ts', () => ({
   checkGitAvailable: mocks.checkGitAvailable,
+}))
+
+vi.mock('#/system/git/clone.ts', () => ({
+  cloneRepo: mocks.cloneGitRepo,
 }))
 
 vi.mock('node:fs', () => ({
@@ -165,6 +170,7 @@ beforeEach(() => {
   mocks.isGitRepo.mockResolvedValue(true)
   mocks.pullBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.pushBranch.mockResolvedValue({ ok: true, message: 'ok' })
+  mocks.cloneGitRepo.mockResolvedValue({ ok: true, message: 'ok', path: '/tmp/repo' })
   mocks.createWorktree.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.createRemoteWorktree.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.bootstrapWorktreeAfterCreate.mockResolvedValue({ ok: true, message: '' })
@@ -339,6 +345,22 @@ describe('fetchRepo invalidation publishing', () => {
     expect(mocks.fetchAll).toHaveBeenCalledWith('/tmp/repo', expect.any(AbortSignal))
   })
 
+  test('merges caller abort signal into fetch operations', async () => {
+    const caller = new AbortController()
+    mocks.fetchAll.mockImplementationOnce(async (_cwd: string, signal?: AbortSignal) => {
+      expect(signal?.aborted).toBe(false)
+      caller.abort('stopped')
+      expect(signal?.aborted).toBe(true)
+      return { ok: false, message: 'cancelled' }
+    })
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const result = await fetchRepo('/tmp/repo', 'user', undefined, caller.signal)
+
+    expect(result).toEqual({ ok: false, message: 'cancelled' })
+    expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
+  })
+
   test('publishes snapshot invalidation after a successful sync', async () => {
     mocks.runServerCancellable.mockResolvedValueOnce({ ok: true, message: 'fetched' })
 
@@ -384,6 +406,35 @@ describe('fetchRepo invalidation publishing', () => {
     })
   })
 
+  test('caller abort stops waiting for a reused background sync without cancelling it', async () => {
+    const fetch = deferred<{ ok: true; message: string }>()
+    mocks.runServerCancellable.mockImplementation(async (_cwd, _kind, task) => await task(new AbortController().signal))
+    mocks.fetchAll.mockImplementationOnce(() => fetch.promise)
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const background = fetchRepo('/tmp/repo', 'background')
+    await vi.waitFor(() => {
+      expect(mocks.fetchAll).toHaveBeenCalledTimes(1)
+    })
+
+    const caller = new AbortController()
+    const user = fetchRepo('/tmp/repo', 'user', undefined, caller.signal)
+    caller.abort('client disconnected')
+
+    await expect(user).resolves.toEqual({ ok: false, message: 'cancelled' })
+    expect(mocks.runServerCancellable).toHaveBeenCalledTimes(1)
+    expect(mocks.fetchAll).toHaveBeenCalledTimes(1)
+    expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
+
+    fetch.resolve({ ok: true, message: 'fetched in background' })
+    await expect(background).resolves.toEqual({ ok: true, message: 'fetched in background' })
+    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledTimes(1)
+    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
+      repoId: '/tmp/repo',
+      query: 'repo-snapshot',
+    })
+  })
+
   test('does not publish invalidations after a failed sync', async () => {
     mocks.runServerCancellable.mockResolvedValueOnce({ ok: false, message: 'fatal: offline' })
 
@@ -392,6 +443,36 @@ describe('fetchRepo invalidation publishing', () => {
 
     expect(result).toEqual({ ok: false, message: 'fatal: offline' })
     expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
+  })
+})
+
+describe('cloneRepo cancellation', () => {
+  test('returns cancelled before clone preflight side effects when caller is already aborted', async () => {
+    const caller = new AbortController()
+    caller.abort('client disconnected')
+
+    const { cloneRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const result = await cloneRepo('op_1', 'https://example.com/repo.git', '/tmp', 'repo', caller.signal)
+
+    expect(result).toEqual({ ok: false, message: 'cancelled' })
+    expect(mocks.checkGitAvailable).not.toHaveBeenCalled()
+    expect(mocks.fsMkdir).not.toHaveBeenCalled()
+    expect(mocks.cloneGitRepo).not.toHaveBeenCalled()
+  })
+
+  test('merges caller abort signal into clone operations', async () => {
+    const caller = new AbortController()
+    mocks.cloneGitRepo.mockImplementationOnce(async (_parentPath: string, _directoryName: string, _url: string, signal) => {
+      expect(signal?.aborted).toBe(false)
+      caller.abort('stopped')
+      expect(signal?.aborted).toBe(true)
+      return { ok: false, message: 'cancelled' }
+    })
+
+    const { cloneRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const result = await cloneRepo('op_1', 'https://example.com/repo.git', '/tmp', 'repo', caller.signal)
+
+    expect(result).toEqual({ ok: false, message: 'cancelled' })
   })
 })
 
