@@ -10,11 +10,12 @@ import {
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import {
   createBranchSnapshot,
   createRepoBranch,
   resetReposStore,
+  seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
@@ -82,9 +83,13 @@ describe('BranchView', () => {
       branches: [branch],
       currentBranchName: 'feature/dirty',
     })
-    setRepoStatusQueryData(REPO_ID, repo.instanceId, [
-      { path: WORKTREE_PATH, branch: 'feature/dirty', isMain: false, entries: [{ x: 'M', y: ' ', path: 'dirty.ts' }] },
-    ])
+    seedRepoReadModelQueryData(repo, {
+      branches: [branch],
+      currentBranch: 'feature/dirty',
+      status: [
+        { path: WORKTREE_PATH, branch: 'feature/dirty', isMain: false, entries: [{ x: 'M', y: ' ', path: 'dirty.ts' }] },
+      ],
+    })
 
     renderBranchView()
 
@@ -97,23 +102,23 @@ describe('BranchView', () => {
       branches: [],
       currentBranchName: 'feature/query-dirty',
     })
-    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
-      current: 'feature/query-dirty',
+    seedRepoReadModelQueryData(repo, {
       branches: [
         createBranchSnapshot('feature/query-dirty', {
           isCurrent: true,
           worktree: { path: WORKTREE_PATH, summary: { dirty: false, changeCount: 0 } },
         }),
       ],
+      currentBranch: 'feature/query-dirty',
+      status: [
+        {
+          path: WORKTREE_PATH,
+          branch: 'feature/query-dirty',
+          isMain: false,
+          entries: [{ x: 'M', y: ' ', path: 'query-dirty.ts' }],
+        },
+      ],
     })
-    setRepoStatusQueryData(REPO_ID, repo.instanceId, [
-      {
-        path: WORKTREE_PATH,
-        branch: 'feature/query-dirty',
-        isMain: false,
-        entries: [{ x: 'M', y: ' ', path: 'query-dirty.ts' }],
-      },
-    ])
 
     renderBranchView()
 

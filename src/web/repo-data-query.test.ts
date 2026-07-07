@@ -12,7 +12,6 @@ import {
   setRepoOperationsQueryData,
   setRepoProjectionQueryData,
   setRepoSnapshotQueryData,
-  setRepoStatusQueryData,
 } from '#/web/repo-data-query.ts'
 import type { PullRequestEntry, RepoRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
@@ -95,7 +94,7 @@ describe('repo projection query data', () => {
     })
   })
 
-  test('projects per-section cache writes into matching projection caches', () => {
+  test('projects snapshot cache writes into matching projection caches', () => {
     const queryClient = new QueryClient()
     const projection: RepoRuntimeProjection = {
       snapshot: { branches: [], current: 'main' },
@@ -105,16 +104,14 @@ describe('repo projection query data', () => {
       requested: { branch: 'feature/a', pullRequestMode: 'summary' },
       loadedAt: 123,
     }
-    const updatedStatus: WorktreeStatus[] = [
-      { path: '/tmp/repo', branch: 'feature/a', isMain: false, entries: [{ x: 'M', y: ' ', path: 'README.md' }] },
-    ]
+    const updatedSnapshot: RepoSnapshot = { branches: [], current: 'feature/a' }
 
     setRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', 'feature/a', 'summary', projection, queryClient)
-    setRepoStatusQueryData('/tmp/repo', 'repo-instance-1', updatedStatus, queryClient)
+    setRepoSnapshotQueryData('/tmp/repo', 'repo-instance-1', updatedSnapshot, queryClient)
 
     expect(getRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', 'feature/a', 'summary', queryClient)).toEqual({
       ...projection,
-      status: updatedStatus,
+      snapshot: updatedSnapshot,
     })
   })
 

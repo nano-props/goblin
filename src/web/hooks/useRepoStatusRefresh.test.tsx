@@ -5,12 +5,11 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { isRepoStatusRefreshable, useRepoStatusRefresh } from '#/web/hooks/useRepoStatusRefresh.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { createRepoBranch, resetReposStore } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, resetReposStore, seedRepoReadModelQueryData } from '#/web/test-utils/bridge.ts'
 import { preferredWorkspacePaneTabByTargetRecordWith } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
 
 const originalRefreshRuntimeProjection = useReposStore.getState().refreshRuntimeProjection
 
@@ -44,11 +43,7 @@ function createRepo(
   const worktreePath = `${id}/main`
   const branches = [createRepoBranch('main', { worktree: { path: worktreePath } })]
   repo.instanceId = id === '/repo-a' ? 'repo-instance-test-a' : 'repo-instance-test-b'
-  setRepoSnapshotQueryData(id, repo.instanceId, {
-    current: 'main',
-    branches,
-  })
-  setRepoStatusQueryData(id, repo.instanceId, [])
+  seedRepoReadModelQueryData(repo, { branches, currentBranch: 'main', status: [] })
   setWorkspacePaneTabsForTargetQueryData({
     repoRoot: id,
     repoInstanceId: repo.instanceId,

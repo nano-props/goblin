@@ -22,13 +22,13 @@ import {
   createPullRequest,
   createRepoBranch,
   resetReposStore,
+  seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   setRepoProjectionQueryData,
   setRepoSnapshotQueryData,
-  setRepoStatusQueryData,
 } from '#/web/repo-data-query.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
@@ -200,9 +200,13 @@ describe('RepoWorkspace', () => {
         'feature/a': [workspacePaneStaticTabEntry('status')],
       },
     })
-    setRepoStatusQueryData(REPO_ID, repo.instanceId, [
-      { path: worktreePath, branch: 'feature/a', isMain: false, entries: [{ x: 'M', y: ' ', path: 'changed.ts' }] },
-    ])
+    seedRepoReadModelQueryData(repo, {
+      branches: [branch],
+      currentBranch: 'feature/a',
+      status: [
+        { path: worktreePath, branch: 'feature/a', isMain: false, entries: [{ x: 'M', y: ' ', path: 'changed.ts' }] },
+      ],
+    })
 
     const { container } = render(
       <QueryClientProvider client={primaryWindowQueryClient}>

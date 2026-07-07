@@ -53,7 +53,7 @@ import {
   readWorkspacePaneTabsForTarget,
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 
 const mockSessions = vi.hoisted(
   () =>

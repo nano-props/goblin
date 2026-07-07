@@ -11,7 +11,7 @@ import {
   seedRepo,
   repoProjection,
 } from '#/web/stores/repos/refresh-test-utils.ts'
-import { seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { seedRepoReadModelQueryData, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
 import {
   preferredWorkspacePaneTabForTarget,
@@ -25,7 +25,6 @@ import {
   repoSnapshotQueryKey,
   repoStatusQueryKey,
   setRepoSnapshotQueryData,
-  setRepoStatusQueryData,
 } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { WorktreeStatus } from '#/web/types.ts'
@@ -734,9 +733,24 @@ describe('core refresh request ordering', () => {
       ],
       'repo-instance-test',
     )
-    setRepoStatusQueryData(REPO_ID, repoInstanceId, [
-      { path: '/tmp/worktree-a', branch: 'feature/a', isMain: false, entries: [] },
-    ])
+    seedRepoReadModelQueryData(
+      { id: REPO_ID, instanceId: repoInstanceId },
+      {
+        branches: [
+          branch('feature/a', undefined, {
+            worktree: {
+              path: '/tmp/worktree-a',
+              summary: {
+                dirty: false,
+                changeCount: 0,
+              },
+            },
+          }),
+        ],
+        currentBranch: 'feature/a',
+        status: [{ path: '/tmp/worktree-a', branch: 'feature/a', isMain: false, entries: [] }],
+      },
+    )
     ipcHandlers['repo.projection'] = async () =>
       repoProjection(
         {

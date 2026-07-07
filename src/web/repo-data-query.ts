@@ -201,7 +201,7 @@ function getRepoStatusQueryData(
   return queryClient.getQueryData<WorktreeStatus[]>(repoStatusQueryKey(repoRoot, repoInstanceId))
 }
 
-export function setRepoStatusQueryData(
+function setRepoStatusQueryData(
   repoRoot: string,
   repoInstanceId: string,
   status: WorktreeStatus[],

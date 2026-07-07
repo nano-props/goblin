@@ -32,8 +32,6 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   setRepoProjectionQueryData,
-  setRepoSnapshotQueryData,
-  setRepoStatusQueryData,
 } from '#/web/repo-data-query.ts'
 import {
   workspacePaneTabsWithStaticTab,
@@ -911,11 +909,6 @@ export function seedRepoReadModelQueryData(
     status?: WorktreeStatus[]
   },
 ): void {
-  setRepoSnapshotQueryData(repo.id, repo.instanceId, {
-    branches: readModel.branches,
-    current: readModel.currentBranch,
-  })
-  setRepoStatusQueryData(repo.id, repo.instanceId, readModel.status ?? [])
   setRepoProjectionQueryData(repo.id, repo.instanceId, null, 'full', {
     snapshot: {
       branches: readModel.branches,

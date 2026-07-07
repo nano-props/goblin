@@ -9,12 +9,13 @@ import {
   createRepoBranch,
   repoPresentationFromQueryForTest,
   resetReposStore,
+  seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 
 const REPO_ID = '/tmp/gbl-branch-action-dispatch-repo'
 const WORKTREE_PATH = '/tmp/gbl-branch-action-dispatch-worktree'
@@ -213,8 +214,7 @@ describe('branch action dispatch', () => {
         ],
       },
     })
-    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
-      current: 'main',
+    seedRepoReadModelQueryData(repo, {
       branches: [
         createBranchSnapshot('main', {
           isCurrent: true,
@@ -224,6 +224,7 @@ describe('branch action dispatch', () => {
           worktree: { path: WORKTREE_PATH, summary: { dirty: true, changeCount: 2 } },
         }),
       ],
+      currentBranch: 'main',
     })
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     const closeTerminalsForWorktree = vi.fn(async () => true)
@@ -244,7 +245,7 @@ describe('branch action dispatch', () => {
     expect(runBranchAction).not.toHaveBeenCalled()
   })
 
-  test('remove worktree preflight derives query snapshot worktree state from the query status cache', async () => {
+  test('remove worktree preflight derives snapshot worktree state from status projection', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree')],
@@ -257,8 +258,7 @@ describe('branch action dispatch', () => {
         ],
       },
     })
-    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
-      current: 'main',
+    seedRepoReadModelQueryData(repo, {
       branches: [
         createBranchSnapshot('main', {
           isCurrent: true,
@@ -268,15 +268,16 @@ describe('branch action dispatch', () => {
           worktree: { path: WORKTREE_PATH, summary: { dirty: false, changeCount: 0 } },
         }),
       ],
+      currentBranch: 'main',
+      status: [
+        {
+          path: WORKTREE_PATH,
+          branch: 'feature/worktree',
+          isMain: false,
+          entries: [{ x: 'M', y: ' ', path: 'query-status-dirty.ts' }],
+        },
+      ],
     })
-    setRepoStatusQueryData(REPO_ID, repo.instanceId, [
-      {
-        path: WORKTREE_PATH,
-        branch: 'feature/worktree',
-        isMain: false,
-        entries: [{ x: 'M', y: ' ', path: 'query-status-dirty.ts' }],
-      },
-    ])
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     const closeTerminalsForWorktree = vi.fn(async () => true)
     useReposStore.setState({ runBranchAction })

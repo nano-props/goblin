@@ -10,8 +10,7 @@ import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { getRepoRemoteBranches } from '#/web/repo-client.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
-import { createRepoBranch, repoPresentationForTest } from '#/web/test-utils/bridge.ts'
+import { createRepoBranch, repoPresentationForTest, seedRepoReadModelQueryData } from '#/web/test-utils/bridge.ts'
 import type { RepoPresentationForTest } from '#/web/test-utils/bridge.ts'
 import type { WorktreeBootstrapPreview } from '#/shared/worktree-bootstrap-summary.ts'
 
@@ -213,8 +212,7 @@ describe('CreateWorktreePageBody', () => {
 function createRepo(): RepoPresentationForTest {
   const repo = emptyRepo('/tmp/goblin-repo', 'goblin-repo', 'repo-instance-test')
   const branches = [createRepoBranch('main'), createRepoBranch('feature/base')]
-  setRepoSnapshotQueryData(repo.id, repo.instanceId, { current: 'main', branches })
-  setRepoStatusQueryData(repo.id, repo.instanceId, [])
+  seedRepoReadModelQueryData(repo, { branches, currentBranch: 'main', status: [] })
   return repoPresentationForTest(repo, { currentBranch: 'main', branches, status: [], worktreesByPath: {} })
 }
 
