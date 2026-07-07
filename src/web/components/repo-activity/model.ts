@@ -1,7 +1,11 @@
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { repoLocalPrimaryRefreshBusy } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { repoBranchActionLoadingLabel, type RepoActionLabel } from '#/web/stores/repos/action-labels.ts'
-import { branchActionKindFromReason, isBranchActionReason } from '#/web/stores/repos/operations.ts'
+import {
+  branchActionKindFromReason,
+  isBranchActionReason,
+  type RepoOperationState,
+} from '#/web/stores/repos/operations.ts'
 import { repoServerOperationActive } from '#/web/repo-data-query.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 import type { RepoOperationsSnapshot } from '#/shared/api-types.ts'
@@ -22,8 +26,16 @@ export type RepoActivityControlView =
   | { kind: 'completion'; completion: RepoCompletion }
   | { kind: 'refresh-button'; manualSyncBusy: boolean }
 
-function branchActionActivity(repo: RepoState, serverOperations?: RepoOperationsSnapshot): RepoActivity | null {
-  const action = projectBranchActionOperation(repo.operations.branchAction, serverOperations?.operations)
+export interface RepoActivityProjectionRepo {
+  id: RepoState['id']
+  branchAction: RepoOperationState
+}
+
+function branchActionActivity(
+  repo: Pick<RepoActivityProjectionRepo, 'branchAction'>,
+  serverOperations?: RepoOperationsSnapshot,
+): RepoActivity | null {
+  const action = projectBranchActionOperation(repo.branchAction, serverOperations?.operations)
   if (action.phase === 'idle' || !isBranchActionReason(action.reason)) return null
   const label = repoBranchActionLoadingLabel(branchActionKindFromReason(action.reason), action.phase)
   return {
@@ -33,7 +45,10 @@ function branchActionActivity(repo: RepoState, serverOperations?: RepoOperations
   }
 }
 
-export function getRepoActivity(repo: RepoState, serverOperations?: RepoOperationsSnapshot): RepoActivity | null {
+export function getRepoActivity(
+  repo: RepoActivityProjectionRepo,
+  serverOperations?: RepoOperationsSnapshot,
+): RepoActivity | null {
   return branchActionActivity(repo, serverOperations)
 }
 
@@ -42,13 +57,10 @@ export function repoOperationsSnapshotHasPrimaryRefresh(snapshot: RepoOperations
 }
 
 export function isRepoPrimaryRefreshBusy(
-  repo: RepoState,
+  repo: Pick<RepoActivityProjectionRepo, 'id'>,
   serverOperations?: RepoOperationsSnapshot,
 ): boolean {
-  return (
-    repoOperationsSnapshotHasPrimaryRefresh(serverOperations) ||
-    repoLocalPrimaryRefreshBusy(repo.id)
-  )
+  return repoOperationsSnapshotHasPrimaryRefresh(serverOperations) || repoLocalPrimaryRefreshBusy(repo.id)
 }
 
 export function getRepoActivityControlView(input: {

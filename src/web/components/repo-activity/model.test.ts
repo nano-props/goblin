@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   getRepoActivity,
   isRepoPrimaryRefreshBusy,
+  type RepoActivityProjectionRepo,
   repoOperationsSnapshotHasPrimaryRefresh,
 } from '#/web/components/repo-activity/model.ts'
 import { seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
@@ -12,6 +13,7 @@ import {
   nextRepoOperationId,
   settleRepoOperationTargets,
 } from '#/web/stores/repos/repo-operation-scheduler.ts'
+import type { RepoState } from '#/web/stores/repos/types.ts'
 import type { RepoOperationsSnapshot, RepoServerOperationState } from '#/shared/api-types.ts'
 
 const REPO_ID = '/tmp/gbl-repo-activity-model'
@@ -40,7 +42,7 @@ describe('repo activity model', () => {
     const repo = seedRepoShellForTest({ id: REPO_ID })
     const operations = operationsSnapshot([serverOperation({ kind: 'push', phase: 'queued' })])
 
-    expect(getRepoActivity(repo, operations)).toMatchObject({
+    expect(getRepoActivity(activityRepo(repo), operations)).toMatchObject({
       kind: 'branch-action',
       labelKey: 'action.push-queued',
     })
@@ -62,6 +64,13 @@ describe('repo activity model', () => {
 
 function operationsSnapshot(operations: RepoServerOperationState[]): RepoOperationsSnapshot {
   return { operations, loadedAt: 123 }
+}
+
+function activityRepo(repo: RepoState): RepoActivityProjectionRepo {
+  return {
+    id: repo.id,
+    branchAction: repo.operations.branchAction,
+  }
 }
 
 function serverOperation(
