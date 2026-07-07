@@ -1,12 +1,9 @@
 import { getBackgroundSyncRepos, setBackgroundSyncRepos } from '#/server/modules/background-sync.ts'
 import { serverRepoNodeLog } from '#/node/logger.ts'
 import {
-  readRepoBulk,
   readRepoProjection,
   getRepoLog,
   getRepoPatch,
-  getRepoSnapshot,
-  getRepoStatus,
   getRepoWorktreeBootstrapPreview,
   probeRepo,
 } from '#/server/modules/repo-read-paths.ts'
@@ -72,14 +69,6 @@ export function createRepoRoutes() {
   app.post('/probe', async (c) => {
     const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.probe, c)
     return c.json(await jsonOr(() => probeRepo(cwd), READ_REPO_ERROR, 'probe'))
-  })
-  app.post('/snapshot', async (c) => {
-    const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.snapshot, c)
-    return c.json(await readJsonOrThrow(() => getRepoSnapshot(cwd, c.req.raw.signal), 'snapshot'))
-  })
-  app.post('/status', async (c) => {
-    const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.status, c)
-    return c.json(await readJsonOrThrow(() => getRepoStatus(cwd, c.req.raw.signal), 'status'))
   })
   app.post('/log', async (c) => {
     const { cwd, branch, count, skip } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.log, c)
@@ -155,20 +144,6 @@ export function createRepoRoutes() {
   app.post('/operations', async (c) => {
     const { cwd, includeSettled } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.operations, c)
     return c.json(getRepoOperationsSnapshot({ repoId: cwd, includeSettled }))
-  })
-  app.post('/composite', async (c) => {
-    const { cwd, include, timeoutMs } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.composite, c)
-    const wants = (include ?? ['snapshot', 'status']) as ReadonlyArray<'snapshot' | 'status'>
-    return c.json(
-      await readJsonOrThrow(
-        () =>
-          readRepoBulk(cwd, wants, {
-            signal: c.req.raw.signal,
-            timeoutMs,
-          }),
-        'composite',
-      ),
-    )
   })
   app.post('/fetch', async (c) => {
     const { cwd, kind, sourceToken } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fetch, c)

@@ -127,7 +127,6 @@ beforeEach(() => {
   for (const key of Object.keys(ipcHandlers)) delete ipcHandlers[key]
   resetReposStore()
   installGoblinTestBridge(ipcHandlers)
-  ipcHandlers['repo.status'] = async () => []
 })
 
 describe('setBranchViewMode', () => {

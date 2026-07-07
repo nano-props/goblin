@@ -3,7 +3,14 @@ import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { terminalLog } from '#/web/logger.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { repoOperation } from '#/web/stores/repos/repo-operation-scheduler.ts'
-import { branch, REPO_ID, resetRefreshTest, ipcHandlers, seedRepo } from '#/web/stores/repos/refresh-test-utils.ts'
+import {
+  branch,
+  REPO_ID,
+  resetRefreshTest,
+  ipcHandlers,
+  seedRepo,
+  repoProjection,
+} from '#/web/stores/repos/refresh-test-utils.ts'
 import { seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
 import {
@@ -13,8 +20,8 @@ import {
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
-  repoBulkReadQueryKey,
   repoDataQueryKey,
+  repoProjectionQueryKey,
   repoSnapshotQueryKey,
   repoStatusQueryKey,
   setRepoSnapshotQueryData,
@@ -64,9 +71,9 @@ describe('remote fetch timestamps', () => {
       branches: [branch('feature/query')],
     })
     let resolveSnapshot!: (value: { branches: ReturnType<typeof branch>[]; current: string }) => void
-    ipcHandlers['repo.snapshot'] = () =>
+    ipcHandlers['repo.projection'] = () =>
       new Promise((resolve) => {
-        resolveSnapshot = resolve
+        resolveSnapshot = (snapshot) => resolve(repoProjection(snapshot))
       })
 
     const work = useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
@@ -98,11 +105,11 @@ describe('remote fetch timestamps', () => {
       fetchCount += 1
       return { ok: true, message: 'ok' }
     }
-    // Composite folds snapshot + status into one round trip, but for
+    // projection folds snapshot + status into one round trip, but for
     // assertions each side still counts as 1 (semantic: it was
     // refreshed). Standalone handlers are kept for tests that exercise
     // the post-write single-data-load path.
-    ipcHandlers['repo.composite'] = async () => {
+    ipcHandlers['repo.projection'] = async () => {
       snapshotCount += 1
       statusCount += 1
       return {
@@ -137,10 +144,11 @@ describe('remote fetch timestamps', () => {
       new Promise<{ ok: true; message: string }>((resolve) => {
         resolveFetch = resolve
       })
-    ipcHandlers['repo.snapshot'] = async () => ({
-      branches: [branch('feature/reopened')],
-      current: 'feature/reopened',
-    })
+    ipcHandlers['repo.projection'] = async () =>
+      repoProjection({
+        branches: [branch('feature/reopened')],
+        current: 'feature/reopened',
+      })
 
     const work = useReposStore.getState().syncAndRefresh(REPO_ID, { repoInstanceId })
     seedRepo([branch('main')], 'repo-instance-test-2')
@@ -177,13 +185,9 @@ describe('remote fetch timestamps', () => {
     const repoInstanceId = seedRepo([branch('feature/a')])
     let snapshotCount = 0
     ipcHandlers['repo.fetch'] = async () => ({ ok: false, message: 'fatal: rejected' })
-    ipcHandlers['repo.snapshot'] = async () => {
+    ipcHandlers['repo.projection'] = async () => {
       snapshotCount += 1
-      return { branches: [branch('feature/a')], current: 'feature/a' }
-    }
-    ipcHandlers['repo.composite'] = async () => {
-      snapshotCount += 1
-      return { snapshot: { branches: [branch('feature/a')], current: 'feature/a' }, status: [], pullRequests: null }
+      return repoProjection({ branches: [branch('feature/a')], current: 'feature/a' })
     }
 
     await useReposStore.getState().syncAndRefresh(REPO_ID, { repoInstanceId })
@@ -202,22 +206,10 @@ describe('remote fetch timestamps', () => {
       fetchCount += 1
       return { ok: true, message: 'ok' }
     }
-    ipcHandlers['repo.snapshot'] = async () => {
-      snapshotCount += 1
-      return { branches: [branch('feature/a'), branch('feature/b')], current: 'feature/a' }
-    }
-    ipcHandlers['repo.status'] = async () => {
-      statusCount += 1
-      return []
-    }
-    ipcHandlers['repo.composite'] = async () => {
+    ipcHandlers['repo.projection'] = async () => {
       snapshotCount += 1
       statusCount += 1
-      return {
-        snapshot: { branches: [branch('feature/a'), branch('feature/b')], current: 'feature/a' },
-        status: [],
-        pullRequests: null,
-      }
+      return repoProjection({ branches: [branch('feature/a'), branch('feature/b')], current: 'feature/a' })
     }
 
     await useReposStore.getState().syncAndRefresh(REPO_ID, { repoInstanceId })
@@ -274,15 +266,11 @@ describe('remote fetch timestamps', () => {
       new Promise<{ ok: true; message: string }>((resolve) => {
         resolveDelete = resolve
       })
-    ipcHandlers['repo.snapshot'] = async () => {
-      snapshotCount += 1
-      return { branches: [branch('main')], current: 'main' }
-    }
-    // Post-write branch action refresh goes through composite in
+    // Post-write branch action refresh goes through projection in
     // `runCoreDataRefreshWorkflow` now.
-    ipcHandlers['repo.composite'] = async () => {
+    ipcHandlers['repo.projection'] = async () => {
       snapshotCount += 1
-      return { snapshot: { branches: [branch('main')], current: 'main' }, status: [], pullRequests: null }
+      return repoProjection({ branches: [branch('main')], current: 'main' })
     }
 
     const work = useReposStore
@@ -306,17 +294,9 @@ describe('remote fetch timestamps', () => {
     const repoInstanceId = seedRepo([branch('main')])
     let snapshotCount = 0
     ipcHandlers['repo.createWorktree'] = async () => ({ ok: true, message: 'ok' })
-    ipcHandlers['repo.snapshot'] = async () => {
+    ipcHandlers['repo.projection'] = async () => {
       snapshotCount += 1
-      return { branches: [branch('main'), branch('feature/a')], current: 'main' }
-    }
-    ipcHandlers['repo.composite'] = async () => {
-      snapshotCount += 1
-      return {
-        snapshot: { branches: [branch('main'), branch('feature/a')], current: 'main' },
-        status: [],
-        pullRequests: null,
-      }
+      return repoProjection({ branches: [branch('main'), branch('feature/a')], current: 'main' })
     }
 
     const result = await useReposStore
@@ -334,9 +314,9 @@ describe('remote fetch timestamps', () => {
     const repoInstanceId = seedRepo([branch('main')])
     let snapshotCount = 0
     ipcHandlers['repo.createWorktree'] = async () => ({ ok: false, message: 'error.invalid-path' })
-    ipcHandlers['repo.snapshot'] = async () => {
+    ipcHandlers['repo.projection'] = async () => {
       snapshotCount += 1
-      return { branches: [branch('main'), branch('feature/a')], current: 'main' }
+      return repoProjection({ branches: [branch('main'), branch('feature/a')], current: 'main' })
     }
 
     const result = await useReposStore
@@ -355,13 +335,9 @@ describe('remote fetch timestamps', () => {
       message: 'Worktree bootstrap failed: setup failed',
       repoChanged: true,
     })
-    ipcHandlers['repo.composite'] = async () => {
+    ipcHandlers['repo.projection'] = async () => {
       snapshotCount += 1
-      return {
-        snapshot: { branches: [branch('main'), branch('feature/a')], current: 'main' },
-        status: [],
-        pullRequests: null,
-      }
+      return repoProjection({ branches: [branch('main'), branch('feature/a')], current: 'main' })
     }
 
     const result = await useReposStore
@@ -381,9 +357,9 @@ describe('remote fetch timestamps', () => {
     const repoInstanceId = seedRepo([branch('feature/a')])
     let snapshotCount = 0
     ipcHandlers['repo.deleteBranch'] = async () => ({ ok: false, message: 'error.branch-not-fully-merged' })
-    ipcHandlers['repo.snapshot'] = async () => {
+    ipcHandlers['repo.projection'] = async () => {
       snapshotCount += 1
-      return { branches: [branch('feature/a')], current: 'feature/a' }
+      return repoProjection({ branches: [branch('feature/a')], current: 'feature/a' })
     }
 
     const result = await useReposStore
@@ -405,13 +381,9 @@ describe('remote fetch timestamps', () => {
     const repoInstanceId = seedRepo([branch('feature/a')])
     let snapshotCount = 0
     ipcHandlers['repo.deleteBranch'] = async () => ({ ok: false, message: 'error.delete-branch-failed' })
-    ipcHandlers['repo.snapshot'] = async () => {
+    ipcHandlers['repo.projection'] = async () => {
       snapshotCount += 1
-      return { branches: [branch('feature/a')], current: 'feature/a' }
-    }
-    ipcHandlers['repo.composite'] = async () => {
-      snapshotCount += 1
-      return { snapshot: { branches: [branch('feature/a')], current: 'feature/a' }, status: [], pullRequests: null }
+      return repoProjection({ branches: [branch('feature/a')], current: 'feature/a' })
     }
 
     const result = await useReposStore
@@ -477,50 +449,68 @@ describe('remote fetch timestamps', () => {
 })
 
 describe('core refresh request ordering', () => {
-  test('refreshCoreData refreshes snapshot and status via the composite endpoint', async () => {
+  test('refreshCoreData refreshes snapshot and status via the projection endpoint', async () => {
     const repoInstanceId = seedRepo([branch('old')])
-    let compositeCalls = 0
-    ipcHandlers['repo.composite'] = async () => {
-      compositeCalls += 1
-      return { snapshot: { branches: [branch('main')], current: 'main' }, status: [], pullRequests: null }
+    let projectionCalls = 0
+    ipcHandlers['repo.projection'] = async () => {
+      projectionCalls += 1
+      return {
+        snapshot: { branches: [branch('main')], current: 'main' },
+        status: [],
+        pullRequests: null,
+        operations: { operations: [], loadedAt: 123 },
+        requested: { branch: null, pullRequestMode: 'full' },
+        loadedAt: 123,
+      }
     }
 
     await useReposStore.getState().refreshCoreData(REPO_ID, { repoInstanceId })
 
-    expect(compositeCalls).toBe(1)
+    expect(projectionCalls).toBe(1)
     expect(repoBranchNames()).toEqual(['main'])
   })
 
-  test('refreshCoreData writes the server composite result into repo data query cache', async () => {
+  test('refreshCoreData writes the server projection result into repo data query cache', async () => {
     const repoInstanceId = seedRepo([branch('old')])
     const status: WorktreeStatus[] = [
       { path: REPO_ID, branch: 'main', isMain: true, entries: [{ x: 'M', y: ' ', path: 'src/main.ts' }] },
     ]
     const snapshot = { branches: [branch('main')], current: 'main' }
-    ipcHandlers['repo.composite'] = async () => ({ snapshot, status, pullRequests: null })
-
-    await useReposStore.getState().refreshCoreData(REPO_ID, { repoInstanceId })
-
-    expect(
-      primaryWindowQueryClient.getQueryData(repoBulkReadQueryKey(REPO_ID, repoInstanceId, ['snapshot', 'status'])),
-    ).toEqual({
+    const projection = {
       snapshot,
       status,
       pullRequests: null,
-    })
+      operations: { operations: [], loadedAt: 123 },
+      requested: { branch: null, pullRequestMode: 'full' as const },
+      loadedAt: 123,
+    }
+    ipcHandlers['repo.projection'] = async () => projection
+
+    await useReposStore.getState().refreshCoreData(REPO_ID, { repoInstanceId })
+
+    expect(primaryWindowQueryClient.getQueryData(repoProjectionQueryKey(REPO_ID, repoInstanceId, null, 'full'))).toEqual(
+      projection,
+    )
     expect(primaryWindowQueryClient.getQueryData(repoSnapshotQueryKey(REPO_ID, repoInstanceId))).toEqual(snapshot)
     expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toEqual(status)
   })
 
-  test('refreshCoreData drops stale results when the repo is reopened during a composite read', async () => {
+  test('refreshCoreData drops stale results when the repo is reopened during a projection read', async () => {
     const repoInstanceId = seedRepo([branch('main')], 'repo-instance-test')
     primaryWindowQueryClient.removeQueries({ queryKey: repoDataQueryKey(REPO_ID, repoInstanceId) })
-    ipcHandlers['repo.composite'] = async () => {
-      // Reopen the repo while the composite is in flight. With the new
+    ipcHandlers['repo.projection'] = async () => {
+      // Reopen the repo while the projection is in flight. With the new
       // atomic flow the snapshot result is stale and should be dropped
       // (the new instance keeps its own data).
       seedRepo([branch('reopened')], 'repo-instance-test-2')
-      return { snapshot: { branches: [branch('stale')], current: 'stale' }, status: [], pullRequests: null }
+      return {
+        snapshot: { branches: [branch('stale')], current: 'stale' },
+        status: [],
+        pullRequests: null,
+        operations: { operations: [], loadedAt: 123 },
+        requested: { branch: null, pullRequestMode: 'full' },
+        loadedAt: 123,
+      }
     }
 
     await useReposStore.getState().refreshCoreData(REPO_ID, { repoInstanceId })
@@ -529,7 +519,7 @@ describe('core refresh request ordering', () => {
     expect(repo?.instanceId).toBe('repo-instance-test-2')
     expect(repo ? readRepoBranchQueryProjection(repo)?.branches.map((b) => b.name) : null).toEqual(['reopened'])
     expect(
-      primaryWindowQueryClient.getQueryData(repoBulkReadQueryKey(REPO_ID, repoInstanceId, ['snapshot', 'status'])),
+      primaryWindowQueryClient.getQueryData(repoProjectionQueryKey(REPO_ID, repoInstanceId, null, 'full')),
     ).toBeUndefined()
     expect(primaryWindowQueryClient.getQueryData(repoSnapshotQueryKey(REPO_ID, repoInstanceId))).toBeUndefined()
     expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toBeUndefined()
@@ -537,15 +527,15 @@ describe('core refresh request ordering', () => {
 
   test('refreshCoreData marks deleted or non-git paths unavailable and skips follow-up reads', async () => {
     const repoInstanceId = seedRepo([branch('main')])
-    let compositeCalls = 0
-    ipcHandlers['repo.composite'] = async () => {
-      compositeCalls += 1
+    let projectionCalls = 0
+    ipcHandlers['repo.projection'] = async () => {
+      projectionCalls += 1
       throw new Error('error.not-git-repo')
     }
 
     await useReposStore.getState().refreshCoreData(REPO_ID, { repoInstanceId })
 
-    expect(compositeCalls).toBe(1)
+    expect(projectionCalls).toBe(1)
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.availability).toMatchObject({ phase: 'unavailable', reason: 'error.not-git-repo' })
     expect(repo?.dataLoads.snapshot.error).toBe('error.not-git-repo')
@@ -556,7 +546,7 @@ describe('core refresh request ordering', () => {
     updateRepoForTest((repo) => {
       repo.availability = { phase: 'unavailable', reason: 'error.path-not-found', checkedAt: Date.now() }
     })
-    ipcHandlers['repo.snapshot'] = async () => ({ branches: [branch('main')], current: 'main' })
+    ipcHandlers['repo.projection'] = async () => repoProjection({ branches: [branch('main')], current: 'main' })
 
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
 
@@ -569,17 +559,17 @@ describe('core refresh request ordering', () => {
   test('refreshSnapshot writes the server snapshot result into repo data query cache', async () => {
     const repoInstanceId = seedRepo([branch('old')])
     const snapshot = { branches: [branch('main')], current: 'main' }
-    ipcHandlers['repo.snapshot'] = async () => snapshot
+    ipcHandlers['repo.projection'] = async () => repoProjection(snapshot)
 
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
 
     expect(primaryWindowQueryClient.getQueryData(repoSnapshotQueryKey(REPO_ID, repoInstanceId))).toEqual(snapshot)
   })
 
-  test('refreshCoreData drops status when the repo is reopened before the composite settles', async () => {
+  test('refreshCoreData drops status when the repo is reopened before the projection settles', async () => {
     const repoInstanceId = seedRepo([branch('main')], 'repo-instance-test')
-    ipcHandlers['repo.composite'] = async () => {
-      // Composite returns valid snapshot, but the repo is reopened
+    ipcHandlers['repo.projection'] = async () => {
+      // projection returns valid snapshot, but the repo is reopened
       // before the apply step. Both branches get dropped.
       seedRepo([branch('reopened')], 'repo-instance-test-2')
       return { snapshot: { branches: [branch('main')], current: 'main' }, status: [], pullRequests: null }
@@ -597,11 +587,13 @@ describe('core refresh request ordering', () => {
     let callCount = 0
     let resolveFirst!: (value: WorktreeStatus[]) => void
     let resolveSecond!: (value: WorktreeStatus[]) => void
-    ipcHandlers['repo.status'] = () => {
+    ipcHandlers['repo.projection'] = () => {
       callCount += 1
-      return new Promise<WorktreeStatus[]>((resolve) => {
-        if (callCount === 1) resolveFirst = resolve
-        else resolveSecond = resolve
+      return new Promise((resolve) => {
+        const complete = (status: WorktreeStatus[]) =>
+          resolve(repoProjection({ branches: [branch('feature/a')], current: 'feature/a' }, status))
+        if (callCount === 1) resolveFirst = complete
+        else resolveSecond = complete
       })
     }
 
@@ -648,18 +640,53 @@ describe('core refresh request ordering', () => {
         },
       }),
     ])
-    ipcHandlers['repo.status'] = async () => [
-      { path: '/tmp/worktree-cleaned', branch: 'feature/cleaned', isMain: false, entries: [] },
-      {
-        path: '/tmp/worktree-dirty',
-        branch: 'feature/dirty',
-        isMain: false,
-        entries: [
-          { x: 'M', y: ' ', path: 'one.ts' },
-          { x: '?', y: '?', path: 'two.ts' },
+    ipcHandlers['repo.projection'] = async () =>
+      repoProjection(
+        {
+          branches: [
+            branch('feature/cleaned', undefined, {
+              worktree: {
+                path: '/tmp/worktree-cleaned',
+                summary: {
+                  dirty: true,
+                  changeCount: 2,
+                },
+              },
+            }),
+            branch('feature/dirty', undefined, {
+              worktree: {
+                path: '/tmp/worktree-dirty',
+                summary: {
+                  dirty: false,
+                  changeCount: 0,
+                },
+              },
+            }),
+            branch('feature/missing', undefined, {
+              worktree: {
+                path: '/tmp/worktree-missing',
+                summary: {
+                  dirty: true,
+                  changeCount: 3,
+                },
+              },
+            }),
+          ],
+          current: '',
+        },
+        [
+          { path: '/tmp/worktree-cleaned', branch: 'feature/cleaned', isMain: false, entries: [] },
+          {
+            path: '/tmp/worktree-dirty',
+            branch: 'feature/dirty',
+            isMain: false,
+            entries: [
+              { x: 'M', y: ' ', path: 'one.ts' },
+              { x: '?', y: '?', path: 'two.ts' },
+            ],
+          },
         ],
-      },
-    ]
+      )
 
     await useReposStore.getState().refreshStatus(REPO_ID, { repoInstanceId })
 
@@ -684,7 +711,8 @@ describe('core refresh request ordering', () => {
     const status: WorktreeStatus[] = [
       { path: REPO_ID, branch: 'feature/a', isMain: true, entries: [{ x: 'M', y: ' ', path: 'changed.ts' }] },
     ]
-    ipcHandlers['repo.status'] = async () => status
+    ipcHandlers['repo.projection'] = async () =>
+      repoProjection({ branches: [branch('feature/a')], current: 'feature/a' }, status)
 
     await useReposStore.getState().refreshStatus(REPO_ID, { repoInstanceId })
 
@@ -709,20 +737,24 @@ describe('core refresh request ordering', () => {
     setRepoStatusQueryData(REPO_ID, repoInstanceId, [
       { path: '/tmp/worktree-a', branch: 'feature/a', isMain: false, entries: [] },
     ])
-    ipcHandlers['repo.snapshot'] = async () => ({
-      branches: [
-        branch('feature/a', undefined, {
-          worktree: {
-            path: '/tmp/worktree-a',
-            summary: {
-              dirty: true,
-              changeCount: 4,
-            },
-          },
-        }),
-      ],
-      current: 'feature/a',
-    })
+    ipcHandlers['repo.projection'] = async () =>
+      repoProjection(
+        {
+          branches: [
+            branch('feature/a', undefined, {
+              worktree: {
+                path: '/tmp/worktree-a',
+                summary: {
+                  dirty: true,
+                  changeCount: 4,
+                },
+              },
+            }),
+          ],
+          current: 'feature/a',
+        },
+        [{ path: '/tmp/worktree-a', branch: 'feature/a', isMain: false, entries: [] }],
+      )
 
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
 
@@ -735,20 +767,21 @@ describe('core refresh request ordering', () => {
 
   test('snapshot refresh stores worktree state in the branch read model', async () => {
     const repoInstanceId = seedRepo([branch('feature/a')])
-    ipcHandlers['repo.snapshot'] = async () => ({
-      branches: [
-        branch('feature/a', undefined, {
-          worktree: {
-            path: '/tmp/worktree-a',
-            summary: {
-              dirty: true,
-              changeCount: 3,
+    ipcHandlers['repo.projection'] = async () =>
+      repoProjection({
+        branches: [
+          branch('feature/a', undefined, {
+            worktree: {
+              path: '/tmp/worktree-a',
+              summary: {
+                dirty: true,
+                changeCount: 3,
+              },
             },
-          },
-        }),
-      ],
-      current: 'feature/a',
-    })
+          }),
+        ],
+        current: 'feature/a',
+      })
 
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
 
@@ -765,9 +798,10 @@ describe('core refresh request ordering', () => {
     const repoInstanceId = seedRepo([branch('feature/a')])
     let resolveStatus!: (value: WorktreeStatus[]) => void
     const status: WorktreeStatus[] = [{ path: '/tmp/gbl-test-repo', branch: 'feature/a', isMain: true, entries: [] }]
-    ipcHandlers['repo.status'] = () =>
-      new Promise<WorktreeStatus[]>((resolve) => {
-        resolveStatus = resolve
+    ipcHandlers['repo.projection'] = () =>
+      new Promise((resolve) => {
+        resolveStatus = (status) =>
+          resolve(repoProjection({ branches: [branch('feature/a')], current: 'feature/a' }, status))
       })
 
     const work = useReposStore.getState().refreshStatus(REPO_ID, { repoInstanceId })
@@ -790,7 +824,7 @@ describe('core refresh request ordering', () => {
       stale: false,
     })
 
-    ipcHandlers['repo.status'] = async () => {
+    ipcHandlers['repo.projection'] = async () => {
       throw new Error('status failed')
     }
 
@@ -807,9 +841,11 @@ describe('core refresh request ordering', () => {
   test('marks read operations as queued before scheduler starts them', async () => {
     const repoInstanceId = seedRepo([branch('feature/a')])
     const resolvers: Array<(value: WorktreeStatus[]) => void> = []
-    ipcHandlers['repo.status'] = () =>
-      new Promise<WorktreeStatus[]>((resolve) => {
-        resolvers.push(resolve)
+    ipcHandlers['repo.projection'] = () =>
+      new Promise((resolve) => {
+        resolvers.push((status) =>
+          resolve(repoProjection({ branches: [branch('feature/a')], current: 'feature/a' }, status)),
+        )
       })
 
     const works = Array.from({ length: 4 }, () => useReposStore.getState().refreshStatus(REPO_ID, { repoInstanceId }))
@@ -835,9 +871,9 @@ describe('core refresh request ordering', () => {
     const repoInstanceId = seedRepo([branch('feature/a')])
     let callCount = 0
     ipcHandlers['repo.abort'] = async () => ({ ok: true, message: 'ok' })
-    ipcHandlers['repo.status'] = () => {
+    ipcHandlers['repo.projection'] = () => {
       callCount += 1
-      return new Promise<WorktreeStatus[]>(() => {})
+      return new Promise(() => {})
     }
 
     const works = Array.from({ length: 4 }, () => useReposStore.getState().refreshStatus(REPO_ID, { repoInstanceId }))
@@ -853,9 +889,11 @@ describe('core refresh request ordering', () => {
   test('drops older queued status refreshes before they start', async () => {
     const repoInstanceId = seedRepo([branch('feature/a')])
     const resolvers: Array<(value: WorktreeStatus[]) => void> = []
-    ipcHandlers['repo.status'] = () =>
-      new Promise<WorktreeStatus[]>((resolve) => {
-        resolvers.push(resolve)
+    ipcHandlers['repo.projection'] = () =>
+      new Promise((resolve) => {
+        resolvers.push((status) =>
+          resolve(repoProjection({ branches: [branch('feature/a')], current: 'feature/a' }, status)),
+        )
       })
 
     const works = Array.from({ length: 5 }, () => useReposStore.getState().refreshStatus(REPO_ID, { repoInstanceId }))
@@ -888,11 +926,13 @@ describe('core refresh request ordering', () => {
     let callCount = 0
     let resolveFirst!: (value: { branches: ReturnType<typeof branch>[]; current: string }) => void
     let resolveSecond!: (value: { branches: ReturnType<typeof branch>[]; current: string }) => void
-    ipcHandlers['repo.snapshot'] = () => {
+    ipcHandlers['repo.projection'] = () => {
       callCount += 1
-      return new Promise<{ branches: ReturnType<typeof branch>[]; current: string }>((resolve) => {
-        if (callCount === 1) resolveFirst = resolve
-        else resolveSecond = resolve
+      return new Promise((resolve) => {
+        const complete = (snapshot: { branches: ReturnType<typeof branch>[]; current: string }) =>
+          resolve(repoProjection(snapshot))
+        if (callCount === 1) resolveFirst = complete
+        else resolveSecond = complete
       })
     }
 
@@ -920,7 +960,8 @@ describe('core refresh request ordering', () => {
         'terminal',
       )
     })
-    ipcHandlers['repo.snapshot'] = async () => ({ branches: [branch('feature/a')], current: 'feature/a' })
+    ipcHandlers['repo.projection'] = async () =>
+      repoProjection({ branches: [branch('feature/a')], current: 'feature/a' })
 
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
 
@@ -948,10 +989,11 @@ describe('core refresh request ordering', () => {
         'terminal',
       )
     })
-    ipcHandlers['repo.snapshot'] = async () => ({
-      branches: [branch('feature/old'), branch('feature/new', undefined, { worktree: { path: '/tmp/worktree-a' } })],
-      current: 'feature/new',
-    })
+    ipcHandlers['repo.projection'] = async () =>
+      repoProjection({
+        branches: [branch('feature/old'), branch('feature/new', undefined, { worktree: { path: '/tmp/worktree-a' } })],
+        current: 'feature/new',
+      })
 
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
 
@@ -974,14 +1016,15 @@ describe('core refresh request ordering', () => {
       calls.push(input)
       return { pruned: 1, remaining: 1 }
     }
-    ipcHandlers['repo.snapshot'] = async () => ({
-      branches: [
-        branch('main', undefined, { worktree: { path: '/repo' } }),
-        branch('feature/a', undefined, { worktree: { path: '/tmp/worktree-a' } }),
-        branch('feature/plain'),
-      ],
-      current: 'main',
-    })
+    ipcHandlers['repo.projection'] = async () =>
+      repoProjection({
+        branches: [
+          branch('main', undefined, { worktree: { path: '/repo' } }),
+          branch('feature/a', undefined, { worktree: { path: '/tmp/worktree-a' } }),
+          branch('feature/plain'),
+        ],
+        current: 'main',
+      })
 
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
 
@@ -1003,10 +1046,11 @@ describe('core refresh request ordering', () => {
     ipcHandlers['terminal.prune'] = async () => {
       throw err
     }
-    ipcHandlers['repo.snapshot'] = async () => ({
-      branches: [branch('main', undefined, { worktree: { path: '/repo' } })],
-      current: 'main',
-    })
+    ipcHandlers['repo.projection'] = async () =>
+      repoProjection({
+        branches: [branch('main', undefined, { worktree: { path: '/repo' } })],
+        current: 'main',
+      })
 
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
     await new Promise((resolve) => setTimeout(resolve, 0))

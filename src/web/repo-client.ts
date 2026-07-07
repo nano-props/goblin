@@ -2,15 +2,13 @@ import { openExternalUrl } from '#/web/app-shell-client.ts'
 import { SERVER_REQUEST_TIMEOUT_ERROR, postServerJson } from '#/web/lib/server-fetch.ts'
 import type {
   CloneRepoResult,
-  RepoOperationsSnapshot,
   RepoRuntimeProjection,
   RepoRuntimeInstancesSnapshot,
   RepoRuntimeOpenResult,
-  RepoSnapshot,
   RepoLogResponse,
 } from '#/shared/api-types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
-import type { ExecResult, LogEntry, PullRequestFetchMode, RepoUrlTarget, WorktreeStatus } from '#/shared/git-types.ts'
+import type { ExecResult, LogEntry, PullRequestFetchMode, RepoUrlTarget } from '#/shared/git-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { ProbeResult } from '#/shared/api-types.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
@@ -50,14 +48,6 @@ export async function abortCloneOperation(operationId: string): Promise<boolean>
   return await postServerJson('/api/repo/abort-clone', { operationId })
 }
 
-export async function getRepoSnapshot(cwd: string, signal?: AbortSignal): Promise<RepoSnapshot> {
-  return await postServerJson('/api/repo/snapshot', { cwd }, { signal })
-}
-
-export async function getRepoStatus(cwd: string, signal?: AbortSignal): Promise<WorktreeStatus[]> {
-  return await postServerJson('/api/repo/status', { cwd }, { signal })
-}
-
 export async function getRepoLog(
   cwd: string,
   branch: string,
@@ -88,14 +78,6 @@ export async function getRepoProjection(
     { cwd, branch: branch || undefined, mode: options?.mode },
     { signal },
   )
-}
-
-export async function getRepoOperations(
-  cwd?: string,
-  options?: { includeSettled?: boolean },
-  signal?: AbortSignal,
-): Promise<RepoOperationsSnapshot> {
-  return await postServerJson('/api/repo/operations', { cwd, includeSettled: options?.includeSettled }, { signal })
 }
 
 export async function abortRepoOperation(cwd: string): Promise<boolean> {
@@ -195,35 +177,6 @@ export async function removeRepoWorktree(
 
 export async function getRepoPatch(cwd: string, worktreePath: string, signal?: AbortSignal): Promise<ExecResult> {
   return await postServerJson('/api/repo/patch', { cwd, worktreePath }, { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.patch })
-}
-
-interface RepoBulkReadResult {
-  snapshot: RepoSnapshot | null
-  status: WorktreeStatus[]
-}
-
-/**
- * Fetch core repo read results in one round trip. Pull request data
- * is intentionally exposed through the runtime projection instead.
- */
-export async function readRepoBulk(
-  cwd: string,
-  options: {
-    include?: ReadonlyArray<'snapshot' | 'status'>
-    signal?: AbortSignal
-    /** Per-section timeout in ms forwarded to the server. `0` disables. */
-    timeoutMs?: number
-  } = {},
-): Promise<RepoBulkReadResult> {
-  return await postServerJson(
-    '/api/repo/composite',
-    {
-      cwd,
-      include: options.include ? [...options.include] : undefined,
-      timeoutMs: options.timeoutMs,
-    },
-    { signal: options.signal },
-  )
 }
 
 export async function openRepoUrl(cwd: string, target: RepoUrlTarget): Promise<ExecResult> {

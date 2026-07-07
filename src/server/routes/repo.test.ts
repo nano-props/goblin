@@ -3,11 +3,8 @@ import { createRepoRoutes } from '#/server/routes/repo.ts'
 
 const mocks = vi.hoisted(() => ({
   probeRepo: vi.fn(),
-  getRepoSnapshot: vi.fn(),
-  getRepoStatus: vi.fn(),
   getRepoLog: vi.fn(),
   getRepoPatch: vi.fn(),
-  readRepoBulk: vi.fn(),
   readRepoProjection: vi.fn(),
   getRepoOperationsSnapshot: vi.fn(),
   fetchRepo: vi.fn(),
@@ -39,11 +36,8 @@ vi.mock('#/server/modules/background-sync.ts', () => ({
 }))
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({
   probeRepo: mocks.probeRepo,
-  getRepoSnapshot: mocks.getRepoSnapshot,
-  getRepoStatus: mocks.getRepoStatus,
   getRepoLog: mocks.getRepoLog,
   getRepoPatch: mocks.getRepoPatch,
-  readRepoBulk: mocks.readRepoBulk,
   readRepoProjection: mocks.readRepoProjection,
   getRepoWorktreeBootstrapPreview: mocks.getRepoWorktreeBootstrapPreview,
 }))
@@ -540,145 +534,6 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(response.status).toBe(400)
     const json = (await response.json()) as { code: string }
     expect(json.code).toBe('BAD_REQUEST')
-  })
-})
-
-describe('repo routes — composite read', () => {
-  test('returns snapshot and status sections by default', async () => {
-    mocks.readRepoBulk.mockResolvedValue({
-      snapshot: { branches: [], current: 'main' },
-      status: [],
-    })
-    const app = createTestRepoRoutes()
-    const response = await app.request(
-      new Request('http://localhost/composite', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo' }),
-      }),
-    )
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({
-      snapshot: { branches: [], current: 'main' },
-      status: [],
-    })
-  })
-
-  test('forwards include to the read function', async () => {
-    mocks.readRepoBulk.mockResolvedValue({ snapshot: null, status: [] })
-    const app = createTestRepoRoutes()
-    await app.request(
-      new Request('http://localhost/composite', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          cwd: '/tmp/repo',
-          include: ['snapshot', 'status'],
-        }),
-      }),
-    )
-    expect(mocks.readRepoBulk).toHaveBeenCalledWith('/tmp/repo', ['snapshot', 'status'], {
-      timeoutMs: undefined,
-      signal: expect.any(AbortSignal),
-    })
-  })
-
-  test('forwards timeoutMs to the read function when provided', async () => {
-    mocks.readRepoBulk.mockResolvedValue({ snapshot: null, status: [] })
-    const app = createTestRepoRoutes()
-    await app.request(
-      new Request('http://localhost/composite', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', include: ['snapshot', 'status'], timeoutMs: 2500 }),
-      }),
-    )
-    expect(mocks.readRepoBulk).toHaveBeenCalledWith(
-      '/tmp/repo',
-      ['snapshot', 'status'],
-      expect.objectContaining({ timeoutMs: 2500 }),
-    )
-  })
-
-  test('returns 400 when timeoutMs is not a number', async () => {
-    const app = createTestRepoRoutes()
-    const response = await app.request(
-      new Request('http://localhost/composite', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', include: ['snapshot', 'status'], timeoutMs: 'soon' }),
-      }),
-    )
-    expect(response.status).toBe(400)
-    const json = (await response.json()) as { code: string }
-    expect(json.code).toBe('BAD_REQUEST')
-  })
-
-  test('returns 400 when timeoutMs is negative', async () => {
-    const app = createTestRepoRoutes()
-    const response = await app.request(
-      new Request('http://localhost/composite', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', include: ['snapshot', 'status'], timeoutMs: -1 }),
-      }),
-    )
-    expect(response.status).toBe(400)
-  })
-
-  test('returns 400 when include has an unknown value', async () => {
-    const app = createTestRepoRoutes()
-    const response = await app.request(
-      new Request('http://localhost/composite', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', include: ['not-a-section'] }),
-      }),
-    )
-    expect(response.status).toBe(400)
-    const json = (await response.json()) as { code: string }
-    expect(json.code).toBe('BAD_REQUEST')
-  })
-
-  test('hard-fails when the read function rejects', async () => {
-    mocks.readRepoBulk.mockRejectedValue(new Error('backend exploded'))
-    const app = createTestRepoRoutes()
-    const response = await app.request(
-      new Request('http://localhost/composite', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo' }),
-      }),
-    )
-    expect(response.status).toBe(500)
-  })
-})
-
-describe('repo routes — authoritative repo reads', () => {
-  test('hard-fails /snapshot when the read layer rejects', async () => {
-    mocks.getRepoSnapshot.mockRejectedValue(new Error('backend exploded'))
-    const app = createTestRepoRoutes()
-    const response = await app.request(
-      new Request('http://localhost/snapshot', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo' }),
-      }),
-    )
-    expect(response.status).toBe(500)
-  })
-
-  test('hard-fails /status when the read layer rejects', async () => {
-    mocks.getRepoStatus.mockRejectedValue(new Error('backend exploded'))
-    const app = createTestRepoRoutes()
-    const response = await app.request(
-      new Request('http://localhost/status', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo' }),
-      }),
-    )
-    expect(response.status).toBe(500)
   })
 })
 

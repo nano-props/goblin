@@ -350,14 +350,12 @@ export interface AppIpcHandlers {
       directoryName: string
     }) => Promise<CloneRepoResult>
     abortClone: (input: { operationId: string }) => Promise<boolean>
-    snapshot: (input: { cwd: string }) => Promise<RepoSnapshot | null>
     projection: (input: {
       cwd: string
       branch?: string
       mode?: PullRequestFetchMode
     }) => Promise<RepoRuntimeProjection>
     operations: (input: { cwd?: string; includeSettled?: boolean }) => Promise<RepoOperationsSnapshot>
-    status: (input: { cwd: string }) => Promise<WorktreeStatus[]>
     patch: (input: { cwd: string; worktreePath: string }) => Promise<ExecResult>
     trashFile: (input: { cwd: string; worktreePath: string; path: string }) => Promise<ExecResult>
     deleteBranch: (input: {

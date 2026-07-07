@@ -32,7 +32,7 @@ describe('repo lifecycle', () => {
     expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
     expect(calls.recent).toEqual([{ kind: 'local', id: REPO_A }])
     await vi.waitFor(() => {
-      expect(calls.composite).toEqual([REPO_A])
+      expect(calls.projection).toEqual([REPO_A])
     })
   })
 
@@ -79,7 +79,7 @@ describe('repo lifecycle', () => {
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
     await vi.waitFor(() => {
-      expect(calls.composite).toEqual([REPO_A, REPO_B])
+      expect(calls.projection).toEqual([REPO_A, REPO_B])
     })
   })
 
@@ -93,7 +93,7 @@ describe('repo lifecycle', () => {
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
     await vi.waitFor(() => {
-      expect(calls.composite).toEqual([REPO_A, REPO_B])
+      expect(calls.projection).toEqual([REPO_A, REPO_B])
     })
   })
 
@@ -126,19 +126,13 @@ describe('repo lifecycle', () => {
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
     await vi.waitFor(() => {
-      expect(calls.composite).toEqual([REPO_A, REPO_B])
+      expect(calls.projection).toEqual([REPO_A, REPO_B])
     })
   })
   test('initial refresh results from a closed repo instance do not overwrite a reopened repo', async () => {
     const snapshotResolvers: Array<(value: { branches: BranchSnapshotInfo[]; current: string }) => void> = []
     installGoblin({
-      snapshot: () =>
-        new Promise<{ branches: BranchSnapshotInfo[]; current: string }>((resolve) => {
-          snapshotResolvers.push(resolve)
-        }),
-      // `refreshCoreData` now goes through the composite endpoint, so
-      // forward every snapshot resolver into the composite handler too.
-      composite: () =>
+      projection: () =>
         new Promise<{
           snapshot: { branches: BranchSnapshotInfo[]; current: string }
           status: never[]
@@ -317,7 +311,7 @@ describe('repo lifecycle', () => {
       kind: 'ready',
       target: newTarget,
     })
-    expect(calls.composite).toEqual([newTarget!.id])
+    expect(calls.projection).toEqual([newTarget!.id])
   })
 
   test('closeRepo clears recorded tab openers scoped to that repo, but leaves other repos untouched', () => {

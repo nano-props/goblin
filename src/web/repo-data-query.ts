@@ -3,19 +3,11 @@ import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   getRepoLog,
-  getRepoOperations,
   getRepoProjection,
   getRepoRemoteBranches,
-  getRepoSnapshot,
-  getRepoStatus,
 } from '#/web/repo-client.ts'
 import type { RepoOperationsSnapshot, RepoRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT, type PullRequestFetchMode, type WorktreeStatus } from '#/shared/git-types.ts'
-
-interface RepoBulkReadCacheEntry {
-  snapshot: RepoSnapshot | null
-  status: WorktreeStatus[]
-}
 
 const ACTIVE_REPO_OPERATION_REFETCH_INTERVAL_MS = 1_000
 const RUNTIME_PROJECTION_REFRESH_DELAYS_MS = [50, 250] as const
@@ -26,14 +18,6 @@ export function repoSnapshotQueryKey(repoRoot: string, repoInstanceId: string) {
 
 export function repoStatusQueryKey(repoRoot: string, repoInstanceId: string) {
   return ['repo-data', repoRoot, repoInstanceId, 'status'] as const
-}
-
-export function repoBulkReadQueryKey(
-  repoRoot: string,
-  repoInstanceId: string,
-  include?: ReadonlyArray<'snapshot' | 'status'>,
-) {
-  return ['repo-data', repoRoot, repoInstanceId, 'bulk', { include: include ? [...include].sort() : null }] as const
 }
 
 export function repoProjectionQueryKey(
@@ -69,23 +53,7 @@ function repoRemoteBranchesQueryKey(repoRoot: string, repoInstanceId: string) {
   return ['repo-data', repoRoot, repoInstanceId, 'remote-branches'] as const
 }
 
-export function repoSnapshotQueryOptions(repoRoot: string, repoInstanceId: string) {
-  return queryOptions({
-    queryKey: repoSnapshotQueryKey(repoRoot, repoInstanceId),
-    queryFn: ({ signal }) => getRepoSnapshot(repoRoot, signal),
-    staleTime: Number.POSITIVE_INFINITY,
-  })
-}
-
-function repoStatusQueryOptions(repoRoot: string, repoInstanceId: string) {
-  return queryOptions({
-    queryKey: repoStatusQueryKey(repoRoot, repoInstanceId),
-    queryFn: ({ signal }) => getRepoStatus(repoRoot, signal),
-    staleTime: Number.POSITIVE_INFINITY,
-  })
-}
-
-function repoProjectionQueryOptions(
+export function repoProjectionQueryOptions(
   repoRoot: string,
   repoInstanceId: string,
   branch?: string | null,
@@ -100,16 +68,6 @@ function repoProjectionQueryOptions(
       repoOperationsSnapshotHasActiveOperations(query.state.data?.operations)
         ? ACTIVE_REPO_OPERATION_REFETCH_INTERVAL_MS
         : false,
-    staleTime: Number.POSITIVE_INFINITY,
-  })
-}
-
-function repoOperationsQueryOptions(repoRoot: string, repoInstanceId: string, includeSettled = false) {
-  return queryOptions({
-    queryKey: repoOperationsQueryKey(repoRoot, repoInstanceId, includeSettled),
-    queryFn: ({ signal }) => getRepoOperations(repoRoot, { includeSettled }, signal),
-    refetchInterval: (query) =>
-      repoOperationsSnapshotHasActiveOperations(query.state.data) ? ACTIVE_REPO_OPERATION_REFETCH_INTERVAL_MS : false,
     staleTime: Number.POSITIVE_INFINITY,
   })
 }
@@ -168,22 +126,6 @@ function repoRemoteBranchesQueryOptions(repoRoot: string, repoInstanceId: string
   })
 }
 
-export function useRepoSnapshotReadModel(repoRoot: string, repoInstanceId: string, enabled: boolean) {
-  return useQuery({
-    ...repoSnapshotQueryOptions(repoRoot, repoInstanceId),
-    enabled,
-    subscribed: enabled,
-  })
-}
-
-export function useRepoStatusReadModel(repoRoot: string, repoInstanceId: string, enabled: boolean) {
-  return useQuery({
-    ...repoStatusQueryOptions(repoRoot, repoInstanceId),
-    enabled,
-    subscribed: enabled,
-  })
-}
-
 export function useRepoProjectionReadModel(
   repoRoot: string,
   repoInstanceId: string,
@@ -200,24 +142,6 @@ export function useRepoProjectionReadModel(
     if (!enabled || !query.data || query.isPlaceholderData) return
     setRepoProjectionQueryData(repoRoot, repoInstanceId, branch, mode, query.data)
   }, [branch, enabled, mode, query.data, query.isPlaceholderData, repoInstanceId, repoRoot])
-  return query
-}
-
-export function useRepoOperationsReadModel(
-  repoRoot: string,
-  repoInstanceId: string,
-  includeSettled: boolean,
-  enabled: boolean,
-) {
-  const query = useQuery({
-    ...repoOperationsQueryOptions(repoRoot, repoInstanceId, includeSettled),
-    enabled,
-    subscribed: enabled,
-  })
-  useEffect(() => {
-    if (!enabled || !query.data) return
-    setRepoOperationsQueryData(repoRoot, repoInstanceId, includeSettled, query.data)
-  }, [enabled, includeSettled, query.data, repoInstanceId, repoRoot])
   return query
 }
 
@@ -341,26 +265,9 @@ export function setRepoProjectionQueryData(
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
   queryClient.setQueryData(repoProjectionQueryKey(repoRoot, repoInstanceId, branch, mode), projection)
-  if (projection.snapshot) setRepoSnapshotQueryDataOnly(repoRoot, repoInstanceId, projection.snapshot, queryClient)
-  setRepoStatusQueryDataOnly(repoRoot, repoInstanceId, projection.status, queryClient)
+  if (projection.snapshot) setRepoSnapshotQueryData(repoRoot, repoInstanceId, projection.snapshot, queryClient)
+  setRepoStatusQueryData(repoRoot, repoInstanceId, projection.status, queryClient)
   setRepoOperationsQueryData(repoRoot, repoInstanceId, false, projection.operations, queryClient)
-}
-
-export function setRepoBulkReadQueryData(
-  repoRoot: string,
-  repoInstanceId: string,
-  include: ReadonlyArray<'snapshot' | 'status'> | undefined,
-  result: RepoBulkReadCacheEntry,
-  queryClient: QueryClient = primaryWindowQueryClient,
-): void {
-  const included = include ?? ['snapshot', 'status']
-  queryClient.setQueryData(repoBulkReadQueryKey(repoRoot, repoInstanceId, include), result)
-  if (included.includes('snapshot') && result.snapshot) {
-    setRepoSnapshotQueryData(repoRoot, repoInstanceId, result.snapshot, queryClient)
-  }
-  if (included.includes('status')) {
-    setRepoStatusQueryData(repoRoot, repoInstanceId, result.status, queryClient)
-  }
 }
 
 export function invalidateRepoDataQueries(

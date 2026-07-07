@@ -123,8 +123,6 @@ export const REPO_PROCEDURE_SCHEMAS = {
   runtimeClose: RepoRuntimeCloseSchema,
   abort: CwdInput,
   probe: CwdInput,
-  snapshot: CwdInput,
-  status: CwdInput,
   log: v.object({
     cwd: v.string(),
     branch: v.string(),
@@ -159,18 +157,6 @@ export const REPO_PROCEDURE_SCHEMAS = {
   operations: v.object({
     cwd: v.optional(v.string()),
     includeSettled: v.optional(v.boolean()),
-  }),
-  // Composite read — folds snapshot/status into one round trip. Pull
-  // request reads are exposed through the server runtime projection only.
-  // Body shape: `{ cwd, include?, timeoutMs? }`; `timeoutMs` is a real
-  // number (no string coercion — query-string parsing is gone).
-  composite: v.object({
-    cwd: v.string(),
-    include: v.optional(v.array(v.picklist(['snapshot', 'status']))),
-    // Per-section timeout in ms. The perimeter rejects non-numbers,
-    // non-integers, negative values, and values above 600000; accepted
-    // values are already safe for server-side timeout handling.
-    timeoutMs: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(600_000))),
   }),
 } as const
 

@@ -164,7 +164,7 @@ upstream `@xterm/*` ships its own test helper.
   the client bridge via `setClientBridgeForTests`, and a path-keyed
   `fetch` stub. `handlers` is `Record<string, (input) => unknown>` mapping
   IPC pathnames (e.g. `'repo.probe'`) and server routes (e.g.
-  `'repo.snapshot'`) to their test handlers.
+  `'repo.projection'`) to their test handlers.
 - `resetReposStore()`, `seedRepoState({...})`, `createBranchSnapshot(...)`,
   `createRepoBranch(...)`, `createPullRequest(...)` — co-located here
   so non-repo tests can use them without dragging in the repo store.

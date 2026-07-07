@@ -13,9 +13,7 @@ export async function flushIpc(): Promise<void> {
 export function installGoblin(overrides: Record<string, (input: any) => unknown> = {}) {
   const calls = {
     recent: [] as RepoSessionEntry[],
-    snapshot: [] as string[],
-    status: [] as string[],
-    composite: [] as string[],
+    projection: [] as string[],
     resolveTarget: [] as Array<{ alias: string; remotePath: string }>,
   }
   const handlers: Record<string, (input: any) => unknown> = {
@@ -23,20 +21,8 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
       if (cwd === '/missing') return { ok: false, message: 'missing' }
       return { ok: true, root: cwd, name: cwd.split('/').at(-1) ?? cwd }
     },
-    'repo.snapshot': ({ cwd }: { cwd: string }) => {
-      calls.snapshot.push(cwd)
-      return { branches: [], current: '' }
-    },
-    'repo.status': ({ cwd }: { cwd: string }) => {
-      calls.status.push(cwd)
-      return []
-    },
-    // The composite endpoint folds snapshot + status into one round
-    // trip, so it lives in its own bucket — the old approach of
-    // pushing into both `snapshot` and `status` hid the fact that
-    // `refreshCoreData` now hits the bridge once, not twice.
-    'repo.composite': ({ cwd }: { cwd: string }) => {
-      calls.composite.push(cwd)
+    'repo.projection': ({ cwd }: { cwd: string }) => {
+      calls.projection.push(cwd)
       return { snapshot: { branches: [], current: '' }, status: [], pullRequests: null }
     },
     'repo.abort': async () => undefined,
@@ -62,8 +48,7 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
   }
   for (const [key, handler] of Object.entries(overrides)) {
     if (key === 'probe') handlers['repo.probe'] = ({ cwd }: { cwd: string }) => handler(cwd)
-    else if (key === 'snapshot') handlers['repo.snapshot'] = ({ cwd }: { cwd: string }) => handler(cwd)
-    else if (key === 'composite') handlers['repo.composite'] = handler
+    else if (key === 'projection') handlers['repo.projection'] = handler
     else handlers[key] = handler
   }
   // Exercise the same server-side lifecycle boundary used in production:

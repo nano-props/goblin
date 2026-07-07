@@ -32,7 +32,7 @@ describe('repo session hydration', () => {
     expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
     expect(calls.recent).toEqual([])
     await vi.waitFor(() => {
-      expect(calls.composite).toEqual([REPO_A, REPO_B])
+      expect(calls.projection).toEqual([REPO_A, REPO_B])
     })
   })
 
@@ -51,7 +51,7 @@ describe('repo session hydration', () => {
     const cached = primaryWindowQueryClient.getQueryData<RepoRuntimeInstancesSnapshot>(repoRuntimeInstancesQueryKey())
     expect(cached?.instances).toEqual([{ repoRoot: REPO_A, repoInstanceId: repo!.instanceId }])
     await vi.waitFor(() => {
-      expect(calls.composite).toEqual([REPO_A])
+      expect(calls.projection).toEqual([REPO_A])
     })
   })
 
@@ -74,13 +74,7 @@ describe('repo session hydration', () => {
     })
     let resolveSnapshot!: (value: { branches: BranchSnapshotInfo[]; current: string }) => void
     installGoblin({
-      snapshot: () =>
-        new Promise<{ branches: BranchSnapshotInfo[]; current: string }>((resolve) => {
-          resolveSnapshot = resolve
-        }),
-      // `refreshCoreData` now goes through the composite endpoint.
-      // The test drives both reads via this single resolver.
-      composite: () =>
+      projection: () =>
         new Promise<{
           snapshot: { branches: BranchSnapshotInfo[]; current: string }
           status: never[]
@@ -136,11 +130,7 @@ describe('repo session hydration', () => {
         new Promise<{ ok: true; root: string; name: string }>((resolve) => {
           probes.set(path, resolve)
         }),
-      snapshot: () => new Promise<{ branches: BranchSnapshotInfo[]; current: string }>(() => {}),
-      // Composite endpoint must mirror the snapshot handler for tests
-      // that hold the read in-flight forever — the projection stays as
-      // 'cache' until the promise settles.
-      composite: () =>
+      projection: () =>
         new Promise<{
           snapshot: { branches: BranchSnapshotInfo[]; current: string }
           status: never[]
@@ -207,7 +197,7 @@ describe('repo session hydration', () => {
         new Promise<{ ok: true; root: string; name: string }>((resolve) => {
           probes.set(path, resolve)
         }),
-      composite: () =>
+      projection: () =>
         new Promise<{
           snapshot: { branches: BranchSnapshotInfo[]; current: string }
           status: never[]

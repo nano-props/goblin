@@ -6,7 +6,7 @@
 //
 // Design choices:
 //   - `handlers` is a `Record<string, IpcTestHandler>` keyed by IPC
-//     pathname (`'repo.probe'`, `'repo.snapshot'`, etc.) and server
+//     pathname (`'repo.probe'`, `'repo.projection'`, etc.) and server
 //     route (`'/api/repo/probe'`, etc.). `installGoblinTestBridge`
 //     wires each pathname to the matching fetch URL.
 //   - The bridge mock composes the same `goblinNative` shape the real
@@ -30,7 +30,11 @@ import {
   readWorkspacePaneTabsForTarget,
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
+import {
+  setRepoProjectionQueryData,
+  setRepoSnapshotQueryData,
+  setRepoStatusQueryData,
+} from '#/web/repo-data-query.ts'
 import {
   workspacePaneTabsWithStaticTab,
   workspacePaneTabsWithoutStaticTab,
@@ -678,26 +682,37 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         return handler(payload)
       }
       const readRepoProjection = async (payload: Record<string, unknown>) => {
-        if (handlers['repo.projection']) return call('repo.projection', payload)
         const cwd = typeof payload.cwd === 'string' ? payload.cwd : ''
         const branch = typeof payload.branch === 'string' && payload.branch.length > 0 ? payload.branch : null
         const mode = payload.mode === 'summary' ? 'summary' : 'full'
-        const snapshot = handlers['repo.snapshot'] ? await call('repo.snapshot', { cwd }) : null
-        const status = handlers['repo.status'] ? await call('repo.status', { cwd }) : []
-        const operations = handlers['repo.operations']
-          ? await call('repo.operations', { cwd, includeSettled: false })
-          : { operations: [], loadedAt: Date.now() }
-        return {
-          snapshot,
-          status,
-          pullRequests: null,
-          operations,
-          requested: {
-            branch,
-            pullRequestMode: mode,
-          },
-          loadedAt: Date.now(),
+        const normalizeProjection = (raw: unknown) => {
+          const projection = raw as {
+            snapshot?: unknown
+            status?: unknown
+            pullRequests?: unknown
+            operations?: unknown
+            requested?: unknown
+            loadedAt?: unknown
+          }
+          return {
+            snapshot: projection.snapshot ?? null,
+            status: Array.isArray(projection.status) ? projection.status : [],
+            pullRequests: projection.pullRequests ?? null,
+            operations:
+              projection.operations && typeof projection.operations === 'object'
+                ? projection.operations
+                : { operations: [], loadedAt: Date.now() },
+            requested:
+              projection.requested && typeof projection.requested === 'object'
+                ? projection.requested
+                : {
+                    branch,
+                    pullRequestMode: mode,
+                  },
+            loadedAt: typeof projection.loadedAt === 'number' ? projection.loadedAt : Date.now(),
+          }
         }
+        return normalizeProjection(await call('repo.projection', payload))
       }
       const openRepoRuntime = async (payload: unknown) => {
         const repoRoot = typeof payload === 'object' && payload && 'repoRoot' in payload ? payload.repoRoot : null
@@ -763,8 +778,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         if (url.pathname === '/api/remote/path-suggestions') return call('remote.listPathSuggestions', body)
         if (url.pathname === '/api/remote/test-repo') return call('remote.testRepo', body)
         if (url.pathname === '/api/repo/probe') return call('repo.probe', body)
-        if (url.pathname === '/api/repo/snapshot') return call('repo.snapshot', body)
-        if (url.pathname === '/api/repo/status') return call('repo.status', body)
         if (url.pathname === '/api/repo/log') return call('repo.log', body)
         if (url.pathname === '/api/repo/remote-branches') return call('repo.remoteBranches', body)
         if (url.pathname === '/api/repo/projection') return readRepoProjection(body)
@@ -772,7 +785,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return handlers['repo.operations'] ? call('repo.operations', body) : { operations: [], loadedAt: Date.now() }
         }
         if (url.pathname === '/api/repo/patch') return call('repo.patch', body)
-        if (url.pathname === '/api/repo/composite') return call('repo.composite', body)
         if (url.pathname === '/api/repo/fetch') return call('repo.fetch', body)
         if (url.pathname === '/api/repo/clone') return call('repo.clone', body)
         if (url.pathname === '/api/repo/abort-clone') return call('repo.abortClone', body)
@@ -904,4 +916,18 @@ export function seedRepoReadModelQueryData(
     current: readModel.currentBranch,
   })
   setRepoStatusQueryData(repo.id, repo.instanceId, readModel.status ?? [])
+  setRepoProjectionQueryData(repo.id, repo.instanceId, null, 'full', {
+    snapshot: {
+      branches: readModel.branches,
+      current: readModel.currentBranch,
+    },
+    status: readModel.status ?? [],
+    pullRequests: null,
+    operations: { operations: [], loadedAt: 0 },
+    requested: {
+      branch: null,
+      pullRequestMode: 'full',
+    },
+    loadedAt: 0,
+  })
 }

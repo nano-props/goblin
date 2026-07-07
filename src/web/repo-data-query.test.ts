@@ -5,11 +5,9 @@ import {
   getRepoProjectionQueryData,
   getRepoSnapshotQueryData,
   getRepoStatusQueryData,
-  repoBulkReadQueryKey,
   repoOperationsQueryKey,
   repoProjectionQueryKey,
   scheduleRepoRuntimeProjectionRefresh,
-  setRepoBulkReadQueryData,
   setRepoOperationsQueryData,
   setRepoProjectionQueryData,
   setRepoStatusQueryData,
@@ -18,12 +16,6 @@ import type { PullRequestEntry, RepoRuntimeProjection, RepoSnapshot } from '#/sh
 import type { WorktreeStatus } from '#/shared/git-types.ts'
 
 describe('repo data query keys', () => {
-  test('normalizes unordered dimensions inside structured key fields', () => {
-    expect(repoBulkReadQueryKey('/tmp/repo', 'repo-instance-1', ['status', 'snapshot'])).toEqual(
-      repoBulkReadQueryKey('/tmp/repo', 'repo-instance-1', ['snapshot', 'status']),
-    )
-  })
-
   test('separates projection branch and fetch mode', () => {
     expect(repoProjectionQueryKey('/tmp/repo', 'repo-instance-1', 'feature/a', 'summary')).not.toEqual(
       repoProjectionQueryKey('/tmp/repo', 'repo-instance-1', 'feature/a', 'full'),
@@ -37,26 +29,6 @@ describe('repo data query keys', () => {
     expect(repoOperationsQueryKey('/tmp/repo', 'repo-instance-1', false)).not.toEqual(
       repoOperationsQueryKey('/tmp/repo', 'repo-instance-1', true),
     )
-  })
-})
-
-describe('repo bulk read query data', () => {
-  test('records partial bulk reads without treating missing snapshot data as a cache write error', () => {
-    const queryClient = new QueryClient()
-    const status = [{ path: '/tmp/repo', branch: 'main', isMain: true, entries: [] }]
-
-    expect(() =>
-      setRepoBulkReadQueryData(
-        '/tmp/repo',
-        'repo-instance-1',
-        ['snapshot', 'status'],
-        { snapshot: null, status },
-        queryClient,
-      ),
-    ).not.toThrow()
-
-    expect(getRepoSnapshotQueryData('/tmp/repo', 'repo-instance-1', queryClient)).toBeUndefined()
-    expect(getRepoStatusQueryData('/tmp/repo', 'repo-instance-1', queryClient)).toEqual(status)
   })
 })
 
