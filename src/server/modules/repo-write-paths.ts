@@ -45,7 +45,7 @@ const activeBackgroundFetches = new Map<
   string,
   { promise: Promise<{ ok: boolean; message: string }>; operationId: string }
 >()
-const createWorktreeOperationQueuesByRepo = new Map<string, PQueue>()
+const repoWriteOperationQueuesByRepo = new Map<string, PQueue>()
 
 type RepoExecResult = { ok: boolean; message: string }
 
@@ -235,7 +235,6 @@ async function runRepoServerWriteOperation<T extends ExecResult>(options: {
   kind: RepoServerOperationKind
   target?: RepoServerOperationTarget | null
   signal?: AbortSignal
-  schedule?: (task: () => Promise<T>) => Promise<T>
   task: () => Promise<T>
 }): Promise<T> {
   const operation = beginRepoServerOperation({
@@ -271,7 +270,7 @@ async function runRepoServerWriteOperation<T extends ExecResult>(options: {
       options.signal?.removeEventListener('abort', onAbort)
     }
   }
-  return await (options.schedule ? options.schedule(run) : run())
+  return await runRepoWriteServiceOperation(options.repoId, run)
 }
 
 export async function cloneRepo(
@@ -430,7 +429,6 @@ export async function createRepoWorktree(
     kind: 'create-worktree',
     target: { branch: createWorktreeTargetBranch(normalized), worktreePath: normalized.worktreePath },
     signal,
-    schedule: (task) => runCreateWorktreeServiceOperation(repoId, task),
     task: async () => {
       return await runWithRepoSource(cwd, async (source) => {
         const result = await source.createWorktree(normalized, signal, {
@@ -443,30 +441,30 @@ export async function createRepoWorktree(
   })
 }
 
-async function runCreateWorktreeServiceOperation<T>(repoId: string, task: () => Promise<T>): Promise<T> {
-  // Create worktree is one service mutation: git create, bootstrap, trust sync,
-  // and invalidation must apply in request order for the same repo.
-  const queue = createWorktreeOperationQueueForRepo(repoId)
+async function runRepoWriteServiceOperation<T>(repoId: string, task: () => Promise<T>): Promise<T> {
+  // Git mutations for a repo share one service queue so server-observed
+  // operation state and filesystem effects move in the same order.
+  const queue = repoWriteOperationQueueForRepo(repoId)
   try {
     return await queue.add(task)
   } finally {
-    scheduleCreateWorktreeOperationQueueCleanup(repoId, queue)
+    scheduleRepoWriteOperationQueueCleanup(repoId, queue)
   }
 }
 
-function createWorktreeOperationQueueForRepo(repoId: string): PQueue {
-  let queue = createWorktreeOperationQueuesByRepo.get(repoId)
+function repoWriteOperationQueueForRepo(repoId: string): PQueue {
+  let queue = repoWriteOperationQueuesByRepo.get(repoId)
   if (!queue) {
     queue = new PQueue({ concurrency: 1 })
-    createWorktreeOperationQueuesByRepo.set(repoId, queue)
+    repoWriteOperationQueuesByRepo.set(repoId, queue)
   }
   return queue
 }
 
-function scheduleCreateWorktreeOperationQueueCleanup(repoId: string, queue: PQueue): void {
+function scheduleRepoWriteOperationQueueCleanup(repoId: string, queue: PQueue): void {
   void queue.onIdle().then(() => {
-    if (createWorktreeOperationQueuesByRepo.get(repoId) !== queue) return
-    if (queue.size === 0 && queue.pending === 0) createWorktreeOperationQueuesByRepo.delete(repoId)
+    if (repoWriteOperationQueuesByRepo.get(repoId) !== queue) return
+    if (queue.size === 0 && queue.pending === 0) repoWriteOperationQueuesByRepo.delete(repoId)
   })
 }
 

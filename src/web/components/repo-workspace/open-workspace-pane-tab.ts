@@ -59,7 +59,7 @@ export async function openWorkspacePaneTab(input: {
     )
   }
   showWorkspacePaneTab(input)
-  if (provider.refreshOnOpen) requestVisibleRepoProjectionRefresh(useReposStore.getState, input.repoId)
+  if (provider.refreshOnOpen) requestVisibleRepoProjectionRefresh(useReposStore.getState, input.repoId, branchName)
   return true
 }
 

@@ -71,6 +71,7 @@ describe('isRepoVisibleProjectionRefreshable', () => {
         id: '/r',
         repoInstanceId: 'repo-instance-test',
         preferredWorkspacePaneTab: 'status',
+        branchName: 'main',
         visibleProjectionViewOpen: true,
         unavailable: false,
         visibleStatusPhase: 'idle',
@@ -84,6 +85,7 @@ describe('isRepoVisibleProjectionRefreshable', () => {
         id: '/r',
         repoInstanceId: 'repo-instance-test',
         preferredWorkspacePaneTab: 'status',
+        branchName: 'main',
         visibleProjectionViewOpen: true,
         unavailable: true,
         visibleStatusPhase: 'idle',
@@ -97,6 +99,7 @@ describe('isRepoVisibleProjectionRefreshable', () => {
         id: '/r',
         repoInstanceId: 'repo-instance-test',
         preferredWorkspacePaneTab: 'status',
+        branchName: 'main',
         visibleProjectionViewOpen: true,
         unavailable: false,
         visibleStatusPhase: 'loading',
@@ -107,6 +110,7 @@ describe('isRepoVisibleProjectionRefreshable', () => {
         id: '/r',
         repoInstanceId: 'repo-instance-test',
         preferredWorkspacePaneTab: 'status',
+        branchName: 'main',
         visibleProjectionViewOpen: true,
         unavailable: false,
         visibleStatusPhase: 'refreshing',
@@ -160,6 +164,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
     expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-b', {
       repoInstanceId: 'repo-instance-test-b',
       scope: 'visible-status',
+      branchName: 'main',
     })
   })
 
@@ -182,6 +187,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
     expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
       repoInstanceId: 'repo-instance-test-a',
       scope: 'visible-status',
+      branchName: 'main',
     })
   })
 
@@ -204,6 +210,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
     expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
       repoInstanceId: 'repo-instance-test-a',
       scope: 'visible-status',
+      branchName: 'main',
     })
   })
 
@@ -230,6 +237,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
     expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
       repoInstanceId: 'repo-instance-test-a',
       scope: 'visible-status',
+      branchName: 'main',
     })
   })
 

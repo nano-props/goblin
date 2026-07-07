@@ -16,7 +16,12 @@ import { getRepoProjection } from '#/web/repo-client.ts'
 import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { RepoRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
-import type { RepoRuntimeProjectionRefreshScope, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
+import type {
+  RepoRuntimeProjectionRefreshOptions,
+  RepoRuntimeProjectionRefreshScope,
+  ReposGet,
+  ReposSet,
+} from '#/web/stores/repos/types.ts'
 
 type ProjectionRefreshTarget =
   | { key: 'repoReadModel'; reason: 'repo-read-model' }
@@ -80,9 +85,11 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
   async function runRuntimeProjectionRefresh(
     id: string,
     repoInstanceId: string,
-    scope: RepoRuntimeProjectionRefreshScope,
+    options: RepoRuntimeProjectionRefreshOptions,
   ): Promise<void> {
+    const { scope } = options
     const { wantsReadModelLoad, wantsVisibleStatusLoad, operationKey, priority, targets } = projectionRefreshPlan(scope)
+    const branchName = scope === 'visible-status' ? options.branchName : null
 
     updateIfFresh(set, id, repoInstanceId, (r) => {
       if (wantsReadModelLoad) {
@@ -105,13 +112,13 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       operationKey,
       priority,
       targets,
-      task: (signal) => getRepoProjection(id, null, { mode: 'full' }, signal),
+      task: (signal) => getRepoProjection(id, branchName, { mode: 'full' }, signal),
       errorFromResult: (projection) => (projection.snapshot ? null : 'error.failed-read-repo'),
       onResult: async (projection: RepoRuntimeProjection, ctx) => {
         const previousBranchModel = ctx.isCurrent()
           ? readRepoBranchQueryProjection({ id, instanceId: repoInstanceId })
           : null
-        if (ctx.isCurrent()) setRepoProjectionQueryData(id, repoInstanceId, null, 'full', projection)
+        if (ctx.isCurrent()) setRepoProjectionQueryData(id, repoInstanceId, branchName, 'full', projection)
 
         if (wantsVisibleStatusLoad) {
           updateIfFresh(set, id, repoInstanceId, (r) => {
@@ -161,12 +168,12 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
 
     async refreshRuntimeProjection(
       id: string,
-      options: { repoInstanceId?: string; scope: RepoRuntimeProjectionRefreshScope },
+      options: RepoRuntimeProjectionRefreshOptions,
     ) {
       const resolved = resolveActionRepoInstanceId(get, id, options.repoInstanceId)
       if (!resolved) return
       const { repoInstanceId } = resolved
-      await runRuntimeProjectionRefresh(id, repoInstanceId, options.scope)
+      await runRuntimeProjectionRefresh(id, repoInstanceId, options)
     },
 
     /** Unified sync pipeline — local and remote repos follow the same path.

@@ -58,7 +58,11 @@ describe('openWorkspacePaneTab', () => {
 
     expect(openTabsFor('feature/worktree')).toEqual(['status'])
     expect(preferredWorkspacePaneTab()).toBe('status')
-    expect(refreshRuntimeProjection).toHaveBeenCalledWith(REPO_ID, { repoInstanceId, scope: 'visible-status' })
+    expect(refreshRuntimeProjection).toHaveBeenCalledWith(REPO_ID, {
+      repoInstanceId,
+      scope: 'visible-status',
+      branchName: 'feature/worktree',
+    })
   })
 
   test('registers changes as a workspace pane static tab and refreshes status', async () => {
@@ -81,7 +85,11 @@ describe('openWorkspacePaneTab', () => {
 
     expect(openTabsFor('feature/worktree')).toEqual(['status', 'changes'])
     expect(preferredWorkspacePaneTab()).toBe('changes')
-    expect(refreshRuntimeProjection).toHaveBeenCalledWith(REPO_ID, { repoInstanceId, scope: 'visible-status' })
+    expect(refreshRuntimeProjection).toHaveBeenCalledWith(REPO_ID, {
+      repoInstanceId,
+      scope: 'visible-status',
+      branchName: 'feature/worktree',
+    })
   })
 
   test('can insert a newly opened static tab immediately after a specific tab', async () => {

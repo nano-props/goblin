@@ -21,6 +21,7 @@ function currentRepoVisibleProjectionRefreshStateEqual(
       a.id === b.id &&
       a.repoInstanceId === b.repoInstanceId &&
       a.preferredWorkspacePaneTab === b.preferredWorkspacePaneTab &&
+      a.branchName === b.branchName &&
       a.visibleProjectionViewOpen === b.visibleProjectionViewOpen &&
       a.unavailable === b.unavailable &&
       a.visibleStatusPhase === b.visibleStatusPhase)
@@ -72,6 +73,7 @@ export function useVisibleRepoProjectionRefresh({
       reason: 'visible-projection-view-opened',
       id: currentRepoRefreshState.id,
       repoInstanceId: currentRepoRefreshState.repoInstanceId,
+      branchName: currentRepoRefreshState.branchName,
     })
   }, [currentRepoRefreshState])
 }

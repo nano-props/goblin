@@ -256,10 +256,7 @@ interface RuntimeCoherentRepoProjectionActions {
    *  target-scoped user intent. */
   setWorkspacePaneTab: (id: string, branch: string, tab: WorkspacePaneTabType) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
-  refreshRuntimeProjection: (
-    id: string,
-    options: { repoInstanceId?: string; scope: RepoRuntimeProjectionRefreshScope },
-  ) => Promise<void>
+  refreshRuntimeProjection: (id: string, options: RepoRuntimeProjectionRefreshOptions) => Promise<void>
   refreshCoreData: (id: string, options?: { repoInstanceId?: string }) => Promise<void>
   syncAndRefresh: (id: string, options?: { repoInstanceId?: string }) => Promise<void>
   setLastResult: (id: string, result: ExecResult, repoInstanceId: string, options?: RepoResultEventOptions) => void
@@ -276,6 +273,9 @@ interface RuntimeCoherentRepoProjectionActions {
 }
 
 export type RepoRuntimeProjectionRefreshScope = 'repo-read-model' | 'visible-status'
+export type RepoRuntimeProjectionRefreshOptions =
+  | { repoInstanceId?: string; scope: 'repo-read-model' }
+  | { repoInstanceId?: string; scope: 'visible-status'; branchName: string | null }
 
 interface RepoMutationActions {
   runBranchAction: (

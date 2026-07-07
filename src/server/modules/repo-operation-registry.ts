@@ -57,8 +57,8 @@ function operationFailureReasonForMessage(
 
 function sortedOperations(states: RepoServerOperationState[]): RepoServerOperationState[] {
   return [...states].sort((a, b) => {
-    const aTime = a.startedAt ?? a.queuedAt
-    const bTime = b.startedAt ?? b.queuedAt
+    const aTime = a.settledAt ?? a.startedAt ?? a.queuedAt
+    const bTime = b.settledAt ?? b.startedAt ?? b.queuedAt
     return bTime - aTime
   })
 }

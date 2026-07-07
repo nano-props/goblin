@@ -7,7 +7,7 @@ import {
   currentRepoVisibleProjectionRefreshState,
 } from '#/web/stores/repos/refresh-coordinator.ts'
 import { beginRepoInvalidationSource, settleRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
-import type { ReposGet } from '#/web/stores/repos/types.ts'
+import type { RepoRuntimeProjectionRefreshOptions, ReposGet } from '#/web/stores/repos/types.ts'
 import {
   createRepoBranch,
   resetReposStore,
@@ -17,6 +17,7 @@ import {
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 
 function callsGet() {
   const calls: string[] = []
@@ -42,7 +43,7 @@ function callsGet() {
       },
       refreshRuntimeProjection: (
         id: string,
-        options: { repoInstanceId?: string; scope: 'repo-read-model' | 'visible-status' },
+        options: RepoRuntimeProjectionRefreshOptions,
       ) => {
         calls.push(`projection:${id}:${options.repoInstanceId ?? ''}:${options.scope}`)
         return Promise.resolve()
@@ -86,6 +87,7 @@ describe('repo refresh coordinator', () => {
       id: '/repo',
       repoInstanceId: repo.instanceId,
       preferredWorkspacePaneTab: 'status',
+      branchName: 'feature/query',
       visibleProjectionViewOpen: true,
     })
   })
@@ -116,16 +118,39 @@ describe('repo refresh coordinator', () => {
   })
 
   test('routes visible projection views through a visible projection refresh', async () => {
-    const { calls, get } = callsGet()
+    const calls: string[] = []
+    const repo = seedRepoWithReadModelForTest({
+      id: '/repo',
+      branches: [createRepoBranch('feature/query', { worktree: { path: '/tmp/query-worktree' } })],
+      currentBranchName: 'feature/query',
+      preferredWorkspacePaneTab: 'status',
+      instanceId: 'repo-instance-test-9',
+      workspacePaneTabsByBranch: {
+        'feature/query': [workspacePaneStaticTabEntry('status')],
+      },
+    })
+    const get: ReposGet = () =>
+      ({
+        ...useReposStore.getState(),
+        refreshRuntimeProjection: (id: string, options: RepoRuntimeProjectionRefreshOptions) => {
+          calls.push(
+            `projection:${id}:${options.repoInstanceId ?? ''}:${options.scope}:${
+              options.scope === 'visible-status' ? options.branchName : ''
+            }`,
+          )
+          return Promise.resolve()
+        },
+      }) as unknown as ReturnType<ReposGet>
 
     await runRepoRefreshIntent(get, {
       kind: 'visible-runtime-projection-requested',
       reason: 'visible-projection-view-opened',
       id: '/repo',
-      repoInstanceId: 'repo-instance-test-9',
+      repoInstanceId: repo.instanceId,
+      branchName: 'feature/query',
     })
 
-    expect(calls).toEqual(['projection:/repo:repo-instance-test-9:visible-status'])
+    expect(calls).toEqual(['projection:/repo:repo-instance-test-9:visible-status:feature/query'])
   })
 
   test('routes repo invalidation refreshes directly through the core refresh path', async () => {

@@ -26,6 +26,7 @@ export type RepoRefreshIntent =
   | (RepoRefreshIntentBase & {
       kind: 'visible-runtime-projection-requested'
       reason: 'visible-projection-view-opened'
+      branchName: string | null
     })
 
 type RepoInvalidationRefreshDisposition = 'refresh' | 'suppress'
@@ -34,6 +35,7 @@ export interface RepoVisibleProjectionRefreshState {
   id: string
   repoInstanceId: string
   preferredWorkspacePaneTab: WorkspacePaneTabType
+  branchName: string | null
   visibleProjectionViewOpen: boolean
   unavailable: boolean
   visibleStatusPhase: 'idle' | 'loading' | 'refreshing'
@@ -44,6 +46,7 @@ export function repoVisibleProjectionRefreshState(repo: RepoState): RepoVisibleP
     id: repo.id,
     repoInstanceId: repo.instanceId,
     preferredWorkspacePaneTab: preferredWorkspacePaneTabForTarget(repo.ui, null),
+    branchName: null,
     visibleProjectionViewOpen: false,
     unavailable: isRepoUnavailable(repo),
     visibleStatusPhase: repo.dataLoads.visibleStatus.phase,
@@ -64,6 +67,7 @@ export function currentRepoVisibleProjectionRefreshState(
     id: repo.id,
     repoInstanceId: repo.instanceId,
     preferredWorkspacePaneTab,
+    branchName,
     visibleProjectionViewOpen: preferredWorkspacePaneTab === 'status' || preferredWorkspacePaneTab === 'changes',
     unavailable: isRepoUnavailable(repo),
     visibleStatusPhase: repo.dataLoads.visibleStatus.phase,
@@ -78,15 +82,16 @@ async function runVisibleRuntimeProjectionRefresh(
   get: ReposGet,
   id: string,
   repoInstanceId: string,
+  branchName: string | null,
 ): Promise<void> {
   const state = get()
   const repo = state.repos[id]
   if (!repo || repo.instanceId !== repoInstanceId) return
-  if (!isRepoVisibleProjectionRefreshable(repoVisibleProjectionRefreshState(repo))) return
-  await state.refreshRuntimeProjection(id, { repoInstanceId, scope: 'visible-status' })
+  if (!isRepoVisibleProjectionRefreshable(currentRepoVisibleProjectionRefreshState(repo, branchName))) return
+  await state.refreshRuntimeProjection(id, { repoInstanceId, scope: 'visible-status', branchName })
 }
 
-export function requestVisibleRepoProjectionRefresh(get: ReposGet, id: string): void {
+export function requestVisibleRepoProjectionRefresh(get: ReposGet, id: string, branchName: string | null): void {
   const repo = get().repos[id]
   if (!repo) return
   void runRepoRefreshIntent(get, {
@@ -94,6 +99,7 @@ export function requestVisibleRepoProjectionRefresh(get: ReposGet, id: string): 
     reason: 'visible-projection-view-opened',
     id,
     repoInstanceId: repo.instanceId,
+    branchName,
   })
 }
 
@@ -131,7 +137,7 @@ export async function runRepoRefreshIntent(get: ReposGet, intent: RepoRefreshInt
       await get().refreshCoreData(intent.id, { repoInstanceId: intent.repoInstanceId })
       return
     case 'visible-runtime-projection-requested':
-      await runVisibleRuntimeProjectionRefresh(get, intent.id, intent.repoInstanceId)
+      await runVisibleRuntimeProjectionRefresh(get, intent.id, intent.repoInstanceId, intent.branchName)
       return
   }
   const exhaustive: never = intent
