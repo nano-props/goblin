@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { PULL_REQUEST_UNKNOWN_RETRY_DELAY_MS } from '#/shared/pull-request-state.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { preferredWorkspacePaneTabByTargetRecordWith } from '#/web/stores/repos/workspace-pane-preferences.ts'
@@ -286,24 +285,22 @@ describe('refreshPullRequests', () => {
     ).toBeNull()
   })
 
-  test('snapshot refresh strips branch pull request metadata while rechecking query data', async () => {
+  test('snapshot refresh strips branch pull request metadata without rechecking pull request data', async () => {
     const existing = pullRequest(1)
     const repoInstanceId = seedRepo([branch('feature/a', existing)])
-    let resolvePullRequests!: (value: null) => void
+    const calls: unknown[] = []
     ipcHandlers['repo.snapshot'] = async () => ({ branches: [branch('feature/a')], current: 'feature/a' })
-    ipcHandlers['repo.pullRequests'] = () =>
-      new Promise<null>((resolve) => {
-        resolvePullRequests = resolve
-      })
+    ipcHandlers['repo.pullRequests'] = async (input) => {
+      calls.push(input)
+      return null
+    }
 
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(readModelBranchesForTest()[0]?.pullRequest).toBeUndefined()
-    expect(repo?.dataLoads.pullRequests.phase).not.toBe('idle')
-
-    resolvePullRequests(null)
-    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(repo?.dataLoads.pullRequests.phase).toBe('idle')
+    expect(calls).toEqual([])
   })
 
   test('clears preserved pull requests when snapshot recheck omits them', async () => {
@@ -349,7 +346,7 @@ describe('refreshPullRequests', () => {
     })
   })
 
-  test('snapshot refresh performs summary lookup without guessing visible detail branch', async () => {
+  test('snapshot refresh does not perform implicit summary lookup', async () => {
     const repoInstanceId = seedRepo([branch('feature/a')])
     const calls: Array<{ branches?: string[]; mode?: string; loadingAtStart?: boolean }> = []
     ipcHandlers['repo.snapshot'] = async () => ({
@@ -368,37 +365,28 @@ describe('refreshPullRequests', () => {
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
-    expect(calls).toEqual([{ branches: ['feature/a', 'feature/b'], mode: 'summary', loadingAtStart: true }])
+    expect(calls).toEqual([])
   })
 
-  test('snapshot refresh leaves visible full lookup to route-visible refresh intents', async () => {
-    vi.useFakeTimers()
+  test('snapshot refresh does not perform visible full lookup retries', async () => {
     const repoInstanceId = seedRepo([branch('feature/a')])
     const calls: Array<{ branches?: string[]; mode?: string }> = []
-    let fullCalls = 0
     ipcHandlers['repo.snapshot'] = async () => ({
       branches: [branch('feature/a')],
       current: 'feature/a',
     })
     ipcHandlers['repo.pullRequests'] = async ({ branches, mode }: { branches?: string[]; mode?: string }) => {
       calls.push({ branches, mode: mode })
-      if (mode === 'summary') return [{ branch: 'feature/a', pullRequest: pullRequest(1) }]
-      fullCalls += 1
-      return [
-        {
-          branch: 'feature/a',
-          pullRequest: pullRequest(1, { mergeable: fullCalls === 1 ? 'UNKNOWN' : 'MERGEABLE' }),
-        },
-      ]
+      return [{ branch: 'feature/a', pullRequest: pullRequest(1, { mergeable: 'UNKNOWN' }) }]
     }
 
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
-    await vi.advanceTimersByTimeAsync(PULL_REQUEST_UNKNOWN_RETRY_DELAY_MS + 1)
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
-    expect(calls).toEqual([{ branches: ['feature/a'], mode: 'summary' }])
+    expect(calls).toEqual([])
   })
 
-  test('snapshot refresh skips selected full lookup when status detail is not visible', async () => {
+  test('snapshot refresh does not inspect selected tab visibility for pull request lookup', async () => {
     const repoInstanceId = seedRepo([branch('feature/a', undefined, { worktree: { path: '/tmp/feature-a-worktree' } })])
     useReposStore.setState((s) => ({
       repos: {
@@ -432,10 +420,10 @@ describe('refreshPullRequests', () => {
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
-    expect(calls).toEqual([{ branches: ['feature/a', 'feature/b'], mode: 'summary' }])
+    expect(calls).toEqual([])
   })
 
-  test('snapshot refresh stops pull request backfill after the first refresh error', async () => {
+  test('snapshot refresh does not record pull request backfill errors', async () => {
     const repoInstanceId = seedRepo([branch('feature/a')])
     const calls: Array<{ branches?: string[]; mode?: string }> = []
     ipcHandlers['repo.snapshot'] = async () => ({
@@ -450,10 +438,8 @@ describe('refreshPullRequests', () => {
     await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
-    expect(calls).toEqual([{ branches: ['feature/a', 'feature/b'], mode: 'summary' }])
-    expect(useReposStore.getState().repos[REPO_ID]?.events).toEqual([
-      expect.objectContaining({ kind: 'error', message: 'GitHub CLI is not signed in to github.com' }),
-    ])
+    expect(calls).toEqual([])
+    expect(useReposStore.getState().repos[REPO_ID]?.events).toEqual([])
   })
 
   test('snapshot refresh unavailable pull request lookups do not enqueue repo error events', async () => {

@@ -1,4 +1,5 @@
 import { runWithRepoSource } from '#/server/modules/repo-source.ts'
+import { getRepoOperationsSnapshot } from '#/server/modules/repo-operation-registry.ts'
 import { isValidRepoLocator } from '#/shared/input-validation.ts'
 import {
   DEFAULT_REPOSITORY_LOG_COUNT,
@@ -7,7 +8,7 @@ import {
   type PullRequestFetchMode,
   type WorktreeStatus,
 } from '#/shared/git-types.ts'
-import type { ProbeResult, PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
+import type { ProbeResult, PullRequestEntry, RepoRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
 import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 
 export async function probeRepo(cwd: string): Promise<ProbeResult> {
@@ -101,6 +102,13 @@ export interface RepoBulkReadOptions {
   timeoutMs?: number
 }
 
+export interface RepoProjectionReadOptions {
+  branch?: string
+  mode?: PullRequestFetchMode
+  signal?: AbortSignal
+  timeoutMs?: number
+}
+
 /**
  * Build a per-section `AbortSignal` that fires when either the
  * caller's signal or the timeout fires. The timeout is a hard cap
@@ -181,5 +189,33 @@ export async function readRepoBulk(
     snapshotCtl?.cancel()
     statusCtl?.cancel()
     prsCtl?.cancel()
+  }
+}
+
+export async function readRepoProjection(
+  cwd: string,
+  options: RepoProjectionReadOptions = {},
+): Promise<RepoRuntimeProjection> {
+  const branch = typeof options.branch === 'string' && options.branch.length > 0 ? options.branch : null
+  const mode: PullRequestFetchMode = options.mode === 'summary' ? 'summary' : 'full'
+  const includePullRequests = !!branch || mode === 'summary'
+  const result = await readRepoBulk(
+    cwd,
+    includePullRequests ? ['snapshot', 'status', 'pullRequests'] : ['snapshot', 'status'],
+    {
+      branches: branch ? [branch] : undefined,
+      mode,
+      signal: options.signal,
+      timeoutMs: options.timeoutMs,
+    },
+  )
+  return {
+    ...result,
+    operations: getRepoOperationsSnapshot({ repoId: cwd }),
+    requested: {
+      branch,
+      pullRequestMode: mode,
+    },
+    loadedAt: Date.now(),
   }
 }

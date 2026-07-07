@@ -332,9 +332,8 @@ describe('setWorkspacePaneTab', () => {
     expect(preferredTabFor('main')).toBe('changes')
   })
 
-  test('passes the current repo instance id to workspace pane tab refreshes', () => {
+  test('keeps workspace pane tab selection as a UI preference write', () => {
     seedRepo({ currentBranchName: 'main', preferredWorkspacePaneTab: 'terminal' })
-    const repoInstanceId = useReposStore.getState().repos[REPO_ID]!.instanceId
     const pullRequestCalls: Parameters<ReturnType<typeof useReposStore.getState>['refreshPullRequests']>[] = []
     const restore = stubRefreshActions({
       refreshPullRequests: async (...args) => {
@@ -345,13 +344,14 @@ describe('setWorkspacePaneTab', () => {
     try {
       useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'main', 'status')
 
-      expect(pullRequestCalls[0]).toEqual([REPO_ID, ['main'], { repoInstanceId, mode: 'full' }])
+      expect(preferredTabFor('main')).toBe('status')
+      expect(pullRequestCalls).toEqual([])
     } finally {
       restore()
     }
   })
 
-  test('refreshes pull request details when switching to status', async () => {
+  test('does not refresh pull request details when switching to status', async () => {
     const calls: string[][] = []
     ipcHandlers['repo.pullRequests'] = async ({ branches }: { branches?: string[] }) => {
       calls.push(branches ?? [])
@@ -362,7 +362,7 @@ describe('setWorkspacePaneTab', () => {
     useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'main', 'status')
     await flushAsyncWork()
 
-    expect(calls).toEqual([['main']])
+    expect(calls).toEqual([])
   })
 
   test('sets the terminal preference regardless of worktree presence', () => {

@@ -156,6 +156,15 @@ export const REPO_PROCEDURE_SCHEMAS = {
     branches: v.optional(StringArray),
     mode: v.optional(v.picklist(['summary', 'full'])),
   }),
+  projection: v.object({
+    cwd: v.string(),
+    branch: v.optional(v.string()),
+    mode: v.optional(v.picklist(['summary', 'full'])),
+  }),
+  operations: v.object({
+    cwd: v.optional(v.string()),
+    includeSettled: v.optional(v.boolean()),
+  }),
   // Composite read — picks which sub-reads to fold into one round trip.
   // Body shape: `{ cwd, include?, branches?, mode?, timeoutMs? }`. `include`
   // and `branches` travel as JSON arrays; `timeoutMs` is a real number

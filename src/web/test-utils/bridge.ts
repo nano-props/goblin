@@ -677,6 +677,32 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         }
         return handler(payload)
       }
+      const readRepoProjection = async (payload: Record<string, unknown>) => {
+        if (handlers['repo.projection']) return call('repo.projection', payload)
+        const cwd = typeof payload.cwd === 'string' ? payload.cwd : ''
+        const branch = typeof payload.branch === 'string' && payload.branch.length > 0 ? payload.branch : null
+        const mode = payload.mode === 'summary' ? 'summary' : 'full'
+        const snapshot = handlers['repo.snapshot'] ? await call('repo.snapshot', { cwd }) : null
+        const status = handlers['repo.status'] ? await call('repo.status', { cwd }) : []
+        const pullRequests =
+          handlers['repo.pullRequests'] && (branch || mode === 'summary')
+            ? await call('repo.pullRequests', { cwd, branches: branch ? [branch] : undefined, mode })
+            : null
+        const operations = handlers['repo.operations']
+          ? await call('repo.operations', { cwd, includeSettled: false })
+          : { operations: [], loadedAt: Date.now() }
+        return {
+          snapshot,
+          status,
+          pullRequests,
+          operations,
+          requested: {
+            branch,
+            pullRequestMode: mode,
+          },
+          loadedAt: Date.now(),
+        }
+      }
       const openRepoRuntime = async (payload: unknown) => {
         const repoRoot = typeof payload === 'object' && payload && 'repoRoot' in payload ? payload.repoRoot : null
         const repoInput = typeof payload === 'object' && payload && 'repoInput' in payload ? payload.repoInput : null
@@ -746,6 +772,10 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         if (url.pathname === '/api/repo/log') return call('repo.log', body)
         if (url.pathname === '/api/repo/remote-branches') return call('repo.remoteBranches', body)
         if (url.pathname === '/api/repo/pull-requests') return call('repo.pullRequests', body)
+        if (url.pathname === '/api/repo/projection') return readRepoProjection(body)
+        if (url.pathname === '/api/repo/operations') {
+          return handlers['repo.operations'] ? call('repo.operations', body) : { operations: [], loadedAt: Date.now() }
+        }
         if (url.pathname === '/api/repo/patch') return call('repo.patch', body)
         if (url.pathname === '/api/repo/composite') return call('repo.composite', body)
         if (url.pathname === '/api/repo/fetch') return call('repo.fetch', body)

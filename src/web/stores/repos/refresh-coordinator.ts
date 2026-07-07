@@ -23,7 +23,6 @@ type CoreRepoRefreshReason = 'initial-load' | 'branch-action'
 export type RepoRefreshIntent =
   | (RepoRefreshIntentBase & { kind: 'core-data-changed'; reason: CoreRepoRefreshReason })
   | (RepoRefreshIntentBase & { kind: 'manual-refresh-requested' })
-  | (RepoRefreshIntentBase & { kind: 'visible-pull-request-changed'; branch: string | null })
   | (RepoRefreshIntentBase & { kind: 'visible-status-like-view-opened' })
 
 type RepoInvalidationRefreshDisposition = 'refresh' | 'suppress'
@@ -70,16 +69,6 @@ export function currentRepoStatusRefreshSnapshot(
 
 export function isRepoStatusRefreshable(repo: RepoStatusRefreshSnapshot): boolean {
   return !repo.unavailable && repo.statusPhase === 'idle'
-}
-
-async function runVisiblePullRequestRefresh(
-  get: ReposGet,
-  id: string,
-  branch: string | null | undefined,
-  repoInstanceId: string,
-): Promise<void> {
-  if (!branch) return
-  await get().refreshPullRequests(id, [branch], { repoInstanceId, mode: 'full' })
 }
 
 async function runVisibleStatusRefresh(get: ReposGet, id: string, repoInstanceId: string): Promise<void> {
@@ -132,9 +121,6 @@ export async function runRepoRefreshIntent(get: ReposGet, intent: RepoRefreshInt
       return
     case 'core-data-changed':
       await get().refreshCoreData(intent.id, { repoInstanceId: intent.repoInstanceId })
-      return
-    case 'visible-pull-request-changed':
-      await runVisiblePullRequestRefresh(get, intent.id, intent.branch, intent.repoInstanceId)
       return
     case 'visible-status-like-view-opened':
       await runVisibleStatusRefresh(get, intent.id, intent.repoInstanceId)

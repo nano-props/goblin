@@ -49,7 +49,7 @@ describe('RepoDashboardPane', () => {
       branches: [createRepoBranch('feature/pr'), createRepoBranch('main')],
       currentBranchName: 'main',
     })
-    setRepoPullRequestsQueryData(REPO_ID, repo.instanceId, undefined, undefined, [
+    setRepoPullRequestsQueryData(REPO_ID, repo.instanceId, undefined, 'summary', [
       {
         branch: 'feature/pr',
         pullRequest: createPullRequest(42, {

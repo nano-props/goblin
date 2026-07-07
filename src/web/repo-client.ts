@@ -3,6 +3,8 @@ import { SERVER_REQUEST_TIMEOUT_ERROR, postServerJson } from '#/web/lib/server-f
 import type {
   CloneRepoResult,
   PullRequestEntry,
+  RepoOperationsSnapshot,
+  RepoRuntimeProjection,
   RepoRuntimeInstancesSnapshot,
   RepoRuntimeOpenResult,
   RepoSnapshot,
@@ -83,6 +85,27 @@ export async function getRepoPullRequests(
   signal?: AbortSignal,
 ): Promise<PullRequestEntry[] | null> {
   return await postServerJson('/api/repo/pull-requests', { cwd, branches, mode: options?.mode }, { signal })
+}
+
+export async function getRepoProjection(
+  cwd: string,
+  branch?: string | null,
+  options?: { mode?: PullRequestFetchMode },
+  signal?: AbortSignal,
+): Promise<RepoRuntimeProjection> {
+  return await postServerJson(
+    '/api/repo/projection',
+    { cwd, branch: branch || undefined, mode: options?.mode },
+    { signal },
+  )
+}
+
+export async function getRepoOperations(
+  cwd?: string,
+  options?: { includeSettled?: boolean },
+  signal?: AbortSignal,
+): Promise<RepoOperationsSnapshot> {
+  return await postServerJson('/api/repo/operations', { cwd, includeSettled: options?.includeSettled }, { signal })
 }
 
 export async function abortRepoOperation(cwd: string): Promise<boolean> {

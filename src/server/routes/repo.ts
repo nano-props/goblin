@@ -2,6 +2,7 @@ import { getBackgroundSyncRepos, setBackgroundSyncRepos } from '#/server/modules
 import { serverRepoNodeLog } from '#/node/logger.ts'
 import {
   readRepoBulk,
+  readRepoProjection,
   getRepoLog,
   getRepoPatch,
   getRepoPullRequests,
@@ -39,6 +40,7 @@ import {
   listRepoRuntimeInstances,
   openRepoRuntimeInstance,
 } from '#/server/modules/repo-runtime-instances.ts'
+import { getRepoOperationsSnapshot } from '#/server/modules/repo-operation-registry.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import type { RepoLogResponse } from '#/shared/api-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
@@ -150,6 +152,19 @@ export function createRepoRoutes() {
         'pull-requests',
       ),
     )
+  })
+  app.post('/projection', async (c) => {
+    const { cwd, branch, mode } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.projection, c)
+    return c.json(
+      await readJsonOrThrow(
+        () => readRepoProjection(cwd, { branch, mode: mode ?? 'full', signal: c.req.raw.signal }),
+        'projection',
+      ),
+    )
+  })
+  app.post('/operations', async (c) => {
+    const { cwd, includeSettled } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.operations, c)
+    return c.json(getRepoOperationsSnapshot({ repoId: cwd, includeSettled }))
   })
   app.post('/composite', async (c) => {
     const { cwd, include, branches, mode, timeoutMs } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.composite, c)

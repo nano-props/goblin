@@ -86,24 +86,16 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     snap: RepoSnapshot,
     previousSnapshotBranches: RepoSnapshot['branches'] | null,
     isSnapshotCurrent: () => boolean,
-    options?: { skipLogBackfill?: boolean },
   ): Promise<void> {
     const validBranches = new Set(snap.branches.map((b) => b.name))
     updateIfFresh(set, id, repoInstanceId, (r) => {
       applySnapshotToRepoProjection(r, snap, validBranches, previousSnapshotBranches)
     })
     pruneRepoBranchPullRequestOperations(id, validBranches)
-    const branchNames = snap.branches.map((branch) => branch.name)
-    const worktreePaths = snap.branches
-      .map((branch) => branch.worktree?.path)
-      .filter((p): p is string => typeof p === 'string' && p.length > 0)
     await runSnapshotSuccessWorkflow(set, get, {
       id,
       repoInstanceId,
-      branchNames,
-      worktreePaths,
       isSnapshotCurrent,
-      skipLogBackfill: options?.skipLogBackfill,
     })
   }
 
@@ -183,9 +175,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             })
             return
           }
-          await runSnapshotSuccessFlow(id, repoInstanceId, snap, previousSnapshot?.branches ?? null, ctx.isCurrent, {
-            skipLogBackfill: options?.skipLogBackfill,
-          })
+          await runSnapshotSuccessFlow(id, repoInstanceId, snap, previousSnapshot?.branches ?? null, ctx.isCurrent)
         },
         onError: (message) => {
           updateIfFresh(set, id, repoInstanceId, (r) => {
@@ -343,9 +333,6 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             result.snapshot,
             previousSnapshot?.branches ?? null,
             ctx.isCurrent,
-            {
-              skipLogBackfill: options?.skipLogBackfill,
-            },
           )
         },
         onError: (message) => {

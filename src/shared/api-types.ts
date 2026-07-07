@@ -240,6 +240,80 @@ export interface PullRequestFetchOptions {
   mode?: PullRequestFetchMode
 }
 
+export type RepoServerOperationPhase = 'queued' | 'running' | 'cancelling' | 'done' | 'failed'
+export type RepoServerOperationKind =
+  | 'fetch'
+  | 'clone'
+  | 'pull'
+  | 'push'
+  | 'create-worktree'
+  | 'delete-branch'
+  | 'remove-worktree'
+  | 'network'
+export type RepoServerOperationSource = NetworkOpKind | 'system'
+export type RepoOperationCancellationReason =
+  | 'caller-abort'
+  | 'user-cancel'
+  | 'request-watchdog-timeout'
+  | 'git-timeout'
+  | 'network-op-superseded'
+export type RepoOperationFailureReason = RepoOperationCancellationReason
+
+export interface RepoServerOperationTarget {
+  branch?: string
+  worktreePath?: string
+  parentPath?: string
+  directoryName?: string
+}
+
+export interface RepoServerOperationCancellationState {
+  underlyingRequested: boolean
+  reason: RepoOperationCancellationReason | null
+  requestedAt: number | null
+  waitCancelledCount: number
+  lastWaitCancelledAt: number | null
+  lastWaitCancellationReason: RepoOperationCancellationReason | null
+}
+
+export interface RepoServerOperationError {
+  message: string
+  reason: RepoOperationFailureReason | null
+}
+
+export interface RepoServerOperationState {
+  id: string
+  repoId: string | null
+  repoInstanceId: string | null
+  kind: RepoServerOperationKind
+  phase: RepoServerOperationPhase
+  source: RepoServerOperationSource
+  target: RepoServerOperationTarget | null
+  queuedAt: number
+  startedAt: number | null
+  deadlineAt: number | null
+  settledAt: number | null
+  error: RepoServerOperationError | null
+  cancellation: RepoServerOperationCancellationState
+  canCancelUnderlying: boolean
+}
+
+export interface RepoOperationsSnapshot {
+  operations: RepoServerOperationState[]
+  loadedAt: number
+}
+
+export interface RepoRuntimeProjection {
+  snapshot: RepoSnapshot | null
+  status: WorktreeStatus[]
+  pullRequests: PullRequestEntry[] | null
+  operations: RepoOperationsSnapshot
+  requested: {
+    branch: string | null
+    pullRequestMode: PullRequestFetchMode
+  }
+  loadedAt: number
+}
+
 export type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 export { isRemoteRepoId, parseRemoteRepoId } from '#/shared/remote-repo.ts'
 
@@ -286,6 +360,12 @@ export interface AppIpcHandlers {
       branches?: string[]
       options?: PullRequestFetchOptions
     }) => Promise<PullRequestEntry[] | null>
+    projection: (input: {
+      cwd: string
+      branch?: string
+      mode?: PullRequestFetchMode
+    }) => Promise<RepoRuntimeProjection>
+    operations: (input: { cwd?: string; includeSettled?: boolean }) => Promise<RepoOperationsSnapshot>
     status: (input: { cwd: string }) => Promise<WorktreeStatus[]>
     patch: (input: { cwd: string; worktreePath: string }) => Promise<ExecResult>
     trashFile: (input: { cwd: string; worktreePath: string; path: string }) => Promise<ExecResult>

@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   getRepoPatch: vi.fn(),
   getRepoPullRequests: vi.fn(),
   readRepoBulk: vi.fn(),
+  readRepoProjection: vi.fn(),
+  getRepoOperationsSnapshot: vi.fn(),
   fetchRepo: vi.fn(),
   cloneRepo: vi.fn(),
   abortCloneOperation: vi.fn(),
@@ -44,7 +46,11 @@ vi.mock('#/server/modules/repo-read-paths.ts', () => ({
   getRepoPatch: mocks.getRepoPatch,
   getRepoPullRequests: mocks.getRepoPullRequests,
   readRepoBulk: mocks.readRepoBulk,
+  readRepoProjection: mocks.readRepoProjection,
   getRepoWorktreeBootstrapPreview: mocks.getRepoWorktreeBootstrapPreview,
+}))
+vi.mock('#/server/modules/repo-operation-registry.ts', () => ({
+  getRepoOperationsSnapshot: mocks.getRepoOperationsSnapshot,
 }))
 vi.mock('#/server/modules/repo-tree.ts', () => ({
   getRepositoryTree: mocks.getRepositoryTree,
@@ -257,6 +263,76 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       mode: 'full',
       signal: expect.any(AbortSignal),
     })
+  })
+
+  test('passes projection body through to the module layer', async () => {
+    mocks.readRepoProjection.mockResolvedValue({
+      snapshot: { branches: [], current: 'main' },
+      status: [],
+      pullRequests: [],
+      operations: { operations: [], loadedAt: 123 },
+      requested: { branch: 'feature/a', pullRequestMode: 'full' },
+      loadedAt: 123,
+    })
+    const app = createTestRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/projection', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', branch: 'feature/a' }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(mocks.readRepoProjection).toHaveBeenCalledWith('/tmp/repo', {
+      branch: 'feature/a',
+      mode: 'full',
+      signal: expect.any(AbortSignal),
+    })
+    expect(await response.json()).toMatchObject({ requested: { branch: 'feature/a', pullRequestMode: 'full' } })
+  })
+
+  test('returns repo operation state snapshots', async () => {
+    mocks.getRepoOperationsSnapshot.mockReturnValue({
+      operations: [
+        {
+          id: 'repo-op-1',
+          repoId: '/tmp/repo',
+          repoInstanceId: null,
+          kind: 'fetch',
+          phase: 'running',
+          source: 'background',
+          target: null,
+          queuedAt: 100,
+          startedAt: 101,
+          deadlineAt: null,
+          settledAt: null,
+          error: null,
+          cancellation: {
+            underlyingRequested: false,
+            reason: null,
+            requestedAt: null,
+            waitCancelledCount: 0,
+            lastWaitCancelledAt: null,
+            lastWaitCancellationReason: null,
+          },
+          canCancelUnderlying: true,
+        },
+      ],
+      loadedAt: 123,
+    })
+    const app = createTestRepoRoutes()
+    const response = await app.request(
+      new Request('http://localhost/operations', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', includeSettled: true }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(mocks.getRepoOperationsSnapshot).toHaveBeenCalledWith({ repoId: '/tmp/repo', includeSettled: true })
+    expect(await response.json()).toMatchObject({ operations: [{ kind: 'fetch', phase: 'running' }] })
   })
 
   test('passes patch body through to getRepoPatch', async () => {
