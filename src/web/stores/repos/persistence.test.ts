@@ -16,8 +16,7 @@ import {
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoSnapshotCacheEntry } from '#/web/stores/repos/types.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { getRepoProjectionQueryData, repoStatusQueryKey } from '#/web/repo-data-query.ts'
-import type { WorktreeStatus } from '#/shared/git-types.ts'
+import { getRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 function cachedRepo(savedAt: number): RepoSnapshotCacheEntry {
   return {
     savedAt,
@@ -172,7 +171,7 @@ describe('restoreRepoProjectionFromCacheEntry', () => {
     expect(repo.projection).toEqual({ source: 'cache', savedAt: now })
   })
 
-  test('seeds cached branch references as projection without inventing status query data', () => {
+  test('seeds cached branch references as runtime projections', () => {
     const now = Date.now()
     const cached = cachedRepo(now)
     cached.data.currentBranch = 'feature/a'
@@ -199,8 +198,5 @@ describe('restoreRepoProjectionFromCacheEntry', () => {
     expect(fullProjection?.status).toEqual([])
     expect(summaryProjection?.snapshot).toEqual(fullProjection?.snapshot)
     expect(summaryProjection?.status).toEqual([])
-    expect(
-      primaryWindowQueryClient.getQueryData<WorktreeStatus[]>(repoStatusQueryKey('/repo', 'repo-instance-test')),
-    ).toBeUndefined()
   })
 })

@@ -6,14 +6,12 @@ import {
   getRepoProjectionQueryData,
   repoOperationsQueryKey,
   repoProjectionQueryKey,
-  repoSnapshotQueryKey,
-  repoStatusQueryKey,
   scheduleRepoRuntimeProjectionRefresh,
   seedRepoProjectionQueryData,
   setRepoOperationsQueryData,
   setRepoProjectionQueryData,
 } from '#/web/repo-data-query.ts'
-import type { PullRequestEntry, RepoRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
+import type { PullRequestEntry, RepoRuntimeProjection } from '#/shared/api-types.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
 
 describe('repo data query keys', () => {
@@ -34,28 +32,75 @@ describe('repo data query keys', () => {
 })
 
 describe('repo projection query data', () => {
-  test('builds projection placeholder data from cached snapshot without inventing status cache', () => {
+  test('builds projection placeholder data from cached runtime projection', () => {
     const queryClient = new QueryClient()
-    const snapshot: RepoSnapshot = { branches: [], current: 'main' }
-
-    queryClient.setQueryData(repoSnapshotQueryKey('/tmp/repo', 'repo-instance-1'), snapshot)
-
-    expect(getRepoProjectionPlaceholderData('/tmp/repo', 'repo-instance-1', null, 'full', queryClient)).toEqual({
-      snapshot,
-      status: [],
-      pullRequests: null,
-      operations: { operations: [], loadedAt: 0 },
+    const status: WorktreeStatus[] = [{ path: '/tmp/repo', branch: 'main', isMain: true, entries: [] }]
+    const cachedProjection: RepoRuntimeProjection = {
+      snapshot: { branches: [], current: 'main' },
+      status,
+      pullRequests: [
+        {
+          branch: 'feature/a',
+          pullRequest: {
+            number: 229,
+            title: 'Converge repo data authority',
+            url: 'https://github.com/acme/repo/pull/229',
+            state: 'open',
+          },
+        },
+      ],
+      operations: { operations: [], loadedAt: 123 },
       requested: { branch: null, pullRequestMode: 'full' },
+      loadedAt: 123,
+    }
+
+    seedRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', cachedProjection, queryClient)
+
+    expect(getRepoProjectionPlaceholderData('/tmp/repo', 'repo-instance-1', 'feature/a', 'full', queryClient)).toEqual({
+      snapshot: cachedProjection.snapshot,
+      status,
+      pullRequests: null,
+      operations: { operations: [], loadedAt: 123 },
+      requested: { branch: 'feature/a', pullRequestMode: 'full' },
       loadedAt: 0,
     })
-    expect(
-      queryClient.getQueryData<WorktreeStatus[]>(repoStatusQueryKey('/tmp/repo', 'repo-instance-1')),
-    ).toBeUndefined()
   })
 
-  test('backfills shared section caches from a server projection', () => {
+  test('prefers the null-branch runtime projection as branch workspace placeholder', () => {
     const queryClient = new QueryClient()
-    const snapshot: RepoSnapshot = { branches: [], current: 'main' }
+    const branchProjection: RepoRuntimeProjection = {
+      snapshot: { branches: [], current: 'feature/other' },
+      status: [],
+      pullRequests: null,
+      operations: { operations: [], loadedAt: 101 },
+      requested: { branch: 'feature/other', pullRequestMode: 'summary' },
+      loadedAt: 101,
+    }
+    const repoProjection: RepoRuntimeProjection = {
+      snapshot: { branches: [], current: 'main' },
+      status: [{ path: '/tmp/repo', branch: 'main', isMain: true, entries: [] }],
+      pullRequests: null,
+      operations: { operations: [], loadedAt: 202 },
+      requested: { branch: null, pullRequestMode: 'full' },
+      loadedAt: 202,
+    }
+
+    seedRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', branchProjection, queryClient)
+    seedRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', repoProjection, queryClient)
+
+    expect(
+      getRepoProjectionPlaceholderData('/tmp/repo', 'repo-instance-1', 'feature/a', 'full', queryClient),
+    ).toMatchObject({
+      snapshot: repoProjection.snapshot,
+      status: repoProjection.status,
+      requested: { branch: 'feature/a', pullRequestMode: 'full' },
+      loadedAt: 0,
+    })
+  })
+
+  test('writes server projection and active operations cache', () => {
+    const queryClient = new QueryClient()
+    const snapshot = { branches: [], current: 'main' }
     const status: WorktreeStatus[] = [{ path: '/tmp/repo', branch: 'main', isMain: true, entries: [] }]
     const pullRequests: PullRequestEntry[] = [
       {
@@ -82,19 +127,13 @@ describe('repo projection query data', () => {
     expect(getRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', 'feature/a', 'full', queryClient)).toEqual(
       projection,
     )
-    expect(queryClient.getQueryData<RepoSnapshot>(repoSnapshotQueryKey('/tmp/repo', 'repo-instance-1'))).toEqual(
-      snapshot,
-    )
-    expect(queryClient.getQueryData<WorktreeStatus[]>(repoStatusQueryKey('/tmp/repo', 'repo-instance-1'))).toEqual(
-      status,
-    )
     expect(getRepoOperationsQueryData('/tmp/repo', 'repo-instance-1', queryClient)).toEqual({
       operations: [],
       loadedAt: 123,
     })
   })
 
-  test('seeds projection data without backfilling section caches', () => {
+  test('seeds projection data without writing active operations cache', () => {
     const queryClient = new QueryClient()
     const projection: RepoRuntimeProjection = {
       snapshot: { branches: [], current: 'main' },
@@ -110,10 +149,7 @@ describe('repo projection query data', () => {
     expect(getRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', 'feature/a', 'summary', queryClient)).toEqual({
       ...projection,
     })
-    expect(queryClient.getQueryData<RepoSnapshot>(repoSnapshotQueryKey('/tmp/repo', 'repo-instance-1'))).toBeUndefined()
-    expect(
-      queryClient.getQueryData<WorktreeStatus[]>(repoStatusQueryKey('/tmp/repo', 'repo-instance-1')),
-    ).toBeUndefined()
+    expect(getRepoOperationsQueryData('/tmp/repo', 'repo-instance-1', queryClient)).toBeUndefined()
   })
 
   test('projects active operation snapshots into projection caches', () => {

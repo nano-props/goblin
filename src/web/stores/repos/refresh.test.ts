@@ -19,13 +19,9 @@ import {
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import {
-  repoDataQueryKey,
-  repoProjectionQueryKey,
-  repoSnapshotQueryKey,
-  repoStatusQueryKey,
-} from '#/web/repo-data-query.ts'
+import { repoDataQueryKey, repoProjectionQueryKey } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
 import type { WorktreeStatus } from '#/web/types.ts'
 beforeEach(resetRefreshTest)
 
@@ -48,6 +44,12 @@ function repoBranchNames(): string[] {
 function repoCurrentBranch(): string | null {
   const repo = useReposStore.getState().repos[REPO_ID]
   return repo ? (readRepoBranchQueryProjection(repo)?.currentBranch ?? null) : null
+}
+
+function cachedRepoProjection(repoInstanceId: string): RepoRuntimeProjection | undefined {
+  return primaryWindowQueryClient.getQueryData<RepoRuntimeProjection>(
+    repoProjectionQueryKey(REPO_ID, repoInstanceId, null, 'full'),
+  )
 }
 
 function createWorktreeAction(): TestCreateWorktreeAction {
@@ -489,8 +491,6 @@ describe('core refresh request ordering', () => {
     expect(primaryWindowQueryClient.getQueryData(repoProjectionQueryKey(REPO_ID, repoInstanceId, null, 'full'))).toEqual(
       projection,
     )
-    expect(primaryWindowQueryClient.getQueryData(repoSnapshotQueryKey(REPO_ID, repoInstanceId))).toEqual(snapshot)
-    expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toEqual(status)
   })
 
   test('refreshCoreData drops stale results when the repo is reopened during a projection read', async () => {
@@ -519,8 +519,6 @@ describe('core refresh request ordering', () => {
     expect(
       primaryWindowQueryClient.getQueryData(repoProjectionQueryKey(REPO_ID, repoInstanceId, null, 'full')),
     ).toBeUndefined()
-    expect(primaryWindowQueryClient.getQueryData(repoSnapshotQueryKey(REPO_ID, repoInstanceId))).toBeUndefined()
-    expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toBeUndefined()
   })
 
   test('refreshCoreData marks deleted or non-git paths unavailable and skips follow-up reads', async () => {
@@ -561,7 +559,7 @@ describe('core refresh request ordering', () => {
 
     await useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['snapshot'] })
 
-    expect(primaryWindowQueryClient.getQueryData(repoSnapshotQueryKey(REPO_ID, repoInstanceId))).toEqual(snapshot)
+    expect(cachedRepoProjection(repoInstanceId)?.snapshot).toEqual(snapshot)
   })
 
   test('refreshCoreData drops status when the repo is reopened before the projection settles', async () => {
@@ -601,11 +599,11 @@ describe('core refresh request ordering', () => {
 
     resolveSecond(fresh)
     await second
-    expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toEqual(fresh)
+    expect(cachedRepoProjection(repoInstanceId)?.status).toEqual(fresh)
 
     resolveFirst([{ path: '/repo', isMain: true, entries: [{ x: 'M', y: ' ', path: 'stale.ts' }] }])
     await first
-    expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toEqual(fresh)
+    expect(cachedRepoProjection(repoInstanceId)?.status).toEqual(fresh)
   })
 
   test('status projection refresh updates normalized worktree dirty metadata in the branch read model', async () => {
@@ -714,7 +712,7 @@ describe('core refresh request ordering', () => {
 
     await useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['status'] })
 
-    expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toEqual(status)
+    expect(cachedRepoProjection(repoInstanceId)?.status).toEqual(status)
   })
 
   test('snapshot refresh keeps status-derived worktree dirtiness authoritative', async () => {
@@ -925,7 +923,7 @@ describe('core refresh request ordering', () => {
       resolvers[3]?.(fresh)
       await works[4]
 
-      expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toEqual(fresh)
+      expect(cachedRepoProjection(repoInstanceId)?.status).toEqual(fresh)
     } finally {
       resolvers[1]?.([])
       resolvers[2]?.([])
