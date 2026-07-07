@@ -1,5 +1,5 @@
 import type { RepoState } from '#/web/stores/repos/types.ts'
-import { repoOperationBusy } from '#/web/stores/repos/repo-operation-scheduler.ts'
+import { repoLocalPrimaryRefreshBusy } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { repoBranchActionLoadingLabel, type RepoActionLabel } from '#/web/stores/repos/action-labels.ts'
 import { branchActionKindFromReason, isBranchActionReason } from '#/web/stores/repos/operations.ts'
 import { repoServerOperationActive } from '#/web/repo-data-query.ts'
@@ -47,8 +47,7 @@ export function isRepoPrimaryRefreshBusy(
 ): boolean {
   return (
     repoOperationsSnapshotHasPrimaryRefresh(serverOperations) ||
-    repoOperationBusy(repo.id, 'manualRefresh') ||
-    repoOperationBusy(repo.id, 'fetch')
+    repoLocalPrimaryRefreshBusy(repo.id)
   )
 }
 

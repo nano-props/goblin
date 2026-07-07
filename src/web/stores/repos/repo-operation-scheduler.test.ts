@@ -3,6 +3,11 @@ import {
   disposeAllRepoOperationSchedulers,
   disposeRepoOperationScheduler,
   markRepoOperationTargets,
+  nextRepoOperationId,
+  repoLocalBranchActionScheduleGuard,
+  repoLocalCoreProjectionRefreshBusy,
+  repoLocalPrimaryRefreshBusy,
+  repoLocalRemoteFetchBlocked,
   repoOperation,
   repoOperationBusy,
   scheduleRepoOperation,
@@ -137,6 +142,47 @@ describe('repo runtime task scheduling', () => {
 
     expect(repoOperationBusy(REPO_ID, 'fetch')).toBe(false)
     expect(repoOperation(REPO_ID, 'fetch').phase).toBe('idle')
+  })
+
+  test('local guard helpers name the scheduler-only busy sets', () => {
+    expect(repoLocalPrimaryRefreshBusy(REPO_ID)).toBe(false)
+    expect(repoLocalCoreProjectionRefreshBusy(REPO_ID)).toBe(false)
+    expect(repoLocalRemoteFetchBlocked(REPO_ID)).toBe(false)
+    expect(repoLocalBranchActionScheduleGuard(REPO_ID)).toEqual({
+      fetchBusy: false,
+      branchOperationPhase: 'idle',
+      coreRefreshBusy: false,
+    })
+
+    markRepoOperationTargets(
+      REPO_ID,
+      nextRepoOperationId(REPO_ID),
+      [{ key: 'manualRefresh', reason: 'manual-refresh' }],
+      'running',
+    )
+    expect(repoLocalPrimaryRefreshBusy(REPO_ID)).toBe(true)
+    expect(repoLocalRemoteFetchBlocked(REPO_ID)).toBe(false)
+
+    markRepoOperationTargets(
+      REPO_ID,
+      nextRepoOperationId(REPO_ID),
+      [{ key: 'visibleStatus', reason: 'visible-status' }],
+      'running',
+    )
+    expect(repoLocalCoreProjectionRefreshBusy(REPO_ID)).toBe(true)
+    expect(repoLocalRemoteFetchBlocked(REPO_ID)).toBe(true)
+
+    markRepoOperationTargets(
+      REPO_ID,
+      nextRepoOperationId(REPO_ID),
+      [{ key: 'branchAction', reason: 'branch:pull', target: 'feature/a' }],
+      'queued',
+    )
+    expect(repoLocalBranchActionScheduleGuard(REPO_ID)).toMatchObject({
+      fetchBusy: false,
+      branchOperationPhase: 'queued',
+      coreRefreshBusy: true,
+    })
   })
 
 })

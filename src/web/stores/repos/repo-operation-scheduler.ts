@@ -243,6 +243,36 @@ export function repoOperationBusy(repoId: string, key: string): boolean {
   return operationBusy(repoOperation(repoId, key))
 }
 
+export function repoLocalPrimaryRefreshBusy(repoId: string): boolean {
+  return repoOperationBusy(repoId, 'manualRefresh') || repoOperationBusy(repoId, 'fetch')
+}
+
+export function repoLocalCoreProjectionRefreshBusy(repoId: string): boolean {
+  return repoOperationBusy(repoId, 'repoReadModel') || repoOperationBusy(repoId, 'visibleStatus')
+}
+
+export function repoLocalRemoteFetchBlocked(repoId: string): boolean {
+  return (
+    repoOperationBusy(repoId, 'fetch') ||
+    repoOperationBusy(repoId, 'branchAction') ||
+    repoLocalCoreProjectionRefreshBusy(repoId)
+  )
+}
+
+export function repoLocalBranchActionScheduleGuard(repoId: string): {
+  fetchBusy: boolean
+  branchOperationPhase: RepoOperationState['phase']
+  coreRefreshBusy: boolean
+} {
+  const fetchOperation = repoOperation(repoId, 'fetch')
+  const branchOperation = repoOperation(repoId, 'branchAction')
+  return {
+    fetchBusy: fetchOperation.phase !== 'idle',
+    branchOperationPhase: branchOperation.phase,
+    coreRefreshBusy: repoLocalCoreProjectionRefreshBusy(repoId),
+  }
+}
+
 export function repoOperationCurrent(repoId: string, key: string, operationId: number): boolean {
   return repoOperation(repoId, key).operationId === operationId
 }

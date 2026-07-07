@@ -7,7 +7,8 @@ import type { RepoBranchActionReason, RepoOperationReason } from '#/web/stores/r
 import { isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
 import {
   repoOperation,
-  repoOperationBusy,
+  repoLocalBranchActionScheduleGuard,
+  repoLocalCoreProjectionRefreshBusy,
   waitForRepoOperationsIdle,
 } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import {
@@ -130,18 +131,13 @@ function branchActionTarget(action: RepoBranchAction): RepoOperationTarget {
   }
 }
 
-function coreRefreshBusy(id: string): boolean {
-  return repoOperationBusy(id, 'repoReadModel') || repoOperationBusy(id, 'visibleStatus')
-}
-
 function evaluateRepoBranchActionSchedule(repo: RepoState, action: RepoBranchAction) {
-  const fetchOperation = repoOperation(repo.id, 'fetch')
-  const branchOperation = repoOperation(repo.id, 'branchAction')
+  const guard = repoLocalBranchActionScheduleGuard(repo.id)
   return evaluateBranchActionScheduleDecision({
     actionKind: action.kind,
-    fetchBusy: fetchOperation.phase !== 'idle',
-    branchOperationPhase: branchOperation.phase,
-    coreRefreshBusy: coreRefreshBusy(repo.id),
+    fetchBusy: guard.fetchBusy,
+    branchOperationPhase: guard.branchOperationPhase,
+    coreRefreshBusy: guard.coreRefreshBusy,
   })
 }
 
@@ -322,7 +318,7 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
       return await runWithRepoInvalidationSource('branch', async (sourceToken) => {
         const runActionTask = async (signal: AbortSignal, ctx: { setPhase: (phase: 'queued' | 'running') => void }) => {
           try {
-            if (coreRefreshBusy(id)) {
+            if (repoLocalCoreProjectionRefreshBusy(id)) {
               ctx.setPhase('queued')
               signal.throwIfAborted()
               await waitForBranchActionIdle(id, ['repoReadModel', 'visibleStatus'], signal, options?.waitTimeoutMs)
