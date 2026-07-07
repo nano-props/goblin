@@ -47,6 +47,7 @@ function reconcileTerminalWorkspacePaneRoute(
     return { kind: 'none' }
   }
   if (model.runtimeTabStateByType.terminal.projectionPhase === 'pending') return { kind: 'pending' }
+  if (model.runtimeTabStateByType.terminal.projectionPhase === 'failed') return { kind: 'none' }
   return replacementForRoute(route, model)
 }
 

@@ -337,6 +337,19 @@ describe('RepoWorkspace', () => {
     const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
     const readContext = terminalReadContextWithSession(terminalWorktreeKey, 'session-1')
     const route = routeNavigation()
+    const expectedCurrentEntry = {
+      repoId: REPO_ID,
+      route: {
+        kind: 'branch' as const,
+        branchName,
+        workspacePaneTab: 'terminal' as const,
+        terminalWorktreeKey,
+        terminalSessionId: 'session-1',
+      },
+    }
+    vi.mocked(route.openRepoBranchTerminal).mockImplementation(() => {
+      expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]?.current).toEqual(expectedCurrentEntry)
+    })
 
     render(
       <QueryClientProvider client={primaryWindowQueryClient}>
@@ -359,16 +372,7 @@ describe('RepoWorkspace', () => {
         replace: true,
       })
       expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]).toEqual({
-        current: {
-          repoId: REPO_ID,
-          route: {
-            kind: 'branch',
-            branchName,
-            workspacePaneTab: 'terminal',
-            terminalWorktreeKey,
-            terminalSessionId: 'session-1',
-          },
-        },
+        current: expectedCurrentEntry,
         backStack: [],
         forwardStack: [],
       })
@@ -664,7 +668,7 @@ describe('RepoWorkspace', () => {
       id: REPO_ID,
       branches: [createRepoBranch(branchName)],
       currentBranchName: branchName,
-      preferredWorkspacePaneTab: 'changes',
+      preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
         [branchName]: [],
       },
@@ -704,6 +708,15 @@ describe('RepoWorkspace', () => {
         backStack: [],
         forwardStack: [],
       })
+      const repo = useReposStore.getState().repos[REPO_ID]
+      expect(
+        repo &&
+          preferredWorkspacePaneTabForTarget(repo.ui, {
+            repoRoot: REPO_ID,
+            branchName,
+            worktreePath: null,
+          }),
+      ).toBe('status')
     })
   })
 

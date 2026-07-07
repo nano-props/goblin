@@ -1162,7 +1162,7 @@ describe('TerminalSessionProvider', () => {
           canonicalRows: 40,
           snapshot: '',
           snapshotSeq: 0,
-        outputEra: 0,
+          outputEra: 0,
         }),
       )
 
@@ -1465,7 +1465,7 @@ describe('TerminalSessionProvider', () => {
         expect.objectContaining({
           snapshot: '',
           snapshotSeq: 0,
-        outputEra: 0,
+          outputEra: 0,
         }),
       )
     } finally {
@@ -1628,6 +1628,17 @@ describe('TerminalSessionProvider', () => {
     })
 
     expect(readTerminalSessionCommandBridge()).toBeNull()
+  })
+
+  test('registers owned terminal creation on the command bridge', async () => {
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
+    const { getContext, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
+
+    try {
+      expect(readTerminalSessionCommandBridge()?.createOwnedTerminal).toBe(getContext().createOwnedTerminal)
+    } finally {
+      await unmount()
+    }
   })
 
   test('P1.7: registry state survives a Provider unmount + remount via the singleton', async () => {

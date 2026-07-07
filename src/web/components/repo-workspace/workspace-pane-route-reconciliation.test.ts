@@ -25,6 +25,14 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
+  test('keeps a routed terminal session while terminal projection has failed', () => {
+    const model = terminalModel({ routedSessionId: 'missing-session', terminalProjectionPhase: 'failed' })
+
+    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
+      kind: 'none',
+    })
+  })
+
   test('waits for terminal creation before replacing a missing routed terminal session', () => {
     const model = terminalModel({
       routedSessionId: 'missing-session',
