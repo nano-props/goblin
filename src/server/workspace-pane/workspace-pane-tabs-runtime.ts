@@ -53,6 +53,7 @@ export interface WorkspacePaneTabsScopeEntry {
 }
 
 interface StoredWorkspacePaneTabsEntry {
+  scope: string
   branchName: string
   worktreePath: string | null
   tabs: WorkspacePaneTabEntry[]
@@ -70,6 +71,7 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     const targetKey = this.targetKey(input)
     const tabs = normalizeWorkspacePaneTabs(input.tabs, { hasWorktree: input.worktreePath !== null })
     this.tabsByTarget.set(targetKey, {
+      scope: input.scope,
       branchName: input.branchName,
       worktreePath: input.worktreePath,
       tabs,
@@ -152,6 +154,15 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     for (const key of Array.from(this.tabsByTarget.keys())) {
       if (key.startsWith(prefix)) this.tabsByTarget.delete(key)
     }
+  }
+
+  scopesForUser(userId: TUser): string[] {
+    const prefix = workspacePaneTabsRuntimeUserPrefixKey(userId)
+    const scopes = new Set<string>()
+    for (const [key, entry] of this.tabsByTarget.entries()) {
+      if (key.startsWith(prefix)) scopes.add(entry.scope)
+    }
+    return Array.from(scopes)
   }
 
   private targetKey(input: WorkspacePaneTabsTargetInput<TUser>): string {

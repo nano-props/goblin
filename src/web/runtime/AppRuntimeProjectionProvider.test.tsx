@@ -41,9 +41,12 @@ let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
 let workspaceTabsChangedHandler: ((repoRoot: string) => void) | null = null
 let recoveredHandler: ((clientId: string) => void) | null = null
 const kickReconnectMock = vi.fn(() => {})
-const recoverSessionsMock = vi.fn<
-  (...args: Array<{ repoRoot: string; repoInstanceId: string }>) => Promise<{ sessions: TerminalSessionSummary[]; snapshots: [] }>
->()
+const recoverSessionsMock =
+  vi.fn<
+    (
+      ...args: Array<{ repoRoot: string; repoInstanceId: string }>
+    ) => Promise<{ sessions: TerminalSessionSummary[]; snapshots: [] }>
+  >()
 const listWorkspaceTabsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<WorkspacePaneTabsEntry[]>>()
 
 describe('AppRuntimeProjectionProvider', () => {
@@ -116,7 +119,10 @@ describe('AppRuntimeProjectionProvider', () => {
   test('waits for workspace membership before hydrating terminal server projection', async () => {
     const repo = seedCurrentRepo()
     useReposStore.setState({ workspaceMembershipReady: false })
-    recoverSessionsMock.mockResolvedValue({ sessions: [completeServerSession(serverSession('session-1'))], snapshots: [] })
+    recoverSessionsMock.mockResolvedValue({
+      sessions: [completeServerSession(serverSession('session-1'))],
+      snapshots: [],
+    })
     const result = renderRuntimeProvider(REPO_ID)
     try {
       expect(recoverSessionsMock).not.toHaveBeenCalled()
@@ -144,7 +150,7 @@ describe('AppRuntimeProjectionProvider', () => {
     }
   })
 
-  test('refreshes workspace tabs and schedules terminal recovery from workspace tab broadcasts', async () => {
+  test('refreshes workspace tabs without recovering terminal sessions from workspace tab broadcasts', async () => {
     const repo = seedCurrentRepo()
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: REPO_ID,
@@ -171,15 +177,15 @@ describe('AppRuntimeProjectionProvider', () => {
         await waitForScheduledServerSync()
       })
 
-      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
       await vi.waitFor(() => expect(listWorkspaceTabsMock).toHaveBeenCalledTimes(1))
+      expect(recoverSessionsMock).not.toHaveBeenCalled()
       expect(tabsFor(repo.instanceId)).toEqual([workspacePaneStaticTabEntry('history')])
     } finally {
       result.unmount()
     }
   })
 
-  test('coalesces terminal session and workspace tab change broadcasts', async () => {
+  test('keeps terminal session and workspace tab refreshes on their own event channels', async () => {
     seedCurrentRepo()
     const result = renderRuntimeProvider(REPO_ID)
     try {
@@ -193,6 +199,7 @@ describe('AppRuntimeProjectionProvider', () => {
       })
 
       expect(recoverSessionsMock).toHaveBeenCalledTimes(1)
+      expect(listWorkspaceTabsMock).toHaveBeenCalledTimes(1)
     } finally {
       result.unmount()
     }

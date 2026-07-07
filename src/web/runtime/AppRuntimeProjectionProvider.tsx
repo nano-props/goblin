@@ -114,7 +114,6 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
     const offWorkspaceTabsChanged = workspacePaneTabsClient.onChanged((repoRoot) => {
       const repoInstanceId = repoInstanceIdForRoot(repoRoot)
       if (typeof repoInstanceId === 'string') refreshWorkspacePaneTabs(repoRoot, repoInstanceId)
-      scheduleProjectionRefresh(repoRoot)
     })
 
     return () => {
@@ -125,7 +124,13 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
       offRecovered()
       offWorkspaceTabsChanged()
     }
-  }, [workspaceMembershipReady, currentRepoId, currentRepoInstanceId, recoverTerminalSessionsFromServer, recoverKnownServerState])
+  }, [
+    workspaceMembershipReady,
+    currentRepoId,
+    currentRepoInstanceId,
+    recoverTerminalSessionsFromServer,
+    recoverKnownServerState,
+  ])
 
   return <>{children}</>
 }

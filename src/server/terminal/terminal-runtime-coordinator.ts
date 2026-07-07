@@ -1,12 +1,12 @@
 import { TerminalDetachedUserTimer } from '#/server/terminal/terminal-detached-user-timer.ts'
 import { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import type { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
-import type { WorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
+import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 
 export interface TerminalRuntimeCoordinatorOptions {
   manager: TerminalSessionManager<string>
-  workspaceTabs: WorkspacePaneTabsRuntime<string>
+  workspaceTabsCoordinator: Pick<WorkspacePaneTabsCoordinator, 'closeUser'>
   detachedTtlMs: number
 }
 
@@ -18,7 +18,7 @@ export interface TerminalRuntimeCoordinator {
 export function createTerminalRuntimeCoordinator(
   options: TerminalRuntimeCoordinatorOptions,
 ): TerminalRuntimeCoordinator {
-  const { manager, workspaceTabs, detachedTtlMs } = options
+  const { manager, workspaceTabsCoordinator, detachedTtlMs } = options
 
   // Detached-user timers key by userId, not clientId. clientId is only
   // the per-tab routing id; terminal lifetime is owned by the
@@ -27,7 +27,7 @@ export function createTerminalRuntimeCoordinator(
     detachedTtlMs,
     onUserExpired(userId) {
       manager.closeSessionsForUser(userId)
-      workspaceTabs.closeTabsForUser(userId)
+      void workspaceTabsCoordinator.closeUser({ userId })
     },
   })
 

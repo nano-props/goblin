@@ -269,6 +269,29 @@ describe('workspace pane tabs runtime', () => {
     expect(runtime.tabs(target())).toEqual([workspacePaneStaticTabEntry('status')])
     expect(runtime.runtimeSessionIds({ ...worktree(), userId: 'user-b' }, 'terminal')).toEqual(['session-1'])
   })
+
+  test('lists scopes owned by a user', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+
+    runtime.replaceTabs({
+      ...target(),
+      scope: 'scope-a',
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    runtime.replaceTabs({
+      ...target(),
+      scope: 'scope-b',
+      tabs: [workspacePaneStaticTabEntry('history')],
+    })
+    runtime.replaceTabs({
+      ...target(),
+      userId: 'user-b',
+      scope: 'scope-c',
+      tabs: [workspacePaneStaticTabEntry('files')],
+    })
+
+    expect(runtime.scopesForUser('user-a').sort()).toEqual(['scope-a', 'scope-b'])
+  })
 })
 
 function target(): {

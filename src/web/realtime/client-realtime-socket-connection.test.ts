@@ -112,6 +112,77 @@ describe('client realtime socket connection', () => {
 
     expect(wsMock.instances).toHaveLength(1)
   })
+
+  test('does not replace a connecting socket while a request is waiting for it to open', async () => {
+    const connection = createTestConnection({
+      onRealtimeMessage: vi.fn(),
+      hasRealtimeSubscribers: () => true,
+    })
+    const promise = connection.request('echo', { value: 'hello' })
+    const socket = wsMock.instances[0]
+
+    connection.kickReconnect()
+
+    expect(socket?.readyState).toBe(wsMock.CONNECTING)
+    expect(wsMock.instances).toHaveLength(1)
+
+    socket?.emitOpen()
+    await Promise.resolve()
+
+    const request = socket?.sent.map((payload) => JSON.parse(payload)).find((message) => message.type === 'request')
+    socket?.emitMessage(
+      JSON.stringify({
+        type: 'response',
+        requestId: request?.requestId,
+        ok: true,
+        action: 'echo',
+        payload: { echoed: 'hello' },
+      }),
+    )
+
+    await expect(promise).resolves.toEqual({ echoed: 'hello' })
+  })
+
+  test('times out realtime-only sockets that never open', () => {
+    vi.useFakeTimers()
+    const connection = createTestConnection({
+      onRealtimeMessage: vi.fn(),
+      hasRealtimeSubscribers: () => true,
+    })
+    connection.openForRealtime()
+    const socket = wsMock.instances[0]
+
+    vi.advanceTimersByTime(10_000)
+
+    expect(socket?.readyState).toBe(wsMock.CLOSED)
+    expect(wsMock.instances).toHaveLength(1)
+
+    vi.advanceTimersByTime(300)
+
+    expect(wsMock.instances).toHaveLength(2)
+    expect(wsMock.instances[1]?.readyState).toBe(wsMock.CONNECTING)
+  })
+
+  test('keeps the open timeout when realtime demand drains before a connecting socket opens', () => {
+    vi.useFakeTimers()
+    let subscribed = true
+    const connection = createTestConnection({
+      onRealtimeMessage: vi.fn(),
+      hasRealtimeSubscribers: () => subscribed,
+    })
+    connection.openForRealtime()
+    const socket = wsMock.instances[0]
+
+    subscribed = false
+    connection.closeSocketIfIdle()
+    vi.advanceTimersByTime(10_000)
+
+    expect(socket?.readyState).toBe(wsMock.CLOSED)
+
+    vi.advanceTimersByTime(300)
+
+    expect(wsMock.instances).toHaveLength(1)
+  })
 })
 
 function createTestConnection(options: {

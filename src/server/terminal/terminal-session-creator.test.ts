@@ -38,6 +38,7 @@ describe('terminal session creator', () => {
       sessions.push(terminalSession(input.terminalSessionId ?? 'session-created'))
       return ensureResult(input.terminalSessionId ?? 'session-created')
     })
+    const cleanupStaleCreate = vi.fn(async () => {})
     const creator = createTerminalSessionCreator({
       createCoordinator: createTerminalSessionCreateCoordinator({
         manager,
@@ -50,6 +51,7 @@ describe('terminal session creator', () => {
       ensureOrRestore,
       isCurrentRepoInstance: vi.fn(() => true),
       rejectStaleCreateIfNeeded: vi.fn(() => null),
+      cleanupStaleCreate,
       listSessions: vi.fn(async () => sessions),
     })
 
@@ -75,6 +77,7 @@ describe('terminal session creator', () => {
       workspacePaneStaticTabEntry('status'),
       workspacePaneRuntimeTabEntry('terminal', 'session-created'),
     ])
+    expect(cleanupStaleCreate).not.toHaveBeenCalled()
   })
 
   test('orders returned sessions by the canonical workspace tab order after insert', async () => {
@@ -97,6 +100,7 @@ describe('terminal session creator', () => {
       sessions.push(terminalSession(input.terminalSessionId ?? 'session-3'))
       return ensureResult(input.terminalSessionId ?? 'session-3')
     })
+    const cleanupStaleCreate = vi.fn(async () => {})
     const creator = createTerminalSessionCreator({
       createCoordinator: createTerminalSessionCreateCoordinator({
         manager,
@@ -109,6 +113,7 @@ describe('terminal session creator', () => {
       ensureOrRestore,
       isCurrentRepoInstance: vi.fn(() => true),
       rejectStaleCreateIfNeeded: vi.fn(() => null),
+      cleanupStaleCreate,
       listSessions: vi.fn(async () => sessions),
     })
 
@@ -126,11 +131,8 @@ describe('terminal session creator', () => {
       workspacePaneRuntimeTabEntry('terminal', 'session-3'),
       workspacePaneRuntimeTabEntry('terminal', 'session-2'),
     ])
-    expect(result.sessions.map((session) => session.terminalSessionId)).toEqual([
-      'session-1',
-      'session-3',
-      'session-2',
-    ])
+    expect(result.sessions.map((session) => session.terminalSessionId)).toEqual(['session-1', 'session-3', 'session-2'])
+    expect(cleanupStaleCreate).not.toHaveBeenCalled()
   })
 
   test('rejects before ensuring when the repo instance is already stale', async () => {
@@ -138,6 +140,7 @@ describe('terminal session creator', () => {
       listSessionsForUser: vi.fn(async () => []),
     }
     const ensureOrRestore = vi.fn(async () => ensureResult('session-created'))
+    const cleanupStaleCreate = vi.fn(async () => {})
     const creator = createTerminalSessionCreator({
       createCoordinator: createTerminalSessionCreateCoordinator({
         manager,
@@ -150,6 +153,7 @@ describe('terminal session creator', () => {
       ensureOrRestore,
       isCurrentRepoInstance: vi.fn(() => false),
       rejectStaleCreateIfNeeded: vi.fn(() => null),
+      cleanupStaleCreate,
       listSessions: vi.fn(async () => []),
     })
 
@@ -162,6 +166,7 @@ describe('terminal session creator', () => {
       }),
     ).resolves.toEqual({ ok: false, message: 'error.repo-instance-stale' })
     expect(ensureOrRestore).not.toHaveBeenCalled()
+    expect(cleanupStaleCreate).not.toHaveBeenCalled()
   })
 
   test('lets stale cleanup stop the create before tab materialization', async () => {
@@ -175,6 +180,9 @@ describe('terminal session creator', () => {
       return ensureResult(input.terminalSessionId ?? 'session-created')
     })
     const rejectStaleCreateIfNeeded = vi.fn(() => ({ ok: false as const, message: 'error.repo-instance-stale' }))
+    const cleanupStaleCreate = vi.fn(async () => {
+      workspaceTabs.closeTabsForScope(USER_ID, SCOPE)
+    })
     const creator = createTerminalSessionCreator({
       createCoordinator: createTerminalSessionCreateCoordinator({
         manager,
@@ -187,6 +195,7 @@ describe('terminal session creator', () => {
       ensureOrRestore,
       isCurrentRepoInstance: vi.fn(() => true),
       rejectStaleCreateIfNeeded,
+      cleanupStaleCreate,
       listSessions: vi.fn(async () => sessions),
     })
 
@@ -199,6 +208,15 @@ describe('terminal session creator', () => {
       }),
     ).resolves.toEqual({ ok: false, message: 'error.repo-instance-stale' })
     expect(rejectStaleCreateIfNeeded).toHaveBeenCalledTimes(1)
+    expect(cleanupStaleCreate).toHaveBeenCalledWith(USER_ID, {
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
+      branch: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      kind: 'additional',
+      cols: 80,
+      rows: 24,
+    })
     expect(workspaceTabs.tabsForScope({ userId: USER_ID, scope: SCOPE })).toEqual([])
   })
 })

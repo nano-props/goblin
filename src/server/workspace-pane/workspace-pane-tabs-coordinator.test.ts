@@ -106,8 +106,9 @@ describe('workspace pane tabs coordinator', () => {
       workspacePaneStaticTabEntry('status'),
       workspacePaneRuntimeTabEntry('terminal', 'session-live'),
     ])
-    expect(workspaceTabs.tabs({ userId: USER_ID, scope: SCOPE, branchName: BRANCH_NAME, worktreePath: WORKTREE_PATH }))
-      .toEqual([workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-live')])
+    expect(
+      workspaceTabs.tabs({ userId: USER_ID, scope: SCOPE, branchName: BRANCH_NAME, worktreePath: WORKTREE_PATH }),
+    ).toEqual([workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-live')])
   })
 
   test('materializes missing live runtime sessions when updating workspace tabs', async () => {
@@ -241,6 +242,90 @@ describe('workspace pane tabs coordinator', () => {
     ).rejects.toThrow('provider failed')
     expect(workspaceTabs.tabs(workspaceTarget())).toEqual([workspacePaneStaticTabEntry('status')])
   })
+
+  test('serializes list canonicalization with scope updates', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      ...workspaceTarget(),
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-stale')],
+    })
+    const liveSessions = deferred<Array<{ sessionId: string; branch: string; worktreePath: string }>>()
+    const listSessionsForUser = vi.fn(async () => await liveSessions.promise)
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      runtimeProviders: [
+        {
+          type: 'terminal',
+          listSessionsForUser,
+        },
+      ],
+    })
+
+    const list = coordinator.listWorkspaceTabs({
+      userId: USER_ID,
+      repoRoot: REPO_ROOT,
+      scope: SCOPE,
+      assertCurrent: () => {},
+      broadcastChanged: vi.fn(),
+    })
+    await vi.waitFor(() => expect(listSessionsForUser).toHaveBeenCalledTimes(1))
+    expect(workspaceTabs.tabs(workspaceTarget())).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneRuntimeTabEntry('terminal', 'session-stale'),
+    ])
+    const update = coordinator.updateTabs({
+      userId: USER_ID,
+      scope: SCOPE,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      operation: { type: 'open-static', tabType: 'history' },
+      assertCurrent: () => {},
+    })
+
+    liveSessions.resolve([{ sessionId: 'session-live', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH }])
+
+    await expect(list).resolves.toEqual([
+      {
+        repoRoot: REPO_ROOT,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-live')],
+      },
+    ])
+    await expect(update).resolves.toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneRuntimeTabEntry('terminal', 'session-live'),
+      workspacePaneStaticTabEntry('history'),
+    ])
+    expect(workspaceTabs.tabs(workspaceTarget())).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneRuntimeTabEntry('terminal', 'session-live'),
+      workspacePaneStaticTabEntry('history'),
+    ])
+  })
+
+  test('serializes scope close after pending reconciliation', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      ...workspaceTarget(),
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-stale')],
+    })
+    const liveSessions = deferred<Array<{ sessionId: string; branch: string; worktreePath: string }>>()
+    const listSessionsForUser = vi.fn(async () => await liveSessions.promise)
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      runtimeProviders: [{ type: 'terminal', listSessionsForUser }],
+    })
+
+    const reconcile = coordinator.reconcileWorktree({ userId: USER_ID, scope: SCOPE, worktreePath: WORKTREE_PATH })
+    await vi.waitFor(() => expect(listSessionsForUser).toHaveBeenCalledTimes(1))
+    const close = coordinator.closeScope({ userId: USER_ID, scope: SCOPE })
+
+    liveSessions.resolve([{ sessionId: 'session-live', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH }])
+    await Promise.all([reconcile, close])
+
+    expect(workspaceTabs.tabsForScope({ userId: USER_ID, scope: SCOPE })).toEqual([])
+  })
 })
 
 function workspaceTarget() {
@@ -250,4 +335,12 @@ function workspaceTarget() {
     branchName: BRANCH_NAME,
     worktreePath: WORKTREE_PATH,
   }
+}
+
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
 }

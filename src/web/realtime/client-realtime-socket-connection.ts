@@ -82,6 +82,7 @@ export function createClientRealtimeSocketConnection<
   const healthProbeLabel = `${options.errorPrefix} health probe`
 
   let reconnectTimer: number | null = null
+  let realtimeOpenTimeout: ReturnType<typeof setTimeout> | null = null
   let heartbeatTimer: ReturnType<typeof globalThis.setInterval> | null = null
   let quitting = isAppQuitting()
   let pendingSocketOpenRequests = 0
@@ -103,6 +104,7 @@ export function createClientRealtimeSocketConnection<
     closeReason: `${socketLabel} closed`,
     errorReason: `${socketLabel} error`,
     onOpen(entry) {
+      clearRealtimeOpenTimeout()
       startHeartbeat(entry.socket, entry.generation)
       options.onOpen?.(entry.connection.clientId)
     },
@@ -111,6 +113,7 @@ export function createClientRealtimeSocketConnection<
       if (message) handleSocketMessage(message, entry.connection.clientId)
     },
     onDisconnect(_entry, context) {
+      clearRealtimeOpenTimeout()
       stopHeartbeat()
       clearPendingHealthProbes()
       rejectPendingSocketRequests(context.reason)
@@ -121,6 +124,7 @@ export function createClientRealtimeSocketConnection<
       reconcileSocketDemand('reconnect')
     },
     onUnavailableSocketDropped() {
+      clearRealtimeOpenTimeout()
       stopHeartbeat()
       clearPendingHealthProbes()
     },
@@ -129,6 +133,7 @@ export function createClientRealtimeSocketConnection<
   subscribeAppQuitting(() => {
     quitting = true
     clearReconnectTimer()
+    clearRealtimeOpenTimeout()
     clearPendingHealthProbes()
     rejectPendingSocketRequests(`${socketLabel} closed`)
     socketLifecycle.closeAndForget()
@@ -155,6 +160,12 @@ export function createClientRealtimeSocketConnection<
     if (reconnectTimer === null) return
     window.clearTimeout(reconnectTimer)
     reconnectTimer = null
+  }
+
+  function clearRealtimeOpenTimeout() {
+    if (realtimeOpenTimeout === null) return
+    clearTimeout(realtimeOpenTimeout)
+    realtimeOpenTimeout = null
   }
 
   function rejectPendingSocketRequests(message: string) {
@@ -199,7 +210,10 @@ export function createClientRealtimeSocketConnection<
       if (!socketLifecycle.active()) scheduleReconnect()
       return
     }
-    if (intent === 'open-now') ensureSocket()
+    if (intent === 'open-now') {
+      clearReconnectTimer()
+      ensureSocket()
+    }
   }
 
   function kickReconnect() {
@@ -212,11 +226,30 @@ export function createClientRealtimeSocketConnection<
       reconcileSocketDemand('open-now')
       return
     }
+    if (current.socket.readyState === WebSocket.CONNECTING) {
+      scheduleRealtimeOpenTimeout()
+      return
+    }
     if (current.socket.readyState === WebSocket.OPEN) startHealthProbe(current.socket, current.generation)
   }
 
   function ensureSocket() {
     socketLifecycle.ensureSocket()
+    scheduleRealtimeOpenTimeout()
+  }
+
+  function scheduleRealtimeOpenTimeout(): void {
+    if (realtimeOpenTimeout !== null) return
+    if (quitting || !options.hasRealtimeSubscribers()) return
+    const current = socketLifecycle.active()
+    if (!current || current.socket.readyState !== WebSocket.CONNECTING) return
+    realtimeOpenTimeout = setTimeout(() => {
+      realtimeOpenTimeout = null
+      if (!socketLifecycle.isActive(current.socket, current.generation)) return
+      if (current.socket.readyState !== WebSocket.CONNECTING) return
+      if (pendingSocketOpenRequests > 0) return
+      forceSocketReconnect(`${socketLabel} open timed out`, current.socket)
+    }, REALTIME_SOCKET_OPEN_TIMEOUT_MS)
   }
 
   function handleSocketMessage(message: TServerMessage, currentClientId: string): void {
@@ -303,10 +336,7 @@ export function createClientRealtimeSocketConnection<
     closeSocketIfIdle()
   }
 
-  async function request<TAction extends Action>(
-    action: TAction,
-    input: TInputs[TAction],
-  ): Promise<TOutputs[TAction]> {
+  async function request<TAction extends Action>(action: TAction, input: TInputs[TAction]): Promise<TOutputs[TAction]> {
     let ws: WebSocket
     try {
       pendingSocketOpenRequests += 1
@@ -395,9 +425,7 @@ export function createClientRealtimeSocketConnection<
   }
 }
 
-function isRealtimeResponseMessage<TAction extends string>(
-  value: unknown,
-): value is RealtimeResponseMessage<TAction> {
+function isRealtimeResponseMessage<TAction extends string>(value: unknown): value is RealtimeResponseMessage<TAction> {
   if (!value || typeof value !== 'object') return false
   const message = value as { type?: unknown; requestId?: unknown; action?: unknown; ok?: unknown }
   return (

@@ -1,14 +1,8 @@
 import PQueue from 'p-queue'
-import type {
-  WorkspacePaneRuntimeTabType,
-  WorkspacePaneTabEntry,
-} from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneRuntimeTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsEntry, WorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs.ts'
-import {
-  workspacePaneTabsUserQueueKey,
-  workspacePaneTabsUserQueueTarget,
-} from '#/server/workspace-pane/workspace-pane-tabs-user-queue-key.ts'
+import { workspacePaneTabsUserScopeQueueKey } from '#/server/workspace-pane/workspace-pane-tabs-user-queue-key.ts'
 import type { WorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import {
   workspacePaneTabsWithRuntimeTab,
@@ -23,7 +17,7 @@ import {
 
 type WorkspacePaneTabsCoordinatorRuntime = Pick<
   WorkspacePaneTabsRuntime<string>,
-  'replaceTabs' | 'tabs' | 'tabsForScope'
+  'closeTabsForScope' | 'replaceTabs' | 'scopesForUser' | 'tabs' | 'tabsForScope'
 >
 
 export interface WorkspacePaneRuntimeTabsLiveSession {
@@ -45,7 +39,7 @@ interface WorkspacePaneTabsCoordinatorOptions {
 export class WorkspacePaneTabsCoordinator {
   private readonly runtimeProviders: readonly WorkspacePaneRuntimeTabsProvider[]
   private readonly workspaceTabs: WorkspacePaneTabsCoordinatorRuntime
-  private readonly operationQueuesByTarget = new Map<string, PQueue>()
+  private readonly operationQueuesByScope = new Map<string, PQueue>()
 
   constructor(options: WorkspacePaneTabsCoordinatorOptions) {
     this.runtimeProviders = options.runtimeProviders
@@ -68,38 +62,32 @@ export class WorkspacePaneTabsCoordinator {
       branchName: input.branchName,
       worktreePath: input.worktreePath,
     }
-    return await this.runWorkspaceTabsOperation(
-      input.userId,
-      input.scope,
-      input.branchName,
-      input.worktreePath,
-      async () => {
-        const providerSnapshots = await this.runtimeProviderSnapshotsForWorktree(
-          input.userId,
-          input.scope,
-          input.worktreePath,
-        )
-        const failure = input.guardBeforeWrite?.() ?? null
-        if (failure) return failure
-        const proposedTabs = workspacePaneTabsWithRuntimeTab(
-          this.workspaceTabs.tabs(target),
-          input.runtimeType,
-          input.sessionId,
-          { insertAfterIdentity: input.insertAfterIdentity ?? null },
-        )
-        return this.workspaceTabs.replaceTabs({
-          ...target,
-          tabs: canonicalWorkspaceRuntimeTabsForTarget({
-            entry: {
-              branchName: input.branchName,
-              worktreePath: input.worktreePath,
-              tabs: proposedTabs,
-            },
-            providerSnapshots,
-          }),
-        })
-      },
-    )
+    return await this.runWorkspaceTabsScopeOperation(input.userId, input.scope, async () => {
+      const providerSnapshots = await this.runtimeProviderSnapshotsForWorktree(
+        input.userId,
+        input.scope,
+        input.worktreePath,
+      )
+      const failure = input.guardBeforeWrite?.() ?? null
+      if (failure) return failure
+      const proposedTabs = workspacePaneTabsWithRuntimeTab(
+        this.workspaceTabs.tabs(target),
+        input.runtimeType,
+        input.sessionId,
+        { insertAfterIdentity: input.insertAfterIdentity ?? null },
+      )
+      return this.workspaceTabs.replaceTabs({
+        ...target,
+        tabs: canonicalWorkspaceRuntimeTabsForTarget({
+          entry: {
+            branchName: input.branchName,
+            worktreePath: input.worktreePath,
+            tabs: proposedTabs,
+          },
+          providerSnapshots,
+        }),
+      })
+    })
   }
 
   async replaceTabs(input: {
@@ -110,24 +98,18 @@ export class WorkspacePaneTabsCoordinator {
     tabs: readonly WorkspacePaneTabEntry[]
     assertCurrent: () => void
   }): Promise<WorkspacePaneTabEntry[]> {
-    return await this.runWorkspaceTabsOperation(
-      input.userId,
-      input.scope,
-      input.branchName,
-      input.worktreePath,
-      async () => {
-        input.assertCurrent()
-        const tabs = await this.canonicalRuntimeTabsForTarget(input)
-        input.assertCurrent()
-        return this.workspaceTabs.replaceTabs({
-          userId: input.userId,
-          scope: input.scope,
-          branchName: input.branchName,
-          worktreePath: input.worktreePath,
-          tabs,
-        })
-      },
-    )
+    return await this.runWorkspaceTabsScopeOperation(input.userId, input.scope, async () => {
+      input.assertCurrent()
+      const tabs = await this.canonicalRuntimeTabsForTarget(input)
+      input.assertCurrent()
+      return this.workspaceTabs.replaceTabs({
+        userId: input.userId,
+        scope: input.scope,
+        branchName: input.branchName,
+        worktreePath: input.worktreePath,
+        tabs,
+      })
+    })
   }
 
   async updateTabs(input: {
@@ -138,25 +120,19 @@ export class WorkspacePaneTabsCoordinator {
     operation: WorkspacePaneTabsUpdateOperation
     assertCurrent: () => void
   }): Promise<WorkspacePaneTabEntry[]> {
-    return await this.runWorkspaceTabsOperation(
-      input.userId,
-      input.scope,
-      input.branchName,
-      input.worktreePath,
-      async () => {
-        input.assertCurrent()
-        const target = {
-          userId: input.userId,
-          scope: input.scope,
-          branchName: input.branchName,
-          worktreePath: input.worktreePath,
-        }
-        const updatedTabs = workspacePaneTabsWithUpdateOperation(this.workspaceTabs.tabs(target), input.operation)
-        const tabs = await this.canonicalRuntimeTabsForTarget({ ...input, tabs: updatedTabs })
-        input.assertCurrent()
-        return this.workspaceTabs.replaceTabs({ ...target, tabs })
-      },
-    )
+    return await this.runWorkspaceTabsScopeOperation(input.userId, input.scope, async () => {
+      input.assertCurrent()
+      const target = {
+        userId: input.userId,
+        scope: input.scope,
+        branchName: input.branchName,
+        worktreePath: input.worktreePath,
+      }
+      const updatedTabs = workspacePaneTabsWithUpdateOperation(this.workspaceTabs.tabs(target), input.operation)
+      const tabs = await this.canonicalRuntimeTabsForTarget({ ...input, tabs: updatedTabs })
+      input.assertCurrent()
+      return this.workspaceTabs.replaceTabs({ ...target, tabs })
+    })
   }
 
   async reconcileWorktree(input: {
@@ -165,7 +141,7 @@ export class WorkspacePaneTabsCoordinator {
     worktreePath: string
     assertCurrent?: () => void
   }): Promise<boolean> {
-    return await this.runWorkspaceTabsWorktreeOperation(input.userId, input.scope, input.worktreePath, async () => {
+    return await this.runWorkspaceTabsScopeOperation(input.userId, input.scope, async () => {
       const providerSnapshots = await this.runtimeProviderSnapshotsForWorktree(
         input.userId,
         input.scope,
@@ -200,13 +176,29 @@ export class WorkspacePaneTabsCoordinator {
     assertCurrent: () => void
     broadcastChanged: () => void
   }): Promise<WorkspacePaneTabsEntry[]> {
-    await this.reconcileWorkspaceTabsProjectionBoundary(input)
-    return this.workspaceTabs.tabsForScope({ userId: input.userId, scope: input.scope }).map((entry) => ({
-      repoRoot: input.repoRoot,
-      branchName: entry.branchName,
-      worktreePath: entry.worktreePath,
-      tabs: entry.tabs,
-    }))
+    return await this.runWorkspaceTabsScopeOperation(input.userId, input.scope, async () => {
+      await this.reconcileWorkspaceTabsProjectionBoundary(input)
+      return this.workspaceTabs.tabsForScope({ userId: input.userId, scope: input.scope }).map((entry) => ({
+        repoRoot: input.repoRoot,
+        branchName: entry.branchName,
+        worktreePath: entry.worktreePath,
+        tabs: entry.tabs,
+      }))
+    })
+  }
+
+  async closeScope(input: { userId: string; scope: string }): Promise<void> {
+    await this.runWorkspaceTabsScopeOperation(input.userId, input.scope, () => {
+      this.workspaceTabs.closeTabsForScope(input.userId, input.scope)
+    })
+  }
+
+  async closeUser(input: { userId: string }): Promise<void> {
+    for (;;) {
+      const scopes = this.workspaceTabs.scopesForUser(input.userId)
+      if (scopes.length === 0) return
+      await Promise.all(scopes.map(async (scope) => await this.closeScope({ userId: input.userId, scope })))
+    }
   }
 
   private async canonicalRuntimeTabsForTarget(input: {
@@ -275,18 +267,11 @@ export class WorkspacePaneTabsCoordinator {
     input.assertCurrent()
     const scopeEntries = this.workspaceTabs.tabsForScope({ userId: input.userId, scope: input.scope })
     const worktreePaths = workspaceRuntimeTabWorktreePaths({ entries: scopeEntries, providerSnapshots })
-    const replacementGroups = await Promise.all(
-      worktreePaths.map(async (worktreePath) => {
-        const worktreeProviderSnapshots = await this.runtimeProviderSnapshotsForWorktree(
-          input.userId,
-          input.scope,
-          worktreePath,
-        )
-        return projectWorkspaceRuntimeTabsFromProviderSnapshots({
-          entries: scopeEntries.filter((entry) => entry.worktreePath === worktreePath),
-          providerSnapshots: worktreeProviderSnapshots,
-          worktreePath,
-        })
+    const replacementGroups = worktreePaths.map((worktreePath) =>
+      projectWorkspaceRuntimeTabsFromProviderSnapshots({
+        entries: scopeEntries.filter((entry) => entry.worktreePath === worktreePath),
+        providerSnapshots,
+        worktreePath,
       }),
     )
     const replacements = replacementGroups.flat()
@@ -306,29 +291,12 @@ export class WorkspacePaneTabsCoordinator {
     if (replacements.length > 0) input.broadcastChanged()
   }
 
-  private async runWorkspaceTabsOperation<T>(
+  private async runWorkspaceTabsScopeOperation<T>(
     userId: string,
     scope: string,
-    branchName: string,
-    worktreePath: string | null,
     task: () => Promise<T> | T,
   ): Promise<T> {
-    return await this.runWorkspaceTabsOperationByKey(
-      workspacePaneTabsUserQueueKey(workspacePaneTabsUserQueueTarget(userId, scope, branchName, worktreePath)),
-      task,
-    )
-  }
-
-  private async runWorkspaceTabsWorktreeOperation<T>(
-    userId: string,
-    scope: string,
-    worktreePath: string,
-    task: () => Promise<T> | T,
-  ): Promise<T> {
-    return await this.runWorkspaceTabsOperationByKey(
-      workspacePaneTabsUserQueueKey({ kind: 'worktree', userId, scope, worktreePath }),
-      task,
-    )
+    return await this.runWorkspaceTabsOperationByKey(workspacePaneTabsUserScopeQueueKey(userId, scope), task)
   }
 
   private async runWorkspaceTabsOperationByKey<T>(queueKey: string, task: () => Promise<T> | T): Promise<T> {
@@ -341,18 +309,18 @@ export class WorkspacePaneTabsCoordinator {
   }
 
   private workspaceTabsOperationQueue(queueKey: string): PQueue {
-    let queue = this.operationQueuesByTarget.get(queueKey)
+    let queue = this.operationQueuesByScope.get(queueKey)
     if (!queue) {
       queue = new PQueue({ concurrency: 1 })
-      this.operationQueuesByTarget.set(queueKey, queue)
+      this.operationQueuesByScope.set(queueKey, queue)
     }
     return queue
   }
 
   private scheduleWorkspaceTabsOperationQueueCleanup(queueKey: string, queue: PQueue): void {
     void queue.onIdle().then(() => {
-      if (this.operationQueuesByTarget.get(queueKey) !== queue) return
-      if (queue.size === 0 && queue.pending === 0) this.operationQueuesByTarget.delete(queueKey)
+      if (this.operationQueuesByScope.get(queueKey) !== queue) return
+      if (queue.size === 0 && queue.pending === 0) this.operationQueuesByScope.delete(queueKey)
     })
   }
 }

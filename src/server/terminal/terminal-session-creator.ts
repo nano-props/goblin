@@ -32,6 +32,7 @@ interface TerminalSessionCreatorOptions {
     input: Pick<TerminalCreateInput, 'repoRoot' | 'repoInstanceId'>,
     terminalRuntimeSessionId: string,
   ): TerminalCreateFailure | null
+  cleanupStaleCreate(userId: string, input: Pick<TerminalCreateInput, 'repoRoot' | 'repoInstanceId'>): Promise<void>
   listSessions(userId: string, repoRoot: string, repoInstanceId: string): Promise<TerminalSessionSummary[]>
 }
 
@@ -66,7 +67,7 @@ class TerminalSessionCreator {
             }),
         )
         if (!createResult.ok) return { ok: false, message: createResult.message }
-        const staleAfterEnsure = this.options.rejectStaleCreateIfNeeded(
+        const staleAfterEnsure = await this.rejectStaleCreateIfNeeded(
           input.userId,
           input.request,
           createResult.terminalRuntimeSessionId,
@@ -77,7 +78,7 @@ class TerminalSessionCreator {
           input.request.repoRoot,
           input.request.repoInstanceId,
         )
-        const staleAfterList = this.options.rejectStaleCreateIfNeeded(
+        const staleAfterList = await this.rejectStaleCreateIfNeeded(
           input.userId,
           input.request,
           createResult.terminalRuntimeSessionId,
@@ -101,9 +102,12 @@ class TerminalSessionCreator {
                 ),
             })
           : []
-        if (isTerminalCreateFailure(tabsResult)) return tabsResult
+        if (isTerminalCreateFailure(tabsResult)) {
+          await this.options.cleanupStaleCreate(input.userId, input.request)
+          return tabsResult
+        }
         const tabs = tabsResult
-        const staleAfterTabs = this.options.rejectStaleCreateIfNeeded(
+        const staleAfterTabs = await this.rejectStaleCreateIfNeeded(
           input.userId,
           input.request,
           createResult.terminalRuntimeSessionId,
@@ -130,6 +134,17 @@ class TerminalSessionCreator {
         }
       },
     )
+  }
+
+  private async rejectStaleCreateIfNeeded(
+    userId: string,
+    input: Pick<TerminalCreateInput, 'repoRoot' | 'repoInstanceId'>,
+    terminalRuntimeSessionId: string,
+  ): Promise<TerminalCreateFailure | null> {
+    const failure = this.options.rejectStaleCreateIfNeeded(userId, input, terminalRuntimeSessionId)
+    if (!failure) return null
+    await this.options.cleanupStaleCreate(userId, input)
+    return failure
   }
 }
 

@@ -23,9 +23,7 @@ import { createTerminalRuntimeCoordinator } from '#/server/terminal/terminal-run
 import { createWorkspacePaneTabsActions } from '#/server/workspace-pane/workspace-pane-tabs-actions.ts'
 import { broadcastWorkspacePaneTabsChanged } from '#/server/workspace-pane/workspace-pane-tabs-realtime.ts'
 import { createTerminalRealtimeHandlers } from '#/server/terminal/terminal-runtime-realtime.ts'
-import {
-  createWorkspacePaneTabsRealtimeHandlers,
-} from '#/server/workspace-pane/workspace-pane-tabs-runtime-realtime.ts'
+import { createWorkspacePaneTabsRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-tabs-runtime-realtime.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { isValidTerminalClientId, isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
@@ -96,21 +94,20 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     workspaceTabs,
     (userId, clientId) => broker.isClientOnline(userId, clientId),
   )
-  const coordinator = createTerminalRuntimeCoordinator({
-    manager,
-    workspaceTabs,
-    detachedTtlMs: TERMINAL_DETACHED_TTL_MS,
-  })
-  broker = coordinator.broker
   const workspaceTabsCoordinator = createWorkspacePaneTabsCoordinator({
     workspaceTabs,
     runtimeProviders: [terminalWorkspacePaneRuntimeTabsProvider(manager)],
   })
+  const coordinator = createTerminalRuntimeCoordinator({
+    manager,
+    workspaceTabsCoordinator,
+    detachedTtlMs: TERMINAL_DETACHED_TTL_MS,
+  })
+  broker = coordinator.broker
   sessionService = createTerminalSessionService({
     isValidClientId: isValidTerminalClientId,
     isValidTerminalSessionId,
     manager,
-    workspaceTabs,
     workspaceTabsCoordinator,
     isCurrentRepoInstance: isCurrentRepoRuntimeInstance,
     broadcastSessionsChanged(userId, repoRoot) {
@@ -124,9 +121,18 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   const unsubscribeRepoRuntimeInstanceClosed = onRepoRuntimeInstanceClosed((event) => {
     const scope = terminalSessionRuntimeScope(event.repoRoot, event.repoInstanceId)
     manager.closeSessionsForRepo(event.userId, scope)
-    workspaceTabs.closeTabsForScope(event.userId, scope)
     broadcastRepoSessionsChanged(event.userId, event.repoRoot)
-    broadcastRepoWorkspaceTabsChanged(event.userId, event.repoRoot)
+    void workspaceTabsCoordinator
+      .closeScope({ userId: event.userId, scope })
+      .then(() => {
+        broadcastRepoWorkspaceTabsChanged(event.userId, event.repoRoot)
+      })
+      .catch((err) => {
+        terminalRuntimeLogger.warn(
+          { userId: event.userId, repoRoot: event.repoRoot, repoInstanceId: event.repoInstanceId, err },
+          'failed to close workspace tabs after repo instance close',
+        )
+      })
   })
 
   let shuttingDown = false

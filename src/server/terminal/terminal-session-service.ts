@@ -12,7 +12,6 @@ import type { WorkspacePaneTabsEntry, WorkspacePaneTabsUpdateInput } from '#/sha
 import { isValidTerminalClientId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import { createTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
-import type { WorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import {
   isValidWorkspacePaneTabsOperation,
   type WorkspacePaneTabsCoordinator,
@@ -38,10 +37,6 @@ interface TerminalSessionServiceOptions {
   isValidClientId(value: unknown): value is string
   isValidTerminalSessionId(value: unknown): value is string
   manager: TerminalSessionServiceManager
-  workspaceTabs: Pick<
-    WorkspacePaneTabsRuntime<string>,
-    'closeTabsForScope'
-  >
   workspaceTabsCoordinator: WorkspacePaneTabsCoordinator
   broadcastSessionsChanged(userId: string, repoRoot: string): void
   broadcastWorkspaceTabsChanged(userId: string, repoRoot: string): void
@@ -79,6 +74,7 @@ class TerminalSessionService {
         this.isCurrentRepoInstance(userId, repoRoot, repoInstanceId),
       rejectStaleCreateIfNeeded: (userId, input, terminalRuntimeSessionId) =>
         this.rejectStaleCreateIfNeeded(userId, input, terminalRuntimeSessionId),
+      cleanupStaleCreate: async (userId, input) => await this.cleanupStaleCreate(userId, input),
       listSessions: async (userId, repoRoot, repoInstanceId) =>
         await this.listSessions(userId, repoRoot, repoInstanceId),
     })
@@ -224,11 +220,17 @@ class TerminalSessionService {
   ): Extract<TerminalCreateResult, { ok: false }> | null {
     if (this.isCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)) return null
     this.options.manager.closeSession(terminalRuntimeSessionId)
-    this.options.workspaceTabs.closeTabsForScope(
-      userId,
-      terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId),
-    )
     return { ok: false, message: 'error.repo-instance-stale' }
+  }
+
+  private async cleanupStaleCreate(
+    userId: string,
+    input: Pick<TerminalCreateInput, 'repoRoot' | 'repoInstanceId'>,
+  ): Promise<void> {
+    await this.workspaceTabsCoordinator.closeScope({
+      userId,
+      scope: terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId),
+    })
   }
 }
 
