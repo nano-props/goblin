@@ -148,7 +148,9 @@ function applyWorkspacePaneRouteReconciliation({
     'selectRepoBranch' | 'showRepoBranchWorkspacePaneTab' | 'showRepoBranchTerminalSession'
   >
 }): void {
-  if (reconciliation.kind === 'none' || reconciliation.kind === 'pending') return
+  if (reconciliation.kind === 'none' || reconciliation.kind === 'pending' || reconciliation.kind === 'unverified') {
+    return
+  }
   if (!reconciliation.route) {
     navigation.selectRepoBranch(repoId, branchName, { replace: true })
     return

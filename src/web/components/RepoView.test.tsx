@@ -49,16 +49,19 @@ vi.mock('#/web/components/BranchNavigator.tsx', () => ({
 vi.mock('#/web/components/RepoWorkspace.tsx', () => ({
   RepoWorkspace: ({
     currentBranchName,
+    workspacePaneRoute,
     shortcutsEnabled = true,
     toolbarTrafficLightOffset = false,
   }: {
     currentBranchName?: string | null
+    workspacePaneRoute?: { kind: string } | null
     shortcutsEnabled?: boolean
     toolbarTrafficLightOffset?: boolean
   }) => (
     <div
       data-testid="repo-workspace"
       data-current-branch-name={currentBranchName ?? ''}
+      data-workspace-pane-route-kind={workspacePaneRoute?.kind ?? ''}
       data-shortcuts-enabled={shortcutsEnabled ? 'true' : 'false'}
       data-traffic-light-offset={toolbarTrafficLightOffset ? 'true' : 'false'}
     />

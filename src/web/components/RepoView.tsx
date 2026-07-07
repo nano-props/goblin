@@ -98,6 +98,11 @@ export function RepoView({
   const setCompactWorkspaceTransitioning = useUiTransitionStore((s) => s.setCompactWorkspaceTransitioning)
   const compactWorkspaceTransitioning =
     compact && compactWorkspaceCurrentBranchName !== null && compactWorkspaceCurrentBranchName !== currentBranchName
+  const workspaceCurrentBranchName = compact ? compactWorkspaceCurrentBranchName : currentBranchName
+  const workspacePaneRoute =
+    routeView?.kind === 'branch' && routeView.branchName === workspaceCurrentBranchName
+      ? routeView.workspacePaneRoute
+      : null
   useEffect(() => {
     if (!compactWorkspaceTransitioning) {
       setCompactWorkspaceTransitioning(false)
@@ -243,8 +248,8 @@ export function RepoView({
           ) : (
             <RepoWorkspace
               repoId={repoId}
-              currentBranchName={compact ? compactWorkspaceCurrentBranchName : currentBranchName}
-              workspacePaneRoute={routeView?.kind === 'branch' ? routeView.workspacePaneRoute : null}
+              currentBranchName={workspaceCurrentBranchName}
+              workspacePaneRoute={workspacePaneRoute}
               shortcutsEnabled={!compact || singlePane === 'workspace'}
               toolbarTrafficLightOffset={workspaceTrafficLightOffset}
               onBackToBranchNavigator={routeView ? () => onOpenRepoRoot?.(repo.id) : undefined}

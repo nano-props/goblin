@@ -69,6 +69,12 @@ interface ResolvedTerminalCreateOptions {
   startupShellCommand?: string
   insertAfterIdentity?: string | null
 }
+
+type TerminalWorkspaceTabsChangedHandler = (
+  base: TerminalSessionBase,
+  tabs: readonly WorkspacePaneTabEntry[],
+) => void | Promise<void>
+
 /**
  * Client-level authority for terminal session state.
  *
@@ -90,7 +96,7 @@ interface ResolvedTerminalCreateOptions {
  */
 export class TerminalSessionProjection {
   private readonly onSelectedWorktreeChange: (terminalWorktreeKey: string, terminalSessionId: string | null) => void
-  private readonly onWorkspaceTabsChanged: (base: TerminalSessionBase, tabs: readonly WorkspacePaneTabEntry[]) => void
+  private readonly onWorkspaceTabsChanged: TerminalWorkspaceTabsChangedHandler
   private repoIndex: TerminalRepoIndex = {}
   private readonly sessions = new Map<string, TerminalSession>()
   private readonly terminalSessionIdByTerminalRuntimeSessionId = new Map<string, string>()
@@ -158,7 +164,7 @@ export class TerminalSessionProjection {
 
   constructor(
     onSelectedWorktreeChange: (terminalWorktreeKey: string, terminalSessionId: string | null) => void = () => {},
-    onWorkspaceTabsChanged: (base: TerminalSessionBase, tabs: readonly WorkspacePaneTabEntry[]) => void = () => {},
+    onWorkspaceTabsChanged: TerminalWorkspaceTabsChangedHandler = () => {},
   ) {
     this.onSelectedWorktreeChange = onSelectedWorktreeChange
     this.onWorkspaceTabsChanged = onWorkspaceTabsChanged
@@ -497,6 +503,7 @@ export class TerminalSessionProjection {
     geometry: { cols: number; rows: number },
     terminalWorktreeKey: string,
     pending: TerminalCreateQueueEntry<TerminalSessionBase, TerminalCreateQueueRequest>,
+    createOptions: ResolvedTerminalCreateOptions,
   ): Promise<string> {
     const repoInstanceId = requireRepoInstanceId(base)
     return await runWorkspacePaneTabsOperation(
@@ -506,7 +513,7 @@ export class TerminalSessionProjection {
         branchName: base.branch,
         worktreePath: base.worktreePath,
       },
-      async () => await this.performCreateTerminalNow(base, geometry, terminalWorktreeKey, pending),
+      async () => await this.performCreateTerminalNow(base, geometry, terminalWorktreeKey, pending, createOptions),
     )
   }
 
@@ -515,14 +522,10 @@ export class TerminalSessionProjection {
     geometry: { cols: number; rows: number },
     terminalWorktreeKey: string,
     pending: TerminalCreateQueueEntry<TerminalSessionBase, TerminalCreateQueueRequest>,
+    createOptions: ResolvedTerminalCreateOptions,
   ): Promise<string> {
     this.requireCurrentCreateRequest(terminalWorktreeKey, pending)
     const request = pending.options
-    if (request.owner && !request.owner.isFresh()) {
-      throw new Error('terminal create request canceled')
-    }
-    const createOptions = await resolveTerminalCreateOptions(request.createOptions)
-    this.requireCurrentCreateRequest(terminalWorktreeKey, pending)
     if (request.owner && !request.owner.isFresh()) {
       throw new Error('terminal create request canceled')
     }
@@ -565,7 +568,20 @@ export class TerminalSessionProjection {
       throw new Error('terminal create request canceled')
     }
     const projectedCreate = projectCreateResultForClient(base, result)
-    this.onWorkspaceTabsChanged(base, result.tabs)
+    try {
+      await this.onWorkspaceTabsChanged(base, result.tabs)
+    } catch (error) {
+      await this.disposeStaleCreateResult(result.terminalSessionId, result.terminalRuntimeSessionId)
+      throw error
+    }
+    if (this.lifecycleQueues.getCreate(terminalWorktreeKey) !== pending) {
+      await this.disposeStaleCreateResult(result.terminalSessionId, result.terminalRuntimeSessionId)
+      throw new Error('terminal create request canceled')
+    }
+    if (request.owner && !request.owner.isFresh()) {
+      await this.disposeStaleCreateResult(result.terminalSessionId, result.terminalRuntimeSessionId)
+      throw new Error('terminal create request canceled')
+    }
     this.setPreferredSelectedTerminalSessionId(terminalWorktreeKey, result.terminalSessionId)
     this.reconcileServerSessions(
       base.repoRoot,
@@ -635,7 +651,11 @@ export class TerminalSessionProjection {
       if (this.lifecycleQueues.getCreate(terminalWorktreeKey) !== pending) {
         throw new Error('terminal create request canceled')
       }
-      pending.resolve(await this.performCreateTerminal(pending.base, geometry, terminalWorktreeKey, pending))
+      const createOptions = await this.resolveCurrentCreateOptions(terminalWorktreeKey, pending)
+      this.requireCurrentCreateRequest(terminalWorktreeKey, pending)
+      pending.resolve(
+        await this.performCreateTerminal(pending.base, geometry, terminalWorktreeKey, pending, createOptions),
+      )
     } catch (error) {
       pending.reject(error)
     } finally {
@@ -644,6 +664,26 @@ export class TerminalSessionProjection {
         this.notifyWorktree(terminalWorktreeKey)
       }
     }
+  }
+
+  private async resolveCurrentCreateOptions(
+    terminalWorktreeKey: string,
+    pending: TerminalCreateQueueEntry<TerminalSessionBase, TerminalCreateQueueRequest>,
+  ): Promise<ResolvedTerminalCreateOptions> {
+    this.requireCurrentCreateRequest(terminalWorktreeKey, pending)
+    const request = pending.options
+    if (request.owner && !request.owner.isFresh()) {
+      throw new Error('terminal create request canceled')
+    }
+    const createOptions = await resolveTerminalCreateOptionsUntilCreateSettles(
+      request.createOptions,
+      pending.promise,
+    )
+    this.requireCurrentCreateRequest(terminalWorktreeKey, pending)
+    if (request.owner && !request.owner.isFresh()) {
+      throw new Error('terminal create request canceled')
+    }
+    return createOptions
   }
 
   // --- Durable close --------------------------------------------------------
@@ -1286,6 +1326,21 @@ async function resolveTerminalCreateOptions(options: TerminalCreateOptions): Pro
   }
 }
 
+async function resolveTerminalCreateOptionsUntilCreateSettles(
+  options: TerminalCreateOptions,
+  createPromise: Promise<string>,
+): Promise<ResolvedTerminalCreateOptions> {
+  const resolution = resolveTerminalCreateOptions(options)
+  const cancellation = new Promise<never>((_, reject) => {
+    void createPromise.catch(reject)
+  })
+  try {
+    return await Promise.race([resolution, cancellation])
+  } finally {
+    void resolution.catch(() => {})
+  }
+}
+
 function terminalCreateDedupeKey(options: TerminalCreateOptions): string | null {
   if (options.resolveStartupShellCommand) return null
   return options.startupShellCommand ?? ''
@@ -1317,7 +1372,7 @@ function stringArraysEqual(a: readonly string[], b: readonly string[]): boolean 
 
 export interface TerminalSessionProjectionDeps {
   onSelectedWorktreeChange: (terminalWorktreeKey: string, terminalSessionId: string | null) => void
-  onWorkspaceTabsChanged?: (base: TerminalSessionBase, tabs: readonly WorkspacePaneTabEntry[]) => void
+  onWorkspaceTabsChanged?: TerminalWorkspaceTabsChangedHandler
 }
 
 let projectionInstance: TerminalSessionProjection | null = null

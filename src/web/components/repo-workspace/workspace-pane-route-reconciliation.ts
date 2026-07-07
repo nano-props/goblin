@@ -7,7 +7,10 @@ import type {
 } from '#/web/components/repo-workspace/tab-model.ts'
 
 export type WorkspacePaneRouteReconciliation =
-  { kind: 'none' } | { kind: 'pending' } | { kind: 'replace'; route: RepoBranchWorkspacePaneRoute | null }
+  | { kind: 'none' }
+  | { kind: 'pending' }
+  | { kind: 'unverified' }
+  | { kind: 'replace'; route: RepoBranchWorkspacePaneRoute | null }
 
 export type WorkspacePaneRouteHistoryResolution =
   { kind: 'defer' } | { kind: 'record'; route: RepoBranchWorkspacePaneRoute | null }
@@ -31,9 +34,9 @@ function reconcileStaticWorkspacePaneRoute(
   route: Extract<RepoBranchWorkspacePaneRoute, { kind: 'static' }>,
   model: RepoWorkspaceTabModel,
 ): WorkspacePaneRouteReconciliation {
-  if (model.tabs.some((tab) => tab.kind === 'static' && tab.type === route.tab)) return { kind: 'none' }
   if (model.tabEntriesProjectionPhase === 'pending') return { kind: 'pending' }
-  if (model.tabEntriesProjectionPhase === 'failed') return { kind: 'none' }
+  if (model.tabEntriesProjectionPhase === 'failed') return { kind: 'unverified' }
+  if (model.tabs.some((tab) => tab.kind === 'static' && tab.type === route.tab)) return { kind: 'none' }
   return replacementForRoute(route, model)
 }
 
@@ -41,6 +44,10 @@ function reconcileTerminalWorkspacePaneRoute(
   route: Extract<RepoBranchWorkspacePaneRoute, { kind: 'terminal' }>,
   model: RepoWorkspaceTabModel,
 ): WorkspacePaneRouteReconciliation {
+  if (model.tabEntriesProjectionPhase === 'pending') return { kind: 'pending' }
+  if (model.tabEntriesProjectionPhase === 'failed') return { kind: 'unverified' }
+  if (model.runtimeTabStateByType.terminal.projectionPhase === 'pending') return { kind: 'pending' }
+  if (model.runtimeTabStateByType.terminal.projectionPhase === 'failed') return { kind: 'unverified' }
   if (
     model.tabs.some(
       (tab) => tab.kind === 'runtime' && tab.runtimeType === 'terminal' && tab.sessionId === route.terminalSessionId,
@@ -48,8 +55,6 @@ function reconcileTerminalWorkspacePaneRoute(
   ) {
     return { kind: 'none' }
   }
-  if (model.runtimeTabStateByType.terminal.projectionPhase === 'pending') return { kind: 'pending' }
-  if (model.runtimeTabStateByType.terminal.projectionPhase === 'failed') return { kind: 'none' }
   return replacementForRoute(route, model)
 }
 
@@ -65,7 +70,7 @@ export function workspacePaneRouteHistoryResolution(
   route: RepoBranchWorkspacePaneRoute | null,
   reconciliation: WorkspacePaneRouteReconciliation,
 ): WorkspacePaneRouteHistoryResolution {
-  if (reconciliation.kind === 'pending') return { kind: 'defer' }
+  if (reconciliation.kind === 'pending' || reconciliation.kind === 'unverified') return { kind: 'defer' }
   if (reconciliation.kind === 'replace') return { kind: 'record', route: reconciliation.route }
   return { kind: 'record', route }
 }

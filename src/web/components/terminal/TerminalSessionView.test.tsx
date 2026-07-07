@@ -1989,17 +1989,12 @@ describe('TerminalSessionView', () => {
     }
   })
 
-  test('drop resolves with the write dropped if the worktree key changed during resolve', async () => {
-    // Locks the worktree-switch guard added on top of the basic
-    // controller-drop path. The blob-save tier is a real roundtrip
-    // (HTTP POST in web, IPC in Electron), so the user has a real
-    // window to switch worktrees before the resolver returns. The
-    // captured `terminalSessionId` would otherwise be typed into a session
-    // the user is no longer looking at — invisible to them, or worse,
-    // into a now-detached session that the projection silently drops.
-    // The fix: capture `terminalSessionId` at handler invocation time, compare to
-    // a ref updated by useEffect on every render, and bail if
-    // they diverge.
+  test('drop writes to the terminal session captured by the drop event after a worktree switch', async () => {
+    // The blob-save tier is a real roundtrip (HTTP POST in web, IPC in
+    // Electron), so the user can switch worktrees before the resolver returns.
+    // The operation target is still the session that received the original
+    // drop event; projection/server lifecycle decides whether that session is
+    // still writable.
     const writeInput = vi.fn()
     const descriptorA = {
       terminalSessionId: 'session-1',
@@ -2143,8 +2138,8 @@ describe('TerminalSessionView', () => {
       })
 
       // User switches worktrees mid-resolve. The session re-renders with
-      // the new descriptor, which updates the current terminalSessionId ref
-      // via the effect on every render.
+      // the new descriptor, but the in-flight drop keeps the target captured
+      // at the event boundary.
       activeWorktreeSnapshot = worktreeSnapshotB
       rerender(
         <TerminalSessionContext value={context}>
@@ -2159,19 +2154,17 @@ describe('TerminalSessionView', () => {
         </TerminalSessionContext>,
       )
 
-      // Now resolve the in-flight blob-save call. The post-resolve
-      // guard must see the divergence and drop the write — neither
-      // terminal session (old nor new) should receive input. The chain runs
-      // through several microtask hops (saveClipboardFiles.then →
+      // Now resolve the in-flight blob-save call. The chain runs through
+      // several microtask hops (saveClipboardFiles.then →
       // resolvePastedFiles.then → processDrop.then → handler.then);
-      // setTimeout(0) is the established pattern in the other
-      // integration tests for draining them all in one act.
+      // setTimeout(0) is the established pattern in the other integration
+      // tests for draining them all in one act.
       await act(async () => {
         resolveSave(['/tmp/a.png'])
         await new Promise((r) => setTimeout(r, 0))
       })
 
-      expect(writeInput).not.toHaveBeenCalled()
+      expect(writeInput).toHaveBeenCalledWith('session-1', "'/tmp/a.png'", 'drop')
     } finally {
       unmount()
     }

@@ -45,8 +45,6 @@ interface WorkspaceNavigationRouterHistory {
   }
 }
 
-let restoreRecordingSuppressed = false
-let restoreRecordingSuppressionTimer: ReturnType<typeof setTimeout> | null = null
 // Router history event metadata. It is not part of terminal create/focus
 // logic; it lets the route/history adapter preserve the app history cursor
 // when the browser lands on a URL through Back/Forward instead of an
@@ -82,24 +80,6 @@ export function useWorkspaceNavigationHistory({
       replaceCurrent &&
       !!replaceCurrentEntry &&
       workspaceNavigationHistoryEntryEqual(currentHistoryEntry, replaceCurrentEntry)
-    if (restoreRecordingSuppressed) {
-      if (replaceCurrentMatches) {
-        recordWorkspaceNavigation(entry, { replace: true })
-        clearBrowserHistoryAction(routeHref)
-        clearRestoreRecordingSuppression()
-        return
-      }
-      const historyCurrent = useReposStore.getState().navigationHistoryByRepo[entry.repoId]?.current ?? null
-      if (workspaceNavigationHistoryEntryEqual(historyCurrent, entry)) {
-        clearBrowserHistoryAction(routeHref)
-        clearRestoreRecordingSuppression()
-        return
-      }
-      recordWorkspaceNavigation(entry, browserHistoryTraversal ? { browserHistoryTraversal } : undefined)
-      clearBrowserHistoryAction(routeHref)
-      clearRestoreRecordingSuppression()
-      return
-    }
     if (browserHistoryTraversal && replaceCurrent && replaceCurrentEntry) {
       if (!replaceCurrentMatches) {
         recordWorkspaceNavigation(replaceCurrentEntry, { browserHistoryTraversal })
@@ -233,7 +213,6 @@ export function restoreWorkspaceNavigationEntry(
   routeNavigation: PrimaryWindowRouteNavigation,
 ): void {
   if (workspaceNavigationEntryBlocksWorkspacePaneInteraction(entry)) return
-  suppressRestoreRecording()
   switch (entry.route.kind) {
     case 'empty':
       routeNavigation.openRepoRoot(entry.repoId)
@@ -278,22 +257,6 @@ function workspaceNavigationEntryBlocksWorkspacePaneInteraction(
   return entry?.route.kind === 'branch'
     ? workspacePaneTabInteractionBlockedForBranch(entry.repoId, entry.route.branchName)
     : false
-}
-
-function suppressRestoreRecording(): void {
-  restoreRecordingSuppressed = true
-  if (restoreRecordingSuppressionTimer !== null) clearTimeout(restoreRecordingSuppressionTimer)
-  restoreRecordingSuppressionTimer = setTimeout(() => {
-    restoreRecordingSuppressionTimer = null
-    restoreRecordingSuppressed = false
-  }, 500)
-}
-
-function clearRestoreRecordingSuppression(): void {
-  restoreRecordingSuppressed = false
-  if (restoreRecordingSuppressionTimer === null) return
-  clearTimeout(restoreRecordingSuppressionTimer)
-  restoreRecordingSuppressionTimer = null
 }
 
 function workspaceNavigationBrowserHistoryTraversal(

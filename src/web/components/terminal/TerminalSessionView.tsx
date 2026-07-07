@@ -117,16 +117,6 @@ export function TerminalSessionView({
   useLayoutEffect(() => {
     descriptorRef.current = descriptor
   }, [descriptor])
-  // `terminalSessionId` can change when the user switches worktrees mid-flight. The
-  // paste/drop handlers capture it at invocation time; a ref tracks
-  // the latest value so the post-resolve `.then` can detect a switch
-  // and drop the write — the captured session is no longer the user's
-  // focus, and the path landing in it would be invisible (or worse,
-  // typed into a now-detached session).
-  const sessionIdRef = useRef<string | null>(terminalSessionId)
-  useEffect(() => {
-    sessionIdRef.current = terminalSessionId
-  }, [terminalSessionId])
   const snapshot = useTerminalSnapshot(terminalSessionId)
   const hasSessions = useTerminalWorktreeCount(terminalWorktreeKey) > 0
   const createPending = useTerminalWorktreeCreatePending(terminalWorktreeKey)
@@ -359,14 +349,12 @@ export function TerminalSessionView({
       if (!terminalSessionId || !isController) return
       const files = Array.from(event.dataTransfer.files).filter(isNonPlaceholderClipboardFile)
       if (files.length === 0) return
-      // Capture the terminal session the user actually dropped into. The
-      // blob-save tier (web HTTP path) is a real roundtrip, so a
-      // worktree switch during resolve would otherwise route the
-      // write to a session the user is no longer looking at.
+      // Capture the terminal session the user actually dropped into. Async
+      // file resolution may finish after the user changes panes, but the
+      // operation's target was fixed by the drop event.
       const capturedSessionId = terminalSessionId
       void processDrop({ files }).then(
         (outcome) => {
-          if (sessionIdRef.current !== capturedSessionId) return
           // `no-op` is unreachable at this call site: `handleDrop`
           // filters zero-byte files before calling `processDrop`, so
           // `processDrop` can only return `files` or `too-large`.
@@ -383,7 +371,7 @@ export function TerminalSessionView({
           // IPC / network / server failure. Surface it instead of
           // silently swallowing the rejection.
           terminalLog.warn('drop resolver failed', { err })
-          if (sessionIdRef.current === capturedSessionId) toast.error(t('terminal.paste-file-failed'))
+          toast.error(t('terminal.paste-file-failed'))
         },
       )
     },
@@ -426,12 +414,11 @@ export function TerminalSessionView({
         return
       }
 
-      // 'files' — resolve paths asynchronously. Capture the session
-      // terminal session id (see `handleDrop` for the worktree-switch rationale).
+      // 'files' — resolve paths asynchronously. Capture the terminal
+      // session id selected by the paste event.
       const capturedSessionId = terminalSessionId
       void resolvePastedFiles(files).then(
         (resolution) => {
-          if (sessionIdRef.current !== capturedSessionId) return
           writeResolutionToPty(resolution, capturedSessionId, 'paste')
         },
         (err) => {
@@ -439,7 +426,7 @@ export function TerminalSessionView({
           // silently swallowing the rejection — the user needs to
           // know their paste didn't land.
           terminalLog.warn('paste resolver failed', { err })
-          if (sessionIdRef.current === capturedSessionId) toast.error(t('terminal.paste-file-failed'))
+          toast.error(t('terminal.paste-file-failed'))
         },
       )
     },

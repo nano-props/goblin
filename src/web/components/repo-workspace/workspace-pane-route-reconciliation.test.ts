@@ -2,7 +2,10 @@ import { describe, expect, test } from 'vitest'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { createRepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
 import type { WorkspacePaneTabSummary } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
-import { reconcileWorkspacePaneRoute } from '#/web/components/repo-workspace/workspace-pane-route-reconciliation.ts'
+import {
+  reconcileWorkspacePaneRoute,
+  workspacePaneRouteHistoryResolution,
+} from '#/web/components/repo-workspace/workspace-pane-route-reconciliation.ts'
 
 const REPO_ID = '/tmp/gbl-route-reconciliation-repo'
 const WORKTREE_PATH = '/tmp/gbl-route-reconciliation-worktree'
@@ -25,11 +28,65 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('keeps a routed terminal session while terminal projection has failed', () => {
+  test('waits for tab entries before replacing a routed terminal session', () => {
+    const model = createRepoWorkspaceTabModel({
+      repoId: REPO_ID,
+      branchName: 'feature/route',
+      worktreePath: WORKTREE_PATH,
+      preferredTab: 'terminal',
+      tabEntries: [],
+      tabEntriesProjectionPhase: 'pending',
+      runtimeTabViews: [terminalView('session-1')],
+      runtimeTabStateByType: {
+        terminal: {
+          projectionPhase: 'ready',
+          selectedSessionId: null,
+        },
+      },
+      requestedSessionIdByRuntimeType: { terminal: 'session-1' },
+    })
+
+    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'session-1' }, model)).toEqual({
+      kind: 'pending',
+    })
+  })
+
+  test('does not verify a materialized terminal route while terminal projection is pending', () => {
+    const model = terminalModel({ routedSessionId: 'session-1', terminalProjectionPhase: 'pending' })
+
+    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'session-1' }, model)).toEqual({
+      kind: 'pending',
+    })
+  })
+
+  test('leaves a routed terminal session unverified while terminal projection has failed', () => {
     const model = terminalModel({ routedSessionId: 'missing-session', terminalProjectionPhase: 'failed' })
 
     expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
-      kind: 'none',
+      kind: 'unverified',
+    })
+  })
+
+  test('leaves a routed terminal session unverified while tab-entry projection has failed', () => {
+    const model = createRepoWorkspaceTabModel({
+      repoId: REPO_ID,
+      branchName: 'feature/route',
+      worktreePath: WORKTREE_PATH,
+      preferredTab: 'terminal',
+      tabEntries: [],
+      tabEntriesProjectionPhase: 'failed',
+      runtimeTabViews: [terminalView('session-1')],
+      runtimeTabStateByType: {
+        terminal: {
+          projectionPhase: 'ready',
+          selectedSessionId: null,
+        },
+      },
+      requestedSessionIdByRuntimeType: { terminal: 'session-1' },
+    })
+
+    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'session-1' }, model)).toEqual({
+      kind: 'unverified',
     })
   })
 
@@ -71,7 +128,7 @@ describe('workspace pane route reconciliation', () => {
     expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'pending' })
   })
 
-  test('keeps a static route while tab-entry projection has failed', () => {
+  test('leaves a static route unverified while tab-entry projection has failed', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/route',
@@ -85,7 +142,30 @@ describe('workspace pane route reconciliation', () => {
       },
     })
 
-    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'none' })
+    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'unverified' })
+  })
+
+  test('does not verify a materialized static route while tab-entry projection has failed', () => {
+    const model = createRepoWorkspaceTabModel({
+      repoId: REPO_ID,
+      branchName: 'feature/route',
+      worktreePath: WORKTREE_PATH,
+      preferredTab: 'history',
+      tabEntries: [workspacePaneStaticTabEntry('history')],
+      tabEntriesProjectionPhase: 'failed',
+      runtimeTabViews: [],
+      runtimeTabStateByType: {
+        terminal: { projectionPhase: 'ready' },
+      },
+    })
+
+    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'unverified' })
+  })
+
+  test('defers history while a route is unverified', () => {
+    expect(workspacePaneRouteHistoryResolution({ kind: 'static', tab: 'history' }, { kind: 'unverified' })).toEqual({
+      kind: 'defer',
+    })
   })
 
   test('waits for terminal creation before replacing a missing routed static tab', () => {

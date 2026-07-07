@@ -116,7 +116,10 @@ import {
   TerminalSessionProjection,
   setTerminalSessionProjectionForTests,
 } from '#/web/components/terminal/TerminalSessionProjection.ts'
-import { clearWorkspacePaneTabsOperationQueuesForTests } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
+import {
+  clearWorkspacePaneTabsOperationQueuesForTests,
+  runWorkspacePaneTabsOperation,
+} from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 
 const REPO_ROOT = '/repo'
 const WORKTREE_PATH = '/repo'
@@ -213,6 +216,15 @@ function durableCloseInput() {
   return {
     terminalRuntimeSessionId: 'session-stale',
     terminalWorktreeKey: WORKTREE_KEY,
+  }
+}
+
+function workspacePaneTabsOperationTarget() {
+  return {
+    repoRoot: REPO_ROOT,
+    repoInstanceId: REPO_INSTANCE_ID,
+    branchName: BRANCH,
+    worktreePath: WORKTREE_PATH,
   }
 }
 
@@ -507,6 +519,30 @@ describe('TerminalSessionProjection create flow', () => {
     expect(projection.snapshot('session-1').phase).toBe('opening')
   })
 
+  test('owned create closes the server session when the owner turns stale during tabs projection write', async () => {
+    projection.destroy()
+    let fresh = true
+    const tabsWrite = Promise.withResolvers<void>()
+    const onWorkspaceTabsChanged = vi.fn(async () => {
+      await tabsWrite.promise
+    })
+    projection = new TerminalSessionProjection(() => {}, onWorkspaceTabsChanged)
+    projection.setRepoIndex(makeRepoIndex())
+
+    const pending = projection.createOwnedTerminal(terminalBase(), {
+      key: 'repo-instance-1',
+      isFresh: () => fresh,
+    })
+
+    await vi.waitFor(() => expect(onWorkspaceTabsChanged).toHaveBeenCalledTimes(1))
+    fresh = false
+    tabsWrite.resolve()
+
+    await expect(pending).rejects.toThrow('terminal create request canceled')
+    expect(mocks.closeMock).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa' })
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+  })
+
   test('owned creates queue distinct user actions instead of deduping them', async () => {
     const first = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
     const secondResult = makeCreateResult({
@@ -693,6 +729,57 @@ describe('TerminalSessionProjection create flow', () => {
       rows: 24,
       clientId: 'client_local',
     })
+  })
+
+  test('waits for workspace pane tabs projection write before resolving create', async () => {
+    projection.destroy()
+    const tabsWrite = Promise.withResolvers<void>()
+    const onWorkspaceTabsChanged = vi.fn(async () => {
+      await tabsWrite.promise
+    })
+    projection = new TerminalSessionProjection(() => {}, onWorkspaceTabsChanged)
+    projection.setRepoIndex(makeRepoIndex())
+
+    const pending = projection.createTerminal(terminalBase())
+    let settled = false
+    void pending.then(
+      () => {
+        settled = true
+      },
+      () => {
+        settled = true
+      },
+    )
+
+    await vi.waitFor(() => expect(onWorkspaceTabsChanged).toHaveBeenCalledTimes(1))
+    await Promise.resolve()
+    expect(settled).toBe(false)
+
+    tabsWrite.resolve()
+    await expect(pending).resolves.toBe('session-1')
+    expect(settled).toBe(true)
+  })
+
+  test('canceling create during async startup resolution releases the workspace pane tab queue', async () => {
+    const startup = Promise.withResolvers<string>()
+    const createPromise = projection
+      .createTerminal(terminalBase(), {
+        resolveStartupShellCommand: async () => await startup.promise,
+      })
+      .catch((error) => {
+        if (error instanceof Error) return error.message
+        throw error
+      })
+
+    await vi.waitFor(() => expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true))
+
+    await expect(projection.closeTerminalsForWorktree(terminalBase())).resolves.toBe(true)
+    await expect(createPromise).resolves.toBe('terminal create request canceled')
+
+    await expect(runWorkspacePaneTabsOperation(workspacePaneTabsOperationTarget(), async () => 'released')).resolves.toBe(
+      'released',
+    )
+    expect(mocks.createMock).not.toHaveBeenCalled()
   })
 
   test('durable close: awaits an in-flight close for the same worktree before creating', async () => {
