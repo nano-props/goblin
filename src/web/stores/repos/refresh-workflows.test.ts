@@ -4,10 +4,10 @@ import {
   createBranchSnapshot,
   installGoblinTestBridge,
   resetReposStore,
+  seedRepoReadModelQueryData,
   seedRepoShellForTest,
 } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
 beforeEach(() => {
@@ -23,9 +23,9 @@ describe('repo refresh workflows', () => {
       instanceId: 'repo-instance-test-2',
       currentBranchName: 'feature/a',
     })
-    setRepoSnapshotQueryData('/repo', repo.instanceId, {
-      current: 'feature/a',
+    seedRepoReadModelQueryData(repo, {
       branches: [createBranchSnapshot('feature/a'), createBranchSnapshot('feature/b')],
+      currentBranch: 'feature/a',
     })
 
     await runSnapshotSuccessWorkflow(useReposStore.setState, useReposStore.getState, {
@@ -54,9 +54,9 @@ describe('repo refresh workflows', () => {
       instanceId: 'repo-instance-test-2',
       currentBranchName: 'feature/a',
     })
-    setRepoSnapshotQueryData('/repo', repo.instanceId, {
-      current: 'feature/a',
+    seedRepoReadModelQueryData(repo, {
       branches: [createBranchSnapshot('feature/a')],
+      currentBranch: 'feature/a',
     })
 
     await expect(
@@ -78,9 +78,9 @@ describe('repo refresh workflows', () => {
       instanceId: 'repo-instance-test-2',
       currentBranchName: 'feature/a',
     })
-    setRepoSnapshotQueryData('/repo', repo.instanceId, {
-      current: 'feature/a',
+    seedRepoReadModelQueryData(repo, {
       branches: [createBranchSnapshot('feature/a')],
+      currentBranch: 'feature/a',
     })
 
     await runSnapshotSuccessWorkflow(useReposStore.setState, useReposStore.getState, {

@@ -11,6 +11,7 @@ import {
   createRepoBranch as branch,
   installGoblinTestBridge,
   resetReposStore,
+  seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import {
@@ -24,7 +25,6 @@ import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 const REPO_ID = '/tmp/gbl-selection-test-repo'
@@ -162,15 +162,15 @@ describe('setBranchViewMode', () => {
     expect(readRepoBranchQueryProjection(repo!)?.currentBranch).toBe('main')
   })
 
-  test('changes branch view mode without mutating the React Query snapshot read model', () => {
+  test('changes branch view mode without mutating the React Query projection read model', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       currentBranchName: 'feature/plain',
     })
-    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
-      current: 'main',
+    seedRepoReadModelQueryData(repo, {
       branches: [branch('main', { worktree: { path: '/repo' } }), branch('feature/plain')],
+      currentBranch: 'main',
     })
 
     useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
@@ -222,16 +222,16 @@ describe('setWorkspacePaneTab', () => {
     expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
   })
 
-  test('uses the React Query snapshot read model to resolve workspace pane tab targets', () => {
+  test('uses the React Query projection read model to resolve workspace pane tab targets', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       currentBranchName: 'feature/query',
       preferredWorkspacePaneTab: 'status',
     })
-    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
-      current: 'feature/query',
+    seedRepoReadModelQueryData(repo, {
       branches: [branch('feature/query', { worktree: { path: '/tmp/query-worktree' } })],
+      currentBranch: 'feature/query',
     })
 
     useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/query', 'changes')

@@ -9,9 +9,9 @@ import {
   repoSnapshotQueryKey,
   repoStatusQueryKey,
   scheduleRepoRuntimeProjectionRefresh,
+  seedRepoProjectionQueryData,
   setRepoOperationsQueryData,
   setRepoProjectionQueryData,
-  setRepoSnapshotQueryData,
 } from '#/web/repo-data-query.ts'
 import type { PullRequestEntry, RepoRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
@@ -38,7 +38,7 @@ describe('repo projection query data', () => {
     const queryClient = new QueryClient()
     const snapshot: RepoSnapshot = { branches: [], current: 'main' }
 
-    setRepoSnapshotQueryData('/tmp/repo', 'repo-instance-1', snapshot, queryClient)
+    queryClient.setQueryData(repoSnapshotQueryKey('/tmp/repo', 'repo-instance-1'), snapshot)
 
     expect(getRepoProjectionPlaceholderData('/tmp/repo', 'repo-instance-1', null, 'full', queryClient)).toEqual({
       snapshot,
@@ -94,7 +94,7 @@ describe('repo projection query data', () => {
     })
   })
 
-  test('projects snapshot cache writes into matching projection caches', () => {
+  test('seeds projection data without backfilling section caches', () => {
     const queryClient = new QueryClient()
     const projection: RepoRuntimeProjection = {
       snapshot: { branches: [], current: 'main' },
@@ -104,15 +104,16 @@ describe('repo projection query data', () => {
       requested: { branch: 'feature/a', pullRequestMode: 'summary' },
       loadedAt: 123,
     }
-    const updatedSnapshot: RepoSnapshot = { branches: [], current: 'feature/a' }
 
-    setRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', 'feature/a', 'summary', projection, queryClient)
-    setRepoSnapshotQueryData('/tmp/repo', 'repo-instance-1', updatedSnapshot, queryClient)
+    seedRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', projection, queryClient)
 
     expect(getRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', 'feature/a', 'summary', queryClient)).toEqual({
       ...projection,
-      snapshot: updatedSnapshot,
     })
+    expect(queryClient.getQueryData<RepoSnapshot>(repoSnapshotQueryKey('/tmp/repo', 'repo-instance-1'))).toBeUndefined()
+    expect(
+      queryClient.getQueryData<WorktreeStatus[]>(repoStatusQueryKey('/tmp/repo', 'repo-instance-1')),
+    ).toBeUndefined()
   })
 
   test('projects active operation snapshots into projection caches', () => {

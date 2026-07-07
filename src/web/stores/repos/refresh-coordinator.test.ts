@@ -8,9 +8,13 @@ import {
 } from '#/web/stores/repos/refresh-coordinator.ts'
 import { beginRepoInvalidationSource, settleRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import type { ReposGet } from '#/web/stores/repos/types.ts'
-import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import {
+  createRepoBranch,
+  resetReposStore,
+  seedRepoReadModelQueryData,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
@@ -66,9 +70,9 @@ describe('repo refresh coordinator', () => {
       currentBranchName: 'feature/query',
       preferredWorkspacePaneTab: 'status',
     })
-    setRepoSnapshotQueryData('/repo', repo.instanceId, {
-      current: 'feature/query',
+    seedRepoReadModelQueryData(repo, {
       branches: [createRepoBranch('feature/query', { worktree: { path: '/tmp/query-worktree' } })],
+      currentBranch: 'feature/query',
     })
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: '/repo',

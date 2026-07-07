@@ -10,7 +10,6 @@ import {
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import {
   createBranchSnapshot,
   createRepoBranch,
@@ -60,15 +59,15 @@ beforeEach(() => {
 })
 
 describe('BranchView', () => {
-  test('uses the React Query snapshot read model for branch rows when available', () => {
+  test('uses the React Query projection read model for branch rows when available', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       currentBranchName: 'feature/query',
     })
-    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
-      current: 'feature/query',
+    seedRepoReadModelQueryData(repo, {
       branches: [createRepoBranch('feature/query')],
+      currentBranch: 'feature/query',
     })
 
     renderBranchView()

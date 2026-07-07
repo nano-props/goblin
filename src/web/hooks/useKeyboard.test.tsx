@@ -12,14 +12,18 @@ vi.mock('sonner', () => ({
     success: vi.fn(),
   },
 }))
-import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import {
+  createRepoBranch,
+  resetReposStore,
+  seedRepoReadModelQueryData,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 
 const testWindow = window as unknown as { goblinNative?: Window['goblinNative'] }
 const REPO_ID = '/tmp/keyboard-repo'
@@ -122,15 +126,15 @@ describe('useKeyboard', () => {
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/no-worktree', 'history')
   })
 
-  test('branch navigation shortcuts use the React Query snapshot read model for branch order', async () => {
+  test('branch navigation shortcuts use the React Query projection read model for branch order', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       currentBranchName: 'main',
     })
-    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
-      current: 'main',
+    seedRepoReadModelQueryData(repo, {
       branches: [createRepoBranch('main'), createRepoBranch('feature/query')],
+      currentBranch: 'main',
     })
     const selectRepoBranch = vi.fn()
     await renderHookHost({

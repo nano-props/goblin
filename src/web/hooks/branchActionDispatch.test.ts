@@ -15,7 +15,6 @@ import {
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 
 const REPO_ID = '/tmp/gbl-branch-action-dispatch-repo'
 const WORKTREE_PATH = '/tmp/gbl-branch-action-dispatch-worktree'
@@ -174,13 +173,13 @@ describe('branch action dispatch', () => {
         ],
       },
     })
-    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
-      current: 'feature/worktree',
+    seedRepoReadModelQueryData(repo, {
       branches: [
         createBranchSnapshot('feature/worktree', {
           worktree: { path: WORKTREE_PATH, summary: { dirty: true, changeCount: 1 } },
         }),
       ],
+      currentBranch: 'feature/worktree',
     })
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     const closeTerminalsForWorktree = vi.fn(async () => true)
@@ -201,7 +200,7 @@ describe('branch action dispatch', () => {
     expect(runBranchAction).not.toHaveBeenCalled()
   })
 
-  test('remove worktree preflight reads worktree metadata from the React Query snapshot cache', async () => {
+  test('remove worktree preflight reads worktree metadata from the React Query projection', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree')],

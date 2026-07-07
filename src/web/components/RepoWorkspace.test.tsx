@@ -28,7 +28,6 @@ import {
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   setRepoProjectionQueryData,
-  setRepoSnapshotQueryData,
 } from '#/web/repo-data-query.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
@@ -223,7 +222,7 @@ describe('RepoWorkspace', () => {
     expect(container.querySelector('button[aria-label="status.copy-patch-title"]')).not.toBeNull()
   })
 
-  test('uses the React Query snapshot read model for workspace branch presentation when available', () => {
+  test('uses the React Query projection read model for workspace branch presentation when available', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
@@ -233,9 +232,9 @@ describe('RepoWorkspace', () => {
         'feature/query': [workspacePaneStaticTabEntry('status')],
       },
     })
-    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
-      current: 'feature/query',
+    seedRepoReadModelQueryData(repo, {
       branches: [createRepoBranch('feature/query')],
+      currentBranch: 'feature/query',
     })
 
     const { container } = render(

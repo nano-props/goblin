@@ -20,7 +20,12 @@ import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
-import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import {
+  createRepoBranch,
+  resetReposStore,
+  seedRepoReadModelQueryData,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
   preferredWorkspacePaneTabForTarget,
@@ -53,7 +58,6 @@ import {
   readWorkspacePaneTabsForTarget,
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 
 const mockSessions = vi.hoisted(
   () =>
@@ -1083,9 +1087,9 @@ describe('TerminalSessionProvider', () => {
               : state.repos[REPO_ID],
           },
         }))
-        setRepoSnapshotQueryData(REPO_ID, useReposStore.getState().repos[REPO_ID]!.instanceId, {
-          current: 'feature/renamed',
+        seedRepoReadModelQueryData(useReposStore.getState().repos[REPO_ID]!, {
           branches: [createRepoBranch('feature/renamed', { worktree: { path: WORKTREE_PATH } })],
+          currentBranch: 'feature/renamed',
         })
         await Promise.resolve()
       })

@@ -17,6 +17,7 @@ import {
   createRepoBranch,
   installWorkspacePaneTabsTestBridge,
   resetReposStore,
+  seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
@@ -42,7 +43,6 @@ import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 const toastMocks = vi.hoisted(() => ({
@@ -172,9 +172,9 @@ describe('workspace commands', () => {
       currentBranchName: 'feature/query',
       preferredWorkspacePaneTab: 'status',
     })
-    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
-      current: 'feature/query',
+    seedRepoReadModelQueryData(repo, {
       branches: [createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH } })],
+      currentBranch: 'feature/query',
     })
     const showRepoBranchWorkspacePaneTab = vi.fn((repoId, branch, tab) => {
       useReposStore.getState().setWorkspacePaneTab(repoId, branch, tab)

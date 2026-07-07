@@ -24,7 +24,6 @@ import {
   repoProjectionQueryKey,
   repoSnapshotQueryKey,
   repoStatusQueryKey,
-  setRepoSnapshotQueryData,
 } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { WorktreeStatus } from '#/web/types.ts'
@@ -65,9 +64,9 @@ function createWorktreeAction(): TestCreateWorktreeAction {
 describe('remote fetch timestamps', () => {
   test('snapshot refresh treats query snapshot branches as existing data while loading', async () => {
     const repoInstanceId = seedRepo([])
-    setRepoSnapshotQueryData(REPO_ID, repoInstanceId, {
-      current: 'feature/query',
+    seedRepoReadModelQueryData({ id: REPO_ID, instanceId: repoInstanceId }, {
       branches: [branch('feature/query')],
+      currentBranch: 'feature/query',
     })
     let resolveSnapshot!: (value: { branches: ReturnType<typeof branch>[]; current: string }) => void
     ipcHandlers['repo.projection'] = () =>

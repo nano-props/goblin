@@ -23,9 +23,13 @@ import {
   type RemoveWorktreeDialogPayload,
 } from '#/web/stores/repos/branch-action-dialogs.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import {
+  createRepoBranch,
+  resetReposStore,
+  seedRepoReadModelQueryData,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 const REPO_ID = '/tmp/gbl-dialog-display-test'
@@ -93,9 +97,10 @@ function dropBranch(repoId: string, branchName: string): void {
   const nextBranches = readModel?.branches.filter((b) => b.name !== branchName) ?? []
   act(() => {
     if (repo) {
-      setRepoSnapshotQueryData(repoId, repo.instanceId, {
-        current: readModel?.currentBranch ?? '',
+      seedRepoReadModelQueryData(repo, {
         branches: nextBranches,
+        currentBranch: readModel?.currentBranch ?? '',
+        status: readModel?.status ?? [],
       })
     }
   })
@@ -134,15 +139,15 @@ describe('useBranchActionDialogDisplay', () => {
     expect(handle.current?.displayCheckboxes.removeAlsoDeletes).toBe(true)
   })
 
-  test('resolves branch context from the React Query snapshot read model when store branches are stale', () => {
+  test('resolves branch context from the React Query projection read model when store branches are stale', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       currentBranchName: 'feature/query',
     })
-    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
-      current: 'feature/query',
+    seedRepoReadModelQueryData(repo, {
       branches: [createRepoBranch('feature/query', { tracking: 'origin/feature/query', trackingGone: false })],
+      currentBranch: 'feature/query',
     })
     const entry: BranchActionDialogEntry<string> = {
       repoId: REPO_ID,

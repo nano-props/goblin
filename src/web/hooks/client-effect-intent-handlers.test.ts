@@ -14,10 +14,14 @@ vi.mock('sonner', () => ({
   },
 }))
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import {
+  createRepoBranch,
+  resetReposStore,
+  seedRepoReadModelQueryData,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 
 const REPO_ID = '/tmp/gbl-client-intent-handlers-repo'
 
@@ -31,15 +35,15 @@ afterEach(() => {
 })
 
 describe('client effect intent handlers', () => {
-  test('routes terminal bell clicks through the React Query snapshot read model', () => {
+  test('routes terminal bell clicks through the React Query projection read model', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       currentBranchName: 'feature/query',
     })
-    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
-      current: 'feature/query',
+    seedRepoReadModelQueryData(repo, {
       branches: [createRepoBranch('feature/query', { worktree: { path: '/tmp/bell-worktree' } })],
+      currentBranch: 'feature/query',
     })
     const d = deps(REPO_ID)
     d.navigation.showRepoBranchWorkspacePaneTab = vi.fn()

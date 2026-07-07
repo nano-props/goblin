@@ -163,7 +163,7 @@ export function useRepoRemoteBranchesQuery(
   return useQuery(repoRemoteBranchesQueryOptions(repoRoot, repoInstanceId, options))
 }
 
-export function setRepoSnapshotQueryData(
+function setRepoSnapshotQueryData(
   repoRoot: string,
   repoInstanceId: string,
   snapshot: RepoSnapshot,

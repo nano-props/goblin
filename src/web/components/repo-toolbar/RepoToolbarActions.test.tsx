@@ -6,8 +6,12 @@ import { screen } from '@testing-library/react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { BranchFilterAction } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
-import { createBranchSnapshot, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import {
+  createBranchSnapshot,
+  resetReposStore,
+  seedRepoReadModelQueryData,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/bridge.ts'
 
 const REPO_ID = '/tmp/gbl-repo-toolbar-actions-test-repo'
 
@@ -18,15 +22,15 @@ beforeEach(() => {
 })
 
 describe('RepoToolbarActions', () => {
-  test('enables the branch filter from the React Query snapshot branch count', () => {
+  test('enables the branch filter from the React Query projection branch count', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       currentBranchName: 'feature/query',
     })
-    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
-      current: 'feature/query',
+    seedRepoReadModelQueryData(repo, {
       branches: [createBranchSnapshot('feature/query', { isCurrent: true })],
+      currentBranch: 'feature/query',
     })
 
     renderInJsdom(

@@ -10,12 +10,13 @@ import {
   createBranchSnapshot,
   createRepoBranch,
   resetReposStore,
+  seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoSnapshotCacheEntry } from '#/web/stores/repos/types.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { getRepoProjectionQueryData, repoStatusQueryKey, setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { getRepoProjectionQueryData, repoStatusQueryKey } from '#/web/repo-data-query.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
 function cachedRepo(savedAt: number): RepoSnapshotCacheEntry {
   return {
@@ -134,9 +135,9 @@ describe('persistRepoSnapshotCacheEntry', () => {
       currentBranch: 'main',
       currentBranchName: 'main',
     })
-    setRepoSnapshotQueryData('/repo', repo.instanceId, {
-      current: 'feature/query',
+    seedRepoReadModelQueryData(repo, {
       branches: [createBranchSnapshot('feature/query', { isCurrent: true })],
+      currentBranch: 'feature/query',
     })
 
     persistRepoSnapshotCacheEntry(useReposStore.setState, repo, 'repo-instance-test')

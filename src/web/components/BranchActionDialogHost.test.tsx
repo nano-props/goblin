@@ -19,11 +19,15 @@ import {
   useBranchActionDialogsStore,
   type RemoveWorktreeDialogPayload,
 } from '#/web/stores/repos/branch-action-dialogs.ts'
-import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import {
+  createRepoBranch,
+  resetReposStore,
+  seedRepoReadModelQueryData,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 vi.mock('#/web/hooks/branchActionDispatch.ts', () => ({
@@ -146,9 +150,10 @@ function setBranchSnapshotForRepo(repoId: string, branches: ReturnType<typeof cr
   const repo = useReposStore.getState().repos[repoId]
   if (!repo) throw new Error(`missing test repo: ${repoId}`)
   const readModel = readRepoBranchQueryProjection(repo)
-  setRepoSnapshotQueryData(repoId, repo.instanceId, {
-    current: readModel?.currentBranch ?? '',
+  seedRepoReadModelQueryData(repo, {
     branches,
+    currentBranch: readModel?.currentBranch ?? '',
+    status: readModel?.status ?? [],
   })
 }
 
