@@ -1,21 +1,26 @@
 import path from 'node:path'
-import PQueue from 'p-queue'
-import { runServerCancellable, abortServerNetworkOp } from '#/server/common/network-ops.ts'
+import {
+  runServerCancellable,
+  abortServerNetworkOp,
+  abortServerNetworkOpByKey,
+} from '#/server/common/network-ops.ts'
 import { publishRepoQueryInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
 import {
   beginRepoServerOperation,
-  createRepoServerOperationId,
-  recordRepoServerOperationWaitCancellation,
   requestRepoServerOperationCancel,
   settleRepoServerOperation,
   startRepoServerOperation,
 } from '#/server/modules/repo-operation-registry.ts'
 import {
   resolveRepoSource,
-  resolveRepoWriteGroupId,
   runWithRepoSource,
   type RepoMutationResult,
 } from '#/server/modules/repo-source.ts'
+import {
+  enqueueRepoWriteOperation,
+  findRepoWriteOperationQueueForRepo,
+  type RepoWriteOperationLifecycle,
+} from '#/server/modules/repo-write-operation-coordinator.ts'
 import {
   getServerRepoSettings,
   pruneServerRepoSettingsForRemovedWorktree,
@@ -48,10 +53,11 @@ const INVALIDATION_SOURCE_TOKEN_RE = /^[A-Za-z0-9_-]{1,128}$/
 const activeCloneControllers = new Map<string, AbortController>()
 const activeBackgroundFetches = new Map<
   string,
-  { promise: Promise<{ ok: boolean; message: string }>; operationId: string }
+  {
+    promise: Promise<{ ok: boolean; message: string }>
+    operationRef: { current: RepoWriteOperationLifecycle | null }
+  }
 >()
-const repoWriteOperationQueuesByRepo = new Map<string, PQueue>()
-let repoWriteOperationAdmission: Promise<void> = Promise.resolve()
 
 type RepoExecResult = { ok: boolean; message: string }
 
@@ -174,18 +180,18 @@ async function withMergedAbortSignal<T>(
 async function waitForResultOrCallerAbort<T extends RepoExecResult>(
   promise: Promise<T>,
   signal?: AbortSignal,
-  operationId?: string,
+  operationRef?: { current: RepoWriteOperationLifecycle | null },
 ): Promise<T> {
   if (!signal) return await promise
   if (signal.aborted) {
-    if (operationId) recordRepoServerOperationWaitCancellation(operationId, 'caller-abort')
+    operationRef?.current?.recordWaitCancellation('caller-abort')
     return { ok: false, message: 'cancelled' } as T
   }
   return await new Promise<T>((resolve, reject) => {
     const cleanup = () => signal.removeEventListener('abort', abort)
     const abort = () => {
       cleanup()
-      if (operationId) recordRepoServerOperationWaitCancellation(operationId, 'caller-abort')
+      operationRef?.current?.recordWaitCancellation('caller-abort')
       resolve({ ok: false, message: 'cancelled' } as T)
     }
     signal.addEventListener('abort', abort, { once: true })
@@ -212,16 +218,32 @@ async function runUserNetworkMutation(
 ): Promise<ExecResult> {
   return await publishSnapshotInvalidationAfterMutation(
     cwd,
-    await enqueueRepoWriteServiceOperation(cwd, signal, async (writeGroupId) => {
-      return await runServerCancellable(cwd, 'user', async (networkSignal) => {
-        return await withMergedAbortSignal([signal, networkSignal], task)
-      }, {
-        gateId: writeGroupId,
-        operationKind,
+    await enqueueRepoWriteOperation(
+      cwd,
+      signal,
+      {
+        repoId: cwd,
+        kind: operationKind,
+        source: 'user',
         target,
-        callerSignal: signal,
-      })
-    }),
+        canCancelUnderlying: true,
+      },
+      (operation, queue) => async () =>
+        await runServerCancellable(
+          cwd,
+          'user',
+          async (networkSignal) => {
+            return await withMergedAbortSignal([signal, networkSignal], task)
+          },
+          {
+            gate: queue,
+            operation,
+            operationKind,
+            target,
+            callerSignal: signal,
+          },
+        ),
+    ),
     sourceToken,
   )
 }
@@ -246,40 +268,45 @@ async function runRepoServerWriteOperation<T extends ExecResult>(options: {
   signal?: AbortSignal
   task: () => Promise<T>
 }): Promise<T> {
-  const operation = beginRepoServerOperation({
-    repoId: options.repoId,
-    kind: options.kind,
-    source: 'user',
-    target: options.target,
-    canCancelUnderlying: !!options.signal,
-  })
-  const onAbort = () => {
-    requestRepoServerOperationCancel(operation.id, 'caller-abort')
-  }
-  if (options.signal?.aborted) onAbort()
-  else options.signal?.addEventListener('abort', onAbort, { once: true })
-  const run = async () => {
-    startRepoServerOperation(operation.id)
-    if (options.signal?.aborted) {
-      const result = { ok: false, message: 'cancelled' } as T
-      settleRepoServerOperation(operation.id, result)
-      return result
-    }
-    try {
-      const result = await options.task()
-      settleRepoServerOperation(operation.id, result)
-      return result
-    } catch (err) {
-      settleRepoServerOperation(operation.id, {
-        ok: false,
-        message: err instanceof Error ? err.message : String(err),
-      })
-      throw err
-    } finally {
-      options.signal?.removeEventListener('abort', onAbort)
-    }
-  }
-  return await enqueueRepoWriteServiceOperation(options.repoId, options.signal, async () => await run())
+  return await enqueueRepoWriteOperation(
+    options.repoId,
+    options.signal,
+    {
+      repoId: options.repoId,
+      kind: options.kind,
+      source: 'user',
+      target: options.target,
+      canCancelUnderlying: !!options.signal,
+    },
+    (operation) => {
+      const onAbort = () => {
+        operation.requestCancel('caller-abort')
+      }
+      if (options.signal?.aborted) onAbort()
+      else options.signal?.addEventListener('abort', onAbort, { once: true })
+      return async () => {
+        operation.start()
+        if (options.signal?.aborted) {
+          const result = { ok: false, message: 'cancelled' } as T
+          operation.settle(result)
+          return result
+        }
+        try {
+          const result = await options.task()
+          operation.settle(result)
+          return result
+        } catch (err) {
+          operation.settle({
+            ok: false,
+            message: err instanceof Error ? err.message : String(err),
+          })
+          throw err
+        } finally {
+          options.signal?.removeEventListener('abort', onAbort)
+        }
+      }
+    },
+  )
 }
 
 export async function cloneRepo(
@@ -353,8 +380,8 @@ export async function fetchRepo(
 ): Promise<{ ok: boolean; message: string }> {
   async function runFetch(
     task: (signal: AbortSignal) => Promise<RepoMutationResult>,
-    operationId?: string,
-    writeGroupId?: string,
+    operation: RepoWriteOperationLifecycle,
+    queue?: object,
   ) {
     const result = await runServerCancellable(
       cwd,
@@ -364,36 +391,50 @@ export async function fetchRepo(
           return await task(mergedSignal ?? networkSignal)
         })
       },
-      { operationId, gateId: writeGroupId, operationKind: 'fetch', callerSignal: signal },
+      { operation, gate: queue, operationKind: 'fetch', callerSignal: signal },
     )
     return await publishSnapshotInvalidationAfterMutation(cwd, result, sourceToken)
   }
-  async function executeFetch(operationId?: string): Promise<{ ok: boolean; message: string }> {
-    return await enqueueRepoWriteServiceOperation(cwd, signal, async (writeGroupId) => {
-      return await runWithRepoSource(
-        cwd,
-        async (source) => await runFetch((signal) => source.fetch(signal), operationId, writeGroupId),
-      )
-    })
+  async function executeFetch(
+    operationRef?: { current: RepoWriteOperationLifecycle | null },
+  ): Promise<{ ok: boolean; message: string }> {
+    return await enqueueRepoWriteOperation(
+      cwd,
+      signal,
+      {
+        repoId: cwd,
+        kind: 'fetch',
+        source: kind,
+        canCancelUnderlying: true,
+      },
+      (operation, queue) => {
+        if (operationRef) operationRef.current = operation
+        return async () =>
+          await runWithRepoSource(
+            cwd,
+            async (source) => await runFetch((signal) => source.fetch(signal), operation, queue),
+          )
+      },
+    )
   }
 
   if (kind === 'user') {
     const backgroundFetch = activeBackgroundFetches.get(cwd)
     if (backgroundFetch) {
-      return await waitForResultOrCallerAbort(backgroundFetch.promise, signal, backgroundFetch.operationId)
+      return await waitForResultOrCallerAbort(backgroundFetch.promise, signal, backgroundFetch.operationRef)
     }
     return await executeFetch()
   }
 
   const existingBackgroundFetch = activeBackgroundFetches.get(cwd)
   if (existingBackgroundFetch) {
-    return await waitForResultOrCallerAbort(existingBackgroundFetch.promise, signal, existingBackgroundFetch.operationId)
+    return await waitForResultOrCallerAbort(existingBackgroundFetch.promise, signal, existingBackgroundFetch.operationRef)
   }
-  const operationId = createRepoServerOperationId()
-  const backgroundFetch = executeFetch(operationId).finally(() => {
+  const operationRef = { current: null as RepoWriteOperationLifecycle | null }
+  const backgroundFetch = executeFetch(operationRef).finally(() => {
     if (activeBackgroundFetches.get(cwd)?.promise === backgroundFetch) activeBackgroundFetches.delete(cwd)
   })
-  activeBackgroundFetches.set(cwd, { promise: backgroundFetch, operationId })
+  activeBackgroundFetches.set(cwd, { promise: backgroundFetch, operationRef })
   return await backgroundFetch
 }
 
@@ -452,63 +493,6 @@ export async function createRepoWorktree(
         return await publishSnapshotInvalidationAfterMutation(cwd, trustSyncedResult, sourceToken)
       })
     },
-  })
-}
-
-async function enqueueRepoWriteServiceOperation<T>(
-  repoId: string,
-  signal: AbortSignal | undefined,
-  task: (writeGroupId: string) => Promise<T>,
-): Promise<T> {
-  const releaseAdmission = await acquireRepoWriteOperationAdmission()
-  let work!: Promise<T>
-  try {
-    const writeGroupId = await resolveRepoWriteGroupId(repoId, signal)
-    work = runResolvedRepoWriteServiceOperation(writeGroupId, () => task(writeGroupId))
-  } finally {
-    releaseAdmission()
-  }
-  return await work
-}
-
-async function acquireRepoWriteOperationAdmission(): Promise<() => void> {
-  const previous = repoWriteOperationAdmission
-  let release!: () => void
-  const next = new Promise<void>((resolve) => {
-    release = resolve
-  })
-  repoWriteOperationAdmission = previous.then(() => next)
-  await previous
-  return release
-}
-
-async function runResolvedRepoWriteServiceOperation<T>(
-  writeGroupId: string,
-  task: () => Promise<T>,
-): Promise<T> {
-  // Git mutations that share one physical repository also share one service
-  // queue, even when the app opened different linked worktree paths.
-  const queue = repoWriteOperationQueueForRepo(writeGroupId)
-  try {
-    return await queue.add(task)
-  } finally {
-    scheduleRepoWriteOperationQueueCleanup(writeGroupId, queue)
-  }
-}
-
-function repoWriteOperationQueueForRepo(writeGroupId: string): PQueue {
-  let queue = repoWriteOperationQueuesByRepo.get(writeGroupId)
-  if (!queue) {
-    queue = new PQueue({ concurrency: 1 })
-    repoWriteOperationQueuesByRepo.set(writeGroupId, queue)
-  }
-  return queue
-}
-
-function scheduleRepoWriteOperationQueueCleanup(writeGroupId: string, queue: PQueue): void {
-  void queue.onIdle().then(() => {
-    if (repoWriteOperationQueuesByRepo.get(writeGroupId) !== queue) return
-    if (queue.size === 0 && queue.pending === 0) repoWriteOperationQueuesByRepo.delete(writeGroupId)
   })
 }
 
@@ -625,6 +609,6 @@ export async function openRepoInFinder(path: string): Promise<ExecResult> {
 
 export async function abortRepoOperation(cwd: string): Promise<boolean> {
   if (!isValidRepoLocator(cwd)) return false
-  const writeGroupId = await resolveRepoWriteGroupId(cwd)
-  return abortServerNetworkOp(writeGroupId) || abortServerNetworkOp(cwd)
+  const queue = await findRepoWriteOperationQueueForRepo(cwd)
+  return (queue ? abortServerNetworkOpByKey(queue) : false) || abortServerNetworkOp(cwd)
 }

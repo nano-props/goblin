@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
   getRepoLog: vi.fn(),
   getRepoPatch: vi.fn(),
   readRepoProjection: vi.fn(),
-  getRepoOperationsSnapshot: vi.fn(),
+  readRepoOperationsSnapshot: vi.fn(),
   fetchRepo: vi.fn(),
   cloneRepo: vi.fn(),
   abortCloneOperation: vi.fn(),
@@ -39,10 +39,8 @@ vi.mock('#/server/modules/repo-read-paths.ts', () => ({
   getRepoLog: mocks.getRepoLog,
   getRepoPatch: mocks.getRepoPatch,
   readRepoProjection: mocks.readRepoProjection,
+  readRepoOperationsSnapshot: mocks.readRepoOperationsSnapshot,
   getRepoWorktreeBootstrapPreview: mocks.getRepoWorktreeBootstrapPreview,
-}))
-vi.mock('#/server/modules/repo-operation-registry.ts', () => ({
-  getRepoOperationsSnapshot: mocks.getRepoOperationsSnapshot,
 }))
 vi.mock('#/server/modules/repo-tree.ts', () => ({
   getRepositoryTree: mocks.getRepositoryTree,
@@ -268,7 +266,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   })
 
   test('returns repo operation state snapshots', async () => {
-    mocks.getRepoOperationsSnapshot.mockReturnValue({
+    mocks.readRepoOperationsSnapshot.mockResolvedValue({
       operations: [
         {
           id: 'repo-op-1',
@@ -306,7 +304,10 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(mocks.getRepoOperationsSnapshot).toHaveBeenCalledWith({ repoId: '/tmp/repo', includeSettled: true })
+    expect(mocks.readRepoOperationsSnapshot).toHaveBeenCalledWith('/tmp/repo', {
+      includeSettled: true,
+      signal: expect.any(AbortSignal),
+    })
     expect(await response.json()).toMatchObject({ operations: [{ kind: 'fetch', phase: 'running' }] })
   })
 

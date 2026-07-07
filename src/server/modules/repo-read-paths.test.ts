@@ -5,10 +5,14 @@ import type { LogEntry, WorktreeStatus } from '#/shared/git-types.ts'
 
 const mocks = vi.hoisted(() => ({
   runWithRepoSource: vi.fn(),
+  listRepoWriteOperationsForRepo: vi.fn(),
 }))
 
 vi.mock('#/server/modules/repo-source.ts', () => ({
   runWithRepoSource: mocks.runWithRepoSource,
+}))
+vi.mock('#/server/modules/repo-write-operation-coordinator.ts', () => ({
+  listRepoWriteOperationsForRepo: mocks.listRepoWriteOperationsForRepo,
 }))
 
 // Tests only need the read surface; cast to the full interface at the
@@ -60,6 +64,8 @@ function makeSource(overrides: Partial<ReadSource> = {}): ReadSource {
 
 beforeEach(() => {
   mocks.runWithRepoSource.mockReset()
+  mocks.listRepoWriteOperationsForRepo.mockReset()
+  mocks.listRepoWriteOperationsForRepo.mockResolvedValue([])
   mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) => task(asRepoSource(makeSource())))
 })
 

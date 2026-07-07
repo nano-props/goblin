@@ -1,5 +1,10 @@
 import type { ExecResult } from '#/shared/git-types.ts'
-import type { NetworkOpKind, RepoServerOperationKind, RepoServerOperationTarget } from '#/shared/api-types.ts'
+import type {
+  NetworkOpKind,
+  RepoOperationCancellationReason,
+  RepoServerOperationKind,
+  RepoServerOperationTarget,
+} from '#/shared/api-types.ts'
 import {
   beginRepoServerOperation,
   recordRepoServerOperationWaitCancellation,
@@ -11,14 +16,23 @@ import {
 interface ActiveNetworkOp {
   ctrl: AbortController
   kind: NetworkOpKind
-  operationId: string
+  operation: ServerOperationLifecycle
   done: Promise<void>
-  keys: string[]
+  keys: NetworkOpKey[]
+}
+
+export interface ServerOperationLifecycle {
+  id: string
+  start(): void
+  requestCancel(reason: RepoOperationCancellationReason): void
+  recordWaitCancellation(reason: RepoOperationCancellationReason): void
+  settle(result: { ok: boolean; message?: string }): void
 }
 
 interface RunServerCancellableOptions {
   operationId?: string
-  gateId?: string
+  operation?: ServerOperationLifecycle
+  gate?: object
   operationKind?: RepoServerOperationKind
   target?: RepoServerOperationTarget | null
   repoInstanceId?: string | null
@@ -26,19 +40,53 @@ interface RunServerCancellableOptions {
   callerSignal?: AbortSignal
 }
 
-const activeNetworkOps = new Map<string, ActiveNetworkOp>()
+type NetworkOpKey = string | object
+
+const activeNetworkOps = new Map<NetworkOpKey, ActiveNetworkOp>()
+
+function beginRegistryOperation(
+  repoId: string,
+  kind: NetworkOpKind,
+  options: RunServerCancellableOptions,
+): ServerOperationLifecycle {
+  const operation = beginRepoServerOperation({
+    id: options.operationId,
+    repoId,
+    repoInstanceId: options.repoInstanceId,
+    kind: options.operationKind ?? 'network',
+    source: kind,
+    target: options.target,
+    deadlineAt: options.deadlineAt,
+    canCancelUnderlying: true,
+  })
+  return {
+    id: operation.id,
+    start() {
+      startRepoServerOperation(operation.id)
+    },
+    requestCancel(reason) {
+      requestRepoServerOperationCancel(operation.id, reason)
+    },
+    recordWaitCancellation(reason) {
+      recordRepoServerOperationWaitCancellation(operation.id, reason)
+    },
+    settle(result) {
+      settleRepoServerOperation(operation.id, result)
+    },
+  }
+}
 
 async function waitForActiveNetworkOp(
   active: ActiveNetworkOp,
   callerSignal: AbortSignal | undefined,
-  operationId: string,
+  operation: ServerOperationLifecycle,
 ): Promise<boolean> {
   if (!callerSignal) {
     await active.done
     return true
   }
   if (callerSignal.aborted) {
-    recordRepoServerOperationWaitCancellation(operationId, 'caller-abort')
+    operation.recordWaitCancellation('caller-abort')
     return false
   }
   return await new Promise<boolean>((resolve) => {
@@ -51,7 +99,7 @@ async function waitForActiveNetworkOp(
       resolve(value)
     }
     const abort = () => {
-      recordRepoServerOperationWaitCancellation(operationId, 'caller-abort')
+      operation.recordWaitCancellation('caller-abort')
       finish(false)
     }
     callerSignal.addEventListener('abort', abort, { once: true })
@@ -68,31 +116,22 @@ export async function runServerCancellable(
   fn: (signal: AbortSignal) => Promise<ExecResult>,
   options: RunServerCancellableOptions = {},
 ): Promise<ExecResult> {
-  const operation = beginRepoServerOperation({
-    id: options.operationId,
-    repoId,
-    repoInstanceId: options.repoInstanceId,
-    kind: options.operationKind ?? 'network',
-    source: kind,
-    target: options.target,
-    deadlineAt: options.deadlineAt,
-    canCancelUnderlying: true,
-  })
-  const operationGateId = options.gateId ?? repoId
+  const operation = options.operation ?? beginRegistryOperation(repoId, kind, options)
+  const operationGateId = options.gate ?? repoId
   let active = activeNetworkOps.get(operationGateId)
   if (active) {
     if (kind === 'user' && active.kind === 'background') {
-      const canContinue = await waitForActiveNetworkOp(active, options.callerSignal, operation.id)
+      const canContinue = await waitForActiveNetworkOp(active, options.callerSignal, operation)
       if (!canContinue) {
         const result = { ok: false, message: 'cancelled' }
-        settleRepoServerOperation(operation.id, result)
+        operation.settle(result)
         return result
       }
       active = activeNetworkOps.get(operationGateId)
     }
     if (active) {
       const result = { ok: false, message: 'error.network-op-in-progress' }
-      settleRepoServerOperation(operation.id, result)
+      operation.settle(result)
       return result
     }
   }
@@ -102,15 +141,15 @@ export async function runServerCancellable(
     resolveDone = resolve
   })
   const keys = Array.from(new Set([operationGateId, repoId]))
-  const slot: ActiveNetworkOp = { ctrl, kind, operationId: operation.id, done, keys }
+  const slot: ActiveNetworkOp = { ctrl, kind, operation, done, keys }
   for (const key of keys) activeNetworkOps.set(key, slot)
-  startRepoServerOperation(operation.id)
+  operation.start()
   try {
     const result = await fn(ctrl.signal)
-    settleRepoServerOperation(operation.id, result)
+    operation.settle(result)
     return result
   } catch (err) {
-    settleRepoServerOperation(operation.id, {
+    operation.settle({
       ok: false,
       message: err instanceof Error ? err.message : String(err),
     })
@@ -126,15 +165,19 @@ export async function runServerCancellable(
 export function abortBackgroundServerNetworkOp(repoId: string): boolean {
   const active = activeNetworkOps.get(repoId)
   if (!active || active.kind !== 'background') return false
-  requestRepoServerOperationCancel(active.operationId, 'user-cancel')
+  active.operation.requestCancel('user-cancel')
   active.ctrl.abort()
   return true
 }
 
 export function abortServerNetworkOp(repoId: string): boolean {
-  const active = activeNetworkOps.get(repoId)
+  return abortServerNetworkOpByKey(repoId)
+}
+
+export function abortServerNetworkOpByKey(key: NetworkOpKey): boolean {
+  const active = activeNetworkOps.get(key)
   if (!active) return false
-  requestRepoServerOperationCancel(active.operationId, 'user-cancel')
+  active.operation.requestCancel('user-cancel')
   active.ctrl.abort()
   return true
 }

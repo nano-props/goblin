@@ -1,5 +1,6 @@
 import { runWithRepoSource } from '#/server/modules/repo-source.ts'
 import { getRepoOperationsSnapshot } from '#/server/modules/repo-operation-registry.ts'
+import { listRepoWriteOperationsForRepo } from '#/server/modules/repo-write-operation-coordinator.ts'
 import { isValidRepoLocator } from '#/shared/input-validation.ts'
 import {
   DEFAULT_REPOSITORY_LOG_COUNT,
@@ -8,7 +9,14 @@ import {
   type PullRequestFetchMode,
   type WorktreeStatus,
 } from '#/shared/git-types.ts'
-import type { ProbeResult, PullRequestEntry, RepoRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
+import type {
+  ProbeResult,
+  PullRequestEntry,
+  RepoOperationsSnapshot,
+  RepoRuntimeProjection,
+  RepoServerOperationState,
+  RepoSnapshot,
+} from '#/shared/api-types.ts'
 import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 
 export async function probeRepo(cwd: string): Promise<ProbeResult> {
@@ -107,6 +115,19 @@ export interface RepoProjectionReadOptions {
   mode?: PullRequestFetchMode
   signal?: AbortSignal
   timeoutMs?: number
+}
+
+export interface RepoOperationsReadOptions {
+  includeSettled?: boolean
+  signal?: AbortSignal
+}
+
+function sortedRepoOperations(states: RepoServerOperationState[]): RepoServerOperationState[] {
+  return [...states].sort((a, b) => {
+    const aTime = a.settledAt ?? a.startedAt ?? a.queuedAt
+    const bTime = b.settledAt ?? b.startedAt ?? b.queuedAt
+    return bTime - aTime
+  })
 }
 
 /**
@@ -211,11 +232,26 @@ export async function readRepoProjection(
   )
   return {
     ...result,
-    operations: getRepoOperationsSnapshot({ repoId: cwd }),
+    operations: await readRepoOperationsSnapshot(cwd, { signal: options.signal }),
     requested: {
       branch,
       pullRequestMode: mode,
     },
+    loadedAt: Date.now(),
+  }
+}
+
+export async function readRepoOperationsSnapshot(
+  cwd?: string,
+  options: RepoOperationsReadOptions = {},
+): Promise<RepoOperationsSnapshot> {
+  const registrySnapshot = getRepoOperationsSnapshot({
+    repoId: cwd,
+    includeSettled: options.includeSettled,
+  })
+  const writeOperations = await listRepoWriteOperationsForRepo(cwd, options)
+  return {
+    operations: sortedRepoOperations([...registrySnapshot.operations, ...writeOperations]),
     loadedAt: Date.now(),
   }
 }

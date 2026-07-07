@@ -148,13 +148,13 @@ export async function resolveRepoSource(repoId: string): Promise<RepoSource> {
   return isRemoteRepoId(repoId) ? await createRemoteRepoSource(repoId) : createLocalRepoSource(repoId)
 }
 
-export async function resolveRepoWriteGroupId(repoId: string, signal?: AbortSignal): Promise<string> {
+export async function resolveRepoWriteBoundaryKey(repoId: string, signal?: AbortSignal): Promise<string> {
   if (isRemoteRepoId(repoId)) {
     try {
       const target = await resolveRemoteRepoTarget(repoId)
-      const groupPath = await getRemoteRepoWriteGroupPath(target, { signal })
-      const groupRef = groupPath ? normalizeRemoteRepoRef({ ...target, remotePath: groupPath }) : null
-      return groupRef?.id ?? repoId
+      const writeBoundaryPath = await getRemoteRepoWriteGroupPath(target, { signal })
+      const boundaryRef = writeBoundaryPath ? normalizeRemoteRepoRef({ ...target, remotePath: writeBoundaryPath }) : null
+      return boundaryRef?.id ?? repoId
     } catch {
       return repoId
     }

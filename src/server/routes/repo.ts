@@ -2,6 +2,7 @@ import { getBackgroundSyncRepos, setBackgroundSyncRepos } from '#/server/modules
 import { serverRepoNodeLog } from '#/node/logger.ts'
 import {
   readRepoProjection,
+  readRepoOperationsSnapshot,
   getRepoLog,
   getRepoPatch,
   getRepoWorktreeBootstrapPreview,
@@ -36,7 +37,6 @@ import {
   listRepoRuntimeInstances,
   openRepoRuntimeInstance,
 } from '#/server/modules/repo-runtime-instances.ts'
-import { getRepoOperationsSnapshot } from '#/server/modules/repo-operation-registry.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import type { RepoLogResponse } from '#/shared/api-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
@@ -143,7 +143,7 @@ export function createRepoRoutes() {
   })
   app.post('/operations', async (c) => {
     const { cwd, includeSettled } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.operations, c)
-    return c.json(getRepoOperationsSnapshot({ repoId: cwd, includeSettled }))
+    return c.json(await readRepoOperationsSnapshot(cwd, { includeSettled, signal: c.req.raw.signal }))
   })
   app.post('/fetch', async (c) => {
     const { cwd, kind, sourceToken } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fetch, c)

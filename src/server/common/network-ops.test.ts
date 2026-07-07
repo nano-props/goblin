@@ -131,8 +131,9 @@ describe('server network operation registry projection', () => {
     await expect(background).resolves.toEqual({ ok: true, message: 'background fetch' })
   })
 
-  test('uses gateId to block network operations from linked repo ids', async () => {
+  test('uses a shared gate object to block network operations from linked repo ids', async () => {
     let resolveFetch!: (value: { ok: true; message: string }) => void
+    const gate = {}
     const first = runServerCancellable(
       '/tmp/repo',
       'user',
@@ -140,7 +141,7 @@ describe('server network operation registry projection', () => {
         new Promise((resolve) => {
           resolveFetch = resolve
         }),
-      { gateId: 'local-git:/tmp/repo/.git', operationKind: 'fetch' },
+      { gate, operationKind: 'fetch' },
     )
 
     await vi.waitFor(() => {
@@ -149,7 +150,7 @@ describe('server network operation registry projection', () => {
 
     await expect(
       runServerCancellable('/tmp/repo-linked', 'user', async () => ({ ok: true, message: 'linked fetch' }), {
-        gateId: 'local-git:/tmp/repo/.git',
+        gate,
         operationKind: 'fetch',
       }),
     ).resolves.toEqual({ ok: false, message: 'error.network-op-in-progress' })

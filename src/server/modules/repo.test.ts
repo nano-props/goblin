@@ -171,7 +171,11 @@ beforeEach(async () => {
   const { resetRepoServerOperationRegistryForTests } = await import(
     '#/server/modules/repo-operation-registry.ts'
   )
+  const { resetRepoWriteOperationCoordinatorForTests } = await import(
+    '#/server/modules/repo-write-operation-coordinator.ts'
+  )
   resetRepoServerOperationRegistryForTests()
+  resetRepoWriteOperationCoordinatorForTests()
   vi.clearAllMocks()
   mocks.runServerCancellable.mockImplementation(async (_cwd, _kind, task) => await task(new AbortController().signal))
   mocks.checkGitAvailable.mockResolvedValue({ ok: true, message: '' })
@@ -470,6 +474,50 @@ describe('fetchRepo invalidation publishing', () => {
       repoId: '/tmp/repo',
       query: 'repo-snapshot',
     })
+  })
+
+  test('caller abort records wait cancellation when reused background sync is still queued', async () => {
+    const deleteBranch = deferred<{ ok: true; message: string }>()
+    mocks.deleteBranch.mockImplementationOnce(async () => await deleteBranch.promise)
+    mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
+
+    const { deleteRepoBranch, fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+
+    const write = deleteRepoBranch('/tmp/repo', 'feature/a')
+    await vi.waitFor(() => {
+      expect(mocks.deleteBranch).toHaveBeenCalledTimes(1)
+    })
+
+    const background = fetchRepo('/tmp/repo', 'background')
+    await vi.waitFor(async () => {
+      expect((await readRepoOperationsSnapshot('/tmp/repo')).operations).toEqual(
+        expect.arrayContaining([expect.objectContaining({ kind: 'fetch', phase: 'queued' })]),
+      )
+    })
+
+    const caller = new AbortController()
+    const user = fetchRepo('/tmp/repo', 'user', undefined, caller.signal)
+    caller.abort('client disconnected')
+
+    await expect(user).resolves.toEqual({ ok: false, message: 'cancelled' })
+    expect(mocks.fetchAll).not.toHaveBeenCalled()
+    await expect(readRepoOperationsSnapshot('/tmp/repo')).resolves.toMatchObject({
+      operations: expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'fetch',
+          phase: 'queued',
+          cancellation: expect.objectContaining({
+            waitCancelledCount: 1,
+            lastWaitCancellationReason: 'caller-abort',
+          }),
+        }),
+      ]),
+    })
+
+    deleteBranch.resolve({ ok: true, message: 'deleted' })
+    await expect(write).resolves.toEqual({ ok: true, message: 'deleted' })
+    await expect(background).resolves.toEqual({ ok: true, message: 'fetched' })
   })
 
   test('does not publish invalidations after a failed sync', async () => {
@@ -822,7 +870,7 @@ describe('repo mutation invalidation publishing', () => {
       },
     ])
     const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
-    const { listRepoServerOperations } = await import('#/server/modules/repo-operation-registry.ts')
+    const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
 
     const first = createRepoWorktree(
       '/tmp/repo',
@@ -844,7 +892,7 @@ describe('repo mutation invalidation publishing', () => {
       expect(mocks.createWorktree).toHaveBeenCalledTimes(1)
     })
     expect(
-      listRepoServerOperations({ repoId: '/tmp/repo' }).find(
+      (await readRepoOperationsSnapshot('/tmp/repo')).operations.find(
         (operation) => operation.target?.branch === 'feature/a',
       ),
     ).toMatchObject({
@@ -869,16 +917,16 @@ describe('repo mutation invalidation publishing', () => {
         },
       },
     )
-    await vi.waitFor(() => {
+    await vi.waitFor(async () => {
       expect(
-        listRepoServerOperations({ repoId: '/tmp/repo' }).find(
+        (await readRepoOperationsSnapshot('/tmp/repo')).operations.find(
           (operation) => operation.target?.branch === 'feature/b',
         ),
       ).toMatchObject({ phase: 'queued' })
     })
     expect(mocks.createWorktree).toHaveBeenCalledTimes(1)
     expect(
-      listRepoServerOperations({ repoId: '/tmp/repo' }).find(
+      (await readRepoOperationsSnapshot('/tmp/repo')).operations.find(
         (operation) => operation.target?.branch === 'feature/b',
       ),
     ).toMatchObject({
@@ -895,9 +943,9 @@ describe('repo mutation invalidation publishing', () => {
 
     secondCreate.resolve({ ok: true, message: 'second created' })
     await expect(second).resolves.toEqual({ ok: true, message: 'second created' })
-    expect(listRepoServerOperations({ repoId: '/tmp/repo' })).toEqual([])
+    expect((await readRepoOperationsSnapshot('/tmp/repo')).operations).toEqual([])
     expect(
-      listRepoServerOperations({ repoId: '/tmp/repo', includeSettled: true }).filter(
+      (await readRepoOperationsSnapshot('/tmp/repo', { includeSettled: true })).operations.filter(
         (operation) => operation.kind === 'create-worktree',
       ),
     ).toHaveLength(2)
@@ -931,14 +979,16 @@ describe('repo mutation invalidation publishing', () => {
     mocks.deleteBranch.mockImplementationOnce(async () => await firstDelete.promise)
     mocks.removeWorktree.mockImplementationOnce(async () => await secondRemove.promise)
     const { deleteRepoBranch, removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
-    const { listRepoServerOperations } = await import('#/server/modules/repo-operation-registry.ts')
+    const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
 
     const first = deleteRepoBranch('/tmp/repo', 'feature/a')
     await vi.waitFor(() => {
       expect(mocks.deleteBranch).toHaveBeenCalledTimes(1)
     })
     expect(
-      listRepoServerOperations({ repoId: '/tmp/repo' }).find((operation) => operation.kind === 'delete-branch'),
+      (await readRepoOperationsSnapshot('/tmp/repo')).operations.find(
+        (operation) => operation.kind === 'delete-branch',
+      ),
     ).toMatchObject({
       kind: 'delete-branch',
       phase: 'running',
@@ -955,7 +1005,9 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(mocks.removeWorktree).not.toHaveBeenCalled()
     expect(
-      listRepoServerOperations({ repoId: '/tmp/repo' }).find((operation) => operation.kind === 'remove-worktree'),
+      (await readRepoOperationsSnapshot('/tmp/repo')).operations.find(
+        (operation) => operation.kind === 'remove-worktree',
+      ),
     ).toMatchObject({
       kind: 'remove-worktree',
       phase: 'queued',
@@ -970,7 +1022,7 @@ describe('repo mutation invalidation publishing', () => {
 
     secondRemove.resolve({ ok: true, message: 'removed' })
     await expect(second).resolves.toEqual({ ok: true, message: 'removed' })
-    expect(listRepoServerOperations({ repoId: '/tmp/repo' })).toEqual([])
+    expect((await readRepoOperationsSnapshot('/tmp/repo')).operations).toEqual([])
   })
 
   test('repo write service operations serialize linked worktree repo ids by common git dir', async () => {
@@ -993,11 +1045,21 @@ describe('repo mutation invalidation publishing', () => {
     mocks.deleteBranch.mockImplementationOnce(async () => await firstDelete.promise)
     mocks.removeWorktree.mockImplementationOnce(async () => await secondRemove.promise)
     const { deleteRepoBranch, removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
-    const { listRepoServerOperations } = await import('#/server/modules/repo-operation-registry.ts')
+    const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
 
     const first = deleteRepoBranch('/tmp/repo', 'feature/a')
     await vi.waitFor(() => {
       expect(mocks.deleteBranch).toHaveBeenCalledTimes(1)
+    })
+    await expect(readRepoOperationsSnapshot('/tmp/repo-linked')).resolves.toMatchObject({
+      operations: [
+        expect.objectContaining({
+          repoId: '/tmp/repo',
+          kind: 'delete-branch',
+          phase: 'running',
+          target: { branch: 'feature/a' },
+        }),
+      ],
     })
 
     const second = removeRepoWorktree('/tmp/repo-linked', {
@@ -1010,7 +1072,7 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(mocks.removeWorktree).not.toHaveBeenCalled()
     expect(
-      listRepoServerOperations({ repoId: '/tmp/repo-linked' }).find(
+      (await readRepoOperationsSnapshot('/tmp/repo-linked')).operations.find(
         (operation) => operation.kind === 'remove-worktree',
       ),
     ).toMatchObject({
@@ -1119,7 +1181,10 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(result).toEqual({ ok: true, message: 'ok' })
     expect(mocks.runServerCancellable).toHaveBeenCalledWith('/tmp/repo', 'user', expect.any(Function), {
-      gateId: 'local-git:/tmp/repo/.git',
+      gate: expect.any(Object),
+      operation: expect.objectContaining({
+        id: expect.stringMatching(/^repo-write-op-/),
+      }),
       operationKind: name === 'pullRepoBranch' ? 'pull' : 'push',
       target: { branch: 'feature/a', ...(name === 'pullRepoBranch' ? { worktreePath: undefined } : {}) },
       callerSignal: undefined,
@@ -1319,13 +1384,13 @@ describe('repo mutation invalidation publishing', () => {
 
   test('deleteRepoBranch publishes snapshot invalidation after success', async () => {
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
-    const { listRepoServerOperations } = await import('#/server/modules/repo-operation-registry.ts')
+    const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
 
     const result = await deleteRepoBranch('/tmp/repo', 'feature/a')
 
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expect(listRepoServerOperations({ repoId: '/tmp/repo' })).toEqual([])
-    expect(listRepoServerOperations({ repoId: '/tmp/repo', includeSettled: true })[0]).toMatchObject({
+    expect((await readRepoOperationsSnapshot('/tmp/repo')).operations).toEqual([])
+    expect((await readRepoOperationsSnapshot('/tmp/repo', { includeSettled: true })).operations[0]).toMatchObject({
       kind: 'delete-branch',
       phase: 'done',
       target: { branch: 'feature/a' },
@@ -1457,7 +1522,7 @@ describe('repo mutation invalidation publishing', () => {
       },
     ])
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
-    const { listRepoServerOperations } = await import('#/server/modules/repo-operation-registry.ts')
+    const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
 
     const result = await removeRepoWorktree('/tmp/repo', {
       branch: 'feature/a',
@@ -1466,8 +1531,8 @@ describe('repo mutation invalidation publishing', () => {
     })
 
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expect(listRepoServerOperations({ repoId: '/tmp/repo' })).toEqual([])
-    expect(listRepoServerOperations({ repoId: '/tmp/repo', includeSettled: true })[0]).toMatchObject({
+    expect((await readRepoOperationsSnapshot('/tmp/repo')).operations).toEqual([])
+    expect((await readRepoOperationsSnapshot('/tmp/repo', { includeSettled: true })).operations[0]).toMatchObject({
       kind: 'remove-worktree',
       phase: 'done',
       target: { branch: 'feature/a', worktreePath: '/tmp/repo-worktree' },
