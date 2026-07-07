@@ -125,19 +125,27 @@ export function RepoView({
 
   const zenModeCollapsed = !compact && view.zenMode && repoWorkspaceActive
   const workspaceTrafficLightOffset = zenModeCollapsed
-  const renderSidebarPane = (branchContent?: ReactNode) => (
+  const sidebarSelectBranch = routeView ? (branchName: string) => onOpenRepoBranch?.(repo.id, branchName) : undefined
+  const sidebarCreateWorktree = routeView ? () => onOpenRepoNewWorktree?.(repo.id) : undefined
+  const sidebarOpenDashboard = routeView ? () => onOpenRepoDashboard?.(repo.id) : undefined
+  const dashboardSelected = routeView?.kind === 'dashboard'
+  const newWorktreeSelected = routeView?.kind === 'newWorktree'
+  const renderSidebarPane = (
+    branchContent?: ReactNode,
+    chromeRegion: 'drag' | 'none' = zenModeCollapsed ? 'none' : 'drag',
+  ) => (
     <RepoWorkspacePane>
       <RepoLayoutSidebar
         repoId={repoId}
         compact={compact}
         branchContent={branchContent}
-        chromeRegion={zenModeCollapsed ? 'none' : 'drag'}
+        chromeRegion={chromeRegion}
         onOpenSettings={onOpenSettings}
-        onSelectBranch={routeView ? (branchName) => onOpenRepoBranch?.(repo.id, branchName) : undefined}
-        onCreateWorktree={routeView ? () => onOpenRepoNewWorktree?.(repo.id) : undefined}
-        onOpenDashboard={routeView ? () => onOpenRepoDashboard?.(repo.id) : undefined}
-        dashboardSelected={routeView?.kind === 'dashboard'}
-        newWorktreeSelected={routeView?.kind === 'newWorktree'}
+        onSelectBranch={sidebarSelectBranch}
+        onCreateWorktree={sidebarCreateWorktree}
+        onOpenDashboard={sidebarOpenDashboard}
+        dashboardSelected={dashboardSelected}
+        newWorktreeSelected={newWorktreeSelected}
         currentBranchName={routeBranchName}
       />
     </RepoWorkspacePane>
@@ -153,6 +161,7 @@ export function RepoView({
         workspacePaneSize={view.workspacePaneSize}
         onWorkspacePaneSizeChange={setWorkspacePaneSize}
         sidebarPane={renderSidebarPane(compact ? <UnavailableRepoView repo={repo} /> : undefined)}
+        zenRevealSidebarPane={renderSidebarPane(undefined, 'none')}
         repoWorkspacePane={
           <RepoWorkspacePane>
             <WorkspaceChrome trafficLightOffset={workspaceTrafficLightOffset} />
@@ -160,7 +169,6 @@ export function RepoView({
           </RepoWorkspacePane>
         }
         singlePaneActivePane={compact ? 'navigator' : singlePane}
-        onOpenSettings={onOpenSettings}
       />
     )
   }
@@ -175,6 +183,10 @@ export function RepoView({
         workspacePaneSize={view.workspacePaneSize}
         onWorkspacePaneSizeChange={setWorkspacePaneSize}
         sidebarPane={renderSidebarPane(compact && currentBranchName ? undefined : <BranchNavigatorSkeleton />)}
+        zenRevealSidebarPane={renderSidebarPane(
+          compact && currentBranchName ? undefined : <BranchNavigatorSkeleton />,
+          'none',
+        )}
         repoWorkspacePane={
           <RepoWorkspacePane>
             {currentBranchName ? (
@@ -191,7 +203,6 @@ export function RepoView({
           </RepoWorkspacePane>
         }
         singlePaneActivePane={currentBranchName ? 'workspace' : 'navigator'}
-        onOpenSettings={onOpenSettings}
       />
     )
   }
@@ -205,6 +216,7 @@ export function RepoView({
       workspacePaneSize={view.workspacePaneSize}
       onWorkspacePaneSizeChange={setWorkspacePaneSize}
       sidebarPane={renderSidebarPane()}
+      zenRevealSidebarPane={renderSidebarPane(undefined, 'none')}
       repoWorkspacePane={
         <RepoWorkspacePane>
           {routeView?.kind === 'dashboard' ? (
@@ -240,7 +252,6 @@ export function RepoView({
         </RepoWorkspacePane>
       }
       singlePaneActivePane={singlePane}
-      onOpenSettings={onOpenSettings}
     />
   )
 }

@@ -116,7 +116,20 @@ vi.mock('#/web/components/RepoPickerHost.tsx', () => ({
 vi.mock('#/web/components/repo-toolbar/RepoToolbarActions.tsx', () => ({
   BranchFilterAction: () => <div data-testid="branch-filter-action" />,
   CreateWorktreeRowAction: () => <button data-testid="create-worktree-row-action" type="button" />,
-  DashboardRowAction: () => <button data-testid="dashboard-row-action" type="button" />,
+  DashboardRowAction: ({
+    onOpenDashboard,
+    selected = false,
+  }: {
+    onOpenDashboard?: () => void
+    selected?: boolean
+  }) => (
+    <button
+      data-testid="dashboard-row-action"
+      data-selected={selected ? 'true' : 'false'}
+      type="button"
+      onClick={onOpenDashboard}
+    />
+  ),
   RepoSyncAction: () => <div data-testid="repo-sync-action" />,
 }))
 
@@ -522,6 +535,33 @@ describe('RepoView workspace navigation', () => {
     expect(floatingSidebarTop?.hasAttribute('data-interactive')).toBe(false)
     expect(floatingSidebarTop?.dataset.titleBarChromeRegion).toBeUndefined()
     expect(floatingSidebarTop?.querySelector('[data-title-bar-chrome-region="no-drag"]')).toBeNull()
+  })
+
+  test('large-screen collapsed Zen Mode opens the dashboard from the revealed sidebar', () => {
+    const onOpenRepoDashboard = vi.fn()
+    useReposStore.getState().setZenMode(true)
+    const { container } = render(
+      <RepoView
+        repoId={REPO_ID}
+        routeView={{ kind: 'branch', repoId: REPO_ID, branchName: 'feature/a' }}
+        onOpenRepoDashboard={onOpenRepoDashboard}
+      />,
+    )
+
+    act(() => {
+      zenModeSidebarTrigger(container)?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
+    })
+
+    const revealedDashboardAction =
+      zenModeSidebarReveal(container)?.querySelector<HTMLButtonElement>('[data-testid="dashboard-row-action"]') ?? null
+    expect(revealedDashboardAction).not.toBeNull()
+
+    act(() => {
+      revealedDashboardAction?.click()
+    })
+
+    expect(onOpenRepoDashboard).toHaveBeenCalledWith(REPO_ID)
+    expect(onOpenRepoDashboard).toHaveBeenCalledTimes(1)
   })
 
   test('large-screen collapsed Zen Mode keeps the sidebar open across the title-bar-chrome reveal surface', () => {

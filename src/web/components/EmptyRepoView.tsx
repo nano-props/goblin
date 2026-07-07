@@ -44,7 +44,6 @@ export function EmptyRepoView({ onOpenSettings }: EmptyRepoViewProps) {
         </RepoWorkspacePane>
       }
       singlePaneActivePane="navigator"
-      onOpenSettings={onOpenSettings}
     />
   )
 }
