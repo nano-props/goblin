@@ -1324,6 +1324,33 @@ describe('workspace commands', () => {
     expect(closeWindow).toHaveBeenCalledTimes(1)
   })
 
+  test('close workspace tab command does not close a persisted active tab on a bare branch route', async () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: 'feature/worktree',
+      preferredWorkspacePaneTab: 'status',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [staticEntry('status'), staticEntry('history')],
+      },
+    })
+    const closeWindow = vi.fn()
+
+    expect(
+      await runCloseWorkspacePaneTabOrWindowCommand({
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        workspacePaneRoute: null,
+        navigation: navigationWith(),
+        closeWindow,
+      }),
+    ).toBe(true)
+
+    expect(closeWindow).toHaveBeenCalledTimes(1)
+    expect(openTabsFor('feature/worktree')).toEqual(['status', 'history'])
+    expect(preferredWorkspacePaneTab()).toBe('status')
+  })
+
   test('close workspace tab command does not close the window when a targeted tab identity is already gone', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,

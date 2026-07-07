@@ -6,10 +6,12 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { WorkspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
 import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { resolveWorkspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 export interface WorkspacePaneRuntimeTabCommandContextInput {
   repoId: string
   branchName: string
+  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
   showRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => void | Promise<void>
   terminalCreateTranslator?: TerminalCreateTranslator
 }
@@ -42,17 +44,23 @@ function assignTerminalRuntimeTabCommandContext(
   input: WorkspacePaneRuntimeTabCommandContextInput,
 ): void {
   context.terminal = {
-    base: selectedTerminalBase(input.repoId, input.branchName),
+    base: selectedTerminalBase(input.repoId, input.branchName, input.workspacePaneRoute),
     bridge: readTerminalSessionCommandBridge(),
-    openerIdentity: captureWorkspacePaneActiveTabIdentity(input.repoId, input.branchName),
+    openerIdentity: captureWorkspacePaneActiveTabIdentity(input.repoId, input.branchName, {
+      workspacePaneRoute: input.workspacePaneRoute,
+    }),
     showTerminalSession: (terminalSessionId) => input.showRuntimeTab('terminal', terminalSessionId),
     t: input.terminalCreateTranslator,
   }
 }
 
-function selectedTerminalBase(repoId: string, branchName: string): TerminalSessionBase | null {
+function selectedTerminalBase(
+  repoId: string,
+  branchName: string,
+  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null,
+): TerminalSessionBase | null {
   const repo = useReposStore.getState().repos[repoId]
-  const target = selectedRepoWorkspaceTargetForRuntimeCommand(repoId, branchName)
+  const target = selectedRepoWorkspaceTargetForRuntimeCommand(repoId, branchName, workspacePaneRoute)
   if (!repo || !target?.worktreePath) return null
   return {
     repoRoot: repoId,
@@ -65,8 +73,9 @@ function selectedTerminalBase(repoId: string, branchName: string): TerminalSessi
 function selectedRepoWorkspaceTargetForRuntimeCommand(
   repoId: string,
   branchName: string,
+  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null,
 ): { branchName: string; worktreePath: string | null } | null {
-  const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, branchName)
+  const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute })
   if (resolution.kind !== 'ready') return null
   if (!resolution.target.branchName) return null
   return { branchName: resolution.target.branchName, worktreePath: resolution.target.worktreePath }

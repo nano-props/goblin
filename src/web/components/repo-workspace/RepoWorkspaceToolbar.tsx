@@ -108,6 +108,7 @@ export function RepoWorkspaceToolbar({
     worktreePath,
     runtimeTabStateByType: workspacePaneTabModel.runtimeTabStateByType,
     initialRuntimeProjectionHydrating: isInitialRuntimeProjectionHydrating,
+    openerIdentity: workspacePaneTabModel.activeTab?.identity ?? null,
     showCreatedRuntimeTab: showCreatedWorkspacePaneRuntimeTab,
     t,
   })

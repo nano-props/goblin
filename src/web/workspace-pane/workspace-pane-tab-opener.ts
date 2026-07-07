@@ -1,6 +1,9 @@
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
-import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import {
+  workspacePaneTabTargetForBranch,
+  type WorkspacePaneTabTargetOptions,
+} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { hasFreshRepoInstance, type RepoInstanceHandle } from '#/web/stores/repos/repo-guards.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
@@ -15,8 +18,12 @@ export type WorkspacePaneTabOpenerRecordResult = 'recorded' | 'missing' | 'stale
  *  must capture this *before* switching into the newly-opened tab (e.g.
  *  before calling `runShowWorkspacePaneTabCommand`), otherwise the "opener"
  *  would incorrectly resolve to the new tab itself. */
-export function captureWorkspacePaneActiveTabIdentity(repoId: string, branchName: string): string | null {
-  return workspacePaneTabTargetForBranch(repoId, branchName)?.activeTab?.identity ?? null
+export function captureWorkspacePaneActiveTabIdentity(
+  repoId: string,
+  branchName: string,
+  options: WorkspacePaneTabTargetOptions = {},
+): string | null {
+  return workspacePaneTabTargetForBranch(repoId, branchName, options)?.activeTab?.identity ?? null
 }
 
 /** Records that `childIdentity` (any static or runtime tab identity) was

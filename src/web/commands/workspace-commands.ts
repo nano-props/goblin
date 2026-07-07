@@ -47,10 +47,12 @@ import {
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { clearWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 interface ShowWorkspacePaneTabCommandOptions {
   repoId: string | null
   branchName: string | null
+  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
   tab: WorkspacePaneTabType
   navigation: PrimaryWindowNavigationActions
 }
@@ -58,6 +60,7 @@ interface ShowWorkspacePaneTabCommandOptions {
 interface TerminalPrimaryActionCommandOptions {
   repoId: string | null
   branchName: string | null
+  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
   navigation: PrimaryWindowNavigationActions
   t?: TerminalCreateTranslator
 }
@@ -65,6 +68,7 @@ interface TerminalPrimaryActionCommandOptions {
 interface NewTerminalTabCommandOptions {
   repoId: string | null
   branchName: string | null
+  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
   navigation: PrimaryWindowNavigationActions
   t?: TerminalCreateTranslator
 }
@@ -72,6 +76,7 @@ interface NewTerminalTabCommandOptions {
 interface WorkspacePaneTabCommandTargetOptions {
   repoId: string | null
   branchName: string | null
+  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
   navigation: PrimaryWindowNavigationActions
   targetIdentity?: string
 }
@@ -99,6 +104,7 @@ type CloseWorkspaceSurfaceIntent = { kind: 'close-tab' } | { kind: 'close-window
 interface SelectWorkspacePaneTabByIndexCommandOptions {
   repoId: string | null
   branchName: string | null
+  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
   tabIndex: number
   navigation: PrimaryWindowNavigationActions
 }
@@ -106,6 +112,7 @@ interface SelectWorkspacePaneTabByIndexCommandOptions {
 interface MoveWorkspacePaneTabCommandOptions {
   repoId: string | null
   branchName: string | null
+  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
   direction: 1 | -1
   navigation: PrimaryWindowNavigationActions
 }
@@ -113,28 +120,31 @@ interface MoveWorkspacePaneTabCommandOptions {
 export async function runShowWorkspacePaneTabCommand({
   repoId,
   branchName,
+  workspacePaneRoute,
   tab,
   navigation,
 }: ShowWorkspacePaneTabCommandOptions): Promise<boolean> {
-  return await showWorkspacePaneTabCommand({ repoId, branchName, tab, navigation })
+  return await showWorkspacePaneTabCommand({ repoId, branchName, workspacePaneRoute, tab, navigation })
 }
 
 async function showWorkspacePaneTabCommand({
   repoId,
   branchName,
+  workspacePaneRoute,
   tab,
   navigation,
 }: ShowWorkspacePaneTabCommandOptions): Promise<boolean> {
   if (!repoId || !branchName) return false
   const provider = workspacePaneTabProvider(tab)
   if (isWorkspacePaneStaticTabProvider(provider)) {
-    const target = selectedRepoWorkspaceTarget(repoId, branchName)
+    const target = selectedRepoWorkspaceTarget(repoId, branchName, workspacePaneRoute)
     if (target) {
       return await openWorkspacePaneTab({
         repoId,
         branchName: target.branchName,
         worktreePath: target.worktreePath,
         type: provider.type,
+        workspacePaneRoute,
         insertAfterIdentity: null,
         navigation,
       })
@@ -142,13 +152,15 @@ async function showWorkspacePaneTabCommand({
     navigation.showRepoBranchWorkspacePaneTab(repoId, branchName, provider.type)
     return true
   }
-  if (tab === 'terminal') return await runTerminalPrimaryActionCommand({ repoId, branchName, navigation })
+  if (tab === 'terminal')
+    return await runTerminalPrimaryActionCommand({ repoId, branchName, workspacePaneRoute, navigation })
   return false
 }
 
 export async function runTerminalPrimaryActionCommand({
   repoId,
   branchName,
+  workspacePaneRoute,
   navigation,
   t,
 }: TerminalPrimaryActionCommandOptions): Promise<boolean> {
@@ -158,6 +170,7 @@ export async function runTerminalPrimaryActionCommand({
     workspacePaneRuntimeTabCommandContext({
       repoId,
       branchName,
+      workspacePaneRoute,
       showRuntimeTab: (type, sessionId) => {
         if (type === 'terminal') navigation.showRepoBranchTerminalSession(repoId, branchName, sessionId)
       },
@@ -169,6 +182,7 @@ export async function runTerminalPrimaryActionCommand({
 export async function runNewTerminalTabCommand({
   repoId,
   branchName,
+  workspacePaneRoute,
   navigation,
   t,
 }: NewTerminalTabCommandOptions): Promise<boolean> {
@@ -178,6 +192,7 @@ export async function runNewTerminalTabCommand({
     workspacePaneRuntimeTabCommandContext({
       repoId,
       branchName,
+      workspacePaneRoute,
       showRuntimeTab: (type, sessionId) => {
         if (type === 'terminal') navigation.showRepoBranchTerminalSession(repoId, branchName, sessionId)
       },
@@ -199,7 +214,12 @@ export async function runConfirmCloseTerminalWorkspacePaneTabCommand(
 async function closeWorkspacePaneTabCommand(options: CloseWorkspacePaneTabCommandOptions): Promise<boolean> {
   const { repoId, navigation, targetIdentity } = options
   const skipRuntimeCloseConfirm = options.skipRuntimeCloseConfirm ?? options.skipTerminalCloseConfirm ?? false
-  const target = repoId && options.branchName ? workspacePaneTabTargetForBranch(repoId, options.branchName) : null
+  const target =
+    repoId && options.branchName
+      ? workspacePaneTabTargetForBranch(repoId, options.branchName, {
+          workspacePaneRoute: options.workspacePaneRoute,
+        })
+      : null
   if (!target) return false
   if (repoWorkspaceTabModelBlocksTabInteraction(target)) return true
   const tab = targetIdentity
@@ -265,7 +285,12 @@ function closeConfirmedTerminalWorkspacePaneTab(options: ConfirmCloseTerminalWor
   }
   const confirmedBranchName = workspacePaneRuntimeTabConfirmedCloseBranchName(confirmed)
   if (!confirmedBranchName) return false
-  const target = repoId && options.branchName ? workspacePaneTabTargetForBranch(repoId, options.branchName) : null
+  const target =
+    repoId && options.branchName
+      ? workspacePaneTabTargetForBranch(repoId, options.branchName, {
+          workspacePaneRoute: options.workspacePaneRoute,
+        })
+      : null
   if (target && repoWorkspaceTabModelBlocksTabInteraction(target)) return false
   const tab = targetIdentity ? (target?.tabs.find((candidate) => candidate.identity === targetIdentity) ?? null) : null
   const wasActive = !!target && !!tab && target.activeTab?.identity === tab.identity
@@ -328,11 +353,12 @@ export async function runCloseWorkspacePaneTabOrWindowCommand({
 export function runSelectWorkspacePaneTabByIndexCommand({
   repoId,
   branchName,
+  workspacePaneRoute,
   tabIndex,
   navigation,
 }: SelectWorkspacePaneTabByIndexCommandOptions): boolean {
   if (!repoId || !branchName || tabIndex < 1) return false
-  const target = workspacePaneTabTargetForBranch(repoId, branchName)
+  const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute })
   const tab = target?.tabs[tabIndex - 1]
   if (!target || !tab) return false
   if (repoWorkspaceTabModelBlocksTabInteraction(target)) return false
@@ -344,11 +370,12 @@ export function runSelectWorkspacePaneTabByIndexCommand({
 export function runMoveWorkspacePaneTabCommand({
   repoId,
   branchName,
+  workspacePaneRoute,
   direction,
   navigation,
 }: MoveWorkspacePaneTabCommandOptions): boolean {
   if (!repoId || !branchName) return false
-  const target = workspacePaneTabTargetForBranch(repoId, branchName)
+  const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute })
   const tab = target ? adjacentRepoWorkspaceTab(target.tabs, target.activeTab?.identity, direction) : null
   if (!target || !tab) return false
   if (repoWorkspaceTabModelBlocksTabInteraction(target)) return false
@@ -359,8 +386,9 @@ export function runMoveWorkspacePaneTabCommand({
 function selectedRepoWorkspaceTarget(
   repoId: string,
   branchName: string,
+  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null,
 ): { branchName: string; worktreePath: string | null } | null {
-  const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, branchName)
+  const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute })
   if (resolution.kind !== 'ready') return null
   if (!resolution.target.branchName) return null
   return { branchName: resolution.target.branchName, worktreePath: resolution.target.worktreePath }
@@ -406,7 +434,9 @@ function resolveCloseWorkspaceSurfaceIntent(options: CloseWorkspacePaneTabComman
   const { repoId, targetIdentity } = options
   if (!repoId) return { kind: 'close-window' }
   if (!options.branchName) return { kind: 'close-window' }
-  const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, options.branchName)
+  const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, options.branchName, {
+    workspacePaneRoute: options.workspacePaneRoute,
+  })
   if (resolution.kind === 'unavailable') return { kind: 'noop' }
   const target = resolution.kind === 'ready' ? resolution.target : null
   if (!target) return { kind: 'close-window' }

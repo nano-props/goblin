@@ -3,7 +3,6 @@ import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import type { TerminalCreateOptions, TerminalCreateOwner } from '#/web/components/terminal/types.ts'
-import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 
 export interface WorkspacePaneRuntimeTabCreateAction {
   label: string
@@ -31,6 +30,7 @@ export interface WorkspacePaneTerminalCreateActionContext {
     owner: TerminalCreateOwner,
     options?: TerminalCreateOptions,
   ) => Promise<string>
+  openerIdentity: string | null
 }
 
 interface WorkspacePaneRuntimeTabCreateActionResolver {
@@ -65,12 +65,11 @@ function terminalRuntimeTabCreateAction(
     blocksTabInteraction: context.runtimeTabStateByType.terminal.createPending,
     onCreate: () => {
       // "+" is a generic entry; opener only drives close-back focus, not insertion.
-      const openerIdentity = captureWorkspacePaneActiveTabIdentity(context.repoRoot, base.branch)
       void runCreateTerminalTabCommand({
         base,
         createTerminal: terminal.createTerminal,
         createOwnedTerminal: terminal.createOwnedTerminal,
-        openerIdentity,
+        openerIdentity: terminal.openerIdentity,
         showCreatedTerminalTab: (terminalSessionId) => context.showCreatedRuntimeTab('terminal', terminalSessionId),
         t: context.t,
       })

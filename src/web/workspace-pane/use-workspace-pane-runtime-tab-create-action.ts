@@ -16,6 +16,7 @@ export interface UseWorkspacePaneRuntimeTabCreateActionInput {
   worktreePath: string | null
   runtimeTabStateByType: WorkspacePaneRuntimeTabCreateStateByType
   initialRuntimeProjectionHydrating: boolean
+  openerIdentity: string | null
   showCreatedRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => void
   t: TerminalCreateTranslator
 }
@@ -27,6 +28,7 @@ export function useWorkspacePaneRuntimeTabCreateAction({
   worktreePath,
   runtimeTabStateByType,
   initialRuntimeProjectionHydrating,
+  openerIdentity,
   showCreatedRuntimeTab,
   t,
 }: UseWorkspacePaneRuntimeTabCreateActionInput): WorkspacePaneRuntimeTabCreateAction | null {
@@ -56,12 +58,14 @@ export function useWorkspacePaneRuntimeTabCreateAction({
           base: terminalBase,
           createTerminal,
           createOwnedTerminal,
+          openerIdentity,
         },
       }),
     [
       createOwnedTerminal,
       createTerminal,
       initialRuntimeProjectionHydrating,
+      openerIdentity,
       repoRoot,
       runtimeTabStateByType,
       showCreatedRuntimeTab,

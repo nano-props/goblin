@@ -9,23 +9,12 @@ const terminalCreateCommandMocks = vi.hoisted(() => ({
   runCreateTerminalTabCommand: vi.fn(async () => ({ ok: true as const, terminalSessionId: 'session-1' })),
 }))
 
-const workspacePaneTabOpenerMocks = vi.hoisted(() => {
-  return {
-    captureWorkspacePaneActiveTabIdentity: vi.fn(() => 'opener-tab'),
-  }
-})
-
 vi.mock('#/web/commands/terminal-create-command.ts', () => ({
   runCreateTerminalTabCommand: terminalCreateCommandMocks.runCreateTerminalTabCommand,
 }))
 
-vi.mock('#/web/workspace-pane/workspace-pane-tab-opener.ts', () => ({
-  captureWorkspacePaneActiveTabIdentity: workspacePaneTabOpenerMocks.captureWorkspacePaneActiveTabIdentity,
-}))
-
 afterEach(() => {
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockClear()
-  workspacePaneTabOpenerMocks.captureWorkspacePaneActiveTabIdentity.mockClear()
 })
 
 describe('workspace pane runtime tab create action', () => {
@@ -39,6 +28,7 @@ describe('workspace pane runtime tab create action', () => {
       terminal: {
         base: null,
         createTerminal: vi.fn(),
+        openerIdentity: null,
       },
     })
 
@@ -66,6 +56,7 @@ describe('workspace pane runtime tab create action', () => {
         base,
         createTerminal,
         createOwnedTerminal,
+        openerIdentity: 'opener-tab',
       },
     })
 
@@ -75,7 +66,6 @@ describe('workspace pane runtime tab create action', () => {
 
     action?.onCreate()
 
-    expect(workspacePaneTabOpenerMocks.captureWorkspacePaneActiveTabIdentity).toHaveBeenCalledWith('/repo', 'main')
     expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).toHaveBeenCalledWith(
       expect.objectContaining({
         base,
@@ -110,6 +100,7 @@ describe('workspace pane runtime tab create action', () => {
       terminal: {
         base,
         createTerminal: vi.fn(),
+        openerIdentity: null,
       },
     })
     expect(pendingAction?.busy).toBe(true)
@@ -124,6 +115,7 @@ describe('workspace pane runtime tab create action', () => {
       terminal: {
         base,
         createTerminal: vi.fn(),
+        openerIdentity: null,
       },
     })
     expect(hydratingAction?.busy).toBe(true)

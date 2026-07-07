@@ -11,18 +11,25 @@ import {
   recordWorkspacePaneTabOpener,
 } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { workspacePaneTabInteractionBlockedForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 export async function openWorkspacePaneTab(input: {
   repoId: string
   branchName: string
   worktreePath: string | null | undefined
   type: WorkspacePaneStaticTabType
+  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
   insertAfterIdentity?: string | null
   navigation: Pick<PrimaryWindowNavigationActions, 'showRepoBranchWorkspacePaneTab'>
 }): Promise<boolean> {
   const provider = workspacePaneStaticTabProvider(input.type)
   if (!provider.canOpen({ hasWorktree: !!input.worktreePath })) return false
-  if (workspacePaneTabInteractionBlockedForBranch(input.repoId, input.branchName)) return false
+  if (
+    workspacePaneTabInteractionBlockedForBranch(input.repoId, input.branchName, {
+      workspacePaneRoute: input.workspacePaneRoute,
+    })
+  )
+    return false
   const state = useReposStore.getState()
   const repo = state.repos[input.repoId]
   if (!repo) return false
@@ -37,7 +44,9 @@ export async function openWorkspacePaneTab(input: {
   // Chrome-tab-style opener tracking: reopening/refocusing an already-open
   // static tab shouldn't overwrite its opener.
   const alreadyOpen = readWorkspacePaneTabsForTarget(target).some((entry) => entry.type === input.type)
-  const openerIdentity = !alreadyOpen ? captureWorkspacePaneActiveTabIdentity(input.repoId, branchName) : null
+  const openerIdentity = !alreadyOpen
+    ? captureWorkspacePaneActiveTabIdentity(input.repoId, branchName, { workspacePaneRoute: input.workspacePaneRoute })
+    : null
   // Default anchor is the captured opener; callers may pass null to force append.
   const insertAfterIdentity = input.insertAfterIdentity === undefined ? openerIdentity : input.insertAfterIdentity
   const committed = await updateWorkspacePaneTabs({

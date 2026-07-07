@@ -3,6 +3,7 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import { resetReposStore, seedRepoWithReadModelForTest, createRepoBranch } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import {
   resolveWorkspacePaneTabTargetForBranch,
   workspacePaneTabTargetForBranch,
@@ -52,6 +53,24 @@ describe('workspace pane tab target read model', () => {
     expect(target?.branchName).toBe('feature/query')
     expect(target?.worktreePath).toBe(WORKTREE_PATH)
     expect(target?.renderedTab).toBe('status')
+  })
+
+  test('treats an explicit bare branch route as an empty workspace pane', () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: 'feature/query',
+      preferredWorkspacePaneTab: 'status',
+      workspacePaneTabsByBranch: {
+        'feature/query': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+      },
+    })
+
+    const target = workspacePaneTabTargetForBranch(REPO_ID, 'feature/query', { workspacePaneRoute: null })
+
+    expect(target?.tabs.map((tab) => tab.identity)).toEqual(['workspace-pane:status', 'workspace-pane:history'])
+    expect(target?.activeTab).toBeNull()
+    expect(target?.renderedTab).toBeNull()
   })
 
   test('records tab openers from the React Query snapshot cache when store branches are stale', () => {

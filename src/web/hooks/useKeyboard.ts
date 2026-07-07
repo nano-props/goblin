@@ -34,6 +34,7 @@ import { getClientBridge } from '#/web/client-bridge.ts'
 import { translate } from '#/web/stores/i18n.ts'
 import { toast } from 'sonner'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 type MoveDirection = 1 | -1
 const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
@@ -43,6 +44,7 @@ interface Options {
   navigation: PrimaryWindowNavigationActions
   currentRepoId: string | null
   currentBranchName?: string | null
+  currentWorkspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
   onShowHelp: () => void
   /** Returns true when workspace shortcuts should not affect the repo view. */
   isWorkspaceShortcutSuppressed: () => boolean
@@ -118,6 +120,7 @@ export function useKeyboard({
   navigation,
   currentRepoId,
   currentBranchName = null,
+  currentWorkspacePaneRoute,
   onShowHelp,
   isWorkspaceShortcutSuppressed,
   isSettingsOpen,
@@ -133,6 +136,7 @@ export function useKeyboard({
   const onExitSettingsRef = useRef(onExitSettings)
   const currentRepoIdRef = useRef(currentRepoId)
   const currentBranchNameRef = useRef(currentBranchName)
+  const currentWorkspacePaneRouteRef = useRef(currentWorkspacePaneRoute)
   const openCreateWorktreeRef = useRef(openCreateWorktree)
   onShowHelpRef.current = onShowHelp
   isWorkspaceShortcutSuppressedRef.current = isWorkspaceShortcutSuppressed
@@ -140,6 +144,7 @@ export function useKeyboard({
   onExitSettingsRef.current = onExitSettings
   currentRepoIdRef.current = currentRepoId
   currentBranchNameRef.current = currentBranchName
+  currentWorkspacePaneRouteRef.current = currentWorkspacePaneRoute
   openCreateWorktreeRef.current = openCreateWorktree
 
   useEffect(() => {
@@ -184,7 +189,13 @@ export function useKeyboard({
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyT') {
           e.preventDefault()
           // Cmd+T is a generic entry → new terminal appends to the end.
-          void runNewTerminalTabCommand({ repoId, branchName: currentBranchNameRef.current, navigation, t: translate })
+          void runNewTerminalTabCommand({
+            repoId,
+            branchName: currentBranchNameRef.current,
+            workspacePaneRoute: currentWorkspacePaneRouteRef.current,
+            navigation,
+            t: translate,
+          })
           return
         }
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyN') {
@@ -200,7 +211,12 @@ export function useKeyboard({
         }
         if (!menuBackedShortcut && !e.shiftKey && e.code === 'KeyW') {
           e.preventDefault()
-          void runCloseWorkspacePaneTabOrWindowCommand({ repoId, branchName: currentBranchNameRef.current, navigation })
+          void runCloseWorkspacePaneTabOrWindowCommand({
+            repoId,
+            branchName: currentBranchNameRef.current,
+            workspacePaneRoute: currentWorkspacePaneRouteRef.current,
+            navigation,
+          })
           return
         }
         const tabIndex = !e.shiftKey ? digitShortcutIndex(e) : null
@@ -209,6 +225,7 @@ export function useKeyboard({
             runSelectWorkspacePaneTabByIndexCommand({
               repoId,
               branchName: currentBranchNameRef.current,
+              workspacePaneRoute: currentWorkspacePaneRouteRef.current,
               tabIndex,
               navigation,
             })
@@ -272,6 +289,7 @@ export function useKeyboard({
             runMoveWorkspacePaneTabCommand({
               repoId: repo.id,
               branchName: currentBranchNameRef.current,
+              workspacePaneRoute: currentWorkspacePaneRouteRef.current,
               direction: action === 'next-workspace-pane-tab' ? 1 : -1,
               navigation,
             })
