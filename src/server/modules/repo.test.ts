@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   getBranchPullRequests: vi.fn(),
   getCurrentBranch: vi.fn(),
   getDefaultBranch: vi.fn(),
+  getRepoCommonDir: vi.fn(),
   getRepoName: vi.fn(),
   getRepoRoot: vi.fn(),
   getRemoteInfo: vi.fn(),
@@ -50,6 +51,7 @@ vi.mock('#/system/git/branches.ts', () => ({
   getBranches: mocks.getBranches,
   getCurrentBranch: mocks.getCurrentBranch,
   getDefaultBranch: mocks.getDefaultBranch,
+  getRepoCommonDir: mocks.getRepoCommonDir,
   getRepoName: mocks.getRepoName,
   getRepoRoot: mocks.getRepoRoot,
   getUpstream: mocks.getUpstream,
@@ -132,6 +134,7 @@ vi.mock('#/system/ssh/git.ts', () => ({
   getRemoteBrowserUrl: vi.fn(),
   getRemoteLog: vi.fn(),
   getRemotePatch: vi.fn(),
+  getRemoteRepoWriteGroupPath: vi.fn(async (target: { remotePath: string }) => target.remotePath),
   getRemoteSnapshot: vi.fn(),
   getRemoteStatus: vi.fn(),
   getRemoteTrackingBranches: vi.fn(),
@@ -222,6 +225,7 @@ beforeEach(async () => {
   mocks.deleteUpstreamBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.removeWorktree.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.getCurrentBranch.mockResolvedValue('main')
+  mocks.getRepoCommonDir.mockImplementation(async (cwd: string) => `${cwd}/.git`)
   mocks.getRepoName.mockResolvedValue('repo')
   mocks.getRepoRoot.mockResolvedValue('/tmp/repo')
   mocks.getWorktrees.mockResolvedValue([])
@@ -779,9 +783,9 @@ describe('repo mutation invalidation publishing', () => {
         },
       },
     )
-    await Promise.resolve()
-    await Promise.resolve()
-    expect(mocks.createWorktree).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => {
+      expect(mocks.createWorktree).toHaveBeenCalledTimes(1)
+    })
     expect(
       listRepoServerOperations({ repoId: '/tmp/repo' }).find(
         (operation) => operation.target?.branch === 'feature/a',
@@ -808,8 +812,13 @@ describe('repo mutation invalidation publishing', () => {
         },
       },
     )
-    await Promise.resolve()
-    await Promise.resolve()
+    await vi.waitFor(() => {
+      expect(
+        listRepoServerOperations({ repoId: '/tmp/repo' }).find(
+          (operation) => operation.target?.branch === 'feature/b',
+        ),
+      ).toMatchObject({ phase: 'queued' })
+    })
     expect(mocks.createWorktree).toHaveBeenCalledTimes(1)
     expect(
       listRepoServerOperations({ repoId: '/tmp/repo' }).find(
@@ -905,6 +914,63 @@ describe('repo mutation invalidation publishing', () => {
     secondRemove.resolve({ ok: true, message: 'removed' })
     await expect(second).resolves.toEqual({ ok: true, message: 'removed' })
     expect(listRepoServerOperations({ repoId: '/tmp/repo' })).toEqual([])
+  })
+
+  test('repo write service operations serialize linked worktree repo ids by common git dir', async () => {
+    const firstDelete = deferred<{ ok: true; message: string }>()
+    const secondRemove = deferred<{ ok: true; message: string }>()
+    mocks.getRepoCommonDir.mockImplementation(async (cwd: string) =>
+      cwd === '/tmp/repo' || cwd === '/tmp/repo-linked' ? '/tmp/repo/.git' : `${cwd}/.git`,
+    )
+    mocks.getWorktrees.mockResolvedValueOnce([]).mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
+      {
+        path: '/tmp/repo-linked',
+        branch: 'feature/b',
+        isBare: false,
+        isPrimary: false,
+        isDirty: false,
+        changeCount: 0,
+      },
+    ])
+    mocks.deleteBranch.mockImplementationOnce(async () => await firstDelete.promise)
+    mocks.removeWorktree.mockImplementationOnce(async () => await secondRemove.promise)
+    const { deleteRepoBranch, removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const { listRepoServerOperations } = await import('#/server/modules/repo-operation-registry.ts')
+
+    const first = deleteRepoBranch('/tmp/repo', 'feature/a')
+    await vi.waitFor(() => {
+      expect(mocks.deleteBranch).toHaveBeenCalledTimes(1)
+    })
+
+    const second = removeRepoWorktree('/tmp/repo-linked', {
+      branch: 'feature/b',
+      worktreePath: '/tmp/repo-linked',
+      alsoDeleteBranch: false,
+    })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(mocks.removeWorktree).not.toHaveBeenCalled()
+    expect(
+      listRepoServerOperations({ repoId: '/tmp/repo-linked' }).find(
+        (operation) => operation.kind === 'remove-worktree',
+      ),
+    ).toMatchObject({
+      kind: 'remove-worktree',
+      phase: 'queued',
+      target: { branch: 'feature/b', worktreePath: '/tmp/repo-linked' },
+    })
+
+    firstDelete.resolve({ ok: true, message: 'deleted' })
+    await expect(first).resolves.toEqual({ ok: true, message: 'deleted' })
+    await vi.waitFor(() => {
+      expect(mocks.removeWorktree).toHaveBeenCalledTimes(1)
+    })
+
+    expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-linked', undefined)
+    secondRemove.resolve({ ok: true, message: 'removed' })
+    await expect(second).resolves.toEqual({ ok: true, message: 'removed' })
   })
 
   test('createRepoWorktree reports settings failure after creating and bootstrapping the worktree', async () => {

@@ -603,6 +603,17 @@ export async function getRemoteTrackingBranches(
   return result.ok ? parseRemoteTrackingRefs(result.stdout) : []
 }
 
+export async function getRemoteRepoWriteGroupPath(
+  target: RemoteRepoTarget,
+  options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
+): Promise<string | null> {
+  const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
+  const result = await run({ type: 'gitWorktreeList', path: target.remotePath }, target, { signal: options.signal })
+  if (options.signal?.aborted || !result.ok) return null
+  const worktrees = parseWorktrees(result.stdout)
+  return worktrees.find((worktree) => worktree.isPrimary && !worktree.isBare)?.path ?? worktrees[0]?.path ?? null
+}
+
 export async function removeRemoteWorktree(
   target: RemoteRepoTarget,
   input: {

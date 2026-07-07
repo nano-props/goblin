@@ -5,6 +5,7 @@ import {
   deleteUpstreamBranch,
   getBranches,
   getCurrentBranch,
+  getRepoCommonDir,
   getHeadHash,
   getLog as getBranchLog,
   getRepoName,
@@ -53,6 +54,7 @@ import {
   getRemoteBrowserUrl,
   getRemoteLog,
   getRemotePatch,
+  getRemoteRepoWriteGroupPath,
   getRemoteSnapshot,
   getRemoteStatus,
   getRemoteWorktreeBootstrapPreview,
@@ -143,6 +145,21 @@ export async function runWithRepoSource<T>(
 
 export async function resolveRepoSource(repoId: string): Promise<RepoSource> {
   return isRemoteRepoId(repoId) ? await createRemoteRepoSource(repoId) : createLocalRepoSource(repoId)
+}
+
+export async function resolveRepoWriteGroupId(repoId: string, signal?: AbortSignal): Promise<string> {
+  if (isRemoteRepoId(repoId)) {
+    try {
+      const target = await resolveRemoteRepoTarget(repoId)
+      const groupPath = await getRemoteRepoWriteGroupPath(target, { signal })
+      const groupRef = groupPath ? normalizeRemoteRepoRef({ ...target, remotePath: groupPath }) : null
+      return groupRef?.id ?? repoId
+    } catch {
+      return repoId
+    }
+  }
+  const commonDir = await getRepoCommonDir(repoId, { signal })
+  return commonDir ? `local-git:${commonDir}` : `local-path:${path.resolve(repoId)}`
 }
 
 function withAffectedRepoIds(result: ExecResult, affectedRepoIds: readonly string[]): RepoMutationResult {

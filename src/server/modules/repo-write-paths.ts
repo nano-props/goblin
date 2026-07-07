@@ -10,7 +10,12 @@ import {
   settleRepoServerOperation,
   startRepoServerOperation,
 } from '#/server/modules/repo-operation-registry.ts'
-import { resolveRepoSource, runWithRepoSource, type RepoMutationResult } from '#/server/modules/repo-source.ts'
+import {
+  resolveRepoSource,
+  resolveRepoWriteGroupId,
+  runWithRepoSource,
+  type RepoMutationResult,
+} from '#/server/modules/repo-source.ts'
 import {
   getServerRepoSettings,
   pruneServerRepoSettingsForRemovedWorktree,
@@ -46,6 +51,7 @@ const activeBackgroundFetches = new Map<
   { promise: Promise<{ ok: boolean; message: string }>; operationId: string }
 >()
 const repoWriteOperationQueuesByRepo = new Map<string, PQueue>()
+let repoWriteOperationAdmission: Promise<void> = Promise.resolve()
 
 type RepoExecResult = { ok: boolean; message: string }
 
@@ -270,7 +276,7 @@ async function runRepoServerWriteOperation<T extends ExecResult>(options: {
       options.signal?.removeEventListener('abort', onAbort)
     }
   }
-  return await runRepoWriteServiceOperation(options.repoId, run)
+  return await enqueueRepoWriteServiceOperation(options.repoId, options.signal, run)
 }
 
 export async function cloneRepo(
@@ -441,30 +447,57 @@ export async function createRepoWorktree(
   })
 }
 
-async function runRepoWriteServiceOperation<T>(repoId: string, task: () => Promise<T>): Promise<T> {
-  // Git mutations for a repo share one service queue so server-observed
-  // operation state and filesystem effects move in the same order.
-  const queue = repoWriteOperationQueueForRepo(repoId)
+async function enqueueRepoWriteServiceOperation<T>(
+  repoId: string,
+  signal: AbortSignal | undefined,
+  task: () => Promise<T>,
+): Promise<T> {
+  const releaseAdmission = await acquireRepoWriteOperationAdmission()
+  let work!: Promise<T>
+  try {
+    const writeGroupId = await resolveRepoWriteGroupId(repoId, signal)
+    work = runResolvedRepoWriteServiceOperation(writeGroupId, task)
+  } finally {
+    releaseAdmission()
+  }
+  return await work
+}
+
+async function acquireRepoWriteOperationAdmission(): Promise<() => void> {
+  const previous = repoWriteOperationAdmission
+  let release!: () => void
+  const next = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  repoWriteOperationAdmission = previous.then(() => next)
+  await previous
+  return release
+}
+
+async function runResolvedRepoWriteServiceOperation<T>(writeGroupId: string, task: () => Promise<T>): Promise<T> {
+  // Git mutations that share one physical repository also share one service
+  // queue, even when the app opened different linked worktree paths.
+  const queue = repoWriteOperationQueueForRepo(writeGroupId)
   try {
     return await queue.add(task)
   } finally {
-    scheduleRepoWriteOperationQueueCleanup(repoId, queue)
+    scheduleRepoWriteOperationQueueCleanup(writeGroupId, queue)
   }
 }
 
-function repoWriteOperationQueueForRepo(repoId: string): PQueue {
-  let queue = repoWriteOperationQueuesByRepo.get(repoId)
+function repoWriteOperationQueueForRepo(writeGroupId: string): PQueue {
+  let queue = repoWriteOperationQueuesByRepo.get(writeGroupId)
   if (!queue) {
     queue = new PQueue({ concurrency: 1 })
-    repoWriteOperationQueuesByRepo.set(repoId, queue)
+    repoWriteOperationQueuesByRepo.set(writeGroupId, queue)
   }
   return queue
 }
 
-function scheduleRepoWriteOperationQueueCleanup(repoId: string, queue: PQueue): void {
+function scheduleRepoWriteOperationQueueCleanup(writeGroupId: string, queue: PQueue): void {
   void queue.onIdle().then(() => {
-    if (repoWriteOperationQueuesByRepo.get(repoId) !== queue) return
-    if (queue.size === 0 && queue.pending === 0) repoWriteOperationQueuesByRepo.delete(repoId)
+    if (repoWriteOperationQueuesByRepo.get(writeGroupId) !== queue) return
+    if (queue.size === 0 && queue.pending === 0) repoWriteOperationQueuesByRepo.delete(writeGroupId)
   })
 }
 
