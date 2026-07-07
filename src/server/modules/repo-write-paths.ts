@@ -352,7 +352,7 @@ export async function fetchRepo(
   signal?: AbortSignal,
 ): Promise<{ ok: boolean; message: string }> {
   async function runFetch(
-    task: (signal: AbortSignal) => Promise<{ ok: boolean; message: string }>,
+    task: (signal: AbortSignal) => Promise<RepoMutationResult>,
     operationId?: string,
     writeGroupId?: string,
   ) {
@@ -366,8 +366,7 @@ export async function fetchRepo(
       },
       { operationId, gateId: writeGroupId, operationKind: 'fetch', callerSignal: signal },
     )
-    if (result.ok) publishRepoSnapshotInvalidation(cwd, sourceToken)
-    return result
+    return await publishSnapshotInvalidationAfterMutation(cwd, result, sourceToken)
   }
   async function executeFetch(operationId?: string): Promise<{ ok: boolean; message: string }> {
     return await enqueueRepoWriteServiceOperation(cwd, signal, async (writeGroupId) => {

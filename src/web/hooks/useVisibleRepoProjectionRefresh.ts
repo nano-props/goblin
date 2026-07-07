@@ -45,14 +45,17 @@ export function useVisibleRepoProjectionRefresh({
     currentRepoVisibleProjectionRefreshStateEqual,
   )
   const previousCurrentRepoId = useRef<string | null>(null)
+  const previousCurrentBranchName = useRef<string | null>(null)
   const previousPreferredWorkspacePaneTab = useRef<WorkspacePaneTabType | null>(null)
   const previousVisibleProjectionViewOpen = useRef<boolean>(false)
 
   useEffect(() => {
     const lastCurrentRepoId = previousCurrentRepoId.current
+    const lastCurrentBranchName = previousCurrentBranchName.current
     const lastPreferredWorkspacePaneTab = previousPreferredWorkspacePaneTab.current
     const lastVisibleProjectionViewOpen = previousVisibleProjectionViewOpen.current
     const nextCurrentRepoId = currentRepoRefreshState?.id ?? null
+    const nextCurrentBranchName = currentRepoRefreshState?.branchName ?? null
     const nextPreferredWorkspacePaneTab = currentRepoRefreshState?.preferredWorkspacePaneTab ?? null
     const nextVisibleProjectionViewOpen = currentRepoRefreshState?.visibleProjectionViewOpen ?? false
     const currentRepoChanged = nextCurrentRepoId !== lastCurrentRepoId
@@ -64,13 +67,21 @@ export function useVisibleRepoProjectionRefresh({
         !lastVisibleProjectionViewOpen) ||
         ((nextPreferredWorkspacePaneTab === 'status' || nextPreferredWorkspacePaneTab === 'changes') &&
           nextPreferredWorkspacePaneTab !== lastPreferredWorkspacePaneTab))
+    const visibleProjectionBranchChanged =
+      !currentRepoChanged &&
+      nextCurrentRepoId !== null &&
+      nextVisibleProjectionViewOpen &&
+      nextCurrentBranchName !== lastCurrentBranchName
     previousCurrentRepoId.current = nextCurrentRepoId
+    previousCurrentBranchName.current = nextCurrentBranchName
     previousPreferredWorkspacePaneTab.current = nextPreferredWorkspacePaneTab
     previousVisibleProjectionViewOpen.current = nextVisibleProjectionViewOpen
-    if (!currentRepoRefreshState || (!currentRepoChanged && !openedVisibleProjectionView)) return
+    if (!currentRepoRefreshState || (!currentRepoChanged && !openedVisibleProjectionView && !visibleProjectionBranchChanged)) {
+      return
+    }
     void runRepoRefreshIntent(useReposStore.getState, {
       kind: 'visible-runtime-projection-requested',
-      reason: 'visible-projection-view-opened',
+      reason: visibleProjectionBranchChanged ? 'visible-projection-branch-changed' : 'visible-projection-view-opened',
       id: currentRepoRefreshState.id,
       repoInstanceId: currentRepoRefreshState.repoInstanceId,
       branchName: currentRepoRefreshState.branchName,

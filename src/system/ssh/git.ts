@@ -603,14 +603,32 @@ export async function getRemoteTrackingBranches(
   return result.ok ? parseRemoteTrackingRefs(result.stdout) : []
 }
 
+async function readRemoteWorktreeList(
+  target: RemoteRepoTarget,
+  options: { signal?: AbortSignal; run: RemoteGitRunner },
+): Promise<WorktreeInfo[]> {
+  const result = await options.run({ type: 'gitWorktreeList', path: target.remotePath }, target, {
+    signal: options.signal,
+  })
+  if (options.signal?.aborted || !result.ok) return []
+  return parseWorktrees(result.stdout)
+}
+
+export async function getRemoteRepoWorktreePaths(
+  target: RemoteRepoTarget,
+  options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
+): Promise<string[]> {
+  const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
+  const worktrees = await readRemoteWorktreeList(target, { signal: options.signal, run })
+  return worktrees.filter((worktree) => !worktree.isBare).map((worktree) => worktree.path)
+}
+
 export async function getRemoteRepoWriteGroupPath(
   target: RemoteRepoTarget,
   options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
 ): Promise<string | null> {
   const run: RemoteGitRunner = options.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
-  const result = await run({ type: 'gitWorktreeList', path: target.remotePath }, target, { signal: options.signal })
-  if (options.signal?.aborted || !result.ok) return null
-  const worktrees = parseWorktrees(result.stdout)
+  const worktrees = await readRemoteWorktreeList(target, { signal: options.signal, run })
   return worktrees.find((worktree) => worktree.isPrimary && !worktree.isBare)?.path ?? worktrees[0]?.path ?? null
 }
 

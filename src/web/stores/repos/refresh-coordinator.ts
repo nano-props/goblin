@@ -25,7 +25,7 @@ export type RepoRefreshIntent =
   | (RepoRefreshIntentBase & { kind: 'manual-refresh-requested' })
   | (RepoRefreshIntentBase & {
       kind: 'visible-runtime-projection-requested'
-      reason: 'visible-projection-view-opened'
+      reason: 'visible-projection-view-opened' | 'visible-projection-branch-changed'
       branchName: string | null
     })
 

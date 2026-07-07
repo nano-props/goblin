@@ -28,6 +28,7 @@ function createRepo(
   id: string,
   options: {
     preferredWorkspacePaneTab?: WorkspacePaneTabType
+    branchNames?: string[]
     /**
      * Phase 4: the legacy `availability.phase` field is gone for
      * remote repos. The refresh state's `unavailable` boolean is
@@ -43,22 +44,29 @@ function createRepo(
   } = {},
 ) {
   const repo = emptyRepo(id, 'repo', 'repo-instance-test')
-  const worktreePath = `${id}/main`
-  const branches = [createRepoBranch('main', { worktree: { path: worktreePath } })]
+  const branchNames = options.branchNames ?? ['main']
+  const branches = branchNames.map((branchName) => {
+    const worktreePath = `${id}/${branchName.replaceAll('/', '-')}`
+    return createRepoBranch(branchName, { worktree: { path: worktreePath } })
+  })
   repo.instanceId = id === '/repo-a' ? 'repo-instance-test-a' : 'repo-instance-test-b'
   seedRepoReadModelQueryData(repo, { branches, currentBranch: 'main', status: [] })
-  setWorkspacePaneTabsForTargetQueryData({
-    repoRoot: id,
-    repoInstanceId: repo.instanceId,
-    branchName: 'main',
-    worktreePath,
-    tabs: [workspacePaneStaticTabEntry('status')],
-  })
-  repo.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(
-    repo.ui,
-    { repoRoot: id, branchName: 'main', worktreePath },
-    options.preferredWorkspacePaneTab ?? 'status',
-  )
+  for (const branch of branches) {
+    const worktreePath = branch.worktree?.path
+    if (!worktreePath) continue
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: id,
+      repoInstanceId: repo.instanceId,
+      branchName: branch.name,
+      worktreePath,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    repo.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(
+      repo.ui,
+      { repoRoot: id, branchName: branch.name, worktreePath },
+      options.preferredWorkspacePaneTab ?? 'status',
+    )
+  }
   if (options.unavailable) repo.availability = { phase: 'unavailable', reason: 'error.failed-read-repo', checkedAt: 0 }
   repo.dataLoads.visibleStatus.phase = options.visibleStatusPhase ?? 'idle'
   return repo
@@ -279,8 +287,8 @@ describe('useVisibleRepoProjectionRefresh', () => {
     expect(refreshRuntimeProjection).not.toHaveBeenCalled()
   })
 
-  test('does not treat branch selection changes as refresh triggers', async () => {
-    const repo = createRepo('/repo-a', { preferredWorkspacePaneTab: 'status' })
+  test('refreshes the visible projection when switching branches in the current repo', async () => {
+    const repo = createRepo('/repo-a', { preferredWorkspacePaneTab: 'status', branchNames: ['main', 'feature/a'] })
     await act(async () => {
       useReposStore.setState({
         repos: { '/repo-a': repo },
@@ -291,6 +299,14 @@ describe('useVisibleRepoProjectionRefresh', () => {
     })
     refreshRuntimeProjection.mockClear()
 
-    expect(refreshRuntimeProjection).not.toHaveBeenCalled()
+    await act(async () => {
+      root.render(<Harness branchName="feature/a" />)
+    })
+
+    expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
+      repoInstanceId: 'repo-instance-test-a',
+      scope: 'visible-status',
+      branchName: 'feature/a',
+    })
   })
 })

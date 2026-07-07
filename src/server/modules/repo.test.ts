@@ -37,6 +37,7 @@ const mocks = vi.hoisted(() => ({
   bootstrapRemoteWorktreeAfterCreate: vi.fn(),
   createRemoteWorktree: vi.fn(),
   getWorktreeBootstrapPreview: vi.fn(),
+  getRemoteRepoWorktreePaths: vi.fn(),
   getRemoteWorktreeBootstrapPreview: vi.fn(),
   getServerRepoSettings: vi.fn(),
   pruneServerRepoSettingsForRemovedWorktree: vi.fn(),
@@ -134,6 +135,7 @@ vi.mock('#/system/ssh/git.ts', () => ({
   getRemoteBrowserUrl: vi.fn(),
   getRemoteLog: vi.fn(),
   getRemotePatch: vi.fn(),
+  getRemoteRepoWorktreePaths: mocks.getRemoteRepoWorktreePaths,
   getRemoteRepoWriteGroupPath: vi.fn(async (target: { remotePath: string }) => target.remotePath),
   getRemoteSnapshot: vi.fn(),
   getRemoteStatus: vi.fn(),
@@ -224,6 +226,7 @@ beforeEach(async () => {
   mocks.deleteBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.deleteUpstreamBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.removeWorktree.mockResolvedValue({ ok: true, message: 'ok' })
+  mocks.getRemoteRepoWorktreePaths.mockResolvedValue([])
   mocks.getCurrentBranch.mockResolvedValue('main')
   mocks.getRepoCommonDir.mockImplementation(async (cwd: string) => `${cwd}/.git`)
   mocks.getRepoName.mockResolvedValue('repo')
@@ -381,6 +384,28 @@ describe('fetchRepo invalidation publishing', () => {
       query: 'repo-snapshot',
     })
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledTimes(1)
+  })
+
+  test('publishes sibling worktree snapshot invalidations after a successful sync', async () => {
+    mocks.getWorktrees.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
+      { path: '/tmp/repo-linked', branch: 'feature/a', isBare: false, isPrimary: false, isDirty: false },
+    ])
+    mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const result = await fetchRepo('/tmp/repo', 'user')
+
+    expect(result).toEqual({ ok: true, message: 'fetched' })
+    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(1, {
+      repoId: '/tmp/repo',
+      query: 'repo-snapshot',
+    })
+    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(2, {
+      repoId: '/tmp/repo-linked',
+      query: 'repo-snapshot',
+    })
+    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledTimes(2)
   })
 
   test('user sync waits for and reuses an active background sync result without duplicating invalidation', async () => {
@@ -575,6 +600,34 @@ describe('repo mutation invalidation publishing', () => {
       repoId: '/tmp/repo',
       query: 'repo-snapshot',
     })
+  })
+
+  test('createRepoWorktree publishes snapshot invalidations for existing siblings and the new worktree', async () => {
+    mocks.getWorktrees.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
+      { path: '/tmp/repo-linked', branch: 'feature/b', isBare: false, isPrimary: false, isDirty: false },
+    ])
+    const { createRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await createRepoWorktree('/tmp/repo', {
+      worktreePath: '/tmp/repo-worktree',
+      mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
+    })
+
+    expect(result).toEqual({ ok: true, message: 'ok' })
+    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(1, {
+      repoId: '/tmp/repo',
+      query: 'repo-snapshot',
+    })
+    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(2, {
+      repoId: '/tmp/repo-linked',
+      query: 'repo-snapshot',
+    })
+    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(3, {
+      repoId: '/tmp/repo-worktree',
+      query: 'repo-snapshot',
+    })
+    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledTimes(3)
   })
 
   test('createRepoWorktree skips bootstrap unless run is explicitly requested', async () => {
@@ -1277,6 +1330,43 @@ describe('repo mutation invalidation publishing', () => {
       repoId: '/tmp/repo',
       query: 'repo-snapshot',
     })
+  })
+
+  test.each([
+    [
+      'pullRepoBranch',
+      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
+        repo.pullRepoBranch('/tmp/repo', 'feature/a'),
+    ],
+    [
+      'pushRepoBranch',
+      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
+        repo.pushRepoBranch('/tmp/repo', 'feature/a'),
+    ],
+    [
+      'deleteRepoBranch',
+      async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
+        repo.deleteRepoBranch('/tmp/repo', 'feature/a'),
+    ],
+  ])('%s publishes sibling worktree snapshot invalidations after success', async (_name, run) => {
+    mocks.getWorktrees.mockResolvedValue([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
+      { path: '/tmp/repo-linked', branch: 'feature/b', isBare: false, isPrimary: false, isDirty: false },
+    ])
+    const repo = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await run(repo)
+
+    expect(result).toEqual({ ok: true, message: 'ok' })
+    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(1, {
+      repoId: '/tmp/repo',
+      query: 'repo-snapshot',
+    })
+    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(2, {
+      repoId: '/tmp/repo-linked',
+      query: 'repo-snapshot',
+    })
+    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledTimes(2)
   })
 
   test('deleteRepoBranch refuses protected branches before touching git', async () => {
