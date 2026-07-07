@@ -185,7 +185,7 @@ function setRepoSnapshotQueryDataOnly(
   queryClient.setQueryData(repoSnapshotQueryKey(repoRoot, repoInstanceId), snapshot)
 }
 
-export function getRepoSnapshotQueryData(
+function getRepoSnapshotQueryData(
   repoRoot: string,
   repoInstanceId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
@@ -193,7 +193,7 @@ export function getRepoSnapshotQueryData(
   return queryClient.getQueryData<RepoSnapshot>(repoSnapshotQueryKey(repoRoot, repoInstanceId))
 }
 
-export function getRepoStatusQueryData(
+function getRepoStatusQueryData(
   repoRoot: string,
   repoInstanceId: string,
   queryClient: QueryClient = primaryWindowQueryClient,

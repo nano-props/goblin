@@ -4,8 +4,8 @@ import type { ReposSet } from '#/web/stores/repos/types.ts'
 import type { RepoSnapshotCacheEntry, RepoState } from '#/web/stores/repos/types.ts'
 import { finishDataLoadSuccess } from '#/web/stores/repos/repo-data-load-state.ts'
 import { stripBranchWorktreeMetadata } from '#/web/stores/repos/worktree-state.ts'
-import { getRepoSnapshotQueryData, setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
-import { repoBranchSnapshotDataFromSnapshot, type RepoBranchSnapshotData } from '#/web/repo-branch-read-model.ts'
+import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { readRepoBranchQueryProjection, type RepoBranchSnapshotData } from '#/web/repo-branch-read-model.ts'
 const MAX_CACHE_AGE_MS = 14 * 24 * 60 * 60 * 1000
 const MAX_REPOS = 50
 const FiniteNumber = v.pipe(v.number(), v.finite())
@@ -97,8 +97,8 @@ export function persistRepoSnapshotCacheEntry(
 ): void {
   if (!repo) return
   if (repo.instanceId !== repoInstanceId) return
-  const snapshot = getRepoSnapshotQueryData(repo.id, repo.instanceId)
-  const entry = snapshot ? repoSnapshotCacheEntryFromRepo(repo, repoBranchSnapshotDataFromSnapshot(snapshot)) : null
+  const branchModel = readRepoBranchQueryProjection(repo)
+  const entry = branchModel ? repoSnapshotCacheEntryFromRepo(repo, branchModel) : null
   if (!entry) return
   set((s) => {
     if (s.repos[repo.id]?.instanceId !== repoInstanceId) return s

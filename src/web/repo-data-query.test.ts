@@ -4,10 +4,10 @@ import {
   getRepoOperationsQueryData,
   getRepoProjectionPlaceholderData,
   getRepoProjectionQueryData,
-  getRepoSnapshotQueryData,
-  getRepoStatusQueryData,
   repoOperationsQueryKey,
   repoProjectionQueryKey,
+  repoSnapshotQueryKey,
+  repoStatusQueryKey,
   scheduleRepoRuntimeProjectionRefresh,
   setRepoOperationsQueryData,
   setRepoProjectionQueryData,
@@ -49,7 +49,9 @@ describe('repo projection query data', () => {
       requested: { branch: null, pullRequestMode: 'full' },
       loadedAt: 0,
     })
-    expect(getRepoStatusQueryData('/tmp/repo', 'repo-instance-1', queryClient)).toBeUndefined()
+    expect(
+      queryClient.getQueryData<WorktreeStatus[]>(repoStatusQueryKey('/tmp/repo', 'repo-instance-1')),
+    ).toBeUndefined()
   })
 
   test('backfills shared section caches from a server projection', () => {
@@ -81,8 +83,12 @@ describe('repo projection query data', () => {
     expect(getRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', 'feature/a', 'full', queryClient)).toEqual(
       projection,
     )
-    expect(getRepoSnapshotQueryData('/tmp/repo', 'repo-instance-1', queryClient)).toEqual(snapshot)
-    expect(getRepoStatusQueryData('/tmp/repo', 'repo-instance-1', queryClient)).toEqual(status)
+    expect(queryClient.getQueryData<RepoSnapshot>(repoSnapshotQueryKey('/tmp/repo', 'repo-instance-1'))).toEqual(
+      snapshot,
+    )
+    expect(queryClient.getQueryData<WorktreeStatus[]>(repoStatusQueryKey('/tmp/repo', 'repo-instance-1'))).toEqual(
+      status,
+    )
     expect(getRepoOperationsQueryData('/tmp/repo', 'repo-instance-1', queryClient)).toEqual({
       operations: [],
       loadedAt: 123,

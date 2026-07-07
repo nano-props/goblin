@@ -15,7 +15,9 @@ import {
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoSnapshotCacheEntry } from '#/web/stores/repos/types.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { getRepoSnapshotQueryData, getRepoStatusQueryData, setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { repoSnapshotQueryKey, repoStatusQueryKey, setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import type { RepoSnapshot } from '#/shared/api-types.ts'
+import type { WorktreeStatus } from '#/shared/git-types.ts'
 function cachedRepo(savedAt: number): RepoSnapshotCacheEntry {
   return {
     savedAt,
@@ -189,10 +191,14 @@ describe('restoreRepoProjectionFromCacheEntry', () => {
 
     seedRepoSnapshotQueryFromCacheEntry('/repo', 'repo-instance-test', cached)
 
-    const snapshot = getRepoSnapshotQueryData('/repo', 'repo-instance-test')
+    const snapshot = primaryWindowQueryClient.getQueryData<RepoSnapshot>(
+      repoSnapshotQueryKey('/repo', 'repo-instance-test'),
+    )
     expect(snapshot?.current).toBe('feature/a')
     expect(snapshot?.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
     expect(snapshot?.branches[0]?.pullRequest).toBeUndefined()
-    expect(getRepoStatusQueryData('/repo', 'repo-instance-test')).toBeUndefined()
+    expect(
+      primaryWindowQueryClient.getQueryData<WorktreeStatus[]>(repoStatusQueryKey('/repo', 'repo-instance-test')),
+    ).toBeUndefined()
   })
 })
