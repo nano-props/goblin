@@ -9,28 +9,35 @@
 // terminal feature. Routes call into it; nothing inside it calls out
 // to the route layer.
 
-import { BufferedTerminalSocket } from '#/server/terminal/buffered-terminal-socket.ts'
-import type { TerminalClientMessage } from '#/shared/terminal-socket.ts'
-import { normalizeTerminalClientMessage } from '#/shared/terminal-validators.ts'
+import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import { serverLogger } from '#/server/logger.ts'
-import { createTerminalSessionService } from '#/server/terminal/terminal-session-service.ts'
+import {
+  createTerminalSessionService,
+  terminalWorkspacePaneRuntimeTabsProvider,
+} from '#/server/terminal/terminal-session-service.ts'
 import { createWorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
-import type { TerminalRealtimeBroker, TerminalRealtimeSocket } from '#/server/terminal/terminal-realtime-broker.ts'
+import { createWorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
+import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { createTerminalRuntimeCoordinator } from '#/server/terminal/terminal-runtime-coordinator.ts'
-import {
-  createTerminalRealtimeHandlers,
-  handleTerminalRealtimeRequestMessage,
-  shouldPauseRealtimeRequest,
-} from '#/server/terminal/terminal-runtime-realtime.ts'
+import { createWorkspacePaneTabsActions } from '#/server/workspace-pane/workspace-pane-tabs-actions.ts'
+import { broadcastWorkspacePaneTabsChanged } from '#/server/workspace-pane/workspace-pane-tabs-realtime.ts'
+import { createTerminalRealtimeHandlers } from '#/server/terminal/terminal-runtime-realtime.ts'
+import { createWorkspacePaneTabsRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-tabs-runtime-realtime.ts'
+import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { isValidTerminalClientId, isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
-import { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
+import {
+  TerminalSessionManager,
+  type TerminalSessionCloseReason,
+  type TerminalSessionOrderProjection,
+} from '#/server/terminal/terminal-session-manager.ts'
 import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
-import { type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
+import { type ServerTerminalActionHost, type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import { isCurrentRepoRuntimeInstance, onRepoRuntimeInstanceClosed } from '#/server/modules/repo-runtime-instances.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
+import { createAppRealtimeHost } from '#/server/realtime/app-realtime-runtime.ts'
 
 // Intentionally long TTL: we want terminals to survive as long as possible in
 // the background so users can leave builds or long-running tasks unattended.
@@ -54,6 +61,11 @@ export interface ServerTerminalRuntime {
 export function createServerTerminalRuntime(options: ServerTerminalRuntimeOptions): ServerTerminalRuntime {
   const { ptySupervisor } = options
   const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+  const terminalSessionOrder = {
+    terminalSessionIds(input) {
+      return workspaceTabs.runtimeSessionIds(input, 'terminal')
+    },
+  } satisfies TerminalSessionOrderProjection<string>
 
   // Sink callbacks fan out to every clientId that shares the
   // session's userId. The manager passes `userId` (a string
@@ -61,7 +73,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   // live output event reaches a sibling tab (different `clientId`,
   // same `userId`) without an extra attach roundtrip. See
   // `identity.ts` for the model.
-  let broker: TerminalRealtimeBroker
+  let broker: RealtimeBroker<AppRealtimeMessage>
   let sessionService: ReturnType<typeof createTerminalSessionService>
   const manager = new TerminalSessionManager<string>(
     ptySupervisor,
@@ -78,8 +90,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       onExit(userId, event) {
         broker.broadcastToUser(userId, { type: 'exit', event })
       },
-      onSessionClosed(userId, session) {
-        handleSessionClosed(userId, session)
+      onSessionClosed(userId, session, reason) {
+        handleSessionClosed(userId, session, reason)
       },
       onIdentity(userId, event) {
         broker.broadcastToUser(userId, { type: 'identity', event })
@@ -88,12 +100,16 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         broker.broadcastToUser(userId, { type: 'lifecycle', event })
       },
     },
-    workspaceTabs,
+    terminalSessionOrder,
     (userId, clientId) => broker.isClientOnline(userId, clientId),
   )
+  const workspaceTabsCoordinator = createWorkspacePaneTabsCoordinator({
+    workspaceTabs,
+    runtimeProviders: [terminalWorkspacePaneRuntimeTabsProvider(manager)],
+  })
   const coordinator = createTerminalRuntimeCoordinator({
     manager,
-    workspaceTabs,
+    workspaceTabsCoordinator,
     detachedTtlMs: TERMINAL_DETACHED_TTL_MS,
   })
   broker = coordinator.broker
@@ -101,7 +117,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     isValidClientId: isValidTerminalClientId,
     isValidTerminalSessionId,
     manager,
-    workspaceTabs,
+    workspaceTabsCoordinator,
     isCurrentRepoInstance: isCurrentRepoRuntimeInstance,
     broadcastSessionsChanged(userId, repoRoot) {
       broadcastRepoSessionsChanged(userId, repoRoot)
@@ -114,12 +130,20 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   const unsubscribeRepoRuntimeInstanceClosed = onRepoRuntimeInstanceClosed((event) => {
     const scope = terminalSessionRuntimeScope(event.repoRoot, event.repoInstanceId)
     manager.closeSessionsForRepo(event.userId, scope)
-    workspaceTabs.closeSessionsForScope(event.userId, scope)
     broadcastRepoSessionsChanged(event.userId, event.repoRoot)
-    broadcastRepoWorkspaceTabsChanged(event.userId, event.repoRoot)
+    void workspaceTabsCoordinator
+      .closeScope({ userId: event.userId, scope })
+      .then(() => {
+        broadcastRepoWorkspaceTabsChanged(event.userId, event.repoRoot)
+      })
+      .catch((err) => {
+        terminalRuntimeLogger.warn(
+          { userId: event.userId, repoRoot: event.repoRoot, repoInstanceId: event.repoInstanceId, err },
+          'failed to close workspace tabs after repo instance close',
+        )
+      })
   })
 
-  const bufferedSocketByRawSocket = new WeakMap<TerminalRealtimeSocket, BufferedTerminalSocket>()
   let shuttingDown = false
   const actions = createTerminalRuntimeActions({
     manager,
@@ -127,47 +151,27 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     sessionService,
     isValidTerminalClientId,
   })
-
-  const host: ServerTerminalHost = {
-    isValidClientId(value) {
-      return isValidTerminalClientId(value)
+  const workspacePaneTabsActions = createWorkspacePaneTabsActions({
+    sessionService,
+    isValidClientId: isValidTerminalClientId,
+    isCurrentRepoInstance: isCurrentRepoRuntimeInstance,
+    broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
+  })
+  const workspacePaneTabsHost: ServerWorkspacePaneTabsHost = {
+    async listWorkspaceTabs(clientId, userId, input) {
+      return await workspacePaneTabsActions.listWorkspaceTabs(clientId, userId, input)
     },
+    async replaceTabs(clientId, userId, input) {
+      return await workspacePaneTabsActions.replaceTabs(clientId, userId, input)
+    },
+    async updateTabs(clientId, userId, input) {
+      return await workspacePaneTabsActions.updateTabs(clientId, userId, input)
+    },
+  }
+
+  const terminalActionHost: ServerTerminalActionHost = {
     isClientOnline(userId, clientId) {
       return broker.isClientOnline(userId, clientId)
-    },
-    getDiagnostics() {
-      const bufferStats = manager.getSessionBufferStats()
-      return {
-        mode: ptySupervisor.getDiagnostics().mode,
-        state: shuttingDown ? 'shutting-down' : 'running',
-        registeredSockets: broker.socketCount(),
-        shuttingDown,
-        pty: ptySupervisor.getDiagnostics(),
-        liveSessionCount: bufferStats.count,
-        totalRingBufferChars: bufferStats.totalBufferChars,
-        maxRingBufferChars: bufferStats.maxBufferChars,
-      }
-    },
-    registerSocket(clientId, userId, socket) {
-      if (typeof clientId !== 'string' || !isValidTerminalClientId(clientId) || !userId) {
-        socket.close(1008, 'invalid client id')
-        return
-      }
-      const rawSocket = socket as TerminalRealtimeSocket
-      let buffered: BufferedTerminalSocket
-      buffered = new BufferedTerminalSocket(rawSocket, () => {
-        broker.unregisterSocket(buffered)
-        bufferedSocketByRawSocket.delete(rawSocket)
-      })
-      bufferedSocketByRawSocket.set(rawSocket, buffered)
-      broker.registerSocket(clientId, userId, buffered)
-    },
-    unregisterSocket(_clientId, _userId, socket) {
-      const buffered =
-        bufferedSocketByRawSocket.get(socket as TerminalRealtimeSocket) ?? (socket as TerminalRealtimeSocket)
-      if (buffered instanceof BufferedTerminalSocket) buffered.deactivate()
-      broker.unregisterSocket(buffered)
-      bufferedSocketByRawSocket.delete(socket as TerminalRealtimeSocket)
     },
     async attach(clientId, userId, input) {
       return await actions.attach(clientId, userId, input)
@@ -190,76 +194,40 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     async listSessions(clientId, userId, input) {
       return await actions.listSessions(clientId, userId, input)
     },
-    async listWorkspaceTabs(clientId, userId, input) {
-      return await actions.listWorkspaceTabs(clientId, userId, input)
+    async recoverSessions(clientId, userId, input) {
+      return await actions.recoverSessions(clientId, userId, input)
     },
     async create(clientId, userId, input) {
       return await actions.create(clientId, userId, input)
     },
-    async replaceTabs(clientId, userId, input) {
-      return await actions.replaceTabs(clientId, userId, input)
-    },
-    async updateTabs(clientId, userId, input) {
-      return await actions.updateTabs(clientId, userId, input)
-    },
     async prune(clientId, userId, input) {
       return await actions.prune(clientId, userId, input)
     },
-    handleRealtimeMessage(clientId, userId, socket, payload) {
-      // Log invalid identifier/parse drops so a stuck takeover
-      // (e.g. an old clientId pattern that the WS validator
-      // missed) is observable in production logs. We still
-      // return early without rejecting the WS — the message is
-      // just unprocessable for this socket.
-      if (typeof clientId !== 'string' || !isValidTerminalClientId(clientId)) {
-        terminalRuntimeLogger.warn({ clientId }, 'invalid realtime message: missing/invalid identifiers')
-        return
+  }
+
+  const realtimeHandlers = createTerminalRealtimeHandlers(terminalActionHost)
+  const workspacePaneTabsRealtimeHandlers = createWorkspacePaneTabsRealtimeHandlers(workspacePaneTabsHost)
+  const appRealtimeHost = createAppRealtimeHost({
+    broker,
+    isValidClientId: isValidTerminalClientId,
+    getDiagnostics() {
+      const bufferStats = manager.getSessionBufferStats()
+      return {
+        terminal: {
+          mode: ptySupervisor.getDiagnostics().mode,
+          state: shuttingDown ? 'shutting-down' : 'running',
+          registeredSockets: broker.socketCount(),
+          shuttingDown,
+          pty: ptySupervisor.getDiagnostics(),
+          liveSessionCount: bufferStats.count,
+          totalRingBufferChars: bufferStats.totalBufferChars,
+          maxRingBufferChars: bufferStats.maxBufferChars,
+        },
       }
-      if (!userId) {
-        terminalRuntimeLogger.warn({ clientId }, 'invalid realtime message: missing userId from auth context')
-        return
-      }
-      let message: TerminalClientMessage | null = null
-      try {
-        message = normalizeTerminalClientMessage(JSON.parse(payload))
-      } catch (err) {
-        terminalRuntimeLogger.warn({ clientId, err }, 'invalid realtime message: parse/normalize failed')
-        return
-      }
-      if (!message) {
-        terminalRuntimeLogger.warn({ clientId }, 'invalid realtime message: null after normalize')
-        return
-      }
-      if (message.type === 'heartbeat') {
-        // Heartbeats are not request/response — they're a pure
-        // liveness signal that feeds the broker's deadline scan.
-        // Resolving here means the rest of the realtime pipeline
-        // (buffered socket, handler table) stays untouched.
-        broker.recordHeartbeat(userId, clientId)
-        return
-      }
-      if (message.type === 'ping') {
-        broker.recordHeartbeat(userId, clientId)
-        const rawSocket = socket as TerminalRealtimeSocket
-        try {
-          rawSocket.send(JSON.stringify({ type: 'pong', requestId: message.requestId }))
-        } catch {
-          bufferedSocketByRawSocket.get(rawSocket)?.deactivate()
-        }
-        return
-      }
-      const bufferedSocket = bufferedSocketByRawSocket.get(socket as TerminalRealtimeSocket)
-      if (shouldPauseRealtimeRequest(message.action)) bufferedSocket?.pause()
-      void handleTerminalRealtimeRequestMessage(
-        realtimeHandlers,
-        clientId,
-        userId,
-        socket as TerminalRealtimeSocket,
-        bufferedSocket,
-        message,
-      )
     },
-    shutdown() {
+    terminalHandlers: realtimeHandlers,
+    workspacePaneTabsHandlers: workspacePaneTabsRealtimeHandlers,
+    onShutdown() {
       if (shuttingDown) return
       shuttingDown = true
       unsubscribeRepoRuntimeInstanceClosed()
@@ -267,9 +235,15 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       manager.closeAll()
       ptySupervisor.shutdown()
     },
-  }
+  })
 
-  const realtimeHandlers = createTerminalRealtimeHandlers(host)
+  const host: ServerTerminalHost = {
+    ...appRealtimeHost,
+    ...terminalActionHost,
+    shutdown() {
+      appRealtimeHost.shutdown()
+    },
+  }
 
   terminalRuntimeLogger.info({ ptyMode: ptySupervisor.getDiagnostics().mode }, 'server terminal runtime created')
 
@@ -285,10 +259,11 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   }
 
   function broadcastRepoWorkspaceTabsChanged(userId: string, repoRoot: string): void {
-    broker.broadcastToUser(userId, { type: 'workspace-tabs-changed', repoRoot })
+    broadcastWorkspacePaneTabsChanged(broker, userId, repoRoot)
   }
 
-  function handleSessionClosed(userId: string, session: TerminalSessionSummary): void {
+  function handleSessionClosed(userId: string, session: TerminalSessionSummary, reason: TerminalSessionCloseReason): void {
+    if (reason !== 'session') return
     broadcastRepoSessionsChanged(userId, session.repoRoot)
     void sessionService
       .reconcileTerminalTabsForSession(userId, session)

@@ -18,7 +18,7 @@ import type {
   WorkspacePaneTabEntry,
   WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type {
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
@@ -740,7 +740,7 @@ describe('RepoWorkspaceToolbar', () => {
     // terminal session projection is still hydrating (`preferredWorkspacePaneTab =
     // 'terminal'`, no materialized terminal tabs), the toolbar's
     // `activeTabIdentity` is null because the tab-model's selection is
-    // `terminal-host` with `tab: null`. The compact layout must still be
+    // `runtime-host` with no materialized tab. The compact layout must still be
     // used (a structural choice driven by screen size) — otherwise the
     // strip falls through to the scrollable layout, which renders fixed
     // `w-36` tabs and the busy `+ New` button. The compact body shows an
@@ -776,7 +776,7 @@ describe('RepoWorkspaceToolbar', () => {
       terminalCount: 0,
       preferredWorkspacePaneTab: 'terminal',
       navigation: navigationWith({}),
-      pendingCreate: true,
+      createPending: true,
     })
 
     const pendingView = c.querySelector('[data-workspace-pane-pending-tab="terminal"]')
@@ -786,6 +786,7 @@ describe('RepoWorkspaceToolbar', () => {
     expect(pendingView?.className).toContain('flex-1')
     expect(pendingView?.textContent).not.toContain('terminal.opening')
     expect(tab?.getAttribute('aria-busy')).toBeNull()
+    expect(tab?.getAttribute('aria-selected')).toBe('true')
     expect(c.querySelector('button[aria-label="terminal.loading"]')).toBeNull()
     expect(c.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')).not.toBeNull()
   })
@@ -795,7 +796,7 @@ describe('RepoWorkspaceToolbar', () => {
       terminalCount: 0,
       preferredWorkspacePaneTab: 'terminal',
       navigation: navigationWith({}),
-      pendingCreate: true,
+      createPending: true,
     })
 
     const pendingView = c.querySelector('[data-workspace-pane-pending-tab="terminal"]')
@@ -804,7 +805,9 @@ describe('RepoWorkspaceToolbar', () => {
     expect(pendingView).not.toBeNull()
     expect(pendingView?.textContent).not.toContain('terminal.opening')
     expect(tabs.map((tab) => tab.getAttribute('aria-label'))).toEqual(['tab.status', 'terminal.opening'])
-    expect(c.querySelector('[role="tab"][aria-label="terminal.opening"]')?.getAttribute('aria-busy')).toBeNull()
+    const pendingTab = c.querySelector('[role="tab"][aria-label="terminal.opening"]')
+    expect(pendingTab?.getAttribute('aria-busy')).toBeNull()
+    expect(pendingTab?.getAttribute('aria-selected')).toBe('true')
     const busyNewButton = c.querySelector<HTMLButtonElement>('[data-workspace-pane-new-button]')
     expect(busyNewButton).not.toBeNull()
     expect(busyNewButton?.getAttribute('aria-label')).toBe('terminal.new')
@@ -1088,7 +1091,7 @@ describe('RepoWorkspaceToolbar', () => {
     const { container: c, mocks } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({}),
-      pendingCreate: true,
+      createPending: true,
     })
 
     expect(c.querySelector('[data-workspace-pane-skeleton-chip=""]')).toBeNull()
@@ -1110,7 +1113,7 @@ describe('RepoWorkspaceToolbar', () => {
     const { container: c, mocks } = renderToolbar({
       terminalCount: 1,
       navigation: navigationWith({}),
-      pendingCreate: true,
+      createPending: true,
     })
 
     expect(c.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:t1"]')).not.toBeNull()
@@ -1165,7 +1168,7 @@ function renderToolbar(options: {
   workspacePaneTabs?: WorkspacePaneTabEntry[]
   worktree?: boolean
   collapsed?: boolean
-  pendingCreate?: boolean
+  createPending?: boolean
   trafficLightOffset?: boolean
   remote?: Partial<RepoState['remote']>
   repoInstanceId?: string
@@ -1261,7 +1264,7 @@ function renderToolbar(options: {
     count: options.terminalCount,
     bellCount: sessions.filter((session) => session.hasBell).length,
     outputActiveCount: 0,
-    pendingCreate: options.pendingCreate ?? false,
+    createPending: options.createPending ?? false,
   }
   const terminalSnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
   const readContext: TerminalSessionReadContextValue = {
@@ -1353,7 +1356,7 @@ function renderToolbar(options: {
         ? '[data-workspace-pane-tab-tooltip-id="terminal:t1"] button[role="tab"]'
         : 'button[aria-label="terminal.new"]'
   const tab = container.querySelector<HTMLButtonElement>(tabSelector)
-  if (!tab && !options.loading && !options.pendingCreate) throw new Error('missing terminal tab')
+  if (!tab && !options.loading && !options.createPending) throw new Error('missing terminal tab')
   return {
     container,
     terminalTab: tab as HTMLButtonElement,
@@ -1418,7 +1421,7 @@ function staticEntry(type: WorkspacePaneStaticTabType): WorkspacePaneTabEntry {
 }
 
 function terminalEntry(id: string): WorkspacePaneTabEntry {
-  return workspacePaneTerminalTabEntry(id)
+  return workspacePaneRuntimeTabEntry('terminal', id)
 }
 
 /**

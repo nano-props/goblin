@@ -1,40 +1,27 @@
 import { describe, expect, test, vi } from 'vitest'
-import type { ServerTerminalHost, ServerTerminalSocket } from '#/server/terminal/terminal-host.ts'
+import type { ServerAppRealtimeHost, ServerAppRealtimeSocket } from '#/server/realtime/app-realtime-host.ts'
 import { createRealtimeRoutes } from '#/server/routes/realtime.ts'
 
-function makeTerminalHost(overrides: Partial<ServerTerminalHost> = {}): ServerTerminalHost {
+function makeTerminalHost(overrides: Partial<ServerAppRealtimeHost> = {}): ServerAppRealtimeHost {
   // `isValidClientId` is a type predicate; the test override has
   // to keep the signature compatible.
   const isValidClientId = ((value: unknown): value is string => typeof value === 'string') as never
   return {
     isValidClientId,
-    isClientOnline: (_userId: string, _clientId: string): boolean => true,
     getDiagnostics: vi.fn(() => ({}) as never),
     registerSocket: vi.fn(),
     unregisterSocket: vi.fn(),
-    attach: vi.fn(async () => ({ ok: true }) as never),
-    restart: vi.fn(async () => ({ ok: true }) as never),
-    write: vi.fn(async () => ({ ok: true }) as never),
-    resize: vi.fn(async () => ({ ok: true }) as never),
-    takeover: vi.fn(async () => ({ ok: true }) as never),
-    close: vi.fn(async () => ({ ok: true }) as never),
-    listSessions: vi.fn(async () => []),
-    listWorkspaceTabs: vi.fn(async () => []),
-    create: vi.fn(async () => ({ ok: true }) as never),
-    replaceTabs: vi.fn(async () => []),
-    updateTabs: vi.fn(async () => []),
-    prune: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
     handleRealtimeMessage: vi.fn(),
     shutdown: vi.fn(),
     ...overrides,
   }
 }
 
-function acceptAll(): ServerTerminalHost['isValidClientId'] {
+function acceptAll(): ServerAppRealtimeHost['isValidClientId'] {
   return ((value: unknown): value is string => typeof value === 'string') as never
 }
 
-function acceptOnly(allowed: string): ServerTerminalHost['isValidClientId'] {
+function acceptOnly(allowed: string): ServerAppRealtimeHost['isValidClientId'] {
   return ((value: unknown): value is string => value === allowed) as never
 }
 
@@ -48,7 +35,7 @@ function acceptOnly(allowed: string): ServerTerminalHost['isValidClientId'] {
 describe('createRealtimeRoutes — auth middleware', () => {
   test('rejects /invalidation without a token', async () => {
     const host = makeTerminalHost()
-    const app = createRealtimeRoutes({ accessToken: 'secret', terminalHost: host })
+    const app = createRealtimeRoutes({ accessToken: 'secret', appRealtimeHost: host })
     const res = await app.request('http://localhost/invalidation')
     expect(res.status).toBe(401)
     const json = (await res.json()) as { ok: false; code: string; message: string }
@@ -58,31 +45,31 @@ describe('createRealtimeRoutes — auth middleware', () => {
 
   test('rejects /invalidation with a wrong token', async () => {
     const host = makeTerminalHost()
-    const app = createRealtimeRoutes({ accessToken: 'secret', terminalHost: host })
+    const app = createRealtimeRoutes({ accessToken: 'secret', appRealtimeHost: host })
     const res = await app.request('http://localhost/invalidation?t=wrong')
     expect(res.status).toBe(401)
   })
 
-  test('rejects /terminal with a wrong token', async () => {
+  test('rejects /app with a wrong token', async () => {
     const host = makeTerminalHost({ isValidClientId: acceptOnly('c1') })
-    const app = createRealtimeRoutes({ accessToken: 'secret', terminalHost: host })
-    const res = await app.request('http://localhost/terminal?t=wrong&clientId=c1')
+    const app = createRealtimeRoutes({ accessToken: 'secret', appRealtimeHost: host })
+    const res = await app.request('http://localhost/app?t=wrong&clientId=c1')
     expect(res.status).toBe(401)
   })
 
-  test('rejects /terminal with an invalid clientId', async () => {
+  test('rejects /app with an invalid clientId', async () => {
     const host = makeTerminalHost({ isValidClientId: acceptOnly('c1') })
-    const app = createRealtimeRoutes({ accessToken: 'secret', terminalHost: host })
-    const res = await app.request('http://localhost/terminal?t=secret&clientId=bad')
+    const app = createRealtimeRoutes({ accessToken: 'secret', appRealtimeHost: host })
+    const res = await app.request('http://localhost/app?t=secret&clientId=bad')
     expect(res.status).toBe(400)
     const json = (await res.json()) as { ok: false; message: string }
     expect(json.message).toBe('Invalid client id')
   })
 
-  test('rejects /terminal with a missing clientId', async () => {
+  test('rejects /app with a missing clientId', async () => {
     const host = makeTerminalHost({ isValidClientId: acceptAll() })
-    const app = createRealtimeRoutes({ accessToken: 'secret', terminalHost: host })
-    const res = await app.request('http://localhost/terminal?t=secret')
+    const app = createRealtimeRoutes({ accessToken: 'secret', appRealtimeHost: host })
+    const res = await app.request('http://localhost/app?t=secret')
     expect(res.status).toBe(400)
     const json = (await res.json()) as { ok: false; message: string }
     expect(json.message).toBe('Missing client id')
@@ -90,14 +77,14 @@ describe('createRealtimeRoutes — auth middleware', () => {
 
   test('rejects /client-intent without a token', async () => {
     const host = makeTerminalHost()
-    const app = createRealtimeRoutes({ accessToken: 'secret', terminalHost: host })
+    const app = createRealtimeRoutes({ accessToken: 'secret', appRealtimeHost: host })
     const res = await app.request('http://localhost/client-intent')
     expect(res.status).toBe(401)
   })
 
   test('rejects /client-intent with a wrong token', async () => {
     const host = makeTerminalHost()
-    const app = createRealtimeRoutes({ accessToken: 'secret', terminalHost: host })
+    const app = createRealtimeRoutes({ accessToken: 'secret', appRealtimeHost: host })
     const res = await app.request('http://localhost/client-intent?t=wrong')
     expect(res.status).toBe(401)
   })
@@ -115,7 +102,7 @@ describe('createRealtimeRoutes — terminal message forwarding', () => {
   test('host.handleRealtimeMessage is called with the raw payload', () => {
     const handle = vi.fn()
     const host = makeTerminalHost({ handleRealtimeMessage: handle })
-    const socket = {} as ServerTerminalSocket
+    const socket = {} as ServerAppRealtimeSocket
     // Method 2 adds `userId` between `clientId` and `socket`.
     // Tests verify the host receives the value the auth middleware
     // derived from the access token.

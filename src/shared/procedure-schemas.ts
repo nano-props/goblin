@@ -14,7 +14,7 @@ import {
   RemotePathSuggestionsInputSchema,
   RemoteTargetSchema,
 } from '#/shared/api-types.ts'
-import { WORKSPACE_PANE_STATIC_TAB_IDS } from '#/shared/workspace-pane.ts'
+import { WORKSPACE_PANE_RUNTIME_TAB_TYPES, WORKSPACE_PANE_STATIC_TAB_IDS } from '#/shared/workspace-pane.ts'
 import { NativeHostProjectionSchema } from '#/shared/native-host-projection.ts'
 import { RepoTreePrefixSchema } from '#/shared/repo-tree-schema.ts'
 import { GIT_HASH_RE } from '#/shared/git-types.ts'
@@ -197,9 +197,9 @@ const WorkspacePaneStaticTabEntrySchema = v.variant('type', [
   v.object({ type: v.literal('history'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.history) }),
   v.object({ type: v.literal('files'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.files) }),
 ])
-const WorkspacePaneTerminalTabEntrySchema = v.object({
-  type: v.literal('terminal'),
-  terminalSessionId: v.pipe(v.string(), v.minLength(1)),
+const WorkspacePaneRuntimeTabEntrySchema = v.object({
+  type: v.picklist(WORKSPACE_PANE_RUNTIME_TAB_TYPES),
+  runtimeSessionId: v.pipe(v.string(), v.minLength(1)),
 })
 const FiletreeSessionViewStateSchema = v.object({
   selectedKeys: v.array(v.string()),
@@ -218,7 +218,7 @@ const WorkspaceSessionStateSchema = v.object({
   ),
   workspacePaneTabsByTargetByRepo: v.record(
     v.string(),
-    v.record(v.string(), v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneTerminalTabEntrySchema]))),
+    v.record(v.string(), v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneRuntimeTabEntrySchema]))),
   ),
   filetreeViewStateByWorktreeByRepo: v.record(v.string(), v.record(v.string(), FiletreeSessionViewStateSchema)),
 })

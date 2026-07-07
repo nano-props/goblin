@@ -2,31 +2,18 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { disconnectAllClientIntentSockets, registerClientIntentSocket } from '#/server/modules/client-intent-broker.ts'
 import { createRepoViewRoutes } from '#/server/routes/repo-view.ts'
 import { createApp } from '#/server/app-factory.ts'
-import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
+import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
 
-// Minimal terminal host stub for the auth-integration `createApp()`
+// Minimal app realtime host stub for the auth-integration `createApp()`
 // tests. Mirrors the one in `app-factory.test.ts`; a future refactor
 // could extract it into a shared test helper if more test files need
 // the same shape.
-function makeTerminalHost(): ServerTerminalHost {
+function makeAppRealtimeHost(): ServerAppRealtimeHost {
   return {
     isValidClientId: ((value: unknown): value is string => typeof value === 'string') as never,
-    isClientOnline: ((_userId: string, _clientId: string): boolean => true) as never,
     getDiagnostics: vi.fn(() => ({}) as never),
     registerSocket: vi.fn(),
     unregisterSocket: vi.fn(),
-    attach: vi.fn(async () => ({ ok: true }) as never),
-    restart: vi.fn(async () => ({ ok: true }) as never),
-    write: vi.fn(async () => ({ ok: true }) as never),
-    resize: vi.fn(async () => ({ ok: true }) as never),
-    takeover: vi.fn(async () => ({ ok: true }) as never),
-    close: vi.fn(async () => ({ ok: true }) as never),
-    listSessions: vi.fn(async () => []),
-    listWorkspaceTabs: vi.fn(async () => []),
-    create: vi.fn(async () => ({ ok: true }) as never),
-    replaceTabs: vi.fn(async () => []),
-    updateTabs: vi.fn(async () => []),
-    prune: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
     handleRealtimeMessage: vi.fn(),
     shutdown: vi.fn(),
   }
@@ -136,7 +123,7 @@ describe('POST /api/repo/view — auth integration via createApp()', () => {
       version: '0.1.0',
       startedAt: 0,
       accessToken: 'secret',
-      terminalHost: makeTerminalHost(),
+      appRealtimeHost: makeAppRealtimeHost(),
     })
     const res = await app.request(
       new Request('http://127.0.0.1:32100/api/repo/view', {
@@ -158,7 +145,7 @@ describe('POST /api/repo/view — auth integration via createApp()', () => {
       version: '0.1.0',
       startedAt: 0,
       accessToken: 'secret',
-      terminalHost: makeTerminalHost(),
+      appRealtimeHost: makeAppRealtimeHost(),
     })
     const res = await app.request(
       new Request('http://127.0.0.1:32100/api/repo/view', {

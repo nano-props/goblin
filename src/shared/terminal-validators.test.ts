@@ -13,6 +13,14 @@ import {
   terminalUtf8ByteLength,
   TERMINAL_WS_MESSAGE_LIMIT_BYTES,
 } from '#/shared/terminal-validators.ts'
+import {
+  WORKSPACE_PANE_TABS_REALTIME_EVENTS,
+  WORKSPACE_PANE_TABS_SOCKET_ACTIONS,
+} from '#/shared/workspace-pane-tabs.ts'
+import {
+  normalizeAppRealtimeClientMessage,
+  normalizeAppRealtimeSocketServerMessage,
+} from '#/shared/app-realtime-validators.ts'
 
 describe('shared terminal validators', () => {
   test('normalizes terminal sizes within supported bounds', () => {
@@ -63,7 +71,7 @@ describe('shared terminal validators', () => {
 
   test('normalizes valid terminal client messages', () => {
     expect(
-      normalizeTerminalClientMessage({
+      normalizeAppRealtimeClientMessage({
         type: 'request',
         requestId: 'req_1',
         action: 'attach',
@@ -76,13 +84,13 @@ describe('shared terminal validators', () => {
       input: { terminalRuntimeSessionId: 'pty_1234567890abcdef', cols: 80, rows: 24, clientId: 'client_a' },
     })
 
-    expect(normalizeTerminalClientMessage({ type: 'ping', requestId: 'health_1' })).toEqual({
+    expect(normalizeAppRealtimeClientMessage({ type: 'ping', requestId: 'health_1' })).toEqual({
       type: 'ping',
       requestId: 'health_1',
     })
 
     expect(
-      normalizeTerminalClientMessage({
+      normalizeAppRealtimeClientMessage({
         type: 'request',
         requestId: 'bad id',
         action: 'attach',
@@ -93,7 +101,7 @@ describe('shared terminal validators', () => {
 
   test('rejects NUL bytes in terminal write data', () => {
     expect(
-      normalizeTerminalClientMessage({
+      normalizeAppRealtimeClientMessage({
         type: 'request',
         requestId: 'request_123',
         action: 'write',
@@ -107,10 +115,25 @@ describe('shared terminal validators', () => {
 
   test('rejects empty terminal ids in workspace tab replacement requests', () => {
     expect(
-      normalizeTerminalClientMessage({
+      normalizeAppRealtimeClientMessage({
+        type: 'request',
+        requestId: 'request_runtime_session_id',
+        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
+        input: {
+          repoRoot: '/repo',
+          repoInstanceId: 'repo-instance-test',
+          branchName: 'main',
+          worktreePath: '/repo',
+          tabs: [{ type: 'terminal', runtimeSessionId: 'session-1' }],
+        },
+      }),
+    ).toMatchObject({ type: 'request', action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace })
+
+    expect(
+      normalizeAppRealtimeClientMessage({
         type: 'request',
         requestId: 'request_123',
-        action: 'replace-tabs',
+        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
         input: {
           repoRoot: '/repo',
           repoInstanceId: 'repo-instance-test',
@@ -120,13 +143,43 @@ describe('shared terminal validators', () => {
         },
       }),
     ).toBeNull()
+
+    expect(
+      normalizeAppRealtimeClientMessage({
+        type: 'request',
+        requestId: 'request_123',
+        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
+        input: {
+          repoRoot: '/repo',
+          repoInstanceId: 'repo-instance-test',
+          branchName: 'main',
+          worktreePath: '/repo',
+          tabs: [{ type: 'terminal', runtimeSessionId: '' }],
+        },
+      }),
+    ).toBeNull()
   })
 
   test('accepts workspace tab operation requests and rejects invalid identities', () => {
     expect(
-      normalizeTerminalClientMessage({
+      normalizeAppRealtimeClientMessage({
         type: 'request',
         requestId: 'request_123',
+        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
+        input: {
+          repoRoot: '/repo',
+          repoInstanceId: 'repo-instance-test',
+          branchName: 'main',
+          worktreePath: '/repo',
+          operation: { type: 'open-static', tabType: 'history' },
+        },
+      }),
+    ).toMatchObject({ type: 'request', action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update })
+
+    expect(
+      normalizeAppRealtimeClientMessage({
+        type: 'request',
+        requestId: 'request_legacy_tabs',
         action: 'update-tabs',
         input: {
           repoRoot: '/repo',
@@ -136,13 +189,13 @@ describe('shared terminal validators', () => {
           operation: { type: 'open-static', tabType: 'history' },
         },
       }),
-    ).toMatchObject({ type: 'request', action: 'update-tabs' })
+    ).toBeNull()
 
     expect(
       normalizeTerminalClientMessage({
         type: 'request',
         requestId: 'request_124',
-        action: 'update-tabs',
+        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
         input: {
           repoRoot: '/repo',
           repoInstanceId: 'repo-instance-test',
@@ -241,7 +294,7 @@ describe('shared terminal validators', () => {
 
   test('normalizes valid terminal socket server messages', () => {
     expect(
-      normalizeTerminalSocketServerMessage({
+      normalizeAppRealtimeSocketServerMessage({
         type: 'output',
         event: {
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
@@ -264,24 +317,40 @@ describe('shared terminal validators', () => {
       },
     })
 
-    expect(normalizeTerminalSocketServerMessage({ type: 'pong', requestId: 'health_1' })).toEqual({
+    expect(normalizeAppRealtimeSocketServerMessage({ type: 'pong', requestId: 'health_1' })).toEqual({
       type: 'pong',
       requestId: 'health_1',
     })
 
     expect(
-      normalizeTerminalSocketServerMessage({
+      normalizeAppRealtimeSocketServerMessage({
         type: 'response',
         requestId: 'req_1',
         ok: false,
         action: 'attach',
       }),
     ).toBeNull()
+
+    expect(
+      normalizeAppRealtimeSocketServerMessage({
+        type: 'response',
+        requestId: 'req_workspace_tabs',
+        ok: true,
+        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+        payload: [],
+      }),
+    ).toMatchObject({
+      type: 'response',
+      requestId: 'req_workspace_tabs',
+      ok: true,
+      action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+      payload: [],
+    })
   })
 
   test('validates terminal socket success response payloads by action', () => {
     expect(
-      normalizeTerminalSocketServerMessage({
+      normalizeAppRealtimeSocketServerMessage({
         type: 'response',
         requestId: 'req_1',
         ok: true,
@@ -308,7 +377,7 @@ describe('shared terminal validators', () => {
     })
 
     expect(
-      normalizeTerminalSocketServerMessage({
+      normalizeAppRealtimeSocketServerMessage({
         type: 'response',
         requestId: 'req_1',
         ok: true,
@@ -336,7 +405,7 @@ describe('shared terminal validators', () => {
     })
 
     expect(
-      normalizeTerminalSocketServerMessage({
+      normalizeAppRealtimeSocketServerMessage({
         type: 'response',
         requestId: 'req_1',
         ok: true,
@@ -388,13 +457,20 @@ describe('shared terminal validators', () => {
 
   test('normalizes workspace tabs changed realtime messages', () => {
     expect(
-      normalizeTerminalSocketServerMessage({
-        type: 'workspace-tabs-changed',
+      normalizeAppRealtimeSocketServerMessage({
+        type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
         repoRoot: '/repo',
       }),
     ).toEqual({
-      type: 'workspace-tabs-changed',
+      type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
       repoRoot: '/repo',
     })
+
+    expect(
+      normalizeAppRealtimeSocketServerMessage({
+        type: 'workspace-tabs-changed',
+        repoRoot: '/repo',
+      }),
+    ).toBeNull()
   })
 })

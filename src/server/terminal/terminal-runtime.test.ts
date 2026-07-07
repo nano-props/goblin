@@ -20,6 +20,10 @@ import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.
 import { HEARTBEAT_DEADLINE_MS, HEARTBEAT_INTERVAL_MS } from '#/server/terminal/terminal-realtime-broker.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
+import {
+  WORKSPACE_PANE_TABS_REALTIME_EVENTS,
+  WORKSPACE_PANE_TABS_SOCKET_ACTIONS,
+} from '#/shared/workspace-pane-tabs.ts'
 
 // Under method 2 the host threads `userId` (derived from the
 // access token) alongside `clientId` (per-tab routing). Tests use
@@ -156,6 +160,35 @@ function sentSocketMessages(socket: {
   send: ReturnType<typeof vi.fn>
 }): Array<{ type?: string; [key: string]: unknown }> {
   return socket.send.mock.calls.map(([payload]) => JSON.parse(String(payload)))
+}
+
+async function requestWorkspacePaneTabs(
+  host: ServerTerminalHost,
+  socket: { send: ReturnType<typeof vi.fn>; close?: ReturnType<typeof vi.fn> },
+  action: (typeof WORKSPACE_PANE_TABS_SOCKET_ACTIONS)[keyof typeof WORKSPACE_PANE_TABS_SOCKET_ACTIONS],
+  input: unknown,
+  requestId: string,
+): Promise<unknown> {
+  host.handleRealtimeMessage(
+    'client_a',
+    USER_1,
+    socket as Parameters<ServerTerminalHost['handleRealtimeMessage']>[2],
+    JSON.stringify({
+      type: 'request',
+      requestId,
+      action,
+      input,
+    }),
+  )
+  await vi.waitFor(() => {
+    expect(sentSocketMessages(socket).some((message) => message.type === 'response' && message.requestId === requestId))
+      .toBe(true)
+  })
+  const response = sentSocketMessages(socket).find(
+    (message) => message.type === 'response' && message.requestId === requestId,
+  )
+  expect(response).toMatchObject({ type: 'response', ok: true, action })
+  return response?.payload
 }
 
 async function createTerminalSession(host: ServerTerminalHost, clientId: string, userId = USER_1): Promise<string> {
@@ -524,7 +557,7 @@ describe('server terminal runtime', () => {
       type: 'exit',
       event: { terminalRuntimeSessionId, terminalSessionId: expect.any(String) },
     })
-    expect(host.getDiagnostics().pty.state).toBe('idle')
+    expect(host.getDiagnostics().terminal.pty.state).toBe('idle')
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
@@ -585,17 +618,25 @@ describe('server terminal runtime', () => {
     })
     expect(created.ok).toBe(true)
     if (!created.ok) return
-    expect(created.tabs).toContainEqual({ type: 'terminal', terminalSessionId: created.terminalSessionId })
+    expect(created.tabs).toContainEqual({ type: 'terminal', runtimeSessionId: created.terminalSessionId })
     socket.send.mockClear()
 
     mockPtys[0]?.emitExit()
 
     await vi.waitFor(() => {
-      expect(sentSocketMessages(socket).some((message) => message.type === 'workspace-tabs-changed')).toBe(true)
+      expect(
+        sentSocketMessages(socket).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+      ).toBe(true)
     })
     expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
     await expect(
-      host.listWorkspaceTabs('client_a', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID }),
+      requestWorkspacePaneTabs(
+        host,
+        socket,
+        WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+        { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
+        'req_list_after_exit',
+      ),
     ).resolves.toEqual([
       {
         repoRoot: REPO_ROOT,
@@ -633,11 +674,19 @@ describe('server terminal runtime', () => {
     ).resolves.toEqual({ pruned: 1, remaining: 0 })
 
     await vi.waitFor(() => {
-      expect(sentSocketMessages(socket).some((message) => message.type === 'workspace-tabs-changed')).toBe(true)
+      expect(
+        sentSocketMessages(socket).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+      ).toBe(true)
     })
     expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
     await expect(
-      host.listWorkspaceTabs('client_a', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID }),
+      requestWorkspacePaneTabs(
+        host,
+        socket,
+        WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+        { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
+        'req_list_after_prune',
+      ),
     ).resolves.toEqual([
       {
         repoRoot: REPO_ROOT,
@@ -651,7 +700,7 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('realtime list-workspace-tabs materializes missing terminal tabs and broadcasts invalidation', async () => {
+  test('realtime workspace pane tabs replace materializes missing terminal tabs and list returns canonical tabs', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
@@ -668,14 +717,28 @@ describe('server terminal runtime', () => {
     expect(created.ok).toBe(true)
     if (!created.ok) return
     await expect(
-      host.replaceTabs('client_a', USER_1, {
+      requestWorkspacePaneTabs(
+        host,
+        socket,
+        WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
+        {
         repoRoot: REPO_ROOT,
         repoInstanceId: REPO_INSTANCE_ID,
         branchName: 'feature',
         worktreePath: '/repo-linked',
         tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
-      }),
-    ).resolves.toEqual([{ type: 'status', tabId: 'workspace-pane:status' }])
+        },
+        'req_replace_workspace_tabs',
+      ),
+    ).resolves.toEqual([
+      { type: 'status', tabId: 'workspace-pane:status' },
+      { type: 'terminal', runtimeSessionId: created.terminalSessionId },
+    ])
+    await vi.waitFor(() => {
+      expect(
+        sentSocketMessages(socket).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+      ).toBe(true)
+    })
     socket.send.mockClear()
 
     host.handleRealtimeMessage(
@@ -685,14 +748,13 @@ describe('server terminal runtime', () => {
       JSON.stringify({
         type: 'request',
         requestId: 'req_list_workspace_tabs',
-        action: 'list-workspace-tabs',
+        action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
         input: { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
       }),
     )
 
     await vi.waitFor(() => {
       const messages = sentSocketMessages(socket)
-      expect(messages.some((message) => message.type === 'workspace-tabs-changed')).toBe(true)
       expect(
         messages.some((message) => message.type === 'response' && message.requestId === 'req_list_workspace_tabs'),
       ).toBe(true)
@@ -703,7 +765,7 @@ describe('server terminal runtime', () => {
     expect(response).toMatchObject({
       type: 'response',
       ok: true,
-      action: 'list-workspace-tabs',
+      action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
       payload: [
         {
           repoRoot: REPO_ROOT,
@@ -711,7 +773,7 @@ describe('server terminal runtime', () => {
           worktreePath: '/repo-linked',
           tabs: [
             { type: 'status', tabId: 'workspace-pane:status' },
-            { type: 'terminal', terminalSessionId: created.terminalSessionId },
+            { type: 'terminal', runtimeSessionId: created.terminalSessionId },
           ],
         },
       ],
@@ -732,7 +794,7 @@ describe('server terminal runtime', () => {
 
     mockPtys[0]?.emitData('hello')
 
-    expect(host.getDiagnostics().registeredSockets).toBe(0)
+    expect(host.getDiagnostics().terminal.registeredSockets).toBe(0)
     expect(isClientOnline('client_a')).toBe(false)
     shutdown()
   })
@@ -807,28 +869,49 @@ describe('server terminal runtime', () => {
     })
     expect(first.ok).toBe(true)
     if (!first.ok) return
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_a', USER_1, socket)
     await expect(
-      host.updateTabs('client_a', USER_1, {
-        repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
-        branchName: 'feature',
-        worktreePath: '/repo-linked',
-        operation: { type: 'open-static', tabType: 'history' },
-      }),
+      requestWorkspacePaneTabs(
+        host,
+        socket,
+        WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
+        {
+          repoRoot: REPO_ROOT,
+          repoInstanceId: REPO_INSTANCE_ID,
+          branchName: 'feature',
+          worktreePath: '/repo-linked',
+          operation: { type: 'open-static', tabType: 'history' },
+        },
+        'req_update_before_repo_close',
+      ),
     ).resolves.toEqual([
       { type: 'status', tabId: 'workspace-pane:status' },
-      { type: 'terminal', terminalSessionId: first.terminalSessionId },
+      { type: 'terminal', runtimeSessionId: first.terminalSessionId },
       { type: 'history', tabId: 'workspace-pane:history' },
     ])
+    socket.send.mockClear()
 
     expect(closeRepoRuntimeInstance(USER_1, REPO_ROOT, REPO_INSTANCE_ID)).toBe(true)
+    await vi.waitFor(() => {
+      expect(
+        sentSocketMessages(socket).filter((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+      ).toHaveLength(1)
+    })
+    expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
     const nextRepoInstanceId = openRepoRuntimeInstance(USER_1, REPO_ROOT)
 
     await expect(
       host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: nextRepoInstanceId }),
     ).resolves.toEqual([])
     await expect(
-      host.listWorkspaceTabs('client_a', USER_1, { repoRoot: REPO_ROOT, repoInstanceId: nextRepoInstanceId }),
+      requestWorkspacePaneTabs(
+        host,
+        socket,
+        WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+        { repoRoot: REPO_ROOT, repoInstanceId: nextRepoInstanceId },
+        'req_list_after_repo_reopen',
+      ),
     ).resolves.toEqual([])
 
     const second = await host.create('client_a', USER_1, {
@@ -845,6 +928,7 @@ describe('server terminal runtime', () => {
     expect(second.action).toBe('created')
     expect(second.terminalSessionId).not.toBe(first.terminalSessionId)
 
+    host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
   })
 
@@ -1492,6 +1576,16 @@ describe('server terminal runtime', () => {
 
     const socket2 = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_b', USER_1, socket2)
+    await expect(
+      requestWorkspacePaneTabs(
+        host,
+        socket2,
+        WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+        { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
+        'req_list_after_detached_ttl',
+      ),
+    ).resolves.toEqual([])
+
     const recreatedSessionId = await createTerminalSession(host, 'client_1')
     const replacementAttach = await host.attach('client_a', USER_1, {
       terminalRuntimeSessionId: recreatedSessionId,
@@ -1754,9 +1848,9 @@ describe('server terminal runtime', () => {
 
   test('exposes a closing-state supervisor after shutdown', async () => {
     const { host, shutdown } = buildRuntime()
-    expect(host.getDiagnostics().shuttingDown).toBe(false)
+    expect(host.getDiagnostics().terminal.shuttingDown).toBe(false)
     shutdown()
-    expect(host.getDiagnostics().shuttingDown).toBe(true)
+    expect(host.getDiagnostics().terminal.shuttingDown).toBe(true)
   })
 
   test('shutdown does not leave detached-user timers after closing registered sockets', () => {
@@ -1811,7 +1905,7 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     try {
       // Empty runtime: no sessions, no buffers.
-      let stats = host.getDiagnostics()
+      let stats = host.getDiagnostics().terminal
       expect(stats.liveSessionCount).toBe(0)
       expect(stats.totalRingBufferChars).toBe(0)
       expect(stats.maxRingBufferChars).toBe(0)
@@ -1819,7 +1913,7 @@ describe('server terminal runtime', () => {
       // Create two sessions; their buffers start empty.
       const sessionA = await createTerminalSession(host, 'client_1')
       const sessionB = await createTerminalSession(host, 'client_1')
-      stats = host.getDiagnostics()
+      stats = host.getDiagnostics().terminal
       expect(stats.liveSessionCount).toBe(2)
       expect(stats.totalRingBufferChars).toBe(0)
       expect(stats.maxRingBufferChars).toBe(0)
@@ -1829,7 +1923,7 @@ describe('server terminal runtime', () => {
       // appends to the per-session render buffer, which is what
       // the new diagnostic fields measure.
       mockPtys[0]?.emitData('aaaaa')
-      stats = host.getDiagnostics()
+      stats = host.getDiagnostics().terminal
       expect(stats.liveSessionCount).toBe(2)
       expect(stats.totalRingBufferChars).toBe(5)
       expect(stats.maxRingBufferChars).toBe(5)
@@ -1837,7 +1931,7 @@ describe('server terminal runtime', () => {
       // Emit more data into the second session. The max should
       // track the larger of the two; the total should sum both.
       mockPtys[1]?.emitData('bbbbbbbbbb')
-      stats = host.getDiagnostics()
+      stats = host.getDiagnostics().terminal
       expect(stats.liveSessionCount).toBe(2)
       expect(stats.totalRingBufferChars).toBe(15)
       expect(stats.maxRingBufferChars).toBe(10)
@@ -2029,13 +2123,13 @@ describe('server terminal runtime', () => {
       await createTerminalSession(host, 'client_half_open')
 
       vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
-      expect(host.getDiagnostics().registeredSockets).toBe(0)
+      expect(host.getDiagnostics().terminal.registeredSockets).toBe(0)
       expect(handle.isClientOnline('client_half_open')).toBe(false)
 
       await vi.advanceTimersByTimeAsync(DETACHED_TTL_MS + 1)
       await vi.runOnlyPendingTimersAsync()
 
-      expect(host.getDiagnostics().liveSessionCount).toBe(0)
+      expect(host.getDiagnostics().terminal.liveSessionCount).toBe(0)
       await expect(
         host.listSessions('client_half_open', USER_1, { repoRoot: '/repo', repoInstanceId: REPO_INSTANCE_ID }),
       ).resolves.toEqual([])
@@ -2065,7 +2159,7 @@ describe('server terminal runtime', () => {
       await vi.advanceTimersByTimeAsync(1_001)
       await vi.runOnlyPendingTimersAsync()
 
-      expect(host.getDiagnostics().liveSessionCount).toBe(0)
+      expect(host.getDiagnostics().terminal.liveSessionCount).toBe(0)
       await expect(
         host.listSessions('client_late_drain', USER_1, { repoRoot: '/repo', repoInstanceId: REPO_INSTANCE_ID }),
       ).resolves.toEqual([])

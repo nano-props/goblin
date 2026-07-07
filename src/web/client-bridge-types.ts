@@ -10,24 +10,27 @@ import type {
   TerminalCreateInput,
   TerminalExitEvent,
   TerminalListSessionsInput,
-  TerminalListWorkspaceTabsInput,
   TerminalMutationResult,
   TerminalNotifyBellInput,
   TerminalOutputEvent,
   TerminalResizeInput,
-  TerminalReplaceWorkspaceTabsInput,
   TerminalRestartInput,
   TerminalSessionSummary,
   TerminalSessionInput,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
   TerminalTestNotificationInput,
-  TerminalUpdateWorkspaceTabsInput,
-  WorkspacePaneTabsEntry,
   TerminalTitleEvent,
   TerminalWriteInput,
+  TerminalSessionsRecoveryResult,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import type {
+  WorkspacePaneTabsEntry,
+  WorkspacePaneTabsListInput,
+  WorkspacePaneTabsReplaceInput,
+  WorkspacePaneTabsUpdateInput,
+} from '#/shared/workspace-pane-tabs.ts'
 import type { TerminalIdentityRealtimeEvent, TerminalLifecycleRealtimeEvent } from '#/web/components/terminal/types.ts'
 
 export interface ClientTerminal {
@@ -38,32 +41,9 @@ export interface ClientTerminal {
   takeover: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>
   close: (input: TerminalSessionInput) => Promise<TerminalMutationResult>
   create: (input: TerminalCreateInput) => Promise<TerminalCreateResult>
-  replaceWorkspaceTabs: (input: TerminalReplaceWorkspaceTabsInput) => Promise<WorkspacePaneTabEntry[]>
-  updateWorkspaceTabs: (input: TerminalUpdateWorkspaceTabsInput) => Promise<WorkspacePaneTabEntry[]>
   pruneTerminals: (repoRoot: string, repoInstanceId: string) => Promise<{ pruned: number; remaining: number }>
   listSessions: (input: TerminalListSessionsInput) => Promise<TerminalSessionSummary[]>
-  listWorkspaceTabs: (input: TerminalListWorkspaceTabsInput) => Promise<WorkspacePaneTabsEntry[]>
-  /**
-   * Open the underlying WebSocket (if not already open) and resolve
-   * once it reaches the OPEN state. Used as a T1.2 prewarm when the
-   * user enters a repo so they pay the DNS+TCP+TLS+WS handshake
-   * before clicking a terminal view. Idempotent (already-open socket
-   * resolves immediately) and best-effort (failures are swallowed;
-   * the next real `listSessions`/`attach` will open or reuse a valid
-   * connection and surface a real error if the server is unreachable).
-   * No parameters: the client maintains a single shared socket, not
-   * per-repo sockets.
-   */
-  prewarm: () => Promise<void>
-  /**
-   * T5.1: force-reconnect if the socket is in a non-OPEN state.
-   * Used as a recovery hook on `visibilitychange:visible` and
-   * `pageshow` (bfcache) so a backgrounded mobile tab reconnects
-   * without waiting for the 300ms backoff. OPEN sockets are probed
-   * with protocol-level ping/pong and only reconnected if the probe
-   * fails or times out.
-   */
-  kickReconnect: () => void
+  recoverSessions: (input: TerminalListSessionsInput) => Promise<TerminalSessionsRecoveryResult>
   notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
   sendTestNotification: (input: TerminalTestNotificationInput) => Promise<boolean>
   setBadge: (count: number) => void
@@ -74,7 +54,6 @@ export interface ClientTerminal {
   onIdentity: (cb: (event: TerminalIdentityRealtimeEvent) => void) => () => void
   onLifecycle: (cb: (event: TerminalLifecycleRealtimeEvent) => void) => () => void
   onSessionsChanged: (cb: (repoRoot: string) => void) => () => void
-  onWorkspaceTabsChanged: (cb: (repoRoot: string) => void) => () => void
   /**
    * Subscribe to per-session close broadcasts from the server. Emitted
    * after a successful `close` IPC alongside the broader
@@ -92,6 +71,22 @@ export interface ClientTerminal {
       worktreePath: string
     }) => void,
   ) => () => void
+}
+
+export interface ClientWorkspacePaneTabs {
+  list: (input: WorkspacePaneTabsListInput) => Promise<WorkspacePaneTabsEntry[]>
+  replace: (input: WorkspacePaneTabsReplaceInput) => Promise<WorkspacePaneTabEntry[]>
+  update: (input: WorkspacePaneTabsUpdateInput) => Promise<WorkspacePaneTabEntry[]>
+  onChanged: (cb: (repoRoot: string) => void) => () => void
+}
+
+export interface ClientAppRealtimeLifecycle {
+  /**
+   * Force/probe reconnect for the shared app realtime WebSocket. Used by the
+   * app runtime projection owner on browser visibility recovery.
+   */
+  kickReconnect: () => void
+  onRecovered: (cb: (clientId: string) => void) => () => void
 }
 
 export interface ClientHostBridge {
@@ -130,5 +125,7 @@ export interface ClientBridge {
    */
   rotateAccessToken?(): Promise<{ accessToken: string }>
   host(): ClientHostBridge | null
+  appRealtime(): ClientAppRealtimeLifecycle
   terminal(): ClientTerminal
+  workspacePaneTabs(): ClientWorkspacePaneTabs
 }

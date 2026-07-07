@@ -1,8 +1,12 @@
 import { getBackgroundSyncDiagnostics } from '#/server/modules/background-sync.ts'
-import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
+import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
 import { createRouteApp } from '#/server/common/http-validate.ts'
 
-export function createHealthRoutes(options: { version: string; startedAt: number; terminalHost: ServerTerminalHost }) {
+export function createHealthRoutes(options: {
+  version: string
+  startedAt: number
+  appRealtimeHost: ServerAppRealtimeHost
+}) {
   const app = createRouteApp()
   const payload = {
     ok: true,
@@ -21,7 +25,7 @@ export function createHealthRoutes(options: { version: string; startedAt: number
   app.get('/health/terminal', async (c) =>
     c.json({
       ...payload,
-      terminal: await options.terminalHost.getDiagnostics(),
+      terminal: (await options.appRealtimeHost.getDiagnostics()).terminal,
     }),
   )
   return app

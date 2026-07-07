@@ -39,23 +39,22 @@ import {
 import { useFocusRegistry, type FocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useSortableTab } from '#/web/components/tab-strip/useSortableTab.ts'
 import {
-  terminalWorkspacePaneTabProvider,
+  workspacePaneRuntimeTabProvider,
   workspacePaneStaticTabProvider,
 } from '#/web/components/workspace-pane/tab-providers.ts'
 import {
+  type WorkspacePaneRuntimeTabItem,
   type WorkspacePaneStaticTabItem,
   type WorkspacePaneTabItem,
-  type WorkspacePaneTerminalTabItem,
   isPendingWorkspacePaneTabItem,
+  isRuntimeWorkspacePaneTabItem,
   isStaticWorkspacePaneTabItem,
-  isTerminalWorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { WorkspacePaneTabTitle } from '#/web/components/workspace-pane/WorkspacePaneTabTitle.tsx'
 
 type WorkspacePaneT = (key: string, params?: Record<string, string | number>) => string
 
 interface WorkspacePaneTabStripProps {
-  terminalWorktreeKey: string | null
   workspacePaneTabTargetKey: string
   items: WorkspacePaneTabItem[]
   workspacePaneId: string
@@ -64,15 +63,19 @@ interface WorkspacePaneTabStripProps {
   panelActive?: boolean
   focusRegistry?: FocusRegistry<string, HTMLButtonElement>
   emptyFocusKey?: string
-  /** Render the New Terminal affordance in a busy state. */
-  newTerminalBusy?: boolean
-  onNew: () => void
+  createAction?: WorkspacePaneTabCreateAction | null
   onSelect: (item: WorkspacePaneTabItem) => void
-  onScrollToBottom: (key: string) => void
+  onReselect: (item: WorkspacePaneTabItem) => void
   onClose: (item: WorkspacePaneTabItem) => void
   onReorder: (tabs: WorkspacePaneTabEntry[]) => void
   onNavigateOut?: (direction: 'prev' | 'next' | 'first' | 'last') => void
   activateKeyboardNavigationSelection?: boolean
+}
+
+export interface WorkspacePaneTabCreateAction {
+  label: string
+  busy?: boolean
+  onCreate: () => void
 }
 
 export const EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY = '__workspace-pane-empty__'
@@ -288,29 +291,37 @@ function workspacePaneTabScrollTarget(tab: HTMLButtonElement): HTMLElement {
   return tab.closest<HTMLElement>(WORKSPACE_PANE_TAB_SCROLL_TARGET_SELECTOR) ?? tab
 }
 
-function useDeferredWorkspacePaneTabFocus({
+function useDeferredActiveWorkspacePaneTabFocusAfterClose({
+  activeTabIdentity,
   items,
   focusRegistry,
 }: {
+  activeTabIdentity: string | null
   items: readonly WorkspacePaneTabItem[]
   focusRegistry: FocusRegistry<string, HTMLButtonElement>
 }) {
-  const pendingFocusIdentityRef = useRef<string | null>(null)
+  const closingActiveIdentityRef = useRef<string | null>(null)
   const [focusRequestVersion, setFocusRequestVersion] = useState(0)
 
   useLayoutEffect(() => {
-    const pendingFocusIdentity = pendingFocusIdentityRef.current
-    if (!pendingFocusIdentity) return
-    if (!items.some((item) => item.identity === pendingFocusIdentity)) {
-      pendingFocusIdentityRef.current = null
+    const closingIdentity = closingActiveIdentityRef.current
+    if (!closingIdentity) return
+    if (activeTabIdentity === closingIdentity) return
+    if (!activeTabIdentity) {
+      if (!items.some((item) => item.identity === closingIdentity)) closingActiveIdentityRef.current = null
       return
     }
-    focusRegistry.focus(pendingFocusIdentity, { preventScroll: true })
-    pendingFocusIdentityRef.current = null
-  }, [focusRegistry, focusRequestVersion, items])
+    const activeItem = items.find((item) => item.identity === activeTabIdentity)
+    if (!activeItem || isPendingWorkspacePaneTabItem(activeItem)) {
+      if (!items.some((item) => item.identity === closingIdentity)) closingActiveIdentityRef.current = null
+      return
+    }
+    focusRegistry.focus(activeTabIdentity, { preventScroll: true })
+    closingActiveIdentityRef.current = null
+  }, [activeTabIdentity, focusRegistry, focusRequestVersion, items])
 
-  return useCallback((identity: string) => {
-    pendingFocusIdentityRef.current = identity
+  return useCallback((closingIdentity: string) => {
+    closingActiveIdentityRef.current = closingIdentity
     setFocusRequestVersion((version) => version + 1)
   }, [])
 }
@@ -320,7 +331,7 @@ function useWorkspacePaneTabDnd({
   newButtonRef,
   onReorder,
 }: {
-  sortableItems: readonly (WorkspacePaneStaticTabItem | WorkspacePaneTerminalTabItem)[]
+  sortableItems: readonly (WorkspacePaneStaticTabItem | WorkspacePaneRuntimeTabItem)[]
   newButtonRef: RefObject<HTMLButtonElement | null>
   onReorder: (tabs: WorkspacePaneTabEntry[]) => void
 }) {
@@ -372,10 +383,7 @@ interface WorkspacePaneTabSwitcherPopoverProps {
   items: WorkspacePaneTabItem[]
   activeTabIdentity: string | null
   label: string
-  newLabel: string
-  canCreateNew: boolean
-  newTerminalBusy: boolean
-  onNew: () => void
+  createAction: WorkspacePaneTabCreateAction | null
   onSelect: (identity: string) => void
   onClose: (event: React.MouseEvent, identity: string) => void
   t: WorkspacePaneT
@@ -385,10 +393,7 @@ function WorkspacePaneTabSwitcherPopover({
   items,
   activeTabIdentity,
   label,
-  newLabel,
-  canCreateNew,
-  newTerminalBusy,
-  onNew,
+  createAction,
   onSelect,
   onClose,
   t,
@@ -402,8 +407,9 @@ function WorkspacePaneTabSwitcherPopover({
   }
 
   const selectNew = () => {
+    if (!createAction || createAction.busy) return
     setOpen(false)
-    onNew()
+    createAction.onCreate()
   }
 
   return (
@@ -448,10 +454,10 @@ function WorkspacePaneTabSwitcherPopover({
                       {selected ? <Check size={13} aria-hidden /> : <WorkspacePaneTabIcon item={item} active={false} />}
                     </span>
                     <span className="min-w-0 flex-1 truncate">{item.label || item.tooltip}</span>
-                    {isTerminalWorkspacePaneTabItem(item) && item.view.hasBell && (
+                    {isRuntimeWorkspacePaneTabItem(item) && item.attention && (
                       <>
                         <span className="h-2 w-2 shrink-0 rounded-full bg-notification" aria-hidden="true" />
-                        <span className="sr-only">{t('terminal.bell-unread')}</span>
+                        <span className="sr-only">{runtimeAttentionLabel(item, t)}</span>
                       </>
                     )}
                   </button>
@@ -474,24 +480,24 @@ function WorkspacePaneTabSwitcherPopover({
             })}
           </div>
         </ScrollArea>
-        {canCreateNew && (
+        {createAction && (
           <div className="border-t border-separator p-1">
             <button
               type="button"
               className={cn(
                 'flex h-7 w-full items-center gap-2 rounded-sm px-2 text-left text-sm text-popover-foreground outline-none transition-colors duration-100',
-                newTerminalBusy
+                createAction.busy
                   ? 'cursor-not-allowed opacity-70'
                   : 'cursor-pointer hover:bg-accent hover:text-accent-foreground',
               )}
               onClick={selectNew}
-              disabled={newTerminalBusy}
-              aria-busy={newTerminalBusy ? 'true' : undefined}
+              disabled={createAction.busy}
+              aria-busy={createAction.busy ? 'true' : undefined}
             >
               <span className="flex size-3.5 shrink-0 items-center justify-center text-muted-foreground">
                 <Plus size={14} />
               </span>
-              <span className="min-w-0 flex-1 truncate">{newLabel}</span>
+              <span className="min-w-0 flex-1 truncate">{createAction.label}</span>
             </button>
           </div>
         )}
@@ -501,7 +507,6 @@ function WorkspacePaneTabSwitcherPopover({
 }
 
 export function WorkspacePaneTabStrip({
-  terminalWorktreeKey,
   workspacePaneTabTargetKey,
   items,
   workspacePaneId,
@@ -510,19 +515,16 @@ export function WorkspacePaneTabStrip({
   panelActive,
   focusRegistry: externalFocusRegistry,
   emptyFocusKey = EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY,
-  newTerminalBusy = false,
-  onNew,
+  createAction = null,
   onSelect,
-  onScrollToBottom,
+  onReselect,
   onClose,
   onReorder,
   onNavigateOut,
   activateKeyboardNavigationSelection = false,
 }: WorkspacePaneTabStripProps) {
   const t = useT()
-  const terminalItems = useMemo(() => items.filter(isTerminalWorkspacePaneTabItem), [items])
   const sortableItems = useMemo(() => items.filter(isSortableWorkspacePaneTabItem), [items])
-  const canCreateNew = terminalWorktreeKey !== null
   const showCollapsedTabs = !!responsiveCompact
   const activeItem = activeTabIdentity ? (items.find((item) => item.identity === activeTabIdentity) ?? null) : null
   const compactPendingItem = showCollapsedTabs ? (items.find(isPendingWorkspacePaneTabItem) ?? null) : null
@@ -540,7 +542,11 @@ export function WorkspacePaneTabStrip({
   const prefersReducedMotion = usePrefersReducedMotion()
   const scrollBehavior: ScrollBehavior = prefersReducedMotion ? 'auto' : 'smooth'
   const [hoveredTabIdentity, setHoveredTabIdentity] = useState<string | null>(null)
-  const requestFocusAfterRender = useDeferredWorkspacePaneTabFocus({ items, focusRegistry })
+  const focusActiveTabAfterClose = useDeferredActiveWorkspacePaneTabFocusAfterClose({
+    activeTabIdentity,
+    items,
+    focusRegistry,
+  })
   const tabDnd = useWorkspacePaneTabDnd({
     sortableItems,
     newButtonRef,
@@ -557,9 +563,17 @@ export function WorkspacePaneTabStrip({
     })
   }, [scrollBehavior])
   const handleNew = useCallback(() => {
+    if (!createAction || createAction.busy) return
     scrollNewButtonIntoView()
-    onNew()
-  }, [onNew, scrollNewButtonIntoView])
+    createAction.onCreate()
+  }, [createAction, scrollNewButtonIntoView])
+  const renderCreateAction = createAction
+    ? {
+        label: createAction.label,
+        busy: createAction.busy ?? false,
+        onCreate: handleNew,
+      }
+    : null
   const handleViewportScroll = useWorkspacePaneTabStripScrollMemory({
     workspacePaneTabTargetKey,
     enabled: !collapseToSelectedTab,
@@ -582,13 +596,10 @@ export function WorkspacePaneTabStrip({
       const item = items.find((candidate) => candidate.identity === identity)
       if (!item) return
       if (isPendingWorkspacePaneTabItem(item)) return
-      if (isTerminalWorkspacePaneTabItem(item) && item.identity === activeTabIdentity && panelActive) {
-        onScrollToBottom(item.view.terminalSessionId)
-      } else {
-        onSelect(item)
-      }
+      if (item.identity === activeTabIdentity && panelActive) onReselect(item)
+      else onSelect(item)
     },
-    [activeTabIdentity, items, panelActive, onScrollToBottom, onSelect],
+    [activeTabIdentity, items, onReselect, onSelect, panelActive],
   )
 
   const handleClose = useCallback(
@@ -600,21 +611,12 @@ export function WorkspacePaneTabStrip({
       if (!item) return
       if (isPendingWorkspacePaneTabItem(item)) return
       const isActive = item.identity === activeTabIdentity
-      const idx = items.findIndex((candidate) => candidate.identity === identity)
-      const nextItem =
-        items.slice(idx + 1).find((candidate) => !isPendingWorkspacePaneTabItem(candidate)) ??
-        items
-          .slice(0, idx)
-          .reverse()
-          .find((candidate) => !isPendingWorkspacePaneTabItem(candidate)) ??
-        null
-      const nextKey = nextItem?.identity ?? null
 
       setHoveredTabIdentity(null)
-      if (isActive && nextKey) requestFocusAfterRender(nextKey)
+      if (isActive) focusActiveTabAfterClose(identity)
       onClose(item)
     },
-    [activeTabIdentity, items, onClose, requestFocusAfterRender],
+    [activeTabIdentity, focusActiveTabAfterClose, items, onClose],
   )
 
   const tabIdForItem = useCallback(
@@ -623,10 +625,13 @@ export function WorkspacePaneTabStrip({
         return workspacePaneStaticTabProvider(item.staticTabType).buttonId(workspacePaneId)
       }
       if (isPendingWorkspacePaneTabItem(item)) return `${workspacePaneId}-${item.type}-pending-tab`
-      const index = terminalItems.findIndex((candidate) => candidate.identity === item.identity)
-      return terminalWorkspacePaneTabProvider.buttonId(workspacePaneId, Math.max(0, index))
+      const runtimeItems = items.filter(
+        (candidate) => candidate.kind === 'runtime' && candidate.runtimeType === item.runtimeType,
+      )
+      const index = runtimeItems.findIndex((candidate) => candidate.identity === item.identity)
+      return workspacePaneRuntimeTabProvider(item.runtimeType).buttonId(workspacePaneId, Math.max(0, index))
     },
-    [workspacePaneId, terminalItems],
+    [workspacePaneId, items],
   )
 
   const activateKeyboardNavigationTarget = useCallback(
@@ -701,14 +706,12 @@ export function WorkspacePaneTabStrip({
   }
 
   if (items.length === 0) {
-    if (!canCreateNew) return null
+    if (!renderCreateAction) return null
     return (
       <WorkspacePaneNewButton
         ref={focusRegistry.setRef(emptyFocusKey)}
         id={`${workspacePaneId}-workspace-pane-tab-empty`}
-        onClick={handleNew}
-        busy={newTerminalBusy}
-        t={t}
+        action={renderCreateAction}
       />
     )
   }
@@ -722,18 +725,14 @@ export function WorkspacePaneTabStrip({
           compactItem={selectedItem}
           workspacePaneId={workspacePaneId}
           context={tabBodyContext}
-          canCreateNew={canCreateNew}
-          newTerminalBusy={newTerminalBusy}
-          onNew={handleNew}
+          createAction={renderCreateAction}
         />
       }
       scrollContent={
         <WorkspacePaneScrollableTabsBody
           items={items}
           context={tabBodyContext}
-          canCreateNew={canCreateNew}
-          onNew={handleNew}
-          newTerminalBusy={newTerminalBusy}
+          createAction={renderCreateAction}
           newButtonRef={newButtonRef}
           workspacePaneId={workspacePaneId}
           dnd={tabDnd}
@@ -767,9 +766,7 @@ interface WorkspacePaneTabBodyCommonProps {
 interface WorkspacePaneCompactTabsBodyProps extends WorkspacePaneTabBodyCommonProps {
   compactItem: WorkspacePaneTabItem | null
   workspacePaneId: string
-  canCreateNew: boolean
-  newTerminalBusy: boolean
-  onNew: () => void
+  createAction: WorkspacePaneTabCreateAction | null
 }
 
 function WorkspacePaneCompactTabsBody({
@@ -777,9 +774,7 @@ function WorkspacePaneCompactTabsBody({
   compactItem,
   workspacePaneId,
   context,
-  canCreateNew,
-  newTerminalBusy,
-  onNew,
+  createAction,
 }: WorkspacePaneCompactTabsBodyProps) {
   const {
     activeTabIdentity,
@@ -813,9 +808,9 @@ function WorkspacePaneCompactTabsBody({
             isSelected={compactItem.identity === activeTabIdentity}
             isFocusable={compactItem.identity === focusableTabIdentity}
             tabId={
-              isStaticWorkspacePaneTabItem(compactItem) || isPendingWorkspacePaneTabItem(compactItem)
-                ? tabIdForItem(compactItem)
-                : terminalWorkspacePaneTabProvider.buttonId(workspacePaneId, 0)
+              compactItem.kind === 'runtime'
+                ? workspacePaneRuntimeTabProvider(compactItem.runtimeType).buttonId(workspacePaneId, 0)
+                : tabIdForItem(compactItem)
             }
             focusRegistry={focusRegistry}
             onSelect={onSelect}
@@ -837,10 +832,7 @@ function WorkspacePaneCompactTabsBody({
         items={items}
         activeTabIdentity={activeTabIdentity}
         label={t('workspace-pane-tabs.tabs')}
-        newLabel={t('terminal.new')}
-        canCreateNew={canCreateNew}
-        newTerminalBusy={newTerminalBusy}
-        onNew={onNew}
+        createAction={createAction}
         onSelect={onSelect}
         onClose={onClose}
         t={t}
@@ -850,9 +842,7 @@ function WorkspacePaneCompactTabsBody({
 }
 
 interface WorkspacePaneScrollableTabsBodyProps extends WorkspacePaneTabBodyCommonProps {
-  canCreateNew: boolean
-  onNew: () => void
-  newTerminalBusy: boolean
+  createAction: WorkspacePaneTabCreateAction | null
   newButtonRef: RefObject<HTMLButtonElement | null>
   workspacePaneId: string
   dnd: ReturnType<typeof useWorkspacePaneTabDnd>
@@ -861,9 +851,7 @@ interface WorkspacePaneScrollableTabsBodyProps extends WorkspacePaneTabBodyCommo
 function WorkspacePaneScrollableTabsBody({
   items,
   context,
-  canCreateNew,
-  onNew,
-  newTerminalBusy,
+  createAction,
   newButtonRef,
   workspacePaneId,
   dnd,
@@ -928,13 +916,11 @@ function WorkspacePaneScrollableTabsBody({
             })}
           </WorkspacePaneTabTooltipLayer>
         </SortableContext>
-        {canCreateNew ? (
+        {createAction ? (
           <WorkspacePaneNewButton
             ref={newButtonRef}
             id={items.length === 0 ? `${workspacePaneId}-workspace-pane-tab-empty` : undefined}
-            onClick={onNew}
-            busy={newTerminalBusy}
-            t={t}
+            action={createAction}
           />
         ) : null}
       </ToolbarTabStripBody>
@@ -962,20 +948,15 @@ interface WorkspacePaneTabProps {
 
 function WorkspacePaneNewButton({
   id,
-  onClick,
-  busy = false,
+  action,
   compact = false,
-  t,
   ref,
 }: {
   id?: string
-  onClick: () => void
-  busy?: boolean
+  action: WorkspacePaneTabCreateAction
   compact?: boolean
-  t: WorkspacePaneT
   ref?: Ref<HTMLButtonElement>
 }) {
-  const label = t('terminal.new')
   return (
     <Button
       ref={ref}
@@ -984,11 +965,11 @@ function WorkspacePaneNewButton({
       size="icon"
       className={cn('h-7 w-7 shrink-0', compact && 'w-7')}
       id={id}
-      onClick={onClick}
-      disabled={busy}
-      aria-busy={busy ? 'true' : undefined}
-      aria-label={label}
-      title={label}
+      onClick={action.onCreate}
+      disabled={action.busy}
+      aria-busy={action.busy ? 'true' : undefined}
+      aria-label={action.label}
+      title={action.label}
       data-workspace-pane-new-button=""
     >
       <Plus size={14} />
@@ -1037,12 +1018,9 @@ function WorkspacePaneTabChrome({
   showSeparator = false,
   onHoverChange,
 }: WorkspacePaneTabChromeProps) {
-  const bellUnreadLabel = t('terminal.bell-unread')
+  const attentionLabel = isRuntimeWorkspacePaneTabItem(item) && item.attention ? runtimeAttentionLabel(item, t) : null
   const accessibleLabel = item.label || item.tooltip
-  const ariaLabel =
-    isTerminalWorkspacePaneTabItem(item) && item.view.hasBell
-      ? `${accessibleLabel} — ${bellUnreadLabel}`
-      : accessibleLabel
+  const ariaLabel = attentionLabel ? `${accessibleLabel} — ${attentionLabel}` : accessibleLabel
   const closeProps = isPendingWorkspacePaneTabItem(item)
     ? ({ closeButton: false } as const)
     : ({
@@ -1102,17 +1080,22 @@ function WorkspacePaneTabChrome({
     >
       <WorkspacePaneTabIcon item={item} active={isActive} compact={compact} />
       <WorkspacePaneTabTitle item={item} />
-      {isTerminalWorkspacePaneTabItem(item) && item.view.hasBell && (
+      {isRuntimeWorkspacePaneTabItem(item) && item.attention && (
         <>
           <span className="relative flex h-2 w-2 shrink-0">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-notification opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-notification" />
           </span>
-          <span className="sr-only">{t('terminal.bell-unread')}</span>
+          <span className="sr-only">{attentionLabel}</span>
         </>
       )}
     </ToolbarClosableTab>
   )
+}
+
+function runtimeAttentionLabel(item: WorkspacePaneRuntimeTabItem, t: WorkspacePaneT): string {
+  const attentionLabelKey = item.attentionLabelKey
+  return attentionLabelKey ? t(attentionLabelKey) : item.tooltip
 }
 
 function WorkspacePaneTab({
@@ -1243,8 +1226,8 @@ function WorkspacePaneTabIcon({
 
 function isSortableWorkspacePaneTabItem(
   item: WorkspacePaneTabItem,
-): item is WorkspacePaneStaticTabItem | WorkspacePaneTerminalTabItem {
-  return item.kind === 'static' || item.kind === 'terminal'
+): item is WorkspacePaneStaticTabItem | WorkspacePaneRuntimeTabItem {
+  return item.kind === 'static' || item.kind === 'runtime'
 }
 
 function arrayMove<T>(array: T[], from: number, to: number): T[] {

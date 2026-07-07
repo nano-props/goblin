@@ -1,23 +1,27 @@
 import { TerminalDetachedUserTimer } from '#/server/terminal/terminal-detached-user-timer.ts'
-import { TerminalRealtimeBroker } from '#/server/terminal/terminal-realtime-broker.ts'
+import { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import type { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
-import type { WorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
+import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
+import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
+import { serverLogger } from '#/server/logger.ts'
+
+const terminalRuntimeCoordinatorLogger = serverLogger.child({ module: 'terminal-runtime-coordinator' })
 
 export interface TerminalRuntimeCoordinatorOptions {
   manager: TerminalSessionManager<string>
-  workspaceTabs: WorkspacePaneTabsRuntime<string>
+  workspaceTabsCoordinator: Pick<WorkspacePaneTabsCoordinator, 'closeUser'>
   detachedTtlMs: number
 }
 
 export interface TerminalRuntimeCoordinator {
-  broker: TerminalRealtimeBroker
+  broker: RealtimeBroker<AppRealtimeMessage>
   shutdown(): void
 }
 
 export function createTerminalRuntimeCoordinator(
   options: TerminalRuntimeCoordinatorOptions,
 ): TerminalRuntimeCoordinator {
-  const { manager, workspaceTabs, detachedTtlMs } = options
+  const { manager, workspaceTabsCoordinator, detachedTtlMs } = options
 
   // Detached-user timers key by userId, not clientId. clientId is only
   // the per-tab routing id; terminal lifetime is owned by the
@@ -25,12 +29,14 @@ export function createTerminalRuntimeCoordinator(
   const detachedUsers = new TerminalDetachedUserTimer({
     detachedTtlMs,
     onUserExpired(userId) {
-      manager.closeSessionsForUser(userId)
-      workspaceTabs.closeSessionsForUser(userId)
+      void closeDetachedUserRuntime(userId).catch((err) => {
+        terminalRuntimeCoordinatorLogger.warn({ userId, err }, 'failed to clean up detached user runtime')
+      })
     },
   })
 
-  const broker = new TerminalRealtimeBroker({
+  const broker = new RealtimeBroker<AppRealtimeMessage>({
+    heartbeatTimeoutReason: 'terminal heartbeat timeout',
     onClientPresenceChanged(event) {
       if (event.online) detachedUsers.clearUserDetachedTimer(event.userId)
       else detachedUsers.scheduleUserDetachedTimer(event.userId, () => broker.hasOnlineUserClients(event.userId))
@@ -52,5 +58,10 @@ export function createTerminalRuntimeCoordinator(
       broker.disconnectAll()
       detachedUsers.shutdown()
     },
+  }
+
+  async function closeDetachedUserRuntime(userId: string): Promise<void> {
+    manager.closeSessionsForUser(userId)
+    await workspaceTabsCoordinator.closeUser({ userId })
   }
 }

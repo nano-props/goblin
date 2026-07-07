@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono, type Context, type Next } from 'hono'
 import { upgradeWebSocket } from '@hono/node-server'
 import {
   InvalidationSocketLimitError,
@@ -13,34 +13,30 @@ import {
 import { createAccessTokenMiddleware } from '#/server/common/auth.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import { errorJson } from '#/server/common/responses.ts'
-import { isTerminalWsMessageWithinLimit } from '#/shared/terminal-validators.ts'
-import type { ServerTerminalHost, ServerTerminalSocket } from '#/server/terminal/terminal-host.ts'
+import { isAppRealtimeWsMessageWithinLimit } from '#/shared/app-realtime-validators.ts'
+import type { ServerAppRealtimeHost, ServerAppRealtimeSocket } from '#/server/realtime/app-realtime-host.ts'
 
 interface RealtimeRouteOptions {
   accessToken: string
-  terminalHost: ServerTerminalHost
+  appRealtimeHost: ServerAppRealtimeHost
 }
 
-// Cap each terminal WS message. Real terminal input is a keystroke
-// or a paste; the cap covers the largest legitimate paste while
-// preventing a hostile client from streaming an unbounded buffer
-// through the worker. Sourced from `shared/terminal-validators.ts` so the
-// per-write cap (MAX_TERMINAL_WRITE_CHARS) and the per-message cap
-// stay aligned as a single invariant — see the export site for the
-// reasoning.
+// Cap each app realtime WS message. Terminal paste is currently the largest
+// legitimate payload, but the limit belongs to the shared transport now that
+// runtime capabilities are siblings.
 
 // Server-authoritative realtime for data, plus a dedicated envelope-forwarding
 // channel for client effect intents sourced from `g`-style CLI clients.
 //
-// `/ws/invalidation` and `/ws/terminal` remain data-plane — they push server-
-// owned state changes (repo invalidations, terminal stream events) to
+// `/ws/invalidation` and `/ws/app` remain data-plane — they push server-
+// owned state changes (repo invalidations, runtime stream events) to
 // subscribers. `/ws/client-intent` is a control-plane relay: the server
 // receives a `ClientEffectIntent` over HTTP (e.g. from `g delta`), wraps it
 // in a JSON envelope, and fans it out to subscribed clients. The server
 // does not interpret intent semantics — it just forwards. Interpretation
 // happens in the client's existing `useClientEffectIntentRouter`,
 // which already handles the same intents coming from Electron IPC.
-export function createRealtimeRoutes({ accessToken, terminalHost }: RealtimeRouteOptions) {
+export function createRealtimeRoutes({ accessToken, appRealtimeHost }: RealtimeRouteOptions) {
   // The shared middleware accepts cookie, header, or `?t=` query, so
   // browser clients (cookie), embedded Electron clients (`?t=`),
   // and LAN CLI clients (any of the three) all work. The middleware
@@ -51,11 +47,11 @@ export function createRealtimeRoutes({ accessToken, terminalHost }: RealtimeRout
 
   const app = new Hono()
   app.use('/invalidation', auth)
-  app.use('/terminal', auth, async (c, next) => {
+  const appRealtimeAuth = async (c: Context, next: Next) => {
     if (!c.req.query('clientId')) {
       return errorJson(c, 'BAD_REQUEST', 'Missing client id')
     }
-    if (!terminalHost.isValidClientId(c.req.query('clientId'))) {
+    if (!appRealtimeHost.isValidClientId(c.req.query('clientId'))) {
       return errorJson(c, 'BAD_REQUEST', 'Invalid client id')
     }
     // Defense in depth: the auth middleware above always sets
@@ -66,7 +62,8 @@ export function createRealtimeRoutes({ accessToken, terminalHost }: RealtimeRout
       return errorJson(c, 'INTERNAL', 'Owner id missing from auth context', 500)
     }
     await next()
-  })
+  }
+  app.use('/app', auth, appRealtimeAuth)
 
   app.get(
     '/invalidation',
@@ -127,46 +124,42 @@ export function createRealtimeRoutes({ accessToken, terminalHost }: RealtimeRout
       }
     }),
   )
-  app.get(
-    '/terminal',
-    upgradeWebSocket((c) => {
-      const clientId = c.req.query('clientId') ?? ''
-      const userId = userIdFromContext(c) ?? ''
-      return {
-        onOpen(_event, ws) {
-          if (!userId) {
-            // Belt-and-suspenders: the pre-upgrade validator above
-            // should have caught this. Close before we hand the
-            // socket to the broker so it never enters a half-registered
-            // state.
-            try {
-              ws.close(1008, 'unauthorized')
-            } catch {}
-            return
-          }
-          terminalHost.registerSocket(clientId, userId, ws as ServerTerminalSocket)
-        },
-        onMessage(event, ws) {
-          if (typeof event.data === 'string') {
-            if (!isTerminalWsMessageWithinLimit(event.data)) {
-              try {
-                ws.close(1009, 'message too large')
-              } catch {}
-              return
-            }
-            terminalHost.handleRealtimeMessage(clientId, userId, ws as ServerTerminalSocket, event.data)
-          }
-        },
-        onClose(_event, ws) {
-          if (!userId) return
-          terminalHost.unregisterSocket(clientId, userId, ws as ServerTerminalSocket)
-        },
-        onError(_event, ws) {
-          if (!userId) return
-          terminalHost.unregisterSocket(clientId, userId, ws as ServerTerminalSocket)
-        },
-      }
-    }),
-  )
+  const appRealtimeUpgrade = upgradeWebSocket((c) => {
+    const clientId = c.req.query('clientId') ?? ''
+    const userId = userIdFromContext(c) ?? ''
+    return {
+      onOpen(_event, ws) {
+        if (!userId) {
+          // Belt-and-suspenders: the pre-upgrade validator above should have
+          // caught this. Close before broker registration so the socket never
+          // enters a half-registered state.
+          try {
+            ws.close(1008, 'unauthorized')
+          } catch {}
+          return
+        }
+        appRealtimeHost.registerSocket(clientId, userId, ws as ServerAppRealtimeSocket)
+      },
+      onMessage(event, ws) {
+        if (typeof event.data !== 'string') return
+        if (!isAppRealtimeWsMessageWithinLimit(event.data)) {
+          try {
+            ws.close(1009, 'message too large')
+          } catch {}
+          return
+        }
+        appRealtimeHost.handleRealtimeMessage(clientId, userId, ws as ServerAppRealtimeSocket, event.data)
+      },
+      onClose(_event, ws) {
+        if (!userId) return
+        appRealtimeHost.unregisterSocket(clientId, userId, ws as ServerAppRealtimeSocket)
+      },
+      onError(_event, ws) {
+        if (!userId) return
+        appRealtimeHost.unregisterSocket(clientId, userId, ws as ServerAppRealtimeSocket)
+      },
+    }
+  })
+  app.get('/app', appRealtimeUpgrade)
   return app
 }

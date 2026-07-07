@@ -175,8 +175,6 @@ export interface TerminalSessionSummary {
   hasRecentOutput: boolean
 }
 
-export type WorkspacePaneTabSummary = TerminalSessionSummary
-
 export interface TerminalWorktreeSnapshot {
   terminalWorktreeKey: string
   selectedDescriptor: TerminalDescriptor | null
@@ -184,7 +182,7 @@ export interface TerminalWorktreeSnapshot {
   count: number
   bellCount: number
   outputActiveCount: number
-  pendingCreate: boolean
+  createPending: boolean
 }
 
 export interface TerminalSessionContextValue {

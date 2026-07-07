@@ -5,7 +5,7 @@ import type {
 } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 
-interface TerminalSessionCommandBridge {
+export interface TerminalSessionCommandBridge {
   terminalWorktreeSnapshot: (terminalWorktreeKey: string) => TerminalWorktreeSnapshot
   createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
   createOwnedTerminal?: (

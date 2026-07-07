@@ -8,23 +8,19 @@ import type {
   TerminalLifecycleEvent,
   TerminalListSessionsInput,
   TerminalPruneInput,
-  TerminalListWorkspaceTabsInput,
   TerminalMutationResult,
   TerminalOutputEvent,
-  TerminalReplaceWorkspaceTabsInput,
   TerminalResizeInput,
   TerminalRestartInput,
   TerminalSessionInput,
   TerminalSessionSummary,
+  TerminalSessionsRecoveryResult,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
-  TerminalUpdateWorkspaceTabsInput,
-  WorkspacePaneTabsEntry,
   TerminalTitleEvent,
   TerminalExitEvent,
   TerminalWriteInput,
 } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 
 export type TerminalRealtimeMessage =
   | { type: 'output'; event: TerminalOutputEvent }
@@ -39,7 +35,6 @@ export type TerminalRealtimeMessage =
   | { type: 'identity'; event: TerminalIdentityEvent }
   | { type: 'lifecycle'; event: TerminalLifecycleEvent }
   | { type: 'sessions-changed'; repoRoot: string }
-  | { type: 'workspace-tabs-changed'; repoRoot: string }
   // Targeted per-session close. Emitted by the server after a
   // successful `close` request, alongside the existing
   // `sessions-changed` global broadcast. Multi-window clients use
@@ -63,10 +58,8 @@ export interface TerminalSocketRequestInputs {
   takeover: TerminalTakeoverInput
   close: TerminalSessionInput
   'list-sessions': TerminalListSessionsInput
-  'list-workspace-tabs': TerminalListWorkspaceTabsInput
+  'recover-sessions': TerminalListSessionsInput
   create: TerminalCreateInput
-  'replace-tabs': TerminalReplaceWorkspaceTabsInput
-  'update-tabs': TerminalUpdateWorkspaceTabsInput
   prune: TerminalPruneInput
 }
 
@@ -78,10 +71,8 @@ export interface TerminalSocketResponseOutputs {
   takeover: TerminalTakeoverResult
   close: TerminalMutationResult
   'list-sessions': TerminalSessionSummary[]
-  'list-workspace-tabs': WorkspacePaneTabsEntry[]
+  'recover-sessions': TerminalSessionsRecoveryResult
   create: TerminalCreateResult
-  'replace-tabs': WorkspacePaneTabEntry[]
-  'update-tabs': WorkspacePaneTabEntry[]
   prune: { pruned: number; remaining: number }
 }
 
@@ -116,24 +107,5 @@ export type TerminalSocketResponseMessage =
       }
     }[TerminalSocketRequestAction]
 
-export type TerminalHealthPongMessage = { type: 'pong'; requestId: string }
-
-export type TerminalSocketServerMessage =
-  TerminalRealtimeMessage | TerminalSocketResponseMessage | TerminalHealthPongMessage
-/**
- * Heartbeat envelope. Sent client→server every
- * `HEARTBEAT_INTERVAL_MS` while the realtime socket is `OPEN`. Carries
- * no payload — the server already knows the `(clientId, userId)` from
- * the upgrade — but a discriminating `type` keeps the union closed so
- * the existing `normalizeTerminalClientMessage` path rejects anything
- * malformed at the WS layer. The server uses the receipt time to drive
- * the broker's per-`clientId` liveness timer; a missed beat
- * (longer than `HEARTBEAT_DEADLINE_MS`) flips broker presence
- * offline so the next `attach` can auto-claim instead of being
- * stranded in viewer mode.
- */
-export interface TerminalHeartbeatMessage {
-  type: 'heartbeat'
-}
-export type TerminalHealthPingMessage = { type: 'ping'; requestId: string }
-export type TerminalClientMessage = TerminalSocketRequestMessage | TerminalHeartbeatMessage | TerminalHealthPingMessage
+export type TerminalSocketServerMessage = TerminalRealtimeMessage | TerminalSocketResponseMessage
+export type TerminalClientMessage = TerminalSocketRequestMessage

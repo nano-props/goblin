@@ -6,14 +6,14 @@ import type {
   RepoWorkspaceTabModel,
   RepoWorkspaceTab,
   RepoWorkspaceSelection,
+  RepoWorkspaceRuntimeTabStateByType,
 } from '#/web/components/repo-workspace/tab-model.ts'
 import {
-  terminalWorkspacePaneTabProvider,
+  workspacePaneRuntimeTabProvider,
   workspacePaneStaticTabProvider,
   type WorkspacePanePanelLabel,
 } from '#/web/components/workspace-pane/tab-providers.ts'
 import { renderRepoWorkspacePanePanel } from '#/web/components/repo-workspace/panels.tsx'
-import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
 
 interface Props {
   repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'branchModel' | 'ui'>
@@ -39,8 +39,7 @@ export function RepoWorkspaceContent({ repo, detail, workspacePaneId, workspaceP
     workspacePaneId,
     compact,
     t,
-    terminalProjectionPhase: workspacePaneTabModel.terminalProjectionPhase,
-    terminalCreatePending: workspacePaneTabModel.terminalCreatePending,
+    runtimeTabStateByType: workspacePaneTabModel.runtimeTabStateByType,
   })
   const noBranchTitleKey = repo.branchModel.branches.length === 0 ? 'branches.empty' : 'branches.filter-empty'
   if (!branch) return <EmptyState title={t(noBranchTitleKey)} />
@@ -62,8 +61,7 @@ export function RepoWorkspaceContent({ repo, detail, workspacePaneId, workspaceP
             detail,
             workspacePaneId,
             panelLabel,
-            terminalProjectionPhase: workspacePaneTabModel.terminalProjectionPhase,
-            terminalProjectionErrorMessage: workspacePaneTabModel.terminalProjectionErrorMessage,
+            runtimeTabStateByType: workspacePaneTabModel.runtimeTabStateByType,
           })
         : null}
     </div>
@@ -76,18 +74,17 @@ function workspacePanePanelLabel(input: {
   workspacePaneId: string
   compact: boolean
   t: (key: string, params?: Record<string, string | number>) => string
-  terminalProjectionPhase: TerminalProjectionHydrationPhase
-  terminalCreatePending: boolean
+  runtimeTabStateByType: RepoWorkspaceRuntimeTabStateByType
 }): WorkspacePanePanelLabel {
   const tab = input.selection?.kind === 'materialized-tab' ? input.selection.materializedTab : null
-  if (tab?.kind === 'terminal') {
-    const terminalTabs = input.tabs.filter((candidate) => candidate.kind === 'terminal')
-    const index = terminalTabs.findIndex((candidate) => candidate.identity === tab.identity)
+  if (tab?.kind === 'runtime') {
+    const provider = workspacePaneRuntimeTabProvider(tab.runtimeType)
+    const runtimeTabs = input.tabs.filter(
+      (candidate) => candidate.kind === 'runtime' && candidate.runtimeType === tab.runtimeType,
+    )
+    const index = runtimeTabs.findIndex((candidate) => candidate.identity === tab.identity)
     return {
-      labelledById: terminalWorkspacePaneTabProvider.buttonId(
-        input.workspacePaneId,
-        input.compact ? 0 : Math.max(0, index),
-      ),
+      labelledById: provider.buttonId(input.workspacePaneId, input.compact ? 0 : Math.max(0, index)),
     }
   }
   if (tab?.kind === 'static') {
@@ -97,11 +94,13 @@ function workspacePanePanelLabel(input: {
   if (pendingTab) {
     return { labelledById: `${input.workspacePaneId}-${pendingTab.type}-pending-tab` }
   }
+  if (input.selection?.kind !== 'runtime-host') return { label: input.t('workspace-pane-tabs.tabs') }
+  const runtimeState = input.runtimeTabStateByType[input.selection.runtimeType]
   return {
-    label: terminalWorkspacePaneTabProvider.pendingLabel({
+    label: workspacePaneRuntimeTabProvider(input.selection.runtimeType).pendingLabel({
       t: input.t,
-      terminalCreatePending: input.terminalCreatePending,
-      terminalProjectionPhase: input.terminalProjectionPhase,
+      createPending: runtimeState.createPending,
+      projectionPhase: runtimeState.projectionPhase,
     }),
   }
 }

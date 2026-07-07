@@ -4,8 +4,8 @@ import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { terminalWorkspacePaneTabProvider } from '#/web/components/workspace-pane/tab-providers.ts'
 import {
-  createTerminalWorkspacePaneTabItem,
-  isTerminalWorkspacePaneTabItem,
+  createRuntimeWorkspacePaneTabItem,
+  isRuntimeWorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
@@ -160,9 +160,9 @@ function makeWorkspacePaneTabStrip(
     onReorder: (tabs: WorkspacePaneTabEntry[]) => void
   }) {
     const selected = props.sessions.find((candidate) => candidate.selected) ?? null
-    const { sessions, ...workspacePaneProps } = props
+    const { sessions, terminalWorktreeKey, onNew, onScrollToBottom, ...workspacePaneProps } = props
     const items = sessions.map((tab) =>
-      createTerminalWorkspacePaneTabItem({
+      createRuntimeWorkspacePaneTabItem({
         view: tab,
         label: tab.originalTitle ?? tab.fullTitle ?? tab.title,
         tooltip: tab.originalTitle ?? tab.fullTitle ?? tab.title,
@@ -172,14 +172,24 @@ function makeWorkspacePaneTabStrip(
     return (
       <WorkspacePaneTabStrip
         {...workspacePaneProps}
+        createAction={{ label: 'terminal.new', onCreate: onNew }}
         workspacePaneTabTargetKey="/repo\0branch\0main"
         items={items}
         activeTabIdentity={selected ? terminalWorkspacePaneTabProvider.identity(selected.terminalSessionId) : null}
         onSelect={(item) => {
-          if (isTerminalWorkspacePaneTabItem(item)) props.onSelect(props.terminalWorktreeKey, item.view)
+          if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
+            props.onSelect(terminalWorktreeKey, item.view)
+          }
+        }}
+        onReselect={(item) => {
+          if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
+            onScrollToBottom(item.view.terminalSessionId)
+          }
         }}
         onClose={(item) => {
-          if (isTerminalWorkspacePaneTabItem(item)) props.onClose(item.view)
+          if (isRuntimeWorkspacePaneTabItem(item) && item.view.type === 'terminal') {
+            props.onClose(item.view)
+          }
         }}
       />
     )

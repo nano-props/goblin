@@ -30,6 +30,7 @@ import {
 } from '#/shared/repo-settings.ts'
 import {
   isWorkspacePaneSessionTabType,
+  isWorkspacePaneRuntimeTabEntry,
   isWorkspacePaneStaticTabType,
   type WorkspacePaneSessionTabType,
   type WorkspacePaneStaticTabType,
@@ -339,7 +340,7 @@ function normalizeSession(value: unknown): WorkspaceSessionState {
 }
 
 function workspacePaneStaticTabs(tabs: readonly WorkspacePaneTabEntry[]): WorkspacePaneStaticTabType[] {
-  return tabs.flatMap((entry) => (entry.type === 'terminal' ? [] : [entry.type]))
+  return tabs.flatMap((entry) => (isWorkspacePaneRuntimeTabEntry(entry) ? [] : [entry.type]))
 }
 
 function normalizeRecentRepos(value: unknown): RepoSessionEntry[] {

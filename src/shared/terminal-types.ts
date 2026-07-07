@@ -1,5 +1,4 @@
-import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 
 /**
  * `controllerStatus === 'connected'` while the broker reports the
@@ -222,32 +221,6 @@ export interface TerminalPruneInput {
   repoInstanceId: string
 }
 
-export interface TerminalListWorkspaceTabsInput {
-  repoRoot: string
-  repoInstanceId: string
-}
-
-export interface TerminalReplaceWorkspaceTabsInput extends WorkspacePaneTabsTarget, RepoInstanceRuntimeInput {
-  tabs: WorkspacePaneTabEntry[]
-}
-
-export type TerminalUpdateWorkspaceTabsOperation =
-  | {
-      type: 'open-static'
-      tabType: WorkspacePaneStaticTabType
-      insertAfterIdentity?: string | null
-    }
-  | { type: 'close-static'; tabType: WorkspacePaneStaticTabType }
-  | { type: 'reorder'; tabIdentities: string[] }
-
-export interface TerminalUpdateWorkspaceTabsInput extends WorkspacePaneTabsTarget, RepoInstanceRuntimeInput {
-  operation: TerminalUpdateWorkspaceTabsOperation
-}
-
-export interface WorkspacePaneTabsEntry extends WorkspacePaneTabsTarget {
-  tabs: WorkspacePaneTabEntry[]
-}
-
 export interface TerminalSessionSummary {
   terminalRuntimeSessionId: string
   terminalSessionId: string
@@ -270,6 +243,11 @@ export interface TerminalHydrationSnapshot {
   snapshot: string
   snapshotSeq: number
   outputEra: number
+}
+
+export interface TerminalSessionsRecoveryResult {
+  sessions: TerminalSessionSummary[]
+  snapshots: TerminalHydrationSnapshot[]
 }
 
 export type TerminalMutationResult = boolean

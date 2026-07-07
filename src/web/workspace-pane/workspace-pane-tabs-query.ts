@@ -1,22 +1,23 @@
 import { useEffect } from 'react'
 import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query'
-import type { WorkspacePaneTabsEntry } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
 import {
   type WorkspacePaneTabsTarget,
   workspacePaneTabsEntryMatchesTarget,
   workspacePaneTabsTargetIdentityKey,
 } from '#/shared/workspace-pane-tabs-target.ts'
-import { terminalClient } from '#/web/terminal.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { defaultWorkspacePaneTabs, normalizeWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { gblLog } from '#/web/logger.ts'
+import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
 
 export type WorkspacePaneTabsQueryData = WorkspacePaneTabsEntry[]
 
 let workspacePaneTabsPersistenceVersion = 0
 const workspacePaneTabsPersistenceListeners = new Set<() => void>()
 const workspacePaneTabsProjectionGeneration = new Map<string, number>()
+const workspacePaneTabsTargetGeneration = new Map<string, number>()
 const workspacePaneTabsRefreshSequence = new Map<string, number>()
 let workspacePaneTabsNextRefreshSequence = 0
 
@@ -93,6 +94,7 @@ export function setWorkspacePaneTabsForTargetQueryData(
       tabs: [...input.tabs],
     },
   ])
+  bumpWorkspacePaneTabsTargetVersion(input)
 }
 
 export function replaceWorkspacePaneTabsQueryData(
@@ -101,7 +103,10 @@ export function replaceWorkspacePaneTabsQueryData(
   entries: readonly WorkspacePaneTabsEntry[],
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
+  const currentEntries =
+    queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(repoRoot, repoInstanceId)) ?? []
   updateWorkspacePaneTabsQueryData(repoRoot, repoInstanceId, queryClient, () => entries)
+  bumpWorkspacePaneTabsTargetVersions(repoRoot, repoInstanceId, [...currentEntries, ...entries])
 }
 
 export function restoreWorkspacePaneTabsTargetQueryData(
@@ -111,13 +116,22 @@ export function restoreWorkspacePaneTabsTargetQueryData(
     branchName: string
     worktreePath: string | null
     previousTargetEntry: WorkspacePaneTabsEntry | undefined
+    expectedTargetVersion?: number
   },
   queryClient: QueryClient = primaryWindowQueryClient,
-): void {
+): boolean {
+  if (
+    input.expectedTargetVersion !== undefined &&
+    workspacePaneTabsTargetVersion(input) !== input.expectedTargetVersion
+  ) {
+    return false
+  }
   updateWorkspacePaneTabsQueryData(input.repoRoot, input.repoInstanceId, queryClient, (current) => [
     ...(current ?? []).filter((entry) => !workspacePaneTabsEntryMatchesTarget(entry, input)),
     ...(input.previousTargetEntry ? [input.previousTargetEntry] : []),
   ])
+  bumpWorkspacePaneTabsTargetVersion(input)
+  return true
 }
 
 export async function cancelWorkspacePaneTabs(
@@ -156,6 +170,16 @@ export function clearWorkspacePaneTabsProjectionState(repoRoot: string, repoInst
   const key = workspacePaneTabsProjectionKey(repoRoot, repoInstanceId)
   workspacePaneTabsProjectionGeneration.delete(key)
   workspacePaneTabsRefreshSequence.delete(key)
+  clearWorkspacePaneTabsTargetVersions(key)
+}
+
+export function workspacePaneTabsTargetVersion(input: {
+  repoRoot: string
+  repoInstanceId: string
+  branchName: string
+  worktreePath: string | null
+}): number {
+  return workspacePaneTabsTargetGeneration.get(workspacePaneTabsTargetProjectionKey(input)) ?? 0
 }
 
 export function workspacePaneTabsByTargetFromQueryData(
@@ -190,6 +214,55 @@ function workspacePaneTabsProjectionKey(repoRoot: string, repoInstanceId: string
   return `${repoRoot}\0${repoInstanceId}`
 }
 
+function workspacePaneTabsTargetProjectionKey(input: {
+  repoRoot: string
+  repoInstanceId: string
+  branchName: string
+  worktreePath: string | null
+}): string {
+  return `${workspacePaneTabsProjectionKey(input.repoRoot, input.repoInstanceId)}\0${workspacePaneTabsTargetIdentityKey(
+    input,
+  )}`
+}
+
+function bumpWorkspacePaneTabsTargetVersion(input: {
+  repoRoot: string
+  repoInstanceId: string
+  branchName: string
+  worktreePath: string | null
+}): void {
+  const key = workspacePaneTabsTargetProjectionKey(input)
+  workspacePaneTabsTargetGeneration.set(key, (workspacePaneTabsTargetGeneration.get(key) ?? 0) + 1)
+}
+
+function bumpWorkspacePaneTabsTargetVersions(
+  repoRoot: string,
+  repoInstanceId: string,
+  targets: readonly WorkspacePaneTabsEntry[],
+): void {
+  const targetKeys = new Set<string>()
+  for (const target of targets) {
+    targetKeys.add(
+      workspacePaneTabsTargetProjectionKey({
+        repoRoot,
+        repoInstanceId,
+        branchName: target.branchName,
+        worktreePath: target.worktreePath,
+      }),
+    )
+  }
+  for (const key of targetKeys) {
+    workspacePaneTabsTargetGeneration.set(key, (workspacePaneTabsTargetGeneration.get(key) ?? 0) + 1)
+  }
+}
+
+function clearWorkspacePaneTabsTargetVersions(projectionKey: string): void {
+  const prefix = `${projectionKey}\0`
+  for (const key of workspacePaneTabsTargetGeneration.keys()) {
+    if (key.startsWith(prefix)) workspacePaneTabsTargetGeneration.delete(key)
+  }
+}
+
 function nextWorkspacePaneTabsRefreshSequence(key: string): number {
   const next = ++workspacePaneTabsNextRefreshSequence
   workspacePaneTabsRefreshSequence.set(key, next)
@@ -207,7 +280,7 @@ async function fetchWorkspacePaneTabsQueryData(
   repoRoot: string,
   repoInstanceId: string,
 ): Promise<WorkspacePaneTabsQueryData> {
-  return normalizeWorkspacePaneTabsQueryData(await terminalClient.listWorkspaceTabs({ repoRoot, repoInstanceId }))
+  return normalizeWorkspacePaneTabsQueryData(await workspacePaneTabsClient.list({ repoRoot, repoInstanceId }))
 }
 
 function updateWorkspacePaneTabsQueryData(

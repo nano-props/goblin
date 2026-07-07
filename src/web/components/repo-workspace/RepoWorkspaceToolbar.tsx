@@ -3,23 +3,25 @@ import { ArrowLeft } from 'lucide-react'
 import { useT } from '#/web/stores/i18n.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { Tip } from '#/web/components/Tip.tsx'
-import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import {
   WorkspacePaneTabStrip,
   EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY,
 } from '#/web/components/workspace-pane/WorkspacePaneTabStrip.tsx'
 import {
   createPendingWorkspacePaneTabItem,
+  createRuntimeWorkspacePaneTabItem,
   createStaticWorkspacePaneTabItem,
-  createTerminalWorkspacePaneTabItem,
   isPendingWorkspacePaneTabItem,
+  isRuntimeWorkspacePaneTabItem,
   isStaticWorkspacePaneTabItem,
-  isTerminalWorkspacePaneTabItem,
   type WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
-import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type {
+  WorkspacePaneRuntimeTabType,
+  WorkspacePaneStaticTabType,
+  WorkspacePaneTabEntry,
+} from '#/shared/workspace-pane.ts'
 import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import type { RepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
@@ -27,11 +29,9 @@ import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts
 import { useIsInitialTerminalProjectionHydrating } from '#/web/stores/terminal-projection-hydration.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
-import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
-import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import {
-  terminalWorkspacePaneTabProvider,
+  workspacePaneRuntimeTabProvider,
   workspacePaneStaticTabProvider,
 } from '#/web/components/workspace-pane/tab-providers.ts'
 import { useWorkspacePaneTabDragPreview } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
@@ -46,6 +46,12 @@ import { WorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/Wor
 import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
 import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import {
+  reselectWorkspacePaneRuntimeTab,
+  selectWorkspacePaneRuntimeTab,
+} from '#/web/workspace-pane/workspace-pane-runtime-tab-actions.ts'
+import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
+import { useWorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-action-context.ts'
 
 interface Props {
   repo: RepoWorkspaceRepo
@@ -69,67 +75,53 @@ export function RepoWorkspaceToolbar({
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
   const compact = useIsCompactUi()
-  // While the first server-side session list for this repo is in flight,
-  // keep the New Terminal affordance visible but busy. Hooks into the
-  // terminal projection readiness store which the Provider updates after a
-  // successful server -> client terminal session projection hydrate.
-  const isInitialSyncInFlight = useIsInitialTerminalProjectionHydrating(repo.id, repo.instanceId)
+  // While the first server-side runtime session list for this repo is in
+  // flight, keep the runtime create affordance visible but busy. The current
+  // signal comes from terminal projection hydration until more runtime tab
+  // providers exist.
+  const isInitialRuntimeProjectionHydrating = useIsInitialTerminalProjectionHydrating(repo.id, repo.instanceId)
   const branchName = detail.branch?.name ?? null
+  const worktreePath = detail.branch?.worktree?.path ?? null
   const workspacePaneTabTargetKey = branchName
     ? workspacePaneTabsTargetIdentityKey({
         repoRoot: repo.id,
         branchName,
-        worktreePath: detail.branch?.worktree?.path ?? null,
+        worktreePath,
       })
     : null
   const preferredWorkspacePaneTab = preferredWorkspacePaneTabForTarget(
     repo.ui,
-    branchName ? { repoRoot: repo.id, branchName, worktreePath: detail.branch?.worktree?.path ?? null } : null,
+    branchName ? { repoRoot: repo.id, branchName, worktreePath } : null,
   )
   const showBranchLevelTabs = !!detail.branch
 
-  const { createTerminal, createOwnedTerminal, selectTerminal, scrollToBottom } = useTerminalSessionContext()
-
   const workspacePaneTabFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
 
-  const terminalBase = useMemo<TerminalSessionBase | null>(
-    () =>
-      detail.branch?.worktree?.path
-        ? {
-            repoRoot: repo.id,
-            repoInstanceId: repo.instanceId,
-            branch: detail.branch.name,
-            worktreePath: detail.branch.worktree.path,
-          }
-        : null,
-    [repo.id, repo.instanceId, detail.branch],
+  // Shared "enter a runtime view" effect for any server-owned tab action:
+  // set the user's preferred tab to the runtime type (when not already there)
+  // and uncollapse the pane. Runtime-specific follow-up lives in the action
+  // registry; renderability is still decided by the tab model.
+  const enterWorkspacePaneRuntimeTab = useCallback(
+    (type: WorkspacePaneRuntimeTabType) => {
+      if (preferredWorkspacePaneTab !== type) {
+        if (branchName) navigation.showRepoBranchWorkspacePaneTab(repo.id, branchName, type)
+      }
+    },
+    [branchName, navigation, repo.id, preferredWorkspacePaneTab],
   )
-
-  // Shared "enter the terminal view" effect for any terminal-targeting action:
-  // set the user's preferred tab to terminal (when not already there) and
-  // uncollapse the pane. Callers add their own follow-up command
-  // (create/select/scroll). Whether the terminal view is *renderable*
-  // (worktree + sessions) is decided at read time by
-  // the shared workspace pane tab model — we only assert user intent here.
-  const enterTerminalTab = useCallback(() => {
-    if (preferredWorkspacePaneTab !== 'terminal') {
-      if (branchName) navigation.showRepoBranchWorkspacePaneTab(repo.id, branchName, 'terminal')
-    }
-  }, [branchName, navigation, repo.id, preferredWorkspacePaneTab])
-
-  const handleNewTerminal = useCallback(() => {
-    if (!terminalBase) return
-    // "+" is a generic entry → don't anchor; opener only drives close-back.
-    const openerIdentity = captureWorkspacePaneActiveTabIdentity(repo.id, terminalBase.branch)
-    void runCreateTerminalTabCommand({
-      base: terminalBase,
-      createTerminal,
-      createOwnedTerminal,
-      openerIdentity,
-      enterTerminalTab,
-      t,
-    })
-  }, [createOwnedTerminal, createTerminal, terminalBase, repo.id, enterTerminalTab, t])
+  const workspacePaneRuntimeTabActionContext = useWorkspacePaneRuntimeTabActionContext({
+    enterRuntimeTab: enterWorkspacePaneRuntimeTab,
+  })
+  const workspacePaneCreateAction = useWorkspacePaneRuntimeTabCreateAction({
+    repoRoot: repo.id,
+    repoInstanceId: repo.instanceId,
+    branchName,
+    worktreePath,
+    runtimeTabStateByType: workspacePaneTabModel.runtimeTabStateByType,
+    initialRuntimeProjectionHydrating: isInitialRuntimeProjectionHydrating,
+    enterRuntimeTab: enterWorkspacePaneRuntimeTab,
+    t,
+  })
 
   const showWorkspacePaneTabItem = useCallback(
     (item: WorkspacePaneTabItem) => {
@@ -137,21 +129,22 @@ export function RepoWorkspaceToolbar({
         if (branchName) navigation.showRepoBranchWorkspacePaneTab(repo.id, branchName, item.staticTabType)
         return
       }
-      if (isTerminalWorkspacePaneTabItem(item)) {
-        enterTerminalTab()
-        selectTerminal(item.view.terminalWorktreeKey, item.view.terminalSessionId)
-        return
+      if (isRuntimeWorkspacePaneTabItem(item)) {
+        selectWorkspacePaneRuntimeTab(item.view, workspacePaneRuntimeTabActionContext)
       }
     },
-    [branchName, enterTerminalTab, navigation, repo.id, selectTerminal],
+    [branchName, navigation, repo.id, workspacePaneRuntimeTabActionContext],
   )
 
-  const handleScrollToBottom = useCallback(
-    (key: string) => {
-      enterTerminalTab()
-      scrollToBottom(key)
+  const reselectWorkspacePaneTabItem = useCallback(
+    (item: WorkspacePaneTabItem) => {
+      if (isRuntimeWorkspacePaneTabItem(item)) {
+        reselectWorkspacePaneRuntimeTab(item.view, workspacePaneRuntimeTabActionContext)
+        return
+      }
+      showWorkspacePaneTabItem(item)
     },
-    [enterTerminalTab, scrollToBottom],
+    [showWorkspacePaneTabItem, workspacePaneRuntimeTabActionContext],
   )
 
   const {
@@ -162,14 +155,14 @@ export function RepoWorkspaceToolbar({
     repoRoot: repo.id,
     repoInstanceId: repo.instanceId,
     branchName,
-    worktreePath: terminalBase?.worktreePath ?? null,
+    worktreePath,
     canonicalTabs: workspacePaneTabModel.tabEntries,
   })
   const { reorderTabs: reorderWorkspacePaneTabs } = useWorkspacePaneTabsReorderMutation({
     repoRoot: repo.id,
     repoInstanceId: repo.instanceId,
     branchName,
-    worktreePath: terminalBase?.worktreePath ?? null,
+    worktreePath,
     canonicalTabs: workspacePaneTabModel.tabEntries,
     onReorderRejected: clearWorkspacePaneTabDragPreview,
   })
@@ -198,38 +191,40 @@ export function RepoWorkspaceToolbar({
           })
         }
         if (tab.kind === 'pending') {
-          const label = terminalWorkspacePaneTabProvider.pendingLabel({
+          const provider = workspacePaneRuntimeTabProvider(tab.runtimeType)
+          const runtimeState = workspacePaneTabModel.runtimeTabStateByType[tab.runtimeType]
+          const label = provider.pendingLabel({
             t,
-            terminalCreatePending: workspacePaneTabModel.terminalCreatePending,
-            terminalProjectionPhase: workspacePaneTabModel.terminalProjectionPhase,
+            createPending: runtimeState.createPending,
+            projectionPhase: runtimeState.projectionPhase,
           })
           return createPendingWorkspacePaneTabItem({
             type: tab.type,
             label,
             tooltip: label,
-            panelId: terminalWorkspacePaneTabProvider.panelId(workspacePaneId),
+            panelId: provider.panelId(workspacePaneId),
           })
         }
+        const provider = workspacePaneRuntimeTabProvider(tab.runtimeType)
         const metadata = {
           t,
           branchName: branchName ?? '',
           statusCount: detail.statusCount,
           view: tab.view,
         }
-        return createTerminalWorkspacePaneTabItem({
+        return createRuntimeWorkspacePaneTabItem({
           view: tab.view,
-          label: terminalWorkspacePaneTabProvider.label(metadata),
-          tooltip: terminalWorkspacePaneTabProvider.tooltip(metadata),
-          closeLabel: terminalWorkspacePaneTabProvider.closeLabel(metadata),
-          panelId: terminalWorkspacePaneTabProvider.panelId(workspacePaneId),
+          label: provider.label(metadata),
+          tooltip: provider.tooltip(metadata),
+          closeLabel: provider.closeLabel(metadata),
+          panelId: provider.panelId(workspacePaneId),
         })
       }),
     [
       branchName,
       detail.statusCount,
       t,
-      workspacePaneTabModel.terminalCreatePending,
-      workspacePaneTabModel.terminalProjectionPhase,
+      workspacePaneTabModel.runtimeTabStateByType,
       workspacePaneTabModel.tabs,
       workspacePaneId,
     ],
@@ -243,17 +238,20 @@ export function RepoWorkspaceToolbar({
       ),
     [canonicalWorkspacePaneTabItems, visualWorkspacePaneTabs],
   )
-  const activeTabIdentity = workspacePaneTabModel.activeTab?.identity ?? null
+  const activeTabIdentity = workspacePaneTabModel.activeTab?.identity ?? activePendingTabIdentity(workspacePaneTabModel)
   const handleSelectWorkspacePaneTabItem = useCallback(
     (item: WorkspacePaneTabItem) => {
       if (isPendingWorkspacePaneTabItem(item)) return
-      if (isTerminalWorkspacePaneTabItem(item) && item.identity === activeTabIdentity) {
-        handleScrollToBottom(item.view.terminalSessionId)
-        return
-      }
       showWorkspacePaneTabItem(item)
     },
-    [activeTabIdentity, handleScrollToBottom, showWorkspacePaneTabItem],
+    [showWorkspacePaneTabItem],
+  )
+  const handleReselectWorkspacePaneTabItem = useCallback(
+    (item: WorkspacePaneTabItem) => {
+      if (isPendingWorkspacePaneTabItem(item)) return
+      reselectWorkspacePaneTabItem(item)
+    },
+    [reselectWorkspacePaneTabItem],
   )
   const handleCloseWorkspacePaneTab = useCallback(
     (item: WorkspacePaneTabItem) => {
@@ -296,7 +294,6 @@ export function RepoWorkspaceToolbar({
       </Button>
     </Tip>
   ) : null
-
   return (
     <WorkspaceToolbar draggable={!compact} trafficLightOffset={trafficLightOffset}>
       <WorkspaceToolbarLeadingSpacer reserve={trafficLightOffset} />
@@ -309,7 +306,6 @@ export function RepoWorkspaceToolbar({
           {compact && repoWorkspaceBackAction}
           {showBranchLevelTabs && workspacePaneTabTargetKey && (
             <WorkspacePaneTabStrip
-              terminalWorktreeKey={workspacePaneTabModel.terminalWorktreeKey}
               workspacePaneTabTargetKey={workspacePaneTabTargetKey}
               items={workspacePaneTabItems}
               workspacePaneId={workspacePaneId}
@@ -318,14 +314,13 @@ export function RepoWorkspaceToolbar({
               panelActive
               focusRegistry={workspacePaneTabFocusRegistry}
               emptyFocusKey={EMPTY_WORKSPACE_PANE_TAB_FOCUS_KEY}
-              // While a terminal create is in flight, the tab model contributes
-              // a pending terminal tab. This is presentation only: create
+              // While a runtime create is in flight, the tab model contributes
+              // a pending runtime tab. This is presentation only: create
               // intent still goes to the server, which is the lifecycle
               // authority and either accepts, serializes, or rejects it.
-              newTerminalBusy={isInitialSyncInFlight || workspacePaneTabModel.terminalCreatePending}
-              onNew={handleNewTerminal}
+              createAction={workspacePaneCreateAction}
               onSelect={handleSelectWorkspacePaneTabItem}
-              onScrollToBottom={handleScrollToBottom}
+              onReselect={handleReselectWorkspacePaneTabItem}
               onClose={handleCloseWorkspacePaneTab}
               onReorder={handleReorderWorkspacePaneTabStrip}
               activateKeyboardNavigationSelection
@@ -344,4 +339,11 @@ export function RepoWorkspaceToolbar({
 
 function workspacePaneTabEntryForItem(item: WorkspacePaneTabItem): WorkspacePaneTabEntry | null {
   return isPendingWorkspacePaneTabItem(item) ? null : item.tabEntry
+}
+
+function activePendingTabIdentity(model: RepoWorkspaceTabModel): string | null {
+  const selection = model.selection
+  if (selection?.kind !== 'runtime-host') return null
+  const runtimeType = selection.runtimeType
+  return model.tabs.find((tab) => tab.kind === 'pending' && tab.runtimeType === runtimeType)?.identity ?? null
 }

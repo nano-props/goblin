@@ -6,18 +6,17 @@ import {
   type TerminalCreateResult,
   type TerminalCreateInput,
   type TerminalSessionSummary,
-  type TerminalUpdateWorkspaceTabsInput,
-  type WorkspacePaneTabsEntry,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabsEntry, WorkspacePaneTabsUpdateInput } from '#/shared/workspace-pane-tabs.ts'
 import { isValidTerminalClientId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import { createTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
-import type { WorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import {
-  createTerminalWorkspaceTabsCoordinator,
   isValidWorkspacePaneTabsOperation,
-} from '#/server/terminal/terminal-workspace-tabs-coordinator.ts'
+  type WorkspacePaneTabsCoordinator,
+  type WorkspacePaneRuntimeTabsProvider,
+} from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
 import {
   createTerminalSessionEnsurer,
@@ -38,16 +37,7 @@ interface TerminalSessionServiceOptions {
   isValidClientId(value: unknown): value is string
   isValidTerminalSessionId(value: unknown): value is string
   manager: TerminalSessionServiceManager
-  workspaceTabs: Pick<
-    WorkspacePaneTabsRuntime<string>,
-    | 'closeStaticTab'
-    | 'ensureTerminalTab'
-    | 'openStaticTab'
-    | 'reorderTabsByIdentity'
-    | 'replaceTabs'
-    | 'tabsForScope'
-    | 'closeSessionsForScope'
-  >
+  workspaceTabsCoordinator: WorkspacePaneTabsCoordinator
   broadcastSessionsChanged(userId: string, repoRoot: string): void
   broadcastWorkspaceTabsChanged(userId: string, repoRoot: string): void
   isCurrentRepoInstance(userId: string, repoRoot: string, repoInstanceId: string): boolean
@@ -58,15 +48,13 @@ type TerminalSessionCreateCoordinator = ReturnType<typeof createTerminalSessionC
 type TerminalSessionCreator = ReturnType<typeof createTerminalSessionCreator>
 type TerminalSessionEnsurer = ReturnType<typeof createTerminalSessionEnsurer>
 type TerminalSessionPruner = ReturnType<typeof createTerminalSessionPruner>
-type TerminalWorkspaceTabsCoordinator = ReturnType<typeof createTerminalWorkspaceTabsCoordinator>
-
 class TerminalSessionService {
   private readonly options: TerminalSessionServiceOptions
   private readonly createCoordinator: TerminalSessionCreateCoordinator
   private readonly creator: TerminalSessionCreator
   private readonly ensurer: TerminalSessionEnsurer
   private readonly pruner: TerminalSessionPruner
-  private readonly workspaceTabsCoordinator: TerminalWorkspaceTabsCoordinator
+  private readonly workspaceTabsCoordinator: WorkspacePaneTabsCoordinator
 
   constructor(options: TerminalSessionServiceOptions) {
     this.options = options
@@ -77,10 +65,7 @@ class TerminalSessionService {
       gCommand: options.gCommand,
     })
     this.pruner = createTerminalSessionPruner({ manager: options.manager })
-    this.workspaceTabsCoordinator = createTerminalWorkspaceTabsCoordinator({
-      manager: options.manager,
-      workspaceTabs: options.workspaceTabs,
-    })
+    this.workspaceTabsCoordinator = options.workspaceTabsCoordinator
     this.creator = createTerminalSessionCreator({
       createCoordinator: this.createCoordinator,
       workspaceTabsCoordinator: this.workspaceTabsCoordinator,
@@ -89,6 +74,7 @@ class TerminalSessionService {
         this.isCurrentRepoInstance(userId, repoRoot, repoInstanceId),
       rejectStaleCreateIfNeeded: (userId, input, terminalRuntimeSessionId) =>
         this.rejectStaleCreateIfNeeded(userId, input, terminalRuntimeSessionId),
+      cleanupStaleCreate: async (userId, input) => await this.cleanupStaleCreate(userId, input),
       listSessions: async (userId, repoRoot, repoInstanceId) =>
         await this.listSessions(userId, repoRoot, repoInstanceId),
     })
@@ -162,7 +148,7 @@ class TerminalSessionService {
     })
   }
 
-  async updateTabs(userId: string, input: TerminalUpdateWorkspaceTabsInput): Promise<WorkspacePaneTabEntry[]> {
+  async updateTabs(userId: string, input: WorkspacePaneTabsUpdateInput): Promise<WorkspacePaneTabEntry[]> {
     if (!isValidRepoLocator(input.repoRoot)) return []
     if (!isValidBranch(input.branchName)) return []
     if (input.worktreePath !== null && !isValidCwd(input.worktreePath)) return []
@@ -234,11 +220,17 @@ class TerminalSessionService {
   ): Extract<TerminalCreateResult, { ok: false }> | null {
     if (this.isCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)) return null
     this.options.manager.closeSession(terminalRuntimeSessionId)
-    this.options.workspaceTabs.closeSessionsForScope(
-      userId,
-      terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId),
-    )
     return { ok: false, message: 'error.repo-instance-stale' }
+  }
+
+  private async cleanupStaleCreate(
+    userId: string,
+    input: Pick<TerminalCreateInput, 'repoRoot' | 'repoInstanceId'>,
+  ): Promise<void> {
+    await this.workspaceTabsCoordinator.closeScope({
+      userId,
+      scope: terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId),
+    })
   }
 }
 
@@ -248,4 +240,19 @@ export function createTerminalSessionService(options: TerminalSessionServiceOpti
 
 function terminalWorktreePath(repoRoot: string, worktreePath: string): string {
   return isRemoteRepoId(repoRoot) ? worktreePath : path.resolve(worktreePath)
+}
+
+export function terminalWorkspacePaneRuntimeTabsProvider(
+  manager: Pick<TerminalSessionServiceManager, 'listSessionsForUser'>,
+): WorkspacePaneRuntimeTabsProvider {
+  return {
+    type: 'terminal',
+    async listSessionsForUser(userId, scope) {
+      return (await manager.listSessionsForUser(userId, scope)).map((session) => ({
+        sessionId: session.terminalSessionId,
+        branch: session.branch,
+        worktreePath: session.worktreePath,
+      }))
+    },
+  }
 }

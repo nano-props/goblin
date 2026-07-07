@@ -1,11 +1,9 @@
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
-import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { createRepoWorkspaceTabModel, type RepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 
 export type WorkspacePaneTabTargetResolution =
   | { kind: 'ready'; target: RepoWorkspaceTabModel }
@@ -28,39 +26,31 @@ export function resolveWorkspacePaneTabTargetForBranch(
   if (!branchModel) return { kind: 'unavailable', reason: 'branch-read-model-unavailable' }
   const branch = branchModel.branches.find((candidate) => candidate.name === branchName)
   if (!branch) return { kind: 'missing' }
-  const worktreePath = branch.worktree?.path
-  const terminalProjectionHydration = useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(repoId)
-  const currentTerminalProjectionHydration =
-    terminalProjectionHydration?.instanceId === repo.instanceId ? terminalProjectionHydration : null
-  const terminalProjectionPhase = currentTerminalProjectionHydration?.phase ?? 'pending'
-  const terminalWorktreeKey = worktreePath ? formatTerminalWorktreeKey(repo.id, worktreePath) : null
-  const snapshot = terminalWorktreeKey
-    ? (readTerminalSessionCommandBridge()?.terminalWorktreeSnapshot(terminalWorktreeKey) ?? null)
-    : null
+  const worktreePath = branch.worktree?.path ?? null
+  const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
+    repoRoot: repo.id,
+    repoInstanceId: repo.instanceId,
+    worktreePath,
+  })
   return {
     kind: 'ready',
     target: createRepoWorkspaceTabModel({
       repoId,
       branchName,
-      worktreePath: worktreePath ?? null,
+      worktreePath,
       preferredTab: preferredWorkspacePaneTabForTarget(repo.ui, {
         repoRoot: repoId,
         branchName,
-        worktreePath: worktreePath ?? null,
+        worktreePath,
       }),
       tabEntries: readWorkspacePaneTabsForTarget({
         repoRoot: repoId,
         repoInstanceId: repo.instanceId,
         branchName,
-        worktreePath: worktreePath ?? null,
+        worktreePath,
       }),
-      runtimeTerminalViews: snapshot?.sessions ?? [],
-      terminalCreatePending: snapshot?.pendingCreate ?? false,
-      terminalProjectionPhase,
-      terminalProjectionErrorMessage: currentTerminalProjectionHydration?.errorMessage,
-      selectedTerminalSessionId: terminalWorktreeKey
-        ? (state.selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] ?? null)
-        : null,
+      runtimeTabViews: runtimeProjection.runtimeTabViews,
+      runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
     }),
   }
 }

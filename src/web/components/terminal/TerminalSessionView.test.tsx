@@ -91,7 +91,7 @@ async function renderTerminalSession() {
       },
     ],
     count: 1,
-    pendingCreate: false,
+    createPending: false,
   }
   const snapshot = {
     phase: 'open' as const,
@@ -237,7 +237,7 @@ describe('TerminalSessionView', () => {
         },
       ],
       count: 1,
-      pendingCreate: false,
+      createPending: false,
     })
     const snapshot = {
       phase: 'open' as const,
@@ -318,7 +318,7 @@ describe('TerminalSessionView', () => {
           },
         ],
         count: 1,
-        pendingCreate: false,
+        createPending: false,
       })
       await act(async () => {
         for (const listener of worktreeListeners) listener()
@@ -358,7 +358,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: summaries,
       count: 1,
-      pendingCreate: false,
+      createPending: false,
     }
     const snapshot = {
       phase: 'open' as const,
@@ -442,7 +442,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: null,
       sessions: [],
       count: 0,
-      pendingCreate: false,
+      createPending: false,
     }
     const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
     const context: TerminalSessionContextValue = {
@@ -522,7 +522,7 @@ describe('TerminalSessionView', () => {
         },
       ],
       count: 1,
-      pendingCreate: false,
+      createPending: false,
     }
     const snapshot = { phase: 'opening' as const, message: null, processName: 'zsh' }
     const context: TerminalSessionContextValue = {
@@ -584,7 +584,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: null,
       sessions: [],
       count: 0,
-      pendingCreate: false,
+      createPending: false,
     }
     const context: TerminalSessionContextValue = {
       createTerminal: vi.fn(),
@@ -663,7 +663,7 @@ describe('TerminalSessionView', () => {
         },
       ],
       count: 1,
-      pendingCreate: false,
+      createPending: false,
     }
     const openingSnapshot = { phase: 'opening' as const, message: null, processName: 'zsh' }
     const openSnapshot = {
@@ -772,7 +772,7 @@ describe('TerminalSessionView', () => {
         },
       ],
       count: 1,
-      pendingCreate: false,
+      createPending: false,
     }
     const openingSnapshot = { phase: 'opening' as const, message: null, processName: 'zsh' }
     const openSnapshot = {
@@ -889,7 +889,7 @@ describe('TerminalSessionView', () => {
         },
       ],
       count: 1,
-      pendingCreate: false,
+      createPending: false,
     }
     const snapshot = {
       phase: 'error' as const,
@@ -1004,7 +1004,7 @@ describe('TerminalSessionView', () => {
         },
       ],
       count: 1,
-      pendingCreate: false,
+      createPending: false,
     }
     // Viewer attachment: the !isController branch of handleDrop should
     // short-circuit before touching writeInput.
@@ -1124,7 +1124,7 @@ describe('TerminalSessionView', () => {
         },
       ],
       count: 1,
-      pendingCreate: false,
+      createPending: false,
     }
     // Controller attachment — the `isController` branch of handleDrop
     // must NOT short-circuit.
@@ -1263,7 +1263,7 @@ describe('TerminalSessionView', () => {
         },
       ],
       count: 1,
-      pendingCreate: false,
+      createPending: false,
     }
     const snapshot = {
       phase: 'open' as const,
@@ -1374,7 +1374,7 @@ describe('TerminalSessionView', () => {
         },
       ],
       count: 1,
-      pendingCreate: false,
+      createPending: false,
     }
     const snapshot = {
       phase: 'open' as const,
@@ -1497,7 +1497,7 @@ describe('TerminalSessionView', () => {
         },
       ],
       count: 1,
-      pendingCreate: false,
+      createPending: false,
     }
     const snapshot = {
       phase: 'open' as const,
@@ -1776,7 +1776,7 @@ describe('TerminalSessionView', () => {
         },
       ],
       count: 1,
-      pendingCreate: false,
+      createPending: false,
     }
     const snapshot = {
       phase: 'open' as const,
@@ -1921,7 +1921,7 @@ describe('TerminalSessionView', () => {
         },
       ],
       count: 1,
-      pendingCreate: false,
+      createPending: false,
     }
     const worktreeSnapshotB = {
       terminalWorktreeKey: '/repo\0/worktree-other',
@@ -1939,7 +1939,7 @@ describe('TerminalSessionView', () => {
         },
       ],
       count: 1,
-      pendingCreate: false,
+      createPending: false,
     }
     const snapshotOpen = {
       phase: 'open' as const,
@@ -2076,7 +2076,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: null,
       sessions: [],
       count: 0,
-      pendingCreate: false,
+      createPending: false,
     }
     const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
     const context: TerminalSessionContextValue = {
@@ -2164,7 +2164,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: null,
       sessions: [],
       count: 0,
-      pendingCreate: false,
+      createPending: false,
     }
     const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
     const context: TerminalSessionContextValue = {

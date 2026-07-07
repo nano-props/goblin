@@ -1,44 +1,28 @@
-import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
+import { useEffect, useMemo, type ReactNode } from 'react'
 
 import '#/web/components/terminal/terminal-session.css'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { terminalClient } from '#/web/terminal.ts'
-import { terminalSessionProviderLog } from '#/web/logger.ts'
 import {
   TerminalSessionContext,
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
-import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import { preloadTerminalFont } from '#/web/components/terminal/terminal-geometry.ts'
-import { loadTerminalSessions } from '#/web/terminal-session-queries.ts'
-import {
-  refreshWorkspacePaneTabs,
-  setWorkspacePaneTabsForTargetQueryData,
-} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import {
-  TerminalSessionProjection,
-  getTerminalSessionProjection,
-} from '#/web/components/terminal/TerminalSessionProjection.ts'
+import { refreshWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { useTerminalSessionProjection } from '#/web/components/terminal/use-terminal-session-projection.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { useTerminalRepoIndex } from '#/web/components/terminal/terminal-repo-index.ts'
 import type { TerminalSessionContextValue, TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
 
 interface TerminalSessionProviderProps {
   children: ReactNode
-  currentRepoId: string | null
 }
 
-export function TerminalSessionProvider({ children, currentRepoId }: TerminalSessionProviderProps) {
+export function TerminalSessionProvider({ children }: TerminalSessionProviderProps) {
   const repoIndex = useTerminalRepoIndex()
-  const currentRepoInstanceId = currentRepoId ? (repoIndex[currentRepoId]?.instanceId ?? null) : null
   const selectedTerminalSessionIdByTerminalWorktree = useReposStore(
     (s) => s.selectedTerminalSessionIdByTerminalWorktree,
   )
-  const workspaceMembershipReady = useReposStore((s) => s.workspaceMembershipReady)
-  const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
-  const repoIndexRef = useRef(repoIndex)
-  repoIndexRef.current = repoIndex
 
   // T1.1: prewarm the terminal font at app startup. The provider lives at
   // the router root above the per-route App, so this fires once per app
@@ -50,103 +34,13 @@ export function TerminalSessionProvider({ children, currentRepoId }: TerminalSes
     void preloadTerminalFont()
   }, [])
 
-  // T1.2: pay the WebSocket handshake cost when the user enters a repo,
-  // before they click a terminal view. The client maintains a single
-  // shared socket, so watching currentRepoId (not terminalWorktreeKey)
-  // is the right granularity: one handshake per repo visit, not one per
-  // worktree tab. The prewarm is fire-and-forget — failures are
-  // swallowed inside the client; the next real IPC will surface a real
-  // error if the server is unreachable.
-  useEffect(() => {
-    if (!currentRepoId) return
-    void terminalClient.prewarm()
-  }, [currentRepoId])
-
-  // The projection is a client-level singleton (terminal-roadmap.md P1.7).
-  // The first Provider mount constructs it via `getTerminalSessionProjection`;
-  // subsequent mounts (StrictMode re-mount, route round-trip) reuse the
-  // same instance. The ref is kept only so the rest of this component can
-  // reach the singleton without re-calling the getter on every render.
-  const projectionRef = useRef<TerminalSessionProjection | null>(null)
-  if (!projectionRef.current) {
-    projectionRef.current = getTerminalSessionProjection({
-      onSelectedWorktreeChange: setSelectedTerminal,
-      onWorkspaceTabsChanged: (base, tabs) => {
-        if (typeof base.repoInstanceId !== 'string') return
-        setWorkspacePaneTabsForTargetQueryData({
-          repoRoot: base.repoRoot,
-          repoInstanceId: base.repoInstanceId,
-          branchName: base.branch,
-          worktreePath: base.worktreePath,
-          tabs,
-        })
-      },
-    })
-  }
-  const projection = projectionRef.current
-
-  const reconcileTerminalSessionsFromServer = useCallback(
-    async (
-      repoRoot: string,
-      expectedRepoInstanceId?: string,
-      options?: { markInitialHydrationFailure?: boolean },
-    ): Promise<void> => {
-      const repo = repoIndexRef.current[repoRoot]
-      if (!repoRoot || !repo) return
-      if (expectedRepoInstanceId && repo.instanceId !== expectedRepoInstanceId) return
-      try {
-        const clientId = readOrCreateWebTerminalClientId()
-        const serverSessions = await loadTerminalSessions(repoRoot, repo.instanceId)
-        if (repoIndexRef.current[repoRoot]?.instanceId !== repo.instanceId) return
-        projection.reconcileServerSessions(repoRoot, serverSessions, clientId)
-        useTerminalProjectionHydrationStore.getState().markProjectionReady(repoRoot, repo.instanceId)
-      } catch (err) {
-        terminalSessionProviderLog.debug('failed to reconcile terminal sessions from server', { err })
-        if (options?.markInitialHydrationFailure && repoIndexRef.current[repoRoot]?.instanceId === repo.instanceId) {
-          useTerminalProjectionHydrationStore
-            .getState()
-            .markProjectionFailed(repoRoot, repo.instanceId, projectionHydrationFailureMessage(err))
-        }
-      }
-    },
-    [projection],
-  )
+  const projection = useTerminalSessionProjection()
 
   // Projection state sync
   useEffect(() => {
     projection.setRepoIndex(repoIndex)
     projection.setPreferredSelectedTerminalSessionIds(selectedTerminalSessionIdByTerminalWorktree)
   }, [projection, repoIndex, selectedTerminalSessionIdByTerminalWorktree])
-
-  // T5.1: visibility recovery hook. On `visibilitychange:visible` and
-  // on `pageshow` (bfcache restore on Safari/Firefox mobile), call
-  // `kickReconnect()` so a backgrounded tab reconnects without
-  // waiting for the 300ms backoff. The kick is a no-op if the socket
-  // is already healthy, so it costs nothing on a desktop browser
-  // where the WS rarely drops. No periodic polling, no force-close
-  // of a working socket. State updates flow through the existing
-  // server-push `sessions-changed` event after the (re)opened
-  // socket delivers its initial snapshot — we never trigger a
-  // client-side reconcile here.
-  useEffect(() => {
-    const onVisibilityChange = () => {
-      if (document.visibilityState !== 'visible') return
-      terminalClient.kickReconnect()
-    }
-    const onPageShow = (event: PageTransitionEvent) => {
-      // `event.persisted === true` means the page came from the
-      // bfcache (Safari/Firefox mobile). A non-persisted pageshow
-      // is a regular full load and the client is already healthy.
-      if (!event.persisted) return
-      terminalClient.kickReconnect()
-    }
-    document.addEventListener('visibilitychange', onVisibilityChange)
-    window.addEventListener('pageshow', onPageShow)
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-      window.removeEventListener('pageshow', onPageShow)
-    }
-  }, [])
 
   // Projection event wiring (singleton lifecycle, see terminal-roadmap.md P1.7).
   // The projection is client-level; we only subscribe / unsubscribe client
@@ -180,11 +74,11 @@ export function TerminalSessionProvider({ children, currentRepoId }: TerminalSes
     // there — the broadcast is multi-window safe by construction.
     const offSessionClosed = terminalClient.onSessionClosed((event) => {
       projection.handleSessionClosed(event)
-      const repoInstanceId = repoIndexRef.current[event.repoRoot]?.instanceId
+      const repoInstanceId = useReposStore.getState().repos[event.repoRoot]?.instanceId
       if (typeof repoInstanceId === 'string') refreshWorkspacePaneTabs(event.repoRoot, repoInstanceId)
     })
 
-    setTerminalSessionCommandBridge({
+    const disposeCommandBridge = setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: projection.terminalWorktreeSnapshot,
       createTerminal: projection.createTerminal,
       selectTerminal: projection.selectTerminal,
@@ -200,55 +94,9 @@ export function TerminalSessionProvider({ children, currentRepoId }: TerminalSes
       offIdentity()
       offLifecycle()
       offSessionClosed()
+      disposeCommandBridge()
     }
   }, [projection])
-
-  // Terminal sessions are runtime state owned by the server. Keep the client
-  // projection reconciled on route entry, focus recovery, and server-pushed
-  // terminal session changes without feeding back into repo routing/read models.
-  useEffect(() => {
-    if (!workspaceMembershipReady || !currentRepoId || !currentRepoInstanceId) return
-    const repoRoot = currentRepoId
-    const repoInstanceId = currentRepoInstanceId
-    let disposed = false
-    useTerminalProjectionHydrationStore.getState().beginProjectionHydration(repoRoot, repoInstanceId)
-    void reconcileTerminalSessionsFromServer(repoRoot, repoInstanceId, { markInitialHydrationFailure: true })
-
-    const handleFocus = () => {
-      if (!currentRepoId) return
-      if (!useTerminalProjectionHydrationStore.getState().shouldRefreshProjection(currentRepoId)) return
-      void reconcileTerminalSessionsFromServer(currentRepoId)
-    }
-    window.addEventListener('focus', handleFocus)
-
-    const pendingProjectionRefreshRepoRoots = new Set<string>()
-    let projectionRefreshTimer: number | null = null
-    const scheduleProjectionRefresh = (repoRoot: string) => {
-      pendingProjectionRefreshRepoRoots.add(repoRoot)
-      if (projectionRefreshTimer !== null) return
-      projectionRefreshTimer = window.setTimeout(() => {
-        projectionRefreshTimer = null
-        if (disposed) return
-        const repoRoots = Array.from(pendingProjectionRefreshRepoRoots)
-        pendingProjectionRefreshRepoRoots.clear()
-        for (const nextRepoRoot of repoRoots) void reconcileTerminalSessionsFromServer(nextRepoRoot)
-      }, 0)
-    }
-    const offSessionsChanged = terminalClient.onSessionsChanged(scheduleProjectionRefresh)
-    const offWorkspaceTabsChanged = terminalClient.onWorkspaceTabsChanged((repoRoot) => {
-      const repoInstanceId = repoIndexRef.current[repoRoot]?.instanceId
-      if (typeof repoInstanceId === 'string') refreshWorkspacePaneTabs(repoRoot, repoInstanceId)
-      scheduleProjectionRefresh(repoRoot)
-    })
-
-    return () => {
-      disposed = true
-      if (projectionRefreshTimer !== null) window.clearTimeout(projectionRefreshTimer)
-      window.removeEventListener('focus', handleFocus)
-      offSessionsChanged()
-      offWorkspaceTabsChanged()
-    }
-  }, [workspaceMembershipReady, currentRepoId, currentRepoInstanceId, reconcileTerminalSessionsFromServer])
 
   const commandValue = useMemo<TerminalSessionContextValue>(
     () => ({
@@ -291,10 +139,4 @@ export function TerminalSessionProvider({ children, currentRepoId }: TerminalSes
       <TerminalSessionReadContext value={readValue}>{children}</TerminalSessionReadContext>
     </TerminalSessionContext>
   )
-}
-
-function projectionHydrationFailureMessage(err: unknown): string {
-  if (err instanceof Error && err.message) return err.message
-  if (typeof err === 'string') return err
-  return 'error.unknown'
 }

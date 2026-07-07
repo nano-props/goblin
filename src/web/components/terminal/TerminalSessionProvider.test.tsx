@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
+import { AppRuntimeProjectionProvider } from '#/web/runtime/AppRuntimeProjectionProvider.tsx'
 import { setTerminalSessionProjectionForTests } from '#/web/components/terminal/TerminalSessionProjection.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
@@ -21,10 +22,8 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { RepoState } from '#/web/stores/repos/types.ts'
 import {
   preferredWorkspacePaneTabForTarget,
-  preferredWorkspacePaneTabByTargetRecordWith,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
@@ -46,9 +45,9 @@ import type {
   TerminalOutputEvent,
   TerminalSessionSummary,
   TerminalTitleEvent,
-  WorkspacePaneTabsEntry,
 } from '#/shared/terminal-types.ts'
-import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
+import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import {
   readWorkspacePaneTabsForTarget,
@@ -269,8 +268,6 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
 const REPO_ID = '/tmp/gbl-terminal-provider-repo'
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/gbl-terminal-provider-worktree'
-const SECOND_REPO_ID = '/tmp/gbl-terminal-provider-repo-2'
-const SECOND_WORKTREE_PATH = '/tmp/gbl-terminal-provider-worktree-2'
 
 let exitHandler: ((event: TerminalExitEvent) => void) | null = null
 let outputHandler: ((event: TerminalOutputEvent) => void) | null = null
@@ -319,7 +316,7 @@ function completeServerSessions(sessions: TestTerminalSessionSummary[]): Termina
 }
 
 function workspaceTabsWithTerminal(terminalSessionId: string) {
-  return [workspacePaneStaticTabEntry('status'), workspacePaneTerminalTabEntry(terminalSessionId)]
+  return [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)]
 }
 
 function tabsFor(repoRoot: string, branchName: string): WorkspacePaneTabEntry[] {
@@ -542,7 +539,10 @@ beforeEach(() => {
         create: createTerminalMock,
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
         listSessions: async (input: { repoRoot: string }) => completeServerSessions(await listSessionsMock(input)),
-        listWorkspaceTabs: async (input: { repoRoot: string }) => await listWorkspaceTabsMock(input),
+        recoverSessions: async (input: { repoRoot: string }) => ({
+          sessions: completeServerSessions(await listSessionsMock(input)),
+          snapshots: [],
+        }),
         onOutput: vi.fn((cb: (event: TerminalOutputEvent) => void) => {
           outputHandler = cb
           return () => {}
@@ -573,7 +573,13 @@ beforeEach(() => {
             if (sessionsChangedHandler === cb) sessionsChangedHandler = null
           }
         }),
-        onWorkspaceTabsChanged: vi.fn((cb: (repoRoot: string) => void) => {
+        onSessionClosed: vi.fn(() => () => {}),
+      },
+      workspacePaneTabs: {
+        replace: vi.fn(async (input: { tabs: unknown[] }) => input.tabs),
+        update: vi.fn(async () => []),
+        list: async (input: { repoRoot: string }) => await listWorkspaceTabsMock(input),
+        onChanged: vi.fn((cb: (repoRoot: string) => void) => {
           workspaceTabsChangedHandler = cb
           return () => {
             if (workspaceTabsChangedHandler === cb) workspaceTabsChangedHandler = null
@@ -618,6 +624,10 @@ beforeEach(() => {
     pathForFile: vi.fn(() => ''),
     saveClipboardFiles: vi.fn(() => Promise.resolve([])),
     host: () => null,
+    appRealtime: () => ({
+      kickReconnect: vi.fn(() => {}),
+      onRecovered: vi.fn(() => () => {}),
+    }),
     terminal: () => ({
       attach: vi.fn(async () => attachResult()),
       restart: vi.fn(async () => attachResult()),
@@ -635,13 +645,12 @@ beforeEach(() => {
       })),
       close: closeMock,
       create: createTerminalMock,
-      replaceWorkspaceTabs: vi.fn(async (input) => input.tabs),
-      updateWorkspaceTabs: vi.fn(async () => []),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: async (input) => completeServerSessions(await listSessionsMock(input)),
-      listWorkspaceTabs: async (input: { repoRoot: string }) => await listWorkspaceTabsMock(input),
-      prewarm: vi.fn(async () => {}),
-      kickReconnect: vi.fn(() => {}),
+      recoverSessions: async (input) => ({
+        sessions: completeServerSessions(await listSessionsMock(input)),
+        snapshots: [],
+      }),
       notifyBell: window.goblinNative.terminal.notifyBell ?? vi.fn(async () => true),
       sendTestNotification: vi.fn(async () => true),
       setBadge: window.goblinNative.terminal.setBadge ?? vi.fn(() => {}),
@@ -675,12 +684,6 @@ beforeEach(() => {
           if (sessionsChangedHandler === cb) sessionsChangedHandler = null
         }
       }),
-      onWorkspaceTabsChanged: vi.fn((cb: (repoRoot: string) => void) => {
-        workspaceTabsChangedHandler = cb
-        return () => {
-          if (workspaceTabsChangedHandler === cb) workspaceTabsChangedHandler = null
-        }
-      }),
       onSessionClosed: vi.fn(
         (
           cb: (event: {
@@ -696,6 +699,17 @@ beforeEach(() => {
           }
         },
       ),
+    }),
+    workspacePaneTabs: () => ({
+      replace: vi.fn(async (input) => input.tabs),
+      update: vi.fn(async () => []),
+      list: async (input) => await listWorkspaceTabsMock(input),
+      onChanged: vi.fn((cb: (repoRoot: string) => void) => {
+        workspaceTabsChangedHandler = cb
+        return () => {
+          if (workspaceTabsChangedHandler === cb) workspaceTabsChangedHandler = null
+        }
+      }),
     }),
   })
 })
@@ -1170,7 +1184,7 @@ describe('TerminalSessionProvider', () => {
       workspacePaneTabsByBranch: {
         'feature/worktree': [
           workspacePaneStaticTabEntry('status'),
-          workspacePaneTerminalTabEntry('session-1'),
+          workspacePaneRuntimeTabEntry('terminal', 'session-1'),
           workspacePaneStaticTabEntry('history'),
         ],
       },
@@ -1182,7 +1196,7 @@ describe('TerminalSessionProvider', () => {
       worktreePath: WORKTREE_PATH,
       tabs: [
         workspacePaneStaticTabEntry('status'),
-        workspacePaneTerminalTabEntry('session-1'),
+        workspacePaneRuntimeTabEntry('terminal', 'session-1'),
         workspacePaneStaticTabEntry('history'),
       ],
     })
@@ -1211,121 +1225,6 @@ describe('TerminalSessionProvider', () => {
       await vi.waitFor(() => {
         expect(tabsFor(REPO_ID, 'feature/worktree')).toEqual([workspacePaneStaticTabEntry('history')])
       })
-    } finally {
-      await unmount()
-    }
-  })
-
-  test('refreshes workspace tabs query from workspace-tabs-changed broadcasts', async () => {
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabsByBranch: {
-        'feature/worktree': [workspacePaneStaticTabEntry('status')],
-      },
-    })
-    setWorkspacePaneTabsForTargetQueryData({
-      repoRoot: REPO_ID,
-      repoInstanceId: useReposStore.getState().repos[REPO_ID]!.instanceId,
-      branchName: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
-      tabs: [workspacePaneStaticTabEntry('status')],
-    })
-    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
-    const { unmount } = await renderProviderWithProbe(terminalWorktreeKey)
-
-    try {
-      listWorkspaceTabsMock.mockResolvedValue([
-        {
-          repoRoot: REPO_ID,
-          branchName: 'feature/worktree',
-          worktreePath: WORKTREE_PATH,
-          tabs: [workspacePaneStaticTabEntry('history')],
-        },
-      ])
-
-      await act(async () => {
-        workspaceTabsChangedHandler?.(REPO_ID)
-        await waitForScheduledServerSync()
-      })
-
-      await vi.waitFor(() => {
-        expect(tabsFor(REPO_ID, 'feature/worktree')).toEqual([workspacePaneStaticTabEntry('history')])
-      })
-    } finally {
-      await unmount()
-    }
-  })
-
-  test('waits for workspace membership before hydrating terminal server projection', async () => {
-    const repo = seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-    })
-    useReposStore.setState({ workspaceMembershipReady: false })
-    serverSessions = [
-      {
-        terminalRuntimeSessionId: 'server_session_1',
-        terminalSessionId: 'session-1',
-        processName: 'zsh',
-        canonicalTitle: null,
-        cwd: WORKTREE_PATH,
-        controller: null,
-        phase: 'open',
-        message: null,
-        cols: 80,
-        rows: 24,
-      },
-    ]
-    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
-    const { getProbe, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
-
-    try {
-      expect(listSessionsMock).not.toHaveBeenCalled()
-      expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)?.instanceId).not.toBe(
-        repo.instanceId,
-      )
-
-      await act(async () => {
-        useReposStore.setState({ workspaceMembershipReady: true })
-      })
-
-      await vi.waitFor(() => expect(getProbe().terminalIds).toEqual(['session-1']))
-      expect(listSessionsMock).toHaveBeenCalledTimes(1)
-      expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
-        instanceId: repo.instanceId,
-        phase: 'ready',
-      })
-    } finally {
-      await unmount()
-    }
-  })
-
-  test('coalesces session and workspace tabs change broadcasts', async () => {
-    seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-    })
-    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
-    const { unmount } = await renderProviderWithProbe(terminalWorktreeKey)
-
-    try {
-      await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
-      listSessionsMock.mockClear()
-
-      await act(async () => {
-        sessionsChangedHandler?.(REPO_ID)
-        workspaceTabsChangedHandler?.(REPO_ID)
-        await waitForScheduledServerSync()
-      })
-
-      expect(listSessionsMock).toHaveBeenCalledTimes(1)
     } finally {
       await unmount()
     }
@@ -1439,98 +1338,6 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
-  test('initial mount only syncs the current repo session list', async () => {
-    const firstRepo = seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-    })
-    const secondRepo = {
-      ...firstRepo,
-      id: SECOND_REPO_ID,
-      instanceId: 'repo-instance-second',
-      ui: {
-        ...firstRepo.ui,
-        preferredWorkspacePaneTabByTarget: preferredWorkspacePaneTabByTargetRecordWith(
-          firstRepo.ui,
-          { repoRoot: SECOND_REPO_ID, branchName: 'feature/other', worktreePath: SECOND_WORKTREE_PATH },
-          'terminal',
-        ),
-      },
-    } satisfies RepoState
-    setRepoSnapshotQueryData(SECOND_REPO_ID, secondRepo.instanceId, {
-      current: 'feature/other',
-      branches: [createRepoBranch('feature/other', { worktree: { path: SECOND_WORKTREE_PATH } })],
-    })
-    setRepoStatusQueryData(SECOND_REPO_ID, secondRepo.instanceId, [])
-    useReposStore.setState((state) => ({
-      ...state,
-      repos: {
-        ...state.repos,
-        [SECOND_REPO_ID]: secondRepo,
-      },
-      order: [REPO_ID, SECOND_REPO_ID],
-    }))
-    const { unmount } = await renderProviderWithProbe(formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH))
-
-    try {
-      await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
-      expect(listSessionsMock).toHaveBeenCalledWith({ repoRoot: REPO_ID, repoInstanceId: firstRepo.instanceId })
-    } finally {
-      await unmount()
-    }
-  })
-
-  test('focus sync only refreshes the current repo session list', async () => {
-    const firstRepo = seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-    })
-    const secondRepo = {
-      ...firstRepo,
-      id: SECOND_REPO_ID,
-      instanceId: 'repo-instance-second',
-      ui: {
-        ...firstRepo.ui,
-        preferredWorkspacePaneTabByTarget: preferredWorkspacePaneTabByTargetRecordWith(
-          firstRepo.ui,
-          { repoRoot: SECOND_REPO_ID, branchName: 'feature/other', worktreePath: SECOND_WORKTREE_PATH },
-          'terminal',
-        ),
-      },
-    } satisfies RepoState
-    setRepoSnapshotQueryData(SECOND_REPO_ID, secondRepo.instanceId, {
-      current: 'feature/other',
-      branches: [createRepoBranch('feature/other', { worktree: { path: SECOND_WORKTREE_PATH } })],
-    })
-    setRepoStatusQueryData(SECOND_REPO_ID, secondRepo.instanceId, [])
-    useReposStore.setState((state) => ({
-      ...state,
-      repos: {
-        ...state.repos,
-        [SECOND_REPO_ID]: secondRepo,
-      },
-      order: [REPO_ID, SECOND_REPO_ID],
-    }))
-    useTerminalProjectionHydrationStore.setState({ refreshCooldownMs: 0 })
-    const { unmount } = await renderProviderWithProbe(formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH))
-
-    try {
-      await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
-      listSessionsMock.mockClear()
-      await act(async () => {
-        window.dispatchEvent(new Event('focus'))
-      })
-      await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
-      expect(listSessionsMock).toHaveBeenCalledWith({ repoRoot: REPO_ID, repoInstanceId: firstRepo.instanceId })
-    } finally {
-      await unmount()
-    }
-  })
-
   test('does not resync sessions when repo changes do not affect terminal worktree mapping', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -1560,60 +1367,6 @@ describe('TerminalSessionProvider', () => {
       })
       await Promise.resolve()
       expect(listSessionsMock).not.toHaveBeenCalled()
-    } finally {
-      await unmount()
-    }
-  })
-
-  test('failed session projection hydrate marks the repo failed', async () => {
-    const repo = seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-    })
-    listSessionsMock.mockRejectedValueOnce(new Error('error.repo-instance-stale'))
-    const { unmount } = await renderProviderWithProbe(formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH))
-
-    try {
-      await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
-      expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
-        instanceId: repo.instanceId,
-        phase: 'failed',
-        errorMessage: 'error.repo-instance-stale',
-      })
-    } finally {
-      await unmount()
-    }
-  })
-
-  test('failed focus projection refresh does not replace an already ready hydrate', async () => {
-    const repo = seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-    })
-    useTerminalProjectionHydrationStore.setState({ refreshCooldownMs: 0 })
-    const { unmount } = await renderProviderWithProbe(formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH))
-
-    try {
-      await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
-      expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
-        instanceId: repo.instanceId,
-        phase: 'ready',
-      })
-
-      listSessionsMock.mockRejectedValueOnce(new Error('error.network'))
-      listSessionsMock.mockClear()
-      await act(async () => {
-        window.dispatchEvent(new Event('focus'))
-      })
-      await vi.waitFor(() => expect(listSessionsMock).toHaveBeenCalledTimes(1))
-      expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
-        instanceId: repo.instanceId,
-        phase: 'ready',
-      })
     } finally {
       await unmount()
     }
@@ -1866,216 +1619,15 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
-  test('T1.2: prewarms the terminal WebSocket when the current repo is set', async () => {
-    const prewarm = vi.fn(async () => {})
-    setClientBridgeForTests({
-      kind: () => 'electron',
-      hasCapability: () => false,
-      getBootstrap: () => ({
-        runtime: {
-          kind: 'electron',
-          bridgeVersion: CLIENT_BRIDGE_VERSION,
-          capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-        },
-        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
-      }),
-      invokeIpc: vi.fn(async () => null),
-      abortIpc: vi.fn(async () => false),
-      onIpcEvent: vi.fn(() => () => {}),
-      onEffectIntent: vi.fn(() => () => {}),
-      pathForFile: vi.fn(() => ''),
-      saveClipboardFiles: vi.fn(async () => []),
-      host: () => null,
-      terminal: () => ({
-        attach: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
-        restart: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
-        write: vi.fn(async () => false),
-        resize: vi.fn(async () => false),
-        takeover: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
-        close: vi.fn(async () => false),
-        create: vi.fn(async () => ({
-          ok: true as const,
-          action: 'created' as const,
-          terminalSessionId: 'k',
-          tabs: [],
-          sessions: [],
-          terminalRuntimeSessionId: 'session-1',
-          snapshot: '',
-          snapshotSeq: 0,
-          outputEra: 0,
-          processName: 'zsh',
-          canonicalTitle: null,
-          phase: 'open' as const,
-          message: null,
-          controller: null,
-          canonicalCols: 80,
-          canonicalRows: 24,
-        })),
-        replaceWorkspaceTabs: vi.fn(async (input) => input.tabs),
-        updateWorkspaceTabs: vi.fn(async () => []),
-        pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
-        listSessions: vi.fn(async () => []),
-        listWorkspaceTabs: vi.fn(async () => []),
-        prewarm,
-        kickReconnect: vi.fn(() => {}),
-        notifyBell: vi.fn(async () => false),
-        sendTestNotification: vi.fn(async () => false),
-        setBadge: () => {},
-        onOutput: () => () => {},
-        onBell: () => () => {},
-        onTitle: () => () => {},
-        onExit: () => () => {},
-        onIdentity: () => () => {},
-        onLifecycle: () => () => {},
-        onSessionsChanged: () => () => {},
-        onWorkspaceTabsChanged: () => () => {},
-        onSessionClosed: () => () => {},
-      }),
+  test('clears the command bridge on provider unmount', async () => {
+    const result = renderTerminalProvider(<span>probe</span>, { currentRepoId: null })
+    expect(readTerminalSessionCommandBridge()).not.toBeNull()
+
+    await act(async () => {
+      result.unmount()
     })
 
-    const result = renderTerminalProvider(<span>probe</span>, { currentRepoId: null })
-    try {
-      // No current route repo yet; the effect's guard skips the prewarm.
-      expect(prewarm).not.toHaveBeenCalled()
-
-      // Seeding a repo alone does not make it route-current.
-      // The function takes no parameters (single shared socket, not per-repo).
-      seedRepoWithReadModelForTest({
-        id: REPO_ID,
-        branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-        currentBranchName: 'feature/worktree',
-        preferredWorkspacePaneTab: 'terminal',
-      })
-      await act(async () => {
-        await Promise.resolve()
-      })
-      expect(prewarm).not.toHaveBeenCalled()
-
-      result.rerender(
-        <QueryClientProvider client={primaryWindowQueryClient}>
-          <TerminalSessionProvider currentRepoId={REPO_ID}>
-            <span>probe</span>
-          </TerminalSessionProvider>
-        </QueryClientProvider>,
-      )
-      await act(async () => {
-        await Promise.resolve()
-      })
-      expect(prewarm).toHaveBeenCalledTimes(1)
-      expect(prewarm).toHaveBeenCalledWith()
-    } finally {
-      await act(async () => {
-        result.unmount()
-      })
-    }
-  })
-
-  test('T5.1: kicks reconnect on visibilitychange:visible and on persisted pageshow', async () => {
-    const kickReconnect = vi.fn(() => {})
-    setClientBridgeForTests({
-      kind: () => 'electron',
-      hasCapability: () => false,
-      getBootstrap: () => ({
-        runtime: {
-          kind: 'electron',
-          bridgeVersion: CLIENT_BRIDGE_VERSION,
-          capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
-        },
-        initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret', clientId: 'client_sharedterminal' },
-      }),
-      invokeIpc: vi.fn(async () => null),
-      abortIpc: vi.fn(async () => false),
-      onIpcEvent: vi.fn(() => () => {}),
-      onEffectIntent: vi.fn(() => () => {}),
-      pathForFile: vi.fn(() => ''),
-      saveClipboardFiles: vi.fn(async () => []),
-      host: () => null,
-      terminal: () => ({
-        attach: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
-        restart: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
-        write: vi.fn(async () => false),
-        resize: vi.fn(async () => false),
-        takeover: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
-        close: vi.fn(async () => false),
-        create: vi.fn(async () => ({
-          ok: true as const,
-          action: 'created' as const,
-          terminalSessionId: 'k',
-          tabs: [],
-          sessions: [],
-          terminalRuntimeSessionId: 'session-1',
-          snapshot: '',
-          snapshotSeq: 0,
-          outputEra: 0,
-          processName: 'zsh',
-          canonicalTitle: null,
-          phase: 'open' as const,
-          message: null,
-          controller: null,
-          canonicalCols: 80,
-          canonicalRows: 24,
-        })),
-        replaceWorkspaceTabs: vi.fn(async (input) => input.tabs),
-        updateWorkspaceTabs: vi.fn(async () => []),
-        pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
-        listSessions: vi.fn(async () => []),
-        listWorkspaceTabs: vi.fn(async () => []),
-        prewarm: vi.fn(async () => {}),
-        kickReconnect,
-        notifyBell: vi.fn(async () => false),
-        sendTestNotification: vi.fn(async () => false),
-        setBadge: () => {},
-        onOutput: () => () => {},
-        onBell: () => () => {},
-        onTitle: () => () => {},
-        onExit: () => () => {},
-        onIdentity: () => () => {},
-        onLifecycle: () => () => {},
-        onSessionsChanged: () => () => {},
-        onWorkspaceTabsChanged: () => () => {},
-        onSessionClosed: () => () => {},
-      }),
-    })
-
-    const result = renderTerminalProvider(<span>probe</span>, { currentRepoId: null })
-    try {
-      // visibilitychange:visible → kick
-      kickReconnect.mockClear()
-      await act(async () => {
-        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' })
-        document.dispatchEvent(new Event('visibilitychange'))
-      })
-      expect(kickReconnect).toHaveBeenCalledTimes(1)
-
-      // visibilitychange:hidden → no kick
-      kickReconnect.mockClear()
-      await act(async () => {
-        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
-        document.dispatchEvent(new Event('visibilitychange'))
-      })
-      expect(kickReconnect).not.toHaveBeenCalled()
-
-      // pageshow with persisted=true → kick (bfcache restore)
-      kickReconnect.mockClear()
-      await act(async () => {
-        window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
-      })
-      expect(kickReconnect).toHaveBeenCalledTimes(1)
-
-      // pageshow with persisted=false → no kick (regular full load)
-      kickReconnect.mockClear()
-      await act(async () => {
-        window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: false }))
-      })
-      expect(kickReconnect).not.toHaveBeenCalled()
-    } finally {
-      await act(async () => {
-        result.unmount()
-      })
-      // Reset visibilityState to the jsdom default so other tests
-      // aren't affected by our defineProperty.
-      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' })
-    }
+    expect(readTerminalSessionCommandBridge()).toBeNull()
   })
 
   test('P1.7: registry state survives a Provider unmount + remount via the singleton', async () => {
@@ -2250,7 +1802,9 @@ function renderTerminalProvider(children: React.ReactNode, options?: { currentRe
   const currentRepoId = options && 'currentRepoId' in options ? options.currentRepoId : REPO_ID
   return renderInJsdom(
     <QueryClientProvider client={primaryWindowQueryClient}>
-      <TerminalSessionProvider currentRepoId={currentRepoId ?? null}>{children}</TerminalSessionProvider>
+      <AppRuntimeProjectionProvider currentRepoId={currentRepoId ?? null}>
+        <TerminalSessionProvider>{children}</TerminalSessionProvider>
+      </AppRuntimeProjectionProvider>
     </QueryClientProvider>,
   )
 }

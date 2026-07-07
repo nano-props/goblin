@@ -25,7 +25,7 @@ import { useTerminalSessionContext } from '#/web/components/terminal/terminal-se
 import {
   useTerminalWorktreeSelectedDescriptor,
   useTerminalWorktreeCount,
-  useTerminalWorktreePendingCreate,
+  useTerminalWorktreeCreatePending,
   useTerminalSnapshot,
 } from '#/web/components/terminal/terminal-session-store.ts'
 import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal-toolbar.tsx'
@@ -115,7 +115,7 @@ export function TerminalSessionView({
   }, [terminalSessionId])
   const snapshot = useTerminalSnapshot(terminalSessionId)
   const hasSessions = useTerminalWorktreeCount(terminalWorktreeKey) > 0
-  const pendingCreate = useTerminalWorktreePendingCreate(terminalWorktreeKey)
+  const createPending = useTerminalWorktreeCreatePending(terminalWorktreeKey)
 
   useLayoutEffect(() => {
     const host = hostRef.current
@@ -272,7 +272,7 @@ export function TerminalSessionView({
   // which is the standard polite-live-region contract.
   const projectionPending = projectionPhase === 'pending'
   const projectionFailed = projectionPhase === 'failed'
-  const showEmptyCta = sessionPhase === 'opening' && !hasSessions && projectionPhase === 'ready' && !pendingCreate
+  const showEmptyCta = sessionPhase === 'opening' && !hasSessions && projectionPhase === 'ready' && !createPending
   const showStatusOverlay = isAttaching && !showEmptyCta
   const statusOverlayLabel =
     sessionPhase === 'restarting'

@@ -151,7 +151,7 @@ The terminal system relies on these identity/grouping scopes:
 
 - **userId**: the server-side terminal user derived from the authenticated access token. Session visibility, lifecycle cleanup, and realtime fanout are partitioned by this id.
 - **clientId**: the logical client for one browser tab or Electron client. It validates and routes requests and is also the code-level controller identity (`TerminalController.clientId`).
-- **terminalSessionId**: the server-allocated persistent identity for one terminal business session. Terminal workspace-pane tabs use this value directly as their durable terminal tab identity.
+- **terminalSessionId**: the server-allocated persistent identity for one terminal business session. Terminal workspace-pane runtime tabs store this value as their generic `runtimeSessionId`.
 - **terminalWorktreeKey**: the repo/worktree grouping key produced by `formatTerminalWorktreeKey(repoRoot, worktreePath)`. It is used for per-worktree selection, tab-strip grouping, bell/activity summaries, and materialization callbacks. It is not a terminal identity.
 - **terminalRuntimeSessionId**: the server-owned runtime lookup id used by attach,
   write, resize, restart, close, and realtime messages. It is not a
@@ -168,7 +168,8 @@ This identity model is the basis for reconnect, mirror mode, controller handoff,
 
 Keep the naming boundary explicit:
 
-- `terminalSessionId` is the durable product/session identity used by tabs.
+- `terminalSessionId` is the durable terminal product/session identity.
+  Workspace-pane runtime tabs carry it as `runtimeSessionId`.
 - `terminalRuntimeSessionId` is the server runtime lookup identity for terminal
   operations and events.
 - A PTY handle is the lower-level supervisor resource. It may be absent

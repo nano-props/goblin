@@ -32,7 +32,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import {
   PrimaryWindowNavigationProvider,
@@ -637,7 +637,7 @@ describe('RepoWorkspaceContent', () => {
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
       terminalWorktreeKey,
-      pendingCreate: true,
+      createPending: true,
     }
     const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
@@ -680,7 +680,7 @@ describe('RepoWorkspaceContent', () => {
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
       terminalWorktreeKey,
-      pendingCreate: true,
+      createPending: true,
     }
     const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
@@ -716,7 +716,7 @@ describe('RepoWorkspaceContent', () => {
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
       terminalWorktreeKey,
-      pendingCreate: false,
+      createPending: false,
     }
     const readContext: TerminalSessionReadContextValue = {
       ...emptyTerminalReadContext,
@@ -1030,7 +1030,7 @@ const emptyWorktreeSnapshot: TerminalWorktreeSnapshot = {
   count: 0,
   bellCount: 0,
   outputActiveCount: 0,
-  pendingCreate: false,
+  createPending: false,
 }
 
 const emptyTerminalReadContext: TerminalSessionReadContextValue = {
@@ -1077,7 +1077,7 @@ function staticEntry(type: WorkspacePaneStaticTabType) {
 }
 
 function terminalEntry(id: string) {
-  return workspacePaneTerminalTabEntry(id)
+  return workspacePaneRuntimeTabEntry('terminal', id)
 }
 
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {

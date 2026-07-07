@@ -1,22 +1,26 @@
 import path from 'node:path'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import type { TerminalCreateInput, TerminalCreateResult, TerminalSessionSummary } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import {
+  isWorkspacePaneRuntimeTabEntry,
+  type WorkspacePaneTabEntry,
+  workspacePaneRuntimeTabSessionId,
+} from '#/shared/workspace-pane.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type {
   TerminalSessionEnsureInput,
   TerminalSessionEnsureResult,
 } from '#/server/terminal/terminal-session-ensurer.ts'
 import type { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
-import type { createTerminalWorkspaceTabsCoordinator } from '#/server/terminal/terminal-workspace-tabs-coordinator.ts'
+import type { createWorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 
 type TerminalSessionCreateCoordinator = ReturnType<typeof createTerminalSessionCreateCoordinator>
-type TerminalWorkspaceTabsCoordinator = ReturnType<typeof createTerminalWorkspaceTabsCoordinator>
+type WorkspacePaneTabsCoordinator = ReturnType<typeof createWorkspacePaneTabsCoordinator>
 type TerminalCreateFailure = Extract<TerminalCreateResult, { ok: false }>
 
 interface TerminalSessionCreatorOptions {
   createCoordinator: TerminalSessionCreateCoordinator
-  workspaceTabsCoordinator: TerminalWorkspaceTabsCoordinator
+  workspaceTabsCoordinator: WorkspacePaneTabsCoordinator
   ensureOrRestore(
     clientId: string,
     userId: string,
@@ -28,6 +32,7 @@ interface TerminalSessionCreatorOptions {
     input: Pick<TerminalCreateInput, 'repoRoot' | 'repoInstanceId'>,
     terminalRuntimeSessionId: string,
   ): TerminalCreateFailure | null
+  cleanupStaleCreate(userId: string, input: Pick<TerminalCreateInput, 'repoRoot' | 'repoInstanceId'>): Promise<void>
   listSessions(userId: string, repoRoot: string, repoInstanceId: string): Promise<TerminalSessionSummary[]>
 }
 
@@ -62,7 +67,7 @@ class TerminalSessionCreator {
             }),
         )
         if (!createResult.ok) return { ok: false, message: createResult.message }
-        const staleAfterEnsure = this.options.rejectStaleCreateIfNeeded(
+        const staleAfterEnsure = await this.rejectStaleCreateIfNeeded(
           input.userId,
           input.request,
           createResult.terminalRuntimeSessionId,
@@ -73,7 +78,7 @@ class TerminalSessionCreator {
           input.request.repoRoot,
           input.request.repoInstanceId,
         )
-        const staleAfterList = this.options.rejectStaleCreateIfNeeded(
+        const staleAfterList = await this.rejectStaleCreateIfNeeded(
           input.userId,
           input.request,
           createResult.terminalRuntimeSessionId,
@@ -81,12 +86,13 @@ class TerminalSessionCreator {
         if (staleAfterList) return staleAfterList
         const createdSession = sessions.find((session) => session.terminalSessionId === createResult.terminalSessionId)
         const tabsResult = createdSession
-          ? await this.options.workspaceTabsCoordinator.ensureTerminalTabForSession({
+          ? await this.options.workspaceTabsCoordinator.ensureRuntimeTabForSession({
               userId: input.userId,
               scope: sessionScope,
               branchName: input.request.branch,
               worktreePath: createdSession.worktreePath,
-              terminalSessionId: createResult.terminalSessionId,
+              runtimeType: 'terminal',
+              sessionId: createResult.terminalSessionId,
               insertAfterIdentity: input.request.insertAfterIdentity ?? null,
               guardBeforeWrite: () =>
                 this.options.rejectStaleCreateIfNeeded(
@@ -96,14 +102,18 @@ class TerminalSessionCreator {
                 ),
             })
           : []
-        if (isTerminalCreateFailure(tabsResult)) return tabsResult
+        if (isTerminalCreateFailure(tabsResult)) {
+          await this.options.cleanupStaleCreate(input.userId, input.request)
+          return tabsResult
+        }
         const tabs = tabsResult
-        const staleAfterTabs = this.options.rejectStaleCreateIfNeeded(
+        const staleAfterTabs = await this.rejectStaleCreateIfNeeded(
           input.userId,
           input.request,
           createResult.terminalRuntimeSessionId,
         )
         if (staleAfterTabs) return staleAfterTabs
+        const responseSessions = terminalSessionsWithWorkspaceTabOrder(sessions, createdSession?.worktreePath, tabs)
         return {
           ok: true,
           action: createResult.action,
@@ -120,10 +130,21 @@ class TerminalSessionCreator {
           controller: createResult.controller,
           canonicalCols: createResult.canonicalCols,
           canonicalRows: createResult.canonicalRows,
-          sessions,
+          sessions: responseSessions,
         }
       },
     )
+  }
+
+  private async rejectStaleCreateIfNeeded(
+    userId: string,
+    input: Pick<TerminalCreateInput, 'repoRoot' | 'repoInstanceId'>,
+    terminalRuntimeSessionId: string,
+  ): Promise<TerminalCreateFailure | null> {
+    const failure = this.options.rejectStaleCreateIfNeeded(userId, input, terminalRuntimeSessionId)
+    if (!failure) return null
+    await this.options.cleanupStaleCreate(userId, input)
+    return failure
   }
 }
 
@@ -139,4 +160,38 @@ function isTerminalCreateFailure(
 
 function terminalWorktreePath(repoRoot: string, worktreePath: string): string {
   return isRemoteRepoId(repoRoot) ? worktreePath : path.resolve(worktreePath)
+}
+
+function terminalSessionsWithWorkspaceTabOrder(
+  sessions: readonly TerminalSessionSummary[],
+  worktreePath: string | null | undefined,
+  tabs: readonly WorkspacePaneTabEntry[],
+): TerminalSessionSummary[] {
+  if (!worktreePath) return [...sessions]
+
+  const sessionsById = new Map(sessions.map((session) => [session.terminalSessionId, session]))
+  const usedSessionIds = new Set<string>()
+  const orderedWorktreeSessions: TerminalSessionSummary[] = []
+
+  for (const tab of tabs) {
+    if (!isWorkspacePaneRuntimeTabEntry(tab) || tab.type !== 'terminal') continue
+    const sessionId = workspacePaneRuntimeTabSessionId(tab)
+    if (usedSessionIds.has(sessionId)) continue
+    const session = sessionsById.get(sessionId)
+    if (!session || session.worktreePath !== worktreePath) continue
+    orderedWorktreeSessions.push(session)
+    usedSessionIds.add(sessionId)
+  }
+
+  for (const session of sessions) {
+    if (session.worktreePath !== worktreePath || usedSessionIds.has(session.terminalSessionId)) continue
+    orderedWorktreeSessions.push(session)
+    usedSessionIds.add(session.terminalSessionId)
+  }
+
+  let orderedWorktreeIndex = 0
+  return sessions.map((session) => {
+    if (session.worktreePath !== worktreePath) return session
+    return orderedWorktreeSessions[orderedWorktreeIndex++] ?? session
+  })
 }

@@ -5,40 +5,68 @@ function getTerminalClient(): ClientTerminal {
   return getClientBridge().terminal()
 }
 
-function bindTerminalMethod<TKey extends keyof ClientTerminal>(key: TKey): ClientTerminal[TKey] {
-  return ((...args: Parameters<ClientTerminal[TKey]>) => {
-    const method = getTerminalClient()[key] as (
-      ...innerArgs: Parameters<ClientTerminal[TKey]>
-    ) => ReturnType<ClientTerminal[TKey]>
-    return method(...args)
-  }) as unknown as ClientTerminal[TKey]
-}
-
 export const terminalClient: ClientTerminal = {
-  attach: bindTerminalMethod('attach'),
-  restart: bindTerminalMethod('restart'),
-  write: bindTerminalMethod('write'),
-  resize: bindTerminalMethod('resize'),
-  takeover: bindTerminalMethod('takeover'),
-  close: bindTerminalMethod('close'),
-  create: bindTerminalMethod('create'),
-  replaceWorkspaceTabs: bindTerminalMethod('replaceWorkspaceTabs'),
-  updateWorkspaceTabs: bindTerminalMethod('updateWorkspaceTabs'),
-  pruneTerminals: bindTerminalMethod('pruneTerminals'),
-  listSessions: bindTerminalMethod('listSessions'),
-  listWorkspaceTabs: bindTerminalMethod('listWorkspaceTabs'),
-  prewarm: bindTerminalMethod('prewarm'),
-  kickReconnect: bindTerminalMethod('kickReconnect'),
-  notifyBell: bindTerminalMethod('notifyBell'),
-  sendTestNotification: bindTerminalMethod('sendTestNotification'),
-  setBadge: bindTerminalMethod('setBadge'),
-  onOutput: bindTerminalMethod('onOutput'),
-  onBell: bindTerminalMethod('onBell'),
-  onTitle: bindTerminalMethod('onTitle'),
-  onExit: bindTerminalMethod('onExit'),
-  onIdentity: bindTerminalMethod('onIdentity'),
-  onLifecycle: bindTerminalMethod('onLifecycle'),
-  onSessionsChanged: bindTerminalMethod('onSessionsChanged'),
-  onWorkspaceTabsChanged: bindTerminalMethod('onWorkspaceTabsChanged'),
-  onSessionClosed: bindTerminalMethod('onSessionClosed'),
+  attach(input) {
+    return getTerminalClient().attach(input)
+  },
+  restart(input) {
+    return getTerminalClient().restart(input)
+  },
+  write(input) {
+    return getTerminalClient().write(input)
+  },
+  resize(input) {
+    return getTerminalClient().resize(input)
+  },
+  takeover(input) {
+    return getTerminalClient().takeover(input)
+  },
+  close(input) {
+    return getTerminalClient().close(input)
+  },
+  create(input) {
+    return getTerminalClient().create(input)
+  },
+  pruneTerminals(repoRoot, repoInstanceId) {
+    return getTerminalClient().pruneTerminals(repoRoot, repoInstanceId)
+  },
+  listSessions(input) {
+    return getTerminalClient().listSessions(input)
+  },
+  recoverSessions(input) {
+    return getTerminalClient().recoverSessions(input)
+  },
+  notifyBell(input) {
+    return getTerminalClient().notifyBell(input)
+  },
+  sendTestNotification(input) {
+    return getTerminalClient().sendTestNotification(input)
+  },
+  setBadge(count) {
+    getTerminalClient().setBadge(count)
+  },
+  onOutput(cb) {
+    return getTerminalClient().onOutput(cb)
+  },
+  onBell(cb) {
+    return getTerminalClient().onBell(cb)
+  },
+  onTitle(cb) {
+    return getTerminalClient().onTitle(cb)
+  },
+  onExit(cb) {
+    return getTerminalClient().onExit(cb)
+  },
+  onIdentity(cb) {
+    return getTerminalClient().onIdentity(cb)
+  },
+  onLifecycle(cb) {
+    return getTerminalClient().onLifecycle(cb)
+  },
+  onSessionsChanged(cb) {
+    return getTerminalClient().onSessionsChanged(cb)
+  },
+  onSessionClosed(cb) {
+    return getTerminalClient().onSessionClosed(cb)
+  },
 }

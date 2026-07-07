@@ -118,11 +118,11 @@ responsibilities are split into focused server modules:
 - `terminal-session-create-coordinator.ts` owns per-worktree create queueing and terminal session id allocation
 - `terminal-session-ensurer.ts` owns local/remote session ensure input construction
 - `terminal-session-pruner.ts` owns removed-worktree session pruning
-- `terminal-workspace-tabs-coordinator.ts` owns workspace tab operation queueing and read-side canonicalization
-- `terminal-workspace-tabs-projection.ts` owns pure workspace tab prune/materialize/dedupe rules
+- workspace-pane runtime tab modules own workspace tab operation queueing,
+  read-side canonicalization, and pure prune/materialize/dedupe rules
 
 The public behavior remains server-first: clients use server-returned canonical
-tabs/sessions and do not infer terminal-tab projection state locally.
+tabs/sessions and do not infer terminal runtime-tab projection state locally.
 
 ## P1.7: Decouple terminal runtime lifetime from React provider lifetime (completed)
 

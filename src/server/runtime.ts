@@ -1,13 +1,13 @@
 import type { Hono } from 'hono'
 import { createApp, type ServerAppOptions } from '#/server/app-factory.ts'
 import { stopBackgroundSync } from '#/server/modules/background-sync.ts'
-import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
+import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
 import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
 import { WorkerBackedPtySupervisor } from '#/server/terminal/pty-supervisor-worker.ts'
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
 
-export interface ServerRuntimeOptions extends Omit<ServerAppOptions, 'terminalHost' | 'serverHost' | 'serverPort'> {
-  terminalHost?: ServerTerminalHost
+export interface ServerRuntimeOptions extends Omit<ServerAppOptions, 'appRealtimeHost' | 'serverHost' | 'serverPort'> {
+  appRealtimeHost?: ServerAppRealtimeHost
   /**
    * On-disk path of the bundled PTY worker entry. When provided, the
    * runtime uses a dedicated subprocess for node-pty work, so a PTY
@@ -24,13 +24,13 @@ export interface ServerRuntimeOptions extends Omit<ServerAppOptions, 'terminalHo
 
 export interface ServerRuntime {
   app: Hono
-  terminalHost: ServerTerminalHost
+  appRealtimeHost: ServerAppRealtimeHost
   shutdown(): void
 }
 
 export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntime {
   const {
-    terminalHost: providedTerminalHost,
+    appRealtimeHost: providedAppRealtimeHost,
     ptyWorkerEntry,
     gCommandEntry,
     gCommandBinDir,
@@ -39,7 +39,7 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
     serverPort,
     ...appOptions
   } = options
-  const runtime = providedTerminalHost
+  const runtime = providedAppRealtimeHost
     ? null
     : createServerTerminalRuntime({
         ptySupervisor: ptyWorkerEntry
@@ -55,14 +55,14 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
             }
           : undefined,
       })
-  const terminalHost = providedTerminalHost ?? (runtime?.host as ServerTerminalHost)
+  const appRealtimeHost = providedAppRealtimeHost ?? (runtime?.host as ServerAppRealtimeHost)
   // `appOptions` carries `accessToken` (renamed from the pre-PR
   // `internalSecret`); it's forwarded straight to `createApp`.
-  const app = createApp({ ...appOptions, terminalHost, serverHost, serverPort })
+  const app = createApp({ ...appOptions, appRealtimeHost, serverHost, serverPort })
   let stopped = false
   return {
     app,
-    terminalHost,
+    appRealtimeHost,
     shutdown() {
       if (stopped) return
       stopped = true
@@ -70,7 +70,7 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
       if (runtime) {
         runtime.shutdown()
       } else {
-        terminalHost.shutdown()
+        appRealtimeHost.shutdown()
       }
     },
   }

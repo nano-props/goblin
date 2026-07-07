@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => {
   const websocketClients = new Set<any>()
   const createServerRuntime = vi.fn(() => ({
     app: { fetch: vi.fn() },
-    terminalHost: {} as any,
+    appRealtimeHost: {} as any,
     shutdown: runtimeShutdown,
   }))
 

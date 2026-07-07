@@ -1,17 +1,26 @@
 import {
+  isWorkspacePaneRuntimeTabEntry,
+  type WorkspacePaneRuntimeTabType,
   type WorkspacePaneStaticTabType,
   type WorkspacePaneTabEntry,
+  workspacePaneRuntimeTabEntry,
+  workspacePaneRuntimeTabSessionId,
   workspacePaneStaticTabEntry,
   workspacePaneTabEntryIdentity,
-  workspacePaneTabsInsertAfterIdentity,
   workspacePaneTabRequiresWorktree,
-  workspacePaneTerminalTabEntry,
 } from '#/shared/workspace-pane.ts'
 import {
   workspacePaneTabsRuntimeKey,
   workspacePaneTabsRuntimeScopePrefixKey,
   workspacePaneTabsRuntimeUserPrefixKey,
 } from '#/shared/workspace-pane-tabs-runtime-keys.ts'
+import {
+  workspacePaneTabEntryArraysEqual,
+  workspacePaneTabsWithIdentityOrder,
+  workspacePaneTabsWithRuntimeTab,
+  workspacePaneTabsWithoutStaticTab,
+  workspacePaneTabsWithStaticTab,
+} from '#/server/workspace-pane/workspace-pane-tabs-operations.ts'
 
 export interface WorkspacePaneTabsTargetInput<TUser extends string | number> {
   userId: TUser
@@ -44,6 +53,7 @@ export interface WorkspacePaneTabsScopeEntry {
 }
 
 interface StoredWorkspacePaneTabsEntry {
+  scope: string
   branchName: string
   worktreePath: string | null
   tabs: WorkspacePaneTabEntry[]
@@ -61,6 +71,7 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     const targetKey = this.targetKey(input)
     const tabs = normalizeWorkspacePaneTabs(input.tabs, { hasWorktree: input.worktreePath !== null })
     this.tabsByTarget.set(targetKey, {
+      scope: input.scope,
       branchName: input.branchName,
       worktreePath: input.worktreePath,
       tabs,
@@ -68,24 +79,16 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     return [...tabs]
   }
 
-  ensureTerminalTab(
+  ensureRuntimeTab(
     input: WorkspacePaneTabsTargetInput<TUser>,
-    terminalSessionId: string,
+    type: WorkspacePaneRuntimeTabType,
+    sessionId: string,
     options?: { insertAfterIdentity?: string | null },
   ): WorkspacePaneTabEntry[] {
     const current = this.tabs(input)
-    if (input.worktreePath === null || terminalSessionId.length === 0) return current
-    if (current.some((entry) => entry.type === 'terminal' && entry.terminalSessionId === terminalSessionId)) {
-      return current
-    }
-    return this.replaceTabs({
-      ...input,
-      tabs: workspacePaneTabsInsertAfterIdentity(
-        current,
-        workspacePaneTerminalTabEntry(terminalSessionId),
-        options?.insertAfterIdentity,
-      ),
-    })
+    if (input.worktreePath === null || sessionId.length === 0) return current
+    const tabs = workspacePaneTabsWithRuntimeTab(current, type, sessionId, options)
+    return workspacePaneTabEntryArraysEqual(current, tabs) ? current : this.replaceTabs({ ...input, tabs })
   }
 
   openStaticTab(
@@ -94,31 +97,26 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     options?: { insertAfterIdentity?: string | null },
   ): WorkspacePaneTabEntry[] {
     const current = this.tabs(input)
-    // Reopening an existing static tab should preserve the current user-managed
-    // order and simply focus that tab on the client side.
-    if (current.some((entry) => entry.type === tabType)) return current
-    return this.replaceTabs({
-      ...input,
-      tabs: workspacePaneTabsInsertAfterIdentity(
-        current,
-        workspacePaneStaticTabEntry(tabType),
-        options?.insertAfterIdentity,
-      ),
-    })
+    const tabs = workspacePaneTabsWithStaticTab(current, tabType, options)
+    return workspacePaneTabEntryArraysEqual(current, tabs) ? current : this.replaceTabs({ ...input, tabs })
   }
 
   closeStaticTab(
     input: WorkspacePaneTabsTargetInput<TUser>,
     tabType: WorkspacePaneStaticTabType,
   ): WorkspacePaneTabEntry[] {
-    return this.replaceTabs({ ...input, tabs: this.tabs(input).filter((entry) => entry.type !== tabType) })
+    const current = this.tabs(input)
+    const tabs = workspacePaneTabsWithoutStaticTab(current, tabType)
+    return workspacePaneTabEntryArraysEqual(current, tabs) ? current : this.replaceTabs({ ...input, tabs })
   }
 
   reorderTabsByIdentity(
     input: WorkspacePaneTabsTargetInput<TUser>,
     tabIdentities: readonly string[],
   ): WorkspacePaneTabEntry[] {
-    return this.replaceTabs({ ...input, tabs: workspacePaneTabsWithIdentityOrder(this.tabs(input), tabIdentities) })
+    const current = this.tabs(input)
+    const tabs = workspacePaneTabsWithIdentityOrder(current, tabIdentities)
+    return workspacePaneTabEntryArraysEqual(current, tabs) ? current : this.replaceTabs({ ...input, tabs })
   }
 
   tabs(input: WorkspacePaneTabsTargetInput<TUser>): WorkspacePaneTabEntry[] {
@@ -133,27 +131,38 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     })
   }
 
-  terminalSessionIds(input: WorkspacePaneTabsWorktreeInput<TUser>): string[] {
+  runtimeSessionIds(input: WorkspacePaneTabsWorktreeInput<TUser>, type: WorkspacePaneRuntimeTabType): string[] {
     const entries = this.tabsForScope({ userId: input.userId, scope: input.scope }).filter(
       (entry) => entry.worktreePath === input.worktreePath,
     )
     return entries.flatMap((entry) =>
-      entry.tabs.flatMap((tab) => (tab.type === 'terminal' ? [tab.terminalSessionId] : [])),
+      entry.tabs.flatMap((tab) =>
+        isWorkspacePaneRuntimeTabEntry(tab) && tab.type === type ? [workspacePaneRuntimeTabSessionId(tab)] : [],
+      ),
     )
   }
 
-  closeSessionsForUser(userId: TUser): void {
+  closeTabsForUser(userId: TUser): void {
     const prefix = workspacePaneTabsRuntimeUserPrefixKey(userId)
     for (const key of Array.from(this.tabsByTarget.keys())) {
       if (key.startsWith(prefix)) this.tabsByTarget.delete(key)
     }
   }
 
-  closeSessionsForScope(userId: TUser, scope: string): void {
+  closeTabsForScope(userId: TUser, scope: string): void {
     const prefix = workspacePaneTabsRuntimeScopePrefixKey(userId, scope)
     for (const key of Array.from(this.tabsByTarget.keys())) {
       if (key.startsWith(prefix)) this.tabsByTarget.delete(key)
     }
+  }
+
+  scopesForUser(userId: TUser): string[] {
+    const prefix = workspacePaneTabsRuntimeUserPrefixKey(userId)
+    const scopes = new Set<string>()
+    for (const [key, entry] of this.tabsByTarget.entries()) {
+      if (key.startsWith(prefix)) scopes.add(entry.scope)
+    }
+    return Array.from(scopes)
   }
 
   private targetKey(input: WorkspacePaneTabsTargetInput<TUser>): string {
@@ -178,36 +187,13 @@ function normalizeWorkspacePaneTabs(
   const seen = new Set<string>()
   for (const entry of tabs) {
     if (!context.hasWorktree && workspacePaneTabRequiresWorktree(entry.type)) continue
-    const normalized =
-      entry.type === 'terminal'
-        ? workspacePaneTerminalTabEntry(entry.terminalSessionId)
-        : workspacePaneStaticTabEntry(entry.type)
+    const normalized = isWorkspacePaneRuntimeTabEntry(entry)
+      ? workspacePaneRuntimeTabEntry(entry.type, workspacePaneRuntimeTabSessionId(entry))
+      : workspacePaneStaticTabEntry(entry.type)
     const identity = workspacePaneTabEntryIdentity(normalized)
     if (seen.has(identity)) continue
     seen.add(identity)
     next.push(normalized)
   }
   return next
-}
-
-function workspacePaneTabsWithIdentityOrder(
-  currentTabs: readonly WorkspacePaneTabEntry[],
-  tabIdentities: readonly string[],
-): WorkspacePaneTabEntry[] {
-  const tabByIdentity = new Map(currentTabs.map((tab) => [workspacePaneTabEntryIdentity(tab), tab]))
-  const used = new Set<string>()
-  const ordered: WorkspacePaneTabEntry[] = []
-  for (const identity of tabIdentities) {
-    const tab = tabByIdentity.get(identity)
-    if (!tab || used.has(identity)) continue
-    used.add(identity)
-    ordered.push(tab)
-  }
-  for (const tab of currentTabs) {
-    const identity = workspacePaneTabEntryIdentity(tab)
-    if (used.has(identity)) continue
-    used.add(identity)
-    ordered.push(tab)
-  }
-  return ordered
 }

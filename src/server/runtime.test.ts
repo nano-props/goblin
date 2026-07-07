@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
+import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
 
 const mocks = vi.hoisted(() => ({
   createApp: vi.fn(() => ({ fetch: vi.fn() })),
@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
     host: {
       isValidClientId: (_value: unknown): _value is string => true,
       shutdown: vi.fn(),
-    } as unknown as ServerTerminalHost,
+    } as unknown as ServerAppRealtimeHost,
     shutdown: vi.fn(),
   })),
 }))
@@ -35,9 +35,9 @@ describe('server runtime', () => {
     vi.clearAllMocks()
   })
 
-  test('injects the terminal host into the server app factory', async () => {
+  test('injects the app realtime host into the server app factory', async () => {
     const { createServerRuntime } = await import('#/server/runtime.ts')
-    const terminalHost = { shutdown: vi.fn() } as unknown as ServerTerminalHost
+    const appRealtimeHost = { shutdown: vi.fn() } as unknown as ServerAppRealtimeHost
 
     const runtime = createServerRuntime({
       version: '0.1.0',
@@ -45,17 +45,17 @@ describe('server runtime', () => {
       accessToken: 'secret',
       serverHost: '127.0.0.1',
       serverPort: 32100,
-      terminalHost,
+      appRealtimeHost,
     })
 
-    expect(runtime.terminalHost).toBe(terminalHost)
+    expect(runtime.appRealtimeHost).toBe(appRealtimeHost)
     expect(mocks.createApp).toHaveBeenCalledWith({
       version: '0.1.0',
       startedAt: 1,
       accessToken: 'secret',
       serverHost: '127.0.0.1',
       serverPort: 32100,
-      terminalHost,
+      appRealtimeHost,
     })
   })
 
@@ -76,25 +76,25 @@ describe('server runtime', () => {
       ptySupervisor: expect.objectContaining({ mode: 'in-process' }),
       gCommand: undefined,
     })
-    expect(runtime.terminalHost).toBe(mocks.createServerTerminalRuntime.mock.results[0]?.value.host)
+    expect(runtime.appRealtimeHost).toBe(mocks.createServerTerminalRuntime.mock.results[0]?.value.host)
     expect(mocks.createApp).toHaveBeenCalledWith({
       version: '0.1.0',
       startedAt: 1,
       accessToken: 'secret',
       serverHost: '127.0.0.1',
       serverPort: 32100,
-      terminalHost: runtime.terminalHost,
+      appRealtimeHost: runtime.appRealtimeHost,
     })
   })
 
-  test('shutdown is idempotent and stops background sync before terminal host teardown', async () => {
+  test('shutdown is idempotent and stops background sync before app realtime host teardown', async () => {
     const { createServerRuntime } = await import('#/server/runtime.ts')
     const events: string[] = []
-    const terminalHost = {
+    const appRealtimeHost = {
       shutdown: vi.fn(() => {
         events.push('terminal')
       }),
-    } as unknown as ServerTerminalHost
+    } as unknown as ServerAppRealtimeHost
     mocks.stopBackgroundSync.mockImplementation(() => {
       events.push('background-sync')
     })
@@ -105,14 +105,14 @@ describe('server runtime', () => {
       accessToken: 'secret',
       serverHost: '127.0.0.1',
       serverPort: 32100,
-      terminalHost,
+      appRealtimeHost,
     })
 
     runtime.shutdown()
     runtime.shutdown()
 
     expect(mocks.stopBackgroundSync).toHaveBeenCalledTimes(1)
-    expect(terminalHost.shutdown).toHaveBeenCalledTimes(1)
+    expect(appRealtimeHost.shutdown).toHaveBeenCalledTimes(1)
     expect(events).toEqual(['background-sync', 'terminal'])
   })
 

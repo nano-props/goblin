@@ -4,7 +4,7 @@ import { act } from '@testing-library/react'
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, describe, expect, test } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import {
   readWorkspacePaneTabsForTarget,
@@ -209,7 +209,7 @@ function readWorkspacePaneTabsFromQueryCache(queryClient: QueryClient): Workspac
 }
 
 function terminalEntry(sessionId: string): WorkspacePaneTabEntry {
-  return workspacePaneTerminalTabEntry(sessionId)
+  return workspacePaneRuntimeTabEntry('terminal', sessionId)
 }
 
 function staticEntry(type: Parameters<typeof workspacePaneStaticTabEntry>[0]): WorkspacePaneTabEntry {

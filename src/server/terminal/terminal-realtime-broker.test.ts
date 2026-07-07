@@ -5,7 +5,7 @@ import {
   TerminalRealtimeBroker,
   type TerminalClientPresenceChange,
 } from '#/server/terminal/terminal-realtime-broker.ts'
-import { BufferedTerminalSocket } from '#/server/terminal/buffered-terminal-socket.ts'
+import { BufferedAppRealtimeSocket } from '#/server/realtime/buffered-app-realtime-socket.ts'
 
 const USER_A = 'user_a'
 const USER_B = 'user_b'
@@ -44,7 +44,7 @@ describe('terminal realtime broker', () => {
   test('disconnectAll force-closes paused buffered sockets', () => {
     const broker = createBroker()
     const rawSocket = { send: vi.fn(), close: vi.fn() }
-    const bufferedSocket = new BufferedTerminalSocket(rawSocket)
+    const bufferedSocket = new BufferedAppRealtimeSocket(rawSocket)
     bufferedSocket.pause()
     broker.registerSocket('client_1_a', USER_A, bufferedSocket)
 
@@ -56,7 +56,7 @@ describe('terminal realtime broker', () => {
 
   test('buffered socket drops output covered by a first-frame flush boundary', () => {
     const rawSocket = { send: vi.fn(), close: vi.fn() }
-    const bufferedSocket = new BufferedTerminalSocket(rawSocket)
+    const bufferedSocket = new BufferedAppRealtimeSocket(rawSocket)
     bufferedSocket.pause()
 
     bufferedSocket.send(
@@ -335,7 +335,7 @@ describe('terminal realtime broker heartbeat presence', () => {
   test('heartbeat deadline force-closes a paused buffered socket', () => {
     const broker = createBroker()
     const rawSocket = { send: vi.fn(), close: vi.fn() }
-    const bufferedSocket = new BufferedTerminalSocket(rawSocket)
+    const bufferedSocket = new BufferedAppRealtimeSocket(rawSocket)
     bufferedSocket.pause()
     broker.registerSocket('client_a_1', USER_A, bufferedSocket)
 

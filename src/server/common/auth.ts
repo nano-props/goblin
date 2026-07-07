@@ -9,7 +9,7 @@ import { ACCESS_TOKEN_COOKIE, ACCESS_TOKEN_HEADER, ACCESS_TOKEN_QUERY } from '#/
  * Auth middleware for the access token. Accepts the token through
  * any of three channels (cookie → header → query), checked with
  * constant-time comparison. Used on every `/api/*` route that
- * requires auth, and on `/ws/invalidation` / `/ws/terminal`.
+ * requires auth, and on `/ws/invalidation` / `/ws/app`.
  *
  * Cookie is the canonical channel for browser clients. Header is
  * the canonical channel for the embedded Electron client.

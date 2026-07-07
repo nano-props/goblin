@@ -161,6 +161,10 @@ describe('client bootstrap', () => {
       pathForFile: () => '',
       saveClipboardFiles: () => Promise.resolve([]),
       host: () => null,
+      appRealtime: () => ({
+        kickReconnect: () => {},
+        onRecovered: () => () => {},
+      }),
       terminal: () => ({
         attach: async () => ({ ok: false, message: 'unavailable' }),
         restart: async () => ({ ok: false, message: 'unavailable' }),
@@ -206,13 +210,9 @@ describe('client bootstrap', () => {
                 canonicalRows: 24,
                 sessions: [],
               },
-        replaceWorkspaceTabs: async (input) => input.tabs,
-        updateWorkspaceTabs: async () => [],
         pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
         listSessions: async () => [],
-        listWorkspaceTabs: async () => [],
-        prewarm: async () => {},
-        kickReconnect: () => {},
+        recoverSessions: async () => ({ sessions: [], snapshots: [] }),
         notifyBell: async () => false,
         sendTestNotification: async () => false,
         setBadge: () => {},
@@ -223,8 +223,13 @@ describe('client bootstrap', () => {
         onIdentity: () => () => {},
         onLifecycle: () => () => {},
         onSessionsChanged: () => () => {},
-        onWorkspaceTabsChanged: () => () => {},
         onSessionClosed: () => () => {},
+      }),
+      workspacePaneTabs: () => ({
+        replace: async (input) => input.tabs,
+        update: async () => [],
+        list: async () => [],
+        onChanged: () => () => {},
       }),
     })
 

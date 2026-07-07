@@ -4,12 +4,10 @@ import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-
 import { hasFreshRepoInstance, type RepoInstanceHandle } from '#/web/stores/repos/repo-guards.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
-// Chrome-tab-style "opener" tracking, covering every workspace pane tab
-// (static and terminal), factored out of both the tab-creation paths
-// (`runCreateTerminalTabCommand`, `openWorkspacePaneTab`) and the tab-close
+// Chrome-tab-style "opener" tracking, covering every workspace pane tab,
+// factored out of both the static/runtime tab-creation paths and the tab-close
 // commands so none of them need to duplicate this bookkeeping. Kept
-// dependency-free of `workspace-commands.ts`/`terminal-create-command.ts` to
-// avoid a cycle between them.
+// dependency-free of command modules to avoid cycles between them.
 
 export type WorkspacePaneTabOpenerRecordResult = 'recorded' | 'missing' | 'stale-instance' | 'unavailable'
 
@@ -21,7 +19,7 @@ export function captureWorkspacePaneActiveTabIdentity(repoId: string, branchName
   return workspacePaneTabTargetForBranch(repoId, branchName)?.activeTab?.identity ?? null
 }
 
-/** Records that `childIdentity` (any static or terminal tab identity) was
+/** Records that `childIdentity` (any static or runtime tab identity) was
  *  opened from `openerIdentity` on `repoId`/`branchName`'s tab strip.
  *  Closing the tab prefers reactivating that opener (see
  *  `runCloseWorkspacePaneTabCommand`) over the generic adjacent-tab

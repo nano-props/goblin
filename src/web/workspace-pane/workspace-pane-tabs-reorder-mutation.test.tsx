@@ -16,9 +16,9 @@ import {
   type WorkspacePaneTabsReorderMutationResult,
   useWorkspacePaneTabsReorderMutation,
 } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
-import { workspacePaneStaticTabEntry, workspacePaneTerminalTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import type { TerminalUpdateWorkspaceTabsInput, WorkspacePaneTabsEntry } from '#/shared/terminal-types.ts'
+import type { WorkspacePaneTabsEntry, WorkspacePaneTabsUpdateInput } from '#/shared/workspace-pane-tabs.ts'
 import { clearWorkspacePaneTabsOperationQueuesForTests } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 
 const REPO_ROOT = '/tmp/workspace-pane-tabs-reorder-mutation-repo'
@@ -28,7 +28,7 @@ const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/workspace-pane-tabs-reorder-mutation-worktree'
 
 interface DeferredUpdateWorkspaceTabsRequest {
-  input: TerminalUpdateWorkspaceTabsInput
+  input: WorkspacePaneTabsUpdateInput
   resolve: (tabs: WorkspacePaneTabEntry[]) => void
   reject: (err: unknown) => void
 }
@@ -242,6 +242,43 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     })
   })
 
+  test('does not roll cache back over a newer same-target projection after server reject', async () => {
+    const requests = installDeferredUpdateWorkspaceTabs()
+    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
+    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
+    const newerProjectionTabs = [staticEntry('history'), terminalEntry('session-2')]
+    seedWorkspacePaneTabs(sourceTabs)
+    renderMutationHook({ canonicalTabs: sourceTabs })
+
+    act(() => {
+      currentControls().reorderTabs(reorderedTabs)
+    })
+    await vi.waitFor(() => {
+      expect(readWorkspacePaneTabs()).toEqual(reorderedTabs)
+      expect(requests).toHaveLength(1)
+    })
+
+    setWorkspacePaneTabsForTargetQueryData(
+      {
+        repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        tabs: newerProjectionTabs,
+      },
+      queryClient,
+    )
+
+    await act(async () => {
+      requests[0]!.reject(new Error('server unavailable'))
+      await flushMicrotasks()
+    })
+
+    await vi.waitFor(() => {
+      expect(readWorkspacePaneTabs()).toEqual(newerProjectionTabs)
+    })
+  })
+
   test('rolls back only the failed branch when another branch updates while reorder is pending', async () => {
     const requests = installDeferredUpdateWorkspaceTabs()
     const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
@@ -312,7 +349,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
   })
 
   test('uses the latest repo runtime instance when the repo instance changes', async () => {
-    const updateWorkspaceTabs = vi.fn(async (_input: TerminalUpdateWorkspaceTabsInput) => [
+    const updateWorkspaceTabs = vi.fn(async (_input: WorkspacePaneTabsUpdateInput) => [
       staticEntry('status'),
       terminalEntry('session-1'),
     ])
@@ -420,7 +457,7 @@ function installDeferredUpdateWorkspaceTabs(): DeferredUpdateWorkspaceTabsReques
 }
 
 function terminalEntry(sessionId: string): WorkspacePaneTabEntry {
-  return workspacePaneTerminalTabEntry(sessionId)
+  return workspacePaneRuntimeTabEntry('terminal', sessionId)
 }
 
 function staticEntry(type: Parameters<typeof workspacePaneStaticTabEntry>[0]): WorkspacePaneTabEntry {

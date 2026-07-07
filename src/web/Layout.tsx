@@ -5,6 +5,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
 import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
 import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
+import { AppRuntimeProjectionProvider } from '#/web/runtime/AppRuntimeProjectionProvider.tsx'
 import { TokenGate } from '#/web/components/TokenGate.tsx'
 import { RepoCloneDialog } from '#/web/components/RepoCloneDialog.tsx'
 import { RepoOpenDialog } from '#/web/components/RepoOpenDialog.tsx'
@@ -170,24 +171,26 @@ function AuthenticatedWorkspaceShell() {
             openCreateWorktree: navigation.openCreateWorktree,
           }}
         >
-          <TerminalSessionProvider currentRepoId={hydratedRouteRepoId}>
-            <div
-              className="relative flex h-full flex-col"
-              onDragEnter={repoDrop.onDragEnter}
-              onDragOver={repoDrop.onDragOver}
-              onDragLeave={repoDrop.onDragLeave}
-              onDrop={repoDrop.onDrop}
-            >
-              <Outlet />
-              <PrimaryWindowOverlays
-                overlays={overlays}
-                repoDrop={repoDrop}
-                navigation={navigation}
-                hydratedRouteRepoId={hydratedRouteRepoId}
-                currentBranchName={currentBranchName}
-              />
-            </div>
-          </TerminalSessionProvider>
+          <AppRuntimeProjectionProvider currentRepoId={hydratedRouteRepoId}>
+            <TerminalSessionProvider>
+              <div
+                className="relative flex h-full flex-col"
+                onDragEnter={repoDrop.onDragEnter}
+                onDragOver={repoDrop.onDragOver}
+                onDragLeave={repoDrop.onDragLeave}
+                onDrop={repoDrop.onDrop}
+              >
+                <Outlet />
+                <PrimaryWindowOverlays
+                  overlays={overlays}
+                  repoDrop={repoDrop}
+                  navigation={navigation}
+                  hydratedRouteRepoId={hydratedRouteRepoId}
+                  currentBranchName={currentBranchName}
+                />
+              </div>
+            </TerminalSessionProvider>
+          </AppRuntimeProjectionProvider>
         </LayoutOverlayActions>
       </PrimaryWindowNavigationProvider>
     </>

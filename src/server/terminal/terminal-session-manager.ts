@@ -5,6 +5,7 @@ import {
   type TerminalController,
   type TerminalExitEvent,
   type TerminalIdentityEvent,
+  type TerminalHydrationSnapshot,
   type TerminalLifecycleEvent,
   type TerminalOutputEvent,
   type TerminalSessionSummary,
@@ -12,7 +13,6 @@ import {
   type TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
 import { isValidTerminalRuntimeSessionId, normalizeTerminalSize } from '#/shared/terminal-validators.ts'
-import type { WorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
 import {
   attachTerminalClient,
@@ -32,10 +32,11 @@ import type { PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 
-type WorkspacePaneTabsRuntimeLike<TUser extends string | number> = Pick<
-  WorkspacePaneTabsRuntime<TUser>,
-  'terminalSessionIds'
->
+export interface TerminalSessionOrderProjection<TUser extends string | number> {
+  terminalSessionIds(input: { userId: TUser; scope: string; worktreePath: string }): readonly string[]
+}
+
+export type TerminalSessionCloseReason = 'session' | 'scope' | 'detached-user' | 'shutdown'
 
 interface TerminalPtyAttachResult {
   generation: number
@@ -89,7 +90,7 @@ export interface TerminalEventSink<TUser extends string | number> {
   onBell?(userId: TUser, event: TerminalBellRealtimeEvent): void
   onTitle?(userId: TUser, event: TerminalTitleEvent): void
   onExit(userId: TUser, event: TerminalExitEvent): void
-  onSessionClosed?(userId: TUser, session: TerminalSessionSummary): void
+  onSessionClosed?(userId: TUser, session: TerminalSessionSummary, reason: TerminalSessionCloseReason): void
   // Identity and lifecycle are emitted on separate channels so the
   // client's teardown decision can subscribe to identity only.
   // A transitional phase update arrives as `onLifecycle` and never
@@ -103,18 +104,18 @@ export class TerminalSessionManager<TUser extends string | number> {
   private readonly terminalRuntimeSessionIdByUserTerminalSessionIndex = new Map<string, string>()
   private readonly sink: TerminalEventSink<TUser>
   private readonly ptySupervisor: PtySupervisor
-  private readonly workspaceTabs: WorkspacePaneTabsRuntimeLike<TUser>
+  private readonly sessionOrder: TerminalSessionOrderProjection<TUser>
   private readonly isClientOnline: (userId: TUser, clientId: string) => boolean
 
   constructor(
     ptySupervisor: PtySupervisor,
     sink: TerminalEventSink<TUser>,
-    workspaceTabs: WorkspacePaneTabsRuntimeLike<TUser>,
+    sessionOrder: TerminalSessionOrderProjection<TUser>,
     isClientOnline: (userId: TUser, clientId: string) => boolean,
   ) {
     this.ptySupervisor = ptySupervisor
     this.sink = sink
-    this.workspaceTabs = workspaceTabs
+    this.sessionOrder = sessionOrder
     this.isClientOnline = isClientOnline
   }
 
@@ -296,7 +297,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     return true
   }
 
-  closeSession(terminalRuntimeSessionId: string): void {
+  closeSession(terminalRuntimeSessionId: string, reason: TerminalSessionCloseReason = 'session'): void {
     const session = this.sessionsByTerminalRuntimeSessionId.get(terminalRuntimeSessionId)
     if (!session) return
     session.ptyBinding.invalidateOwnership()
@@ -309,18 +310,18 @@ export class TerminalSessionManager<TUser extends string | number> {
     )
       this.terminalRuntimeSessionIdByUserTerminalSessionIndex.delete(userTerminalSessionIndex)
     session.ptyBinding.dispose(session)
-    this.sink.onSessionClosed?.(session.userId, closedSession)
+    this.sink.onSessionClosed?.(session.userId, closedSession, reason)
   }
 
   closeSessionsForUser(userId: TUser): void {
     for (const session of Array.from(this.sessionsByTerminalRuntimeSessionId.values())) {
-      if (session.userId === userId) this.closeSession(session.id)
+      if (session.userId === userId) this.closeSession(session.id, 'detached-user')
     }
   }
 
   closeSessionsForRepo(userId: TUser, scope: string): void {
     for (const session of Array.from(this.sessionsByTerminalRuntimeSessionId.values())) {
-      if (session.userId === userId && session.scope === scope) this.closeSession(session.id)
+      if (session.userId === userId && session.scope === scope) this.closeSession(session.id, 'scope')
     }
   }
 
@@ -336,7 +337,7 @@ export class TerminalSessionManager<TUser extends string | number> {
 
   closeAll(): void {
     for (const terminalRuntimeSessionId of Array.from(this.sessionsByTerminalRuntimeSessionId.keys()))
-      this.closeSession(terminalRuntimeSessionId)
+      this.closeSession(terminalRuntimeSessionId, 'shutdown')
   }
 
   async listSessionsForUser(userId: TUser, scope: string): Promise<TerminalSessionSummary[]> {
@@ -366,6 +367,27 @@ export class TerminalSessionManager<TUser extends string | number> {
         rows: session.rows,
       })),
     )
+  }
+
+  async recoverSessionsForUser(
+    userId: TUser,
+    scope: string,
+  ): Promise<{ sessions: TerminalSessionSummary[]; snapshots: TerminalHydrationSnapshot[] }> {
+    const sessions = await this.listSessionsForUser(userId, scope)
+    const snapshots: TerminalHydrationSnapshot[] = []
+    for (const summary of sessions) {
+      const session = this.getSession(userId, summary.terminalRuntimeSessionId)
+      if (!session) continue
+      const snap = await replaySnapshot(session.render)
+      if (!snap) continue
+      snapshots.push({
+        terminalRuntimeSessionId: summary.terminalRuntimeSessionId,
+        snapshot: snap.snapshot,
+        snapshotSeq: snap.snapshotSeq,
+        outputEra: snap.outputEra,
+      })
+    }
+    return { sessions, snapshots }
   }
 
   getSessionSummaryForUser(userId: TUser, terminalRuntimeSessionId: string): TerminalSessionSummary | null {
@@ -401,7 +423,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     const terminalSessionByTerminalSessionId = new Map(sessions.map((session) => [session.terminalSessionId, session]))
     const seen = new Set<string>()
     const tabListedSessions: TerminalSessionView<TUser>[] = []
-    for (const terminalSessionId of this.workspaceTabs.terminalSessionIds({ userId, scope, worktreePath })) {
+    for (const terminalSessionId of this.sessionOrder.terminalSessionIds({ userId, scope, worktreePath })) {
       const session = terminalSessionByTerminalSessionId.get(terminalSessionId)
       if (!session || seen.has(terminalSessionId)) continue
       seen.add(terminalSessionId)

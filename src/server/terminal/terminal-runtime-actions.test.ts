@@ -3,6 +3,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import { clearRepoRuntimeInstancesForUser, openRepoRuntimeInstance } from '#/server/modules/repo-runtime-instances.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
+import { WORKSPACE_PANE_TABS_REALTIME_EVENTS } from '#/shared/workspace-pane-tabs.ts'
 
 const CLIENT_ID = 'client_terminal_actions'
 // Identity is userId-keyed under method 2: the runtime derives
@@ -118,7 +119,10 @@ describe('terminal-runtime-actions close broadcast', () => {
       }),
     ).resolves.toMatchObject({ ok: true })
 
-    expect(broadcasts).toHaveBeenCalledWith(USER_ID, { type: 'workspace-tabs-changed', repoRoot: '/repo' })
+    expect(broadcasts).toHaveBeenCalledWith(USER_ID, {
+      type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
+      repoRoot: '/repo',
+    })
   })
 
   test('does not emit workspace tab invalidation after a failed create', async () => {
@@ -244,69 +248,7 @@ describe('terminal-runtime-actions close broadcast', () => {
   })
 })
 
-describe('terminal-runtime-actions workspace tabs broadcast', () => {
-  test('emits a workspace tabs invalidation after replaceTabs succeeds', async () => {
-    clearRepoRuntimeInstancesForUser(USER_ID)
-    syncCurrentRepoInstance()
-    const { actions, broadcasts } = makeActions({ closeSessionForUser: () => false })
-
-    await expect(
-      actions.replaceTabs(CLIENT_ID, USER_ID, {
-        repoRoot: '/repo',
-        repoInstanceId: REPO_INSTANCE_ID,
-        branchName: 'feature/worktree',
-        worktreePath: '/repo',
-        tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
-      }),
-    ).resolves.toEqual([])
-
-    expect(broadcasts).toHaveBeenCalledTimes(1)
-    expect(broadcasts).toHaveBeenCalledWith(USER_ID, {
-      type: 'workspace-tabs-changed',
-      repoRoot: '/repo',
-    })
-  })
-
-  test('rejects invalid replaceTabs input without emitting', async () => {
-    clearRepoRuntimeInstancesForUser(USER_ID)
-    syncCurrentRepoInstance()
-    const { actions, broadcasts } = makeActions({ closeSessionForUser: () => false })
-
-    await expect(
-      actions.replaceTabs(CLIENT_ID, USER_ID, {
-        repoRoot: '',
-        repoInstanceId: REPO_INSTANCE_ID,
-        branchName: 'feature/worktree',
-        worktreePath: '/repo',
-        tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
-      }),
-    ).resolves.toEqual([])
-
-    expect(broadcasts).not.toHaveBeenCalled()
-  })
-
-  test('emits a workspace tabs invalidation after updateTabs succeeds', async () => {
-    clearRepoRuntimeInstancesForUser(USER_ID)
-    syncCurrentRepoInstance()
-    const { actions, broadcasts } = makeActions({ closeSessionForUser: () => false })
-
-    await expect(
-      actions.updateTabs(CLIENT_ID, USER_ID, {
-        repoRoot: '/repo',
-        repoInstanceId: REPO_INSTANCE_ID,
-        branchName: 'feature/worktree',
-        worktreePath: '/repo',
-        operation: { type: 'open-static', tabType: 'status' },
-      }),
-    ).resolves.toEqual([])
-
-    expect(broadcasts).toHaveBeenCalledTimes(1)
-    expect(broadcasts).toHaveBeenCalledWith(USER_ID, {
-      type: 'workspace-tabs-changed',
-      repoRoot: '/repo',
-    })
-  })
-
+describe('terminal-runtime-actions prune', () => {
   test('rejects stale repo-instance prune requests before touching session state', async () => {
     clearRepoRuntimeInstancesForUser(USER_ID)
     syncCurrentRepoInstance()

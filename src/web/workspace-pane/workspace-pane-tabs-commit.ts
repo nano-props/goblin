@@ -1,13 +1,13 @@
 import type { QueryClient } from '@tanstack/react-query'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import type { TerminalUpdateWorkspaceTabsOperation } from '#/shared/terminal-types.ts'
-import { terminalClient } from '#/web/terminal.ts'
+import type { WorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs.ts'
 import { gblLog } from '#/web/logger.ts'
 import {
   cancelWorkspacePaneTabs,
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { runWorkspacePaneTabsOperation } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
+import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
 
 export interface CommitWorkspacePaneTabsInput {
   repoRoot: string
@@ -22,7 +22,7 @@ export interface UpdateWorkspacePaneTabsInput {
   repoInstanceId: string
   branchName: string
   worktreePath: string | null
-  operation: TerminalUpdateWorkspaceTabsOperation
+  operation: WorkspacePaneTabsUpdateOperation
 }
 
 export type WorkspacePaneTabsMutationOperation = 'commit' | 'update' | 'reorder'
@@ -163,7 +163,7 @@ export async function writeCanonicalWorkspacePaneTabsForTarget(
 export async function replaceWorkspacePaneTabsOnServer(
   input: CommitWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabEntry[]> {
-  return await terminalClient.replaceWorkspaceTabs({
+  return await workspacePaneTabsClient.replace({
     repoRoot: input.repoRoot,
     repoInstanceId: input.repoInstanceId,
     branchName: input.branchName,
@@ -175,7 +175,7 @@ export async function replaceWorkspacePaneTabsOnServer(
 export async function updateWorkspacePaneTabsOnServer(
   input: UpdateWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabEntry[]> {
-  return await terminalClient.updateWorkspaceTabs({
+  return await workspacePaneTabsClient.update({
     repoRoot: input.repoRoot,
     repoInstanceId: input.repoInstanceId,
     branchName: input.branchName,

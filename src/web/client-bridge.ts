@@ -1,13 +1,19 @@
 import type { ClientNativeCapability } from '#/shared/bootstrap.ts'
 import type { IpcEvent, IpcRequest } from '#/shared/api-types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import type { ClientHostBridge, ClientBridge, ClientTerminal } from '#/web/client-bridge-types.ts'
+import type {
+  ClientHostBridge,
+  ClientBridge,
+} from '#/web/client-bridge-types.ts'
 import { readNativeBridge } from '#/web/native-bridge.ts'
 import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
 import { normalizeClientServerClientId, readWebBootstrap } from '#/web/client-bootstrap-bridge.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
-import { createServerTerminalClient, type ClientServerTerminalConfig } from '#/web/client-terminal.ts'
+import { createClientAppRealtime, type AppRealtimeServerConfig } from '#/web/app-realtime-client.ts'
+import { createServerTerminalClient } from '#/web/client-terminal.ts'
+import { createServerWorkspacePaneTabsClient } from '#/web/client-workspace-pane-tabs.ts'
 import { createTerminalNotificationProvider } from '#/web/terminal-notification-provider.ts'
+import type { ClientAppRealtimeLifecycle, ClientTerminal, ClientWorkspacePaneTabs } from '#/web/client-bridge-types.ts'
 
 /**
  * Compute the client's capability set from the live `goblinNative`
@@ -44,7 +50,7 @@ function capabilitiesFromBridge(bridge: NonNullable<Window['goblinNative']>): Re
  * the same `window.location.origin` + cookie auth flow, so there is
  * no longer an Electron-specific fork here.
  */
-function readServerTerminalConfig(): ClientServerTerminalConfig | null {
+function readServerAppRealtimeConfig(): AppRealtimeServerConfig | null {
   // Two paths can populate the bootstrap's `initialServer`:
   //
   //  - QR-code URL bootstrap (`?accessToken=…`) drops a token on
@@ -78,29 +84,37 @@ function readServerTerminalConfig(): ClientServerTerminalConfig | null {
   return null
 }
 
-// The terminal client is *expensive*: it opens a WebSocket, holds
-// subscriber sets, and shares state across the whole client.
-// `terminalClient` from `#/web/terminal.ts` re-reads `getClientBridge()`
-// on every method call, so we must keep a stable singleton here.
-// The client's notification provider and badge callback re-read
-// `goblinNative` on each invocation — that's the lazy hook that lets
-// bell-state tests swap the preload between cases without rebuilding
-// the WebSocket layer.
-let memoizedTerminalClient: ClientTerminal | null = null
-function getOrCreateTerminalClient(): ClientTerminal {
-  if (memoizedTerminalClient) return memoizedTerminalClient
-  memoizedTerminalClient = createServerTerminalClient({
+interface ClientServerRealtimeClients {
+  appRealtime: ClientAppRealtimeLifecycle
+  terminal: ClientTerminal
+  workspacePaneTabs: ClientWorkspacePaneTabs
+}
+
+// The app realtime client is *expensive*: it owns the shared WebSocket,
+// subscriber sets, heartbeat, and recovery hooks. Feature clients are sibling
+// capability adapters over that transport.
+let memoizedRealtimeClients: ClientServerRealtimeClients | null = null
+function getOrCreateRealtimeClients(): ClientServerRealtimeClients {
+  if (memoizedRealtimeClients) return memoizedRealtimeClients
+  const appRealtime = createClientAppRealtime({
     getServerConfig() {
-      const server = readServerTerminalConfig()
-      if (!server) throw new Error('Client terminal client is unavailable')
+      const server = readServerAppRealtimeConfig()
+      if (!server) throw new Error('Client app realtime client is unavailable')
       return server
     },
-    notificationProvider: createTerminalNotificationProvider(),
-    setBadge: (count: number) => {
-      readNativeBridge()?.terminal?.setBadge?.(count)
-    },
   })
-  return memoizedTerminalClient
+  memoizedRealtimeClients = {
+    appRealtime,
+    terminal: createServerTerminalClient({
+      realtime: appRealtime,
+      notificationProvider: createTerminalNotificationProvider(),
+      setBadge: (count: number) => {
+        readNativeBridge()?.terminal?.setBadge?.(count)
+      },
+    }),
+    workspacePaneTabs: createServerWorkspacePaneTabsClient(appRealtime),
+  }
+  return memoizedRealtimeClients
 }
 
 /**
@@ -127,7 +141,7 @@ function getOrCreateTerminalClient(): ClientTerminal {
  */
 function createClientBridge(): ClientBridge {
   const clipboardBackend = (() => {
-    const server = readServerTerminalConfig()
+    const server = readServerAppRealtimeConfig()
     if (!server) return null
     return createHttpClipboardBackend({
       url: server.url,
@@ -135,7 +149,7 @@ function createClientBridge(): ClientBridge {
     })
   })()
 
-  const terminalClient = getOrCreateTerminalClient()
+  const realtimeClients = getOrCreateRealtimeClients()
 
   return {
     kind() {
@@ -202,8 +216,14 @@ function createClientBridge(): ClientBridge {
     host(): ClientHostBridge | null {
       return readNativeBridge()?.host ?? null
     },
+    appRealtime() {
+      return realtimeClients.appRealtime
+    },
     terminal() {
-      return terminalClient
+      return realtimeClients.terminal
+    },
+    workspacePaneTabs() {
+      return realtimeClients.workspacePaneTabs
     },
   }
 }

@@ -548,7 +548,6 @@ beforeEach(() => {
         onIdentity: vi.fn(),
         onLifecycle: vi.fn(),
         onSessionsChanged: vi.fn(),
-        onWorkspaceTabsChanged: vi.fn(),
         onSessionClosed: vi.fn(),
       },
     },
@@ -578,6 +577,10 @@ beforeEach(() => {
     pathForFile: vi.fn(() => ''),
     saveClipboardFiles: vi.fn(() => Promise.resolve([])),
     host: () => window.goblinNative.host ?? null,
+    appRealtime: () => ({
+      kickReconnect: () => {},
+      onRecovered: () => () => {},
+    }),
     terminal: () => ({
       attach: terminalCalls.attach.mockResolvedValue(attachResult('pty_session_1_aaaaaaaaa')),
       restart: terminalCalls.restart.mockResolvedValue(attachResult('pty_session_2_aaaaaaaaa')),
@@ -604,13 +607,9 @@ beforeEach(() => {
               ok: true as const,
             },
       ),
-      replaceWorkspaceTabs: vi.fn(async (input) => input.tabs),
-      updateWorkspaceTabs: vi.fn(async () => []),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: vi.fn(async () => []),
-      listWorkspaceTabs: vi.fn(async () => []),
-      prewarm: vi.fn(async () => {}),
-      kickReconnect: vi.fn(() => {}),
+      recoverSessions: vi.fn(async () => ({ sessions: [], snapshots: [] })),
       notifyBell: terminalCalls.notifyBell.mockResolvedValue(true),
       sendTestNotification: vi.fn(async () => true),
       setBadge: terminalCalls.setBadge,
@@ -621,8 +620,13 @@ beforeEach(() => {
       onIdentity: vi.fn(() => () => {}),
       onLifecycle: vi.fn(() => () => {}),
       onSessionsChanged: vi.fn(() => () => {}),
-      onWorkspaceTabsChanged: vi.fn(() => () => {}),
       onSessionClosed: vi.fn(() => () => {}),
+    }),
+    workspacePaneTabs: () => ({
+      replace: vi.fn(async (input) => input.tabs),
+      update: vi.fn(async () => []),
+      list: vi.fn(async () => []),
+      onChanged: vi.fn(() => () => {}),
     }),
   })
 })
@@ -1476,7 +1480,7 @@ describe('TerminalSession', () => {
     expect(term.write.mock.calls.map(([data]: unknown[]) => data)).toEqual(['remote-screen'])
   })
 
-  test('does not rewrite an existing terminal view when hydrate refreshes the same session snapshot', async () => {
+  test('rewrites an existing terminal view when hydrate refreshes the same session with a newer snapshot', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const session = new TerminalSession(descriptor, vi.fn())
@@ -1504,8 +1508,8 @@ describe('TerminalSession', () => {
     })
     await flushTerminalStart()
 
-    expect(term.reset).not.toHaveBeenCalled()
-    expect(term.write).not.toHaveBeenCalled()
+    expect(term.reset).toHaveBeenCalledTimes(1)
+    expect(term.write.mock.calls.map(([data]: unknown[]) => data)).toEqual(['fresher-same-session-screen'])
     expect(session.currentTerminalRuntimeSessionId()).toBe('pty_session_1_aaaaaaaaa')
   })
 

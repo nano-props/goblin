@@ -1,20 +1,26 @@
 import type { LucideIcon } from 'lucide-react'
 import type {
+  WorkspacePaneRuntimeTabEntry,
+  WorkspacePaneRuntimeTabType,
   WorkspacePaneStaticTabType,
   WorkspacePaneTabEntry,
   WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabSummary } from '#/web/components/terminal/types.ts'
 import {
-  terminalWorkspacePaneTabProvider,
+  workspacePaneRuntimeTabProvider,
   workspacePaneStaticTabProvider,
-  workspacePaneTabProvider,
 } from '#/web/components/workspace-pane/tab-providers.ts'
-import { PENDING_TERMINAL_WORKSPACE_PANE_TAB_IDENTITY } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
+import type { WorkspacePaneRuntimeTabAttention } from '#/web/components/workspace-pane/tab-providers.ts'
+import type {
+  WorkspacePaneRuntimeTabSummary,
+} from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
+import {
+  workspacePanePendingRuntimeTabIdentity,
+  workspacePaneRuntimeTabSummaryIdentity,
+  workspacePaneRuntimeTabSummarySessionId,
+} from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
 
-type TerminalWorkspacePaneTabSummary = Extract<WorkspacePaneTabSummary, { type: 'terminal' }>
-
-type WorkspacePaneTabKind = 'static' | 'terminal' | 'pending'
+type WorkspacePaneTabKind = 'static' | 'runtime' | 'pending'
 
 interface WorkspacePaneTabItemBase {
   identity: string
@@ -38,20 +44,25 @@ export interface WorkspacePaneStaticTabItem extends WorkspacePaneSortableTabItem
   tabEntry: Extract<WorkspacePaneTabEntry, { type: WorkspacePaneStaticTabType }>
 }
 
-export interface WorkspacePaneTerminalTabItem extends WorkspacePaneSortableTabItemBase {
-  kind: 'terminal'
-  view: TerminalWorkspacePaneTabSummary
+export interface WorkspacePaneRuntimeTabItem extends WorkspacePaneSortableTabItemBase {
+  type: WorkspacePaneRuntimeTabType
+  kind: 'runtime'
+  runtimeType: WorkspacePaneRuntimeTabType
+  view: WorkspacePaneRuntimeTabSummary
   closeLabel: string
-  tabEntry: Extract<WorkspacePaneTabEntry, { type: 'terminal' }>
+  tabEntry: WorkspacePaneRuntimeTabEntry
+  attention: WorkspacePaneRuntimeTabAttention['attention']
+  attentionLabelKey?: WorkspacePaneRuntimeTabAttention['attentionLabelKey']
 }
 
 interface WorkspacePanePendingTabItem extends WorkspacePaneTabItemBase {
+  type: WorkspacePaneRuntimeTabType
   kind: 'pending'
   busy: true
 }
 
 export type WorkspacePaneTabItem =
-  WorkspacePaneStaticTabItem | WorkspacePaneTerminalTabItem | WorkspacePanePendingTabItem
+  WorkspacePaneStaticTabItem | WorkspacePaneRuntimeTabItem | WorkspacePanePendingTabItem
 
 export function createStaticWorkspacePaneTabItem(input: {
   type: WorkspacePaneStaticTabType
@@ -76,42 +87,47 @@ export function createStaticWorkspacePaneTabItem(input: {
   }
 }
 
-export function createTerminalWorkspacePaneTabItem(input: {
-  view: TerminalWorkspacePaneTabSummary
+export function createRuntimeWorkspacePaneTabItem(input: {
+  view: WorkspacePaneRuntimeTabSummary
   label: string
   tooltip: string
   closeLabel: string
   panelId?: string
-}): WorkspacePaneTerminalTabItem {
+}): WorkspacePaneRuntimeTabItem {
+  const type = input.view.type
+  const provider = workspacePaneRuntimeTabProvider(type)
+  const sessionId = workspacePaneRuntimeTabSummarySessionId(input.view)
+  const identity = workspacePaneRuntimeTabSummaryIdentity(input.view)
   return {
-    identity: terminalWorkspacePaneTabProvider.identity(input.view.terminalSessionId),
-    type: input.view.type,
-    kind: 'terminal',
+    identity,
+    type,
+    kind: 'runtime',
+    runtimeType: type,
     view: input.view,
     label: input.label,
     tooltip: input.tooltip,
     closeLabel: input.closeLabel,
-    icon: terminalWorkspacePaneTabProvider.icon,
+    icon: provider.icon,
     panelId: input.panelId,
-    sortableId: terminalWorkspacePaneTabProvider.identity(input.view.terminalSessionId),
-    tabEntry: terminalWorkspacePaneTabProvider.tabEntry(input.view.terminalSessionId),
+    sortableId: identity,
+    tabEntry: provider.tabEntry(sessionId),
+    ...provider.attention({ view: input.view }),
   }
 }
 
 export function createPendingWorkspacePaneTabItem(input: {
-  type: WorkspacePaneTabType
+  type: WorkspacePaneRuntimeTabType
   label: string
   tooltip: string
   panelId?: string
 }): WorkspacePanePendingTabItem {
-  const identity = input.type === 'terminal' ? PENDING_TERMINAL_WORKSPACE_PANE_TAB_IDENTITY : `${input.type}:pending`
   return {
-    identity,
+    identity: workspacePanePendingRuntimeTabIdentity(input.type),
     type: input.type,
     kind: 'pending',
     label: input.label,
     tooltip: input.tooltip,
-    icon: workspacePaneTabProvider(input.type).icon,
+    icon: workspacePaneRuntimeTabProvider(input.type).icon,
     panelId: input.panelId,
     busy: true,
   }
@@ -121,8 +137,8 @@ export function isStaticWorkspacePaneTabItem(item: WorkspacePaneTabItem): item i
   return item.kind === 'static'
 }
 
-export function isTerminalWorkspacePaneTabItem(item: WorkspacePaneTabItem): item is WorkspacePaneTerminalTabItem {
-  return item.kind === 'terminal' && item.view.type === 'terminal'
+export function isRuntimeWorkspacePaneTabItem(item: WorkspacePaneTabItem): item is WorkspacePaneRuntimeTabItem {
+  return item.kind === 'runtime'
 }
 
 export function isPendingWorkspacePaneTabItem(item: WorkspacePaneTabItem): item is WorkspacePanePendingTabItem {

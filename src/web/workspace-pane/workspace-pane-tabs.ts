@@ -1,5 +1,6 @@
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import {
+  isWorkspacePaneRuntimeTabEntry,
   workspacePaneStaticTabEntry,
   workspacePaneTabEntryFromUnknown,
   workspacePaneTabEntryIdentity,
@@ -16,7 +17,7 @@ export function defaultWorkspacePaneTabs(): WorkspacePaneTabEntry[] {
 export function workspacePaneStaticTabsFromEntries(
   tabs: readonly WorkspacePaneTabEntry[],
 ): WorkspacePaneStaticTabType[] {
-  return normalizeWorkspacePaneTabs(tabs).flatMap((entry) => (entry.type === 'terminal' ? [] : [entry.type]))
+  return normalizeWorkspacePaneTabs(tabs).flatMap((entry) => (isWorkspacePaneRuntimeTabEntry(entry) ? [] : [entry.type]))
 }
 
 export function workspacePaneTabsWithStaticTab(
