@@ -1,7 +1,6 @@
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
 import {
-  workspacePanePreferenceTargetOptions,
   workspacePaneTabTargetForBranch,
   type WorkspacePaneTabTargetOptions,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
@@ -22,7 +21,7 @@ export type WorkspacePaneTabOpenerRecordResult = 'recorded' | 'missing' | 'stale
 export function captureWorkspacePaneActiveTabIdentity(
   repoId: string,
   branchName: string,
-  options: WorkspacePaneTabTargetOptions = workspacePanePreferenceTargetOptions,
+  options: WorkspacePaneTabTargetOptions,
 ): string | null {
   return workspacePaneTabTargetForBranch(repoId, branchName, options)?.activeTab?.identity ?? null
 }
