@@ -7,9 +7,9 @@ import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
 } from 'react'
 import { WorkspaceNavigationControls } from '#/web/components/WorkspaceNavigationControls.tsx'
-import { RepoLayoutSidebar } from '#/web/components/repo-layout/RepoLayoutSidebar.tsx'
 import { cn } from '#/web/lib/cn.ts'
 import {
   clampRepoSidebarSizePercent,
@@ -41,7 +41,7 @@ interface ZenModeSidebarRevealState {
 }
 
 interface ZenModeSidebarRevealProps {
-  repoId?: string
+  sidebarPane: ReactNode
   open: boolean
   // The panel can stay visually mounted while zen mode exits; only an
   // interactive panel may own pointer handlers or native drag regions.
@@ -50,7 +50,6 @@ interface ZenModeSidebarRevealProps {
   onSidebarSizeChange: (sidebarSize: number) => void
   onSurfaceEnter: () => void
   onSurfaceLeave: () => void
-  onOpenSettings?: () => void
 }
 
 interface ZenModeSidebarRevealTriggerProps {
@@ -61,11 +60,11 @@ interface ZenModeSidebarRevealTriggerProps {
 
 interface ZenModeSidebarChromeProps {
   repoId?: string
+  sidebarPane: ReactNode
   zenModeToggleEnabled: boolean
   revealEnabled: boolean
   sidebarSize: number
   onSidebarSizeChange: (sidebarSize: number) => void
-  onOpenSettings?: () => void
 }
 
 interface ZenModeSidebarResizeRailProps {
@@ -142,11 +141,11 @@ function useZenModeSidebarReveal(enabled: boolean): ZenModeSidebarRevealState {
 
 export function ZenModeSidebarChrome({
   repoId,
+  sidebarPane,
   zenModeToggleEnabled,
   revealEnabled,
   sidebarSize,
   onSidebarSizeChange,
-  onOpenSettings,
 }: ZenModeSidebarChromeProps) {
   const reveal = useZenModeSidebarReveal(revealEnabled)
   if (!zenModeToggleEnabled && !reveal.rendered) return null
@@ -155,14 +154,13 @@ export function ZenModeSidebarChrome({
     <>
       {reveal.rendered ? (
         <ZenModeSidebarReveal
-          repoId={repoId}
+          sidebarPane={sidebarPane}
           open={reveal.open}
           interactive={revealEnabled}
           sidebarSize={sidebarSize}
           onSidebarSizeChange={onSidebarSizeChange}
           onSurfaceEnter={reveal.onSurfaceEnter}
           onSurfaceLeave={reveal.onSurfaceLeave}
-          onOpenSettings={onOpenSettings}
         />
       ) : null}
       {zenModeToggleEnabled ? (
@@ -213,14 +211,13 @@ function ZenModeSidebarRevealTrigger({
 }
 
 function ZenModeSidebarReveal({
-  repoId,
+  sidebarPane,
   open,
   interactive,
   sidebarSize,
   onSidebarSizeChange,
   onSurfaceEnter,
   onSurfaceLeave,
-  onOpenSettings,
 }: ZenModeSidebarRevealProps) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
@@ -481,7 +478,7 @@ function ZenModeSidebarReveal({
         onMouseLeave={panelInteractive ? handleSurfaceLeave : undefined}
       >
         <FloatingSurfaceBoundary onPinnedChange={handleDescendantSurfacePinnedChange}>
-          <RepoLayoutSidebar repoId={repoId} compact={false} chromeRegion="none" onOpenSettings={onOpenSettings} />
+          {sidebarPane}
           <ZenModeSidebarResizeRail
             interactive={panelInteractive}
             resizeRailState={resizeRailState}
