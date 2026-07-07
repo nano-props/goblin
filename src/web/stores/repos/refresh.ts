@@ -16,11 +16,46 @@ import { getRepoProjection } from '#/web/repo-client.ts'
 import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { RepoRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
-import type { RepoRuntimeProjectionRefreshSection, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
+import type { RepoRuntimeProjectionRefreshScope, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 
+type ProjectionRefreshLoad = 'snapshot' | 'status'
 type ProjectionRefreshTarget = {
-  key: RepoRuntimeProjectionRefreshSection
-  reason: RepoRuntimeProjectionRefreshSection
+  key: ProjectionRefreshLoad
+  reason: ProjectionRefreshLoad
+}
+
+interface ProjectionRefreshPlan {
+  wantsSnapshot: boolean
+  wantsStatus: boolean
+  operationKey: string
+  priority: number
+  targets: [ProjectionRefreshTarget, ...ProjectionRefreshTarget[]]
+}
+
+function projectionRefreshPlan(scope: RepoRuntimeProjectionRefreshScope): ProjectionRefreshPlan {
+  switch (scope) {
+    case 'repo-read-model':
+      return {
+        wantsSnapshot: true,
+        wantsStatus: true,
+        operationKey: 'snapshot+status',
+        priority: 50,
+        targets: [
+          { key: 'snapshot', reason: 'snapshot' },
+          { key: 'status', reason: 'status' },
+        ],
+      }
+    case 'visible-status':
+      return {
+        wantsSnapshot: false,
+        wantsStatus: true,
+        operationKey: 'status',
+        priority: 40,
+        targets: [{ key: 'status', reason: 'status' }],
+      }
+  }
+  const exhaustive: never = scope
+  return exhaustive
 }
 
 export function createRefreshActions(set: ReposSet, get: ReposGet) {
@@ -47,21 +82,9 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
   async function runRuntimeProjectionRefresh(
     id: string,
     repoInstanceId: string,
-    sections: readonly RepoRuntimeProjectionRefreshSection[],
+    scope: RepoRuntimeProjectionRefreshScope,
   ): Promise<void> {
-    const wantsSnapshot = sections.includes('snapshot')
-    const wantsStatus = sections.includes('status')
-    if (!wantsSnapshot && !wantsStatus) return
-    const operationKey = wantsSnapshot && wantsStatus ? 'snapshot+status' : wantsSnapshot ? 'snapshot' : 'status'
-    const targets: [ProjectionRefreshTarget, ...ProjectionRefreshTarget[]] =
-      wantsSnapshot && wantsStatus
-        ? [
-            { key: 'snapshot', reason: 'snapshot' },
-            { key: 'status', reason: 'status' },
-          ]
-        : wantsSnapshot
-          ? [{ key: 'snapshot', reason: 'snapshot' }]
-          : [{ key: 'status', reason: 'status' }]
+    const { wantsSnapshot, wantsStatus, operationKey, priority, targets } = projectionRefreshPlan(scope)
 
     updateIfFresh(set, id, repoInstanceId, (r) => {
       if (wantsSnapshot) {
@@ -78,7 +101,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       repoInstanceId,
       lane: 'read',
       operationKey,
-      priority: wantsSnapshot ? 50 : 40,
+      priority,
       targets,
       task: (signal) => getRepoProjection(id, null, { mode: 'full' }, signal),
       errorFromResult: (projection) => (projection.snapshot ? null : 'error.failed-read-repo'),
@@ -136,12 +159,12 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
 
     async refreshRuntimeProjection(
       id: string,
-      options: { repoInstanceId?: string; sections: readonly RepoRuntimeProjectionRefreshSection[] },
+      options: { repoInstanceId?: string; scope: RepoRuntimeProjectionRefreshScope },
     ) {
       const resolved = resolveActionRepoInstanceId(get, id, options.repoInstanceId)
       if (!resolved) return
       const { repoInstanceId } = resolved
-      await runRuntimeProjectionRefresh(id, repoInstanceId, options.sections)
+      await runRuntimeProjectionRefresh(id, repoInstanceId, options.scope)
     },
 
     /** Unified sync pipeline — local and remote repos follow the same path.

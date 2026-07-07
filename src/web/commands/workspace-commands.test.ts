@@ -227,7 +227,7 @@ describe('workspace commands', () => {
         }),
       ).resolves.toBe(true)
 
-      expect(refreshRuntimeProjection).toHaveBeenCalledWith(REPO_ID, { repoInstanceId, sections: ['status'] })
+      expect(refreshRuntimeProjection).toHaveBeenCalledWith(REPO_ID, { repoInstanceId, scope: 'visible-status' })
     },
   )
 

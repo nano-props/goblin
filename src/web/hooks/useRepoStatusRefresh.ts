@@ -70,7 +70,6 @@ export function useRepoStatusRefresh({
       reason: 'status-like-view-opened',
       id: currentRepoSnapshot.id,
       repoInstanceId: currentRepoSnapshot.repoInstanceId,
-      sections: ['status'],
     })
   }, [currentRepoSnapshot])
 }

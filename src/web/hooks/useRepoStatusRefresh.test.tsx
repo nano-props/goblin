@@ -156,7 +156,7 @@ describe('useRepoStatusRefresh', () => {
 
     expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-b', {
       repoInstanceId: 'repo-instance-test-b',
-      sections: ['status'],
+      scope: 'visible-status',
     })
   })
 
@@ -178,7 +178,7 @@ describe('useRepoStatusRefresh', () => {
 
     expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
       repoInstanceId: 'repo-instance-test-a',
-      sections: ['status'],
+      scope: 'visible-status',
     })
   })
 
@@ -200,7 +200,7 @@ describe('useRepoStatusRefresh', () => {
 
     expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
       repoInstanceId: 'repo-instance-test-a',
-      sections: ['status'],
+      scope: 'visible-status',
     })
   })
 
@@ -226,7 +226,7 @@ describe('useRepoStatusRefresh', () => {
     })
     expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
       repoInstanceId: 'repo-instance-test-a',
-      sections: ['status'],
+      scope: 'visible-status',
     })
   })
 

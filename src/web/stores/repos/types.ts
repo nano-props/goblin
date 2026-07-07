@@ -258,7 +258,7 @@ interface RuntimeCoherentRepoProjectionActions {
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   refreshRuntimeProjection: (
     id: string,
-    options: { repoInstanceId?: string; sections: readonly RepoRuntimeProjectionRefreshSection[] },
+    options: { repoInstanceId?: string; scope: RepoRuntimeProjectionRefreshScope },
   ) => Promise<void>
   refreshCoreData: (id: string, options?: { repoInstanceId?: string }) => Promise<void>
   syncAndRefresh: (id: string, options?: { repoInstanceId?: string }) => Promise<void>
@@ -275,7 +275,7 @@ interface RuntimeCoherentRepoProjectionActions {
   clearFetchFailed: (id: string, repoInstanceId: string) => void
 }
 
-export type RepoRuntimeProjectionRefreshSection = 'snapshot' | 'status'
+export type RepoRuntimeProjectionRefreshScope = 'repo-read-model' | 'visible-status'
 
 interface RepoMutationActions {
   runBranchAction: (

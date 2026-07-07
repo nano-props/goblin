@@ -26,7 +26,7 @@ export async function runCoreDataRefreshWorkflow(
 ): Promise<void> {
   await get().refreshRuntimeProjection(options.id, {
     repoInstanceId: options.repoInstanceId,
-    sections: ['snapshot', 'status'],
+    scope: 'repo-read-model',
   })
   const after = get().repos[options.id]
   if (!after || after.instanceId !== options.repoInstanceId) return

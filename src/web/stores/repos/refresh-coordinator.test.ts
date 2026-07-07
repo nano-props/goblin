@@ -42,9 +42,9 @@ function callsGet() {
       },
       refreshRuntimeProjection: (
         id: string,
-        options: { repoInstanceId?: string; sections: ReadonlyArray<'snapshot' | 'status'> },
+        options: { repoInstanceId?: string; scope: 'repo-read-model' | 'visible-status' },
       ) => {
-        calls.push(`projection:${id}:${options.repoInstanceId ?? ''}:${options.sections.join('+')}`)
+        calls.push(`projection:${id}:${options.repoInstanceId ?? ''}:${options.scope}`)
         return Promise.resolve()
       },
     }) as unknown as ReturnType<ReposGet>
@@ -90,7 +90,7 @@ describe('repo refresh coordinator', () => {
     })
   })
 
-  test('routes initial load through a coordinated snapshot and status refresh', async () => {
+  test('routes initial load through a coordinated repo read-model projection refresh', async () => {
     const { calls, get } = callsGet()
 
     await runRepoRefreshIntent(get, {
@@ -115,7 +115,7 @@ describe('repo refresh coordinator', () => {
     expect(calls).toEqual(['manual:/repo:repo-instance-test-5'])
   })
 
-  test('routes visible status-like views through a projection section refresh', async () => {
+  test('routes visible status-like views through a visible projection refresh', async () => {
     const { calls, get } = callsGet()
 
     await runRepoRefreshIntent(get, {
@@ -123,10 +123,9 @@ describe('repo refresh coordinator', () => {
       reason: 'status-like-view-opened',
       id: '/repo',
       repoInstanceId: 'repo-instance-test-9',
-      sections: ['status'],
     })
 
-    expect(calls).toEqual(['projection:/repo:repo-instance-test-9:status'])
+    expect(calls).toEqual(['projection:/repo:repo-instance-test-9:visible-status'])
   })
 
   test('routes repo invalidation refreshes directly through the core refresh path', async () => {
