@@ -25,6 +25,18 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
+  test('waits for terminal creation before replacing a missing routed terminal session', () => {
+    const model = terminalModel({
+      routedSessionId: 'missing-session',
+      terminalProjectionPhase: 'ready',
+      createPending: true,
+    })
+
+    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
+      kind: 'pending',
+    })
+  })
+
   test('replaces a stale terminal route with the resolved materialized terminal tab', () => {
     const model = terminalModel({ routedSessionId: 'missing-session', terminalProjectionPhase: 'ready' })
 
@@ -45,6 +57,23 @@ describe('workspace pane route reconciliation', () => {
       runtimeTabViews: [],
       runtimeTabStateByType: {
         terminal: { projectionPhase: 'ready' },
+      },
+    })
+
+    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'pending' })
+  })
+
+  test('waits for terminal creation before replacing a missing routed static tab', () => {
+    const model = createRepoWorkspaceTabModel({
+      repoId: REPO_ID,
+      branchName: 'feature/route',
+      worktreePath: WORKTREE_PATH,
+      preferredTab: 'history',
+      tabEntries: [workspacePaneStaticTabEntry('status')],
+      tabEntriesProjectionPhase: 'ready',
+      runtimeTabViews: [],
+      runtimeTabStateByType: {
+        terminal: { createPending: true, projectionPhase: 'ready' },
       },
     })
 
@@ -92,7 +121,11 @@ describe('workspace pane route reconciliation', () => {
   })
 })
 
-function terminalModel(input: { routedSessionId: string; terminalProjectionPhase: 'pending' | 'ready' | 'failed' }) {
+function terminalModel(input: {
+  routedSessionId: string
+  terminalProjectionPhase: 'pending' | 'ready' | 'failed'
+  createPending?: boolean
+}) {
   return createRepoWorkspaceTabModel({
     repoId: REPO_ID,
     branchName: 'feature/route',
@@ -103,10 +136,12 @@ function terminalModel(input: { routedSessionId: string; terminalProjectionPhase
     runtimeTabViews: [terminalView('session-1')],
     runtimeTabStateByType: {
       terminal: {
+        createPending: input.createPending ?? false,
         projectionPhase: input.terminalProjectionPhase,
-        selectedSessionId: input.routedSessionId,
+        selectedSessionId: null,
       },
     },
+    requestedSessionIdByRuntimeType: { terminal: input.routedSessionId },
   })
 }
 

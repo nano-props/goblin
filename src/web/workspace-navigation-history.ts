@@ -77,11 +77,11 @@ export function useWorkspaceNavigationHistory({
   useEffect(() => {
     if (!entry) return
     const currentHistoryEntry = useReposStore.getState().navigationHistoryByRepo[entry.repoId]?.current ?? null
+    const browserHistoryTraversal = workspaceNavigationBrowserHistoryTraversal(routeHref)
     const replaceCurrentMatches =
       replaceCurrent &&
       !!replaceCurrentEntry &&
       workspaceNavigationHistoryEntryEqual(currentHistoryEntry, replaceCurrentEntry)
-    const browserHistoryTraversal = replaceCurrentMatches ? null : workspaceNavigationBrowserHistoryTraversal(routeHref)
     if (restoreRecordingSuppressed) {
       if (replaceCurrentMatches) {
         recordWorkspaceNavigation(entry, { replace: true })
@@ -98,6 +98,19 @@ export function useWorkspaceNavigationHistory({
       recordWorkspaceNavigation(entry, browserHistoryTraversal ? { browserHistoryTraversal } : undefined)
       clearBrowserHistoryAction(routeHref)
       clearRestoreRecordingSuppression()
+      return
+    }
+    if (browserHistoryTraversal && replaceCurrent && replaceCurrentEntry) {
+      if (!replaceCurrentMatches) {
+        recordWorkspaceNavigation(replaceCurrentEntry, { browserHistoryTraversal })
+      }
+      const restoredCurrent = useReposStore.getState().navigationHistoryByRepo[entry.repoId]?.current ?? null
+      if (workspaceNavigationHistoryEntryEqual(restoredCurrent, replaceCurrentEntry)) {
+        recordWorkspaceNavigation(entry, { replace: true })
+      } else if (!workspaceNavigationHistoryEntryEqual(restoredCurrent, entry)) {
+        recordWorkspaceNavigation(entry)
+      }
+      clearBrowserHistoryAction(routeHref)
       return
     }
     recordWorkspaceNavigation(

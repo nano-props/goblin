@@ -484,11 +484,16 @@ describe('RepoWorkspace', () => {
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
-        [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-1')],
+        [branchName]: [
+          workspacePaneStaticTabEntry('status'),
+          workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+          workspacePaneRuntimeTabEntry('terminal', 'session-2'),
+        ],
       },
     })
     const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
-    const readContext = terminalReadContextWithSession(terminalWorktreeKey, 'session-1')
+    useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'session-2')
+    const readContext = terminalReadContextWithSessions(terminalWorktreeKey, ['session-1', 'session-2'], 'session-2')
     const route = routeNavigation()
 
     render(
@@ -513,9 +518,52 @@ describe('RepoWorkspace', () => {
 
     expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
     expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]).toBeUndefined()
-    expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]).not.toBe(
-      'missing-session',
+    expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]).toBe('session-2')
+  })
+
+  test('does not reconcile a stale terminal route while terminal creation is pending', async () => {
+    const worktreePath = '/tmp/repo-workspace-container-repo-a'
+    const branchName = 'feature/a'
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
+      currentBranchName: branchName,
+      preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-1')],
+      },
+    })
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
+    const route = routeNavigation()
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext
+              value={terminalReadContextWithSessions(terminalWorktreeKey, ['session-1'], 'session-1', {
+                createPending: true,
+              })}
+            >
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName={branchName}
+                workspacePaneRoute={{ kind: 'terminal', terminalSessionId: 'missing-session' }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
     )
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
+    expect(route.openRepoBranch).not.toHaveBeenCalled()
+    expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]).toBeUndefined()
   })
 
   test('syncs a routed static tab after the branch projection appears', async () => {
@@ -739,6 +787,7 @@ function terminalReadContextWithSessions(
   terminalWorktreeKey: string,
   terminalSessionIds: readonly string[],
   selectedTerminalSessionId: string | null = terminalSessionIds[0] ?? null,
+  options: { createPending?: boolean } = {},
 ): TerminalSessionReadContextValue {
   const snapshot: TerminalWorktreeSnapshot = {
     terminalWorktreeKey,
@@ -757,7 +806,7 @@ function terminalReadContextWithSessions(
     count: terminalSessionIds.length,
     bellCount: 0,
     outputActiveCount: 0,
-    createPending: false,
+    createPending: options.createPending ?? false,
   }
   return {
     ...terminalReadContext,

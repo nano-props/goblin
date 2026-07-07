@@ -357,8 +357,15 @@ function activeRepoWorkspaceTab(
   requestedSessionIdByRuntimeType: RepoWorkspaceRequestedRuntimeSessionByType | undefined,
 ): RepoWorkspaceMaterializedTab | null {
   if (isWorkspacePaneRuntimeTabType(renderableTab)) {
-    const selectedSessionId =
-      requestedSessionIdByRuntimeType?.[renderableTab] ?? runtimeTabStateByType[renderableTab].selectedSessionId
+    const requestedSessionId = requestedSessionIdByRuntimeType?.[renderableTab]
+    if (requestedSessionId !== undefined) {
+      return requestedSessionId
+        ? (tabs.find(
+            (tab) => tab.kind === 'runtime' && tab.type === renderableTab && tab.sessionId === requestedSessionId,
+          ) ?? null)
+        : null
+    }
+    const selectedSessionId = runtimeTabStateByType[renderableTab].selectedSessionId
     if (selectedSessionId) {
       const selected = tabs.find(
         (tab) => tab.kind === 'runtime' && tab.type === renderableTab && tab.sessionId === selectedSessionId,

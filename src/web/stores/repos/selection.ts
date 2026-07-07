@@ -217,10 +217,7 @@ function createWorkspaceNavigationHistoryActions(set: ReposSet, get: ReposGet): 
           return {
             navigationHistoryByRepo: {
               ...s.navigationHistoryByRepo,
-              [entry.repoId]: {
-                ...currentRepoHistory,
-                current: entry,
-              },
+              [entry.repoId]: navigationHistoryWithReplacedCurrentEntry(currentRepoHistory, entry),
             },
           }
         }
@@ -314,6 +311,17 @@ function navigationHistoryForRepo(
   state: WorkspaceNavigationHistoryRepoState | undefined,
 ): WorkspaceNavigationHistoryRepoState {
   return state ?? { current: null, backStack: [], forwardStack: [] }
+}
+
+function navigationHistoryWithReplacedCurrentEntry(
+  history: WorkspaceNavigationHistoryRepoState,
+  entry: WorkspaceNavigationHistoryEntry,
+): WorkspaceNavigationHistoryRepoState {
+  return {
+    current: entry,
+    backStack: history.backStack.filter((candidate) => !workspaceNavigationHistoryEntryEqual(candidate, entry)),
+    forwardStack: history.forwardStack.filter((candidate) => !workspaceNavigationHistoryEntryEqual(candidate, entry)),
+  }
 }
 
 function navigationHistoryWithRestoredEntry(

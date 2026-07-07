@@ -103,6 +103,29 @@ describe('repo workspace pane tab model', () => {
     expect(repoWorkspaceRuntimeTabSessionId(model.activeTab, 'terminal')).toBe('session-2')
   })
 
+  test('does not fall back to another terminal when a requested runtime session is missing', () => {
+    const model = createModel({
+      repoId: REPO_ID,
+      branchName: 'feature/model',
+      worktreePath: WORKTREE_PATH,
+      preferredTab: 'terminal',
+      tabEntries: [terminalEntry('session-1'), terminalEntry('session-2')],
+      runtimeTabViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, false)],
+      terminalProjectionPhase: 'pending',
+      selectedTerminalSessionId: 'session-2',
+      requestedSessionIdByRuntimeType: { terminal: 'missing-session' },
+    })
+
+    expect(model.runtimeTabStateByType.terminal.selectedSessionId).toBe('session-2')
+    expect(model.selection).toEqual({
+      kind: 'runtime-host',
+      tab: 'terminal',
+      runtimeType: 'terminal',
+      materializedTab: null,
+    })
+    expect(model.activeTab).toBeNull()
+  })
+
   test('creates pending runtime tabs from runtime tab state', () => {
     const model = createModel({
       repoId: REPO_ID,

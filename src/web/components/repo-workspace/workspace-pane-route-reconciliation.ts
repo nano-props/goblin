@@ -1,4 +1,5 @@
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import { WORKSPACE_PANE_RUNTIME_TAB_TYPES } from '#/shared/workspace-pane.ts'
 import type {
   RepoWorkspaceMaterializedTab,
   RepoWorkspaceTab,
@@ -16,8 +17,13 @@ export function reconcileWorkspacePaneRoute(
   model: RepoWorkspaceTabModel,
 ): WorkspacePaneRouteReconciliation {
   if (!route || !model.branchName) return { kind: 'none' }
+  if (workspacePaneRouteReconciliationBlocked(model)) return { kind: 'pending' }
   if (route.kind === 'static') return reconcileStaticWorkspacePaneRoute(route, model)
   return reconcileTerminalWorkspacePaneRoute(route, model)
+}
+
+function workspacePaneRouteReconciliationBlocked(model: RepoWorkspaceTabModel): boolean {
+  return WORKSPACE_PANE_RUNTIME_TAB_TYPES.some((type) => model.runtimeTabStateByType[type].createPending)
 }
 
 function reconcileStaticWorkspacePaneRoute(
@@ -58,10 +64,23 @@ function replacementForRoute(
   model: RepoWorkspaceTabModel,
 ): WorkspacePaneRouteReconciliation {
   const fallbackRoute =
-    routeForMaterializedTab(model.activeTab) ?? routeForMaterializedTab(firstMaterializedTab(model.tabs))
+    routeForMaterializedTab(model.activeTab) ??
+    routeForMaterializedTab(firstMaterializedTabForRoute(route, model.tabs)) ??
+    routeForMaterializedTab(firstMaterializedTab(model.tabs))
   return fallbackRoute && workspacePaneRouteEquals(route, fallbackRoute)
     ? { kind: 'none' }
     : { kind: 'replace', route: fallbackRoute }
+}
+
+function firstMaterializedTabForRoute(
+  route: RepoBranchWorkspacePaneRoute,
+  tabs: readonly RepoWorkspaceTab[],
+): RepoWorkspaceMaterializedTab | null {
+  if (route.kind !== 'terminal') return null
+  return (
+    tabs.find((tab): tab is RepoWorkspaceMaterializedTab => tab.kind === 'runtime' && tab.runtimeType === 'terminal') ??
+    null
+  )
 }
 
 function firstMaterializedTab(tabs: readonly RepoWorkspaceTab[]): RepoWorkspaceMaterializedTab | null {

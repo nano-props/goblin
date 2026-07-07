@@ -3,6 +3,7 @@ import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import {
   createRepoWorkspaceTabModel,
+  repoWorkspaceTabModelBlocksTabInteraction,
   repoWorkspaceRuntimeTabSessionId,
   type RepoWorkspaceTabEntriesProjectionPhase,
   type RepoWorkspaceTabModel,
@@ -124,14 +125,15 @@ function workspacePaneTabsProjectionPhase(
  * the tab-model hook explicit.
  */
 export function useSyncRepoWorkspaceRuntimeTabSelection(
-  model: Pick<RepoWorkspaceTabModel, 'activeTab' | 'runtimeTabTargetKeyByType'>,
+  model: Pick<RepoWorkspaceTabModel, 'activeTab' | 'runtimeTabTargetKeyByType' | 'runtimeTabStateByType'>,
   selectedSessionIdByRuntimeType: WorkspacePaneRuntimeTabTargetProjectionHookResult['selectedSessionIdByRuntimeType'],
 ): void {
+  const tabInteractionBlocked = repoWorkspaceTabModelBlocksTabInteraction(model)
   const activeSessionIdByRuntimeType = useMemo(
     () => ({
-      terminal: repoWorkspaceRuntimeTabSessionId(model.activeTab, 'terminal'),
+      terminal: tabInteractionBlocked ? null : repoWorkspaceRuntimeTabSessionId(model.activeTab, 'terminal'),
     }),
-    [model.activeTab],
+    [model.activeTab, tabInteractionBlocked],
   )
   useSyncWorkspacePaneRuntimeTabProviderSelection(
     {
