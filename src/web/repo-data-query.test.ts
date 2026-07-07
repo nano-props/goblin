@@ -2,6 +2,7 @@ import { QueryClient } from '@tanstack/react-query'
 import { describe, expect, test, vi } from 'vitest'
 import {
   getRepoOperationsQueryData,
+  getRepoProjectionPlaceholderData,
   getRepoProjectionQueryData,
   getRepoSnapshotQueryData,
   getRepoStatusQueryData,
@@ -10,6 +11,7 @@ import {
   scheduleRepoRuntimeProjectionRefresh,
   setRepoOperationsQueryData,
   setRepoProjectionQueryData,
+  setRepoSnapshotQueryData,
   setRepoStatusQueryData,
 } from '#/web/repo-data-query.ts'
 import type { PullRequestEntry, RepoRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
@@ -33,6 +35,23 @@ describe('repo data query keys', () => {
 })
 
 describe('repo projection query data', () => {
+  test('builds projection placeholder data from cached snapshot without inventing status cache', () => {
+    const queryClient = new QueryClient()
+    const snapshot: RepoSnapshot = { branches: [], current: 'main' }
+
+    setRepoSnapshotQueryData('/tmp/repo', 'repo-instance-1', snapshot, queryClient)
+
+    expect(getRepoProjectionPlaceholderData('/tmp/repo', 'repo-instance-1', null, 'full', queryClient)).toEqual({
+      snapshot,
+      status: [],
+      pullRequests: null,
+      operations: { operations: [], loadedAt: 0 },
+      requested: { branch: null, pullRequestMode: 'full' },
+      loadedAt: 0,
+    })
+    expect(getRepoStatusQueryData('/tmp/repo', 'repo-instance-1', queryClient)).toBeUndefined()
+  })
+
   test('backfills shared section caches from a server projection', () => {
     const queryClient = new QueryClient()
     const snapshot: RepoSnapshot = { branches: [], current: 'main' }

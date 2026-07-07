@@ -59,7 +59,7 @@ export function repoProjectionQueryOptions(
   branch?: string | null,
   mode?: PullRequestFetchMode,
 ) {
-  const placeholderData = repoProjectionPlaceholderData(repoRoot, repoInstanceId, branch, mode)
+  const placeholderData = getRepoProjectionPlaceholderData(repoRoot, repoInstanceId, branch, mode)
   return queryOptions({
     queryKey: repoProjectionQueryKey(repoRoot, repoInstanceId, branch, mode),
     queryFn: ({ signal }) => getRepoProjection(repoRoot, branch, { mode }, signal),
@@ -79,17 +79,18 @@ function repoOperationsSnapshotHasActiveOperations(snapshot: RepoOperationsSnaps
   )
 }
 
-function repoProjectionPlaceholderData(
+export function getRepoProjectionPlaceholderData(
   repoRoot: string,
   repoInstanceId: string,
   branch?: string | null,
   mode?: PullRequestFetchMode,
+  queryClient: QueryClient = primaryWindowQueryClient,
 ): RepoRuntimeProjection | undefined {
-  const snapshot = getRepoSnapshotQueryData(repoRoot, repoInstanceId)
-  const status = getRepoStatusQueryData(repoRoot, repoInstanceId)
-  if (!snapshot || !status) return undefined
+  const snapshot = getRepoSnapshotQueryData(repoRoot, repoInstanceId, queryClient)
+  if (!snapshot) return undefined
+  const status = getRepoStatusQueryData(repoRoot, repoInstanceId, queryClient) ?? []
   const requestedBranch = branch || null
-  const operations = getRepoOperationsQueryData(repoRoot, repoInstanceId) ?? { operations: [], loadedAt: 0 }
+  const operations = getRepoOperationsQueryData(repoRoot, repoInstanceId, queryClient) ?? { operations: [], loadedAt: 0 }
   return {
     snapshot,
     status,
