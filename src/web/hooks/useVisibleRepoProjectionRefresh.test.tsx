@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act } from '@testing-library/react'
+import { QueryClientProvider } from '@tanstack/react-query'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
@@ -10,16 +11,56 @@ import {
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { createRepoBranch, resetReposStore, seedRepoReadModelQueryData } from '#/web/test-utils/bridge.ts'
 import { preferredWorkspacePaneTabByTargetRecordWith } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabEntry, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
+import type { TerminalSessionReadContextValue, TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 
 const originalRefreshRuntimeProjection = useReposStore.getState().refreshRuntimeProjection
+const emptyTerminalWorktreeSnapshots = new Map<string, TerminalWorktreeSnapshot>()
+const emptyTerminalSnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
+const emptyTerminalWorktreeSnapshot = (terminalWorktreeKey: string): TerminalWorktreeSnapshot => {
+  let snapshot = emptyTerminalWorktreeSnapshots.get(terminalWorktreeKey)
+  if (!snapshot) {
+    snapshot = {
+      terminalWorktreeKey,
+      selectedDescriptor: null,
+      sessions: [],
+      count: 0,
+      bellCount: 0,
+      outputActiveCount: 0,
+      createPending: false,
+    }
+    emptyTerminalWorktreeSnapshots.set(terminalWorktreeKey, snapshot)
+  }
+  return snapshot
+}
+const terminalReadContext: TerminalSessionReadContextValue = {
+  terminalWorktreeSnapshot: emptyTerminalWorktreeSnapshot,
+  subscribeTerminalWorktree: () => () => {},
+  repoBellCount: () => 0,
+  subscribeRepoBellCount: () => () => {},
+  snapshot: () => emptyTerminalSnapshot,
+  subscribeSnapshot: () => () => {},
+}
 
 function Harness({
   repoId = '/repo-a',
   branchName = 'main',
 }: { repoId?: string | null; branchName?: string | null } = {}) {
+  return (
+    <QueryClientProvider client={primaryWindowQueryClient}>
+      <TerminalSessionReadContext value={terminalReadContext}>
+        <HarnessEffect repoId={repoId} branchName={branchName} />
+      </TerminalSessionReadContext>
+    </QueryClientProvider>
+  )
+}
+
+function HarnessEffect({ repoId, branchName }: { repoId: string | null; branchName: string | null }) {
   useVisibleRepoProjectionRefresh({ hydratedRouteRepoId: repoId, currentBranchName: branchName })
   return null
 }
@@ -29,6 +70,7 @@ function createRepo(
   options: {
     preferredWorkspacePaneTab?: WorkspacePaneTabType
     branchNames?: string[]
+    workspacePaneTabs?: WorkspacePaneTabEntry[]
     /**
      * Phase 4: the legacy `availability.phase` field is gone for
      * remote repos. The refresh state's `unavailable` boolean is
@@ -59,7 +101,7 @@ function createRepo(
       repoInstanceId: repo.instanceId,
       branchName: branch.name,
       worktreePath,
-      tabs: [workspacePaneStaticTabEntry('status')],
+      tabs: options.workspacePaneTabs ?? [workspacePaneStaticTabEntry('status')],
     })
     repo.ui.preferredWorkspacePaneTabByTarget = preferredWorkspacePaneTabByTargetRecordWith(
       repo.ui,
@@ -79,6 +121,7 @@ describe('isRepoVisibleProjectionRefreshable', () => {
         id: '/r',
         repoInstanceId: 'repo-instance-test',
         preferredWorkspacePaneTab: 'status',
+        renderedWorkspacePaneTab: 'status',
         branchName: 'main',
         visibleProjectionViewOpen: true,
         unavailable: false,
@@ -93,6 +136,7 @@ describe('isRepoVisibleProjectionRefreshable', () => {
         id: '/r',
         repoInstanceId: 'repo-instance-test',
         preferredWorkspacePaneTab: 'status',
+        renderedWorkspacePaneTab: 'status',
         branchName: 'main',
         visibleProjectionViewOpen: true,
         unavailable: true,
@@ -107,6 +151,7 @@ describe('isRepoVisibleProjectionRefreshable', () => {
         id: '/r',
         repoInstanceId: 'repo-instance-test',
         preferredWorkspacePaneTab: 'status',
+        renderedWorkspacePaneTab: 'status',
         branchName: 'main',
         visibleProjectionViewOpen: true,
         unavailable: false,
@@ -118,6 +163,7 @@ describe('isRepoVisibleProjectionRefreshable', () => {
         id: '/r',
         repoInstanceId: 'repo-instance-test',
         preferredWorkspacePaneTab: 'status',
+        renderedWorkspacePaneTab: 'status',
         branchName: 'main',
         visibleProjectionViewOpen: true,
         unavailable: false,
@@ -135,6 +181,12 @@ describe('useVisibleRepoProjectionRefresh', () => {
   beforeEach(() => {
     ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
     resetReposStore()
+    primaryWindowQueryClient.clear()
+    emptyTerminalWorktreeSnapshots.clear()
+    useTerminalProjectionHydrationStore.setState({
+      hydrationByRepo: new Map(),
+      refreshedAtByRepo: new Map(),
+    })
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
@@ -148,6 +200,11 @@ describe('useVisibleRepoProjectionRefresh', () => {
     act(() => root.unmount())
     container.remove()
     resetReposStore()
+    primaryWindowQueryClient.clear()
+    useTerminalProjectionHydrationStore.setState({
+      hydrationByRepo: new Map(),
+      refreshedAtByRepo: new Map(),
+    })
     useReposStore.setState({ refreshRuntimeProjection: originalRefreshRuntimeProjection })
     ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false
   })
@@ -177,7 +234,10 @@ describe('useVisibleRepoProjectionRefresh', () => {
   })
 
   test('refreshes the visible projection when opening the status tab', async () => {
-    const repo = createRepo('/repo-a', { preferredWorkspacePaneTab: 'terminal' })
+    const repo = createRepo('/repo-a', {
+      preferredWorkspacePaneTab: 'history',
+      workspacePaneTabs: [workspacePaneStaticTabEntry('history')],
+    })
     await act(async () => {
       useReposStore.setState({
         repos: { '/repo-a': repo },
@@ -189,6 +249,13 @@ describe('useVisibleRepoProjectionRefresh', () => {
     refreshRuntimeProjection.mockClear()
 
     await act(async () => {
+      setWorkspacePaneTabsForTargetQueryData({
+        repoRoot: '/repo-a',
+        repoInstanceId: 'repo-instance-test-a',
+        branchName: 'main',
+        worktreePath: '/repo-a/main',
+        tabs: [workspacePaneStaticTabEntry('history'), workspacePaneStaticTabEntry('status')],
+      })
       useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'status')
     })
 
@@ -200,7 +267,10 @@ describe('useVisibleRepoProjectionRefresh', () => {
   })
 
   test('refreshes the visible projection when opening the changes tab', async () => {
-    const repo = createRepo('/repo-a', { preferredWorkspacePaneTab: 'terminal' })
+    const repo = createRepo('/repo-a', {
+      preferredWorkspacePaneTab: 'history',
+      workspacePaneTabs: [workspacePaneStaticTabEntry('history')],
+    })
     await act(async () => {
       useReposStore.setState({
         repos: { '/repo-a': repo },
@@ -212,6 +282,13 @@ describe('useVisibleRepoProjectionRefresh', () => {
     refreshRuntimeProjection.mockClear()
 
     await act(async () => {
+      setWorkspacePaneTabsForTargetQueryData({
+        repoRoot: '/repo-a',
+        repoInstanceId: 'repo-instance-test-a',
+        branchName: 'main',
+        worktreePath: '/repo-a/main',
+        tabs: [workspacePaneStaticTabEntry('history'), workspacePaneStaticTabEntry('changes')],
+      })
       useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'changes')
     })
 
@@ -222,8 +299,11 @@ describe('useVisibleRepoProjectionRefresh', () => {
     })
   })
 
-  test('refreshes the visible projection when reopening the status tab after bouncing through terminal', async () => {
-    const repo = createRepo('/repo-a', { preferredWorkspacePaneTab: 'status' })
+  test('refreshes the visible projection when reopening the status tab after bouncing through history', async () => {
+    const repo = createRepo('/repo-a', {
+      preferredWorkspacePaneTab: 'status',
+      workspacePaneTabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+    })
     await act(async () => {
       useReposStore.setState({
         repos: { '/repo-a': repo },
@@ -235,7 +315,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
     refreshRuntimeProjection.mockClear()
 
     await act(async () => {
-      useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'terminal')
+      useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'history')
     })
     expect(refreshRuntimeProjection).not.toHaveBeenCalled()
 
@@ -310,8 +390,13 @@ describe('useVisibleRepoProjectionRefresh', () => {
     })
   })
 
-  test('refreshes after branch switches when status is rendered through tab fallback', async () => {
-    const repo = createRepo('/repo-a', { preferredWorkspacePaneTab: 'terminal', branchNames: ['main', 'feature/a'] })
+  test('refreshes after branch switches when status is rendered through stale runtime tab fallback', async () => {
+    const repo = createRepo('/repo-a', {
+      preferredWorkspacePaneTab: 'terminal',
+      branchNames: ['main', 'feature/a'],
+      workspacePaneTabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-1')],
+    })
+    useTerminalProjectionHydrationStore.getState().markProjectionReady('/repo-a', 'repo-instance-test-a')
     await act(async () => {
       useReposStore.setState({
         repos: { '/repo-a': repo },

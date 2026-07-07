@@ -6,15 +6,7 @@ import {
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState, ReposGet } from '#/web/stores/repos/types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
-import {
-  preferredWorkspacePaneTabForTarget,
-  workspacePaneTabsTargetForRepoBranch,
-} from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { invalidateRepoDataQueries } from '#/web/repo-data-query.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { normalizeWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 interface RepoRefreshIntentBase {
   id: string
@@ -38,70 +30,19 @@ export interface RepoVisibleProjectionRefreshState {
   id: string
   repoInstanceId: string
   preferredWorkspacePaneTab: WorkspacePaneTabType
+  renderedWorkspacePaneTab: WorkspacePaneTabType | null
   branchName: string | null
   visibleProjectionViewOpen: boolean
   unavailable: boolean
   visibleStatusPhase: 'idle' | 'loading' | 'refreshing'
 }
 
-export function repoVisibleProjectionRefreshState(repo: RepoState): RepoVisibleProjectionRefreshState {
-  return {
-    id: repo.id,
-    repoInstanceId: repo.instanceId,
-    preferredWorkspacePaneTab: preferredWorkspacePaneTabForTarget(repo.ui, null),
-    branchName: null,
-    visibleProjectionViewOpen: false,
-    unavailable: isRepoUnavailable(repo),
-    visibleStatusPhase: repo.dataLoads.visibleStatus.phase,
-  }
-}
-
-export function currentRepoVisibleProjectionRefreshState(
-  repo: RepoState,
-  branchName: string | null,
-): RepoVisibleProjectionRefreshState {
-  const branchModel = readRepoBranchQueryProjection(repo)
-  const target =
-    branchModel && branchName
-      ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branchName)
-      : null
-  const preferredWorkspacePaneTab = preferredWorkspacePaneTabForTarget(repo.ui, target)
-  const visibleProjectionViewOpen = target
-    ? renderedWorkspacePaneProjectionTabOpen(repo, target, preferredWorkspacePaneTab)
-    : false
-  return {
-    id: repo.id,
-    repoInstanceId: repo.instanceId,
-    preferredWorkspacePaneTab,
-    branchName,
-    visibleProjectionViewOpen,
-    unavailable: isRepoUnavailable(repo),
-    visibleStatusPhase: repo.dataLoads.visibleStatus.phase,
-  }
-}
-
-function renderedWorkspacePaneProjectionTabOpen(
-  repo: RepoState,
-  target: WorkspacePaneTabsTarget,
-  preferredWorkspacePaneTab: WorkspacePaneTabType,
-): boolean {
-  const tabEntries = normalizeWorkspacePaneTabs(
-    readWorkspacePaneTabsForTarget({
-      repoRoot: repo.id,
-      repoInstanceId: repo.instanceId,
-      branchName: target.branchName,
-      worktreePath: target.worktreePath,
-    }),
-    { hasWorktree: target.worktreePath !== null },
-  )
-  const renderedTab = tabEntries.some((entry) => entry.type === preferredWorkspacePaneTab)
-    ? preferredWorkspacePaneTab
-    : (tabEntries[0]?.type ?? null)
-  return renderedTab === 'status' || renderedTab === 'changes'
-}
-
 export function isRepoVisibleProjectionRefreshable(repo: RepoVisibleProjectionRefreshState): boolean {
   return !repo.unavailable && repo.visibleStatusPhase === 'idle'
+}
+
+function isRepoStateVisibleProjectionRefreshable(repo: RepoState): boolean {
+  return !isRepoUnavailable(repo) && repo.dataLoads.visibleStatus.phase === 'idle'
 }
 
 async function runVisibleRuntimeProjectionRefresh(
@@ -113,7 +54,7 @@ async function runVisibleRuntimeProjectionRefresh(
   const state = get()
   const repo = state.repos[id]
   if (!repo || repo.instanceId !== repoInstanceId) return
-  if (!isRepoVisibleProjectionRefreshable(currentRepoVisibleProjectionRefreshState(repo, branchName))) return
+  if (!isRepoStateVisibleProjectionRefreshable(repo)) return
   await state.refreshRuntimeProjection(id, { repoInstanceId, scope: 'visible-status', branchName })
 }
 

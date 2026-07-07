@@ -34,8 +34,15 @@ export function workspacePaneTabsQueryOptions(repoRoot: string, repoInstanceId: 
   })
 }
 
-export function useWorkspacePaneTabsQuery(repoRoot: string, repoInstanceId: string) {
-  const query = useQuery(workspacePaneTabsQueryOptions(repoRoot, repoInstanceId))
+export function useWorkspacePaneTabsQuery(
+  repoRoot: string,
+  repoInstanceId: string,
+  options: { enabled?: boolean } = {},
+) {
+  const query = useQuery({
+    ...workspacePaneTabsQueryOptions(repoRoot, repoInstanceId),
+    enabled: options.enabled !== false,
+  })
   useEffect(() => {
     if (query.status === 'success') notifyWorkspacePaneTabsPersistenceChanged()
   }, [query.dataUpdatedAt, query.status])

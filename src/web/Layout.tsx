@@ -173,6 +173,10 @@ function AuthenticatedWorkspaceShell() {
         >
           <AppRuntimeProjectionProvider currentRepoId={hydratedRouteRepoId}>
             <TerminalSessionProvider>
+              <VisibleRepoProjectionRefreshEffect
+                hydratedRouteRepoId={hydratedRouteRepoId}
+                currentBranchName={currentBranchName}
+              />
               <div
                 className="relative flex h-full flex-col"
                 onDragEnter={repoDrop.onDragEnter}
@@ -340,10 +344,20 @@ function AuthenticatedWorkspaceSideEffects({
   useSessionPersistence({ routedRepoId })
   useWorkspaceNavigationHistory({ routeContext })
   useBackgroundFetch({ hydratedRouteRepoId })
-  useVisibleRepoProjectionRefresh({ hydratedRouteRepoId, currentBranchName })
   useNetworkReconnect()
   useRepoStoreInvalidationRefresh()
   useSettingsQueryInvalidationSync()
+  return null
+}
+
+function VisibleRepoProjectionRefreshEffect({
+  hydratedRouteRepoId,
+  currentBranchName,
+}: {
+  hydratedRouteRepoId: string | null
+  currentBranchName: string | null
+}) {
+  useVisibleRepoProjectionRefresh({ hydratedRouteRepoId, currentBranchName })
   return null
 }
 

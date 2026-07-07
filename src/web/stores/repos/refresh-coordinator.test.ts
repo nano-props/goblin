@@ -4,18 +4,15 @@ import {
   repoInvalidationRefreshDisposition,
   resetRepoRefreshCoordinatorState,
   runRepoRefreshIntent,
-  currentRepoVisibleProjectionRefreshState,
 } from '#/web/stores/repos/refresh-coordinator.ts'
 import { beginRepoInvalidationSource, settleRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import type { RepoRuntimeProjectionRefreshOptions, ReposGet } from '#/web/stores/repos/types.ts'
 import {
   createRepoBranch,
   resetReposStore,
-  seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
@@ -62,60 +59,6 @@ describe('repo refresh coordinator', () => {
   afterEach(() => {
     resetRepoRefreshCoordinatorState()
     vi.useRealTimers()
-  })
-
-  test('builds visible projection refresh state from the React Query branch read model', () => {
-    const repo = seedRepoWithReadModelForTest({
-      id: '/repo',
-      branches: [],
-      currentBranchName: 'feature/query',
-      preferredWorkspacePaneTab: 'status',
-    })
-    seedRepoReadModelQueryData(repo, {
-      branches: [createRepoBranch('feature/query', { worktree: { path: '/tmp/query-worktree' } })],
-      currentBranch: 'feature/query',
-    })
-    setWorkspacePaneTabsForTargetQueryData({
-      repoRoot: '/repo',
-      repoInstanceId: repo.instanceId,
-      branchName: 'feature/query',
-      worktreePath: '/tmp/query-worktree',
-      tabs: [workspacePaneStaticTabEntry('status')],
-    })
-
-    expect(currentRepoVisibleProjectionRefreshState(repo, 'feature/query')).toMatchObject({
-      id: '/repo',
-      repoInstanceId: repo.instanceId,
-      preferredWorkspacePaneTab: 'status',
-      branchName: 'feature/query',
-      visibleProjectionViewOpen: true,
-    })
-  })
-
-  test('treats the fallback rendered status tab as a visible projection view', () => {
-    const branch = createRepoBranch('feature/query', { worktree: { path: '/tmp/query-worktree' } })
-    const repo = seedRepoWithReadModelForTest({
-      id: '/repo',
-      branches: [branch],
-      currentBranchName: 'feature/query',
-      preferredWorkspacePaneTab: 'terminal',
-    })
-    seedRepoReadModelQueryData(repo, {
-      branches: [branch],
-      currentBranch: 'feature/query',
-    })
-    setWorkspacePaneTabsForTargetQueryData({
-      repoRoot: '/repo',
-      repoInstanceId: repo.instanceId,
-      branchName: 'feature/query',
-      worktreePath: '/tmp/query-worktree',
-      tabs: [workspacePaneStaticTabEntry('status')],
-    })
-
-    expect(currentRepoVisibleProjectionRefreshState(repo, 'feature/query')).toMatchObject({
-      preferredWorkspacePaneTab: 'terminal',
-      visibleProjectionViewOpen: true,
-    })
   })
 
   test('routes initial load through a coordinated repo read-model projection refresh', async () => {
