@@ -1,8 +1,13 @@
 import { Cron } from 'croner'
 import PQueue from 'p-queue'
-import { abortRepoBackgroundOperation, fetchRepo } from '#/server/modules/repo-write-paths.ts'
+import { fetchRepo } from '#/server/modules/repo-write-paths.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { getServerFetchIntervalSec, subscribeServerFetchInterval } from '#/server/modules/settings-source.ts'
+
+interface BackgroundSyncActiveFetch {
+  repoId: string
+  ctrl: AbortController
+}
 
 interface BackgroundSyncState {
   repoIds: string[]
@@ -14,6 +19,7 @@ interface BackgroundSyncState {
   generation: number
   nextRepoIndex: number
   tickRunning: boolean
+  activeFetch: BackgroundSyncActiveFetch | null
 }
 
 export interface BackgroundSyncDiagnostics {
@@ -43,6 +49,7 @@ const state: BackgroundSyncState = {
   generation: 0,
   nextRepoIndex: 0,
   tickRunning: false,
+  activeFetch: null,
 }
 
 let settingsSubscription: (() => void) | null = null
@@ -122,6 +129,18 @@ function nextEligibleAt(repoId: string, now: number = Date.now()): number | null
   return Math.max(nextIntervalAt, backoffUntil ?? 0)
 }
 
+function abortActiveFetchForRepo(repoId: string): boolean {
+  const active = state.activeFetch
+  if (!active || active.repoId !== repoId) return false
+  active.ctrl.abort('background-sync-repo-removed')
+  return true
+}
+
+function abortActiveFetch(): void {
+  state.activeFetch?.ctrl.abort('background-sync-stopped')
+  state.activeFetch = null
+}
+
 async function enqueueScheduledFetch(generation: number): Promise<void> {
   if (generation !== state.generation || state.intervalMs <= 0) return
   if (syncQueue.pending + syncQueue.size > 0) return
@@ -156,12 +175,16 @@ async function runScheduledFetch(generation: number): Promise<void> {
   state.tickRunning = true
   const now = Date.now()
   let repoId: string | null = null
+  let activeFetch: BackgroundSyncActiveFetch | null = null
   try {
     repoId = findNextDueRepo(now)
     if (!repoId || state.intervalMs <= 0) return
     state.lastFetchAtByRepo[repoId] = now
+    const ctrl = new AbortController()
+    activeFetch = { repoId, ctrl }
+    state.activeFetch = activeFetch
     const fetchStart = Date.now()
-    const result = await fetchRepo(repoId, 'background')
+    const result = await fetchRepo(repoId, 'background', ctrl.signal)
     const fetchDuration = Date.now() - fetchStart
     // Log slow fetchs for performance monitoring
     if (fetchDuration > 5000) {
@@ -184,6 +207,7 @@ async function runScheduledFetch(generation: number): Promise<void> {
       )
     }
   } catch (err) {
+    if (activeFetch?.ctrl.signal.aborted) return
     if (repoId) recordRepoFailure(repoId, now)
     backgroundSyncLogger.warn(
       {
@@ -195,6 +219,7 @@ async function runScheduledFetch(generation: number): Promise<void> {
       'background fetch threw',
     )
   } finally {
+    if (state.activeFetch === activeFetch) state.activeFetch = null
     state.tickRunning = false
     enqueuePendingRegistrationFetch()
   }
@@ -211,7 +236,7 @@ export async function setBackgroundSyncRepos(repoIds: string[]): Promise<void> {
   }
   const removedRepoIds = state.repoIds.filter((repoId) => !nextRepoIds.includes(repoId))
   state.generation += 1
-  for (const repoId of removedRepoIds) void abortRepoBackgroundOperation(repoId)
+  for (const repoId of removedRepoIds) abortActiveFetchForRepo(repoId)
   for (const repoId of nextRepoIds) {
     if (state.lastFetchAtByRepo[repoId] === undefined) state.lastFetchAtByRepo[repoId] = null
   }
@@ -221,7 +246,7 @@ export async function setBackgroundSyncRepos(repoIds: string[]): Promise<void> {
 }
 
 export function stopBackgroundSync(): void {
-  for (const repoId of state.repoIds) void abortRepoBackgroundOperation(repoId)
+  abortActiveFetch()
   state.generation += 1
   state.repoIds = []
   state.lastFetchAtByRepo = {}
@@ -230,6 +255,7 @@ export function stopBackgroundSync(): void {
   state.intervalMs = 0
   state.nextRepoIndex = 0
   state.tickRunning = false
+  state.activeFetch = null
   syncQueue.clear()
   stopBackgroundSyncJob()
 }

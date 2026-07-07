@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
-  abortRepoWriteBackgroundNetworkOperation,
   abortRepoWriteNetworkOperation,
   enqueueRepoWriteOperation,
   listRepoWriteOperationsForRepo,
@@ -82,7 +81,6 @@ describe('repo write operation coordinator', () => {
       { repoId: '/tmp/repo', kind: 'fetch', source: 'background' },
       (_operation, context) => async () =>
         await context.runNetworkOperation(
-          'background',
           () =>
             new Promise<{ ok: true; message: string }>((resolve) => {
               resolveFetch = resolve
@@ -123,7 +121,6 @@ describe('repo write operation coordinator', () => {
       { repoId: '/tmp/repo', kind: 'pull', source: 'user' },
       (_operation, context) => async () =>
         await context.runNetworkOperation(
-          'user',
           (signal) =>
             new Promise<{ ok: false; message: string }>((resolve) => {
               signal.addEventListener('abort', () => resolve({ ok: false, message: 'cancelled' }))
@@ -158,33 +155,4 @@ describe('repo write operation coordinator', () => {
     ])
   })
 
-  test('background-only cancellation does not cancel a user network operation', async () => {
-    let resolvePull!: (value: { ok: true; message: string }) => void
-    const work = enqueueRepoWriteOperation(
-      '/tmp/repo',
-      undefined,
-      { repoId: '/tmp/repo', kind: 'pull', source: 'user' },
-      (_operation, context) => async () =>
-        await context.runNetworkOperation(
-          'user',
-          () =>
-            new Promise<{ ok: true; message: string }>((resolve) => {
-              resolvePull = resolve
-            }),
-        ),
-    )
-
-    await vi.waitFor(async () => {
-      await expect(listRepoWriteOperationsForRepo('/tmp/repo')).resolves.toMatchObject([
-        {
-          kind: 'pull',
-          phase: 'running',
-        },
-      ])
-    })
-    await expect(abortRepoWriteBackgroundNetworkOperation('/tmp/repo')).resolves.toBe(false)
-
-    resolvePull({ ok: true, message: 'ok' })
-    await expect(work).resolves.toEqual({ ok: true, message: 'ok' })
-  })
 })

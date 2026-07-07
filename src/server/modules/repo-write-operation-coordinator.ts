@@ -1,7 +1,6 @@
 import PQueue from 'p-queue'
 import { resolveRepoWriteBoundaryKey } from '#/server/modules/repo-source.ts'
 import type {
-  NetworkOpKind,
   RepoOperationCancellationReason,
   RepoOperationFailureReason,
   RepoServerOperationKind,
@@ -23,7 +22,6 @@ export interface RepoWriteOperationLifecycle {
 
 export interface RepoWriteOperationContext {
   runNetworkOperation<T extends ExecResult>(
-    kind: NetworkOpKind,
     task: (signal: AbortSignal) => Promise<T>,
     options?: { callerSignal?: AbortSignal },
   ): Promise<T>
@@ -48,7 +46,6 @@ interface RepoWriteOperationQueueRuntime {
 
 interface ActiveRepoWriteNetworkOperation {
   ctrl: AbortController
-  kind: NetworkOpKind
   operation: RepoWriteOperationLifecycle
 }
 
@@ -226,7 +223,6 @@ async function runResolvedRepoWriteOperation<T>(
 async function runRepoWriteNetworkOperation<T extends ExecResult>(
   runtime: RepoWriteOperationQueueRuntime,
   operation: RepoWriteOperationLifecycle,
-  kind: NetworkOpKind,
   task: (signal: AbortSignal) => Promise<T>,
   options: { callerSignal?: AbortSignal } = {},
 ): Promise<T> {
@@ -243,7 +239,7 @@ async function runRepoWriteNetworkOperation<T extends ExecResult>(
   }
 
   const ctrl = new AbortController()
-  const slot: ActiveRepoWriteNetworkOperation = { ctrl, kind, operation }
+  const slot: ActiveRepoWriteNetworkOperation = { ctrl, operation }
   runtime.activeNetworkOperation = slot
   operation.start()
   try {
@@ -266,8 +262,8 @@ function createRepoWriteOperationContext(
   operation: RepoWriteOperationLifecycle,
 ): RepoWriteOperationContext {
   return {
-    async runNetworkOperation(kind, task, options) {
-      return await runRepoWriteNetworkOperation(runtime, operation, kind, task, options)
+    async runNetworkOperation(task, options) {
+      return await runRepoWriteNetworkOperation(runtime, operation, task, options)
     },
   }
 }
@@ -308,19 +304,14 @@ export async function enqueueRepoWriteOperation<T>(
 
 export async function abortRepoWriteNetworkOperation(
   repoId: string,
-  options: { backgroundOnly?: boolean; signal?: AbortSignal } = {},
+  options: { signal?: AbortSignal } = {},
 ): Promise<boolean> {
   const boundaryKey = await resolveRepoWriteBoundaryKey(repoId, options.signal)
   const active = repoWriteOperationRuntimesByBoundary.get(boundaryKey)?.activeNetworkOperation
   if (!active) return false
-  if (options.backgroundOnly && active.kind !== 'background') return false
   active.operation.requestCancel('user-cancel')
   active.ctrl.abort()
   return true
-}
-
-export async function abortRepoWriteBackgroundNetworkOperation(repoId: string): Promise<boolean> {
-  return await abortRepoWriteNetworkOperation(repoId, { backgroundOnly: true })
 }
 
 export async function listRepoWriteOperationsForRepo(

@@ -12,7 +12,6 @@ import {
   type RepoMutationResult,
 } from '#/server/modules/repo-source.ts'
 import {
-  abortRepoWriteBackgroundNetworkOperation,
   abortRepoWriteNetworkOperation,
   enqueueRepoWriteOperation,
   type RepoWriteOperationLifecycle,
@@ -208,7 +207,6 @@ async function runUserNetworkMutation(
       },
       (_operation, context) => async () =>
         await context.runNetworkOperation(
-          'user',
           async (networkSignal) => {
             return await withMergedAbortSignal([signal, networkSignal], task)
           },
@@ -342,7 +340,6 @@ export async function fetchRepo(
     context: RepoWriteOperationContext,
   ) {
     const result = await context.runNetworkOperation(
-      kind,
       async (networkSignal) => {
         return await withMergedAbortSignal([signal, networkSignal], async (mergedSignal) => {
           return await task(mergedSignal ?? networkSignal)
@@ -554,9 +551,4 @@ export async function openRepoInFinder(path: string): Promise<ExecResult> {
 export async function abortRepoOperation(cwd: string): Promise<boolean> {
   if (!isValidRepoLocator(cwd)) return false
   return await abortRepoWriteNetworkOperation(cwd)
-}
-
-export async function abortRepoBackgroundOperation(cwd: string): Promise<boolean> {
-  if (!isValidRepoLocator(cwd)) return false
-  return await abortRepoWriteBackgroundNetworkOperation(cwd)
 }
