@@ -1,17 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  abortBackgroundServerNetworkOp: vi.fn(),
+  abortRepoBackgroundOperation: vi.fn(),
   fetchRepo: vi.fn(),
   getServerFetchIntervalSec: vi.fn(),
   subscribeServerFetchInterval: vi.fn(),
 }))
 
-vi.mock('#/server/common/network-ops.ts', () => ({
-  abortBackgroundServerNetworkOp: mocks.abortBackgroundServerNetworkOp,
-}))
-
 vi.mock('#/server/modules/repo-write-paths.ts', () => ({
+  abortRepoBackgroundOperation: mocks.abortRepoBackgroundOperation,
   fetchRepo: mocks.fetchRepo,
 }))
 
@@ -69,7 +66,7 @@ describe('server background sync scheduler', () => {
     await setBackgroundSyncRepos(['/tmp/repo-a'])
     await setBackgroundSyncRepos(['/tmp/repo-b'])
 
-    expect(mocks.abortBackgroundServerNetworkOp).toHaveBeenCalledWith('/tmp/repo-a')
+    expect(mocks.abortRepoBackgroundOperation).toHaveBeenCalledWith('/tmp/repo-a')
   })
 
   test('only re-fetches a repo on re-activation once its previous fetch is overdue', async () => {
@@ -139,7 +136,7 @@ describe('server background sync scheduler', () => {
     await vi.advanceTimersByTimeAsync(1000)
 
     expect(mocks.fetchRepo.mock.calls.length).toBe(callsAfterFirst)
-    expect(mocks.abortBackgroundServerNetworkOp).not.toHaveBeenCalled()
+    expect(mocks.abortRepoBackgroundOperation).not.toHaveBeenCalled()
   })
 
   test("re-enqueues a tab-switched repo from the previous fetch's finally", async () => {

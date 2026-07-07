@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import {
+  abortRepoWriteBackgroundNetworkOperation,
+  abortRepoWriteNetworkOperation,
   enqueueRepoWriteOperation,
   listRepoWriteOperationsForRepo,
   resetRepoWriteOperationCoordinatorForTests,
@@ -70,5 +72,119 @@ describe('repo write operation coordinator', () => {
     await expect(listRepoWriteOperationsForRepo('/tmp/repo-104', { includeSettled: true })).resolves.toMatchObject([
       { repoId: '/tmp/repo-104', kind: 'fetch', phase: 'done' },
     ])
+  })
+
+  test('runs cancellable network operations inside the repo write runtime', async () => {
+    let resolveFetch!: (value: { ok: true; message: string }) => void
+    const work = enqueueRepoWriteOperation(
+      '/tmp/repo',
+      undefined,
+      { repoId: '/tmp/repo', kind: 'fetch', source: 'background' },
+      (_operation, context) => async () =>
+        await context.runNetworkOperation(
+          'background',
+          () =>
+            new Promise<{ ok: true; message: string }>((resolve) => {
+              resolveFetch = resolve
+            }),
+        ),
+    )
+
+    await vi.waitFor(async () => {
+      await expect(listRepoWriteOperationsForRepo('/tmp/repo')).resolves.toMatchObject([
+        {
+          repoId: '/tmp/repo',
+          kind: 'fetch',
+          phase: 'running',
+          source: 'background',
+        },
+      ])
+    })
+
+    resolveFetch({ ok: true, message: 'ok' })
+    await expect(work).resolves.toEqual({ ok: true, message: 'ok' })
+    await expect(listRepoWriteOperationsForRepo('/tmp/repo')).resolves.toEqual([])
+    await expect(listRepoWriteOperationsForRepo('/tmp/repo', { includeSettled: true })).resolves.toMatchObject([
+      {
+        kind: 'fetch',
+        phase: 'done',
+        error: null,
+      },
+    ])
+  })
+
+  test('cancels the active network operation for the resolved write boundary', async () => {
+    mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (repoId: string) =>
+      repoId === '/tmp/repo' || repoId === '/tmp/repo-linked' ? '/tmp/repo/.git' : repoId,
+    )
+    const work = enqueueRepoWriteOperation(
+      '/tmp/repo',
+      undefined,
+      { repoId: '/tmp/repo', kind: 'pull', source: 'user' },
+      (_operation, context) => async () =>
+        await context.runNetworkOperation(
+          'user',
+          (signal) =>
+            new Promise<{ ok: false; message: string }>((resolve) => {
+              signal.addEventListener('abort', () => resolve({ ok: false, message: 'cancelled' }))
+            }),
+        ),
+    )
+
+    await vi.waitFor(async () => {
+      await expect(listRepoWriteOperationsForRepo('/tmp/repo')).resolves.toMatchObject([
+        {
+          kind: 'pull',
+          phase: 'running',
+        },
+      ])
+    })
+    await expect(abortRepoWriteNetworkOperation('/tmp/repo-linked')).resolves.toBe(true)
+
+    await expect(work).resolves.toEqual({ ok: false, message: 'cancelled' })
+    await expect(listRepoWriteOperationsForRepo('/tmp/repo', { includeSettled: true })).resolves.toMatchObject([
+      {
+        kind: 'pull',
+        phase: 'failed',
+        cancellation: {
+          underlyingRequested: true,
+          reason: 'user-cancel',
+        },
+        error: {
+          message: 'cancelled',
+          reason: 'user-cancel',
+        },
+      },
+    ])
+  })
+
+  test('background-only cancellation does not cancel a user network operation', async () => {
+    let resolvePull!: (value: { ok: true; message: string }) => void
+    const work = enqueueRepoWriteOperation(
+      '/tmp/repo',
+      undefined,
+      { repoId: '/tmp/repo', kind: 'pull', source: 'user' },
+      (_operation, context) => async () =>
+        await context.runNetworkOperation(
+          'user',
+          () =>
+            new Promise<{ ok: true; message: string }>((resolve) => {
+              resolvePull = resolve
+            }),
+        ),
+    )
+
+    await vi.waitFor(async () => {
+      await expect(listRepoWriteOperationsForRepo('/tmp/repo')).resolves.toMatchObject([
+        {
+          kind: 'pull',
+          phase: 'running',
+        },
+      ])
+    })
+    await expect(abortRepoWriteBackgroundNetworkOperation('/tmp/repo')).resolves.toBe(false)
+
+    resolvePull({ ok: true, message: 'ok' })
+    await expect(work).resolves.toEqual({ ok: true, message: 'ok' })
   })
 })

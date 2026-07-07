@@ -1,9 +1,4 @@
 import path from 'node:path'
-import {
-  runServerCancellable,
-  abortServerNetworkOp,
-  abortServerNetworkOpByKey,
-} from '#/server/common/network-ops.ts'
 import { publishRepoQueryInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
 import {
   beginRepoServerOperation,
@@ -17,9 +12,11 @@ import {
   type RepoMutationResult,
 } from '#/server/modules/repo-source.ts'
 import {
+  abortRepoWriteBackgroundNetworkOperation,
+  abortRepoWriteNetworkOperation,
   enqueueRepoWriteOperation,
-  findRepoWriteOperationQueueForRepo,
   type RepoWriteOperationLifecycle,
+  type RepoWriteOperationContext,
 } from '#/server/modules/repo-write-operation-coordinator.ts'
 import {
   getServerRepoSettings,
@@ -209,20 +206,13 @@ async function runUserNetworkMutation(
         target,
         canCancelUnderlying: true,
       },
-      (operation, queue) => async () =>
-        await runServerCancellable(
-          cwd,
+      (_operation, context) => async () =>
+        await context.runNetworkOperation(
           'user',
           async (networkSignal) => {
             return await withMergedAbortSignal([signal, networkSignal], task)
           },
-          {
-            activeKey: queue,
-            operation,
-            operationKind,
-            target,
-            callerSignal: signal,
-          },
+          { callerSignal: signal },
         ),
     ),
   )
@@ -349,18 +339,16 @@ export async function fetchRepo(
 ): Promise<{ ok: boolean; message: string }> {
   async function runFetch(
     task: (signal: AbortSignal) => Promise<RepoMutationResult>,
-    operation: RepoWriteOperationLifecycle,
-    queue?: object,
+    context: RepoWriteOperationContext,
   ) {
-    const result = await runServerCancellable(
-      cwd,
+    const result = await context.runNetworkOperation(
       kind,
       async (networkSignal) => {
         return await withMergedAbortSignal([signal, networkSignal], async (mergedSignal) => {
           return await task(mergedSignal ?? networkSignal)
         })
       },
-      { operation, activeKey: queue, operationKind: 'fetch', callerSignal: signal },
+      { callerSignal: signal },
     )
     return await publishSnapshotInvalidationAfterMutation(cwd, result)
   }
@@ -376,12 +364,12 @@ export async function fetchRepo(
         source: kind,
         canCancelUnderlying: true,
       },
-      (operation, queue) => {
+      (operation, context) => {
         if (operationRef) operationRef.current = operation
         return async () =>
           await runWithRepoSource(
             cwd,
-            async (source) => await runFetch((signal) => source.fetch(signal), operation, queue),
+            async (source) => await runFetch((signal) => source.fetch(signal), context),
           )
       },
     )
@@ -565,6 +553,10 @@ export async function openRepoInFinder(path: string): Promise<ExecResult> {
 
 export async function abortRepoOperation(cwd: string): Promise<boolean> {
   if (!isValidRepoLocator(cwd)) return false
-  const queue = await findRepoWriteOperationQueueForRepo(cwd)
-  return (queue ? abortServerNetworkOpByKey(queue) : false) || abortServerNetworkOp(cwd)
+  return await abortRepoWriteNetworkOperation(cwd)
+}
+
+export async function abortRepoBackgroundOperation(cwd: string): Promise<boolean> {
+  if (!isValidRepoLocator(cwd)) return false
+  return await abortRepoWriteBackgroundNetworkOperation(cwd)
 }

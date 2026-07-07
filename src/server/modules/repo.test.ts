@@ -29,7 +29,6 @@ const mocks = vi.hoisted(() => ({
   pullBranch: vi.fn(),
   pushBranch: vi.fn(),
   removeWorktree: vi.fn(),
-  runServerCancellable: vi.fn(),
   setBackgroundSyncRepos: vi.fn(),
   publishRepoQueryInvalidation: vi.fn(),
   publishSettingsInvalidation: vi.fn(),
@@ -152,11 +151,6 @@ vi.mock('#/system/git/pull-requests.ts', () => ({
   getBranchPullRequests: mocks.getBranchPullRequests,
 }))
 
-vi.mock('#/server/common/network-ops.ts', () => ({
-  runServerCancellable: mocks.runServerCancellable,
-  abortServerNetworkOp: vi.fn(),
-}))
-
 vi.mock('#/server/modules/invalidation-broker.ts', () => ({
   publishRepoQueryInvalidation: mocks.publishRepoQueryInvalidation,
   publishSettingsInvalidation: mocks.publishSettingsInvalidation,
@@ -177,7 +171,6 @@ beforeEach(async () => {
   resetRepoServerOperationRegistryForTests()
   resetRepoWriteOperationCoordinatorForTests()
   vi.clearAllMocks()
-  mocks.runServerCancellable.mockImplementation(async (_cwd, _kind, task) => await task(new AbortController().signal))
   mocks.checkGitAvailable.mockResolvedValue({ ok: true, message: '' })
   mocks.fsStat.mockResolvedValue({ isDirectory: () => true })
   mocks.fsAccess.mockResolvedValue(undefined)
@@ -352,9 +345,6 @@ describe('fetchRepo invalidation publishing', () => {
     ['user', 'user'],
     ['background', 'background'],
   ])('%s sync fetches prune stale remote-tracking refs', async (_name, kind) => {
-    mocks.runServerCancellable.mockImplementationOnce(
-      async (_cwd, _kind, task) => await task(new AbortController().signal),
-    )
     mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
@@ -381,7 +371,7 @@ describe('fetchRepo invalidation publishing', () => {
   })
 
   test('publishes snapshot invalidation after a successful sync', async () => {
-    mocks.runServerCancellable.mockResolvedValueOnce({ ok: true, message: 'fetched' })
+    mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const result = await fetchRepo('/tmp/repo', 'user')
@@ -418,7 +408,6 @@ describe('fetchRepo invalidation publishing', () => {
 
   test('user sync waits for and reuses an active background sync result without duplicating invalidation', async () => {
     let resolveFetch!: (value: { ok: true; message: string }) => void
-    mocks.runServerCancellable.mockImplementation(async (_cwd, _kind, task) => await task(new AbortController().signal))
     mocks.fetchAll.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
@@ -438,7 +427,6 @@ describe('fetchRepo invalidation publishing', () => {
 
     expect(backgroundResult).toEqual({ ok: true, message: 'fetched in background' })
     expect(userResult).toEqual({ ok: true, message: 'fetched in background' })
-    expect(mocks.runServerCancellable).toHaveBeenCalledTimes(1)
     expect(mocks.fetchAll).toHaveBeenCalledTimes(1)
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledTimes(1)
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
@@ -449,7 +437,6 @@ describe('fetchRepo invalidation publishing', () => {
 
   test('caller abort stops waiting for a reused background sync without cancelling it', async () => {
     const fetch = deferred<{ ok: true; message: string }>()
-    mocks.runServerCancellable.mockImplementation(async (_cwd, _kind, task) => await task(new AbortController().signal))
     mocks.fetchAll.mockImplementationOnce(() => fetch.promise)
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
@@ -463,7 +450,6 @@ describe('fetchRepo invalidation publishing', () => {
     caller.abort('client disconnected')
 
     await expect(user).resolves.toEqual({ ok: false, message: 'cancelled' })
-    expect(mocks.runServerCancellable).toHaveBeenCalledTimes(1)
     expect(mocks.fetchAll).toHaveBeenCalledTimes(1)
     expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
 
@@ -521,7 +507,7 @@ describe('fetchRepo invalidation publishing', () => {
   })
 
   test('does not publish invalidations after a failed sync', async () => {
-    mocks.runServerCancellable.mockResolvedValueOnce({ ok: false, message: 'fatal: offline' })
+    mocks.fetchAll.mockResolvedValueOnce({ ok: false, message: 'fatal: offline' })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const result = await fetchRepo('/tmp/repo', 'background')
@@ -1171,21 +1157,25 @@ describe('repo mutation invalidation publishing', () => {
       async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
         repo.pushRepoBranch('/tmp/repo', 'feature/a'),
     ],
-  ])('%s uses the repo write queue as the network-op active key', async (name, run) => {
+  ])('%s records the network mutation in the repo write coordinator', async (name, run) => {
     const repo = await import('#/server/modules/repo-write-paths.ts')
+    const { listRepoWriteOperationsForRepo } = await import('#/server/modules/repo-write-operation-coordinator.ts')
 
     const result = await run(repo)
 
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expect(mocks.runServerCancellable).toHaveBeenCalledWith('/tmp/repo', 'user', expect.any(Function), {
-      activeKey: expect.any(Object),
-      operation: expect.objectContaining({
-        id: expect.stringMatching(/^repo-write-op-/),
-      }),
-      operationKind: name === 'pullRepoBranch' ? 'pull' : 'push',
-      target: { branch: 'feature/a', ...(name === 'pullRepoBranch' ? { worktreePath: undefined } : {}) },
-      callerSignal: undefined,
-    })
+    expect(name === 'pullRepoBranch' ? mocks.pullBranch : mocks.pushBranch).toHaveBeenCalled()
+    await expect(listRepoWriteOperationsForRepo('/tmp/repo', { includeSettled: true })).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: expect.stringMatching(/^repo-write-op-/),
+          kind: name === 'pullRepoBranch' ? 'pull' : 'push',
+          phase: 'done',
+          source: 'user',
+          target: expect.objectContaining({ branch: 'feature/a' }),
+        }),
+      ]),
+    )
   })
 
   test.each([

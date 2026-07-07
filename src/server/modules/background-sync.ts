@@ -1,7 +1,6 @@
 import { Cron } from 'croner'
 import PQueue from 'p-queue'
-import { abortBackgroundServerNetworkOp } from '#/server/common/network-ops.ts'
-import { fetchRepo } from '#/server/modules/repo-write-paths.ts'
+import { abortRepoBackgroundOperation, fetchRepo } from '#/server/modules/repo-write-paths.ts'
 import { serverLogger } from '#/server/logger.ts'
 import { getServerFetchIntervalSec, subscribeServerFetchInterval } from '#/server/modules/settings-source.ts'
 
@@ -212,7 +211,7 @@ export async function setBackgroundSyncRepos(repoIds: string[]): Promise<void> {
   }
   const removedRepoIds = state.repoIds.filter((repoId) => !nextRepoIds.includes(repoId))
   state.generation += 1
-  for (const repoId of removedRepoIds) abortBackgroundServerNetworkOp(repoId)
+  for (const repoId of removedRepoIds) void abortRepoBackgroundOperation(repoId)
   for (const repoId of nextRepoIds) {
     if (state.lastFetchAtByRepo[repoId] === undefined) state.lastFetchAtByRepo[repoId] = null
   }
@@ -222,7 +221,7 @@ export async function setBackgroundSyncRepos(repoIds: string[]): Promise<void> {
 }
 
 export function stopBackgroundSync(): void {
-  for (const repoId of state.repoIds) abortBackgroundServerNetworkOp(repoId)
+  for (const repoId of state.repoIds) void abortRepoBackgroundOperation(repoId)
   state.generation += 1
   state.repoIds = []
   state.lastFetchAtByRepo = {}
