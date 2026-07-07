@@ -16,8 +16,9 @@ const storeState = {
       availability: { phase: 'available' },
       instanceId: 'repo-instance-test-7',
       dataLoads: {
-        snapshot: { phase: 'idle', loadedAt: 0, stale: false, error: null },
-        status: { phase: 'idle', loadedAt: 0, stale: false, error: null },
+        repoReadModel: { phase: 'idle', loadedAt: 0, stale: false, error: null },
+        visibleStatus: { phase: 'idle', loadedAt: 0, stale: false, error: null },
+        fetch: { phase: 'idle', loadedAt: 0, stale: false, error: null },
       },
     },
   },
@@ -55,8 +56,9 @@ describe('useRepoStoreInvalidationRefresh', () => {
       availability: { phase: 'available' },
       instanceId: 'repo-instance-test-7',
       dataLoads: {
-        snapshot: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
-        status: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
+        repoReadModel: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
+        visibleStatus: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
+        fetch: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
       },
     }
   })
@@ -68,7 +70,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
     vi.useRealTimers()
   })
 
-  test('refreshes snapshot and status when a repo-snapshot invalidation arrives', async () => {
+  test('refreshes the runtime projection when a repo-snapshot invalidation arrives', async () => {
     const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
     renderInJsdom(<Harness />)
 

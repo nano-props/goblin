@@ -74,7 +74,7 @@ describe('RepoActivityControl component', () => {
         [REPO_ID]: {
           ...repo,
           // Use the fetch data load since `latestRepoSyncTime` reads
-          // `dataLoads.fetch.loadedAt` directly; setting snapshot
+          // `dataLoads.fetch.loadedAt` directly; setting the read model
           // requires `projection.source === 'fresh'` which would also
           // work but couples this test to a second code path.
           dataLoads: {

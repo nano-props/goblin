@@ -36,7 +36,7 @@ export interface RepoStatusRefreshSnapshot {
   preferredWorkspacePaneTab: WorkspacePaneTabType
   statusViewOpen: boolean
   unavailable: boolean
-  statusPhase: 'idle' | 'loading' | 'refreshing'
+  visibleStatusPhase: 'idle' | 'loading' | 'refreshing'
 }
 
 export function repoStatusRefreshSnapshot(repo: RepoState): RepoStatusRefreshSnapshot {
@@ -46,7 +46,7 @@ export function repoStatusRefreshSnapshot(repo: RepoState): RepoStatusRefreshSna
     preferredWorkspacePaneTab: preferredWorkspacePaneTabForTarget(repo.ui, null),
     statusViewOpen: false,
     unavailable: isRepoUnavailable(repo),
-    statusPhase: repo.dataLoads.status.phase,
+    visibleStatusPhase: repo.dataLoads.visibleStatus.phase,
   }
 }
 
@@ -66,12 +66,12 @@ export function currentRepoStatusRefreshSnapshot(
     preferredWorkspacePaneTab,
     statusViewOpen: preferredWorkspacePaneTab === 'status' || preferredWorkspacePaneTab === 'changes',
     unavailable: isRepoUnavailable(repo),
-    statusPhase: repo.dataLoads.status.phase,
+    visibleStatusPhase: repo.dataLoads.visibleStatus.phase,
   }
 }
 
 export function isRepoStatusRefreshable(repo: RepoStatusRefreshSnapshot): boolean {
-  return !repo.unavailable && repo.statusPhase === 'idle'
+  return !repo.unavailable && repo.visibleStatusPhase === 'idle'
 }
 
 async function runVisibleRuntimeProjectionRefresh(

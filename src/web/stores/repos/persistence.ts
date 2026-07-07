@@ -52,9 +52,9 @@ function cachedBranches(
 function restoreProjectionFromSnapshot(repo: RepoState, snapshot: RepoSnapshotCacheEntry): RepoState {
   const dataLoads = {
     ...repo.dataLoads,
-    snapshot: { ...repo.dataLoads.snapshot },
+    repoReadModel: { ...repo.dataLoads.repoReadModel },
   }
-  if (snapshot.data.branches.length > 0) finishDataLoadSuccess(dataLoads.snapshot, snapshot.savedAt)
+  if (snapshot.data.branches.length > 0) finishDataLoadSuccess(dataLoads.repoReadModel, snapshot.savedAt)
   return {
     ...repo,
     name: snapshot.name || repo.name,

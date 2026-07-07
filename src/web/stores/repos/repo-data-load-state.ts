@@ -11,8 +11,8 @@ export interface RepoDataLoadState {
 }
 
 export interface RepoDataLoadBundle {
-  snapshot: RepoDataLoadState
-  status: RepoDataLoadState
+  repoReadModel: RepoDataLoadState
+  visibleStatus: RepoDataLoadState
   fetch: RepoDataLoadState
 }
 
@@ -27,8 +27,8 @@ export function idleDataLoad(loadedAt: number | null = null): RepoDataLoadState 
 
 export function emptyRepoDataLoadBundle(): RepoDataLoadBundle {
   return {
-    snapshot: idleDataLoad(),
-    status: idleDataLoad(),
+    repoReadModel: idleDataLoad(),
+    visibleStatus: idleDataLoad(),
     fetch: idleDataLoad(),
   }
 }

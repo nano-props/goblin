@@ -9,8 +9,8 @@ describe('backgroundSyncRepoIdsFromStore', () => {
       remote: { hasRemotes: true, hasGitHubRemote: true },
       availability: { phase: 'available' },
     })
-    repo.dataLoads.snapshot.phase = 'refreshing'
-    repo.dataLoads.status.phase = 'refreshing'
+    repo.dataLoads.repoReadModel.phase = 'refreshing'
+    repo.dataLoads.visibleStatus.phase = 'refreshing'
     repo.operations.repoReadModel.phase = 'running'
     repo.operations.visibleStatus.phase = 'running'
 
@@ -58,9 +58,9 @@ function createRepo(input: {
     name: 'repo',
     instanceId: 'repo-instance-test',
     dataLoads: {
+      repoReadModel: { phase: 'idle', loadedAt: null, stale: false, error: null },
+      visibleStatus: { phase: 'idle', loadedAt: null, stale: false, error: null },
       fetch: { phase: 'idle', loadedAt: null, stale: false, error: null },
-      snapshot: { phase: 'idle', loadedAt: null, stale: false, error: null },
-      status: { phase: 'idle', loadedAt: null, stale: false, error: null },
     },
     operations: {
       fetch: {

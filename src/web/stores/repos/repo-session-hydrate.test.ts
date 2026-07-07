@@ -92,7 +92,7 @@ describe('repo session hydration', () => {
       cachedRepo ? readRepoBranchQueryProjection(cachedRepo)?.branches.map((b) => b.name) : null,
     ).toEqual(['cached'])
     expect(cachedRepo?.projection.source).toBe('cache')
-    expect(cachedRepo?.dataLoads.snapshot.phase).toBe('refreshing')
+    expect(cachedRepo?.dataLoads.repoReadModel.phase).toBe('refreshing')
     expect(cachedRepo?.projection.savedAt).toBe(savedAt)
 
     resolveSnapshot({ branches: [branchSnapshot('fresh')], current: 'fresh' })
@@ -102,7 +102,7 @@ describe('repo session hydration', () => {
       const freshRepo = useReposStore.getState().repos[REPO_A]
       expect(freshRepo ? readRepoBranchQueryProjection(freshRepo)?.currentBranch : null).toBe('fresh')
       expect(freshRepo?.projection.source).toBe('fresh')
-      expect(freshRepo?.dataLoads.snapshot.phase).toBe('idle')
+      expect(freshRepo?.dataLoads.repoReadModel.phase).toBe('idle')
       expect(freshRepo?.projection.savedAt).toBeNull()
     })
   })

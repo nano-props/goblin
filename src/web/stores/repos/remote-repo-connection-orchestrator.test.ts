@@ -80,9 +80,9 @@ describe('runRemoteRepoConnection', () => {
         name: 'example:repo',
         instanceId: 'repo-instance-test',
         dataLoads: {
+          repoReadModel: { phase: 'idle', loadedAt: null, stale: false, error: null },
+          visibleStatus: { phase: 'idle', loadedAt: null, stale: false, error: null },
           fetch: { phase: 'idle', loadedAt: null, stale: false, error: null },
-          snapshot: { phase: 'idle', loadedAt: null, stale: false, error: null },
-          status: { phase: 'idle', loadedAt: null, stale: false, error: null },
         },
         operations: emptyOperations(),
         ui: {
@@ -421,8 +421,8 @@ function idleDataLoad() {
 function emptyDataLoads() {
   return {
     fetch: idleDataLoad(),
-    snapshot: idleDataLoad(),
-    status: idleDataLoad(),
+    repoReadModel: idleDataLoad(),
+    visibleStatus: idleDataLoad(),
   }
 }
 

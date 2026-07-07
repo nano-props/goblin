@@ -23,8 +23,8 @@ type ProjectionRefreshTarget =
   | { key: 'visibleStatus'; reason: 'visible-status' }
 
 interface ProjectionRefreshPlan {
-  wantsSnapshot: boolean
-  wantsStatus: boolean
+  wantsReadModelLoad: boolean
+  wantsVisibleStatusLoad: boolean
   operationKey: string
   priority: number
   targets: [ProjectionRefreshTarget, ...ProjectionRefreshTarget[]]
@@ -34,8 +34,8 @@ function projectionRefreshPlan(scope: RepoRuntimeProjectionRefreshScope): Projec
   switch (scope) {
     case 'repo-read-model':
       return {
-        wantsSnapshot: true,
-        wantsStatus: true,
+        wantsReadModelLoad: true,
+        wantsVisibleStatusLoad: true,
         operationKey: 'repo-read-model',
         priority: 50,
         targets: [
@@ -45,8 +45,8 @@ function projectionRefreshPlan(scope: RepoRuntimeProjectionRefreshScope): Projec
       }
     case 'visible-status':
       return {
-        wantsSnapshot: false,
-        wantsStatus: true,
+        wantsReadModelLoad: false,
+        wantsVisibleStatusLoad: true,
         operationKey: 'visible-status',
         priority: 40,
         targets: [{ key: 'visibleStatus', reason: 'visible-status' }],
@@ -82,14 +82,18 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     repoInstanceId: string,
     scope: RepoRuntimeProjectionRefreshScope,
   ): Promise<void> {
-    const { wantsSnapshot, wantsStatus, operationKey, priority, targets } = projectionRefreshPlan(scope)
+    const { wantsReadModelLoad, wantsVisibleStatusLoad, operationKey, priority, targets } = projectionRefreshPlan(scope)
 
     updateIfFresh(set, id, repoInstanceId, (r) => {
-      if (wantsSnapshot) {
-        startDataLoad(r.dataLoads.snapshot, { hasData: (readRepoBranchQueryProjection(r)?.branches.length ?? 0) > 0 })
+      if (wantsReadModelLoad) {
+        startDataLoad(r.dataLoads.repoReadModel, {
+          hasData: (readRepoBranchQueryProjection(r)?.branches.length ?? 0) > 0,
+        })
       }
-      if (wantsStatus) {
-        startDataLoad(r.dataLoads.status, { hasData: (readRepoBranchQueryProjection(r)?.status.length ?? 0) > 0 })
+      if (wantsVisibleStatusLoad) {
+        startDataLoad(r.dataLoads.visibleStatus, {
+          hasData: (readRepoBranchQueryProjection(r)?.status.length ?? 0) > 0,
+        })
       }
     })
     await runLatestOperation({
@@ -109,10 +113,10 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
           : null
         if (ctx.isCurrent()) setRepoProjectionQueryData(id, repoInstanceId, null, 'full', projection)
 
-        if (wantsStatus) {
+        if (wantsVisibleStatusLoad) {
           updateIfFresh(set, id, repoInstanceId, (r) => {
-            if (projection.snapshot) finishDataLoadSuccess(r.dataLoads.status)
-            else finishDataLoadError(r.dataLoads.status, 'error.failed-read-repo')
+            if (projection.snapshot) finishDataLoadSuccess(r.dataLoads.visibleStatus)
+            else finishDataLoadError(r.dataLoads.visibleStatus, 'error.failed-read-repo')
           })
         }
         if (projection.status.length > 0 && ctx.isCurrent()) {
@@ -120,12 +124,12 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         }
         if (!projection.snapshot) {
           updateIfFresh(set, id, repoInstanceId, (r) => {
-            if (wantsSnapshot) finishDataLoadError(r.dataLoads.snapshot, 'error.failed-read-repo')
+            if (wantsReadModelLoad) finishDataLoadError(r.dataLoads.repoReadModel, 'error.failed-read-repo')
             r.events = appendRepoEvent(r.events, errorEvent('error.failed-read-repo'))
           })
           return
         }
-        if (wantsSnapshot) {
+        if (wantsReadModelLoad) {
           await runSnapshotSuccessFlow(
             id,
             repoInstanceId,
@@ -136,11 +140,11 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         }
       },
       onError: (message) => {
-        if (wantsStatus && !wantsSnapshot) refreshStatusLog.warn('failed', { err: new Error(message) })
+        if (wantsVisibleStatusLoad && !wantsReadModelLoad) refreshStatusLog.warn('failed', { err: new Error(message) })
         updateIfFresh(set, id, repoInstanceId, (r) => {
           if (isRepoUnavailableReason(message)) markRepoUnavailable(r, message)
-          if (wantsSnapshot) finishDataLoadError(r.dataLoads.snapshot, message)
-          if (wantsStatus) finishDataLoadError(r.dataLoads.status, message)
+          if (wantsReadModelLoad) finishDataLoadError(r.dataLoads.repoReadModel, message)
+          if (wantsVisibleStatusLoad) finishDataLoadError(r.dataLoads.visibleStatus, message)
           r.events = appendRepoEvent(r.events, errorEvent(message))
         })
       },

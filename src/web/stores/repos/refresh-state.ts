@@ -34,7 +34,7 @@ export function applySnapshotToRepoProjection(
   markRepoAvailable(r)
   r.projection.source = 'fresh'
   r.projection.savedAt = null
-  finishDataLoadSuccess(r.dataLoads.snapshot)
+  finishDataLoadSuccess(r.dataLoads.repoReadModel)
 }
 
 export function shouldAttemptFetch(repo: RepoState | null | undefined, repoInstanceId: string): boolean {

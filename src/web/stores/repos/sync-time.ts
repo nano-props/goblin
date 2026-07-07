@@ -5,7 +5,7 @@
 import type { RepoState } from '#/web/stores/repos/types.ts'
 
 export function latestRepoSyncTime(repo: Pick<RepoState, 'projection' | 'dataLoads'>): number | null {
-  const snapshotLoadedAt = repo.projection.source === 'fresh' ? repo.dataLoads.snapshot.loadedAt : null
-  const times = [repo.dataLoads.fetch.loadedAt, snapshotLoadedAt].filter((time): time is number => time !== null)
+  const readModelLoadedAt = repo.projection.source === 'fresh' ? repo.dataLoads.repoReadModel.loadedAt : null
+  const times = [repo.dataLoads.fetch.loadedAt, readModelLoadedAt].filter((time): time is number => time !== null)
   return times.length === 0 ? null : Math.max(...times)
 }

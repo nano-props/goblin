@@ -79,7 +79,7 @@ describe('remote fetch timestamps', () => {
     const work = useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, scope: 'repo-read-model' })
     await Promise.resolve()
 
-    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.snapshot.phase).toBe('refreshing')
+    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.repoReadModel.phase).toBe('refreshing')
 
     resolveSnapshot({ branches: [branch('feature/query')], current: 'feature/query' })
     await work
@@ -534,7 +534,7 @@ describe('core refresh request ordering', () => {
     expect(projectionCalls).toBe(1)
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.availability).toMatchObject({ phase: 'unavailable', reason: 'error.not-git-repo' })
-    expect(repo?.dataLoads.snapshot.error).toBe('error.not-git-repo')
+    expect(repo?.dataLoads.repoReadModel.error).toBe('error.not-git-repo')
   })
 
   test('repo read-model projection refresh restores an unavailable repo when the path is a git repo again', async () => {
@@ -549,7 +549,7 @@ describe('core refresh request ordering', () => {
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.availability).toEqual({ phase: 'available' })
     expect(repoBranchNames()).toEqual(['main'])
-    expect(repo?.dataLoads.snapshot.error).toBeNull()
+    expect(repo?.dataLoads.repoReadModel.error).toBeNull()
   })
 
   test('repo read-model projection refresh writes the server snapshot result into repo data query cache', async () => {
@@ -817,7 +817,7 @@ describe('core refresh request ordering', () => {
 
     const work = useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, scope: 'visible-status' })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.status).toMatchObject({
+    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.visibleStatus).toMatchObject({
       phase: 'loading',
       loadedAt: null,
       error: null,
@@ -827,9 +827,9 @@ describe('core refresh request ordering', () => {
     resolveStatus(status)
     await work
 
-    const loadedAt = useReposStore.getState().repos[REPO_ID]?.dataLoads.status.loadedAt
+    const loadedAt = useReposStore.getState().repos[REPO_ID]?.dataLoads.visibleStatus.loadedAt
     expect(loadedAt).toEqual(expect.any(Number))
-    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.status).toMatchObject({
+    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.visibleStatus).toMatchObject({
       phase: 'idle',
       error: null,
       stale: false,
@@ -841,7 +841,7 @@ describe('core refresh request ordering', () => {
 
     await useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, scope: 'visible-status' })
 
-    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.status).toMatchObject({
+    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.visibleStatus).toMatchObject({
       phase: 'idle',
       loadedAt,
       error: 'status failed',

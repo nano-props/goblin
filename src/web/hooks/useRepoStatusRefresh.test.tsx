@@ -36,7 +36,7 @@ function createRepo(
      * boolean came from.
      */
     unavailable?: boolean
-    statusPhase?: 'idle' | 'loading' | 'refreshing'
+    visibleStatusPhase?: 'idle' | 'loading' | 'refreshing'
   } = {},
 ) {
   const repo = emptyRepo(id, 'repo', 'repo-instance-test')
@@ -57,7 +57,7 @@ function createRepo(
     options.preferredWorkspacePaneTab ?? 'status',
   )
   if (options.unavailable) repo.availability = { phase: 'unavailable', reason: 'error.failed-read-repo', checkedAt: 0 }
-  repo.dataLoads.status.phase = options.statusPhase ?? 'idle'
+  repo.dataLoads.visibleStatus.phase = options.visibleStatusPhase ?? 'idle'
   return repo
 }
 
@@ -70,7 +70,7 @@ describe('isRepoStatusRefreshable', () => {
         preferredWorkspacePaneTab: 'status',
         statusViewOpen: true,
         unavailable: false,
-        statusPhase: 'idle',
+        visibleStatusPhase: 'idle',
       }),
     ).toBe(true)
   })
@@ -83,7 +83,7 @@ describe('isRepoStatusRefreshable', () => {
         preferredWorkspacePaneTab: 'status',
         statusViewOpen: true,
         unavailable: true,
-        statusPhase: 'idle',
+        visibleStatusPhase: 'idle',
       }),
     ).toBe(false)
   })
@@ -96,7 +96,7 @@ describe('isRepoStatusRefreshable', () => {
         preferredWorkspacePaneTab: 'status',
         statusViewOpen: true,
         unavailable: false,
-        statusPhase: 'loading',
+        visibleStatusPhase: 'loading',
       }),
     ).toBe(false)
     expect(
@@ -106,7 +106,7 @@ describe('isRepoStatusRefreshable', () => {
         preferredWorkspacePaneTab: 'status',
         statusViewOpen: true,
         unavailable: false,
-        statusPhase: 'refreshing',
+        visibleStatusPhase: 'refreshing',
       }),
     ).toBe(false)
   })
@@ -250,7 +250,7 @@ describe('useRepoStatusRefresh', () => {
   })
 
   test('skips refresh when a status refresh is already in flight', async () => {
-    const repo = createRepo('/repo-a', { statusPhase: 'loading' })
+    const repo = createRepo('/repo-a', { visibleStatusPhase: 'loading' })
     await act(async () => {
       useReposStore.setState({
         repos: { '/repo-a': repo },

@@ -12,7 +12,7 @@ export interface RepoWorkspacePresentation {
 
 export function getRepoWorkspacePresentation(repo: RepoState | undefined): RepoWorkspacePresentation {
   if (!repo) return { exists: false, initialLoading: false }
-  // Snapshot is loading when either it never resolved or the SSH probe
+  // The repo read model is loading when either it never resolved or the SSH probe
   // hasn't settled yet for a remote repo with no cached data. The
   // latter is the slow-network case: the placeholder repo is up but we
   // don't yet know whether the remote is reachable, so we keep showing
@@ -20,10 +20,10 @@ export function getRepoWorkspacePresentation(repo: RepoState | undefined): RepoW
   // available the projection already shows stale branches and we drop
   // the skeleton.
   const remoteConnecting = deriveConnectivity(repo) === 'connecting'
-  const hasLoadedSnapshot = repo.dataLoads.snapshot.loadedAt !== null
+  const hasLoadedReadModel = repo.dataLoads.repoReadModel.loadedAt !== null
   return {
     exists: true,
-    initialLoading: dataLoadInitialLoading(repo.dataLoads.snapshot) || (remoteConnecting && !hasLoadedSnapshot),
+    initialLoading: dataLoadInitialLoading(repo.dataLoads.repoReadModel) || (remoteConnecting && !hasLoadedReadModel),
   }
 }
 
@@ -35,7 +35,7 @@ export interface RepoWorkspaceRepo extends BranchActionRepo {
     statusReady: boolean
   }
   ui: Pick<RepoState['ui'], 'preferredWorkspacePaneTabByTarget'> & { currentBranchName: string | null }
-  dataLoads: Pick<RepoState['dataLoads'], 'status'>
+  dataLoads: Pick<RepoState['dataLoads'], 'visibleStatus'>
   remote: BranchActionRepo['remote'] & Pick<RepoState['remote'], 'lifecycle'>
 }
 
@@ -57,7 +57,7 @@ export function getCurrentRepoWorkspace(repo: RepoWorkspaceRepo) {
 
 export function getCurrentRepoWorkspacePresentation(repo: RepoWorkspaceRepo) {
   const detail = getCurrentRepoWorkspace(repo)
-  const statusLoading = dataLoadBusy(repo.dataLoads.status)
+  const statusLoading = dataLoadBusy(repo.dataLoads.visibleStatus)
 
   return {
     ...detail,
@@ -66,10 +66,10 @@ export function getCurrentRepoWorkspacePresentation(repo: RepoWorkspaceRepo) {
       pullRequests: false,
     },
     errors: {
-      status: repo.dataLoads.status.error,
+      status: repo.dataLoads.visibleStatus.error,
     },
     stale: {
-      status: repo.dataLoads.status.stale,
+      status: repo.dataLoads.visibleStatus.stale,
     },
   }
 }

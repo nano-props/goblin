@@ -28,7 +28,7 @@ function callsGet() {
           instanceId: 'repo-instance-test-9',
           availability: { phase: 'available' },
           dataLoads: {
-            status: { phase: 'idle', loadedAt: null, error: null, stale: false },
+            visibleStatus: { phase: 'idle', loadedAt: null, error: null, stale: false },
           },
         },
       },

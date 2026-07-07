@@ -23,7 +23,7 @@ function currentRepoStatusSnapshotEqual(
       a.preferredWorkspacePaneTab === b.preferredWorkspacePaneTab &&
       a.statusViewOpen === b.statusViewOpen &&
       a.unavailable === b.unavailable &&
-      a.statusPhase === b.statusPhase)
+      a.visibleStatusPhase === b.visibleStatusPhase)
   )
 }
 
