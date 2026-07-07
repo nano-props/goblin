@@ -6,13 +6,23 @@ import {
   readWorkspacePaneRuntimeTabTargetProjection,
   workspacePaneRuntimeTabTargetProjection,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
+import { workspacePaneRuntimeTabProjectionProviders } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
+import { WORKSPACE_PANE_RUNTIME_TAB_TYPES } from '#/shared/workspace-pane.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 
 afterEach(() => {
   setTerminalSessionCommandBridge(null)
   useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
+  useReposStore.setState({ selectedTerminalSessionIdByTerminalWorktree: {} })
 })
 
 describe('workspace pane runtime tab target projection', () => {
+  test('registers a projection provider for every runtime tab type', () => {
+    expect(workspacePaneRuntimeTabProjectionProviders().map((provider) => provider.type)).toEqual(
+      WORKSPACE_PANE_RUNTIME_TAB_TYPES,
+    )
+  })
+
   test('builds terminal runtime projection from explicit runtime inputs', () => {
     const projection = workspacePaneRuntimeTabTargetProjection({
       providers: [
@@ -91,6 +101,36 @@ describe('workspace pane runtime tab target projection', () => {
       projectionPhase: 'ready',
       selectedSessionId: 'session-1',
     })
+  })
+
+  test('reads terminal selected session through the projection provider', () => {
+    const terminalWorktreeKey = '/repo\0/repo-worktree'
+    setTerminalSessionCommandBridge({
+      terminalWorktreeSnapshot: vi.fn(() => ({
+        terminalWorktreeKey,
+        selectedDescriptor: null,
+        sessions: [terminalView('session-1'), terminalView('session-2')],
+        count: 2,
+        bellCount: 0,
+        outputActiveCount: 0,
+        createPending: false,
+      })),
+      createTerminal: vi.fn(async () => 'session-3'),
+      selectTerminal: vi.fn(),
+    })
+    useReposStore.setState({
+      selectedTerminalSessionIdByTerminalWorktree: {
+        [terminalWorktreeKey]: 'session-2',
+      },
+    })
+
+    const projection = readWorkspacePaneRuntimeTabTargetProjection({
+      repoRoot: '/repo',
+      repoInstanceId: 'repo-instance-1',
+      worktreePath: '/repo-worktree',
+    })
+
+    expect(projection.runtimeTabStateByType.terminal.selectedSessionId).toBe('session-2')
   })
 
   test('formats the current runtime target key', () => {

@@ -4,7 +4,6 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
-import { workspacePaneRuntimeTabTargetKey } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-key.ts'
 
 export type WorkspacePaneTabTargetResolution =
   | { kind: 'ready'; target: RepoWorkspaceTabModel }
@@ -28,16 +27,10 @@ export function resolveWorkspacePaneTabTargetForBranch(
   const branch = branchModel.branches.find((candidate) => candidate.name === branchName)
   if (!branch) return { kind: 'missing' }
   const worktreePath = branch.worktree?.path ?? null
-  const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey({ repoRoot: repo.id, worktreePath })
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     repoRoot: repo.id,
     repoInstanceId: repo.instanceId,
     worktreePath,
-    selectedSessionIdByRuntimeType: {
-      terminal: runtimeTabTargetKey
-        ? (state.selectedTerminalSessionIdByTerminalWorktree[runtimeTabTargetKey] ?? null)
-        : null,
-    },
   })
   return {
     kind: 'ready',

@@ -30,22 +30,65 @@ export interface WorkspacePaneRuntimeTabProviderProjection {
   selectedSessionId: string | null
 }
 
+interface WorkspacePaneRuntimeTabProjectionReadInput extends WorkspacePaneRuntimeTabTargetInput {
+  selectedSessionIdByRuntimeType?: WorkspacePaneRuntimeTabTargetSelectionByType
+}
+
+interface WorkspacePaneRuntimeTabSelectionSyncInput {
+  activeSessionIdByRuntimeType: WorkspacePaneRuntimeTabTargetSelectionByType
+  runtimeTabTargetKeyByType: WorkspacePaneRuntimeTabTargetKeyByType
+}
+
+export interface WorkspacePaneRuntimeTabProjectionProvider {
+  type: WorkspacePaneRuntimeTabType
+  targetKey: (input: Pick<WorkspacePaneRuntimeTabTargetInput, 'repoRoot' | 'worktreePath'>) => string | null
+  readProjection: (input: WorkspacePaneRuntimeTabProjectionReadInput) => WorkspacePaneRuntimeTabProviderProjection
+  useProjection: (input: WorkspacePaneRuntimeTabTargetInput) => WorkspacePaneRuntimeTabProviderProjection
+  useSyncSelection: (
+    input: WorkspacePaneRuntimeTabSelectionSyncInput,
+    selectedSessionIdByRuntimeType: WorkspacePaneRuntimeTabTargetSelectionByType,
+  ) => void
+}
+
+const terminalRuntimeTabProjectionProvider = {
+  type: 'terminal',
+  targetKey: terminalRuntimeTabTargetKey,
+  readProjection: readTerminalRuntimeTabProviderProjection,
+  useProjection: useTerminalRuntimeTabProviderProjection,
+  useSyncSelection: useSyncTerminalRuntimeTabSelection,
+} satisfies WorkspacePaneRuntimeTabProjectionProvider
+
+const WORKSPACE_PANE_RUNTIME_TAB_PROJECTION_PROVIDERS = [
+  terminalRuntimeTabProjectionProvider,
+] as const satisfies readonly WorkspacePaneRuntimeTabProjectionProvider[]
+
+const WORKSPACE_PANE_RUNTIME_TAB_PROJECTION_PROVIDER_BY_TYPE = {
+  terminal: terminalRuntimeTabProjectionProvider,
+} as const satisfies Record<WorkspacePaneRuntimeTabType, WorkspacePaneRuntimeTabProjectionProvider>
+
+export function workspacePaneRuntimeTabProjectionProviders(): readonly WorkspacePaneRuntimeTabProjectionProvider[] {
+  return WORKSPACE_PANE_RUNTIME_TAB_PROJECTION_PROVIDERS
+}
+
+export function workspacePaneRuntimeTabProjectionProvider(
+  type: WorkspacePaneRuntimeTabType,
+): WorkspacePaneRuntimeTabProjectionProvider {
+  return WORKSPACE_PANE_RUNTIME_TAB_PROJECTION_PROVIDER_BY_TYPE[type]
+}
+
 export function workspacePaneRuntimeTabTargetKeyForType(
   type: WorkspacePaneRuntimeTabType,
   input: Pick<WorkspacePaneRuntimeTabTargetInput, 'repoRoot' | 'worktreePath'>,
 ): string | null {
-  switch (type) {
-    case 'terminal':
-      return terminalRuntimeTabTargetKey(input)
-  }
+  return workspacePaneRuntimeTabProjectionProvider(type).targetKey(input)
 }
 
 export function workspacePaneRuntimeTabTargetKeyByType(
   input: Pick<WorkspacePaneRuntimeTabTargetInput, 'repoRoot' | 'worktreePath'>,
 ): WorkspacePaneRuntimeTabTargetKeyByType {
-  return {
-    terminal: workspacePaneRuntimeTabTargetKeyForType('terminal', input),
-  }
+  return Object.fromEntries(
+    workspacePaneRuntimeTabProjectionProviders().map((provider) => [provider.type, provider.targetKey(input)]),
+  ) as WorkspacePaneRuntimeTabTargetKeyByType
 }
 
 export function readWorkspacePaneRuntimeTabProviderProjections(input: {
@@ -54,13 +97,15 @@ export function readWorkspacePaneRuntimeTabProviderProjections(input: {
   worktreePath: string | null
   selectedSessionIdByRuntimeType?: WorkspacePaneRuntimeTabTargetSelectionByType
 }): WorkspacePaneRuntimeTabProviderProjection[] {
-  return [readTerminalRuntimeTabProviderProjection(input)]
+  return workspacePaneRuntimeTabProjectionProviders().map((provider) => provider.readProjection(input))
 }
 
 export function useWorkspacePaneRuntimeTabProviderProjections(
   input: WorkspacePaneRuntimeTabTargetInput,
 ): WorkspacePaneRuntimeTabProviderProjection[] {
-  const terminal = useTerminalRuntimeTabProviderProjection(input)
+  // Hook calls stay explicit so adding a runtime type requires a deliberate
+  // compile-time update without making hook order depend on a dynamic loop.
+  const terminal = workspacePaneRuntimeTabProjectionProvider('terminal').useProjection(input)
   return useMemo(() => [terminal], [terminal])
 }
 
@@ -71,7 +116,7 @@ export function useSyncWorkspacePaneRuntimeTabProviderSelection(
   },
   selectedSessionIdByRuntimeType: WorkspacePaneRuntimeTabTargetSelectionByType,
 ): void {
-  useSyncTerminalRuntimeTabSelection(input, selectedSessionIdByRuntimeType)
+  workspacePaneRuntimeTabProjectionProvider('terminal').useSyncSelection(input, selectedSessionIdByRuntimeType)
 }
 
 function terminalRuntimeTabTargetKey(
@@ -88,7 +133,9 @@ function readTerminalRuntimeTabProviderProjection(input: {
 }): WorkspacePaneRuntimeTabProviderProjection {
   const targetKey = terminalRuntimeTabTargetKey(input)
   const snapshot = targetKey ? (readTerminalSessionCommandBridge()?.terminalWorktreeSnapshot(targetKey) ?? null) : null
-  const selectedSessionId = targetKey ? (input.selectedSessionIdByRuntimeType?.terminal ?? null) : null
+  const selectedSessionId = targetKey
+    ? (input.selectedSessionIdByRuntimeType?.terminal ?? readTerminalSelectedSessionId(targetKey))
+    : null
   const projectionState = readTerminalRuntimeProjectionState(input.repoRoot, input.repoInstanceId)
   return {
     type: 'terminal',
@@ -102,6 +149,10 @@ function readTerminalRuntimeTabProviderProjection(input: {
       selectedSessionId,
     },
   }
+}
+
+function readTerminalSelectedSessionId(terminalWorktreeKey: string): string | null {
+  return useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] ?? null
 }
 
 function useTerminalRuntimeTabProviderProjection({
