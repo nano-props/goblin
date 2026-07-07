@@ -378,7 +378,7 @@ describe('runBranchAction', () => {
       },
     })
 
-    const statusWork = useReposStore.getState().refreshStatus(REPO_ID)
+    const statusWork = useReposStore.getState().refreshRuntimeProjection(REPO_ID, { sections: ['status'] })
     await flushAsyncWork()
     const deleteWork = useReposStore.getState().runBranchAction(REPO_ID, {
       kind: 'deleteBranch',
@@ -422,7 +422,7 @@ describe('runBranchAction', () => {
       },
     })
 
-    void useReposStore.getState().refreshStatus(REPO_ID)
+    void useReposStore.getState().refreshRuntimeProjection(REPO_ID, { sections: ['status'] })
     await flushAsyncWork()
     const result = await useReposStore.getState().runBranchAction(
       REPO_ID,
@@ -518,7 +518,7 @@ describe('runBranchAction', () => {
       },
     })
 
-    const statusWork = useReposStore.getState().refreshStatus(REPO_ID)
+    const statusWork = useReposStore.getState().refreshRuntimeProjection(REPO_ID, { sections: ['status'] })
     await flushAsyncWork()
     const pullWork = useReposStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
     await flushAsyncWork()
@@ -575,7 +575,7 @@ describe('runBranchAction', () => {
         },
       })
 
-      const statusWork = useReposStore.getState().refreshStatus(REPO_ID)
+      const statusWork = useReposStore.getState().refreshRuntimeProjection(REPO_ID, { sections: ['status'] })
       await flushAsyncWork()
       const actionWork = useReposStore.getState().runBranchAction(REPO_ID, action)
       await flushAsyncWork()

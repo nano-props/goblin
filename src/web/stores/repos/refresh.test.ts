@@ -76,7 +76,7 @@ describe('remote fetch timestamps', () => {
         resolveSnapshot = (snapshot) => resolve(repoProjection(snapshot))
       })
 
-    const work = useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
+    const work = useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['snapshot'] })
     await Promise.resolve()
 
     expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.snapshot.phase).toBe('refreshing')
@@ -541,14 +541,14 @@ describe('core refresh request ordering', () => {
     expect(repo?.dataLoads.snapshot.error).toBe('error.not-git-repo')
   })
 
-  test('refreshSnapshot restores an unavailable repo when the path is a git repo again', async () => {
+  test('snapshot projection refresh restores an unavailable repo when the path is a git repo again', async () => {
     const repoInstanceId = seedRepo([branch('old')])
     updateRepoForTest((repo) => {
       repo.availability = { phase: 'unavailable', reason: 'error.path-not-found', checkedAt: Date.now() }
     })
     ipcHandlers['repo.projection'] = async () => repoProjection({ branches: [branch('main')], current: 'main' })
 
-    await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
+    await useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['snapshot'] })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.availability).toEqual({ phase: 'available' })
@@ -556,12 +556,12 @@ describe('core refresh request ordering', () => {
     expect(repo?.dataLoads.snapshot.error).toBeNull()
   })
 
-  test('refreshSnapshot writes the server snapshot result into repo data query cache', async () => {
+  test('snapshot projection refresh writes the server snapshot result into repo data query cache', async () => {
     const repoInstanceId = seedRepo([branch('old')])
     const snapshot = { branches: [branch('main')], current: 'main' }
     ipcHandlers['repo.projection'] = async () => repoProjection(snapshot)
 
-    await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
+    await useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['snapshot'] })
 
     expect(primaryWindowQueryClient.getQueryData(repoSnapshotQueryKey(REPO_ID, repoInstanceId))).toEqual(snapshot)
   })
@@ -597,8 +597,8 @@ describe('core refresh request ordering', () => {
       })
     }
 
-    const first = useReposStore.getState().refreshStatus(REPO_ID, { repoInstanceId })
-    const second = useReposStore.getState().refreshStatus(REPO_ID, { repoInstanceId })
+    const first = useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['status'] })
+    const second = useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['status'] })
     const fresh = [{ path: '/repo', isMain: true, entries: [{ x: 'M', y: ' ', path: 'fresh.ts' }] }]
 
     resolveSecond(fresh)
@@ -610,7 +610,7 @@ describe('core refresh request ordering', () => {
     expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toEqual(fresh)
   })
 
-  test('refreshStatus updates normalized worktree dirty metadata in the branch read model', async () => {
+  test('status projection refresh updates normalized worktree dirty metadata in the branch read model', async () => {
     const repoInstanceId = seedRepo([
       branch('feature/cleaned', undefined, {
         worktree: {
@@ -688,7 +688,7 @@ describe('core refresh request ordering', () => {
         ],
       )
 
-    await useReposStore.getState().refreshStatus(REPO_ID, { repoInstanceId })
+    await useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['status'] })
 
     const repo = useReposStore.getState().repos[REPO_ID]!
     const worktreesByPath = readRepoBranchQueryProjection(repo)?.worktreesByPath
@@ -706,7 +706,7 @@ describe('core refresh request ordering', () => {
     })
   })
 
-  test('refreshStatus writes the server status result into repo data query cache', async () => {
+  test('status projection refresh writes the server status result into repo data query cache', async () => {
     const repoInstanceId = seedRepo([branch('feature/a')])
     const status: WorktreeStatus[] = [
       { path: REPO_ID, branch: 'feature/a', isMain: true, entries: [{ x: 'M', y: ' ', path: 'changed.ts' }] },
@@ -714,7 +714,7 @@ describe('core refresh request ordering', () => {
     ipcHandlers['repo.projection'] = async () =>
       repoProjection({ branches: [branch('feature/a')], current: 'feature/a' }, status)
 
-    await useReposStore.getState().refreshStatus(REPO_ID, { repoInstanceId })
+    await useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['status'] })
 
     expect(primaryWindowQueryClient.getQueryData(repoStatusQueryKey(REPO_ID, repoInstanceId))).toEqual(status)
   })
@@ -756,7 +756,7 @@ describe('core refresh request ordering', () => {
         [{ path: '/tmp/worktree-a', branch: 'feature/a', isMain: false, entries: [] }],
       )
 
-    await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
+    await useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['snapshot'] })
 
     const repo = useReposStore.getState().repos[REPO_ID]!
     expect(readRepoBranchQueryProjection(repo)?.worktreesByPath['/tmp/worktree-a']).toMatchObject({
@@ -783,7 +783,7 @@ describe('core refresh request ordering', () => {
         current: 'feature/a',
       })
 
-    await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
+    await useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['snapshot'] })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     const projection = repo ? readRepoBranchQueryProjection(repo) : null
@@ -794,7 +794,7 @@ describe('core refresh request ordering', () => {
     })
   })
 
-  test('refreshStatus records data-load loading, success, and stale error state', async () => {
+  test('status projection refresh records data-load loading, success, and stale error state', async () => {
     const repoInstanceId = seedRepo([branch('feature/a')])
     let resolveStatus!: (value: WorktreeStatus[]) => void
     const status: WorktreeStatus[] = [{ path: '/tmp/gbl-test-repo', branch: 'feature/a', isMain: true, entries: [] }]
@@ -804,7 +804,7 @@ describe('core refresh request ordering', () => {
           resolve(repoProjection({ branches: [branch('feature/a')], current: 'feature/a' }, status))
       })
 
-    const work = useReposStore.getState().refreshStatus(REPO_ID, { repoInstanceId })
+    const work = useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['status'] })
 
     expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.status).toMatchObject({
       phase: 'loading',
@@ -828,7 +828,7 @@ describe('core refresh request ordering', () => {
       throw new Error('status failed')
     }
 
-    await useReposStore.getState().refreshStatus(REPO_ID, { repoInstanceId })
+    await useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['status'] })
 
     expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.status).toMatchObject({
       phase: 'idle',
@@ -848,7 +848,7 @@ describe('core refresh request ordering', () => {
         )
       })
 
-    const works = Array.from({ length: 4 }, () => useReposStore.getState().refreshStatus(REPO_ID, { repoInstanceId }))
+    const works = Array.from({ length: 4 }, () => useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['status'] }))
 
     expect(resolvers).toHaveLength(3)
     expect(repoOperation(REPO_ID, 'status').phase).toBe('queued')
@@ -876,7 +876,7 @@ describe('core refresh request ordering', () => {
       return new Promise(() => {})
     }
 
-    const works = Array.from({ length: 4 }, () => useReposStore.getState().refreshStatus(REPO_ID, { repoInstanceId }))
+    const works = Array.from({ length: 4 }, () => useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['status'] }))
     expect(callCount).toBe(3)
     expect(repoOperation(REPO_ID, 'status').phase).toBe('queued')
 
@@ -896,7 +896,7 @@ describe('core refresh request ordering', () => {
         )
       })
 
-    const works = Array.from({ length: 5 }, () => useReposStore.getState().refreshStatus(REPO_ID, { repoInstanceId }))
+    const works = Array.from({ length: 5 }, () => useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['status'] }))
     const fresh = [{ path: '/repo', isMain: true, entries: [{ x: 'M', y: ' ', path: 'fresh.ts' }] }]
 
     try {
@@ -936,8 +936,8 @@ describe('core refresh request ordering', () => {
       })
     }
 
-    const first = useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
-    const second = useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
+    const first = useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['snapshot'] })
+    const second = useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['snapshot'] })
 
     resolveSecond({ branches: [branch('fresh')], current: 'fresh' })
     await second
@@ -963,7 +963,7 @@ describe('core refresh request ordering', () => {
     ipcHandlers['repo.projection'] = async () =>
       repoProjection({ branches: [branch('feature/a')], current: 'feature/a' })
 
-    await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
+    await useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['snapshot'] })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     const projection = repo ? readRepoBranchQueryProjection(repo) : null
@@ -995,7 +995,7 @@ describe('core refresh request ordering', () => {
         current: 'feature/new',
       })
 
-    await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
+    await useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['snapshot'] })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     const projection = repo ? readRepoBranchQueryProjection(repo) : null
@@ -1026,7 +1026,7 @@ describe('core refresh request ordering', () => {
         current: 'main',
       })
 
-    await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
+    await useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['snapshot'] })
 
     expect(calls).toEqual([
       expect.objectContaining({
@@ -1052,7 +1052,7 @@ describe('core refresh request ordering', () => {
         current: 'main',
       })
 
-    await useReposStore.getState().refreshSnapshot(REPO_ID, { repoInstanceId })
+    await useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, sections: ['snapshot'] })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(warnSpy).toHaveBeenCalledWith('failed to prune repo sessions', { err })

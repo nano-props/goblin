@@ -256,16 +256,10 @@ interface RuntimeCoherentRepoProjectionActions {
    *  target-scoped user intent. */
   setWorkspacePaneTab: (id: string, branch: string, tab: WorkspacePaneTabType) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
-  refreshSnapshot: (id: string, options?: { skipLogBackfill?: boolean; repoInstanceId?: string }) => Promise<void>
-  refreshSnapshotAndStatus: (
-    id: string,
-    options?: { skipLogBackfill?: boolean; repoInstanceId?: string },
-  ) => Promise<void>
   refreshRuntimeProjection: (
     id: string,
     options: { repoInstanceId?: string; sections: readonly RepoRuntimeProjectionRefreshSection[] },
   ) => Promise<void>
-  refreshStatus: (id: string, options?: { repoInstanceId?: string }) => Promise<void>
   refreshCoreData: (id: string, options?: { repoInstanceId?: string }) => Promise<void>
   syncAndRefresh: (id: string, options?: { repoInstanceId?: string }) => Promise<void>
   setLastResult: (id: string, result: ExecResult, repoInstanceId: string, options?: RepoResultEventOptions) => void

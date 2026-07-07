@@ -129,37 +129,11 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
   }
 
   return {
-    async refreshSnapshot(id: string, options?: { skipLogBackfill?: boolean; repoInstanceId?: string }) {
-      const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
-      if (!resolved) return
-      const { repoInstanceId } = resolved
-      await runRuntimeProjectionRefresh(id, repoInstanceId, ['snapshot'])
-    },
-
-    async refreshStatus(id: string, options?: { repoInstanceId?: string }) {
-      const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
-      if (!resolved) return
-      const { repoInstanceId } = resolved
-      await runRuntimeProjectionRefresh(id, repoInstanceId, ['status'])
-    },
-
     async refreshCoreData(id: string, options?: { repoInstanceId?: string }) {
       const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
       if (!resolved) return
       const { repoInstanceId } = resolved
       await runCoreDataRefreshWorkflow(get, { id, repoInstanceId })
-    },
-
-    /**
-     * Combined snapshot + status refresh backed by the server runtime
-     * projection. The store method name is kept as the local intent API,
-     * but the frontend no longer calls snapshot/status/composite reads.
-     */
-    async refreshSnapshotAndStatus(id: string, options?: { skipLogBackfill?: boolean; repoInstanceId?: string }) {
-      const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
-      if (!resolved) return
-      const { repoInstanceId } = resolved
-      await runRuntimeProjectionRefresh(id, repoInstanceId, ['snapshot', 'status'])
     },
 
     async refreshRuntimeProjection(

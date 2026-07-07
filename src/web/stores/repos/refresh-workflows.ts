@@ -24,7 +24,10 @@ export async function runCoreDataRefreshWorkflow(
   get: ReposGet,
   options: { id: string; repoInstanceId: string },
 ): Promise<void> {
-  await get().refreshSnapshotAndStatus(options.id, { skipLogBackfill: true, repoInstanceId: options.repoInstanceId })
+  await get().refreshRuntimeProjection(options.id, {
+    repoInstanceId: options.repoInstanceId,
+    sections: ['snapshot', 'status'],
+  })
   const after = get().repos[options.id]
   if (!after || after.instanceId !== options.repoInstanceId) return
   if (isRepoUnavailable(after)) return
