@@ -28,6 +28,8 @@ import type { PrimaryWindowNavigationActions } from '#/web/primary-window-naviga
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { getRepoOperationsQueryData } from '#/web/repo-data-query.ts'
+import { branchActionOperationFromServer } from '#/web/hooks/branch-action-state.ts'
 
 interface TerminalBellIntentDeps {
   navigation: PrimaryWindowNavigationActions
@@ -151,7 +153,11 @@ export async function handleWorkspaceClientIntent(
       return true
     case 'create-worktree': {
       if (!currentRepo) return true
-      if (currentRepo.operations.branchAction.phase !== 'idle') {
+      const branchAction = branchActionOperationFromServer(
+        currentRepo.operations.branchAction,
+        getRepoOperationsQueryData(currentRepo.id, currentRepo.instanceId)?.operations,
+      )
+      if (branchAction.phase !== 'idle') {
         toast.error(deps.t('action.create-worktree-busy'))
         return true
       }

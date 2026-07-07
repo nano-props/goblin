@@ -24,6 +24,8 @@ import { setTerminalSessionCommandBridge } from '#/web/components/terminal/termi
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
+import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
 const testWindow = window as unknown as { goblinNative?: Window['goblinNative'] }
 const REPO_ID = '/tmp/keyboard-repo'
@@ -331,6 +333,29 @@ describe('useKeyboard', () => {
     expect(toast.error).toHaveBeenCalledWith('action.create-worktree-busy')
   })
 
+  test('primary modifier plus n reads busy state from server operations projection', async () => {
+    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: 'feature/worktree',
+    })
+    setRepoOperationsQueryData(REPO_ID, repo.instanceId, false, {
+      operations: [serverOperation(repo.instanceId, { kind: 'create-worktree', phase: 'running' })],
+      loadedAt: 123,
+    })
+    const openCreateWorktree = vi.fn()
+    await renderHookHost({ currentRepoId: REPO_ID, openCreateWorktree })
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true, bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(openCreateWorktree).not.toHaveBeenCalled()
+    expect(toast.error).toHaveBeenCalledWith('action.create-worktree-busy')
+  })
+
   test('does not run menu-backed primary shortcuts from the client in electron', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     installNativeBridgeStub()
@@ -402,6 +427,35 @@ describe('useKeyboard', () => {
 
 function renderHookHost(overrides: Partial<HookHostOptions> = {}) {
   return renderInJsdom(<HookHost {...overrides} />)
+}
+
+function serverOperation(
+  repoInstanceId: string,
+  overrides: Pick<RepoServerOperationState, 'kind' | 'phase'>,
+): RepoServerOperationState {
+  return {
+    id: `repo-op-${overrides.kind}-${overrides.phase}`,
+    repoId: REPO_ID,
+    repoInstanceId,
+    kind: overrides.kind,
+    phase: overrides.phase,
+    source: 'user',
+    target: null,
+    queuedAt: 100,
+    startedAt: overrides.phase === 'queued' ? null : 101,
+    deadlineAt: null,
+    settledAt: null,
+    error: null,
+    cancellation: {
+      underlyingRequested: false,
+      reason: null,
+      requestedAt: null,
+      waitCancelledCount: 0,
+      lastWaitCancelledAt: null,
+      lastWaitCancellationReason: null,
+    },
+    canCancelUnderlying: true,
+  }
 }
 
 function HookHost(overrides: Partial<HookHostOptions>) {
