@@ -3,6 +3,7 @@ import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/sha
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import {
   orderWorkspacePaneItemsByTabEntries,
+  workspacePaneTabsWithoutStaticTab,
   workspacePaneTabsWithDraggedOrder,
 } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
@@ -35,6 +36,12 @@ describe('workspacePaneTabsWithDraggedOrder', () => {
       terminalOne,
       history,
     ])
+  })
+})
+
+describe('workspacePaneTabsWithoutStaticTab', () => {
+  test('allows closing the final tab', () => {
+    expect(workspacePaneTabsWithoutStaticTab([staticEntry('status')], 'status')).toEqual([])
   })
 })
 

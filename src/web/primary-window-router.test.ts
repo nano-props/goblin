@@ -88,7 +88,7 @@ describe('repo route view derivation', () => {
       kind: 'branch',
       repoId: '/repo',
       branchName: 'feature/a',
-      workspacePaneRoute: { kind: 'static', tab: 'status' },
+      workspacePaneRoute: null,
     })
   })
 

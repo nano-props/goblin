@@ -6,7 +6,10 @@ import {
   normalizeWorkspaceSessionLayoutState,
 } from '#/shared/workspace-layout.ts'
 import type { BranchViewMode, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
-import type { WorkspaceNavigationHistoryRepoState } from '#/web/stores/repos/types.ts'
+import type {
+  WorkspaceNavigationHistoryEntry,
+  WorkspaceNavigationHistoryRepoState,
+} from '#/web/stores/repos/types.ts'
 import {
   workspaceNavigationHistoryEntryCanReplaceCurrent,
   workspaceNavigationHistoryEntryEqual,
@@ -202,6 +205,17 @@ function createWorkspaceNavigationHistoryActions(set: ReposSet, get: ReposGet): 
       set((s) => {
         const currentRepoHistory = navigationHistoryForRepo(s.navigationHistoryByRepo[entry.repoId])
         if (workspaceNavigationHistoryEntryEqual(currentRepoHistory.current, entry)) return s
+        const restoredHistory = options?.browserHistoryTraversal
+          ? navigationHistoryWithRestoredEntry(currentRepoHistory, entry, options.browserHistoryTraversal)
+          : null
+        if (restoredHistory) {
+          return {
+            navigationHistoryByRepo: {
+              ...s.navigationHistoryByRepo,
+              [entry.repoId]: restoredHistory,
+            },
+          }
+        }
         if (options?.replace) {
           return {
             navigationHistoryByRepo: {
@@ -303,6 +317,40 @@ function navigationHistoryForRepo(
   state: WorkspaceNavigationHistoryRepoState | undefined,
 ): WorkspaceNavigationHistoryRepoState {
   return state ?? { current: null, backStack: [], forwardStack: [] }
+}
+
+function navigationHistoryWithRestoredEntry(
+  history: WorkspaceNavigationHistoryRepoState,
+  entry: WorkspaceNavigationHistoryEntry,
+  direction: 'back' | 'forward',
+): WorkspaceNavigationHistoryRepoState | null {
+  if (!history.current) return null
+  const stack = direction === 'back' ? history.backStack : history.forwardStack
+  const targetIndex =
+    direction === 'back'
+      ? stack.findLastIndex((candidate) => workspaceNavigationHistoryEntryEqual(candidate, entry))
+      : stack.findIndex((candidate) => workspaceNavigationHistoryEntryEqual(candidate, entry))
+  if (targetIndex < 0) return null
+  if (direction === 'back') {
+    return {
+      current: entry,
+      backStack: stack.slice(0, targetIndex),
+      forwardStack: [
+        ...stack.slice(targetIndex + 1),
+        history.current,
+        ...history.forwardStack,
+      ].slice(0, MAX_WORKSPACE_NAVIGATION_HISTORY_ENTRIES),
+    }
+  }
+  return {
+    current: entry,
+    backStack: [
+      ...history.backStack,
+      history.current,
+      ...stack.slice(0, targetIndex),
+    ].slice(-MAX_WORKSPACE_NAVIGATION_HISTORY_ENTRIES),
+    forwardStack: stack.slice(targetIndex + 1),
+  }
 }
 
 export function createSelectionActions(set: ReposSet, get: ReposGet) {

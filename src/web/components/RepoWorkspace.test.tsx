@@ -412,6 +412,9 @@ describe('RepoWorkspace', () => {
 
     expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
     expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]).toBeUndefined()
+    expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]).not.toBe(
+      'missing-session',
+    )
   })
 
   test('replaces an unrenderable static route with the resolved static route', async () => {
@@ -452,6 +455,55 @@ describe('RepoWorkspace', () => {
             kind: 'branch',
             branchName,
             workspacePaneTab: 'status',
+            terminalWorktreeKey: null,
+            terminalSessionId: null,
+          },
+        },
+        backStack: [],
+        forwardStack: [],
+      })
+    })
+  })
+
+  test('replaces an unrenderable route with the bare branch route when the pane is empty', async () => {
+    const branchName = 'feature/empty-pane'
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(branchName)],
+      currentBranchName: branchName,
+      preferredWorkspacePaneTab: 'changes',
+      workspacePaneTabsByBranch: {
+        [branchName]: [],
+      },
+    })
+    const route = routeNavigation()
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName={branchName}
+                workspacePaneRoute={{ kind: 'static', tab: 'changes' }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(route.openRepoBranch).toHaveBeenCalledWith(REPO_ID, branchName, { replace: true })
+      expect(route.openRepoBranchTab).not.toHaveBeenCalled()
+      expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]).toEqual({
+        current: {
+          repoId: REPO_ID,
+          route: {
+            kind: 'branch',
+            branchName,
+            workspacePaneTab: null,
             terminalWorktreeKey: null,
             terminalSessionId: null,
           },

@@ -810,7 +810,11 @@ describe('RepoWorkspaceContent', () => {
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
     const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
-    const createTerminal = vi.fn(async () => 'session-1')
+    let resolvedStartupShellCommand: string | null = null
+    const createTerminal: TerminalSessionContextValue['createTerminal'] = vi.fn(async (_base, options) => {
+      resolvedStartupShellCommand = (await options?.resolveStartupShellCommand?.()) ?? null
+      return 'session-1'
+    })
     const writeInput = vi.fn()
     const showRepoBranchWorkspacePaneTab = vi.fn()
     const showRepoBranchTerminalSession = vi.fn()
@@ -851,6 +855,7 @@ describe('RepoWorkspaceContent', () => {
     const actionButton = row.querySelector<HTMLButtonElement>('[data-action-popover-trigger]')
     expect(actionButton?.getAttribute('aria-busy')).toBe('true')
     expect(actionButton?.querySelector('svg.animate-spin')).toBeTruthy()
+    expect(createTerminal).toHaveBeenCalledTimes(1)
     await act(async () => {
       row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
       await Promise.resolve()
@@ -867,10 +872,11 @@ describe('RepoWorkspaceContent', () => {
     expect(createTerminal).toHaveBeenCalledWith(
       { repoRoot: REPO_ID, repoInstanceId: repo.instanceId, branch: branchName, worktreePath },
       {
-        startupShellCommand: "bat --paging=never --style=plain '/tmp/filetree-open-worktree/README.md'\r",
+        resolveStartupShellCommand: expect.any(Function),
         insertAfterIdentity: 'workspace-pane:files',
       },
     )
+    expect(resolvedStartupShellCommand).toBe("bat --paging=never --style=plain '/tmp/filetree-open-worktree/README.md'\r")
     expect(writeInput).not.toHaveBeenCalled()
 
     // Chrome-tab-style opener tracking: the terminal this opened should be

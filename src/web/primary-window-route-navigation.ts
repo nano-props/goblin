@@ -65,8 +65,8 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
         const repoSlug = repoSlugForId(repoId)
         if (!repoSlug) return
         void router?.navigate({
-          to: '/repo/$repoSlug/branch/$branchSlug/tab/$tabKey',
-          params: { repoSlug, branchSlug: branchSlugFromName(branchName), tabKey: 'status' },
+          to: '/repo/$repoSlug/branch/$branchSlug',
+          params: { repoSlug, branchSlug: branchSlugFromName(branchName) },
           replace: options?.replace,
         })
       },

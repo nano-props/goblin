@@ -171,9 +171,21 @@ The clean flow is:
 4. The caller navigates directly to the canonical terminal route for that
    returned session.
 
+If a create flow needs async preparation before the PTY can be launched, such
+as resolving a file viewer command for "open file in terminal", that preparation
+must be part of the projection-owned create request. Use a create option that is
+resolved inside the terminal create queue after `createPending` is visible; do
+not `await` the preparation in a component and only then call create.
+
 Route reconciliation remains a boundary concern: stale or unrenderable URLs
 should be replaced with a canonical route from the current projection, not
 silently interpreted through local preferred-tab state.
+
+The bare branch URL is the canonical empty workspace-pane route. Explicit pane
+tabs use explicit URLs such as `/tab/status` or `/terminal/{sessionId}`. Do not
+canonicalize a bare branch URL to `/tab/status`: that erases the user's empty
+pane state and reintroduces hidden preferred-tab fallback as a second route
+authority.
 
 ## Identity model
 

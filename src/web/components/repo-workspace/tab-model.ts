@@ -137,7 +137,7 @@ export interface RepoWorkspaceTabModelInput {
   repoId: string
   branchName: string | null
   worktreePath: string | null
-  preferredTab: WorkspacePaneTabType
+  preferredTab: WorkspacePaneTabType | null
   tabEntries: readonly WorkspacePaneTabEntry[]
   tabEntriesProjectionPhase?: RepoWorkspaceTabEntriesProjectionPhase
   runtimeTabViews: readonly WorkspacePaneTabSummary[]
@@ -159,14 +159,17 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
     hasWorktree,
   })
   const staticTabs = materializedTabs.flatMap((tab) => (tab.kind === 'static' ? [tab.type] : []))
-  const candidateTab = resolveRenderableWorkspacePaneTab(input.preferredTab, {
-    hasWorktree,
-    runtimeTabAvailabilityByType: runtimeTabAvailabilityByTypeForTabs(materializedTabs, runtimeTabStateByType),
-  })
+  const candidateTab = input.preferredTab
+    ? resolveRenderableWorkspacePaneTab(input.preferredTab, {
+        hasWorktree,
+        runtimeTabAvailabilityByType: runtimeTabAvailabilityByTypeForTabs(materializedTabs, runtimeTabStateByType),
+      })
+    : null
   const materializedActiveTab = candidateTab
     ? activeRepoWorkspaceTab(materializedTabs, candidateTab, runtimeTabStateByType)
     : null
-  const selection = workspacePaneSelection(candidateTab, materializedActiveTab, materializedTabs)
+  const selection =
+    input.preferredTab === null ? null : workspacePaneSelection(candidateTab, materializedActiveTab, materializedTabs)
   const pendingTab =
     selection?.kind === 'runtime-host' && runtimeTabStateByType[selection.runtimeType].createPending
       ? pendingRuntimeWorkspacePaneTab(selection.runtimeType)

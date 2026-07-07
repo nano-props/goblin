@@ -222,7 +222,10 @@ interface LocalWorkspaceActions {
   setTabOpener: (scopeKey: string, childIdentity: string, openerIdentity: string) => void
   /** Clears a tab's recorded opener within a scope, e.g. once the tab has closed. */
   clearTabOpener: (scopeKey: string, childIdentity: string) => void
-  recordWorkspaceNavigation: (entry: WorkspaceNavigationHistoryEntry, options?: { replace?: boolean }) => void
+  recordWorkspaceNavigation: (
+    entry: WorkspaceNavigationHistoryEntry,
+    options?: { replace?: boolean; browserHistoryTraversal?: 'back' | 'forward' },
+  ) => void
   goBackInWorkspaceNavigation: (repoId: string) => WorkspaceNavigationHistoryEntry | null
   goForwardInWorkspaceNavigation: (repoId: string) => WorkspaceNavigationHistoryEntry | null
 }

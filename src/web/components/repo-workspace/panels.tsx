@@ -232,7 +232,6 @@ function FiletreeTab({
       if (!beginOpeningFile(openingFileKey)) return
       try {
         const openerIdentity = captureWorkspacePaneActiveTabIdentity(repoId, branchName)
-        const viewerResult = await getRepositoryFileViewer(repoId, worktreePath)
         await runCreateTerminalTabCommand({
           base: { repoRoot: repoId, repoInstanceId, branch: branchName, worktreePath },
           createTerminal,
@@ -241,7 +240,10 @@ function FiletreeTab({
           showCreatedTerminalTab: (terminalSessionId) =>
             navigation.showRepoBranchTerminalSession(repoId, branchName, terminalSessionId),
           options: {
-            startupShellCommand: fileReadCommand(viewerResult, absoluteFilePathForTerminal(worktreePath, node.path)),
+            resolveStartupShellCommand: async () => {
+              const viewerResult = await getRepositoryFileViewer(repoId, worktreePath)
+              return fileReadCommand(viewerResult, absoluteFilePathForTerminal(worktreePath, node.path))
+            },
             insertAfterIdentity: openerIdentity,
           },
           t,

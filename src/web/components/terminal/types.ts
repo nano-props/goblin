@@ -127,6 +127,13 @@ export interface TerminalCreateOptions {
    */
   startupShellCommand?: string
   /**
+   * Lazily resolves startupShellCommand after the create request has entered
+   * the projection queue. Use this when preparing the command needs async work:
+   * createPending must be projection-owned before that work starts, otherwise
+   * workspace-pane navigation can race the eventual create result.
+   */
+  resolveStartupShellCommand?: () => Promise<string>
+  /**
    * Optional workspace pane tab identity to anchor the new terminal tab after.
    * When omitted or null, the new tab appends to the end of the strip.
    * See `docs/workspace-tab-opener.md`.

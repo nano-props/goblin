@@ -99,6 +99,39 @@ describe('workspace navigation history', () => {
     expect(history().backStack).toEqual([firstTerminal])
   })
 
+  test('restores the cursor when browser history lands on a back stack entry', () => {
+    const store = useReposStore.getState()
+    const dashboard = entry('dashboard')
+    const status = branchEntry({ tab: 'status', terminalSessionId: null })
+    const terminal = branchEntry({ tab: 'terminal', terminalSessionId: 'session-1' })
+
+    store.recordWorkspaceNavigation(dashboard)
+    store.recordWorkspaceNavigation(status)
+    store.recordWorkspaceNavigation(terminal)
+    store.recordWorkspaceNavigation(dashboard, { browserHistoryTraversal: 'back' })
+
+    expect(history().current).toEqual(dashboard)
+    expect(history().backStack).toEqual([])
+    expect(history().forwardStack).toEqual([status, terminal])
+  })
+
+  test('restores the cursor when browser history lands on a forward stack entry', () => {
+    const store = useReposStore.getState()
+    const dashboard = entry('dashboard')
+    const status = branchEntry({ tab: 'status', terminalSessionId: null })
+    const terminal = branchEntry({ tab: 'terminal', terminalSessionId: 'session-1' })
+
+    store.recordWorkspaceNavigation(dashboard)
+    store.recordWorkspaceNavigation(status)
+    store.recordWorkspaceNavigation(terminal)
+    store.recordWorkspaceNavigation(dashboard, { browserHistoryTraversal: 'back' })
+    store.recordWorkspaceNavigation(terminal, { browserHistoryTraversal: 'forward' })
+
+    expect(history().current).toEqual(terminal)
+    expect(history().backStack).toEqual([dashboard, status])
+    expect(history().forwardStack).toEqual([])
+  })
+
   test('treats a new-worktree return target as part of the route identity', () => {
     const store = useReposStore.getState()
     store.recordWorkspaceNavigation(newWorktreeEntry('/repo/repo-slug/branch/feature-a'))
@@ -122,7 +155,7 @@ function entry(kind: 'dashboard' | 'newWorktree' | 'branch', branchName?: string
       route: {
         kind,
         branchName: branchName ?? 'feature/test',
-        workspacePaneTab: 'status',
+        workspacePaneTab: null,
         terminalWorktreeKey: null,
         terminalSessionId: null,
       },

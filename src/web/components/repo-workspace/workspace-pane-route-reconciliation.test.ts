@@ -70,6 +70,26 @@ describe('workspace pane route reconciliation', () => {
       route: { kind: 'static', tab: 'status' },
     })
   })
+
+  test('replaces an unmaterialized route with the bare branch route when the pane is empty', () => {
+    const model = createRepoWorkspaceTabModel({
+      repoId: REPO_ID,
+      branchName: 'feature/route',
+      worktreePath: null,
+      preferredTab: 'changes',
+      tabEntries: [],
+      tabEntriesProjectionPhase: 'ready',
+      runtimeTabViews: [],
+      runtimeTabStateByType: {
+        terminal: { projectionPhase: 'ready' },
+      },
+    })
+
+    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'changes' }, model)).toEqual({
+      kind: 'replace',
+      route: null,
+    })
+  })
 })
 
 function terminalModel(input: { routedSessionId: string; terminalProjectionPhase: 'pending' | 'ready' | 'failed' }) {

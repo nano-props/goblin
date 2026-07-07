@@ -100,6 +100,13 @@ describe('workspace pane tabs runtime', () => {
     expect(runtime.closeStaticTab(target(), 'status')).toEqual([workspacePaneStaticTabEntry('history')])
   })
 
+  test('allows closing the final tab', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+
+    expect(runtime.closeStaticTab(target(), 'status')).toEqual([])
+    expect(runtime.tabs(target())).toEqual([])
+  })
+
   test('openStaticTab with insertAfterIdentity inserts after a static identity', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
     runtime.replaceTabs({

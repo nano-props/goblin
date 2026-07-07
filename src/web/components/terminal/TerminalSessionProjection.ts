@@ -61,6 +61,11 @@ interface TerminalCreateQueueRequest {
   owner: TerminalCreateOwner | null
   dedupeKey: string | null
 }
+
+interface ResolvedTerminalCreateOptions {
+  startupShellCommand?: string
+  insertAfterIdentity?: string | null
+}
 /**
  * Client-level authority for terminal session state.
  *
@@ -509,9 +514,13 @@ export class TerminalSessionProjection {
     if (request.owner && !request.owner.isFresh()) {
       throw new Error('terminal create request canceled')
     }
+    const createOptions = await resolveTerminalCreateOptions(request.createOptions)
+    if (request.owner && !request.owner.isFresh()) {
+      throw new Error('terminal create request canceled')
+    }
     const clientId = readOrCreateWebTerminalClientId()
     const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
-    const createKind = request.createOptions.startupShellCommand
+    const createKind = createOptions.startupShellCommand
       ? 'additional'
       : this.visibleSessionsForWorktree(terminalWorktreeKey).length === 0
         ? 'primary'
@@ -522,12 +531,8 @@ export class TerminalSessionProjection {
       branch: base.branch,
       worktreePath: base.worktreePath,
       kind: createKind,
-      ...(request.createOptions.startupShellCommand
-        ? { startupShellCommand: request.createOptions.startupShellCommand }
-        : {}),
-      ...(request.createOptions.insertAfterIdentity
-        ? { insertAfterIdentity: request.createOptions.insertAfterIdentity }
-        : {}),
+      ...(createOptions.startupShellCommand ? { startupShellCommand: createOptions.startupShellCommand } : {}),
+      ...(createOptions.insertAfterIdentity ? { insertAfterIdentity: createOptions.insertAfterIdentity } : {}),
       cols: geometry.cols,
       rows: geometry.rows,
       clientId,
@@ -1248,7 +1253,21 @@ function requireRepoInstanceId(base: TerminalSessionBase): string {
   throw new Error('error.repo-instance-stale')
 }
 
-function terminalCreateDedupeKey(options: TerminalCreateOptions): string {
+async function resolveTerminalCreateOptions(options: TerminalCreateOptions): Promise<ResolvedTerminalCreateOptions> {
+  if (options.startupShellCommand && options.resolveStartupShellCommand) {
+    throw new Error('startupShellCommand cannot be combined with resolveStartupShellCommand')
+  }
+  const startupShellCommand = options.resolveStartupShellCommand
+    ? await options.resolveStartupShellCommand()
+    : options.startupShellCommand
+  return {
+    ...(startupShellCommand ? { startupShellCommand } : {}),
+    ...(options.insertAfterIdentity ? { insertAfterIdentity: options.insertAfterIdentity } : {}),
+  }
+}
+
+function terminalCreateDedupeKey(options: TerminalCreateOptions): string | null {
+  if (options.resolveStartupShellCommand) return null
   return options.startupShellCommand ?? ''
 }
 

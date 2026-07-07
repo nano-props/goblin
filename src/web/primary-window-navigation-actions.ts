@@ -12,7 +12,7 @@ export interface PrimaryWindowNavigationActions {
   activateRepo: (repoId: string) => void
   closeRepo: (repoId: string) => void
   cycleRepo: (direction: 1 | -1) => void
-  selectRepoBranch: (repoId: string, branch: string) => void
+  selectRepoBranch: (repoId: string, branch: string, options?: { replace?: boolean }) => void
   showRepoBranchWorkspacePaneTab: (
     repoId: string,
     branch: string,
@@ -63,8 +63,8 @@ export function createPrimaryWindowNavigationActions({
       const repoId = nextNavigationRepoId(order, currentRepoId, direction)
       if (repoId) routeNavigation.openRepoDashboard(repoId)
     },
-    selectRepoBranch(repoId, branch) {
-      routeNavigation.openRepoBranch(repoId, branch)
+    selectRepoBranch(repoId, branch, options) {
+      routeNavigation.openRepoBranch(repoId, branch, options)
     },
     showRepoBranchWorkspacePaneTab(repoId, branch, tab, options) {
       if (workspacePaneTabInteractionBlockedForBranch(repoId, branch)) return

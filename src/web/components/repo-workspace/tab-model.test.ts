@@ -457,6 +457,24 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab).toBeNull()
   })
 
+  test('keeps bare branch routes on the empty workspace pane', () => {
+    const model = createModel({
+      repoId: REPO_ID,
+      branchName: 'feature/model',
+      worktreePath: WORKTREE_PATH,
+      preferredTab: null,
+      tabEntries: [staticEntry('status')],
+      runtimeTabViews: [],
+      terminalProjectionPhase: 'ready',
+      selectedTerminalSessionId: null,
+    })
+
+    expect(model.tabs.map((tab) => tab.identity)).toEqual(['workspace-pane:status'])
+    expect(model.selection).toBeNull()
+    expect(model.renderedTab).toBeNull()
+    expect(model.activeTab).toBeNull()
+  })
+
   test('falls back to tabs[0] for server-side exits', () => {
     // The last terminal exits externally through the server workspace tab list,
     // so the model uses the generic tabs[0] fallback.

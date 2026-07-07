@@ -6,7 +6,7 @@ import type {
 } from '#/web/components/repo-workspace/tab-model.ts'
 
 export type WorkspacePaneRouteReconciliation =
-  { kind: 'none' } | { kind: 'pending' } | { kind: 'replace'; route: RepoBranchWorkspacePaneRoute }
+  { kind: 'none' } | { kind: 'pending' } | { kind: 'replace'; route: RepoBranchWorkspacePaneRoute | null }
 
 export type WorkspacePaneRouteHistoryResolution =
   { kind: 'defer' } | { kind: 'record'; route: RepoBranchWorkspacePaneRoute | null }
@@ -57,12 +57,11 @@ function replacementForRoute(
   route: RepoBranchWorkspacePaneRoute,
   model: RepoWorkspaceTabModel,
 ): WorkspacePaneRouteReconciliation {
-  const fallbackRoute = routeForMaterializedTab(model.activeTab) ??
-    routeForMaterializedTab(firstMaterializedTab(model.tabs)) ?? {
-      kind: 'static',
-      tab: 'status',
-    }
-  return workspacePaneRouteEquals(route, fallbackRoute) ? { kind: 'none' } : { kind: 'replace', route: fallbackRoute }
+  const fallbackRoute =
+    routeForMaterializedTab(model.activeTab) ?? routeForMaterializedTab(firstMaterializedTab(model.tabs))
+  return fallbackRoute && workspacePaneRouteEquals(route, fallbackRoute)
+    ? { kind: 'none' }
+    : { kind: 'replace', route: fallbackRoute }
 }
 
 function firstMaterializedTab(tabs: readonly RepoWorkspaceTab[]): RepoWorkspaceMaterializedTab | null {

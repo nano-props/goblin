@@ -298,6 +298,34 @@ describe('TerminalSessionProjection create flow', () => {
     })
   })
 
+  test('marks create pending before resolving an async startup shell command', async () => {
+    const startupCommand = Promise.withResolvers<string>()
+    const create = projection.createTerminal(terminalBase(), {
+      resolveStartupShellCommand: async () => await startupCommand.promise,
+    })
+
+    await vi.waitFor(() => {
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
+    })
+    expect(mocks.createMock).not.toHaveBeenCalled()
+
+    startupCommand.resolve("bat '/repo/README.md'\r")
+    await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
+
+    await expect(create).resolves.toBe('session-1')
+    expect(mocks.createMock).toHaveBeenCalledWith({
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
+      branch: BRANCH,
+      worktreePath: WORKTREE_PATH,
+      kind: 'additional',
+      startupShellCommand: "bat '/repo/README.md'\r",
+      cols: 80,
+      rows: 24,
+      clientId: 'client_local',
+    })
+  })
+
   test('deduplicates identical in-flight creates for the same worktree', async () => {
     const first = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
     mocks.createMock.mockReset()

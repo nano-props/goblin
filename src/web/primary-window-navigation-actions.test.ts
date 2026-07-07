@@ -18,6 +18,20 @@ beforeEach(() => {
 })
 
 describe('createPrimaryWindowNavigationActions', () => {
+  test('opens bare branch routes through route navigation', () => {
+    const navigation = routeNavigation()
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: '/tmp/repo-a',
+      order: ['/tmp/repo-a', '/tmp/repo-b'],
+      closeRepo: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    actions.selectRepoBranch('/tmp/repo-b', 'feature/test', { replace: true })
+
+    expect(navigation.openRepoBranch).toHaveBeenCalledWith('/tmp/repo-b', 'feature/test', { replace: true })
+  })
+
   test('opens branch workspace static tabs through route navigation', () => {
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
@@ -228,6 +242,32 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(navigation.openRepoNewWorktree).toHaveBeenCalledWith('/tmp/repo-a', {
       returnTo: '/repo/repo-a/branch/main',
     })
+  })
+
+  test('restores a saved bare branch workspace history entry', () => {
+    const navigation = routeNavigation()
+    const goBackInWorkspaceNavigation = vi.fn(() => ({
+      repoId: '/tmp/repo-a',
+      route: {
+        kind: 'branch' as const,
+        branchName: 'feature/test',
+        workspacePaneTab: null,
+        terminalWorktreeKey: null,
+        terminalSessionId: null,
+      },
+    }))
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: '/tmp/repo-a',
+      order: ['/tmp/repo-a'],
+      closeRepo: vi.fn(),
+      goBackInWorkspaceNavigation,
+      routeNavigation: navigation,
+    })
+
+    actions.goBack('/tmp/repo-a')
+
+    expect(goBackInWorkspaceNavigation).toHaveBeenCalledWith('/tmp/repo-a')
+    expect(navigation.openRepoBranch).toHaveBeenCalledWith('/tmp/repo-a', 'feature/test')
   })
 
   test('does not open create worktree without a current repo', () => {

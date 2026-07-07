@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react'
+import { useRouter } from '@tanstack/react-router'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -27,30 +28,77 @@ interface WorkspaceNavigationHistoryOptions {
   replaceCurrent?: boolean
 }
 
+type WorkspaceNavigationBrowserHistoryTraversal = 'back' | 'forward'
+type WorkspaceNavigationBrowserHistoryAction =
+  | { href: string; type: 'BACK' | 'FORWARD' | 'PUSH' | 'REPLACE' }
+  | { href: string; type: 'GO'; index: number }
+
+interface WorkspaceNavigationRouterHistory {
+  state: { location: { href: string } }
+  history: {
+    subscribe: (
+      cb: (event: {
+        location: { href: string }
+        action:
+          | { type: 'BACK' | 'FORWARD' | 'PUSH' | 'REPLACE' }
+          | { type: 'GO'; index: number }
+      }) => void,
+    ) => () => void
+  }
+}
+
 let restoreRecordingSuppressed = false
 let restoreRecordingSuppressionTimer: ReturnType<typeof setTimeout> | null = null
+// Router history event metadata. It is not part of terminal create/focus
+// logic; it lets the route/history adapter preserve the app history cursor
+// when the browser lands on a URL through Back/Forward instead of an
+// app-initiated PUSH.
+let browserHistoryAction: WorkspaceNavigationBrowserHistoryAction | null = null
 
 export function useWorkspaceNavigationHistory({
   routeContext,
   replaceCurrent = false,
 }: WorkspaceNavigationHistoryOptions): void {
   const entry = useWorkspaceNavigationHistoryEntry(routeContext)
+  const router = useRouter({ warn: false }) as WorkspaceNavigationRouterHistory | null
+  const routeHref = router?.state.location.href ?? currentBrowserLocationHref()
   const recordWorkspaceNavigation = useReposStore((s) => s.recordWorkspaceNavigation)
+
+  useEffect(
+    () => {
+      if (!router) return
+      return router.history.subscribe(({ location, action }) => {
+        browserHistoryAction =
+          action.type === 'GO'
+            ? { href: location.href, type: 'GO', index: action.index }
+            : { href: location.href, type: action.type }
+      })
+    },
+    [router],
+  )
 
   useEffect(() => {
     if (!entry) return
+    const browserHistoryTraversal = replaceCurrent
+      ? null
+      : workspaceNavigationBrowserHistoryTraversal(routeHref)
     if (restoreRecordingSuppressed) {
       if (replaceCurrent) {
         recordWorkspaceNavigation(entry, { replace: true })
+        clearBrowserHistoryAction(routeHref)
         clearRestoreRecordingSuppression()
         return
       }
       const historyCurrent = useReposStore.getState().navigationHistoryByRepo[entry.repoId]?.current ?? null
-      if (workspaceNavigationHistoryEntryEqual(historyCurrent, entry)) clearRestoreRecordingSuppression()
+      if (workspaceNavigationHistoryEntryEqual(historyCurrent, entry)) {
+        clearBrowserHistoryAction(routeHref)
+        clearRestoreRecordingSuppression()
+      }
       return
     }
-    recordWorkspaceNavigation(entry)
-  }, [entry, recordWorkspaceNavigation, replaceCurrent])
+    recordWorkspaceNavigation(entry, browserHistoryTraversal ? { browserHistoryTraversal } : undefined)
+    clearBrowserHistoryAction(routeHref)
+  }, [entry, recordWorkspaceNavigation, replaceCurrent, routeHref])
 }
 
 function useWorkspaceNavigationHistoryEntry(
@@ -105,8 +153,8 @@ function workspaceNavigationHistoryRouteSnapshotFromContext({
       const worktreePath = routeContext.worktreePath ?? branch?.worktree?.path ?? null
       const terminalWorktreeKey = worktreePath ? formatTerminalWorktreeKey(repoId, worktreePath) : null
       const route = routeContext.workspacePaneRoute ?? null
-      const workspacePaneTab: WorkspacePaneTabType =
-        route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : 'status'
+      const workspacePaneTab: WorkspacePaneTabType | null =
+        route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null
       return {
         repoId,
         kind: 'branch',
@@ -181,6 +229,10 @@ export function restoreWorkspaceNavigationEntry(
         routeNavigation.openRepoBranchTerminal(entry.repoId, entry.route.branchName, entry.route.terminalSessionId)
         return
       }
+      if (!entry.route.workspacePaneTab) {
+        routeNavigation.openRepoBranch(entry.repoId, entry.route.branchName)
+        return
+      }
       routeNavigation.openRepoBranchTab(
         entry.repoId,
         entry.route.branchName,
@@ -222,4 +274,25 @@ function clearRestoreRecordingSuppression(): void {
   if (restoreRecordingSuppressionTimer === null) return
   clearTimeout(restoreRecordingSuppressionTimer)
   restoreRecordingSuppressionTimer = null
+}
+
+function workspaceNavigationBrowserHistoryTraversal(routeHref: string): WorkspaceNavigationBrowserHistoryTraversal | null {
+  const action = browserHistoryAction
+  if (!action || action.href !== routeHref) return null
+  if (action.type === 'BACK') return 'back'
+  if (action.type === 'FORWARD') return 'forward'
+  if (action.type === 'GO') {
+    if (action.index < 0) return 'back'
+    if (action.index > 0) return 'forward'
+  }
+  return null
+}
+
+function clearBrowserHistoryAction(routeHref: string): void {
+  if (browserHistoryAction?.href === routeHref) browserHistoryAction = null
+}
+
+function currentBrowserLocationHref(): string {
+  if (typeof window === 'undefined') return ''
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`
 }
