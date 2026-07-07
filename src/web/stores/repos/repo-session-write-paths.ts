@@ -2,7 +2,7 @@ import { lastPathSegment } from '#/web/lib/paths.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import {
   restoreRepoProjectionFromCacheEntry,
-  seedRepoSnapshotQueryFromCacheEntry,
+  seedRepoProjectionQueryFromCacheEntry,
 } from '#/web/stores/repos/persistence.ts'
 import { disposeRepoOperationScheduler } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
@@ -223,7 +223,7 @@ function buildNewRepo(
   const cached = s.repoSnapshotCache[id]
   const hint = nameHints.find((value): value is string => !!value)
   const name = hint ?? cached?.name ?? lastPathSegment(id)
-  seedRepoSnapshotQueryFromCacheEntry(id, instanceId, cached)
+  seedRepoProjectionQueryFromCacheEntry(id, instanceId, cached)
   const repo = restoreRepoProjectionFromCacheEntry(emptyRepo(id, name, instanceId), cached)
   return hint ? { ...repo, name: hint } : repo
 }

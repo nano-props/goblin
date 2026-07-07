@@ -4,7 +4,7 @@ import type { ReposSet } from '#/web/stores/repos/types.ts'
 import type { RepoSnapshotCacheEntry, RepoState } from '#/web/stores/repos/types.ts'
 import { finishDataLoadSuccess } from '#/web/stores/repos/repo-data-load-state.ts'
 import { stripBranchWorktreeMetadata } from '#/web/stores/repos/worktree-state.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { seedRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection, type RepoBranchSnapshotData } from '#/web/repo-branch-read-model.ts'
 const MAX_CACHE_AGE_MS = 14 * 24 * 60 * 60 * 1000
 const MAX_REPOS = 50
@@ -78,15 +78,30 @@ export function restoreRepoProjectionFromCacheEntry(
   return restoreProjectionFromSnapshot(repo, snapshot)
 }
 
-export function seedRepoSnapshotQueryFromCacheEntry(
+export function seedRepoProjectionQueryFromCacheEntry(
   repoRoot: string,
   repoInstanceId: string,
   snapshot: RepoSnapshotCacheEntry | undefined,
 ): void {
   if (!snapshot || isExpired(snapshot.savedAt)) return
-  setRepoSnapshotQueryData(repoRoot, repoInstanceId, {
+  const cachedSnapshot = {
     branches: cachedBranches(snapshot.data.branches),
     current: snapshot.data.currentBranch,
+  }
+  const cachedProjection = {
+    snapshot: cachedSnapshot,
+    status: [],
+    pullRequests: null,
+    operations: { operations: [], loadedAt: 0 },
+    loadedAt: 0,
+  }
+  seedRepoProjectionQueryData(repoRoot, repoInstanceId, {
+    ...cachedProjection,
+    requested: { branch: null, pullRequestMode: 'full' },
+  })
+  seedRepoProjectionQueryData(repoRoot, repoInstanceId, {
+    ...cachedProjection,
+    requested: { branch: null, pullRequestMode: 'summary' },
   })
 }
 

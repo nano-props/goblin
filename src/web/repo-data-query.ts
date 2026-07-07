@@ -271,6 +271,20 @@ export function setRepoProjectionQueryData(
   setRepoOperationsQueryData(repoRoot, repoInstanceId, false, projection.operations, queryClient)
 }
 
+export function seedRepoProjectionQueryData(
+  repoRoot: string,
+  repoInstanceId: string,
+  projection: RepoRuntimeProjection,
+  queryClient: QueryClient = primaryWindowQueryClient,
+): void {
+  // Cache/session restore seed data is a UI placeholder, not an authoritative
+  // section read, so do not backfill snapshot/status section caches here.
+  queryClient.setQueryData(
+    repoProjectionQueryKey(repoRoot, repoInstanceId, projection.requested.branch, projection.requested.pullRequestMode),
+    projection,
+  )
+}
+
 export function invalidateRepoDataQueries(
   repoRoot: string,
   repoInstanceId: string,

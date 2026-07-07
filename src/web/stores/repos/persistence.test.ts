@@ -3,7 +3,7 @@ import {
   restoreRepoProjectionFromCacheEntry,
   normalizeRepoSnapshotCache,
   persistRepoSnapshotCacheEntry,
-  seedRepoSnapshotQueryFromCacheEntry,
+  seedRepoProjectionQueryFromCacheEntry,
 } from '#/web/stores/repos/persistence.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import {
@@ -15,8 +15,7 @@ import {
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoSnapshotCacheEntry } from '#/web/stores/repos/types.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { repoSnapshotQueryKey, repoStatusQueryKey, setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
-import type { RepoSnapshot } from '#/shared/api-types.ts'
+import { getRepoProjectionQueryData, repoStatusQueryKey, setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
 function cachedRepo(savedAt: number): RepoSnapshotCacheEntry {
   return {
@@ -172,7 +171,7 @@ describe('restoreRepoProjectionFromCacheEntry', () => {
     expect(repo.projection).toEqual({ source: 'cache', savedAt: now })
   })
 
-  test('seeds cached branch references without inventing status query data', () => {
+  test('seeds cached branch references as projection without inventing status query data', () => {
     const now = Date.now()
     const cached = cachedRepo(now)
     cached.data.currentBranch = 'feature/a'
@@ -189,14 +188,16 @@ describe('restoreRepoProjectionFromCacheEntry', () => {
       }),
     ]
 
-    seedRepoSnapshotQueryFromCacheEntry('/repo', 'repo-instance-test', cached)
+    seedRepoProjectionQueryFromCacheEntry('/repo', 'repo-instance-test', cached)
 
-    const snapshot = primaryWindowQueryClient.getQueryData<RepoSnapshot>(
-      repoSnapshotQueryKey('/repo', 'repo-instance-test'),
-    )
-    expect(snapshot?.current).toBe('feature/a')
-    expect(snapshot?.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
-    expect(snapshot?.branches[0]?.pullRequest).toBeUndefined()
+    const fullProjection = getRepoProjectionQueryData('/repo', 'repo-instance-test', null, 'full')
+    const summaryProjection = getRepoProjectionQueryData('/repo', 'repo-instance-test', null, 'summary')
+    expect(fullProjection?.snapshot?.current).toBe('feature/a')
+    expect(fullProjection?.snapshot?.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
+    expect(fullProjection?.snapshot?.branches[0]?.pullRequest).toBeUndefined()
+    expect(fullProjection?.status).toEqual([])
+    expect(summaryProjection?.snapshot).toEqual(fullProjection?.snapshot)
+    expect(summaryProjection?.status).toEqual([])
     expect(
       primaryWindowQueryClient.getQueryData<WorktreeStatus[]>(repoStatusQueryKey('/repo', 'repo-instance-test')),
     ).toBeUndefined()
