@@ -4,8 +4,8 @@ import {
   workspacePanePendingRuntimeTabIdentity,
   workspacePaneRuntimeTabSummaryIdentity,
   workspacePaneRuntimeTabSummarySessionId,
-} from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
-import type { WorkspacePaneTabSummary } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
+} from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
+import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 
 const terminalView: WorkspacePaneTabSummary = {
   type: 'terminal',

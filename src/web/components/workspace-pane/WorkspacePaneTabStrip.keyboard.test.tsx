@@ -2,7 +2,7 @@
 
 import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { terminalWorkspacePaneTabProvider } from '#/web/components/workspace-pane/tab-providers.ts'
+import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import {
   createRuntimeWorkspacePaneTabItem,
   isRuntimeWorkspacePaneTabItem,

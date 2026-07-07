@@ -12,7 +12,7 @@ import {
   isRuntimeWorkspacePaneTabItem,
   type WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
-import { terminalWorkspacePaneTabProvider } from '#/web/components/workspace-pane/tab-providers.ts'
+import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionSummary } from '#/web/components/terminal/types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'

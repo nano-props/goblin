@@ -1,5 +1,5 @@
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneRuntimeTabSummary } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
+import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 
 export interface WorkspacePaneRuntimeTabActionContext {
   enterRuntimeTab: (type: WorkspacePaneRuntimeTabType) => void

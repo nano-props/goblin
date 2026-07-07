@@ -9,16 +9,16 @@ import type {
 import {
   workspacePaneRuntimeTabProvider,
   workspacePaneStaticTabProvider,
-} from '#/web/components/workspace-pane/tab-providers.ts'
-import type { WorkspacePaneRuntimeTabAttention } from '#/web/components/workspace-pane/tab-providers.ts'
+} from '#/web/workspace-pane/tab-providers.ts'
+import type { WorkspacePaneRuntimeTabAttention } from '#/web/workspace-pane/tab-providers.ts'
 import type {
   WorkspacePaneRuntimeTabSummary,
-} from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
+} from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import {
   workspacePanePendingRuntimeTabIdentity,
   workspacePaneRuntimeTabSummaryIdentity,
   workspacePaneRuntimeTabSummarySessionId,
-} from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
+} from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 
 type WorkspacePaneTabKind = 'static' | 'runtime' | 'pending'
 

@@ -17,18 +17,18 @@ import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/w
 import type {
   WorkspacePaneRuntimeTabSummary,
   WorkspacePaneTabSummary,
-} from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
+} from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import {
   workspacePanePendingRuntimeTabIdentity,
   workspacePaneRuntimeTabSummaryIdentity,
   workspacePaneRuntimeTabSummarySessionId,
-} from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
+} from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import { normalizeWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import {
   type WorkspacePaneRuntimeTabAvailabilityByType,
   workspacePaneStaticTabProvider,
   workspacePaneTabProvider,
-} from '#/web/components/workspace-pane/tab-providers.ts'
+} from '#/web/workspace-pane/tab-providers.ts'
 import { workspacePaneRuntimeTabTargetKey } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-key.ts'
 import {
   workspacePaneRuntimeTabTargetKeyByType,

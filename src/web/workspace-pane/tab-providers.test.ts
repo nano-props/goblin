@@ -11,8 +11,8 @@ import {
   workspacePaneStaticTabProvider,
   workspacePaneTabProviders,
   workspacePaneTabProvider,
-} from '#/web/components/workspace-pane/tab-providers.ts'
-import type { WorkspacePaneTabSummary } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
+} from '#/web/workspace-pane/tab-providers.ts'
+import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import {
   WORKSPACE_PANE_BRANCH_TAB_TYPES,
   WORKSPACE_PANE_STATIC_TAB_IDS,

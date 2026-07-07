@@ -16,7 +16,7 @@ import {
   workspacePaneTabsForTargetFromQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { useWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-target-projection.ts'
-import { createRepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
+import { createRepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { useRepoProjectionReadModel } from '#/web/repo-data-query.ts'
 
 export { isRepoVisibleProjectionRefreshable }

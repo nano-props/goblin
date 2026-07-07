@@ -3,7 +3,7 @@ import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/refresh-
 import { hasFreshRepoInstance, repoInstanceHandle } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabProvider } from '#/web/components/workspace-pane/tab-providers.ts'
+import { workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import { updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
