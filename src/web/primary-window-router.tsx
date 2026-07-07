@@ -56,18 +56,6 @@ const repoBranchIndexRoute = createRoute({
 const repoBranchTabRoute = createRoute({
   getParentRoute: () => repoBranchRoute,
   path: 'tab/$tabKey',
-  beforeLoad: ({ params }) => {
-    if (!isWorkspacePaneStaticTabType(params.tabKey)) {
-      throw redirect({
-        to: '/repo/$repoSlug/branch/$branchSlug',
-        params: {
-          repoSlug: params.repoSlug,
-          branchSlug: params.branchSlug,
-        },
-        replace: true,
-      })
-    }
-  },
 })
 
 const repoBranchTerminalRoute = createRoute({
@@ -185,7 +173,7 @@ export function repoRouteViewFromChildRoute(
         branchName,
         workspacePaneRoute: isWorkspacePaneStaticTabType(childRoute.tabKey)
           ? { kind: 'static', tab: childRoute.tabKey }
-          : { kind: 'static', tab: 'status' },
+          : { kind: 'invalid-static', tabKey: childRoute.tabKey },
       }
     }
     return { kind: 'branch', repoId, branchName, workspacePaneRoute: null }

@@ -18,7 +18,11 @@ import type {
   WorkspacePaneTabEntry,
   WorkspacePaneTabType,
 } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
+import {
+  isWorkspacePaneStaticTabType,
+  workspacePaneStaticTabEntry,
+  workspacePaneRuntimeTabEntry,
+} from '#/shared/workspace-pane.ts'
 import type {
   TerminalSessionContextValue,
   TerminalSessionReadContextValue,
@@ -33,6 +37,7 @@ import {
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import {
   createRepoBranch,
@@ -121,10 +126,10 @@ function defaultRuntimeExternalAppSettings() {
 type RepoWorkspaceToolbarHarnessProps = Omit<
   ComponentProps<typeof RepoWorkspaceToolbar>,
   'workspacePaneTabModel' | 'branchActions'
->
+> & { workspacePaneRoute: RepoBranchWorkspacePaneRoute | null }
 
 function RepoWorkspaceToolbarHarness(props: RepoWorkspaceToolbarHarnessProps) {
-  const workspacePaneTabModel = useRepoWorkspaceTabModel(props.repo, props.detail)
+  const workspacePaneTabModel = useRepoWorkspaceTabModel(props.repo, props.detail, props.workspacePaneRoute)
   const branchActions = useBranchActions(props.repo, props.detail.branch!)
   return <RepoWorkspaceToolbar {...props} workspacePaneTabModel={workspacePaneTabModel} branchActions={branchActions} />
 }
@@ -1262,6 +1267,8 @@ function renderToolbar(options: {
     hasBell: false,
     hasRecentOutput: false,
   }))
+  const preferredWorkspacePaneTab = options.preferredWorkspacePaneTab ?? 'status'
+  const workspacePaneRoute = workspacePaneRouteForPreferredTab(preferredWorkspacePaneTab, sessions)
   const selectedDescriptor: TerminalDescriptor | null = sessions[0]
     ? {
         terminalSessionId: sessions[0].terminalSessionId,
@@ -1359,6 +1366,7 @@ function renderToolbar(options: {
               repo={repoWorkspaceRepo(repo)}
               detail={detail}
               workspacePaneId="workspace"
+              workspacePaneRoute={workspacePaneRoute}
               trafficLightOffset={options.trafficLightOffset}
             />
           </TerminalSessionReadContext>
@@ -1389,6 +1397,16 @@ function renderToolbar(options: {
       showRepoBranchTerminalSession,
     },
   }
+}
+
+function workspacePaneRouteForPreferredTab(
+  preferredTab: WorkspacePaneTabType,
+  sessions: readonly TerminalSessionSummary[],
+): RepoBranchWorkspacePaneRoute | null {
+  if (preferredTab === 'terminal') {
+    return { kind: 'terminal', terminalSessionId: sessions[0]?.terminalSessionId ?? 'pending-terminal' }
+  }
+  return isWorkspacePaneStaticTabType(preferredTab) ? { kind: 'static', tab: preferredTab } : null
 }
 
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {

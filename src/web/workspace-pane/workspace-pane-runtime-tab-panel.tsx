@@ -27,6 +27,7 @@ export interface WorkspacePaneRuntimeTabPanelRenderInput {
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
   target: WorkspacePaneRuntimeTabPanelTarget
+  selectedSessionId: string | null
   runtimeState: WorkspacePaneRuntimeTabPanelState
 }
 
@@ -51,6 +52,7 @@ export function renderWorkspacePaneRuntimeTabPanel(input: WorkspacePaneRuntimeTa
       workspacePaneId={input.workspacePaneId}
       panelLabel={input.panelLabel}
       target={input.target}
+      selectedSessionId={input.selectedSessionId}
       runtimeState={input.runtimeState}
     />
   )
@@ -60,6 +62,7 @@ function TerminalWorkspacePaneRuntimeTabPanel({
   workspacePaneId,
   panelLabel,
   target,
+  selectedSessionId,
   runtimeState,
 }: WorkspacePaneRuntimeTabPanelProps) {
   const t = useT()
@@ -89,6 +92,7 @@ function TerminalWorkspacePaneRuntimeTabPanel({
         repoInstanceId={target.repoInstanceId}
         branch={target.branchName}
         worktreePath={target.worktreePath}
+        selectedTerminalSessionId={selectedSessionId}
         projectionPhase={runtimeState.projectionPhase}
         projectionErrorMessage={runtimeState.projectionErrorMessage}
         createTerminalForSlot={createTerminalForSlot}

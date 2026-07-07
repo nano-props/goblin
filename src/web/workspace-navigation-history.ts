@@ -20,7 +20,7 @@ export type WorkspaceNavigationRouteContext =
       repoId: string
       branchName: string
       worktreePath?: string | null
-      workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
+      workspacePaneRoute: RepoBranchWorkspacePaneRoute | null
     }
 
 interface WorkspaceNavigationHistoryOptions {
@@ -172,7 +172,7 @@ function workspaceNavigationHistoryRouteSnapshotFromContext({
       const branch = branchModel?.branches.find((candidate) => candidate.name === routeContext.branchName)
       const worktreePath = routeContext.worktreePath ?? branch?.worktree?.path ?? null
       const terminalWorktreeKey = worktreePath ? formatTerminalWorktreeKey(repoId, worktreePath) : null
-      const route = routeContext.workspacePaneRoute ?? null
+      const route = routeContext.workspacePaneRoute
       const workspacePaneTab: WorkspacePaneTabType | null =
         route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : null
       return {

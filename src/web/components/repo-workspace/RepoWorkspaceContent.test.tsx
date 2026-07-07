@@ -13,6 +13,7 @@ import type { BranchCopyPatchAction } from '#/web/hooks/branch-action-state.ts'
 import {
   TerminalSessionContext,
   TerminalSessionReadContext,
+  useTerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type {
   TerminalSessionContextValue,
@@ -31,8 +32,15 @@ import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticTabType, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import {
+  isWorkspacePaneStaticTabType,
+  workspacePaneStaticTabEntry,
+  workspacePaneRuntimeTabEntry,
+} from '#/shared/workspace-pane.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import {
   PrimaryWindowNavigationProvider,
@@ -70,8 +78,39 @@ function RepoWorkspaceContentHarness(props: RepoWorkspaceContentHarnessProps) {
 }
 
 function RepoWorkspaceContentInner(props: RepoWorkspaceContentHarnessProps) {
-  const workspacePaneTabModel = useRepoWorkspaceTabModel(props.repo, props.detail)
+  const workspacePaneRoute = useHarnessWorkspacePaneRoute(props)
+  const workspacePaneTabModel = useRepoWorkspaceTabModel(props.repo, props.detail, workspacePaneRoute)
   return <RepoWorkspaceContent {...props} workspacePaneTabModel={workspacePaneTabModel} />
+}
+
+function useHarnessWorkspacePaneRoute(props: RepoWorkspaceContentHarnessProps): RepoBranchWorkspacePaneRoute | null {
+  const branch = props.detail.branch
+  const preferredTab = preferredWorkspacePaneTabForTarget(
+    props.repo.ui,
+    branch ? { repoRoot: props.repo.id, branchName: branch.name, worktreePath: branch.worktree?.path ?? null } : null,
+  )
+  const readContext = useTerminalSessionReadContext()
+  if (preferredTab === 'terminal') {
+    const terminalWorktreeKey = branch?.worktree?.path
+      ? formatTerminalWorktreeKey(props.repo.id, branch.worktree.path)
+      : null
+    const terminalWorktreeSnapshot = terminalWorktreeKey
+      ? readContext.terminalWorktreeSnapshot(terminalWorktreeKey)
+      : null
+    return {
+      kind: 'terminal',
+      terminalSessionId:
+        terminalWorktreeSnapshot?.selectedDescriptor?.terminalSessionId ??
+        terminalWorktreeSnapshot?.sessions.find((session) => session.selected)?.terminalSessionId ??
+        terminalWorktreeSnapshot?.sessions[0]?.terminalSessionId ??
+        'pending-terminal',
+    }
+  }
+  return workspacePaneRouteForStaticPreferredTab(preferredTab)
+}
+
+function workspacePaneRouteForStaticPreferredTab(tab: WorkspacePaneTabType): RepoBranchWorkspacePaneRoute | null {
+  return isWorkspacePaneStaticTabType(tab) ? { kind: 'static', tab } : null
 }
 
 function repoWorkspaceRepo(repo: RepoState): RepoWorkspaceRepo {
@@ -876,7 +915,9 @@ describe('RepoWorkspaceContent', () => {
         insertAfterIdentity: 'workspace-pane:files',
       },
     )
-    expect(resolvedStartupShellCommand).toBe("bat --paging=never --style=plain '/tmp/filetree-open-worktree/README.md'\r")
+    expect(resolvedStartupShellCommand).toBe(
+      "bat --paging=never --style=plain '/tmp/filetree-open-worktree/README.md'\r",
+    )
     expect(writeInput).not.toHaveBeenCalled()
 
     // Chrome-tab-style opener tracking: the terminal this opened should be
@@ -1043,12 +1084,14 @@ const emptyWorktreeSnapshot: TerminalWorktreeSnapshot = {
   createPending: false,
 }
 
+const emptyTerminalSnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
+
 const emptyTerminalReadContext: TerminalSessionReadContextValue = {
   terminalWorktreeSnapshot: () => emptyWorktreeSnapshot,
   subscribeTerminalWorktree: () => () => {},
   repoBellCount: () => 0,
   subscribeRepoBellCount: () => () => {},
-  snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
+  snapshot: () => emptyTerminalSnapshot,
   subscribeSnapshot: () => () => {},
 }
 

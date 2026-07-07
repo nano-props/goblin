@@ -25,7 +25,10 @@ import {
   captureTerminalHostGeometry,
   resolveTerminalStartupGeometryHint,
 } from '#/web/components/terminal/terminal-session-geometry.ts'
-import { TerminalSessionLifecycleQueues } from '#/web/components/terminal/terminal-session-lifecycle-queues.ts'
+import {
+  TerminalSessionLifecycleQueues,
+  type TerminalCreateQueueEntry,
+} from '#/web/components/terminal/terminal-session-lifecycle-queues.ts'
 import { DEFAULT_TERMINAL_COLS, DEFAULT_TERMINAL_ROWS } from '#/web/components/terminal/terminal-geometry.ts'
 import {
   countOrphanedTerminalSessionIds,
@@ -492,7 +495,8 @@ export class TerminalSessionProjection {
   private async performCreateTerminal(
     base: TerminalSessionBase,
     geometry: { cols: number; rows: number },
-    request: TerminalCreateQueueRequest,
+    terminalWorktreeKey: string,
+    pending: TerminalCreateQueueEntry<TerminalSessionBase, TerminalCreateQueueRequest>,
   ): Promise<string> {
     const repoInstanceId = requireRepoInstanceId(base)
     return await runWorkspacePaneTabsOperation(
@@ -502,29 +506,33 @@ export class TerminalSessionProjection {
         branchName: base.branch,
         worktreePath: base.worktreePath,
       },
-      async () => await this.performCreateTerminalNow(base, geometry, request),
+      async () => await this.performCreateTerminalNow(base, geometry, terminalWorktreeKey, pending),
     )
   }
 
   private async performCreateTerminalNow(
     base: TerminalSessionBase,
     geometry: { cols: number; rows: number },
-    request: TerminalCreateQueueRequest,
+    terminalWorktreeKey: string,
+    pending: TerminalCreateQueueEntry<TerminalSessionBase, TerminalCreateQueueRequest>,
   ): Promise<string> {
+    this.requireCurrentCreateRequest(terminalWorktreeKey, pending)
+    const request = pending.options
     if (request.owner && !request.owner.isFresh()) {
       throw new Error('terminal create request canceled')
     }
     const createOptions = await resolveTerminalCreateOptions(request.createOptions)
+    this.requireCurrentCreateRequest(terminalWorktreeKey, pending)
     if (request.owner && !request.owner.isFresh()) {
       throw new Error('terminal create request canceled')
     }
     const clientId = readOrCreateWebTerminalClientId()
-    const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
     const createKind = createOptions.startupShellCommand
       ? 'additional'
       : this.visibleSessionsForWorktree(terminalWorktreeKey).length === 0
         ? 'primary'
         : 'additional'
+    pending.creating = true
     const result = await terminalClient.create({
       repoRoot: base.repoRoot,
       repoInstanceId: requireRepoInstanceId(base),
@@ -548,6 +556,10 @@ export class TerminalSessionProjection {
     ) {
       throw new Error('error.terminal-create-failed')
     }
+    if (this.lifecycleQueues.getCreate(terminalWorktreeKey) !== pending) {
+      await this.disposeStaleCreateResult(result.terminalSessionId, result.terminalRuntimeSessionId)
+      throw new Error('terminal create request canceled')
+    }
     if (request.owner && !request.owner.isFresh()) {
       await this.disposeStaleCreateResult(result.terminalSessionId, result.terminalRuntimeSessionId)
       throw new Error('terminal create request canceled')
@@ -562,6 +574,15 @@ export class TerminalSessionProjection {
       projectedCreate.snapshotByTerminalRuntimeSessionId,
     )
     return result.terminalSessionId
+  }
+
+  private requireCurrentCreateRequest(
+    terminalWorktreeKey: string,
+    pending: TerminalCreateQueueEntry<TerminalSessionBase, TerminalCreateQueueRequest>,
+  ): void {
+    if (this.lifecycleQueues.getCreate(terminalWorktreeKey) !== pending) {
+      throw new Error('terminal create request canceled')
+    }
   }
 
   private startupGeometryHint(terminalWorktreeKey: string): { cols: number; rows: number } {
@@ -614,8 +635,7 @@ export class TerminalSessionProjection {
       if (this.lifecycleQueues.getCreate(terminalWorktreeKey) !== pending) {
         throw new Error('terminal create request canceled')
       }
-      pending.creating = true
-      pending.resolve(await this.performCreateTerminal(pending.base, geometry, pending.options))
+      pending.resolve(await this.performCreateTerminal(pending.base, geometry, terminalWorktreeKey, pending))
     } catch (error) {
       pending.reject(error)
     } finally {

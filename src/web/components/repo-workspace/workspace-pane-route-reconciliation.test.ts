@@ -71,6 +71,23 @@ describe('workspace pane route reconciliation', () => {
     expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'pending' })
   })
 
+  test('keeps a static route while tab-entry projection has failed', () => {
+    const model = createRepoWorkspaceTabModel({
+      repoId: REPO_ID,
+      branchName: 'feature/route',
+      worktreePath: WORKTREE_PATH,
+      preferredTab: 'history',
+      tabEntries: [],
+      tabEntriesProjectionPhase: 'failed',
+      runtimeTabViews: [],
+      runtimeTabStateByType: {
+        terminal: { projectionPhase: 'ready' },
+      },
+    })
+
+    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'none' })
+  })
+
   test('waits for terminal creation before replacing a missing routed static tab', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
@@ -103,6 +120,26 @@ describe('workspace pane route reconciliation', () => {
     })
 
     expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'changes' }, model)).toEqual({
+      kind: 'replace',
+      route: { kind: 'static', tab: 'status' },
+    })
+  })
+
+  test('replaces an invalid static route through the same canonical route path', () => {
+    const model = createRepoWorkspaceTabModel({
+      repoId: REPO_ID,
+      branchName: 'feature/route',
+      worktreePath: null,
+      preferredTab: null,
+      tabEntries: [workspacePaneStaticTabEntry('status')],
+      tabEntriesProjectionPhase: 'ready',
+      runtimeTabViews: [],
+      runtimeTabStateByType: {
+        terminal: { projectionPhase: 'ready' },
+      },
+    })
+
+    expect(reconcileWorkspacePaneRoute({ kind: 'invalid-static', tabKey: 'not-a-tab' }, model)).toEqual({
       kind: 'replace',
       route: { kind: 'static', tab: 'status' },
     })

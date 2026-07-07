@@ -19,6 +19,7 @@ export function reconcileWorkspacePaneRoute(
   if (!route || !model.branchName) return { kind: 'none' }
   if (workspacePaneRouteReconciliationBlocked(model)) return { kind: 'pending' }
   if (route.kind === 'static') return reconcileStaticWorkspacePaneRoute(route, model)
+  if (route.kind === 'invalid-static') return reconcileInvalidWorkspacePaneRoute(route, model)
   return reconcileTerminalWorkspacePaneRoute(route, model)
 }
 
@@ -32,6 +33,7 @@ function reconcileStaticWorkspacePaneRoute(
 ): WorkspacePaneRouteReconciliation {
   if (model.tabs.some((tab) => tab.kind === 'static' && tab.type === route.tab)) return { kind: 'none' }
   if (model.tabEntriesProjectionPhase === 'pending') return { kind: 'pending' }
+  if (model.tabEntriesProjectionPhase === 'failed') return { kind: 'none' }
   return replacementForRoute(route, model)
 }
 
@@ -48,6 +50,14 @@ function reconcileTerminalWorkspacePaneRoute(
   }
   if (model.runtimeTabStateByType.terminal.projectionPhase === 'pending') return { kind: 'pending' }
   if (model.runtimeTabStateByType.terminal.projectionPhase === 'failed') return { kind: 'none' }
+  return replacementForRoute(route, model)
+}
+
+function reconcileInvalidWorkspacePaneRoute(
+  route: Extract<RepoBranchWorkspacePaneRoute, { kind: 'invalid-static' }>,
+  model: RepoWorkspaceTabModel,
+): WorkspacePaneRouteReconciliation {
+  if (model.tabEntriesProjectionPhase === 'pending') return { kind: 'pending' }
   return replacementForRoute(route, model)
 }
 
@@ -99,5 +109,6 @@ function workspacePaneRouteEquals(a: RepoBranchWorkspacePaneRoute, b: RepoBranch
   if (a.kind !== b.kind) return false
   if (a.kind === 'static' && b.kind === 'static') return a.tab === b.tab
   if (a.kind === 'terminal' && b.kind === 'terminal') return a.terminalSessionId === b.terminalSessionId
+  if (a.kind === 'invalid-static' && b.kind === 'invalid-static') return a.tabKey === b.tabKey
   return false
 }

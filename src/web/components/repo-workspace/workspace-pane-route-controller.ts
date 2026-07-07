@@ -18,7 +18,7 @@ export interface WorkspacePaneRouteControllerInput {
   repoId: string
   branchName: string | null
   worktreePath: string | null
-  route: RepoBranchWorkspacePaneRoute | null | undefined
+  route: RepoBranchWorkspacePaneRoute | null
   model: RepoWorkspaceTabModel
 }
 
@@ -35,7 +35,7 @@ export function useWorkspacePaneRouteController({
   model,
 }: WorkspacePaneRouteControllerInput): WorkspacePaneRouteReconciliation {
   const navigation = usePrimaryWindowNavigation()
-  const reconciliation = useMemo(() => reconcileWorkspacePaneRoute(route ?? null, model), [route, model])
+  const reconciliation = useMemo(() => reconcileWorkspacePaneRoute(route, model), [route, model])
 
   useWorkspacePaneNavigationHistory({
     repoId,
@@ -91,7 +91,7 @@ function useWorkspacePaneNavigationHistory({
   repoId: string
   branchName: string | null
   worktreePath: string | null
-  route: RepoBranchWorkspacePaneRoute | null | undefined
+  route: RepoBranchWorkspacePaneRoute | null
   reconciliation: WorkspacePaneRouteReconciliation
 }): void {
   const historyRoute = workspacePaneRouteHistoryResolution(route ?? null, reconciliation)
@@ -157,9 +157,13 @@ function applyWorkspacePaneRouteReconciliation({
     navigation.showRepoBranchWorkspacePaneTab(repoId, branchName, reconciliation.route.tab, { replace: true })
     return
   }
-  navigation.showRepoBranchTerminalSession(repoId, branchName, reconciliation.route.terminalSessionId, {
-    replace: true,
-  })
+  if (reconciliation.route.kind === 'terminal') {
+    navigation.showRepoBranchTerminalSession(repoId, branchName, reconciliation.route.terminalSessionId, {
+      replace: true,
+    })
+    return
+  }
+  navigation.selectRepoBranch(repoId, branchName, { replace: true })
 }
 
 function useSyncRoutedWorkspacePaneSelection({
@@ -172,7 +176,7 @@ function useSyncRoutedWorkspacePaneSelection({
   repoId: string
   branchName: string | null
   worktreePath: string | null
-  route: RepoBranchWorkspacePaneRoute | null | undefined
+  route: RepoBranchWorkspacePaneRoute | null
   reconciliation: WorkspacePaneRouteReconciliation
 }): void {
   const setWorkspacePaneTab = useReposStore((s) => s.setWorkspacePaneTab)
@@ -187,6 +191,7 @@ function useSyncRoutedWorkspacePaneSelection({
       branchName,
       worktreePath,
     }
+    if (route.kind === 'invalid-static') return
     const routeTab = route.kind === 'static' ? route.tab : 'terminal'
     if (preferredWorkspacePaneTabForTarget(repo.ui, target) !== routeTab) {
       setWorkspacePaneTab(repoId, branchName, routeTab)

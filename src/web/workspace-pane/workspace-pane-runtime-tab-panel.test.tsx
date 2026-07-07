@@ -20,6 +20,7 @@ interface CapturedTerminalSessionViewProps {
   repoInstanceId: string
   branch: string
   worktreePath: string
+  selectedTerminalSessionId?: string | null
   projectionPhase?: string
   projectionErrorMessage?: string
   createTerminalForSlot?: (base: TerminalSessionBase) => Promise<unknown>
@@ -62,6 +63,7 @@ describe('workspace pane runtime tab panel', () => {
       repoInstanceId: 'repo-instance-1',
       branch: 'main',
       worktreePath: '/repo-worktree',
+      selectedTerminalSessionId: 'session-1',
       projectionPhase: 'failed',
       projectionErrorMessage: 'boom',
     })
@@ -117,6 +119,7 @@ function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = 
             branchName: 'main',
             worktreePath: '/repo-worktree',
           },
+          selectedSessionId: 'session-1',
           runtimeState: {
             projectionPhase: 'failed',
             projectionErrorMessage: 'boom',

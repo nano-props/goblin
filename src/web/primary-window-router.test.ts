@@ -110,6 +110,19 @@ describe('repo route view derivation', () => {
       repoRouteViewFromChildRoute('/repo', {
         dashboard: false,
         branchSlug: 'ZmVhdHVyZS9h',
+        tabKey: 'not-a-tab',
+        newWorktree: false,
+      }),
+    ).toEqual({
+      kind: 'branch',
+      repoId: '/repo',
+      branchName: 'feature/a',
+      workspacePaneRoute: { kind: 'invalid-static', tabKey: 'not-a-tab' },
+    })
+    expect(
+      repoRouteViewFromChildRoute('/repo', {
+        dashboard: false,
+        branchSlug: 'ZmVhdHVyZS9h',
         terminalSessionId: 'session-1',
         newWorktree: false,
       }),

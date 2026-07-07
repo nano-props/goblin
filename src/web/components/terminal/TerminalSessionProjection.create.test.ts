@@ -326,6 +326,48 @@ describe('TerminalSessionProjection create flow', () => {
     })
   })
 
+  test('closeTerminalsForWorktree cancels create while async startup shell command is resolving', async () => {
+    const startupCommand = Promise.withResolvers<string>()
+    const create = projection.createTerminal(terminalBase(), {
+      resolveStartupShellCommand: async () => await startupCommand.promise,
+    })
+
+    await vi.waitFor(() => {
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
+    })
+    const createExpectation = expect(create).rejects.toThrow('terminal create request canceled')
+    const closePromise = projection.closeTerminalsForWorktree(terminalBase())
+
+    await createExpectation
+    await expect(closePromise).resolves.toBe(true)
+
+    startupCommand.resolve("bat '/repo/README.md'\r")
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(mocks.createMock).not.toHaveBeenCalled()
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
+  })
+
+  test('destroy cancels create while async startup shell command is resolving', async () => {
+    const startupCommand = Promise.withResolvers<string>()
+    const create = projection.createTerminal(terminalBase(), {
+      resolveStartupShellCommand: async () => await startupCommand.promise,
+    })
+
+    await vi.waitFor(() => {
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
+    })
+    const createExpectation = expect(create).rejects.toThrow('terminal session projection destroyed')
+    projection.destroy()
+    await createExpectation
+
+    startupCommand.resolve("bat '/repo/README.md'\r")
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(mocks.createMock).not.toHaveBeenCalled()
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
+  })
+
   test('deduplicates identical in-flight creates for the same worktree', async () => {
     const first = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
     mocks.createMock.mockReset()
@@ -559,6 +601,22 @@ describe('TerminalSessionProjection create flow', () => {
     await expectation
     expect((projection as any).lifecycleQueues.hasCreate(WORKTREE_KEY)).toBe(false)
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
+  })
+
+  test('destroy disposes a server create result that resolves after the queue entry is gone', async () => {
+    const { promise, resolve } = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
+    mocks.createMock.mockReturnValueOnce(promise)
+    const pending = projection.createTerminal(terminalBase())
+
+    await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
+    const expectation = expect(pending).rejects.toThrow('terminal session projection destroyed')
+    projection.destroy()
+    await expectation
+
+    resolve(makeCreateResult())
+    await vi.waitFor(() => {
+      expect(mocks.closeMock).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa' })
+    })
   })
 
   test('closeTerminalsForWorktree waits for an in-flight create before closing it', async () => {

@@ -213,6 +213,118 @@ async function dispatchPasteWithText(sessionRoot: HTMLElement, text: string, fil
 }
 
 describe('TerminalSessionView', () => {
+  test('attaches the explicit terminal session before projection selection catches up', async () => {
+    const descriptor = {
+      terminalSessionId: 'session-1',
+      terminalWorktreeKey: '/repo\0/worktree',
+      index: 1,
+      repoRoot: '/repo',
+      branch: 'feature',
+      worktreePath: '/worktree',
+    }
+    const terminalWorktreeSnapshot = completeWorktreeSnapshot({
+      terminalWorktreeKey: '/repo\0/worktree',
+      selectedDescriptor: descriptor,
+      sessions: [
+        {
+          terminalSessionId: 'session-1',
+          terminalWorktreeKey: '/repo\0/worktree',
+          index: 1,
+          title: 'zsh',
+          phase: 'open' as const,
+          selected: true,
+          hasBell: false,
+        },
+        {
+          terminalSessionId: 'session-2',
+          terminalWorktreeKey: '/repo\0/worktree',
+          index: 2,
+          title: 'zsh',
+          phase: 'open' as const,
+          selected: false,
+          hasBell: false,
+        },
+      ],
+      count: 2,
+      createPending: false,
+    })
+    const snapshot = {
+      phase: 'open' as const,
+      message: null,
+      processName: 'zsh',
+      attachment: {
+        role: 'controller' as const,
+        controllerStatus: 'connected' as const,
+        active: true,
+        canTakeover: false,
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+    }
+    const attach = vi.fn()
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'session-1',
+      registerHost: vi.fn(),
+      unregisterHost: vi.fn(),
+      selectTerminal: vi.fn(),
+      scrollToBottom: vi.fn(),
+      scrollLines: vi.fn(),
+      clearBell: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(async () => true),
+      attach,
+      detach: vi.fn(),
+      restart: vi.fn(),
+      isTerminalFocusTarget: vi.fn(() => false),
+      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      clearSearch: vi.fn(),
+      writeInput: vi.fn(),
+      takeover: vi.fn(),
+      focusTerminal: vi.fn(),
+    }
+    const readContext: TerminalSessionReadContextValue = {
+      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
+      subscribeTerminalWorktree: () => () => {},
+      repoBellCount: () => 0,
+      subscribeRepoBellCount: () => () => {},
+      snapshot: () => snapshot,
+      subscribeSnapshot: () => () => {},
+    }
+
+    const { unmount } = renderInJsdom(
+      <TerminalSessionContext value={context}>
+        <TerminalSessionReadContext value={readContext}>
+          <TerminalSessionView
+            repoRoot="/repo"
+            repoInstanceId={'repo-instance-test'}
+            branch="feature"
+            worktreePath="/worktree"
+            selectedTerminalSessionId="session-2"
+          />
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>,
+    )
+
+    try {
+      expect(attach).toHaveBeenCalledWith(
+        expect.objectContaining({
+          terminalSessionId: 'session-2',
+          index: 2,
+          repoRoot: '/repo',
+          branch: 'feature',
+          worktreePath: '/worktree',
+        }),
+        expect.any(HTMLDivElement),
+      )
+      expect(attach).not.toHaveBeenCalledWith(
+        expect.objectContaining({ terminalSessionId: 'session-1' }),
+        expect.any(HTMLDivElement),
+      )
+    } finally {
+      unmount()
+    }
+  })
+
   test('keeps the active terminal attached when selected descriptor metadata changes', async () => {
     const descriptor = {
       terminalSessionId: 'session-1',

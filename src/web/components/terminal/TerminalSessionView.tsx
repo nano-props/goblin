@@ -24,6 +24,7 @@ import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import {
   useTerminalWorktreeSelectedDescriptor,
+  useTerminalWorktreeSessionDescriptor,
   useTerminalWorktreeCount,
   useTerminalWorktreeCreatePending,
   useTerminalSnapshot,
@@ -41,6 +42,7 @@ interface TerminalSessionViewProps {
   repoInstanceId: string
   branch: string
   worktreePath: string
+  selectedTerminalSessionId?: string | null
   projectionPhase?: TerminalProjectionHydrationPhase
   projectionErrorMessage?: string
   createTerminalForSlot?: (base: TerminalSessionBase) => Promise<unknown>
@@ -51,6 +53,7 @@ export function TerminalSessionView({
   repoInstanceId,
   branch,
   worktreePath,
+  selectedTerminalSessionId,
   projectionPhase = 'ready',
   projectionErrorMessage,
   createTerminalForSlot,
@@ -94,8 +97,19 @@ export function TerminalSessionView({
     return () => observer.disconnect()
   }, [registerHost, terminalWorktreeKey])
 
-  const descriptor = useTerminalWorktreeSelectedDescriptor(terminalWorktreeKey)
-  const terminalSessionId = descriptor?.terminalSessionId ?? null
+  const selectedDescriptor = useTerminalWorktreeSelectedDescriptor(terminalWorktreeKey)
+  const explicitDescriptor = useTerminalWorktreeSessionDescriptor({
+    terminalWorktreeKey,
+    terminalSessionId: selectedTerminalSessionId ?? null,
+    repoRoot,
+    branch,
+    worktreePath,
+  })
+  const descriptor = selectedTerminalSessionId === undefined ? selectedDescriptor : explicitDescriptor
+  const terminalSessionId =
+    selectedTerminalSessionId === undefined
+      ? (selectedDescriptor?.terminalSessionId ?? null)
+      : selectedTerminalSessionId
   // The descriptor is server projection metadata. Keep the latest value
   // available for attach, but do not let metadata-only changes such as tab
   // reorder/index updates drive the xterm mount lifecycle.

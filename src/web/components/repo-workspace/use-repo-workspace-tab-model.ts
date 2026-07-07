@@ -28,7 +28,7 @@ export interface RepoWorkspaceTabModelInputState {
 export function useRepoWorkspaceTabModel(
   repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'ui'>,
   detail: CurrentRepoWorkspacePresentation,
-  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null,
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null,
 ) {
   const { input, selectedSessionIdByRuntimeType } = useRepoWorkspaceTabModelInput(repo, detail, workspacePaneRoute)
   const model = useMemo(() => createRepoWorkspaceTabModel(input), [input])
@@ -44,7 +44,7 @@ export function useRepoWorkspaceTabModel(
 export function useRepoWorkspaceTabModelInput(
   repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'ui'>,
   detail: CurrentRepoWorkspacePresentation,
-  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null,
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null,
 ): RepoWorkspaceTabModelInputState {
   const { branch } = detail
   const branchName = branch?.name ?? null
@@ -74,6 +74,7 @@ export function useRepoWorkspaceTabModelInput(
     if (workspacePaneRoute === null) return null
     if (workspacePaneRoute?.kind === 'static') return workspacePaneRoute.tab
     if (workspacePaneRoute?.kind === 'terminal') return 'terminal'
+    if (workspacePaneRoute?.kind === 'invalid-static') return null
     return preferredWorkspacePaneTabForTarget(
       repo.ui,
       branchName ? { repoRoot: repo.id, branchName, worktreePath } : null,

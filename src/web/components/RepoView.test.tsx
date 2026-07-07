@@ -116,13 +116,7 @@ vi.mock('#/web/components/RepoPickerHost.tsx', () => ({
 vi.mock('#/web/components/repo-toolbar/RepoToolbarActions.tsx', () => ({
   BranchFilterAction: () => <div data-testid="branch-filter-action" />,
   CreateWorktreeRowAction: () => <button data-testid="create-worktree-row-action" type="button" />,
-  DashboardRowAction: ({
-    onOpenDashboard,
-    selected = false,
-  }: {
-    onOpenDashboard?: () => void
-    selected?: boolean
-  }) => (
+  DashboardRowAction: ({ onOpenDashboard, selected = false }: { onOpenDashboard?: () => void; selected?: boolean }) => (
     <button
       data-testid="dashboard-row-action"
       data-selected={selected ? 'true' : 'false'}
@@ -227,7 +221,9 @@ vi.mock('#/web/components/Layout.tsx', () => ({
 const REPO_ID = '/tmp/repo-view-test'
 
 function branchRepoView(branchName = 'feature/a') {
-  return <RepoView repoId={REPO_ID} routeView={{ kind: 'branch', repoId: REPO_ID, branchName }} />
+  return (
+    <RepoView repoId={REPO_ID} routeView={{ kind: 'branch', repoId: REPO_ID, branchName, workspacePaneRoute: null }} />
+  )
 }
 
 beforeEach(() => {
@@ -253,7 +249,10 @@ describe('RepoView workspace navigation', () => {
     resetReposStore()
 
     const { container } = render(
-      <RepoView repoId={REPO_ID} routeView={{ kind: 'branch', repoId: REPO_ID, branchName: 'feature/a' }} />,
+      <RepoView
+        repoId={REPO_ID}
+        routeView={{ kind: 'branch', repoId: REPO_ID, branchName: 'feature/a', workspacePaneRoute: null }}
+      />,
     )
 
     expect(container.querySelector('[data-testid="repo-workspace-skeleton"]')).not.toBeNull()
@@ -305,20 +304,33 @@ describe('RepoView workspace navigation', () => {
     seedRepoShellForTest({ id: REPO_ID, currentBranchName: null })
 
     expect(() =>
-      render(<RepoView repoId={REPO_ID} routeView={{ kind: 'branch', repoId: REPO_ID, branchName: 'feature/a' }} />),
+      render(
+        <RepoView
+          repoId={REPO_ID}
+          routeView={{ kind: 'branch', repoId: REPO_ID, branchName: 'feature/a', workspacePaneRoute: null }}
+        />,
+      ),
     ).not.toThrow()
   })
 
   test('route branch view uses the URL branch as the displayed workspace branch', () => {
     const { container } = render(
-      <RepoView repoId={REPO_ID} routeView={{ kind: 'branch', repoId: REPO_ID, branchName: 'feature/a' }} />,
+      <RepoView
+        repoId={REPO_ID}
+        routeView={{ kind: 'branch', repoId: REPO_ID, branchName: 'feature/a', workspacePaneRoute: null }}
+      />,
     )
 
     expect(repoWorkspace(container)?.dataset.currentBranchName).toBe('feature/a')
   })
 
   test('route branch view leaves store selection unchanged when read model is ready', () => {
-    render(<RepoView repoId={REPO_ID} routeView={{ kind: 'branch', repoId: REPO_ID, branchName: 'feature/a' }} />)
+    render(
+      <RepoView
+        repoId={REPO_ID}
+        routeView={{ kind: 'branch', repoId: REPO_ID, branchName: 'feature/a', workspacePaneRoute: null }}
+      />,
+    )
   })
 
   test('new worktree page cancel returns to the stored source route', () => {
@@ -543,7 +555,7 @@ describe('RepoView workspace navigation', () => {
     const { container } = render(
       <RepoView
         repoId={REPO_ID}
-        routeView={{ kind: 'branch', repoId: REPO_ID, branchName: 'feature/a' }}
+        routeView={{ kind: 'branch', repoId: REPO_ID, branchName: 'feature/a', workspacePaneRoute: null }}
         onOpenRepoDashboard={onOpenRepoDashboard}
       />,
     )

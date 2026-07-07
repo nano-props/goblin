@@ -11,6 +11,7 @@ import type { TerminalSnapshot, TerminalDescriptor, TerminalSessionSummary } fro
 
 const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = { phase: 'opening', message: null, processName: 'terminal' }
 const EMPTY_TERMINAL_SESSION_SUMMARIES: TerminalSessionSummary[] = []
+const MISSING_TERMINAL_DESCRIPTOR_SNAPSHOT = ''
 
 export function useTerminalWorktreeCount(terminalWorktreeKey: string | null): number {
   const { terminalWorktreeSnapshot, subscribeTerminalWorktree } = useTerminalSessionReadContext()
@@ -103,6 +104,48 @@ export function useTerminalWorktreeSelectedDescriptor(terminalWorktreeKey: strin
     [terminalWorktreeKey, terminalWorktreeSnapshot],
   )
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+}
+
+export function useTerminalWorktreeSessionDescriptor({
+  terminalWorktreeKey,
+  terminalSessionId,
+  repoRoot,
+  branch,
+  worktreePath,
+}: {
+  terminalWorktreeKey: string | null
+  terminalSessionId: string | null
+  repoRoot: string
+  branch: string
+  worktreePath: string
+}): TerminalDescriptor | null {
+  const { terminalWorktreeSnapshot, subscribeTerminalWorktree } = useTerminalSessionReadContext()
+  const subscribe = useCallback(
+    (listener: () => void) =>
+      terminalWorktreeKey && terminalSessionId ? subscribeTerminalWorktree(terminalWorktreeKey, listener) : () => {},
+    [terminalSessionId, terminalWorktreeKey, subscribeTerminalWorktree],
+  )
+  const getSnapshot = useCallback(() => {
+    if (!terminalWorktreeKey || !terminalSessionId) return MISSING_TERMINAL_DESCRIPTOR_SNAPSHOT
+    const session = terminalWorktreeSnapshot(terminalWorktreeKey).sessions.find(
+      (candidate) => candidate.terminalSessionId === terminalSessionId,
+    )
+    return session ? `${session.terminalSessionId}\0${session.index}` : MISSING_TERMINAL_DESCRIPTOR_SNAPSHOT
+  }, [terminalSessionId, terminalWorktreeKey, terminalWorktreeSnapshot])
+  const descriptorSnapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+  return useMemo(() => {
+    if (!terminalWorktreeKey || !descriptorSnapshot) return null
+    const [snapshotTerminalSessionId, indexText] = descriptorSnapshot.split('\0')
+    if (!snapshotTerminalSessionId) return null
+    return {
+      terminalWorktreeKey,
+      terminalSessionId: snapshotTerminalSessionId,
+      index: Number(indexText) || 0,
+      repoRoot,
+      branch,
+      worktreePath,
+    }
+  }, [branch, descriptorSnapshot, repoRoot, terminalWorktreeKey, worktreePath])
 }
 
 export function useTerminalSessionSummaries(terminalWorktreeKey: string | null): TerminalSessionSummary[] {

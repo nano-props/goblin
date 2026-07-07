@@ -22,7 +22,7 @@ import { useWorkspacePaneRouteController } from '#/web/components/repo-workspace
 interface Props {
   repoId: string
   currentBranchName?: string | null
-  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null
   shortcutsEnabled?: boolean
   toolbarTrafficLightOffset?: boolean
   onBackToBranchNavigator?: () => void
@@ -120,7 +120,7 @@ function RepoWorkspaceLoaded({
   onBackToBranchNavigator,
 }: {
   repoShell: RepoWorkspaceRepoShell
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null
   workspacePaneId: string
   shortcutsEnabled: boolean
   toolbarTrafficLightOffset: boolean
@@ -189,7 +189,7 @@ function RepoWorkspaceLoaded({
 interface RepoWorkspacePaneProps {
   repo: RepoWorkspaceRepo
   detail: CurrentRepoWorkspacePresentation
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null
   workspacePaneId: string
   toolbarTrafficLightOffset?: boolean
   branchActions?: BranchActions
@@ -238,7 +238,7 @@ function RepoWorkspacePane({
 interface BranchActionWorkspacePaneProps {
   repo: RepoWorkspaceRepo
   detail: CurrentRepoWorkspacePresentation
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null
   branch: NonNullable<CurrentRepoWorkspacePresentation['branch']>
   workspacePaneId: string
   shortcutsEnabled: boolean

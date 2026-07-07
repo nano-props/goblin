@@ -15,7 +15,10 @@ import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { isWorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
-import type { RepoWorkspaceRuntimeTabStateByType } from '#/web/components/repo-workspace/tab-model.ts'
+import type {
+  RepoWorkspaceRuntimeTabStateByType,
+  RepoWorkspaceSelection,
+} from '#/web/components/repo-workspace/tab-model.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
@@ -43,10 +46,11 @@ export interface WorkspacePanePanelRenderInput {
   detail: CurrentRepoWorkspacePresentation
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
+  selection: RepoWorkspaceSelection
   runtimeTabStateByType: RepoWorkspaceRuntimeTabStateByType
 }
 
-interface WorkspacePanePanelProps extends Omit<WorkspacePanePanelRenderInput, 'type'> {}
+interface WorkspacePanePanelProps extends Omit<WorkspacePanePanelRenderInput, 'type' | 'selection'> {}
 
 type RepoWorkspaceBranch = NonNullable<CurrentRepoWorkspacePresentation['branch']>
 type WorkspacePaneStaticPanelComponent = (props: WorkspacePanePanelProps) => ReactNode
@@ -59,13 +63,14 @@ const REPO_WORKSPACE_STATIC_PANEL_BY_TYPE: Record<WorkspacePaneStaticTabType, Wo
 }
 
 export function renderRepoWorkspacePanePanel(input: WorkspacePanePanelRenderInput): ReactNode {
-  const { type, ...panelProps } = input
+  const { type, selection, ...panelProps } = input
   if (isWorkspacePaneRuntimeTabType(type)) {
     const runtimeState = input.runtimeTabStateByType[type]
     return renderWorkspacePaneRuntimeTabPanel({
       type,
       workspacePaneId: input.workspacePaneId,
       panelLabel: input.panelLabel,
+      selectedSessionId: selectedRuntimeSessionId(selection, type),
       target: {
         repoRoot: input.repo.id,
         repoInstanceId: input.repo.instanceId,
@@ -80,6 +85,12 @@ export function renderRepoWorkspacePanePanel(input: WorkspacePanePanelRenderInpu
   }
   const Panel = REPO_WORKSPACE_STATIC_PANEL_BY_TYPE[type]
   return <Panel {...panelProps} />
+}
+
+function selectedRuntimeSessionId(selection: RepoWorkspaceSelection, type: WorkspacePaneTabType): string | null {
+  if (selection.kind !== 'materialized-tab') return null
+  const tab = selection.materializedTab
+  return tab.kind === 'runtime' && tab.runtimeType === type ? tab.sessionId : null
 }
 
 function StatusWorkspacePanePanel({ workspacePaneId, panelLabel, detail }: WorkspacePanePanelProps) {
