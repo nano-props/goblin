@@ -9,8 +9,7 @@ import {
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
-import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
-import { workspacePaneTabsTargetForRepoBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { repoBranchReadModelFromSnapshot } from '#/web/repo-branch-read-model.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
   useWorkspacePaneTabsQuery,
@@ -18,6 +17,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { useWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-target-projection.ts'
 import { createRepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
+import { useRepoProjectionReadModel } from '#/web/repo-data-query.ts'
 
 export { isRepoVisibleProjectionRefreshable }
 
@@ -49,6 +49,16 @@ function isVisibleProjectionWorkspacePaneTab(tab: WorkspacePaneTabType | null): 
   return tab === 'status' || tab === 'changes'
 }
 
+function visibleProjectionRefreshKey(repo: RepoVisibleProjectionRefreshState): string | null {
+  if (!repo.visibleProjectionViewOpen || !repo.branchName || !repo.renderedWorkspacePaneTab) return null
+  return [
+    repo.id,
+    repo.repoInstanceId,
+    repo.branchName,
+    repo.renderedWorkspacePaneTab,
+  ].join('\0')
+}
+
 export function useVisibleRepoProjectionRefresh({
   hydratedRouteRepoId = null,
   currentBranchName = null,
@@ -76,7 +86,12 @@ export function useVisibleRepoProjectionRefresh({
   const repoRoot = currentRepoShell?.id ?? ''
   const repoInstanceId = currentRepoShell?.repoInstanceId ?? ''
   const repoEnabled = currentRepoShell !== null
-  const branchReadModel = useRepoBranchReadModel(repoRoot, repoInstanceId, repoEnabled)
+  const projectionReadModel = useRepoProjectionReadModel(repoRoot, repoInstanceId, currentBranchName, 'full', repoEnabled)
+  const projection = projectionReadModel.data
+  const branchReadModel = useMemo(
+    () => (projection?.snapshot ? repoBranchReadModelFromSnapshot(projection.snapshot, projection.status) : null),
+    [projection],
+  )
   const branch = useMemo(
     () => branchReadModel?.branches.find((candidate) => candidate.name === currentBranchName) ?? null,
     [branchReadModel?.branches, currentBranchName],
@@ -100,15 +115,11 @@ export function useVisibleRepoProjectionRefresh({
   })
   const preferredWorkspacePaneTab = useMemo(() => {
     if (!currentRepoShell || !branchReadModel) return 'status'
-    const target = workspacePaneTabsTargetForRepoBranch(
-      { repoRoot: currentRepoShell.id, branches: branchReadModel.branches },
-      branchName,
-    )
     return preferredWorkspacePaneTabForTarget(
       { preferredWorkspacePaneTabByTarget: currentRepoShell.preferredWorkspacePaneTabByTarget },
-      target,
+      branchName ? { repoRoot: currentRepoShell.id, branchName, worktreePath } : null,
     )
-  }, [branchName, branchReadModel, currentRepoShell])
+  }, [branchName, branchReadModel, currentRepoShell, worktreePath])
   const renderedWorkspacePaneTab = useMemo<WorkspacePaneTabType | null>(() => {
     if (!currentRepoShell || !branchName) return null
     return createRepoWorkspaceTabModel({
@@ -145,51 +156,32 @@ export function useVisibleRepoProjectionRefresh({
         : null,
     [branchName, currentRepoShell, preferredWorkspacePaneTab, renderedWorkspacePaneTab],
   )
-  const previousCurrentRepoId = useRef<string | null>(null)
-  const previousCurrentBranchName = useRef<string | null>(null)
-  const previousRenderedWorkspacePaneTab = useRef<WorkspacePaneTabType | null>(null)
-  const previousVisibleProjectionViewOpen = useRef<boolean>(false)
+  const lastRequestedVisibleProjectionKey = useRef<string | null>(null)
+  const lastRequestedBranchName = useRef<string | null>(null)
 
   useEffect(() => {
-    const lastCurrentRepoId = previousCurrentRepoId.current
-    const lastCurrentBranchName = previousCurrentBranchName.current
-    const lastRenderedWorkspacePaneTab = previousRenderedWorkspacePaneTab.current
-    const lastVisibleProjectionViewOpen = previousVisibleProjectionViewOpen.current
-    const nextCurrentRepoId = currentRepoRefreshState?.id ?? null
-    const nextCurrentBranchName = currentRepoRefreshState?.branchName ?? null
-    const nextRenderedWorkspacePaneTab = currentRepoRefreshState?.renderedWorkspacePaneTab ?? null
-    const nextVisibleProjectionViewOpen = currentRepoRefreshState?.visibleProjectionViewOpen ?? false
-    const currentRepoChanged = nextCurrentRepoId !== lastCurrentRepoId
-    const openedVisibleProjectionView =
-      !currentRepoChanged && nextCurrentRepoId !== null && nextVisibleProjectionViewOpen && !lastVisibleProjectionViewOpen
-    const switchedVisibleProjectionView =
-      !currentRepoChanged &&
-      nextCurrentRepoId !== null &&
-      nextVisibleProjectionViewOpen &&
-      lastVisibleProjectionViewOpen &&
-      nextRenderedWorkspacePaneTab !== lastRenderedWorkspacePaneTab
-    const visibleProjectionBranchChanged =
-      !currentRepoChanged &&
-      nextCurrentRepoId !== null &&
-      nextVisibleProjectionViewOpen &&
-      nextCurrentBranchName !== lastCurrentBranchName
-    previousCurrentRepoId.current = nextCurrentRepoId
-    previousCurrentBranchName.current = nextCurrentBranchName
-    previousRenderedWorkspacePaneTab.current = nextRenderedWorkspacePaneTab
-    previousVisibleProjectionViewOpen.current = nextVisibleProjectionViewOpen
-    if (
-      !currentRepoRefreshState ||
-      (!currentRepoChanged &&
-        !openedVisibleProjectionView &&
-        !switchedVisibleProjectionView &&
-        !visibleProjectionBranchChanged)
-    ) {
+    if (!currentRepoRefreshState) {
+      lastRequestedVisibleProjectionKey.current = null
+      lastRequestedBranchName.current = null
       return
     }
+    const nextVisibleProjectionKey = visibleProjectionRefreshKey(currentRepoRefreshState)
+    if (!nextVisibleProjectionKey) {
+      lastRequestedVisibleProjectionKey.current = null
+      lastRequestedBranchName.current = null
+      return
+    }
+    if (nextVisibleProjectionKey === lastRequestedVisibleProjectionKey.current) return
     if (!isRepoVisibleProjectionRefreshable(currentRepoRefreshState)) return
+    const previousBranchName = lastRequestedBranchName.current
+    lastRequestedVisibleProjectionKey.current = nextVisibleProjectionKey
+    lastRequestedBranchName.current = currentRepoRefreshState.branchName
     void runRepoRefreshIntent(useReposStore.getState, {
       kind: 'visible-runtime-projection-requested',
-      reason: visibleProjectionBranchChanged ? 'visible-projection-branch-changed' : 'visible-projection-view-opened',
+      reason:
+        previousBranchName !== null && previousBranchName !== currentRepoRefreshState.branchName
+          ? 'visible-projection-branch-changed'
+          : 'visible-projection-view-opened',
       id: currentRepoRefreshState.id,
       repoInstanceId: currentRepoRefreshState.repoInstanceId,
       branchName: currentRepoRefreshState.branchName,
