@@ -7,7 +7,6 @@ import {
   workspacePaneRuntimeTabSessionId,
   workspacePaneStaticTabEntry,
   workspacePaneTabEntryIdentity,
-  workspacePaneTabsInsertAfterIdentity,
   workspacePaneTabRequiresWorktree,
 } from '#/shared/workspace-pane.ts'
 import {
@@ -15,6 +14,13 @@ import {
   workspacePaneTabsRuntimeScopePrefixKey,
   workspacePaneTabsRuntimeUserPrefixKey,
 } from '#/shared/workspace-pane-tabs-runtime-keys.ts'
+import {
+  workspacePaneTabEntryArraysEqual,
+  workspacePaneTabsWithIdentityOrder,
+  workspacePaneTabsWithRuntimeTab,
+  workspacePaneTabsWithoutStaticTab,
+  workspacePaneTabsWithStaticTab,
+} from '#/server/workspace-pane/workspace-pane-tabs-operations.ts'
 
 export interface WorkspacePaneTabsTargetInput<TUser extends string | number> {
   userId: TUser
@@ -79,24 +85,8 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
   ): WorkspacePaneTabEntry[] {
     const current = this.tabs(input)
     if (input.worktreePath === null || sessionId.length === 0) return current
-    if (
-      current.some(
-        (entry) =>
-          isWorkspacePaneRuntimeTabEntry(entry) &&
-          entry.type === type &&
-          workspacePaneRuntimeTabSessionId(entry) === sessionId,
-      )
-    ) {
-      return current
-    }
-    return this.replaceTabs({
-      ...input,
-      tabs: workspacePaneTabsInsertAfterIdentity(
-        current,
-        workspacePaneRuntimeTabEntry(type, sessionId),
-        options?.insertAfterIdentity,
-      ),
-    })
+    const tabs = workspacePaneTabsWithRuntimeTab(current, type, sessionId, options)
+    return workspacePaneTabEntryArraysEqual(current, tabs) ? current : this.replaceTabs({ ...input, tabs })
   }
 
   openStaticTab(
@@ -105,31 +95,26 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     options?: { insertAfterIdentity?: string | null },
   ): WorkspacePaneTabEntry[] {
     const current = this.tabs(input)
-    // Reopening an existing static tab should preserve the current user-managed
-    // order and simply focus that tab on the client side.
-    if (current.some((entry) => entry.type === tabType)) return current
-    return this.replaceTabs({
-      ...input,
-      tabs: workspacePaneTabsInsertAfterIdentity(
-        current,
-        workspacePaneStaticTabEntry(tabType),
-        options?.insertAfterIdentity,
-      ),
-    })
+    const tabs = workspacePaneTabsWithStaticTab(current, tabType, options)
+    return workspacePaneTabEntryArraysEqual(current, tabs) ? current : this.replaceTabs({ ...input, tabs })
   }
 
   closeStaticTab(
     input: WorkspacePaneTabsTargetInput<TUser>,
     tabType: WorkspacePaneStaticTabType,
   ): WorkspacePaneTabEntry[] {
-    return this.replaceTabs({ ...input, tabs: this.tabs(input).filter((entry) => entry.type !== tabType) })
+    const current = this.tabs(input)
+    const tabs = workspacePaneTabsWithoutStaticTab(current, tabType)
+    return workspacePaneTabEntryArraysEqual(current, tabs) ? current : this.replaceTabs({ ...input, tabs })
   }
 
   reorderTabsByIdentity(
     input: WorkspacePaneTabsTargetInput<TUser>,
     tabIdentities: readonly string[],
   ): WorkspacePaneTabEntry[] {
-    return this.replaceTabs({ ...input, tabs: workspacePaneTabsWithIdentityOrder(this.tabs(input), tabIdentities) })
+    const current = this.tabs(input)
+    const tabs = workspacePaneTabsWithIdentityOrder(current, tabIdentities)
+    return workspacePaneTabEntryArraysEqual(current, tabs) ? current : this.replaceTabs({ ...input, tabs })
   }
 
   tabs(input: WorkspacePaneTabsTargetInput<TUser>): WorkspacePaneTabEntry[] {
@@ -200,26 +185,4 @@ function normalizeWorkspacePaneTabs(
     next.push(normalized)
   }
   return next
-}
-
-function workspacePaneTabsWithIdentityOrder(
-  currentTabs: readonly WorkspacePaneTabEntry[],
-  tabIdentities: readonly string[],
-): WorkspacePaneTabEntry[] {
-  const tabByIdentity = new Map(currentTabs.map((tab) => [workspacePaneTabEntryIdentity(tab), tab]))
-  const used = new Set<string>()
-  const ordered: WorkspacePaneTabEntry[] = []
-  for (const identity of tabIdentities) {
-    const tab = tabByIdentity.get(identity)
-    if (!tab || used.has(identity)) continue
-    used.add(identity)
-    ordered.push(tab)
-  }
-  for (const tab of currentTabs) {
-    const identity = workspacePaneTabEntryIdentity(tab)
-    if (used.has(identity)) continue
-    used.add(identity)
-    ordered.push(tab)
-  }
-  return ordered
 }

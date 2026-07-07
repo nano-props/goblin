@@ -146,4 +146,108 @@ describe('workspace pane tabs coordinator', () => {
       workspacePaneRuntimeTabEntry('terminal', 'session-live'),
     ])
   })
+
+  test('does not mutate workspace tabs when update canonicalization fails', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: SCOPE,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      runtimeProviders: [
+        {
+          type: 'terminal',
+          listSessionsForUser: vi.fn(async () => {
+            throw new Error('provider failed')
+          }),
+        },
+      ],
+    })
+
+    await expect(
+      coordinator.updateTabs({
+        userId: USER_ID,
+        scope: SCOPE,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        operation: { type: 'open-static', tabType: 'history' },
+        assertCurrent: () => {},
+      }),
+    ).rejects.toThrow('provider failed')
+    expect(workspaceTabs.tabs(workspaceTarget())).toEqual([workspacePaneStaticTabEntry('status')])
+  })
+
+  test('does not mutate workspace tabs when update becomes stale before commit', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      ...workspaceTarget(),
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      runtimeProviders: [
+        {
+          type: 'terminal',
+          listSessionsForUser: vi.fn(async () => [
+            { sessionId: 'session-live', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+          ]),
+        },
+      ],
+    })
+    let assertCalls = 0
+
+    await expect(
+      coordinator.updateTabs({
+        userId: USER_ID,
+        scope: SCOPE,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        operation: { type: 'open-static', tabType: 'history' },
+        assertCurrent: () => {
+          assertCalls += 1
+          if (assertCalls === 2) throw new Error('error.repo-instance-stale')
+        },
+      }),
+    ).rejects.toThrow('error.repo-instance-stale')
+    expect(workspaceTabs.tabs(workspaceTarget())).toEqual([workspacePaneStaticTabEntry('status')])
+  })
+
+  test('does not partially materialize runtime tabs when reconcile provider loading fails', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      runtimeProviders: [
+        {
+          type: 'terminal',
+          listSessionsForUser: vi.fn(async () => [
+            { sessionId: 'session-live', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+          ]),
+        },
+        {
+          type: 'terminal',
+          listSessionsForUser: vi.fn(async () => {
+            throw new Error('provider failed')
+          }),
+        },
+      ],
+    })
+
+    await expect(
+      coordinator.reconcileWorktree({ userId: USER_ID, scope: SCOPE, worktreePath: WORKTREE_PATH }),
+    ).rejects.toThrow('provider failed')
+    expect(workspaceTabs.tabs(workspaceTarget())).toEqual([workspacePaneStaticTabEntry('status')])
+  })
 })
+
+function workspaceTarget() {
+  return {
+    userId: USER_ID,
+    scope: SCOPE,
+    branchName: BRANCH_NAME,
+    worktreePath: WORKTREE_PATH,
+  }
+}

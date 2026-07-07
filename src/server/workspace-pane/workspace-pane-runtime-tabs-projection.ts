@@ -7,6 +7,7 @@ import {
   workspacePaneStaticTabEntry,
   workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
+import { workspacePaneTabEntryArraysEqual } from '#/server/workspace-pane/workspace-pane-tabs-operations.ts'
 
 export interface WorkspacePaneRuntimeTabsProjectionEntry {
   branchName: string
@@ -23,6 +24,15 @@ export interface WorkspacePaneRuntimeTabsProjectionReplacement {
 export interface WorkspacePaneRuntimeTabsProjectionSession {
   sessionId: string
   branch: string
+}
+
+export interface WorkspacePaneRuntimeTabsProviderSnapshot {
+  type: WorkspacePaneRuntimeTabType
+  liveSessions: readonly WorkspacePaneRuntimeTabsProviderSnapshotSession[]
+}
+
+export interface WorkspacePaneRuntimeTabsProviderSnapshotSession extends WorkspacePaneRuntimeTabsProjectionSession {
+  worktreePath: string
 }
 
 const DEFAULT_WORKTREE_TABS: readonly WorkspacePaneTabEntry[] = [workspacePaneStaticTabEntry('status')]
@@ -85,6 +95,81 @@ export function projectWorkspaceRuntimeTabsForWorktree(input: {
   return replacements
 }
 
+export function canonicalWorkspaceRuntimeTabsForTarget(input: {
+  entry: WorkspacePaneRuntimeTabsProjectionEntry
+  providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
+}): WorkspacePaneTabEntry[] {
+  let tabs = [...input.entry.tabs]
+  if (input.entry.worktreePath === null) {
+    for (const snapshot of input.providerSnapshots) {
+      tabs = workspaceTabsWithoutStaleRuntimeEntries(tabs, snapshot.type, [])
+    }
+    return tabs
+  }
+  for (const snapshot of input.providerSnapshots) {
+    const replacements = projectWorkspaceRuntimeTabsForWorktree({
+      runtimeType: snapshot.type,
+      entries: [{ ...input.entry, tabs }],
+      worktreePath: input.entry.worktreePath,
+      liveSessions: liveSessionsForWorktree(snapshot.liveSessions, input.entry.worktreePath),
+    })
+    tabs = replacements[0]?.tabs ?? tabs
+  }
+  return tabs
+}
+
+export function projectWorkspaceRuntimeTabsFromProviderSnapshots(input: {
+  entries: readonly WorkspacePaneRuntimeTabsProjectionEntry[]
+  providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
+  worktreePath: string
+}): WorkspacePaneRuntimeTabsProjectionReplacement[] {
+  let entries = input.entries.map((entry) => ({
+    branchName: entry.branchName,
+    worktreePath: entry.worktreePath,
+    tabs: [...entry.tabs],
+  }))
+  const changedKeys = new Set<string>()
+  for (const snapshot of input.providerSnapshots) {
+    const replacements = projectWorkspaceRuntimeTabsForWorktree({
+      runtimeType: snapshot.type,
+      entries,
+      worktreePath: input.worktreePath,
+      liveSessions: liveSessionsForWorktree(snapshot.liveSessions, input.worktreePath),
+    })
+    for (const replacement of replacements) {
+      const key = workspacePaneTabsProjectionEntryKey(replacement)
+      changedKeys.add(key)
+      const index = entries.findIndex((entry) => workspacePaneTabsProjectionEntryKey(entry) === key)
+      const nextEntry = {
+        branchName: replacement.branchName,
+        worktreePath: replacement.worktreePath,
+        tabs: replacement.tabs,
+      }
+      if (index === -1) entries = [...entries, nextEntry]
+      else entries[index] = nextEntry
+    }
+  }
+  return entries.flatMap((entry) => {
+    if (entry.worktreePath === null) return []
+    return changedKeys.has(workspacePaneTabsProjectionEntryKey(entry))
+      ? [{ branchName: entry.branchName, worktreePath: entry.worktreePath, tabs: entry.tabs }]
+      : []
+  })
+}
+
+export function workspaceRuntimeTabWorktreePaths(input: {
+  entries: readonly WorkspacePaneRuntimeTabsProjectionEntry[]
+  providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
+}): string[] {
+  const worktreePaths = new Set(
+    input.entries.flatMap((entry) => (entry.worktreePath === null ? [] : [entry.worktreePath])),
+  )
+  for (const snapshot of input.providerSnapshots) {
+    for (const session of snapshot.liveSessions) worktreePaths.add(session.worktreePath)
+  }
+  return Array.from(worktreePaths)
+}
+
 export function workspaceTabsWithoutStaleRuntimeEntries(
   tabs: readonly WorkspacePaneTabEntry[],
   runtimeType: WorkspacePaneRuntimeTabType,
@@ -108,16 +193,13 @@ export function workspaceTabsWithoutStaleRuntimeEntries(
   return next
 }
 
-export function workspacePaneTabEntryArraysEqual(
-  a: readonly WorkspacePaneTabEntry[],
-  b: readonly WorkspacePaneTabEntry[],
-): boolean {
-  if (a.length !== b.length) return false
-  for (let index = 0; index < a.length; index += 1) {
-    const current = a[index]
-    const next = b[index]
-    if (!current || !next) return false
-    if (workspacePaneTabEntryIdentity(current) !== workspacePaneTabEntryIdentity(next)) return false
-  }
-  return true
+function liveSessionsForWorktree(
+  liveSessions: readonly WorkspacePaneRuntimeTabsProviderSnapshotSession[],
+  worktreePath: string,
+): WorkspacePaneRuntimeTabsProjectionSession[] {
+  return liveSessions.filter((session) => session.worktreePath === worktreePath)
+}
+
+function workspacePaneTabsProjectionEntryKey(input: { branchName: string; worktreePath: string | null }): string {
+  return `${input.branchName}\0${input.worktreePath ?? ''}`
 }

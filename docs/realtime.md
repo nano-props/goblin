@@ -11,7 +11,7 @@ Use this doc for realtime transport and lifecycle rules.
 
 ## Channel categories
 
-The above rules cover data-plane channels (`/ws/invalidation`, `/ws/terminal`) — they push server-owned state changes to subscribers. A third category exists for **control-plane relays**: a channel that forwards an action envelope triggered by an out-of-band write (e.g. `g delta` from a PTY arriving at `/ws/client-intent`). A relay is not invalidation (no refetch implied) and not streaming (one-shot per request, not continuous).
+The above rules cover data-plane channels (`/ws/invalidation`, `/ws/app`) — they push server-owned state changes to subscribers. A third category exists for **control-plane relays**: a channel that forwards an action envelope triggered by an out-of-band write (e.g. `g delta` from a PTY arriving at `/ws/client-intent`). A relay is not invalidation (no refetch implied) and not streaming (one-shot per request, not continuous).
 
 When adding a new `/ws/*` channel, classify it into one of these three before writing code:
 
