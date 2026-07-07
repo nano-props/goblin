@@ -78,7 +78,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       if (typeof repoInstanceId === 'string') refreshWorkspacePaneTabs(event.repoRoot, repoInstanceId)
     })
 
-    setTerminalSessionCommandBridge({
+    const disposeCommandBridge = setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: projection.terminalWorktreeSnapshot,
       createTerminal: projection.createTerminal,
       selectTerminal: projection.selectTerminal,
@@ -94,6 +94,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       offIdentity()
       offLifecycle()
       offSessionClosed()
+      disposeCommandBridge()
     }
   }, [projection])
 

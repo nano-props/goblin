@@ -6,7 +6,7 @@ import {
   type PtySpawnResult,
   type PtySupervisor,
 } from '#/server/terminal/pty-supervisor.ts'
-import { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
+import { TerminalSessionManager, type TerminalEventSink } from '#/server/terminal/terminal-session-manager.ts'
 
 const USER_ID = 'user_terminal_session_manager'
 const CLIENT_ID = 'client_terminal_session_manager'
@@ -89,12 +89,13 @@ function createDeferredPtySupervisor(): PtySupervisor & {
   }
 }
 
-function createManager(supervisor: PtySupervisor) {
+function createManager(supervisor: PtySupervisor, sink: Partial<TerminalEventSink<string>> = {}) {
   return new TerminalSessionManager<string>(
     supervisor,
     {
       onOutput: vi.fn(),
       onExit: vi.fn(),
+      ...sink,
     },
     {
       terminalSessionIds: vi.fn(() => []),
@@ -197,6 +198,36 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     await expect(pending).resolves.toEqual({ ok: false, message: 'error.unavailable' })
     await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
     expect(supervisor.killed).toEqual(['pty_late_spawn_123456'])
+  })
+
+  test('reports scope close reason for repo cleanup', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const onSessionClosed = vi.fn()
+    const manager = createManager(supervisor, { onSessionClosed })
+    const created = await createSession(manager, supervisor)
+
+    manager.closeSessionsForRepo(USER_ID, SCOPE)
+
+    expect(onSessionClosed).toHaveBeenCalledWith(
+      USER_ID,
+      expect.objectContaining({ terminalRuntimeSessionId: created.terminalRuntimeSessionId }),
+      'scope',
+    )
+  })
+
+  test('reports detached-user close reason for detached TTL cleanup', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const onSessionClosed = vi.fn()
+    const manager = createManager(supervisor, { onSessionClosed })
+    const created = await createSession(manager, supervisor)
+
+    manager.closeSessionsForUser(USER_ID)
+
+    expect(onSessionClosed).toHaveBeenCalledWith(
+      USER_ID,
+      expect.objectContaining({ terminalRuntimeSessionId: created.terminalRuntimeSessionId }),
+      'detached-user',
+    )
   })
 
   test('kills an older restart PTY when a newer restart generation wins', async () => {

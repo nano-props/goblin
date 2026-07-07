@@ -3,6 +3,9 @@ import { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import type { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
+import { serverLogger } from '#/server/logger.ts'
+
+const terminalRuntimeCoordinatorLogger = serverLogger.child({ module: 'terminal-runtime-coordinator' })
 
 export interface TerminalRuntimeCoordinatorOptions {
   manager: TerminalSessionManager<string>
@@ -26,8 +29,9 @@ export function createTerminalRuntimeCoordinator(
   const detachedUsers = new TerminalDetachedUserTimer({
     detachedTtlMs,
     onUserExpired(userId) {
-      manager.closeSessionsForUser(userId)
-      void workspaceTabsCoordinator.closeUser({ userId })
+      void closeDetachedUserRuntime(userId).catch((err) => {
+        terminalRuntimeCoordinatorLogger.warn({ userId, err }, 'failed to clean up detached user runtime')
+      })
     },
   })
 
@@ -54,5 +58,10 @@ export function createTerminalRuntimeCoordinator(
       broker.disconnectAll()
       detachedUsers.shutdown()
     },
+  }
+
+  async function closeDetachedUserRuntime(userId: string): Promise<void> {
+    manager.closeSessionsForUser(userId)
+    await workspaceTabsCoordinator.closeUser({ userId })
   }
 }

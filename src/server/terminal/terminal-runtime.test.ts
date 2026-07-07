@@ -870,17 +870,18 @@ describe('server terminal runtime', () => {
     expect(first.ok).toBe(true)
     if (!first.ok) return
     const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_a', USER_1, socket)
     await expect(
       requestWorkspacePaneTabs(
         host,
         socket,
         WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
         {
-        repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
-        branchName: 'feature',
-        worktreePath: '/repo-linked',
-        operation: { type: 'open-static', tabType: 'history' },
+          repoRoot: REPO_ROOT,
+          repoInstanceId: REPO_INSTANCE_ID,
+          branchName: 'feature',
+          worktreePath: '/repo-linked',
+          operation: { type: 'open-static', tabType: 'history' },
         },
         'req_update_before_repo_close',
       ),
@@ -889,8 +890,15 @@ describe('server terminal runtime', () => {
       { type: 'terminal', runtimeSessionId: first.terminalSessionId },
       { type: 'history', tabId: 'workspace-pane:history' },
     ])
+    socket.send.mockClear()
 
     expect(closeRepoRuntimeInstance(USER_1, REPO_ROOT, REPO_INSTANCE_ID)).toBe(true)
+    await vi.waitFor(() => {
+      expect(
+        sentSocketMessages(socket).filter((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+      ).toHaveLength(1)
+    })
+    expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
     const nextRepoInstanceId = openRepoRuntimeInstance(USER_1, REPO_ROOT)
 
     await expect(
@@ -920,6 +928,7 @@ describe('server terminal runtime', () => {
     expect(second.action).toBe('created')
     expect(second.terminalSessionId).not.toBe(first.terminalSessionId)
 
+    host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
   })
 

@@ -1619,6 +1619,17 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
+  test('clears the command bridge on provider unmount', async () => {
+    const result = renderTerminalProvider(<span>probe</span>, { currentRepoId: null })
+    expect(readTerminalSessionCommandBridge()).not.toBeNull()
+
+    await act(async () => {
+      result.unmount()
+    })
+
+    expect(readTerminalSessionCommandBridge()).toBeNull()
+  })
+
   test('P1.7: registry state survives a Provider unmount + remount via the singleton', async () => {
     // Before P1.7, the Provider owned its registry and destroyed it
     // on unmount. After P1.7, the registry is a client-level

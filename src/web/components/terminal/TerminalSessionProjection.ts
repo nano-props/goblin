@@ -1289,8 +1289,8 @@ let projectionInstance: TerminalSessionProjection | null = null
  * First call constructs the singleton with `deps` (only the first
  * call's deps are honored — subsequent calls return the existing
  * instance even if deps differ, because the singleton is meant to
- * outlive any Provider remount). The Provider is the canonical
- * caller; tests inject via `setTerminalSessionProjectionForTests`.
+ * outlive any Provider remount). App runtime projection wiring is the
+ * canonical app caller; tests inject via `setTerminalSessionProjectionForTests`.
  *
  * Mirrors the `getClientBridge()` shape at
  * `src/web/client-bridge.ts`.

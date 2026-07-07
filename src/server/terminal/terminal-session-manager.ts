@@ -36,6 +36,8 @@ export interface TerminalSessionOrderProjection<TUser extends string | number> {
   terminalSessionIds(input: { userId: TUser; scope: string; worktreePath: string }): readonly string[]
 }
 
+export type TerminalSessionCloseReason = 'session' | 'scope' | 'detached-user' | 'shutdown'
+
 interface TerminalPtyAttachResult {
   generation: number
   result: TerminalAttachResult
@@ -88,7 +90,7 @@ export interface TerminalEventSink<TUser extends string | number> {
   onBell?(userId: TUser, event: TerminalBellRealtimeEvent): void
   onTitle?(userId: TUser, event: TerminalTitleEvent): void
   onExit(userId: TUser, event: TerminalExitEvent): void
-  onSessionClosed?(userId: TUser, session: TerminalSessionSummary): void
+  onSessionClosed?(userId: TUser, session: TerminalSessionSummary, reason: TerminalSessionCloseReason): void
   // Identity and lifecycle are emitted on separate channels so the
   // client's teardown decision can subscribe to identity only.
   // A transitional phase update arrives as `onLifecycle` and never
@@ -295,7 +297,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     return true
   }
 
-  closeSession(terminalRuntimeSessionId: string): void {
+  closeSession(terminalRuntimeSessionId: string, reason: TerminalSessionCloseReason = 'session'): void {
     const session = this.sessionsByTerminalRuntimeSessionId.get(terminalRuntimeSessionId)
     if (!session) return
     session.ptyBinding.invalidateOwnership()
@@ -308,18 +310,18 @@ export class TerminalSessionManager<TUser extends string | number> {
     )
       this.terminalRuntimeSessionIdByUserTerminalSessionIndex.delete(userTerminalSessionIndex)
     session.ptyBinding.dispose(session)
-    this.sink.onSessionClosed?.(session.userId, closedSession)
+    this.sink.onSessionClosed?.(session.userId, closedSession, reason)
   }
 
   closeSessionsForUser(userId: TUser): void {
     for (const session of Array.from(this.sessionsByTerminalRuntimeSessionId.values())) {
-      if (session.userId === userId) this.closeSession(session.id)
+      if (session.userId === userId) this.closeSession(session.id, 'detached-user')
     }
   }
 
   closeSessionsForRepo(userId: TUser, scope: string): void {
     for (const session of Array.from(this.sessionsByTerminalRuntimeSessionId.values())) {
-      if (session.userId === userId && session.scope === scope) this.closeSession(session.id)
+      if (session.userId === userId && session.scope === scope) this.closeSession(session.id, 'scope')
     }
   }
 
@@ -335,7 +337,7 @@ export class TerminalSessionManager<TUser extends string | number> {
 
   closeAll(): void {
     for (const terminalRuntimeSessionId of Array.from(this.sessionsByTerminalRuntimeSessionId.keys()))
-      this.closeSession(terminalRuntimeSessionId)
+      this.closeSession(terminalRuntimeSessionId, 'shutdown')
   }
 
   async listSessionsForUser(userId: TUser, scope: string): Promise<TerminalSessionSummary[]> {

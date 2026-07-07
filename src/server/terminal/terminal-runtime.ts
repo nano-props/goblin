@@ -26,7 +26,11 @@ import { createTerminalRealtimeHandlers } from '#/server/terminal/terminal-runti
 import { createWorkspacePaneTabsRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-tabs-runtime-realtime.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { isValidTerminalClientId, isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
-import { TerminalSessionManager, type TerminalSessionOrderProjection } from '#/server/terminal/terminal-session-manager.ts'
+import {
+  TerminalSessionManager,
+  type TerminalSessionCloseReason,
+  type TerminalSessionOrderProjection,
+} from '#/server/terminal/terminal-session-manager.ts'
 import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { type ServerTerminalActionHost, type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
@@ -86,8 +90,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       onExit(userId, event) {
         broker.broadcastToUser(userId, { type: 'exit', event })
       },
-      onSessionClosed(userId, session) {
-        handleSessionClosed(userId, session)
+      onSessionClosed(userId, session, reason) {
+        handleSessionClosed(userId, session, reason)
       },
       onIdentity(userId, event) {
         broker.broadcastToUser(userId, { type: 'identity', event })
@@ -258,7 +262,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     broadcastWorkspacePaneTabsChanged(broker, userId, repoRoot)
   }
 
-  function handleSessionClosed(userId: string, session: TerminalSessionSummary): void {
+  function handleSessionClosed(userId: string, session: TerminalSessionSummary, reason: TerminalSessionCloseReason): void {
+    if (reason !== 'session') return
     broadcastRepoSessionsChanged(userId, session.repoRoot)
     void sessionService
       .reconcileTerminalTabsForSession(userId, session)
