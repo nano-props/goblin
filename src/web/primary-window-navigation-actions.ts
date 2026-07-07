@@ -2,7 +2,11 @@ import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/repos/types.ts'
-import { restoreWorkspaceNavigationEntry } from '#/web/workspace-navigation-history.ts'
+import {
+  restoreWorkspaceNavigationEntry,
+  workspaceNavigationHistoryRestoreBlocked,
+} from '#/web/workspace-navigation-history.ts'
+import { workspacePaneTabInteractionBlockedForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
 export interface PrimaryWindowNavigationActions {
   activateRepo: (repoId: string) => void
@@ -63,18 +67,22 @@ export function createPrimaryWindowNavigationActions({
       routeNavigation.openRepoBranch(repoId, branch)
     },
     showRepoBranchWorkspacePaneTab(repoId, branch, tab, options) {
+      if (workspacePaneTabInteractionBlockedForBranch(repoId, branch)) return
       if (options) routeNavigation.openRepoBranchTab(repoId, branch, tab, options)
       else routeNavigation.openRepoBranchTab(repoId, branch, tab)
     },
     showRepoBranchTerminalSession(repoId, branch, terminalSessionId, options) {
+      if (workspacePaneTabInteractionBlockedForBranch(repoId, branch)) return
       if (options) routeNavigation.openRepoBranchTerminal(repoId, branch, terminalSessionId, options)
       else routeNavigation.openRepoBranchTerminal(repoId, branch, terminalSessionId)
     },
     goBack(repoId) {
+      if (workspaceNavigationHistoryRestoreBlocked(repoId, 'back')) return
       const target = goBackInWorkspaceNavigation?.(repoId) ?? null
       if (target) restoreWorkspaceNavigationEntry(target, routeNavigation)
     },
     goForward(repoId) {
+      if (workspaceNavigationHistoryRestoreBlocked(repoId, 'forward')) return
       const target = goForwardInWorkspaceNavigation?.(repoId) ?? null
       if (target) restoreWorkspaceNavigationEntry(target, routeNavigation)
     },

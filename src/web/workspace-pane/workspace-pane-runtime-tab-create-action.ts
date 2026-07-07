@@ -3,14 +3,12 @@ import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import type { TerminalCreateOptions, TerminalCreateOwner } from '#/web/components/terminal/types.ts'
-import {
-  captureWorkspacePaneActiveTabIdentity,
-  captureWorkspacePaneTabFocusGuard,
-} from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 
 export interface WorkspacePaneRuntimeTabCreateAction {
   label: string
   busy: boolean
+  blocksTabInteraction: boolean
   onCreate: () => void
 }
 
@@ -23,10 +21,7 @@ export interface WorkspacePaneRuntimeTabCreateActionContext {
   terminal?: WorkspacePaneTerminalCreateActionContext
 }
 
-export type WorkspacePaneRuntimeTabCreateStateByType = Record<
-  WorkspacePaneRuntimeTabType,
-  { createPending: boolean }
->
+export type WorkspacePaneRuntimeTabCreateStateByType = Record<WorkspacePaneRuntimeTabType, { createPending: boolean }>
 
 export interface WorkspacePaneTerminalCreateActionContext {
   base: TerminalSessionBase | null
@@ -67,17 +62,16 @@ function terminalRuntimeTabCreateAction(
   return {
     label: context.t('terminal.new'),
     busy: context.initialRuntimeProjectionHydrating || context.runtimeTabStateByType.terminal.createPending,
+    blocksTabInteraction: context.runtimeTabStateByType.terminal.createPending,
     onCreate: () => {
       // "+" is a generic entry; opener only drives close-back focus, not insertion.
       const openerIdentity = captureWorkspacePaneActiveTabIdentity(context.repoRoot, base.branch)
-      const shouldShowCreatedTerminalTab = captureWorkspacePaneTabFocusGuard(context.repoRoot, base.branch)
       void runCreateTerminalTabCommand({
         base,
         createTerminal: terminal.createTerminal,
         createOwnedTerminal: terminal.createOwnedTerminal,
         openerIdentity,
         showCreatedTerminalTab: (terminalSessionId) => context.showCreatedRuntimeTab('terminal', terminalSessionId),
-        shouldShowCreatedTerminalTab,
         t: context.t,
       })
     },

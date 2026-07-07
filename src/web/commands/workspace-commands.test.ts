@@ -564,7 +564,7 @@ describe('workspace commands', () => {
     expect(tabsFor('feature/worktree')).toEqual([staticEntry('status')])
   })
 
-  test('new terminal tab command does not steal focus if user changed view during create', async () => {
+  test('new terminal tab command opens the created terminal after create finishes', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -590,10 +590,6 @@ describe('workspace commands', () => {
     })
     await vi.waitFor(() => expect(createTerminal).toHaveBeenCalledTimes(1))
 
-    // Simulate the user clicking a different tab while the create is in flight.
-    useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/worktree', 'status')
-    expect(preferredWorkspacePaneTab()).toBe('status')
-
     resolve('session-2')
     await command
 
@@ -604,6 +600,7 @@ describe('workspace commands', () => {
     ])
     expect(preferredWorkspacePaneTab()).toBe('status')
     expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[WORKTREE_KEY]).toBe('session-2')
+    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'session-2')
   })
 
   test('new terminal tab command does not create a terminal after the repo is closed and reopened', async () => {

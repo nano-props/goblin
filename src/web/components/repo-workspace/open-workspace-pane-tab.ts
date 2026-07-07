@@ -10,6 +10,7 @@ import {
   captureWorkspacePaneActiveTabIdentity,
   recordWorkspacePaneTabOpener,
 } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import { workspacePaneTabInteractionBlockedForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
 export async function openWorkspacePaneTab(input: {
   repoId: string
@@ -21,6 +22,7 @@ export async function openWorkspacePaneTab(input: {
 }): Promise<boolean> {
   const provider = workspacePaneStaticTabProvider(input.type)
   if (!provider.canOpen({ hasWorktree: !!input.worktreePath })) return false
+  if (workspacePaneTabInteractionBlockedForBranch(input.repoId, input.branchName)) return false
   const state = useReposStore.getState()
   const repo = state.repos[input.repoId]
   if (!repo) return false

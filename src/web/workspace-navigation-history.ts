@@ -8,6 +8,7 @@ import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { isWorkspacePaneStaticTabType, type WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { workspaceNavigationHistoryEntryEqual } from '#/web/stores/repos/navigation-history-entry.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import { workspacePaneTabInteractionBlockedForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
 export type WorkspaceNavigationRouteContext =
   | { kind: 'empty'; repoId: string }
@@ -23,24 +24,33 @@ export type WorkspaceNavigationRouteContext =
 
 interface WorkspaceNavigationHistoryOptions {
   routeContext: WorkspaceNavigationRouteContext | null
+  replaceCurrent?: boolean
 }
 
 let restoreRecordingSuppressed = false
 let restoreRecordingSuppressionTimer: ReturnType<typeof setTimeout> | null = null
 
-export function useWorkspaceNavigationHistory({ routeContext }: WorkspaceNavigationHistoryOptions): void {
+export function useWorkspaceNavigationHistory({
+  routeContext,
+  replaceCurrent = false,
+}: WorkspaceNavigationHistoryOptions): void {
   const entry = useWorkspaceNavigationHistoryEntry(routeContext)
   const recordWorkspaceNavigation = useReposStore((s) => s.recordWorkspaceNavigation)
 
   useEffect(() => {
     if (!entry) return
     if (restoreRecordingSuppressed) {
+      if (replaceCurrent) {
+        recordWorkspaceNavigation(entry, { replace: true })
+        clearRestoreRecordingSuppression()
+        return
+      }
       const historyCurrent = useReposStore.getState().navigationHistoryByRepo[entry.repoId]?.current ?? null
       if (workspaceNavigationHistoryEntryEqual(historyCurrent, entry)) clearRestoreRecordingSuppression()
       return
     }
     recordWorkspaceNavigation(entry)
-  }, [entry, recordWorkspaceNavigation])
+  }, [entry, recordWorkspaceNavigation, replaceCurrent])
 }
 
 function useWorkspaceNavigationHistoryEntry(
@@ -154,6 +164,7 @@ export function restoreWorkspaceNavigationEntry(
   entry: WorkspaceNavigationHistoryEntry,
   routeNavigation: PrimaryWindowRouteNavigation,
 ): void {
+  if (workspaceNavigationEntryBlocksWorkspacePaneInteraction(entry)) return
   suppressRestoreRecording()
   switch (entry.route.kind) {
     case 'empty':
@@ -177,6 +188,24 @@ export function restoreWorkspaceNavigationEntry(
       )
       return
   }
+}
+
+export function workspaceNavigationHistoryRestoreBlocked(repoId: string, direction: 'back' | 'forward'): boolean {
+  const history = useReposStore.getState().navigationHistoryByRepo[repoId]
+  const target = direction === 'back' ? history?.backStack.at(-1) : history?.forwardStack.at(-1)
+  if (!target) return false
+  return (
+    workspaceNavigationEntryBlocksWorkspacePaneInteraction(history?.current ?? null) ||
+    workspaceNavigationEntryBlocksWorkspacePaneInteraction(target)
+  )
+}
+
+function workspaceNavigationEntryBlocksWorkspacePaneInteraction(
+  entry: WorkspaceNavigationHistoryEntry | null,
+): boolean {
+  return entry?.route.kind === 'branch'
+    ? workspacePaneTabInteractionBlockedForBranch(entry.repoId, entry.route.branchName)
+    : false
 }
 
 function suppressRestoreRecording(): void {

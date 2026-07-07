@@ -198,10 +198,21 @@ function createRuntimeWorkspacePreferenceActions(set: ReposSet, get: ReposGet): 
 
 function createWorkspaceNavigationHistoryActions(set: ReposSet, get: ReposGet): WorkspaceNavigationHistoryActions {
   return {
-    recordWorkspaceNavigation(entry) {
+    recordWorkspaceNavigation(entry, options) {
       set((s) => {
         const currentRepoHistory = navigationHistoryForRepo(s.navigationHistoryByRepo[entry.repoId])
         if (workspaceNavigationHistoryEntryEqual(currentRepoHistory.current, entry)) return s
+        if (options?.replace) {
+          return {
+            navigationHistoryByRepo: {
+              ...s.navigationHistoryByRepo,
+              [entry.repoId]: {
+                ...currentRepoHistory,
+                current: entry,
+              },
+            },
+          }
+        }
         if (workspaceNavigationHistoryEntryCanReplaceCurrent(currentRepoHistory.current, entry)) {
           return {
             navigationHistoryByRepo: {

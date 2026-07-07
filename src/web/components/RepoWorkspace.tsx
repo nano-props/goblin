@@ -1,4 +1,4 @@
-import { useEffect, useId } from 'react'
+import { useEffect, useId, useMemo } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
@@ -23,9 +23,9 @@ import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import {
   reconcileWorkspacePaneRoute,
+  workspacePaneRouteHistoryResolution,
   type WorkspacePaneRouteReconciliation,
 } from '#/web/components/repo-workspace/workspace-pane-route-reconciliation.ts'
-import type { RepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
 
 interface Props {
   repoId: string
@@ -153,18 +153,6 @@ function RepoWorkspaceLoaded({
     worktreePath: historyBranch?.worktree?.path ?? null,
     route: workspacePaneRoute,
   })
-  useWorkspaceNavigationHistory({
-    routeContext:
-      currentBranchName && historyBranch
-        ? {
-            kind: 'branch',
-            repoId: repoShell.id,
-            branchName: currentBranchName,
-            worktreePath: historyBranch.worktree?.path ?? null,
-            workspacePaneRoute,
-          }
-        : null,
-  })
   if (!branchReadModel || !statusReadModel.data) {
     return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
   }
@@ -236,12 +224,22 @@ function RepoWorkspacePane({
 }: RepoWorkspacePaneProps) {
   const workspacePaneTabModel = useRepoWorkspaceTabModel(repo, detail, workspacePaneRoute)
   const navigation = usePrimaryWindowNavigation()
+  const workspacePaneRouteReconciliation = useMemo(
+    () => reconcileWorkspacePaneRoute(workspacePaneRoute, workspacePaneTabModel),
+    [workspacePaneRoute, workspacePaneTabModel],
+  )
   useReconcileWorkspacePaneRoute({
     repoId: repo.id,
     branchName: detail.branch?.name ?? null,
-    route: workspacePaneRoute,
-    model: workspacePaneTabModel,
+    reconciliation: workspacePaneRouteReconciliation,
     navigation,
+  })
+  useWorkspacePaneNavigationHistory({
+    repoId: repo.id,
+    branchName: detail.branch?.name ?? null,
+    worktreePath: detail.branch?.worktree?.path ?? null,
+    route: workspacePaneRoute,
+    reconciliation: workspacePaneRouteReconciliation,
   })
 
   return (
@@ -268,14 +266,12 @@ function RepoWorkspacePane({
 function useReconcileWorkspacePaneRoute({
   repoId,
   branchName,
-  route,
-  model,
+  reconciliation,
   navigation,
 }: {
   repoId: string
   branchName: string | null
-  route: RepoBranchWorkspacePaneRoute | null
-  model: RepoWorkspaceTabModel
+  reconciliation: WorkspacePaneRouteReconciliation
   navigation: {
     showRepoBranchWorkspacePaneTab: (
       repoId: string,
@@ -293,9 +289,37 @@ function useReconcileWorkspacePaneRoute({
 }): void {
   useEffect(() => {
     if (!branchName) return
-    const reconciliation = reconcileWorkspacePaneRoute(route, model)
     applyWorkspacePaneRouteReconciliation({ repoId, branchName, reconciliation, navigation })
-  }, [branchName, model, navigation, repoId, route])
+  }, [branchName, navigation, reconciliation, repoId])
+}
+
+function useWorkspacePaneNavigationHistory({
+  repoId,
+  branchName,
+  worktreePath,
+  route,
+  reconciliation,
+}: {
+  repoId: string
+  branchName: string | null
+  worktreePath: string | null
+  route: RepoBranchWorkspacePaneRoute | null
+  reconciliation: WorkspacePaneRouteReconciliation
+}): void {
+  const historyRoute = workspacePaneRouteHistoryResolution(route, reconciliation)
+  useWorkspaceNavigationHistory({
+    replaceCurrent: reconciliation.kind === 'replace',
+    routeContext:
+      branchName && historyRoute.kind === 'record'
+        ? {
+            kind: 'branch',
+            repoId,
+            branchName,
+            worktreePath,
+            workspacePaneRoute: historyRoute.route,
+          }
+        : null,
+  })
 }
 
 function applyWorkspacePaneRouteReconciliation({
@@ -322,7 +346,7 @@ function applyWorkspacePaneRouteReconciliation({
     ) => void
   }
 }): void {
-  if (reconciliation.kind === 'none') return
+  if (reconciliation.kind === 'none' || reconciliation.kind === 'pending') return
   if (reconciliation.route.kind === 'static') {
     navigation.showRepoBranchWorkspacePaneTab(repoId, branchName, reconciliation.route.tab, { replace: true })
     return

@@ -1,11 +1,13 @@
 import { terminalLog } from '#/web/logger.ts'
 import type { TerminalCreateOptions } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import {
   showTerminalCreateErrorToast,
   terminalCreateErrorKey,
   type TerminalCreateTranslator,
 } from '#/web/components/terminal/terminal-create-feedback.ts'
+import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/components/workspace-pane/tab-providers.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -37,8 +39,6 @@ export async function runCreateTerminalTabCommand(input: {
   openerIdentity: string | null
   /** Opens the concrete terminal route after the server has created a session. */
   showCreatedTerminalTab?: (terminalSessionId: string) => void | Promise<void>
-  /** Prevents late terminal creation from stealing focus after the user navigates away. */
-  shouldShowCreatedTerminalTab?: () => boolean
   /**
    * Insertion anchor for the new terminal tab. Callers decide explicitly:
    * supply the captured opener's identity when the terminal is opened from
@@ -55,14 +55,19 @@ export async function runCreateTerminalTabCommand(input: {
   if (!usesOwnedCreate && !hasFreshRepoInstance(useReposStore.getState(), repoInstance)) {
     return { ok: false, error: new Error('cancelled'), messageKey: 'error.terminal-create-failed' }
   }
+  if (terminalCreatePending(input.base)) {
+    return {
+      ok: false,
+      error: new Error('terminal create already pending'),
+      messageKey: 'error.terminal-create-failed',
+    }
+  }
   try {
     const terminalSessionId = await createTerminalSession(input, owner)
     if (!usesOwnedCreate && !hasFreshRepoInstance(useReposStore.getState(), repoInstance)) {
       return { ok: false, error: new Error('cancelled'), messageKey: 'error.terminal-create-failed' }
     }
-    if (input.showCreatedTerminalTab && (input.shouldShowCreatedTerminalTab?.() ?? true)) {
-      await input.showCreatedTerminalTab(terminalSessionId)
-    }
+    if (input.showCreatedTerminalTab) await input.showCreatedTerminalTab(terminalSessionId)
     if (input.openerIdentity) {
       recordWorkspacePaneTabOpener(
         input.base.repoRoot,
@@ -81,6 +86,13 @@ export async function runCreateTerminalTabCommand(input: {
     terminalLog.warn(input.logMessage ?? 'failed to create terminal', { err: error, messageKey })
     return { ok: false, error, messageKey }
   }
+}
+
+function terminalCreatePending(base: TerminalSessionBase): boolean {
+  const bridge = readTerminalSessionCommandBridge()
+  if (!bridge) return false
+  const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
+  return bridge.terminalWorktreeSnapshot(terminalWorktreeKey).createPending
 }
 
 function isTerminalCreateCanceled(error: unknown): boolean {

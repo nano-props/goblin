@@ -18,10 +18,7 @@ import { isWorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type { RepoWorkspaceRuntimeTabStateByType } from '#/web/components/repo-workspace/tab-model.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
-import {
-  captureWorkspacePaneActiveTabIdentity,
-  captureWorkspacePaneTabFocusGuard,
-} from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import type { WorkspacePanePanelLabel } from '#/web/components/workspace-pane/tab-providers.ts'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
@@ -235,7 +232,6 @@ function FiletreeTab({
       if (!beginOpeningFile(openingFileKey)) return
       try {
         const openerIdentity = captureWorkspacePaneActiveTabIdentity(repoId, branchName)
-        const shouldShowCreatedTerminalTab = captureWorkspacePaneTabFocusGuard(repoId, branchName)
         const viewerResult = await getRepositoryFileViewer(repoId, worktreePath)
         await runCreateTerminalTabCommand({
           base: { repoRoot: repoId, repoInstanceId, branch: branchName, worktreePath },
@@ -244,7 +240,6 @@ function FiletreeTab({
           openerIdentity,
           showCreatedTerminalTab: (terminalSessionId) =>
             navigation.showRepoBranchTerminalSession(repoId, branchName, terminalSessionId),
-          shouldShowCreatedTerminalTab,
           options: {
             startupShellCommand: fileReadCommand(viewerResult, absoluteFilePathForTerminal(worktreePath, node.path)),
             insertAfterIdentity: openerIdentity,

@@ -1,6 +1,21 @@
-import { describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
+import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
+import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/repos/types.ts'
+
+const REPO_ID = '/tmp/navigation-actions-repo'
+const BRANCH_NAME = 'feature/create-pending'
+const WORKTREE_PATH = '/tmp/navigation-actions-worktree'
+const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
+
+beforeEach(() => {
+  resetReposStore()
+  setTerminalSessionCommandBridge(null)
+})
 
 describe('createPrimaryWindowNavigationActions', () => {
   test('opens branch workspace static tabs through route navigation', () => {
@@ -29,6 +44,80 @@ describe('createPrimaryWindowNavigationActions', () => {
     actions.showRepoBranchTerminalSession('/tmp/repo-b', 'feature/test', 'session-1')
 
     expect(navigation.openRepoBranchTerminal).toHaveBeenCalledWith('/tmp/repo-b', 'feature/test', 'session-1')
+  })
+
+  test('blocks workspace pane route navigation while terminal creation is pending', () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: BRANCH_NAME,
+      preferredWorkspacePaneTab: 'status',
+    })
+    setTerminalSessionCommandBridge({
+      terminalWorktreeSnapshot: () => createPendingWorktreeSnapshot(),
+      createTerminal: vi.fn(async () => 'session-1'),
+      selectTerminal: vi.fn(),
+    })
+    const navigation = routeNavigation()
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: REPO_ID,
+      order: [REPO_ID],
+      closeRepo: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    actions.showRepoBranchWorkspacePaneTab(REPO_ID, BRANCH_NAME, 'history')
+    actions.showRepoBranchTerminalSession(REPO_ID, BRANCH_NAME, 'session-1')
+
+    expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
+    expect(navigation.openRepoBranchTerminal).not.toHaveBeenCalled()
+  })
+
+  test('blocks workspace history restore before mutating history while terminal creation is pending', () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: BRANCH_NAME,
+      preferredWorkspacePaneTab: 'status',
+    })
+    const dashboard = {
+      repoId: REPO_ID,
+      route: { kind: 'dashboard' },
+    } satisfies WorkspaceNavigationHistoryEntry
+    const branch = {
+      repoId: REPO_ID,
+      route: {
+        kind: 'branch',
+        branchName: BRANCH_NAME,
+        workspacePaneTab: 'status',
+        terminalWorktreeKey: WORKTREE_KEY,
+        terminalSessionId: null,
+      },
+    } satisfies WorkspaceNavigationHistoryEntry
+    useReposStore.getState().recordWorkspaceNavigation(dashboard)
+    useReposStore.getState().recordWorkspaceNavigation(branch)
+    setTerminalSessionCommandBridge({
+      terminalWorktreeSnapshot: () => createPendingWorktreeSnapshot(),
+      createTerminal: vi.fn(async () => 'session-1'),
+      selectTerminal: vi.fn(),
+    })
+    const goBackInWorkspaceNavigation = vi.fn((repoId: string) =>
+      useReposStore.getState().goBackInWorkspaceNavigation(repoId),
+    )
+    const navigation = routeNavigation()
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: REPO_ID,
+      order: [REPO_ID],
+      closeRepo: vi.fn(),
+      goBackInWorkspaceNavigation,
+      routeNavigation: navigation,
+    })
+
+    actions.goBack(REPO_ID)
+
+    expect(goBackInWorkspaceNavigation).not.toHaveBeenCalled()
+    expect(navigation.openRepoDashboard).not.toHaveBeenCalled()
+    expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]?.current).toEqual(branch)
   })
 
   test('cycles repos by navigating from the current repo', () => {
@@ -169,5 +258,17 @@ function routeNavigation(): PrimaryWindowRouteNavigation {
     openRepoBranchTerminal: vi.fn(),
     openRepoNewWorktree: vi.fn(),
     cancelRepoNewWorktree: vi.fn(),
+  }
+}
+
+function createPendingWorktreeSnapshot(): TerminalWorktreeSnapshot {
+  return {
+    terminalWorktreeKey: WORKTREE_KEY,
+    selectedDescriptor: null,
+    sessions: [],
+    count: 0,
+    bellCount: 0,
+    outputActiveCount: 0,
+    createPending: true,
   }
 }

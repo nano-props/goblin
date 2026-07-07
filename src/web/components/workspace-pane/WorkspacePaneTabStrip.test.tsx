@@ -205,6 +205,83 @@ describe('WorkspacePaneTabStrip', () => {
     expect(onNew).not.toHaveBeenCalled()
   })
 
+  test('blocks tab switching and closing while terminal creation is pending', () => {
+    const onSelect = vi.fn()
+    const onClose = vi.fn()
+    render(
+      <TestWorkspacePaneTabStrip
+        terminalWorktreeKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        newTerminalBusy
+        newTerminalBlocksTabInteraction
+        sessions={[
+          session({ terminalSessionId: 't1', selected: true, title: 'term-1' }),
+          session({ terminalSessionId: 't2', selected: false, title: 'term-2' }),
+        ]}
+        onNew={() => {}}
+        onSelect={onSelect}
+        onScrollToBottom={() => {}}
+        onClose={onClose}
+        onReorder={() => {}}
+      />,
+    )
+
+    const inactiveTab = document.body.querySelector<HTMLButtonElement>('#workspace-workspace-pane-tab-1')
+    expect(inactiveTab).not.toBeNull()
+    expect(inactiveTab?.disabled).toBe(true)
+    expect(document.body.querySelector('button[aria-label="close term-2"]')).toBeNull()
+
+    act(() => {
+      inactiveTab?.click()
+    })
+
+    expect(onSelect).not.toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  test('blocks compact popover tab switching while terminal creation is pending', async () => {
+    const onSelect = vi.fn()
+    render(
+      <TestWorkspacePaneTabStrip
+        terminalWorktreeKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        responsiveCompact
+        newTerminalBusy
+        newTerminalBlocksTabInteraction
+        sessions={[
+          session({ terminalSessionId: 't1', selected: true, title: 'term-1' }),
+          session({ terminalSessionId: 't2', selected: false, title: 'term-2' }),
+        ]}
+        onNew={() => {}}
+        onSelect={onSelect}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    const trigger = document.body.querySelector('button[aria-label="workspace-pane-tabs.tabs"]')
+    if (!(trigger instanceof HTMLButtonElement)) throw new Error('missing terminal popover trigger')
+
+    await act(async () => {
+      trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0 }))
+      trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+      await Promise.resolve()
+    })
+
+    const inactiveItem = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === 'term-2',
+    )
+    expect(inactiveItem).not.toBeNull()
+    expect(inactiveItem?.disabled).toBe(true)
+
+    act(() => {
+      inactiveItem?.click()
+    })
+
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
   test('collapsed terminal tab only navigates out on arrow keys', () => {
     const onNavigateOut = vi.fn()
     render(
@@ -1297,6 +1374,7 @@ function TestWorkspacePaneTabStrip(props: {
   responsiveCompact?: boolean
   panelActive?: boolean
   newTerminalBusy?: boolean
+  newTerminalBlocksTabInteraction?: boolean
   onNew: () => void
   onSelect: (terminalWorktreeKey: string, tab: TerminalSessionSummary) => void
   onScrollToBottom: (key: string) => void
@@ -1305,7 +1383,15 @@ function TestWorkspacePaneTabStrip(props: {
   onNavigateOut?: (direction: 'prev' | 'next' | 'first' | 'last') => void
 }) {
   const selected = props.sessions.find((candidate) => candidate.selected) ?? null
-  const { sessions, terminalWorktreeKey, newTerminalBusy, onNew, onScrollToBottom, ...workspacePaneProps } = props
+  const {
+    sessions,
+    terminalWorktreeKey,
+    newTerminalBusy,
+    newTerminalBlocksTabInteraction,
+    onNew,
+    onScrollToBottom,
+    ...workspacePaneProps
+  } = props
   const items: WorkspacePaneTabItem[] = sessions.map((tab) =>
     createRuntimeWorkspacePaneTabItem({
       view: tab,
@@ -1331,6 +1417,7 @@ function TestWorkspacePaneTabStrip(props: {
           ? {
               label: 'terminal.new',
               busy: newTerminalBusy ?? false,
+              blocksTabInteraction: newTerminalBlocksTabInteraction ?? false,
               onCreate: onNew,
             }
           : null

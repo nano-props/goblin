@@ -11,7 +11,6 @@ export interface WorkspacePaneRuntimeTabCommandContext {
     bridge: TerminalSessionCommandBridge | null
     openerIdentity: string | null
     showTerminalSession: (terminalSessionId: string) => void | Promise<void>
-    shouldShowCreatedTerminalSession?: () => boolean
     t?: TerminalCreateTranslator
   }
 }
@@ -53,6 +52,7 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
   // Synchronous local-state read (no network round trip), so there's no
   // responsiveness cost to deciding before switching views.
   const worktree = terminal.bridge.terminalWorktreeSnapshot(terminalWorktreeKey)
+  if (worktree.createPending) return true
   if (worktree.count > 0) {
     // The primary action should land on a working runtime session when one
     // already exists instead of leaving selection wherever it previously was.
@@ -66,7 +66,6 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
     createOwnedTerminal: terminal.bridge.createOwnedTerminal,
     openerIdentity: terminal.openerIdentity,
     showCreatedTerminalTab: terminal.showTerminalSession,
-    shouldShowCreatedTerminalTab: terminal.shouldShowCreatedTerminalSession,
     t: terminal.t,
     logMessage: 'terminal primary action create failed',
   })
@@ -77,13 +76,14 @@ async function runNewTerminalAction(context: WorkspacePaneRuntimeTabCommandConte
   const terminal = context.terminal
   if (!terminal?.base) return false
   if (!terminal.bridge) return false
+  const terminalWorktreeKey = formatTerminalWorktreeKey(terminal.base.repoRoot, terminal.base.worktreePath)
+  if (terminal.bridge.terminalWorktreeSnapshot(terminalWorktreeKey).createPending) return true
   const result = await runCreateTerminalTabCommand({
     base: terminal.base,
     createTerminal: terminal.bridge.createTerminal,
     createOwnedTerminal: terminal.bridge.createOwnedTerminal,
     openerIdentity: terminal.openerIdentity,
     showCreatedTerminalTab: terminal.showTerminalSession,
-    shouldShowCreatedTerminalTab: terminal.shouldShowCreatedTerminalSession,
     t: terminal.t,
   })
   return result.ok

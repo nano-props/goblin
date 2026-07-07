@@ -275,16 +275,15 @@ describe('RepoWorkspace', () => {
     const route = routeNavigation()
     const testNavigation = navigationWithStore(route)
 
-    const workspace = (workspacePaneRoute: Parameters<typeof RepoWorkspace>[0]['workspacePaneRoute']) => (
+    const workspace = (
+      workspacePaneRoute: Parameters<typeof RepoWorkspace>[0]['workspacePaneRoute'],
+      readContext: TerminalSessionReadContextValue = terminalReadContext,
+    ) => (
       <QueryClientProvider client={primaryWindowQueryClient}>
         <PrimaryWindowNavigationProvider value={testNavigation}>
           <TerminalSessionContext value={{ ...terminalCommandContext, createTerminal }}>
-            <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace
-                repoId={REPO_ID}
-                currentBranchName="feature/a"
-                workspacePaneRoute={workspacePaneRoute}
-              />
+            <TerminalSessionReadContext value={readContext}>
+              <RepoWorkspace repoId={REPO_ID} currentBranchName="feature/a" workspacePaneRoute={workspacePaneRoute} />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
@@ -302,7 +301,12 @@ describe('RepoWorkspace', () => {
     })
     expect(route.openRepoBranchTerminal).toHaveBeenCalledWith(REPO_ID, 'feature/a', 'session-1')
 
-    rerender(workspace({ kind: 'terminal', terminalSessionId: 'session-1' }))
+    rerender(
+      workspace(
+        { kind: 'terminal', terminalSessionId: 'session-1' },
+        terminalReadContextWithSession(terminalWorktreeKey, 'session-1'),
+      ),
+    )
 
     await waitFor(() => {
       expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]?.backStack).toEqual([statusEntry])
@@ -353,6 +357,20 @@ describe('RepoWorkspace', () => {
       expect(route.openRepoBranchTerminal).toHaveBeenCalledWith(REPO_ID, branchName, 'session-1', {
         replace: true,
       })
+      expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]).toEqual({
+        current: {
+          repoId: REPO_ID,
+          route: {
+            kind: 'branch',
+            branchName,
+            workspacePaneTab: 'terminal',
+            terminalWorktreeKey,
+            terminalSessionId: 'session-1',
+          },
+        },
+        backStack: [],
+        forwardStack: [],
+      })
     })
   })
 
@@ -393,6 +411,7 @@ describe('RepoWorkspace', () => {
     })
 
     expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
+    expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]).toBeUndefined()
   })
 
   test('replaces an unrenderable static route with the resolved static route', async () => {
@@ -426,6 +445,20 @@ describe('RepoWorkspace', () => {
 
     await waitFor(() => {
       expect(route.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, branchName, 'status', { replace: true })
+      expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]).toEqual({
+        current: {
+          repoId: REPO_ID,
+          route: {
+            kind: 'branch',
+            branchName,
+            workspacePaneTab: 'status',
+            terminalWorktreeKey: null,
+            terminalSessionId: null,
+          },
+        },
+        backStack: [],
+        forwardStack: [],
+      })
     })
   })
 
@@ -529,7 +562,9 @@ function terminalReadContextWithSession(
   }
 }
 
-function navigationWithStore(routeNavigationOverrides: PrimaryWindowRouteNavigation = routeNavigation()): PrimaryWindowNavigationActions {
+function navigationWithStore(
+  routeNavigationOverrides: PrimaryWindowRouteNavigation = routeNavigation(),
+): PrimaryWindowNavigationActions {
   const store = useReposStore.getState()
   return createPrimaryWindowNavigationActions({
     currentRepoId: REPO_ID,

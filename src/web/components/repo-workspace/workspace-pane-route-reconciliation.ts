@@ -6,8 +6,10 @@ import type {
 } from '#/web/components/repo-workspace/tab-model.ts'
 
 export type WorkspacePaneRouteReconciliation =
-  | { kind: 'none' }
-  | { kind: 'replace'; route: RepoBranchWorkspacePaneRoute }
+  { kind: 'none' } | { kind: 'pending' } | { kind: 'replace'; route: RepoBranchWorkspacePaneRoute }
+
+export type WorkspacePaneRouteHistoryResolution =
+  { kind: 'defer' } | { kind: 'record'; route: RepoBranchWorkspacePaneRoute | null }
 
 export function reconcileWorkspacePaneRoute(
   route: RepoBranchWorkspacePaneRoute | null,
@@ -23,7 +25,7 @@ function reconcileStaticWorkspacePaneRoute(
   model: RepoWorkspaceTabModel,
 ): WorkspacePaneRouteReconciliation {
   if (model.tabs.some((tab) => tab.kind === 'static' && tab.type === route.tab)) return { kind: 'none' }
-  if (model.tabEntriesProjectionPhase === 'pending') return { kind: 'none' }
+  if (model.tabEntriesProjectionPhase === 'pending') return { kind: 'pending' }
   return replacementForRoute(route, model)
 }
 
@@ -38,18 +40,28 @@ function reconcileTerminalWorkspacePaneRoute(
   ) {
     return { kind: 'none' }
   }
-  if (model.runtimeTabStateByType.terminal.projectionPhase === 'pending') return { kind: 'none' }
+  if (model.runtimeTabStateByType.terminal.projectionPhase === 'pending') return { kind: 'pending' }
   return replacementForRoute(route, model)
+}
+
+export function workspacePaneRouteHistoryResolution(
+  route: RepoBranchWorkspacePaneRoute | null,
+  reconciliation: WorkspacePaneRouteReconciliation,
+): WorkspacePaneRouteHistoryResolution {
+  if (reconciliation.kind === 'pending') return { kind: 'defer' }
+  if (reconciliation.kind === 'replace') return { kind: 'record', route: reconciliation.route }
+  return { kind: 'record', route }
 }
 
 function replacementForRoute(
   route: RepoBranchWorkspacePaneRoute,
   model: RepoWorkspaceTabModel,
 ): WorkspacePaneRouteReconciliation {
-  const fallbackRoute = routeForMaterializedTab(model.activeTab) ?? routeForMaterializedTab(firstMaterializedTab(model.tabs)) ?? {
-    kind: 'static',
-    tab: 'status',
-  }
+  const fallbackRoute = routeForMaterializedTab(model.activeTab) ??
+    routeForMaterializedTab(firstMaterializedTab(model.tabs)) ?? {
+      kind: 'static',
+      tab: 'status',
+    }
   return workspacePaneRouteEquals(route, fallbackRoute) ? { kind: 'none' } : { kind: 'replace', route: fallbackRoute }
 }
 

@@ -1,4 +1,8 @@
-import { createRepoWorkspaceTabModel, type RepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
+import {
+  createRepoWorkspaceTabModel,
+  repoWorkspaceTabModelBlocksTabInteraction,
+  type RepoWorkspaceTabModel,
+} from '#/web/components/repo-workspace/tab-model.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -13,6 +17,11 @@ export type WorkspacePaneTabTargetResolution =
 export function workspacePaneTabTargetForBranch(repoId: string, branchName: string): RepoWorkspaceTabModel | null {
   const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, branchName)
   return resolution.kind === 'ready' ? resolution.target : null
+}
+
+export function workspacePaneTabInteractionBlockedForBranch(repoId: string, branchName: string): boolean {
+  const target = workspacePaneTabTargetForBranch(repoId, branchName)
+  return target ? repoWorkspaceTabModelBlocksTabInteraction(target) : false
 }
 
 export function resolveWorkspacePaneTabTargetForBranch(

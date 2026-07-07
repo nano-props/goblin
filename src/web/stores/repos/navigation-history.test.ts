@@ -54,6 +54,16 @@ describe('workspace navigation history', () => {
     expect(history().backStack).toEqual([])
   })
 
+  test('explicitly replaces the current entry without pushing history', () => {
+    const store = useReposStore.getState()
+    store.recordWorkspaceNavigation(entry('dashboard'))
+    store.recordWorkspaceNavigation(entry('branch', 'feature/a'), { replace: true })
+
+    expect(history().current).toEqual(entry('branch', 'feature/a'))
+    expect(history().backStack).toEqual([])
+    expect(history().forwardStack).toEqual([])
+  })
+
   test('updates branch metadata without adding a back entry', () => {
     const store = useReposStore.getState()
     store.recordWorkspaceNavigation(branchEntry({ tab: 'status', terminalSessionId: null }))

@@ -287,6 +287,12 @@ export function repoWorkspaceRuntimeTabSessionId(
   return tab?.kind === 'runtime' && tab.runtimeType === type ? tab.sessionId : null
 }
 
+export function repoWorkspaceTabModelBlocksTabInteraction(
+  model: Pick<RepoWorkspaceTabModel, 'runtimeTabStateByType'>,
+): boolean {
+  return WORKSPACE_PANE_RUNTIME_TAB_TYPES.some((type) => model.runtimeTabStateByType[type].createPending)
+}
+
 function materializedWorkspacePaneTabs(input: {
   tabEntries: readonly WorkspacePaneTabEntry[]
   runtimeViews: readonly WorkspacePaneRuntimeTabSummary[]

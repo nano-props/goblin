@@ -10,6 +10,7 @@ import {
   adjacentRepoWorkspaceTab,
   isRepoWorkspaceRuntimeTab,
   nextRepoWorkspaceTabAfterClose,
+  repoWorkspaceTabModelBlocksTabInteraction,
   type RepoWorkspaceTab,
   type RepoWorkspaceTabModel,
 } from '#/web/components/repo-workspace/tab-model.ts'
@@ -45,10 +46,7 @@ import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import {
-  clearWorkspacePaneTabOpener,
-  workspacePaneTabOpener,
-} from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import { clearWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 
 interface ShowWorkspacePaneTabCommandOptions {
   repoId: string | null
@@ -203,6 +201,7 @@ async function closeWorkspacePaneTabCommand(options: CloseWorkspacePaneTabComman
   const skipRuntimeCloseConfirm = options.skipRuntimeCloseConfirm ?? options.skipTerminalCloseConfirm ?? false
   const target = repoId && options.branchName ? workspacePaneTabTargetForBranch(repoId, options.branchName) : null
   if (!target) return false
+  if (repoWorkspaceTabModelBlocksTabInteraction(target)) return true
   const tab = targetIdentity
     ? (target?.tabs.find((candidate) => candidate.identity === targetIdentity) ?? null)
     : (target?.activeTab ?? null)
@@ -267,15 +266,14 @@ function closeConfirmedTerminalWorkspacePaneTab(options: ConfirmCloseTerminalWor
   const confirmedBranchName = workspacePaneRuntimeTabConfirmedCloseBranchName(confirmed)
   if (!confirmedBranchName) return false
   const target = repoId && options.branchName ? workspacePaneTabTargetForBranch(repoId, options.branchName) : null
+  if (target && repoWorkspaceTabModelBlocksTabInteraction(target)) return false
   const tab = targetIdentity ? (target?.tabs.find((candidate) => candidate.identity === targetIdentity) ?? null) : null
   const wasActive = !!target && !!tab && target.activeTab?.identity === tab.identity
   // Read the opener scoped by the runtime tab's actual branch from the
   // confirmed-close payload, not `target.branchName` — the current route
   // branch may have changed since the confirm dialog was opened.
   const openerIdentity =
-    wasActive && target && tab
-      ? workspacePaneTabOpener(target.repoId, confirmedBranchName, tab.identity)
-      : null
+    wasActive && target && tab ? workspacePaneTabOpener(target.repoId, confirmedBranchName, tab.identity) : null
   const nextTab =
     wasActive && target && tab ? nextRepoWorkspaceTabAfterClose(target.tabs, tab.identity, openerIdentity) : null
   const closeContext = readWorkspacePaneRuntimeTabCloseContext()
@@ -337,6 +335,7 @@ export function runSelectWorkspacePaneTabByIndexCommand({
   const target = workspacePaneTabTargetForBranch(repoId, branchName)
   const tab = target?.tabs[tabIndex - 1]
   if (!target || !tab) return false
+  if (repoWorkspaceTabModelBlocksTabInteraction(target)) return false
   if (tab.kind === 'pending') return false
   showWorkspacePaneCommandTab(target, tab, navigation)
   return true
@@ -352,6 +351,7 @@ export function runMoveWorkspacePaneTabCommand({
   const target = workspacePaneTabTargetForBranch(repoId, branchName)
   const tab = target ? adjacentRepoWorkspaceTab(target.tabs, target.activeTab?.identity, direction) : null
   if (!target || !tab) return false
+  if (repoWorkspaceTabModelBlocksTabInteraction(target)) return false
   showWorkspacePaneCommandTab(target, tab, navigation)
   return true
 }

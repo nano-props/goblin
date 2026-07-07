@@ -33,14 +33,6 @@ const terminalCreateCommandMocks = vi.hoisted(() => ({
   runCreateTerminalTabCommand: vi.fn(async () => ({ ok: true as const, terminalSessionId: 'session-1' })),
 }))
 
-const workspacePaneTabOpenerMocks = vi.hoisted(() => {
-  const shouldShowCreatedTerminalTab = vi.fn(() => true)
-  return {
-    shouldShowCreatedTerminalTab,
-    captureWorkspacePaneTabFocusGuard: vi.fn(() => shouldShowCreatedTerminalTab),
-  }
-})
-
 vi.mock('#/web/components/terminal/TerminalSessionView.tsx', () => ({
   TerminalSessionView: (props: CapturedTerminalSessionViewProps) => {
     terminalSessionViewMocks.props.push(props)
@@ -52,15 +44,9 @@ vi.mock('#/web/commands/terminal-create-command.ts', () => ({
   runCreateTerminalTabCommand: terminalCreateCommandMocks.runCreateTerminalTabCommand,
 }))
 
-vi.mock('#/web/workspace-pane/workspace-pane-tab-opener.ts', () => ({
-  captureWorkspacePaneTabFocusGuard: workspacePaneTabOpenerMocks.captureWorkspacePaneTabFocusGuard,
-}))
-
 afterEach(() => {
   terminalSessionViewMocks.props.length = 0
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockClear()
-  workspacePaneTabOpenerMocks.captureWorkspacePaneTabFocusGuard.mockClear()
-  workspacePaneTabOpenerMocks.shouldShowCreatedTerminalTab.mockClear()
 })
 
 describe('workspace pane runtime tab panel', () => {
@@ -84,7 +70,9 @@ describe('workspace pane runtime tab panel', () => {
   test('delegates terminal empty-slot create to the terminal create command', async () => {
     const createTerminal = vi.fn(async () => 'session-1')
     const createOwnedTerminal = vi.fn(async () => 'session-1')
-    const { navigation } = renderPanel({ terminalContext: terminalCommandContextWith({ createTerminal, createOwnedTerminal }) })
+    const { navigation } = renderPanel({
+      terminalContext: terminalCommandContextWith({ createTerminal, createOwnedTerminal }),
+    })
 
     const base: TerminalSessionBase = {
       repoRoot: '/repo',
@@ -103,11 +91,9 @@ describe('workspace pane runtime tab panel', () => {
         createTerminal,
         createOwnedTerminal,
         openerIdentity: null,
-        shouldShowCreatedTerminalTab: workspacePaneTabOpenerMocks.shouldShowCreatedTerminalTab,
         logMessage: 'workspace pane terminal create failed',
       }),
     )
-    expect(workspacePaneTabOpenerMocks.captureWorkspacePaneTabFocusGuard).toHaveBeenCalledWith('/repo', 'main')
     const commandCalls = terminalCreateCommandMocks.runCreateTerminalTabCommand.mock.calls as unknown as Array<
       [{ showCreatedTerminalTab: (terminalSessionId: string) => void | Promise<void> }]
     >

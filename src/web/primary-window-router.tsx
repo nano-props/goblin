@@ -76,6 +76,7 @@ const repoBranchTabRoute = createRoute({
           branchSlug: params.branchSlug,
           tabKey: 'status',
         },
+        replace: true,
       })
     }
   },

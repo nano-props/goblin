@@ -56,6 +56,7 @@ Notes:
 - Workspace pane tabs truth lives in the server workspace-pane runtime. React Query caches the runtime projection. Reorder may use a short-lived optimistic query update, but success must replace it with server-returned tabs and failure must rollback or invalidate.
 - Runtime-coherent state may use invalidation plus refetch or realtime streaming.
 - For runtime correctness boundaries, prefer server-owned fast fail over client guards. A mutation that no longer matches the live runtime instance should be rejected by the server, not locally guessed away by the client.
+- Do not introduce client-only async tokens or focus guards to suppress late navigation after a write completes. Model the operation as a server/projection-owned pending state, reject competing user operations at their entry point, and then project the server result.
 - Do not mirror authoritative runtime membership from the client back into the server with whole-snapshot sync. Use server-owned open/close transitions and let the server mint runtime identities.
 - Cache identity must match runtime identity. If reopen can mint a new instance for the same stable path, cache keys and mutation preconditions need an instance dimension too.
 - Do not layer a client freshness check on top of a server-owned runtime id when the server can already validate the mutation from that id alone. That is not extra safety; it is a second authority and a new failure mode.

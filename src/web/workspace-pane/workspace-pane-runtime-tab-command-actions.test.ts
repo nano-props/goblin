@@ -21,10 +21,7 @@ describe('workspace pane runtime tab command actions', () => {
       terminalWorktreeSnapshot: () => ({
         terminalWorktreeKey: '/repo\0/repo-worktree',
         selectedDescriptor: null,
-        sessions: [
-          terminalSession('session-1', true),
-          terminalSession('session-2', false),
-        ],
+        sessions: [terminalSession('session-1', true), terminalSession('session-2', false)],
         count: 2,
         bellCount: 0,
         outputActiveCount: 0,
@@ -47,6 +44,48 @@ describe('workspace pane runtime tab command actions', () => {
 
     expect(showTerminalSession).toHaveBeenCalledWith('session-1')
     expect(selectTerminal).not.toHaveBeenCalled()
+    expect(createTerminal).not.toHaveBeenCalled()
+  })
+
+  test('terminal actions no-op while a terminal create is pending', async () => {
+    const createTerminal = vi.fn(async () => 'created-session')
+    const showTerminalSession = vi.fn()
+    const bridge: TerminalSessionCommandBridge = {
+      terminalWorktreeSnapshot: () => ({
+        terminalWorktreeKey: '/repo\0/repo-worktree',
+        selectedDescriptor: null,
+        sessions: [terminalSession('session-1', true)],
+        count: 1,
+        bellCount: 0,
+        outputActiveCount: 0,
+        createPending: true,
+      }),
+      createTerminal,
+      selectTerminal: vi.fn(),
+    }
+
+    await expect(
+      runWorkspacePaneRuntimePrimaryAction('terminal', {
+        terminal: {
+          base: terminalBase,
+          bridge,
+          openerIdentity: null,
+          showTerminalSession,
+        },
+      }),
+    ).resolves.toBe(true)
+    await expect(
+      runWorkspacePaneRuntimeNewAction('terminal', {
+        terminal: {
+          base: terminalBase,
+          bridge,
+          openerIdentity: null,
+          showTerminalSession,
+        },
+      }),
+    ).resolves.toBe(true)
+
+    expect(showTerminalSession).not.toHaveBeenCalled()
     expect(createTerminal).not.toHaveBeenCalled()
   })
 

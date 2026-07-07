@@ -11,6 +11,11 @@ The strip splits based on **how** the action was triggered:
 
 The opener is captured at click time and does not change afterwards.
 
+Opener is not a focus guard. It should not decide whether a late async create
+result may navigate. Async create flows should serialize through the
+operation entry point using projection-owned pending state; opener only
+answers insertion and close-back behavior.
+
 ## Close
 
 When closing a tab with an opener:

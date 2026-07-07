@@ -21,7 +21,7 @@ describe('workspace pane route reconciliation', () => {
     const model = terminalModel({ routedSessionId: 'missing-session', terminalProjectionPhase: 'pending' })
 
     expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
-      kind: 'none',
+      kind: 'pending',
     })
   })
 
@@ -48,7 +48,7 @@ describe('workspace pane route reconciliation', () => {
       },
     })
 
-    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'none' })
+    expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'pending' })
   })
 
   test('replaces an unmaterialized static route with the resolved materialized tab', () => {
@@ -72,10 +72,7 @@ describe('workspace pane route reconciliation', () => {
   })
 })
 
-function terminalModel(input: {
-  routedSessionId: string
-  terminalProjectionPhase: 'pending' | 'ready' | 'failed'
-}) {
+function terminalModel(input: { routedSessionId: string; terminalProjectionPhase: 'pending' | 'ready' | 'failed' }) {
   return createRepoWorkspaceTabModel({
     repoId: REPO_ID,
     branchName: 'feature/route',

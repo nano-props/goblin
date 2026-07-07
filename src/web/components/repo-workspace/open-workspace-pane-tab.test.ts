@@ -19,14 +19,18 @@ import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-p
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { clearWorkspacePaneTabsOperationQueuesForTests } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
+import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 
 const REPO_ID = '/tmp/workspace-pane-tab-repo'
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-worktree'
+const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 const originalRefreshStatus = useReposStore.getState().refreshStatus
 
 beforeEach(() => {
   resetReposStore()
   installWorkspacePaneTabsTestBridge()
+  setTerminalSessionCommandBridge(null)
   clearWorkspacePaneTabsOperationQueuesForTests()
 })
 
@@ -34,6 +38,7 @@ afterEach(() => {
   resetReposStore()
   useReposStore.setState({ refreshStatus: originalRefreshStatus })
   setClientBridgeForTests(null)
+  setTerminalSessionCommandBridge(null)
   clearWorkspacePaneTabsOperationQueuesForTests()
 })
 
@@ -206,6 +211,30 @@ describe('openWorkspacePaneTab', () => {
     expect(openTabsFor('feature/worktree')).toContain('history')
     expect(preferredWorkspacePaneTab()).toBe('history')
     expect(refreshStatus).not.toHaveBeenCalled()
+  })
+
+  test('fast-fails before static tab mutation while terminal creation is pending', async () => {
+    seedWorktreeRepo('status')
+    const updateWorkspaceTabs = vi.fn(async () => [workspacePaneStaticTabEntry('status')])
+    installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
+    setTerminalSessionCommandBridge({
+      terminalWorktreeSnapshot: () => worktreeSnapshot({ createPending: true }),
+      createTerminal: vi.fn(async () => 'session-1'),
+      selectTerminal: vi.fn(),
+    })
+
+    await expect(
+      openWorkspacePaneTab({
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        worktreePath: WORKTREE_PATH,
+        type: 'history',
+        navigation: navigationWithStoreActions(),
+      }),
+    ).resolves.toBe(false)
+
+    expect(updateWorkspaceTabs).not.toHaveBeenCalled()
+    expect(preferredWorkspacePaneTab()).toBe('status')
   })
 
   test('records the active tab as the opener when opening a new static tab', async () => {
@@ -553,5 +582,17 @@ function navigationWithStoreActions(): Pick<PrimaryWindowNavigationActions, 'sho
       useReposStore.setState({ restoredRepoId: repoId })
       state.setWorkspacePaneTab(repoId, branch, tab)
     },
+  }
+}
+
+function worktreeSnapshot(input: { createPending: boolean }): TerminalWorktreeSnapshot {
+  return {
+    terminalWorktreeKey: WORKTREE_KEY,
+    selectedDescriptor: null,
+    sessions: [],
+    count: 0,
+    bellCount: 0,
+    outputActiveCount: 0,
+    createPending: input.createPending,
   }
 }

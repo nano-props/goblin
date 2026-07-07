@@ -9,7 +9,6 @@ import type { WorkspacePanePanelLabel } from '#/web/components/workspace-pane/ta
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
-import { captureWorkspacePaneTabFocusGuard } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 
 export interface WorkspacePaneRuntimeTabPanelState {
   projectionPhase: WorkspacePaneRuntimeProjectionPhase
@@ -68,7 +67,6 @@ function TerminalWorkspacePaneRuntimeTabPanel({
   const navigation = usePrimaryWindowNavigation()
   const createTerminalForSlot = useCallback(
     async (base: TerminalSessionBase) => {
-      const shouldShowCreatedTerminalTab = captureWorkspacePaneTabFocusGuard(base.repoRoot, base.branch)
       await runCreateTerminalTabCommand({
         base,
         createTerminal,
@@ -76,7 +74,6 @@ function TerminalWorkspacePaneRuntimeTabPanel({
         openerIdentity: null,
         showCreatedTerminalTab: (terminalSessionId) =>
           navigation.showRepoBranchTerminalSession(base.repoRoot, base.branch, terminalSessionId),
-        shouldShowCreatedTerminalTab,
         t,
         logMessage: 'workspace pane terminal create failed',
       })

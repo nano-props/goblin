@@ -14,10 +14,11 @@ interface UseSortableTabResult {
 
 export function useSortableTab(
   id: string,
-  options?: { onButtonRef?: (node: HTMLButtonElement | null) => void },
+  options?: { disabled?: boolean; onButtonRef?: (node: HTMLButtonElement | null) => void },
 ): UseSortableTabResult {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id,
+    disabled: options?.disabled,
   })
   const sortableOnKeyDown = listeners?.onKeyDown as ((event: KeyboardEvent) => void) | undefined
   const { onKeyDown: _sortableOnKeyDown, ...sortableListeners } = (listeners ?? {}) as ComponentPropsWithoutRef<'div'>
