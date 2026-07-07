@@ -662,6 +662,9 @@ export class TerminalSessionProjection {
       pending.creating = false
       if (this.lifecycleQueues.deleteCreate(terminalWorktreeKey, pending)) {
         this.notifyWorktree(terminalWorktreeKey)
+        if (this.lifecycleQueues.hasCreate(terminalWorktreeKey)) {
+          void this.flushCreateRequest(terminalWorktreeKey)
+        }
       }
     }
   }
@@ -744,12 +747,22 @@ export class TerminalSessionProjection {
   private async settleCreateRequestForWorktree(terminalWorktreeKey: string): Promise<void> {
     const pending = this.lifecycleQueues.getCreate(terminalWorktreeKey)
     if (!pending) return
+    const error = new Error('terminal create request canceled')
     if (!pending.creating) {
-      const error = new Error('terminal create request canceled')
-      if (this.lifecycleQueues.deleteCreate(terminalWorktreeKey, pending)) {
-        pending.reject(error)
+      if (this.lifecycleQueues.rejectCreatesForWorktree(terminalWorktreeKey, error, { includeActive: true })) {
         this.notifyWorktree(terminalWorktreeKey)
       }
+      try {
+        await pending.promise
+      } catch {
+        // A rejected create means no terminal session was created for this
+        // pending request. The release barrier can continue to close any
+        // sessions that were already present or that did get materialized.
+      }
+      return
+    }
+    if (this.lifecycleQueues.rejectCreatesForWorktree(terminalWorktreeKey, error, { includeActive: false })) {
+      this.notifyWorktree(terminalWorktreeKey)
     }
     try {
       await pending.promise

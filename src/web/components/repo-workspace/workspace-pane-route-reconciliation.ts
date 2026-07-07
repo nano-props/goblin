@@ -63,6 +63,7 @@ function reconcileInvalidWorkspacePaneRoute(
   model: RepoWorkspaceTabModel,
 ): WorkspacePaneRouteReconciliation {
   if (model.tabEntriesProjectionPhase === 'pending') return { kind: 'pending' }
+  if (model.tabEntriesProjectionPhase === 'failed') return { kind: 'unverified' }
   return replacementForRoute(route, model)
 }
 

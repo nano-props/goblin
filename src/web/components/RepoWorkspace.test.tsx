@@ -443,6 +443,52 @@ describe('RepoWorkspace', () => {
     expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
   })
 
+  test('does not sync a routed terminal session before terminal projection verifies the route', async () => {
+    const worktreePath = '/tmp/repo-workspace-container-repo-a'
+    const branchName = 'feature/a'
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
+      currentBranchName: branchName,
+      preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        [branchName]: [
+          workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+          workspacePaneRuntimeTabEntry('terminal', 'session-2'),
+        ],
+      },
+    })
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
+    useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'session-2')
+    const route = routeNavigation()
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext
+              value={terminalReadContextWithSessions(terminalWorktreeKey, ['session-1', 'session-2'])}
+            >
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName={branchName}
+                workspacePaneRoute={{ kind: 'terminal', terminalSessionId: 'session-1' }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
+    expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]).toBeUndefined()
+    expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]).toBe('session-2')
+  })
+
   test('preserves existing app history when canonicalizing a stale terminal route from another page', async () => {
     const worktreePath = '/tmp/repo-workspace-container-repo-a'
     const branchName = 'feature/a'

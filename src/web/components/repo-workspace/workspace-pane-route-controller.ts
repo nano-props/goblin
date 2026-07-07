@@ -8,6 +8,7 @@ import { usePrimaryWindowNavigation, type PrimaryWindowNavigationActions } from 
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import type { RepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
+import { useSyncRepoWorkspaceRuntimeTabSelection } from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
 import {
   reconcileWorkspacePaneRoute,
   workspacePaneRouteHistoryResolution,
@@ -51,6 +52,7 @@ export function useWorkspacePaneRouteController({
     route,
     reconciliation,
   })
+  useSyncRepoWorkspaceRuntimeTabSelection(model, { enabled: reconciliation.kind === 'none' })
   useReconcileWorkspacePaneRoute({
     repoId,
     branchName,

@@ -225,6 +225,25 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
+  test('leaves an invalid static route unverified while tab-entry projection has failed', () => {
+    const model = createRepoWorkspaceTabModel({
+      repoId: REPO_ID,
+      branchName: 'feature/route',
+      worktreePath: null,
+      preferredTab: null,
+      tabEntries: [workspacePaneStaticTabEntry('status')],
+      tabEntriesProjectionPhase: 'failed',
+      runtimeTabViews: [],
+      runtimeTabStateByType: {
+        terminal: { projectionPhase: 'ready' },
+      },
+    })
+
+    expect(reconcileWorkspacePaneRoute({ kind: 'invalid-static', tabKey: 'not-a-tab' }, model)).toEqual({
+      kind: 'unverified',
+    })
+  })
+
   test('replaces an unmaterialized route with the bare branch route when the pane is empty', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,

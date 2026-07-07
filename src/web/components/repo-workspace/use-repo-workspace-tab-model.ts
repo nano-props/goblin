@@ -16,23 +16,16 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   useWorkspacePaneRuntimeTabTargetProjection,
-  type WorkspacePaneRuntimeTabTargetProjectionHookResult,
 } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-target-projection.ts'
 import { useSyncWorkspacePaneRuntimeTabProviderSelection } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
-
-export interface RepoWorkspaceTabModelInputState {
-  input: RepoWorkspaceTabModelInput
-  selectedSessionIdByRuntimeType: WorkspacePaneRuntimeTabTargetProjectionHookResult['selectedSessionIdByRuntimeType']
-}
 
 export function useRepoWorkspaceTabModel(
   repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'ui'>,
   detail: CurrentRepoWorkspacePresentation,
   workspacePaneRoute: RepoBranchWorkspacePaneRoute | null,
 ) {
-  const { input, selectedSessionIdByRuntimeType } = useRepoWorkspaceTabModelInput(repo, detail, workspacePaneRoute)
+  const input = useRepoWorkspaceTabModelInput(repo, detail, workspacePaneRoute)
   const model = useMemo(() => createRepoWorkspaceTabModel(input), [input])
-  useSyncRepoWorkspaceRuntimeTabSelection(model, selectedSessionIdByRuntimeType)
   return model
 }
 
@@ -45,7 +38,7 @@ export function useRepoWorkspaceTabModelInput(
   repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'ui'>,
   detail: CurrentRepoWorkspacePresentation,
   workspacePaneRoute: RepoBranchWorkspacePaneRoute | null,
-): RepoWorkspaceTabModelInputState {
+): RepoWorkspaceTabModelInput {
   const { branch } = detail
   const branchName = branch?.name ?? null
   const worktreePath = branch?.worktree?.path ?? null
@@ -106,10 +99,7 @@ export function useRepoWorkspaceTabModelInput(
     ],
   )
 
-  return useMemo(
-    () => ({ input, selectedSessionIdByRuntimeType: runtimeProjection.selectedSessionIdByRuntimeType }),
-    [input, runtimeProjection.selectedSessionIdByRuntimeType],
-  )
+  return input
 }
 
 function workspacePaneTabsProjectionPhase(
@@ -121,20 +111,26 @@ function workspacePaneTabsProjectionPhase(
 }
 
 /**
- * Mirrors the model's resolved active runtime selection into the backing runtime store. Keeping
- * this separate from input collection makes the single write-side effect in
- * the tab-model hook explicit.
+ * Mirrors the verified model's resolved active runtime selection into the
+ * backing runtime store. The caller owns the route/reconciliation boundary;
+ * this hook only performs the provider write once that boundary allows it.
  */
 export function useSyncRepoWorkspaceRuntimeTabSelection(
   model: Pick<RepoWorkspaceTabModel, 'activeTab' | 'runtimeTabTargetKeyByType' | 'runtimeTabStateByType'>,
-  selectedSessionIdByRuntimeType: WorkspacePaneRuntimeTabTargetProjectionHookResult['selectedSessionIdByRuntimeType'],
+  options: { enabled: boolean },
 ): void {
-  const tabInteractionBlocked = repoWorkspaceTabModelBlocksTabInteraction(model)
+  const tabInteractionBlocked = !options.enabled || repoWorkspaceTabModelBlocksTabInteraction(model)
   const activeSessionIdByRuntimeType = useMemo(
     () => ({
       terminal: tabInteractionBlocked ? null : repoWorkspaceRuntimeTabSessionId(model.activeTab, 'terminal'),
     }),
     [model.activeTab, tabInteractionBlocked],
+  )
+  const selectedSessionIdByRuntimeType = useMemo(
+    () => ({
+      terminal: model.runtimeTabStateByType.terminal.selectedSessionId,
+    }),
+    [model.runtimeTabStateByType],
   )
   useSyncWorkspacePaneRuntimeTabProviderSelection(
     {
