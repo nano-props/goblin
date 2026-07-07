@@ -4,7 +4,7 @@ import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs
 import { deriveConnectivity } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { getRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { repoRuntimeInstancesQueryKey } from '#/web/repo-runtime-query.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import type { RepoRuntimeInstancesSnapshot } from '#/shared/api-types.ts'
@@ -89,7 +89,7 @@ describe('repo session hydration', () => {
     const cachedRepo = useReposStore.getState().repos[REPO_A]
     expect(cachedRepo?.name).toBe('cached-a')
     expect(
-      cachedRepo ? getRepoSnapshotQueryData(cachedRepo.id, cachedRepo.instanceId)?.branches.map((b) => b.name) : null,
+      cachedRepo ? readRepoBranchQueryProjection(cachedRepo)?.branches.map((b) => b.name) : null,
     ).toEqual(['cached'])
     expect(cachedRepo?.projection.source).toBe('cache')
     expect(cachedRepo?.dataLoads.snapshot.phase).toBe('refreshing')
@@ -100,7 +100,7 @@ describe('repo session hydration', () => {
 
     await vi.waitFor(() => {
       const freshRepo = useReposStore.getState().repos[REPO_A]
-      expect(freshRepo ? getRepoSnapshotQueryData(freshRepo.id, freshRepo.instanceId)?.current : null).toBe('fresh')
+      expect(freshRepo ? readRepoBranchQueryProjection(freshRepo)?.currentBranch : null).toBe('fresh')
       expect(freshRepo?.projection.source).toBe('fresh')
       expect(freshRepo?.dataLoads.snapshot.phase).toBe('idle')
       expect(freshRepo?.projection.savedAt).toBeNull()
@@ -154,7 +154,7 @@ describe('repo session hydration', () => {
     await vi.waitFor(() => {
       const repo = useReposStore.getState().repos[REPO_A]
       expect(repo).toBeDefined()
-      expect(repo ? getRepoSnapshotQueryData(repo.id, repo.instanceId)?.branches.map((b) => b.name) : null).toEqual([
+      expect(repo ? readRepoBranchQueryProjection(repo)?.branches.map((b) => b.name) : null).toEqual([
         'cached',
       ])
       // Local repos read as 'connected' under deriveConnectivity; the

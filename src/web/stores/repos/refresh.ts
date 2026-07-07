@@ -13,11 +13,7 @@ import { createRefreshSyncHelpers } from '#/web/stores/repos/refresh-sync.ts'
 import { runWithRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import { finishDataLoadError, finishDataLoadSuccess, startDataLoad } from '#/web/stores/repos/repo-data-load-state.ts'
 import { getRepoProjection } from '#/web/repo-client.ts'
-import {
-  getRepoSnapshotQueryData,
-  getRepoStatusQueryData,
-  setRepoProjectionQueryData,
-} from '#/web/repo-data-query.ts'
+import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { RepoRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
 import type { RepoRuntimeProjectionRefreshSection, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
@@ -72,7 +68,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         startDataLoad(r.dataLoads.snapshot, { hasData: (readRepoBranchQueryProjection(r)?.branches.length ?? 0) > 0 })
       }
       if (wantsStatus) {
-        startDataLoad(r.dataLoads.status, { hasData: (getRepoStatusQueryData(r.id, r.instanceId)?.length ?? 0) > 0 })
+        startDataLoad(r.dataLoads.status, { hasData: (readRepoBranchQueryProjection(r)?.status.length ?? 0) > 0 })
       }
     })
     await runLatestOperation({
@@ -87,7 +83,9 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       task: (signal) => getRepoProjection(id, null, { mode: 'full' }, signal),
       errorFromResult: (projection) => (projection.snapshot ? null : 'error.failed-read-repo'),
       onResult: async (projection: RepoRuntimeProjection, ctx) => {
-        const previousSnapshot = ctx.isCurrent() ? getRepoSnapshotQueryData(id, repoInstanceId) : null
+        const previousBranchModel = ctx.isCurrent()
+          ? readRepoBranchQueryProjection({ id, instanceId: repoInstanceId })
+          : null
         if (ctx.isCurrent()) setRepoProjectionQueryData(id, repoInstanceId, null, 'full', projection)
 
         if (wantsStatus) {
@@ -111,7 +109,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
             id,
             repoInstanceId,
             projection.snapshot,
-            previousSnapshot?.branches ?? null,
+            previousBranchModel?.branches ?? null,
             ctx.isCurrent,
           )
         }

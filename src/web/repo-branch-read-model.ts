@@ -1,8 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query'
 import {
+  getRepoProjectionPlaceholderData,
   getRepoProjectionQueryData,
-  getRepoSnapshotQueryData,
-  getRepoStatusQueryData,
   useRepoProjectionReadModel,
 } from '#/web/repo-data-query.ts'
 import { stripBranchWorktreeMetadata, worktreeStatesFromBranchReadModel } from '#/web/stores/repos/worktree-state.ts'
@@ -55,13 +54,11 @@ export function readRepoBranchQueryProjection(
   repo: Pick<RepoState, 'id' | 'instanceId'>,
   queryClient?: QueryClient,
 ): RepoBranchReadModelData | null {
-  const projection = getRepoProjectionQueryData(repo.id, repo.instanceId, null, 'full', queryClient)
+  const projection =
+    getRepoProjectionQueryData(repo.id, repo.instanceId, null, 'full', queryClient) ??
+    getRepoProjectionPlaceholderData(repo.id, repo.instanceId, null, 'full', queryClient)
   if (projection?.snapshot) return repoBranchReadModelFromSnapshot(projection.snapshot, projection.status)
-  const snapshot = getRepoSnapshotQueryData(repo.id, repo.instanceId, queryClient)
-  const status = getRepoStatusQueryData(repo.id, repo.instanceId, queryClient)
-  if (!snapshot) return null
-  if (!status) return null
-  return repoBranchReadModelFromSnapshot(snapshot, status)
+  return null
 }
 
 export function requireRepoBranchQueryProjection(
