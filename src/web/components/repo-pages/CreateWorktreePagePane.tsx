@@ -22,7 +22,7 @@ import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
 import { settingsSnapshotQueryOptions } from '#/web/settings-queries.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
-import { branchActionOperationFromServer } from '#/web/hooks/branch-action-state.ts'
+import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 
@@ -165,10 +165,7 @@ export function CreateWorktreePagePane({
   async function handleCreateWorktree(request: CreateWorktreeRequest): Promise<boolean> {
     const currentRepo = useReposStore.getState().repos[repoId]
     if (!currentRepo || currentRepo.instanceId !== liveRepo.instanceId) return false
-    const branchAction = branchActionOperationFromServer(
-      currentRepo.operations.branchAction,
-      operationsReadModel.data?.operations,
-    )
+    const branchAction = projectBranchActionOperation(currentRepo, operationsReadModel.data?.operations)
     if (branchAction.phase !== 'idle' || worktreeBootstrap.loading) return false
     const result = await runBranchAction(
       repoId,
@@ -187,10 +184,7 @@ export function CreateWorktreePagePane({
             ...liveRepo,
             operations: {
               ...liveRepo.operations,
-              branchAction: branchActionOperationFromServer(
-                liveRepo.operations.branchAction,
-                operationsReadModel.data?.operations,
-              ),
+              branchAction: projectBranchActionOperation(liveRepo, operationsReadModel.data?.operations),
             },
             branchModel: branchReadModel,
           }}

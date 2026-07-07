@@ -3,7 +3,7 @@ import { repoOperationBusy } from '#/web/stores/repos/repo-operation-scheduler.t
 import { repoBranchActionLoadingLabel, type RepoActionLabel } from '#/web/stores/repos/action-labels.ts'
 import { branchActionKindFromReason, isBranchActionReason } from '#/web/stores/repos/operations.ts'
 import { repoServerOperationActive } from '#/web/repo-data-query.ts'
-import { branchActionOperationFromServer } from '#/web/hooks/branch-action-state.ts'
+import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 import type { RepoOperationsSnapshot } from '#/shared/api-types.ts'
 type RepoActivityKind = 'branch-action'
 
@@ -23,10 +23,7 @@ export type RepoActivityControlView =
   | { kind: 'refresh-button'; manualSyncBusy: boolean }
 
 function branchActionActivity(repo: RepoState, serverOperations?: RepoOperationsSnapshot): RepoActivity | null {
-  const action = branchActionOperationFromServer(
-    repo.operations.branchAction,
-    serverOperations?.operations,
-  )
+  const action = projectBranchActionOperation(repo, serverOperations?.operations)
   if (action.phase === 'idle' || !isBranchActionReason(action.reason)) return null
   const label = repoBranchActionLoadingLabel(branchActionKindFromReason(action.reason), action.phase)
   return {

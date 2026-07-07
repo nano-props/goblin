@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest'
 import {
   branchActionOperationFromServer,
   isActiveServerBranchAction,
+  projectBranchActionOperation,
   serverBranchActionReason,
 } from '#/web/hooks/branch-action-state.ts'
 import { idleOperation } from '#/web/stores/repos/operations.ts'
@@ -46,6 +47,34 @@ describe('branch action state projection', () => {
         'feature/a',
       ),
     ).toBe(fallback)
+  })
+
+  test('projects from a repo-shaped fallback without leaking the fallback read to callers', () => {
+    const repo = {
+      operations: {
+        branchAction: {
+          ...idleOperation(),
+          phase: 'running' as const,
+          reason: 'branch:pull' as const,
+          target: 'feature/a',
+        },
+      },
+    }
+
+    expect(projectBranchActionOperation(repo, undefined)).toMatchObject({
+      phase: 'running',
+      reason: 'branch:pull',
+      target: 'feature/a',
+    })
+    expect(
+      projectBranchActionOperation(repo, [
+        serverOperation({ kind: 'push', phase: 'queued', branch: 'feature/b' }),
+      ]),
+    ).toMatchObject({
+      phase: 'queued',
+      reason: 'branch:push',
+      target: 'feature/b',
+    })
   })
 
   test('ignores inactive and non-branch server operations', () => {

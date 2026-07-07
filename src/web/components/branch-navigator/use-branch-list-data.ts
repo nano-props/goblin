@@ -5,7 +5,7 @@
 
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { branchActionOperationFromServer, type BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+import { projectBranchActionOperation, type BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { RepoState, RepoUiState } from '#/web/stores/repos/types.ts'
 import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
@@ -92,10 +92,7 @@ export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
     ...repoShell,
     operations: {
       ...repoShell.operations,
-      branchAction: branchActionOperationFromServer(
-        repoShell.operations.branchAction,
-        operationsReadModel.data?.operations,
-      ),
+      branchAction: projectBranchActionOperation(repoShell, operationsReadModel.data?.operations),
     },
     branchModel: branchReadModel,
   }

@@ -17,7 +17,7 @@ import { useRepoProjectionReadModel } from '#/web/repo-data-query.ts'
 import { repoBranchReadModelFromSnapshot } from '#/web/repo-branch-read-model.ts'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
 import { useWorkspaceNavigationHistory } from '#/web/workspace-navigation-history.ts'
-import { branchActionOperationFromServer } from '#/web/hooks/branch-action-state.ts'
+import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 
 interface Props {
   repoId: string
@@ -170,11 +170,7 @@ function RepoWorkspaceLoaded({
     branchModel: presentationBranchModel,
     operations: {
       ...repoShell.operations,
-      branchAction: branchActionOperationFromServer(
-        repoShell.operations.branchAction,
-        projection.operations.operations,
-        currentBranchName,
-      ),
+      branchAction: projectBranchActionOperation(repoShell, projection.operations.operations, currentBranchName),
     },
   }
   const detailBase = getCurrentRepoWorkspacePresentation(presentationRepo)

@@ -35,7 +35,7 @@ import { translate } from '#/web/stores/i18n.ts'
 import { toast } from 'sonner'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { getRepoOperationsQueryData } from '#/web/repo-data-query.ts'
-import { branchActionOperationFromServer } from '#/web/hooks/branch-action-state.ts'
+import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 
 type MoveDirection = 1 | -1
 const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
@@ -193,8 +193,8 @@ export function useKeyboard({
           e.preventDefault()
           const repo = repoId ? useReposStore.getState().repos[repoId] : null
           if (!repo) return
-          const branchAction = branchActionOperationFromServer(
-            repo.operations.branchAction,
+          const branchAction = projectBranchActionOperation(
+            repo,
             getRepoOperationsQueryData(repo.id, repo.instanceId)?.operations,
           )
           if (branchAction.phase === 'idle') {

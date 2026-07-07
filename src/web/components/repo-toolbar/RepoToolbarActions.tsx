@@ -14,7 +14,7 @@ import { formatAccelerator } from '#/shared/accelerator.ts'
 import { CREATE_WORKTREE_SHORTCUT } from '#/shared/shortcut-definitions.ts'
 import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
 import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
-import { branchActionOperationFromServer } from '#/web/hooks/branch-action-state.ts'
+import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 
 interface Props {
   repoId: string
@@ -117,7 +117,9 @@ function useCreateWorktreeTrigger(repoId: string) {
         ? {
             id: repo.id,
             instanceId: repo.instanceId,
-            branchAction: repo.operations.branchAction,
+            operations: {
+              branchAction: repo.operations.branchAction,
+            },
           }
         : null
     },
@@ -127,16 +129,14 @@ function useCreateWorktreeTrigger(repoId: string) {
         !!b &&
         a.id === b.id &&
         a.instanceId === b.instanceId &&
-        a.branchAction.phase === b.branchAction.phase &&
-        a.branchAction.reason === b.branchAction.reason &&
-        a.branchAction.target === b.branchAction.target),
+        a.operations.branchAction.phase === b.operations.branchAction.phase &&
+        a.operations.branchAction.reason === b.operations.branchAction.reason &&
+        a.operations.branchAction.target === b.operations.branchAction.target),
   )
   const operationsReadModel = useRepoOperationsReadModel(repoShell?.id ?? '', repoShell?.instanceId ?? '', {
     enabled: !!repoShell,
   })
-  const branchAction = repoShell
-    ? branchActionOperationFromServer(repoShell.branchAction, operationsReadModel.data?.operations)
-    : null
+  const branchAction = repoShell ? projectBranchActionOperation(repoShell, operationsReadModel.data?.operations) : null
   const branchActionBusy = branchAction ? branchAction.phase !== 'idle' : true
   return {
     disabled: branchActionBusy,

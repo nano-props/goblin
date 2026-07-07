@@ -83,6 +83,14 @@ export function branchActionOperationFromServer(
   }
 }
 
+export function projectBranchActionOperation(
+  repo: Pick<BranchActionRepo, 'operations'>,
+  operations: readonly RepoServerOperationState[] | undefined,
+  branchName?: string | null,
+): RepoOperationState {
+  return branchActionOperationFromServer(repo.operations.branchAction, operations, branchName)
+}
+
 export function branchActionItemIdFromKind(kind: RepoBranchActionKind): BranchActionItemId | null {
   switch (kind) {
     case 'pull':
