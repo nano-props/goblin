@@ -261,6 +261,10 @@ interface RuntimeCoherentRepoProjectionActions {
     id: string,
     options?: { skipLogBackfill?: boolean; repoInstanceId?: string },
   ) => Promise<void>
+  refreshRuntimeProjection: (
+    id: string,
+    options: { repoInstanceId?: string; sections: readonly RepoRuntimeProjectionRefreshSection[] },
+  ) => Promise<void>
   refreshStatus: (id: string, options?: { repoInstanceId?: string }) => Promise<void>
   refreshCoreData: (id: string, options?: { repoInstanceId?: string }) => Promise<void>
   syncAndRefresh: (id: string, options?: { repoInstanceId?: string }) => Promise<void>
@@ -276,6 +280,8 @@ interface RuntimeCoherentRepoProjectionActions {
    *  around forever. */
   clearFetchFailed: (id: string, repoInstanceId: string) => void
 }
+
+export type RepoRuntimeProjectionRefreshSection = 'snapshot' | 'status'
 
 interface RepoMutationActions {
   runBranchAction: (

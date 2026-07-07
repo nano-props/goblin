@@ -211,10 +211,11 @@ describe('workspace commands', () => {
         createTerminal: vi.fn(async () => 'session-1'),
         selectTerminal: vi.fn(),
       })
-      const refreshStatus = vi.fn(async () => {})
+      const refreshRuntimeProjection = vi.fn(async () => {})
       const repoInstanceId = useReposStore.getState().repos[REPO_ID]!.instanceId
       useReposStore.setState({
-        refreshStatus: refreshStatus as ReturnType<typeof useReposStore.getState>['refreshStatus'],
+        refreshRuntimeProjection:
+          refreshRuntimeProjection as ReturnType<typeof useReposStore.getState>['refreshRuntimeProjection'],
       })
 
       await expect(
@@ -226,7 +227,7 @@ describe('workspace commands', () => {
         }),
       ).resolves.toBe(true)
 
-      expect(refreshStatus).toHaveBeenCalledWith(REPO_ID, { repoInstanceId })
+      expect(refreshRuntimeProjection).toHaveBeenCalledWith(REPO_ID, { repoInstanceId, sections: ['status'] })
     },
   )
 

@@ -23,6 +23,9 @@ function callsGet() {
           id: '/repo',
           instanceId: 'repo-instance-test-9',
           availability: { phase: 'available' },
+          dataLoads: {
+            status: { phase: 'idle', loadedAt: null, error: null, stale: false },
+          },
         },
       },
       syncAndRefresh: (id: string, options?: { repoInstanceId?: string }) => {
@@ -31,6 +34,13 @@ function callsGet() {
       },
       refreshCoreData: (id: string, options?: { repoInstanceId?: string }) => {
         calls.push(`core:${id}:${options?.repoInstanceId ?? ''}`)
+        return Promise.resolve()
+      },
+      refreshRuntimeProjection: (
+        id: string,
+        options: { repoInstanceId?: string; sections: ReadonlyArray<'snapshot' | 'status'> },
+      ) => {
+        calls.push(`projection:${id}:${options.repoInstanceId ?? ''}:${options.sections.join('+')}`)
         return Promise.resolve()
       },
     }) as unknown as ReturnType<ReposGet>
@@ -99,6 +109,20 @@ describe('repo refresh coordinator', () => {
     })
 
     expect(calls).toEqual(['manual:/repo:repo-instance-test-5'])
+  })
+
+  test('routes visible status-like views through a projection section refresh', async () => {
+    const { calls, get } = callsGet()
+
+    await runRepoRefreshIntent(get, {
+      kind: 'visible-runtime-projection-requested',
+      reason: 'status-like-view-opened',
+      id: '/repo',
+      repoInstanceId: 'repo-instance-test-9',
+      sections: ['status'],
+    })
+
+    expect(calls).toEqual(['projection:/repo:repo-instance-test-9:status'])
   })
 
   test('routes repo invalidation refreshes directly through the core refresh path', async () => {

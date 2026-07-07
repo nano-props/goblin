@@ -66,9 +66,11 @@ export function useRepoStatusRefresh({
     previousStatusViewOpen.current = nextStatusViewOpen
     if (!currentRepoSnapshot || (!currentRepoChanged && !openedStatusLikeTab)) return
     void runRepoRefreshIntent(useReposStore.getState, {
-      kind: 'visible-status-like-view-opened',
+      kind: 'visible-runtime-projection-requested',
+      reason: 'status-like-view-opened',
       id: currentRepoSnapshot.id,
       repoInstanceId: currentRepoSnapshot.repoInstanceId,
+      sections: ['status'],
     })
   }, [currentRepoSnapshot])
 }

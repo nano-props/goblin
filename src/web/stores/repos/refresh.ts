@@ -20,10 +20,12 @@ import {
 } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { RepoRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
-import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
+import type { RepoRuntimeProjectionRefreshSection, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 
-type ProjectionRefreshSection = 'snapshot' | 'status'
-type ProjectionRefreshTarget = { key: ProjectionRefreshSection; reason: ProjectionRefreshSection }
+type ProjectionRefreshTarget = {
+  key: RepoRuntimeProjectionRefreshSection
+  reason: RepoRuntimeProjectionRefreshSection
+}
 
 export function createRefreshActions(set: ReposSet, get: ReposGet) {
   const { runManualSyncPipeline } = createRefreshSyncHelpers(set, get)
@@ -46,10 +48,10 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     })
   }
 
-  async function refreshRuntimeProjection(
+  async function runRuntimeProjectionRefresh(
     id: string,
     repoInstanceId: string,
-    sections: readonly ProjectionRefreshSection[],
+    sections: readonly RepoRuntimeProjectionRefreshSection[],
   ): Promise<void> {
     const wantsSnapshot = sections.includes('snapshot')
     const wantsStatus = sections.includes('status')
@@ -131,14 +133,14 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
       if (!resolved) return
       const { repoInstanceId } = resolved
-      await refreshRuntimeProjection(id, repoInstanceId, ['snapshot'])
+      await runRuntimeProjectionRefresh(id, repoInstanceId, ['snapshot'])
     },
 
     async refreshStatus(id: string, options?: { repoInstanceId?: string }) {
       const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
       if (!resolved) return
       const { repoInstanceId } = resolved
-      await refreshRuntimeProjection(id, repoInstanceId, ['status'])
+      await runRuntimeProjectionRefresh(id, repoInstanceId, ['status'])
     },
 
     async refreshCoreData(id: string, options?: { repoInstanceId?: string }) {
@@ -157,7 +159,17 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
       if (!resolved) return
       const { repoInstanceId } = resolved
-      await refreshRuntimeProjection(id, repoInstanceId, ['snapshot', 'status'])
+      await runRuntimeProjectionRefresh(id, repoInstanceId, ['snapshot', 'status'])
+    },
+
+    async refreshRuntimeProjection(
+      id: string,
+      options: { repoInstanceId?: string; sections: readonly RepoRuntimeProjectionRefreshSection[] },
+    ) {
+      const resolved = resolveActionRepoInstanceId(get, id, options.repoInstanceId)
+      if (!resolved) return
+      const { repoInstanceId } = resolved
+      await runRuntimeProjectionRefresh(id, repoInstanceId, options.sections)
     },
 
     /** Unified sync pipeline — local and remote repos follow the same path.

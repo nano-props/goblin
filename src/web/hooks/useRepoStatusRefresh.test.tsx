@@ -12,7 +12,7 @@ import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
 
-const originalRefreshStatus = useReposStore.getState().refreshStatus
+const originalRefreshRuntimeProjection = useReposStore.getState().refreshRuntimeProjection
 
 function Harness({
   repoId = '/repo-a',
@@ -120,7 +120,7 @@ describe('isRepoStatusRefreshable', () => {
 describe('useRepoStatusRefresh', () => {
   let container: HTMLDivElement
   let root: Root
-  let refreshStatus: ReturnType<typeof vi.fn>
+  let refreshRuntimeProjection: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
     ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -128,15 +128,17 @@ describe('useRepoStatusRefresh', () => {
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
-    refreshStatus = vi.fn().mockResolvedValue(undefined)
-    useReposStore.setState({ refreshStatus: refreshStatus as typeof originalRefreshStatus })
+    refreshRuntimeProjection = vi.fn().mockResolvedValue(undefined)
+    useReposStore.setState({
+      refreshRuntimeProjection: refreshRuntimeProjection as typeof originalRefreshRuntimeProjection,
+    })
   })
 
   afterEach(() => {
     act(() => root.unmount())
     container.remove()
     resetReposStore()
-    useReposStore.setState({ refreshStatus: originalRefreshStatus })
+    useReposStore.setState({ refreshRuntimeProjection: originalRefreshRuntimeProjection })
     ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false
   })
 
@@ -151,13 +153,16 @@ describe('useRepoStatusRefresh', () => {
       })
       root.render(<Harness repoId="/repo-a" />)
     })
-    refreshStatus.mockClear()
+    refreshRuntimeProjection.mockClear()
 
     await act(async () => {
       root.render(<Harness repoId="/repo-b" />)
     })
 
-    expect(refreshStatus).toHaveBeenCalledWith('/repo-b', { repoInstanceId: 'repo-instance-test-b' })
+    expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-b', {
+      repoInstanceId: 'repo-instance-test-b',
+      sections: ['status'],
+    })
   })
 
   test('refreshes status when opening the status tab', async () => {
@@ -170,13 +175,16 @@ describe('useRepoStatusRefresh', () => {
       })
       root.render(<Harness />)
     })
-    refreshStatus.mockClear()
+    refreshRuntimeProjection.mockClear()
 
     await act(async () => {
       useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'status')
     })
 
-    expect(refreshStatus).toHaveBeenCalledWith('/repo-a', { repoInstanceId: 'repo-instance-test-a' })
+    expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
+      repoInstanceId: 'repo-instance-test-a',
+      sections: ['status'],
+    })
   })
 
   test('refreshes status when opening the changes tab', async () => {
@@ -189,13 +197,16 @@ describe('useRepoStatusRefresh', () => {
       })
       root.render(<Harness />)
     })
-    refreshStatus.mockClear()
+    refreshRuntimeProjection.mockClear()
 
     await act(async () => {
       useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'changes')
     })
 
-    expect(refreshStatus).toHaveBeenCalledWith('/repo-a', { repoInstanceId: 'repo-instance-test-a' })
+    expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
+      repoInstanceId: 'repo-instance-test-a',
+      sections: ['status'],
+    })
   })
 
   test('refreshes status when reopening the status tab after bouncing through terminal', async () => {
@@ -208,17 +219,20 @@ describe('useRepoStatusRefresh', () => {
       })
       root.render(<Harness />)
     })
-    refreshStatus.mockClear()
+    refreshRuntimeProjection.mockClear()
 
     await act(async () => {
       useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'terminal')
     })
-    expect(refreshStatus).not.toHaveBeenCalled()
+    expect(refreshRuntimeProjection).not.toHaveBeenCalled()
 
     await act(async () => {
       useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'status')
     })
-    expect(refreshStatus).toHaveBeenCalledWith('/repo-a', { repoInstanceId: 'repo-instance-test-a' })
+    expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
+      repoInstanceId: 'repo-instance-test-a',
+      sections: ['status'],
+    })
   })
 
   test('skips refresh when the repo is unavailable', async () => {
@@ -231,13 +245,13 @@ describe('useRepoStatusRefresh', () => {
       })
       root.render(<Harness />)
     })
-    refreshStatus.mockClear()
+    refreshRuntimeProjection.mockClear()
 
     await act(async () => {
       useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'status')
     })
 
-    expect(refreshStatus).not.toHaveBeenCalled()
+    expect(refreshRuntimeProjection).not.toHaveBeenCalled()
   })
 
   test('skips refresh when a status refresh is already in flight', async () => {
@@ -250,13 +264,13 @@ describe('useRepoStatusRefresh', () => {
       })
       root.render(<Harness />)
     })
-    refreshStatus.mockClear()
+    refreshRuntimeProjection.mockClear()
 
     await act(async () => {
       useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'status')
     })
 
-    expect(refreshStatus).not.toHaveBeenCalled()
+    expect(refreshRuntimeProjection).not.toHaveBeenCalled()
   })
 
   test('does not treat branch selection changes as refresh triggers', async () => {
@@ -269,8 +283,8 @@ describe('useRepoStatusRefresh', () => {
       })
       root.render(<Harness />)
     })
-    refreshStatus.mockClear()
+    refreshRuntimeProjection.mockClear()
 
-    expect(refreshStatus).not.toHaveBeenCalled()
+    expect(refreshRuntimeProjection).not.toHaveBeenCalled()
   })
 })

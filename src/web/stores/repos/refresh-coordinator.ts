@@ -5,6 +5,7 @@ import {
 } from '#/web/stores/repos/invalidation-sources.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState, ReposGet } from '#/web/stores/repos/types.ts'
+import type { RepoRuntimeProjectionRefreshSection } from '#/web/stores/repos/types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import {
   preferredWorkspacePaneTabForTarget,
@@ -23,7 +24,11 @@ type CoreRepoRefreshReason = 'initial-load' | 'branch-action'
 export type RepoRefreshIntent =
   | (RepoRefreshIntentBase & { kind: 'core-data-changed'; reason: CoreRepoRefreshReason })
   | (RepoRefreshIntentBase & { kind: 'manual-refresh-requested' })
-  | (RepoRefreshIntentBase & { kind: 'visible-status-like-view-opened' })
+  | (RepoRefreshIntentBase & {
+      kind: 'visible-runtime-projection-requested'
+      reason: 'status-like-view-opened'
+      sections: readonly RepoRuntimeProjectionRefreshSection[]
+    })
 
 type RepoInvalidationRefreshDisposition = 'refresh' | 'suppress'
 
@@ -71,21 +76,28 @@ export function isRepoStatusRefreshable(repo: RepoStatusRefreshSnapshot): boolea
   return !repo.unavailable && repo.statusPhase === 'idle'
 }
 
-async function runVisibleStatusRefresh(get: ReposGet, id: string, repoInstanceId: string): Promise<void> {
+async function runVisibleRuntimeProjectionRefresh(
+  get: ReposGet,
+  id: string,
+  repoInstanceId: string,
+  sections: readonly RepoRuntimeProjectionRefreshSection[],
+): Promise<void> {
   const state = get()
   const repo = state.repos[id]
   if (!repo || repo.instanceId !== repoInstanceId) return
-  if (!isRepoStatusRefreshable(repoStatusRefreshSnapshot(repo))) return
-  await state.refreshStatus(id, { repoInstanceId })
+  if (sections.includes('status') && !isRepoStatusRefreshable(repoStatusRefreshSnapshot(repo))) return
+  await state.refreshRuntimeProjection(id, { repoInstanceId, sections })
 }
 
 export function requestVisibleRepoStatusRefresh(get: ReposGet, id: string): void {
   const repo = get().repos[id]
   if (!repo) return
   void runRepoRefreshIntent(get, {
-    kind: 'visible-status-like-view-opened',
+    kind: 'visible-runtime-projection-requested',
+    reason: 'status-like-view-opened',
     id,
     repoInstanceId: repo.instanceId,
+    sections: ['status'],
   })
 }
 
@@ -122,8 +134,8 @@ export async function runRepoRefreshIntent(get: ReposGet, intent: RepoRefreshInt
     case 'core-data-changed':
       await get().refreshCoreData(intent.id, { repoInstanceId: intent.repoInstanceId })
       return
-    case 'visible-status-like-view-opened':
-      await runVisibleStatusRefresh(get, intent.id, intent.repoInstanceId)
+    case 'visible-runtime-projection-requested':
+      await runVisibleRuntimeProjectionRefresh(get, intent.id, intent.repoInstanceId, intent.sections)
       return
   }
   const exhaustive: never = intent
