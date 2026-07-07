@@ -4,7 +4,7 @@ import {
   repoInvalidationRefreshDisposition,
   resetRepoRefreshCoordinatorState,
   runRepoRefreshIntent,
-  currentRepoStatusRefreshSnapshot,
+  currentRepoVisibleProjectionRefreshState,
 } from '#/web/stores/repos/refresh-coordinator.ts'
 import { beginRepoInvalidationSource, settleRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import type { ReposGet } from '#/web/stores/repos/types.ts'
@@ -63,7 +63,7 @@ describe('repo refresh coordinator', () => {
     vi.useRealTimers()
   })
 
-  test('builds status refresh snapshots from the React Query branch read model', () => {
+  test('builds visible projection refresh state from the React Query branch read model', () => {
     const repo = seedRepoWithReadModelForTest({
       id: '/repo',
       branches: [],
@@ -82,11 +82,11 @@ describe('repo refresh coordinator', () => {
       tabs: [workspacePaneStaticTabEntry('status')],
     })
 
-    expect(currentRepoStatusRefreshSnapshot(repo, 'feature/query')).toMatchObject({
+    expect(currentRepoVisibleProjectionRefreshState(repo, 'feature/query')).toMatchObject({
       id: '/repo',
       repoInstanceId: repo.instanceId,
       preferredWorkspacePaneTab: 'status',
-      statusViewOpen: true,
+      visibleProjectionViewOpen: true,
     })
   })
 
@@ -115,12 +115,12 @@ describe('repo refresh coordinator', () => {
     expect(calls).toEqual(['manual:/repo:repo-instance-test-5'])
   })
 
-  test('routes visible status-like views through a visible projection refresh', async () => {
+  test('routes visible projection views through a visible projection refresh', async () => {
     const { calls, get } = callsGet()
 
     await runRepoRefreshIntent(get, {
       kind: 'visible-runtime-projection-requested',
-      reason: 'status-like-view-opened',
+      reason: 'visible-projection-view-opened',
       id: '/repo',
       repoInstanceId: 'repo-instance-test-9',
     })

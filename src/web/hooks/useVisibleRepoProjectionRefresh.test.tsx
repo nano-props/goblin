@@ -3,7 +3,10 @@ import { act } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
-import { isRepoStatusRefreshable, useRepoStatusRefresh } from '#/web/hooks/useRepoStatusRefresh.ts'
+import {
+  isRepoVisibleProjectionRefreshable,
+  useVisibleRepoProjectionRefresh,
+} from '#/web/hooks/useVisibleRepoProjectionRefresh.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { createRepoBranch, resetReposStore, seedRepoReadModelQueryData } from '#/web/test-utils/bridge.ts'
 import { preferredWorkspacePaneTabByTargetRecordWith } from '#/web/stores/repos/workspace-pane-preferences.ts'
@@ -17,7 +20,7 @@ function Harness({
   repoId = '/repo-a',
   branchName = 'main',
 }: { repoId?: string | null; branchName?: string | null } = {}) {
-  useRepoStatusRefresh({ hydratedRouteRepoId: repoId, currentBranchName: branchName })
+  useVisibleRepoProjectionRefresh({ hydratedRouteRepoId: repoId, currentBranchName: branchName })
   return null
 }
 
@@ -27,12 +30,12 @@ function createRepo(
     preferredWorkspacePaneTab?: WorkspacePaneTabType
     /**
      * Phase 4: the legacy `availability.phase` field is gone for
-     * remote repos. The snapshot's `unavailable` boolean is
+     * remote repos. The refresh state's `unavailable` boolean is
      * computed by `isRepoUnavailable(repo)`. For local repos
      * (which these tests are about), the field is set via
      * `availability.phase`. The factory below just routes the
      * test's intent through whichever legacy field still works
-     * — the snapshot tests don't care which storage the
+     * — these projection-refresh tests don't care which storage the
      * boolean came from.
      */
     unavailable?: boolean
@@ -61,14 +64,14 @@ function createRepo(
   return repo
 }
 
-describe('isRepoStatusRefreshable', () => {
+describe('isRepoVisibleProjectionRefreshable', () => {
   test('returns true for an idle, available repo', () => {
     expect(
-      isRepoStatusRefreshable({
+      isRepoVisibleProjectionRefreshable({
         id: '/r',
         repoInstanceId: 'repo-instance-test',
         preferredWorkspacePaneTab: 'status',
-        statusViewOpen: true,
+        visibleProjectionViewOpen: true,
         unavailable: false,
         visibleStatusPhase: 'idle',
       }),
@@ -77,11 +80,11 @@ describe('isRepoStatusRefreshable', () => {
 
   test('returns false when availability is unavailable', () => {
     expect(
-      isRepoStatusRefreshable({
+      isRepoVisibleProjectionRefreshable({
         id: '/r',
         repoInstanceId: 'repo-instance-test',
         preferredWorkspacePaneTab: 'status',
-        statusViewOpen: true,
+        visibleProjectionViewOpen: true,
         unavailable: true,
         visibleStatusPhase: 'idle',
       }),
@@ -90,21 +93,21 @@ describe('isRepoStatusRefreshable', () => {
 
   test('returns false when a refresh is already in flight', () => {
     expect(
-      isRepoStatusRefreshable({
+      isRepoVisibleProjectionRefreshable({
         id: '/r',
         repoInstanceId: 'repo-instance-test',
         preferredWorkspacePaneTab: 'status',
-        statusViewOpen: true,
+        visibleProjectionViewOpen: true,
         unavailable: false,
         visibleStatusPhase: 'loading',
       }),
     ).toBe(false)
     expect(
-      isRepoStatusRefreshable({
+      isRepoVisibleProjectionRefreshable({
         id: '/r',
         repoInstanceId: 'repo-instance-test',
         preferredWorkspacePaneTab: 'status',
-        statusViewOpen: true,
+        visibleProjectionViewOpen: true,
         unavailable: false,
         visibleStatusPhase: 'refreshing',
       }),
@@ -112,7 +115,7 @@ describe('isRepoStatusRefreshable', () => {
   })
 })
 
-describe('useRepoStatusRefresh', () => {
+describe('useVisibleRepoProjectionRefresh', () => {
   let container: HTMLDivElement
   let root: Root
   let refreshRuntimeProjection: ReturnType<typeof vi.fn>
@@ -137,7 +140,7 @@ describe('useRepoStatusRefresh', () => {
     ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false
   })
 
-  test('refreshes status when switching to another current repo', async () => {
+  test('refreshes the visible projection when switching to another current repo', async () => {
     const repoA = createRepo('/repo-a')
     const repoB = createRepo('/repo-b')
     await act(async () => {
@@ -160,7 +163,7 @@ describe('useRepoStatusRefresh', () => {
     })
   })
 
-  test('refreshes status when opening the status tab', async () => {
+  test('refreshes the visible projection when opening the status tab', async () => {
     const repo = createRepo('/repo-a', { preferredWorkspacePaneTab: 'terminal' })
     await act(async () => {
       useReposStore.setState({
@@ -182,7 +185,7 @@ describe('useRepoStatusRefresh', () => {
     })
   })
 
-  test('refreshes status when opening the changes tab', async () => {
+  test('refreshes the visible projection when opening the changes tab', async () => {
     const repo = createRepo('/repo-a', { preferredWorkspacePaneTab: 'terminal' })
     await act(async () => {
       useReposStore.setState({
@@ -204,7 +207,7 @@ describe('useRepoStatusRefresh', () => {
     })
   })
 
-  test('refreshes status when reopening the status tab after bouncing through terminal', async () => {
+  test('refreshes the visible projection when reopening the status tab after bouncing through terminal', async () => {
     const repo = createRepo('/repo-a', { preferredWorkspacePaneTab: 'status' })
     await act(async () => {
       useReposStore.setState({
@@ -249,7 +252,7 @@ describe('useRepoStatusRefresh', () => {
     expect(refreshRuntimeProjection).not.toHaveBeenCalled()
   })
 
-  test('skips refresh when a status refresh is already in flight', async () => {
+  test('skips refresh when a visible projection refresh is already in flight', async () => {
     const repo = createRepo('/repo-a', { visibleStatusPhase: 'loading' })
     await act(async () => {
       useReposStore.setState({

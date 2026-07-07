@@ -117,7 +117,7 @@ describe('repo lifecycle', () => {
     const second = await useReposStore.getState().ensureWorkspaceOpen(REPO_B)
     if (second.ok) useReposStore.setState({ restoredRepoId: second.id })
     // Opening REPO_A again is a focus action: the repo is already
-    // resolved and its data is coherent, so we skip the snapshot/status
+    // resolved and its data is coherent, so we skip the runtime projection
     // pipeline. (hydrateRepoSession still always refreshes on boot — see
     // the lifecycle-hydrate test for the cached-then-fresh contract.)
     const third = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)

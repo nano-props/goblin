@@ -449,7 +449,7 @@ describe('remote fetch timestamps', () => {
 })
 
 describe('core refresh request ordering', () => {
-  test('refreshCoreData refreshes snapshot and status via the projection endpoint', async () => {
+  test('refreshCoreData refreshes the repo read model and visible status via the projection endpoint', async () => {
     const repoInstanceId = seedRepo([branch('old')])
     let projectionCalls = 0
     ipcHandlers['repo.projection'] = async () => {
@@ -578,7 +578,7 @@ describe('core refresh request ordering', () => {
     expect(repo ? readRepoBranchQueryProjection(repo)?.branches.map((b) => b.name) : null).toEqual(['reopened'])
   })
 
-  test('ignores stale status refreshes for the same repo instance', async () => {
+  test('ignores stale visible projection refreshes for the same repo instance', async () => {
     const repoInstanceId = seedRepo([branch('feature/a')])
     let callCount = 0
     let resolveFirst!: (value: WorktreeStatus[]) => void
@@ -897,7 +897,7 @@ describe('core refresh request ordering', () => {
     expect(useReposStore.getState().repos[REPO_ID]).toBeUndefined()
   })
 
-  test('drops older queued status refreshes before they start', async () => {
+  test('drops older queued visible projection refreshes before they start', async () => {
     const repoInstanceId = seedRepo([branch('feature/a')])
     const resolvers: Array<(value: WorktreeStatus[]) => void> = []
     ipcHandlers['repo.projection'] = () =>

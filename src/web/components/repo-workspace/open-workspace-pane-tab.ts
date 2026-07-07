@@ -1,5 +1,5 @@
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import { requestVisibleRepoStatusRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
+import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
 import { hasFreshRepoInstance, repoInstanceHandle } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
@@ -59,7 +59,7 @@ export async function openWorkspacePaneTab(input: {
     )
   }
   showWorkspacePaneTab(input)
-  if (provider.refreshOnOpen) requestVisibleRepoStatusRefresh(useReposStore.getState, input.repoId)
+  if (provider.refreshOnOpen) requestVisibleRepoProjectionRefresh(useReposStore.getState, input.repoId)
   return true
 }
 

@@ -206,7 +206,7 @@ function createRepoOperationScheduler(): RepoOperationScheduler {
       read: new RepoOperationLaneQueue(3),
       write: new RepoOperationLaneQueue(1),
       // Lifecycle runs are long-lived (resolveTarget + testRemote =
-      // up to 20s) and must not block snapshot/status refreshes.
+      // up to 20s) and must not block runtime projection refreshes.
       // Concurrency 1 per repo: a lifecycle run is its own critical
       // section — concurrent runs of the same repo would race the
       // lifecycle union writes.
