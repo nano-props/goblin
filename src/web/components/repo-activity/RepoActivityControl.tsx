@@ -19,6 +19,8 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { repoEventActionSuccessLabel } from '#/web/stores/repos/action-labels.ts'
 import { formatRelativeTime } from '#/web/lib/dates.ts'
 import { latestRepoSyncTime } from '#/web/stores/repos/sync-time.ts'
+import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
+
 interface Props {
   repoId: string
 }
@@ -59,12 +61,13 @@ export function RepoActivityControl({ repoId }: Props) {
 }
 
 function RepoActivityControlView({ repo }: { repo: RepoState }) {
+  const operationsReadModel = useRepoOperationsReadModel(repo.id, repo.instanceId)
   const visibleActivity = useRepoActivityControlPresentation(repo)
   const completion = useRepoCompletion(repo.id)
   const view = getRepoActivityControlView({
     visibleActivity,
     completion,
-    manualSyncBusy: isRepoPrimaryRefreshBusy(repo),
+    manualSyncBusy: isRepoPrimaryRefreshBusy(repo, operationsReadModel.data),
   })
 
   switch (view.kind) {

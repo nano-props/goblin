@@ -3,10 +3,11 @@ import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   getRepoLog,
+  getRepoOperations,
   getRepoProjection,
   getRepoRemoteBranches,
 } from '#/web/repo-client.ts'
-import type { RepoOperationsSnapshot, RepoRuntimeProjection } from '#/shared/api-types.ts'
+import type { RepoOperationsSnapshot, RepoRuntimeProjection, RepoServerOperationState } from '#/shared/api-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT, type PullRequestFetchMode } from '#/shared/git-types.ts'
 
 const ACTIVE_REPO_OPERATION_REFETCH_INTERVAL_MS = 1_000
@@ -64,10 +65,13 @@ export function repoProjectionQueryOptions(
   })
 }
 
-function repoOperationsSnapshotHasActiveOperations(snapshot: RepoOperationsSnapshot | undefined): boolean {
+export function repoServerOperationActive(operation: Pick<RepoServerOperationState, 'phase'>): boolean {
+  return operation.phase === 'queued' || operation.phase === 'running' || operation.phase === 'cancelling'
+}
+
+export function repoOperationsSnapshotHasActiveOperations(snapshot: RepoOperationsSnapshot | undefined): boolean {
   return !!snapshot?.operations.some(
-    (operation) =>
-      operation.phase === 'queued' || operation.phase === 'running' || operation.phase === 'cancelling',
+    (operation) => repoServerOperationActive(operation),
   )
 }
 
@@ -148,6 +152,24 @@ function repoRemoteBranchesQueryOptions(repoRoot: string, repoInstanceId: string
   })
 }
 
+export function repoOperationsQueryOptions(
+  repoRoot: string,
+  repoInstanceId: string,
+  options: { includeSettled?: boolean; enabled?: boolean } = {},
+) {
+  const includeSettled = options.includeSettled === true
+  return queryOptions({
+    queryKey: repoOperationsQueryKey(repoRoot, repoInstanceId, includeSettled),
+    queryFn: ({ signal }) => getRepoOperations(repoRoot, { includeSettled, signal }),
+    enabled: options.enabled,
+    refetchInterval: (query) =>
+      repoOperationsSnapshotHasActiveOperations(query.state.data)
+        ? ACTIVE_REPO_OPERATION_REFETCH_INTERVAL_MS
+        : false,
+    staleTime: Number.POSITIVE_INFINITY,
+  })
+}
+
 export function useRepoProjectionReadModel(
   repoRoot: string,
   repoInstanceId: string,
@@ -182,6 +204,24 @@ export function useRepoRemoteBranchesQuery(
   options: { enabled?: boolean } = {},
 ) {
   return useQuery(repoRemoteBranchesQueryOptions(repoRoot, repoInstanceId, options))
+}
+
+export function useRepoOperationsReadModel(
+  repoRoot: string,
+  repoInstanceId: string,
+  options: { includeSettled?: boolean; enabled?: boolean } = {},
+) {
+  const includeSettled = options.includeSettled === true
+  const enabled = options.enabled !== false
+  const query = useQuery({
+    ...repoOperationsQueryOptions(repoRoot, repoInstanceId, { includeSettled, enabled }),
+    subscribed: enabled,
+  })
+  useEffect(() => {
+    if (!enabled || !query.data) return
+    setRepoOperationsQueryData(repoRoot, repoInstanceId, includeSettled, query.data)
+  }, [enabled, includeSettled, query.data, repoInstanceId, repoRoot])
+  return query
 }
 
 export function getRepoOperationsQueryData(

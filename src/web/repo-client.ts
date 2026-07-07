@@ -2,6 +2,7 @@ import { openExternalUrl } from '#/web/app-shell-client.ts'
 import { SERVER_REQUEST_TIMEOUT_ERROR, postServerJson } from '#/web/lib/server-fetch.ts'
 import type {
   CloneRepoResult,
+  RepoOperationsSnapshot,
   RepoRuntimeProjection,
   RepoRuntimeInstancesSnapshot,
   RepoRuntimeOpenResult,
@@ -77,6 +78,17 @@ export async function getRepoProjection(
     '/api/repo/projection',
     { cwd, branch: branch || undefined, mode: options?.mode },
     { signal },
+  )
+}
+
+export async function getRepoOperations(
+  cwd: string,
+  options?: { includeSettled?: boolean; signal?: AbortSignal },
+): Promise<RepoOperationsSnapshot> {
+  return await postServerJson(
+    '/api/repo/operations',
+    { cwd, includeSettled: options?.includeSettled },
+    { signal: options?.signal },
   )
 }
 

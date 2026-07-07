@@ -2,6 +2,8 @@ import type { RepoState } from '#/web/stores/repos/types.ts'
 import { repoOperationBusy } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { repoBranchActionLoadingLabel, type RepoActionLabel } from '#/web/stores/repos/action-labels.ts'
 import { branchActionKindFromReason, isBranchActionReason } from '#/web/stores/repos/operations.ts'
+import { repoServerOperationActive } from '#/web/repo-data-query.ts'
+import type { RepoOperationsSnapshot } from '#/shared/api-types.ts'
 type RepoActivityKind = 'branch-action'
 
 export interface RepoActivity {
@@ -34,8 +36,19 @@ export function getRepoActivity(repo: RepoState): RepoActivity | null {
   return branchActionActivity(repo)
 }
 
-export function isRepoPrimaryRefreshBusy(repo: RepoState): boolean {
-  return repoOperationBusy(repo.id, 'manualRefresh') || repoOperationBusy(repo.id, 'fetch')
+export function repoOperationsSnapshotHasPrimaryRefresh(snapshot: RepoOperationsSnapshot | undefined): boolean {
+  return !!snapshot?.operations.some((operation) => operation.kind === 'fetch' && repoServerOperationActive(operation))
+}
+
+export function isRepoPrimaryRefreshBusy(
+  repo: RepoState,
+  serverOperations?: RepoOperationsSnapshot,
+): boolean {
+  return (
+    repoOperationsSnapshotHasPrimaryRefresh(serverOperations) ||
+    repoOperationBusy(repo.id, 'manualRefresh') ||
+    repoOperationBusy(repo.id, 'fetch')
+  )
 }
 
 export function getRepoActivityControlView(input: {

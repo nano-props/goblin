@@ -1,18 +1,20 @@
 // @vitest-environment jsdom
 
 import { act } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { RepoActivityControl } from '#/web/components/repo-activity/RepoActivityControl.tsx'
 import { resetReposStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/repos/repo-operation-scheduler.ts'
+import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 
 const REPO_ID = '/tmp/repo-activity-control-component'
 
 beforeEach(() => {
-  vi.useFakeTimers()
   resetReposStore()
   // Empty dict so `t('key')` returns the key itself — lets the test
   // assert the exact key the tooltip wires up, independent of the
@@ -26,23 +28,56 @@ beforeEach(() => {
   })
 })
 
-afterEach(() => {
-  vi.useRealTimers()
-})
-
 describe('RepoActivityControl component', () => {
+  test('disables the primary refresh button while server projection reports an active fetch', () => {
+    const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
+    setRepoOperationsQueryData(REPO_ID, repo.instanceId, false, {
+      operations: [
+        {
+          id: 'repo-op-1',
+          repoId: REPO_ID,
+          repoInstanceId: repo.instanceId,
+          kind: 'fetch',
+          phase: 'running',
+          source: 'user',
+          target: null,
+          queuedAt: 100,
+          startedAt: 101,
+          deadlineAt: null,
+          settledAt: null,
+          error: null,
+          cancellation: {
+            underlyingRequested: false,
+            reason: null,
+            requestedAt: null,
+            waitCancelledCount: 0,
+            lastWaitCancelledAt: null,
+            lastWaitCancellationReason: null,
+          },
+          canCancelUnderlying: true,
+        },
+      ],
+      loadedAt: 123,
+    })
+
+    const { container } = renderControl()
+
+    expect(button(container).disabled).toBe(true)
+    expect(button(container).getAttribute('aria-busy')).toBe('true')
+  })
+
   test('keeps the primary refresh button enabled during background-blocked refresh states', () => {
-    seedRepoShellForTest({ id: REPO_ID, remote: { hasRemotes: true } })
+    seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
     markRepoOperationTargets(REPO_ID, nextRepoOperationId(REPO_ID), [{ key: 'visibleStatus', reason: 'visible-status' }], 'running')
 
-    const { container } = renderInJsdom(<RepoActivityControl repoId={REPO_ID} />)
+    const { container } = renderControl()
 
     expect(button(container).disabled).toBe(false)
     expect(button(container).getAttribute('aria-busy')).toBeNull()
   })
 
   test('disables the primary refresh button during manual refreshes', () => {
-    seedRepoShellForTest({ id: REPO_ID, remote: { hasRemotes: true } })
+    seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
     markRepoOperationTargets(
       REPO_ID,
       nextRepoOperationId(REPO_ID),
@@ -50,16 +85,16 @@ describe('RepoActivityControl component', () => {
       'running',
     )
 
-    const { container } = renderInJsdom(<RepoActivityControl repoId={REPO_ID} />)
+    const { container } = renderControl()
 
     expect(button(container).disabled).toBe(true)
     expect(button(container).getAttribute('aria-busy')).toBe('true')
   })
 
   test('renders the primary refresh button for local-only repositories without the local-only label', () => {
-    seedRepoShellForTest({ id: REPO_ID, remote: { hasRemotes: false } })
+    seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: false } })
 
-    const { container } = renderInJsdom(<RepoActivityControl repoId={REPO_ID} />)
+    const { container } = renderControl()
 
     expect(button(container).disabled).toBe(false)
     expect(container.textContent).not.toContain('tab.local-only')
@@ -67,7 +102,7 @@ describe('RepoActivityControl component', () => {
 
   test('shows the last-sync time in the refresh button tooltip when fetch has loaded', async () => {
     const loadedAt = Date.now() - 5_000
-    const repo = seedRepoShellForTest({ id: REPO_ID, remote: { hasRemotes: true } })
+    const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
     useReposStore.setState((state) => ({
       repos: {
         ...state.repos,
@@ -85,7 +120,7 @@ describe('RepoActivityControl component', () => {
       },
     }))
 
-    const { container } = renderInJsdom(<RepoActivityControl repoId={REPO_ID} />)
+    const { container } = renderControl()
 
     const tooltip = await openTooltip(button(container))
     // The tooltip should be a single line (no separator), starting
@@ -96,9 +131,9 @@ describe('RepoActivityControl component', () => {
   })
 
   test('falls back to the fetch action title in the refresh button tooltip before the first sync', async () => {
-    seedRepoShellForTest({ id: REPO_ID, remote: { hasRemotes: true } })
+    seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
 
-    const { container } = renderInJsdom(<RepoActivityControl repoId={REPO_ID} />)
+    const { container } = renderControl()
 
     const tooltip = await openTooltip(button(container))
     // No sync time has been recorded, so the tooltip shows the
@@ -107,6 +142,20 @@ describe('RepoActivityControl component', () => {
     expect(tooltip.textContent).not.toContain('repo-picker.tooltip.last-sync-label')
   })
 })
+
+function renderControl() {
+  return renderInJsdom(
+    <QueryClientProvider client={primaryWindowQueryClient}>
+      <RepoActivityControl repoId={REPO_ID} />
+    </QueryClientProvider>,
+  )
+}
+
+function seedRepoForControl(input: Parameters<typeof seedRepoShellForTest>[0]) {
+  const repo = seedRepoShellForTest(input)
+  setRepoOperationsQueryData(repo.id, repo.instanceId, false, { operations: [], loadedAt: 0 })
+  return repo
+}
 
 function button(container: HTMLElement): HTMLButtonElement {
   const element = container.querySelector('button')
@@ -139,8 +188,7 @@ async function openTooltip(target: HTMLElement): Promise<HTMLElement> {
     target.dispatchEvent(new MouseEvent('pointermove', { bubbles: true }))
   })
   await act(async () => {
-    vi.runAllTimers()
-    await Promise.resolve()
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 250))
   })
   const tooltip = document.body.querySelector('[role="tooltip"]')
   if (!(tooltip instanceof HTMLElement)) throw new Error('Tooltip did not open')
