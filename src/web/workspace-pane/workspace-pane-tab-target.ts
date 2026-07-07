@@ -21,13 +21,15 @@ export interface WorkspacePaneTabTargetOptions {
    * workspace-pane preference. `null` is an explicit bare branch route and
    * therefore has no active pane tab.
    */
-  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
 }
+
+export const workspacePanePreferenceTargetOptions: WorkspacePaneTabTargetOptions = { workspacePaneRoute: undefined }
 
 export function workspacePaneTabTargetForBranch(
   repoId: string,
   branchName: string,
-  options: WorkspacePaneTabTargetOptions = {},
+  options: WorkspacePaneTabTargetOptions,
 ): RepoWorkspaceTabModel | null {
   const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, branchName, options)
   return resolution.kind === 'ready' ? resolution.target : null
@@ -36,7 +38,7 @@ export function workspacePaneTabTargetForBranch(
 export function workspacePaneTabInteractionBlockedForBranch(
   repoId: string,
   branchName: string,
-  options: WorkspacePaneTabTargetOptions = {},
+  options: WorkspacePaneTabTargetOptions,
 ): boolean {
   const target = workspacePaneTabTargetForBranch(repoId, branchName, options)
   return target ? repoWorkspaceTabModelBlocksTabInteraction(target) : false
@@ -45,7 +47,7 @@ export function workspacePaneTabInteractionBlockedForBranch(
 export function resolveWorkspacePaneTabTargetForBranch(
   repoId: string,
   branchName: string,
-  options: WorkspacePaneTabTargetOptions = {},
+  options: WorkspacePaneTabTargetOptions,
 ): WorkspacePaneTabTargetResolution {
   const state = useReposStore.getState()
   const repo = state.repos[repoId]

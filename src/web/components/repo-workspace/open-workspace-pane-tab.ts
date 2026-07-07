@@ -18,7 +18,7 @@ export async function openWorkspacePaneTab(input: {
   branchName: string
   worktreePath: string | null | undefined
   type: WorkspacePaneStaticTabType
-  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
   insertAfterIdentity?: string | null
   navigation: Pick<PrimaryWindowNavigationActions, 'showRepoBranchWorkspacePaneTab'>
 }): Promise<boolean> {

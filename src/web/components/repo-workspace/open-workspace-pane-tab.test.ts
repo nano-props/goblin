@@ -51,6 +51,7 @@ describe('openWorkspacePaneTab', () => {
 
     await expect(
       openWorkspacePaneTab({
+        workspacePaneRoute: undefined,
         repoId: REPO_ID,
         branchName: 'feature/worktree',
         worktreePath: WORKTREE_PATH,
@@ -72,6 +73,7 @@ describe('openWorkspacePaneTab', () => {
 
     await expect(
       openWorkspacePaneTab({
+        workspacePaneRoute: undefined,
         repoId: REPO_ID,
         branchName: 'feature/worktree',
         worktreePath: WORKTREE_PATH,
@@ -100,6 +102,7 @@ describe('openWorkspacePaneTab', () => {
 
     await expect(
       openWorkspacePaneTab({
+        workspacePaneRoute: undefined,
         repoId: REPO_ID,
         branchName: 'feature/worktree',
         worktreePath: WORKTREE_PATH,
@@ -130,6 +133,7 @@ describe('openWorkspacePaneTab', () => {
 
     await expect(
       openWorkspacePaneTab({
+        workspacePaneRoute: undefined,
         repoId: REPO_ID,
         branchName: 'feature/worktree',
         worktreePath: WORKTREE_PATH,
@@ -159,6 +163,7 @@ describe('openWorkspacePaneTab', () => {
 
     await expect(
       openWorkspacePaneTab({
+        workspacePaneRoute: undefined,
         repoId: REPO_ID,
         branchName: 'feature/no-worktree',
         worktreePath: null,
@@ -182,6 +187,7 @@ describe('openWorkspacePaneTab', () => {
 
     await expect(
       openWorkspacePaneTab({
+        workspacePaneRoute: undefined,
         repoId: REPO_ID,
         branchName: 'feature/no-worktree',
         worktreePath: null,
@@ -200,6 +206,7 @@ describe('openWorkspacePaneTab', () => {
 
     await expect(
       openWorkspacePaneTab({
+        workspacePaneRoute: undefined,
         repoId: REPO_ID,
         branchName: 'feature/worktree',
         worktreePath: WORKTREE_PATH,
@@ -225,6 +232,7 @@ describe('openWorkspacePaneTab', () => {
 
     await expect(
       openWorkspacePaneTab({
+        workspacePaneRoute: undefined,
         repoId: REPO_ID,
         branchName: 'feature/worktree',
         worktreePath: WORKTREE_PATH,
@@ -250,6 +258,7 @@ describe('openWorkspacePaneTab', () => {
 
     await expect(
       openWorkspacePaneTab({
+        workspacePaneRoute: undefined,
         repoId: REPO_ID,
         branchName: 'feature/worktree',
         worktreePath: WORKTREE_PATH,
@@ -276,6 +285,7 @@ describe('openWorkspacePaneTab', () => {
       },
     })
     await openWorkspacePaneTab({
+      workspacePaneRoute: undefined,
       repoId: REPO_ID,
       branchName: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
@@ -287,6 +297,7 @@ describe('openWorkspacePaneTab', () => {
     // changes tab from a different tab — the original opener must stick.
     useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/worktree', 'history')
     await openWorkspacePaneTab({
+      workspacePaneRoute: undefined,
       repoId: REPO_ID,
       branchName: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
@@ -326,6 +337,7 @@ describe('openWorkspacePaneTab', () => {
     })
 
     const openPromise = openWorkspacePaneTab({
+      workspacePaneRoute: undefined,
       repoId: REPO_ID,
       branchName: 'feature/a',
       worktreePath: WORKTREE_PATH,
@@ -374,6 +386,7 @@ describe('openWorkspacePaneTab', () => {
     })
 
     const openPromise = openWorkspacePaneTab({
+      workspacePaneRoute: undefined,
       repoId: REPO_ID,
       branchName: 'feature/a',
       worktreePath: WORKTREE_PATH,
@@ -424,6 +437,7 @@ describe('openWorkspacePaneTab', () => {
     })
 
     const openPromise = openWorkspacePaneTab({
+      workspacePaneRoute: undefined,
       repoId: REPO_ID,
       branchName: 'feature/a',
       worktreePath: WORKTREE_PATH,
@@ -487,6 +501,7 @@ describe('openWorkspacePaneTab', () => {
     })
 
     await openWorkspacePaneTab({
+      workspacePaneRoute: undefined,
       repoId: REPO_ID,
       branchName: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
@@ -497,6 +512,7 @@ describe('openWorkspacePaneTab', () => {
     // "status". Both repos share the identity string `workspace-pane:changes`,
     // so without scoping this would clobber the first repo's recorded opener.
     await openWorkspacePaneTab({
+      workspacePaneRoute: undefined,
       repoId: OTHER_REPO_ID,
       branchName: 'main',
       worktreePath: OTHER_WORKTREE_PATH,
@@ -517,6 +533,7 @@ describe('openWorkspacePaneTab', () => {
     await expect(
       Promise.all([
         openWorkspacePaneTab({
+          workspacePaneRoute: undefined,
           repoId: REPO_ID,
           branchName: 'feature/worktree',
           worktreePath: WORKTREE_PATH,
@@ -524,6 +541,7 @@ describe('openWorkspacePaneTab', () => {
           navigation: navigationWithStoreActions(),
         }),
         openWorkspacePaneTab({
+          workspacePaneRoute: undefined,
           repoId: REPO_ID,
           branchName: 'feature/worktree',
           worktreePath: WORKTREE_PATH,

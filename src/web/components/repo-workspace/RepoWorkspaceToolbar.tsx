@@ -45,16 +45,16 @@ import { WorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/Wor
 import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
 import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import {
-  reselectWorkspacePaneRuntimeTab,
-} from '#/web/workspace-pane/workspace-pane-runtime-tab-actions.ts'
+import { reselectWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-actions.ts'
 import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
 import { useWorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-action-context.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 interface Props {
   repo: RepoWorkspaceRepo
   detail: CurrentRepoWorkspacePresentation
   workspacePaneId: string
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null
   workspacePaneTabModel: RepoWorkspaceTabModel
   trafficLightOffset?: boolean
   branchActions?: BranchActions
@@ -65,6 +65,7 @@ export function RepoWorkspaceToolbar({
   repo,
   detail,
   workspacePaneId,
+  workspacePaneRoute,
   workspacePaneTabModel,
   trafficLightOffset = false,
   branchActions,
@@ -249,11 +250,12 @@ export function RepoWorkspaceToolbar({
       void runCloseWorkspacePaneTabCommand({
         repoId: repo.id,
         branchName,
+        workspacePaneRoute,
         targetIdentity: item.identity,
         navigation,
       })
     },
-    [branchName, navigation, repo.id],
+    [branchName, navigation, repo.id, workspacePaneRoute],
   )
 
   // No current branch means there is no tab/action target; keep the

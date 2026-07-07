@@ -6,7 +6,10 @@ import {
   restoreWorkspaceNavigationEntry,
   workspaceNavigationHistoryRestoreBlocked,
 } from '#/web/workspace-navigation-history.ts'
-import { workspacePaneTabInteractionBlockedForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import {
+  workspacePanePreferenceTargetOptions,
+  workspacePaneTabInteractionBlockedForBranch,
+} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
 export interface PrimaryWindowNavigationActions {
   activateRepo: (repoId: string) => void
@@ -67,12 +70,12 @@ export function createPrimaryWindowNavigationActions({
       routeNavigation.openRepoBranch(repoId, branch, options)
     },
     showRepoBranchWorkspacePaneTab(repoId, branch, tab, options) {
-      if (workspacePaneTabInteractionBlockedForBranch(repoId, branch)) return
+      if (workspacePaneTabInteractionBlockedForBranch(repoId, branch, workspacePanePreferenceTargetOptions)) return
       if (options) routeNavigation.openRepoBranchTab(repoId, branch, tab, options)
       else routeNavigation.openRepoBranchTab(repoId, branch, tab)
     },
     showRepoBranchTerminalSession(repoId, branch, terminalSessionId, options) {
-      if (workspacePaneTabInteractionBlockedForBranch(repoId, branch)) return
+      if (workspacePaneTabInteractionBlockedForBranch(repoId, branch, workspacePanePreferenceTargetOptions)) return
       if (options) routeNavigation.openRepoBranchTerminal(repoId, branch, terminalSessionId, options)
       else routeNavigation.openRepoBranchTerminal(repoId, branch, terminalSessionId)
     },

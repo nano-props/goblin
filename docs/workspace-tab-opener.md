@@ -16,6 +16,17 @@ result may navigate. Async create flows should serialize through the
 operation entry point using projection-owned pending state; opener only
 answers insertion and close-back behavior.
 
+## Route context
+
+Workspace pane routes are part of the operation input. Route-backed command,
+open, close, and opener-capture paths must pass the current
+`workspacePaneRoute` explicitly. `undefined` is only for entry points that are
+not inside a workspace pane route and intentionally use persisted preference;
+it should be spelled at the call site, not produced by omitting an option.
+
+This keeps a bare branch route (`workspacePaneRoute: null`) as an empty pane
+instead of silently falling back to a persisted active tab.
+
 ## Close
 
 When closing a tab with an opener:

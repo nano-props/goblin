@@ -6,6 +6,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import {
   resolveWorkspacePaneTabTargetForBranch,
+  workspacePanePreferenceTargetOptions,
   workspacePaneTabTargetForBranch,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
@@ -29,11 +30,13 @@ describe('workspace pane tab target read model', () => {
       restoredRepoId: REPO_ID,
     }))
 
-    expect(resolveWorkspacePaneTabTargetForBranch(REPO_ID, 'feature/query')).toEqual({
+    expect(
+      resolveWorkspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions),
+    ).toEqual({
       kind: 'unavailable',
       reason: 'branch-read-model-unavailable',
     })
-    expect(workspacePaneTabTargetForBranch(REPO_ID, 'feature/query')).toBeNull()
+    expect(workspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions)).toBeNull()
   })
 
   test('resolves branch targets from the React Query snapshot cache when store branches are stale', () => {
@@ -48,7 +51,7 @@ describe('workspace pane tab target read model', () => {
       branches: [createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH } })],
     })
 
-    const target = workspacePaneTabTargetForBranch(REPO_ID, 'feature/query')
+    const target = workspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions)
 
     expect(target?.branchName).toBe('feature/query')
     expect(target?.worktreePath).toBe(WORKTREE_PATH)

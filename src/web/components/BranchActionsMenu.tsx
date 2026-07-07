@@ -19,7 +19,9 @@ interface Props {
 
 export function BranchActionsMenu({ repo, branch, open, onOpenChange }: Props) {
   const branchActions = useBranchActions(repo, branch)
-  const { mainItems, destructiveItems } = useBranchActionItems(repo, branch, branchActions)
+  const { mainItems, destructiveItems } = useBranchActionItems(repo, branch, branchActions, {
+    workspacePaneRoute: undefined,
+  })
 
   // Dialogs are no longer rendered here. The shared
   // `BranchActionDialogHost` is mounted once at the workspace level

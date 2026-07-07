@@ -220,6 +220,7 @@ function RepoWorkspacePane({
         repo={repo}
         detail={detail}
         workspacePaneId={workspacePaneId}
+        workspacePaneRoute={workspacePaneRoute}
         trafficLightOffset={toolbarTrafficLightOffset}
         workspacePaneTabModel={workspacePaneTabModel}
         branchActions={branchActions}
@@ -257,7 +258,7 @@ function BranchActionWorkspacePane({
   onBackToBranchNavigator,
 }: BranchActionWorkspacePaneProps) {
   const branchActions = useBranchActions(repo, branch)
-  const actions = useBranchActionItems(repo, branch, branchActions)
+  const actions = useBranchActionItems(repo, branch, branchActions, { workspacePaneRoute })
   useBranchActionShortcutRegistry(actions, shortcutsEnabled)
 
   return (

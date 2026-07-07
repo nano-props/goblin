@@ -9,7 +9,10 @@ import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { isWorkspacePaneStaticTabType, type WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { workspaceNavigationHistoryEntryEqual } from '#/web/stores/repos/navigation-history-entry.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
-import { workspacePaneTabInteractionBlockedForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import {
+  workspacePanePreferenceTargetOptions,
+  workspacePaneTabInteractionBlockedForBranch,
+} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
 export type WorkspaceNavigationRouteContext =
   | { kind: 'empty'; repoId: string }
@@ -255,7 +258,11 @@ function workspaceNavigationEntryBlocksWorkspacePaneInteraction(
   entry: WorkspaceNavigationHistoryEntry | null,
 ): boolean {
   return entry?.route.kind === 'branch'
-    ? workspacePaneTabInteractionBlockedForBranch(entry.repoId, entry.route.branchName)
+    ? workspacePaneTabInteractionBlockedForBranch(
+        entry.repoId,
+        entry.route.branchName,
+        workspacePanePreferenceTargetOptions,
+      )
     : false
 }
 

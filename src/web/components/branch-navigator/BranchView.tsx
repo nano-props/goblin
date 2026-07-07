@@ -53,6 +53,7 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
       branchName,
       worktreePath: branch?.worktree?.path ?? null,
       type: 'status',
+      workspacePaneRoute: undefined,
       insertAfterIdentity: null,
       navigation,
     })

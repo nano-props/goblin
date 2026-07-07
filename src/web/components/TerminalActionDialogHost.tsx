@@ -47,6 +47,7 @@ export function TerminalActionDialogHost({ currentRepoId, navigation }: Props) {
         await runConfirmCloseTerminalWorkspacePaneTabCommand({
           repoId: payload.repoId,
           branchName: payload.terminalBase.branch,
+          workspacePaneRoute: payload.workspacePaneRoute,
           navigation,
           targetIdentity: payload.targetIdentity,
           confirmedTerminal: {

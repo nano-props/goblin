@@ -174,6 +174,7 @@ export function BranchStatus({ detail }: Props) {
             branchName,
             worktreePath: worktreePathRaw,
             type: 'files',
+            workspacePaneRoute: { kind: 'static', tab: 'status' },
             navigation,
           })
         },
@@ -192,6 +193,7 @@ export function BranchStatus({ detail }: Props) {
             branchName,
             worktreePath: worktreePathRaw,
             type: 'changes',
+            workspacePaneRoute: { kind: 'static', tab: 'status' },
             navigation,
           })
         },
@@ -211,6 +213,7 @@ export function BranchStatus({ detail }: Props) {
             branchName,
             worktreePath: worktreePathRaw,
             type: 'history',
+            workspacePaneRoute: { kind: 'static', tab: 'status' },
             navigation,
           })
         },

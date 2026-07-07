@@ -49,10 +49,12 @@ import {
 import { clearWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
+type WorkspacePaneCommandRoute = RepoBranchWorkspacePaneRoute | null | undefined
+
 interface ShowWorkspacePaneTabCommandOptions {
   repoId: string | null
   branchName: string | null
-  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
+  workspacePaneRoute: WorkspacePaneCommandRoute
   tab: WorkspacePaneTabType
   navigation: PrimaryWindowNavigationActions
 }
@@ -60,7 +62,7 @@ interface ShowWorkspacePaneTabCommandOptions {
 interface TerminalPrimaryActionCommandOptions {
   repoId: string | null
   branchName: string | null
-  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
+  workspacePaneRoute: WorkspacePaneCommandRoute
   navigation: PrimaryWindowNavigationActions
   t?: TerminalCreateTranslator
 }
@@ -68,7 +70,7 @@ interface TerminalPrimaryActionCommandOptions {
 interface NewTerminalTabCommandOptions {
   repoId: string | null
   branchName: string | null
-  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
+  workspacePaneRoute: WorkspacePaneCommandRoute
   navigation: PrimaryWindowNavigationActions
   t?: TerminalCreateTranslator
 }
@@ -76,7 +78,7 @@ interface NewTerminalTabCommandOptions {
 interface WorkspacePaneTabCommandTargetOptions {
   repoId: string | null
   branchName: string | null
-  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
+  workspacePaneRoute: WorkspacePaneCommandRoute
   navigation: PrimaryWindowNavigationActions
   targetIdentity?: string
 }
@@ -104,7 +106,7 @@ type CloseWorkspaceSurfaceIntent = { kind: 'close-tab' } | { kind: 'close-window
 interface SelectWorkspacePaneTabByIndexCommandOptions {
   repoId: string | null
   branchName: string | null
-  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
+  workspacePaneRoute: WorkspacePaneCommandRoute
   tabIndex: number
   navigation: PrimaryWindowNavigationActions
 }
@@ -112,7 +114,7 @@ interface SelectWorkspacePaneTabByIndexCommandOptions {
 interface MoveWorkspacePaneTabCommandOptions {
   repoId: string | null
   branchName: string | null
-  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
+  workspacePaneRoute: WorkspacePaneCommandRoute
   direction: 1 | -1
   navigation: PrimaryWindowNavigationActions
 }
@@ -238,7 +240,7 @@ async function closeWorkspacePaneTabCommand(options: CloseWorkspacePaneTabComman
         worktreePath: target.worktreePath,
       },
     })
-    if (openWorkspacePaneRuntimeCloseConfirm(target.repoId, closeConfirm)) return true
+    if (openWorkspacePaneRuntimeCloseConfirm(target.repoId, closeConfirm, options.workspacePaneRoute)) return true
   }
 
   const closingIdentity = tab.identity
@@ -320,6 +322,7 @@ function closeConfirmedTerminalWorkspacePaneTab(options: ConfirmCloseTerminalWor
 function openWorkspacePaneRuntimeCloseConfirm(
   repoId: string,
   request: WorkspacePaneRuntimeTabCloseConfirmRequest | null,
+  workspacePaneRoute: WorkspacePaneCommandRoute,
 ): boolean {
   if (!request) return false
   const terminalBase = request.type === 'terminal' ? terminalBaseForRuntimeTabCloseTarget(request.target) : null
@@ -327,6 +330,7 @@ function openWorkspacePaneRuntimeCloseConfirm(
     useTerminalActionDialogsStore.getState().openCloseConfirm({
       repoId,
       targetIdentity: request.identity,
+      workspacePaneRoute,
       terminalSessionId: request.sessionId,
       terminalBase,
       processName: request.processName,
@@ -386,7 +390,7 @@ export function runMoveWorkspacePaneTabCommand({
 function selectedRepoWorkspaceTarget(
   repoId: string,
   branchName: string,
-  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null,
+  workspacePaneRoute: WorkspacePaneCommandRoute,
 ): { branchName: string; worktreePath: string | null } | null {
   const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute })
   if (resolution.kind !== 'ready') return null
