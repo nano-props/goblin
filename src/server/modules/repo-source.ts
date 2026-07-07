@@ -525,8 +525,13 @@ async function createRemoteRepoSource(repoId: string): Promise<RepoSource> {
     },
     async deleteBranch(branch, options, signal) {
       const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal)
-      const deleted = await deleteRemoteBranch(target, { branch, force: options?.force, signal })
-      return deleted.ok ? withAffectedRepoIds(deleted, affectedRepoIds) : deleted
+      const deleted = await deleteRemoteBranch(target, {
+        branch,
+        force: options?.force,
+        alsoDeleteUpstream: options?.alsoDeleteUpstream,
+        signal,
+      })
+      return deleted.ok || deleted.repoChanged ? withAffectedRepoIds(deleted, affectedRepoIds) : deleted
     },
     async removeWorktree(input, signal) {
       const result = await removeRemoteWorktree(target, { ...input, signal })

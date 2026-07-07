@@ -36,9 +36,11 @@ const mocks = vi.hoisted(() => ({
   bootstrapWorktreeAfterCreate: vi.fn(),
   bootstrapRemoteWorktreeAfterCreate: vi.fn(),
   createRemoteWorktree: vi.fn(),
+  deleteRemoteBranch: vi.fn(),
   getWorktreeBootstrapPreview: vi.fn(),
   getRemoteRepoWorktreePaths: vi.fn(),
   getRemoteWorktreeBootstrapPreview: vi.fn(),
+  removeRemoteWorktree: vi.fn(),
   getServerRepoSettings: vi.fn(),
   pruneServerRepoSettingsForRemovedWorktree: vi.fn(),
   resolveRemoteTarget: vi.fn(),
@@ -130,7 +132,7 @@ vi.mock('#/system/ssh/diagnostics.ts', () => ({
 vi.mock('#/system/ssh/git.ts', () => ({
   bootstrapRemoteWorktreeAfterCreate: mocks.bootstrapRemoteWorktreeAfterCreate,
   createRemoteWorktree: mocks.createRemoteWorktree,
-  deleteRemoteBranch: vi.fn(),
+  deleteRemoteBranch: mocks.deleteRemoteBranch,
   fetchRemoteRepo: vi.fn(),
   getRemoteBrowserUrl: vi.fn(),
   getRemoteLog: vi.fn(),
@@ -143,7 +145,7 @@ vi.mock('#/system/ssh/git.ts', () => ({
   getRemoteWorktreeBootstrapPreview: mocks.getRemoteWorktreeBootstrapPreview,
   pullRemoteBranch: vi.fn(),
   pushRemoteBranch: vi.fn(),
-  removeRemoteWorktree: vi.fn(),
+  removeRemoteWorktree: mocks.removeRemoteWorktree,
 }))
 
 vi.mock('#/system/git/pull-requests.ts', () => ({
@@ -226,6 +228,8 @@ beforeEach(async () => {
   mocks.deleteBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.deleteUpstreamBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.removeWorktree.mockResolvedValue({ ok: true, message: 'ok' })
+  mocks.deleteRemoteBranch.mockResolvedValue({ ok: true, message: 'ok' })
+  mocks.removeRemoteWorktree.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.getRemoteRepoWorktreePaths.mockResolvedValue([])
   mocks.getCurrentBranch.mockResolvedValue('main')
   mocks.getRepoCommonDir.mockImplementation(async (cwd: string) => `${cwd}/.git`)
@@ -1328,6 +1332,39 @@ describe('repo mutation invalidation publishing', () => {
     })
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
       repoId: '/tmp/repo',
+      query: 'repo-snapshot',
+    })
+  })
+
+  test('remote deleteRepoBranch forwards upstream deletion and refreshes affected remote worktrees after partial failure', async () => {
+    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
+    const linkedRepoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo-linked' })
+    mocks.getRemoteRepoWorktreePaths.mockResolvedValueOnce(['/srv/repo', '/srv/repo-linked'])
+    mocks.deleteRemoteBranch.mockResolvedValueOnce({
+      ok: false,
+      message: 'remote rejected delete',
+      repoChanged: true,
+    })
+    const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await deleteRepoBranch(repoId, 'feature/a', { alsoDeleteUpstream: true })
+
+    expect(result).toEqual({ ok: false, message: 'remote rejected delete', repoChanged: true })
+    expect(mocks.deleteRemoteBranch).toHaveBeenCalledWith(
+      expect.objectContaining({ remotePath: '/srv/repo' }),
+      {
+        branch: 'feature/a',
+        force: undefined,
+        alsoDeleteUpstream: true,
+        signal: undefined,
+      },
+    )
+    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(1, {
+      repoId,
+      query: 'repo-snapshot',
+    })
+    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(2, {
+      repoId: linkedRepoId,
       query: 'repo-snapshot',
     })
   })

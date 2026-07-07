@@ -12,6 +12,9 @@ import {
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { invalidateRepoDataQueries } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { normalizeWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 interface RepoRefreshIntentBase {
   id: string
@@ -63,15 +66,38 @@ export function currentRepoVisibleProjectionRefreshState(
       ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branchName)
       : null
   const preferredWorkspacePaneTab = preferredWorkspacePaneTabForTarget(repo.ui, target)
+  const visibleProjectionViewOpen = target
+    ? renderedWorkspacePaneProjectionTabOpen(repo, target, preferredWorkspacePaneTab)
+    : false
   return {
     id: repo.id,
     repoInstanceId: repo.instanceId,
     preferredWorkspacePaneTab,
     branchName,
-    visibleProjectionViewOpen: preferredWorkspacePaneTab === 'status' || preferredWorkspacePaneTab === 'changes',
+    visibleProjectionViewOpen,
     unavailable: isRepoUnavailable(repo),
     visibleStatusPhase: repo.dataLoads.visibleStatus.phase,
   }
+}
+
+function renderedWorkspacePaneProjectionTabOpen(
+  repo: RepoState,
+  target: WorkspacePaneTabsTarget,
+  preferredWorkspacePaneTab: WorkspacePaneTabType,
+): boolean {
+  const tabEntries = normalizeWorkspacePaneTabs(
+    readWorkspacePaneTabsForTarget({
+      repoRoot: repo.id,
+      repoInstanceId: repo.instanceId,
+      branchName: target.branchName,
+      worktreePath: target.worktreePath,
+    }),
+    { hasWorktree: target.worktreePath !== null },
+  )
+  const renderedTab = tabEntries.some((entry) => entry.type === preferredWorkspacePaneTab)
+    ? preferredWorkspacePaneTab
+    : (tabEntries[0]?.type ?? null)
+  return renderedTab === 'status' || renderedTab === 'changes'
 }
 
 export function isRepoVisibleProjectionRefreshable(repo: RepoVisibleProjectionRefreshState): boolean {

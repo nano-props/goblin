@@ -309,4 +309,27 @@ describe('useVisibleRepoProjectionRefresh', () => {
       branchName: 'feature/a',
     })
   })
+
+  test('refreshes after branch switches when status is rendered through tab fallback', async () => {
+    const repo = createRepo('/repo-a', { preferredWorkspacePaneTab: 'terminal', branchNames: ['main', 'feature/a'] })
+    await act(async () => {
+      useReposStore.setState({
+        repos: { '/repo-a': repo },
+        order: ['/repo-a'],
+        restoredRepoId: '/repo-a',
+      })
+      root.render(<Harness />)
+    })
+    refreshRuntimeProjection.mockClear()
+
+    await act(async () => {
+      root.render(<Harness branchName="feature/a" />)
+    })
+
+    expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
+      repoInstanceId: 'repo-instance-test-a',
+      scope: 'visible-status',
+      branchName: 'feature/a',
+    })
+  })
 })

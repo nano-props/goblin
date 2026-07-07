@@ -92,6 +92,32 @@ describe('repo refresh coordinator', () => {
     })
   })
 
+  test('treats the fallback rendered status tab as a visible projection view', () => {
+    const branch = createRepoBranch('feature/query', { worktree: { path: '/tmp/query-worktree' } })
+    const repo = seedRepoWithReadModelForTest({
+      id: '/repo',
+      branches: [branch],
+      currentBranchName: 'feature/query',
+      preferredWorkspacePaneTab: 'terminal',
+    })
+    seedRepoReadModelQueryData(repo, {
+      branches: [branch],
+      currentBranch: 'feature/query',
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: '/repo',
+      repoInstanceId: repo.instanceId,
+      branchName: 'feature/query',
+      worktreePath: '/tmp/query-worktree',
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+
+    expect(currentRepoVisibleProjectionRefreshState(repo, 'feature/query')).toMatchObject({
+      preferredWorkspacePaneTab: 'terminal',
+      visibleProjectionViewOpen: true,
+    })
+  })
+
   test('routes initial load through a coordinated repo read-model projection refresh', async () => {
     const { calls, get } = callsGet()
 

@@ -73,6 +73,7 @@ export type RemoteCommandKind =
   | { type: 'gitPullCurrent'; path: string }
   | { type: 'gitFetchBranch'; path: string; remote: string; remoteBranch: string; branch: string }
   | { type: 'gitPush'; path: string; remote: string; branch: string; targetBranch: string; setUpstream: boolean }
+  | { type: 'gitPushDeleteBranch'; path: string; remote: string; branch: string }
   | { type: 'gitRemoteBranches'; path: string }
   | { type: 'gitWorktreeAdd'; path: string; input: CreateWorktreeInput }
   | { type: 'gitWorktreeRemove'; path: string; worktreePath: string }
@@ -460,6 +461,10 @@ function scriptForCommand(command: RemoteCommandKind): string {
       ]
         .filter(Boolean)
         .join(' ')
+    case 'gitPushDeleteBranch':
+      return `git -C ${shellQuote(command.path)} push --delete -- ${shellQuote(command.remote)} ${shellQuote(
+        command.branch,
+      )}`
     case 'gitRemoteBranches':
       return `git -C ${shellQuote(command.path)} for-each-ref ${shellQuote('--format=%(refname:short)')} refs/remotes/`
     case 'gitWorktreeAdd':
