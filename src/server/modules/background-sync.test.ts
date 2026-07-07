@@ -78,6 +78,33 @@ describe('server background sync scheduler', () => {
     expect(repoASignal?.aborted).toBe(true)
   })
 
+  test('does not treat a removed in-flight background fetch as a completed cadence attempt', async () => {
+    let repoASignal: AbortSignal | undefined
+    mocks.fetchRepo.mockImplementation(async (repoId: string, _kind: string, signal?: AbortSignal) => {
+      if (repoId === '/tmp/repo-a' && !repoASignal) {
+        repoASignal = signal
+        return await new Promise<{ ok: boolean; message: string }>((resolve) => {
+          signal?.addEventListener('abort', () => resolve({ ok: false, message: 'cancelled' }), { once: true })
+        })
+      }
+      return { ok: true, message: 'ok' }
+    })
+    const { setBackgroundSyncRepos } = await import('#/server/modules/background-sync.ts')
+
+    await setBackgroundSyncRepos(['/tmp/repo-a'])
+    await vi.waitFor(() => expect(repoASignal).toBeDefined())
+    await setBackgroundSyncRepos(['/tmp/repo-b'])
+    await vi.waitFor(() => {
+      expect(mocks.fetchRepo).toHaveBeenCalledWith('/tmp/repo-b', 'background', expect.any(AbortSignal))
+    })
+
+    await setBackgroundSyncRepos(['/tmp/repo-a'])
+    await vi.waitFor(() => {
+      const repoACalls = mocks.fetchRepo.mock.calls.filter((call) => call[0] === '/tmp/repo-a')
+      expect(repoACalls).toHaveLength(2)
+    })
+  })
+
   test('only re-fetches a repo on re-activation once its previous fetch is overdue', async () => {
     mocks.fetchRepo.mockResolvedValue({ ok: true, message: 'ok' })
     const { getBackgroundSyncDiagnostics, setBackgroundSyncRepos } = await import('#/server/modules/background-sync.ts')

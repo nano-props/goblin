@@ -130,31 +130,6 @@ function execResultOnly(result: RepoMutationResult & { affectedWorktreePaths?: r
   return execResult
 }
 
-async function withMergedAbortSignal<T>(
-  signals: Array<AbortSignal | undefined>,
-  task: (signal: AbortSignal | undefined) => Promise<T>,
-): Promise<T> {
-  const activeSignals = signals.filter((signal): signal is AbortSignal => !!signal)
-  if (activeSignals.length <= 1) return await task(activeSignals[0])
-  if (typeof AbortSignal.any === 'function') return await task(AbortSignal.any(activeSignals))
-  const ctrl = new AbortController()
-  const abort = (event: Event) => {
-    ctrl.abort((event.target as AbortSignal | null)?.reason)
-  }
-  for (const signal of activeSignals) {
-    if (signal.aborted) {
-      ctrl.abort(signal.reason)
-      return await task(ctrl.signal)
-    }
-    signal.addEventListener('abort', abort)
-  }
-  try {
-    return await task(ctrl.signal)
-  } finally {
-    for (const signal of activeSignals) signal.removeEventListener('abort', abort)
-  }
-}
-
 async function waitForResultOrCallerAbort<T extends RepoExecResult>(
   promise: Promise<T>,
   signal?: AbortSignal,
@@ -206,12 +181,7 @@ async function runUserNetworkMutation(
         canCancelUnderlying: true,
       },
       (_operation, context) => async () =>
-        await context.runNetworkOperation(
-          async (networkSignal) => {
-            return await withMergedAbortSignal([signal, networkSignal], task)
-          },
-          { callerSignal: signal },
-        ),
+        await context.runNetworkOperation(async (networkSignal) => await task(networkSignal)),
     ),
   )
 }
@@ -309,16 +279,14 @@ export async function cloneRepo(
     return result
   }
   try {
-    return await withMergedAbortSignal([signal], async (mergedSignal) => {
-      if (mergedSignal?.aborted) return settleClone({ ok: false, message: 'cancelled' })
-      const gitAvailable = await checkGitAvailable()
-      if (!gitAvailable.ok) return settleClone(gitAvailable)
-      if (mergedSignal?.aborted) return settleClone({ ok: false, message: 'cancelled' })
-      const writable = await ensureWritableDirectory(targetParent)
-      if (!writable.ok) return settleClone(writable)
-      if (mergedSignal?.aborted) return settleClone({ ok: false, message: 'cancelled' })
-      return settleClone(await cloneGitRepo(targetParent, targetName, repoUrl, mergedSignal))
-    })
+    if (signal?.aborted) return settleClone({ ok: false, message: 'cancelled' })
+    const gitAvailable = await checkGitAvailable()
+    if (!gitAvailable.ok) return settleClone(gitAvailable)
+    if (signal?.aborted) return settleClone({ ok: false, message: 'cancelled' })
+    const writable = await ensureWritableDirectory(targetParent)
+    if (!writable.ok) return settleClone(writable)
+    if (signal?.aborted) return settleClone({ ok: false, message: 'cancelled' })
+    return settleClone(await cloneGitRepo(targetParent, targetName, repoUrl, signal))
   } catch (err) {
     settleRepoServerOperation(operation.id, {
       ok: false,
@@ -339,14 +307,7 @@ export async function fetchRepo(
     task: (signal: AbortSignal) => Promise<RepoMutationResult>,
     context: RepoWriteOperationContext,
   ) {
-    const result = await context.runNetworkOperation(
-      async (networkSignal) => {
-        return await withMergedAbortSignal([signal, networkSignal], async (mergedSignal) => {
-          return await task(mergedSignal ?? networkSignal)
-        })
-      },
-      { callerSignal: signal },
-    )
+    const result = await context.runNetworkOperation(async (networkSignal) => await task(networkSignal))
     return await publishSnapshotInvalidationAfterMutation(cwd, result)
   }
   async function executeFetch(

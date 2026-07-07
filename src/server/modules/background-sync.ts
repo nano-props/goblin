@@ -106,6 +106,10 @@ function clearRepoBackoff(repoId: string): void {
   delete state.backoffUntilByRepo[repoId]
 }
 
+function recordRepoFetchAttempt(repoId: string, at: number): void {
+  state.lastFetchAtByRepo[repoId] = at
+}
+
 function computeBackoffDelayMs(failureCount: number): number {
   const base = Math.max(MIN_BACKOFF_MS, Math.min(MAX_BACKOFF_BASE_MS, state.intervalMs))
   return Math.min(base * 2 ** failureCount, MAX_BACKOFF_MS)
@@ -179,7 +183,6 @@ async function runScheduledFetch(generation: number): Promise<void> {
   try {
     repoId = findNextDueRepo(now)
     if (!repoId || state.intervalMs <= 0) return
-    state.lastFetchAtByRepo[repoId] = now
     const ctrl = new AbortController()
     activeFetch = { repoId, ctrl }
     state.activeFetch = activeFetch
@@ -190,6 +193,8 @@ async function runScheduledFetch(generation: number): Promise<void> {
     if (fetchDuration > 5000) {
       backgroundSyncLogger.warn({ repoId, fetchDuration, intervalMs: state.intervalMs }, 'background fetch slow')
     }
+    if (activeFetch.ctrl.signal.aborted) return
+    recordRepoFetchAttempt(repoId, now)
     if (result.ok) {
       clearRepoBackoff(repoId)
       return
@@ -208,7 +213,10 @@ async function runScheduledFetch(generation: number): Promise<void> {
     }
   } catch (err) {
     if (activeFetch?.ctrl.signal.aborted) return
-    if (repoId) recordRepoFailure(repoId, now)
+    if (repoId) {
+      recordRepoFetchAttempt(repoId, now)
+      recordRepoFailure(repoId, now)
+    }
     backgroundSyncLogger.warn(
       {
         err,

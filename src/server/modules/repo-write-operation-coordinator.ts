@@ -21,10 +21,7 @@ export interface RepoWriteOperationLifecycle {
 }
 
 export interface RepoWriteOperationContext {
-  runNetworkOperation<T extends ExecResult>(
-    task: (signal: AbortSignal) => Promise<T>,
-    options?: { callerSignal?: AbortSignal },
-  ): Promise<T>
+  runNetworkOperation<T extends ExecResult>(task: (signal: AbortSignal) => Promise<T>): Promise<T>
 }
 
 interface BeginRepoWriteOperationInput {
@@ -224,9 +221,9 @@ async function runRepoWriteNetworkOperation<T extends ExecResult>(
   runtime: RepoWriteOperationQueueRuntime,
   operation: RepoWriteOperationLifecycle,
   task: (signal: AbortSignal) => Promise<T>,
-  options: { callerSignal?: AbortSignal } = {},
+  callerSignal?: AbortSignal,
 ): Promise<T> {
-  if (options.callerSignal?.aborted) {
+  if (callerSignal?.aborted) {
     operation.recordWaitCancellation('caller-abort')
     const result = { ok: false, message: 'cancelled' }
     operation.settle(result)
@@ -240,6 +237,11 @@ async function runRepoWriteNetworkOperation<T extends ExecResult>(
 
   const ctrl = new AbortController()
   const slot: ActiveRepoWriteNetworkOperation = { ctrl, operation }
+  const onCallerAbort = () => {
+    operation.requestCancel('caller-abort')
+    ctrl.abort(callerSignal?.reason)
+  }
+  callerSignal?.addEventListener('abort', onCallerAbort, { once: true })
   runtime.activeNetworkOperation = slot
   operation.start()
   try {
@@ -253,6 +255,7 @@ async function runRepoWriteNetworkOperation<T extends ExecResult>(
     })
     throw err
   } finally {
+    callerSignal?.removeEventListener('abort', onCallerAbort)
     if (runtime.activeNetworkOperation === slot) runtime.activeNetworkOperation = null
   }
 }
@@ -260,10 +263,11 @@ async function runRepoWriteNetworkOperation<T extends ExecResult>(
 function createRepoWriteOperationContext(
   runtime: RepoWriteOperationQueueRuntime,
   operation: RepoWriteOperationLifecycle,
+  callerSignal: AbortSignal | undefined,
 ): RepoWriteOperationContext {
   return {
-    async runNetworkOperation(task, options) {
-      return await runRepoWriteNetworkOperation(runtime, operation, task, options)
+    async runNetworkOperation(task) {
+      return await runRepoWriteNetworkOperation(runtime, operation, task, callerSignal)
     },
   }
 }
@@ -280,7 +284,7 @@ export async function enqueueRepoWriteOperation<T>(
     const boundaryKey = await resolveRepoWriteBoundaryKey(repoId, signal)
     const runtime = repoWriteOperationRuntimeForBoundary(boundaryKey)
     const operation = beginRepoWriteOperation(runtime, operationInput)
-    const context = createRepoWriteOperationContext(runtime, operation)
+    const context = createRepoWriteOperationContext(runtime, operation, signal)
     let task: () => Promise<T>
     try {
       task = prepareTask(operation, context)

@@ -155,4 +155,53 @@ describe('repo write operation coordinator', () => {
     ])
   })
 
+  test('records caller cancellation for a running network operation', async () => {
+    const caller = new AbortController()
+    let resolveTaskSignal!: (signal: AbortSignal) => void
+    const taskSignalReady = new Promise<AbortSignal>((resolve) => {
+      resolveTaskSignal = resolve
+    })
+    const work = enqueueRepoWriteOperation(
+      '/tmp/repo',
+      caller.signal,
+      { repoId: '/tmp/repo', kind: 'fetch', source: 'user' },
+      (_operation, context) => async () =>
+        await context.runNetworkOperation(
+          (signal) =>
+            new Promise<{ ok: false; message: string }>((resolve) => {
+              resolveTaskSignal(signal)
+              signal.addEventListener('abort', () => resolve({ ok: false, message: 'cancelled' }), { once: true })
+            }),
+        ),
+    )
+
+    await vi.waitFor(async () => {
+      await expect(listRepoWriteOperationsForRepo('/tmp/repo')).resolves.toMatchObject([
+        {
+          kind: 'fetch',
+          phase: 'running',
+        },
+      ])
+    })
+
+    caller.abort('client disconnected')
+
+    await expect(taskSignalReady).resolves.toMatchObject({ aborted: true })
+    await expect(work).resolves.toEqual({ ok: false, message: 'cancelled' })
+    await expect(listRepoWriteOperationsForRepo('/tmp/repo', { includeSettled: true })).resolves.toMatchObject([
+      {
+        kind: 'fetch',
+        phase: 'failed',
+        cancellation: {
+          underlyingRequested: true,
+          reason: 'caller-abort',
+        },
+        error: {
+          message: 'cancelled',
+          reason: 'caller-abort',
+        },
+      },
+    ])
+  })
+
 })
