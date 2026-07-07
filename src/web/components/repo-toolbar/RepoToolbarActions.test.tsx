@@ -4,14 +4,17 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { screen } from '@testing-library/react'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { BranchFilterAction } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
+import { BranchFilterAction, CreateWorktreeRowAction } from '#/web/components/repo-toolbar/RepoToolbarActions.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   createBranchSnapshot,
   resetReposStore,
   seedRepoReadModelQueryData,
+  seedRepoShellForTest,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
+import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
+import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
 const REPO_ID = '/tmp/gbl-repo-toolbar-actions-test-repo'
 
@@ -57,4 +60,49 @@ describe('RepoToolbarActions', () => {
 
     expect(screen.getByLabelText('branches.filter-label').hasAttribute('disabled')).toBe(true)
   })
+
+  test('disables create worktree entry from server branch operation projection', () => {
+    const repo = seedRepoShellForTest({ id: REPO_ID })
+    setRepoOperationsQueryData(REPO_ID, repo.instanceId, false, {
+      operations: [serverOperation(repo.instanceId, { kind: 'create-worktree', phase: 'running' })],
+      loadedAt: 123,
+    })
+
+    renderInJsdom(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <CreateWorktreeRowAction repoId={REPO_ID} />
+      </QueryClientProvider>,
+    )
+
+    expect(screen.getByTestId('create-worktree-button').hasAttribute('disabled')).toBe(true)
+  })
 })
+
+function serverOperation(
+  repoInstanceId: string,
+  overrides: Pick<RepoServerOperationState, 'kind' | 'phase'>,
+): RepoServerOperationState {
+  return {
+    id: `repo-op-${overrides.kind}-${overrides.phase}`,
+    repoId: REPO_ID,
+    repoInstanceId,
+    kind: overrides.kind,
+    phase: overrides.phase,
+    source: 'user',
+    target: null,
+    queuedAt: 100,
+    startedAt: overrides.phase === 'queued' ? null : 101,
+    deadlineAt: null,
+    settledAt: null,
+    error: null,
+    cancellation: {
+      underlyingRequested: false,
+      reason: null,
+      requestedAt: null,
+      waitCancelledCount: 0,
+      lastWaitCancelledAt: null,
+      lastWaitCancellationReason: null,
+    },
+    canCancelUnderlying: true,
+  }
+}

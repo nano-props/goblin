@@ -13,6 +13,8 @@ import { useT } from '#/web/stores/i18n.ts'
 import { formatAccelerator } from '#/shared/accelerator.ts'
 import { CREATE_WORKTREE_SHORTCUT } from '#/shared/shortcut-definitions.ts'
 import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
+import { branchActionOperationFromServer } from '#/web/hooks/branch-action-state.ts'
 
 interface Props {
   repoId: string
@@ -107,14 +109,34 @@ export function CreateWorktreeRowAction({
 
 function useCreateWorktreeTrigger(repoId: string) {
   const overlayActions = useContext(LayoutOverlayActions)
-  const branchAction = useStoreWithEqualityFn(
+  const repoShell = useStoreWithEqualityFn(
     useReposStore,
     (s) => {
       const repo = s.repos[repoId]
-      return repo ? repo.operations.branchAction : null
+      return repo
+        ? {
+            id: repo.id,
+            instanceId: repo.instanceId,
+            branchAction: repo.operations.branchAction,
+          }
+        : null
     },
-    (a, b) => a === b || (!!a && !!b && a.phase === b.phase && a.reason === b.reason && a.target === b.target),
+    (a, b) =>
+      a === b ||
+      (!!a &&
+        !!b &&
+        a.id === b.id &&
+        a.instanceId === b.instanceId &&
+        a.branchAction.phase === b.branchAction.phase &&
+        a.branchAction.reason === b.branchAction.reason &&
+        a.branchAction.target === b.branchAction.target),
   )
+  const operationsReadModel = useRepoOperationsReadModel(repoShell?.id ?? '', repoShell?.instanceId ?? '', {
+    enabled: !!repoShell,
+  })
+  const branchAction = repoShell
+    ? branchActionOperationFromServer(repoShell.branchAction, operationsReadModel.data?.operations)
+    : null
   const branchActionBusy = branchAction ? branchAction.phase !== 'idle' : true
   return {
     disabled: branchActionBusy,

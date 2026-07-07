@@ -11,6 +11,7 @@ import { useI18nStore } from '#/web/stores/i18n.ts'
 import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
 const REPO_ID = '/tmp/repo-activity-control-component'
 
@@ -32,37 +33,36 @@ describe('RepoActivityControl component', () => {
   test('disables the primary refresh button while server projection reports an active fetch', () => {
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
     setRepoOperationsQueryData(REPO_ID, repo.instanceId, false, {
-      operations: [
-        {
-          id: 'repo-op-1',
-          repoId: REPO_ID,
-          repoInstanceId: repo.instanceId,
-          kind: 'fetch',
-          phase: 'running',
-          source: 'user',
-          target: null,
-          queuedAt: 100,
-          startedAt: 101,
-          deadlineAt: null,
-          settledAt: null,
-          error: null,
-          cancellation: {
-            underlyingRequested: false,
-            reason: null,
-            requestedAt: null,
-            waitCancelledCount: 0,
-            lastWaitCancelledAt: null,
-            lastWaitCancellationReason: null,
-          },
-          canCancelUnderlying: true,
-        },
-      ],
+      operations: [serverOperation(repo.instanceId, { kind: 'fetch', phase: 'running' })],
       loadedAt: 123,
     })
 
     const { container } = renderControl()
 
     expect(button(container).disabled).toBe(true)
+    expect(button(container).getAttribute('aria-busy')).toBe('true')
+  })
+
+  test('renders branch action activity from server operation projection', async () => {
+    const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
+    setRepoOperationsQueryData(REPO_ID, repo.instanceId, false, {
+      operations: [
+        serverOperation(repo.instanceId, {
+          kind: 'push',
+          phase: 'queued',
+          branch: 'feature/a',
+        }),
+      ],
+      loadedAt: 123,
+    })
+
+    const { container } = renderControl()
+
+    await act(async () => {
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 150))
+    })
+
+    expect(container.textContent).toContain('action.push-queued')
     expect(button(container).getAttribute('aria-busy')).toBe('true')
   })
 
@@ -155,6 +155,35 @@ function seedRepoForControl(input: Parameters<typeof seedRepoShellForTest>[0]) {
   const repo = seedRepoShellForTest(input)
   setRepoOperationsQueryData(repo.id, repo.instanceId, false, { operations: [], loadedAt: 0 })
   return repo
+}
+
+function serverOperation(
+  repoInstanceId: string,
+  overrides: Pick<RepoServerOperationState, 'kind' | 'phase'> & { branch?: string },
+): RepoServerOperationState {
+  return {
+    id: `repo-op-${overrides.kind}-${overrides.phase}`,
+    repoId: REPO_ID,
+    repoInstanceId,
+    kind: overrides.kind,
+    phase: overrides.phase,
+    source: 'user',
+    target: overrides.branch ? { branch: overrides.branch } : null,
+    queuedAt: 100,
+    startedAt: overrides.phase === 'queued' ? null : 101,
+    deadlineAt: null,
+    settledAt: null,
+    error: null,
+    cancellation: {
+      underlyingRequested: false,
+      reason: null,
+      requestedAt: null,
+      waitCancelledCount: 0,
+      lastWaitCancelledAt: null,
+      lastWaitCancellationReason: null,
+    },
+    canCancelUnderlying: true,
+  }
 }
 
 function button(container: HTMLElement): HTMLButtonElement {

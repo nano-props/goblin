@@ -20,6 +20,7 @@ import { repoEventActionSuccessLabel } from '#/web/stores/repos/action-labels.ts
 import { formatRelativeTime } from '#/web/lib/dates.ts'
 import { latestRepoSyncTime } from '#/web/stores/repos/sync-time.ts'
 import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
+import type { RepoOperationsSnapshot } from '#/shared/api-types.ts'
 
 interface Props {
   repoId: string
@@ -28,8 +29,8 @@ interface Props {
 const COMPLETION_VISIBLE_MS = 1500
 const EMPTY_EVENTS: RepoEvent[] = []
 
-function useRepoActivityControlPresentation(repo: RepoState) {
-  const rawActivity = getRepoActivity(repo)
+function useRepoActivityControlPresentation(repo: RepoState, serverOperations?: RepoOperationsSnapshot) {
+  const rawActivity = getRepoActivity(repo, serverOperations)
   const rawActivityKey = rawActivity
     ? `${rawActivity.kind}:${rawActivity.labelKey}:${JSON.stringify(rawActivity.labelParams ?? {})}`
     : null
@@ -62,7 +63,7 @@ export function RepoActivityControl({ repoId }: Props) {
 
 function RepoActivityControlView({ repo }: { repo: RepoState }) {
   const operationsReadModel = useRepoOperationsReadModel(repo.id, repo.instanceId)
-  const visibleActivity = useRepoActivityControlPresentation(repo)
+  const visibleActivity = useRepoActivityControlPresentation(repo, operationsReadModel.data)
   const completion = useRepoCompletion(repo.id)
   const view = getRepoActivityControlView({
     visibleActivity,

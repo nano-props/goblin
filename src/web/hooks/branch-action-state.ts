@@ -1,7 +1,12 @@
 import type { RepoBranchActionKind } from '#/web/stores/repos/branch-action-types.ts'
-import { branchActionKindFromReason, isBranchActionReason } from '#/web/stores/repos/operations.ts'
+import {
+  branchActionKindFromReason,
+  isBranchActionReason,
+  type RepoOperationState,
+} from '#/web/stores/repos/operations.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
+import type { RepoServerOperationState } from '#/shared/api-types.ts'
 export type BranchActionItemId =
   'status' | 'history' | 'changes' | 'files' | 'copyPatch' | 'pull' | 'push' | 'deleteBranch' | 'removeWorktree'
 
@@ -30,6 +35,52 @@ export interface BranchActionRepo {
 
 export function isBranchActionBlocked(repo: Pick<BranchActionRepo, 'operations'>): boolean {
   return repo.operations.branchAction.phase !== 'idle'
+}
+
+export function isActiveServerBranchAction(operation: RepoServerOperationState): boolean {
+  return (
+    serverBranchActionReason(operation) !== null &&
+    (operation.phase === 'queued' || operation.phase === 'running' || operation.phase === 'cancelling')
+  )
+}
+
+export function serverBranchActionReason(operation: RepoServerOperationState): RepoOperationState['reason'] {
+  switch (operation.kind) {
+    case 'pull':
+      return 'branch:pull'
+    case 'push':
+      return 'branch:push'
+    case 'create-worktree':
+      return 'branch:createWorktree'
+    case 'delete-branch':
+      return 'branch:deleteBranch'
+    case 'remove-worktree':
+      return 'branch:removeWorktree'
+    default:
+      return null
+  }
+}
+
+export function branchActionOperationFromServer(
+  fallback: RepoOperationState,
+  operations: readonly RepoServerOperationState[] | undefined,
+  branchName?: string | null,
+): RepoOperationState {
+  const operation = operations?.find((candidate) => {
+    if (!isActiveServerBranchAction(candidate)) return false
+    if (!branchName) return true
+    return candidate.target?.branch === branchName
+  })
+  if (!operation) return fallback
+  return {
+    operationId: operation.queuedAt,
+    phase: operation.phase === 'queued' ? 'queued' : 'running',
+    reason: serverBranchActionReason(operation),
+    target: operation.target?.branch ?? null,
+    startedAt: operation.startedAt,
+    settledAt: operation.settledAt,
+    error: operation.error?.message ?? null,
+  }
 }
 
 export function branchActionItemIdFromKind(kind: RepoBranchActionKind): BranchActionItemId | null {

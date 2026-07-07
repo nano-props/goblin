@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import {
+  getRepoActivity,
   isRepoPrimaryRefreshBusy,
   repoOperationsSnapshotHasPrimaryRefresh,
 } from '#/web/components/repo-activity/model.ts'
@@ -32,6 +33,17 @@ describe('repo activity model', () => {
 
     expect(repoOperationsSnapshotHasPrimaryRefresh(operations)).toBe(false)
     expect(isRepoPrimaryRefreshBusy(repo, operations)).toBe(false)
+  })
+
+  test('projects branch action activity from server operations', () => {
+    resetReposStore()
+    const repo = seedRepoShellForTest({ id: REPO_ID })
+    const operations = operationsSnapshot([serverOperation({ kind: 'push', phase: 'queued' })])
+
+    expect(getRepoActivity(repo, operations)).toMatchObject({
+      kind: 'branch-action',
+      labelKey: 'action.push-queued',
+    })
   })
 
   test('marks the primary refresh control busy while a manual refresh is active', () => {

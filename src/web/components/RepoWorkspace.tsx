@@ -17,8 +17,7 @@ import { useRepoProjectionReadModel } from '#/web/repo-data-query.ts'
 import { repoBranchReadModelFromSnapshot } from '#/web/repo-branch-read-model.ts'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
 import { useWorkspaceNavigationHistory } from '#/web/workspace-navigation-history.ts'
-import type { RepoOperationState } from '#/web/stores/repos/operations.ts'
-import type { RepoServerOperationState } from '#/shared/api-types.ts'
+import { branchActionOperationFromServer } from '#/web/hooks/branch-action-state.ts'
 
 interface Props {
   repoId: string
@@ -30,56 +29,6 @@ interface Props {
 
 // Keep this equality in sync with fields read by RepoWorkspace children.
 type RepoWorkspaceRepoShell = Omit<RepoWorkspaceRepo, 'branchModel'>
-
-function isActiveServerBranchAction(operation: RepoServerOperationState): boolean {
-  return (
-    (operation.kind === 'pull' ||
-      operation.kind === 'push' ||
-      operation.kind === 'create-worktree' ||
-      operation.kind === 'delete-branch' ||
-      operation.kind === 'remove-worktree') &&
-    (operation.phase === 'queued' || operation.phase === 'running' || operation.phase === 'cancelling')
-  )
-}
-
-function serverBranchActionReason(operation: RepoServerOperationState): RepoOperationState['reason'] {
-  switch (operation.kind) {
-    case 'pull':
-      return 'branch:pull'
-    case 'push':
-      return 'branch:push'
-    case 'create-worktree':
-      return 'branch:createWorktree'
-    case 'delete-branch':
-      return 'branch:deleteBranch'
-    case 'remove-worktree':
-      return 'branch:removeWorktree'
-    default:
-      return null
-  }
-}
-
-function branchActionOperationFromServer(
-  fallback: RepoOperationState,
-  operations: readonly RepoServerOperationState[],
-  branchName: string | null | undefined,
-): RepoOperationState {
-  const operation = operations.find((candidate) => {
-    if (!isActiveServerBranchAction(candidate)) return false
-    if (!branchName) return true
-    return candidate.target?.branch === branchName
-  })
-  if (!operation) return fallback
-  return {
-    operationId: operation.queuedAt,
-    phase: operation.phase === 'queued' ? 'queued' : 'running',
-    reason: serverBranchActionReason(operation),
-    target: operation.target?.branch ?? null,
-    startedAt: operation.startedAt,
-    settledAt: operation.settledAt,
-    error: operation.error?.message ?? null,
-  }
-}
 
 function repoWorkspaceRepoShellEqual(
   a: RepoWorkspaceRepoShell | undefined,

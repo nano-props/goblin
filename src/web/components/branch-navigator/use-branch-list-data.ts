@@ -5,9 +5,10 @@
 
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+import { branchActionOperationFromServer, type BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { RepoState, RepoUiState } from '#/web/stores/repos/types.ts'
 import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
+import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
 
 // Composed projection: branch/status/worktree data comes from the repo
 // data query; the store contributes only identity, UI, operation, and
@@ -82,10 +83,20 @@ export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
     },
     branchListRepoShellEqual,
   )
+  const operationsReadModel = useRepoOperationsReadModel(repoShell?.id ?? '', repoShell?.instanceId ?? '', {
+    enabled: !!repoShell,
+  })
   const branchReadModel = useRepoBranchReadModel(repoShell?.id ?? '', repoShell?.instanceId ?? '', !!repoShell)
   if (!repoShell || !branchReadModel) return undefined
   return {
     ...repoShell,
+    operations: {
+      ...repoShell.operations,
+      branchAction: branchActionOperationFromServer(
+        repoShell.operations.branchAction,
+        operationsReadModel.data?.operations,
+      ),
+    },
     branchModel: branchReadModel,
   }
 }
