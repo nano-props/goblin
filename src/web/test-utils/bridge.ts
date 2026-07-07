@@ -231,6 +231,10 @@ export function installWorkspacePaneTabsTestBridge(
     pathForFile: () => '',
     saveClipboardFiles: async () => [],
     host: () => null,
+    appRealtime: () => ({
+      kickReconnect: () => {},
+      onRecovered: () => () => {},
+    }),
     terminal: () => ({
       attach: async () => ({ ok: false, message: 'unhandled terminal attach' }),
       restart: async () => ({ ok: false, message: 'unhandled terminal restart' }),
@@ -268,8 +272,6 @@ export function installWorkspacePaneTabsTestBridge(
       pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
       listSessions: async () => [],
       recoverSessions: async () => ({ sessions: [], snapshots: [] }),
-      prewarm: async () => {},
-      kickReconnect: () => {},
       notifyBell: async () => true,
       sendTestNotification: async () => true,
       setBadge: () => {},
@@ -280,7 +282,6 @@ export function installWorkspacePaneTabsTestBridge(
       onIdentity: () => () => {},
       onLifecycle: () => () => {},
       onSessionsChanged: () => () => {},
-      onRecovered: () => () => {},
       onSessionClosed: () => () => {},
     }),
     workspacePaneTabs: () => ({
@@ -297,7 +298,6 @@ export function installWorkspacePaneTabsTestBridge(
         return []
       },
       onChanged: () => () => {},
-      onRecovered: () => () => {},
     }),
   } satisfies ClientBridge)
 }
@@ -430,8 +430,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           pruneTerminals: () => Promise.resolve({ pruned: 0, remaining: 0 }),
           listSessions: () => Promise.resolve([]),
           recoverSessions: () => Promise.resolve({ sessions: [], snapshots: [] }),
-          prewarm: () => Promise.resolve(),
-          kickReconnect: () => {},
           notifyBell: () => Promise.resolve(true),
           sendTestNotification: () => Promise.resolve(true),
           setBadge: () => {},
@@ -442,7 +440,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           onIdentity: () => () => {},
           onLifecycle: () => () => {},
           onSessionsChanged: () => () => {},
-          onRecovered: () => () => {},
           onSessionClosed: () => () => {},
         },
       },
@@ -633,6 +630,10 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     pathForFile: () => '',
     saveClipboardFiles: () => Promise.resolve([]),
     host: () => window.goblinNative.host ?? null,
+    appRealtime: () => ({
+      kickReconnect: () => {},
+      onRecovered: () => () => {},
+    }),
     terminal: () => ({
       attach: async (input) => callTerminalHandler('terminal.attach', input),
       restart: async (input) => callTerminalHandler('terminal.restart', input),
@@ -644,8 +645,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       pruneTerminals: async (repoRoot) => callTerminalHandler('terminal.prune', { repoRoot }),
       listSessions: async (input) => callTerminalHandler('terminal.listSessions', input),
       recoverSessions: async (input) => callTerminalHandler('terminal.recoverSessions', input),
-      prewarm: async () => {},
-      kickReconnect: () => {},
       notifyBell: async (input) => callTerminalHandler('terminal.notifyBell', input),
       sendTestNotification: async () => true,
       setBadge: () => {},
@@ -656,7 +655,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       onIdentity: () => () => {},
       onLifecycle: () => () => {},
       onSessionsChanged: () => () => {},
-      onRecovered: () => () => {},
       onSessionClosed: () => () => {},
     }),
     workspacePaneTabs: () => ({
@@ -664,7 +662,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       update: async (input) => callTerminalHandler('workspacePaneTabs.update', input),
       list: async (input) => callTerminalHandler('workspacePaneTabs.list', input),
       onChanged: () => () => {},
-      onRecovered: () => () => {},
     }),
   })
   vi.stubGlobal(

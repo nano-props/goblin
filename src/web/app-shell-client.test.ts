@@ -39,6 +39,10 @@ function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
     pathForFile: () => '',
     saveClipboardFiles: () => Promise.resolve([]),
     host: () => null,
+    appRealtime: () => ({
+      kickReconnect: () => {},
+      onRecovered: () => () => {},
+    }),
     terminal: (() => {
       throw new Error('unused terminal client')
     }) as never,

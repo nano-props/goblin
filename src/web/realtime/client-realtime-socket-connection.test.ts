@@ -77,13 +77,40 @@ describe('client realtime socket connection', () => {
 
   test('notifies callers when the socket opens with the current client id', () => {
     const onOpen = vi.fn()
-    const connection = createTestConnection({ onRealtimeMessage: vi.fn(), onOpen })
+    const connection = createTestConnection({ onRealtimeMessage: vi.fn(), hasRealtimeSubscribers: () => true, onOpen })
     connection.openForRealtime()
     const socket = wsMock.instances[0]
 
     socket?.emitOpen()
 
     expect(onOpen).toHaveBeenCalledWith('client_realtime')
+  })
+
+  test('does not open for realtime without socket demand', () => {
+    const connection = createTestConnection({ onRealtimeMessage: vi.fn() })
+
+    connection.openForRealtime()
+
+    expect(wsMock.instances).toHaveLength(0)
+  })
+
+  test('cancels pending reconnect when realtime subscribers drain', () => {
+    vi.useFakeTimers()
+    let subscribed = true
+    const connection = createTestConnection({
+      onRealtimeMessage: vi.fn(),
+      hasRealtimeSubscribers: () => subscribed,
+    })
+    connection.openForRealtime()
+    const socket = wsMock.instances[0]
+    socket?.emitOpen()
+
+    socket?.emitError()
+    subscribed = false
+    connection.closeSocketIfIdle()
+    vi.advanceTimersByTime(300)
+
+    expect(wsMock.instances).toHaveLength(1)
   })
 })
 

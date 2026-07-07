@@ -66,6 +66,10 @@ function seedElectronBootstrap() {
     pathForFile: () => '',
     saveClipboardFiles: vi.fn(async () => []),
     host: () => null,
+    appRealtime: () => ({
+      kickReconnect: () => {},
+      onRecovered: () => () => {},
+    }),
     terminal: () => ({
       attach: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
       restart: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
@@ -94,8 +98,6 @@ function seedElectronBootstrap() {
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: vi.fn(async () => []),
       recoverSessions: vi.fn(async () => ({ sessions: [], snapshots: [] })),
-      prewarm: vi.fn(async () => {}),
-      kickReconnect: vi.fn(() => {}),
       notifyBell: vi.fn(async () => false),
       sendTestNotification: vi.fn(async () => false),
       setBadge: () => {},
@@ -106,7 +108,6 @@ function seedElectronBootstrap() {
       onIdentity: () => () => {},
       onLifecycle: () => () => {},
       onSessionsChanged: () => () => {},
-      onRecovered: () => () => {},
       onSessionClosed: () => () => {},
     }),
     workspacePaneTabs: () => ({
@@ -114,7 +115,6 @@ function seedElectronBootstrap() {
       update: vi.fn(async () => []),
       list: vi.fn(async () => []),
       onChanged: () => () => {},
-      onRecovered: () => () => {},
     }),
     rotateAccessToken: vi.fn(async () => ({ accessToken: 'rotated-secret' })),
   })
@@ -146,6 +146,10 @@ function seedWebBootstrap() {
     pathForFile: () => '',
     saveClipboardFiles: vi.fn(async () => []),
     host: () => null,
+    appRealtime: () => ({
+      kickReconnect: () => {},
+      onRecovered: () => () => {},
+    }),
     terminal: () => ({
       attach: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
       restart: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
@@ -174,8 +178,6 @@ function seedWebBootstrap() {
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: vi.fn(async () => []),
       recoverSessions: vi.fn(async () => ({ sessions: [], snapshots: [] })),
-      prewarm: vi.fn(async () => {}),
-      kickReconnect: vi.fn(() => {}),
       notifyBell: vi.fn(async () => false),
       sendTestNotification: vi.fn(async () => false),
       setBadge: () => {},
@@ -186,7 +188,6 @@ function seedWebBootstrap() {
       onIdentity: () => () => {},
       onLifecycle: () => () => {},
       onSessionsChanged: () => () => {},
-      onRecovered: () => () => {},
       onSessionClosed: () => () => {},
     }),
     workspacePaneTabs: () => ({
@@ -194,7 +195,6 @@ function seedWebBootstrap() {
       update: vi.fn(async () => []),
       list: vi.fn(async () => []),
       onChanged: () => () => {},
-      onRecovered: () => () => {},
     }),
   })
 }

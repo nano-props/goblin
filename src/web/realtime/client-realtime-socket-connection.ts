@@ -37,6 +37,7 @@ type RealtimeResponseMessage<TAction extends string> =
     }
 
 type RealtimePongMessage = { type: 'pong'; requestId: string }
+type SocketDemandIntent = 'open-now' | 'reconnect' | 'idle'
 
 export interface ClientRealtimeSocketConnectionOptions<
   TInputs extends object,
@@ -58,7 +59,6 @@ export interface ClientRealtimeSocketConnection<TInputs extends object, TOutputs
   openForRealtime(): void
   closeSocketIfIdle(): void
   kickReconnect(): void
-  prewarm(): Promise<void>
   request<TAction extends RealtimeAction<TInputs, TOutputs>>(
     action: TAction,
     input: TInputs[TAction],
@@ -115,10 +115,10 @@ export function createClientRealtimeSocketConnection<
       clearPendingHealthProbes()
       rejectPendingSocketRequests(context.reason)
       if (context.idleClose) {
-        if (options.hasRealtimeSubscribers()) socketLifecycle.ensureSocket()
+        reconcileSocketDemand('open-now')
         return
       }
-      scheduleReconnect()
+      reconcileSocketDemand('reconnect')
     },
     onUnavailableSocketDropped() {
       stopHeartbeat()
@@ -136,16 +136,10 @@ export function createClientRealtimeSocketConnection<
 
   return {
     openForRealtime() {
-      socketLifecycle.cancelIdleClose()
-      ensureSocket()
+      reconcileSocketDemand('open-now')
     },
     closeSocketIfIdle,
     kickReconnect,
-    prewarm() {
-      return waitForSocketOpen()
-        .then(() => undefined)
-        .catch(() => {})
-    },
     request,
   }
 
@@ -185,11 +179,27 @@ export function createClientRealtimeSocketConnection<
   }
 
   function scheduleReconnect() {
-    if (reconnectTimer !== null || !options.hasRealtimeSubscribers() || quitting) return
+    if (reconnectTimer !== null || !shouldKeepSocketOpen() || quitting) return
     reconnectTimer = window.setTimeout(() => {
       reconnectTimer = null
-      ensureSocket()
+      reconcileSocketDemand('open-now')
     }, 300)
+  }
+
+  function reconcileSocketDemand(intent: SocketDemandIntent): void {
+    const hasDemand = shouldKeepSocketOpen()
+    if (quitting || !hasDemand) {
+      clearReconnectTimer()
+      socketLifecycle.requestIdleClose()
+      return
+    }
+
+    socketLifecycle.cancelIdleClose()
+    if (intent === 'reconnect') {
+      if (!socketLifecycle.active()) scheduleReconnect()
+      return
+    }
+    if (intent === 'open-now') ensureSocket()
   }
 
   function kickReconnect() {
@@ -199,7 +209,7 @@ export function createClientRealtimeSocketConnection<
     socketLifecycle.forgetUnavailableSocket()
     const current = socketLifecycle.active()
     if (!current) {
-      ensureSocket()
+      reconcileSocketDemand('open-now')
       return
     }
     if (current.socket.readyState === WebSocket.OPEN) startHealthProbe(current.socket, current.generation)
@@ -280,8 +290,7 @@ export function createClientRealtimeSocketConnection<
   }
 
   function closeSocketIfIdle() {
-    if (!socketLifecycle.requestIdleClose()) return
-    clearReconnectTimer()
+    reconcileSocketDemand('idle')
   }
 
   function settleSocketRequest(message: RealtimeResponseMessage<Action>) {
@@ -298,14 +307,20 @@ export function createClientRealtimeSocketConnection<
     action: TAction,
     input: TInputs[TAction],
   ): Promise<TOutputs[TAction]> {
-    pendingSocketOpenRequests += 1
-    socketLifecycle.cancelIdleClose()
     let ws: WebSocket
     try {
-      ws = await waitForSocketOpen()
-    } finally {
-      pendingSocketOpenRequests = Math.max(0, pendingSocketOpenRequests - 1)
+      pendingSocketOpenRequests += 1
+      reconcileSocketDemand('open-now')
+      try {
+        ws = await waitForSocketOpen()
+      } finally {
+        pendingSocketOpenRequests = Math.max(0, pendingSocketOpenRequests - 1)
+      }
+    } catch (error) {
+      reconcileSocketDemand('idle')
+      throw error
     }
+    const requestSocket = ws
     return await new Promise<TOutputs[TAction]>((resolve, reject) => {
       const requestId = options.createRequestId()
       const timeout = setTimeout(() => {
@@ -313,7 +328,7 @@ export function createClientRealtimeSocketConnection<
         if (!pending) return
         pendingSocketRequests.delete(requestId)
         clearTimeout(pending.timeout)
-        forceSocketReconnect(`${requestLabel} timed out`, ws)
+        forceSocketReconnect(`${requestLabel} timed out`, requestSocket)
         reject(new Error(`${requestLabel} timed out`))
       }, REALTIME_REQUEST_TIMEOUT_MS)
       pendingSocketRequests.set(requestId, {
@@ -323,11 +338,11 @@ export function createClientRealtimeSocketConnection<
         timeout,
       } as PendingSocketRequest<Action, Output>)
       try {
-        ws.send(options.encodeClientMessage({ type: 'request', requestId, action, input }))
+        requestSocket.send(options.encodeClientMessage({ type: 'request', requestId, action, input }))
       } catch (error) {
         clearTimeout(timeout)
         pendingSocketRequests.delete(requestId)
-        forceSocketReconnect(`${requestLabel} send failed`, ws)
+        forceSocketReconnect(`${requestLabel} send failed`, requestSocket)
         reject(error)
       }
     })
@@ -335,7 +350,6 @@ export function createClientRealtimeSocketConnection<
 
   function waitForSocketOpen(): Promise<WebSocket> {
     if (typeof WebSocket === 'undefined') return Promise.reject(new Error(`${socketLabel} unavailable`))
-    ensureSocket()
     const current = socketLifecycle.active()
     if (!current) return Promise.reject(new Error(`${socketLabel} unavailable`))
     const currentSocket = current.socket

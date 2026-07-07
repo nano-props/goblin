@@ -30,9 +30,6 @@ export function createServerWorkspacePaneTabsClient(realtime: ClientAppRealtime)
         closeRealtimeSubscriptionIfIdle()
       }
     },
-    onRecovered(cb) {
-      return realtime.onRecovered(cb)
-    },
   }
 
   function ensureRealtimeSubscription(): void {

@@ -548,7 +548,6 @@ beforeEach(() => {
         onIdentity: vi.fn(),
         onLifecycle: vi.fn(),
         onSessionsChanged: vi.fn(),
-        onRecovered: vi.fn(),
         onSessionClosed: vi.fn(),
       },
     },
@@ -578,6 +577,10 @@ beforeEach(() => {
     pathForFile: vi.fn(() => ''),
     saveClipboardFiles: vi.fn(() => Promise.resolve([])),
     host: () => window.goblinNative.host ?? null,
+    appRealtime: () => ({
+      kickReconnect: () => {},
+      onRecovered: () => () => {},
+    }),
     terminal: () => ({
       attach: terminalCalls.attach.mockResolvedValue(attachResult('pty_session_1_aaaaaaaaa')),
       restart: terminalCalls.restart.mockResolvedValue(attachResult('pty_session_2_aaaaaaaaa')),
@@ -607,8 +610,6 @@ beforeEach(() => {
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: vi.fn(async () => []),
       recoverSessions: vi.fn(async () => ({ sessions: [], snapshots: [] })),
-      prewarm: vi.fn(async () => {}),
-      kickReconnect: vi.fn(() => {}),
       notifyBell: terminalCalls.notifyBell.mockResolvedValue(true),
       sendTestNotification: vi.fn(async () => true),
       setBadge: terminalCalls.setBadge,
@@ -619,7 +620,6 @@ beforeEach(() => {
       onIdentity: vi.fn(() => () => {}),
       onLifecycle: vi.fn(() => () => {}),
       onSessionsChanged: vi.fn(() => () => {}),
-      onRecovered: vi.fn(() => () => {}),
       onSessionClosed: vi.fn(() => () => {}),
     }),
     workspacePaneTabs: () => ({
@@ -627,7 +627,6 @@ beforeEach(() => {
       update: vi.fn(async () => []),
       list: vi.fn(async () => []),
       onChanged: vi.fn(() => () => {}),
-      onRecovered: vi.fn(() => () => {}),
     }),
   })
 })

@@ -161,6 +161,10 @@ describe('client bootstrap', () => {
       pathForFile: () => '',
       saveClipboardFiles: () => Promise.resolve([]),
       host: () => null,
+      appRealtime: () => ({
+        kickReconnect: () => {},
+        onRecovered: () => () => {},
+      }),
       terminal: () => ({
         attach: async () => ({ ok: false, message: 'unavailable' }),
         restart: async () => ({ ok: false, message: 'unavailable' }),
@@ -209,8 +213,6 @@ describe('client bootstrap', () => {
         pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
         listSessions: async () => [],
         recoverSessions: async () => ({ sessions: [], snapshots: [] }),
-        prewarm: async () => {},
-        kickReconnect: () => {},
         notifyBell: async () => false,
         sendTestNotification: async () => false,
         setBadge: () => {},
@@ -221,7 +223,6 @@ describe('client bootstrap', () => {
         onIdentity: () => () => {},
         onLifecycle: () => () => {},
         onSessionsChanged: () => () => {},
-        onRecovered: () => () => {},
         onSessionClosed: () => () => {},
       }),
       workspacePaneTabs: () => ({
@@ -229,7 +230,6 @@ describe('client bootstrap', () => {
         update: async () => [],
         list: async () => [],
         onChanged: () => () => {},
-        onRecovered: () => () => {},
       }),
     })
 

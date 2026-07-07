@@ -87,9 +87,6 @@ export function createServerTerminalClient(options: {
         return recovery
       })
     },
-    prewarm() {
-      return options.realtime.prewarm()
-    },
     notifyBell(input: TerminalNotifyBellInput) {
       return options.notificationProvider.notifyBell(input)
     },
@@ -162,12 +159,6 @@ export function createServerTerminalClient(options: {
         sessionClosedSubscribers.delete(cb)
         closeRealtimeSubscriptionIfIdle()
       }
-    },
-    onRecovered(cb) {
-      return options.realtime.onRecovered(cb)
-    },
-    kickReconnect() {
-      options.realtime.kickReconnect()
     },
   }
 

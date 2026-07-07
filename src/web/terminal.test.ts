@@ -865,16 +865,17 @@ describe('terminal web host client', () => {
     disposeWorkspaceTabsChanged()
   })
 
-  test('kickReconnect health-probes an open terminal socket and keeps it when pong arrives', async () => {
+  test('kickReconnect health-probes an open app realtime socket and keeps it when pong arrives', async () => {
     vi.useFakeTimers()
     try {
       const { terminalClient } = await import('#/web/terminal.ts')
+      const { appRealtimeClient } = await import('#/web/app-realtime.ts')
       const dispose = terminalClient.onOutput(() => {})
       const socket = wsMock.instances[0]
       if (!socket) throw new Error('missing web terminal socket')
       socket.emitOpen()
 
-      terminalClient.kickReconnect()
+      appRealtimeClient.kickReconnect()
       const ping = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.type === 'ping')
       expect(ping).toMatchObject({ type: 'ping' })
       socket.emitMessage(JSON.stringify({ type: 'pong', requestId: ping.requestId }))
@@ -892,13 +893,14 @@ describe('terminal web host client', () => {
     vi.useFakeTimers()
     try {
       const { terminalClient } = await import('#/web/terminal.ts')
+      const { appRealtimeClient } = await import('#/web/app-realtime.ts')
       const dispose = terminalClient.onOutput(() => {})
       const socket = wsMock.instances[0]
       if (!socket) throw new Error('missing web terminal socket')
       socket.emitOpen()
 
-      terminalClient.kickReconnect()
-      terminalClient.kickReconnect()
+      appRealtimeClient.kickReconnect()
+      appRealtimeClient.kickReconnect()
 
       expect(
         socket.sent.map((payload) => JSON.parse(payload)).filter((message) => message.type === 'ping'),
@@ -909,10 +911,11 @@ describe('terminal web host client', () => {
     }
   })
 
-  test('kickReconnect reconnects an open terminal socket when health probe send fails', async () => {
+  test('kickReconnect reconnects an open app realtime socket when health probe send fails', async () => {
     vi.useFakeTimers()
     try {
       const { terminalClient } = await import('#/web/terminal.ts')
+      const { appRealtimeClient } = await import('#/web/app-realtime.ts')
       const dispose = terminalClient.onOutput(() => {})
       const socket = wsMock.instances[0]
       if (!socket) throw new Error('missing web terminal socket')
@@ -921,7 +924,7 @@ describe('terminal web host client', () => {
         throw new Error('send failed')
       })
 
-      terminalClient.kickReconnect()
+      appRealtimeClient.kickReconnect()
 
       expect(socket.readyState).toBe(wsMock.CLOSED)
       await vi.advanceTimersByTimeAsync(300)
@@ -932,16 +935,17 @@ describe('terminal web host client', () => {
     }
   })
 
-  test('kickReconnect reconnects an open terminal socket when health probe times out', async () => {
+  test('kickReconnect reconnects an open app realtime socket when health probe times out', async () => {
     vi.useFakeTimers()
     try {
       const { terminalClient } = await import('#/web/terminal.ts')
+      const { appRealtimeClient } = await import('#/web/app-realtime.ts')
       const dispose = terminalClient.onOutput(() => {})
       const socket = wsMock.instances[0]
       if (!socket) throw new Error('missing web terminal socket')
       socket.emitOpen()
 
-      terminalClient.kickReconnect()
+      appRealtimeClient.kickReconnect()
       const ping = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.type === 'ping')
       expect(ping).toMatchObject({ type: 'ping' })
       await vi.advanceTimersByTimeAsync(5_000)
@@ -955,14 +959,15 @@ describe('terminal web host client', () => {
     }
   })
 
-  test('kickReconnect replaces a closing terminal socket while realtime subscribers remain', async () => {
+  test('kickReconnect replaces a closing app realtime socket while realtime subscribers remain', async () => {
     const { terminalClient } = await import('#/web/terminal.ts')
+    const { appRealtimeClient } = await import('#/web/app-realtime.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
     socket.readyState = wsMock.CLOSING
 
-    terminalClient.kickReconnect()
+    appRealtimeClient.kickReconnect()
 
     expect(wsMock.instances).toHaveLength(2)
     dispose()

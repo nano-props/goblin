@@ -75,13 +75,6 @@ describe('createRealtimeRoutes — auth middleware', () => {
     expect(json.message).toBe('Missing client id')
   })
 
-  test('keeps /terminal as an app realtime compatibility alias', async () => {
-    const host = makeTerminalHost({ isValidClientId: acceptOnly('c1') })
-    const app = createRealtimeRoutes({ accessToken: 'secret', appRealtimeHost: host })
-    const res = await app.request('http://localhost/terminal?t=secret&clientId=bad')
-    expect(res.status).toBe(400)
-  })
-
   test('rejects /client-intent without a token', async () => {
     const host = makeTerminalHost()
     const app = createRealtimeRoutes({ accessToken: 'secret', appRealtimeHost: host })

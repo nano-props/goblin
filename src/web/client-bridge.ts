@@ -9,11 +9,11 @@ import { readNativeBridge } from '#/web/native-bridge.ts'
 import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
 import { normalizeClientServerClientId, readWebBootstrap } from '#/web/client-bootstrap-bridge.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
-import { createClientAppRealtime, type AppRealtimeServerConfig, type ClientAppRealtime } from '#/web/app-realtime-client.ts'
+import { createClientAppRealtime, type AppRealtimeServerConfig } from '#/web/app-realtime-client.ts'
 import { createServerTerminalClient } from '#/web/client-terminal.ts'
 import { createServerWorkspacePaneTabsClient } from '#/web/client-workspace-pane-tabs.ts'
 import { createTerminalNotificationProvider } from '#/web/terminal-notification-provider.ts'
-import type { ClientTerminal, ClientWorkspacePaneTabs } from '#/web/client-bridge-types.ts'
+import type { ClientAppRealtimeLifecycle, ClientTerminal, ClientWorkspacePaneTabs } from '#/web/client-bridge-types.ts'
 
 /**
  * Compute the client's capability set from the live `goblinNative`
@@ -85,7 +85,7 @@ function readServerAppRealtimeConfig(): AppRealtimeServerConfig | null {
 }
 
 interface ClientServerRealtimeClients {
-  appRealtime: ClientAppRealtime
+  appRealtime: ClientAppRealtimeLifecycle
   terminal: ClientTerminal
   workspacePaneTabs: ClientWorkspacePaneTabs
 }
@@ -215,6 +215,9 @@ function createClientBridge(): ClientBridge {
     },
     host(): ClientHostBridge | null {
       return readNativeBridge()?.host ?? null
+    },
+    appRealtime() {
+      return realtimeClients.appRealtime
     },
     terminal() {
       return realtimeClients.terminal

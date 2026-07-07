@@ -23,7 +23,6 @@ export interface AppRealtimeServerConfig {
 
 export interface ClientAppRealtime {
   request: ClientRealtimeSocketConnection<AppRealtimeRequestInputs, AppRealtimeResponseOutputs>['request']
-  prewarm: () => Promise<void>
   kickReconnect: () => void
   onMessage: (cb: (message: AppRealtimeMessage, currentClientId: string) => void) => () => void
   onRecovered: (cb: (currentClientId: string) => void) => () => void
@@ -34,7 +33,7 @@ export function createClientAppRealtime(options: {
 }): ClientAppRealtime {
   const messageSubscribers = new Set<(message: AppRealtimeMessage, currentClientId: string) => void>()
   const recoveredSubscribers = new Set<(currentClientId: string) => void>()
-  let hasOpened = false
+  let hasOpenedWithRealtimeSubscribers = false
 
   const connection = createClientRealtimeSocketConnection<
     AppRealtimeRequestInputs,
@@ -57,8 +56,9 @@ export function createClientAppRealtime(options: {
       return messageSubscribers.size > 0 || recoveredSubscribers.size > 0
     },
     onOpen(currentClientId) {
-      if (!hasOpened) {
-        hasOpened = true
+      if (messageSubscribers.size === 0 && recoveredSubscribers.size === 0) return
+      if (!hasOpenedWithRealtimeSubscribers) {
+        hasOpenedWithRealtimeSubscribers = true
         return
       }
       for (const subscriber of recoveredSubscribers) subscriber(currentClientId)
@@ -74,7 +74,6 @@ export function createClientAppRealtime(options: {
 
   return {
     request: connection.request,
-    prewarm: connection.prewarm,
     kickReconnect: connection.kickReconnect,
     onMessage(cb) {
       messageSubscribers.add(cb)

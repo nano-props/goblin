@@ -64,7 +64,6 @@ export function createRealtimeRoutes({ accessToken, appRealtimeHost }: RealtimeR
     await next()
   }
   app.use('/app', auth, appRealtimeAuth)
-  app.use('/terminal', auth, appRealtimeAuth)
 
   app.get(
     '/invalidation',
@@ -162,7 +161,5 @@ export function createRealtimeRoutes({ accessToken, appRealtimeHost }: RealtimeR
     }
   })
   app.get('/app', appRealtimeUpgrade)
-  // Compatibility alias while clients roll from `/ws/terminal` to `/ws/app`.
-  app.get('/terminal', appRealtimeUpgrade)
   return app
 }

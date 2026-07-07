@@ -23,7 +23,4 @@ export const workspacePaneTabsClient: WorkspacePaneTabsClient = {
   onChanged(cb) {
     return getWorkspacePaneTabsClient().onChanged(cb)
   },
-  onRecovered(cb) {
-    return getWorkspacePaneTabsClient().onRecovered(cb)
-  },
 }
