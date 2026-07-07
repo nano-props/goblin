@@ -212,12 +212,15 @@ async function runUserNetworkMutation(
 ): Promise<ExecResult> {
   return await publishSnapshotInvalidationAfterMutation(
     cwd,
-    await runServerCancellable(cwd, 'user', async (networkSignal) => {
-      return await withMergedAbortSignal([signal, networkSignal], task)
-    }, {
-      operationKind,
-      target,
-      callerSignal: signal,
+    await enqueueRepoWriteServiceOperation(cwd, signal, async (writeGroupId) => {
+      return await runServerCancellable(cwd, 'user', async (networkSignal) => {
+        return await withMergedAbortSignal([signal, networkSignal], task)
+      }, {
+        gateId: writeGroupId,
+        operationKind,
+        target,
+        callerSignal: signal,
+      })
     }),
     sourceToken,
   )
@@ -276,7 +279,7 @@ async function runRepoServerWriteOperation<T extends ExecResult>(options: {
       options.signal?.removeEventListener('abort', onAbort)
     }
   }
-  return await enqueueRepoWriteServiceOperation(options.repoId, options.signal, run)
+  return await enqueueRepoWriteServiceOperation(options.repoId, options.signal, async () => await run())
 }
 
 export async function cloneRepo(
@@ -351,6 +354,7 @@ export async function fetchRepo(
   async function runFetch(
     task: (signal: AbortSignal) => Promise<{ ok: boolean; message: string }>,
     operationId?: string,
+    writeGroupId?: string,
   ) {
     const result = await runServerCancellable(
       cwd,
@@ -360,13 +364,18 @@ export async function fetchRepo(
           return await task(mergedSignal ?? networkSignal)
         })
       },
-      { operationId, operationKind: 'fetch', callerSignal: signal },
+      { operationId, gateId: writeGroupId, operationKind: 'fetch', callerSignal: signal },
     )
     if (result.ok) publishRepoSnapshotInvalidation(cwd, sourceToken)
     return result
   }
   async function executeFetch(operationId?: string): Promise<{ ok: boolean; message: string }> {
-    return await runWithRepoSource(cwd, async (source) => await runFetch((signal) => source.fetch(signal), operationId))
+    return await enqueueRepoWriteServiceOperation(cwd, signal, async (writeGroupId) => {
+      return await runWithRepoSource(
+        cwd,
+        async (source) => await runFetch((signal) => source.fetch(signal), operationId, writeGroupId),
+      )
+    })
   }
 
   if (kind === 'user') {
@@ -450,13 +459,13 @@ export async function createRepoWorktree(
 async function enqueueRepoWriteServiceOperation<T>(
   repoId: string,
   signal: AbortSignal | undefined,
-  task: () => Promise<T>,
+  task: (writeGroupId: string) => Promise<T>,
 ): Promise<T> {
   const releaseAdmission = await acquireRepoWriteOperationAdmission()
   let work!: Promise<T>
   try {
     const writeGroupId = await resolveRepoWriteGroupId(repoId, signal)
-    work = runResolvedRepoWriteServiceOperation(writeGroupId, task)
+    work = runResolvedRepoWriteServiceOperation(writeGroupId, () => task(writeGroupId))
   } finally {
     releaseAdmission()
   }
@@ -474,7 +483,10 @@ async function acquireRepoWriteOperationAdmission(): Promise<() => void> {
   return release
 }
 
-async function runResolvedRepoWriteServiceOperation<T>(writeGroupId: string, task: () => Promise<T>): Promise<T> {
+async function runResolvedRepoWriteServiceOperation<T>(
+  writeGroupId: string,
+  task: () => Promise<T>,
+): Promise<T> {
   // Git mutations that share one physical repository also share one service
   // queue, even when the app opened different linked worktree paths.
   const queue = repoWriteOperationQueueForRepo(writeGroupId)
@@ -612,7 +624,8 @@ export async function openRepoInFinder(path: string): Promise<ExecResult> {
   return await openInFinder(path)
 }
 
-export function abortRepoOperation(cwd: string): boolean {
+export async function abortRepoOperation(cwd: string): Promise<boolean> {
   if (!isValidRepoLocator(cwd)) return false
-  return abortServerNetworkOp(cwd)
+  const writeGroupId = await resolveRepoWriteGroupId(cwd)
+  return abortServerNetworkOp(writeGroupId) || abortServerNetworkOp(cwd)
 }

@@ -13,10 +13,12 @@ interface ActiveNetworkOp {
   kind: NetworkOpKind
   operationId: string
   done: Promise<void>
+  keys: string[]
 }
 
 interface RunServerCancellableOptions {
   operationId?: string
+  gateId?: string
   operationKind?: RepoServerOperationKind
   target?: RepoServerOperationTarget | null
   repoInstanceId?: string | null
@@ -76,7 +78,8 @@ export async function runServerCancellable(
     deadlineAt: options.deadlineAt,
     canCancelUnderlying: true,
   })
-  let active = activeNetworkOps.get(repoId)
+  const operationGateId = options.gateId ?? repoId
+  let active = activeNetworkOps.get(operationGateId)
   if (active) {
     if (kind === 'user' && active.kind === 'background') {
       const canContinue = await waitForActiveNetworkOp(active, options.callerSignal, operation.id)
@@ -85,7 +88,7 @@ export async function runServerCancellable(
         settleRepoServerOperation(operation.id, result)
         return result
       }
-      active = activeNetworkOps.get(repoId)
+      active = activeNetworkOps.get(operationGateId)
     }
     if (active) {
       const result = { ok: false, message: 'error.network-op-in-progress' }
@@ -98,8 +101,9 @@ export async function runServerCancellable(
   const done = new Promise<void>((resolve) => {
     resolveDone = resolve
   })
-  const slot: ActiveNetworkOp = { ctrl, kind, operationId: operation.id, done }
-  activeNetworkOps.set(repoId, slot)
+  const keys = Array.from(new Set([operationGateId, repoId]))
+  const slot: ActiveNetworkOp = { ctrl, kind, operationId: operation.id, done, keys }
+  for (const key of keys) activeNetworkOps.set(key, slot)
   startRepoServerOperation(operation.id)
   try {
     const result = await fn(ctrl.signal)
@@ -112,7 +116,9 @@ export async function runServerCancellable(
     })
     throw err
   } finally {
-    if (activeNetworkOps.get(repoId) === slot) activeNetworkOps.delete(repoId)
+    for (const key of slot.keys) {
+      if (activeNetworkOps.get(key) === slot) activeNetworkOps.delete(key)
+    }
     resolveDone()
   }
 }

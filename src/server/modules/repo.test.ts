@@ -973,6 +973,37 @@ describe('repo mutation invalidation publishing', () => {
     await expect(second).resolves.toEqual({ ok: true, message: 'removed' })
   })
 
+  test('repo write service operations serialize linked worktree network mutations by common git dir', async () => {
+    const firstDelete = deferred<{ ok: true; message: string }>()
+    const secondPull = deferred<{ ok: true; message: string }>()
+    mocks.getRepoCommonDir.mockImplementation(async (cwd: string) =>
+      cwd === '/tmp/repo' || cwd === '/tmp/repo-linked' ? '/tmp/repo/.git' : `${cwd}/.git`,
+    )
+    mocks.deleteBranch.mockImplementationOnce(async () => await firstDelete.promise)
+    mocks.pullBranch.mockImplementationOnce(async () => await secondPull.promise)
+    const { deleteRepoBranch, pullRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
+
+    const first = deleteRepoBranch('/tmp/repo', 'feature/a')
+    await vi.waitFor(() => {
+      expect(mocks.deleteBranch).toHaveBeenCalledTimes(1)
+    })
+
+    const second = pullRepoBranch('/tmp/repo-linked', 'feature/b')
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(mocks.pullBranch).not.toHaveBeenCalled()
+
+    firstDelete.resolve({ ok: true, message: 'deleted' })
+    await expect(first).resolves.toEqual({ ok: true, message: 'deleted' })
+    await vi.waitFor(() => {
+      expect(mocks.pullBranch).toHaveBeenCalledTimes(1)
+    })
+
+    secondPull.resolve({ ok: true, message: 'pulled' })
+    await expect(second).resolves.toEqual({ ok: true, message: 'pulled' })
+  })
+
   test('createRepoWorktree reports settings failure after creating and bootstrapping the worktree', async () => {
     const configHash = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
     mocks.trustServerRepoWorktreeBootstrapConfig.mockRejectedValueOnce(new Error('settings write failed'))
@@ -1031,8 +1062,10 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(result).toEqual({ ok: true, message: 'ok' })
     expect(mocks.runServerCancellable).toHaveBeenCalledWith('/tmp/repo', 'user', expect.any(Function), {
+      gateId: 'local-git:/tmp/repo/.git',
       operationKind: name === 'pullRepoBranch' ? 'pull' : 'push',
       target: { branch: 'feature/a', ...(name === 'pullRepoBranch' ? { worktreePath: undefined } : {}) },
+      callerSignal: undefined,
     })
   })
 
