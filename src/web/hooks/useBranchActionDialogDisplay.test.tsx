@@ -31,6 +31,8 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
+import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
 const REPO_ID = '/tmp/gbl-dialog-display-test'
 const OTHER_REPO_ID = '/tmp/gbl-dialog-display-test-other'
@@ -162,6 +164,34 @@ describe('useBranchActionDialogDisplay', () => {
 
     expect(handle.current?.liveContext?.branch.name).toBe('feature/query')
     expect(handle.current?.displayContext?.branch.tracking).toBe('origin/feature/query')
+  })
+
+  test('projects dialog branch action state from server operations', () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/query', { tracking: 'origin/feature/query', trackingGone: false })],
+      currentBranchName: 'feature/query',
+    })
+    setRepoOperationsQueryData(repo.id, repo.instanceId, false, {
+      loadedAt: 123,
+      operations: [serverOperation({ repoInstanceId: repo.instanceId, kind: 'delete-branch', branch: 'feature/query' })],
+    })
+    const entry: BranchActionDialogEntry<string> = {
+      repoId: REPO_ID,
+      branchName: 'feature/query',
+      payload: 'feature/query',
+    }
+    act(() => {
+      useBranchActionDialogsStore.getState().openDeleteConfirm(entry)
+    })
+
+    const handle = mountHarness(entry)
+
+    expect(handle.current?.liveContext?.repo.branchAction).toMatchObject({
+      phase: 'running',
+      reason: 'branch:deleteBranch',
+      target: 'feature/query',
+    })
   })
 
   test('liveContext and displayContext share identity while the slot is open (single resolveContext call)', () => {
@@ -380,3 +410,31 @@ describe('useBranchActionDialogDisplay', () => {
     expect(Object.isFrozen(handle.current?.displayCheckboxes)).toBe(true)
   })
 })
+
+function serverOperation(
+  overrides: Pick<RepoServerOperationState, 'kind'> & { branch: string; repoInstanceId: string },
+): RepoServerOperationState {
+  return {
+    id: `repo-op-${overrides.kind}`,
+    repoId: REPO_ID,
+    repoInstanceId: overrides.repoInstanceId,
+    kind: overrides.kind,
+    phase: 'running',
+    source: 'user',
+    target: { branch: overrides.branch },
+    queuedAt: 100,
+    startedAt: 101,
+    deadlineAt: null,
+    settledAt: null,
+    error: null,
+    cancellation: {
+      underlyingRequested: false,
+      reason: null,
+      requestedAt: null,
+      waitCancelledCount: 0,
+      lastWaitCancelledAt: null,
+      lastWaitCancellationReason: null,
+    },
+    canCancelUnderlying: true,
+  }
+}

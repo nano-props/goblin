@@ -194,7 +194,7 @@ export function useKeyboard({
           const repo = repoId ? useReposStore.getState().repos[repoId] : null
           if (!repo) return
           const branchAction = projectBranchActionOperation(
-            repo,
+            repo.operations.branchAction,
             getRepoOperationsQueryData(repo.id, repo.instanceId)?.operations,
           )
           if (branchAction.phase === 'idle') {

@@ -63,7 +63,10 @@ import { installWebSocketMock } from '#/web/test-utils/websocket-mock.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
 
 export type IpcTestHandler = (input: any) => unknown
-export type RepoPresentationForTest = RepoState & { branchModel: RepoBranchReadModelData }
+export type RepoPresentationForTest = RepoState & {
+  branchAction: RepoState['operations']['branchAction']
+  branchModel: RepoBranchReadModelData
+}
 
 export function repoPresentationForTest(
   repo: RepoState,
@@ -71,6 +74,7 @@ export function repoPresentationForTest(
 ): RepoPresentationForTest {
   return {
     ...repo,
+    branchAction: repo.operations.branchAction,
     branchModel: branchReadModel,
   }
 }
@@ -80,6 +84,7 @@ export function repoPresentationFromQueryForTest(repo: RepoState): RepoPresentat
   if (!readModel) throw new Error(`missing branch read model for test repo: ${repo.id}`)
   return {
     ...repo,
+    branchAction: repo.operations.branchAction,
     branchModel: readModel,
   }
 }

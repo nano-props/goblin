@@ -80,6 +80,7 @@ function repoWorkspaceRepo(repo: RepoState): RepoWorkspaceRepo {
   return {
     ...repo,
     ui: { ...repo.ui, currentBranchName: branchModel.branches[0]?.name ?? null },
+    branchAction: repo.operations.branchAction,
     branchModel: { ...branchModel, statusReady: true },
   }
 }

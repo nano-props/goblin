@@ -3,6 +3,7 @@ import {
   branchActionOperationFromServer,
   isActiveServerBranchAction,
   projectBranchActionOperation,
+  projectBranchActionRepo,
   serverBranchActionReason,
 } from '#/web/hooks/branch-action-state.ts'
 import { idleOperation } from '#/web/stores/repos/operations.ts'
@@ -61,19 +62,46 @@ describe('branch action state projection', () => {
       },
     }
 
-    expect(projectBranchActionOperation(repo, undefined)).toMatchObject({
+    expect(projectBranchActionOperation(repo.operations.branchAction, undefined)).toMatchObject({
       phase: 'running',
       reason: 'branch:pull',
       target: 'feature/a',
     })
     expect(
-      projectBranchActionOperation(repo, [
+      projectBranchActionOperation(repo.operations.branchAction, [
         serverOperation({ kind: 'push', phase: 'queued', branch: 'feature/b' }),
       ]),
     ).toMatchObject({
       phase: 'queued',
       reason: 'branch:push',
       target: 'feature/b',
+    })
+  })
+
+  test('projects a branch action repo without exposing the local operations wrapper', () => {
+    const repo = {
+      id: REPO_ID,
+      instanceId: 'repo-instance-1',
+      operations: {
+        branchAction: idleOperation(),
+      },
+      remote: { hasRemotes: true },
+    }
+
+    const projected = projectBranchActionRepo(repo, [
+      serverOperation({ kind: 'remove-worktree', phase: 'running', branch: 'feature/a' }),
+    ])
+
+    expect('operations' in projected).toBe(false)
+    expect(projected).toMatchObject({
+      id: REPO_ID,
+      instanceId: 'repo-instance-1',
+      remote: { hasRemotes: true },
+      branchAction: {
+        phase: 'running',
+        reason: 'branch:removeWorktree',
+        target: 'feature/a',
+      },
     })
   })
 

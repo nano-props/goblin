@@ -23,7 +23,7 @@ export type RepoActivityControlView =
   | { kind: 'refresh-button'; manualSyncBusy: boolean }
 
 function branchActionActivity(repo: RepoState, serverOperations?: RepoOperationsSnapshot): RepoActivity | null {
-  const action = projectBranchActionOperation(repo, serverOperations?.operations)
+  const action = projectBranchActionOperation(repo.operations.branchAction, serverOperations?.operations)
   if (action.phase === 'idle' || !isBranchActionReason(action.reason)) return null
   const label = repoBranchActionLoadingLabel(branchActionKindFromReason(action.reason), action.phase)
   return {

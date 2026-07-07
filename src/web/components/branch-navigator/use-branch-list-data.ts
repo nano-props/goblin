@@ -5,7 +5,7 @@
 
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { projectBranchActionOperation, type BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+import { projectBranchActionRepo, type BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { RepoState, RepoUiState } from '#/web/stores/repos/types.ts'
 import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
 import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
@@ -18,7 +18,9 @@ export type BranchListRepo = BranchActionRepo & {
   ui: Pick<RepoUiState, 'branchViewMode'>
 }
 
-type BranchListRepoShell = Omit<BranchListRepo, 'branchModel'>
+type BranchListRepoShell = Omit<BranchListRepo, 'branchModel' | 'branchAction'> & {
+  operations: Pick<RepoState['operations'], 'branchAction'>
+}
 
 const branchListRepoShellEqualFields: Array<keyof BranchListRepoShell> = [
   'id',
@@ -89,11 +91,7 @@ export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
   const branchReadModel = useRepoBranchReadModel(repoShell?.id ?? '', repoShell?.instanceId ?? '', !!repoShell)
   if (!repoShell || !branchReadModel) return undefined
   return {
-    ...repoShell,
-    operations: {
-      ...repoShell.operations,
-      branchAction: projectBranchActionOperation(repoShell, operationsReadModel.data?.operations),
-    },
+    ...projectBranchActionRepo(repoShell, operationsReadModel.data?.operations),
     branchModel: branchReadModel,
   }
 }

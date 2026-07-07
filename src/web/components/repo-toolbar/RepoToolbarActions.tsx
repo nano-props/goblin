@@ -136,7 +136,9 @@ function useCreateWorktreeTrigger(repoId: string) {
   const operationsReadModel = useRepoOperationsReadModel(repoShell?.id ?? '', repoShell?.instanceId ?? '', {
     enabled: !!repoShell,
   })
-  const branchAction = repoShell ? projectBranchActionOperation(repoShell, operationsReadModel.data?.operations) : null
+  const branchAction = repoShell
+    ? projectBranchActionOperation(repoShell.operations.branchAction, operationsReadModel.data?.operations)
+    : null
   const branchActionBusy = branchAction ? branchAction.phase !== 'idle' : true
   return {
     disabled: branchActionBusy,

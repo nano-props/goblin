@@ -154,7 +154,7 @@ export async function handleWorkspaceClientIntent(
     case 'create-worktree': {
       if (!currentRepo) return true
       const branchAction = projectBranchActionOperation(
-        currentRepo,
+        currentRepo.operations.branchAction,
         getRepoOperationsQueryData(currentRepo.id, currentRepo.instanceId)?.operations,
       )
       if (branchAction.phase !== 'idle') {

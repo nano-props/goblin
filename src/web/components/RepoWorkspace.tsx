@@ -17,7 +17,8 @@ import { useRepoProjectionReadModel } from '#/web/repo-data-query.ts'
 import { repoBranchReadModelFromSnapshot } from '#/web/repo-branch-read-model.ts'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
 import { useWorkspaceNavigationHistory } from '#/web/workspace-navigation-history.ts'
-import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
+import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+import type { RepoState } from '#/web/stores/repos/types.ts'
 
 interface Props {
   repoId: string
@@ -28,7 +29,9 @@ interface Props {
 }
 
 // Keep this equality in sync with fields read by RepoWorkspace children.
-type RepoWorkspaceRepoShell = Omit<RepoWorkspaceRepo, 'branchModel'>
+type RepoWorkspaceRepoShell = Omit<RepoWorkspaceRepo, 'branchModel' | 'branchAction'> & {
+  operations: Pick<RepoState['operations'], 'branchAction'>
+}
 
 function repoWorkspaceRepoShellEqual(
   a: RepoWorkspaceRepoShell | undefined,
@@ -166,12 +169,8 @@ function RepoWorkspaceLoaded({
     }
   }
   const presentationRepo: RepoWorkspaceRepo = {
-    ...repoShell,
+    ...projectBranchActionRepo(repoShell, projection.operations.operations, currentBranchName),
     branchModel: presentationBranchModel,
-    operations: {
-      ...repoShell.operations,
-      branchAction: projectBranchActionOperation(repoShell, projection.operations.operations, currentBranchName),
-    },
   }
   const detailBase = getCurrentRepoWorkspacePresentation(presentationRepo)
   const detail: CurrentRepoWorkspacePresentation = {
