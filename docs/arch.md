@@ -66,6 +66,23 @@ architecture itself. Future session tabs such as chat should add a runtime
 type, provider, projection, panel, create action, and close/action adapters
 without changing the generic tab strip contract.
 
+Runtime tab types are intentionally registered statically. Adding a new
+server-owned session tab type should update the explicit extension points
+instead of adding fallback logic in `WorkspacePaneTabStrip` or local client
+mirrors:
+
+- `src/shared/workspace-pane.ts`: add the runtime type and its tab scope.
+- `src/server/workspace-pane/*`: keep using the generic coordinator and
+  projection helpers; the new feature contributes a
+  `WorkspacePaneRuntimeTabsProvider`.
+- `src/server/<feature>/*`: own the feature lifecycle and expose live runtime
+  sessions to the workspace-pane provider.
+- `src/web/workspace-pane/workspace-pane-runtime-tab-*.ts*`: add provider
+  projection, target key, create, command, close, and panel entries for the
+  new type.
+- `src/web/components/workspace-pane/tab-providers.ts`: add labels, icons,
+  pending/attention state, close policy, and renderability for the new type.
+
 Compatibility note: old workspace tab protocol names
 (`list-workspace-tabs`, `replace-tabs`, `update-tabs`,
 `workspace-tabs-changed`) and old terminal-specific tab entries are not part

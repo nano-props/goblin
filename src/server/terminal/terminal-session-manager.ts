@@ -13,7 +13,6 @@ import {
   type TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
 import { isValidTerminalRuntimeSessionId, normalizeTerminalSize } from '#/shared/terminal-validators.ts'
-import type { WorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
 import {
   attachTerminalClient,
@@ -33,10 +32,9 @@ import type { PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 
-type WorkspacePaneTabsRuntimeLike<TUser extends string | number> = Pick<
-  WorkspacePaneTabsRuntime<TUser>,
-  'runtimeSessionIds'
->
+export interface TerminalSessionOrderProjection<TUser extends string | number> {
+  terminalSessionIds(input: { userId: TUser; scope: string; worktreePath: string }): readonly string[]
+}
 
 interface TerminalPtyAttachResult {
   generation: number
@@ -104,18 +102,18 @@ export class TerminalSessionManager<TUser extends string | number> {
   private readonly terminalRuntimeSessionIdByUserTerminalSessionIndex = new Map<string, string>()
   private readonly sink: TerminalEventSink<TUser>
   private readonly ptySupervisor: PtySupervisor
-  private readonly workspaceTabs: WorkspacePaneTabsRuntimeLike<TUser>
+  private readonly sessionOrder: TerminalSessionOrderProjection<TUser>
   private readonly isClientOnline: (userId: TUser, clientId: string) => boolean
 
   constructor(
     ptySupervisor: PtySupervisor,
     sink: TerminalEventSink<TUser>,
-    workspaceTabs: WorkspacePaneTabsRuntimeLike<TUser>,
+    sessionOrder: TerminalSessionOrderProjection<TUser>,
     isClientOnline: (userId: TUser, clientId: string) => boolean,
   ) {
     this.ptySupervisor = ptySupervisor
     this.sink = sink
-    this.workspaceTabs = workspaceTabs
+    this.sessionOrder = sessionOrder
     this.isClientOnline = isClientOnline
   }
 
@@ -423,7 +421,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     const terminalSessionByTerminalSessionId = new Map(sessions.map((session) => [session.terminalSessionId, session]))
     const seen = new Set<string>()
     const tabListedSessions: TerminalSessionView<TUser>[] = []
-    for (const terminalSessionId of this.workspaceTabs.runtimeSessionIds({ userId, scope, worktreePath }, 'terminal')) {
+    for (const terminalSessionId of this.sessionOrder.terminalSessionIds({ userId, scope, worktreePath })) {
       const session = terminalSessionByTerminalSessionId.get(terminalSessionId)
       if (!session || seen.has(terminalSessionId)) continue
       seen.add(terminalSessionId)

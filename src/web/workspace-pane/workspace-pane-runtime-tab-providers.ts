@@ -58,6 +58,9 @@ const terminalRuntimeTabProjectionProvider = {
   useSyncSelection: useSyncTerminalRuntimeTabSelection,
 } satisfies WorkspacePaneRuntimeTabProjectionProvider
 
+// Runtime tab types are registered explicitly so adding a new server-owned
+// session tab type requires a compile-time update instead of hidden fallback
+// behavior in the generic tab strip.
 const WORKSPACE_PANE_RUNTIME_TAB_PROJECTION_PROVIDERS = [
   terminalRuntimeTabProjectionProvider,
 ] as const satisfies readonly WorkspacePaneRuntimeTabProjectionProvider[]

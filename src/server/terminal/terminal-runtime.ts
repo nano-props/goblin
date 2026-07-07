@@ -26,7 +26,7 @@ import { createTerminalRealtimeHandlers } from '#/server/terminal/terminal-runti
 import { createWorkspacePaneTabsRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-tabs-runtime-realtime.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { isValidTerminalClientId, isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
-import { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
+import { TerminalSessionManager, type TerminalSessionOrderProjection } from '#/server/terminal/terminal-session-manager.ts'
 import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { type ServerTerminalActionHost, type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
@@ -57,6 +57,11 @@ export interface ServerTerminalRuntime {
 export function createServerTerminalRuntime(options: ServerTerminalRuntimeOptions): ServerTerminalRuntime {
   const { ptySupervisor } = options
   const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+  const terminalSessionOrder = {
+    terminalSessionIds(input) {
+      return workspaceTabs.runtimeSessionIds(input, 'terminal')
+    },
+  } satisfies TerminalSessionOrderProjection<string>
 
   // Sink callbacks fan out to every clientId that shares the
   // session's userId. The manager passes `userId` (a string
@@ -91,7 +96,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
         broker.broadcastToUser(userId, { type: 'lifecycle', event })
       },
     },
-    workspaceTabs,
+    terminalSessionOrder,
     (userId, clientId) => broker.isClientOnline(userId, clientId),
   )
   const workspaceTabsCoordinator = createWorkspacePaneTabsCoordinator({

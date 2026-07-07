@@ -1567,6 +1567,16 @@ describe('server terminal runtime', () => {
 
     const socket2 = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_b', USER_1, socket2)
+    await expect(
+      requestWorkspacePaneTabs(
+        host,
+        socket2,
+        WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+        { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
+        'req_list_after_detached_ttl',
+      ),
+    ).resolves.toEqual([])
+
     const recreatedSessionId = await createTerminalSession(host, 'client_1')
     const replacementAttach = await host.attach('client_a', USER_1, {
       terminalRuntimeSessionId: recreatedSessionId,
