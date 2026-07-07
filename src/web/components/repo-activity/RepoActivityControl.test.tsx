@@ -26,7 +26,7 @@ describe('RepoActivityControl', () => {
   test('keeps the primary refresh button idle during contextual status refreshes', () => {
     resetReposStore()
     seedRepoShellForTest({ id: REPO_ID })
-    markRepoOperationTargets(REPO_ID, nextRepoOperationId(REPO_ID), [{ key: 'status', reason: 'status' }], 'running')
+    markRepoOperationTargets(REPO_ID, nextRepoOperationId(REPO_ID), [{ key: 'visibleStatus', reason: 'visible-status' }], 'running')
 
     const repo = useReposStore.getState().repos[REPO_ID]!
     expect(isRepoPrimaryRefreshBusy(repo)).toBe(false)

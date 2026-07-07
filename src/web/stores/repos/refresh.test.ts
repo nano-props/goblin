@@ -862,20 +862,20 @@ describe('core refresh request ordering', () => {
     const works = Array.from({ length: 4 }, () => useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, scope: 'visible-status' }))
 
     expect(resolvers).toHaveLength(3)
-    expect(repoOperation(REPO_ID, 'status').phase).toBe('queued')
+    expect(repoOperation(REPO_ID, 'visibleStatus').phase).toBe('queued')
 
     resolvers[0]?.([])
     await works[0]
 
     expect(resolvers).toHaveLength(4)
-    expect(repoOperation(REPO_ID, 'status').phase).toBe('running')
+    expect(repoOperation(REPO_ID, 'visibleStatus').phase).toBe('running')
 
     resolvers[1]?.([])
     resolvers[2]?.([])
     resolvers[3]?.([])
     await Promise.all(works)
 
-    expect(repoOperation(REPO_ID, 'status').phase).toBe('idle')
+    expect(repoOperation(REPO_ID, 'visibleStatus').phase).toBe('idle')
   })
 
   test('closing a repo cancels active and queued repo operations', async () => {
@@ -889,7 +889,7 @@ describe('core refresh request ordering', () => {
 
     const works = Array.from({ length: 4 }, () => useReposStore.getState().refreshRuntimeProjection(REPO_ID, { repoInstanceId, scope: 'visible-status' }))
     expect(callCount).toBe(3)
-    expect(repoOperation(REPO_ID, 'status').phase).toBe('queued')
+    expect(repoOperation(REPO_ID, 'visibleStatus').phase).toBe('queued')
 
     useReposStore.getState().closeRepo(REPO_ID)
 
@@ -912,7 +912,7 @@ describe('core refresh request ordering', () => {
 
     try {
       expect(resolvers).toHaveLength(3)
-      expect(repoOperation(REPO_ID, 'status').phase).toBe('queued')
+      expect(repoOperation(REPO_ID, 'visibleStatus').phase).toBe('queued')
 
       await expect(works[3]).resolves.toBeUndefined()
 

@@ -135,7 +135,7 @@ function seedRepo(id: string, lifecycle: RemoteRepoConnectionLifecycle | null) {
             settledAt: null,
             error: null,
           },
-          snapshot: {
+          repoReadModel: {
             operationId: 0,
             phase: 'idle',
             reason: null,
@@ -144,7 +144,7 @@ function seedRepo(id: string, lifecycle: RemoteRepoConnectionLifecycle | null) {
             settledAt: null,
             error: null,
           },
-          status: {
+          visibleStatus: {
             operationId: 0,
             phase: 'idle',
             reason: null,

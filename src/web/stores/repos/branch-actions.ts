@@ -131,7 +131,7 @@ function branchActionTarget(action: RepoBranchAction): RepoOperationTarget {
 }
 
 function coreRefreshBusy(id: string): boolean {
-  return repoOperationBusy(id, 'snapshot') || repoOperationBusy(id, 'status')
+  return repoOperationBusy(id, 'repoReadModel') || repoOperationBusy(id, 'visibleStatus')
 }
 
 function evaluateRepoBranchActionSchedule(repo: RepoState, action: RepoBranchAction) {
@@ -325,7 +325,7 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
             if (coreRefreshBusy(id)) {
               ctx.setPhase('queued')
               signal.throwIfAborted()
-              await waitForBranchActionIdle(id, ['snapshot', 'status'], signal, options?.waitTimeoutMs)
+              await waitForBranchActionIdle(id, ['repoReadModel', 'visibleStatus'], signal, options?.waitTimeoutMs)
             }
           } catch (err) {
             const message = err instanceof Error ? err.message : String(err)

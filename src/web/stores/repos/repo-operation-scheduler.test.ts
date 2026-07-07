@@ -65,7 +65,7 @@ describe('repo runtime task scheduling', () => {
           releaseFirst = () => resolve('first')
         }),
     )
-    const replaced = scheduleRepoOperation(REPO_ID, 'network', async () => 'replaced', { replaceQueuedKey: 'status' })
+    const replaced = scheduleRepoOperation(REPO_ID, 'network', async () => 'replaced', { replaceQueuedKey: 'visible-status' })
     const latest = scheduleRepoOperation(
       REPO_ID,
       'network',
@@ -73,7 +73,7 @@ describe('repo runtime task scheduling', () => {
         starts.push('latest')
         return 'latest'
       },
-      { replaceQueuedKey: 'status' },
+      { replaceQueuedKey: 'visible-status' },
     )
 
     await expect(replaced).rejects.toThrow('cancelled')

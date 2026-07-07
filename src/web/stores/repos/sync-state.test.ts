@@ -8,13 +8,13 @@ import {
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
 import type { RepoOperationTarget } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
-type CoreRemoteFetchBlockerKey = 'fetch' | 'branchAction' | 'snapshot' | 'status'
+type CoreRemoteFetchBlockerKey = 'fetch' | 'branchAction' | 'repoReadModel' | 'visibleStatus'
 
 interface RepoOverrides {
   fetchBusy?: boolean
   branchActionBusy?: boolean
-  snapshotBusy?: boolean
-  statusBusy?: boolean
+  repoReadModelBusy?: boolean
+  visibleStatusBusy?: boolean
 }
 
 function repo(overrides: RepoOverrides = {}): RepoState {
@@ -30,16 +30,21 @@ function repo(overrides: RepoOverrides = {}): RepoState {
       'running',
     )
   }
-  if (overrides.snapshotBusy) {
+  if (overrides.repoReadModelBusy) {
     markRepoOperationTargets(
       base.id,
       nextRepoOperationId(base.id),
-      [{ key: 'snapshot', reason: 'snapshot' }],
+      [{ key: 'repoReadModel', reason: 'repo-read-model' }],
       'running',
     )
   }
-  if (overrides.statusBusy) {
-    markRepoOperationTargets(base.id, nextRepoOperationId(base.id), [{ key: 'status', reason: 'status' }], 'running')
+  if (overrides.visibleStatusBusy) {
+    markRepoOperationTargets(
+      base.id,
+      nextRepoOperationId(base.id),
+      [{ key: 'visibleStatus', reason: 'visible-status' }],
+      'running',
+    )
   }
   return base
 }
@@ -54,16 +59,23 @@ describe('canStartRemoteFetch', () => {
     expect(canStartRemoteFetch(repo())).toBe(true)
     expect(canStartRemoteFetch(repo({ fetchBusy: true }))).toBe(false)
     expect(canStartRemoteFetch(repo({ branchActionBusy: true }))).toBe(false)
-    expect(canStartRemoteFetch(repo({ snapshotBusy: true }))).toBe(false)
-    expect(canStartRemoteFetch(repo({ statusBusy: true }))).toBe(false)
+    expect(canStartRemoteFetch(repo({ repoReadModelBusy: true }))).toBe(false)
+    expect(canStartRemoteFetch(repo({ visibleStatusBusy: true }))).toBe(false)
   })
 
-  test.each<CoreRemoteFetchBlockerKey>(['fetch', 'branchAction', 'snapshot', 'status'])(
+  test.each<CoreRemoteFetchBlockerKey>(['fetch', 'branchAction', 'repoReadModel', 'visibleStatus'])(
     'is blocked while runtime %s work is active',
     (key) => {
       const r = repo()
       const operationId = nextRepoOperationId(r.id)
-      const target: RepoOperationTarget = { key, reason: key === 'branchAction' ? 'branch:pull' : key }
+      const target: RepoOperationTarget =
+        key === 'branchAction'
+          ? { key, reason: 'branch:pull' }
+          : key === 'repoReadModel'
+            ? { key, reason: 'repo-read-model' }
+            : key === 'visibleStatus'
+              ? { key, reason: 'visible-status' }
+              : { key, reason: key }
 
       markRepoOperationTargets(r.id, operationId, [target], 'running')
 

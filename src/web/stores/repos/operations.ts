@@ -1,6 +1,6 @@
 import type { RepoBranchActionKind } from '#/web/stores/repos/branch-action-types.ts'
 export type RepoOperationPhase = 'idle' | 'queued' | 'running'
-export type RepoOperationKey = 'fetch' | 'manualRefresh' | 'snapshot' | 'status' | 'branchAction'
+export type RepoOperationKey = 'fetch' | 'manualRefresh' | 'repoReadModel' | 'visibleStatus' | 'branchAction'
 export type RepoBranchActionReason =
   'branch:pull' | 'branch:push' | 'branch:createWorktree' | 'branch:deleteBranch' | 'branch:removeWorktree'
 export type RepoOperationReason =
@@ -8,8 +8,8 @@ export type RepoOperationReason =
   | 'network'
   | 'pull'
   | 'push'
-  | 'snapshot'
-  | 'status'
+  | 'repo-read-model'
+  | 'visible-status'
   | 'user-fetch'
   | 'manual-refresh'
   | RepoBranchActionReason
@@ -33,8 +33,8 @@ export interface RepoOperationTarget {
 export interface RepoOperationsState {
   fetch: RepoOperationState
   manualRefresh: RepoOperationState
-  snapshot: RepoOperationState
-  status: RepoOperationState
+  repoReadModel: RepoOperationState
+  visibleStatus: RepoOperationState
   branchAction: RepoOperationState
 }
 
@@ -62,8 +62,8 @@ export function emptyRepoOperations(): RepoOperationsState {
   return {
     fetch: idleOperation(),
     manualRefresh: idleOperation(),
-    snapshot: idleOperation(),
-    status: idleOperation(),
+    repoReadModel: idleOperation(),
+    visibleStatus: idleOperation(),
     branchAction: idleOperation(),
   }
 }
@@ -74,10 +74,10 @@ function operationForKey(operations: RepoOperationsState, key: string): RepoOper
       return operations.fetch
     case 'manualRefresh':
       return operations.manualRefresh
-    case 'snapshot':
-      return operations.snapshot
-    case 'status':
-      return operations.status
+    case 'repoReadModel':
+      return operations.repoReadModel
+    case 'visibleStatus':
+      return operations.visibleStatus
     case 'branchAction':
       return operations.branchAction
   }
@@ -90,10 +90,10 @@ function readOperationForKey(operations: RepoOperationsState, key: string): Repo
       return operations.fetch
     case 'manualRefresh':
       return operations.manualRefresh
-    case 'snapshot':
-      return operations.snapshot
-    case 'status':
-      return operations.status
+    case 'repoReadModel':
+      return operations.repoReadModel
+    case 'visibleStatus':
+      return operations.visibleStatus
     case 'branchAction':
       return operations.branchAction
   }

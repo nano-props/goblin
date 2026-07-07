@@ -6,12 +6,12 @@ export function canStartRemoteFetch(repo: RepoState | undefined): repo is RepoSt
   if (!repo) return false
   if (isRepoUnavailable(repo)) return false
   // Network writes must not overlap with core repo reads/writes that mutate
-  // branch/status truth. Log and PR refreshes are metadata reads, so they can
-  // remain visible without blocking manual sync/pull/push.
+  // runtime projection truth. Log and PR refreshes are metadata reads, so they
+  // can remain visible without blocking manual sync/pull/push.
   return (
     !repoOperationBusy(repo.id, 'fetch') &&
     !repoOperationBusy(repo.id, 'branchAction') &&
-    !repoOperationBusy(repo.id, 'snapshot') &&
-    !repoOperationBusy(repo.id, 'status')
+    !repoOperationBusy(repo.id, 'repoReadModel') &&
+    !repoOperationBusy(repo.id, 'visibleStatus')
   )
 }

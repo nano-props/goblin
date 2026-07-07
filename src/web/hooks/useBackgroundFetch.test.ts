@@ -11,8 +11,8 @@ describe('backgroundSyncRepoIdsFromStore', () => {
     })
     repo.dataLoads.snapshot.phase = 'refreshing'
     repo.dataLoads.status.phase = 'refreshing'
-    repo.operations.snapshot.phase = 'running'
-    repo.operations.status.phase = 'running'
+    repo.operations.repoReadModel.phase = 'running'
+    repo.operations.visibleStatus.phase = 'running'
 
     expect(backgroundSyncRepoIdsFromStore({ repos: { '/repo': repo } }, '/repo')).toEqual(['/repo'])
   })
@@ -81,7 +81,7 @@ function createRepo(input: {
         settledAt: null,
         error: null,
       },
-      snapshot: {
+      repoReadModel: {
         operationId: 0,
         phase: 'idle',
         reason: null,
@@ -90,7 +90,7 @@ function createRepo(input: {
         settledAt: null,
         error: null,
       },
-      status: {
+      visibleStatus: {
         operationId: 0,
         phase: 'idle',
         reason: null,

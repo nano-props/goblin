@@ -84,13 +84,7 @@ describe('runRemoteRepoConnection', () => {
           snapshot: { phase: 'idle', loadedAt: null, stale: false, error: null },
           status: { phase: 'idle', loadedAt: null, stale: false, error: null },
         },
-        operations: {
-          fetch: idle(),
-          manualRefresh: idle(),
-          snapshot: idle(),
-          status: idle(),
-          branchAction: idle(),
-        },
+        operations: emptyOperations(),
         ui: {
           branchViewMode: 'all',
           preferredWorkspacePaneTabByTarget: {},
@@ -436,8 +430,8 @@ function emptyOperations() {
   return {
     fetch: idle(),
     manualRefresh: idle(),
-    snapshot: idle(),
-    status: idle(),
+    repoReadModel: idle(),
+    visibleStatus: idle(),
     branchAction: idle(),
   }
 }

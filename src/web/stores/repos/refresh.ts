@@ -18,11 +18,9 @@ import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { RepoRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
 import type { RepoRuntimeProjectionRefreshScope, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 
-type ProjectionRefreshLoad = 'snapshot' | 'status'
-type ProjectionRefreshTarget = {
-  key: ProjectionRefreshLoad
-  reason: ProjectionRefreshLoad
-}
+type ProjectionRefreshTarget =
+  | { key: 'repoReadModel'; reason: 'repo-read-model' }
+  | { key: 'visibleStatus'; reason: 'visible-status' }
 
 interface ProjectionRefreshPlan {
   wantsSnapshot: boolean
@@ -38,20 +36,20 @@ function projectionRefreshPlan(scope: RepoRuntimeProjectionRefreshScope): Projec
       return {
         wantsSnapshot: true,
         wantsStatus: true,
-        operationKey: 'snapshot+status',
+        operationKey: 'repo-read-model',
         priority: 50,
         targets: [
-          { key: 'snapshot', reason: 'snapshot' },
-          { key: 'status', reason: 'status' },
+          { key: 'repoReadModel', reason: 'repo-read-model' },
+          { key: 'visibleStatus', reason: 'visible-status' },
         ],
       }
     case 'visible-status':
       return {
         wantsSnapshot: false,
         wantsStatus: true,
-        operationKey: 'status',
+        operationKey: 'visible-status',
         priority: 40,
-        targets: [{ key: 'status', reason: 'status' }],
+        targets: [{ key: 'visibleStatus', reason: 'visible-status' }],
       }
   }
   const exhaustive: never = scope

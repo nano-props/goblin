@@ -33,7 +33,7 @@ afterEach(() => {
 describe('RepoActivityControl component', () => {
   test('keeps the primary refresh button enabled during background-blocked refresh states', () => {
     seedRepoShellForTest({ id: REPO_ID, remote: { hasRemotes: true } })
-    markRepoOperationTargets(REPO_ID, nextRepoOperationId(REPO_ID), [{ key: 'status', reason: 'status' }], 'running')
+    markRepoOperationTargets(REPO_ID, nextRepoOperationId(REPO_ID), [{ key: 'visibleStatus', reason: 'visible-status' }], 'running')
 
     const { container } = renderInJsdom(<RepoActivityControl repoId={REPO_ID} />)
 
