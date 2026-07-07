@@ -5,7 +5,7 @@ import { cleanup } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoDashboardPane } from '#/web/components/repo-pages/RepoDashboardPane.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoPullRequestsQueryData } from '#/web/repo-data-query.ts'
+import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import {
   createPullRequest,
@@ -43,21 +43,30 @@ describe('RepoDashboardPane', () => {
     expect(container.textContent).not.toContain('dashboard.attention.empty')
   })
 
-  test('uses pull request query data for PR metrics and attention badges', () => {
+  test('uses projection pull request data for PR metrics and attention badges', () => {
+    const featureBranch = createRepoBranch('feature/pr')
+    const mainBranch = createRepoBranch('main')
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch('feature/pr'), createRepoBranch('main')],
+      branches: [featureBranch, mainBranch],
       currentBranchName: 'main',
     })
-    setRepoPullRequestsQueryData(REPO_ID, repo.instanceId, undefined, 'summary', [
-      {
-        branch: 'feature/pr',
-        pullRequest: createPullRequest(42, {
-          headRefName: 'feature/pr',
-          checks: { total: 2, passing: 1, failing: 1, pending: 0 },
-        }),
-      },
-    ])
+    setRepoProjectionQueryData(REPO_ID, repo.instanceId, null, 'summary', {
+      snapshot: { current: 'main', branches: [featureBranch, mainBranch] },
+      status: [],
+      pullRequests: [
+        {
+          branch: 'feature/pr',
+          pullRequest: createPullRequest(42, {
+            headRefName: 'feature/pr',
+            checks: { total: 2, passing: 1, failing: 1, pending: 0 },
+          }),
+        },
+      ],
+      operations: { operations: [], loadedAt: 123 },
+      requested: { branch: null, pullRequestMode: 'summary' },
+      loadedAt: 123,
+    })
 
     const { container } = renderInJsdom(
       <QueryClientProvider client={primaryWindowQueryClient}>

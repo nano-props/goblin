@@ -3,7 +3,6 @@ export const EMBEDDED_SERVER_IPC_ROUTES = {
   'repo.clone': { route: '/api/repo/clone', method: 'POST' },
   'repo.abortClone': { route: '/api/repo/abort-clone', method: 'POST' },
   'repo.snapshot': { route: '/api/repo/snapshot', method: 'POST' },
-  'repo.pullRequests': { route: '/api/repo/pull-requests', method: 'POST' },
   'repo.projection': { route: '/api/repo/projection', method: 'POST' },
   'repo.operations': { route: '/api/repo/operations', method: 'POST' },
   'repo.composite': { route: '/api/repo/composite', method: 'POST' },

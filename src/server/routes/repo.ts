@@ -5,7 +5,6 @@ import {
   readRepoProjection,
   getRepoLog,
   getRepoPatch,
-  getRepoPullRequests,
   getRepoSnapshot,
   getRepoStatus,
   getRepoWorktreeBootstrapPreview,
@@ -144,15 +143,6 @@ export function createRepoRoutes() {
     }
     return c.json(result)
   })
-  app.post('/pull-requests', async (c) => {
-    const { cwd, branches, mode } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pullRequests, c)
-    return c.json(
-      await readJsonOrThrow(
-        () => getRepoPullRequests(cwd, branches, { mode: mode ?? 'full', signal: c.req.raw.signal }),
-        'pull-requests',
-      ),
-    )
-  })
   app.post('/projection', async (c) => {
     const { cwd, branch, mode } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.projection, c)
     return c.json(
@@ -167,16 +157,12 @@ export function createRepoRoutes() {
     return c.json(getRepoOperationsSnapshot({ repoId: cwd, includeSettled }))
   })
   app.post('/composite', async (c) => {
-    const { cwd, include, branches, mode, timeoutMs } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.composite, c)
-    const wants = (include ?? ['snapshot', 'status', 'pullRequests']) as ReadonlyArray<
-      'snapshot' | 'status' | 'pullRequests'
-    >
+    const { cwd, include, timeoutMs } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.composite, c)
+    const wants = (include ?? ['snapshot', 'status']) as ReadonlyArray<'snapshot' | 'status'>
     return c.json(
       await readJsonOrThrow(
         () =>
           readRepoBulk(cwd, wants, {
-            branches,
-            mode,
             signal: c.req.raw.signal,
             timeoutMs,
           }),

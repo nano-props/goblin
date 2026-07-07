@@ -329,15 +329,6 @@ export function waitForRepoOperationsIdle(repoId: string, keys: string[], signal
   })
 }
 
-export function pruneRepoBranchPullRequestOperations(repoId: string, validBranches: Set<string>): void {
-  const operations = repoOperationSchedulers.get(repoId)?.operations
-  if (!operations) return
-  for (const key of Object.keys(operations) as RepoOperationKey[]) {
-    if (!key.startsWith('pullRequest:')) continue
-    if (!validBranches.has(key.slice('pullRequest:'.length))) delete operations[key]
-  }
-}
-
 export function scheduleRepoOperation<T>(
   repoId: string,
   lane: RepoOperationLane,

@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   getRepoStatus: vi.fn(),
   getRepoLog: vi.fn(),
   getRepoPatch: vi.fn(),
-  getRepoPullRequests: vi.fn(),
   readRepoBulk: vi.fn(),
   readRepoProjection: vi.fn(),
   getRepoOperationsSnapshot: vi.fn(),
@@ -44,7 +43,6 @@ vi.mock('#/server/modules/repo-read-paths.ts', () => ({
   getRepoStatus: mocks.getRepoStatus,
   getRepoLog: mocks.getRepoLog,
   getRepoPatch: mocks.getRepoPatch,
-  getRepoPullRequests: mocks.getRepoPullRequests,
   readRepoBulk: mocks.readRepoBulk,
   readRepoProjection: mocks.readRepoProjection,
   getRepoWorktreeBootstrapPreview: mocks.getRepoWorktreeBootstrapPreview,
@@ -126,10 +124,10 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(mocks.probeRepo).not.toHaveBeenCalled()
   })
 
-  test('returns 400 for invalid picklist values in the body (e.g. pull-requests mode)', async () => {
+  test('returns 400 for invalid picklist values in the body (e.g. projection mode)', async () => {
     const app = createTestRepoRoutes()
     const response = await app.request(
-      new Request('http://localhost/pull-requests', {
+      new Request('http://localhost/projection', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ cwd: '/tmp/repo', mode: 'not-a-mode' }),
@@ -138,7 +136,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(response.status).toBe(400)
     const json = (await response.json()) as { ok: boolean; code: string }
     expect(json.code).toBe('BAD_REQUEST')
-    expect(mocks.getRepoPullRequests).not.toHaveBeenCalled()
+    expect(mocks.readRepoProjection).not.toHaveBeenCalled()
   })
 
   test('passes a valid body through to the module layer', async () => {
@@ -246,23 +244,6 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(response.status).toBe(200)
     expect(await response.json()).toMatchObject({ ok: true, preview: { hasOperations: false } })
     expect(mocks.getRepoWorktreeBootstrapPreview).toHaveBeenCalledWith('/tmp/repo', expect.any(AbortSignal))
-  })
-
-  test('passes an array of branches through the body to the module layer', async () => {
-    mocks.getRepoPullRequests.mockResolvedValue([])
-    const app = createTestRepoRoutes()
-    const response = await app.request(
-      new Request('http://localhost/pull-requests', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', branches: ['main', 'feature'] }),
-      }),
-    )
-    expect(response.status).toBe(200)
-    expect(mocks.getRepoPullRequests).toHaveBeenCalledWith('/tmp/repo', ['main', 'feature'], {
-      mode: 'full',
-      signal: expect.any(AbortSignal),
-    })
   })
 
   test('passes projection body through to the module layer', async () => {
@@ -563,11 +544,10 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 })
 
 describe('repo routes — composite read', () => {
-  test('returns all three sections by default', async () => {
+  test('returns snapshot and status sections by default', async () => {
     mocks.readRepoBulk.mockResolvedValue({
       snapshot: { branches: [], current: 'main' },
       status: [],
-      pullRequests: [],
     })
     const app = createTestRepoRoutes()
     const response = await app.request(
@@ -581,12 +561,11 @@ describe('repo routes — composite read', () => {
     expect(await response.json()).toEqual({
       snapshot: { branches: [], current: 'main' },
       status: [],
-      pullRequests: [],
     })
   })
 
-  test('forwards include, branches, and mode to the read function', async () => {
-    mocks.readRepoBulk.mockResolvedValue({ snapshot: null, status: [], pullRequests: null })
+  test('forwards include to the read function', async () => {
+    mocks.readRepoBulk.mockResolvedValue({ snapshot: null, status: [] })
     const app = createTestRepoRoutes()
     await app.request(
       new Request('http://localhost/composite', {
@@ -595,21 +574,17 @@ describe('repo routes — composite read', () => {
         body: JSON.stringify({
           cwd: '/tmp/repo',
           include: ['snapshot', 'status'],
-          branches: ['main', 'feature'],
-          mode: 'summary',
         }),
       }),
     )
     expect(mocks.readRepoBulk).toHaveBeenCalledWith('/tmp/repo', ['snapshot', 'status'], {
-      branches: ['main', 'feature'],
-      mode: 'summary',
       timeoutMs: undefined,
       signal: expect.any(AbortSignal),
     })
   })
 
   test('forwards timeoutMs to the read function when provided', async () => {
-    mocks.readRepoBulk.mockResolvedValue({ snapshot: null, status: [], pullRequests: null })
+    mocks.readRepoBulk.mockResolvedValue({ snapshot: null, status: [] })
     const app = createTestRepoRoutes()
     await app.request(
       new Request('http://localhost/composite', {

@@ -4,7 +4,6 @@ import type {
   BrowserRemoteProvider,
   ExecResult,
   GitRemoteInfo,
-  PullRequestFetchMode,
 } from '#/web/types.ts'
 import type { RemoteRepoConnectionLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspaceSessionState } from '#/shared/api-types.ts'
@@ -261,14 +260,6 @@ interface RuntimeCoherentRepoProjectionActions {
   refreshSnapshotAndStatus: (
     id: string,
     options?: { skipLogBackfill?: boolean; repoInstanceId?: string },
-  ) => Promise<void>
-  refreshPullRequests: (
-    id: string,
-    branches?: string[],
-    options?: {
-      repoInstanceId?: string
-      mode?: PullRequestFetchMode
-    },
   ) => Promise<void>
   refreshStatus: (id: string, options?: { repoInstanceId?: string }) => Promise<void>
   refreshCoreData: (id: string, options?: { repoInstanceId?: string }) => Promise<void>

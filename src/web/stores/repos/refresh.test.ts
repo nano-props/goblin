@@ -198,7 +198,6 @@ describe('remote fetch timestamps', () => {
     let fetchCount = 0
     let snapshotCount = 0
     let statusCount = 0
-    const pullRequestCalls: Array<{ branches?: string[]; mode?: string }> = []
     ipcHandlers['repo.fetch'] = async () => {
       fetchCount += 1
       return { ok: true, message: 'ok' }
@@ -220,10 +219,6 @@ describe('remote fetch timestamps', () => {
         pullRequests: null,
       }
     }
-    ipcHandlers['repo.pullRequests'] = async ({ branches, mode }: { branches?: string[]; mode?: string }) => {
-      pullRequestCalls.push({ branches, mode: mode })
-      return []
-    }
 
     await useReposStore.getState().syncAndRefresh(REPO_ID, { repoInstanceId })
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -231,7 +226,6 @@ describe('remote fetch timestamps', () => {
     expect(fetchCount).toBe(1)
     expect(snapshotCount).toBe(1)
     expect(statusCount).toBe(1)
-    expect(pullRequestCalls).toEqual([])
   })
 
   test('manual sync records thrown fetch failures instead of rejecting', async () => {

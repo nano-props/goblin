@@ -122,25 +122,11 @@ function staticTabs(...views: WorkspacePaneStaticTabType[]): WorkspacePaneTabEnt
   return views.map((view) => workspacePaneStaticTabEntry(view))
 }
 
-function stubRefreshActions(
-  stubs: Partial<Pick<ReturnType<typeof useReposStore.getState>, 'refreshPullRequests' | 'refreshStatus'>>,
-): () => void {
-  const original = useReposStore.getState()
-  useReposStore.setState(stubs)
-  return () => {
-    useReposStore.setState({
-      refreshPullRequests: original.refreshPullRequests,
-      refreshStatus: original.refreshStatus,
-    })
-  }
-}
-
 beforeEach(() => {
   primaryWindowQueryClient.clear()
   for (const key of Object.keys(ipcHandlers)) delete ipcHandlers[key]
   resetReposStore()
   installGoblinTestBridge(ipcHandlers)
-  ipcHandlers['repo.pullRequests'] = async () => []
   ipcHandlers['repo.status'] = async () => []
 })
 
@@ -334,35 +320,10 @@ describe('setWorkspacePaneTab', () => {
 
   test('keeps workspace pane tab selection as a UI preference write', () => {
     seedRepo({ currentBranchName: 'main', preferredWorkspacePaneTab: 'terminal' })
-    const pullRequestCalls: Parameters<ReturnType<typeof useReposStore.getState>['refreshPullRequests']>[] = []
-    const restore = stubRefreshActions({
-      refreshPullRequests: async (...args) => {
-        pullRequestCalls.push(args)
-      },
-    })
-
-    try {
-      useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'main', 'status')
-
-      expect(preferredTabFor('main')).toBe('status')
-      expect(pullRequestCalls).toEqual([])
-    } finally {
-      restore()
-    }
-  })
-
-  test('does not refresh pull request details when switching to status', async () => {
-    const calls: string[][] = []
-    ipcHandlers['repo.pullRequests'] = async ({ branches }: { branches?: string[] }) => {
-      calls.push(branches ?? [])
-      return []
-    }
-    seedRepo({ currentBranchName: 'main', preferredWorkspacePaneTab: 'terminal' })
 
     useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'main', 'status')
-    await flushAsyncWork()
 
-    expect(calls).toEqual([])
+    expect(preferredTabFor('main')).toBe('status')
   })
 
   test('sets the terminal preference regardless of worktree presence', () => {

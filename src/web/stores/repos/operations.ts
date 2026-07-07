@@ -1,10 +1,8 @@
 import type { RepoBranchActionKind } from '#/web/stores/repos/branch-action-types.ts'
 export type RepoOperationPhase = 'idle' | 'queued' | 'running'
-export type RepoOperationKey =
-  'fetch' | 'manualRefresh' | 'snapshot' | 'status' | 'pullRequests' | 'branchAction' | `pullRequest:${string}`
+export type RepoOperationKey = 'fetch' | 'manualRefresh' | 'snapshot' | 'status' | 'branchAction'
 export type RepoBranchActionReason =
   'branch:pull' | 'branch:push' | 'branch:createWorktree' | 'branch:deleteBranch' | 'branch:removeWorktree'
-export type RepoPullRequestReason = 'summary' | 'full'
 export type RepoOperationReason =
   | 'fetch'
   | 'network'
@@ -12,10 +10,8 @@ export type RepoOperationReason =
   | 'push'
   | 'snapshot'
   | 'status'
-  | 'pullRequests'
   | 'user-fetch'
   | 'manual-refresh'
-  | RepoPullRequestReason
   | RepoBranchActionReason
 
 export interface RepoOperationState {
@@ -39,9 +35,7 @@ export interface RepoOperationsState {
   manualRefresh: RepoOperationState
   snapshot: RepoOperationState
   status: RepoOperationState
-  pullRequests: RepoOperationState
   branchAction: RepoOperationState
-  pullRequestsByBranch: Record<string, RepoOperationState>
 }
 
 export function isBranchActionReason(reason: RepoOperationReason | null): reason is RepoBranchActionReason {
@@ -70,20 +64,11 @@ export function emptyRepoOperations(): RepoOperationsState {
     manualRefresh: idleOperation(),
     snapshot: idleOperation(),
     status: idleOperation(),
-    pullRequests: idleOperation(),
     branchAction: idleOperation(),
-    pullRequestsByBranch: {},
   }
-}
-
-function isPullRequestOperationKey(key: string): key is `pullRequest:${string}` {
-  return key.startsWith('pullRequest:')
 }
 
 function operationForKey(operations: RepoOperationsState, key: string): RepoOperationState {
-  if (isPullRequestOperationKey(key)) {
-    return (operations.pullRequestsByBranch[key.slice('pullRequest:'.length)] ??= idleOperation())
-  }
   switch (key as RepoOperationKey) {
     case 'fetch':
       return operations.fetch
@@ -93,8 +78,6 @@ function operationForKey(operations: RepoOperationsState, key: string): RepoOper
       return operations.snapshot
     case 'status':
       return operations.status
-    case 'pullRequests':
-      return operations.pullRequests
     case 'branchAction':
       return operations.branchAction
   }
@@ -102,8 +85,6 @@ function operationForKey(operations: RepoOperationsState, key: string): RepoOper
 }
 
 function readOperationForKey(operations: RepoOperationsState, key: string): RepoOperationState | undefined {
-  if (isPullRequestOperationKey(key))
-    return operations.pullRequestsByBranch[key.slice('pullRequest:'.length)] ?? idleOperation()
   switch (key as RepoOperationKey) {
     case 'fetch':
       return operations.fetch
@@ -113,8 +94,6 @@ function readOperationForKey(operations: RepoOperationsState, key: string): Repo
       return operations.snapshot
     case 'status':
       return operations.status
-    case 'pullRequests':
-      return operations.pullRequests
     case 'branchAction':
       return operations.branchAction
   }
@@ -154,12 +133,6 @@ export function settleRepoOperationViews(
   for (const target of targets) {
     const operation = readOperationForKey(operations, target.key)
     if (operation) settleOperation(operation, operationId, { error })
-  }
-}
-
-export function pruneRepoOperationViewsForBranches(operations: RepoOperationsState, validBranches: Set<string>): void {
-  for (const branch of Object.keys(operations.pullRequestsByBranch)) {
-    if (!validBranches.has(branch)) delete operations.pullRequestsByBranch[branch]
   }
 }
 

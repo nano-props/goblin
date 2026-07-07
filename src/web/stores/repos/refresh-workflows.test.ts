@@ -27,8 +27,6 @@ describe('repo refresh workflows', () => {
       current: 'feature/a',
       branches: [createBranchSnapshot('feature/a'), createBranchSnapshot('feature/b')],
     })
-    const refreshPullRequests = vi.fn(() => Promise.resolve())
-    useReposStore.setState({ refreshPullRequests })
 
     await runSnapshotSuccessWorkflow(useReposStore.setState, useReposStore.getState, {
       id: '/repo',
@@ -36,7 +34,6 @@ describe('repo refresh workflows', () => {
       isSnapshotCurrent: () => true,
     })
 
-    expect(refreshPullRequests).not.toHaveBeenCalled()
     expect(useReposStore.getState().repoSnapshotCache['/repo']).toMatchObject({
       data: {
         currentBranch: 'feature/a',

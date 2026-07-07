@@ -35,7 +35,7 @@ export interface RepoWorkspaceRepo extends BranchActionRepo {
     statusReady: boolean
   }
   ui: Pick<RepoState['ui'], 'preferredWorkspacePaneTabByTarget'> & { currentBranchName: string | null }
-  dataLoads: Pick<RepoState['dataLoads'], 'status' | 'pullRequests'>
+  dataLoads: Pick<RepoState['dataLoads'], 'status'>
   remote: BranchActionRepo['remote'] & Pick<RepoState['remote'], 'lifecycle'>
 }
 
@@ -63,7 +63,7 @@ export function getCurrentRepoWorkspacePresentation(repo: RepoWorkspaceRepo) {
     ...detail,
     loading: {
       status: statusLoading,
-      pullRequests: dataLoadBusy(repo.dataLoads.pullRequests),
+      pullRequests: false,
     },
     errors: {
       status: repo.dataLoads.status.error,

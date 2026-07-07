@@ -236,10 +236,6 @@ export interface PullRequestEntry {
   pullRequest: PullRequestInfo
 }
 
-export interface PullRequestFetchOptions {
-  mode?: PullRequestFetchMode
-}
-
 export type RepoServerOperationPhase = 'queued' | 'running' | 'cancelling' | 'done' | 'failed'
 export type RepoServerOperationKind =
   | 'fetch'
@@ -355,11 +351,6 @@ export interface AppIpcHandlers {
     }) => Promise<CloneRepoResult>
     abortClone: (input: { operationId: string }) => Promise<boolean>
     snapshot: (input: { cwd: string }) => Promise<RepoSnapshot | null>
-    pullRequests: (input: {
-      cwd: string
-      branches?: string[]
-      options?: PullRequestFetchOptions
-    }) => Promise<PullRequestEntry[] | null>
     projection: (input: {
       cwd: string
       branch?: string

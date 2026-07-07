@@ -3,37 +3,22 @@ import { describe, expect, test, vi } from 'vitest'
 import {
   getRepoOperationsQueryData,
   getRepoProjectionQueryData,
-  getRepoPullRequestsQueryData,
   getRepoSnapshotQueryData,
   getRepoStatusQueryData,
   repoBulkReadQueryKey,
   repoOperationsQueryKey,
   repoProjectionQueryKey,
-  repoPullRequestsQueryKey,
   scheduleRepoRuntimeProjectionRefresh,
   setRepoBulkReadQueryData,
   setRepoOperationsQueryData,
   setRepoProjectionQueryData,
-  setRepoPullRequestsQueryData,
   setRepoStatusQueryData,
 } from '#/web/repo-data-query.ts'
 import type { PullRequestEntry, RepoRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
 
 describe('repo data query keys', () => {
-  test('separates pull request branch names from fetch mode', () => {
-    expect(repoPullRequestsQueryKey('/tmp/repo', 'repo-instance-1', ['feature/a'], 'full')).not.toEqual(
-      repoPullRequestsQueryKey('/tmp/repo', 'repo-instance-1', ['feature/a', 'full'], undefined),
-    )
-    expect(repoPullRequestsQueryKey('/tmp/repo', 'repo-instance-1', ['summary'], 'full')).not.toEqual(
-      repoPullRequestsQueryKey('/tmp/repo', 'repo-instance-1', ['full'], 'summary'),
-    )
-  })
-
   test('normalizes unordered dimensions inside structured key fields', () => {
-    expect(repoPullRequestsQueryKey('/tmp/repo', 'repo-instance-1', ['feature/b', 'feature/a'], 'full')).toEqual(
-      repoPullRequestsQueryKey('/tmp/repo', 'repo-instance-1', ['feature/a', 'feature/b'], 'full'),
-    )
     expect(repoBulkReadQueryKey('/tmp/repo', 'repo-instance-1', ['status', 'snapshot'])).toEqual(
       repoBulkReadQueryKey('/tmp/repo', 'repo-instance-1', ['snapshot', 'status']),
     )
@@ -65,7 +50,7 @@ describe('repo bulk read query data', () => {
         '/tmp/repo',
         'repo-instance-1',
         ['snapshot', 'status'],
-        { snapshot: null, status, pullRequests: null },
+        { snapshot: null, status },
         queryClient,
       ),
     ).not.toThrow()
@@ -76,7 +61,7 @@ describe('repo bulk read query data', () => {
 })
 
 describe('repo projection query data', () => {
-  test('backfills the legacy per-section caches from a server projection', () => {
+  test('backfills shared section caches from a server projection', () => {
     const queryClient = new QueryClient()
     const snapshot: RepoSnapshot = { branches: [], current: 'main' }
     const status: WorktreeStatus[] = [{ path: '/tmp/repo', branch: 'main', isMain: true, entries: [] }]
@@ -107,9 +92,6 @@ describe('repo projection query data', () => {
     )
     expect(getRepoSnapshotQueryData('/tmp/repo', 'repo-instance-1', queryClient)).toEqual(snapshot)
     expect(getRepoStatusQueryData('/tmp/repo', 'repo-instance-1', queryClient)).toEqual(status)
-    expect(getRepoPullRequestsQueryData('/tmp/repo', 'repo-instance-1', ['feature/a'], 'full', queryClient)).toEqual(
-      pullRequests,
-    )
     expect(getRepoOperationsQueryData('/tmp/repo', 'repo-instance-1', queryClient)).toEqual({
       operations: [],
       loadedAt: 123,
@@ -129,84 +111,14 @@ describe('repo projection query data', () => {
     const updatedStatus: WorktreeStatus[] = [
       { path: '/tmp/repo', branch: 'feature/a', isMain: false, entries: [{ x: 'M', y: ' ', path: 'README.md' }] },
     ]
-    const updatedPullRequests: PullRequestEntry[] = [
-      {
-        branch: 'feature/a',
-        pullRequest: {
-          number: 230,
-          title: 'Projection cache update',
-          url: 'https://github.com/acme/repo/pull/230',
-          state: 'open',
-        },
-      },
-    ]
 
     setRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', 'feature/a', 'summary', projection, queryClient)
     setRepoStatusQueryData('/tmp/repo', 'repo-instance-1', updatedStatus, queryClient)
-    setRepoPullRequestsQueryData(
-      '/tmp/repo',
-      'repo-instance-1',
-      ['feature/a'],
-      'summary',
-      updatedPullRequests,
-      queryClient,
-    )
 
     expect(getRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', 'feature/a', 'summary', queryClient)).toEqual({
       ...projection,
       status: updatedStatus,
-      pullRequests: updatedPullRequests,
     })
-  })
-
-  test('projects all-branch pull request writes into branch and dashboard summary projections', () => {
-    const queryClient = new QueryClient()
-    const branchProjection: RepoRuntimeProjection = {
-      snapshot: { branches: [], current: 'main' },
-      status: [],
-      pullRequests: null,
-      operations: { operations: [], loadedAt: 123 },
-      requested: { branch: 'feature/a', pullRequestMode: 'summary' },
-      loadedAt: 123,
-    }
-    const noBranchProjection: RepoRuntimeProjection = {
-      ...branchProjection,
-      requested: { branch: null, pullRequestMode: 'summary' },
-    }
-    const noBranchFullProjection: RepoRuntimeProjection = {
-      ...branchProjection,
-      requested: { branch: null, pullRequestMode: 'full' },
-    }
-    const pullRequests: PullRequestEntry[] = [
-      {
-        branch: 'feature/a',
-        pullRequest: {
-          number: 231,
-          title: 'All branch cache update',
-          url: 'https://github.com/acme/repo/pull/231',
-          state: 'open',
-        },
-      },
-    ]
-
-    setRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', 'feature/a', 'summary', branchProjection, queryClient)
-    setRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', null, 'summary', noBranchProjection, queryClient)
-    setRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', null, 'full', noBranchFullProjection, queryClient)
-    setRepoPullRequestsQueryData('/tmp/repo', 'repo-instance-1', undefined, 'summary', pullRequests, queryClient)
-
-    expect(getRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', 'feature/a', 'summary', queryClient)).toEqual({
-      ...branchProjection,
-      pullRequests,
-    })
-    expect(getRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', null, 'summary', queryClient)).toEqual(
-      {
-        ...noBranchProjection,
-        pullRequests,
-      },
-    )
-    expect(getRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', null, 'full', queryClient)).toEqual(
-      noBranchFullProjection,
-    )
   })
 
   test('projects active operation snapshots into projection caches', () => {

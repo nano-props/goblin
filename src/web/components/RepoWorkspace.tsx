@@ -94,7 +94,6 @@ function repoWorkspaceRepoShellEqual(
       a.ui.currentBranchName === b.ui.currentBranchName &&
       a.ui.preferredWorkspacePaneTabByTarget === b.ui.preferredWorkspacePaneTabByTarget &&
       a.dataLoads.status === b.dataLoads.status &&
-      a.dataLoads.pullRequests === b.dataLoads.pullRequests &&
       a.operations.branchAction === b.operations.branchAction &&
       a.remote.lifecycle === b.remote.lifecycle &&
       a.remote.hasRemotes === b.remote.hasRemotes &&
@@ -128,7 +127,6 @@ export function RepoWorkspace({
             },
             dataLoads: {
               status: repo.dataLoads.status,
-              pullRequests: repo.dataLoads.pullRequests,
             },
             operations: {
               branchAction: repo.operations.branchAction,

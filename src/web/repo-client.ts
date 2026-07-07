@@ -2,7 +2,6 @@ import { openExternalUrl } from '#/web/app-shell-client.ts'
 import { SERVER_REQUEST_TIMEOUT_ERROR, postServerJson } from '#/web/lib/server-fetch.ts'
 import type {
   CloneRepoResult,
-  PullRequestEntry,
   RepoOperationsSnapshot,
   RepoRuntimeProjection,
   RepoRuntimeInstancesSnapshot,
@@ -76,15 +75,6 @@ export async function getRepoLog(
 
 export async function getRepoRemoteBranches(cwd: string, signal?: AbortSignal): Promise<string[]> {
   return await postServerJson('/api/repo/remote-branches', { cwd }, { signal })
-}
-
-export async function getRepoPullRequests(
-  cwd: string,
-  branches?: string[],
-  options?: { mode?: PullRequestFetchMode },
-  signal?: AbortSignal,
-): Promise<PullRequestEntry[] | null> {
-  return await postServerJson('/api/repo/pull-requests', { cwd, branches, mode: options?.mode }, { signal })
 }
 
 export async function getRepoProjection(
@@ -210,20 +200,16 @@ export async function getRepoPatch(cwd: string, worktreePath: string, signal?: A
 interface RepoBulkReadResult {
   snapshot: RepoSnapshot | null
   status: WorktreeStatus[]
-  pullRequests: PullRequestEntry[] | null
 }
 
 /**
- * Fetch several repo read results in one round trip. The client's
- * refresh flow collapses the three calls (snapshot + status + PRs)
- * into a single network request.
+ * Fetch core repo read results in one round trip. Pull request data
+ * is intentionally exposed through the runtime projection instead.
  */
 export async function readRepoBulk(
   cwd: string,
   options: {
-    include?: ReadonlyArray<'snapshot' | 'status' | 'pullRequests'>
-    branches?: string[]
-    mode?: PullRequestFetchMode
+    include?: ReadonlyArray<'snapshot' | 'status'>
     signal?: AbortSignal
     /** Per-section timeout in ms forwarded to the server. `0` disables. */
     timeoutMs?: number
@@ -234,8 +220,6 @@ export async function readRepoBulk(
     {
       cwd,
       include: options.include ? [...options.include] : undefined,
-      branches: options.branches,
-      mode: options.mode,
       timeoutMs: options.timeoutMs,
     },
     { signal: options.signal },

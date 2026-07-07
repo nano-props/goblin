@@ -151,11 +151,6 @@ export const REPO_PROCEDURE_SCHEMAS = {
     cwd: v.string(),
     worktreePath: v.string(),
   }),
-  pullRequests: v.object({
-    cwd: v.string(),
-    branches: v.optional(StringArray),
-    mode: v.optional(v.picklist(['summary', 'full'])),
-  }),
   projection: v.object({
     cwd: v.string(),
     branch: v.optional(v.string()),
@@ -165,15 +160,13 @@ export const REPO_PROCEDURE_SCHEMAS = {
     cwd: v.optional(v.string()),
     includeSettled: v.optional(v.boolean()),
   }),
-  // Composite read — picks which sub-reads to fold into one round trip.
-  // Body shape: `{ cwd, include?, branches?, mode?, timeoutMs? }`. `include`
-  // and `branches` travel as JSON arrays; `timeoutMs` is a real number
-  // (no string coercion — query-string parsing is gone).
+  // Composite read — folds snapshot/status into one round trip. Pull
+  // request reads are exposed through the server runtime projection only.
+  // Body shape: `{ cwd, include?, timeoutMs? }`; `timeoutMs` is a real
+  // number (no string coercion — query-string parsing is gone).
   composite: v.object({
     cwd: v.string(),
-    include: v.optional(v.array(v.picklist(['snapshot', 'status', 'pullRequests']))),
-    branches: v.optional(StringArray),
-    mode: v.optional(v.picklist(['summary', 'full'])),
+    include: v.optional(v.array(v.picklist(['snapshot', 'status']))),
     // Per-section timeout in ms. The perimeter rejects non-numbers,
     // non-integers, negative values, and values above 600000; accepted
     // values are already safe for server-side timeout handling.

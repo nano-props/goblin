@@ -83,17 +83,13 @@ describe('runRemoteRepoConnection', () => {
           fetch: { phase: 'idle', loadedAt: null, stale: false, error: null },
           snapshot: { phase: 'idle', loadedAt: null, stale: false, error: null },
           status: { phase: 'idle', loadedAt: null, stale: false, error: null },
-          pullRequests: { phase: 'idle', loadedAt: null, stale: false, error: null, mode: null },
-          pullRequestsByBranch: {},
         },
         operations: {
           fetch: idle(),
           manualRefresh: idle(),
           snapshot: idle(),
           status: idle(),
-          pullRequests: idle(),
           branchAction: idle(),
-          pullRequestsByBranch: {},
         },
         ui: {
           branchViewMode: 'all',
@@ -433,8 +429,6 @@ function emptyDataLoads() {
     fetch: idleDataLoad(),
     snapshot: idleDataLoad(),
     status: idleDataLoad(),
-    pullRequests: { ...idleDataLoad(), mode: null },
-    pullRequestsByBranch: {},
   }
 }
 
@@ -444,8 +438,6 @@ function emptyOperations() {
     manualRefresh: idle(),
     snapshot: idle(),
     status: idle(),
-    pullRequests: idle(),
     branchAction: idle(),
-    pullRequestsByBranch: {},
   }
 }

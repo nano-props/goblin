@@ -1,7 +1,6 @@
 // Data-load state tracks UI-facing load phases (idle/loading/refreshing).
 // Executability decisions use the operations system (operations.ts) instead;
 // keeping the two separate eliminates the risk of drift.
-import type { PullRequestFetchMode } from '#/web/types.ts'
 type RepoDataLoadPhase = 'idle' | 'loading' | 'refreshing'
 
 export interface RepoDataLoadState {
@@ -11,16 +10,10 @@ export interface RepoDataLoadState {
   stale: boolean
 }
 
-export interface RepoPullRequestDataLoadState extends RepoDataLoadState {
-  mode: PullRequestFetchMode | null
-}
-
 export interface RepoDataLoadBundle {
   snapshot: RepoDataLoadState
   status: RepoDataLoadState
   fetch: RepoDataLoadState
-  pullRequests: RepoPullRequestDataLoadState
-  pullRequestsByBranch: Record<string, RepoPullRequestDataLoadState>
 }
 
 export function idleDataLoad(loadedAt: number | null = null): RepoDataLoadState {
@@ -32,23 +25,11 @@ export function idleDataLoad(loadedAt: number | null = null): RepoDataLoadState 
   }
 }
 
-export function idlePullRequestDataLoad(
-  loadedAt: number | null = null,
-  mode: PullRequestFetchMode | null = null,
-): RepoPullRequestDataLoadState {
-  return {
-    ...idleDataLoad(loadedAt),
-    mode,
-  }
-}
-
 export function emptyRepoDataLoadBundle(): RepoDataLoadBundle {
   return {
     snapshot: idleDataLoad(),
     status: idleDataLoad(),
     fetch: idleDataLoad(),
-    pullRequests: idlePullRequestDataLoad(),
-    pullRequestsByBranch: {},
   }
 }
 
@@ -79,44 +60,6 @@ export function finishDataLoadError(dataLoad: RepoDataLoadState, error: string):
   dataLoad.stale = stale
 }
 
-function finishDataLoadUnavailable(dataLoad: RepoDataLoadState): void {
-  const stale = dataLoad.loadedAt !== null || dataLoad.phase === 'refreshing'
-  dataLoad.phase = 'idle'
-  dataLoad.error = null
-  dataLoad.stale = stale
-}
-
 export function cancelDataLoad(dataLoad: RepoDataLoadState): void {
   dataLoad.phase = 'idle'
-}
-
-export function startPullRequestDataLoad(
-  dataLoad: RepoPullRequestDataLoadState,
-  mode: PullRequestFetchMode,
-  options?: { hasData?: boolean },
-): void {
-  startDataLoad(dataLoad, options)
-  dataLoad.mode = mode
-}
-
-export function finishPullRequestDataLoadSuccess(
-  dataLoad: RepoPullRequestDataLoadState,
-  mode: PullRequestFetchMode,
-  loadedAt: number = Date.now(),
-): void {
-  finishDataLoadSuccess(dataLoad, loadedAt)
-  dataLoad.mode = mode
-}
-
-export function finishPullRequestDataLoadUnavailable(
-  dataLoad: RepoPullRequestDataLoadState,
-  mode: PullRequestFetchMode,
-): void {
-  finishDataLoadUnavailable(dataLoad)
-  dataLoad.mode = mode
-}
-
-export function finishPullRequestDataLoadError(dataLoad: RepoPullRequestDataLoadState, error: string): void {
-  finishDataLoadError(dataLoad, error)
-  dataLoad.mode = null
 }

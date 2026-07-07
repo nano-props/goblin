@@ -27,7 +27,6 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
       calls.snapshot.push(cwd)
       return { branches: [], current: '' }
     },
-    'repo.pullRequests': async () => [],
     'repo.status': ({ cwd }: { cwd: string }) => {
       calls.status.push(cwd)
       return []

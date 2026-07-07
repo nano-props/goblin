@@ -102,7 +102,6 @@ function installSuccessfulCreateWorktreeBridge(options?: { onSnapshot?: () => vo
       return snapshot
     },
     'repo.status': async () => [],
-    'repo.pullRequests': async () => [],
     'repo.composite': async () => {
       options?.onSnapshot?.()
       return { snapshot, status: [], pullRequests: null }
@@ -126,7 +125,6 @@ function installSuccessfulCreateWorktreeBridgeWithExistingWorktree(options?: { o
       return snapshot
     },
     'repo.status': async () => [],
-    'repo.pullRequests': async () => [],
     'repo.composite': async () => {
       options?.onSnapshot?.()
       return { snapshot, status: [], pullRequests: null }
@@ -329,7 +327,6 @@ describe('runBranchAction', () => {
       },
       'repo.snapshot': async () => ({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
       'repo.status': async () => [],
-      'repo.pullRequests': async () => [],
     })
 
     const syncWork = useReposStore.getState().syncAndRefresh(REPO_ID)
@@ -388,7 +385,6 @@ describe('runBranchAction', () => {
         return { ok: true, message: 'ok' }
       },
       'repo.snapshot': async () => ({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
-      'repo.pullRequests': async () => [],
     })
 
     const statusWork = useReposStore.getState().refreshStatus(REPO_ID)
@@ -434,7 +430,6 @@ describe('runBranchAction', () => {
         return { ok: true, message: 'ok' }
       },
       'repo.snapshot': async () => ({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
-      'repo.pullRequests': async () => [],
     })
 
     void useReposStore.getState().refreshStatus(REPO_ID)
@@ -477,7 +472,6 @@ describe('runBranchAction', () => {
         statusCalls += 1
         return []
       },
-      'repo.pullRequests': async () => [],
     })
 
     const result = await useReposStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
@@ -500,7 +494,6 @@ describe('runBranchAction', () => {
       'repo.pull': async () => ({ ok: false, message: 'boom' }),
       'repo.snapshot': async () => ({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
       'repo.status': async () => [],
-      'repo.pullRequests': async () => [],
     })
 
     const result = await useReposStore
@@ -534,7 +527,6 @@ describe('runBranchAction', () => {
         })
       },
       'repo.snapshot': async () => ({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
-      'repo.pullRequests': async () => [],
     })
 
     const statusWork = useReposStore.getState().refreshStatus(REPO_ID)
@@ -590,7 +582,6 @@ describe('runBranchAction', () => {
           })
         },
         'repo.snapshot': async () => ({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
-        'repo.pullRequests': async () => [],
       })
 
       const statusWork = useReposStore.getState().refreshStatus(REPO_ID)
@@ -652,7 +643,6 @@ describe('runBranchAction', () => {
         }),
       'repo.snapshot': async () => ({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
       'repo.status': async () => [],
-      'repo.pullRequests': async () => [],
     })
 
     useReposStore.getState().submitBranchAction(REPO_ID, createWorktreeAction())
@@ -761,7 +751,6 @@ describe('runBranchAction', () => {
             resolve({ branches: [createBranchSnapshot('feature/stale')], current: 'feature/stale' })
         }),
       'repo.status': async () => [],
-      'repo.pullRequests': async () => [],
       // Post-write refresh now goes through the composite endpoint, so
       // its handler must mirror the snapshot contract for this test.
       'repo.composite': () =>
@@ -805,7 +794,6 @@ describe('runBranchAction', () => {
         current: 'feature/a',
       }),
       'repo.status': async () => [],
-      'repo.pullRequests': async () => [],
     })
 
     await useReposStore
