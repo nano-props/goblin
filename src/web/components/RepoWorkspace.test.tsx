@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoWorkspace } from '#/web/components/RepoWorkspace.tsx'
@@ -13,11 +13,15 @@ import type {
   TerminalSessionReadContextValue,
   TerminalWorktreeSnapshot,
 } from '#/web/components/terminal/types.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import {
   PrimaryWindowNavigationProvider,
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
+import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
+import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
   createPullRequest,
   createRepoBranch,
@@ -30,7 +34,9 @@ import {
   setRepoSnapshotQueryData,
   setRepoStatusQueryData,
 } from '#/web/repo-data-query.ts'
-import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 const REPO_ID = '/tmp/repo-workspace-container-repo'
 
@@ -80,6 +86,7 @@ const navigation: PrimaryWindowNavigationActions = {
   cycleRepo: vi.fn(),
   selectRepoBranch: vi.fn(),
   showRepoBranchWorkspacePaneTab: vi.fn(),
+  showRepoBranchTerminalSession: vi.fn(),
   goBack: vi.fn(),
   goForward: vi.fn(),
   openSettings: vi.fn(),
@@ -219,6 +226,209 @@ describe('RepoWorkspace', () => {
     expect(container.querySelector('button[aria-label="status.copy-patch-title"]')).not.toBeNull()
   })
 
+  test('records workspace history when creating a terminal from the status tab', async () => {
+    const worktreePath = '/tmp/repo-workspace-container-repo-a'
+    const branch = createRepoBranch('feature/a', { worktree: { path: worktreePath } })
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [branch],
+      currentBranchName: 'feature/a',
+      preferredWorkspacePaneTab: 'status',
+      workspacePaneTabsByBranch: {
+        'feature/a': [workspacePaneStaticTabEntry('status')],
+      },
+    })
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
+    const statusEntry = {
+      repoId: REPO_ID,
+      route: {
+        kind: 'branch' as const,
+        branchName: 'feature/a',
+        workspacePaneTab: 'status' as const,
+        terminalWorktreeKey,
+        terminalSessionId: null,
+      },
+    }
+    const terminalEntry = {
+      repoId: REPO_ID,
+      route: {
+        kind: 'branch' as const,
+        branchName: 'feature/a',
+        workspacePaneTab: 'terminal' as const,
+        terminalWorktreeKey,
+        terminalSessionId: 'session-1',
+      },
+    }
+    const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
+      const terminalSessionId = 'session-1'
+      setWorkspacePaneTabsForTargetQueryData({
+        repoRoot: base.repoRoot,
+        repoInstanceId: base.repoInstanceId!,
+        branchName: base.branch,
+        worktreePath: base.worktreePath,
+        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
+      })
+      useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, terminalSessionId)
+      return terminalSessionId
+    })
+    const route = routeNavigation()
+    const testNavigation = navigationWithStore(route)
+
+    const workspace = (workspacePaneRoute: Parameters<typeof RepoWorkspace>[0]['workspacePaneRoute']) => (
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={testNavigation}>
+          <TerminalSessionContext value={{ ...terminalCommandContext, createTerminal }}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName="feature/a"
+                workspacePaneRoute={workspacePaneRoute}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>
+    )
+    const { rerender } = render(workspace({ kind: 'static', tab: 'status' }))
+
+    await waitFor(() => {
+      expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]?.current).toEqual(statusEntry)
+    })
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'terminal.new' }).click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(route.openRepoBranchTerminal).toHaveBeenCalledWith(REPO_ID, 'feature/a', 'session-1')
+
+    rerender(workspace({ kind: 'terminal', terminalSessionId: 'session-1' }))
+
+    await waitFor(() => {
+      expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]?.backStack).toEqual([statusEntry])
+      expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]?.current).toEqual(terminalEntry)
+    })
+
+    act(() => {
+      testNavigation.goBack(REPO_ID)
+    })
+
+    expect(route.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, 'feature/a', 'status')
+  })
+
+  test('replaces a stale terminal route with the resolved live terminal route', async () => {
+    const worktreePath = '/tmp/repo-workspace-container-repo-a'
+    const branchName = 'feature/a'
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
+      currentBranchName: branchName,
+      preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-1')],
+      },
+    })
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
+    const readContext = terminalReadContextWithSession(terminalWorktreeKey, 'session-1')
+    const route = routeNavigation()
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={readContext}>
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName={branchName}
+                workspacePaneRoute={{ kind: 'terminal', terminalSessionId: 'missing-session' }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(route.openRepoBranchTerminal).toHaveBeenCalledWith(REPO_ID, branchName, 'session-1', {
+        replace: true,
+      })
+    })
+  })
+
+  test('does not replace a missing terminal route while terminal projection is pending', async () => {
+    const worktreePath = '/tmp/repo-workspace-container-repo-a'
+    const branchName = 'feature/a'
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
+      currentBranchName: branchName,
+      preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-1')],
+      },
+    })
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
+    const readContext = terminalReadContextWithSession(terminalWorktreeKey, 'session-1')
+    const route = routeNavigation()
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={readContext}>
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName={branchName}
+                workspacePaneRoute={{ kind: 'terminal', terminalSessionId: 'missing-session' }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
+  })
+
+  test('replaces an unrenderable static route with the resolved static route', async () => {
+    const branchName = 'feature/no-worktree'
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(branchName)],
+      currentBranchName: branchName,
+      preferredWorkspacePaneTab: 'changes',
+      workspacePaneTabsByBranch: {
+        [branchName]: [workspacePaneStaticTabEntry('status')],
+      },
+    })
+    const route = routeNavigation()
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName={branchName}
+                workspacePaneRoute={{ kind: 'static', tab: 'changes' }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(route.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, branchName, 'status', { replace: true })
+    })
+  })
+
   test('uses the React Query snapshot read model for workspace branch presentation when available', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -286,4 +496,63 @@ function scrollViewport(container: HTMLElement): HTMLDivElement {
   const viewport = container.querySelector<HTMLDivElement>('[data-radix-scroll-area-viewport]')
   if (!viewport) throw new Error('missing workspace tab strip scroll viewport')
   return viewport
+}
+
+function terminalReadContextWithSession(
+  terminalWorktreeKey: string,
+  terminalSessionId: string,
+): TerminalSessionReadContextValue {
+  const snapshot: TerminalWorktreeSnapshot = {
+    terminalWorktreeKey,
+    selectedDescriptor: null,
+    sessions: [
+      {
+        type: 'terminal',
+        terminalSessionId,
+        terminalWorktreeKey,
+        index: 1,
+        title: terminalSessionId,
+        phase: 'open',
+        selected: true,
+        hasBell: false,
+        hasRecentOutput: false,
+      },
+    ],
+    count: 1,
+    bellCount: 0,
+    outputActiveCount: 0,
+    createPending: false,
+  }
+  return {
+    ...terminalReadContext,
+    terminalWorktreeSnapshot: (key) => (key === terminalWorktreeKey ? snapshot : emptyWorktreeSnapshot),
+  }
+}
+
+function navigationWithStore(routeNavigationOverrides: PrimaryWindowRouteNavigation = routeNavigation()): PrimaryWindowNavigationActions {
+  const store = useReposStore.getState()
+  return createPrimaryWindowNavigationActions({
+    currentRepoId: REPO_ID,
+    order: [REPO_ID],
+    closeRepo: store.closeRepo,
+    goBackInWorkspaceNavigation: store.goBackInWorkspaceNavigation,
+    goForwardInWorkspaceNavigation: store.goForwardInWorkspaceNavigation,
+    routeNavigation: routeNavigationOverrides,
+  })
+}
+
+function routeNavigation(): PrimaryWindowRouteNavigation {
+  return {
+    repoSlugForId: vi.fn(() => 'repo-workspace-container-repo'),
+    openHome: vi.fn(),
+    openSettings: vi.fn(),
+    closeSettings: vi.fn(),
+    openRepoRoot: vi.fn(),
+    openRepoDashboard: vi.fn(),
+    openRepoBranch: vi.fn(),
+    openRepoBranchTab: vi.fn(),
+    openRepoBranchTerminal: vi.fn(),
+    openRepoNewWorktree: vi.fn(),
+    cancelRepoNewWorktree: vi.fn(),
+  }
 }

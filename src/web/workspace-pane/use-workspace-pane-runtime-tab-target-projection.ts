@@ -15,6 +15,7 @@ export interface UseWorkspacePaneRuntimeTabTargetProjectionInput {
   repoRoot: string
   repoInstanceId: string
   worktreePath: string | null
+  selectedSessionIdByRuntimeType?: WorkspacePaneRuntimeTabTargetSelectionByType
 }
 
 export interface WorkspacePaneRuntimeTabTargetProjectionHookResult
@@ -28,13 +29,19 @@ export function useWorkspacePaneRuntimeTabTargetProjection({
   repoRoot,
   repoInstanceId,
   worktreePath,
+  selectedSessionIdByRuntimeType: selectedSessionIdOverrideByRuntimeType,
 }: UseWorkspacePaneRuntimeTabTargetProjectionInput): WorkspacePaneRuntimeTabTargetProjectionHookResult {
   const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey({ repoRoot, worktreePath })
   const runtimeTabTargetKeyByType = useMemo(
     () => workspacePaneRuntimeTabTargetKeyByType({ repoRoot, worktreePath }),
     [repoRoot, worktreePath],
   )
-  const providerProjections = useWorkspacePaneRuntimeTabProviderProjections({ repoRoot, repoInstanceId, worktreePath })
+  const providerProjections = useWorkspacePaneRuntimeTabProviderProjections({
+    repoRoot,
+    repoInstanceId,
+    worktreePath,
+    selectedSessionIdByRuntimeType: selectedSessionIdOverrideByRuntimeType,
+  })
 
   const selectedSessionIdByRuntimeType = useMemo<WorkspacePaneRuntimeTabTargetSelectionByType>(
     () =>

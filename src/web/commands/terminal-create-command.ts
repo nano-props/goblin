@@ -35,8 +35,10 @@ export async function runCreateTerminalTabCommand(input: {
    * finishes.
    */
   openerIdentity: string | null
-  /** Switches into the terminal view immediately before creating the terminal. */
-  enterTerminalTab: () => void | Promise<void>
+  /** Opens the concrete terminal route after the server has created a session. */
+  showCreatedTerminalTab?: (terminalSessionId: string) => void | Promise<void>
+  /** Prevents late terminal creation from stealing focus after the user navigates away. */
+  shouldShowCreatedTerminalTab?: () => boolean
   /**
    * Insertion anchor for the new terminal tab. Callers decide explicitly:
    * supply the captured opener's identity when the terminal is opened from
@@ -50,7 +52,6 @@ export async function runCreateTerminalTabCommand(input: {
   const repoInstance = repoInstanceHandle(useReposStore.getState().repos[input.base.repoRoot])
   const owner = createTerminalCreateOwner(repoInstance)
   const usesOwnedCreate = !!(owner && input.createOwnedTerminal)
-  await input.enterTerminalTab()
   if (!usesOwnedCreate && !hasFreshRepoInstance(useReposStore.getState(), repoInstance)) {
     return { ok: false, error: new Error('cancelled'), messageKey: 'error.terminal-create-failed' }
   }
@@ -58,6 +59,9 @@ export async function runCreateTerminalTabCommand(input: {
     const terminalSessionId = await createTerminalSession(input, owner)
     if (!usesOwnedCreate && !hasFreshRepoInstance(useReposStore.getState(), repoInstance)) {
       return { ok: false, error: new Error('cancelled'), messageKey: 'error.terminal-create-failed' }
+    }
+    if (input.showCreatedTerminalTab && (input.shouldShowCreatedTerminalTab?.() ?? true)) {
+      await input.showCreatedTerminalTab(terminalSessionId)
     }
     if (input.openerIdentity) {
       recordWorkspacePaneTabOpener(

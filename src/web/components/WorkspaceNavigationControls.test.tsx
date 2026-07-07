@@ -117,6 +117,7 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
     cycleRepo: () => {},
     selectRepoBranch: () => {},
     showRepoBranchWorkspacePaneTab: () => {},
+    showRepoBranchTerminalSession: () => {},
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},

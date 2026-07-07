@@ -75,6 +75,7 @@ describe('useKeyboard', () => {
     })
     const selectTerminal = vi.fn()
     const showRepoBranchWorkspacePaneTab = vi.fn()
+    const showRepoBranchTerminalSession = vi.fn()
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => terminalWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'session-1'),
@@ -83,7 +84,7 @@ describe('useKeyboard', () => {
     await renderHookHost({
       currentRepoId: REPO_ID,
       currentBranchName: 'feature/worktree',
-      navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
+      navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
     })
 
     await act(async () => {
@@ -91,8 +92,9 @@ describe('useKeyboard', () => {
       await Promise.resolve()
     })
 
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'terminal')
-    expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'session-1')
+    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'session-1')
+    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
+    expect(selectTerminal).not.toHaveBeenCalled()
   })
 
   test('workspace pane tab shortcuts move through branch tabs without a worktree', async () => {
@@ -183,6 +185,7 @@ describe('useKeyboard', () => {
     })
     const selectTerminal = vi.fn()
     const showRepoBranchWorkspacePaneTab = vi.fn()
+    const showRepoBranchTerminalSession = vi.fn()
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => terminalWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'session-1'),
@@ -191,7 +194,7 @@ describe('useKeyboard', () => {
     await renderHookHost({
       currentRepoId: REPO_ID,
       currentBranchName: 'feature/worktree',
-      navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
+      navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
     })
     const terminalHost = document.createElement('div')
     terminalHost.className = 'goblin-managed-terminal-host'
@@ -204,8 +207,9 @@ describe('useKeyboard', () => {
       await Promise.resolve()
     })
 
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'terminal')
-    expect(selectTerminal).toHaveBeenCalledWith(WORKTREE_KEY, 'session-1')
+    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'session-1')
+    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
+    expect(selectTerminal).not.toHaveBeenCalled()
     terminalHost.remove()
   })
 
@@ -421,6 +425,7 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
     cycleRepo: () => {},
     selectRepoBranch: () => {},
     showRepoBranchWorkspacePaneTab: () => {},
+    showRepoBranchTerminalSession: () => {},
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},

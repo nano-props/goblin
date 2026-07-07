@@ -244,6 +244,7 @@ export function RepoView({
             <RepoWorkspace
               repoId={repoId}
               currentBranchName={compact ? compactWorkspaceCurrentBranchName : currentBranchName}
+              workspacePaneRoute={routeView?.kind === 'branch' ? routeView.workspacePaneRoute : null}
               shortcutsEnabled={!compact || singlePane === 'workspace'}
               toolbarTrafficLightOffset={workspaceTrafficLightOffset}
               onBackToBranchNavigator={routeView ? () => onOpenRepoRoot?.(repo.id) : undefined}

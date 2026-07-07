@@ -45,7 +45,7 @@ export function useClientEffectIntentRouter({
   // This hook is the single client-side subscription point for native effect
   // intents. Routing stays centralized here; intent-specific behavior lives in
   // the handler/plan helpers so components do not subscribe independently.
-  const { ensureWorkspaceOpen, setSelectedTerminal, resetLayout, toggleZenMode } = useReposStore(
+  const { ensureWorkspaceOpen, resetLayout, toggleZenMode } = useReposStore(
     useShallow(clientEffectIntentStoreActionsFromStore),
   )
   const t = useT()
@@ -85,7 +85,6 @@ export function useClientEffectIntentRouter({
       isOverlayOpen: () => isOverlayOpenRef.current(),
       isWorkspaceShortcutSuppressed: () => isWorkspaceShortcutSuppressedRef.current(),
       ensureWorkspaceOpen: async (input: string | RepoSessionEntry) => await ensureWorkspaceOpenRef.current(input),
-      setSelectedTerminal,
       resetLayout,
       toggleZenMode,
       t: (key: string) => tRef.current(key),
@@ -144,7 +143,6 @@ export function useClientEffectIntentRouter({
     openCreateWorktree,
     openRepoPathDialog,
     resetLayout,
-    setSelectedTerminal,
     toggleZenMode,
     t,
   ])

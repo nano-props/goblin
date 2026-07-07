@@ -1,4 +1,4 @@
-import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/repos/types.ts'
@@ -9,7 +9,18 @@ export interface PrimaryWindowNavigationActions {
   closeRepo: (repoId: string) => void
   cycleRepo: (direction: 1 | -1) => void
   selectRepoBranch: (repoId: string, branch: string) => void
-  showRepoBranchWorkspacePaneTab: (repoId: string, branch: string, tab: WorkspacePaneTabType) => void
+  showRepoBranchWorkspacePaneTab: (
+    repoId: string,
+    branch: string,
+    tab: WorkspacePaneStaticTabType,
+    options?: { replace?: boolean },
+  ) => void
+  showRepoBranchTerminalSession: (
+    repoId: string,
+    branch: string,
+    terminalSessionId: string,
+    options?: { replace?: boolean },
+  ) => void
   goBack: (repoId: string) => void
   goForward: (repoId: string) => void
   openSettings: (page: SettingsPage) => void
@@ -20,7 +31,6 @@ interface CreatePrimaryWindowNavigationActionsOptions {
   currentRepoId: string | null
   order: string[]
   closeRepo: (repoId: string) => void
-  setWorkspacePaneTab: (repoId: string, branch: string, tab: WorkspacePaneTabType) => void
   goBackInWorkspaceNavigation?: (repoId: string) => WorkspaceNavigationHistoryEntry | null
   goForwardInWorkspaceNavigation?: (repoId: string) => WorkspaceNavigationHistoryEntry | null
   routeNavigation: PrimaryWindowRouteNavigation
@@ -30,7 +40,6 @@ export function createPrimaryWindowNavigationActions({
   currentRepoId,
   order,
   closeRepo,
-  setWorkspacePaneTab,
   goBackInWorkspaceNavigation,
   goForwardInWorkspaceNavigation,
   routeNavigation,
@@ -53,9 +62,13 @@ export function createPrimaryWindowNavigationActions({
     selectRepoBranch(repoId, branch) {
       routeNavigation.openRepoBranch(repoId, branch)
     },
-    showRepoBranchWorkspacePaneTab(repoId, branch, tab) {
-      routeNavigation.openRepoBranch(repoId, branch)
-      setWorkspacePaneTab(repoId, branch, tab)
+    showRepoBranchWorkspacePaneTab(repoId, branch, tab, options) {
+      if (options) routeNavigation.openRepoBranchTab(repoId, branch, tab, options)
+      else routeNavigation.openRepoBranchTab(repoId, branch, tab)
+    },
+    showRepoBranchTerminalSession(repoId, branch, terminalSessionId, options) {
+      if (options) routeNavigation.openRepoBranchTerminal(repoId, branch, terminalSessionId, options)
+      else routeNavigation.openRepoBranchTerminal(repoId, branch, terminalSessionId)
     },
     goBack(repoId) {
       const target = goBackInWorkspaceNavigation?.(repoId) ?? null

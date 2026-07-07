@@ -39,6 +39,7 @@ let navigation!: PrimaryWindowNavigationActions
 const activateRepoSpy = vi.fn()
 const closeRepoSpy = vi.fn()
 const showRepoBranchWorkspacePaneTabSpy = vi.fn()
+const showRepoBranchTerminalSessionSpy = vi.fn()
 const consumeExternalOpenPathsSpy = vi.fn<() => Promise<string[]>>(async () => [])
 
 beforeEach(() => {
@@ -48,6 +49,7 @@ beforeEach(() => {
   activateRepoSpy.mockClear()
   closeRepoSpy.mockClear()
   showRepoBranchWorkspacePaneTabSpy.mockClear()
+  showRepoBranchTerminalSessionSpy.mockClear()
   appDataClientMocks.clearRecentRepoHistory.mockClear()
   consumeExternalOpenPathsSpy.mockReset()
   consumeExternalOpenPathsSpy.mockResolvedValue([])
@@ -68,6 +70,9 @@ beforeEach(() => {
       showRepoBranchWorkspacePaneTabSpy(repoId, branch, tab)
       const state = useReposStore.getState()
       state.setWorkspacePaneTab(repoId, branch, tab)
+    },
+    showRepoBranchTerminalSession: (repoId, branch, terminalSessionId) => {
+      showRepoBranchTerminalSessionSpy(repoId, branch, terminalSessionId)
     },
     goBack: () => {},
     goForward: () => {},
@@ -168,11 +173,8 @@ describe('useClientEffectIntentRouter', () => {
       await Promise.resolve()
     })
 
-    const state = useReposStore.getState()
-    expect(showRepoBranchWorkspacePaneTabSpy).toHaveBeenCalledWith(repo.id, 'feature/test', 'terminal')
-    expect(state.selectedTerminalSessionIdByTerminalWorktree).toMatchObject({
-      [terminalWorktreeKey]: terminalSessionId,
-    })
+    expect(showRepoBranchTerminalSessionSpy).toHaveBeenCalledWith(repo.id, 'feature/test', terminalSessionId)
+    expect(showRepoBranchWorkspacePaneTabSpy).not.toHaveBeenCalled()
   })
 
   test('terminal bell clicks combine branch and terminal view navigation in a single route-driven action', async () => {
@@ -186,12 +188,12 @@ describe('useClientEffectIntentRouter', () => {
         createBranchSnapshot('feature/test', { worktree: { path: '/tmp/repo-feature' } }),
       ],
     })
-    const routeNavigationCalls: Array<{ repoId: string; branch: string; tab: string }> = []
+    const routeNavigationCalls: Array<{ repoId: string; branch: string; terminalSessionId: string }> = []
     navigation = {
       ...navigation,
       selectRepoBranch: vi.fn(),
-      showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {
-        routeNavigationCalls.push({ repoId, branch, tab })
+      showRepoBranchTerminalSession: (repoId, branch, terminalSessionId) => {
+        routeNavigationCalls.push({ repoId, branch, terminalSessionId })
       },
     }
     currentRepoId = repo.id
@@ -206,7 +208,7 @@ describe('useClientEffectIntentRouter', () => {
       await Promise.resolve()
     })
 
-    expect(routeNavigationCalls).toEqual([{ repoId: repo.id, branch: 'feature/test', tab: 'terminal' }])
+    expect(routeNavigationCalls).toEqual([{ repoId: repo.id, branch: 'feature/test', terminalSessionId }])
   })
 
   test('close-repo menu action delegates to navigation close', async () => {

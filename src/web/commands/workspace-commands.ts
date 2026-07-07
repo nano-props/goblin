@@ -18,8 +18,6 @@ import {
   isWorkspacePaneStaticTabProvider,
   workspacePaneTabProvider,
 } from '#/web/components/workspace-pane/tab-providers.ts'
-import { selectWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-actions.ts'
-import { readWorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-action-context.ts'
 import {
   confirmWorkspacePaneRuntimeTabClose,
   workspacePaneRuntimeTabCloseConfirmRequest,
@@ -143,9 +141,11 @@ async function showWorkspacePaneTabCommand({
         navigation,
       })
     }
+    navigation.showRepoBranchWorkspacePaneTab(repoId, branchName, provider.type)
+    return true
   }
-  navigation.showRepoBranchWorkspacePaneTab(repoId, branchName, tab)
-  return true
+  if (tab === 'terminal') return await runTerminalPrimaryActionCommand({ repoId, branchName, navigation })
+  return false
 }
 
 export async function runTerminalPrimaryActionCommand({
@@ -160,8 +160,8 @@ export async function runTerminalPrimaryActionCommand({
     workspacePaneRuntimeTabCommandContext({
       repoId,
       branchName,
-      enterRuntimeTab: async (type) => {
-        await runShowWorkspacePaneTabCommand({ repoId, branchName, tab: type, navigation })
+      showRuntimeTab: (type, sessionId) => {
+        if (type === 'terminal') navigation.showRepoBranchTerminalSession(repoId, branchName, sessionId)
       },
       terminalCreateTranslator: t,
     }),
@@ -180,8 +180,8 @@ export async function runNewTerminalTabCommand({
     workspacePaneRuntimeTabCommandContext({
       repoId,
       branchName,
-      enterRuntimeTab: async (type) => {
-        await runShowWorkspacePaneTabCommand({ repoId, branchName, tab: type, navigation })
+      showRuntimeTab: (type, sessionId) => {
+        if (type === 'terminal') navigation.showRepoBranchTerminalSession(repoId, branchName, sessionId)
       },
       terminalCreateTranslator: t,
     }),
@@ -374,15 +374,12 @@ function showWorkspacePaneCommandTab(
   const branchName = target.branchName
   if (!branchName) return
   if (isRepoWorkspaceRuntimeTab(tab)) {
-    selectWorkspacePaneRuntimeTab(
-      tab.view,
-      readWorkspacePaneRuntimeTabActionContext({
-        enterRuntimeTab: (type) => navigation.showRepoBranchWorkspacePaneTab(target.repoId, branchName, type),
-      }),
-    )
+    if (tab.runtimeType === 'terminal') {
+      navigation.showRepoBranchTerminalSession(target.repoId, branchName, tab.sessionId)
+    }
     return
   }
-  navigation.showRepoBranchWorkspacePaneTab(target.repoId, branchName, tab.type)
+  if (tab.kind === 'static') navigation.showRepoBranchWorkspacePaneTab(target.repoId, branchName, tab.type)
 }
 
 function observeWorkspacePaneTabClose(

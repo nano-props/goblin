@@ -88,6 +88,36 @@ describe('repo route view derivation', () => {
       kind: 'branch',
       repoId: '/repo',
       branchName: 'feature/a',
+      workspacePaneRoute: { kind: 'static', tab: 'status' },
+    })
+  })
+
+  test('maps branch workspace pane child routes to stable route views', () => {
+    expect(
+      repoRouteViewFromChildRoute('/repo', {
+        dashboard: false,
+        branchSlug: 'ZmVhdHVyZS9h',
+        tabKey: 'history',
+        newWorktree: false,
+      }),
+    ).toEqual({
+      kind: 'branch',
+      repoId: '/repo',
+      branchName: 'feature/a',
+      workspacePaneRoute: { kind: 'static', tab: 'history' },
+    })
+    expect(
+      repoRouteViewFromChildRoute('/repo', {
+        dashboard: false,
+        branchSlug: 'ZmVhdHVyZS9h',
+        terminalSessionId: 'session-1',
+        newWorktree: false,
+      }),
+    ).toEqual({
+      kind: 'branch',
+      repoId: '/repo',
+      branchName: 'feature/a',
+      workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'session-1' },
     })
   })
 })

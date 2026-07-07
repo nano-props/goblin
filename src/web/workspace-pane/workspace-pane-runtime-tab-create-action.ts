@@ -3,7 +3,10 @@ import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import type { TerminalCreateOptions, TerminalCreateOwner } from '#/web/components/terminal/types.ts'
-import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import {
+  captureWorkspacePaneActiveTabIdentity,
+  captureWorkspacePaneTabFocusGuard,
+} from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 
 export interface WorkspacePaneRuntimeTabCreateAction {
   label: string
@@ -15,7 +18,7 @@ export interface WorkspacePaneRuntimeTabCreateActionContext {
   repoRoot: string
   runtimeTabStateByType: WorkspacePaneRuntimeTabCreateStateByType
   initialRuntimeProjectionHydrating: boolean
-  enterRuntimeTab: (type: WorkspacePaneRuntimeTabType) => void | Promise<void>
+  showCreatedRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => void | Promise<void>
   t: TerminalCreateTranslator
   terminal?: WorkspacePaneTerminalCreateActionContext
 }
@@ -67,12 +70,14 @@ function terminalRuntimeTabCreateAction(
     onCreate: () => {
       // "+" is a generic entry; opener only drives close-back focus, not insertion.
       const openerIdentity = captureWorkspacePaneActiveTabIdentity(context.repoRoot, base.branch)
+      const shouldShowCreatedTerminalTab = captureWorkspacePaneTabFocusGuard(context.repoRoot, base.branch)
       void runCreateTerminalTabCommand({
         base,
         createTerminal: terminal.createTerminal,
         createOwnedTerminal: terminal.createOwnedTerminal,
         openerIdentity,
-        enterTerminalTab: () => context.enterRuntimeTab('terminal'),
+        showCreatedTerminalTab: (terminalSessionId) => context.showCreatedRuntimeTab('terminal', terminalSessionId),
+        shouldShowCreatedTerminalTab,
         t: context.t,
       })
     },

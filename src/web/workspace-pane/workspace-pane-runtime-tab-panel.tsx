@@ -4,10 +4,12 @@ import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import { TerminalSessionView } from '#/web/components/terminal/TerminalSessionView.tsx'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
+import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePanePanelLabel } from '#/web/components/workspace-pane/tab-providers.ts'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
+import { captureWorkspacePaneTabFocusGuard } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 
 export interface WorkspacePaneRuntimeTabPanelState {
   projectionPhase: WorkspacePaneRuntimeProjectionPhase
@@ -63,20 +65,23 @@ function TerminalWorkspacePaneRuntimeTabPanel({
 }: WorkspacePaneRuntimeTabPanelProps) {
   const t = useT()
   const { createTerminal, createOwnedTerminal } = useTerminalSessionContext()
+  const navigation = usePrimaryWindowNavigation()
   const createTerminalForSlot = useCallback(
     async (base: TerminalSessionBase) => {
+      const shouldShowCreatedTerminalTab = captureWorkspacePaneTabFocusGuard(base.repoRoot, base.branch)
       await runCreateTerminalTabCommand({
         base,
         createTerminal,
         createOwnedTerminal,
         openerIdentity: null,
-        // No switch needed: this CTA is rendered inside the runtime tab body.
-        enterTerminalTab: () => {},
+        showCreatedTerminalTab: (terminalSessionId) =>
+          navigation.showRepoBranchTerminalSession(base.repoRoot, base.branch, terminalSessionId),
+        shouldShowCreatedTerminalTab,
         t,
         logMessage: 'workspace pane terminal create failed',
       })
     },
-    [createOwnedTerminal, createTerminal, t],
+    [createOwnedTerminal, createTerminal, navigation, t],
   )
 
   if (!target.branchName || !target.worktreePath) return null

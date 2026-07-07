@@ -117,7 +117,7 @@ function AuthenticatedWorkspaceShell() {
   })
   const currentBranchName = routeContext?.kind === 'branch' ? (routeContext.branchName ?? null) : null
   const order = useReposStore((s) => s.order)
-  const { closeRepo, setWorkspacePaneTab, goBackInWorkspaceNavigation, goForwardInWorkspaceNavigation } = useReposStore(
+  const { closeRepo, goBackInWorkspaceNavigation, goForwardInWorkspaceNavigation } = useReposStore(
     useShallow(primaryWindowNavigationStoreActionsFromStore),
   )
   const routeNavigation = usePrimaryWindowRouteNavigation()
@@ -127,7 +127,6 @@ function AuthenticatedWorkspaceShell() {
         currentRepoId: hydratedRouteRepoId,
         order,
         closeRepo,
-        setWorkspacePaneTab,
         goBackInWorkspaceNavigation,
         goForwardInWorkspaceNavigation,
         routeNavigation,
@@ -138,7 +137,6 @@ function AuthenticatedWorkspaceShell() {
       goForwardInWorkspaceNavigation,
       order,
       routeNavigation,
-      setWorkspacePaneTab,
       hydratedRouteRepoId,
     ],
   )

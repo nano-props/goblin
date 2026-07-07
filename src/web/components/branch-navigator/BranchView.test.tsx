@@ -29,6 +29,7 @@ const navigation: PrimaryWindowNavigationActions = {
   cycleRepo: vi.fn(),
   selectRepoBranch: vi.fn(),
   showRepoBranchWorkspacePaneTab: vi.fn(),
+  showRepoBranchTerminalSession: vi.fn(),
   goBack: vi.fn(),
   goForward: vi.fn(),
   openSettings: vi.fn(),

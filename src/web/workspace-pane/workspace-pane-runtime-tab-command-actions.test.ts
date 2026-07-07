@@ -14,9 +14,9 @@ const terminalBase: TerminalSessionBase = {
 
 describe('workspace pane runtime tab command actions', () => {
   test('primary terminal action focuses the first existing runtime session', async () => {
-    const enterRuntimeTab = vi.fn()
     const createTerminal = vi.fn(async () => 'created-session')
     const selectTerminal = vi.fn()
+    const showTerminalSession = vi.fn()
     const bridge: TerminalSessionCommandBridge = {
       terminalWorktreeSnapshot: () => ({
         terminalWorktreeKey: '/repo\0/repo-worktree',
@@ -36,45 +36,45 @@ describe('workspace pane runtime tab command actions', () => {
 
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
-        enterRuntimeTab,
         terminal: {
           base: terminalBase,
           bridge,
           openerIdentity: null,
+          showTerminalSession,
         },
       }),
     ).resolves.toBe(true)
 
-    expect(enterRuntimeTab).toHaveBeenCalledWith('terminal')
-    expect(selectTerminal).toHaveBeenCalledWith('/repo\0/repo-worktree', 'session-1')
+    expect(showTerminalSession).toHaveBeenCalledWith('session-1')
+    expect(selectTerminal).not.toHaveBeenCalled()
     expect(createTerminal).not.toHaveBeenCalled()
   })
 
-  test('primary terminal action enters the runtime tab when no bridge is available', async () => {
-    const enterRuntimeTab = vi.fn()
+  test('primary terminal action rejects when no bridge is available', async () => {
+    const showTerminalSession = vi.fn()
 
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
-        enterRuntimeTab,
         terminal: {
           base: terminalBase,
           bridge: null,
           openerIdentity: null,
+          showTerminalSession,
         },
       }),
-    ).resolves.toBe(true)
+    ).resolves.toBe(false)
 
-    expect(enterRuntimeTab).toHaveBeenCalledWith('terminal')
+    expect(showTerminalSession).not.toHaveBeenCalled()
   })
 
   test('new terminal action rejects when no runtime base is available', async () => {
     await expect(
       runWorkspacePaneRuntimeNewAction('terminal', {
-        enterRuntimeTab: vi.fn(),
         terminal: {
           base: null,
           bridge: null,
           openerIdentity: null,
+          showTerminalSession: vi.fn(),
         },
       }),
     ).resolves.toBe(false)

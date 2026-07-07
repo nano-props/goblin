@@ -20,6 +20,7 @@ export interface WorkspacePaneRuntimeTabTargetInput {
   repoRoot: string
   repoInstanceId: string
   worktreePath: string | null
+  selectedSessionIdByRuntimeType?: WorkspacePaneRuntimeTabTargetSelectionByType
 }
 
 export interface WorkspacePaneRuntimeTabProviderProjection {
@@ -162,6 +163,7 @@ function useTerminalRuntimeTabProviderProjection({
   repoRoot,
   repoInstanceId,
   worktreePath,
+  selectedSessionIdByRuntimeType,
 }: WorkspacePaneRuntimeTabTargetInput): WorkspacePaneRuntimeTabProviderProjection {
   const targetKey = terminalRuntimeTabTargetKey({ repoRoot, worktreePath })
   const terminalSessionSummaries = useTerminalSessionSummaries(targetKey)
@@ -172,7 +174,7 @@ function useTerminalRuntimeTabProviderProjection({
   )
 
   return useMemo(() => {
-    const selectedSessionId = targetKey ? (selectedTerminalSessionId ?? null) : null
+    const selectedSessionId = targetKey ? (selectedSessionIdByRuntimeType?.terminal ?? selectedTerminalSessionId ?? null) : null
     const currentHydration =
       terminalProjectionHydration.instanceId === repoInstanceId ? terminalProjectionHydration : null
     return {
@@ -190,6 +192,7 @@ function useTerminalRuntimeTabProviderProjection({
   }, [
     repoInstanceId,
     selectedTerminalSessionId,
+    selectedSessionIdByRuntimeType,
     targetKey,
     terminalCreatePending,
     terminalProjectionHydration,

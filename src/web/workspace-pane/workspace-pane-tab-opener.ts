@@ -19,6 +19,18 @@ export function captureWorkspacePaneActiveTabIdentity(repoId: string, branchName
   return workspacePaneTabTargetForBranch(repoId, branchName)?.activeTab?.identity ?? null
 }
 
+export function captureWorkspacePaneTabFocusGuard(repoId: string, branchName: string): () => boolean {
+  const token = workspacePaneTabFocusToken(repoId, branchName)
+  return () => token !== null && workspacePaneTabFocusToken(repoId, branchName) === token
+}
+
+function workspacePaneTabFocusToken(repoId: string, branchName: string): string | null {
+  const target = workspacePaneTabTargetForBranch(repoId, branchName)
+  if (target?.activeTab) return `tab:${target.activeTab.identity}`
+  if (target?.selection?.kind === 'runtime-host') return `runtime-host:${target.selection.runtimeType}`
+  return null
+}
+
 /** Records that `childIdentity` (any static or runtime tab identity) was
  *  opened from `openerIdentity` on `repoId`/`branchName`'s tab strip.
  *  Closing the tab prefers reactivating that opener (see

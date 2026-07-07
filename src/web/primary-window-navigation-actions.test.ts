@@ -3,19 +3,32 @@ import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navig
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 
 describe('createPrimaryWindowNavigationActions', () => {
-  test('updates branch workspace tab preference explicitly', () => {
-    const setWorkspacePaneTab = vi.fn()
+  test('opens branch workspace static tabs through route navigation', () => {
+    const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
       currentRepoId: '/tmp/repo-a',
       order: ['/tmp/repo-a', '/tmp/repo-b'],
       closeRepo: vi.fn(),
-      setWorkspacePaneTab,
-      routeNavigation: routeNavigation(),
+      routeNavigation: navigation,
     })
 
-    actions.showRepoBranchWorkspacePaneTab('/tmp/repo-b', 'feature/test', 'terminal')
+    actions.showRepoBranchWorkspacePaneTab('/tmp/repo-b', 'feature/test', 'history')
 
-    expect(setWorkspacePaneTab).toHaveBeenCalledWith('/tmp/repo-b', 'feature/test', 'terminal')
+    expect(navigation.openRepoBranchTab).toHaveBeenCalledWith('/tmp/repo-b', 'feature/test', 'history')
+  })
+
+  test('opens branch terminal sessions through route navigation', () => {
+    const navigation = routeNavigation()
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: '/tmp/repo-a',
+      order: ['/tmp/repo-a', '/tmp/repo-b'],
+      closeRepo: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    actions.showRepoBranchTerminalSession('/tmp/repo-b', 'feature/test', 'session-1')
+
+    expect(navigation.openRepoBranchTerminal).toHaveBeenCalledWith('/tmp/repo-b', 'feature/test', 'session-1')
   })
 
   test('cycles repos by navigating from the current repo', () => {
@@ -24,7 +37,6 @@ describe('createPrimaryWindowNavigationActions', () => {
       currentRepoId: '/tmp/repo-a',
       order: ['/tmp/repo-a', '/tmp/repo-b', '/tmp/repo-c'],
       closeRepo: vi.fn(),
-      setWorkspacePaneTab: vi.fn(),
       routeNavigation: navigation,
     })
 
@@ -39,7 +51,6 @@ describe('createPrimaryWindowNavigationActions', () => {
       currentRepoId: '/tmp/repo-a',
       order: ['/tmp/repo-a', '/tmp/repo-b', '/tmp/repo-c'],
       closeRepo: vi.fn(),
-      setWorkspacePaneTab: vi.fn(),
       routeNavigation: navigation,
     })
 
@@ -55,7 +66,6 @@ describe('createPrimaryWindowNavigationActions', () => {
       currentRepoId: '/tmp/repo-a',
       order: ['/tmp/repo-a', '/tmp/repo-b', '/tmp/repo-c'],
       closeRepo,
-      setWorkspacePaneTab: vi.fn(),
       routeNavigation: navigation,
     })
 
@@ -72,7 +82,6 @@ describe('createPrimaryWindowNavigationActions', () => {
       currentRepoId: '/tmp/repo-b',
       order: ['/tmp/repo-a', '/tmp/repo-b', '/tmp/repo-c'],
       closeRepo,
-      setWorkspacePaneTab: vi.fn(),
       routeNavigation: navigation,
     })
 
@@ -88,7 +97,6 @@ describe('createPrimaryWindowNavigationActions', () => {
       currentRepoId: '/tmp/repo-a',
       order: ['/tmp/repo-a'],
       closeRepo: vi.fn(),
-      setWorkspacePaneTab: vi.fn(),
       routeNavigation: navigation,
     })
 
@@ -103,7 +111,6 @@ describe('createPrimaryWindowNavigationActions', () => {
       currentRepoId: '/tmp/repo-a',
       order: ['/tmp/repo-a'],
       closeRepo: vi.fn(),
-      setWorkspacePaneTab: vi.fn(),
       routeNavigation: navigation,
     })
 
@@ -122,7 +129,6 @@ describe('createPrimaryWindowNavigationActions', () => {
       currentRepoId: '/tmp/repo-a',
       order: ['/tmp/repo-a'],
       closeRepo: vi.fn(),
-      setWorkspacePaneTab: vi.fn(),
       goBackInWorkspaceNavigation,
       routeNavigation: navigation,
     })
@@ -141,7 +147,6 @@ describe('createPrimaryWindowNavigationActions', () => {
       currentRepoId: null,
       order: [],
       closeRepo: vi.fn(),
-      setWorkspacePaneTab: vi.fn(),
       routeNavigation: navigation,
     })
 
@@ -160,6 +165,8 @@ function routeNavigation(): PrimaryWindowRouteNavigation {
     openRepoRoot: vi.fn(),
     openRepoDashboard: vi.fn(),
     openRepoBranch: vi.fn(),
+    openRepoBranchTab: vi.fn(),
+    openRepoBranchTerminal: vi.fn(),
     openRepoNewWorktree: vi.fn(),
     cancelRepoNewWorktree: vi.fn(),
   }

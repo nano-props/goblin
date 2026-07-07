@@ -54,6 +54,41 @@ describe('workspace navigation history', () => {
     expect(history().backStack).toEqual([])
   })
 
+  test('updates branch metadata without adding a back entry', () => {
+    const store = useReposStore.getState()
+    store.recordWorkspaceNavigation(branchEntry({ tab: 'status', terminalSessionId: null }))
+    store.recordWorkspaceNavigation(branchEntry({ tab: 'status', terminalSessionId: 'session-1' }))
+
+    expect(history().current).toEqual(branchEntry({ tab: 'status', terminalSessionId: 'session-1' }))
+    expect(history().backStack).toEqual([])
+  })
+
+  test('collapses pending terminal creation into the current terminal entry', () => {
+    const store = useReposStore.getState()
+    const status = branchEntry({ tab: 'status', terminalSessionId: null })
+    const pendingTerminal = branchEntry({ tab: 'terminal', terminalSessionId: null })
+    const createdTerminal = branchEntry({ tab: 'terminal', terminalSessionId: 'session-1' })
+
+    store.recordWorkspaceNavigation(status)
+    store.recordWorkspaceNavigation(pendingTerminal)
+    store.recordWorkspaceNavigation(createdTerminal)
+
+    expect(history().current).toEqual(createdTerminal)
+    expect(history().backStack).toEqual([status])
+  })
+
+  test('records explicit terminal session switches as navigation', () => {
+    const store = useReposStore.getState()
+    const firstTerminal = branchEntry({ tab: 'terminal', terminalSessionId: 'session-1' })
+    const secondTerminal = branchEntry({ tab: 'terminal', terminalSessionId: 'session-2' })
+
+    store.recordWorkspaceNavigation(firstTerminal)
+    store.recordWorkspaceNavigation(secondTerminal)
+
+    expect(history().current).toEqual(secondTerminal)
+    expect(history().backStack).toEqual([firstTerminal])
+  })
+
   test('treats a new-worktree return target as part of the route identity', () => {
     const store = useReposStore.getState()
     store.recordWorkspaceNavigation(newWorktreeEntry('/repo/repo-slug/branch/feature-a'))
@@ -89,4 +124,23 @@ function entry(kind: 'dashboard' | 'newWorktree' | 'branch', branchName?: string
 
 function newWorktreeEntry(returnTo: string | null): WorkspaceNavigationHistoryEntry {
   return { repoId: REPO_ID, route: { kind: 'newWorktree', returnTo } }
+}
+
+function branchEntry({
+  tab,
+  terminalSessionId,
+}: {
+  tab: 'status' | 'terminal'
+  terminalSessionId: string | null
+}): WorkspaceNavigationHistoryEntry {
+  return {
+    repoId: REPO_ID,
+    route: {
+      kind: 'branch',
+      branchName: 'feature/a',
+      workspacePaneTab: tab,
+      terminalWorktreeKey: '/tmp/repo\0/tmp/repo-worktree',
+      terminalSessionId,
+    },
+  }
 }

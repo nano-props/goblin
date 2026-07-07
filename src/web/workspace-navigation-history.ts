@@ -4,16 +4,22 @@ import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-na
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/repos/types.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
-import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import { isWorkspacePaneStaticTabType, type WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { workspaceNavigationHistoryEntryEqual } from '#/web/stores/repos/navigation-history-entry.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 export type WorkspaceNavigationRouteContext =
   | { kind: 'empty'; repoId: string }
   | { kind: 'dashboard'; repoId: string }
   | { kind: 'newWorktree'; repoId: string; returnTo: string | null }
-  | { kind: 'branch'; repoId: string; branchName: string; worktreePath?: string | null }
+  | {
+      kind: 'branch'
+      repoId: string
+      branchName: string
+      worktreePath?: string | null
+      workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
+    }
 
 interface WorkspaceNavigationHistoryOptions {
   routeContext: WorkspaceNavigationRouteContext | null
@@ -49,8 +55,6 @@ function useWorkspaceNavigationHistoryEntry(
       return workspaceNavigationHistoryRouteSnapshotFromContext({
         routeContext,
         repoId: repo.id,
-        repoUi: repo.ui,
-        selectedTerminalSessionIdByTerminalWorktree: s.selectedTerminalSessionIdByTerminalWorktree,
       })
     },
     workspaceNavigationHistoryRouteSnapshotEqual,
@@ -73,13 +77,9 @@ type WorkspaceNavigationHistoryRouteSnapshot =
 function workspaceNavigationHistoryRouteSnapshotFromContext({
   routeContext,
   repoId,
-  repoUi,
-  selectedTerminalSessionIdByTerminalWorktree,
 }: {
   routeContext: WorkspaceNavigationRouteContext
   repoId: string
-  repoUi: Parameters<typeof preferredWorkspacePaneTabForTarget>[0]
-  selectedTerminalSessionIdByTerminalWorktree: Record<string, string>
 }): WorkspaceNavigationHistoryRouteSnapshot | null {
   switch (routeContext.kind) {
     case 'empty':
@@ -93,21 +93,17 @@ function workspaceNavigationHistoryRouteSnapshotFromContext({
       const branchModel = repo ? readRepoBranchQueryProjection(repo) : null
       const branch = branchModel?.branches.find((candidate) => candidate.name === routeContext.branchName)
       const worktreePath = routeContext.worktreePath ?? branch?.worktree?.path ?? null
-      const workspacePaneTab = preferredWorkspacePaneTabForTarget(repoUi, {
-        repoRoot: repoId,
-        branchName: routeContext.branchName,
-        worktreePath,
-      })
       const terminalWorktreeKey = worktreePath ? formatTerminalWorktreeKey(repoId, worktreePath) : null
+      const route = routeContext.workspacePaneRoute ?? null
+      const workspacePaneTab: WorkspacePaneTabType =
+        route?.kind === 'terminal' ? 'terminal' : route?.kind === 'static' ? route.tab : 'status'
       return {
         repoId,
         kind: 'branch',
         branchName: routeContext.branchName,
         workspacePaneTab,
         terminalWorktreeKey,
-        terminalSessionId: terminalWorktreeKey
-          ? (selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] ?? null)
-          : null,
+        terminalSessionId: route?.kind === 'terminal' ? route.terminalSessionId : null,
       }
     }
   }
@@ -170,13 +166,15 @@ export function restoreWorkspaceNavigationEntry(
       routeNavigation.openRepoNewWorktree(entry.repoId, { returnTo: entry.route.returnTo })
       return
     case 'branch':
-      routeNavigation.openRepoBranch(entry.repoId, entry.route.branchName)
-      if (entry.route.workspacePaneTab) {
-        useReposStore.getState().setWorkspacePaneTab(entry.repoId, entry.route.branchName, entry.route.workspacePaneTab)
+      if (entry.route.workspacePaneTab === 'terminal' && entry.route.terminalSessionId) {
+        routeNavigation.openRepoBranchTerminal(entry.repoId, entry.route.branchName, entry.route.terminalSessionId)
+        return
       }
-      if (entry.route.terminalWorktreeKey) {
-        useReposStore.getState().setSelectedTerminal(entry.route.terminalWorktreeKey, entry.route.terminalSessionId)
-      }
+      routeNavigation.openRepoBranchTab(
+        entry.repoId,
+        entry.route.branchName,
+        isWorkspacePaneStaticTabType(entry.route.workspacePaneTab) ? entry.route.workspacePaneTab : 'status',
+      )
       return
   }
 }

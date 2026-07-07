@@ -79,6 +79,7 @@ export interface RepoWorkspaceRuntimeTabState {
 
 export type RepoWorkspaceRuntimeTabStateByType = Record<WorkspacePaneRuntimeTabType, RepoWorkspaceRuntimeTabState>
 export type RepoWorkspaceRuntimeViewsByType = Record<WorkspacePaneRuntimeTabType, WorkspacePaneRuntimeTabSummary[]>
+export type RepoWorkspaceTabEntriesProjectionPhase = 'pending' | 'ready' | 'failed'
 
 export interface RepoWorkspaceRuntimeTabStateInput {
   createPending?: boolean
@@ -117,6 +118,8 @@ export interface RepoWorkspaceTabModel {
   runtimeViewsByType: RepoWorkspaceRuntimeViewsByType
   /** Single target-scoped mixed workspace pane tab list. */
   tabEntries: WorkspacePaneTabEntry[]
+  /** Hydration state for the target-scoped tab-entry projection. */
+  tabEntriesProjectionPhase: RepoWorkspaceTabEntriesProjectionPhase
   /** Open static workspace pane tabs derived from tabEntries. */
   staticTabs: WorkspacePaneStaticTabType[]
   /** Live runtime session views owned by server-side runtime features. */
@@ -136,6 +139,7 @@ export interface RepoWorkspaceTabModelInput {
   worktreePath: string | null
   preferredTab: WorkspacePaneTabType
   tabEntries: readonly WorkspacePaneTabEntry[]
+  tabEntriesProjectionPhase?: RepoWorkspaceTabEntriesProjectionPhase
   runtimeTabViews: readonly WorkspacePaneTabSummary[]
   runtimeTabStateByType: RepoWorkspaceRuntimeTabStateInputByType
 }
@@ -178,6 +182,7 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
     runtimeTabStateByType,
     runtimeViewsByType,
     tabEntries,
+    tabEntriesProjectionPhase: input.tabEntriesProjectionPhase ?? 'ready',
     staticTabs,
     runtimeViews,
     tabs,

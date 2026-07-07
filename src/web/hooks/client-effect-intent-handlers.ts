@@ -32,7 +32,6 @@ import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 interface TerminalBellIntentDeps {
   navigation: PrimaryWindowNavigationActions
   closeAllOverlays: () => void
-  setSelectedTerminal: (terminalWorktreeKey: string, terminalSessionId: string) => void
 }
 
 interface SharedClientIntentDeps {
@@ -47,7 +46,6 @@ interface SharedClientIntentDeps {
   isOverlayOpen: () => boolean
   isWorkspaceShortcutSuppressed: () => boolean
   ensureWorkspaceOpen: (input: string | RepoSessionEntry) => Promise<OpenRepoResult>
-  setSelectedTerminal: (terminalWorktreeKey: string, terminalSessionId: string) => void
   resetLayout: () => void
   toggleZenMode: () => void
   t: (key: string) => string
@@ -70,8 +68,7 @@ export function handleTerminalBellClickIntent(
   deps.closeAllOverlays()
   switch (plan.kind) {
     case 'show-worktree-terminal':
-      deps.setSelectedTerminal(plan.terminalWorktreeKey, plan.terminalSessionId)
-      deps.navigation.showRepoBranchWorkspacePaneTab(plan.repoId, plan.branch, 'terminal')
+      deps.navigation.showRepoBranchTerminalSession(plan.repoId, plan.branch, plan.terminalSessionId)
       return
   }
 }
@@ -191,6 +188,14 @@ export async function handleWorkspaceClientIntent(
       })
       return true
     case 'show-workspace-pane-tab':
+      if (plan.tab === 'terminal') {
+        return await runTerminalPrimaryActionCommand({
+          repoId: plan.repoId,
+          branchName: deps.currentBranchName,
+          navigation: deps.navigation,
+          t: deps.t,
+        })
+      }
       return await runShowWorkspacePaneTabCommand({
         repoId: plan.repoId,
         branchName: deps.currentBranchName,

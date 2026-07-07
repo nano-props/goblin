@@ -4,13 +4,16 @@ import type { TerminalCreateTranslator } from '#/web/components/terminal/termina
 import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { WorkspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
-import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import {
+  captureWorkspacePaneActiveTabIdentity,
+  captureWorkspacePaneTabFocusGuard,
+} from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { resolveWorkspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
 export interface WorkspacePaneRuntimeTabCommandContextInput {
   repoId: string
   branchName: string
-  enterRuntimeTab: (type: WorkspacePaneRuntimeTabType) => void | Promise<void>
+  showRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => void | Promise<void>
   terminalCreateTranslator?: TerminalCreateTranslator
 }
 
@@ -33,9 +36,7 @@ const WORKSPACE_PANE_RUNTIME_TAB_COMMAND_CONTEXT_RESOLVERS_BY_TYPE: Record<
 export function workspacePaneRuntimeTabCommandContext(
   input: WorkspacePaneRuntimeTabCommandContextInput,
 ): WorkspacePaneRuntimeTabCommandContext {
-  const context: WorkspacePaneRuntimeTabCommandContext = {
-    enterRuntimeTab: input.enterRuntimeTab,
-  }
+  const context: WorkspacePaneRuntimeTabCommandContext = {}
   for (const resolver of Object.values(WORKSPACE_PANE_RUNTIME_TAB_COMMAND_CONTEXT_RESOLVERS_BY_TYPE)) {
     resolver.assign(context, input)
   }
@@ -46,10 +47,13 @@ function assignTerminalRuntimeTabCommandContext(
   context: WorkspacePaneRuntimeTabCommandContext,
   input: WorkspacePaneRuntimeTabCommandContextInput,
 ): void {
+  const shouldShowCreatedTerminalSession = captureWorkspacePaneTabFocusGuard(input.repoId, input.branchName)
   context.terminal = {
     base: selectedTerminalBase(input.repoId, input.branchName),
     bridge: readTerminalSessionCommandBridge(),
     openerIdentity: captureWorkspacePaneActiveTabIdentity(input.repoId, input.branchName),
+    showTerminalSession: (terminalSessionId) => input.showRuntimeTab('terminal', terminalSessionId),
+    shouldShowCreatedTerminalSession,
     t: input.terminalCreateTranslator,
   }
 }

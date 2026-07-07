@@ -7,7 +7,10 @@ import {
 } from '#/shared/workspace-layout.ts'
 import type { BranchViewMode, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
 import type { WorkspaceNavigationHistoryRepoState } from '#/web/stores/repos/types.ts'
-import { workspaceNavigationHistoryEntryEqual } from '#/web/stores/repos/navigation-history-entry.ts'
+import {
+  workspaceNavigationHistoryEntryCanReplaceCurrent,
+  workspaceNavigationHistoryEntryEqual,
+} from '#/web/stores/repos/navigation-history-entry.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
@@ -199,6 +202,17 @@ function createWorkspaceNavigationHistoryActions(set: ReposSet, get: ReposGet): 
       set((s) => {
         const currentRepoHistory = navigationHistoryForRepo(s.navigationHistoryByRepo[entry.repoId])
         if (workspaceNavigationHistoryEntryEqual(currentRepoHistory.current, entry)) return s
+        if (workspaceNavigationHistoryEntryCanReplaceCurrent(currentRepoHistory.current, entry)) {
+          return {
+            navigationHistoryByRepo: {
+              ...s.navigationHistoryByRepo,
+              [entry.repoId]: {
+                ...currentRepoHistory,
+                current: entry,
+              },
+            },
+          }
+        }
 
         const nextRepoHistory: WorkspaceNavigationHistoryRepoState = {
           current: entry,

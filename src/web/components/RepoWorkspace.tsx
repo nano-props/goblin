@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useEffect, useId } from 'react'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
@@ -14,13 +14,23 @@ import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShor
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/branch-action-surface-context.ts'
 import { useRepoPullRequestsReadModel, useRepoStatusReadModel } from '#/web/repo-data-query.ts'
-import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { readRepoBranchQueryProjection, useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
 import { useWorkspaceNavigationHistory } from '#/web/workspace-navigation-history.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
+import {
+  reconcileWorkspacePaneRoute,
+  type WorkspacePaneRouteReconciliation,
+} from '#/web/components/repo-workspace/workspace-pane-route-reconciliation.ts'
+import type { RepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
 
 interface Props {
   repoId: string
   currentBranchName?: string | null
+  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
   shortcutsEnabled?: boolean
   toolbarTrafficLightOffset?: boolean
   onBackToBranchNavigator?: () => void
@@ -56,6 +66,7 @@ function repoWorkspaceRepoShellEqual(
 export function RepoWorkspace({
   repoId,
   currentBranchName,
+  workspacePaneRoute = null,
   shortcutsEnabled = true,
   toolbarTrafficLightOffset = false,
   onBackToBranchNavigator,
@@ -99,6 +110,7 @@ export function RepoWorkspace({
   return (
     <RepoWorkspaceLoaded
       repoShell={repoShell}
+      workspacePaneRoute={workspacePaneRoute}
       workspacePaneId={workspacePaneId}
       shortcutsEnabled={shortcutsEnabled}
       toolbarTrafficLightOffset={toolbarTrafficLightOffset}
@@ -109,12 +121,14 @@ export function RepoWorkspace({
 
 function RepoWorkspaceLoaded({
   repoShell,
+  workspacePaneRoute,
   workspacePaneId,
   shortcutsEnabled,
   toolbarTrafficLightOffset,
   onBackToBranchNavigator,
 }: {
   repoShell: RepoWorkspaceRepoShell
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null
   workspacePaneId: string
   shortcutsEnabled: boolean
   toolbarTrafficLightOffset: boolean
@@ -133,6 +147,12 @@ function RepoWorkspaceLoaded({
   const historyBranch = currentBranchName
     ? branchReadModel?.branches.find((branch) => branch.name === currentBranchName)
     : null
+  useSyncRoutedWorkspacePaneSelection({
+    repoId: repoShell.id,
+    branchName: currentBranchName,
+    worktreePath: historyBranch?.worktree?.path ?? null,
+    route: workspacePaneRoute,
+  })
   useWorkspaceNavigationHistory({
     routeContext:
       currentBranchName && historyBranch
@@ -141,6 +161,7 @@ function RepoWorkspaceLoaded({
             repoId: repoShell.id,
             branchName: currentBranchName,
             worktreePath: historyBranch.worktree?.path ?? null,
+            workspacePaneRoute,
           }
         : null,
   })
@@ -173,6 +194,7 @@ function RepoWorkspaceLoaded({
         <BranchActionWorkspacePane
           repo={presentationRepo}
           detail={detail}
+          workspacePaneRoute={workspacePaneRoute}
           branch={detail.branch}
           workspacePaneId={workspacePaneId}
           shortcutsEnabled={shortcutsEnabled}
@@ -183,6 +205,7 @@ function RepoWorkspaceLoaded({
         <RepoWorkspacePane
           repo={presentationRepo}
           detail={detail}
+          workspacePaneRoute={workspacePaneRoute}
           workspacePaneId={workspacePaneId}
           toolbarTrafficLightOffset={toolbarTrafficLightOffset}
           onBackToBranchNavigator={onBackToBranchNavigator}
@@ -195,6 +218,7 @@ function RepoWorkspaceLoaded({
 interface RepoWorkspacePaneProps {
   repo: RepoWorkspaceRepo
   detail: CurrentRepoWorkspacePresentation
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null
   workspacePaneId: string
   toolbarTrafficLightOffset?: boolean
   branchActions?: BranchActions
@@ -204,12 +228,21 @@ interface RepoWorkspacePaneProps {
 function RepoWorkspacePane({
   repo,
   detail,
+  workspacePaneRoute,
   workspacePaneId,
   toolbarTrafficLightOffset = false,
   branchActions,
   onBackToBranchNavigator,
 }: RepoWorkspacePaneProps) {
-  const workspacePaneTabModel = useRepoWorkspaceTabModel(repo, detail)
+  const workspacePaneTabModel = useRepoWorkspaceTabModel(repo, detail, workspacePaneRoute)
+  const navigation = usePrimaryWindowNavigation()
+  useReconcileWorkspacePaneRoute({
+    repoId: repo.id,
+    branchName: detail.branch?.name ?? null,
+    route: workspacePaneRoute,
+    model: workspacePaneTabModel,
+    navigation,
+  })
 
   return (
     <>
@@ -232,9 +265,77 @@ function RepoWorkspacePane({
   )
 }
 
+function useReconcileWorkspacePaneRoute({
+  repoId,
+  branchName,
+  route,
+  model,
+  navigation,
+}: {
+  repoId: string
+  branchName: string | null
+  route: RepoBranchWorkspacePaneRoute | null
+  model: RepoWorkspaceTabModel
+  navigation: {
+    showRepoBranchWorkspacePaneTab: (
+      repoId: string,
+      branch: string,
+      tab: Extract<RepoBranchWorkspacePaneRoute, { kind: 'static' }>['tab'],
+      options?: { replace?: boolean },
+    ) => void
+    showRepoBranchTerminalSession: (
+      repoId: string,
+      branch: string,
+      terminalSessionId: string,
+      options?: { replace?: boolean },
+    ) => void
+  }
+}): void {
+  useEffect(() => {
+    if (!branchName) return
+    const reconciliation = reconcileWorkspacePaneRoute(route, model)
+    applyWorkspacePaneRouteReconciliation({ repoId, branchName, reconciliation, navigation })
+  }, [branchName, model, navigation, repoId, route])
+}
+
+function applyWorkspacePaneRouteReconciliation({
+  repoId,
+  branchName,
+  reconciliation,
+  navigation,
+}: {
+  repoId: string
+  branchName: string
+  reconciliation: WorkspacePaneRouteReconciliation
+  navigation: {
+    showRepoBranchWorkspacePaneTab: (
+      repoId: string,
+      branch: string,
+      tab: Extract<RepoBranchWorkspacePaneRoute, { kind: 'static' }>['tab'],
+      options?: { replace?: boolean },
+    ) => void
+    showRepoBranchTerminalSession: (
+      repoId: string,
+      branch: string,
+      terminalSessionId: string,
+      options?: { replace?: boolean },
+    ) => void
+  }
+}): void {
+  if (reconciliation.kind === 'none') return
+  if (reconciliation.route.kind === 'static') {
+    navigation.showRepoBranchWorkspacePaneTab(repoId, branchName, reconciliation.route.tab, { replace: true })
+    return
+  }
+  navigation.showRepoBranchTerminalSession(repoId, branchName, reconciliation.route.terminalSessionId, {
+    replace: true,
+  })
+}
+
 interface BranchActionWorkspacePaneProps {
   repo: RepoWorkspaceRepo
   detail: CurrentRepoWorkspacePresentation
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null
   branch: NonNullable<CurrentRepoWorkspacePresentation['branch']>
   workspacePaneId: string
   shortcutsEnabled: boolean
@@ -245,6 +346,7 @@ interface BranchActionWorkspacePaneProps {
 function BranchActionWorkspacePane({
   repo,
   detail,
+  workspacePaneRoute,
   branch,
   workspacePaneId,
   shortcutsEnabled,
@@ -260,6 +362,7 @@ function BranchActionWorkspacePane({
       <RepoWorkspacePane
         repo={repo}
         detail={detail}
+        workspacePaneRoute={workspacePaneRoute}
         workspacePaneId={workspacePaneId}
         toolbarTrafficLightOffset={toolbarTrafficLightOffset}
         branchActions={branchActions}
@@ -267,4 +370,41 @@ function BranchActionWorkspacePane({
       />
     </BranchActionSurfaceContext>
   )
+}
+
+function useSyncRoutedWorkspacePaneSelection({
+  repoId,
+  branchName,
+  worktreePath,
+  route,
+}: {
+  repoId: string
+  branchName: string | null
+  worktreePath: string | null
+  route: RepoBranchWorkspacePaneRoute | null
+}): void {
+  const setWorkspacePaneTab = useReposStore((s) => s.setWorkspacePaneTab)
+  const setSelectedTerminal = useReposStore((s) => s.setSelectedTerminal)
+  useEffect(() => {
+    if (!branchName || !route) return
+    const state = useReposStore.getState()
+    const repo = state.repos[repoId]
+    const branchModel = repo ? readRepoBranchQueryProjection(repo) : null
+    const branch = branchModel?.branches.find((candidate) => candidate.name === branchName)
+    const target = branch
+      ? {
+          repoRoot: repoId,
+          branchName,
+          worktreePath: branch.worktree?.path ?? null,
+        }
+      : null
+    if (!repo || !target) return
+    const routeTab = route.kind === 'static' ? route.tab : 'terminal'
+    if (preferredWorkspacePaneTabForTarget(repo.ui, target) !== routeTab) {
+      setWorkspacePaneTab(repoId, branchName, routeTab)
+    }
+    if (route.kind === 'terminal' && worktreePath) {
+      setSelectedTerminal(formatTerminalWorktreeKey(repoId, worktreePath), route.terminalSessionId)
+    }
+  }, [branchName, repoId, route, setSelectedTerminal, setWorkspacePaneTab, worktreePath])
 }

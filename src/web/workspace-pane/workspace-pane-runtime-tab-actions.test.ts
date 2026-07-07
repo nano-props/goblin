@@ -21,32 +21,29 @@ const terminalView: WorkspacePaneTerminalTabSummary = {
 
 describe('workspace pane runtime tab actions', () => {
   test('selects a terminal runtime tab through the runtime action registry', () => {
-    const enterRuntimeTab = vi.fn()
-    const selectTerminal = vi.fn()
+    const showRuntimeTab = vi.fn()
 
     expect(
       selectWorkspacePaneRuntimeTab(terminalView, {
-        enterRuntimeTab,
-        terminal: { selectTerminal },
+        showRuntimeTab,
       }),
     ).toBe(true)
 
-    expect(enterRuntimeTab).toHaveBeenCalledWith('terminal')
-    expect(selectTerminal).toHaveBeenCalledWith('repo\0worktree', 'session-1')
+    expect(showRuntimeTab).toHaveBeenCalledWith('terminal', 'session-1')
   })
 
   test('reselects a terminal runtime tab through the runtime action registry', () => {
-    const enterRuntimeTab = vi.fn()
+    const showRuntimeTab = vi.fn()
     const scrollToBottom = vi.fn()
 
     expect(
       reselectWorkspacePaneRuntimeTab(terminalView, {
-        enterRuntimeTab,
+        showRuntimeTab,
         terminal: { scrollToBottom },
       }),
     ).toBe(true)
 
-    expect(enterRuntimeTab).toHaveBeenCalledWith('terminal')
+    expect(showRuntimeTab).toHaveBeenCalledWith('terminal', 'session-1')
     expect(scrollToBottom).toHaveBeenCalledWith('session-1')
   })
 })

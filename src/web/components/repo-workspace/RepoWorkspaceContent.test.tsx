@@ -813,6 +813,7 @@ describe('RepoWorkspaceContent', () => {
     const createTerminal = vi.fn(async () => 'session-1')
     const writeInput = vi.fn()
     const showRepoBranchWorkspacePaneTab = vi.fn()
+    const showRepoBranchTerminalSession = vi.fn()
     let resolveViewer!: (value: { viewer: 'bat'; shell: 'posix' }) => void
     filetreeClientMocks.getRepositoryFileViewer.mockImplementationOnce(
       () =>
@@ -824,7 +825,9 @@ describe('RepoWorkspaceContent', () => {
 
     renderInJsdom(
       <QueryClientProvider client={queryClient}>
-        <PrimaryWindowNavigationProvider value={navigationWith({ showRepoBranchWorkspacePaneTab })}>
+        <PrimaryWindowNavigationProvider
+          value={navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession })}
+        >
           <TerminalSessionContext value={terminalCommandContextWith({ createTerminal, writeInput })}>
             <TerminalSessionReadContext value={emptyTerminalReadContext}>
               <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
@@ -859,7 +862,8 @@ describe('RepoWorkspaceContent', () => {
       await Promise.resolve()
     })
 
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/filetree-open', 'terminal')
+    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/filetree-open', 'session-1')
+    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(createTerminal).toHaveBeenCalledWith(
       { repoRoot: REPO_ID, repoInstanceId: repo.instanceId, branch: branchName, worktreePath },
       {
@@ -1087,6 +1091,7 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
     cycleRepo: () => {},
     selectRepoBranch: () => {},
     showRepoBranchWorkspacePaneTab: () => {},
+    showRepoBranchTerminalSession: () => {},
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},

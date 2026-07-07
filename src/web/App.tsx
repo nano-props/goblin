@@ -7,6 +7,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import { repoWorkspaceBehavior } from '#/web/lib/workspace-layout.ts'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
+import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 
 // NOTE: App-level lifecycle hooks (bootstrap, session persistence,
 // keyboard, event routing, overlays, file drop) live in the <Layout>
@@ -28,8 +29,12 @@ interface AppProps {
 export type RepoRouteView =
   | { kind: 'empty'; repoId: string }
   | { kind: 'dashboard'; repoId: string }
-  | { kind: 'branch'; repoId: string; branchName: string }
+  | { kind: 'branch'; repoId: string; branchName: string; workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null }
   | { kind: 'newWorktree'; repoId: string }
+
+export type RepoBranchWorkspacePaneRoute =
+  | { kind: 'static'; tab: WorkspacePaneStaticTabType }
+  | { kind: 'terminal'; terminalSessionId: string }
 
 export function App({
   routeSettingsPage = null,

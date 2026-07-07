@@ -1,8 +1,10 @@
 import { useMemo } from 'react'
 import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import {
   createRepoWorkspaceTabModel,
   repoWorkspaceRuntimeTabSessionId,
+  type RepoWorkspaceTabEntriesProjectionPhase,
   type RepoWorkspaceTabModel,
   type RepoWorkspaceTabModelInput,
 } from '#/web/components/repo-workspace/tab-model.ts'
@@ -25,8 +27,9 @@ export interface RepoWorkspaceTabModelInputState {
 export function useRepoWorkspaceTabModel(
   repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'ui'>,
   detail: CurrentRepoWorkspacePresentation,
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null = null,
 ) {
-  const { input, selectedSessionIdByRuntimeType } = useRepoWorkspaceTabModelInput(repo, detail)
+  const { input, selectedSessionIdByRuntimeType } = useRepoWorkspaceTabModelInput(repo, detail, workspacePaneRoute)
   const model = useMemo(() => createRepoWorkspaceTabModel(input), [input])
   useSyncRepoWorkspaceRuntimeTabSelection(model, selectedSessionIdByRuntimeType)
   return model
@@ -40,6 +43,7 @@ export function useRepoWorkspaceTabModel(
 export function useRepoWorkspaceTabModelInput(
   repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'ui'>,
   detail: CurrentRepoWorkspacePresentation,
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null = null,
 ): RepoWorkspaceTabModelInputState {
   const { branch } = detail
   const branchName = branch?.name ?? null
@@ -48,6 +52,8 @@ export function useRepoWorkspaceTabModelInput(
     repoRoot: repo.id,
     repoInstanceId: repo.instanceId,
     worktreePath,
+    selectedSessionIdByRuntimeType:
+      workspacePaneRoute?.kind === 'terminal' ? { terminal: workspacePaneRoute.terminalSessionId } : undefined,
   })
   const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(repo.id, repo.instanceId)
 
@@ -62,9 +68,12 @@ export function useRepoWorkspaceTabModelInput(
   )
 
   const preferredTab = useMemo(
-    () =>
-      preferredWorkspacePaneTabForTarget(repo.ui, branchName ? { repoRoot: repo.id, branchName, worktreePath } : null),
-    [repo.ui.preferredWorkspacePaneTabByTarget, repo.id, branchName, worktreePath],
+    () => {
+      if (workspacePaneRoute?.kind === 'static') return workspacePaneRoute.tab
+      if (workspacePaneRoute?.kind === 'terminal') return 'terminal'
+      return preferredWorkspacePaneTabForTarget(repo.ui, branchName ? { repoRoot: repo.id, branchName, worktreePath } : null)
+    },
+    [repo.ui.preferredWorkspacePaneTabByTarget, repo.id, branchName, worktreePath, workspacePaneRoute],
   )
 
   const input = useMemo<RepoWorkspaceTabModelInput>(
@@ -74,6 +83,7 @@ export function useRepoWorkspaceTabModelInput(
       worktreePath,
       preferredTab,
       tabEntries: workspacePaneTabEntries,
+      tabEntriesProjectionPhase: workspacePaneTabsProjectionPhase(workspacePaneTabsQuery.status),
       runtimeTabViews: runtimeProjection.runtimeTabViews,
       runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
     }),
@@ -82,6 +92,7 @@ export function useRepoWorkspaceTabModelInput(
       branchName,
       worktreePath,
       preferredTab,
+      workspacePaneTabsQuery.status,
       workspacePaneTabEntries,
       runtimeProjection.runtimeTabViews,
       runtimeProjection.runtimeTabStateByType,
@@ -92,6 +103,14 @@ export function useRepoWorkspaceTabModelInput(
     () => ({ input, selectedSessionIdByRuntimeType: runtimeProjection.selectedSessionIdByRuntimeType }),
     [input, runtimeProjection.selectedSessionIdByRuntimeType],
   )
+}
+
+function workspacePaneTabsProjectionPhase(
+  status: ReturnType<typeof useWorkspacePaneTabsQuery>['status'],
+): RepoWorkspaceTabEntriesProjectionPhase {
+  if (status === 'success') return 'ready'
+  if (status === 'error') return 'failed'
+  return 'pending'
 }
 
 /**
