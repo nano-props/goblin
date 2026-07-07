@@ -1,7 +1,6 @@
 export const EMBEDDED_SERVER_IPC_ROUTES = {
   'repo.probe': { route: '/api/repo/probe', method: 'POST' },
   'repo.clone': { route: '/api/repo/clone', method: 'POST' },
-  'repo.abortClone': { route: '/api/repo/abort-clone', method: 'POST' },
   'repo.projection': { route: '/api/repo/projection', method: 'POST' },
   'repo.operations': { route: '/api/repo/operations', method: 'POST' },
   'repo.patch': { route: '/api/repo/patch', method: 'POST' },

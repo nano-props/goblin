@@ -216,6 +216,32 @@ export function installWorkspacePaneTabsTestBridge(
     ) => WorkspacePaneTabsEntry[] | Promise<WorkspacePaneTabsEntry[]>
   } = {},
 ): void {
+  let serverEntries: WorkspacePaneTabsEntry[] = []
+  const targetKey = (input: { repoRoot: string; branchName: string; worktreePath: string | null }) =>
+    workspacePaneTabsTargetIdentityKey(input)
+  const serverTabsForTarget = (input: WorkspacePaneTabsUpdateInput): WorkspacePaneTabEntry[] => {
+    const entry = serverEntries.find((candidate) => targetKey(candidate) === targetKey(input))
+    if (entry) return [...entry.tabs]
+    const tabs = readWorkspacePaneTabsForTarget(input)
+    const key = targetKey(input)
+    serverEntries = [
+      ...serverEntries.filter((candidate) => targetKey(candidate) !== key),
+      { repoRoot: input.repoRoot, branchName: input.branchName, worktreePath: input.worktreePath, tabs },
+    ]
+    return tabs
+  }
+  const replaceServerTarget = (
+    input: { repoRoot: string; branchName: string; worktreePath: string | null },
+    tabs: readonly WorkspacePaneTabEntry[],
+  ): WorkspacePaneTabEntry[] => {
+    const nextTabs = [...tabs]
+    const key = targetKey(input)
+    serverEntries = [
+      ...serverEntries.filter((entry) => targetKey(entry) !== key),
+      { repoRoot: input.repoRoot, branchName: input.branchName, worktreePath: input.worktreePath, tabs: nextTabs },
+    ]
+    return nextTabs
+  }
   setClientBridgeForTests({
     kind: () => 'web',
     hasCapability: () => false,
@@ -293,24 +319,29 @@ export function installWorkspacePaneTabsTestBridge(
     }),
     workspacePaneTabs: () => ({
       replace: async (input) => {
-        if (options.replaceWorkspaceTabs) return await options.replaceWorkspaceTabs(input)
-        return [...input.tabs]
+        const tabs = options.replaceWorkspaceTabs ? await options.replaceWorkspaceTabs(input) : [...input.tabs]
+        return replaceServerTarget(input, tabs)
       },
       update: async (input) => {
-        if (options.updateWorkspaceTabs) return await options.updateWorkspaceTabs(input)
-        return defaultWorkspacePaneTabsOperationResult(input)
+        if (options.updateWorkspaceTabs) serverTabsForTarget(input)
+        const tabs = options.updateWorkspaceTabs
+          ? await options.updateWorkspaceTabs(input)
+          : defaultWorkspacePaneTabsOperationResult(input, serverTabsForTarget(input))
+        return replaceServerTarget(input, tabs)
       },
       list: async (input) => {
         if (options.listWorkspaceTabs) return await options.listWorkspaceTabs(input)
-        return []
+        return serverEntries.filter((entry) => entry.repoRoot === input.repoRoot)
       },
       onChanged: () => () => {},
     }),
   } satisfies ClientBridge)
 }
 
-function defaultWorkspacePaneTabsOperationResult(input: WorkspacePaneTabsUpdateInput): WorkspacePaneTabEntry[] {
-  const currentTabs = readWorkspacePaneTabsForTarget(input)
+function defaultWorkspacePaneTabsOperationResult(
+  input: WorkspacePaneTabsUpdateInput,
+  currentTabs: readonly WorkspacePaneTabEntry[],
+): WorkspacePaneTabEntry[] {
   switch (input.operation.type) {
     case 'open-static':
       return workspacePaneTabsWithStaticTab(currentTabs, input.operation.tabType, {
@@ -532,7 +563,9 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
             ? ([...(payload as { tabs: WorkspacePaneTabEntry[] }).tabs] satisfies WorkspacePaneTabEntry[])
             : []
         case 'workspacePaneTabs.update':
-          return isWorkspacePaneTabsUpdateInput(payload) ? defaultWorkspacePaneTabsOperationResult(payload) : []
+          return isWorkspacePaneTabsUpdateInput(payload)
+            ? defaultWorkspacePaneTabsOperationResult(payload, readWorkspacePaneTabsForTarget(payload))
+            : []
         case 'workspacePaneTabs.list':
           return []
         case 'terminal.listSessions':
@@ -790,7 +823,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         if (url.pathname === '/api/repo/patch') return call('repo.patch', body)
         if (url.pathname === '/api/repo/fetch') return call('repo.fetch', body)
         if (url.pathname === '/api/repo/clone') return call('repo.clone', body)
-        if (url.pathname === '/api/repo/abort-clone') return call('repo.abortClone', body)
         if (url.pathname === '/api/repo/pull') return call('repo.pull', body)
         if (url.pathname === '/api/repo/push') return call('repo.push', body)
         if (url.pathname === '/api/repo/create-worktree') return call('repo.createWorktree', body)

@@ -1,11 +1,9 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import {
   handleRepoInvalidationRefresh,
-  repoInvalidationRefreshDisposition,
   resetRepoRefreshCoordinatorState,
   runRepoRefreshIntent,
 } from '#/web/stores/repos/refresh-coordinator.ts'
-import { beginRepoInvalidationSource, settleRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import type { RepoRuntimeProjectionRefreshOptions, ReposGet } from '#/web/stores/repos/types.ts'
 import {
   createRepoBranch,
@@ -58,7 +56,6 @@ describe('repo refresh coordinator', () => {
 
   afterEach(() => {
     resetRepoRefreshCoordinatorState()
-    vi.useRealTimers()
   })
 
   test('routes initial load through a coordinated repo read-model projection refresh', async () => {
@@ -130,31 +127,6 @@ describe('repo refresh coordinator', () => {
     expect(calls).toEqual(['core:/repo:repo-instance-test-9'])
   })
 
-  test('suppresses repo invalidations from an active local source token', () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
-    beginRepoInvalidationSource('repo_branch_1')
-
-    expect(repoInvalidationRefreshDisposition({ sourceToken: 'repo_branch_1' })).toBe('suppress')
-  })
-
-  test('suppresses repo invalidations from a recently settled local source token', () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
-    beginRepoInvalidationSource('repo_manual_1')
-    settleRepoInvalidationSource('repo_manual_1')
-
-    expect(repoInvalidationRefreshDisposition({ sourceToken: 'repo_manual_1' })).toBe('suppress')
-  })
-
-  test('refreshes repo invalidations from unrelated sources', () => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
-    beginRepoInvalidationSource('repo_manual_2')
-
-    expect(repoInvalidationRefreshDisposition({ sourceToken: 'repo_manual_other' })).toBe('refresh')
-  })
-
   test('does not change invalidation behavior when the coordinated core refresh throws', async () => {
     const get: ReposGet = () =>
       ({
@@ -169,7 +141,5 @@ describe('repo refresh coordinator', () => {
         repoInstanceId: 'repo-instance-test-13',
       }),
     ).rejects.toThrow('boom')
-
-    expect(repoInvalidationRefreshDisposition({})).toBe('refresh')
   })
 })

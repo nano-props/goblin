@@ -344,12 +344,10 @@ export interface AppIpcHandlers {
     runtimeList: () => Promise<RepoRuntimeInstancesSnapshot>
     runtimeClose: (input: { repoRoot: string; repoInstanceId: string }) => Promise<{ ok: boolean; closed: boolean }>
     clone: (input: {
-      operationId: string
       url: string
       parentPath: string
       directoryName: string
     }) => Promise<CloneRepoResult>
-    abortClone: (input: { operationId: string }) => Promise<boolean>
     projection: (input: {
       cwd: string
       branch?: string

@@ -18,7 +18,6 @@ import {
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { clearWorkspacePaneTabsOperationQueuesForTests } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 
 const REPO_ID = '/tmp/workspace-pane-tab-repo'
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-worktree'
@@ -27,14 +26,12 @@ const originalRefreshRuntimeProjection = useReposStore.getState().refreshRuntime
 beforeEach(() => {
   resetReposStore()
   installWorkspacePaneTabsTestBridge()
-  clearWorkspacePaneTabsOperationQueuesForTests()
 })
 
 afterEach(() => {
   resetReposStore()
   useReposStore.setState({ refreshRuntimeProjection: originalRefreshRuntimeProjection })
   setClientBridgeForTests(null)
-  clearWorkspacePaneTabsOperationQueuesForTests()
 })
 
 describe('openWorkspacePaneTab', () => {
@@ -498,7 +495,7 @@ describe('openWorkspacePaneTab', () => {
     expect(openers[tabOpenerScopeKey(OTHER_REPO_ID, 'main')]?.['workspace-pane:changes']).toBe('workspace-pane:status')
   })
 
-  test('serializes direct open calls so concurrent static tab opens do not overwrite each other', async () => {
+  test('preserves concurrent static tab opens through server-canonical updates', async () => {
     seedWorktreeRepo('status')
 
     await expect(

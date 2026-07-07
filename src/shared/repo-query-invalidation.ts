@@ -4,7 +4,6 @@ export interface RepoQueryInvalidationEvent {
   type: 'repo-query-invalidated'
   repoId: string
   query: RepoQueryKind
-  sourceToken?: string
 }
 
 export function isRepoQueryInvalidationEvent(value: unknown): value is RepoQueryInvalidationEvent {
@@ -13,7 +12,6 @@ export function isRepoQueryInvalidationEvent(value: unknown): value is RepoQuery
   return (
     event.type === 'repo-query-invalidated' &&
     typeof event.repoId === 'string' &&
-    event.query === 'repo-snapshot' &&
-    (event.sourceToken === undefined || typeof event.sourceToken === 'string')
+    event.query === 'repo-snapshot'
   )
 }

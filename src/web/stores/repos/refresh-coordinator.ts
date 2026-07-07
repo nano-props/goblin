@@ -1,8 +1,4 @@
 import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidation.ts'
-import {
-  shouldSuppressRepoInvalidationSource,
-  resetRepoInvalidationSourceState,
-} from '#/web/stores/repos/invalidation-sources.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState, ReposGet } from '#/web/stores/repos/types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
@@ -23,8 +19,6 @@ export type RepoRefreshIntent =
       reason: 'visible-projection-view-opened' | 'visible-projection-branch-changed'
       branchName: string | null
     })
-
-type RepoInvalidationRefreshDisposition = 'refresh' | 'suppress'
 
 export interface RepoVisibleProjectionRefreshState {
   id: string
@@ -70,30 +64,19 @@ export function requestVisibleRepoProjectionRefresh(get: ReposGet, id: string, b
   })
 }
 
-export function repoInvalidationRefreshDisposition(
-  event: Pick<RepoQueryInvalidationEvent, 'sourceToken'>,
-): RepoInvalidationRefreshDisposition {
-  if (shouldSuppressRepoInvalidationSource(event.sourceToken)) return 'suppress'
-  return 'refresh'
-}
-
 export async function handleRepoInvalidationRefresh(
   get: ReposGet,
-  event: Pick<RepoQueryInvalidationEvent, 'repoId' | 'query' | 'sourceToken'>,
+  event: Pick<RepoQueryInvalidationEvent, 'repoId' | 'query'>,
   repoInstanceId: string,
 ): Promise<void> {
   const repoId = event.repoId
   const repo = get().repos[repoId]
   if (!repo || repo.instanceId !== repoInstanceId || isRepoUnavailable(repo)) return
-  const disposition = repoInvalidationRefreshDisposition(event)
-  if (disposition !== 'refresh') return
   invalidateRepoDataQueries(repoId, repoInstanceId)
   await get().refreshCoreData(repoId, { repoInstanceId })
 }
 
-export function resetRepoRefreshCoordinatorState(): void {
-  resetRepoInvalidationSourceState()
-}
+export function resetRepoRefreshCoordinatorState(): void {}
 
 export async function runRepoRefreshIntent(get: ReposGet, intent: RepoRefreshIntent): Promise<void> {
   switch (intent.kind) {

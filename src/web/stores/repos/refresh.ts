@@ -10,7 +10,6 @@ import {
   resolveActionRepoInstanceId,
 } from '#/web/stores/repos/refresh-state.ts'
 import { createRefreshSyncHelpers } from '#/web/stores/repos/refresh-sync.ts'
-import { runWithRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import { finishDataLoadError, finishDataLoadSuccess, startDataLoad } from '#/web/stores/repos/repo-data-load-state.ts'
 import { getRepoProjection } from '#/web/repo-client.ts'
 import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
@@ -193,11 +192,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         lane: 'read',
         priority: 100,
         targets: [{ key: 'manualRefresh', reason: 'manual-refresh' }],
-        task: async () =>
-          await runWithRepoInvalidationSource(
-            'manual',
-            async (sourceToken) => await runManualSyncPipeline(id, repoInstanceId, sourceToken),
-          ),
+        task: async () => await runManualSyncPipeline(id, repoInstanceId),
       })
     },
   }

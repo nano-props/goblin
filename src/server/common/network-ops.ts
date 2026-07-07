@@ -30,9 +30,8 @@ export interface ServerOperationLifecycle {
 }
 
 interface RunServerCancellableOptions {
-  operationId?: string
   operation?: ServerOperationLifecycle
-  gate?: object
+  activeKey?: object
   operationKind?: RepoServerOperationKind
   target?: RepoServerOperationTarget | null
   repoInstanceId?: string | null
@@ -50,7 +49,6 @@ function beginRegistryOperation(
   options: RunServerCancellableOptions,
 ): ServerOperationLifecycle {
   const operation = beginRepoServerOperation({
-    id: options.operationId,
     repoId,
     repoInstanceId: options.repoInstanceId,
     kind: options.operationKind ?? 'network',
@@ -117,8 +115,8 @@ export async function runServerCancellable(
   options: RunServerCancellableOptions = {},
 ): Promise<ExecResult> {
   const operation = options.operation ?? beginRegistryOperation(repoId, kind, options)
-  const operationGateId = options.gate ?? repoId
-  let active = activeNetworkOps.get(operationGateId)
+  const activeOperationKey = options.activeKey ?? repoId
+  let active = activeNetworkOps.get(activeOperationKey)
   if (active) {
     if (kind === 'user' && active.kind === 'background') {
       const canContinue = await waitForActiveNetworkOp(active, options.callerSignal, operation)
@@ -127,7 +125,7 @@ export async function runServerCancellable(
         operation.settle(result)
         return result
       }
-      active = activeNetworkOps.get(operationGateId)
+      active = activeNetworkOps.get(activeOperationKey)
     }
     if (active) {
       const result = { ok: false, message: 'error.network-op-in-progress' }
@@ -140,7 +138,7 @@ export async function runServerCancellable(
   const done = new Promise<void>((resolve) => {
     resolveDone = resolve
   })
-  const keys = Array.from(new Set([operationGateId, repoId]))
+  const keys = Array.from(new Set([activeOperationKey, repoId]))
   const slot: ActiveNetworkOp = { ctrl, kind, operation, done, keys }
   for (const key of keys) activeNetworkOps.set(key, slot)
   operation.start()

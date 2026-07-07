@@ -12,7 +12,6 @@ import { getRepositoryFileViewer } from '#/server/modules/repo-file-viewer.ts'
 import { getRepositoryTree } from '#/server/modules/repo-tree.ts'
 import { trashRepositoryFile } from '#/server/modules/repo-tree-trash.ts'
 import {
-  abortCloneOperation,
   abortRepoOperation,
   cloneRepo,
   createRepoWorktree,
@@ -146,50 +145,42 @@ export function createRepoRoutes() {
     return c.json(await readRepoOperationsSnapshot(cwd, { includeSettled, signal: c.req.raw.signal }))
   })
   app.post('/fetch', async (c) => {
-    const { cwd, kind, sourceToken } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fetch, c)
+    const { cwd, kind } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fetch, c)
     return c.json(
-      await jsonOr(() => fetchRepo(cwd, kind ?? 'user', sourceToken, c.req.raw.signal), READ_REPO_ERROR, 'fetch'),
+      await jsonOr(() => fetchRepo(cwd, kind ?? 'user', c.req.raw.signal), READ_REPO_ERROR, 'fetch'),
     )
   })
   app.post('/clone', async (c) => {
-    const { operationId, url, parentPath, directoryName } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.clone, c)
+    const { url, parentPath, directoryName } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.clone, c)
     return c.json(
-      await jsonOr(
-        () => cloneRepo(operationId, url, parentPath, directoryName, c.req.raw.signal),
-        READ_REPO_ERROR,
-        'clone',
-      ),
+      await jsonOr(() => cloneRepo(url, parentPath, directoryName, c.req.raw.signal), READ_REPO_ERROR, 'clone'),
     )
   })
-  app.post('/abort-clone', async (c) => {
-    const { operationId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.abortClone, c)
-    return c.json(await jsonOr(async () => abortCloneOperation(operationId), false, 'abort-clone'))
-  })
   app.post('/pull', async (c) => {
-    const { cwd, branch, worktreePath, sourceToken } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pull, c)
+    const { cwd, branch, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pull, c)
     return c.json(
       await jsonOr(
-        () => pullRepoBranch(cwd, branch, worktreePath, c.req.raw.signal, sourceToken),
+        () => pullRepoBranch(cwd, branch, worktreePath, c.req.raw.signal),
         READ_REPO_ERROR,
         'pull',
       ),
     )
   })
   app.post('/push', async (c) => {
-    const { cwd, branch, sourceToken } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.push, c)
+    const { cwd, branch } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.push, c)
     return c.json(
-      await jsonOr(() => pushRepoBranch(cwd, branch, c.req.raw.signal, sourceToken), READ_REPO_ERROR, 'push'),
+      await jsonOr(() => pushRepoBranch(cwd, branch, c.req.raw.signal), READ_REPO_ERROR, 'push'),
     )
   })
   app.post('/create-worktree', async (c) => {
-    const { cwd, worktreePath, mode, sourceToken, worktreeBootstrap } = await parseHttpBody(
+    const { cwd, worktreePath, mode, worktreeBootstrap } = await parseHttpBody(
       REPO_PROCEDURE_SCHEMAS.createWorktree,
       c,
     )
     return c.json(
       await jsonOr(
         () =>
-          createRepoWorktree(cwd, { worktreePath, mode }, c.req.raw.signal, sourceToken, {
+          createRepoWorktree(cwd, { worktreePath, mode }, c.req.raw.signal, {
             worktreeBootstrap,
           }),
         READ_REPO_ERROR,
@@ -198,20 +189,20 @@ export function createRepoRoutes() {
     )
   })
   app.post('/delete-branch', async (c) => {
-    const { cwd, branch, force, alsoDeleteUpstream, sourceToken } = await parseHttpBody(
+    const { cwd, branch, force, alsoDeleteUpstream } = await parseHttpBody(
       REPO_PROCEDURE_SCHEMAS.deleteBranch,
       c,
     )
     return c.json(
       await jsonOr(
-        () => deleteRepoBranch(cwd, branch, { force, alsoDeleteUpstream }, c.req.raw.signal, sourceToken),
+        () => deleteRepoBranch(cwd, branch, { force, alsoDeleteUpstream }, c.req.raw.signal),
         READ_REPO_ERROR,
         'delete-branch',
       ),
     )
   })
   app.post('/remove-worktree', async (c) => {
-    const { cwd, branch, worktreePath, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream, sourceToken } =
+    const { cwd, branch, worktreePath, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream } =
       await parseHttpBody(REPO_PROCEDURE_SCHEMAS.removeWorktree, c)
     return c.json(
       await jsonOr(
@@ -220,7 +211,6 @@ export function createRepoRoutes() {
             cwd,
             { branch, worktreePath, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream },
             c.req.raw.signal,
-            sourceToken,
           ),
         READ_REPO_ERROR,
         'remove-worktree',

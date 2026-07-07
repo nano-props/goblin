@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   readRepoOperationsSnapshot: vi.fn(),
   fetchRepo: vi.fn(),
   cloneRepo: vi.fn(),
-  abortCloneOperation: vi.fn(),
   pullRepoBranch: vi.fn(),
   pushRepoBranch: vi.fn(),
   createRepoWorktree: vi.fn(),
@@ -53,7 +52,6 @@ vi.mock('#/server/modules/repo-tree-trash.ts', () => ({
 }))
 vi.mock('#/server/modules/repo-write-paths.ts', () => ({
   cloneRepo: mocks.cloneRepo,
-  abortCloneOperation: mocks.abortCloneOperation,
   pullRepoBranch: mocks.pullRepoBranch,
   pushRepoBranch: mocks.pushRepoBranch,
   createRepoWorktree: mocks.createRepoWorktree,
@@ -589,10 +587,10 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       }),
     )
     expect(response.status).toBe(200)
-    expect(mocks.fetchRepo).toHaveBeenCalledWith('/tmp/repo', 'user', undefined, expect.any(AbortSignal))
+    expect(mocks.fetchRepo).toHaveBeenCalledWith('/tmp/repo', 'user', expect.any(AbortSignal))
   })
 
-  test('clone route forwards operationId/url/parentPath/directoryName', async () => {
+  test('clone route forwards url/parentPath/directoryName and the request abort signal', async () => {
     mocks.cloneRepo.mockResolvedValue({ ok: true, message: 'ok', path: '/tmp/repo' })
     const app = createTestRepoRoutes()
     const response = await app.request(
@@ -600,7 +598,6 @@ describe('repo routes — POST body validation (action endpoints)', () => {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          operationId: 'op_1',
           url: 'https://example.com/r.git',
           parentPath: '/tmp',
           directoryName: 'r',
@@ -608,7 +605,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       }),
     )
     expect(response.status).toBe(200)
-    expect(mocks.cloneRepo).toHaveBeenCalledWith('op_1', 'https://example.com/r.git', '/tmp', 'r', expect.any(AbortSignal))
+    expect(mocks.cloneRepo).toHaveBeenCalledWith('https://example.com/r.git', '/tmp', 'r', expect.any(AbortSignal))
   })
 
   test('open-url route forwards repo URL targets', async () => {

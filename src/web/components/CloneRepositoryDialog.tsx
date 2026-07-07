@@ -5,19 +5,17 @@ import { DialogStatusRow } from '#/web/components/ui/dialog-status-row.tsx'
 import { FormDialog } from '#/web/components/ui/form-dialog.tsx'
 import { Field, FieldDescription, FieldError, FieldLabel } from '#/web/components/ui/field.tsx'
 import { Input } from '#/web/components/ui/input.tsx'
-import { abortCloneOperation } from '#/web/repo-client.ts'
 import { chooseCloneParentPath, hasNativeDirectoryPicker, homeDirectory } from '#/web/app-shell-client.ts'
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { joinPath, tildify, untildify } from '#/web/lib/paths.ts'
 import { cn } from '#/web/lib/cn.ts'
 import type { CloneRepoResult } from '#/shared/api-types.ts'
-import { createOpaqueId } from '#/shared/opaque-id.ts'
 export interface CloneRepositoryRequest {
-  operationId: string
   url: string
   parentPath: string
   directoryName: string
+  signal: AbortSignal
 }
 
 interface Props {
@@ -35,7 +33,7 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
   const [directoryTouched, setDirectoryTouched] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const operationIdRef = useRef<string | null>(null)
+  const cloneAbortRef = useRef<AbortController | null>(null)
 
   const urlTrimmed = url.trim()
   const parentPathTrimmed = untildify(parentPath.trim())
@@ -51,14 +49,18 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
   const canChooseParentPath = hasNativeDirectoryPicker()
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      cloneAbortRef.current?.abort()
+      cloneAbortRef.current = null
+      return
+    }
     setUrl('')
     setParentPath(tildify(defaultCloneParentPath()))
     setDirectoryName('')
     setDirectoryTouched(false)
     setPending(false)
     setError(null)
-    operationIdRef.current = null
+    cloneAbortRef.current = null
   }, [open])
 
   useEffect(() => {
@@ -78,26 +80,26 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
 
   async function handleSubmit() {
     if (!canSubmit) return
-    const operationId = createOperationId()
-    operationIdRef.current = operationId
+    const abortController = new AbortController()
+    cloneAbortRef.current = abortController
     setPending(true)
     setError(null)
     let result: CloneRepoResult
     try {
       result = await onClone({
-        operationId,
         url: urlTrimmed,
         parentPath: parentPathTrimmed,
         directoryName: directoryNameTrimmed,
+        signal: abortController.signal,
       })
     } catch (err) {
-      if (operationIdRef.current !== operationId) return
+      if (cloneAbortRef.current !== abortController) return
       setPending(false)
       setError(err instanceof Error ? err.message : t('error.unknown'))
       return
     }
-    if (operationIdRef.current !== operationId) return
-    operationIdRef.current = null
+    if (cloneAbortRef.current !== abortController) return
+    cloneAbortRef.current = null
     if (result.ok) {
       setPending(false)
       onClose()
@@ -109,10 +111,10 @@ export function CloneRepositoryDialog({ open, onClose, onClone }: Props) {
   }
 
   async function handleCancel() {
-    const operationId = operationIdRef.current
-    operationIdRef.current = null
-    if (pending && operationId) {
-      void abortCloneOperation(operationId).catch(() => {})
+    const abortController = cloneAbortRef.current
+    cloneAbortRef.current = null
+    if (pending && abortController) {
+      abortController.abort()
       setPending(false)
     }
     onClose()
@@ -245,8 +247,4 @@ function isValidDirectoryName(name: string): boolean {
 
 function defaultCloneParentPath(): string {
   return joinPath(homeDirectory(), 'Developer')
-}
-
-function createOperationId(): string {
-  return createOpaqueId('clone-operation')
 }

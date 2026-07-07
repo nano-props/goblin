@@ -63,7 +63,7 @@ export function createRefreshSyncHelpers(set: ReposSet, get: ReposGet) {
     })
   }
 
-  async function attemptFetch(id: string, repoInstanceId: string, sourceToken?: string): Promise<ExecResult | null> {
+  async function attemptFetch(id: string, repoInstanceId: string): Promise<ExecResult | null> {
     let repo = repoIfFresh(get, id, repoInstanceId)
     if (!repo || !shouldAttemptFetch(repo, repoInstanceId)) return null
     if (!canStartRemoteFetch(repo)) {
@@ -77,7 +77,7 @@ export function createRefreshSyncHelpers(set: ReposSet, get: ReposGet) {
       if (!canStartRemoteFetch(repo)) return null
     }
     try {
-      return await runNetworkTask(id, (signal) => fetchRepo(id, 'user', signal, sourceToken), {
+      return await runNetworkTask(id, (signal) => fetchRepo(id, 'user', signal), {
         repoInstanceId,
         reason: 'user-fetch',
         priority: 100,
@@ -96,12 +96,12 @@ export function createRefreshSyncHelpers(set: ReposSet, get: ReposGet) {
     if (fetchResult.message !== 'cancelled') get().setLastResult(id, fetchResult, repoInstanceId)
   }
 
-  async function runManualSyncPipeline(id: string, repoInstanceId: string, sourceToken: string): Promise<void> {
+  async function runManualSyncPipeline(id: string, repoInstanceId: string): Promise<void> {
     let fetchResult: ExecResult | null = null
     const repoBeforeFetch = repoIfFresh(get, id, repoInstanceId)
     if (!repoBeforeFetch) return
     if (shouldAttemptFetch(repoBeforeFetch, repoInstanceId)) {
-      fetchResult = await attemptFetch(id, repoInstanceId, sourceToken)
+      fetchResult = await attemptFetch(id, repoInstanceId)
     }
     if (repoIfFresh(get, id, repoInstanceId)) {
       await get().refreshCoreData(id, { repoInstanceId })

@@ -374,7 +374,7 @@ describe('fetchRepo invalidation publishing', () => {
     })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const result = await fetchRepo('/tmp/repo', 'user', undefined, caller.signal)
+    const result = await fetchRepo('/tmp/repo', 'user', caller.signal)
 
     expect(result).toEqual({ ok: false, message: 'cancelled' })
     expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
@@ -459,7 +459,7 @@ describe('fetchRepo invalidation publishing', () => {
     })
 
     const caller = new AbortController()
-    const user = fetchRepo('/tmp/repo', 'user', undefined, caller.signal)
+    const user = fetchRepo('/tmp/repo', 'user', caller.signal)
     caller.abort('client disconnected')
 
     await expect(user).resolves.toEqual({ ok: false, message: 'cancelled' })
@@ -497,7 +497,7 @@ describe('fetchRepo invalidation publishing', () => {
     })
 
     const caller = new AbortController()
-    const user = fetchRepo('/tmp/repo', 'user', undefined, caller.signal)
+    const user = fetchRepo('/tmp/repo', 'user', caller.signal)
     caller.abort('client disconnected')
 
     await expect(user).resolves.toEqual({ ok: false, message: 'cancelled' })
@@ -537,7 +537,7 @@ describe('cloneRepo cancellation', () => {
     caller.abort('client disconnected')
 
     const { cloneRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const result = await cloneRepo('op_1', 'https://example.com/repo.git', '/tmp', 'repo', caller.signal)
+    const result = await cloneRepo('https://example.com/repo.git', '/tmp', 'repo', caller.signal)
 
     expect(result).toEqual({ ok: false, message: 'cancelled' })
     expect(mocks.checkGitAvailable).not.toHaveBeenCalled()
@@ -555,42 +555,46 @@ describe('cloneRepo cancellation', () => {
     })
 
     const { cloneRepo } = await import('#/server/modules/repo-write-paths.ts')
-    const result = await cloneRepo('op_1', 'https://example.com/repo.git', '/tmp', 'repo', caller.signal)
+    const result = await cloneRepo('https://example.com/repo.git', '/tmp', 'repo', caller.signal)
 
     expect(result).toEqual({ ok: false, message: 'cancelled' })
   })
 
-  test('records clone operation state and structured user cancellation', async () => {
+  test('records clone operation state and structured caller cancellation', async () => {
     mocks.cloneGitRepo.mockImplementationOnce(
       (_parentPath: string, _directoryName: string, _url: string, signal?: AbortSignal) =>
         new Promise((resolve) => {
           signal?.addEventListener('abort', () => resolve({ ok: false, message: 'cancelled' }))
         }),
     )
-    const { cloneRepo, abortCloneOperation } = await import('#/server/modules/repo-write-paths.ts')
+    const { cloneRepo } = await import('#/server/modules/repo-write-paths.ts')
     const { listRepoServerOperations } = await import('#/server/modules/repo-operation-registry.ts')
+    const caller = new AbortController()
 
-    const work = cloneRepo('op_1', 'https://example.com/repo.git', '/tmp', 'repo')
+    const work = cloneRepo('https://example.com/repo.git', '/tmp', 'repo', caller.signal)
+    let operationId = ''
     await vi.waitFor(() => {
-      expect(listRepoServerOperations({ includeSettled: true }).find((operation) => operation.id === 'op_1')).toMatchObject({
+      const operation = listRepoServerOperations({ includeSettled: true }).find((operation) => operation.kind === 'clone')
+      expect(operation).toMatchObject({
         kind: 'clone',
         phase: 'running',
         target: { parentPath: '/tmp', directoryName: 'repo' },
       })
+      operationId = operation!.id
     })
 
-    expect(abortCloneOperation('op_1')).toBe(true)
+    caller.abort('stopped')
     await expect(work).resolves.toEqual({ ok: false, message: 'cancelled' })
-    expect(listRepoServerOperations({ includeSettled: true }).find((operation) => operation.id === 'op_1')).toMatchObject({
+    expect(listRepoServerOperations({ includeSettled: true }).find((operation) => operation.id === operationId)).toMatchObject({
       kind: 'clone',
       phase: 'failed',
       cancellation: {
         underlyingRequested: true,
-        reason: 'user-cancel',
+        reason: 'caller-abort',
       },
       error: {
         message: 'cancelled',
-        reason: 'user-cancel',
+        reason: 'caller-abort',
       },
     })
   })
@@ -722,7 +726,6 @@ describe('repo mutation invalidation publishing', () => {
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
       },
       undefined,
-      undefined,
       {
         worktreeBootstrap: {
           kind: 'run',
@@ -762,7 +765,6 @@ describe('repo mutation invalidation publishing', () => {
         worktreePath: '/tmp/repo-worktree',
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
       },
-      undefined,
       undefined,
       {
         worktreeBootstrap: {
@@ -804,7 +806,6 @@ describe('repo mutation invalidation publishing', () => {
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
       },
       undefined,
-      undefined,
       {
         worktreeBootstrap: {
           kind: 'run',
@@ -829,7 +830,6 @@ describe('repo mutation invalidation publishing', () => {
         worktreePath: '/tmp/repo-worktree',
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
       },
-      undefined,
       undefined,
       {
         worktreeBootstrap: {
@@ -879,7 +879,6 @@ describe('repo mutation invalidation publishing', () => {
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
       },
       undefined,
-      undefined,
       {
         worktreeBootstrap: {
           kind: 'run',
@@ -907,7 +906,6 @@ describe('repo mutation invalidation publishing', () => {
         worktreePath: '/tmp/repo-worktree-b',
         mode: { kind: 'newBranch', newBranch: 'feature/b', baseRef: 'main' },
       },
-      undefined,
       undefined,
       {
         worktreeBootstrap: {
@@ -1135,7 +1133,6 @@ describe('repo mutation invalidation publishing', () => {
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
       },
       undefined,
-      undefined,
       {
         worktreeBootstrap: {
           kind: 'run',
@@ -1174,14 +1171,14 @@ describe('repo mutation invalidation publishing', () => {
       async (repo: typeof import('#/server/modules/repo-write-paths.ts')) =>
         repo.pushRepoBranch('/tmp/repo', 'feature/a'),
     ],
-  ])('%s runs inside the repo network-op gate', async (name, run) => {
+  ])('%s uses the repo write queue as the network-op active key', async (name, run) => {
     const repo = await import('#/server/modules/repo-write-paths.ts')
 
     const result = await run(repo)
 
     expect(result).toEqual({ ok: true, message: 'ok' })
     expect(mocks.runServerCancellable).toHaveBeenCalledWith('/tmp/repo', 'user', expect.any(Function), {
-      gate: expect.any(Object),
+      activeKey: expect.any(Object),
       operation: expect.objectContaining({
         id: expect.stringMatching(/^repo-write-op-/),
       }),
@@ -1245,7 +1242,6 @@ describe('repo mutation invalidation publishing', () => {
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
       },
       undefined,
-      undefined,
       {
         worktreeBootstrap: {
           kind: 'run',
@@ -1296,7 +1292,6 @@ describe('repo mutation invalidation publishing', () => {
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
       },
       undefined,
-      undefined,
       {
         worktreeBootstrap: {
           kind: 'run',
@@ -1335,7 +1330,6 @@ describe('repo mutation invalidation publishing', () => {
         worktreePath: '/tmp/repo-worktree',
         mode: { kind: 'newBranch', newBranch: 'feature/a', baseRef: 'main' },
       },
-      undefined,
       undefined,
       {
         worktreeBootstrap: {
@@ -1630,16 +1624,11 @@ describe('repo mutation invalidation publishing', () => {
     mocks.getWorktrees.mockResolvedValueOnce(worktrees).mockResolvedValueOnce(worktrees)
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await removeRepoWorktree(
-      '/tmp/repo-linked',
-      {
-        branch: 'feature/a',
-        worktreePath: '/tmp/repo-linked',
-        alsoDeleteBranch: true,
-      },
-      undefined,
-      'repo_branch_token',
-    )
+    const result = await removeRepoWorktree('/tmp/repo-linked', {
+      branch: 'feature/a',
+      worktreePath: '/tmp/repo-linked',
+      alsoDeleteBranch: true,
+    })
 
     expect(result).toEqual({ ok: true, message: 'ok' })
     expect(mocks.getCurrentBranch).toHaveBeenCalledWith('/tmp/repo', { signal: undefined })
@@ -1648,7 +1637,6 @@ describe('repo mutation invalidation publishing', () => {
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(1, {
       repoId: '/tmp/repo-linked',
       query: 'repo-snapshot',
-      sourceToken: 'repo_branch_token',
     })
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(2, {
       repoId: '/tmp/repo',

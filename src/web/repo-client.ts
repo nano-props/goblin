@@ -29,24 +29,21 @@ export async function probeRepo(cwd: string, signal?: AbortSignal): Promise<Prob
 }
 
 export async function cloneRepository(input: {
-  operationId: string
   url: string
   parentPath: string
   directoryName: string
-}): Promise<CloneRepoResult> {
+}, options?: { signal?: AbortSignal }): Promise<CloneRepoResult> {
   try {
-    return await postServerJson('/api/repo/clone', input, { timeoutMs: REPO_REQUEST_TIMEOUT_MS.clone })
+    return await postServerJson('/api/repo/clone', input, {
+      signal: options?.signal,
+      timeoutMs: REPO_REQUEST_TIMEOUT_MS.clone,
+    })
   } catch (err) {
     if (err instanceof Error && err.message === SERVER_REQUEST_TIMEOUT_ERROR) {
-      void abortCloneOperation(input.operationId).catch(() => {})
       return { ok: false, message: SERVER_REQUEST_TIMEOUT_ERROR }
     }
     throw err
   }
-}
-
-export async function abortCloneOperation(operationId: string): Promise<boolean> {
-  return await postServerJson('/api/repo/abort-clone', { operationId })
 }
 
 export async function getRepoLog(
@@ -100,9 +97,8 @@ export async function fetchRepo(
   cwd: string,
   kind?: 'user' | 'background',
   signal?: AbortSignal,
-  sourceToken?: string,
 ): Promise<{ ok: boolean; message: string }> {
-  return await postServerJson('/api/repo/fetch', kind ? { cwd, kind, sourceToken } : { cwd, sourceToken }, {
+  return await postServerJson('/api/repo/fetch', kind ? { cwd, kind } : { cwd }, {
     signal,
     timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
   })
@@ -113,11 +109,10 @@ export async function pullRepoBranch(
   branch: string,
   worktreePath?: string,
   signal?: AbortSignal,
-  sourceToken?: string,
 ): Promise<ExecResult> {
   return await postServerJson(
     '/api/repo/pull',
-    { cwd, branch, worktreePath, sourceToken },
+    { cwd, branch, worktreePath },
     { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork },
   )
 }
@@ -126,9 +121,8 @@ export async function pushRepoBranch(
   cwd: string,
   branch: string,
   signal?: AbortSignal,
-  sourceToken?: string,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/push', { cwd, branch, sourceToken }, {
+  return await postServerJson('/api/repo/push', { cwd, branch }, {
     signal,
     timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
   })
@@ -139,11 +133,10 @@ export async function createRepoWorktree(
   input: CreateWorktreeInput,
   worktreeBootstrap: WorktreeBootstrapDecision,
   signal?: AbortSignal,
-  sourceToken?: string,
 ): Promise<ExecResult> {
   return await postServerJson(
     '/api/repo/create-worktree',
-    { cwd, ...input, sourceToken, worktreeBootstrap },
+    { cwd, ...input, worktreeBootstrap },
     { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.worktreeCreate },
   )
 }
@@ -160,11 +153,10 @@ export async function deleteRepoBranch(
   branch: string,
   options?: { force?: boolean; alsoDeleteUpstream?: boolean },
   signal?: AbortSignal,
-  sourceToken?: string,
 ): Promise<ExecResult> {
   return await postServerJson(
     '/api/repo/delete-branch',
-    { cwd, branch, force: options?.force, alsoDeleteUpstream: options?.alsoDeleteUpstream, sourceToken },
+    { cwd, branch, force: options?.force, alsoDeleteUpstream: options?.alsoDeleteUpstream },
     { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.branchMutation },
   )
 }
@@ -179,9 +171,8 @@ export async function removeRepoWorktree(
     alsoDeleteUpstream?: boolean
   },
   signal?: AbortSignal,
-  sourceToken?: string,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/remove-worktree', { cwd, ...options, sourceToken }, {
+  return await postServerJson('/api/repo/remove-worktree', { cwd, ...options }, {
     signal,
     timeoutMs: REPO_REQUEST_TIMEOUT_MS.removeWorktree,
   })
