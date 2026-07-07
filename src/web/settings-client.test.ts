@@ -122,24 +122,26 @@ describe('settings-client', () => {
 
   test('passes abort signal through when fetching i18n payload', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
-    const fetchMock = mockFetch(async () => ({
-      ok: true,
-      json: async () => ({ lang: 'en', pref: 'auto', dict: { hello: 'hello' } }),
-    }))
+    const fetchMock = mockFetch((_url, init) => {
+      const signal = (init as RequestInit | undefined)?.signal
+      return new Promise((_resolve, reject) => {
+        if (signal?.aborted) reject(signal.reason)
+        signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+      })
+    })
     const controller = new AbortController()
 
     const { getI18nSnapshot } = await import('#/web/settings-client.ts')
-    await expect(getI18nSnapshot({ signal: controller.signal })).resolves.toEqual({
-      lang: 'en',
-      pref: 'auto',
-      dict: { hello: 'hello' },
-    })
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:32100/api/i18n',
-      expect.objectContaining({
-        signal: controller.signal,
-      }),
-    )
+    const request = getI18nSnapshot({ signal: controller.signal })
+    const assertion = expect(request).rejects.toThrow('cancelled')
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    const requestSignal = init.signal
+    expect(requestSignal).toBeInstanceOf(AbortSignal)
+    expect(requestSignal).not.toBe(controller.signal)
+    expect(requestSignal?.aborted).toBe(false)
+    controller.abort(new Error('cancelled'))
+    expect(requestSignal?.aborted).toBe(true)
+    await assertion
   })
 
   test('sets the global shortcut through the native bridge even when the embedded server is available', async () => {

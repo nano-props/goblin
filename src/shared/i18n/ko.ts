@@ -512,6 +512,7 @@ export const ko: Record<DictKey, string> = {
   'error.repo-instance-stale': '리포지토리 인스턴스가 만료되었습니다',
   'error.not-controller': '이 터미널은 다른 세션이 제어하고 있습니다',
   'error.network-op-in-progress': '다른 git 네트워크 작업이 이미 실행 중입니다.',
+  'error.request-timeout': '요청 시간이 초과되었습니다. 다시 시도하세요.',
   'error.branch-action-wait-timeout': '저장소 새로고침 완료 대기 시간이 초과되었습니다.',
   'error.unknown': '알 수 없는 오류',
   'error.cannot-delete-current-branch': '현재 브랜치는 삭제할 수 없습니다',

@@ -524,6 +524,7 @@ export const en = {
   'error.repo-instance-stale': 'Repository instance is stale',
   'error.not-controller': 'Another session is controlling this terminal',
   'error.network-op-in-progress': 'Another git network operation is already running.',
+  'error.request-timeout': 'Request timed out. Try again.',
   'error.branch-action-wait-timeout': 'Timed out waiting for repository refresh to finish.',
   'error.unknown': 'Unknown error',
   'error.cannot-delete-current-branch': 'Cannot delete the current branch',

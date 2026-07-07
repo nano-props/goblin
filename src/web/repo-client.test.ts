@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { ClientBridge } from '#/web/client-bridge-types.ts'
@@ -65,6 +65,10 @@ describe('repo-client', () => {
     vi.resetModules()
     vi.restoreAllMocks()
     setClientBridgeForTests(null)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   test('opens repository branch URLs through the native host bridge when available', async () => {
@@ -176,6 +180,107 @@ describe('repo-client', () => {
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
       }),
     )
+  })
+
+  test('times out long-running fetch requests with a stable error key', async () => {
+    vi.useFakeTimers()
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    mockFetch((_url, init) => {
+      const signal = (init as RequestInit | undefined)?.signal
+      return new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+      })
+    })
+
+    const { fetchRepo } = await import('#/web/repo-client.ts')
+    const request = fetchRepo('/tmp/repo', 'user')
+    const assertion = expect(request).rejects.toThrow('error.request-timeout')
+
+    await vi.advanceTimersByTimeAsync(240_000)
+    await assertion
+  })
+
+  test('aborts clone operations after the clone request watchdog fires', async () => {
+    vi.useFakeTimers()
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const fetchMock = mockFetch((url, init) => {
+      const href = String(url)
+      if (href.endsWith('/api/repo/abort-clone')) {
+        return { ok: true, json: async () => true }
+      }
+      const signal = (init as RequestInit | undefined)?.signal
+      return new Promise((_resolve, reject) => {
+        signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+      })
+    })
+
+    const { cloneRepository } = await import('#/web/repo-client.ts')
+    const request = cloneRepository({
+      operationId: 'op_1',
+      url: 'https://example.com/repo.git',
+      parentPath: '/tmp',
+      directoryName: 'repo',
+    })
+
+    await vi.advanceTimersByTimeAsync(360_000)
+    await expect(request).resolves.toEqual({ ok: false, message: 'error.request-timeout' })
+    await Promise.resolve()
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://127.0.0.1:32100/api/repo/abort-clone',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ operationId: 'op_1' }),
+      }),
+    )
+  })
+
+  test('gives remove-worktree a multi-step mutation request budget', async () => {
+    vi.useFakeTimers()
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    let requestSignal: AbortSignal | undefined
+    mockFetch((_url, init) => {
+      requestSignal = (init as RequestInit | undefined)?.signal ?? undefined
+      return new Promise((_resolve, reject) => {
+        requestSignal?.addEventListener('abort', () => reject(requestSignal?.reason), { once: true })
+      })
+    })
+
+    const { removeRepoWorktree } = await import('#/web/repo-client.ts')
+    const request = removeRepoWorktree('/tmp/repo', {
+      branch: 'feature/remove',
+      worktreePath: '/tmp/repo-feature-remove',
+      alsoDeleteBranch: true,
+      alsoDeleteUpstream: true,
+    })
+    const assertion = expect(request).rejects.toThrow('error.request-timeout')
+
+    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(240_000)
+    expect(requestSignal?.aborted).toBe(false)
+    await vi.advanceTimersByTimeAsync(360_000)
+    await assertion
+  })
+
+  test('gives patch generation an explicit long-read request budget', async () => {
+    vi.useFakeTimers()
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    let requestSignal: AbortSignal | undefined
+    mockFetch((_url, init) => {
+      requestSignal = (init as RequestInit | undefined)?.signal ?? undefined
+      return new Promise((_resolve, reject) => {
+        requestSignal?.addEventListener('abort', () => reject(requestSignal?.reason), { once: true })
+      })
+    })
+
+    const { getRepoPatch } = await import('#/web/repo-client.ts')
+    const request = getRepoPatch('/tmp/repo', '/tmp/repo-feature')
+    const assertion = expect(request).rejects.toThrow('error.request-timeout')
+
+    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(120_000)
+    expect(requestSignal?.aborted).toBe(false)
+    await vi.advanceTimersByTimeAsync(780_000)
+    await assertion
   })
 
   test('throws when repository log returns an error envelope', async () => {

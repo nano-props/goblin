@@ -520,6 +520,7 @@ export const ja: Record<DictKey, string> = {
   'error.repo-instance-stale': 'リポジトリインスタンスは失効しています',
   'error.not-controller': 'このターミナルは他のセッションが制御しています',
   'error.network-op-in-progress': '別の git ネットワーク操作がすでに実行中です。',
+  'error.request-timeout': 'リクエストがタイムアウトしました。もう一度お試しください。',
   'error.branch-action-wait-timeout': 'リポジトリの更新完了待ちがタイムアウトしました。',
   'error.unknown': '不明なエラー',
   'error.cannot-delete-current-branch': '現在のブランチは削除できません',
