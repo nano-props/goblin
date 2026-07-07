@@ -37,6 +37,7 @@ import {
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 
 const REPO_ID = '/tmp/repo-workspace-container-repo'
 
@@ -374,6 +375,106 @@ describe('RepoWorkspace', () => {
     })
   })
 
+  test('syncs a routed terminal session into the projection-owned terminal selection', async () => {
+    const worktreePath = '/tmp/repo-workspace-container-repo-a'
+    const branchName = 'feature/a'
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
+      currentBranchName: branchName,
+      preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        [branchName]: [
+          workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+          workspacePaneRuntimeTabEntry('terminal', 'session-2'),
+        ],
+      },
+    })
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
+    useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'session-1')
+    const route = routeNavigation()
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext
+              value={terminalReadContextWithSessions(terminalWorktreeKey, ['session-1', 'session-2'])}
+            >
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName={branchName}
+                workspacePaneRoute={{ kind: 'terminal', terminalSessionId: 'session-2' }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]).toBe(
+        'session-2',
+      )
+    })
+    expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
+  })
+
+  test('preserves existing app history when canonicalizing a stale terminal route from another page', async () => {
+    const worktreePath = '/tmp/repo-workspace-container-repo-a'
+    const branchName = 'feature/a'
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
+      currentBranchName: branchName,
+      preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-1')],
+      },
+    })
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
+    useReposStore.getState().recordWorkspaceNavigation({ repoId: REPO_ID, route: { kind: 'dashboard' } })
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
+    const route = routeNavigation()
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContextWithSession(terminalWorktreeKey, 'session-1')}>
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName={branchName}
+                workspacePaneRoute={{ kind: 'terminal', terminalSessionId: 'missing-session' }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      expect(route.openRepoBranchTerminal).toHaveBeenCalledWith(REPO_ID, branchName, 'session-1', {
+        replace: true,
+      })
+      expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]).toEqual({
+        current: {
+          repoId: REPO_ID,
+          route: {
+            kind: 'branch',
+            branchName,
+            workspacePaneTab: 'terminal',
+            terminalWorktreeKey,
+            terminalSessionId: 'session-1',
+          },
+        },
+        backStack: [{ repoId: REPO_ID, route: { kind: 'dashboard' } }],
+        forwardStack: [],
+      })
+    })
+  })
+
   test('does not replace a missing terminal route while terminal projection is pending', async () => {
     const worktreePath = '/tmp/repo-workspace-container-repo-a'
     const branchName = 'feature/a'
@@ -415,6 +516,50 @@ describe('RepoWorkspace', () => {
     expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]).not.toBe(
       'missing-session',
     )
+  })
+
+  test('syncs a routed static tab after the branch projection appears', async () => {
+    const branchName = 'feature/cold-route'
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigationWithStore()}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName={branchName}
+                workspacePaneRoute={{ kind: 'static', tab: 'history' }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    act(() => {
+      seedRepoWithReadModelForTest({
+        id: REPO_ID,
+        branches: [createRepoBranch(branchName)],
+        currentBranchName: branchName,
+        preferredWorkspacePaneTab: 'status',
+        workspacePaneTabsByBranch: {
+          [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+        },
+      })
+    })
+
+    await waitFor(() => {
+      const repo = useReposStore.getState().repos[REPO_ID]
+      expect(
+        repo &&
+          preferredWorkspacePaneTabForTarget(repo.ui, {
+            repoRoot: REPO_ID,
+            branchName,
+            worktreePath: null,
+          }),
+      ).toBe('history')
+    })
   })
 
   test('replaces an unrenderable static route with the resolved static route', async () => {
@@ -587,23 +732,29 @@ function terminalReadContextWithSession(
   terminalWorktreeKey: string,
   terminalSessionId: string,
 ): TerminalSessionReadContextValue {
+  return terminalReadContextWithSessions(terminalWorktreeKey, [terminalSessionId], terminalSessionId)
+}
+
+function terminalReadContextWithSessions(
+  terminalWorktreeKey: string,
+  terminalSessionIds: readonly string[],
+  selectedTerminalSessionId: string | null = terminalSessionIds[0] ?? null,
+): TerminalSessionReadContextValue {
   const snapshot: TerminalWorktreeSnapshot = {
     terminalWorktreeKey,
     selectedDescriptor: null,
-    sessions: [
-      {
-        type: 'terminal',
-        terminalSessionId,
-        terminalWorktreeKey,
-        index: 1,
-        title: terminalSessionId,
-        phase: 'open',
-        selected: true,
-        hasBell: false,
-        hasRecentOutput: false,
-      },
-    ],
-    count: 1,
+    sessions: terminalSessionIds.map((terminalSessionId, index) => ({
+      type: 'terminal',
+      terminalSessionId,
+      terminalWorktreeKey,
+      index: index + 1,
+      title: terminalSessionId,
+      phase: 'open',
+      selected: terminalSessionId === selectedTerminalSessionId,
+      hasBell: false,
+      hasRecentOutput: false,
+    })),
+    count: terminalSessionIds.length,
     bellCount: 0,
     outputActiveCount: 0,
     createPending: false,

@@ -20,7 +20,6 @@ export interface WorkspacePaneRuntimeTabTargetInput {
   repoRoot: string
   repoInstanceId: string
   worktreePath: string | null
-  selectedSessionIdByRuntimeType?: WorkspacePaneRuntimeTabTargetSelectionByType
 }
 
 export interface WorkspacePaneRuntimeTabProviderProjection {
@@ -31,10 +30,6 @@ export interface WorkspacePaneRuntimeTabProviderProjection {
   selectedSessionId: string | null
 }
 
-interface WorkspacePaneRuntimeTabProjectionReadInput extends WorkspacePaneRuntimeTabTargetInput {
-  selectedSessionIdByRuntimeType?: WorkspacePaneRuntimeTabTargetSelectionByType
-}
-
 interface WorkspacePaneRuntimeTabSelectionSyncInput {
   activeSessionIdByRuntimeType: WorkspacePaneRuntimeTabTargetSelectionByType
   runtimeTabTargetKeyByType: WorkspacePaneRuntimeTabTargetKeyByType
@@ -43,7 +38,7 @@ interface WorkspacePaneRuntimeTabSelectionSyncInput {
 export interface WorkspacePaneRuntimeTabProjectionProvider {
   type: WorkspacePaneRuntimeTabType
   targetKey: (input: Pick<WorkspacePaneRuntimeTabTargetInput, 'repoRoot' | 'worktreePath'>) => string | null
-  readProjection: (input: WorkspacePaneRuntimeTabProjectionReadInput) => WorkspacePaneRuntimeTabProviderProjection
+  readProjection: (input: WorkspacePaneRuntimeTabTargetInput) => WorkspacePaneRuntimeTabProviderProjection
   useProjection: (input: WorkspacePaneRuntimeTabTargetInput) => WorkspacePaneRuntimeTabProviderProjection
   useSyncSelection: (
     input: WorkspacePaneRuntimeTabSelectionSyncInput,
@@ -99,7 +94,6 @@ export function readWorkspacePaneRuntimeTabProviderProjections(input: {
   repoRoot: string
   repoInstanceId: string
   worktreePath: string | null
-  selectedSessionIdByRuntimeType?: WorkspacePaneRuntimeTabTargetSelectionByType
 }): WorkspacePaneRuntimeTabProviderProjection[] {
   return workspacePaneRuntimeTabProjectionProviders().map((provider) => provider.readProjection(input))
 }
@@ -133,13 +127,10 @@ function readTerminalRuntimeTabProviderProjection(input: {
   repoRoot: string
   repoInstanceId: string
   worktreePath: string | null
-  selectedSessionIdByRuntimeType?: WorkspacePaneRuntimeTabTargetSelectionByType
 }): WorkspacePaneRuntimeTabProviderProjection {
   const targetKey = terminalRuntimeTabTargetKey(input)
   const snapshot = targetKey ? (readTerminalSessionCommandBridge()?.terminalWorktreeSnapshot(targetKey) ?? null) : null
-  const selectedSessionId = targetKey
-    ? (input.selectedSessionIdByRuntimeType?.terminal ?? readTerminalSelectedSessionId(targetKey))
-    : null
+  const selectedSessionId = targetKey ? readTerminalSelectedSessionId(targetKey) : null
   const projectionState = readTerminalRuntimeProjectionState(input.repoRoot, input.repoInstanceId)
   return {
     type: 'terminal',
@@ -163,7 +154,6 @@ function useTerminalRuntimeTabProviderProjection({
   repoRoot,
   repoInstanceId,
   worktreePath,
-  selectedSessionIdByRuntimeType,
 }: WorkspacePaneRuntimeTabTargetInput): WorkspacePaneRuntimeTabProviderProjection {
   const targetKey = terminalRuntimeTabTargetKey({ repoRoot, worktreePath })
   const terminalSessionSummaries = useTerminalSessionSummaries(targetKey)
@@ -174,7 +164,7 @@ function useTerminalRuntimeTabProviderProjection({
   )
 
   return useMemo(() => {
-    const selectedSessionId = targetKey ? (selectedSessionIdByRuntimeType?.terminal ?? selectedTerminalSessionId ?? null) : null
+    const selectedSessionId = targetKey ? (selectedTerminalSessionId ?? null) : null
     const currentHydration =
       terminalProjectionHydration.instanceId === repoInstanceId ? terminalProjectionHydration : null
     return {
@@ -192,7 +182,6 @@ function useTerminalRuntimeTabProviderProjection({
   }, [
     repoInstanceId,
     selectedTerminalSessionId,
-    selectedSessionIdByRuntimeType,
     targetKey,
     terminalCreatePending,
     terminalProjectionHydration,

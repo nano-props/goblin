@@ -132,6 +132,23 @@ describe('workspace navigation history', () => {
     expect(history().forwardStack).toEqual([])
   })
 
+  test('restores the cursor when browser back lands on an app forward stack entry', () => {
+    const store = useReposStore.getState()
+    const dashboard = entry('dashboard')
+    const status = branchEntry({ tab: 'status', terminalSessionId: null })
+    const terminal = branchEntry({ tab: 'terminal', terminalSessionId: 'session-1' })
+
+    store.recordWorkspaceNavigation(dashboard)
+    store.recordWorkspaceNavigation(status)
+    store.recordWorkspaceNavigation(terminal)
+    store.goBackInWorkspaceNavigation(REPO_ID)
+    store.recordWorkspaceNavigation(terminal, { browserHistoryTraversal: 'back' })
+
+    expect(history().current).toEqual(terminal)
+    expect(history().backStack).toEqual([dashboard, status])
+    expect(history().forwardStack).toEqual([])
+  })
+
   test('treats a new-worktree return target as part of the route identity', () => {
     const store = useReposStore.getState()
     store.recordWorkspaceNavigation(newWorktreeEntry('/repo/repo-slug/branch/feature-a'))

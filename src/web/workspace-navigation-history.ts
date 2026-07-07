@@ -26,12 +26,12 @@ export type WorkspaceNavigationRouteContext =
 interface WorkspaceNavigationHistoryOptions {
   routeContext: WorkspaceNavigationRouteContext | null
   replaceCurrent?: boolean
+  replaceCurrentRouteContext?: WorkspaceNavigationRouteContext | null
 }
 
 type WorkspaceNavigationBrowserHistoryTraversal = 'back' | 'forward'
 type WorkspaceNavigationBrowserHistoryAction =
-  | { href: string; type: 'BACK' | 'FORWARD' | 'PUSH' | 'REPLACE' }
-  | { href: string; type: 'GO'; index: number }
+  { href: string; type: 'BACK' | 'FORWARD' | 'PUSH' | 'REPLACE' } | { href: string; type: 'GO'; index: number }
 
 interface WorkspaceNavigationRouterHistory {
   state: { location: { href: string } }
@@ -39,9 +39,7 @@ interface WorkspaceNavigationRouterHistory {
     subscribe: (
       cb: (event: {
         location: { href: string }
-        action:
-          | { type: 'BACK' | 'FORWARD' | 'PUSH' | 'REPLACE' }
-          | { type: 'GO'; index: number }
+        action: { type: 'BACK' | 'FORWARD' | 'PUSH' | 'REPLACE' } | { type: 'GO'; index: number }
       }) => void,
     ) => () => void
   }
@@ -58,32 +56,34 @@ let browserHistoryAction: WorkspaceNavigationBrowserHistoryAction | null = null
 export function useWorkspaceNavigationHistory({
   routeContext,
   replaceCurrent = false,
+  replaceCurrentRouteContext = null,
 }: WorkspaceNavigationHistoryOptions): void {
   const entry = useWorkspaceNavigationHistoryEntry(routeContext)
+  const replaceCurrentEntry = useWorkspaceNavigationHistoryEntry(replaceCurrentRouteContext)
   const router = useRouter({ warn: false }) as WorkspaceNavigationRouterHistory | null
   const routeHref = router?.state.location.href ?? currentBrowserLocationHref()
   const recordWorkspaceNavigation = useReposStore((s) => s.recordWorkspaceNavigation)
 
-  useEffect(
-    () => {
-      if (!router) return
-      return router.history.subscribe(({ location, action }) => {
-        browserHistoryAction =
-          action.type === 'GO'
-            ? { href: location.href, type: 'GO', index: action.index }
-            : { href: location.href, type: action.type }
-      })
-    },
-    [router],
-  )
+  useEffect(() => {
+    if (!router) return
+    return router.history.subscribe(({ location, action }) => {
+      browserHistoryAction =
+        action.type === 'GO'
+          ? { href: location.href, type: 'GO', index: action.index }
+          : { href: location.href, type: action.type }
+    })
+  }, [router])
 
   useEffect(() => {
     if (!entry) return
-    const browserHistoryTraversal = replaceCurrent
-      ? null
-      : workspaceNavigationBrowserHistoryTraversal(routeHref)
+    const currentHistoryEntry = useReposStore.getState().navigationHistoryByRepo[entry.repoId]?.current ?? null
+    const replaceCurrentMatches =
+      replaceCurrent &&
+      !!replaceCurrentEntry &&
+      workspaceNavigationHistoryEntryEqual(currentHistoryEntry, replaceCurrentEntry)
+    const browserHistoryTraversal = replaceCurrentMatches ? null : workspaceNavigationBrowserHistoryTraversal(routeHref)
     if (restoreRecordingSuppressed) {
-      if (replaceCurrent) {
+      if (replaceCurrentMatches) {
         recordWorkspaceNavigation(entry, { replace: true })
         clearBrowserHistoryAction(routeHref)
         clearRestoreRecordingSuppression()
@@ -93,12 +93,19 @@ export function useWorkspaceNavigationHistory({
       if (workspaceNavigationHistoryEntryEqual(historyCurrent, entry)) {
         clearBrowserHistoryAction(routeHref)
         clearRestoreRecordingSuppression()
+        return
       }
+      recordWorkspaceNavigation(entry, browserHistoryTraversal ? { browserHistoryTraversal } : undefined)
+      clearBrowserHistoryAction(routeHref)
+      clearRestoreRecordingSuppression()
       return
     }
-    recordWorkspaceNavigation(entry, browserHistoryTraversal ? { browserHistoryTraversal } : undefined)
+    recordWorkspaceNavigation(
+      entry,
+      replaceCurrentMatches ? { replace: true } : browserHistoryTraversal ? { browserHistoryTraversal } : undefined,
+    )
     clearBrowserHistoryAction(routeHref)
-  }, [entry, recordWorkspaceNavigation, replaceCurrent, routeHref])
+  }, [entry, recordWorkspaceNavigation, replaceCurrent, replaceCurrentEntry, routeHref])
 }
 
 function useWorkspaceNavigationHistoryEntry(
@@ -276,7 +283,9 @@ function clearRestoreRecordingSuppression(): void {
   restoreRecordingSuppressionTimer = null
 }
 
-function workspaceNavigationBrowserHistoryTraversal(routeHref: string): WorkspaceNavigationBrowserHistoryTraversal | null {
+function workspaceNavigationBrowserHistoryTraversal(
+  routeHref: string,
+): WorkspaceNavigationBrowserHistoryTraversal | null {
   const action = browserHistoryAction
   if (!action || action.href !== routeHref) return null
   if (action.type === 'BACK') return 'back'

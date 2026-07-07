@@ -4,7 +4,6 @@ import type { WorkspacePaneTabSummary } from '#/web/components/workspace-pane/wo
 import {
   readWorkspacePaneRuntimeTabProviderProjections,
   type WorkspacePaneRuntimeTabProviderProjection,
-  type WorkspacePaneRuntimeTabTargetSelectionByType,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
 
 export type { WorkspacePaneRuntimeTabTargetSelectionByType } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
@@ -22,7 +21,6 @@ export function readWorkspacePaneRuntimeTabTargetProjection(input: {
   repoRoot: string
   repoInstanceId: string
   worktreePath: string | null
-  selectedSessionIdByRuntimeType?: WorkspacePaneRuntimeTabTargetSelectionByType
 }): WorkspacePaneRuntimeTabTargetProjection {
   return workspacePaneRuntimeTabTargetProjection({
     providers: readWorkspacePaneRuntimeTabProviderProjections(input),

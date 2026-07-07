@@ -181,6 +181,12 @@ Route reconciliation remains a boundary concern: stale or unrenderable URLs
 should be replaced with a canonical route from the current projection, not
 silently interpreted through local preferred-tab state.
 
+URL-backed terminal routes are requested selection, not projection state. A
+route such as `/terminal/{sessionId}` may ask the tab model to render that
+materialized session, but it must not be injected into the runtime projection's
+`selectedSessionId`. The shared selection-sync path is responsible for writing
+the resolved active session back to the projection owner.
+
 The bare branch URL is the canonical empty workspace-pane route. Explicit pane
 tabs use explicit URLs such as `/tab/status` or `/terminal/{sessionId}`. Do not
 canonicalize a bare branch URL to `/tab/status`: that erases the user's empty

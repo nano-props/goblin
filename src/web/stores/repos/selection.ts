@@ -6,10 +6,7 @@ import {
   normalizeWorkspaceSessionLayoutState,
 } from '#/shared/workspace-layout.ts'
 import type { BranchViewMode, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
-import type {
-  WorkspaceNavigationHistoryEntry,
-  WorkspaceNavigationHistoryRepoState,
-} from '#/web/stores/repos/types.ts'
+import type { WorkspaceNavigationHistoryEntry, WorkspaceNavigationHistoryRepoState } from '#/web/stores/repos/types.ts'
 import {
   workspaceNavigationHistoryEntryCanReplaceCurrent,
   workspaceNavigationHistoryEntryEqual,
@@ -324,32 +321,53 @@ function navigationHistoryWithRestoredEntry(
   entry: WorkspaceNavigationHistoryEntry,
   direction: 'back' | 'forward',
 ): WorkspaceNavigationHistoryRepoState | null {
-  if (!history.current) return null
-  const stack = direction === 'back' ? history.backStack : history.forwardStack
-  const targetIndex =
-    direction === 'back'
-      ? stack.findLastIndex((candidate) => workspaceNavigationHistoryEntryEqual(candidate, entry))
-      : stack.findIndex((candidate) => workspaceNavigationHistoryEntryEqual(candidate, entry))
-  if (targetIndex < 0) return null
+  const current = history.current
+  if (!current) return null
+  const backStackIndex = history.backStack.findLastIndex((candidate) =>
+    workspaceNavigationHistoryEntryEqual(candidate, entry),
+  )
+  const forwardStackIndex = history.forwardStack.findIndex((candidate) =>
+    workspaceNavigationHistoryEntryEqual(candidate, entry),
+  )
   if (direction === 'back') {
-    return {
-      current: entry,
-      backStack: stack.slice(0, targetIndex),
-      forwardStack: [
-        ...stack.slice(targetIndex + 1),
-        history.current,
-        ...history.forwardStack,
-      ].slice(0, MAX_WORKSPACE_NAVIGATION_HISTORY_ENTRIES),
-    }
+    if (backStackIndex >= 0) return navigationHistoryWithBackStackEntry(history, current, entry, backStackIndex)
+    if (forwardStackIndex >= 0)
+      return navigationHistoryWithForwardStackEntry(history, current, entry, forwardStackIndex)
+    return null
   }
+  if (forwardStackIndex >= 0) return navigationHistoryWithForwardStackEntry(history, current, entry, forwardStackIndex)
+  if (backStackIndex >= 0) return navigationHistoryWithBackStackEntry(history, current, entry, backStackIndex)
+  return null
+}
+
+function navigationHistoryWithBackStackEntry(
+  history: WorkspaceNavigationHistoryRepoState,
+  current: WorkspaceNavigationHistoryEntry,
+  entry: WorkspaceNavigationHistoryEntry,
+  targetIndex: number,
+): WorkspaceNavigationHistoryRepoState {
   return {
     current: entry,
-    backStack: [
-      ...history.backStack,
-      history.current,
-      ...stack.slice(0, targetIndex),
-    ].slice(-MAX_WORKSPACE_NAVIGATION_HISTORY_ENTRIES),
-    forwardStack: stack.slice(targetIndex + 1),
+    backStack: history.backStack.slice(0, targetIndex),
+    forwardStack: [...history.backStack.slice(targetIndex + 1), current, ...history.forwardStack].slice(
+      0,
+      MAX_WORKSPACE_NAVIGATION_HISTORY_ENTRIES,
+    ),
+  }
+}
+
+function navigationHistoryWithForwardStackEntry(
+  history: WorkspaceNavigationHistoryRepoState,
+  current: WorkspaceNavigationHistoryEntry,
+  entry: WorkspaceNavigationHistoryEntry,
+  targetIndex: number,
+): WorkspaceNavigationHistoryRepoState {
+  return {
+    current: entry,
+    backStack: [...history.backStack, current, ...history.forwardStack.slice(0, targetIndex)].slice(
+      -MAX_WORKSPACE_NAVIGATION_HISTORY_ENTRIES,
+    ),
+    forwardStack: history.forwardStack.slice(targetIndex + 1),
   }
 }
 

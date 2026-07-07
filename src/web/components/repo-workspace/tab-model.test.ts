@@ -86,6 +86,23 @@ describe('repo workspace pane tab model', () => {
     expect(repoWorkspaceRuntimeTabSessionId(model.activeTab, 'terminal')).toBe('session-2')
   })
 
+  test('uses a requested runtime session for the active tab without rewriting projection state', () => {
+    const model = createModel({
+      repoId: REPO_ID,
+      branchName: 'feature/model',
+      worktreePath: WORKTREE_PATH,
+      preferredTab: 'terminal',
+      tabEntries: [terminalEntry('session-1'), terminalEntry('session-2')],
+      runtimeTabViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, false)],
+      terminalProjectionPhase: 'ready',
+      selectedTerminalSessionId: 'session-1',
+      requestedSessionIdByRuntimeType: { terminal: 'session-2' },
+    })
+
+    expect(model.runtimeTabStateByType.terminal.selectedSessionId).toBe('session-1')
+    expect(repoWorkspaceRuntimeTabSessionId(model.activeTab, 'terminal')).toBe('session-2')
+  })
+
   test('creates pending runtime tabs from runtime tab state', () => {
     const model = createModel({
       repoId: REPO_ID,

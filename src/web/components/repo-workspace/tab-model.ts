@@ -80,6 +80,7 @@ export interface RepoWorkspaceRuntimeTabState {
 export type RepoWorkspaceRuntimeTabStateByType = Record<WorkspacePaneRuntimeTabType, RepoWorkspaceRuntimeTabState>
 export type RepoWorkspaceRuntimeViewsByType = Record<WorkspacePaneRuntimeTabType, WorkspacePaneRuntimeTabSummary[]>
 export type RepoWorkspaceTabEntriesProjectionPhase = 'pending' | 'ready' | 'failed'
+export type RepoWorkspaceRequestedRuntimeSessionByType = Partial<Record<WorkspacePaneRuntimeTabType, string | null>>
 
 export interface RepoWorkspaceRuntimeTabStateInput {
   createPending?: boolean
@@ -142,6 +143,7 @@ export interface RepoWorkspaceTabModelInput {
   tabEntriesProjectionPhase?: RepoWorkspaceTabEntriesProjectionPhase
   runtimeTabViews: readonly WorkspacePaneTabSummary[]
   runtimeTabStateByType: RepoWorkspaceRuntimeTabStateInputByType
+  requestedSessionIdByRuntimeType?: RepoWorkspaceRequestedRuntimeSessionByType
 }
 
 export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): RepoWorkspaceTabModel {
@@ -166,7 +168,12 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
       })
     : null
   const materializedActiveTab = candidateTab
-    ? activeRepoWorkspaceTab(materializedTabs, candidateTab, runtimeTabStateByType)
+    ? activeRepoWorkspaceTab(
+        materializedTabs,
+        candidateTab,
+        runtimeTabStateByType,
+        input.requestedSessionIdByRuntimeType,
+      )
     : null
   const selection =
     input.preferredTab === null ? null : workspacePaneSelection(candidateTab, materializedActiveTab, materializedTabs)
@@ -347,9 +354,11 @@ function activeRepoWorkspaceTab(
   tabs: readonly RepoWorkspaceMaterializedTab[],
   renderableTab: WorkspacePaneTabType,
   runtimeTabStateByType: RepoWorkspaceRuntimeTabStateByType,
+  requestedSessionIdByRuntimeType: RepoWorkspaceRequestedRuntimeSessionByType | undefined,
 ): RepoWorkspaceMaterializedTab | null {
   if (isWorkspacePaneRuntimeTabType(renderableTab)) {
-    const selectedSessionId = runtimeTabStateByType[renderableTab].selectedSessionId
+    const selectedSessionId =
+      requestedSessionIdByRuntimeType?.[renderableTab] ?? runtimeTabStateByType[renderableTab].selectedSessionId
     if (selectedSessionId) {
       const selected = tabs.find(
         (tab) => tab.kind === 'runtime' && tab.type === renderableTab && tab.sessionId === selectedSessionId,

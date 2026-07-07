@@ -52,10 +52,12 @@ export function useRepoWorkspaceTabModelInput(
     repoRoot: repo.id,
     repoInstanceId: repo.instanceId,
     worktreePath,
-    selectedSessionIdByRuntimeType:
-      workspacePaneRoute?.kind === 'terminal' ? { terminal: workspacePaneRoute.terminalSessionId } : undefined,
   })
   const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(repo.id, repo.instanceId)
+  const requestedSessionIdByRuntimeType = useMemo(
+    () => (workspacePaneRoute?.kind === 'terminal' ? { terminal: workspacePaneRoute.terminalSessionId } : undefined),
+    [workspacePaneRoute],
+  )
 
   const workspacePaneTabEntries = useMemo(
     () =>
@@ -67,15 +69,15 @@ export function useRepoWorkspaceTabModelInput(
     [workspacePaneTabsQuery.data, repo.id, repo.instanceId, branchName, worktreePath],
   )
 
-  const preferredTab = useMemo(
-    () => {
-      if (workspacePaneRoute === null) return null
-      if (workspacePaneRoute?.kind === 'static') return workspacePaneRoute.tab
-      if (workspacePaneRoute?.kind === 'terminal') return 'terminal'
-      return preferredWorkspacePaneTabForTarget(repo.ui, branchName ? { repoRoot: repo.id, branchName, worktreePath } : null)
-    },
-    [repo.ui.preferredWorkspacePaneTabByTarget, repo.id, branchName, worktreePath, workspacePaneRoute],
-  )
+  const preferredTab = useMemo(() => {
+    if (workspacePaneRoute === null) return null
+    if (workspacePaneRoute?.kind === 'static') return workspacePaneRoute.tab
+    if (workspacePaneRoute?.kind === 'terminal') return 'terminal'
+    return preferredWorkspacePaneTabForTarget(
+      repo.ui,
+      branchName ? { repoRoot: repo.id, branchName, worktreePath } : null,
+    )
+  }, [repo.ui.preferredWorkspacePaneTabByTarget, repo.id, branchName, worktreePath, workspacePaneRoute])
 
   const input = useMemo<RepoWorkspaceTabModelInput>(
     () => ({
@@ -87,6 +89,7 @@ export function useRepoWorkspaceTabModelInput(
       tabEntriesProjectionPhase: workspacePaneTabsProjectionPhase(workspacePaneTabsQuery.status),
       runtimeTabViews: runtimeProjection.runtimeTabViews,
       runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
+      requestedSessionIdByRuntimeType,
     }),
     [
       repo.id,
@@ -97,6 +100,7 @@ export function useRepoWorkspaceTabModelInput(
       workspacePaneTabEntries,
       runtimeProjection.runtimeTabViews,
       runtimeProjection.runtimeTabStateByType,
+      requestedSessionIdByRuntimeType,
     ],
   )
 
