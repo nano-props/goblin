@@ -337,10 +337,15 @@ export function setRepoOperationsQueryData(
 ): void {
   queryClient.setQueryData(repoOperationsQueryKey(repoRoot, repoRuntimeId, includeSettled), operations)
   if (!includeSettled) {
-    queryClient.setQueriesData<RepoRuntimeProjection>(
-      { queryKey: repoProjectionQueryPrefix(repoRoot, repoRuntimeId) },
-      (current) => (current ? { ...current, operations } : current),
-    )
+    const projectionQueries = queryClient
+      .getQueryCache()
+      .findAll({ queryKey: repoProjectionQueryPrefix(repoRoot, repoRuntimeId) })
+    for (const query of projectionQueries) {
+      if (query.state.isInvalidated) continue
+      queryClient.setQueryData<RepoRuntimeProjection>(query.queryKey, (current) =>
+        current ? { ...current, operations } : current,
+      )
+    }
   }
 }
 

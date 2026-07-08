@@ -219,6 +219,24 @@ describe('repo projection query data', () => {
     })
   })
 
+  test('does not clear projection invalidation when patching operations snapshots', async () => {
+    const queryClient = new QueryClient()
+    const projection = repoProjectionForTest(1)
+    const projectionKey = repoProjectionQueryKey('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full')
+    const operations = { operations: [], loadedAt: 2 }
+
+    setRepoProjectionQueryData('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', projection, queryClient)
+    await queryClient.invalidateQueries({ queryKey: projectionKey, exact: true, refetchType: 'none' })
+
+    expect(queryClient.getQueryState(projectionKey)?.isInvalidated).toBe(true)
+    setRepoOperationsQueryData('/tmp/repo', 'repo-runtime-1', false, operations, queryClient)
+
+    expect(queryClient.getQueryState(projectionKey)?.isInvalidated).toBe(true)
+    expect(getRepoProjectionQueryData('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', queryClient)).toEqual(
+      projection,
+    )
+  })
+
   test('invalidates runtime projection queries once per server-owned lifecycle signal', () => {
     const queryClient = new QueryClient()
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
