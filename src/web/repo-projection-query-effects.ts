@@ -9,6 +9,7 @@ import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
 interface ProjectionQueryVersionState {
   invalidationVersion: number
   fetchVersion: number | null
+  suppressCacheSuccessesUntilFreshFetch: boolean
 }
 
 function isRepoRuntimeProjection(value: unknown): value is RepoRuntimeProjection {
@@ -29,7 +30,7 @@ export function useRepoProjectionQueryEffects(queryClient: QueryClient = primary
     const versionState = (queryHash: string) => {
       let state = versionsByQueryHash.get(queryHash)
       if (!state) {
-        state = { invalidationVersion: 0, fetchVersion: null }
+        state = { invalidationVersion: 0, fetchVersion: null, suppressCacheSuccessesUntilFreshFetch: false }
         versionsByQueryHash.set(queryHash, state)
       }
       return state
@@ -49,14 +50,22 @@ export function useRepoProjectionQueryEffects(queryClient: QueryClient = primary
       }
       if (event.action.type === 'invalidate') {
         state.invalidationVersion += 1
+        state.suppressCacheSuccessesUntilFreshFetch = true
         return
       }
       if (event.action.type !== 'success') return
-      if (state.fetchVersion !== null && state.fetchVersion < state.invalidationVersion) {
+      const manualSuccess = event.action.manual === true
+      if (!manualSuccess && state.fetchVersion !== null) {
+        if (state.fetchVersion < state.invalidationVersion) {
+          state.fetchVersion = null
+          state.suppressCacheSuccessesUntilFreshFetch = true
+          return
+        }
         state.fetchVersion = null
+        state.suppressCacheSuccessesUntilFreshFetch = false
+      } else if (state.suppressCacheSuccessesUntilFreshFetch) {
         return
       }
-      state.fetchVersion = null
       const data = event.query.state.data
       if (!isRepoRuntimeProjection(data)) return
       acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {

@@ -42,6 +42,17 @@ export function parseRepoProjectionQueryKey(queryKey: readonly unknown[]): Parse
   return { repoRoot, repoRuntimeId }
 }
 
+function repoProjectionQueryKeysEqual(a: readonly unknown[], b: readonly unknown[]): boolean {
+  if (a.length !== 5 || b.length !== 5) return false
+  if (a[0] !== b[0] || a[1] !== b[1] || a[2] !== b[2] || a[3] !== b[3]) return false
+  const aOptions = a[4]
+  const bOptions = b[4]
+  if (!aOptions || !bOptions || typeof aOptions !== 'object' || typeof bOptions !== 'object') return false
+  const aProjection = aOptions as { branch?: unknown; mode?: unknown }
+  const bProjection = bOptions as { branch?: unknown; mode?: unknown }
+  return aProjection.branch === bProjection.branch && aProjection.mode === bProjection.mode
+}
+
 export function repoOperationsQueryKey(repoRoot: string, repoRuntimeId: string, includeSettled = false) {
   return ['repo-data', repoRoot, repoRuntimeId, 'operations', { includeSettled }] as const
 }
@@ -398,12 +409,34 @@ export async function refreshRepoProjectionReadModel(
   await queryClient.cancelQueries({ queryKey: queryOptions.queryKey, exact: true })
   await queryClient.invalidateQueries({ queryKey: queryOptions.queryKey, exact: true, refetchType: 'none' })
   options.signal?.throwIfAborted()
-  const projection = await queryClient.fetchQuery({
-    ...queryOptions,
-    staleTime: 0,
-    queryFn: ({ signal }) =>
-      getRepoProjection(repoRoot, branch, { mode }, options.signal ? abortSignalAny([signal, options.signal]) : signal),
-  })
+  let projection: RepoRuntimeProjection
+  for (;;) {
+    let invalidatedDuringFetch = false
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (event.type !== 'updated') return
+      if (event.action.type !== 'invalidate') return
+      if (repoProjectionQueryKeysEqual(event.query.queryKey, queryOptions.queryKey)) invalidatedDuringFetch = true
+    })
+    try {
+      projection = await queryClient.fetchQuery({
+        ...queryOptions,
+        staleTime: 0,
+        queryFn: ({ signal }) =>
+          getRepoProjection(
+            repoRoot,
+            branch,
+            { mode },
+            options.signal ? abortSignalAny([signal, options.signal]) : signal,
+          ),
+      })
+    } finally {
+      unsubscribe()
+    }
+    options.signal?.throwIfAborted()
+    if (!invalidatedDuringFetch && queryClient.getQueryState(queryOptions.queryKey)?.isInvalidated !== true) break
+    await queryClient.invalidateQueries({ queryKey: queryOptions.queryKey, exact: true, refetchType: 'none' })
+    options.signal?.throwIfAborted()
+  }
   setRepoOperationsQueryData(repoRoot, repoRuntimeId, false, projection.operations, queryClient)
   return projection
 }

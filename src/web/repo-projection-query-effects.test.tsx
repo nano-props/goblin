@@ -6,6 +6,7 @@ import { useRepoProjectionQueryEffects } from '#/web/repo-projection-query-effec
 import {
   invalidateRepoRuntimeProjectionQueries,
   repoProjectionQueryKey,
+  setRepoOperationsQueryData,
   setRepoProjectionQueryData,
 } from '#/web/repo-data-query.ts'
 import {
@@ -96,6 +97,9 @@ describe('repo projection query effects', () => {
       })
 
       expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
+      expect(pruneTerminals).not.toHaveBeenCalled()
+
+      setRepoOperationsQueryData('/repo', repo.repoRuntimeId, false, { operations: [], loadedAt: 99 }, queryClient)
       expect(pruneTerminals).not.toHaveBeenCalled()
 
       releases[1]!(projection(2, 'fresh'))
