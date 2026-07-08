@@ -2,12 +2,12 @@ import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
-import type { TerminalCreateOptions, TerminalCreateOwner } from '#/web/components/terminal/types.ts'
-import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import type { TerminalCreateOptions } from '#/web/components/terminal/types.ts'
 
 export interface WorkspacePaneRuntimeTabCreateAction {
   label: string
   busy: boolean
+  blocksTabInteraction: boolean
   onCreate: () => void
 }
 
@@ -15,24 +15,17 @@ export interface WorkspacePaneRuntimeTabCreateActionContext {
   repoRoot: string
   runtimeTabStateByType: WorkspacePaneRuntimeTabCreateStateByType
   initialRuntimeProjectionHydrating: boolean
-  enterRuntimeTab: (type: WorkspacePaneRuntimeTabType) => void | Promise<void>
+  showCreatedRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => boolean | Promise<boolean>
   t: TerminalCreateTranslator
   terminal?: WorkspacePaneTerminalCreateActionContext
 }
 
-export type WorkspacePaneRuntimeTabCreateStateByType = Record<
-  WorkspacePaneRuntimeTabType,
-  { createPending: boolean }
->
+export type WorkspacePaneRuntimeTabCreateStateByType = Record<WorkspacePaneRuntimeTabType, { createPending: boolean }>
 
 export interface WorkspacePaneTerminalCreateActionContext {
   base: TerminalSessionBase | null
   createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
-  createOwnedTerminal?: (
-    base: TerminalSessionBase,
-    owner: TerminalCreateOwner,
-    options?: TerminalCreateOptions,
-  ) => Promise<string>
+  captureOpenerIdentity: () => string | null
 }
 
 interface WorkspacePaneRuntimeTabCreateActionResolver {
@@ -64,15 +57,15 @@ function terminalRuntimeTabCreateAction(
   return {
     label: context.t('terminal.new'),
     busy: context.initialRuntimeProjectionHydrating || context.runtimeTabStateByType.terminal.createPending,
+    blocksTabInteraction: context.runtimeTabStateByType.terminal.createPending,
     onCreate: () => {
       // "+" is a generic entry; opener only drives close-back focus, not insertion.
-      const openerIdentity = captureWorkspacePaneActiveTabIdentity(context.repoRoot, base.branch)
+      const openerIdentity = terminal.captureOpenerIdentity()
       void runCreateTerminalTabCommand({
         base,
         createTerminal: terminal.createTerminal,
-        createOwnedTerminal: terminal.createOwnedTerminal,
         openerIdentity,
-        enterTerminalTab: () => context.enterRuntimeTab('terminal'),
+        showCreatedTerminalTab: (terminalSessionId) => context.showCreatedRuntimeTab('terminal', terminalSessionId),
         t: context.t,
       })
     },

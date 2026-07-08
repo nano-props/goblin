@@ -7,7 +7,10 @@ import {
   workspacePaneTabProvider,
   workspacePaneTabProviders,
 } from '#/web/workspace-pane/tab-providers.ts'
-import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import {
+  workspacePanePreferenceTargetOptions,
+  workspacePaneTabTargetForBranch,
+} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import {
   canCloseWorkspacePaneRuntimeTabWithContext,
@@ -36,6 +39,7 @@ export function beginWorkspacePaneTabClose(
   const closeContext = readWorkspacePaneRuntimeTabCloseContext()
   const closeTarget = {
     repoRoot: target.repoId,
+    repoInstanceId: target.repoInstanceId,
     branchName: target.branchName,
     worktreePath: target.worktreePath,
   }
@@ -80,7 +84,9 @@ export async function closeWorkspacePaneTabsForWorktree({
   branchName,
   worktreePath,
 }: CloseWorkspacePaneTabsForWorktreeOptions): Promise<boolean> {
-  const target = workspacePaneTabTargetForBranch(repoId, branchName)
+  const repo = useReposStore.getState().repos[repoId]
+  if (!repo) return false
+  const target = workspacePaneTabTargetForBranch(repoId, branchName, workspacePanePreferenceTargetOptions)
   if (target && target.worktreePath !== worktreePath) return true
   const openStaticWorktreeTabs = new Set(
     (target?.tabs ?? []).flatMap((tab) => {
@@ -92,6 +98,7 @@ export async function closeWorkspacePaneTabsForWorktree({
   const closeContext = readWorkspacePaneRuntimeTabCloseContext()
   const runtimeCloseTarget = {
     repoRoot: repoId,
+    repoInstanceId: repo.instanceId,
     branchName,
     worktreePath,
   }

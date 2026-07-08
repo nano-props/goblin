@@ -16,11 +16,13 @@ import type { PrimaryWindowNavigationActions } from '#/web/primary-window-naviga
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { clientEffectIntentStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 interface ClientEffectIntentRouterOptions {
   navigation: PrimaryWindowNavigationActions
   currentRepoId: string | null
   currentBranchName?: string | null
+  currentWorkspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
   closeAllOverlays: () => void
   openRepoPathDialog: () => void
   openCloneRepo: () => void
@@ -34,6 +36,7 @@ export function useClientEffectIntentRouter({
   navigation,
   currentRepoId,
   currentBranchName = null,
+  currentWorkspacePaneRoute,
   closeAllOverlays,
   openRepoPathDialog,
   openCloneRepo,
@@ -45,13 +48,14 @@ export function useClientEffectIntentRouter({
   // This hook is the single client-side subscription point for native effect
   // intents. Routing stays centralized here; intent-specific behavior lives in
   // the handler/plan helpers so components do not subscribe independently.
-  const { ensureWorkspaceOpen, setSelectedTerminal, resetLayout, toggleZenMode } = useReposStore(
+  const { ensureWorkspaceOpen, resetLayout, toggleZenMode } = useReposStore(
     useShallow(clientEffectIntentStoreActionsFromStore),
   )
   const t = useT()
   const navigationRef = useRef(navigation)
   const currentRepoIdRef = useRef(currentRepoId)
   const currentBranchNameRef = useRef(currentBranchName)
+  const currentWorkspacePaneRouteRef = useRef(currentWorkspacePaneRoute)
   const isOverlayOpenRef = useRef(isOverlayOpen)
   const isWorkspaceShortcutSuppressedRef = useRef(isWorkspaceShortcutSuppressed)
   const tRef = useRef(t)
@@ -59,6 +63,7 @@ export function useClientEffectIntentRouter({
   navigationRef.current = navigation
   currentRepoIdRef.current = currentRepoId
   currentBranchNameRef.current = currentBranchName
+  currentWorkspacePaneRouteRef.current = currentWorkspacePaneRoute
   isOverlayOpenRef.current = isOverlayOpen
   isWorkspaceShortcutSuppressedRef.current = isWorkspaceShortcutSuppressed
   tRef.current = t
@@ -77,6 +82,7 @@ export function useClientEffectIntentRouter({
       navigation: navigationRef.current,
       currentRepoId: currentRepoIdRef.current,
       currentBranchName: currentBranchNameRef.current,
+      currentWorkspacePaneRoute: currentWorkspacePaneRouteRef.current,
       closeAllOverlays,
       openRepoPathDialog,
       openCloneRepo,
@@ -85,7 +91,6 @@ export function useClientEffectIntentRouter({
       isOverlayOpen: () => isOverlayOpenRef.current(),
       isWorkspaceShortcutSuppressed: () => isWorkspaceShortcutSuppressedRef.current(),
       ensureWorkspaceOpen: async (input: string | RepoSessionEntry) => await ensureWorkspaceOpenRef.current(input),
-      setSelectedTerminal,
       resetLayout,
       toggleZenMode,
       t: (key: string) => tRef.current(key),
@@ -144,7 +149,6 @@ export function useClientEffectIntentRouter({
     openCreateWorktree,
     openRepoPathDialog,
     resetLayout,
-    setSelectedTerminal,
     toggleZenMode,
     t,
   ])

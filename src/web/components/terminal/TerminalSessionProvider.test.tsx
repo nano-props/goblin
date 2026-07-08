@@ -308,7 +308,7 @@ function completeServerSession(session: TestTerminalSessionSummary): TerminalSes
   return {
     ...session,
     terminalSessionId: normalizeTestSessionId(session.terminalSessionId),
-    repoInstanceId: session.repoInstanceId ?? 'repo-instance-test',
+    repoInstanceId: session.repoInstanceId ?? useReposStore.getState().repos[REPO_ID]!.instanceId,
     repoRoot: session.repoRoot ?? REPO_ID,
     branch: session.branch ?? BRANCH_NAME,
     worktreePath: session.worktreePath ?? WORKTREE_PATH,
@@ -1166,7 +1166,7 @@ describe('TerminalSessionProvider', () => {
           canonicalRows: 40,
           snapshot: '',
           snapshotSeq: 0,
-        outputEra: 0,
+          outputEra: 0,
         }),
       )
 
@@ -1469,7 +1469,7 @@ describe('TerminalSessionProvider', () => {
         expect.objectContaining({
           snapshot: '',
           snapshotSeq: 0,
-        outputEra: 0,
+          outputEra: 0,
         }),
       )
     } finally {
@@ -1632,6 +1632,17 @@ describe('TerminalSessionProvider', () => {
     })
 
     expect(readTerminalSessionCommandBridge()).toBeNull()
+  })
+
+  test('registers terminal creation on the command bridge', async () => {
+    const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
+    const { getContext, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
+
+    try {
+      expect(readTerminalSessionCommandBridge()?.createTerminal).toBe(getContext().createTerminal)
+    } finally {
+      await unmount()
+    }
   })
 
   test('P1.7: registry state survives a Provider unmount + remount via the singleton', async () => {

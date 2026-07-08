@@ -28,7 +28,9 @@ const navigation: PrimaryWindowNavigationActions = {
   closeRepo: vi.fn(),
   cycleRepo: vi.fn(),
   selectRepoBranch: vi.fn(),
+  showRepoBranchEmptyWorkspacePane: () => true,
   showRepoBranchWorkspacePaneTab: vi.fn(),
+  showRepoBranchTerminalSession: vi.fn(),
   goBack: vi.fn(),
   goForward: vi.fn(),
   openSettings: vi.fn(),
@@ -86,7 +88,12 @@ describe('BranchView', () => {
       branches: [branch],
       currentBranch: 'feature/dirty',
       status: [
-        { path: WORKTREE_PATH, branch: 'feature/dirty', isMain: false, entries: [{ x: 'M', y: ' ', path: 'dirty.ts' }] },
+        {
+          path: WORKTREE_PATH,
+          branch: 'feature/dirty',
+          isMain: false,
+          entries: [{ x: 'M', y: ' ', path: 'dirty.ts' }],
+        },
       ],
     })
 

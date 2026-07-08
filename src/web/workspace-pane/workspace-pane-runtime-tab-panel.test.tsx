@@ -7,6 +7,10 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { stubI18n } from '#/test-utils/i18n-mock.ts'
 import { TerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionContextValue } from '#/web/components/terminal/types.ts'
+import {
+  PrimaryWindowNavigationProvider,
+  type PrimaryWindowNavigationActions,
+} from '#/web/primary-window-navigation.tsx'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 
 stubI18n()
@@ -16,6 +20,7 @@ interface CapturedTerminalSessionViewProps {
   repoInstanceId: string
   branch: string
   worktreePath: string
+  selectedTerminalSessionId?: string | null
   projectionPhase?: string
   projectionErrorMessage?: string
   createTerminalForSlot?: (base: TerminalSessionBase) => Promise<unknown>
@@ -58,6 +63,7 @@ describe('workspace pane runtime tab panel', () => {
       repoInstanceId: 'repo-instance-1',
       branch: 'main',
       worktreePath: '/repo-worktree',
+      selectedTerminalSessionId: 'session-1',
       projectionPhase: 'failed',
       projectionErrorMessage: 'boom',
     })
@@ -65,8 +71,9 @@ describe('workspace pane runtime tab panel', () => {
 
   test('delegates terminal empty-slot create to the terminal create command', async () => {
     const createTerminal = vi.fn(async () => 'session-1')
-    const createOwnedTerminal = vi.fn(async () => 'session-1')
-    renderPanel({ terminalContext: terminalCommandContextWith({ createTerminal, createOwnedTerminal }) })
+    const { navigation } = renderPanel({
+      terminalContext: terminalCommandContextWith({ createTerminal }),
+    })
 
     const base: TerminalSessionBase = {
       repoRoot: '/repo',
@@ -83,38 +90,59 @@ describe('workspace pane runtime tab panel', () => {
       expect.objectContaining({
         base,
         createTerminal,
-        createOwnedTerminal,
         openerIdentity: null,
         logMessage: 'workspace pane terminal create failed',
       }),
     )
     const commandCalls = terminalCreateCommandMocks.runCreateTerminalTabCommand.mock.calls as unknown as Array<
-      [{ enterTerminalTab: () => void | Promise<void> }]
+      [{ showCreatedTerminalTab: (terminalSessionId: string) => boolean | Promise<boolean> }]
     >
-    await commandCalls[0]?.[0].enterTerminalTab()
+    await commandCalls[0]?.[0].showCreatedTerminalTab('session-1')
+    expect(navigation.showRepoBranchTerminalSession).toHaveBeenCalledWith('/repo', 'main', 'session-1')
   })
 })
 
 function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = {}) {
-  return renderInJsdom(
-    <TerminalSessionContext value={input.terminalContext ?? terminalCommandContextWith()}>
-      {renderWorkspacePaneRuntimeTabPanel({
-        type: 'terminal',
-        workspacePaneId: 'workspace',
-        panelLabel: { label: 'Terminal' },
-        target: {
-          repoRoot: '/repo',
-          repoInstanceId: 'repo-instance-1',
-          branchName: 'main',
-          worktreePath: '/repo-worktree',
-        },
-        runtimeState: {
-          projectionPhase: 'failed',
-          projectionErrorMessage: 'boom',
-        },
-      })}
-    </TerminalSessionContext>,
+  const navigation = navigationWith()
+  const result = renderInJsdom(
+    <PrimaryWindowNavigationProvider value={navigation}>
+      <TerminalSessionContext value={input.terminalContext ?? terminalCommandContextWith()}>
+        {renderWorkspacePaneRuntimeTabPanel({
+          type: 'terminal',
+          workspacePaneId: 'workspace',
+          panelLabel: { label: 'Terminal' },
+          target: {
+            repoRoot: '/repo',
+            repoInstanceId: 'repo-instance-1',
+            branchName: 'main',
+            worktreePath: '/repo-worktree',
+          },
+          selectedSessionId: 'session-1',
+          runtimeState: {
+            projectionPhase: 'failed',
+            projectionErrorMessage: 'boom',
+          },
+        })}
+      </TerminalSessionContext>
+    </PrimaryWindowNavigationProvider>,
   )
+  return { ...result, navigation }
+}
+
+function navigationWith(): PrimaryWindowNavigationActions {
+  return {
+    activateRepo: vi.fn(),
+    closeRepo: vi.fn(),
+    cycleRepo: vi.fn(),
+    selectRepoBranch: vi.fn(),
+    showRepoBranchEmptyWorkspacePane: () => true,
+    showRepoBranchWorkspacePaneTab: vi.fn(),
+    showRepoBranchTerminalSession: vi.fn(),
+    goBack: vi.fn(),
+    goForward: vi.fn(),
+    openSettings: vi.fn(),
+    openCreateWorktree: vi.fn(),
+  }
 }
 
 function terminalCommandContextWith(overrides: Partial<TerminalSessionContextValue> = {}): TerminalSessionContextValue {

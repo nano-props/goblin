@@ -21,7 +21,7 @@ interface WorkspaceSessionBranchProjection {
 interface WorkspaceSessionRepoProjection {
   branches: readonly WorkspaceSessionBranchProjection[]
   ui?: {
-    preferredWorkspacePaneTabByTarget: Record<string, WorkspacePaneTabType>
+    preferredWorkspacePaneTabByTarget: Record<string, WorkspacePaneTabType | null>
   }
 }
 
@@ -36,19 +36,20 @@ export function persistedPreferredWorkspacePaneTabByTargetByRepoForSession(
   repos: Record<string, WorkspaceSessionRepoProjectionWithUi | undefined>,
   order: string[],
   workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
-): Record<string, Record<string, WorkspacePaneSessionTabType>> {
-  const byRepo: Record<string, Record<string, WorkspacePaneSessionTabType>> = {}
+): Record<string, Record<string, WorkspacePaneSessionTabType | null>> {
+  const byRepo: Record<string, Record<string, WorkspacePaneSessionTabType | null>> = {}
   for (const id of order) {
     const repo = repos[id]
     if (!repo) continue
-    const byTarget: Record<string, WorkspacePaneSessionTabType> = {}
+    const byTarget: Record<string, WorkspacePaneSessionTabType | null> = {}
     for (const [targetKey, tab] of Object.entries(repo.ui.preferredWorkspacePaneTabByTarget)) {
       const target = workspacePaneTabsTargetKeyBelongsToRepo(targetKey, id, repo)
       if (!target) continue
-      if (!isWorkspacePaneSessionTabType(tab)) continue
-      if (target.kind === 'branch' && workspacePaneTabRequiresWorktree(tab)) continue
+      if (tab !== null && !isWorkspacePaneSessionTabType(tab)) continue
+      if (tab !== null && target.kind === 'branch' && workspacePaneTabRequiresWorktree(tab)) continue
       const targetTabs = workspacePaneTabsByTargetByRepo[id]?.[targetKey] ?? defaultWorkspacePaneTabs()
-      if (isWorkspacePaneStaticTabType(tab) && !workspacePaneStaticTabsFromEntries(targetTabs).includes(tab)) continue
+      if (tab !== null && isWorkspacePaneStaticTabType(tab) && !workspacePaneStaticTabsFromEntries(targetTabs).includes(tab))
+        continue
       byTarget[targetKey] = tab
     }
     if (Object.keys(byTarget).length > 0) byRepo[id] = byTarget

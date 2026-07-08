@@ -64,23 +64,19 @@ describe('repo selectors', () => {
       restorableWorkspaceLayoutStoreActionsFromStore({
         toggleZenMode: fnA as never,
         resetLayout: fnA as never,
-        setSelectedTerminal: fnA as never,
       }),
     ).toEqual({
       toggleZenMode: fnA,
       resetLayout: fnA,
-      setSelectedTerminal: fnA,
     })
     expect(
       restorableWorkspaceLayoutPreferenceStoreActionsFromStore({
         toggleZenMode: fnA as never,
         resetLayout: fnA as never,
-        setSelectedTerminal: fnA as never,
       }),
     ).toEqual({
       toggleZenMode: fnA,
       resetLayout: fnA,
-      setSelectedTerminal: fnA,
     })
     expect(
       runtimeCoherentRepoOpenStoreActionsFromStore({
@@ -92,31 +88,25 @@ describe('repo selectors', () => {
     expect(
       runtimeCoherentRepoNavigationStoreActionsFromStore({
         closeRepo: fnA as never,
-        setWorkspacePaneTab: fnA as never,
       }),
     ).toEqual({
       closeRepo: fnA,
-      setWorkspacePaneTab: fnA,
     })
     expect(
       runtimeCoherentRepoProjectionStoreActionsFromStore({
         ensureWorkspaceOpen: fnA as never,
         closeRepo: fnA as never,
-        setWorkspacePaneTab: fnA as never,
       }),
     ).toEqual({
       ensureWorkspaceOpen: fnA,
       closeRepo: fnA,
-      setWorkspacePaneTab: fnA,
     })
     expect(
       primaryWindowNavigationStoreActionsFromStore({
         closeRepo: fnA,
-        setWorkspacePaneTab: fnA,
       }),
     ).toEqual({
       closeRepo: fnA,
-      setWorkspacePaneTab: fnA,
       goBackInWorkspaceNavigation: expect.any(Function),
       goForwardInWorkspaceNavigation: expect.any(Function),
     })
@@ -130,13 +120,11 @@ describe('repo selectors', () => {
     expect(
       clientEffectIntentStoreActionsFromStore({
         ensureWorkspaceOpen: fnA as never,
-        setSelectedTerminal: fnA as never,
         resetLayout: fnA as never,
         toggleZenMode: fnA as never,
       }),
     ).toEqual({
       ensureWorkspaceOpen: fnA,
-      setSelectedTerminal: fnA,
       resetLayout: fnA,
       toggleZenMode: fnA,
     })

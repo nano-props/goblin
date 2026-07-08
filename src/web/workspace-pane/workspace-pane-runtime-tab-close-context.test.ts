@@ -9,13 +9,16 @@ import {
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-context.ts'
 import { terminalRuntimeTabCloseContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
 
+const REPO_INSTANCE_ID = 'repo-instance-test'
 const terminalBase: TerminalSessionBase = {
   repoRoot: '/repo',
+  repoInstanceId: REPO_INSTANCE_ID,
   branch: 'main',
   worktreePath: '/repo-worktree',
 }
 const closeTarget = {
   repoRoot: terminalBase.repoRoot,
+  repoInstanceId: REPO_INSTANCE_ID,
   branchName: terminalBase.branch,
   worktreePath: terminalBase.worktreePath,
 }
@@ -32,12 +35,7 @@ describe('workspace pane runtime tab close context', () => {
 
     const context = readWorkspacePaneRuntimeTabCloseContext()
 
-    expect(
-      canCloseWorkspacePaneRuntimeTabWithContext(
-        { type: 'terminal', target: closeTarget },
-        context,
-      ),
-    ).toBe(true)
+    expect(canCloseWorkspacePaneRuntimeTabWithContext({ type: 'terminal', target: closeTarget }, context)).toBe(true)
     expect(
       canConfirmWorkspacePaneRuntimeTabCloseWithContext(
         { type: 'terminal', sessionId: 'session-1', target: closeTarget },

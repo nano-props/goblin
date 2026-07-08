@@ -11,6 +11,7 @@ export function buildTerminalWorktreeSnapshot(input: {
   selectedDescriptor: TerminalWorktreeSnapshot['selectedDescriptor']
   createPending: boolean
   sessions: TerminalSessionLike[]
+  closingSessionIds?: readonly string[]
   selectedTerminalSessionId: string | null
   getCachedSnapshot: (terminalSessionId: string) => TerminalSnapshot | null
   cacheSnapshot: (terminalSessionId: string, snapshot: TerminalSnapshot) => void
@@ -28,6 +29,7 @@ export function buildTerminalWorktreeSnapshot(input: {
     bellCount,
     outputActiveCount,
     createPending: input.createPending,
+    ...(input.closingSessionIds?.length ? { closingSessionIds: [...input.closingSessionIds] } : {}),
   }
 }
 

@@ -16,13 +16,19 @@ import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/bran
 import { useRepoProjectionReadModel } from '#/web/repo-data-query.ts'
 import { repoBranchReadModelFromSnapshot } from '#/web/repo-branch-read-model.ts'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
-import { useWorkspaceNavigationHistory } from '#/web/workspace-navigation-history.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import { useWorkspacePaneRouteController } from '#/web/components/repo-workspace/workspace-pane-route-controller.ts'
 import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
+
+export type RepoWorkspacePaneRouteContext =
+  | { kind: 'routed'; route: RepoBranchWorkspacePaneRoute | null }
+  | { kind: 'inactive' }
 
 interface Props {
   repoId: string
   currentBranchName?: string | null
+  workspacePaneRouteContext: RepoWorkspacePaneRouteContext
   shortcutsEnabled?: boolean
   toolbarTrafficLightOffset?: boolean
   onBackToBranchNavigator?: () => void
@@ -59,6 +65,7 @@ function repoWorkspaceRepoShellEqual(
 export function RepoWorkspace({
   repoId,
   currentBranchName,
+  workspacePaneRouteContext,
   shortcutsEnabled = true,
   toolbarTrafficLightOffset = false,
   onBackToBranchNavigator,
@@ -101,6 +108,7 @@ export function RepoWorkspace({
   return (
     <RepoWorkspaceLoaded
       repoShell={repoShell}
+      workspacePaneRouteContext={workspacePaneRouteContext}
       workspacePaneId={workspacePaneId}
       shortcutsEnabled={shortcutsEnabled}
       toolbarTrafficLightOffset={toolbarTrafficLightOffset}
@@ -111,12 +119,14 @@ export function RepoWorkspace({
 
 function RepoWorkspaceLoaded({
   repoShell,
+  workspacePaneRouteContext,
   workspacePaneId,
   shortcutsEnabled,
   toolbarTrafficLightOffset,
   onBackToBranchNavigator,
 }: {
   repoShell: RepoWorkspaceRepoShell
+  workspacePaneRouteContext: RepoWorkspacePaneRouteContext
   workspacePaneId: string
   shortcutsEnabled: boolean
   toolbarTrafficLightOffset: boolean
@@ -134,20 +144,6 @@ function RepoWorkspaceLoaded({
   const branchReadModel = projection?.snapshot
     ? repoBranchReadModelFromSnapshot(projection.snapshot, projection.status)
     : null
-  const historyBranch = currentBranchName
-    ? branchReadModel?.branches.find((branch) => branch.name === currentBranchName)
-    : null
-  useWorkspaceNavigationHistory({
-    routeContext:
-      currentBranchName && historyBranch
-        ? {
-            kind: 'branch',
-            repoId: repoShell.id,
-            branchName: currentBranchName,
-            worktreePath: historyBranch.worktree?.path ?? null,
-          }
-        : null,
-  })
   if (!branchReadModel || !projection) {
     return <RepoWorkspaceSkeleton toolbarTrafficLightOffset={toolbarTrafficLightOffset} />
   }
@@ -187,6 +183,7 @@ function RepoWorkspaceLoaded({
         <BranchActionWorkspacePane
           repo={presentationRepo}
           detail={detail}
+          workspacePaneRouteContext={workspacePaneRouteContext}
           branch={detail.branch}
           workspacePaneId={workspacePaneId}
           shortcutsEnabled={shortcutsEnabled}
@@ -197,6 +194,7 @@ function RepoWorkspaceLoaded({
         <RepoWorkspacePane
           repo={presentationRepo}
           detail={detail}
+          workspacePaneRouteContext={workspacePaneRouteContext}
           workspacePaneId={workspacePaneId}
           toolbarTrafficLightOffset={toolbarTrafficLightOffset}
           onBackToBranchNavigator={onBackToBranchNavigator}
@@ -209,6 +207,7 @@ function RepoWorkspaceLoaded({
 interface RepoWorkspacePaneProps {
   repo: RepoWorkspaceRepo
   detail: CurrentRepoWorkspacePresentation
+  workspacePaneRouteContext: RepoWorkspacePaneRouteContext
   workspacePaneId: string
   toolbarTrafficLightOffset?: boolean
   branchActions?: BranchActions
@@ -218,12 +217,22 @@ interface RepoWorkspacePaneProps {
 function RepoWorkspacePane({
   repo,
   detail,
+  workspacePaneRouteContext,
   workspacePaneId,
   toolbarTrafficLightOffset = false,
   branchActions,
   onBackToBranchNavigator,
 }: RepoWorkspacePaneProps) {
-  const workspacePaneTabModel = useRepoWorkspaceTabModel(repo, detail)
+  const workspacePaneRoute = workspacePaneRouteContext.kind === 'routed' ? workspacePaneRouteContext.route : null
+  const workspacePaneTabModel = useRepoWorkspaceTabModel(repo, detail, workspacePaneRoute)
+  useWorkspacePaneRouteController({
+    enabled: workspacePaneRouteContext.kind === 'routed',
+    repoId: repo.id,
+    branchName: detail.branch?.name ?? null,
+    worktreePath: detail.branch?.worktree?.path ?? null,
+    route: workspacePaneRoute,
+    model: workspacePaneTabModel,
+  })
 
   return (
     <>
@@ -231,6 +240,7 @@ function RepoWorkspacePane({
         repo={repo}
         detail={detail}
         workspacePaneId={workspacePaneId}
+        workspacePaneRoute={workspacePaneRoute}
         trafficLightOffset={toolbarTrafficLightOffset}
         workspacePaneTabModel={workspacePaneTabModel}
         branchActions={branchActions}
@@ -249,6 +259,7 @@ function RepoWorkspacePane({
 interface BranchActionWorkspacePaneProps {
   repo: RepoWorkspaceRepo
   detail: CurrentRepoWorkspacePresentation
+  workspacePaneRouteContext: RepoWorkspacePaneRouteContext
   branch: NonNullable<CurrentRepoWorkspacePresentation['branch']>
   workspacePaneId: string
   shortcutsEnabled: boolean
@@ -259,14 +270,16 @@ interface BranchActionWorkspacePaneProps {
 function BranchActionWorkspacePane({
   repo,
   detail,
+  workspacePaneRouteContext,
   branch,
   workspacePaneId,
   shortcutsEnabled,
   toolbarTrafficLightOffset = false,
   onBackToBranchNavigator,
 }: BranchActionWorkspacePaneProps) {
+  const workspacePaneRoute = workspacePaneRouteContext.kind === 'routed' ? workspacePaneRouteContext.route : null
   const branchActions = useBranchActions(repo, branch)
-  const actions = useBranchActionItems(repo, branch, branchActions)
+  const actions = useBranchActionItems(repo, branch, branchActions, { workspacePaneRoute })
   useBranchActionShortcutRegistry(actions, shortcutsEnabled)
 
   return (
@@ -274,6 +287,7 @@ function BranchActionWorkspacePane({
       <RepoWorkspacePane
         repo={repo}
         detail={detail}
+        workspacePaneRouteContext={workspacePaneRouteContext}
         workspacePaneId={workspacePaneId}
         toolbarTrafficLightOffset={toolbarTrafficLightOffset}
         branchActions={branchActions}

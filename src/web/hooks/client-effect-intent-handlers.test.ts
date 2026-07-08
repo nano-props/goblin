@@ -48,7 +48,7 @@ describe('client effect intent handlers', () => {
       currentBranch: 'feature/query',
     })
     const d = deps(REPO_ID)
-    d.navigation.showRepoBranchWorkspacePaneTab = vi.fn()
+    d.navigation.showRepoBranchTerminalSession = vi.fn()
 
     handleTerminalBellClickIntent(
       {
@@ -60,8 +60,7 @@ describe('client effect intent handlers', () => {
       d,
     )
 
-    expect(d.setSelectedTerminal).toHaveBeenCalledWith(`${REPO_ID}\0/tmp/bell-worktree`, 'session-query')
-    expect(d.navigation.showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/query', 'terminal')
+    expect(d.navigation.showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/query', 'session-query')
   })
 
   test('returns false when changes cannot be shown for a branch without a worktree', async () => {
@@ -157,7 +156,6 @@ function deps(currentRepoId: string | null, currentBranchName = 'feature/worktre
       ok: true as const,
       id: typeof input === 'string' ? input : input.id,
     })),
-    setSelectedTerminal: vi.fn(),
     resetLayout: vi.fn(),
     toggleZenMode: vi.fn(),
     t: (key: string) => key,
@@ -170,10 +168,13 @@ function navigationWithStoreActions(): PrimaryWindowNavigationActions {
     closeRepo: (repoId) => useReposStore.getState().closeRepo(repoId),
     cycleRepo: vi.fn(),
     selectRepoBranch: vi.fn(),
+    showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {
       const state = useReposStore.getState()
       state.setWorkspacePaneTab(repoId, branch, tab)
+      return true
     },
+    showRepoBranchTerminalSession: vi.fn(),
     goBack: vi.fn(),
     goForward: vi.fn(),
     openSettings: vi.fn(),

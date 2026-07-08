@@ -54,8 +54,11 @@ Notes:
 - Settings truth lives on the server; clients read it through query snapshots or specialized runtime projections.
 - Settings writes belong in `src/web/settings-actions.ts`. `src/web/settings-client.ts` is the transport boundary, not a UI mutation API. UI stores may keep local projections such as theme/i18n state, but their server write-through path should use settings actions so the settings query cache stays coherent.
 - Workspace pane tabs truth lives in the server workspace-pane runtime. React Query caches the runtime projection. Reorder may use a short-lived optimistic query update, but success must replace it with server-returned tabs and failure must rollback or invalidate.
-- Runtime-coherent state may use invalidation plus refetch or realtime streaming.
+- Runtime-coherent state may use server-published invalidation plus targeted refetch or realtime streaming. It must not use client polling as the mechanism that discovers server-owned changes.
 - For runtime correctness boundaries, prefer server-owned fast fail over client guards. A mutation that no longer matches the live runtime instance should be rejected by the server, not locally guessed away by the client.
+- Do not introduce client-only async tokens or focus guards to suppress late navigation after a write completes. Model the operation as a server/projection-owned pending state, reject competing user operations at their entry point, and then project the server result.
+- Operation facts must be recorded in the sequential workflow that performs the operation. Examples include opener relationships, selected target supplements, and operation-owned runtime identities. Do not wait for route effects, render effects, or later reconciliation to "fill in" facts that were already known at the trigger boundary or immediately after the server accepted the write.
+- If an operation cannot prove its preconditions before a write, fail before the write. Do not perform the write first and then use cleanup, delayed effects, or route repair to approximate the intended state.
 - Do not mirror authoritative runtime membership from the client back into the server with whole-snapshot sync. Use server-owned open/close transitions and let the server mint runtime identities.
 - Cache identity must match runtime identity. If reopen can mint a new instance for the same stable path, cache keys and mutation preconditions need an instance dimension too.
 - Do not layer a client freshness check on top of a server-owned runtime id when the server can already validate the mutation from that id alone. That is not extra safety; it is a second authority and a new failure mode.
@@ -86,12 +89,58 @@ Notes:
 - Restorable state is not runtime-coherent shared state.
 - Session writes are client -> persistence only after boot restore; they do not publish runtime invalidation.
 - Workspace pane tabs in saved session state are boot-only import data. After restore, runtime tab changes flow server -> React Query -> later persistence; saved session data must not become a live tab authority.
+- Workspace pane target preference distinguishes three states: no target (`null` render selection), uninitialized target (use `INITIAL_WORKSPACE_PANE_TAB`), and explicit empty pane (`preferredWorkspacePaneTabByTarget[targetKey] === null`). Do not use `status` as a fallback for route misses, projection misses, or bare branch URLs.
+- URL-backed workspace pane routes are the visible-pane source of truth. Client preference and selected runtime-session state are restorable projection supplements, not command authorities. Internal workspace-pane commands must decide their target route and write the matching preference/selection supplement through the navigation action that accepted the route.
+- Route effects may sync an externally arrived URL (manual address entry, browser Back/Forward, restore) into preference/selection so the restorable projection stays coherent. Command correctness must not depend on those effects running after the route changes.
+- Workspace-pane navigation APIs must report whether navigation was accepted. If the branch target is blocked, missing, stale, or cannot produce a route, the command should fail fast instead of silently returning, inventing a fallback tab, or relying on reconciliation to repair a half-state.
 - Native-only validation or registration may feed back into server-owned runtime settings and then converge through invalidation/refetch.
+
+## Sequential command workflows
+
+User operations that combine server writes, client projection supplements, and
+route changes must be modeled as one ordered workflow. At the operation entry
+point, read the current route and projection once, prove the preconditions, and
+derive the exact business facts the operation owns: target route, opener,
+close-back target, insertion anchor, selected runtime session, and any server
+write input. Then run the write and commit only the result that was already
+planned.
+
+Do not split a command into "start a write now, then fix navigation/state later"
+pieces. In particular:
+
+- Do not use render effects, route effects, delayed callbacks, or background
+  observers to fill facts the command already knew.
+- Do not add client-only freshness tokens, focus guards, or post-await
+  "is the user still here?" checks to decide whether the command should
+  navigate.
+- Do not navigate first to hide an unresolved write, unless the product action
+  itself is explicitly a navigation command.
+- Do not let route reconciliation invent a successful target for a command.
+  Reconciliation may canonicalize externally arrived stale URLs or wait for a
+  real runtime lifecycle state; it is not a command repair layer.
+
+The normal shape is:
+
+```ts
+const plan = resolveOperationPlan(currentRoute, currentProjection)
+if (!plan.ok) return false
+const result = await performServerOrRuntimeWrite(plan.write)
+if (!result.ok) return false
+return commitPlannedNavigation(plan.route)
+```
+
+If a runtime write has a visible transitional lifecycle, project that lifecycle
+through the owning runtime model. For example, terminal close hides the session
+from the tab strip while close is in flight, and the terminal projection exposes
+that session id as closing. Route reconciliation can then wait on a real
+terminal lifecycle state instead of misclassifying the current URL as stale.
+That is acceptable projection state; it is not a command token or guard.
 
 ## Sync rules
 
 - Use invalidation plus refetch for runtime-coherent state that changes occasionally.
 - Use streaming only for continuous flows such as terminal output.
+- Do not add `refetchInterval`, `setInterval`, or timer loops to keep runtime-coherent server state fresh. Publish a server invalidation event at the write/lifecycle boundary, or use a streaming channel when the data is continuous.
 - Treat session restore as boot-only.
 - Keep visual preview and animation state local. Do not persist it, sync it, or write it to server/query caches except through the actual server mutation it previews.
 - For server mutations that return canonical state, write that returned value into React Query. For mutations that only publish invalidation, invalidate the query and let the next read project server truth.

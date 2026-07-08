@@ -5,22 +5,21 @@ import { createWorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane
 import type { WorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-actions.ts'
 
 export interface UseWorkspacePaneRuntimeTabActionContextInput {
-  enterRuntimeTab: (type: WorkspacePaneRuntimeTabType) => void
+  showRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => boolean
 }
 
 export function useWorkspacePaneRuntimeTabActionContext({
-  enterRuntimeTab,
+  showRuntimeTab,
 }: UseWorkspacePaneRuntimeTabActionContextInput): WorkspacePaneRuntimeTabActionContext {
-  const { selectTerminal, scrollToBottom } = useTerminalSessionContext()
+  const { scrollToBottom } = useTerminalSessionContext()
   return useMemo(
     () =>
       createWorkspacePaneRuntimeTabActionContext({
-        enterRuntimeTab,
+        showRuntimeTab,
         terminal: {
-          selectTerminal,
           scrollToBottom,
         },
       }),
-    [enterRuntimeTab, scrollToBottom, selectTerminal],
+    [showRuntimeTab, scrollToBottom],
   )
 }

@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
 import { act } from '@testing-library/react'
+import type { ComponentProps } from 'react'
 import { describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { TerminalSessionView } from '#/web/components/terminal/TerminalSessionView.tsx'
+import { TerminalSessionView as TerminalSessionViewComponent } from '#/web/components/terminal/TerminalSessionView.tsx'
 import {
   TerminalSessionContext,
   TerminalSessionReadContext,
@@ -42,6 +43,22 @@ vi.mock('#/web/components/terminal/mobile-detection.ts', () => ({
 // `renderInJsdom` registers `cleanup` via `afterEach`, which
 // unmounts all rendered components and removes their containers.
 
+type TestTerminalSessionViewProps = Omit<
+  ComponentProps<typeof TerminalSessionViewComponent>,
+  'createTerminalForSlot'
+> & {
+  createTerminalForSlot?: ComponentProps<typeof TerminalSessionViewComponent>['createTerminalForSlot']
+}
+
+const defaultCreateTerminalForSlot = vi.fn(async () => {})
+
+function TerminalSessionView({
+  createTerminalForSlot = defaultCreateTerminalForSlot,
+  ...props
+}: TestTerminalSessionViewProps) {
+  return <TerminalSessionViewComponent {...props} createTerminalForSlot={createTerminalForSlot} />
+}
+
 type TestTerminalSummary = Omit<TerminalSessionSummary, 'type' | 'hasRecentOutput'> &
   Partial<Pick<TerminalSessionSummary, 'type' | 'hasRecentOutput'>>
 
@@ -71,8 +88,13 @@ async function renderTerminalSession() {
     terminalSessionId: 'session-1',
     terminalWorktreeKey: '/repo\0/worktree',
     index: 1,
+
     repoRoot: '/repo',
+
+    repoInstanceId: 'repo-instance-test',
+
     branch: 'feature',
+
     worktreePath: '/worktree',
   }
   const terminalWorktreeSnapshot = {
@@ -213,13 +235,140 @@ async function dispatchPasteWithText(sessionRoot: HTMLElement, text: string, fil
 }
 
 describe('TerminalSessionView', () => {
+  test('attaches the explicit terminal session before projection selection catches up', async () => {
+    const descriptor = {
+      terminalSessionId: 'session-1',
+      terminalWorktreeKey: '/repo\0/worktree',
+      index: 1,
+
+      repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
+      branch: 'feature',
+
+      worktreePath: '/worktree',
+    }
+    const terminalWorktreeSnapshot = completeWorktreeSnapshot({
+      terminalWorktreeKey: '/repo\0/worktree',
+      selectedDescriptor: descriptor,
+      sessions: [
+        {
+          terminalSessionId: 'session-1',
+          terminalWorktreeKey: '/repo\0/worktree',
+          index: 1,
+          title: 'zsh',
+          phase: 'open' as const,
+          selected: true,
+          hasBell: false,
+        },
+        {
+          terminalSessionId: 'session-2',
+          terminalWorktreeKey: '/repo\0/worktree',
+          index: 2,
+          title: 'zsh',
+          phase: 'open' as const,
+          selected: false,
+          hasBell: false,
+        },
+      ],
+      count: 2,
+      createPending: false,
+    })
+    const snapshot = {
+      phase: 'open' as const,
+      message: null,
+      processName: 'zsh',
+      attachment: {
+        role: 'controller' as const,
+        controllerStatus: 'connected' as const,
+        active: true,
+        canTakeover: false,
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+    }
+    const attach = vi.fn()
+    const context: TerminalSessionContextValue = {
+      createTerminal: async () => 'session-1',
+      registerHost: vi.fn(),
+      unregisterHost: vi.fn(),
+      selectTerminal: vi.fn(),
+      scrollToBottom: vi.fn(),
+      scrollLines: vi.fn(),
+      clearBell: vi.fn(() => false),
+      closeTerminalByDescriptor: vi.fn(async () => true),
+      attach,
+      detach: vi.fn(),
+      restart: vi.fn(),
+      isTerminalFocusTarget: vi.fn(() => false),
+      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
+      clearSearch: vi.fn(),
+      writeInput: vi.fn(),
+      takeover: vi.fn(),
+      focusTerminal: vi.fn(),
+    }
+    const readContext: TerminalSessionReadContextValue = {
+      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
+      subscribeTerminalWorktree: () => () => {},
+      repoBellCount: () => 0,
+      subscribeRepoBellCount: () => () => {},
+      snapshot: () => snapshot,
+      subscribeSnapshot: () => () => {},
+    }
+
+    const { unmount } = renderInJsdom(
+      <TerminalSessionContext value={context}>
+        <TerminalSessionReadContext value={readContext}>
+          <TerminalSessionView
+            repoRoot="/repo"
+            repoInstanceId={'repo-instance-test'}
+            branch="feature"
+            worktreePath="/worktree"
+            selectedTerminalSessionId="session-2"
+          />
+        </TerminalSessionReadContext>
+      </TerminalSessionContext>,
+    )
+
+    try {
+      expect(attach).toHaveBeenCalledWith(
+        expect.objectContaining({
+          terminalSessionId: 'session-2',
+          index: 2,
+
+          repoRoot: '/repo',
+
+          repoInstanceId: 'repo-instance-test',
+
+          branch: 'feature',
+
+          worktreePath: '/worktree',
+        }),
+        expect.any(HTMLDivElement),
+      )
+      expect(attach).not.toHaveBeenCalledWith(
+        expect.objectContaining({ terminalSessionId: 'session-1' }),
+        expect.any(HTMLDivElement),
+      )
+    } finally {
+      unmount()
+    }
+  })
+
   test('keeps the active terminal attached when selected descriptor metadata changes', async () => {
     const descriptor = {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     let terminalWorktreeSnapshot = completeWorktreeSnapshot({
@@ -349,8 +498,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -502,8 +656,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -643,8 +802,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -752,8 +916,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -869,8 +1038,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -984,8 +1158,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -1104,8 +1283,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -1243,8 +1427,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -1354,8 +1543,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -1477,8 +1671,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -1756,8 +1955,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -1877,32 +2081,37 @@ describe('TerminalSessionView', () => {
     }
   })
 
-  test('drop resolves with the write dropped if the worktree key changed during resolve', async () => {
-    // Locks the worktree-switch guard added on top of the basic
-    // controller-drop path. The blob-save tier is a real roundtrip
-    // (HTTP POST in web, IPC in Electron), so the user has a real
-    // window to switch worktrees before the resolver returns. The
-    // captured `terminalSessionId` would otherwise be typed into a session
-    // the user is no longer looking at — invisible to them, or worse,
-    // into a now-detached session that the projection silently drops.
-    // The fix: capture `terminalSessionId` at handler invocation time, compare to
-    // a ref updated by useEffect on every render, and bail if
-    // they diverge.
+  test('drop writes to the terminal session captured by the drop event after a worktree switch', async () => {
+    // The blob-save tier is a real roundtrip (HTTP POST in web, IPC in
+    // Electron), so the user can switch worktrees before the resolver returns.
+    // The operation target is still the session that received the original
+    // drop event; projection/server lifecycle decides whether that session is
+    // still writable.
     const writeInput = vi.fn()
     const descriptorA = {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const descriptorB = {
       terminalSessionId: 'session-2',
       terminalWorktreeKey: '/repo\0/worktree-other',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree-other',
     }
     const worktreeSnapshotA = {
@@ -2031,8 +2240,8 @@ describe('TerminalSessionView', () => {
       })
 
       // User switches worktrees mid-resolve. The session re-renders with
-      // the new descriptor, which updates the current terminalSessionId ref
-      // via the effect on every render.
+      // the new descriptor, but the in-flight drop keeps the target captured
+      // at the event boundary.
       activeWorktreeSnapshot = worktreeSnapshotB
       rerender(
         <TerminalSessionContext value={context}>
@@ -2047,30 +2256,29 @@ describe('TerminalSessionView', () => {
         </TerminalSessionContext>,
       )
 
-      // Now resolve the in-flight blob-save call. The post-resolve
-      // guard must see the divergence and drop the write — neither
-      // terminal session (old nor new) should receive input. The chain runs
-      // through several microtask hops (saveClipboardFiles.then →
+      // Now resolve the in-flight blob-save call. The chain runs through
+      // several microtask hops (saveClipboardFiles.then →
       // resolvePastedFiles.then → processDrop.then → handler.then);
-      // setTimeout(0) is the established pattern in the other
-      // integration tests for draining them all in one act.
+      // setTimeout(0) is the established pattern in the other integration
+      // tests for draining them all in one act.
       await act(async () => {
         resolveSave(['/tmp/a.png'])
         await new Promise((r) => setTimeout(r, 0))
       })
 
-      expect(writeInput).not.toHaveBeenCalled()
+      expect(writeInput).toHaveBeenCalledWith('session-1', "'/tmp/a.png'", 'drop')
     } finally {
       unmount()
     }
   })
 
-  test('empty worktree shows a New terminal CTA that calls createTerminal', async () => {
+  test('empty worktree shows a New terminal CTA that calls the supplied create operation', async () => {
     // Regression for the "blank screen on first click" symptom: when
     // a worktree has no sessions yet, the session renders a CTA so the
     // user doesn't see a featureless black box and can discover the
     // affordance without reaching for the per-worktree "+" tab.
-    const createTerminal = vi.fn(async () => 'session-1')
+    const createTerminal = vi.fn(async () => 'raw-session')
+    const createTerminalForSlot = vi.fn(async () => 'session-1')
     const emptyWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
       selectedDescriptor: null,
@@ -2116,6 +2324,7 @@ describe('TerminalSessionView', () => {
             repoInstanceId={'repo-instance-test'}
             branch="feature"
             worktreePath="/worktree"
+            createTerminalForSlot={createTerminalForSlot}
           />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
@@ -2138,89 +2347,13 @@ describe('TerminalSessionView', () => {
         button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
 
-      expect(createTerminal).toHaveBeenCalledTimes(1)
-      expect(createTerminal).toHaveBeenCalledWith({
+      expect(createTerminal).not.toHaveBeenCalled()
+      expect(createTerminalForSlot).toHaveBeenCalledTimes(1)
+      expect(createTerminalForSlot).toHaveBeenCalledWith({
         repoRoot: '/repo',
         repoInstanceId: 'repo-instance-test',
         branch: 'feature',
         worktreePath: '/worktree',
-      })
-    } finally {
-      unmount()
-    }
-  })
-
-  test('empty-state CTA failure uses terminal create feedback toast', async () => {
-    // Locks the failure path of the new empty-state CTA. The create
-    // throws (e.g., server rejected with error.terminal-create-failed),
-    // and the session surfaces that to the user via sonner.error so they
-    // can retry instead of staring at a still-empty session.
-    const createTerminal = vi.fn(async () => {
-      throw new Error('error.terminal-create-failed')
-    })
-    const { toast } = await import('sonner')
-    const emptyWorktreeSnapshot = {
-      terminalWorktreeKey: '/repo\0/worktree',
-      selectedDescriptor: null,
-      sessions: [],
-      count: 0,
-      createPending: false,
-    }
-    const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
-    const context: TerminalSessionContextValue = {
-      createTerminal,
-      registerHost: vi.fn(),
-      unregisterHost: vi.fn(),
-      selectTerminal: vi.fn(),
-      scrollToBottom: vi.fn(),
-      scrollLines: vi.fn(),
-      clearBell: vi.fn(() => false),
-      closeTerminalByDescriptor: vi.fn(async () => true),
-      attach: vi.fn(),
-      detach: vi.fn(),
-      restart: vi.fn(),
-      isTerminalFocusTarget: vi.fn(() => false),
-      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
-      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
-      clearSearch: vi.fn(),
-      writeInput: vi.fn(),
-      takeover: vi.fn(),
-      focusTerminal: vi.fn(),
-    }
-    const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
-      subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
-      snapshot: () => emptySnapshot,
-      subscribeSnapshot: () => () => {},
-    }
-
-    const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext value={context}>
-        <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView
-            repoRoot="/repo"
-            repoInstanceId={'repo-instance-test'}
-            branch="feature"
-            worktreePath="/worktree"
-          />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>,
-    )
-
-    try {
-      vi.mocked(toast.error).mockClear()
-      const button = Array.from(container.querySelectorAll('button')).find(
-        (node) => node.textContent === 'terminal.new',
-      )
-      expect(button).toBeDefined()
-      await act(async () => {
-        button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-        await new Promise((r) => setTimeout(r, 0))
-      })
-      expect(toast.error).toHaveBeenCalledWith('action.result-error', {
-        description: 'error.terminal-create-failed',
       })
     } finally {
       unmount()

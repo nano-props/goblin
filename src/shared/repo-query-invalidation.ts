@@ -1,4 +1,6 @@
-export type RepoQueryKind = 'repo-snapshot'
+export const REPO_QUERY_KINDS = ['repo-snapshot', 'repo-runtime'] as const
+
+export type RepoQueryKind = (typeof REPO_QUERY_KINDS)[number]
 
 export interface RepoQueryInvalidationEvent {
   type: 'repo-query-invalidated'
@@ -12,6 +14,6 @@ export function isRepoQueryInvalidationEvent(value: unknown): value is RepoQuery
   return (
     event.type === 'repo-query-invalidated' &&
     typeof event.repoId === 'string' &&
-    event.query === 'repo-snapshot'
+    REPO_QUERY_KINDS.includes(event.query as RepoQueryKind)
   )
 }

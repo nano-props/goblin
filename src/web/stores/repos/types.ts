@@ -59,8 +59,9 @@ export interface RepoWorktreeState {
 export interface RepoUiState {
   branchViewMode: BranchViewMode
   /** Target-scoped selected workspace pane tab. Worktree-backed panes are keyed by
-   *  worktree path; branch-only panes are keyed by branch name. */
-  preferredWorkspacePaneTabByTarget: Record<string, WorkspacePaneTabType>
+   *  worktree path; branch-only panes are keyed by branch name. `null` is an
+   *  intentional empty workspace pane, not a missing preference. */
+  preferredWorkspacePaneTabByTarget: Record<string, WorkspacePaneTabType | null>
 }
 
 interface RepoProjectionMeta {
@@ -175,7 +176,7 @@ export interface WorkspaceNavigationHistoryRepoState {
 
 export interface SessionWorkspacePaneRestoreState {
   workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>
-  preferredWorkspacePaneTabByTargetByRepo: Record<string, Record<string, WorkspacePaneSessionTabType>>
+  preferredWorkspacePaneTabByTargetByRepo: Record<string, Record<string, WorkspacePaneSessionTabType | null>>
 }
 
 export interface RepoSessionHydrationOptions {
@@ -202,11 +203,12 @@ interface LocalWorkspaceState {
    *  (static and terminal): maps a tab's identity (see
    *  `workspacePaneTabEntryIdentity`) to the identity of the tab that was
    *  active when it was opened. Closing a tab prefers reactivating its
-   *  opener before falling back to the adjacent-tab heuristic. Scoped by
-   *  `tabOpenerScopeKey(repoId, branchName)` because static tab identities
-   *  (e.g. `workspace-pane:changes`) are shared constants across every
-   *  repo/branch, unlike terminal identities. Session-local only — openers
-   *  don't need to survive reload/restart. */
+   *  opener before falling back to the adjacent-tab heuristic. Scoped by the
+   *  same workspace pane target identity as tab-list projection and selected
+   *  pane preference because static tab identities (e.g.
+   *  `workspace-pane:changes`) are shared constants across every target,
+   *  unlike terminal identities. Session-local only — openers don't need to
+   *  survive reload/restart. */
   tabOpenerIdentityByScope: Record<string, Record<string, string>>
   /** Session-only app navigation history, scoped by repo. The route owns
    *  the visible repo/branch, while this store keeps enough local context
@@ -215,13 +217,15 @@ interface LocalWorkspaceState {
 }
 
 interface LocalWorkspaceActions {
-  /** Records that `childIdentity` was opened from the currently active
-   *  `openerIdentity` tab, within the given opener scope
-   *  (`tabOpenerScopeKey(repoId, branchName)`). */
+  /** Records that `childIdentity` was opened from `openerIdentity` within a
+   *  workspace-pane target scope. */
   setTabOpener: (scopeKey: string, childIdentity: string, openerIdentity: string) => void
   /** Clears a tab's recorded opener within a scope, e.g. once the tab has closed. */
   clearTabOpener: (scopeKey: string, childIdentity: string) => void
-  recordWorkspaceNavigation: (entry: WorkspaceNavigationHistoryEntry) => void
+  recordWorkspaceNavigation: (
+    entry: WorkspaceNavigationHistoryEntry,
+    options?: { replace?: boolean; browserHistoryTraversal?: 'back' | 'forward' },
+  ) => void
   goBackInWorkspaceNavigation: (repoId: string) => WorkspaceNavigationHistoryEntry | null
   goForwardInWorkspaceNavigation: (repoId: string) => WorkspaceNavigationHistoryEntry | null
 }
@@ -254,7 +258,7 @@ interface RuntimeCoherentRepoProjectionActions {
    *  against terminal session count, worktree presence, or opened workspace pane tabs;
    *  the UI resolves the active pane at read time so session restore preserves
    *  target-scoped user intent. */
-  setWorkspacePaneTab: (id: string, branch: string, tab: WorkspacePaneTabType) => void
+  setWorkspacePaneTab: (id: string, branch: string, tab: WorkspacePaneTabType | null) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   refreshRuntimeProjection: (id: string, options: RepoRuntimeProjectionRefreshOptions) => Promise<void>
   refreshCoreData: (id: string, options?: { repoInstanceId?: string }) => Promise<void>

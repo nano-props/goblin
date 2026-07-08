@@ -1,17 +1,15 @@
 import { terminalLog } from '#/web/logger.ts'
 import type { TerminalCreateOptions } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import {
   showTerminalCreateErrorToast,
   terminalCreateErrorKey,
   type TerminalCreateTranslator,
 } from '#/web/components/terminal/terminal-create-feedback.ts'
+import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
-import { hasFreshRepoInstance, repoInstanceHandle } from '#/web/stores/repos/repo-guards.ts'
-import type { TerminalCreateOwner } from '#/web/components/terminal/types.ts'
-import { createWorkspacePaneTerminalTab } from '#/web/workspace-pane/workspace-pane-terminal-create.ts'
 
 export type TerminalCreateCommandResult =
   { ok: true; terminalSessionId: string } | { ok: false; error: unknown; messageKey: string }
@@ -21,11 +19,6 @@ const TERMINAL_CREATE_CANCELED_MESSAGE = 'terminal create request canceled'
 export async function runCreateTerminalTabCommand(input: {
   base: TerminalSessionBase
   createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
-  createOwnedTerminal?: (
-    base: TerminalSessionBase,
-    owner: TerminalCreateOwner,
-    options?: TerminalCreateOptions,
-  ) => Promise<string>
   /**
    * The tab this creation should be attributed to (used for close-back focus
    * via the workspace pane tab opener tracker). Captured by the caller at
@@ -35,8 +28,8 @@ export async function runCreateTerminalTabCommand(input: {
    * finishes.
    */
   openerIdentity: string | null
-  /** Switches into the terminal view immediately before creating the terminal. */
-  enterTerminalTab: () => void | Promise<void>
+  /** Opens the concrete terminal route after the server has created a session. */
+  showCreatedTerminalTab?: (terminalSessionId: string) => boolean | Promise<boolean>
   /**
    * Insertion anchor for the new terminal tab. Callers decide explicitly:
    * supply the captured opener's identity when the terminal is opened from
@@ -47,26 +40,33 @@ export async function runCreateTerminalTabCommand(input: {
   t?: TerminalCreateTranslator
   logMessage?: string
 }): Promise<TerminalCreateCommandResult> {
-  const repoInstance = repoInstanceHandle(useReposStore.getState().repos[input.base.repoRoot])
-  const owner = createTerminalCreateOwner(repoInstance)
-  const usesOwnedCreate = !!(owner && input.createOwnedTerminal)
-  await input.enterTerminalTab()
-  if (!usesOwnedCreate && !hasFreshRepoInstance(useReposStore.getState(), repoInstance)) {
-    return { ok: false, error: new Error('cancelled'), messageKey: 'error.terminal-create-failed' }
+  if (!input.base.repoInstanceId) {
+    return { ok: false, error: new Error('repo instance unavailable'), messageKey: 'error.terminal-create-failed' }
+  }
+  if (terminalCreatePending(input.base)) {
+    return {
+      ok: false,
+      error: new Error('terminal create already pending'),
+      messageKey: 'error.terminal-create-failed',
+    }
   }
   try {
-    const terminalSessionId = await createTerminalSession(input, owner)
-    if (!usesOwnedCreate && !hasFreshRepoInstance(useReposStore.getState(), repoInstance)) {
-      return { ok: false, error: new Error('cancelled'), messageKey: 'error.terminal-create-failed' }
-    }
+    const terminalSessionId = await input.createTerminal(input.base, input.options)
     if (input.openerIdentity) {
       recordWorkspacePaneTabOpener(
         input.base.repoRoot,
         input.base.branch,
         terminalWorkspacePaneTabProvider.identity(terminalSessionId),
         input.openerIdentity,
-        repoInstance,
       )
+    }
+    const navigationAccepted = input.showCreatedTerminalTab ? await input.showCreatedTerminalTab(terminalSessionId) : true
+    if (!navigationAccepted) {
+      return {
+        ok: false,
+        error: new Error('workspace pane navigation rejected'),
+        messageKey: 'error.terminal-create-failed',
+      }
     }
     return { ok: true, terminalSessionId }
   } catch (error) {
@@ -79,37 +79,16 @@ export async function runCreateTerminalTabCommand(input: {
   }
 }
 
+function terminalCreatePending(base: TerminalSessionBase): boolean {
+  const bridge = readTerminalSessionCommandBridge()
+  if (!bridge) return false
+  const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
+  return bridge.terminalWorktreeSnapshot(terminalWorktreeKey).createPending
+}
+
 function isTerminalCreateCanceled(error: unknown): boolean {
-  return error instanceof Error && error.message === TERMINAL_CREATE_CANCELED_MESSAGE
-}
-
-function createTerminalCreateOwner(repoInstance: ReturnType<typeof repoInstanceHandle>): TerminalCreateOwner | null {
-  if (repoInstance === null) return null
-  return {
-    key: `${repoInstance.id}\0${repoInstance.repoInstanceId}`,
-    isFresh: () => hasFreshRepoInstance(useReposStore.getState(), repoInstance),
-  }
-}
-
-async function createTerminalSession(
-  input: {
-    base: TerminalSessionBase
-    createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
-    createOwnedTerminal?: (
-      base: TerminalSessionBase,
-      owner: TerminalCreateOwner,
-      options?: TerminalCreateOptions,
-    ) => Promise<string>
-    options?: TerminalCreateOptions
-  },
-  owner: TerminalCreateOwner | null,
-): Promise<string> {
-  if (owner && input.createOwnedTerminal) {
-    return await input.createOwnedTerminal(input.base, owner, input.options)
-  }
-  return await createWorkspacePaneTerminalTab({
-    base: input.base,
-    createTerminal: input.createTerminal,
-    options: input.options,
-  })
+  return (
+    error instanceof Error &&
+    (error.message === TERMINAL_CREATE_CANCELED_MESSAGE || error.message === 'error.repo-instance-stale')
+  )
 }

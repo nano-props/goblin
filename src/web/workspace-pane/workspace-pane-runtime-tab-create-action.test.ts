@@ -9,21 +9,12 @@ const terminalCreateCommandMocks = vi.hoisted(() => ({
   runCreateTerminalTabCommand: vi.fn(async () => ({ ok: true as const, terminalSessionId: 'session-1' })),
 }))
 
-const workspacePaneTabOpenerMocks = vi.hoisted(() => ({
-  captureWorkspacePaneActiveTabIdentity: vi.fn(() => 'opener-tab'),
-}))
-
 vi.mock('#/web/commands/terminal-create-command.ts', () => ({
   runCreateTerminalTabCommand: terminalCreateCommandMocks.runCreateTerminalTabCommand,
 }))
 
-vi.mock('#/web/workspace-pane/workspace-pane-tab-opener.ts', () => ({
-  captureWorkspacePaneActiveTabIdentity: workspacePaneTabOpenerMocks.captureWorkspacePaneActiveTabIdentity,
-}))
-
 afterEach(() => {
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockClear()
-  workspacePaneTabOpenerMocks.captureWorkspacePaneActiveTabIdentity.mockClear()
 })
 
 describe('workspace pane runtime tab create action', () => {
@@ -32,11 +23,12 @@ describe('workspace pane runtime tab create action', () => {
       repoRoot: '/repo',
       runtimeTabStateByType: runtimeTabState(),
       initialRuntimeProjectionHydrating: false,
-      enterRuntimeTab: vi.fn(),
+      showCreatedRuntimeTab: vi.fn(),
       t: translate,
       terminal: {
         base: null,
-        createTerminal: vi.fn(),
+        createTerminal: vi.fn(async () => 'session-1'),
+        captureOpenerIdentity: vi.fn(() => null),
       },
     })
 
@@ -51,44 +43,45 @@ describe('workspace pane runtime tab create action', () => {
       worktreePath: '/repo-worktree',
     }
     const createTerminal = vi.fn(async () => 'session-1')
-    const createOwnedTerminal = vi.fn(async () => 'session-1')
-    const enterRuntimeTab = vi.fn()
+    const showCreatedRuntimeTab = vi.fn()
+    const captureOpenerIdentity = vi.fn(() => 'opener-tab')
 
     const action = workspacePaneRuntimeTabCreateAction('terminal', {
       repoRoot: '/repo',
       runtimeTabStateByType: runtimeTabState(),
       initialRuntimeProjectionHydrating: false,
-      enterRuntimeTab,
+      showCreatedRuntimeTab,
       t: translate,
       terminal: {
         base,
         createTerminal,
-        createOwnedTerminal,
+        captureOpenerIdentity,
       },
     })
 
     expect(action?.label).toBe('terminal.new')
     expect(action?.busy).toBe(false)
+    expect(action?.blocksTabInteraction).toBe(false)
+    expect(captureOpenerIdentity).not.toHaveBeenCalled()
 
     action?.onCreate()
 
-    expect(workspacePaneTabOpenerMocks.captureWorkspacePaneActiveTabIdentity).toHaveBeenCalledWith('/repo', 'main')
+    expect(captureOpenerIdentity).toHaveBeenCalledOnce()
     expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).toHaveBeenCalledWith(
       expect.objectContaining({
         base,
         createTerminal,
-        createOwnedTerminal,
         openerIdentity: 'opener-tab',
         t: translate,
       }),
     )
 
     const commandCalls = terminalCreateCommandMocks.runCreateTerminalTabCommand.mock.calls as unknown as Array<
-      [{ enterTerminalTab: () => void | Promise<void> }]
+      [{ showCreatedTerminalTab: (terminalSessionId: string) => boolean | Promise<boolean> }]
     >
     const commandInput = commandCalls[0]?.[0]
-    await commandInput?.enterTerminalTab()
-    expect(enterRuntimeTab).toHaveBeenCalledWith('terminal')
+    await commandInput?.showCreatedTerminalTab('session-1')
+    expect(showCreatedRuntimeTab).toHaveBeenCalledWith('terminal', 'session-1')
   })
 
   test('marks the terminal create action busy while projection or create is pending', () => {
@@ -98,33 +91,35 @@ describe('workspace pane runtime tab create action', () => {
       worktreePath: '/repo-worktree',
     }
 
-    expect(
-      workspacePaneRuntimeTabCreateAction('terminal', {
-        repoRoot: '/repo',
-        runtimeTabStateByType: runtimeTabState({ createPending: true }),
-        initialRuntimeProjectionHydrating: false,
-        enterRuntimeTab: vi.fn(),
-        t: translate,
-        terminal: {
-          base,
-          createTerminal: vi.fn(),
-        },
-      })?.busy,
-    ).toBe(true)
+    const pendingAction = workspacePaneRuntimeTabCreateAction('terminal', {
+      repoRoot: '/repo',
+      runtimeTabStateByType: runtimeTabState({ createPending: true }),
+      initialRuntimeProjectionHydrating: false,
+      showCreatedRuntimeTab: vi.fn(),
+      t: translate,
+      terminal: {
+        base,
+        createTerminal: vi.fn(async () => 'session-1'),
+        captureOpenerIdentity: vi.fn(() => null),
+      },
+    })
+    expect(pendingAction?.busy).toBe(true)
+    expect(pendingAction?.blocksTabInteraction).toBe(true)
 
-    expect(
-      workspacePaneRuntimeTabCreateAction('terminal', {
-        repoRoot: '/repo',
-        runtimeTabStateByType: runtimeTabState(),
-        initialRuntimeProjectionHydrating: true,
-        enterRuntimeTab: vi.fn(),
-        t: translate,
-        terminal: {
-          base,
-          createTerminal: vi.fn(),
-        },
-      })?.busy,
-    ).toBe(true)
+    const hydratingAction = workspacePaneRuntimeTabCreateAction('terminal', {
+      repoRoot: '/repo',
+      runtimeTabStateByType: runtimeTabState(),
+      initialRuntimeProjectionHydrating: true,
+      showCreatedRuntimeTab: vi.fn(),
+      t: translate,
+      terminal: {
+        base,
+        createTerminal: vi.fn(async () => 'session-1'),
+        captureOpenerIdentity: vi.fn(() => null),
+      },
+    })
+    expect(hydratingAction?.busy).toBe(true)
+    expect(hydratingAction?.blocksTabInteraction).toBe(false)
   })
 })
 

@@ -145,6 +145,59 @@ This distinction matters for destructive worktree operations. Before a worktree 
 
 Repo routes and server-side repo write paths should not know about Workspace Pane tabs or terminal UI resources. They remain responsible for repository mutation. UI resource release belongs to the Workspace Pane tab lifecycle on the client.
 
+### Terminal create and Workspace Pane navigation
+
+Terminal creation is a serial operation at the workspace-pane target boundary.
+While `TerminalSessionProjection` reports `createPending` for a
+`terminalWorktreeKey`, user-driven workspace-pane tab interaction for that
+repo/branch/worktree should fast-fail at the operation entry point:
+tab switching, terminal selection, tab closing, shortcuts, history restore,
+notification jumps, and static-tab opens should not enqueue competing
+navigation.
+
+The pending bit is projection state from the terminal lifecycle queue. Do not
+add client-only focus tokens, request generations, or "is the user still on
+the initiating tab" guards to decide whether a completed create may navigate.
+Those checks create a second authority for user intent and make late async
+completion order part of the product model.
+
+The clean flow is:
+
+1. The user invokes create through a command/open-tab entry point.
+2. The entry point rejects immediately if the target projection is already
+   pending.
+3. The terminal projection/server create path owns session creation and
+   returns the server-allocated `terminalSessionId`.
+4. The caller navigates directly to the canonical terminal route for that
+   returned session.
+
+If a create flow needs async preparation before the PTY can be launched, such
+as resolving a file viewer command for "open file in terminal", that preparation
+must be part of the projection-owned create request. Use a create option that is
+resolved inside the terminal create queue after `createPending` is visible; do
+not `await` the preparation in a component and only then call create.
+
+Route reconciliation remains a boundary concern: stale or unrenderable explicit
+pane URLs should fast-fail to the bare branch route. Do not replace
+`/terminal/{missingSessionId}` or `/tab/{unrenderableTab}` with a different live
+tab just because one exists. The resulting workspace history entry should record
+the empty pane (`workspacePaneTab: null`) rather than inventing a tab hit.
+The tab model must apply the same rule before reconciliation effects run:
+generic preferred-tab fallback is only for persisted preferences, never for an
+explicit URL route.
+
+URL-backed terminal routes are requested selection, not projection state. A
+route such as `/terminal/{sessionId}` may ask the tab model to render that
+materialized session, but it must not be injected into the runtime projection's
+`selectedSessionId`. The shared selection-sync path is responsible for writing
+the resolved active session back to the projection owner.
+
+The bare branch URL is the canonical empty workspace-pane route. Explicit pane
+tabs use explicit URLs such as `/tab/status` or `/terminal/{sessionId}`. Do not
+canonicalize a bare branch URL to `/tab/status`: that erases the user's empty
+pane state and reintroduces hidden preferred-tab fallback as a second route
+authority.
+
 ## Identity model
 
 The terminal system relies on these identity/grouping scopes:

@@ -13,6 +13,12 @@ import { gblLog } from '#/web/logger.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
 
 export type WorkspacePaneTabsQueryData = WorkspacePaneTabsEntry[]
+export type WorkspacePaneTabsProjectionPhase = 'pending' | 'ready' | 'failed'
+
+export interface WorkspacePaneTabsTargetProjection {
+  phase: WorkspacePaneTabsProjectionPhase
+  tabs: WorkspacePaneTabEntry[]
+}
 
 let workspacePaneTabsPersistenceVersion = 0
 const workspacePaneTabsPersistenceListeners = new Set<() => void>()
@@ -63,6 +69,23 @@ export function readWorkspacePaneTabsForTarget(
       workspacePaneTabsQueryKey(target.repoRoot, target.repoInstanceId),
     ) ?? []
   return workspacePaneTabsForTargetFromQueryData(data, target)
+}
+
+export function readWorkspacePaneTabsProjectionForTarget(
+  target: {
+    repoRoot: string
+    repoInstanceId: string
+    branchName: string | null | undefined
+    worktreePath: string | null
+  },
+  queryClient: QueryClient = primaryWindowQueryClient,
+): WorkspacePaneTabsTargetProjection {
+  const state = queryClient.getQueryState<WorkspacePaneTabsQueryData>(
+    workspacePaneTabsQueryKey(target.repoRoot, target.repoInstanceId),
+  )
+  if (state?.status === 'error') return { phase: 'failed', tabs: [] }
+  if (state?.status !== 'success') return { phase: 'pending', tabs: [] }
+  return { phase: 'ready', tabs: workspacePaneTabsForTargetFromQueryData(state.data ?? [], target) }
 }
 
 export function workspacePaneTabsForTargetFromQueryData(

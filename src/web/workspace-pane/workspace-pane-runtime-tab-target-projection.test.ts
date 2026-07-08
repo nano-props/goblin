@@ -81,6 +81,11 @@ describe('workspace pane runtime tab target projection', () => {
       createPending: true,
     }))
     useTerminalProjectionHydrationStore.getState().markProjectionReady('/repo', 'repo-instance-1')
+    useReposStore.setState({
+      selectedTerminalSessionIdByTerminalWorktree: {
+        [terminalWorktreeKey]: 'session-1',
+      },
+    })
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot,
       createTerminal: vi.fn(async () => 'session-2'),
@@ -91,7 +96,6 @@ describe('workspace pane runtime tab target projection', () => {
       repoRoot: '/repo',
       repoInstanceId: 'repo-instance-1',
       worktreePath: '/repo-worktree',
-      selectedSessionIdByRuntimeType: { terminal: 'session-1' },
     })
 
     expect(terminalWorktreeSnapshot).toHaveBeenCalledWith(terminalWorktreeKey)

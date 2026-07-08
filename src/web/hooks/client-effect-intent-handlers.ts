@@ -28,19 +28,20 @@ import type { PrimaryWindowNavigationActions } from '#/web/primary-window-naviga
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { getRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 
 interface TerminalBellIntentDeps {
   navigation: PrimaryWindowNavigationActions
   closeAllOverlays: () => void
-  setSelectedTerminal: (terminalWorktreeKey: string, terminalSessionId: string) => void
 }
 
 interface SharedClientIntentDeps {
   navigation: PrimaryWindowNavigationActions
   currentRepoId: string | null
   currentBranchName: string | null
+  currentWorkspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
   closeAllOverlays: () => void
   openRepoPathDialog: () => void
   openCloneRepo: () => void
@@ -49,7 +50,6 @@ interface SharedClientIntentDeps {
   isOverlayOpen: () => boolean
   isWorkspaceShortcutSuppressed: () => boolean
   ensureWorkspaceOpen: (input: string | RepoSessionEntry) => Promise<OpenRepoResult>
-  setSelectedTerminal: (terminalWorktreeKey: string, terminalSessionId: string) => void
   resetLayout: () => void
   toggleZenMode: () => void
   t: (key: string) => string
@@ -72,8 +72,7 @@ export function handleTerminalBellClickIntent(
   deps.closeAllOverlays()
   switch (plan.kind) {
     case 'show-worktree-terminal':
-      deps.setSelectedTerminal(plan.terminalWorktreeKey, plan.terminalSessionId)
-      deps.navigation.showRepoBranchWorkspacePaneTab(plan.repoId, plan.branch, 'terminal')
+      deps.navigation.showRepoBranchTerminalSession(plan.repoId, plan.branch, plan.terminalSessionId)
       return
   }
 }
@@ -171,6 +170,7 @@ export async function handleWorkspaceClientIntent(
       return await runNewTerminalTabCommand({
         repoId: plan.repoId,
         branchName: deps.currentBranchName,
+        workspacePaneRoute: deps.currentWorkspacePaneRoute,
         navigation: deps.navigation,
         t: deps.t,
       })
@@ -178,6 +178,7 @@ export async function handleWorkspaceClientIntent(
       return await runCloseWorkspacePaneTabOrWindowCommand({
         repoId: plan.repoId,
         branchName: deps.currentBranchName,
+        workspacePaneRoute: deps.currentWorkspacePaneRoute,
         navigation: deps.navigation,
       })
     case 'close-repo':
@@ -197,9 +198,19 @@ export async function handleWorkspaceClientIntent(
       })
       return true
     case 'show-workspace-pane-tab':
+      if (plan.tab === 'terminal') {
+        return await runTerminalPrimaryActionCommand({
+          repoId: plan.repoId,
+          branchName: deps.currentBranchName,
+          workspacePaneRoute: deps.currentWorkspacePaneRoute,
+          navigation: deps.navigation,
+          t: deps.t,
+        })
+      }
       return await runShowWorkspacePaneTabCommand({
         repoId: plan.repoId,
         branchName: deps.currentBranchName,
+        workspacePaneRoute: deps.currentWorkspacePaneRoute,
         tab: plan.tab,
         navigation: deps.navigation,
       })
@@ -207,6 +218,7 @@ export async function handleWorkspaceClientIntent(
       return await runTerminalPrimaryActionCommand({
         repoId: plan.repoId,
         branchName: deps.currentBranchName,
+        workspacePaneRoute: deps.currentWorkspacePaneRoute,
         navigation: deps.navigation,
         t: deps.t,
       })

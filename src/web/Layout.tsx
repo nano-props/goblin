@@ -41,6 +41,8 @@ import { returnToFromHref, usePrimaryWindowRouteNavigation } from '#/web/primary
 import { useWorkspaceNavigationHistory } from '#/web/workspace-navigation-history.ts'
 import type { WorkspaceNavigationRouteContext } from '#/web/workspace-navigation-history.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 
 const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapState>({
   status: 'restoring-workspace',
@@ -116,8 +118,9 @@ function AuthenticatedWorkspaceShell() {
     return routedRepoId && s.repos[routedRepoId] ? routedRepoId : null
   })
   const currentBranchName = routeContext?.kind === 'branch' ? (routeContext.branchName ?? null) : null
+  const currentWorkspacePaneRoute = routeContext?.kind === 'branch' ? (routeContext.workspacePaneRoute ?? null) : null
   const order = useReposStore((s) => s.order)
-  const { closeRepo, setWorkspacePaneTab, goBackInWorkspaceNavigation, goForwardInWorkspaceNavigation } = useReposStore(
+  const { closeRepo, goBackInWorkspaceNavigation, goForwardInWorkspaceNavigation } = useReposStore(
     useShallow(primaryWindowNavigationStoreActionsFromStore),
   )
   const routeNavigation = usePrimaryWindowRouteNavigation()
@@ -127,7 +130,6 @@ function AuthenticatedWorkspaceShell() {
         currentRepoId: hydratedRouteRepoId,
         order,
         closeRepo,
-        setWorkspacePaneTab,
         goBackInWorkspaceNavigation,
         goForwardInWorkspaceNavigation,
         routeNavigation,
@@ -138,7 +140,6 @@ function AuthenticatedWorkspaceShell() {
       goForwardInWorkspaceNavigation,
       order,
       routeNavigation,
-      setWorkspacePaneTab,
       hydratedRouteRepoId,
     ],
   )
@@ -151,6 +152,7 @@ function AuthenticatedWorkspaceShell() {
         routedRepoId={routedRepoId}
         hydratedRouteRepoId={hydratedRouteRepoId}
         currentBranchName={currentBranchName}
+        currentWorkspacePaneRoute={currentWorkspacePaneRoute}
         routeContext={workspaceNavigationRouteContext(routeContext, routeHref)}
         navigation={navigation}
         closeAllOverlays={overlays.closeAllOverlays}
@@ -176,6 +178,7 @@ function AuthenticatedWorkspaceShell() {
               <VisibleRepoProjectionRefreshEffect
                 hydratedRouteRepoId={hydratedRouteRepoId}
                 currentBranchName={currentBranchName}
+                currentWorkspacePaneRoute={currentWorkspacePaneRoute}
               />
               <div
                 className="relative flex h-full flex-col"
@@ -191,6 +194,7 @@ function AuthenticatedWorkspaceShell() {
                   navigation={navigation}
                   hydratedRouteRepoId={hydratedRouteRepoId}
                   currentBranchName={currentBranchName}
+                  currentWorkspacePaneRoute={currentWorkspacePaneRoute}
                 />
               </div>
             </TerminalSessionProvider>
@@ -215,6 +219,7 @@ interface RepoRouteContext {
   kind: 'empty' | 'dashboard' | 'branch' | 'newWorktree'
   repoSlug: string
   branchName?: string
+  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
 }
 
 export function repoRouteContextFromMatches(
@@ -229,12 +234,32 @@ export function repoRouteContextFromMatches(
   const branchSlug = repoMatch.params.branchSlug
   if (branchSlug) {
     const branchName = branchNameFromSlug(branchSlug)
-    return branchName ? { kind: 'branch', repoSlug, branchName } : { kind: 'empty', repoSlug }
+    return branchName
+      ? {
+          kind: 'branch',
+          repoSlug,
+          branchName,
+          workspacePaneRoute: workspacePaneRouteFromMatches(matches),
+        }
+      : { kind: 'empty', repoSlug }
   }
 
   if (repoMatch.routeId.includes('/worktree/new')) return { kind: 'newWorktree', repoSlug }
   if (repoMatch.routeId.includes('/dashboard')) return { kind: 'dashboard', repoSlug }
   return { kind: 'empty', repoSlug }
+}
+
+function workspacePaneRouteFromMatches(
+  matches: Array<{ routeId: string; params: Record<string, string> }>,
+): RepoBranchWorkspacePaneRoute | null {
+  const terminalMatch = [...matches].reverse().find((match) => typeof match.params.terminalSessionId === 'string')
+  const terminalSessionId = terminalMatch?.params.terminalSessionId
+  if (terminalSessionId) return { kind: 'terminal', terminalSessionId }
+
+  const tabMatch = [...matches].reverse().find((match) => typeof match.params.tabKey === 'string')
+  const tabKey = tabMatch?.params.tabKey
+  if (!tabKey) return null
+  return isWorkspacePaneStaticTabType(tabKey) ? { kind: 'static', tab: tabKey } : { kind: 'invalid-static', tabKey }
 }
 
 interface PrimaryWindowOverlaysProps {
@@ -243,6 +268,7 @@ interface PrimaryWindowOverlaysProps {
   navigation: PrimaryWindowNavigationActions
   hydratedRouteRepoId: string | null
   currentBranchName: string | null
+  currentWorkspacePaneRoute: RepoBranchWorkspacePaneRoute | null
 }
 
 function PrimaryWindowOverlays({
@@ -251,6 +277,7 @@ function PrimaryWindowOverlays({
   navigation,
   hydratedRouteRepoId,
   currentBranchName,
+  currentWorkspacePaneRoute,
 }: PrimaryWindowOverlaysProps) {
   return (
     <>
@@ -262,7 +289,12 @@ function PrimaryWindowOverlays({
       />
       <BranchActionDialogHost currentRepoId={hydratedRouteRepoId} currentBranchName={currentBranchName} />
       <FiletreeActionDialogHost currentRepoId={hydratedRouteRepoId} />
-      <TerminalActionDialogHost currentRepoId={hydratedRouteRepoId} navigation={navigation} />
+      <TerminalActionDialogHost
+        currentRepoId={hydratedRouteRepoId}
+        currentBranchName={currentBranchName}
+        currentWorkspacePaneRoute={currentWorkspacePaneRoute}
+        navigation={navigation}
+      />
       <RepoDropOverlay active={repoDrop.active} />
       <Toaster position="bottom-right" closeButton />
     </>
@@ -291,6 +323,7 @@ function AuthenticatedWorkspaceSideEffects({
   routedRepoId,
   hydratedRouteRepoId,
   currentBranchName,
+  currentWorkspacePaneRoute,
   routeContext,
   navigation,
   closeAllOverlays,
@@ -305,6 +338,7 @@ function AuthenticatedWorkspaceSideEffects({
   routedRepoId: string | null
   hydratedRouteRepoId: string | null
   currentBranchName: string | null
+  currentWorkspacePaneRoute: RepoBranchWorkspacePaneRoute | null
   routeContext: WorkspaceNavigationRouteContext | null
   navigation: PrimaryWindowNavigationActions
   closeAllOverlays: () => void
@@ -321,6 +355,7 @@ function AuthenticatedWorkspaceSideEffects({
     navigation,
     currentRepoId: hydratedRouteRepoId,
     currentBranchName,
+    currentWorkspacePaneRoute,
     closeAllOverlays,
     openRepoPathDialog,
     openCloneRepo,
@@ -334,6 +369,7 @@ function AuthenticatedWorkspaceSideEffects({
     navigation,
     currentRepoId: hydratedRouteRepoId,
     currentBranchName,
+    currentWorkspacePaneRoute,
     onShowHelp: navigateToSettingsShortcuts,
     isWorkspaceShortcutSuppressed: () => workspaceShortcutsSuppressed,
     isSettingsOpen: () => isSettingsOpen,
@@ -353,11 +389,17 @@ function AuthenticatedWorkspaceSideEffects({
 function VisibleRepoProjectionRefreshEffect({
   hydratedRouteRepoId,
   currentBranchName,
+  currentWorkspacePaneRoute,
 }: {
   hydratedRouteRepoId: string | null
   currentBranchName: string | null
+  currentWorkspacePaneRoute: RepoBranchWorkspacePaneRoute | null
 }) {
-  useVisibleRepoProjectionRefresh({ hydratedRouteRepoId, currentBranchName })
+  useVisibleRepoProjectionRefresh({
+    hydratedRouteRepoId,
+    currentBranchName,
+    workspacePaneRoute: currentWorkspacePaneRoute,
+  })
   return null
 }
 

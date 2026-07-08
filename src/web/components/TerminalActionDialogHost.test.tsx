@@ -41,12 +41,20 @@ afterEach(() => {
 
 describe('TerminalActionDialogHost', () => {
   test('retains the process message while the close animation runs after store state is cleared', () => {
-    renderInJsdom(<TerminalActionDialogHost currentRepoId="/repo" navigation={{} as PrimaryWindowNavigationActions} />)
+    renderInJsdom(
+      <TerminalActionDialogHost
+        currentRepoId="/repo"
+        currentBranchName="main"
+        currentWorkspacePaneRoute={{ kind: 'terminal', terminalSessionId: 'session-1' }}
+        navigation={{} as PrimaryWindowNavigationActions}
+      />,
+    )
 
     act(() => {
       useTerminalActionDialogsStore.getState().openCloseConfirm({
         repoId: '/repo',
         targetIdentity: 'terminal:session-1',
+        workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'session-1' },
         terminalSessionId: 'session-1',
         terminalBase: { repoRoot: '/repo', branch: 'main', worktreePath: '/repo-worktree' },
         processName: 'node',

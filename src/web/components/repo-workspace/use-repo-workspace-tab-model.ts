@@ -1,8 +1,11 @@
 import { useMemo } from 'react'
 import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import {
   createRepoWorkspaceTabModel,
+  repoWorkspaceTabModelBlocksTabInteraction,
   repoWorkspaceRuntimeTabSessionId,
+  type RepoWorkspaceTabEntriesProjectionPhase,
   type RepoWorkspaceTabModel,
   type RepoWorkspaceTabModelInput,
 } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
@@ -11,24 +14,16 @@ import {
   useWorkspacePaneTabsQuery,
   workspacePaneTabsForTargetFromQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import {
-  useWorkspacePaneRuntimeTabTargetProjection,
-  type WorkspacePaneRuntimeTabTargetProjectionHookResult,
-} from '#/web/workspace-pane/use-workspace-pane-runtime-tab-target-projection.ts'
+import { useWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-target-projection.ts'
 import { useSyncWorkspacePaneRuntimeTabProviderSelection } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
-
-export interface RepoWorkspaceTabModelInputState {
-  input: RepoWorkspaceTabModelInput
-  selectedSessionIdByRuntimeType: WorkspacePaneRuntimeTabTargetProjectionHookResult['selectedSessionIdByRuntimeType']
-}
 
 export function useRepoWorkspaceTabModel(
   repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'ui'>,
   detail: CurrentRepoWorkspacePresentation,
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null,
 ) {
-  const { input, selectedSessionIdByRuntimeType } = useRepoWorkspaceTabModelInput(repo, detail)
+  const input = useRepoWorkspaceTabModelInput(repo, detail, workspacePaneRoute)
   const model = useMemo(() => createRepoWorkspaceTabModel(input), [input])
-  useSyncRepoWorkspaceRuntimeTabSelection(model, selectedSessionIdByRuntimeType)
   return model
 }
 
@@ -40,7 +35,8 @@ export function useRepoWorkspaceTabModel(
 export function useRepoWorkspaceTabModelInput(
   repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'ui'>,
   detail: CurrentRepoWorkspacePresentation,
-): RepoWorkspaceTabModelInputState {
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null,
+): RepoWorkspaceTabModelInput {
   const { branch } = detail
   const branchName = branch?.name ?? null
   const worktreePath = branch?.worktree?.path ?? null
@@ -50,6 +46,10 @@ export function useRepoWorkspaceTabModelInput(
     worktreePath,
   })
   const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(repo.id, repo.instanceId)
+  const requestedSessionIdByRuntimeType = useMemo(
+    () => (workspacePaneRoute?.kind === 'terminal' ? { terminal: workspacePaneRoute.terminalSessionId } : undefined),
+    [workspacePaneRoute],
+  )
 
   const workspacePaneTabEntries = useMemo(
     () =>
@@ -61,53 +61,77 @@ export function useRepoWorkspaceTabModelInput(
     [workspacePaneTabsQuery.data, repo.id, repo.instanceId, branchName, worktreePath],
   )
 
-  const preferredTab = useMemo(
-    () =>
-      preferredWorkspacePaneTabForTarget(repo.ui, branchName ? { repoRoot: repo.id, branchName, worktreePath } : null),
-    [repo.ui.preferredWorkspacePaneTabByTarget, repo.id, branchName, worktreePath],
-  )
+  const preferredTab = useMemo(() => {
+    if (workspacePaneRoute === null) return null
+    if (workspacePaneRoute?.kind === 'static') return workspacePaneRoute.tab
+    if (workspacePaneRoute?.kind === 'terminal') return 'terminal'
+    if (workspacePaneRoute?.kind === 'invalid-static') return null
+    return preferredWorkspacePaneTabForTarget(
+      repo.ui,
+      branchName ? { repoRoot: repo.id, branchName, worktreePath } : null,
+    )
+  }, [repo.ui.preferredWorkspacePaneTabByTarget, repo.id, branchName, worktreePath, workspacePaneRoute])
 
   const input = useMemo<RepoWorkspaceTabModelInput>(
     () => ({
       repoId: repo.id,
+      repoInstanceId: repo.instanceId,
       branchName,
       worktreePath,
       preferredTab,
+      allowPreferredTabFallback: false,
       tabEntries: workspacePaneTabEntries,
+      tabEntriesProjectionPhase: workspacePaneTabsProjectionPhase(workspacePaneTabsQuery.status),
       runtimeTabViews: runtimeProjection.runtimeTabViews,
       runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
+      requestedSessionIdByRuntimeType,
     }),
     [
       repo.id,
+      repo.instanceId,
       branchName,
       worktreePath,
       preferredTab,
+      workspacePaneTabsQuery.status,
       workspacePaneTabEntries,
       runtimeProjection.runtimeTabViews,
       runtimeProjection.runtimeTabStateByType,
+      requestedSessionIdByRuntimeType,
     ],
   )
 
-  return useMemo(
-    () => ({ input, selectedSessionIdByRuntimeType: runtimeProjection.selectedSessionIdByRuntimeType }),
-    [input, runtimeProjection.selectedSessionIdByRuntimeType],
-  )
+  return input
+}
+
+function workspacePaneTabsProjectionPhase(
+  status: ReturnType<typeof useWorkspacePaneTabsQuery>['status'],
+): RepoWorkspaceTabEntriesProjectionPhase {
+  if (status === 'success') return 'ready'
+  if (status === 'error') return 'failed'
+  return 'pending'
 }
 
 /**
- * Mirrors the model's resolved active runtime selection into the backing runtime store. Keeping
- * this separate from input collection makes the single write-side effect in
- * the tab-model hook explicit.
+ * Mirrors the verified model's resolved active runtime selection into the
+ * backing runtime store. The caller owns the route/reconciliation boundary;
+ * this hook only performs the provider write once that boundary allows it.
  */
 export function useSyncRepoWorkspaceRuntimeTabSelection(
-  model: Pick<RepoWorkspaceTabModel, 'activeTab' | 'runtimeTabTargetKeyByType'>,
-  selectedSessionIdByRuntimeType: WorkspacePaneRuntimeTabTargetProjectionHookResult['selectedSessionIdByRuntimeType'],
+  model: Pick<RepoWorkspaceTabModel, 'activeTab' | 'runtimeTabTargetKeyByType' | 'runtimeTabStateByType'>,
+  options: { enabled: boolean },
 ): void {
+  const tabInteractionBlocked = !options.enabled || repoWorkspaceTabModelBlocksTabInteraction(model)
   const activeSessionIdByRuntimeType = useMemo(
     () => ({
-      terminal: repoWorkspaceRuntimeTabSessionId(model.activeTab, 'terminal'),
+      terminal: tabInteractionBlocked ? null : repoWorkspaceRuntimeTabSessionId(model.activeTab, 'terminal'),
     }),
-    [model.activeTab],
+    [model.activeTab, tabInteractionBlocked],
+  )
+  const selectedSessionIdByRuntimeType = useMemo(
+    () => ({
+      terminal: model.runtimeTabStateByType.terminal.selectedSessionId,
+    }),
+    [model.runtimeTabStateByType],
   )
   useSyncWorkspacePaneRuntimeTabProviderSelection(
     {

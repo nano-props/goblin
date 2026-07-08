@@ -5,7 +5,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { flushMicrotasks, renderInJsdom } from '#/test-utils/render.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { installWorkspacePaneTabsTestBridge, resetReposStore } from '#/web/test-utils/bridge.ts'
+import {
+  createRepoBranch,
+  installWorkspacePaneTabsTestBridge,
+  resetReposStore,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/bridge.ts'
 import {
   readWorkspacePaneTabsForTarget,
   setWorkspacePaneTabsForTargetQueryData,
@@ -37,6 +42,7 @@ let controls: WorkspacePaneTabsReorderMutationResult | null = null
 
 beforeEach(() => {
   resetReposStore()
+  seedWorkspacePaneTabsRepo(REPO_INSTANCE_ID)
   queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -440,6 +446,15 @@ function seedWorkspacePaneTabs(tabs: WorkspacePaneTabEntry[], repoInstanceId: st
     },
     queryClient,
   )
+}
+
+function seedWorkspacePaneTabsRepo(repoInstanceId: string): void {
+  seedRepoWithReadModelForTest({
+    id: REPO_ROOT,
+    instanceId: repoInstanceId,
+    branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+    currentBranchName: BRANCH_NAME,
+  })
 }
 
 function installDeferredUpdateWorkspaceTabs(): DeferredUpdateWorkspaceTabsRequest[] {

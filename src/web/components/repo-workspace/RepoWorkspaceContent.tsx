@@ -61,6 +61,7 @@ export function RepoWorkspaceContent({ repo, detail, workspacePaneId, workspaceP
             detail,
             workspacePaneId,
             panelLabel,
+            selection,
             runtimeTabStateByType: workspacePaneTabModel.runtimeTabStateByType,
           })
         : null}

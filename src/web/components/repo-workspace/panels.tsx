@@ -14,11 +14,13 @@ import type { RepoTreeNode } from '#/shared/api-types.ts'
 import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
-import { isWorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
-import type { RepoWorkspaceRuntimeTabStateByType } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+import { isWorkspacePaneRuntimeTabType, workspacePaneStaticTabId } from '#/shared/workspace-pane.ts'
+import type {
+  RepoWorkspaceRuntimeTabStateByType,
+  RepoWorkspaceSelection,
+} from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
-import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/tab-providers.ts'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
@@ -43,10 +45,11 @@ export interface WorkspacePanePanelRenderInput {
   detail: CurrentRepoWorkspacePresentation
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
+  selection: RepoWorkspaceSelection
   runtimeTabStateByType: RepoWorkspaceRuntimeTabStateByType
 }
 
-interface WorkspacePanePanelProps extends Omit<WorkspacePanePanelRenderInput, 'type'> {}
+interface WorkspacePanePanelProps extends Omit<WorkspacePanePanelRenderInput, 'type' | 'selection'> {}
 
 type RepoWorkspaceBranch = NonNullable<CurrentRepoWorkspacePresentation['branch']>
 type WorkspacePaneStaticPanelComponent = (props: WorkspacePanePanelProps) => ReactNode
@@ -59,13 +62,14 @@ const REPO_WORKSPACE_STATIC_PANEL_BY_TYPE: Record<WorkspacePaneStaticTabType, Wo
 }
 
 export function renderRepoWorkspacePanePanel(input: WorkspacePanePanelRenderInput): ReactNode {
-  const { type, ...panelProps } = input
+  const { type, selection, ...panelProps } = input
   if (isWorkspacePaneRuntimeTabType(type)) {
     const runtimeState = input.runtimeTabStateByType[type]
     return renderWorkspacePaneRuntimeTabPanel({
       type,
       workspacePaneId: input.workspacePaneId,
       panelLabel: input.panelLabel,
+      selectedSessionId: selectedRuntimeSessionId(selection, type),
       target: {
         repoRoot: input.repo.id,
         repoInstanceId: input.repo.instanceId,
@@ -80,6 +84,12 @@ export function renderRepoWorkspacePanePanel(input: WorkspacePanePanelRenderInpu
   }
   const Panel = REPO_WORKSPACE_STATIC_PANEL_BY_TYPE[type]
   return <Panel {...panelProps} />
+}
+
+function selectedRuntimeSessionId(selection: RepoWorkspaceSelection, type: WorkspacePaneTabType): string | null {
+  if (selection.kind !== 'materialized-tab') return null
+  const tab = selection.materializedTab
+  return tab.kind === 'runtime' && tab.runtimeType === type ? tab.sessionId : null
 }
 
 function StatusWorkspacePanePanel({ workspacePaneId, panelLabel, detail }: WorkspacePanePanelProps) {
@@ -158,7 +168,7 @@ function FiletreeTab({
 }) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
-  const { createTerminal, createOwnedTerminal } = useTerminalSessionContext()
+  const { createTerminal } = useTerminalSessionContext()
   const openTrashFileConfirm = useFiletreeActionDialogsStore((s) => s.openTrashFileConfirm)
   const interactionScopeKey = useMemo(() => filetreeInteractionScopeKey(repoId, worktreePath), [repoId, worktreePath])
   const selectedKeyList = useFiletreeInteractionStore(
@@ -231,16 +241,18 @@ function FiletreeTab({
       const openingFileKey = `${openingFileKeyPrefix}${node.id}`
       if (!beginOpeningFile(openingFileKey)) return
       try {
-        const openerIdentity = captureWorkspacePaneActiveTabIdentity(repoId, branchName)
-        const viewerResult = await getRepositoryFileViewer(repoId, worktreePath)
+        const openerIdentity = workspacePaneStaticTabId('files')
         await runCreateTerminalTabCommand({
           base: { repoRoot: repoId, repoInstanceId, branch: branchName, worktreePath },
           createTerminal,
-          createOwnedTerminal,
           openerIdentity,
-          enterTerminalTab: () => navigation.showRepoBranchWorkspacePaneTab(repoId, branchName, 'terminal'),
+          showCreatedTerminalTab: (terminalSessionId) =>
+            navigation.showRepoBranchTerminalSession(repoId, branchName, terminalSessionId),
           options: {
-            startupShellCommand: fileReadCommand(viewerResult, absoluteFilePathForTerminal(worktreePath, node.path)),
+            resolveStartupShellCommand: async () => {
+              const viewerResult = await getRepositoryFileViewer(repoId, worktreePath)
+              return fileReadCommand(viewerResult, absoluteFilePathForTerminal(worktreePath, node.path))
+            },
             insertAfterIdentity: openerIdentity,
           },
           t,
@@ -253,7 +265,6 @@ function FiletreeTab({
     [
       beginOpeningFile,
       branchName,
-      createOwnedTerminal,
       createTerminal,
       endOpeningFile,
       openingFileKeyPrefix,

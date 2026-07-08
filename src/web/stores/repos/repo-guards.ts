@@ -72,25 +72,6 @@ export function isRepoUnavailable(repo: RepoState): boolean {
 
 type RepoMutator = (repo: Draft<RepoState>) => void
 
-export interface RepoInstanceHandle {
-  id: string
-  repoInstanceId: string
-}
-
-export function repoInstanceHandle(
-  repo: Pick<RepoState, 'id' | 'instanceId'> | null | undefined,
-): RepoInstanceHandle | null {
-  return repo ? { id: repo.id, repoInstanceId: repo.instanceId } : null
-}
-
-export function hasFreshRepoInstance(
-  state: Pick<ReposStore, 'repos'>,
-  handle: RepoInstanceHandle | null | undefined,
-): boolean {
-  if (!handle) return false
-  return state.repos[handle.id]?.instanceId === handle.repoInstanceId
-}
-
 export function currentRepoInstanceId(state: Pick<ReposStore, 'repos'>, repoRoot: string): string | null {
   return state.repos[repoRoot]?.instanceId ?? null
 }

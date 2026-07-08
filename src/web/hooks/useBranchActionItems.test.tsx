@@ -146,7 +146,7 @@ function HookHost({
   branch?: RepoBranchState
 }) {
   const branchActions = mocks.useBranchActions()
-  onReady(useBranchActionItems(repo(), inputBranch ?? branch(), branchActions))
+  onReady(useBranchActionItems(repo(), inputBranch ?? branch(), branchActions, { workspacePaneRoute: undefined }))
   return null
 }
 

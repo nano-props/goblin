@@ -74,18 +74,25 @@ export function projectCreateResultForClient(
 export function projectServerTerminalSession(input: {
   repoIndex: TerminalRepoIndex
   repoRoot: string
+  repoInstanceId: string
   serverSession: ServerTerminalSessionSummary
   clientId: string
   index: number
   serverSnapshot?: TerminalHydrationSnapshot | null
 }): ProjectedServerTerminalSession | null {
   if (input.serverSession.repoRoot !== input.repoRoot) return null
+  if (input.serverSession.repoInstanceId !== input.repoInstanceId) return null
   const branch =
     input.serverSession.branch ||
     branchForTerminalWorktree(input.repoIndex, input.serverSession.repoRoot, input.serverSession.worktreePath)
   if (!branch) return null
   const descriptor = terminalDescriptor(
-    { repoRoot: input.serverSession.repoRoot, branch, worktreePath: input.serverSession.worktreePath },
+    {
+      repoRoot: input.serverSession.repoRoot,
+      repoInstanceId: input.serverSession.repoInstanceId,
+      branch,
+      worktreePath: input.serverSession.worktreePath,
+    },
     input.serverSession.terminalSessionId,
     input.index,
   )

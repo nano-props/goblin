@@ -75,6 +75,7 @@ interface WorkspacePaneTabStripProps {
 export interface WorkspacePaneTabCreateAction {
   label: string
   busy?: boolean
+  blocksTabInteraction?: boolean
   onCreate: () => void
 }
 
@@ -329,10 +330,12 @@ function useDeferredActiveWorkspacePaneTabFocusAfterClose({
 function useWorkspacePaneTabDnd({
   sortableItems,
   newButtonRef,
+  disabled,
   onReorder,
 }: {
   sortableItems: readonly (WorkspacePaneStaticTabItem | WorkspacePaneRuntimeTabItem)[]
   newButtonRef: RefObject<HTMLButtonElement | null>
+  disabled: boolean
   onReorder: (tabs: WorkspacePaneTabEntry[]) => void
 }) {
   const sensors = useSensors(
@@ -349,6 +352,7 @@ function useWorkspacePaneTabDnd({
 
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
+      if (disabled) return
       const { active, over } = event
       if (!over) return
       const activeId = String(active.id)
@@ -368,7 +372,7 @@ function useWorkspacePaneTabDnd({
         ),
       )
     },
-    [onReorder, sortableItems],
+    [disabled, onReorder, sortableItems],
   )
 
   return {
@@ -384,6 +388,7 @@ interface WorkspacePaneTabSwitcherPopoverProps {
   activeTabIdentity: string | null
   label: string
   createAction: WorkspacePaneTabCreateAction | null
+  tabInteractionBlocked: boolean
   onSelect: (identity: string) => void
   onClose: (event: React.MouseEvent, identity: string) => void
   t: WorkspacePaneT
@@ -394,6 +399,7 @@ function WorkspacePaneTabSwitcherPopover({
   activeTabIdentity,
   label,
   createAction,
+  tabInteractionBlocked,
   onSelect,
   onClose,
   t,
@@ -402,6 +408,7 @@ function WorkspacePaneTabSwitcherPopover({
   const contentRef = useRef<HTMLDivElement>(null)
 
   const selectView = (identity: string) => {
+    if (tabInteractionBlocked) return
     setOpen(false)
     onSelect(identity)
   }
@@ -447,6 +454,7 @@ function WorkspacePaneTabSwitcherPopover({
                         'bg-selected text-selected-foreground hover:bg-selected hover:text-selected-foreground',
                     )}
                     onClick={() => selectView(item.identity)}
+                    disabled={tabInteractionBlocked}
                     aria-label={item.tooltip}
                     aria-current={selected ? 'true' : undefined}
                   >
@@ -469,6 +477,7 @@ function WorkspacePaneTabSwitcherPopover({
                       className="absolute right-1 top-1/2 size-6 -translate-y-1/2 text-muted-foreground"
                       onPointerDown={(event) => event.stopPropagation()}
                       onClick={(event) => onClose(event, item.identity)}
+                      disabled={tabInteractionBlocked}
                       title={item.closeLabel}
                       aria-label={item.closeLabel}
                     >
@@ -550,6 +559,7 @@ export function WorkspacePaneTabStrip({
   const tabDnd = useWorkspacePaneTabDnd({
     sortableItems,
     newButtonRef,
+    disabled: !!createAction?.blocksTabInteraction,
     onReorder,
   })
   const scrollNewButtonIntoView = useCallback(() => {
@@ -571,9 +581,11 @@ export function WorkspacePaneTabStrip({
     ? {
         label: createAction.label,
         busy: createAction.busy ?? false,
+        blocksTabInteraction: createAction.blocksTabInteraction ?? false,
         onCreate: handleNew,
       }
     : null
+  const tabInteractionBlocked = renderCreateAction?.blocksTabInteraction ?? false
   const handleViewportScroll = useWorkspacePaneTabStripScrollMemory({
     workspacePaneTabTargetKey,
     enabled: !collapseToSelectedTab,
@@ -594,18 +606,20 @@ export function WorkspacePaneTabStrip({
   const handleSelect = useCallback(
     (identity: string) => {
       const item = items.find((candidate) => candidate.identity === identity)
+      if (tabInteractionBlocked) return
       if (!item) return
       if (isPendingWorkspacePaneTabItem(item)) return
       if (item.identity === activeTabIdentity && panelActive) onReselect(item)
       else onSelect(item)
     },
-    [activeTabIdentity, items, onReselect, onSelect, panelActive],
+    [activeTabIdentity, items, onReselect, onSelect, panelActive, tabInteractionBlocked],
   )
 
   const handleClose = useCallback(
     (event: React.MouseEvent, identity: string) => {
       event.preventDefault()
       event.stopPropagation()
+      if (tabInteractionBlocked) return
 
       const item = items.find((candidate) => candidate.identity === identity)
       if (!item) return
@@ -616,7 +630,7 @@ export function WorkspacePaneTabStrip({
       if (isActive) focusActiveTabAfterClose(identity)
       onClose(item)
     },
-    [activeTabIdentity, focusActiveTabAfterClose, items, onClose],
+    [activeTabIdentity, focusActiveTabAfterClose, items, onClose, tabInteractionBlocked],
   )
 
   const tabIdForItem = useCallback(
@@ -637,17 +651,19 @@ export function WorkspacePaneTabStrip({
   const activateKeyboardNavigationTarget = useCallback(
     (fromIdentity: string, toIdentity: string) => {
       const to = items.find((item) => item.identity === toIdentity)
+      if (tabInteractionBlocked) return
       if (!activateKeyboardNavigationSelection || fromIdentity === toIdentity || !to) return
       if (isPendingWorkspacePaneTabItem(to)) return
       onSelect(to)
     },
-    [activateKeyboardNavigationSelection, items, onSelect],
+    [activateKeyboardNavigationSelection, items, onSelect, tabInteractionBlocked],
   )
 
   const handleTabKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLButtonElement>, tabIdentity: string) => {
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight' && e.key !== 'Home' && e.key !== 'End') return
       e.preventDefault()
+      if (tabInteractionBlocked) return
       const keys = items.filter((item) => !isPendingWorkspacePaneTabItem(item)).map((item) => item.identity)
       const idx = keys.indexOf(tabIdentity)
       if (idx === -1) return
@@ -688,7 +704,14 @@ export function WorkspacePaneTabStrip({
         activateKeyboardNavigationTarget(tabIdentity, nextKey)
       }
     },
-    [activateKeyboardNavigationTarget, collapseToSelectedTab, focusRegistry, items, onNavigateOut],
+    [
+      activateKeyboardNavigationTarget,
+      collapseToSelectedTab,
+      focusRegistry,
+      items,
+      onNavigateOut,
+      tabInteractionBlocked,
+    ],
   )
 
   const tabBodyContext: WorkspacePaneTabBodyContext = {
@@ -703,6 +726,7 @@ export function WorkspacePaneTabStrip({
     onClose: handleClose,
     onKeyDown: handleTabKeyDown,
     t,
+    tabInteractionBlocked,
   }
 
   if (items.length === 0) {
@@ -756,6 +780,7 @@ interface WorkspacePaneTabBodyContext {
   onClose: (event: React.MouseEvent, identity: string) => void
   onKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>, identity: string) => void
   t: WorkspacePaneT
+  tabInteractionBlocked: boolean
 }
 
 interface WorkspacePaneTabBodyCommonProps {
@@ -788,6 +813,7 @@ function WorkspacePaneCompactTabsBody({
     onClose,
     onKeyDown,
     t,
+    tabInteractionBlocked,
   } = context
   // Compact tabs intentionally use muted chrome even when selected, so
   // selection should not suppress separators; hover still does.
@@ -817,6 +843,7 @@ function WorkspacePaneCompactTabsBody({
             onClose={onClose}
             onKeyDown={onKeyDown}
             t={t}
+            interactionDisabled={tabInteractionBlocked}
             compact
             showSeparator={shouldShowWorkspacePaneTabSeparator({
               leftId: compactItem.identity,
@@ -833,6 +860,7 @@ function WorkspacePaneCompactTabsBody({
         activeTabIdentity={activeTabIdentity}
         label={t('workspace-pane-tabs.tabs')}
         createAction={createAction}
+        tabInteractionBlocked={tabInteractionBlocked}
         onSelect={onSelect}
         onClose={onClose}
         t={t}
@@ -868,6 +896,7 @@ function WorkspacePaneScrollableTabsBody({
     onClose,
     onKeyDown,
     t,
+    tabInteractionBlocked,
   } = context
   const { sensors, restrictToVisibleTabStrip, sortableIds, handleDragEnd } = dnd
   const activeVisualIdentity = panelActive ? activeTabIdentity : null
@@ -905,6 +934,7 @@ function WorkspacePaneScrollableTabsBody({
                 onClose,
                 onKeyDown,
                 t,
+                interactionDisabled: tabInteractionBlocked,
                 compact: false,
               }
               if (!isSortableWorkspacePaneTabItem(item)) {
@@ -941,6 +971,7 @@ interface WorkspacePaneTabProps {
   onClose: (event: React.MouseEvent, identity: string) => void
   onKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>, identity: string) => void
   t: WorkspacePaneT
+  interactionDisabled: boolean
   compact?: boolean
   showSeparator?: boolean
   onHoverChange?: (identity: string | null) => void
@@ -993,6 +1024,7 @@ interface WorkspacePaneTabChromeProps {
   onClose: (event: React.MouseEvent, identity: string) => void
   onKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>, identity: string) => void
   t: WorkspacePaneT
+  interactionDisabled: boolean
   compact?: boolean
   showSeparator?: boolean
   onHoverChange?: (identity: string | null) => void
@@ -1014,6 +1046,7 @@ function WorkspacePaneTabChrome({
   onClose,
   onKeyDown,
   t,
+  interactionDisabled,
   compact = false,
   showSeparator = false,
   onHoverChange,
@@ -1021,13 +1054,14 @@ function WorkspacePaneTabChrome({
   const attentionLabel = isRuntimeWorkspacePaneTabItem(item) && item.attention ? runtimeAttentionLabel(item, t) : null
   const accessibleLabel = item.label || item.tooltip
   const ariaLabel = attentionLabel ? `${accessibleLabel} — ${attentionLabel}` : accessibleLabel
-  const closeProps = isPendingWorkspacePaneTabItem(item)
-    ? ({ closeButton: false } as const)
-    : ({
-        closeLabel: item.closeLabel,
-        closeVisible: isActive && !compact,
-        onClose: (e: React.MouseEvent<HTMLButtonElement>) => onClose(e, item.identity),
-      } as const)
+  const closeProps =
+    isPendingWorkspacePaneTabItem(item) || interactionDisabled
+      ? ({ closeButton: false } as const)
+      : ({
+          closeLabel: item.closeLabel,
+          closeVisible: isActive && !compact,
+          onClose: (e: React.MouseEvent<HTMLButtonElement>) => onClose(e, item.identity),
+        } as const)
   const collectionAria =
     index !== undefined && total !== undefined
       ? {
@@ -1072,6 +1106,8 @@ function WorkspacePaneTabChrome({
         'aria-controls': item.panelId,
         ...collectionAria,
         tabIndex: isFocusable ? 0 : -1,
+        disabled: interactionDisabled,
+        'aria-disabled': interactionDisabled ? true : undefined,
         onClick: () => onSelect(item.identity),
         onKeyDown: (e) => onKeyDown(e, item.identity),
       }}
@@ -1111,6 +1147,7 @@ function WorkspacePaneTab({
   onClose,
   onKeyDown,
   t,
+  interactionDisabled,
   compact,
   showSeparator,
   onHoverChange,
@@ -1129,6 +1166,7 @@ function WorkspacePaneTab({
       onClose={onClose}
       onKeyDown={onKeyDown}
       t={t}
+      interactionDisabled={interactionDisabled}
       compact={compact}
       showSeparator={showSeparator}
       onHoverChange={onHoverChange}
@@ -1150,11 +1188,15 @@ function SortableWorkspacePaneTab({
   onClose,
   onKeyDown,
   t,
+  interactionDisabled,
   compact,
   showSeparator,
   onHoverChange,
 }: WorkspacePaneTabProps & { sortableIdentity: string }) {
-  const sortable = useSortableTab(sortableIdentity, { onButtonRef: focusRegistry.setRef(item.identity) })
+  const sortable = useSortableTab(sortableIdentity, {
+    disabled: interactionDisabled,
+    onButtonRef: focusRegistry.setRef(item.identity),
+  })
 
   return (
     <div ref={sortable.setContainerRef} style={sortable.style} className="touch-none select-none">
@@ -1178,6 +1220,7 @@ function SortableWorkspacePaneTab({
           onKeyDown(e, item.identity)
         }}
         t={t}
+        interactionDisabled={interactionDisabled}
         compact={compact}
         showSeparator={showSeparator}
         onHoverChange={onHoverChange}

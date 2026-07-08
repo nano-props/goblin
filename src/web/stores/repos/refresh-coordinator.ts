@@ -2,7 +2,7 @@ import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidatio
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState, ReposGet } from '#/web/stores/repos/types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
-import { invalidateRepoDataQueries } from '#/web/repo-data-query.ts'
+import { invalidateRepoDataQueries, invalidateRepoRuntimeProjectionQueries } from '#/web/repo-data-query.ts'
 
 interface RepoRefreshIntentBase {
   id: string
@@ -23,7 +23,7 @@ export type RepoRefreshIntent =
 export interface RepoVisibleProjectionRefreshState {
   id: string
   repoInstanceId: string
-  preferredWorkspacePaneTab: WorkspacePaneTabType
+  preferredWorkspacePaneTab: WorkspacePaneTabType | null
   renderedWorkspacePaneTab: WorkspacePaneTabType | null
   branchName: string | null
   visibleProjectionViewOpen: boolean
@@ -72,6 +72,10 @@ export async function handleRepoInvalidationRefresh(
   const repoId = event.repoId
   const repo = get().repos[repoId]
   if (!repo || repo.instanceId !== repoInstanceId || isRepoUnavailable(repo)) return
+  if (event.query === 'repo-runtime') {
+    invalidateRepoRuntimeProjectionQueries(repoId, repoInstanceId)
+    return
+  }
   invalidateRepoDataQueries(repoId, repoInstanceId)
   await get().refreshCoreData(repoId, { repoInstanceId })
 }

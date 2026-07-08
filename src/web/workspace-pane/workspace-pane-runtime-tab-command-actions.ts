@@ -6,11 +6,11 @@ import type { TerminalCreateTranslator } from '#/web/components/terminal/termina
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 
 export interface WorkspacePaneRuntimeTabCommandContext {
-  enterRuntimeTab: (type: WorkspacePaneRuntimeTabType) => void | Promise<void>
   terminal?: {
     base: TerminalSessionBase | null
     bridge: TerminalSessionCommandBridge | null
     openerIdentity: string | null
+    showTerminalSession: (terminalSessionId: string) => boolean | Promise<boolean>
     t?: TerminalCreateTranslator
   }
 }
@@ -46,32 +46,24 @@ export async function runWorkspacePaneRuntimeNewAction(
 
 async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandContext): Promise<boolean> {
   const terminal = context.terminal
-  if (!terminal?.base) {
-    await context.enterRuntimeTab('terminal')
-    return true
-  }
-  if (!terminal.bridge) {
-    await context.enterRuntimeTab('terminal')
-    return true
-  }
+  if (!terminal?.base) return false
+  if (!terminal.bridge) return false
   const terminalWorktreeKey = formatTerminalWorktreeKey(terminal.base.repoRoot, terminal.base.worktreePath)
   // Synchronous local-state read (no network round trip), so there's no
   // responsiveness cost to deciding before switching views.
   const worktree = terminal.bridge.terminalWorktreeSnapshot(terminalWorktreeKey)
+  if (worktree.createPending) return true
   if (worktree.count > 0) {
     // The primary action should land on a working runtime session when one
     // already exists instead of leaving selection wherever it previously was.
-    await context.enterRuntimeTab('terminal')
     const firstSession = worktree.sessions[0]
-    if (firstSession) terminal.bridge.selectTerminal(terminalWorktreeKey, firstSession.terminalSessionId)
-    return true
+    return firstSession ? await terminal.showTerminalSession(firstSession.terminalSessionId) : false
   }
   const result = await runCreateTerminalTabCommand({
     base: terminal.base,
     createTerminal: terminal.bridge.createTerminal,
-    createOwnedTerminal: terminal.bridge.createOwnedTerminal,
     openerIdentity: terminal.openerIdentity,
-    enterTerminalTab: () => context.enterRuntimeTab('terminal'),
+    showCreatedTerminalTab: terminal.showTerminalSession,
     t: terminal.t,
     logMessage: 'terminal primary action create failed',
   })
@@ -81,16 +73,14 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
 async function runNewTerminalAction(context: WorkspacePaneRuntimeTabCommandContext): Promise<boolean> {
   const terminal = context.terminal
   if (!terminal?.base) return false
-  if (!terminal.bridge) {
-    await context.enterRuntimeTab('terminal')
-    return true
-  }
+  if (!terminal.bridge) return false
+  const terminalWorktreeKey = formatTerminalWorktreeKey(terminal.base.repoRoot, terminal.base.worktreePath)
+  if (terminal.bridge.terminalWorktreeSnapshot(terminalWorktreeKey).createPending) return true
   const result = await runCreateTerminalTabCommand({
     base: terminal.base,
     createTerminal: terminal.bridge.createTerminal,
-    createOwnedTerminal: terminal.bridge.createOwnedTerminal,
     openerIdentity: terminal.openerIdentity,
-    enterTerminalTab: () => context.enterRuntimeTab('terminal'),
+    showCreatedTerminalTab: terminal.showTerminalSession,
     t: terminal.t,
   })
   return result.ok

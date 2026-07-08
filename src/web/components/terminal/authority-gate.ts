@@ -208,14 +208,13 @@ export function createXtermAuthorityGate(opts: XtermAuthorityGateOptions): Termi
         message: result.message,
       })
     }
-    // Post-await dispose guard: the client's takeover round-trip
-    // can resolve after the session was disposed (e.g. the user
-    // navigated away mid-takeover). Without this re-check the
-    // `onPromoted` callback would mutate a destroyed runtime and
-    // flip the gate's role to `controller`, leaving stale state
-    // for the next sibling attach on the same `terminalRuntimeSessionId`.
+    // Finalization lifecycle check: the client's takeover round-trip can
+    // resolve after the session was disposed. Without this resource boundary,
+    // `onPromoted` would mutate a destroyed runtime and flip the gate's role
+    // to `controller`, leaving stale state for the next sibling attach on the
+    // same `terminalRuntimeSessionId`.
     if (!opts.isSessionAlive(terminalRuntimeSessionId)) {
-      return deny('session-closed', 'post-await isSessionAlive', { terminalRuntimeSessionId })
+      return deny('session-closed', 'finalizeSessionAlive', { terminalRuntimeSessionId })
     }
     // ORDERING CONTRACT: `onPromoted` MUST run before `role` is
     // flipped to 'controller'. Callers of `takeover()` /

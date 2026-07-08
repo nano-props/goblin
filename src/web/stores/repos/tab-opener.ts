@@ -1,15 +1,19 @@
 import type { ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
+import {
+  workspacePaneTabsTargetIdentityKey,
+  type WorkspacePaneTabsTarget,
+} from '#/shared/workspace-pane-tabs-target.ts'
 
 type TabOpenerActions = Pick<ReposStore, 'setTabOpener' | 'clearTabOpener'>
 
 // Opener identities (e.g. `workspace-pane:changes`) are shared string
-// constants across *every* repo/branch's static tabs, unlike terminal
-// identities which embed a globally-unique session id. Recording openers in
-// a single flat map would let one repo's "changes" tab bleed its opener
-// into an unrelated repo's "changes" tab. Scoping by `${repoId}\0${branchName}`
-// keeps each tab strip's opener bookkeeping independent.
-export function tabOpenerScopeKey(repoId: string, branchName: string): string {
-  return `${repoId}\0${branchName}`
+// constants across *every* workspace pane target, unlike terminal identities
+// which embed a globally-unique session id. The opener scope must therefore be
+// the same target identity used by the tab-list projection and selected-tab
+// preference. Worktree-backed branches share the worktree target; branch-only
+// panes use the branch target.
+export function tabOpenerScopeKey(target: WorkspacePaneTabsTarget): string {
+  return workspacePaneTabsTargetIdentityKey(target)
 }
 
 export function createTabOpenerActions(set: ReposSet): TabOpenerActions {

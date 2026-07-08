@@ -36,7 +36,7 @@ import {
   pushRepoBranch,
   removeRepoWorktree,
 } from '#/web/repo-client.ts'
-import { scheduleRepoRuntimeProjectionRefresh } from '#/web/repo-data-query.ts'
+import { invalidateRepoRuntimeProjectionQueries } from '#/web/repo-data-query.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 const BRANCH_NETWORK_OPERATION_KEY = 'branch-network-action'
 const BRANCH_ACTION_WAIT_TIMEOUT_MS = 30_000
@@ -206,11 +206,7 @@ function waitForBranchActionIdle(
     })
 }
 
-function runBranchActionIpc(
-  action: RepoBranchAction,
-  repoId: string,
-  signal?: AbortSignal,
-): Promise<ExecResult> {
+function runBranchActionIpc(action: RepoBranchAction, repoId: string, signal?: AbortSignal): Promise<ExecResult> {
   switch (action.kind) {
     case 'pull':
       return pullRepoBranch(repoId, action.branch, action.worktreePath, signal)
@@ -289,9 +285,9 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
       updateIfFresh(set, id, repoInstanceId, (r) => {
         if (network) startDataLoad(r.dataLoads.fetch, { hasData: r.dataLoads.fetch.loadedAt !== null })
       })
-      scheduleRepoRuntimeProjectionRefresh(id, repoInstanceId)
+      invalidateRepoRuntimeProjectionQueries(id, repoInstanceId)
       const handleResult = async (result: ExecResult) => {
-        scheduleRepoRuntimeProjectionRefresh(id, repoInstanceId)
+        invalidateRepoRuntimeProjectionQueries(id, repoInstanceId)
         syncNetworkFetchDataLoadState(set, id, repoInstanceId, network, result)
         if (!shouldSuppressBranchActionResultMessage(result, options)) {
           get().setLastResult(id, result, repoInstanceId, { action: branchActionEventAction(action) })
@@ -306,7 +302,7 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
         if (result.ok && network) get().clearFetchFailed(id, repoInstanceId)
       }
       const handleError = (message: string) => {
-        scheduleRepoRuntimeProjectionRefresh(id, repoInstanceId)
+        invalidateRepoRuntimeProjectionQueries(id, repoInstanceId)
         syncNetworkFetchDataLoadState(set, id, repoInstanceId, network, { ok: false, message })
         if (message === 'cancelled') return
         get().setLastResult(id, { ok: false, message }, repoInstanceId, { action: branchActionEventAction(action) })
@@ -326,7 +322,7 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
         throwIfStale(get, id, repoInstanceId)
         ctx.setPhase('running')
         const work = runBranchActionIpc(action, id, signal)
-        scheduleRepoRuntimeProjectionRefresh(id, repoInstanceId)
+        invalidateRepoRuntimeProjectionQueries(id, repoInstanceId)
         return work
       }
 

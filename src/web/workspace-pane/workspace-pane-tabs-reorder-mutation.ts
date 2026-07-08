@@ -97,7 +97,8 @@ async function runWorkspacePaneTabsReorder(
       operation: { type: 'reorder', tabIdentities: draggedTabs.map(workspacePaneTabEntryIdentity) },
     })
     if (workspacePaneTabsTargetVersion(target) !== optimisticTargetVersion) return
-    await writeCanonicalWorkspacePaneTabsForTarget({ ...target, tabs: serverTabs }, queryClient)
+    const accepted = await writeCanonicalWorkspacePaneTabsForTarget({ ...target, tabs: serverTabs }, queryClient)
+    if (!accepted) return
   } catch (err) {
     restoreWorkspacePaneTabsTargetQueryData(
       {

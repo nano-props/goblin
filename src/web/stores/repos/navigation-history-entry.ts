@@ -23,3 +23,32 @@ export function workspaceNavigationHistoryEntryEqual(
       )
   }
 }
+
+export function workspaceNavigationHistoryEntryCanReplaceCurrent(
+  a: WorkspaceNavigationHistoryEntry | null,
+  b: WorkspaceNavigationHistoryEntry | null,
+): boolean {
+  if (!a || !b) return false
+  if (a.repoId !== b.repoId || a.route.kind !== b.route.kind) return false
+  switch (a.route.kind) {
+    case 'empty':
+    case 'dashboard':
+    case 'newWorktree':
+      return false
+    case 'branch': {
+      if (
+        b.route.kind !== 'branch' ||
+        a.route.branchName !== b.route.branchName ||
+        a.route.workspacePaneTab !== b.route.workspacePaneTab
+      ) {
+        return false
+      }
+      if (a.route.workspacePaneTab !== 'terminal') return true
+      return (
+        !a.route.terminalSessionId ||
+        !b.route.terminalSessionId ||
+        a.route.terminalSessionId === b.route.terminalSessionId
+      )
+    }
+  }
+}

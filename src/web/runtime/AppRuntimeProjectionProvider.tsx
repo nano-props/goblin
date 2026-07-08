@@ -35,12 +35,13 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
         const clientId = readOrCreateWebTerminalClientId()
         const recovery = await terminalClient.recoverSessions({ repoRoot, repoInstanceId })
         if (repoInstanceIdForRoot(repoRoot) !== repoInstanceId) return
-        terminalProjection.reconcileServerSessions(
-          repoRoot,
+        const reconciled = terminalProjection.reconcileServerSessions(
+          { repoRoot, repoInstanceId },
           recovery.sessions,
           clientId,
           terminalHydrationSnapshotMap(recovery.snapshots),
         )
+        if (!reconciled) return
         useTerminalProjectionHydrationStore.getState().markProjectionReady(repoRoot, repoInstanceId)
       } catch (err) {
         appRuntimeProjectionLog.debug('failed to reconcile terminal sessions from server', { err })

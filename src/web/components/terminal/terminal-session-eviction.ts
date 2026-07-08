@@ -1,13 +1,16 @@
 export function countOrphanedTerminalSessionIds(input: {
   repoRoot: string
+  repoInstanceId: string
   localTerminalSessionIds: string[]
   getRepoRootForTerminalSessionId: (terminalSessionId: string) => string | null
+  getRepoInstanceIdForTerminalSessionId: (terminalSessionId: string) => string | null
   hasTerminalRuntimeSessionIdForTerminalSessionId: (terminalSessionId: string) => boolean
   serverTerminalSessionIds: ReadonlySet<string>
 }): string[] {
   const orphanedTerminalSessionIds: string[] = []
   for (const terminalSessionId of input.localTerminalSessionIds) {
     if (input.getRepoRootForTerminalSessionId(terminalSessionId) !== input.repoRoot) continue
+    if (input.getRepoInstanceIdForTerminalSessionId(terminalSessionId) !== input.repoInstanceId) continue
     if (input.serverTerminalSessionIds.has(terminalSessionId)) continue
     if (!input.hasTerminalRuntimeSessionIdForTerminalSessionId(terminalSessionId)) continue
     orphanedTerminalSessionIds.push(terminalSessionId)

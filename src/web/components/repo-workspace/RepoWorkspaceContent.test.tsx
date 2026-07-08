@@ -13,6 +13,7 @@ import type { BranchCopyPatchAction } from '#/web/hooks/branch-action-state.ts'
 import {
   TerminalSessionContext,
   TerminalSessionReadContext,
+  useTerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type {
   TerminalSessionContextValue,
@@ -31,8 +32,19 @@ import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
-import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticTabType, WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
+import {
+  isWorkspacePaneStaticTabType,
+  workspacePaneStaticTabEntry,
+  workspacePaneRuntimeTabEntry,
+} from '#/shared/workspace-pane.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import {
+  workspacePanePreferenceTargetOptions,
+  workspacePaneTabTargetForBranch,
+} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import {
   PrimaryWindowNavigationProvider,
@@ -70,22 +82,61 @@ function RepoWorkspaceContentHarness(props: RepoWorkspaceContentHarnessProps) {
 }
 
 function RepoWorkspaceContentInner(props: RepoWorkspaceContentHarnessProps) {
-  const workspacePaneTabModel = useRepoWorkspaceTabModel(props.repo, props.detail)
+  const workspacePaneRoute = useHarnessWorkspacePaneRoute(props)
+  const workspacePaneTabModel = useRepoWorkspaceTabModel(props.repo, props.detail, workspacePaneRoute)
   return <RepoWorkspaceContent {...props} workspacePaneTabModel={workspacePaneTabModel} />
+}
+
+function useHarnessWorkspacePaneRoute(props: RepoWorkspaceContentHarnessProps): RepoBranchWorkspacePaneRoute | null {
+  const branch = props.detail.branch
+  const preferredTab = preferredWorkspacePaneTabForTarget(
+    props.repo.ui,
+    branch ? { repoRoot: props.repo.id, branchName: branch.name, worktreePath: branch.worktree?.path ?? null } : null,
+  )
+  const readContext = useTerminalSessionReadContext()
+  if (preferredTab === 'terminal') {
+    const terminalWorktreeKey = branch?.worktree?.path
+      ? formatTerminalWorktreeKey(props.repo.id, branch.worktree.path)
+      : null
+    const terminalWorktreeSnapshot = terminalWorktreeKey
+      ? readContext.terminalWorktreeSnapshot(terminalWorktreeKey)
+      : null
+    return {
+      kind: 'terminal',
+      terminalSessionId:
+        terminalWorktreeSnapshot?.selectedDescriptor?.terminalSessionId ??
+        terminalWorktreeSnapshot?.sessions.find((session) => session.selected)?.terminalSessionId ??
+        terminalWorktreeSnapshot?.sessions[0]?.terminalSessionId ??
+        'pending-terminal',
+    }
+  }
+  return workspacePaneRouteForStaticPreferredTab(preferredTab)
+}
+
+function workspacePaneRouteForStaticPreferredTab(tab: WorkspacePaneTabType | null): RepoBranchWorkspacePaneRoute | null {
+  return isWorkspacePaneStaticTabType(tab) ? { kind: 'static', tab } : null
 }
 
 function repoWorkspaceRepo(repo: RepoState): RepoWorkspaceRepo {
   const branchModel = readRepoBranchQueryProjection(repo)
   if (!branchModel) throw new Error('missing branch read model')
+  const currentBranchName = branchModel.currentBranch || branchModel.branches[0]?.name || null
   return {
     ...repo,
-    ui: { ...repo.ui, currentBranchName: branchModel.branches[0]?.name ?? null },
+    ui: { ...repo.ui, currentBranchName },
     branchAction: repo.operations.branchAction,
     branchModel: { ...branchModel, statusReady: true },
   }
 }
 
+function preferenceBackedWorkspacePaneTabModel(repoId: string, branchName: string) {
+  const model = workspacePaneTabTargetForBranch(repoId, branchName, workspacePanePreferenceTargetOptions)
+  if (!model) throw new Error('missing preference-backed workspace pane tab model')
+  return model
+}
+
 beforeEach(() => {
+  primaryWindowQueryClient.clear()
   resetReposStore()
   installWorkspacePaneTabsTestBridge()
   useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
@@ -155,7 +206,9 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const presentationRepo = repoWorkspaceRepo(repo)
+    const detail = getCurrentRepoWorkspacePresentation(presentationRepo)
+    const workspacePaneTabModel = preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/changes')
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -168,7 +221,12 @@ describe('RepoWorkspaceContent', () => {
             onSelect: onCopyPatch,
           })}
         >
-          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContent
+            repo={presentationRepo}
+            detail={detail}
+            workspacePaneId="workspace"
+            workspacePaneTabModel={workspacePaneTabModel}
+          />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -377,12 +435,19 @@ describe('RepoWorkspaceContent', () => {
         hasGitHubRemote: true,
       },
     })
-    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const presentationRepo = repoWorkspaceRepo(repo)
+    const detail = getCurrentRepoWorkspacePresentation(presentationRepo)
+    const workspacePaneTabModel = preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/open-links')
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContent
+            repo={presentationRepo}
+            detail={detail}
+            workspacePaneId="workspace"
+            workspacePaneTabModel={workspacePaneTabModel}
+          />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -486,12 +551,19 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const presentationRepo = repoWorkspaceRepo(repo)
+    const detail = getCurrentRepoWorkspacePresentation(presentationRepo)
+    const workspacePaneTabModel = preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/changes-panel')
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContent
+            repo={presentationRepo}
+            detail={detail}
+            workspacePaneId="workspace"
+            workspacePaneTabModel={workspacePaneTabModel}
+          />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -580,7 +652,12 @@ describe('RepoWorkspaceContent', () => {
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContent
+            repo={repoWorkspaceRepo(repo)}
+            detail={detail}
+            workspacePaneId="workspace"
+            workspacePaneTabModel={preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/no-worktree')}
+          />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -608,7 +685,12 @@ describe('RepoWorkspaceContent', () => {
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContent
+            repo={repoWorkspaceRepo(repo)}
+            detail={detail}
+            workspacePaneId="workspace"
+            workspacePaneTabModel={preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/terminal-empty')}
+          />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -811,9 +893,14 @@ describe('RepoWorkspaceContent', () => {
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
     const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
-    const createTerminal = vi.fn(async () => 'session-1')
+    let resolvedStartupShellCommand: string | null = null
+    const createTerminal: TerminalSessionContextValue['createTerminal'] = vi.fn(async (_base, options) => {
+      resolvedStartupShellCommand = (await options?.resolveStartupShellCommand?.()) ?? null
+      return 'session-1'
+    })
     const writeInput = vi.fn()
     const showRepoBranchWorkspacePaneTab = vi.fn()
+    const showRepoBranchTerminalSession = vi.fn()
     let resolveViewer!: (value: { viewer: 'bat'; shell: 'posix' }) => void
     filetreeClientMocks.getRepositoryFileViewer.mockImplementationOnce(
       () =>
@@ -825,7 +912,9 @@ describe('RepoWorkspaceContent', () => {
 
     renderInJsdom(
       <QueryClientProvider client={queryClient}>
-        <PrimaryWindowNavigationProvider value={navigationWith({ showRepoBranchWorkspacePaneTab })}>
+        <PrimaryWindowNavigationProvider
+          value={navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession })}
+        >
           <TerminalSessionContext value={terminalCommandContextWith({ createTerminal, writeInput })}>
             <TerminalSessionReadContext value={emptyTerminalReadContext}>
               <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
@@ -849,6 +938,7 @@ describe('RepoWorkspaceContent', () => {
     const actionButton = row.querySelector<HTMLButtonElement>('[data-action-popover-trigger]')
     expect(actionButton?.getAttribute('aria-busy')).toBe('true')
     expect(actionButton?.querySelector('svg.animate-spin')).toBeTruthy()
+    expect(createTerminal).toHaveBeenCalledTimes(1)
     await act(async () => {
       row.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
       await Promise.resolve()
@@ -860,21 +950,27 @@ describe('RepoWorkspaceContent', () => {
       await Promise.resolve()
     })
 
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/filetree-open', 'terminal')
+    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/filetree-open', 'session-1')
+    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(createTerminal).toHaveBeenCalledWith(
       { repoRoot: REPO_ID, repoInstanceId: repo.instanceId, branch: branchName, worktreePath },
       {
-        startupShellCommand: "bat --paging=never --style=plain '/tmp/filetree-open-worktree/README.md'\r",
+        resolveStartupShellCommand: expect.any(Function),
         insertAfterIdentity: 'workspace-pane:files',
       },
+    )
+    expect(resolvedStartupShellCommand).toBe(
+      "bat --paging=never --style=plain '/tmp/filetree-open-worktree/README.md'\r",
     )
     expect(writeInput).not.toHaveBeenCalled()
 
     // Chrome-tab-style opener tracking: the terminal this opened should be
     // attributed to "files" (the only tab open, and active, when the file
-    // was double-clicked), scoped to this branch.
+    // was double-clicked), scoped to this workspace pane target.
     expect(
-      useReposStore.getState().tabOpenerIdentityByScope[tabOpenerScopeKey(REPO_ID, branchName)]?.['terminal:session-1'],
+      useReposStore.getState().tabOpenerIdentityByScope[
+        tabOpenerScopeKey({ repoRoot: REPO_ID, branchName, worktreePath })
+      ]?.['terminal:session-1'],
     ).toBe('workspace-pane:files')
   })
 
@@ -886,14 +982,22 @@ describe('RepoWorkspaceContent', () => {
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: {
         'feature/a': [staticEntry('status'), staticEntry('history')],
+        'feature/b': [staticEntry('status')],
       },
     })
-    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const presentationRepo = repoWorkspaceRepo(repo)
+    const detail = getCurrentRepoWorkspacePresentation(presentationRepo)
+    const workspacePaneTabModel = preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/b')
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContent
+            repo={presentationRepo}
+            detail={detail}
+            workspacePaneId="workspace"
+            workspacePaneTabModel={workspacePaneTabModel}
+          />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -1034,12 +1138,14 @@ const emptyWorktreeSnapshot: TerminalWorktreeSnapshot = {
   createPending: false,
 }
 
+const emptyTerminalSnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
+
 const emptyTerminalReadContext: TerminalSessionReadContextValue = {
   terminalWorktreeSnapshot: () => emptyWorktreeSnapshot,
   subscribeTerminalWorktree: () => () => {},
   repoBellCount: () => 0,
   subscribeRepoBellCount: () => () => {},
-  snapshot: () => ({ phase: 'opening', message: null, processName: 'terminal' }),
+  snapshot: () => emptyTerminalSnapshot,
   subscribeSnapshot: () => () => {},
 }
 
@@ -1086,8 +1192,10 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
     activateRepo: () => {},
     closeRepo: () => {},
     cycleRepo: () => {},
-    selectRepoBranch: () => {},
-    showRepoBranchWorkspacePaneTab: () => {},
+    selectRepoBranch: () => true,
+    showRepoBranchEmptyWorkspacePane: () => true,
+    showRepoBranchWorkspacePaneTab: () => true,
+    showRepoBranchTerminalSession: () => true,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},

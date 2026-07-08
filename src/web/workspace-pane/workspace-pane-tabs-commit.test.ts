@@ -3,7 +3,12 @@
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { commitWorkspacePaneTabs, updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
-import { installWorkspacePaneTabsTestBridge, resetReposStore } from '#/web/test-utils/bridge.ts'
+import {
+  createRepoBranch,
+  installWorkspacePaneTabsTestBridge,
+  resetReposStore,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/bridge.ts'
 import {
   clearWorkspacePaneTabsProjectionState,
   readWorkspacePaneTabsForTarget,
@@ -18,11 +23,13 @@ import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
 
 const REPO_ROOT = '/tmp/workspace-pane-tabs-commit-repo'
 const REPO_INSTANCE_ID = 'repo-instance-test'
+const NEXT_REPO_INSTANCE_ID = 'repo-instance-next'
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/workspace-pane-tabs-commit-worktree'
 
 beforeEach(() => {
   resetReposStore()
+  seedWorkspacePaneTabsRepo(REPO_INSTANCE_ID)
 })
 
 afterEach(() => {
@@ -365,6 +372,45 @@ describe('updateWorkspacePaneTabs', () => {
 
     expect(readWorkspacePaneTabs()).toEqual([workspacePaneStaticTabEntry('status')])
   })
+
+  test('does not accept server tabs after the repo instance changes', async () => {
+    let resolveServerTabs!: (tabs: WorkspacePaneTabEntry[]) => void
+    let markUpdateStarted!: () => void
+    const updateStarted = new Promise<void>((resolve) => {
+      markUpdateStarted = resolve
+    })
+    const serverTabs = new Promise<WorkspacePaneTabEntry[]>((resolve) => {
+      resolveServerTabs = resolve
+    })
+    installWorkspacePaneTabsTestBridge({
+      updateWorkspaceTabs: async () => {
+        markUpdateStarted()
+        return await serverTabs
+      },
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+
+    const update = updateWorkspacePaneTabs({
+      repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      operation: { type: 'open-static', tabType: 'history' },
+    })
+    await updateStarted
+
+    seedWorkspacePaneTabsRepo(NEXT_REPO_INSTANCE_ID)
+    resolveServerTabs([workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')])
+
+    await expect(update).resolves.toMatchObject({ ok: false, canceled: true })
+    expect(readWorkspacePaneTabs()).toEqual([workspacePaneStaticTabEntry('status')])
+  })
 })
 
 function readWorkspacePaneTabs(): WorkspacePaneTabEntry[] {
@@ -373,5 +419,14 @@ function readWorkspacePaneTabs(): WorkspacePaneTabEntry[] {
     repoInstanceId: REPO_INSTANCE_ID,
     branchName: BRANCH_NAME,
     worktreePath: WORKTREE_PATH,
+  })
+}
+
+function seedWorkspacePaneTabsRepo(instanceId: string): void {
+  seedRepoWithReadModelForTest({
+    id: REPO_ROOT,
+    instanceId,
+    branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+    currentBranchName: BRANCH_NAME,
   })
 }

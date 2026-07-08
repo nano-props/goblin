@@ -8,6 +8,7 @@ function makeDescriptor(terminalSessionId: string, index: number): TerminalDescr
     terminalWorktreeKey: '/repo\0/repo',
     index,
     repoRoot: '/repo',
+    repoInstanceId: 'repo-instance-test',
     branch: 'main',
     worktreePath: '/repo',
   }
@@ -101,5 +102,28 @@ describe('terminal session worktree snapshot helper', () => {
       hasRecentOutput: () => false,
     })
     expect(session.snapshotSpy).toHaveBeenCalledTimes(1)
+  })
+
+  test('projects closing terminal session ids when present', () => {
+    const descriptor = makeDescriptor('session-1', 1)
+    const session = makeSession(descriptor, {
+      phase: 'open',
+      message: null,
+      processName: 'bash',
+    })
+    const snapshot = buildTerminalWorktreeSnapshot({
+      terminalWorktreeKey: descriptor.terminalWorktreeKey,
+      selectedDescriptor: null,
+      createPending: false,
+      closingSessionIds: [descriptor.terminalSessionId],
+      sessions: [session],
+      selectedTerminalSessionId: null,
+      getCachedSnapshot: () => null,
+      cacheSnapshot: () => {},
+      hasBell: () => false,
+      hasRecentOutput: () => false,
+    })
+
+    expect(snapshot.closingSessionIds).toEqual([descriptor.terminalSessionId])
   })
 })

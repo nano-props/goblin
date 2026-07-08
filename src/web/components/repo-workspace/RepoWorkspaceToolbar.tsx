@@ -27,7 +27,6 @@ import type { RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useIsInitialTerminalProjectionHydrating } from '#/web/stores/terminal-projection-hydration.ts'
-import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import {
@@ -46,17 +45,16 @@ import { WorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/Wor
 import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
 import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import {
-  reselectWorkspacePaneRuntimeTab,
-  selectWorkspacePaneRuntimeTab,
-} from '#/web/workspace-pane/workspace-pane-runtime-tab-actions.ts'
+import { reselectWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-actions.ts'
 import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
 import { useWorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-action-context.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 interface Props {
   repo: RepoWorkspaceRepo
   detail: CurrentRepoWorkspacePresentation
   workspacePaneId: string
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null
   workspacePaneTabModel: RepoWorkspaceTabModel
   trafficLightOffset?: boolean
   branchActions?: BranchActions
@@ -67,6 +65,7 @@ export function RepoWorkspaceToolbar({
   repo,
   detail,
   workspacePaneId,
+  workspacePaneRoute,
   workspacePaneTabModel,
   trafficLightOffset = false,
   branchActions,
@@ -89,28 +88,20 @@ export function RepoWorkspaceToolbar({
         worktreePath,
       })
     : null
-  const preferredWorkspacePaneTab = preferredWorkspacePaneTabForTarget(
-    repo.ui,
-    branchName ? { repoRoot: repo.id, branchName, worktreePath } : null,
-  )
   const showBranchLevelTabs = !!detail.branch
 
   const workspacePaneTabFocusRegistry = useFocusRegistry<string, HTMLButtonElement>()
 
-  // Shared "enter a runtime view" effect for any server-owned tab action:
-  // set the user's preferred tab to the runtime type (when not already there)
-  // and uncollapse the pane. Runtime-specific follow-up lives in the action
-  // registry; renderability is still decided by the tab model.
-  const enterWorkspacePaneRuntimeTab = useCallback(
-    (type: WorkspacePaneRuntimeTabType) => {
-      if (preferredWorkspacePaneTab !== type) {
-        if (branchName) navigation.showRepoBranchWorkspacePaneTab(repo.id, branchName, type)
-      }
+  const showCreatedWorkspacePaneRuntimeTab = useCallback(
+    (type: WorkspacePaneRuntimeTabType, sessionId: string) => {
+      if (!branchName) return false
+      if (type === 'terminal') return navigation.showRepoBranchTerminalSession(repo.id, branchName, sessionId)
+      return false
     },
-    [branchName, navigation, repo.id, preferredWorkspacePaneTab],
+    [branchName, navigation, repo.id],
   )
   const workspacePaneRuntimeTabActionContext = useWorkspacePaneRuntimeTabActionContext({
-    enterRuntimeTab: enterWorkspacePaneRuntimeTab,
+    showRuntimeTab: showCreatedWorkspacePaneRuntimeTab,
   })
   const workspacePaneCreateAction = useWorkspacePaneRuntimeTabCreateAction({
     repoRoot: repo.id,
@@ -119,7 +110,8 @@ export function RepoWorkspaceToolbar({
     worktreePath,
     runtimeTabStateByType: workspacePaneTabModel.runtimeTabStateByType,
     initialRuntimeProjectionHydrating: isInitialRuntimeProjectionHydrating,
-    enterRuntimeTab: enterWorkspacePaneRuntimeTab,
+    workspacePaneRoute,
+    showCreatedRuntimeTab: showCreatedWorkspacePaneRuntimeTab,
     t,
   })
 
@@ -130,10 +122,10 @@ export function RepoWorkspaceToolbar({
         return
       }
       if (isRuntimeWorkspacePaneTabItem(item)) {
-        selectWorkspacePaneRuntimeTab(item.view, workspacePaneRuntimeTabActionContext)
+        if (branchName) navigation.showRepoBranchTerminalSession(repo.id, branchName, item.tabEntry.runtimeSessionId)
       }
     },
-    [branchName, navigation, repo.id, workspacePaneRuntimeTabActionContext],
+    [branchName, navigation, repo.id],
   )
 
   const reselectWorkspacePaneTabItem = useCallback(
@@ -259,11 +251,12 @@ export function RepoWorkspaceToolbar({
       void runCloseWorkspacePaneTabCommand({
         repoId: repo.id,
         branchName,
+        workspacePaneRoute,
         targetIdentity: item.identity,
         navigation,
       })
     },
-    [branchName, navigation, repo.id],
+    [branchName, navigation, repo.id, workspacePaneRoute],
   )
 
   // No current branch means there is no tab/action target; keep the

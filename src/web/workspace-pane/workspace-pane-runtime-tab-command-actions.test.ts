@@ -14,17 +14,14 @@ const terminalBase: TerminalSessionBase = {
 
 describe('workspace pane runtime tab command actions', () => {
   test('primary terminal action focuses the first existing runtime session', async () => {
-    const enterRuntimeTab = vi.fn()
     const createTerminal = vi.fn(async () => 'created-session')
     const selectTerminal = vi.fn()
+    const showTerminalSession = vi.fn(() => true)
     const bridge: TerminalSessionCommandBridge = {
       terminalWorktreeSnapshot: () => ({
         terminalWorktreeKey: '/repo\0/repo-worktree',
         selectedDescriptor: null,
-        sessions: [
-          terminalSession('session-1', true),
-          terminalSession('session-2', false),
-        ],
+        sessions: [terminalSession('session-1', true), terminalSession('session-2', false)],
         count: 2,
         bellCount: 0,
         outputActiveCount: 0,
@@ -36,45 +33,87 @@ describe('workspace pane runtime tab command actions', () => {
 
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
-        enterRuntimeTab,
         terminal: {
           base: terminalBase,
           bridge,
           openerIdentity: null,
+          showTerminalSession,
         },
       }),
     ).resolves.toBe(true)
 
-    expect(enterRuntimeTab).toHaveBeenCalledWith('terminal')
-    expect(selectTerminal).toHaveBeenCalledWith('/repo\0/repo-worktree', 'session-1')
+    expect(showTerminalSession).toHaveBeenCalledWith('session-1')
+    expect(selectTerminal).not.toHaveBeenCalled()
     expect(createTerminal).not.toHaveBeenCalled()
   })
 
-  test('primary terminal action enters the runtime tab when no bridge is available', async () => {
-    const enterRuntimeTab = vi.fn()
+  test('terminal actions no-op while a terminal create is pending', async () => {
+    const createTerminal = vi.fn(async () => 'created-session')
+    const showTerminalSession = vi.fn(() => true)
+    const bridge: TerminalSessionCommandBridge = {
+      terminalWorktreeSnapshot: () => ({
+        terminalWorktreeKey: '/repo\0/repo-worktree',
+        selectedDescriptor: null,
+        sessions: [terminalSession('session-1', true)],
+        count: 1,
+        bellCount: 0,
+        outputActiveCount: 0,
+        createPending: true,
+      }),
+      createTerminal,
+      selectTerminal: vi.fn(),
+    }
 
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {
-        enterRuntimeTab,
+        terminal: {
+          base: terminalBase,
+          bridge,
+          openerIdentity: null,
+          showTerminalSession,
+        },
+      }),
+    ).resolves.toBe(true)
+    await expect(
+      runWorkspacePaneRuntimeNewAction('terminal', {
+        terminal: {
+          base: terminalBase,
+          bridge,
+          openerIdentity: null,
+          showTerminalSession,
+        },
+      }),
+    ).resolves.toBe(true)
+
+    expect(showTerminalSession).not.toHaveBeenCalled()
+    expect(createTerminal).not.toHaveBeenCalled()
+  })
+
+  test('primary terminal action rejects when no bridge is available', async () => {
+    const showTerminalSession = vi.fn(() => true)
+
+    await expect(
+      runWorkspacePaneRuntimePrimaryAction('terminal', {
         terminal: {
           base: terminalBase,
           bridge: null,
           openerIdentity: null,
+          showTerminalSession,
         },
       }),
-    ).resolves.toBe(true)
+    ).resolves.toBe(false)
 
-    expect(enterRuntimeTab).toHaveBeenCalledWith('terminal')
+    expect(showTerminalSession).not.toHaveBeenCalled()
   })
 
   test('new terminal action rejects when no runtime base is available', async () => {
     await expect(
       runWorkspacePaneRuntimeNewAction('terminal', {
-        enterRuntimeTab: vi.fn(),
         terminal: {
           base: null,
           bridge: null,
           openerIdentity: null,
+          showTerminalSession: vi.fn(),
         },
       }),
     ).resolves.toBe(false)

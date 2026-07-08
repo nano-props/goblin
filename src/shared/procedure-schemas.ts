@@ -194,7 +194,7 @@ const WorkspaceSessionStateSchema = v.object({
   selectedTerminalSessionIdByTerminalWorktree: v.record(v.string(), v.string()),
   preferredWorkspacePaneTabByTargetByRepo: v.record(
     v.string(),
-    v.record(v.string(), v.picklist(['status', 'changes', 'history', 'files', 'terminal'])),
+    v.record(v.string(), v.nullable(v.picklist(['status', 'changes', 'history', 'files', 'terminal']))),
   ),
   workspacePaneTabsByTargetByRepo: v.record(
     v.string(),
