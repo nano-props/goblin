@@ -5,13 +5,21 @@ import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { useT } from '#/web/stores/i18n.ts'
 import { useTerminalActionDialogsStore } from '#/web/stores/repos/terminal-action-dialogs.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 interface Props {
   currentRepoId: string | null
+  currentBranchName: string | null
+  currentWorkspacePaneRoute: RepoBranchWorkspacePaneRoute | null
   navigation: PrimaryWindowNavigationActions
 }
 
-export function TerminalActionDialogHost({ currentRepoId, navigation }: Props) {
+export function TerminalActionDialogHost({
+  currentRepoId,
+  currentBranchName,
+  currentWorkspacePaneRoute,
+  navigation,
+}: Props) {
   const t = useT()
   const closeConfirm = useTerminalActionDialogsStore((s) => s.closeConfirm)
   const closeCloseConfirm = useTerminalActionDialogsStore((s) => s.closeCloseConfirm)
@@ -48,6 +56,9 @@ export function TerminalActionDialogHost({ currentRepoId, navigation }: Props) {
           repoId: payload.repoId,
           branchName: payload.terminalBase.branch,
           workspacePaneRoute: payload.workspacePaneRoute,
+          currentRepoId,
+          currentBranchName,
+          currentWorkspacePaneRoute,
           navigation,
           targetIdentity: payload.targetIdentity,
           confirmedTerminal: {

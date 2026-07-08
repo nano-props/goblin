@@ -56,6 +56,7 @@ vi.mock('sonner', () => ({
 }))
 
 const REPO_ID = '/tmp/gbl-workspace-command-repo'
+const OTHER_REPO_ID = '/tmp/gbl-workspace-command-other-repo'
 const WORKTREE_PATH = '/tmp/gbl-workspace-command-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
@@ -879,6 +880,9 @@ describe('workspace commands', () => {
         workspacePaneRoute: payload.workspacePaneRoute,
         repoId: payload.repoId,
         branchName: payload.terminalBase.branch,
+        currentRepoId: payload.repoId,
+        currentBranchName: payload.terminalBase.branch,
+        currentWorkspacePaneRoute: payload.workspacePaneRoute ?? null,
         navigation: navigationWith(),
         targetIdentity: payload.targetIdentity,
         confirmedTerminal: {
@@ -893,6 +897,135 @@ describe('workspace commands', () => {
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
+  })
+
+  test('close workspace tab confirm does not navigate when the user has switched away from the original route', async () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: 'feature/worktree',
+      preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [staticEntry('status'), terminalEntry('session-1'), staticEntry('history')],
+      },
+    })
+    const closeTerminalByDescriptor = vi.fn(async () => true)
+    setTerminalSessionCommandBridge({
+      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal({ processName: 'node' }),
+      createTerminal: vi.fn(async () => 'session-2'),
+      selectTerminal: vi.fn(),
+      closeTerminalByDescriptor,
+    })
+    const workspacePaneRoute = { kind: 'terminal', terminalSessionId: 'session-1' } as const
+    expect(
+      await runCloseWorkspacePaneTabCommand({
+        workspacePaneRoute,
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        navigation: navigationWith(),
+        targetIdentity: 'terminal:session-1',
+      }),
+    ).toBe(true)
+    const payload = useTerminalActionDialogsStore.getState().closeConfirm
+    if (!payload) throw new Error('expected terminal close confirmation payload')
+    const showRepoBranchWorkspacePaneTab = vi.fn((repoId, branch, tab) => {
+      useReposStore.getState().setWorkspacePaneTab(repoId, branch, tab)
+    })
+
+    expect(
+      await runConfirmCloseTerminalWorkspacePaneTabCommand({
+        workspacePaneRoute: payload.workspacePaneRoute,
+        repoId: payload.repoId,
+        branchName: payload.terminalBase.branch,
+        currentRepoId: payload.repoId,
+        currentBranchName: payload.terminalBase.branch,
+        currentWorkspacePaneRoute: { kind: 'static', tab: 'status' },
+        navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
+        targetIdentity: payload.targetIdentity,
+        confirmedTerminal: {
+          terminalSessionId: payload.terminalSessionId,
+          base: payload.terminalBase,
+        },
+      }),
+    ).toBe(true)
+
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-1', {
+      repoRoot: REPO_ID,
+      branch: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+    })
+    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
+  })
+
+  test('close workspace tab confirm does not navigate after switching to another repo', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: 'feature/worktree',
+      preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [staticEntry('status'), terminalEntry('session-1'), staticEntry('history')],
+      },
+    })
+    const otherRepo = seedRepoWithReadModelForTest({
+      id: OTHER_REPO_ID,
+      branches: [
+        createRepoBranch('feature/worktree', { worktree: { path: '/tmp/gbl-workspace-command-other-worktree' } }),
+      ],
+      currentBranchName: 'feature/worktree',
+      preferredWorkspacePaneTab: 'terminal',
+    })
+    useReposStore.setState({
+      repos: { [REPO_ID]: repo, [OTHER_REPO_ID]: otherRepo },
+      order: [REPO_ID, OTHER_REPO_ID],
+      restoredRepoId: OTHER_REPO_ID,
+    })
+    const closeTerminalByDescriptor = vi.fn(async () => true)
+    setTerminalSessionCommandBridge({
+      terminalWorktreeSnapshot: () => worktreeSnapshotWithTerminal({ processName: 'node' }),
+      createTerminal: vi.fn(async () => 'session-2'),
+      selectTerminal: vi.fn(),
+      closeTerminalByDescriptor,
+    })
+    const workspacePaneRoute = { kind: 'terminal', terminalSessionId: 'session-1' } as const
+    expect(
+      await runCloseWorkspacePaneTabCommand({
+        workspacePaneRoute,
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        navigation: navigationWith(),
+        targetIdentity: 'terminal:session-1',
+      }),
+    ).toBe(true)
+    const payload = useTerminalActionDialogsStore.getState().closeConfirm
+    if (!payload) throw new Error('expected terminal close confirmation payload')
+    const showRepoBranchWorkspacePaneTab = vi.fn((repoId, branch, tab) => {
+      useReposStore.getState().setWorkspacePaneTab(repoId, branch, tab)
+    })
+
+    expect(
+      await runConfirmCloseTerminalWorkspacePaneTabCommand({
+        workspacePaneRoute: payload.workspacePaneRoute,
+        repoId: payload.repoId,
+        branchName: payload.terminalBase.branch,
+        currentRepoId: OTHER_REPO_ID,
+        currentBranchName: 'feature/worktree',
+        currentWorkspacePaneRoute: workspacePaneRoute,
+        navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
+        targetIdentity: payload.targetIdentity,
+        confirmedTerminal: {
+          terminalSessionId: payload.terminalSessionId,
+          base: payload.terminalBase,
+        },
+      }),
+    ).toBe(true)
+
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-1', {
+      repoRoot: REPO_ID,
+      branch: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+    })
+    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
   })
 
   test('close workspace tab command commits UI without waiting for terminal resources', async () => {

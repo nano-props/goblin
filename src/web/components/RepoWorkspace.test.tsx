@@ -339,7 +339,7 @@ describe('RepoWorkspace', () => {
     expect(route.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, 'feature/a', 'status')
   })
 
-  test('replaces a stale terminal route with the resolved live terminal route', async () => {
+  test('replaces a stale terminal route with the bare branch route', async () => {
     const worktreePath = '/tmp/repo-workspace-container-repo-a'
     const branchName = 'feature/a'
     const repo = seedRepoWithReadModelForTest({
@@ -360,12 +360,12 @@ describe('RepoWorkspace', () => {
       route: {
         kind: 'branch' as const,
         branchName,
-        workspacePaneTab: 'terminal' as const,
+        workspacePaneTab: null,
         terminalWorktreeKey,
-        terminalSessionId: 'session-1',
+        terminalSessionId: null,
       },
     }
-    vi.mocked(route.openRepoBranchTerminal).mockImplementation(() => {
+    vi.mocked(route.openRepoBranch).mockImplementation(() => {
       expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]?.current).toEqual(expectedCurrentEntry)
     })
 
@@ -386,9 +386,8 @@ describe('RepoWorkspace', () => {
     )
 
     await waitFor(() => {
-      expect(route.openRepoBranchTerminal).toHaveBeenCalledWith(REPO_ID, branchName, 'session-1', {
-        replace: true,
-      })
+      expect(route.openRepoBranch).toHaveBeenCalledWith(REPO_ID, branchName, { replace: true })
+      expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
       expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]).toEqual({
         current: expectedCurrentEntry,
         backStack: [],
@@ -523,18 +522,17 @@ describe('RepoWorkspace', () => {
     )
 
     await waitFor(() => {
-      expect(route.openRepoBranchTerminal).toHaveBeenCalledWith(REPO_ID, branchName, 'session-1', {
-        replace: true,
-      })
+      expect(route.openRepoBranch).toHaveBeenCalledWith(REPO_ID, branchName, { replace: true })
+      expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
       expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]).toEqual({
         current: {
           repoId: REPO_ID,
           route: {
             kind: 'branch',
             branchName,
-            workspacePaneTab: 'terminal',
+            workspacePaneTab: null,
             terminalWorktreeKey,
-            terminalSessionId: 'session-1',
+            terminalSessionId: null,
           },
         },
         backStack: [{ repoId: REPO_ID, route: { kind: 'dashboard' } }],
@@ -678,7 +676,7 @@ describe('RepoWorkspace', () => {
     })
   })
 
-  test('replaces an unrenderable static route with the resolved static route', async () => {
+  test('replaces an unrenderable static route with the bare branch route', async () => {
     const branchName = 'feature/no-worktree'
     seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -708,14 +706,15 @@ describe('RepoWorkspace', () => {
     )
 
     await waitFor(() => {
-      expect(route.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, branchName, 'status', { replace: true })
+      expect(route.openRepoBranch).toHaveBeenCalledWith(REPO_ID, branchName, { replace: true })
+      expect(route.openRepoBranchTab).not.toHaveBeenCalled()
       expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]).toEqual({
         current: {
           repoId: REPO_ID,
           route: {
             kind: 'branch',
             branchName,
-            workspacePaneTab: 'status',
+            workspacePaneTab: null,
             terminalWorktreeKey: null,
             terminalSessionId: null,
           },

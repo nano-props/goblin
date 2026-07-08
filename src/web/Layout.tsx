@@ -189,6 +189,7 @@ function AuthenticatedWorkspaceShell() {
                   navigation={navigation}
                   hydratedRouteRepoId={hydratedRouteRepoId}
                   currentBranchName={currentBranchName}
+                  currentWorkspacePaneRoute={currentWorkspacePaneRoute}
                 />
               </div>
             </TerminalSessionProvider>
@@ -262,6 +263,7 @@ interface PrimaryWindowOverlaysProps {
   navigation: PrimaryWindowNavigationActions
   hydratedRouteRepoId: string | null
   currentBranchName: string | null
+  currentWorkspacePaneRoute: RepoBranchWorkspacePaneRoute | null
 }
 
 function PrimaryWindowOverlays({
@@ -270,6 +272,7 @@ function PrimaryWindowOverlays({
   navigation,
   hydratedRouteRepoId,
   currentBranchName,
+  currentWorkspacePaneRoute,
 }: PrimaryWindowOverlaysProps) {
   return (
     <>
@@ -281,7 +284,12 @@ function PrimaryWindowOverlays({
       />
       <BranchActionDialogHost currentRepoId={hydratedRouteRepoId} currentBranchName={currentBranchName} />
       <FiletreeActionDialogHost currentRepoId={hydratedRouteRepoId} />
-      <TerminalActionDialogHost currentRepoId={hydratedRouteRepoId} navigation={navigation} />
+      <TerminalActionDialogHost
+        currentRepoId={hydratedRouteRepoId}
+        currentBranchName={currentBranchName}
+        currentWorkspacePaneRoute={currentWorkspacePaneRoute}
+        navigation={navigation}
+      />
       <RepoDropOverlay active={repoDrop.active} />
       <Toaster position="bottom-right" closeButton />
     </>

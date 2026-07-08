@@ -102,12 +102,11 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
-  test('replaces a stale terminal route with the resolved materialized terminal tab', () => {
+  test('replaces a stale terminal route with the bare branch route', () => {
     const model = terminalModel({ routedSessionId: 'missing-session', terminalProjectionPhase: 'ready' })
 
     expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
-      kind: 'replace',
-      route: { kind: 'terminal', terminalSessionId: 'session-1' },
+      kind: 'replace-empty-pane',
     })
   })
 
@@ -185,7 +184,7 @@ describe('workspace pane route reconciliation', () => {
     expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'history' }, model)).toEqual({ kind: 'pending' })
   })
 
-  test('replaces an unmaterialized static route with the resolved materialized tab', () => {
+  test('replaces an unmaterialized static route with the bare branch route', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/route',
@@ -200,12 +199,11 @@ describe('workspace pane route reconciliation', () => {
     })
 
     expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'changes' }, model)).toEqual({
-      kind: 'replace',
-      route: { kind: 'static', tab: 'status' },
+      kind: 'replace-empty-pane',
     })
   })
 
-  test('replaces an invalid static route through the same canonical route path', () => {
+  test('replaces an invalid static route with the bare branch route', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
       branchName: 'feature/route',
@@ -220,8 +218,7 @@ describe('workspace pane route reconciliation', () => {
     })
 
     expect(reconcileWorkspacePaneRoute({ kind: 'invalid-static', tabKey: 'not-a-tab' }, model)).toEqual({
-      kind: 'replace',
-      route: { kind: 'static', tab: 'status' },
+      kind: 'replace-empty-pane',
     })
   })
 
@@ -259,8 +256,7 @@ describe('workspace pane route reconciliation', () => {
     })
 
     expect(reconcileWorkspacePaneRoute({ kind: 'static', tab: 'changes' }, model)).toEqual({
-      kind: 'replace',
-      route: null,
+      kind: 'replace-empty-pane',
     })
   })
 })

@@ -177,9 +177,11 @@ must be part of the projection-owned create request. Use a create option that is
 resolved inside the terminal create queue after `createPending` is visible; do
 not `await` the preparation in a component and only then call create.
 
-Route reconciliation remains a boundary concern: stale or unrenderable URLs
-should be replaced with a canonical route from the current projection, not
-silently interpreted through local preferred-tab state.
+Route reconciliation remains a boundary concern: stale or unrenderable explicit
+pane URLs should fast-fail to the bare branch route. Do not replace
+`/terminal/{missingSessionId}` or `/tab/{unrenderableTab}` with a different live
+tab just because one exists. The resulting workspace history entry should record
+the empty pane (`workspacePaneTab: null`) rather than inventing a tab hit.
 
 URL-backed terminal routes are requested selection, not projection state. A
 route such as `/terminal/{sessionId}` may ask the tab model to render that

@@ -1,16 +1,9 @@
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { WORKSPACE_PANE_RUNTIME_TAB_TYPES } from '#/shared/workspace-pane.ts'
-import type {
-  RepoWorkspaceMaterializedTab,
-  RepoWorkspaceTab,
-  RepoWorkspaceTabModel,
-} from '#/web/components/repo-workspace/tab-model.ts'
+import type { RepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
 
 export type WorkspacePaneRouteReconciliation =
-  | { kind: 'none' }
-  | { kind: 'pending' }
-  | { kind: 'unverified' }
-  | { kind: 'replace'; route: RepoBranchWorkspacePaneRoute | null }
+  { kind: 'none' } | { kind: 'pending' } | { kind: 'unverified' } | { kind: 'replace-empty-pane' }
 
 export type WorkspacePaneRouteHistoryResolution =
   { kind: 'defer' } | { kind: 'record'; route: RepoBranchWorkspacePaneRoute | null }
@@ -37,7 +30,7 @@ function reconcileStaticWorkspacePaneRoute(
   if (model.tabEntriesProjectionPhase === 'pending') return { kind: 'pending' }
   if (model.tabEntriesProjectionPhase === 'failed') return { kind: 'unverified' }
   if (model.tabs.some((tab) => tab.kind === 'static' && tab.type === route.tab)) return { kind: 'none' }
-  return replacementForRoute(route, model)
+  return replaceWithEmptyPaneRoute()
 }
 
 function reconcileTerminalWorkspacePaneRoute(
@@ -55,7 +48,7 @@ function reconcileTerminalWorkspacePaneRoute(
   ) {
     return { kind: 'none' }
   }
-  return replacementForRoute(route, model)
+  return replaceWithEmptyPaneRoute()
 }
 
 function reconcileInvalidWorkspacePaneRoute(
@@ -64,7 +57,7 @@ function reconcileInvalidWorkspacePaneRoute(
 ): WorkspacePaneRouteReconciliation {
   if (model.tabEntriesProjectionPhase === 'pending') return { kind: 'pending' }
   if (model.tabEntriesProjectionPhase === 'failed') return { kind: 'unverified' }
-  return replacementForRoute(route, model)
+  return replaceWithEmptyPaneRoute()
 }
 
 export function workspacePaneRouteHistoryResolution(
@@ -72,49 +65,10 @@ export function workspacePaneRouteHistoryResolution(
   reconciliation: WorkspacePaneRouteReconciliation,
 ): WorkspacePaneRouteHistoryResolution {
   if (reconciliation.kind === 'pending' || reconciliation.kind === 'unverified') return { kind: 'defer' }
-  if (reconciliation.kind === 'replace') return { kind: 'record', route: reconciliation.route }
+  if (reconciliation.kind === 'replace-empty-pane') return { kind: 'record', route: null }
   return { kind: 'record', route }
 }
 
-function replacementForRoute(
-  route: RepoBranchWorkspacePaneRoute,
-  model: RepoWorkspaceTabModel,
-): WorkspacePaneRouteReconciliation {
-  const fallbackRoute =
-    routeForMaterializedTab(model.activeTab) ??
-    routeForMaterializedTab(firstMaterializedTabForRoute(route, model.tabs)) ??
-    routeForMaterializedTab(firstMaterializedTab(model.tabs))
-  return fallbackRoute && workspacePaneRouteEquals(route, fallbackRoute)
-    ? { kind: 'none' }
-    : { kind: 'replace', route: fallbackRoute }
-}
-
-function firstMaterializedTabForRoute(
-  route: RepoBranchWorkspacePaneRoute,
-  tabs: readonly RepoWorkspaceTab[],
-): RepoWorkspaceMaterializedTab | null {
-  if (route.kind !== 'terminal') return null
-  return (
-    tabs.find((tab): tab is RepoWorkspaceMaterializedTab => tab.kind === 'runtime' && tab.runtimeType === 'terminal') ??
-    null
-  )
-}
-
-function firstMaterializedTab(tabs: readonly RepoWorkspaceTab[]): RepoWorkspaceMaterializedTab | null {
-  return tabs.find((tab): tab is RepoWorkspaceMaterializedTab => tab.kind !== 'pending') ?? null
-}
-
-function routeForMaterializedTab(tab: RepoWorkspaceMaterializedTab | null): RepoBranchWorkspacePaneRoute | null {
-  if (!tab) return null
-  if (tab.kind === 'static') return { kind: 'static', tab: tab.type }
-  if (tab.runtimeType === 'terminal') return { kind: 'terminal', terminalSessionId: tab.sessionId }
-  return null
-}
-
-function workspacePaneRouteEquals(a: RepoBranchWorkspacePaneRoute, b: RepoBranchWorkspacePaneRoute): boolean {
-  if (a.kind !== b.kind) return false
-  if (a.kind === 'static' && b.kind === 'static') return a.tab === b.tab
-  if (a.kind === 'terminal' && b.kind === 'terminal') return a.terminalSessionId === b.terminalSessionId
-  if (a.kind === 'invalid-static' && b.kind === 'invalid-static') return a.tabKey === b.tabKey
-  return false
+function replaceWithEmptyPaneRoute(): WorkspacePaneRouteReconciliation {
+  return { kind: 'replace-empty-pane' }
 }

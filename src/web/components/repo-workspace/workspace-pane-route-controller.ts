@@ -72,10 +72,7 @@ function useReconcileWorkspacePaneRoute({
   repoId: string
   branchName: string | null
   reconciliation: WorkspacePaneRouteReconciliation
-  navigation: Pick<
-    PrimaryWindowNavigationActions,
-    'selectRepoBranch' | 'showRepoBranchWorkspacePaneTab' | 'showRepoBranchTerminalSession'
-  >
+  navigation: Pick<PrimaryWindowNavigationActions, 'selectRepoBranch'>
 }): void {
   useEffect(() => {
     if (!branchName) return
@@ -98,7 +95,7 @@ function useWorkspacePaneNavigationHistory({
 }): void {
   const historyRoute = workspacePaneRouteHistoryResolution(route ?? null, reconciliation)
   const replaceCurrentRouteContext =
-    branchName && reconciliation.kind === 'replace'
+    branchName && reconciliation.kind === 'replace-empty-pane'
       ? workspacePaneHistoryRouteContext({
           repoId,
           branchName,
@@ -107,7 +104,7 @@ function useWorkspacePaneNavigationHistory({
         })
       : null
   useWorkspaceNavigationHistory({
-    replaceCurrent: reconciliation.kind === 'replace',
+    replaceCurrent: reconciliation.kind === 'replace-empty-pane',
     replaceCurrentRouteContext,
     routeContext:
       branchName && historyRoute.kind === 'record'
@@ -145,26 +142,9 @@ function applyWorkspacePaneRouteReconciliation({
   repoId: string
   branchName: string
   reconciliation: WorkspacePaneRouteReconciliation
-  navigation: Pick<
-    PrimaryWindowNavigationActions,
-    'selectRepoBranch' | 'showRepoBranchWorkspacePaneTab' | 'showRepoBranchTerminalSession'
-  >
+  navigation: Pick<PrimaryWindowNavigationActions, 'selectRepoBranch'>
 }): void {
   if (reconciliation.kind === 'none' || reconciliation.kind === 'pending' || reconciliation.kind === 'unverified') {
-    return
-  }
-  if (!reconciliation.route) {
-    navigation.selectRepoBranch(repoId, branchName, { replace: true })
-    return
-  }
-  if (reconciliation.route.kind === 'static') {
-    navigation.showRepoBranchWorkspacePaneTab(repoId, branchName, reconciliation.route.tab, { replace: true })
-    return
-  }
-  if (reconciliation.route.kind === 'terminal') {
-    navigation.showRepoBranchTerminalSession(repoId, branchName, reconciliation.route.terminalSessionId, {
-      replace: true,
-    })
     return
   }
   navigation.selectRepoBranch(repoId, branchName, { replace: true })

@@ -94,6 +94,9 @@ interface ConfirmedTerminalClose {
 }
 
 interface ConfirmCloseTerminalWorkspacePaneTabCommandOptions extends WorkspacePaneTabCommandTargetOptions {
+  currentRepoId: string | null
+  currentBranchName: string | null
+  currentWorkspacePaneRoute: RepoBranchWorkspacePaneRoute | null
   confirmedTerminal: ConfirmedTerminalClose
 }
 
@@ -287,22 +290,35 @@ function closeConfirmedTerminalWorkspacePaneTab(options: ConfirmCloseTerminalWor
   }
   const confirmedBranchName = workspacePaneRuntimeTabConfirmedCloseBranchName(confirmed)
   if (!confirmedBranchName) return false
-  const target =
+  const confirmedIdentity = targetIdentity ?? workspacePaneRuntimeTabConfirmedCloseIdentity(confirmed)
+  const closeTarget =
     repoId && options.branchName
       ? workspacePaneTabTargetForBranch(repoId, options.branchName, {
           workspacePaneRoute: options.workspacePaneRoute,
         })
       : null
-  if (target && repoWorkspaceTabModelBlocksTabInteraction(target)) return false
-  const tab = targetIdentity ? (target?.tabs.find((candidate) => candidate.identity === targetIdentity) ?? null) : null
-  const wasActive = !!target && !!tab && target.activeTab?.identity === tab.identity
-  // Read the opener scoped by the runtime tab's actual branch from the
-  // confirmed-close payload, not `target.branchName` — the current route
-  // branch may have changed since the confirm dialog was opened.
+  const currentTarget =
+    options.currentRepoId && options.currentRepoId === repoId && options.currentBranchName
+      ? workspacePaneTabTargetForBranch(options.currentRepoId, options.currentBranchName, {
+          workspacePaneRoute: options.currentWorkspacePaneRoute,
+        })
+      : null
+  if (closeTarget && repoWorkspaceTabModelBlocksTabInteraction(closeTarget)) return false
+  const tab = closeTarget?.tabs.find((candidate) => candidate.identity === confirmedIdentity) ?? null
+  const wasActive =
+    !!currentTarget &&
+    currentTarget.branchName === confirmedBranchName &&
+    currentTarget.activeTab?.identity === confirmedIdentity
+  // Close the original runtime tab, but only drive close-back navigation when
+  // the current routed pane is still showing that same tab.
   const openerIdentity =
-    wasActive && target && tab ? workspacePaneTabOpener(target.repoId, confirmedBranchName, tab.identity) : null
+    wasActive && closeTarget && tab
+      ? workspacePaneTabOpener(closeTarget.repoId, confirmedBranchName, tab.identity)
+      : null
   const nextTab =
-    wasActive && target && tab ? nextRepoWorkspaceTabAfterClose(target.tabs, tab.identity, openerIdentity) : null
+    wasActive && closeTarget && tab
+      ? nextRepoWorkspaceTabAfterClose(closeTarget.tabs, tab.identity, openerIdentity)
+      : null
   const closeContext = readWorkspacePaneRuntimeTabCloseContext()
   if (!canConfirmWorkspacePaneRuntimeTabCloseWithContext(confirmed, closeContext)) return false
   observeWorkspacePaneTabClose(
@@ -315,7 +331,7 @@ function closeConfirmedTerminalWorkspacePaneTab(options: ConfirmCloseTerminalWor
     confirmedBranchName,
     targetIdentity ?? workspacePaneRuntimeTabConfirmedCloseIdentity(confirmed),
   )
-  if (target && nextTab) showWorkspacePaneCommandTab(target, nextTab, navigation)
+  if (closeTarget && nextTab) showWorkspacePaneCommandTab(closeTarget, nextTab, navigation)
   return true
 }
 
