@@ -128,6 +128,7 @@ function requestCoalescedActiveRepoRefetch(
       runtime.inFlight = null
       if (runtime.rerunRequested) {
         runtime.rerunRequested = false
+        markRepoQueryKeysInvalidated(queryClient, queryKeys)
         run()
         return
       }
