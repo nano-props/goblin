@@ -323,7 +323,7 @@ export function useRepoOperationsReadModel(
   })
   useEffect(() => {
     if (!enabled || !query.data) return
-    setRepoOperationsQueryData(repoRoot, repoRuntimeId, includeSettled, query.data)
+    if (!includeSettled) updateRepoProjectionOperationsQueryData(repoRoot, repoRuntimeId, query.data)
   }, [enabled, includeSettled, query.data, repoRuntimeId, repoRoot])
   return query
 }
@@ -344,16 +344,21 @@ export function setRepoOperationsQueryData(
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
   queryClient.setQueryData(repoOperationsQueryKey(repoRoot, repoRuntimeId, includeSettled), operations)
-  if (!includeSettled) {
-    const projectionQueries = queryClient
-      .getQueryCache()
-      .findAll({ queryKey: repoProjectionQueryPrefix(repoRoot, repoRuntimeId) })
-    for (const query of projectionQueries) {
-      if (query.state.isInvalidated) continue
-      queryClient.setQueryData<RepoRuntimeProjection>(query.queryKey, (current) =>
-        current ? { ...current, operations } : current,
-      )
-    }
+  if (!includeSettled) updateRepoProjectionOperationsQueryData(repoRoot, repoRuntimeId, operations, queryClient)
+}
+
+function updateRepoProjectionOperationsQueryData(
+  repoRoot: string,
+  repoRuntimeId: string,
+  operations: RepoOperationsSnapshot,
+  queryClient: QueryClient = primaryWindowQueryClient,
+): void {
+  const projectionQueries = queryClient.getQueryCache().findAll({ queryKey: repoProjectionQueryPrefix(repoRoot, repoRuntimeId) })
+  for (const query of projectionQueries) {
+    if (query.state.isInvalidated) continue
+    queryClient.setQueryData<RepoRuntimeProjection>(query.queryKey, (current) =>
+      current ? { ...current, operations } : current,
+    )
   }
 }
 

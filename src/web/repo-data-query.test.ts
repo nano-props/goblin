@@ -1,5 +1,7 @@
-import { QueryClient, QueryObserver } from '@tanstack/react-query'
+import { createElement } from 'react'
+import { QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { renderInJsdom } from '#/test-utils/render.tsx'
 import {
   getRepoOperationsQueryData,
   getRepoProjectionPlaceholderData,
@@ -12,8 +14,9 @@ import {
   seedRepoProjectionQueryData,
   setRepoOperationsQueryData,
   setRepoProjectionQueryData,
+  useRepoOperationsReadModel,
 } from '#/web/repo-data-query.ts'
-import type { PullRequestEntry, RepoRuntimeProjection } from '#/shared/api-types.ts'
+import type { PullRequestEntry, RepoOperationsSnapshot, RepoRuntimeProjection } from '#/shared/api-types.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
 
 const repoClientMocks = vi.hoisted(() => ({
@@ -379,6 +382,44 @@ describe('repo projection query data', () => {
     }
   })
 
+  test('does not clear operations invalidation from a stale operations query success', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const releases: Array<(snapshot: RepoOperationsSnapshot) => void> = []
+    repoClientMocks.getRepoOperations.mockImplementation(
+      () =>
+        new Promise<RepoOperationsSnapshot>((resolve) => {
+          releases.push(resolve)
+        }),
+    )
+    function OperationsHarness() {
+      useRepoOperationsReadModel('/tmp/repo', 'repo-runtime-1')
+      return null
+    }
+    const result = renderInJsdom(
+      createElement(QueryClientProvider, { client: queryClient }, createElement(OperationsHarness)),
+    )
+    try {
+      await vi.waitFor(() => {
+        expect(releases).toHaveLength(1)
+      })
+
+      invalidateRepoRuntimeProjectionQueries('/tmp/repo', 'repo-runtime-1', queryClient)
+      releases[0]!(repoOperationsForTest(1))
+
+      await vi.waitFor(() => {
+        expect(releases).toHaveLength(2)
+      })
+      await vi.waitFor(() => {
+        expect(queryClient.getQueryState(repoOperationsQueryKey('/tmp/repo', 'repo-runtime-1'))?.isInvalidated).toBe(
+          true,
+        )
+      })
+    } finally {
+      result.unmount()
+      queryClient.clear()
+    }
+  })
+
   test('imperative projection refresh cancels an active matching projection query before reading', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const signals: AbortSignal[] = []
@@ -459,4 +500,8 @@ function repoProjectionForTest(loadedAt: number): RepoRuntimeProjection {
     requested: { branch: 'feature/a', pullRequestMode: 'full' },
     loadedAt,
   }
+}
+
+function repoOperationsForTest(loadedAt: number): RepoOperationsSnapshot {
+  return { operations: [], loadedAt }
 }
