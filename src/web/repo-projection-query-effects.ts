@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import type { QueryClient } from '@tanstack/react-query'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { parseRepoProjectionQueryKey } from '#/web/repo-data-query.ts'
+import { parseRepoProjectionQueryKey, setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import { acceptRepoProjectionReadModel } from '#/web/stores/repos/projection-read-model-effects.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
@@ -68,6 +68,9 @@ export function useRepoProjectionQueryEffects(queryClient: QueryClient = primary
       }
       const data = event.query.state.data
       if (!isRepoRuntimeProjection(data)) return
+      if (!manualSuccess && data.loadedAt > 0) {
+        setRepoOperationsQueryData(parsed.repoRoot, parsed.repoRuntimeId, false, data.operations, queryClient)
+      }
       acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {
         repoRoot: parsed.repoRoot,
         repoRuntimeId: parsed.repoRuntimeId,

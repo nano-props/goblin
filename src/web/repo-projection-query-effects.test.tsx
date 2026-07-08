@@ -5,6 +5,8 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useRepoProjectionQueryEffects } from '#/web/repo-projection-query-effects.ts'
 import {
   invalidateRepoRuntimeProjectionQueries,
+  getRepoOperationsQueryData,
+  repoOperationsQueryKey,
   repoProjectionQueryKey,
   setRepoOperationsQueryData,
   setRepoProjectionQueryData,
@@ -75,6 +77,7 @@ describe('repo projection query effects', () => {
     installGoblinTestBridge({ 'terminal.prune': pruneTerminals })
     const repo = seedRepoShellForTest({ id: '/repo', repoRuntimeId: 'repo-runtime-test-1' })
     renderInJsdom(<Harness queryClient={queryClient} />)
+    setRepoOperationsQueryData('/repo', repo.repoRuntimeId, false, { operations: [], loadedAt: 0 }, queryClient)
     const releases: Array<(projection: RepoRuntimeProjection) => void> = []
     const observer = new QueryObserver<RepoRuntimeProjection>(queryClient, {
       queryKey: repoProjectionQueryKey('/repo', repo.repoRuntimeId, null, 'full'),
@@ -91,15 +94,18 @@ describe('repo projection query effects', () => {
       })
 
       invalidateRepoRuntimeProjectionQueries('/repo', repo.repoRuntimeId, queryClient)
+      expect(queryClient.getQueryState(repoOperationsQueryKey('/repo', repo.repoRuntimeId))?.isInvalidated).toBe(true)
       releases[0]!(projection(1, 'stale'))
       await vi.waitFor(() => {
         expect(releases).toHaveLength(2)
       })
 
+      expect(queryClient.getQueryState(repoOperationsQueryKey('/repo', repo.repoRuntimeId))?.isInvalidated).toBe(true)
+      expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(0)
       expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
       expect(pruneTerminals).not.toHaveBeenCalled()
 
-      setRepoOperationsQueryData('/repo', repo.repoRuntimeId, false, { operations: [], loadedAt: 99 }, queryClient)
+      setRepoOperationsQueryData('/repo', repo.repoRuntimeId, false, { operations: [], loadedAt: 1 }, queryClient)
       expect(pruneTerminals).not.toHaveBeenCalled()
 
       releases[1]!(projection(2, 'fresh'))
@@ -107,6 +113,7 @@ describe('repo projection query effects', () => {
         expect(pruneTerminals).toHaveBeenCalledTimes(1)
         expect(useReposStore.getState().repos['/repo']?.projection.source).toBe('fresh')
         expect(useReposStore.getState().repos['/repo']?.dataLoads.repoReadModel.loadedAt).toBe(2)
+        expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(2)
       })
     } finally {
       unsubscribe()

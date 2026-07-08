@@ -289,10 +289,6 @@ export function useRepoProjectionReadModel(
     enabled,
     subscribed: enabled,
   })
-  useEffect(() => {
-    if (!enabled || !query.data || query.isPlaceholderData) return
-    setRepoOperationsQueryData(repoRoot, repoRuntimeId, false, query.data.operations)
-  }, [branch, enabled, mode, query.data, query.isPlaceholderData, repoRuntimeId, repoRoot])
   return query
 }
 
