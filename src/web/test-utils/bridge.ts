@@ -25,6 +25,7 @@ import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { disposeAllRepoOperationSchedulers } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import type { ClientBridge } from '#/web/client-bridge-types.ts'
+import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   readWorkspacePaneTabsForTarget,
@@ -921,7 +922,7 @@ export function seedRepoWithReadModelForTest(options: {
   })
   seedRepoReadModelQueryData(repo, {
     branches: branchesWithSnapshotWorktreeMetadata,
-    currentBranch: options.currentBranch ?? '',
+    currentBranch: options.currentBranch ?? currentBranchName ?? '',
     status,
   })
   for (const [branchName, tabs] of Object.entries(options.workspacePaneTabsByBranch ?? {})) {
@@ -946,7 +947,7 @@ export function seedRepoReadModelQueryData(
     status?: WorktreeStatus[]
   },
 ): void {
-  setRepoProjectionQueryData(repo.id, repo.instanceId, null, 'full', {
+  const projection: RepoRuntimeProjection = {
     snapshot: {
       branches: readModel.branches,
       current: readModel.currentBranch,
@@ -959,5 +960,15 @@ export function seedRepoReadModelQueryData(
       pullRequestMode: 'full',
     },
     loadedAt: 0,
-  })
+  }
+  setRepoProjectionQueryData(repo.id, repo.instanceId, null, 'full', projection)
+  if (readModel.currentBranch) {
+    setRepoProjectionQueryData(repo.id, repo.instanceId, readModel.currentBranch, 'full', {
+      ...projection,
+      requested: {
+        branch: readModel.currentBranch,
+        pullRequestMode: 'full',
+      },
+    })
+  }
 }
