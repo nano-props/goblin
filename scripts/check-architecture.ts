@@ -16,6 +16,17 @@ export interface Rule {
   allowedImportsByFile?: Record<string, readonly string[]>
 }
 
+interface SourcePattern {
+  label: string
+  pattern: RegExp
+}
+
+export interface SourcePatternRule {
+  fromPrefix: string
+  disallow: SourcePattern[]
+  reason: string
+}
+
 export interface ImportReference {
   importPath: string
   importedNames: readonly string[] | null
@@ -82,6 +93,23 @@ const RULES: Rule[] = [
     },
     reason:
       'settings-client is the transport boundary; settings writes must flow through settings-actions so server results update React Query projections',
+  },
+]
+
+const SOURCE_PATTERN_RULES: SourcePatternRule[] = [
+  {
+    fromPrefix: '/src/web/',
+    disallow: [
+      { label: 'legacy repo IPC read route', pattern: /['"`]repo\.(?:snapshot|status|composite)['"`]/ },
+      { label: 'legacy repo HTTP read route', pattern: /['"`]\/api\/repo\/(?:snapshot|status|composite)\b/ },
+      { label: 'legacy repo read helper', pattern: /\bgetRepo(?:Snapshot|Status|Composite)\b/ },
+      {
+        label: 'legacy repo procedure schema key',
+        pattern: /\b(?:REPO_QUERY_SCHEMAS|REPO_PROCEDURE_SCHEMAS)\.(?:snapshot|status|composite)\b/,
+      },
+    ],
+    reason:
+      'web repo reads must flow through the runtime projection and React Query read-model surfaces, not legacy direct snapshot/status/composite reads',
   },
 ]
 
@@ -191,6 +219,7 @@ export function violatesRule(relativeFilePath: string, importRef: ImportReferenc
 export function checkArchitectureSources(
   sources: Array<{ relativeFilePath: string; source: string }>,
   rules: readonly Rule[] = RULES,
+  sourcePatternRules: readonly SourcePatternRule[] = SOURCE_PATTERN_RULES,
 ): string[] {
   const violations: string[] = []
   for (const { relativeFilePath, source } of sources) {
@@ -199,6 +228,13 @@ export function checkArchitectureSources(
       for (const rule of rules) {
         if (!violatesRule(relativeFilePath, importRef, rule)) continue
         violations.push(`${relativeFilePath}: disallowed import "${importRef.importPath}" — ${rule.reason}`)
+      }
+    }
+    for (const rule of sourcePatternRules) {
+      if (!relativeFilePath.startsWith(rule.fromPrefix)) continue
+      for (const pattern of rule.disallow) {
+        if (!pattern.pattern.test(source)) continue
+        violations.push(`${relativeFilePath}: disallowed source pattern "${pattern.label}" — ${rule.reason}`)
       }
     }
   }

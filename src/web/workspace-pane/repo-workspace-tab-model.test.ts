@@ -7,8 +7,8 @@ import {
   type RepoWorkspaceTabModel,
   type RepoWorkspaceTabModelInput,
   type RepoWorkspaceRuntimeTabStateInputByType,
-} from '#/web/components/repo-workspace/tab-model.ts'
-import type { WorkspacePaneTabSummary } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
+} from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'

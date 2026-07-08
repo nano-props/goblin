@@ -41,7 +41,7 @@ import { useSortableTab } from '#/web/components/tab-strip/useSortableTab.ts'
 import {
   workspacePaneRuntimeTabProvider,
   workspacePaneStaticTabProvider,
-} from '#/web/components/workspace-pane/tab-providers.ts'
+} from '#/web/workspace-pane/tab-providers.ts'
 import {
   type WorkspacePaneRuntimeTabItem,
   type WorkspacePaneStaticTabItem,

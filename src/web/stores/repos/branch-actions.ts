@@ -7,7 +7,8 @@ import type { RepoBranchActionReason, RepoOperationReason } from '#/web/stores/r
 import { isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
 import {
   repoOperation,
-  repoOperationBusy,
+  repoLocalBranchActionScheduleGuard,
+  repoLocalCoreProjectionRefreshBusy,
   waitForRepoOperationsIdle,
 } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import {
@@ -28,7 +29,6 @@ import {
 import type { RepoEventAction, RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import type { ExecResult } from '#/web/types.ts'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
-import { runWithRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import {
   createRepoWorktree,
   deleteRepoBranch,
@@ -36,6 +36,7 @@ import {
   pushRepoBranch,
   removeRepoWorktree,
 } from '#/web/repo-client.ts'
+import { scheduleRepoRuntimeProjectionRefresh } from '#/web/repo-data-query.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 const BRANCH_NETWORK_OPERATION_KEY = 'branch-network-action'
 const BRANCH_ACTION_WAIT_TIMEOUT_MS = 30_000
@@ -129,18 +130,13 @@ function branchActionTarget(action: RepoBranchAction): RepoOperationTarget {
   }
 }
 
-function coreRefreshBusy(id: string): boolean {
-  return repoOperationBusy(id, 'snapshot') || repoOperationBusy(id, 'status')
-}
-
 function evaluateRepoBranchActionSchedule(repo: RepoState, action: RepoBranchAction) {
-  const fetchOperation = repoOperation(repo.id, 'fetch')
-  const branchOperation = repoOperation(repo.id, 'branchAction')
+  const guard = repoLocalBranchActionScheduleGuard(repo.id)
   return evaluateBranchActionScheduleDecision({
     actionKind: action.kind,
-    fetchBusy: fetchOperation.phase !== 'idle',
-    branchOperationPhase: branchOperation.phase,
-    coreRefreshBusy: coreRefreshBusy(repo.id),
+    fetchBusy: guard.fetchBusy,
+    branchOperationPhase: guard.branchOperationPhase,
+    coreRefreshBusy: guard.coreRefreshBusy,
   })
 }
 
@@ -214,22 +210,20 @@ function runBranchActionIpc(
   action: RepoBranchAction,
   repoId: string,
   signal?: AbortSignal,
-  sourceToken?: string,
 ): Promise<ExecResult> {
   switch (action.kind) {
     case 'pull':
-      return pullRepoBranch(repoId, action.branch, action.worktreePath, signal, sourceToken)
+      return pullRepoBranch(repoId, action.branch, action.worktreePath, signal)
     case 'push':
-      return pushRepoBranch(repoId, action.branch, signal, sourceToken)
+      return pushRepoBranch(repoId, action.branch, signal)
     case 'createWorktree':
-      return createRepoWorktree(repoId, action.input, action.worktreeBootstrap, signal, sourceToken)
+      return createRepoWorktree(repoId, action.input, action.worktreeBootstrap, signal)
     case 'deleteBranch':
       return deleteRepoBranch(
         repoId,
         action.branch,
         { force: action.force, alsoDeleteUpstream: action.alsoDeleteUpstream },
         signal,
-        sourceToken,
       )
     case 'removeWorktree':
       return removeRepoWorktree(
@@ -242,7 +236,6 @@ function runBranchActionIpc(
           alsoDeleteUpstream: action.alsoDeleteUpstream,
         },
         signal,
-        sourceToken,
       )
   }
   const exhaustive: never = action
@@ -296,7 +289,9 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
       updateIfFresh(set, id, repoInstanceId, (r) => {
         if (network) startDataLoad(r.dataLoads.fetch, { hasData: r.dataLoads.fetch.loadedAt !== null })
       })
+      scheduleRepoRuntimeProjectionRefresh(id, repoInstanceId)
       const handleResult = async (result: ExecResult) => {
+        scheduleRepoRuntimeProjectionRefresh(id, repoInstanceId)
         syncNetworkFetchDataLoadState(set, id, repoInstanceId, network, result)
         if (!shouldSuppressBranchActionResultMessage(result, options)) {
           get().setLastResult(id, result, repoInstanceId, { action: branchActionEventAction(action) })
@@ -311,63 +306,64 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
         if (result.ok && network) get().clearFetchFailed(id, repoInstanceId)
       }
       const handleError = (message: string) => {
+        scheduleRepoRuntimeProjectionRefresh(id, repoInstanceId)
         syncNetworkFetchDataLoadState(set, id, repoInstanceId, network, { ok: false, message })
         if (message === 'cancelled') return
         get().setLastResult(id, { ok: false, message }, repoInstanceId, { action: branchActionEventAction(action) })
       }
-      return await runWithRepoInvalidationSource('branch', async (sourceToken) => {
-        const runActionTask = async (signal: AbortSignal, ctx: { setPhase: (phase: 'queued' | 'running') => void }) => {
-          try {
-            if (coreRefreshBusy(id)) {
-              ctx.setPhase('queued')
-              signal.throwIfAborted()
-              await waitForBranchActionIdle(id, ['snapshot', 'status'], signal, options?.waitTimeoutMs)
-            }
-          } catch (err) {
-            const message = err instanceof Error ? err.message : String(err)
-            if (message === BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE) return { ok: false, message }
-            throw err
+      const runActionTask = async (signal: AbortSignal, ctx: { setPhase: (phase: 'queued' | 'running') => void }) => {
+        try {
+          if (repoLocalCoreProjectionRefreshBusy(id)) {
+            ctx.setPhase('queued')
+            signal.throwIfAborted()
+            await waitForBranchActionIdle(id, ['repoReadModel', 'visibleStatus'], signal, options?.waitTimeoutMs)
           }
-          throwIfStale(get, id, repoInstanceId)
-          ctx.setPhase('running')
-          return runBranchActionIpc(action, id, signal, sourceToken)
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err)
+          if (message === BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE) return { ok: false, message }
+          throw err
         }
+        throwIfStale(get, id, repoInstanceId)
+        ctx.setPhase('running')
+        const work = runBranchActionIpc(action, id, signal)
+        scheduleRepoRuntimeProjectionRefresh(id, repoInstanceId)
+        return work
+      }
 
-        if (network) {
-          return await runLatestOperation({
-            set,
-            get,
-            id,
-            repoInstanceId,
-            lane: 'network',
-            operationKey: BRANCH_NETWORK_OPERATION_KEY,
-            priority: 100,
-            targets: [branchActionTarget(action), { key: 'fetch', reason: networkFetchReason(action) }],
-            task: runActionTask,
-            queuedTimeoutMs: options?.waitTimeoutMs ?? BRANCH_ACTION_WAIT_TIMEOUT_MS,
-            queuedTimeoutMessage: BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE,
-            errorFromResult: branchActionErrorFromResult,
-            errorResult: branchActionErrorResult,
-            onResult: handleResult,
-            onError: handleError,
-          })
-        }
-
-        return await runExclusiveOperation({
+      if (network) {
+        return await runLatestOperation({
           set,
           get,
           id,
           repoInstanceId,
-          lane: 'write',
+          lane: 'network',
+          operationKey: BRANCH_NETWORK_OPERATION_KEY,
           priority: 100,
-          targets: [branchActionTarget(action)],
-          busyResult: { ok: false, message: 'cancelled' },
+          targets: [branchActionTarget(action), { key: 'fetch', reason: networkFetchReason(action) }],
           task: runActionTask,
+          queuedTimeoutMs: options?.waitTimeoutMs ?? BRANCH_ACTION_WAIT_TIMEOUT_MS,
+          queuedTimeoutMessage: BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE,
           errorFromResult: branchActionErrorFromResult,
           errorResult: branchActionErrorResult,
           onResult: handleResult,
           onError: handleError,
         })
+      }
+
+      return await runExclusiveOperation({
+        set,
+        get,
+        id,
+        repoInstanceId,
+        lane: 'write',
+        priority: 100,
+        targets: [branchActionTarget(action)],
+        busyResult: { ok: false, message: 'cancelled' },
+        task: runActionTask,
+        errorFromResult: branchActionErrorFromResult,
+        errorResult: branchActionErrorResult,
+        onResult: handleResult,
+        onError: handleError,
       })
     },
   }

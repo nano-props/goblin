@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTerminalTabSummary } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
+import type { WorkspacePaneTerminalTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import {
   closeWorkspacePaneRuntimeTabsForWorktree,
   confirmWorkspacePaneRuntimeTabClose,

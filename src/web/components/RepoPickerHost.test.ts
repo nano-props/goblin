@@ -143,18 +143,18 @@ describe('repoPickerReposEqual', () => {
     expect(repoPickerReposEqual(left, right)).toBe(false)
   })
 
-  test('does not treat warm cache snapshot time as a sync time', () => {
+  test('does not treat warm cache read-model time as a sync time', () => {
     const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
     repo.projection = { source: 'cache', savedAt: 2_000 }
-    repo.dataLoads.snapshot.loadedAt = 2_000
+    repo.dataLoads.repoReadModel.loadedAt = 2_000
 
     expect(latestRepoSyncTime(repo)).toBeNull()
   })
 
-  test('uses fresh snapshot and fetch data-load times as sync candidates', () => {
+  test('uses fresh read-model and fetch data-load times as sync candidates', () => {
     const repo = emptyRepo('/tmp/repo', 'repo', 'repo-instance-test')
     repo.projection = { source: 'fresh', savedAt: null }
-    repo.dataLoads.snapshot.loadedAt = 2_000
+    repo.dataLoads.repoReadModel.loadedAt = 2_000
     repo.dataLoads.fetch.loadedAt = 3_000
 
     expect(latestRepoSyncTime(repo)).toBe(3_000)

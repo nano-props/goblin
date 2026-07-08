@@ -18,9 +18,11 @@ import { useLoadingVisibility } from '#/web/hooks/useLoadingVisibility.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { getRepoWorktreeBootstrapPreview } from '#/web/repo-client.ts'
 import { useRepoBranchReadModel } from '#/web/repo-branch-read-model.ts'
+import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
 import { settingsSnapshotQueryOptions } from '#/web/settings-queries.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
+import { projectBranchActionOperation, projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { SettingsSnapshot } from '#/shared/api-types.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 
@@ -51,6 +53,9 @@ export function CreateWorktreePagePane({
   const liveRepo = useReposStore((s) => s.repos[repoId])
   const runBranchAction = useReposStore((s) => s.runBranchAction)
   const branchReadModel = useRepoBranchReadModel(liveRepo?.id ?? '', liveRepo?.instanceId ?? '', !!liveRepo)
+  const operationsReadModel = useRepoOperationsReadModel(liveRepo?.id ?? '', liveRepo?.instanceId ?? '', {
+    enabled: !!liveRepo,
+  })
   const repoInstanceId = liveRepo?.instanceId ?? null
   const [configTrustChoice, setConfigTrustChoice] = useState<ConfigTrustChoice>(null)
   const [bootstrapLoad, setBootstrapLoad] = useState<BootstrapLoad | null>(null)
@@ -160,7 +165,11 @@ export function CreateWorktreePagePane({
   async function handleCreateWorktree(request: CreateWorktreeRequest): Promise<boolean> {
     const currentRepo = useReposStore.getState().repos[repoId]
     if (!currentRepo || currentRepo.instanceId !== liveRepo.instanceId) return false
-    if (currentRepo.operations.branchAction.phase !== 'idle' || worktreeBootstrap.loading) return false
+    const branchAction = projectBranchActionOperation(
+      currentRepo.operations.branchAction,
+      operationsReadModel.data?.operations,
+    )
+    if (branchAction.phase !== 'idle' || worktreeBootstrap.loading) return false
     const result = await runBranchAction(
       repoId,
       { kind: 'createWorktree', input: request.input, worktreeBootstrap: currentWorktreeBootstrapDecision() },
@@ -174,7 +183,10 @@ export function CreateWorktreePagePane({
     <CreateWorktreePageShell compact={compact} trafficLightOffset={trafficLightOffset} onBack={onCancel}>
       <ScrollPane>
         <CreateWorktreePageBody
-          repo={{ ...liveRepo, branchModel: branchReadModel }}
+          repo={{
+            ...projectBranchActionRepo(liveRepo, operationsReadModel.data?.operations),
+            branchModel: branchReadModel,
+          }}
           worktreeBootstrap={worktreeBootstrap}
           onCancel={onCancel}
           onCreate={handleCreateWorktree}

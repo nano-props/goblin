@@ -1,21 +1,17 @@
 import type { RepoBranchActionKind } from '#/web/stores/repos/branch-action-types.ts'
 export type RepoOperationPhase = 'idle' | 'queued' | 'running'
-export type RepoOperationKey =
-  'fetch' | 'manualRefresh' | 'snapshot' | 'status' | 'pullRequests' | 'branchAction' | `pullRequest:${string}`
+export type RepoOperationKey = 'fetch' | 'manualRefresh' | 'repoReadModel' | 'visibleStatus' | 'branchAction'
 export type RepoBranchActionReason =
   'branch:pull' | 'branch:push' | 'branch:createWorktree' | 'branch:deleteBranch' | 'branch:removeWorktree'
-export type RepoPullRequestReason = 'summary' | 'full'
 export type RepoOperationReason =
   | 'fetch'
   | 'network'
   | 'pull'
   | 'push'
-  | 'snapshot'
-  | 'status'
-  | 'pullRequests'
+  | 'repo-read-model'
+  | 'visible-status'
   | 'user-fetch'
   | 'manual-refresh'
-  | RepoPullRequestReason
   | RepoBranchActionReason
 
 export interface RepoOperationState {
@@ -37,11 +33,9 @@ export interface RepoOperationTarget {
 export interface RepoOperationsState {
   fetch: RepoOperationState
   manualRefresh: RepoOperationState
-  snapshot: RepoOperationState
-  status: RepoOperationState
-  pullRequests: RepoOperationState
+  repoReadModel: RepoOperationState
+  visibleStatus: RepoOperationState
   branchAction: RepoOperationState
-  pullRequestsByBranch: Record<string, RepoOperationState>
 }
 
 export function isBranchActionReason(reason: RepoOperationReason | null): reason is RepoBranchActionReason {
@@ -68,33 +62,22 @@ export function emptyRepoOperations(): RepoOperationsState {
   return {
     fetch: idleOperation(),
     manualRefresh: idleOperation(),
-    snapshot: idleOperation(),
-    status: idleOperation(),
-    pullRequests: idleOperation(),
+    repoReadModel: idleOperation(),
+    visibleStatus: idleOperation(),
     branchAction: idleOperation(),
-    pullRequestsByBranch: {},
   }
-}
-
-function isPullRequestOperationKey(key: string): key is `pullRequest:${string}` {
-  return key.startsWith('pullRequest:')
 }
 
 function operationForKey(operations: RepoOperationsState, key: string): RepoOperationState {
-  if (isPullRequestOperationKey(key)) {
-    return (operations.pullRequestsByBranch[key.slice('pullRequest:'.length)] ??= idleOperation())
-  }
   switch (key as RepoOperationKey) {
     case 'fetch':
       return operations.fetch
     case 'manualRefresh':
       return operations.manualRefresh
-    case 'snapshot':
-      return operations.snapshot
-    case 'status':
-      return operations.status
-    case 'pullRequests':
-      return operations.pullRequests
+    case 'repoReadModel':
+      return operations.repoReadModel
+    case 'visibleStatus':
+      return operations.visibleStatus
     case 'branchAction':
       return operations.branchAction
   }
@@ -102,19 +85,15 @@ function operationForKey(operations: RepoOperationsState, key: string): RepoOper
 }
 
 function readOperationForKey(operations: RepoOperationsState, key: string): RepoOperationState | undefined {
-  if (isPullRequestOperationKey(key))
-    return operations.pullRequestsByBranch[key.slice('pullRequest:'.length)] ?? idleOperation()
   switch (key as RepoOperationKey) {
     case 'fetch':
       return operations.fetch
     case 'manualRefresh':
       return operations.manualRefresh
-    case 'snapshot':
-      return operations.snapshot
-    case 'status':
-      return operations.status
-    case 'pullRequests':
-      return operations.pullRequests
+    case 'repoReadModel':
+      return operations.repoReadModel
+    case 'visibleStatus':
+      return operations.visibleStatus
     case 'branchAction':
       return operations.branchAction
   }
@@ -154,12 +133,6 @@ export function settleRepoOperationViews(
   for (const target of targets) {
     const operation = readOperationForKey(operations, target.key)
     if (operation) settleOperation(operation, operationId, { error })
-  }
-}
-
-export function pruneRepoOperationViewsForBranches(operations: RepoOperationsState, validBranches: Set<string>): void {
-  for (const branch of Object.keys(operations.pullRequestsByBranch)) {
-    if (!validBranches.has(branch)) delete operations.pullRequestsByBranch[branch]
   }
 }
 

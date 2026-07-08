@@ -1,6 +1,6 @@
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
-import type { RepoWorkspaceRuntimeTabStateInput } from '#/web/components/repo-workspace/tab-model.ts'
-import type { WorkspacePaneTabSummary } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
+import type { RepoWorkspaceRuntimeTabStateInput } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import {
   readWorkspacePaneRuntimeTabProviderProjections,
   type WorkspacePaneRuntimeTabProviderProjection,

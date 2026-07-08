@@ -20,7 +20,7 @@ import { usePublicAppBootstrap } from '#/web/hooks/usePublicAppBootstrap.ts'
 import { useAppOverlays } from '#/web/hooks/useAppOverlays.ts'
 import { useBackgroundFetch } from '#/web/hooks/useBackgroundFetch.ts'
 import { useNetworkReconnect } from '#/web/hooks/useNetworkReconnect.ts'
-import { useRepoStatusRefresh } from '#/web/hooks/useRepoStatusRefresh.ts'
+import { useVisibleRepoProjectionRefresh } from '#/web/hooks/useVisibleRepoProjectionRefresh.ts'
 import { useKeyboard } from '#/web/hooks/useKeyboard.ts'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
 import { useRepoDrop } from '#/web/hooks/useRepoDrop.ts'
@@ -173,6 +173,10 @@ function AuthenticatedWorkspaceShell() {
         >
           <AppRuntimeProjectionProvider currentRepoId={hydratedRouteRepoId}>
             <TerminalSessionProvider>
+              <VisibleRepoProjectionRefreshEffect
+                hydratedRouteRepoId={hydratedRouteRepoId}
+                currentBranchName={currentBranchName}
+              />
               <div
                 className="relative flex h-full flex-col"
                 onDragEnter={repoDrop.onDragEnter}
@@ -340,10 +344,20 @@ function AuthenticatedWorkspaceSideEffects({
   useSessionPersistence({ routedRepoId })
   useWorkspaceNavigationHistory({ routeContext })
   useBackgroundFetch({ hydratedRouteRepoId })
-  useRepoStatusRefresh({ hydratedRouteRepoId, currentBranchName })
   useNetworkReconnect()
   useRepoStoreInvalidationRefresh()
   useSettingsQueryInvalidationSync()
+  return null
+}
+
+function VisibleRepoProjectionRefreshEffect({
+  hydratedRouteRepoId,
+  currentBranchName,
+}: {
+  hydratedRouteRepoId: string | null
+  currentBranchName: string | null
+}) {
+  useVisibleRepoProjectionRefresh({ hydratedRouteRepoId, currentBranchName })
   return null
 }
 

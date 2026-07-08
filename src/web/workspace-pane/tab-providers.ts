@@ -14,7 +14,7 @@ import {
   workspacePaneStaticTabId,
   workspacePaneStaticTabEntry,
 } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabSummary } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
+import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import type { WorkspacePaneRuntimeProjectionPhase } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 
 type T = (key: string, params?: Record<string, string | number>) => string

@@ -7,7 +7,7 @@ import {
   type TerminalCreateTranslator,
 } from '#/web/components/terminal/terminal-create-feedback.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import { terminalWorkspacePaneTabProvider } from '#/web/components/workspace-pane/tab-providers.ts'
+import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { hasFreshRepoInstance, repoInstanceHandle } from '#/web/stores/repos/repo-guards.ts'
 import type { TerminalCreateOwner } from '#/web/components/terminal/types.ts'

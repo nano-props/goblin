@@ -6,7 +6,7 @@
 //
 // Design choices:
 //   - `handlers` is a `Record<string, IpcTestHandler>` keyed by IPC
-//     pathname (`'repo.probe'`, `'repo.snapshot'`, etc.) and server
+//     pathname (`'repo.probe'`, `'repo.projection'`, etc.) and server
 //     route (`'/api/repo/probe'`, etc.). `installGoblinTestBridge`
 //     wires each pathname to the matching fetch URL.
 //   - The bridge mock composes the same `goblinNative` shape the real
@@ -30,7 +30,9 @@ import {
   readWorkspacePaneTabsForTarget,
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
+import {
+  setRepoProjectionQueryData,
+} from '#/web/repo-data-query.ts'
 import {
   workspacePaneTabsWithStaticTab,
   workspacePaneTabsWithoutStaticTab,
@@ -61,7 +63,10 @@ import { installWebSocketMock } from '#/web/test-utils/websocket-mock.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
 
 export type IpcTestHandler = (input: any) => unknown
-export type RepoPresentationForTest = RepoState & { branchModel: RepoBranchReadModelData }
+export type RepoPresentationForTest = RepoState & {
+  branchAction: RepoState['operations']['branchAction']
+  branchModel: RepoBranchReadModelData
+}
 
 export function repoPresentationForTest(
   repo: RepoState,
@@ -69,6 +74,7 @@ export function repoPresentationForTest(
 ): RepoPresentationForTest {
   return {
     ...repo,
+    branchAction: repo.operations.branchAction,
     branchModel: branchReadModel,
   }
 }
@@ -78,6 +84,7 @@ export function repoPresentationFromQueryForTest(repo: RepoState): RepoPresentat
   if (!readModel) throw new Error(`missing branch read model for test repo: ${repo.id}`)
   return {
     ...repo,
+    branchAction: repo.operations.branchAction,
     branchModel: readModel,
   }
 }
@@ -209,6 +216,32 @@ export function installWorkspacePaneTabsTestBridge(
     ) => WorkspacePaneTabsEntry[] | Promise<WorkspacePaneTabsEntry[]>
   } = {},
 ): void {
+  let serverEntries: WorkspacePaneTabsEntry[] = []
+  const targetKey = (input: { repoRoot: string; branchName: string; worktreePath: string | null }) =>
+    workspacePaneTabsTargetIdentityKey(input)
+  const serverTabsForTarget = (input: WorkspacePaneTabsUpdateInput): WorkspacePaneTabEntry[] => {
+    const entry = serverEntries.find((candidate) => targetKey(candidate) === targetKey(input))
+    if (entry) return [...entry.tabs]
+    const tabs = readWorkspacePaneTabsForTarget(input)
+    const key = targetKey(input)
+    serverEntries = [
+      ...serverEntries.filter((candidate) => targetKey(candidate) !== key),
+      { repoRoot: input.repoRoot, branchName: input.branchName, worktreePath: input.worktreePath, tabs },
+    ]
+    return tabs
+  }
+  const replaceServerTarget = (
+    input: { repoRoot: string; branchName: string; worktreePath: string | null },
+    tabs: readonly WorkspacePaneTabEntry[],
+  ): WorkspacePaneTabEntry[] => {
+    const nextTabs = [...tabs]
+    const key = targetKey(input)
+    serverEntries = [
+      ...serverEntries.filter((entry) => targetKey(entry) !== key),
+      { repoRoot: input.repoRoot, branchName: input.branchName, worktreePath: input.worktreePath, tabs: nextTabs },
+    ]
+    return nextTabs
+  }
   setClientBridgeForTests({
     kind: () => 'web',
     hasCapability: () => false,
@@ -286,24 +319,29 @@ export function installWorkspacePaneTabsTestBridge(
     }),
     workspacePaneTabs: () => ({
       replace: async (input) => {
-        if (options.replaceWorkspaceTabs) return await options.replaceWorkspaceTabs(input)
-        return [...input.tabs]
+        const tabs = options.replaceWorkspaceTabs ? await options.replaceWorkspaceTabs(input) : [...input.tabs]
+        return replaceServerTarget(input, tabs)
       },
       update: async (input) => {
-        if (options.updateWorkspaceTabs) return await options.updateWorkspaceTabs(input)
-        return defaultWorkspacePaneTabsOperationResult(input)
+        if (options.updateWorkspaceTabs) serverTabsForTarget(input)
+        const tabs = options.updateWorkspaceTabs
+          ? await options.updateWorkspaceTabs(input)
+          : defaultWorkspacePaneTabsOperationResult(input, serverTabsForTarget(input))
+        return replaceServerTarget(input, tabs)
       },
       list: async (input) => {
         if (options.listWorkspaceTabs) return await options.listWorkspaceTabs(input)
-        return []
+        return serverEntries.filter((entry) => entry.repoRoot === input.repoRoot)
       },
       onChanged: () => () => {},
     }),
   } satisfies ClientBridge)
 }
 
-function defaultWorkspacePaneTabsOperationResult(input: WorkspacePaneTabsUpdateInput): WorkspacePaneTabEntry[] {
-  const currentTabs = readWorkspacePaneTabsForTarget(input)
+function defaultWorkspacePaneTabsOperationResult(
+  input: WorkspacePaneTabsUpdateInput,
+  currentTabs: readonly WorkspacePaneTabEntry[],
+): WorkspacePaneTabEntry[] {
   switch (input.operation.type) {
     case 'open-static':
       return workspacePaneTabsWithStaticTab(currentTabs, input.operation.tabType, {
@@ -525,7 +563,9 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
             ? ([...(payload as { tabs: WorkspacePaneTabEntry[] }).tabs] satisfies WorkspacePaneTabEntry[])
             : []
         case 'workspacePaneTabs.update':
-          return isWorkspacePaneTabsUpdateInput(payload) ? defaultWorkspacePaneTabsOperationResult(payload) : []
+          return isWorkspacePaneTabsUpdateInput(payload)
+            ? defaultWorkspacePaneTabsOperationResult(payload, readWorkspacePaneTabsForTarget(payload))
+            : []
         case 'workspacePaneTabs.list':
           return []
         case 'terminal.listSessions':
@@ -677,6 +717,39 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         }
         return handler(payload)
       }
+      const readRepoProjection = async (payload: Record<string, unknown>) => {
+        const cwd = typeof payload.cwd === 'string' ? payload.cwd : ''
+        const branch = typeof payload.branch === 'string' && payload.branch.length > 0 ? payload.branch : null
+        const mode = payload.mode === 'summary' ? 'summary' : 'full'
+        const normalizeProjection = (raw: unknown) => {
+          const projection = raw as {
+            snapshot?: unknown
+            status?: unknown
+            pullRequests?: unknown
+            operations?: unknown
+            requested?: unknown
+            loadedAt?: unknown
+          }
+          return {
+            snapshot: projection.snapshot ?? null,
+            status: Array.isArray(projection.status) ? projection.status : [],
+            pullRequests: projection.pullRequests ?? null,
+            operations:
+              projection.operations && typeof projection.operations === 'object'
+                ? projection.operations
+                : { operations: [], loadedAt: Date.now() },
+            requested:
+              projection.requested && typeof projection.requested === 'object'
+                ? projection.requested
+                : {
+                    branch,
+                    pullRequestMode: mode,
+                  },
+            loadedAt: typeof projection.loadedAt === 'number' ? projection.loadedAt : Date.now(),
+          }
+        }
+        return normalizeProjection(await call('repo.projection', payload))
+      }
       const openRepoRuntime = async (payload: unknown) => {
         const repoRoot = typeof payload === 'object' && payload && 'repoRoot' in payload ? payload.repoRoot : null
         const repoInput = typeof payload === 'object' && payload && 'repoInput' in payload ? payload.repoInput : null
@@ -741,16 +814,15 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         if (url.pathname === '/api/remote/path-suggestions') return call('remote.listPathSuggestions', body)
         if (url.pathname === '/api/remote/test-repo') return call('remote.testRepo', body)
         if (url.pathname === '/api/repo/probe') return call('repo.probe', body)
-        if (url.pathname === '/api/repo/snapshot') return call('repo.snapshot', body)
-        if (url.pathname === '/api/repo/status') return call('repo.status', body)
         if (url.pathname === '/api/repo/log') return call('repo.log', body)
         if (url.pathname === '/api/repo/remote-branches') return call('repo.remoteBranches', body)
-        if (url.pathname === '/api/repo/pull-requests') return call('repo.pullRequests', body)
+        if (url.pathname === '/api/repo/projection') return readRepoProjection(body)
+        if (url.pathname === '/api/repo/operations') {
+          return handlers['repo.operations'] ? call('repo.operations', body) : { operations: [], loadedAt: Date.now() }
+        }
         if (url.pathname === '/api/repo/patch') return call('repo.patch', body)
-        if (url.pathname === '/api/repo/composite') return call('repo.composite', body)
         if (url.pathname === '/api/repo/fetch') return call('repo.fetch', body)
         if (url.pathname === '/api/repo/clone') return call('repo.clone', body)
-        if (url.pathname === '/api/repo/abort-clone') return call('repo.abortClone', body)
         if (url.pathname === '/api/repo/pull') return call('repo.pull', body)
         if (url.pathname === '/api/repo/push') return call('repo.push', body)
         if (url.pathname === '/api/repo/create-worktree') return call('repo.createWorktree', body)
@@ -874,9 +946,18 @@ export function seedRepoReadModelQueryData(
     status?: WorktreeStatus[]
   },
 ): void {
-  setRepoSnapshotQueryData(repo.id, repo.instanceId, {
-    branches: readModel.branches,
-    current: readModel.currentBranch,
+  setRepoProjectionQueryData(repo.id, repo.instanceId, null, 'full', {
+    snapshot: {
+      branches: readModel.branches,
+      current: readModel.currentBranch,
+    },
+    status: readModel.status ?? [],
+    pullRequests: null,
+    operations: { operations: [], loadedAt: 0 },
+    requested: {
+      branch: null,
+      pullRequestMode: 'full',
+    },
+    loadedAt: 0,
   })
-  setRepoStatusQueryData(repo.id, repo.instanceId, readModel.status ?? [])
 }

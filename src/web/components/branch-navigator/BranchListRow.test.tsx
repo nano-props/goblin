@@ -6,6 +6,7 @@ import { BranchListRow } from '#/web/components/branch-navigator/BranchListRow.t
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { createRepoBranch, repoPresentationForTest } from '#/web/test-utils/bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 
 // Side-effect import: registers a partial mock of `#/web/stores/i18n.ts`
 // that delegates to the real module so `i18next.use(initReactI18next).
@@ -46,14 +47,14 @@ beforeEach(() => {
 describe('BranchListRow', () => {
   test('forwards `branchActionBusy=true` when an in-flight branch action targets this branch', () => {
     const repo = branchListRowRepo()
-    repo.operations.branchAction = { ...repo.operations.branchAction, phase: 'running', target: 'feature/a' }
+    repo.branchAction = { ...repo.branchAction, phase: 'running', target: 'feature/a' }
     renderInJsdom(<BranchListRow {...baseProps(repo, 'feature/a')} />)
     expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ branchActionBusy: true }))
   })
 
   test('forwards `branchActionBusy=false` when an in-flight branch action targets a different branch', () => {
     const repo = branchListRowRepo()
-    repo.operations.branchAction = { ...repo.operations.branchAction, phase: 'running', target: 'feature/other' }
+    repo.branchAction = { ...repo.branchAction, phase: 'running', target: 'feature/other' }
     renderInJsdom(<BranchListRow {...baseProps(repo, 'feature/a')} />)
     expect(branchRowPropsSpy).toHaveBeenCalledWith(expect.objectContaining({ branchActionBusy: false }))
   })
@@ -73,7 +74,7 @@ describe('BranchListRow', () => {
 })
 
 function baseProps(
-  repo: ReturnType<typeof repoPresentationForTest>,
+  repo: BranchActionRepo,
   branchName: string,
 ): Omit<React.ComponentProps<typeof BranchListRow>, 'terminalBellCount' | 'branchActionBusy'> {
   return {
@@ -87,11 +88,18 @@ function baseProps(
   }
 }
 
-function branchListRowRepo() {
-  return repoPresentationForTest(emptyRepo('/tmp/repo', 'repo', 'repo-instance-test'), {
+function branchListRowRepo(): BranchActionRepo {
+  const repo = repoPresentationForTest(emptyRepo('/tmp/repo', 'repo', 'repo-instance-test'), {
     branches: [],
     currentBranch: '',
     status: [],
     worktreesByPath: {},
   })
+  return {
+    id: repo.id,
+    instanceId: repo.instanceId,
+    branchModel: repo.branchModel,
+    branchAction: repo.operations.branchAction,
+    remote: repo.remote,
+  }
 }

@@ -17,7 +17,8 @@ export function RepoCloneDialog({ open, onOpenChange }: RepoCloneDialogProps) {
   const navigation = usePrimaryWindowNavigation()
 
   async function handleClone(request: CloneRepositoryRequest): Promise<CloneRepoResult> {
-    const result = await runCloneRepository(request)
+    const { signal, ...cloneInput } = request
+    const result = await runCloneRepository(cloneInput, { signal })
     if (!result.ok || !result.path) return result
     const openResult = await ensureWorkspaceOpen(result.path)
     if (!openResult.ok) {

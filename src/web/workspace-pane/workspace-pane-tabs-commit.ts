@@ -6,7 +6,6 @@ import {
   cancelWorkspacePaneTabs,
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { runWorkspacePaneTabsOperation } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
 
 export interface CommitWorkspacePaneTabsInput {
@@ -84,13 +83,13 @@ export function reportWorkspacePaneTabsFailure(input: {
 export async function commitWorkspacePaneTabs(
   input: CommitWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabsMutationResult> {
-  return await runWorkspacePaneTabsOperation(input, async () => await commitWorkspacePaneTabsNow(input))
+  return await commitWorkspacePaneTabsNow(input)
 }
 
 export async function updateWorkspacePaneTabs(
   input: UpdateWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabsMutationResult> {
-  return await runWorkspacePaneTabsOperation(input, async () => await updateWorkspacePaneTabsNow(input))
+  return await updateWorkspacePaneTabsNow(input)
 }
 
 async function commitWorkspacePaneTabsNow(
@@ -156,10 +155,6 @@ export async function writeCanonicalWorkspacePaneTabsForTarget(
   setWorkspacePaneTabsForTargetQueryData(input, queryClient)
 }
 
-/**
- * Low-level full-list server replace. User-facing tab operations should run
- * through runWorkspacePaneTabsOperation before calling this.
- */
 export async function replaceWorkspacePaneTabsOnServer(
   input: CommitWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabEntry[]> {

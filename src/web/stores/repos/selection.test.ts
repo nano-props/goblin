@@ -11,6 +11,7 @@ import {
   createRepoBranch as branch,
   installGoblinTestBridge,
   resetReposStore,
+  seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import {
@@ -24,7 +25,6 @@ import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 const REPO_ID = '/tmp/gbl-selection-test-repo'
@@ -122,26 +122,11 @@ function staticTabs(...views: WorkspacePaneStaticTabType[]): WorkspacePaneTabEnt
   return views.map((view) => workspacePaneStaticTabEntry(view))
 }
 
-function stubRefreshActions(
-  stubs: Partial<Pick<ReturnType<typeof useReposStore.getState>, 'refreshPullRequests' | 'refreshStatus'>>,
-): () => void {
-  const original = useReposStore.getState()
-  useReposStore.setState(stubs)
-  return () => {
-    useReposStore.setState({
-      refreshPullRequests: original.refreshPullRequests,
-      refreshStatus: original.refreshStatus,
-    })
-  }
-}
-
 beforeEach(() => {
   primaryWindowQueryClient.clear()
   for (const key of Object.keys(ipcHandlers)) delete ipcHandlers[key]
   resetReposStore()
   installGoblinTestBridge(ipcHandlers)
-  ipcHandlers['repo.pullRequests'] = async () => []
-  ipcHandlers['repo.status'] = async () => []
 })
 
 describe('setBranchViewMode', () => {
@@ -177,15 +162,15 @@ describe('setBranchViewMode', () => {
     expect(readRepoBranchQueryProjection(repo!)?.currentBranch).toBe('main')
   })
 
-  test('changes branch view mode without mutating the React Query snapshot read model', () => {
+  test('changes branch view mode without mutating the React Query projection read model', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       currentBranchName: 'feature/plain',
     })
-    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
-      current: 'main',
+    seedRepoReadModelQueryData(repo, {
       branches: [branch('main', { worktree: { path: '/repo' } }), branch('feature/plain')],
+      currentBranch: 'main',
     })
 
     useReposStore.getState().setBranchViewMode(REPO_ID, 'worktrees')
@@ -237,16 +222,16 @@ describe('setWorkspacePaneTab', () => {
     expect(useReposStore.getState().repos[REPO_ID]).toBe(before)
   })
 
-  test('uses the React Query snapshot read model to resolve workspace pane tab targets', () => {
+  test('uses the React Query projection read model to resolve workspace pane tab targets', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       currentBranchName: 'feature/query',
       preferredWorkspacePaneTab: 'status',
     })
-    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
-      current: 'feature/query',
+    seedRepoReadModelQueryData(repo, {
       branches: [branch('feature/query', { worktree: { path: '/tmp/query-worktree' } })],
+      currentBranch: 'feature/query',
     })
 
     useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'feature/query', 'changes')
@@ -332,37 +317,12 @@ describe('setWorkspacePaneTab', () => {
     expect(preferredTabFor('main')).toBe('changes')
   })
 
-  test('passes the current repo instance id to workspace pane tab refreshes', () => {
-    seedRepo({ currentBranchName: 'main', preferredWorkspacePaneTab: 'terminal' })
-    const repoInstanceId = useReposStore.getState().repos[REPO_ID]!.instanceId
-    const pullRequestCalls: Parameters<ReturnType<typeof useReposStore.getState>['refreshPullRequests']>[] = []
-    const restore = stubRefreshActions({
-      refreshPullRequests: async (...args) => {
-        pullRequestCalls.push(args)
-      },
-    })
-
-    try {
-      useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'main', 'status')
-
-      expect(pullRequestCalls[0]).toEqual([REPO_ID, ['main'], { repoInstanceId, mode: 'full' }])
-    } finally {
-      restore()
-    }
-  })
-
-  test('refreshes pull request details when switching to status', async () => {
-    const calls: string[][] = []
-    ipcHandlers['repo.pullRequests'] = async ({ branches }: { branches?: string[] }) => {
-      calls.push(branches ?? [])
-      return []
-    }
+  test('keeps workspace pane tab selection as a UI preference write', () => {
     seedRepo({ currentBranchName: 'main', preferredWorkspacePaneTab: 'terminal' })
 
     useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'main', 'status')
-    await flushAsyncWork()
 
-    expect(calls).toEqual([['main']])
+    expect(preferredTabFor('main')).toBe('status')
   })
 
   test('sets the terminal preference regardless of worktree presence', () => {

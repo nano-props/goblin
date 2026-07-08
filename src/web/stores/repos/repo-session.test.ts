@@ -5,7 +5,7 @@ import type { BranchSnapshotInfo } from '#/web/types.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
 import { createRepoBranch, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { getRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { removeRepoRuntimeInstanceFromCache, repoRuntimeInstancesQueryKey } from '#/web/repo-runtime-query.ts'
 import type { RepoRuntimeInstancesSnapshot } from '#/shared/api-types.ts'
 import {
@@ -32,7 +32,7 @@ describe('repo lifecycle', () => {
     expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
     expect(calls.recent).toEqual([{ kind: 'local', id: REPO_A }])
     await vi.waitFor(() => {
-      expect(calls.composite).toEqual([REPO_A])
+      expect(calls.projection).toEqual([REPO_A])
     })
   })
 
@@ -79,7 +79,7 @@ describe('repo lifecycle', () => {
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
     await vi.waitFor(() => {
-      expect(calls.composite).toEqual([REPO_A, REPO_B])
+      expect(calls.projection).toEqual([REPO_A, REPO_B])
     })
   })
 
@@ -93,7 +93,7 @@ describe('repo lifecycle', () => {
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
     await vi.waitFor(() => {
-      expect(calls.composite).toEqual([REPO_A, REPO_B])
+      expect(calls.projection).toEqual([REPO_A, REPO_B])
     })
   })
 
@@ -117,7 +117,7 @@ describe('repo lifecycle', () => {
     const second = await useReposStore.getState().ensureWorkspaceOpen(REPO_B)
     if (second.ok) useReposStore.setState({ restoredRepoId: second.id })
     // Opening REPO_A again is a focus action: the repo is already
-    // resolved and its data is coherent, so we skip the snapshot/status
+    // resolved and its data is coherent, so we skip the runtime projection
     // pipeline. (hydrateRepoSession still always refreshes on boot — see
     // the lifecycle-hydrate test for the cached-then-fresh contract.)
     const third = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
@@ -126,19 +126,13 @@ describe('repo lifecycle', () => {
     expect(useReposStore.getState().order).toEqual([REPO_A, REPO_B])
     expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
     await vi.waitFor(() => {
-      expect(calls.composite).toEqual([REPO_A, REPO_B])
+      expect(calls.projection).toEqual([REPO_A, REPO_B])
     })
   })
   test('initial refresh results from a closed repo instance do not overwrite a reopened repo', async () => {
     const snapshotResolvers: Array<(value: { branches: BranchSnapshotInfo[]; current: string }) => void> = []
     installGoblin({
-      snapshot: () =>
-        new Promise<{ branches: BranchSnapshotInfo[]; current: string }>((resolve) => {
-          snapshotResolvers.push(resolve)
-        }),
-      // `refreshCoreData` now goes through the composite endpoint, so
-      // forward every snapshot resolver into the composite handler too.
-      composite: () =>
+      projection: () =>
         new Promise<{
           snapshot: { branches: BranchSnapshotInfo[]; current: string }
           status: never[]
@@ -162,7 +156,7 @@ describe('repo lifecycle', () => {
     expect(secondToken).not.toBe(firstToken)
     await vi.waitFor(() => {
       const repo = useReposStore.getState().repos[REPO_A]
-      expect(repo ? getRepoSnapshotQueryData(repo.id, repo.instanceId)?.current : null).toBe('fresh')
+      expect(repo ? readRepoBranchQueryProjection(repo)?.currentBranch : null).toBe('fresh')
     })
 
     snapshotResolvers[0]?.({ branches: [branchSnapshot('stale')], current: 'stale' })
@@ -170,7 +164,7 @@ describe('repo lifecycle', () => {
 
     {
       const repo = useReposStore.getState().repos[REPO_A]
-      expect(repo ? getRepoSnapshotQueryData(repo.id, repo.instanceId)?.current : null).toBe('fresh')
+      expect(repo ? readRepoBranchQueryProjection(repo)?.currentBranch : null).toBe('fresh')
     }
   })
 
@@ -262,7 +256,7 @@ describe('repo lifecycle', () => {
     await vi.waitFor(() => {
       const repo = useReposStore.getState().repos[target!.id]
       expect(
-        repo ? getRepoSnapshotQueryData(repo.id, repo.instanceId)?.branches.map((branch) => branch.name) : null,
+        repo ? readRepoBranchQueryProjection(repo)?.branches.map((branch) => branch.name) : null,
       ).toEqual([])
     })
   })
@@ -317,7 +311,7 @@ describe('repo lifecycle', () => {
       kind: 'ready',
       target: newTarget,
     })
-    expect(calls.composite).toEqual([newTarget!.id])
+    expect(calls.projection).toEqual([newTarget!.id])
   })
 
   test('closeRepo clears recorded tab openers scoped to that repo, but leaves other repos untouched', () => {

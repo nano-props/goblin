@@ -25,11 +25,9 @@ export interface CreateWorktreeInput {
   mode: CreateWorktreeMode
 }
 
-/** Wire-shape envelope used by the IPC bridge: includes `cwd` and the
- *  optional invalidation `sourceToken` on top of the canonical input. */
+/** Wire-shape envelope used by the IPC bridge: includes `cwd` on top of the canonical input. */
 export interface CreateWorktreeIpcInput extends CreateWorktreeInput {
   cwd: string
-  sourceToken?: string
   worktreeBootstrap: WorktreeBootstrapDecision
 }
 

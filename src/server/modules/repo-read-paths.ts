@@ -1,4 +1,6 @@
 import { runWithRepoSource } from '#/server/modules/repo-source.ts'
+import { getRepoOperationsSnapshot } from '#/server/modules/repo-operation-registry.ts'
+import { listRepoWriteOperationsForRepo } from '#/server/modules/repo-write-operation-coordinator.ts'
 import { isValidRepoLocator } from '#/shared/input-validation.ts'
 import {
   DEFAULT_REPOSITORY_LOG_COUNT,
@@ -7,7 +9,14 @@ import {
   type PullRequestFetchMode,
   type WorktreeStatus,
 } from '#/shared/git-types.ts'
-import type { ProbeResult, PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
+import type {
+  ProbeResult,
+  PullRequestEntry,
+  RepoOperationsSnapshot,
+  RepoRuntimeProjection,
+  RepoServerOperationState,
+  RepoSnapshot,
+} from '#/shared/api-types.ts'
 import type { WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
 
 export async function probeRepo(cwd: string): Promise<ProbeResult> {
@@ -101,6 +110,26 @@ export interface RepoBulkReadOptions {
   timeoutMs?: number
 }
 
+export interface RepoProjectionReadOptions {
+  branch?: string
+  mode?: PullRequestFetchMode
+  signal?: AbortSignal
+  timeoutMs?: number
+}
+
+export interface RepoOperationsReadOptions {
+  includeSettled?: boolean
+  signal?: AbortSignal
+}
+
+function sortedRepoOperations(states: RepoServerOperationState[]): RepoServerOperationState[] {
+  return [...states].sort((a, b) => {
+    const aTime = a.settledAt ?? a.startedAt ?? a.queuedAt
+    const bTime = b.settledAt ?? b.startedAt ?? b.queuedAt
+    return bTime - aTime
+  })
+}
+
 /**
  * Build a per-section `AbortSignal` that fires when either the
  * caller's signal or the timeout fires. The timeout is a hard cap
@@ -181,5 +210,48 @@ export async function readRepoBulk(
     snapshotCtl?.cancel()
     statusCtl?.cancel()
     prsCtl?.cancel()
+  }
+}
+
+export async function readRepoProjection(
+  cwd: string,
+  options: RepoProjectionReadOptions = {},
+): Promise<RepoRuntimeProjection> {
+  const branch = typeof options.branch === 'string' && options.branch.length > 0 ? options.branch : null
+  const mode: PullRequestFetchMode = options.mode === 'summary' ? 'summary' : 'full'
+  const includePullRequests = !!branch || mode === 'summary'
+  const result = await readRepoBulk(
+    cwd,
+    includePullRequests ? ['snapshot', 'status', 'pullRequests'] : ['snapshot', 'status'],
+    {
+      branches: branch ? [branch] : undefined,
+      mode,
+      signal: options.signal,
+      timeoutMs: options.timeoutMs,
+    },
+  )
+  return {
+    ...result,
+    operations: await readRepoOperationsSnapshot(cwd, { signal: options.signal }),
+    requested: {
+      branch,
+      pullRequestMode: mode,
+    },
+    loadedAt: Date.now(),
+  }
+}
+
+export async function readRepoOperationsSnapshot(
+  cwd?: string,
+  options: RepoOperationsReadOptions = {},
+): Promise<RepoOperationsSnapshot> {
+  const registrySnapshot = getRepoOperationsSnapshot({
+    repoId: cwd,
+    includeSettled: options.includeSettled,
+  })
+  const writeOperations = await listRepoWriteOperationsForRepo(cwd, options)
+  return {
+    operations: sortedRepoOperations([...registrySnapshot.operations, ...writeOperations]),
+    loadedAt: Date.now(),
   }
 }

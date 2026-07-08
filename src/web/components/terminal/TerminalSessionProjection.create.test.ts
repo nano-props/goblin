@@ -116,7 +116,6 @@ import {
   TerminalSessionProjection,
   setTerminalSessionProjectionForTests,
 } from '#/web/components/terminal/TerminalSessionProjection.ts'
-import { clearWorkspacePaneTabsOperationQueuesForTests } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 
 const REPO_ROOT = '/repo'
 const WORKTREE_PATH = '/repo'
@@ -220,7 +219,6 @@ describe('TerminalSessionProjection create flow', () => {
   let projection: TerminalSessionProjection
 
   beforeEach(() => {
-    clearWorkspacePaneTabsOperationQueuesForTests()
     mocks.createMock.mockReset()
     mocks.createMock.mockResolvedValue(makeCreateResult())
     mocks.closeMock.mockReset()
@@ -244,7 +242,6 @@ describe('TerminalSessionProjection create flow', () => {
 
   afterEach(() => {
     projection.destroy()
-    clearWorkspacePaneTabsOperationQueuesForTests()
     setTerminalSessionProjectionForTests(null)
     document.body.innerHTML = ''
     if (originalResizeObserver) {

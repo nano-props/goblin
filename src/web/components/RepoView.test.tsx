@@ -927,7 +927,7 @@ describe('RepoView workspace navigation', () => {
   })
 
   test('large-screen initial loading keeps the workspace pane empty when no branch is selected', () => {
-    setSnapshotLoading(REPO_ID)
+    setReadModelLoading(REPO_ID)
     const { container } = render(<RepoView repoId={REPO_ID} />)
 
     expect(workspace(container)?.dataset.mode).toBe('split')
@@ -940,7 +940,7 @@ describe('RepoView workspace navigation', () => {
 
   test('large-screen focused initial loading with current branch keeps floating sidebar reveal available', () => {
     useReposStore.getState().setZenMode(true)
-    setSnapshotLoading(REPO_ID)
+    setReadModelLoading(REPO_ID)
 
     const { container } = render(branchRepoView())
 
@@ -973,7 +973,7 @@ describe('RepoView workspace navigation', () => {
 
   test('compact initial loading shows the selected Repo Workspace skeleton as the single pane', () => {
     responsiveMocks.mode = 'compact'
-    setSnapshotLoading(REPO_ID)
+    setReadModelLoading(REPO_ID)
 
     const { container } = render(branchRepoView())
 
@@ -1125,7 +1125,7 @@ function domRect({ left, top, width, height }: { left: number; top: number; widt
   }
 }
 
-function setSnapshotLoading(repoId: string) {
+function setReadModelLoading(repoId: string) {
   const repo = useReposStore.getState().repos[repoId]
   if (!repo) throw new Error(`missing repo ${repoId}`)
   useReposStore.setState({
@@ -1134,8 +1134,8 @@ function setSnapshotLoading(repoId: string) {
         ...repo,
         dataLoads: {
           ...repo.dataLoads,
-          snapshot: {
-            ...repo.dataLoads.snapshot,
+          repoReadModel: {
+            ...repo.dataLoads.repoReadModel,
             phase: 'loading' as const,
             loadedAt: null,
             error: null,

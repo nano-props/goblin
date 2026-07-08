@@ -7,7 +7,7 @@ import {
   workspacePaneTabScope,
   type WorkspacePaneRenderabilityContext,
 } from '#/web/lib/workspace-pane-tab.ts'
-import type { WorkspacePaneRuntimeTabAvailability } from '#/web/components/workspace-pane/tab-providers.ts'
+import type { WorkspacePaneRuntimeTabAvailability } from '#/web/workspace-pane/tab-providers.ts'
 
 function terminalAvailability(
   overrides: Partial<WorkspacePaneRuntimeTabAvailability> = {},

@@ -15,7 +15,6 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
-import { clearWorkspacePaneTabsOperationQueuesForTests } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 
 const REPO_ROOT = '/tmp/workspace-pane-tabs-commit-repo'
 const REPO_INSTANCE_ID = 'repo-instance-test'
@@ -23,12 +22,10 @@ const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/workspace-pane-tabs-commit-worktree'
 
 beforeEach(() => {
-  clearWorkspacePaneTabsOperationQueuesForTests()
   resetReposStore()
 })
 
 afterEach(() => {
-  clearWorkspacePaneTabsOperationQueuesForTests()
   resetReposStore()
   setClientBridgeForTests(null)
 })

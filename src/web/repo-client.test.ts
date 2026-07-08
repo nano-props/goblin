@@ -174,7 +174,6 @@ describe('repo-client', () => {
     expect(hasNativeDirectoryPicker()).toBe(false)
     await expect(
       cloneRepository({
-        operationId: 'op_1',
         url: 'https://example.com/repo.git',
         parentPath: '/tmp',
         directoryName: 'repo',
@@ -185,6 +184,11 @@ describe('repo-client', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
+        body: JSON.stringify({
+          url: 'https://example.com/repo.git',
+          parentPath: '/tmp',
+          directoryName: 'repo',
+        }),
       }),
     )
   })
@@ -207,23 +211,19 @@ describe('repo-client', () => {
     await assertion
   })
 
-  test('aborts clone operations after the clone request watchdog fires', async () => {
+  test('aborts the clone request after the clone request watchdog fires', async () => {
     vi.useFakeTimers()
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
-    const fetchMock = mockFetch((url, init) => {
-      const href = String(url)
-      if (href.endsWith('/api/repo/abort-clone')) {
-        return { ok: true, json: async () => true }
-      }
-      const signal = (init as RequestInit | undefined)?.signal
+    let requestSignal: AbortSignal | undefined
+    const fetchMock = mockFetch((_url, init) => {
+      requestSignal = (init as RequestInit | undefined)?.signal ?? undefined
       return new Promise((_resolve, reject) => {
-        signal?.addEventListener('abort', () => reject(signal.reason), { once: true })
+        requestSignal?.addEventListener('abort', () => reject(requestSignal?.reason), { once: true })
       })
     })
 
     const { cloneRepository } = await import('#/web/repo-client.ts')
     const request = cloneRepository({
-      operationId: 'op_1',
       url: 'https://example.com/repo.git',
       parentPath: '/tmp',
       directoryName: 'repo',
@@ -231,14 +231,9 @@ describe('repo-client', () => {
 
     await vi.advanceTimersByTimeAsync(360_000)
     await expect(request).resolves.toEqual({ ok: false, message: 'error.request-timeout' })
-    await Promise.resolve()
-    expect(fetchMock).toHaveBeenCalledWith(
-      'http://127.0.0.1:32100/api/repo/abort-clone',
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ operationId: 'op_1' }),
-      }),
-    )
+    expect(requestSignal?.aborted).toBe(true)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(new URL(String((fetchMock.mock.calls[0] as unknown as [unknown])[0])).pathname).toBe('/api/repo/clone')
   })
 
   test('gives remove-worktree a multi-step mutation request budget', async () => {

@@ -3,19 +3,20 @@ import {
   restoreRepoProjectionFromCacheEntry,
   normalizeRepoSnapshotCache,
   persistRepoSnapshotCacheEntry,
-  seedRepoSnapshotQueryFromCacheEntry,
+  seedRepoProjectionQueryFromCacheEntry,
 } from '#/web/stores/repos/persistence.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import {
   createBranchSnapshot,
   createRepoBranch,
   resetReposStore,
+  seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoSnapshotCacheEntry } from '#/web/stores/repos/types.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { getRepoSnapshotQueryData, getRepoStatusQueryData, setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { getRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 function cachedRepo(savedAt: number): RepoSnapshotCacheEntry {
   return {
     savedAt,
@@ -133,9 +134,9 @@ describe('persistRepoSnapshotCacheEntry', () => {
       currentBranch: 'main',
       currentBranchName: 'main',
     })
-    setRepoSnapshotQueryData('/repo', repo.instanceId, {
-      current: 'feature/query',
+    seedRepoReadModelQueryData(repo, {
       branches: [createBranchSnapshot('feature/query', { isCurrent: true })],
+      currentBranch: 'feature/query',
     })
 
     persistRepoSnapshotCacheEntry(useReposStore.setState, repo, 'repo-instance-test')
@@ -170,7 +171,7 @@ describe('restoreRepoProjectionFromCacheEntry', () => {
     expect(repo.projection).toEqual({ source: 'cache', savedAt: now })
   })
 
-  test('seeds cached branch references without inventing status query data', () => {
+  test('seeds cached branch references as runtime projections', () => {
     const now = Date.now()
     const cached = cachedRepo(now)
     cached.data.currentBranch = 'feature/a'
@@ -187,12 +188,15 @@ describe('restoreRepoProjectionFromCacheEntry', () => {
       }),
     ]
 
-    seedRepoSnapshotQueryFromCacheEntry('/repo', 'repo-instance-test', cached)
+    seedRepoProjectionQueryFromCacheEntry('/repo', 'repo-instance-test', cached)
 
-    const snapshot = getRepoSnapshotQueryData('/repo', 'repo-instance-test')
-    expect(snapshot?.current).toBe('feature/a')
-    expect(snapshot?.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
-    expect(snapshot?.branches[0]?.pullRequest).toBeUndefined()
-    expect(getRepoStatusQueryData('/repo', 'repo-instance-test')).toBeUndefined()
+    const fullProjection = getRepoProjectionQueryData('/repo', 'repo-instance-test', null, 'full')
+    const summaryProjection = getRepoProjectionQueryData('/repo', 'repo-instance-test', null, 'summary')
+    expect(fullProjection?.snapshot?.current).toBe('feature/a')
+    expect(fullProjection?.snapshot?.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
+    expect(fullProjection?.snapshot?.branches[0]?.pullRequest).toBeUndefined()
+    expect(fullProjection?.status).toEqual([])
+    expect(summaryProjection?.snapshot).toEqual(fullProjection?.snapshot)
+    expect(summaryProjection?.status).toEqual([])
   })
 })

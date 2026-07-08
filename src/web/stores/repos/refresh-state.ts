@@ -1,43 +1,14 @@
 import { markRepoAvailable } from '#/web/stores/repos/availability.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
-import { pruneRepoOperationViewsForBranches } from '#/web/stores/repos/operations.ts'
 import {
   cancelDataLoad,
-  finishPullRequestDataLoadError,
-  finishPullRequestDataLoadSuccess,
-  finishPullRequestDataLoadUnavailable,
   finishDataLoadError,
   finishDataLoadSuccess,
-  idlePullRequestDataLoad,
-  startPullRequestDataLoad,
 } from '#/web/stores/repos/repo-data-load-state.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { RepoState, ReposGet } from '#/web/stores/repos/types.ts'
-import type { ExecResult, PullRequestFetchMode } from '#/web/types.ts'
-
-function finishPullRequestBranchDataLoads(
-  r: {
-    dataLoads: {
-      pullRequestsByBranch: Record<string, ReturnType<typeof idlePullRequestDataLoad>>
-    }
-  },
-  branchNames: string[],
-  existingBranches: ReadonlySet<string>,
-  finish: (dataLoad: ReturnType<typeof idlePullRequestDataLoad>) => void,
-  options?: { createMissing?: boolean },
-): void {
-  for (const branch of branchNames) {
-    if (!existingBranches.has(branch)) {
-      delete r.dataLoads.pullRequestsByBranch[branch]
-      continue
-    }
-    const dataLoad = options?.createMissing
-      ? (r.dataLoads.pullRequestsByBranch[branch] ??= idlePullRequestDataLoad())
-      : r.dataLoads.pullRequestsByBranch[branch]
-    if (dataLoad) finish(dataLoad)
-  }
-}
+import type { ExecResult } from '#/web/types.ts'
 
 export function applySnapshotToRepoProjection(
   r: RepoState,
@@ -46,10 +17,7 @@ export function applySnapshotToRepoProjection(
   previousSnapshotBranches: RepoSnapshot['branches'] | null,
 ): void {
   void previousSnapshotBranches
-  r.dataLoads.pullRequestsByBranch = Object.fromEntries(
-    Object.entries(r.dataLoads.pullRequestsByBranch).filter(([branch]) => validBranches.has(branch)),
-  )
-  pruneRepoOperationViewsForBranches(r.operations, validBranches)
+  void validBranches
   if (snap.remote) {
     r.remote.remotes = snap.remote.remotes.map((remote) => remote.name)
     r.remote.remoteDetails = snap.remote.remotes
@@ -66,23 +34,7 @@ export function applySnapshotToRepoProjection(
   markRepoAvailable(r)
   r.projection.source = 'fresh'
   r.projection.savedAt = null
-  finishDataLoadSuccess(r.dataLoads.snapshot)
-}
-
-export function startPullRequestRefreshDataLoads(
-  r: RepoState,
-  branchNames: string[],
-  mode: PullRequestFetchMode,
-): void {
-  startPullRequestDataLoad(r.dataLoads.pullRequests, mode, {
-    hasData: false,
-  })
-  for (const branch of branchNames) {
-    r.dataLoads.pullRequestsByBranch[branch] ??= idlePullRequestDataLoad()
-    startPullRequestDataLoad(r.dataLoads.pullRequestsByBranch[branch], mode, {
-      hasData: false,
-    })
-  }
+  finishDataLoadSuccess(r.dataLoads.repoReadModel)
 }
 
 export function shouldAttemptFetch(repo: RepoState | null | undefined, repoInstanceId: string): boolean {
@@ -115,61 +67,6 @@ export function applyFetchDataLoadResult(r: RepoState, result: ExecResult): void
 export function applyFetchDataLoadError(r: RepoState, message: string): void {
   if (message === 'cancelled') cancelDataLoad(r.dataLoads.fetch)
   else finishDataLoadError(r.dataLoads.fetch, message)
-}
-
-export function applyPullRequestRefreshUnavailableState(
-  r: RepoState,
-  branchNames: string[],
-  existingBranches: ReadonlySet<string>,
-  mode: PullRequestFetchMode,
-): void {
-  finishPullRequestDataLoadUnavailable(r.dataLoads.pullRequests, mode)
-  finishPullRequestBranchDataLoads(r, branchNames, existingBranches, (dataLoad) =>
-    finishPullRequestDataLoadUnavailable(dataLoad, mode),
-  )
-}
-
-export function applyPullRequestRefreshSuccessState(
-  r: RepoState,
-  branchNames: string[],
-  existingBranches: ReadonlySet<string>,
-  mode: PullRequestFetchMode,
-): void {
-  finishPullRequestDataLoadSuccess(r.dataLoads.pullRequests, mode)
-  finishPullRequestBranchDataLoads(
-    r,
-    branchNames,
-    existingBranches,
-    (dataLoad) => finishPullRequestDataLoadSuccess(dataLoad, mode),
-    { createMissing: true },
-  )
-}
-
-export function applyPullRequestRefreshStaleState(
-  r: RepoState,
-  branchNames: string[],
-  existingBranches: ReadonlySet<string>,
-  mode: PullRequestFetchMode,
-  operationId: number,
-): void {
-  const currentBranches = branchNames.filter(
-    (branch) => r.operations.pullRequestsByBranch[branch]?.operationId === operationId,
-  )
-  finishPullRequestBranchDataLoads(r, currentBranches, existingBranches, (dataLoad) =>
-    finishPullRequestDataLoadUnavailable(dataLoad, mode),
-  )
-}
-
-export function applyPullRequestRefreshErrorState(
-  r: RepoState,
-  branchNames: string[],
-  existingBranches: ReadonlySet<string>,
-  message: string,
-): void {
-  finishPullRequestDataLoadError(r.dataLoads.pullRequests, message)
-  finishPullRequestBranchDataLoads(r, branchNames, existingBranches, (dataLoad) =>
-    finishPullRequestDataLoadError(dataLoad, message),
-  )
 }
 
 export function canRunRemoteFetchNow(repo: RepoState): boolean {

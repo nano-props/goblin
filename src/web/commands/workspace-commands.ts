@@ -12,12 +12,12 @@ import {
   nextRepoWorkspaceTabAfterClose,
   type RepoWorkspaceTab,
   type RepoWorkspaceTabModel,
-} from '#/web/components/repo-workspace/tab-model.ts'
+} from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import {
   isWorkspacePaneStaticTabProvider,
   workspacePaneTabProvider,
-} from '#/web/components/workspace-pane/tab-providers.ts'
+} from '#/web/workspace-pane/tab-providers.ts'
 import { selectWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-actions.ts'
 import { readWorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-action-context.ts'
 import {

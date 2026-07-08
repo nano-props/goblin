@@ -34,7 +34,6 @@ import {
 import { syncTerminalRuntimeSessionIdIndex } from '#/web/components/terminal/terminal-session-index.ts'
 import { resolveSelectedTerminalSessionId } from '#/web/components/terminal/terminal-session-selection.ts'
 import { buildTerminalWorktreeSnapshot } from '#/web/components/terminal/terminal-session-worktree-snapshot.ts'
-import { runWorkspacePaneTabsOperation } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 import type {
   TerminalDescriptor,
   TerminalCreateOptions,
@@ -489,16 +488,7 @@ export class TerminalSessionProjection {
     geometry: { cols: number; rows: number },
     request: TerminalCreateQueueRequest,
   ): Promise<string> {
-    const repoInstanceId = requireRepoInstanceId(base)
-    return await runWorkspacePaneTabsOperation(
-      {
-        repoRoot: base.repoRoot,
-        repoInstanceId,
-        branchName: base.branch,
-        worktreePath: base.worktreePath,
-      },
-      async () => await this.performCreateTerminalNow(base, geometry, request),
-    )
+    return await this.performCreateTerminalNow(base, geometry, request)
   }
 
   private async performCreateTerminalNow(

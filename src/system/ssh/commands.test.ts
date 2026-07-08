@@ -120,6 +120,18 @@ describe('remote ssh command builders', () => {
     expect(invocation.script).toBe('exit 1')
   })
 
+  test('remote branch delete push quotes remote and branch arguments', () => {
+    const invocation = buildRemoteCommandInvocation(target(), {
+      type: 'gitPushDeleteBranch',
+      path: '/srv/repo worktree',
+      remote: 'origin',
+      branch: "topic/feature with 'quote'",
+    })
+
+    expect(invocation.script).toContain("git -C '/srv/repo worktree' push --delete -- 'origin'")
+    expect(invocation.script).toContain("'topic/feature with '\\''quote'\\'''")
+  })
+
   test('remote bootstrap script handles space paths and excludes copied tree children', async () => {
     const dir = path.join(os.tmpdir(), `goblin-remote-bootstrap-test-${Date.now()}-${process.pid}`)
     tempDirs.push(dir)

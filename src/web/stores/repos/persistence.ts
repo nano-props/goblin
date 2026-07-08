@@ -4,8 +4,8 @@ import type { ReposSet } from '#/web/stores/repos/types.ts'
 import type { RepoSnapshotCacheEntry, RepoState } from '#/web/stores/repos/types.ts'
 import { finishDataLoadSuccess } from '#/web/stores/repos/repo-data-load-state.ts'
 import { stripBranchWorktreeMetadata } from '#/web/stores/repos/worktree-state.ts'
-import { getRepoSnapshotQueryData, setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
-import { repoBranchSnapshotDataFromSnapshot, type RepoBranchSnapshotData } from '#/web/repo-branch-read-model.ts'
+import { seedRepoProjectionQueryData } from '#/web/repo-data-query.ts'
+import { readRepoBranchQueryProjection, type RepoBranchSnapshotData } from '#/web/repo-branch-read-model.ts'
 const MAX_CACHE_AGE_MS = 14 * 24 * 60 * 60 * 1000
 const MAX_REPOS = 50
 const FiniteNumber = v.pipe(v.number(), v.finite())
@@ -52,9 +52,9 @@ function cachedBranches(
 function restoreProjectionFromSnapshot(repo: RepoState, snapshot: RepoSnapshotCacheEntry): RepoState {
   const dataLoads = {
     ...repo.dataLoads,
-    snapshot: { ...repo.dataLoads.snapshot },
+    repoReadModel: { ...repo.dataLoads.repoReadModel },
   }
-  if (snapshot.data.branches.length > 0) finishDataLoadSuccess(dataLoads.snapshot, snapshot.savedAt)
+  if (snapshot.data.branches.length > 0) finishDataLoadSuccess(dataLoads.repoReadModel, snapshot.savedAt)
   return {
     ...repo,
     name: snapshot.name || repo.name,
@@ -78,15 +78,30 @@ export function restoreRepoProjectionFromCacheEntry(
   return restoreProjectionFromSnapshot(repo, snapshot)
 }
 
-export function seedRepoSnapshotQueryFromCacheEntry(
+export function seedRepoProjectionQueryFromCacheEntry(
   repoRoot: string,
   repoInstanceId: string,
   snapshot: RepoSnapshotCacheEntry | undefined,
 ): void {
   if (!snapshot || isExpired(snapshot.savedAt)) return
-  setRepoSnapshotQueryData(repoRoot, repoInstanceId, {
+  const cachedSnapshot = {
     branches: cachedBranches(snapshot.data.branches),
     current: snapshot.data.currentBranch,
+  }
+  const cachedProjection = {
+    snapshot: cachedSnapshot,
+    status: [],
+    pullRequests: null,
+    operations: { operations: [], loadedAt: 0 },
+    loadedAt: 0,
+  }
+  seedRepoProjectionQueryData(repoRoot, repoInstanceId, {
+    ...cachedProjection,
+    requested: { branch: null, pullRequestMode: 'full' },
+  })
+  seedRepoProjectionQueryData(repoRoot, repoInstanceId, {
+    ...cachedProjection,
+    requested: { branch: null, pullRequestMode: 'summary' },
   })
 }
 
@@ -97,8 +112,8 @@ export function persistRepoSnapshotCacheEntry(
 ): void {
   if (!repo) return
   if (repo.instanceId !== repoInstanceId) return
-  const snapshot = getRepoSnapshotQueryData(repo.id, repo.instanceId)
-  const entry = snapshot ? repoSnapshotCacheEntryFromRepo(repo, repoBranchSnapshotDataFromSnapshot(snapshot)) : null
+  const branchModel = readRepoBranchQueryProjection(repo)
+  const entry = branchModel ? repoSnapshotCacheEntryFromRepo(repo, branchModel) : null
   if (!entry) return
   set((s) => {
     if (s.repos[repo.id]?.instanceId !== repoInstanceId) return s

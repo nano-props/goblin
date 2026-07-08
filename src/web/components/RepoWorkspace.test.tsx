@@ -22,13 +22,12 @@ import {
   createPullRequest,
   createRepoBranch,
   resetReposStore,
+  seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
-  setRepoPullRequestsQueryData,
-  setRepoSnapshotQueryData,
-  setRepoStatusQueryData,
+  setRepoProjectionQueryData,
 } from '#/web/repo-data-query.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
@@ -200,9 +199,13 @@ describe('RepoWorkspace', () => {
         'feature/a': [workspacePaneStaticTabEntry('status')],
       },
     })
-    setRepoStatusQueryData(REPO_ID, repo.instanceId, [
-      { path: worktreePath, branch: 'feature/a', isMain: false, entries: [{ x: 'M', y: ' ', path: 'changed.ts' }] },
-    ])
+    seedRepoReadModelQueryData(repo, {
+      branches: [branch],
+      currentBranch: 'feature/a',
+      status: [
+        { path: worktreePath, branch: 'feature/a', isMain: false, entries: [{ x: 'M', y: ' ', path: 'changed.ts' }] },
+      ],
+    })
 
     const { container } = render(
       <QueryClientProvider client={primaryWindowQueryClient}>
@@ -219,7 +222,7 @@ describe('RepoWorkspace', () => {
     expect(container.querySelector('button[aria-label="status.copy-patch-title"]')).not.toBeNull()
   })
 
-  test('uses the React Query snapshot read model for workspace branch presentation when available', () => {
+  test('uses the React Query projection read model for workspace branch presentation when available', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
@@ -229,9 +232,9 @@ describe('RepoWorkspace', () => {
         'feature/query': [workspacePaneStaticTabEntry('status')],
       },
     })
-    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
-      current: 'feature/query',
+    seedRepoReadModelQueryData(repo, {
       branches: [createRepoBranch('feature/query')],
+      currentBranch: 'feature/query',
     })
 
     const { container } = render(
@@ -250,7 +253,7 @@ describe('RepoWorkspace', () => {
     expect(container.textContent).not.toContain('branches.empty')
   })
 
-  test('uses the React Query pull request read model for the current branch when available', () => {
+  test('uses the React Query projection for the current branch pull request when available', () => {
     const branch = createRepoBranch('feature/pr')
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -262,9 +265,14 @@ describe('RepoWorkspace', () => {
       },
     })
     const pullRequest = createPullRequest(42, { headRefName: 'feature/pr' })
-    setRepoPullRequestsQueryData(REPO_ID, repo.instanceId, ['feature/pr'], 'full', [
-      { branch: 'feature/pr', pullRequest },
-    ])
+    setRepoProjectionQueryData(REPO_ID, repo.instanceId, 'feature/pr', 'full', {
+      snapshot: { current: 'feature/pr', branches: [branch] },
+      status: [],
+      pullRequests: [{ branch: 'feature/pr', pullRequest }],
+      operations: { operations: [], loadedAt: 123 },
+      requested: { branch: 'feature/pr', pullRequestMode: 'full' },
+      loadedAt: 123,
+    })
 
     const { container } = render(
       <QueryClientProvider client={primaryWindowQueryClient}>

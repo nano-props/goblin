@@ -14,10 +14,16 @@ vi.mock('sonner', () => ({
   },
 }))
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import {
+  createRepoBranch,
+  resetReposStore,
+  seedRepoReadModelQueryData,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
+import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
 const REPO_ID = '/tmp/gbl-client-intent-handlers-repo'
 
@@ -31,15 +37,15 @@ afterEach(() => {
 })
 
 describe('client effect intent handlers', () => {
-  test('routes terminal bell clicks through the React Query snapshot read model', () => {
+  test('routes terminal bell clicks through the React Query projection read model', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       currentBranchName: 'feature/query',
     })
-    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
-      current: 'feature/query',
+    seedRepoReadModelQueryData(repo, {
       branches: [createRepoBranch('feature/query', { worktree: { path: '/tmp/bell-worktree' } })],
+      currentBranch: 'feature/query',
     })
     const d = deps(REPO_ID)
     d.navigation.showRepoBranchWorkspacePaneTab = vi.fn()
@@ -120,6 +126,19 @@ describe('client effect intent handlers', () => {
     expect(d.openCreateWorktree).not.toHaveBeenCalled()
     expect(toast.error).toHaveBeenCalledWith('action.create-worktree-busy')
   })
+
+  test('create-worktree-requested reads busy state from server operations projection', async () => {
+    const repo = seedRepoWithReadModelForTest({ id: REPO_ID, branches: [createRepoBranch('main')] })
+    setRepoOperationsQueryData(REPO_ID, repo.instanceId, false, {
+      operations: [serverOperation(repo.instanceId, { kind: 'create-worktree', phase: 'running' })],
+      loadedAt: 123,
+    })
+    const d = deps(REPO_ID)
+
+    await expect(handleWorkspaceClientIntent({ type: 'create-worktree-requested' }, d)).resolves.toBe(true)
+    expect(d.openCreateWorktree).not.toHaveBeenCalled()
+    expect(toast.error).toHaveBeenCalledWith('action.create-worktree-busy')
+  })
 })
 
 function deps(currentRepoId: string | null, currentBranchName = 'feature/worktree') {
@@ -159,5 +178,34 @@ function navigationWithStoreActions(): PrimaryWindowNavigationActions {
     goForward: vi.fn(),
     openSettings: vi.fn(),
     openCreateWorktree: vi.fn(),
+  }
+}
+
+function serverOperation(
+  repoInstanceId: string,
+  overrides: Pick<RepoServerOperationState, 'kind' | 'phase'>,
+): RepoServerOperationState {
+  return {
+    id: `repo-op-${overrides.kind}-${overrides.phase}`,
+    repoId: REPO_ID,
+    repoInstanceId,
+    kind: overrides.kind,
+    phase: overrides.phase,
+    source: 'user',
+    target: null,
+    queuedAt: 100,
+    startedAt: overrides.phase === 'queued' ? null : 101,
+    deadlineAt: null,
+    settledAt: null,
+    error: null,
+    cancellation: {
+      underlyingRequested: false,
+      reason: null,
+      requestedAt: null,
+      waitCancelledCount: 0,
+      lastWaitCancelledAt: null,
+      lastWaitCancellationReason: null,
+    },
+    canCancelUnderlying: true,
   }
 }
