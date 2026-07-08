@@ -29,7 +29,7 @@ afterEach(() => {
 
 describe('terminal create command', () => {
   test('shows the created terminal after the session is created', async () => {
-    const createTerminal = vi.fn(async () => 'session-1')
+    const createTerminal = vi.fn(async () => 'term-111111111111111111111')
     const showCreatedTerminalTab = vi.fn(() => true)
 
     await expect(
@@ -44,16 +44,16 @@ describe('terminal create command', () => {
         openerIdentity: null,
         showCreatedTerminalTab,
       }),
-    ).resolves.toEqual({ ok: true, terminalSessionId: 'session-1' })
+    ).resolves.toEqual({ ok: true, terminalSessionId: 'term-111111111111111111111' })
 
     expect(createTerminal).toHaveBeenCalledTimes(1)
-    expect(showCreatedTerminalTab).toHaveBeenCalledWith('session-1')
+    expect(showCreatedTerminalTab).toHaveBeenCalledWith('term-111111111111111111111')
   })
 
   test('records opener before showing the created terminal route', async () => {
-    const createTerminal = vi.fn(async () => 'session-1')
+    const createTerminal = vi.fn(async () => 'term-111111111111111111111')
     const showCreatedTerminalTab = vi.fn((terminalSessionId: string) => {
-      expect(workspacePaneTabOpener(REPO_ID, 'main', `terminal:${terminalSessionId}`)).toBe('terminal:session-0')
+      expect(workspacePaneTabOpener(REPO_ID, 'main', `terminal:${terminalSessionId}`)).toBe('terminal:term-000000000000000000000')
       return true
     })
 
@@ -66,17 +66,17 @@ describe('terminal create command', () => {
           worktreePath: WORKTREE_PATH,
         },
         createTerminal,
-        openerIdentity: 'terminal:session-0',
+        openerIdentity: 'terminal:term-000000000000000000000',
         showCreatedTerminalTab,
       }),
-    ).resolves.toEqual({ ok: true, terminalSessionId: 'session-1' })
+    ).resolves.toEqual({ ok: true, terminalSessionId: 'term-111111111111111111111' })
 
-    expect(showCreatedTerminalTab).toHaveBeenCalledWith('session-1')
-    expect(workspacePaneTabOpener(REPO_ID, 'main', 'terminal:session-1')).toBe('terminal:session-0')
+    expect(showCreatedTerminalTab).toHaveBeenCalledWith('term-111111111111111111111')
+    expect(workspacePaneTabOpener(REPO_ID, 'main', 'terminal:term-111111111111111111111')).toBe('terminal:term-000000000000000000000')
   })
 
   test('reports failure if showing the created terminal route is rejected', async () => {
-    const createTerminal = vi.fn(async () => 'session-1')
+    const createTerminal = vi.fn(async () => 'term-111111111111111111111')
     const showCreatedTerminalTab = vi.fn(() => false)
 
     await expect(
@@ -88,17 +88,17 @@ describe('terminal create command', () => {
           worktreePath: WORKTREE_PATH,
         },
         createTerminal,
-        openerIdentity: 'terminal:session-0',
+        openerIdentity: 'terminal:term-000000000000000000000',
         showCreatedTerminalTab,
       }),
     ).resolves.toMatchObject({ ok: false, messageKey: 'error.terminal-create-failed' })
 
-    expect(showCreatedTerminalTab).toHaveBeenCalledWith('session-1')
-    expect(workspacePaneTabOpener(REPO_ID, 'main', 'terminal:session-1')).toBe('terminal:session-0')
+    expect(showCreatedTerminalTab).toHaveBeenCalledWith('term-111111111111111111111')
+    expect(workspacePaneTabOpener(REPO_ID, 'main', 'terminal:term-111111111111111111111')).toBe('terminal:term-000000000000000000000')
   })
 
   test('fast-fails before create while a terminal create is already pending for the worktree', async () => {
-    const createTerminal = vi.fn(async () => 'session-1')
+    const createTerminal = vi.fn(async () => 'term-111111111111111111111')
     const showCreatedTerminalTab = vi.fn(() => true)
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => worktreeSnapshot({ createPending: true }),
@@ -125,7 +125,7 @@ describe('terminal create command', () => {
   })
 
   test('fast-fails before create when the base has no repo instance id at the trigger boundary', async () => {
-    const createTerminal = vi.fn(async () => 'session-1')
+    const createTerminal = vi.fn(async () => 'term-111111111111111111111')
     const showCreatedTerminalTab = vi.fn(() => true)
 
     await expect(

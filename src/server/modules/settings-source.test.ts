@@ -75,7 +75,7 @@ test('persists updates and notifies subscribers from the server settings store',
     ...defaultWorkspaceSessionState(),
     openRepoEntries: [{ kind: 'local', id: '/repo-b' }],
     restoredRepoId: '/repo-b',
-    selectedTerminalSessionIdByTerminalWorktree: { '/repo-b\0/worktree': 'session-2' },
+    selectedTerminalSessionIdByTerminalWorktree: { '/repo-b\0/worktree': 'term-222222222222222222222' },
     workspacePaneTabsByTargetByRepo: {
       '/repo-b': {
         [branchTargetKey('/repo-b', 'main')]: [],
@@ -108,7 +108,7 @@ test('persists updates and notifies subscribers from the server settings store',
   expect(await reloaded.getServerSessionState()).toMatchObject({
     openRepoEntries: [{ kind: 'local', id: '/repo-b' }],
     restoredRepoId: '/repo-b',
-    selectedTerminalSessionIdByTerminalWorktree: { '/repo-b\0/worktree': 'session-2' },
+    selectedTerminalSessionIdByTerminalWorktree: { '/repo-b\0/worktree': 'term-222222222222222222222' },
     workspacePaneTabsByTargetByRepo: {
       '/repo-b': {
         [branchTargetKey('/repo-b', 'main')]: [],
@@ -282,7 +282,7 @@ test('normalizes target-scoped workspace pane tab preferences in server sessions
         [changesTargetKey]: [workspacePaneStaticTabEntry('changes')],
         [terminalTargetKey]: [
           workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', runtimeSessionId: 'session-1' },
+          { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
         ],
       },
     },
@@ -319,14 +319,14 @@ test('normalizes workspace pane tab list in server sessions', async () => {
       '/repo-b': {
         [mainTargetKey]: [
           workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', runtimeSessionId: 'session-1' },
+          { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
           workspacePaneStaticTabEntry('history'),
           workspacePaneStaticTabEntry('status'),
           workspacePaneStaticTabEntry('changes'),
         ],
         [worktreeTargetKeyValue]: [
           workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', runtimeSessionId: 'session-1' },
+          { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
           workspacePaneStaticTabEntry('changes'),
         ],
         [emptyTargetKey]: [],
@@ -346,7 +346,7 @@ test('normalizes workspace pane tab list in server sessions', async () => {
         [mainTargetKey]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
         [worktreeTargetKeyValue]: [
           workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', runtimeSessionId: 'session-1' },
+          { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
           workspacePaneStaticTabEntry('changes'),
         ],
         [emptyTargetKey]: [],

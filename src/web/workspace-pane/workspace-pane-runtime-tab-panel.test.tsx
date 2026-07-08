@@ -31,7 +31,7 @@ const terminalSessionViewMocks = vi.hoisted(() => ({
 }))
 
 const terminalCreateCommandMocks = vi.hoisted(() => ({
-  runCreateTerminalTabCommand: vi.fn(async () => ({ ok: true as const, terminalSessionId: 'session-1' })),
+  runCreateTerminalTabCommand: vi.fn(async () => ({ ok: true as const, terminalSessionId: 'term-111111111111111111111' })),
 }))
 
 vi.mock('#/web/components/terminal/TerminalSessionView.tsx', () => ({
@@ -63,14 +63,14 @@ describe('workspace pane runtime tab panel', () => {
       repoInstanceId: 'repo-instance-1',
       branch: 'main',
       worktreePath: '/repo-worktree',
-      selectedTerminalSessionId: 'session-1',
+      selectedTerminalSessionId: 'term-111111111111111111111',
       projectionPhase: 'failed',
       projectionErrorMessage: 'boom',
     })
   })
 
   test('delegates terminal empty-slot create to the terminal create command', async () => {
-    const createTerminal = vi.fn(async () => 'session-1')
+    const createTerminal = vi.fn(async () => 'term-111111111111111111111')
     const { navigation } = renderPanel({
       terminalContext: terminalCommandContextWith({ createTerminal }),
     })
@@ -97,8 +97,8 @@ describe('workspace pane runtime tab panel', () => {
     const commandCalls = terminalCreateCommandMocks.runCreateTerminalTabCommand.mock.calls as unknown as Array<
       [{ showCreatedTerminalTab: (terminalSessionId: string) => boolean | Promise<boolean> }]
     >
-    await commandCalls[0]?.[0].showCreatedTerminalTab('session-1')
-    expect(navigation.showRepoBranchTerminalSession).toHaveBeenCalledWith('/repo', 'main', 'session-1')
+    await commandCalls[0]?.[0].showCreatedTerminalTab('term-111111111111111111111')
+    expect(navigation.showRepoBranchTerminalSession).toHaveBeenCalledWith('/repo', 'main', 'term-111111111111111111111')
   })
 })
 
@@ -117,7 +117,7 @@ function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = 
             branchName: 'main',
             worktreePath: '/repo-worktree',
           },
-          selectedSessionId: 'session-1',
+          selectedSessionId: 'term-111111111111111111111',
           runtimeState: {
             projectionPhase: 'failed',
             projectionErrorMessage: 'boom',
@@ -147,7 +147,7 @@ function navigationWith(): PrimaryWindowNavigationActions {
 
 function terminalCommandContextWith(overrides: Partial<TerminalSessionContextValue> = {}): TerminalSessionContextValue {
   return {
-    createTerminal: vi.fn(async () => 'session-1'),
+    createTerminal: vi.fn(async () => 'term-111111111111111111111'),
     registerHost: vi.fn(),
     unregisterHost: vi.fn(),
     selectTerminal: vi.fn(),

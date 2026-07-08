@@ -88,7 +88,7 @@ describe('WorkspacePaneTabStrip', () => {
         panelActive
         sessions={[
           session({
-            terminalSessionId: 't1',
+            terminalSessionId: 'term-111111111111111111111',
             selected: true,
             originalTitle: '~/repo/worktree — npm run dev',
           }),
@@ -101,7 +101,7 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    const tab = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:t1"]')
+    const tab = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:term-111111111111111111111"]')
     if (!(tab instanceof HTMLElement)) throw new Error('missing terminal tab')
     tab.getBoundingClientRect = () =>
       ({
@@ -134,8 +134,8 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneId="workspace"
         responsiveCompact
         sessions={[
-          session({ terminalSessionId: 't1', selected: false, title: 'term-1' }),
-          session({ terminalSessionId: 't2', selected: true, title: 'term-2' }),
+          session({ terminalSessionId: 'term-111111111111111111111', selected: false, title: 'term-1' }),
+          session({ terminalSessionId: 'term-222222222222222222222', selected: true, title: 'term-2' }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -175,7 +175,7 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneId="workspace"
         responsiveCompact
         newTerminalBusy
-        sessions={[session({ terminalSessionId: 't1', selected: true, title: 'term-1' })]}
+        sessions={[session({ terminalSessionId: 'term-111111111111111111111', selected: true, title: 'term-1' })]}
         onNew={onNew}
         onSelect={() => {}}
         onScrollToBottom={() => {}}
@@ -215,8 +215,8 @@ describe('WorkspacePaneTabStrip', () => {
         newTerminalBusy
         newTerminalBlocksTabInteraction
         sessions={[
-          session({ terminalSessionId: 't1', selected: true, title: 'term-1' }),
-          session({ terminalSessionId: 't2', selected: false, title: 'term-2' }),
+          session({ terminalSessionId: 'term-111111111111111111111', selected: true, title: 'term-1' }),
+          session({ terminalSessionId: 'term-222222222222222222222', selected: false, title: 'term-2' }),
         ]}
         onNew={() => {}}
         onSelect={onSelect}
@@ -249,8 +249,8 @@ describe('WorkspacePaneTabStrip', () => {
         newTerminalBusy
         newTerminalBlocksTabInteraction
         sessions={[
-          session({ terminalSessionId: 't1', selected: true, title: 'term-1' }),
-          session({ terminalSessionId: 't2', selected: false, title: 'term-2' }),
+          session({ terminalSessionId: 'term-111111111111111111111', selected: true, title: 'term-1' }),
+          session({ terminalSessionId: 'term-222222222222222222222', selected: false, title: 'term-2' }),
         ]}
         onNew={() => {}}
         onSelect={onSelect}
@@ -290,8 +290,8 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneId="workspace"
         responsiveCompact
         sessions={[
-          session({ terminalSessionId: 't1', selected: false, title: 'term-1' }),
-          session({ terminalSessionId: 't2', selected: true, title: 'term-2' }),
+          session({ terminalSessionId: 'term-111111111111111111111', selected: false, title: 'term-1' }),
+          session({ terminalSessionId: 'term-222222222222222222222', selected: true, title: 'term-2' }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -325,9 +325,9 @@ describe('WorkspacePaneTabStrip', () => {
         terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
-          session({ terminalSessionId: 't3', title: 'term-3', selected: false }),
+          session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1' }),
+          session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
+          session({ terminalSessionId: 'term-333333333333333333333', title: 'term-3', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -368,8 +368,8 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneId="workspace"
         panelActive
         sessions={[
-          session({ terminalSessionId: 't1', selected: true }),
-          session({ terminalSessionId: 'session-2', selected: false, index: 2 }),
+          session({ terminalSessionId: 'term-111111111111111111111', selected: true }),
+          session({ terminalSessionId: 'term-222222222222222222222', selected: false, index: 2 }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -379,7 +379,7 @@ describe('WorkspacePaneTabStrip', () => {
       />,
     )
 
-    const terminalTwo = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:session-2"]')
+    const terminalTwo = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:term-222222222222222222222"]')
     const newButton = document.body.querySelector('button[aria-label="terminal.new"]')
     if (!(terminalTwo instanceof HTMLElement)) throw new Error('missing terminal tab')
     if (!(newButton instanceof HTMLButtonElement)) throw new Error('missing new terminal button')
@@ -401,7 +401,7 @@ describe('WorkspacePaneTabStrip', () => {
         panelActive
         sessions={[
           session({
-            terminalSessionId: 't1',
+            terminalSessionId: 'term-111111111111111111111',
             selected: true,
             hasBell: true,
             hasRecentOutput: false,
@@ -435,9 +435,9 @@ describe('WorkspacePaneTabStrip', () => {
         terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
-          session({ terminalSessionId: 't3', title: 'term-3', selected: false }),
+          session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1' }),
+          session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
+          session({ terminalSessionId: 'term-333333333333333333333', title: 'term-3', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -491,8 +491,8 @@ describe('WorkspacePaneTabStrip', () => {
         terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1', selected: true }),
-          session({ terminalSessionId: 'session-2', title: 'term-2', selected: false, index: 2 }),
+          session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: true }),
+          session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false, index: 2 }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -520,9 +520,9 @@ describe('WorkspacePaneTabStrip', () => {
         terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
-          session({ terminalSessionId: 't3', title: 'term-3', selected: false }),
+          session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1' }),
+          session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
+          session({ terminalSessionId: 'term-333333333333333333333', title: 'term-3', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -547,9 +547,9 @@ describe('WorkspacePaneTabStrip', () => {
         terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1', selected: false }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
-          session({ terminalSessionId: 't3', title: 'term-3', selected: true }),
+          session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: false }),
+          session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
+          session({ terminalSessionId: 'term-333333333333333333333', title: 'term-3', selected: true }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -582,9 +582,9 @@ describe('WorkspacePaneTabStrip', () => {
         terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
-          session({ terminalSessionId: 't3', title: 'term-3', selected: false }),
+          session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1' }),
+          session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
+          session({ terminalSessionId: 'term-333333333333333333333', title: 'term-3', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -607,8 +607,8 @@ describe('WorkspacePaneTabStrip', () => {
         terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
+          session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1' }),
+          session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -632,9 +632,9 @@ describe('WorkspacePaneTabStrip', () => {
         terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1', selected: false }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: true }),
-          session({ terminalSessionId: 't3', title: 'term-3', selected: false }),
+          session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: false }),
+          session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: true }),
+          session({ terminalSessionId: 'term-333333333333333333333', title: 'term-3', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -657,8 +657,8 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneId="workspace"
         responsiveCompact
         sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
+          session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1' }),
+          session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -685,8 +685,8 @@ describe('WorkspacePaneTabStrip', () => {
         terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
+          session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1' }),
+          session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
         ]}
         onNew={onNew}
         onSelect={() => {}}
@@ -716,8 +716,8 @@ describe('WorkspacePaneTabStrip', () => {
         terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1', selected: false }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: true }),
+          session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: false }),
+          session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: true }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -741,8 +741,8 @@ describe('WorkspacePaneTabStrip', () => {
         terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1 refreshed', selected: false }),
-          session({ terminalSessionId: 't2', title: 'term-2 refreshed', selected: true }),
+          session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1 refreshed', selected: false }),
+          session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2 refreshed', selected: true }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -762,8 +762,8 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneTabTargetKey="/repo\0branch\0feature-a"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 'a1', title: 'term-a1', selected: false }),
-          session({ terminalSessionId: 'a2', title: 'term-a2', selected: true }),
+          session({ terminalSessionId: 'term-aaaaaaaaaaaaaaaaaaaa1', title: 'term-a1', selected: false }),
+          session({ terminalSessionId: 'term-aaaaaaaaaaaaaaaaaaaa2', title: 'term-a2', selected: true }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -788,8 +788,8 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneTabTargetKey="/repo\0branch\0feature-b"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 'b1', title: 'term-b1', selected: false }),
-          session({ terminalSessionId: 'b2', title: 'term-b2', selected: true }),
+          session({ terminalSessionId: 'term-bbbbbbbbbbbbbbbbbbbb1', title: 'term-b1', selected: false }),
+          session({ terminalSessionId: 'term-bbbbbbbbbbbbbbbbbbbb2', title: 'term-b2', selected: true }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -808,7 +808,7 @@ describe('WorkspacePaneTabStrip', () => {
         terminalWorktreeKey="/repo\0/repo/worktree-a"
         workspacePaneTabTargetKey="/repo\0branch\0feature-a"
         workspacePaneId="workspace"
-        sessions={[session({ terminalSessionId: 'a1', title: 'term-a1', selected: true })]}
+        sessions={[session({ terminalSessionId: 'term-aaaaaaaaaaaaaaaaaaaa1', title: 'term-a1', selected: true })]}
         onNew={() => {}}
         onSelect={() => {}}
         onScrollToBottom={() => {}}
@@ -825,8 +825,8 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneTabTargetKey="/repo\0branch\0feature-b"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 'b1', title: 'term-b1', selected: false }),
-          session({ terminalSessionId: 'b2', title: 'term-b2', selected: false }),
+          session({ terminalSessionId: 'term-bbbbbbbbbbbbbbbbbbbb1', title: 'term-b1', selected: false }),
+          session({ terminalSessionId: 'term-bbbbbbbbbbbbbbbbbbbb2', title: 'term-b2', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -850,8 +850,8 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneTabTargetKey="/repo\0branch\0feature-b"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 'b1', title: 'term-b1', selected: false }),
-          session({ terminalSessionId: 'b2', title: 'term-b2', selected: true }),
+          session({ terminalSessionId: 'term-bbbbbbbbbbbbbbbbbbbb1', title: 'term-b1', selected: false }),
+          session({ terminalSessionId: 'term-bbbbbbbbbbbbbbbbbbbb2', title: 'term-b2', selected: true }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -871,9 +871,9 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneTabTargetKey="/repo\0branch\0feature-a"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 'a1', title: 'term-a1', selected: false }),
-          session({ terminalSessionId: 'a2', title: 'term-a2', selected: true }),
-          session({ terminalSessionId: 'a3', title: 'term-a3', selected: false }),
+          session({ terminalSessionId: 'term-aaaaaaaaaaaaaaaaaaaa1', title: 'term-a1', selected: false }),
+          session({ terminalSessionId: 'term-aaaaaaaaaaaaaaaaaaaa2', title: 'term-a2', selected: true }),
+          session({ terminalSessionId: 'term-aaaaaaaaaaaaaaaaaaaa3', title: 'term-a3', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -895,8 +895,8 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneTabTargetKey="/repo\0branch\0feature-b"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 'b1', title: 'term-b1', selected: true }),
-          session({ terminalSessionId: 'b2', title: 'term-b2', selected: false }),
+          session({ terminalSessionId: 'term-bbbbbbbbbbbbbbbbbbbb1', title: 'term-b1', selected: true }),
+          session({ terminalSessionId: 'term-bbbbbbbbbbbbbbbbbbbb2', title: 'term-b2', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -919,9 +919,9 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneTabTargetKey="/repo\0branch\0feature-a"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 'a1', title: 'term-a1', selected: false }),
-          session({ terminalSessionId: 'a2', title: 'term-a2', selected: true }),
-          session({ terminalSessionId: 'a3', title: 'term-a3', selected: false }),
+          session({ terminalSessionId: 'term-aaaaaaaaaaaaaaaaaaaa1', title: 'term-a1', selected: false }),
+          session({ terminalSessionId: 'term-aaaaaaaaaaaaaaaaaaaa2', title: 'term-a2', selected: true }),
+          session({ terminalSessionId: 'term-aaaaaaaaaaaaaaaaaaaa3', title: 'term-a3', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -939,8 +939,8 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneTabTargetKey="/repo\0branch\0feature-b"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 'b1', title: 'term-b1', selected: true }),
-          session({ terminalSessionId: 'b2', title: 'term-b2', selected: false }),
+          session({ terminalSessionId: 'term-bbbbbbbbbbbbbbbbbbbb1', title: 'term-b1', selected: true }),
+          session({ terminalSessionId: 'term-bbbbbbbbbbbbbbbbbbbb2', title: 'term-b2', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -956,9 +956,9 @@ describe('WorkspacePaneTabStrip', () => {
   test('scrolls the right neighbour into view after closing the active tab', () => {
     function CloseActiveHarness() {
       const [sessions, setSessions] = useState([
-        session({ terminalSessionId: 't1', title: 'term-1', selected: false }),
-        session({ terminalSessionId: 't2', title: 'term-2', selected: true }),
-        session({ terminalSessionId: 't3', title: 'term-3', selected: false }),
+        session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: false }),
+        session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: true }),
+        session({ terminalSessionId: 'term-333333333333333333333', title: 'term-3', selected: false }),
       ])
 
       return (
@@ -975,7 +975,7 @@ describe('WorkspacePaneTabStrip', () => {
                 .filter((candidate) => candidate.terminalSessionId !== closed.terminalSessionId)
                 .map((candidate) => ({
                   ...candidate,
-                  selected: candidate.terminalSessionId === 't3',
+                  selected: candidate.terminalSessionId === 'term-333333333333333333333',
                 })),
             )
           }}
@@ -1010,9 +1010,9 @@ describe('WorkspacePaneTabStrip', () => {
   test('focuses the actual active tab after closing the active tab', () => {
     function CloseActiveSelectsLeftHarness() {
       const [sessions, setSessions] = useState([
-        session({ terminalSessionId: 't1', title: 'term-1', selected: false }),
-        session({ terminalSessionId: 't2', title: 'term-2', selected: true }),
-        session({ terminalSessionId: 't3', title: 'term-3', selected: false }),
+        session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: false }),
+        session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: true }),
+        session({ terminalSessionId: 'term-333333333333333333333', title: 'term-3', selected: false }),
       ])
 
       return (
@@ -1029,7 +1029,7 @@ describe('WorkspacePaneTabStrip', () => {
                 .filter((candidate) => candidate.terminalSessionId !== closed.terminalSessionId)
                 .map((candidate) => ({
                   ...candidate,
-                  selected: candidate.terminalSessionId === 't1',
+                  selected: candidate.terminalSessionId === 'term-111111111111111111111',
                 })),
             )
           }}
@@ -1052,9 +1052,9 @@ describe('WorkspacePaneTabStrip', () => {
   test('does not scroll when the active tab stays visible after a non-active terminal session is removed', () => {
     function CloseInactiveHarness() {
       const [sessions, setSessions] = useState([
-        session({ terminalSessionId: 't1', title: 'term-1', selected: true }),
-        session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
-        session({ terminalSessionId: 't3', title: 'term-3', selected: false }),
+        session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: true }),
+        session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
+        session({ terminalSessionId: 'term-333333333333333333333', title: 'term-3', selected: false }),
       ])
 
       return (
@@ -1102,8 +1102,8 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneId="workspace"
         responsiveCompact
         sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
+          session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1' }),
+          session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -1138,8 +1138,8 @@ describe('WorkspacePaneTabStrip', () => {
         terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
+          session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1' }),
+          session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -1161,8 +1161,8 @@ describe('WorkspacePaneTabStrip', () => {
         responsiveCompact
         panelActive
         sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1' }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
+          session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1' }),
+          session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -1184,8 +1184,8 @@ describe('WorkspacePaneTabStrip', () => {
   test('focuses the next compact tab after closing the active tab', async () => {
     function CompactCloseFocusHarness() {
       const [sessions, setSessions] = useState([
-        session({ terminalSessionId: 't1', title: 'term-1', selected: true }),
-        session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
+        session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: true }),
+        session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
       ])
 
       return (
@@ -1234,8 +1234,8 @@ describe('WorkspacePaneTabStrip', () => {
         responsiveCompact
         panelActive
         sessions={[
-          session({ terminalSessionId: 't1', title: 'term-1', selected: false }),
-          session({ terminalSessionId: 't2', title: 'term-2', selected: false }),
+          session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: false }),
+          session({ terminalSessionId: 'term-222222222222222222222', title: 'term-2', selected: false }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -1270,7 +1270,7 @@ describe('WorkspacePaneTabStrip', () => {
         workspacePaneId="workspace"
         responsiveCompact
         panelActive
-        sessions={[session({ terminalSessionId: 't1', title: 'term-1', selected: false })]}
+        sessions={[session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: false })]}
         pendingTerminal
         newTerminalBusy
         onNew={() => {}}
@@ -1302,7 +1302,7 @@ describe('WorkspacePaneTabStrip', () => {
         terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         panelActive
-        sessions={[session({ terminalSessionId: 't1', title: 'term-1', selected: false })]}
+        sessions={[session({ terminalSessionId: 'term-111111111111111111111', title: 'term-1', selected: false })]}
         pendingTerminal
         newTerminalBusy
         onNew={() => {}}
@@ -1330,7 +1330,7 @@ describe('WorkspacePaneTabStrip', () => {
 
   test('keeps placeholder terminal titles out of materialized tab text', () => {
     const placeholderView: TerminalSessionSummary = {
-      ...session({ terminalSessionId: 't1', title: 'terminal', selected: true }),
+      ...session({ terminalSessionId: 'term-111111111111111111111', title: 'terminal', selected: true }),
       fullTitle: 'terminal',
       originalTitle: null,
     }
@@ -1357,7 +1357,7 @@ describe('WorkspacePaneTabStrip', () => {
     )
 
     const tab = document.body.querySelector('[role="tab"][aria-label="terminal.opening"]')
-    const terminalView = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:t1"]')
+    const terminalView = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:term-111111111111111111111"]')
 
     expect(tab).not.toBeNull()
     expect(terminalView?.textContent).not.toContain('terminal')
@@ -1503,7 +1503,7 @@ function rect({ left, right }: { left: number; right: number }): DOMRect {
 }
 
 function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessionSummary {
-  const terminalSessionId = overrides.terminalSessionId ?? 't1'
+  const terminalSessionId = overrides.terminalSessionId ?? 'term-111111111111111111111'
   const title = overrides.title ?? 'term-1'
   return {
     type: 'terminal',

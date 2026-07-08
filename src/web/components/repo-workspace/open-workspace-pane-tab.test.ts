@@ -245,7 +245,7 @@ describe('openWorkspacePaneTab', () => {
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => worktreeSnapshot({ createPending: true }),
-      createTerminal: vi.fn(async () => 'session-1'),
+      createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
     })
 

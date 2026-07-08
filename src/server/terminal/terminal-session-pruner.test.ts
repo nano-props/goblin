@@ -27,9 +27,9 @@ describe('terminal session pruner', () => {
 
   test('closes local sessions whose worktree is no longer live', async () => {
     const sessions = [
-      terminalSession('session-live', { repoRoot: REPO_ROOT, worktreePath: LIVE_WORKTREE_PATH }),
-      terminalSession('session-stale', { repoRoot: REPO_ROOT, worktreePath: STALE_WORKTREE_PATH }),
-      terminalSession('session-other-repo', { repoRoot: '/other-repo', worktreePath: '/other-repo/worktree' }),
+      terminalSession('term-livelivelivelivelive1', { repoRoot: REPO_ROOT, worktreePath: LIVE_WORKTREE_PATH }),
+      terminalSession('term-stalestalestalestale1', { repoRoot: REPO_ROOT, worktreePath: STALE_WORKTREE_PATH }),
+      terminalSession('term-otherrepootherrepo001', { repoRoot: '/other-repo', worktreePath: '/other-repo/worktree' }),
     ]
     const closeSession = vi.fn((terminalRuntimeSessionId: string) => {
       const index = sessions.findIndex((session) => session.terminalRuntimeSessionId === terminalRuntimeSessionId)
@@ -52,13 +52,13 @@ describe('terminal session pruner', () => {
     ).resolves.toEqual({ pruned: 1, remaining: 2 })
     expect(getWorktrees).toHaveBeenCalledWith(REPO_ROOT, { includeStatus: false })
     expect(closeSession).toHaveBeenCalledTimes(1)
-    expect(closeSession).toHaveBeenCalledWith('pty_session-stale')
+    expect(closeSession).toHaveBeenCalledWith('pty_term-stalestalestalestale1')
   })
 
   test('does not close remote sessions', async () => {
     const sessions = [
-      terminalSession('session-remote-a', { repoRoot: REMOTE_REPO_ROOT, worktreePath: '/srv/repo' }),
-      terminalSession('session-remote-b', { repoRoot: REMOTE_REPO_ROOT, worktreePath: '/srv/repo/linked' }),
+      terminalSession('term-remotearemotearemotea', { repoRoot: REMOTE_REPO_ROOT, worktreePath: '/srv/repo' }),
+      terminalSession('term-remotebremotebremoteb', { repoRoot: REMOTE_REPO_ROOT, worktreePath: '/srv/repo/linked' }),
     ]
     const closeSession = vi.fn()
     const assertCurrent = vi.fn()
@@ -90,7 +90,7 @@ describe('terminal session pruner', () => {
     const pruner = createTerminalSessionPruner({
       manager: {
         listSessionsForUser: vi.fn(async () => [
-          terminalSession('session-stale', { repoRoot: REPO_ROOT, worktreePath: STALE_WORKTREE_PATH }),
+          terminalSession('term-stalestalestalestale1', { repoRoot: REPO_ROOT, worktreePath: STALE_WORKTREE_PATH }),
         ]),
         closeSession,
       },

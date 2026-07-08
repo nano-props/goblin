@@ -10,7 +10,7 @@ let wsMock: WebSocketMockHandle
 const bellInput = {
   title: 'repo',
   body: 'feature/test\nzsh',
-  terminalSessionId: 'session-1',
+  terminalSessionId: 'term-111111111111111111111',
   repoRoot: '/tmp/repo',
 }
 
@@ -73,7 +73,7 @@ describe('terminal notification provider', () => {
     expect(bellClick).toHaveBeenCalledWith({
       type: 'terminal-bell-click',
       repoRoot: '/tmp/repo',
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
     })
     dispose()
   })

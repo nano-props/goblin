@@ -8,7 +8,7 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 
 const descriptor: TerminalDescriptor = {
-  terminalSessionId: 'session-1',
+  terminalSessionId: 'term-111111111111111111111',
   terminalWorktreeKey: 'worktree-key',
   index: 1,
   repoRoot: '/tmp/repo',
@@ -71,7 +71,7 @@ describe('terminal bell state', () => {
     expect(window.goblinNative.terminal.notifyBell).toHaveBeenCalledWith({
       title: 'repo',
       body: 'feature/test\nzsh',
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: 'worktree-key',
       repoRoot: '/tmp/repo',
     })
@@ -98,7 +98,7 @@ describe('terminal bell state', () => {
     expect(window.goblinNative.terminal.notifyBell).toHaveBeenCalledWith({
       title: 'repo',
       body: 'feature/test\n~/Developer/goblin — npm run dev',
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: 'worktree-key',
       repoRoot: '/tmp/repo',
     })

@@ -41,7 +41,7 @@ describe('branch action dispatch', () => {
       workspacePaneTabsByBranch: {
         'feature/worktree': [
           workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', runtimeSessionId: 'session-1' },
+          { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
         ],
       },
     })
@@ -103,7 +103,7 @@ describe('branch action dispatch', () => {
       workspacePaneTabsByBranch: {
         'feature/worktree': [
           workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', runtimeSessionId: 'session-1' },
+          { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
         ],
       },
     })
@@ -169,7 +169,7 @@ describe('branch action dispatch', () => {
       workspacePaneTabsByBranch: {
         'feature/worktree': [
           workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', runtimeSessionId: 'session-1' },
+          { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
         ],
       },
     })
@@ -209,7 +209,7 @@ describe('branch action dispatch', () => {
       workspacePaneTabsByBranch: {
         'feature/worktree': [
           workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', runtimeSessionId: 'session-1' },
+          { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
         ],
       },
     })
@@ -253,7 +253,7 @@ describe('branch action dispatch', () => {
       workspacePaneTabsByBranch: {
         'feature/worktree': [
           workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', runtimeSessionId: 'session-1' },
+          { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
         ],
       },
     })
@@ -303,7 +303,7 @@ function installTerminalBridge(options: {
 }): void {
   setTerminalSessionCommandBridge({
     terminalWorktreeSnapshot: options.terminalWorktreeSnapshot ?? (() => worktreeSnapshotWithTerminal()),
-    createTerminal: vi.fn(async () => 'session-2'),
+    createTerminal: vi.fn(async () => 'term-222222222222222222222'),
     selectTerminal: vi.fn(),
     closeTerminalByDescriptor: vi.fn(async () => true),
     closeTerminalsForWorktree: options.closeTerminalsForWorktree,
@@ -326,7 +326,7 @@ function worktreeSnapshotWithTerminal(): TerminalWorktreeSnapshot {
   return {
     terminalWorktreeKey: WORKTREE_KEY,
     selectedDescriptor: {
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: WORKTREE_KEY,
       index: 1,
       repoRoot: REPO_ID,
@@ -339,7 +339,7 @@ function worktreeSnapshotWithTerminal(): TerminalWorktreeSnapshot {
     sessions: [
       {
         type: 'terminal',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         terminalWorktreeKey: WORKTREE_KEY,
         index: 1,
         title: 'terminal 1',

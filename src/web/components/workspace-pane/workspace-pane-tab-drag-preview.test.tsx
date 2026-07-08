@@ -30,8 +30,8 @@ afterEach(() => {
 
 describe('useWorkspacePaneTabDragPreview', () => {
   test('stages reordered tabs synchronously for drag layout only', () => {
-    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
-    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
+    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
+    const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
     renderPreviewHook({ canonicalTabs: sourceTabs })
 
     expect(currentControls().visualTabs).toEqual(sourceTabs)
@@ -45,8 +45,8 @@ describe('useWorkspacePaneTabDragPreview', () => {
 
   test('does not mutate workspace pane tabs query cache', () => {
     const queryClient = new QueryClient()
-    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
-    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
+    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
+    const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
     setWorkspacePaneTabsForTargetQueryData(
       {
         repoRoot: REPO_ROOT,
@@ -69,8 +69,8 @@ describe('useWorkspacePaneTabDragPreview', () => {
   })
 
   test('clears the visual preview when canonical tabs catch up', () => {
-    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
-    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
+    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
+    const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
     const renderResult = renderPreviewHook({ canonicalTabs: sourceTabs })
 
     act(() => {
@@ -86,7 +86,7 @@ describe('useWorkspacePaneTabDragPreview', () => {
   })
 
   test('does not stage a preview when the reorder is a no-op or has no tab target', () => {
-    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
+    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
     const renderResult = renderPreviewHook({ canonicalTabs: sourceTabs })
 
     act(() => {
@@ -98,14 +98,14 @@ describe('useWorkspacePaneTabDragPreview', () => {
       renderResult.rerender(<HookHost input={previewInput({ branchName: null, canonicalTabs: sourceTabs })} />)
     })
     act(() => {
-      expect(currentControls().stageDragPreview([staticEntry('status'), terminalEntry('session-1')])).toBe(false)
+      expect(currentControls().stageDragPreview([staticEntry('status'), terminalEntry('term-111111111111111111111')])).toBe(false)
     })
     expect(currentControls().visualTabs).toEqual(sourceTabs)
   })
 
   test('keeps a staged preview when only a worktree target branch changes', () => {
-    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
-    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
+    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
+    const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
     const renderResult = renderPreviewHook({ canonicalTabs: sourceTabs })
 
     act(() => {
@@ -123,8 +123,8 @@ describe('useWorkspacePaneTabDragPreview', () => {
   })
 
   test('clears a staged preview when the tab target identity changes', () => {
-    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
-    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
+    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
+    const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
     const renderResult = renderPreviewHook({ canonicalTabs: sourceTabs })
 
     act(() => {
@@ -147,8 +147,8 @@ describe('useWorkspacePaneTabDragPreview', () => {
   })
 
   test('clears a staged preview when the repo runtime instance changes', () => {
-    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
-    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
+    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
+    const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
     const renderResult = renderPreviewHook({ canonicalTabs: sourceTabs })
 
     act(() => {

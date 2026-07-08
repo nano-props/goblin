@@ -105,7 +105,7 @@ describe('TerminalSessionProjection', () => {
 
     const reconciled = projection.reconcileServerSessions(
       { repoRoot: REPO_ROOT, repoInstanceId: 'repo-instance-old' },
-      [makeServerSession('pty_session_a_aaaaaaaaa', 'session-1', { repoInstanceId: 'repo-instance-old' })],
+      [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111', { repoInstanceId: 'repo-instance-old' })],
       'client_local',
       new Map(),
     )
@@ -119,7 +119,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_a_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
@@ -131,7 +131,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleOutput({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
-        terminalSessionId: 'unrouted-terminal-session',
+        terminalSessionId: 'term-unroutedunroutedroute',
         data: 'hello',
         seq: 1,
         outputEra: 0,
@@ -141,7 +141,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleOutput({
         terminalRuntimeSessionId: 'pty_session_b_aaaaaaaaa',
-        terminalSessionId: 'unrouted-terminal-session',
+        terminalSessionId: 'term-unroutedunroutedroute',
         data: 'hello',
         seq: 1,
         outputEra: 0,
@@ -158,7 +158,7 @@ describe('TerminalSessionProjection', () => {
       try {
         projection.handleOutput({
           terminalRuntimeSessionId,
-          terminalSessionId: 'session-1',
+          terminalSessionId: 'term-111111111111111111111',
           data: 'before-index',
           seq: 1,
           outputEra: 0,
@@ -169,7 +169,7 @@ describe('TerminalSessionProjection', () => {
         projection.reconcileServerSessions(
           { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
           [
-            makeServerSession(terminalRuntimeSessionId, 'session-1', {
+            makeServerSession(terminalRuntimeSessionId, 'term-111111111111111111111', {
               controller: { clientId: 'client_local', status: 'connected' },
             }),
           ],
@@ -185,7 +185,7 @@ describe('TerminalSessionProjection', () => {
         expect(hydrateSpy).toHaveBeenCalledWith(
           expect.objectContaining({ terminalRuntimeSessionId, snapshot: 'before-index', snapshotSeq: 1, outputEra: 0 }),
         )
-        expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]?.terminalSessionId).toBe('session-1')
+        expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]?.terminalSessionId).toBe('term-111111111111111111111')
       } finally {
         hydrateSpy.mockRestore()
       }
@@ -197,7 +197,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_a_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
@@ -208,7 +208,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleOutput({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
-        terminalSessionId: 'unrouted-terminal-session',
+        terminalSessionId: 'term-unroutedunroutedroute',
         data: '',
         seq: 1,
         outputEra: 0,
@@ -217,7 +217,7 @@ describe('TerminalSessionProjection', () => {
       vi.advanceTimersByTime(5000)
       projection.handleOutput({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
-        terminalSessionId: 'unrouted-terminal-session',
+        terminalSessionId: 'term-unroutedunroutedroute',
         data: '',
         seq: 2,
         outputEra: 0,
@@ -232,7 +232,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_a_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
@@ -243,7 +243,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleOutput({
         terminalRuntimeSessionId: 'pty_session_old_aaaaaaaaa',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         data: 'stale output',
         seq: 1,
         outputEra: 0,
@@ -258,7 +258,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_a_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
@@ -269,7 +269,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleServerTitle({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
-        terminalSessionId: 'unrouted-terminal-session',
+        terminalSessionId: 'term-unroutedunroutedroute',
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
         canonicalTitle: 'new title',
@@ -279,7 +279,7 @@ describe('TerminalSessionProjection', () => {
       handleServerTitleSpy.mockClear()
       projection.handleServerTitle({
         terminalRuntimeSessionId: 'pty_session_b_aaaaaaaaa',
-        terminalSessionId: 'unrouted-terminal-session',
+        terminalSessionId: 'term-unroutedunroutedroute',
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
         canonicalTitle: 'ignored',
@@ -296,7 +296,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_a_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
@@ -308,7 +308,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleServerTitle({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
         canonicalTitle: 'new title',
@@ -320,7 +320,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_a_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
@@ -331,7 +331,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleServerTitle({
         terminalRuntimeSessionId: 'pty_session_old_aaaaaaaaa',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
         canonicalTitle: 'stale title',
@@ -343,7 +343,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_a_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
@@ -354,14 +354,14 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleExit({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
-        terminalSessionId: 'unrouted-terminal-session',
+        terminalSessionId: 'term-unroutedunroutedroute',
       })
       expect(handleExitSpy).toHaveBeenCalledTimes(1)
 
       handleExitSpy.mockClear()
       projection.handleExit({
         terminalRuntimeSessionId: 'pty_session_b_aaaaaaaaa',
-        terminalSessionId: 'unrouted-terminal-session',
+        terminalSessionId: 'term-unroutedunroutedroute',
       })
       expect(handleExitSpy).not.toHaveBeenCalled()
     })
@@ -376,7 +376,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_a_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
@@ -391,7 +391,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleOutput({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         data: 'hello',
         seq: 1,
         outputEra: 0,
@@ -401,7 +401,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleIdentity({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         role: 'controller',
         controllerStatus: 'connected',
         canonicalCols: 100,
@@ -411,14 +411,14 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleLifecycle({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         phase: 'open',
         message: null,
         takeoverPending: false,
       })
       expect(handleLifecycleSpy).toHaveBeenCalledTimes(1)
 
-      projection.handleExit({ terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa', terminalSessionId: 'session-1' })
+      projection.handleExit({ terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa', terminalSessionId: 'term-111111111111111111111' })
       expect(handleExitSpy).toHaveBeenCalledTimes(1)
     })
   })
@@ -428,7 +428,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_a_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
@@ -455,14 +455,14 @@ describe('TerminalSessionProjection', () => {
 
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_1_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
 
       const snapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
       expect(snapshot.count).toBe(1)
-      expect(snapshot.sessions[0]!.terminalSessionId).toBe('session-1')
+      expect(snapshot.sessions[0]!.terminalSessionId).toBe('term-111111111111111111111')
       expect(selectedChanges).toContainEqual({
         terminalWorktreeKey: WORKTREE_KEY,
         terminalSessionId: snapshot.sessions[0]!.terminalSessionId,
@@ -473,7 +473,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_1_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
@@ -496,7 +496,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_1_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
@@ -539,7 +539,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_1_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
@@ -583,7 +583,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_1_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
@@ -606,9 +606,9 @@ describe('TerminalSessionProjection', () => {
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
         [
-          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1'),
-          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2'),
-          makeServerSession('pty_session_3_aaaaaaaaa', 'session-3'),
+          makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111'),
+          makeServerSession('pty_session_2_aaaaaaaaa', 'term-222222222222222222222'),
+          makeServerSession('pty_session_3_aaaaaaaaa', 'term-333333333333333333333'),
         ],
         'client_local',
         new Map(),
@@ -616,8 +616,8 @@ describe('TerminalSessionProjection', () => {
 
       const activeSessionId = projection
         .terminalWorktreeSnapshot(WORKTREE_KEY)
-        .sessions.find((session) => session.terminalSessionId === 'session-2')?.terminalSessionId
-      if (!activeSessionId) throw new Error('missing session-2')
+        .sessions.find((session) => session.terminalSessionId === 'term-222222222222222222222')?.terminalSessionId
+      if (!activeSessionId) throw new Error('missing term-222222222222222222222')
       projection.selectTerminal(WORKTREE_KEY, activeSessionId)
       const session = (projection as any).sessions.get(activeSessionId)
       let resolveClose!: () => void
@@ -637,14 +637,14 @@ describe('TerminalSessionProjection', () => {
       await Promise.resolve()
 
       const closingSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
-      expect(closingSnapshot.sessions.map((item) => item.terminalSessionId)).toEqual(['session-1', 'session-3'])
-      expect(closingSnapshot.selectedDescriptor?.terminalSessionId).toBe('session-3')
+      expect(closingSnapshot.sessions.map((item) => item.terminalSessionId)).toEqual(['term-111111111111111111111', 'term-333333333333333333333'])
+      expect(closingSnapshot.selectedDescriptor?.terminalSessionId).toBe('term-333333333333333333333')
 
       resolveClose()
       await expect(closePromise).resolves.toBe(true)
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((item) => item.terminalSessionId)).toEqual([
-        'session-1',
-        'session-3',
+        'term-111111111111111111111',
+        'term-333333333333333333333',
       ])
     })
 
@@ -652,7 +652,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_1_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
@@ -693,7 +693,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_1_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
@@ -724,7 +724,7 @@ describe('TerminalSessionProjection', () => {
 
       expect(projection.isKnownSession(terminalSessionId)).toBe(true)
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe('session-1')
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe('term-111111111111111111111')
       expect(dispose).not.toHaveBeenCalled()
     })
 
@@ -732,7 +732,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_1_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
@@ -758,7 +758,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_1_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
@@ -783,27 +783,27 @@ describe('TerminalSessionProjection', () => {
     test('preserves current selection and falls back to controller when current is lost', () => {
       projection.setRepoIndex(makeRepoIndex())
 
-      // First reconcile: session-1 becomes current
+      // First reconcile: term-111111111111111111111 becomes current
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_1_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe('session-1')
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe('term-111111111111111111111')
 
-      // Second reconcile: session-1 removed, session-2 is controller
+      // Second reconcile: term-111111111111111111111 removed, term-222222222222222222222 is controller
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
         [
-          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2', {
+          makeServerSession('pty_session_2_aaaaaaaaa', 'term-222222222222222222222', {
             controller: { clientId: 'client_local', status: 'connected' },
           }),
         ],
         'client_local',
         new Map(),
       )
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe('session-2')
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe('term-222222222222222222222')
     })
 
     test('closing the active terminal selects the adjacent tab in the server session list', () => {
@@ -812,9 +812,9 @@ describe('TerminalSessionProjection', () => {
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
         [
-          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2'),
-          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1'),
-          makeServerSession('pty_session_3_aaaaaaaaa', 'session-3'),
+          makeServerSession('pty_session_2_aaaaaaaaa', 'term-222222222222222222222'),
+          makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111'),
+          makeServerSession('pty_session_3_aaaaaaaaa', 'term-333333333333333333333'),
         ],
         'client_local',
         new Map(),
@@ -822,14 +822,14 @@ describe('TerminalSessionProjection', () => {
 
       const snapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
       const activeSessionId = snapshot.sessions.find(
-        (session) => session.terminalSessionId === 'session-2',
+        (session) => session.terminalSessionId === 'term-222222222222222222222',
       )?.terminalSessionId
-      if (!activeSessionId) throw new Error('missing session-2')
+      if (!activeSessionId) throw new Error('missing term-222222222222222222222')
 
       projection.selectTerminal(WORKTREE_KEY, activeSessionId)
       ;(projection as any).removeSession(activeSessionId, { dispose: false, closeSession: false })
 
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe('session-1')
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe('term-111111111111111111111')
     })
 
     test('invalidates cached worktree snapshot when the server session list changes', () => {
@@ -837,28 +837,28 @@ describe('TerminalSessionProjection', () => {
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
         [
-          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1'),
-          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2'),
+          makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111'),
+          makeServerSession('pty_session_2_aaaaaaaaa', 'term-222222222222222222222'),
         ],
         'client_local',
         new Map(),
       )
 
       const firstSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
-      expect(firstSnapshot.sessions.map((session) => session.terminalSessionId)).toEqual(['session-1', 'session-2'])
+      expect(firstSnapshot.sessions.map((session) => session.terminalSessionId)).toEqual(['term-111111111111111111111', 'term-222222222222222222222'])
 
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
         [
-          makeServerSession('pty_session_2_aaaaaaaaa', 'session-2'),
-          makeServerSession('pty_session_1_aaaaaaaaa', 'session-1'),
+          makeServerSession('pty_session_2_aaaaaaaaa', 'term-222222222222222222222'),
+          makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111'),
         ],
         'client_local',
         new Map(),
       )
 
       const secondSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
-      expect(secondSnapshot.sessions.map((session) => session.terminalSessionId)).toEqual(['session-2', 'session-1'])
+      expect(secondSnapshot.sessions.map((session) => session.terminalSessionId)).toEqual(['term-222222222222222222222', 'term-111111111111111111111'])
     })
   })
 
@@ -867,7 +867,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_1_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
@@ -889,7 +889,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
-        [makeServerSession('pty_session_1_aaaaaaaaa', 'session-1')],
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
         'client_local',
         new Map(),
       )
@@ -950,7 +950,7 @@ describe('TerminalSessionProjection', () => {
       // (StrictMode, route round-trip) reuse the singleton, so any
       // state injected before the remount is still visible after.
       projection.setRepoIndex(makeRepoIndex())
-      const descriptor = makeDescriptor('session-1', 1)
+      const descriptor = makeDescriptor('term-111111111111111111111', 1)
       // Add a session via the internal API (no real WS, no
       // TerminalSession — just the projection bookkeeping).
       ;(projection as any).sessions.set(descriptor.terminalSessionId, {
@@ -969,7 +969,7 @@ describe('TerminalSessionProjection', () => {
       // i.e. the state survived the synthetic remount.
       const stored = (after as any).sessions.get(descriptor.terminalSessionId) as
         { descriptor: TerminalDescriptor } | undefined
-      expect(stored?.descriptor.terminalSessionId).toBe('session-1')
+      expect(stored?.descriptor.terminalSessionId).toBe('term-111111111111111111111')
     })
   })
 })

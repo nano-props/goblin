@@ -121,7 +121,7 @@ describe('AppRuntimeProjectionProvider', () => {
     const repo = seedCurrentRepo()
     useReposStore.setState({ workspaceMembershipReady: false })
     recoverSessionsMock.mockResolvedValue({
-      sessions: [completeServerSession(serverSession('session-1'))],
+      sessions: [completeServerSession(serverSession('term-111111111111111111111'))],
       snapshots: [],
     })
     const result = renderRuntimeProvider(REPO_ID)
@@ -138,7 +138,7 @@ describe('AppRuntimeProjectionProvider', () => {
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
       expect(projectionMocks.reconcileServerSessions).toHaveBeenCalledWith(
         { repoRoot: REPO_ID, repoInstanceId: repo.instanceId },
-        [completeServerSession(serverSession('session-1'))],
+        [completeServerSession(serverSession('term-111111111111111111111'))],
         'client_sharedterminal',
         expect.any(Map),
       )
@@ -221,7 +221,7 @@ describe('AppRuntimeProjectionProvider', () => {
       recoverSessionsMock.mockClear()
       listWorkspaceTabsMock.mockClear()
       recoverSessionsMock.mockResolvedValue({
-        sessions: [completeServerSession(serverSession('session-1'))],
+        sessions: [completeServerSession(serverSession('term-111111111111111111111'))],
         snapshots: [],
       })
       listWorkspaceTabsMock.mockResolvedValue([
@@ -241,7 +241,7 @@ describe('AppRuntimeProjectionProvider', () => {
       await vi.waitFor(() => expect(listWorkspaceTabsMock).toHaveBeenCalledTimes(1))
       expect(projectionMocks.reconcileServerSessions).toHaveBeenLastCalledWith(
         { repoRoot: REPO_ID, repoInstanceId: repo.instanceId },
-        [completeServerSession(serverSession('session-1'))],
+        [completeServerSession(serverSession('term-111111111111111111111'))],
         'client_sharedterminal',
         expect.any(Map),
       )
@@ -305,7 +305,7 @@ describe('AppRuntimeProjectionProvider', () => {
 
       await act(async () => {
         recovery.resolve({
-          sessions: [completeServerSession({ ...serverSession('session-1'), repoInstanceId: firstRepo.instanceId })],
+          sessions: [completeServerSession({ ...serverSession('term-111111111111111111111'), repoInstanceId: firstRepo.instanceId })],
           snapshots: [],
         })
         await Promise.resolve()
@@ -434,7 +434,7 @@ function testBridge(): ClientBridge {
       resize: vi.fn(async () => true),
       takeover: vi.fn(async () => ({
         ok: true as const,
-        terminalRuntimeSessionId: 'session-1',
+        terminalRuntimeSessionId: 'term-111111111111111111111',
         role: 'controller' as const,
         controllerStatus: 'connected' as const,
         controller: { clientId: 'client_local', status: 'connected' as const },

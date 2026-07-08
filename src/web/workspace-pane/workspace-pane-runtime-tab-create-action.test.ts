@@ -6,7 +6,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 
 const terminalCreateCommandMocks = vi.hoisted(() => ({
-  runCreateTerminalTabCommand: vi.fn(async () => ({ ok: true as const, terminalSessionId: 'session-1' })),
+  runCreateTerminalTabCommand: vi.fn(async () => ({ ok: true as const, terminalSessionId: 'term-111111111111111111111' })),
 }))
 
 vi.mock('#/web/commands/terminal-create-command.ts', () => ({
@@ -27,7 +27,7 @@ describe('workspace pane runtime tab create action', () => {
       t: translate,
       terminal: {
         base: null,
-        createTerminal: vi.fn(async () => 'session-1'),
+        createTerminal: vi.fn(async () => 'term-111111111111111111111'),
         captureOpenerIdentity: vi.fn(() => null),
       },
     })
@@ -42,7 +42,7 @@ describe('workspace pane runtime tab create action', () => {
       branch: 'main',
       worktreePath: '/repo-worktree',
     }
-    const createTerminal = vi.fn(async () => 'session-1')
+    const createTerminal = vi.fn(async () => 'term-111111111111111111111')
     const showCreatedRuntimeTab = vi.fn()
     const captureOpenerIdentity = vi.fn(() => 'opener-tab')
 
@@ -80,8 +80,8 @@ describe('workspace pane runtime tab create action', () => {
       [{ showCreatedTerminalTab: (terminalSessionId: string) => boolean | Promise<boolean> }]
     >
     const commandInput = commandCalls[0]?.[0]
-    await commandInput?.showCreatedTerminalTab('session-1')
-    expect(showCreatedRuntimeTab).toHaveBeenCalledWith('terminal', 'session-1')
+    await commandInput?.showCreatedTerminalTab('term-111111111111111111111')
+    expect(showCreatedRuntimeTab).toHaveBeenCalledWith('terminal', 'term-111111111111111111111')
   })
 
   test('marks the terminal create action busy while projection or create is pending', () => {
@@ -99,7 +99,7 @@ describe('workspace pane runtime tab create action', () => {
       t: translate,
       terminal: {
         base,
-        createTerminal: vi.fn(async () => 'session-1'),
+        createTerminal: vi.fn(async () => 'term-111111111111111111111'),
         captureOpenerIdentity: vi.fn(() => null),
       },
     })
@@ -114,7 +114,7 @@ describe('workspace pane runtime tab create action', () => {
       t: translate,
       terminal: {
         base,
-        createTerminal: vi.fn(async () => 'session-1'),
+        createTerminal: vi.fn(async () => 'term-111111111111111111111'),
         captureOpenerIdentity: vi.fn(() => null),
       },
     })

@@ -135,7 +135,7 @@ describe('terminal web host client', () => {
         type: 'identity',
         event: {
           terminalRuntimeSessionId: 'pty_1',
-          terminalSessionId: 'terminal_1',
+          terminalSessionId: 'term-111111111111111111111',
           controller: { clientId: 'client_sharedterminal', status: 'connected' },
           canonicalCols: 100,
           canonicalRows: 30,
@@ -146,7 +146,7 @@ describe('terminal web host client', () => {
     expect(socket.url).toContain('clientId=client_sharedterminal')
     expect(onIdentity).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
-      terminalSessionId: 'terminal_1',
+      terminalSessionId: 'term-111111111111111111111',
       role: 'controller',
       controllerStatus: 'connected',
       canonicalCols: 100,
@@ -224,7 +224,7 @@ describe('terminal web host client', () => {
         ok: true,
         action: 'create',
         payload: {
-          ...terminalCreatePayload('session-1'),
+          ...terminalCreatePayload('term-111111111111111111111'),
         },
       }),
     )
@@ -671,10 +671,10 @@ describe('terminal web host client', () => {
         requestId: createRequest?.requestId,
         ok: true,
         action: 'create',
-        payload: terminalCreatePayload('session-1'),
+        payload: terminalCreatePayload('term-111111111111111111111'),
       }),
     )
-    await expect(createPromise).resolves.toMatchObject({ ok: true, terminalSessionId: 'session-1' })
+    await expect(createPromise).resolves.toMatchObject({ ok: true, terminalSessionId: 'term-111111111111111111111' })
     expect(fetchMock).not.toHaveBeenCalled()
     dispose()
   })
@@ -701,7 +701,7 @@ describe('terminal web host client', () => {
         requestId: createRequest?.requestId,
         ok: true,
         action: 'create',
-        payload: { ok: true, action: 'created', terminalSessionId: 'session-1', tabs: [], sessions: [] },
+        payload: { ok: true, action: 'created', terminalSessionId: 'term-111111111111111111111', tabs: [], sessions: [] },
       }),
     )
 
@@ -737,7 +737,7 @@ describe('terminal web host client', () => {
         type: 'title',
         event: {
           terminalRuntimeSessionId: 'pty_1',
-          terminalSessionId: 'terminal_1',
+          terminalSessionId: 'term-111111111111111111111',
           repoRoot: '/tmp/repo',
           worktreePath: '/tmp/repo-worktree',
           canonicalTitle: '~/Developer/goblin — npm run dev',
@@ -749,7 +749,7 @@ describe('terminal web host client', () => {
         type: 'output',
         event: {
           terminalRuntimeSessionId: 'pty_1',
-          terminalSessionId: 'terminal_1',
+          terminalSessionId: 'term-111111111111111111111',
           data: 'hello',
           seq: 1,
           outputEra: 0,
@@ -762,7 +762,7 @@ describe('terminal web host client', () => {
         type: 'bell',
         event: {
           terminalRuntimeSessionId: 'pty_1',
-          terminalSessionId: 'terminal_1',
+          terminalSessionId: 'term-111111111111111111111',
           repoRoot: '/tmp/repo',
           worktreePath: '/tmp/repo-worktree',
           processName: 'zsh',
@@ -773,7 +773,7 @@ describe('terminal web host client', () => {
     socket.emitMessage(
       JSON.stringify({
         type: 'exit',
-        event: { terminalRuntimeSessionId: 'pty_1', terminalSessionId: 'terminal_1' },
+        event: { terminalRuntimeSessionId: 'pty_1', terminalSessionId: 'term-111111111111111111111' },
       }),
     )
     socket.emitMessage(
@@ -781,7 +781,7 @@ describe('terminal web host client', () => {
         type: 'identity',
         event: {
           terminalRuntimeSessionId: 'pty_1',
-          terminalSessionId: 'terminal_1',
+          terminalSessionId: 'term-111111111111111111111',
           controller: null,
           canonicalCols: 100,
           canonicalRows: 30,
@@ -793,7 +793,7 @@ describe('terminal web host client', () => {
         type: 'lifecycle',
         event: {
           terminalRuntimeSessionId: 'pty_1',
-          terminalSessionId: 'terminal_1',
+          terminalSessionId: 'term-111111111111111111111',
           phase: 'open',
           message: null,
           takeoverPending: false,
@@ -815,7 +815,7 @@ describe('terminal web host client', () => {
 
     expect(onOutput).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
-      terminalSessionId: 'terminal_1',
+      terminalSessionId: 'term-111111111111111111111',
       data: 'hello',
       seq: 1,
       outputEra: 0,
@@ -823,7 +823,7 @@ describe('terminal web host client', () => {
     })
     expect(onBell).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
-      terminalSessionId: 'terminal_1',
+      terminalSessionId: 'term-111111111111111111111',
       repoRoot: '/tmp/repo',
       worktreePath: '/tmp/repo-worktree',
       processName: 'zsh',
@@ -831,15 +831,15 @@ describe('terminal web host client', () => {
     })
     expect(onTitle).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
-      terminalSessionId: 'terminal_1',
+      terminalSessionId: 'term-111111111111111111111',
       repoRoot: '/tmp/repo',
       worktreePath: '/tmp/repo-worktree',
       canonicalTitle: '~/Developer/goblin — npm run dev',
     })
-    expect(onExit).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_1', terminalSessionId: 'terminal_1' })
+    expect(onExit).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_1', terminalSessionId: 'term-111111111111111111111' })
     expect(onIdentity).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
-      terminalSessionId: 'terminal_1',
+      terminalSessionId: 'term-111111111111111111111',
       role: 'unowned',
       controllerStatus: 'none',
       canonicalCols: 100,
@@ -847,7 +847,7 @@ describe('terminal web host client', () => {
     })
     expect(onLifecycle).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
-      terminalSessionId: 'terminal_1',
+      terminalSessionId: 'term-111111111111111111111',
       phase: 'open',
       message: null,
       takeoverPending: false,
@@ -992,7 +992,7 @@ describe('terminal web host client', () => {
         type: 'output',
         event: {
           terminalRuntimeSessionId: 'pty_1',
-          terminalSessionId: 'terminal_1',
+          terminalSessionId: 'term-111111111111111111111',
           data: 'hello',
           seq: 1,
           outputEra: 0,
@@ -1033,11 +1033,11 @@ describe('terminal web host client', () => {
         requestId: request?.requestId,
         ok: true,
         action: 'create',
-        payload: terminalCreatePayload('session-1'),
+        payload: terminalCreatePayload('term-111111111111111111111'),
       }),
     )
 
-    await expect(createPromise).resolves.toMatchObject({ ok: true, terminalSessionId: 'session-1' })
+    await expect(createPromise).resolves.toMatchObject({ ok: true, terminalSessionId: 'term-111111111111111111111' })
     expect(socket.readyState).toBe(wsMock.CLOSED)
   })
 
@@ -1060,7 +1060,7 @@ describe('terminal web host client', () => {
         type: 'output',
         event: {
           terminalRuntimeSessionId: 'term_old',
-          terminalSessionId: 'terminal_old',
+          terminalSessionId: 'term-oldoldoldoldoldoldold',
           data: 'stale',
           seq: 1,
           outputEra: 0,
@@ -1073,7 +1073,7 @@ describe('terminal web host client', () => {
         type: 'output',
         event: {
           terminalRuntimeSessionId: 'term_new',
-          terminalSessionId: 'terminal_new',
+          terminalSessionId: 'term-newnewnewnewnewnewnew',
           data: 'fresh',
           seq: 2,
           outputEra: 0,
@@ -1085,7 +1085,7 @@ describe('terminal web host client', () => {
     expect(onOutput).toHaveBeenCalledTimes(1)
     expect(onOutput).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'term_new',
-      terminalSessionId: 'terminal_new',
+      terminalSessionId: 'term-newnewnewnewnewnewnew',
       data: 'fresh',
       seq: 2,
       outputEra: 0,
@@ -1117,7 +1117,7 @@ describe('terminal web host client', () => {
     const { onClientLocalEventType, resetClientLocalEventsForTests } = await import('#/web/local-events.ts')
     const bellClick = vi.fn()
     const dispose = onClientLocalEventType('terminal-bell-click', bellClick)
-    const terminalSessionId = 'session-2'
+    const terminalSessionId = 'term-222222222222222222222'
 
     await expect(
       terminalClient.notifyBell({

@@ -7,7 +7,7 @@ import {
 
 const terminalView: WorkspacePaneTerminalTabSummary = {
   type: 'terminal',
-  terminalSessionId: 'session-1',
+  terminalSessionId: 'term-111111111111111111111',
   terminalWorktreeKey: 'repo\0worktree',
   index: 1,
   title: 'Terminal 1',
@@ -29,7 +29,7 @@ describe('workspace pane runtime tab actions', () => {
       }),
     ).toBe(true)
 
-    expect(showRuntimeTab).toHaveBeenCalledWith('terminal', 'session-1')
+    expect(showRuntimeTab).toHaveBeenCalledWith('terminal', 'term-111111111111111111111')
   })
 
   test('reselects a terminal runtime tab through the runtime action registry', () => {
@@ -43,7 +43,7 @@ describe('workspace pane runtime tab actions', () => {
       }),
     ).toBe(true)
 
-    expect(showRuntimeTab).toHaveBeenCalledWith('terminal', 'session-1')
-    expect(scrollToBottom).toHaveBeenCalledWith('session-1')
+    expect(showRuntimeTab).toHaveBeenCalledWith('terminal', 'term-111111111111111111111')
+    expect(scrollToBottom).toHaveBeenCalledWith('term-111111111111111111111')
   })
 })

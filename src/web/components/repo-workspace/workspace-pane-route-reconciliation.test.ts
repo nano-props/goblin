@@ -14,9 +14,9 @@ const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
 describe('workspace pane route reconciliation', () => {
   test('keeps a routed terminal session when it is materialized', () => {
-    const model = terminalModel({ routedSessionId: 'session-1', terminalProjectionPhase: 'ready' })
+    const model = terminalModel({ routedSessionId: 'term-111111111111111111111', terminalProjectionPhase: 'ready' })
 
-    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'session-1' }, model)).toEqual({
+    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }, model)).toEqual({
       kind: 'none',
     })
   })
@@ -39,25 +39,25 @@ describe('workspace pane route reconciliation', () => {
       preferredTab: 'terminal',
       tabEntries: [],
       tabEntriesProjectionPhase: 'pending',
-      runtimeTabViews: [terminalView('session-1')],
+      runtimeTabViews: [terminalView('term-111111111111111111111')],
       runtimeTabStateByType: {
         terminal: {
           projectionPhase: 'ready',
           selectedSessionId: null,
         },
       },
-      requestedSessionIdByRuntimeType: { terminal: 'session-1' },
+      requestedSessionIdByRuntimeType: { terminal: 'term-111111111111111111111' },
     })
 
-    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'session-1' }, model)).toEqual({
+    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }, model)).toEqual({
       kind: 'pending',
     })
   })
 
   test('does not verify a materialized terminal route while terminal projection is pending', () => {
-    const model = terminalModel({ routedSessionId: 'session-1', terminalProjectionPhase: 'pending' })
+    const model = terminalModel({ routedSessionId: 'term-111111111111111111111', terminalProjectionPhase: 'pending' })
 
-    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'session-1' }, model)).toEqual({
+    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }, model)).toEqual({
       kind: 'pending',
     })
   })
@@ -80,17 +80,17 @@ describe('workspace pane route reconciliation', () => {
       preferredTab: 'terminal',
       tabEntries: [],
       tabEntriesProjectionPhase: 'failed',
-      runtimeTabViews: [terminalView('session-1')],
+      runtimeTabViews: [terminalView('term-111111111111111111111')],
       runtimeTabStateByType: {
         terminal: {
           projectionPhase: 'ready',
           selectedSessionId: null,
         },
       },
-      requestedSessionIdByRuntimeType: { terminal: 'session-1' },
+      requestedSessionIdByRuntimeType: { terminal: 'term-111111111111111111111' },
     })
 
-    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'session-1' }, model)).toEqual({
+    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }, model)).toEqual({
       kind: 'unverified',
     })
   })
@@ -307,9 +307,9 @@ function terminalModel(input: {
     branchName: 'feature/route',
     worktreePath: WORKTREE_PATH,
     preferredTab: 'terminal',
-    tabEntries: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-1')],
+    tabEntries: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
     tabEntriesProjectionPhase: 'ready',
-    runtimeTabViews: [terminalView('session-1')],
+    runtimeTabViews: [terminalView('term-111111111111111111111')],
     runtimeTabStateByType: {
       terminal: {
         createPending: input.createPending ?? false,

@@ -45,7 +45,7 @@ describe('TerminalActionDialogHost', () => {
       <TerminalActionDialogHost
         currentRepoId="/repo"
         currentBranchName="main"
-        currentWorkspacePaneRoute={{ kind: 'terminal', terminalSessionId: 'session-1' }}
+        currentWorkspacePaneRoute={{ kind: 'terminal', terminalSessionId: 'term-111111111111111111111' }}
         navigation={{} as PrimaryWindowNavigationActions}
       />,
     )
@@ -53,9 +53,9 @@ describe('TerminalActionDialogHost', () => {
     act(() => {
       useTerminalActionDialogsStore.getState().openCloseConfirm({
         repoId: '/repo',
-        targetIdentity: 'terminal:session-1',
-        workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'session-1' },
-        terminalSessionId: 'session-1',
+        targetIdentity: 'terminal:term-111111111111111111111',
+        workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
+        terminalSessionId: 'term-111111111111111111111',
         terminalBase: { repoRoot: '/repo', branch: 'main', worktreePath: '/repo-worktree' },
         processName: 'node',
       })

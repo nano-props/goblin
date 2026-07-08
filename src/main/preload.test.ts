@@ -173,7 +173,7 @@ describe('preload goblinNative bridge', () => {
     const { goblinNative, invocations, sends, ipcRenderer } = loadPreload()
 
     await goblinNative.terminal.notifyBell({
-      terminalSessionId: 'terminal-session-test',
+      terminalSessionId: 'term-testtesttesttesttest0',
       title: 'Goblin',
       body: 'Bell',
       repoRoot: '/repo',

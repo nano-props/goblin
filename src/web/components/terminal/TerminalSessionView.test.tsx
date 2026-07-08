@@ -85,7 +85,7 @@ function completeWorktreeSnapshot(snapshot: TestWorktreeSnapshot): TerminalWorkt
 async function renderTerminalSession() {
   const writeInput = vi.fn()
   const descriptor = {
-    terminalSessionId: 'session-1',
+    terminalSessionId: 'term-111111111111111111111',
     terminalWorktreeKey: '/repo\0/worktree',
     index: 1,
 
@@ -102,7 +102,7 @@ async function renderTerminalSession() {
     selectedDescriptor: descriptor,
     sessions: [
       {
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         terminalWorktreeKey: '/repo\0/worktree',
         index: 1,
         title: 'zsh',
@@ -130,7 +130,7 @@ async function renderTerminalSession() {
     },
   }
   const context: TerminalSessionContextValue = {
-    createTerminal: async () => 'session-1',
+    createTerminal: async () => 'term-111111111111111111111',
     registerHost: vi.fn(),
     unregisterHost: vi.fn(),
     selectTerminal: vi.fn(),
@@ -237,7 +237,7 @@ async function dispatchPasteWithText(sessionRoot: HTMLElement, text: string, fil
 describe('TerminalSessionView', () => {
   test('attaches the explicit terminal session before projection selection catches up', async () => {
     const descriptor = {
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
 
@@ -254,7 +254,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          terminalSessionId: 'session-1',
+          terminalSessionId: 'term-111111111111111111111',
           terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
@@ -263,7 +263,7 @@ describe('TerminalSessionView', () => {
           hasBell: false,
         },
         {
-          terminalSessionId: 'session-2',
+          terminalSessionId: 'term-222222222222222222222',
           terminalWorktreeKey: '/repo\0/worktree',
           index: 2,
           title: 'zsh',
@@ -290,7 +290,7 @@ describe('TerminalSessionView', () => {
     }
     const attach = vi.fn()
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'session-1',
+      createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -326,7 +326,7 @@ describe('TerminalSessionView', () => {
             repoInstanceId={'repo-instance-test'}
             branch="feature"
             worktreePath="/worktree"
-            selectedTerminalSessionId="session-2"
+            selectedTerminalSessionId="term-222222222222222222222"
           />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
@@ -335,7 +335,7 @@ describe('TerminalSessionView', () => {
     try {
       expect(attach).toHaveBeenCalledWith(
         expect.objectContaining({
-          terminalSessionId: 'session-2',
+          terminalSessionId: 'term-222222222222222222222',
           index: 2,
 
           repoRoot: '/repo',
@@ -349,7 +349,7 @@ describe('TerminalSessionView', () => {
         expect.any(HTMLDivElement),
       )
       expect(attach).not.toHaveBeenCalledWith(
-        expect.objectContaining({ terminalSessionId: 'session-1' }),
+        expect.objectContaining({ terminalSessionId: 'term-111111111111111111111' }),
         expect.any(HTMLDivElement),
       )
     } finally {
@@ -359,7 +359,7 @@ describe('TerminalSessionView', () => {
 
   test('keeps the active terminal attached when selected descriptor metadata changes', async () => {
     const descriptor = {
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
 
@@ -376,7 +376,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          terminalSessionId: 'session-1',
+          terminalSessionId: 'term-111111111111111111111',
           terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
@@ -405,7 +405,7 @@ describe('TerminalSessionView', () => {
     const detach = vi.fn()
     const worktreeListeners = new Set<() => void>()
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'session-1',
+      createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -457,7 +457,7 @@ describe('TerminalSessionView', () => {
         selectedDescriptor: { ...descriptor, index: 2 },
         sessions: [
           {
-            terminalSessionId: 'session-1',
+            terminalSessionId: 'term-111111111111111111111',
             terminalWorktreeKey: '/repo\0/worktree',
             index: 2,
             title: 'zsh',
@@ -484,7 +484,7 @@ describe('TerminalSessionView', () => {
     const takeover = vi.fn().mockResolvedValue(true)
     const summaries = [
       {
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         terminalWorktreeKey: '/repo\0/worktree',
         index: 1,
         title: 'zsh',
@@ -495,7 +495,7 @@ describe('TerminalSessionView', () => {
       },
     ]
     const descriptor = {
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
 
@@ -529,7 +529,7 @@ describe('TerminalSessionView', () => {
       },
     }
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'session-1',
+      createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -584,7 +584,7 @@ describe('TerminalSessionView', () => {
         button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
 
-      expect(takeover).toHaveBeenCalledWith('session-1')
+      expect(takeover).toHaveBeenCalledWith('term-111111111111111111111')
     } finally {
       unmount()
     }
@@ -600,7 +600,7 @@ describe('TerminalSessionView', () => {
     }
     const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
     const context: TerminalSessionContextValue = {
-      createTerminal: vi.fn(async () => 'session-2'),
+      createTerminal: vi.fn(async () => 'term-222222222222222222222'),
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -653,7 +653,7 @@ describe('TerminalSessionView', () => {
 
   test('hides the xterm host while an existing session is still attaching locally', async () => {
     const descriptor = {
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
 
@@ -670,7 +670,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          terminalSessionId: 'session-1',
+          terminalSessionId: 'term-111111111111111111111',
           terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
@@ -685,7 +685,7 @@ describe('TerminalSessionView', () => {
     }
     const snapshot = { phase: 'opening' as const, message: null, processName: 'zsh' }
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'session-1',
+      createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -799,7 +799,7 @@ describe('TerminalSessionView', () => {
 
   test('focuses the controller terminal after the ready render shows the host', async () => {
     const descriptor = {
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
 
@@ -816,7 +816,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          terminalSessionId: 'session-1',
+          terminalSessionId: 'term-111111111111111111111',
           terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
@@ -846,7 +846,7 @@ describe('TerminalSessionView', () => {
     }
     const focusTerminal = vi.fn()
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'session-1',
+      createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -900,7 +900,7 @@ describe('TerminalSessionView', () => {
       const readyHost = container.querySelector('.goblin-terminal-session__host')
       expect(readyHost?.classList.contains('goblin-terminal-session__host--hidden')).toBe(false)
       expect(focusTerminal).toHaveBeenCalledTimes(1)
-      expect(focusTerminal).toHaveBeenCalledWith('session-1')
+      expect(focusTerminal).toHaveBeenCalledWith('term-111111111111111111111')
 
       activeSnapshot = { ...openSnapshot, takeoverPending: true }
       rerender(tree())
@@ -913,7 +913,7 @@ describe('TerminalSessionView', () => {
 
   test('focuses the controller terminal after search closes if ready happened while search was open', async () => {
     const descriptor = {
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
 
@@ -930,7 +930,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          terminalSessionId: 'session-1',
+          terminalSessionId: 'term-111111111111111111111',
           terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
@@ -960,7 +960,7 @@ describe('TerminalSessionView', () => {
     }
     const focusTerminal = vi.fn()
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'session-1',
+      createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -1021,7 +1021,7 @@ describe('TerminalSessionView', () => {
 
       expect(container.querySelector('.goblin-terminal-session__search')).toBeNull()
       expect(focusTerminal).toHaveBeenCalledTimes(1)
-      expect(focusTerminal).toHaveBeenCalledWith('session-1')
+      expect(focusTerminal).toHaveBeenCalledWith('term-111111111111111111111')
     } finally {
       unmount()
     }
@@ -1035,7 +1035,7 @@ describe('TerminalSessionView', () => {
     const takeover = vi.fn().mockResolvedValue(true)
     const restart = vi.fn()
     const descriptor = {
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
 
@@ -1052,7 +1052,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          terminalSessionId: 'session-1',
+          terminalSessionId: 'term-111111111111111111111',
           terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
@@ -1080,7 +1080,7 @@ describe('TerminalSessionView', () => {
       },
     }
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'session-1',
+      createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -1155,7 +1155,7 @@ describe('TerminalSessionView', () => {
     // closes that hole.
     const writeInput = vi.fn()
     const descriptor = {
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
 
@@ -1172,7 +1172,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          terminalSessionId: 'session-1',
+          terminalSessionId: 'term-111111111111111111111',
           terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
@@ -1202,7 +1202,7 @@ describe('TerminalSessionView', () => {
       },
     }
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'session-1',
+      createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -1280,7 +1280,7 @@ describe('TerminalSessionView', () => {
     // dropped the controller gate would have slipped through.
     const writeInput = vi.fn()
     const descriptor = {
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
 
@@ -1297,7 +1297,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          terminalSessionId: 'session-1',
+          terminalSessionId: 'term-111111111111111111111',
           terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
@@ -1327,7 +1327,7 @@ describe('TerminalSessionView', () => {
       },
     }
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'session-1',
+      createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -1401,7 +1401,7 @@ describe('TerminalSessionView', () => {
       // quotes — if the escape regresses to plain concat this
       // assertion catches it.
       expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith('session-1', "'/resolved/shot with space.png'", 'drop')
+      expect(writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/resolved/shot with space.png'", 'drop')
       // The path-attempt tier succeeded, so the blob-save backend
       // was never consulted.
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
@@ -1424,7 +1424,7 @@ describe('TerminalSessionView', () => {
     // paths.
     const writeInput = vi.fn()
     const descriptor = {
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
 
@@ -1441,7 +1441,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          terminalSessionId: 'session-1',
+          terminalSessionId: 'term-111111111111111111111',
           terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
@@ -1469,7 +1469,7 @@ describe('TerminalSessionView', () => {
       },
     }
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'session-1',
+      createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -1540,7 +1540,7 @@ describe('TerminalSessionView', () => {
     // is never reached; writeInput gets the shell-escaped path.
     const writeInput = vi.fn()
     const descriptor = {
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
 
@@ -1557,7 +1557,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          terminalSessionId: 'session-1',
+          terminalSessionId: 'term-111111111111111111111',
           terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
@@ -1585,7 +1585,7 @@ describe('TerminalSessionView', () => {
       },
     }
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'session-1',
+      createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -1653,7 +1653,7 @@ describe('TerminalSessionView', () => {
       // both of which `shellEscapePath` wraps in single quotes — if
       // the escape regresses to plain concat this catches it.
       expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith('session-1', "'/resolved/weird name & space.png'", 'paste')
+      expect(writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/resolved/weird name & space.png'", 'paste')
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
     } finally {
       unmount()
@@ -1668,7 +1668,7 @@ describe('TerminalSessionView', () => {
     // check runs before any async resolver work).
     const writeInput = vi.fn()
     const descriptor = {
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
 
@@ -1685,7 +1685,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          terminalSessionId: 'session-1',
+          terminalSessionId: 'term-111111111111111111111',
           terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
@@ -1713,7 +1713,7 @@ describe('TerminalSessionView', () => {
       },
     }
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'session-1',
+      createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -1818,7 +1818,7 @@ describe('TerminalSessionView', () => {
     try {
       await dispatchPaste(rendered.sessionRoot, [new File([new Uint8Array([1])], 'bad.png')])
 
-      expect(rendered.writeInput).toHaveBeenCalledWith('session-1', "'/tmp/safe-name.png'", 'paste')
+      expect(rendered.writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/tmp/safe-name.png'", 'paste')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-unsafe')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
     } finally {
@@ -1933,7 +1933,7 @@ describe('TerminalSessionView', () => {
         new File([new Uint8Array([1])], 'c.png'),
       ])
 
-      expect(rendered.writeInput).toHaveBeenCalledWith('session-1', "'/abs/a.png' '/tmp/b.png'", 'paste')
+      expect(rendered.writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/abs/a.png' '/tmp/b.png'", 'paste')
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-partial')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
     } finally {
@@ -1952,7 +1952,7 @@ describe('TerminalSessionView', () => {
     // writeResolutionToPty wiring.
     const writeInput = vi.fn()
     const descriptor = {
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
 
@@ -1969,7 +1969,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptor,
       sessions: [
         {
-          terminalSessionId: 'session-1',
+          terminalSessionId: 'term-111111111111111111111',
           terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
@@ -1997,7 +1997,7 @@ describe('TerminalSessionView', () => {
       },
     }
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'session-1',
+      createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -2073,7 +2073,7 @@ describe('TerminalSessionView', () => {
       // the order the resolver returns them (path-attempt tier first,
       // then blob-save). paste-file-partial toasts once.
       expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith('session-1', "'/abs/a.png' '/tmp/b.png'", 'drop')
+      expect(writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/abs/a.png' '/tmp/b.png'", 'drop')
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-partial')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
     } finally {
@@ -2089,7 +2089,7 @@ describe('TerminalSessionView', () => {
     // still writable.
     const writeInput = vi.fn()
     const descriptorA = {
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
 
@@ -2102,7 +2102,7 @@ describe('TerminalSessionView', () => {
       worktreePath: '/worktree',
     }
     const descriptorB = {
-      terminalSessionId: 'session-2',
+      terminalSessionId: 'term-222222222222222222222',
       terminalWorktreeKey: '/repo\0/worktree-other',
       index: 1,
 
@@ -2119,7 +2119,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptorA,
       sessions: [
         {
-          terminalSessionId: 'session-1',
+          terminalSessionId: 'term-111111111111111111111',
           terminalWorktreeKey: '/repo\0/worktree',
           index: 1,
           title: 'zsh',
@@ -2137,7 +2137,7 @@ describe('TerminalSessionView', () => {
       selectedDescriptor: descriptorB,
       sessions: [
         {
-          terminalSessionId: 'session-2',
+          terminalSessionId: 'term-222222222222222222222',
           terminalWorktreeKey: '/repo\0/worktree-other',
           index: 1,
           title: 'zsh',
@@ -2165,7 +2165,7 @@ describe('TerminalSessionView', () => {
       },
     }
     const context: TerminalSessionContextValue = {
-      createTerminal: async () => 'session-1',
+      createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
       selectTerminal: vi.fn(),
@@ -2266,7 +2266,7 @@ describe('TerminalSessionView', () => {
         await new Promise((r) => setTimeout(r, 0))
       })
 
-      expect(writeInput).toHaveBeenCalledWith('session-1', "'/tmp/a.png'", 'drop')
+      expect(writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/tmp/a.png'", 'drop')
     } finally {
       unmount()
     }
@@ -2278,7 +2278,7 @@ describe('TerminalSessionView', () => {
     // user doesn't see a featureless black box and can discover the
     // affordance without reaching for the per-worktree "+" tab.
     const createTerminal = vi.fn(async () => 'raw-session')
-    const createTerminalForSlot = vi.fn(async () => 'session-1')
+    const createTerminalForSlot = vi.fn(async () => 'term-111111111111111111111')
     const emptyWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
       selectedDescriptor: null,
@@ -2414,7 +2414,7 @@ describe('TerminalSessionView', () => {
       const event = await dispatchPasteWithText(rendered.sessionRoot, 'file:///home/user/foo.png', [file])
 
       expect(event.defaultPrevented).toBe(true)
-      expect(rendered.writeInput).toHaveBeenCalledWith('session-1', "'/home/user/foo.png'", 'paste')
+      expect(rendered.writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/home/user/foo.png'", 'paste')
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
     } finally {
       await rendered.cleanup()
@@ -2436,7 +2436,7 @@ describe('TerminalSessionView', () => {
       const event = await dispatchPasteWithText(rendered.sessionRoot, 'C:\\Users\\me\\bar.png', [file])
 
       expect(event.defaultPrevented).toBe(true)
-      expect(rendered.writeInput).toHaveBeenCalledWith('session-1', "'C:\\Users\\me\\bar.png'", 'paste')
+      expect(rendered.writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'C:\\Users\\me\\bar.png'", 'paste')
     } finally {
       await rendered.cleanup()
     }

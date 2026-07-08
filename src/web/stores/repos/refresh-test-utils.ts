@@ -70,7 +70,7 @@ export function resetRefreshTest(): void {
   ipcHandlers['terminal.create'] = async (input: { kind?: string }) => ({
     ok: true,
     action: input?.kind === 'primary' ? 'reused' : 'created',
-    terminalSessionId: input?.kind === 'primary' ? 'terminal-session-test-1' : 'terminal-session-test-2',
+    terminalSessionId: input?.kind === 'primary' ? 'term-testtesttesttesttest1' : 'term-testtesttesttesttest2',
     sessions: [],
   })
   ipcHandlers['terminal.prune'] = async () => ({ pruned: 0, remaining: 0 })

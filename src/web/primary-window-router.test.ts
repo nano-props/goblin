@@ -123,14 +123,14 @@ describe('repo route view derivation', () => {
       repoRouteViewFromChildRoute('/repo', {
         dashboard: false,
         branchSlug: 'ZmVhdHVyZS9h',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         newWorktree: false,
       }),
     ).toEqual({
       kind: 'branch',
       repoId: '/repo',
       branchName: 'feature/a',
-      workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'session-1' },
+      workspacePaneRoute: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
     })
   })
 })

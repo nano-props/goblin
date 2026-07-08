@@ -177,7 +177,7 @@ describe('client bootstrap', () => {
             ? {
                 ok: true as const,
                 action: 'reused' as const,
-                terminalSessionId: 'session-1',
+                terminalSessionId: 'term-111111111111111111111',
                 tabs: [],
                 terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
                 processName: 'zsh',
@@ -195,7 +195,7 @@ describe('client bootstrap', () => {
             : {
                 ok: true as const,
                 action: 'created' as const,
-                terminalSessionId: 'session-2',
+                terminalSessionId: 'term-222222222222222222222',
                 tabs: [],
                 terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
                 processName: 'zsh',

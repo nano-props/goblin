@@ -79,7 +79,7 @@ describe('terminal session ensurer', () => {
         clientId: 'client_terminal_ensurer',
       },
       {
-        terminalSessionId: 'session-local',
+        terminalSessionId: 'term-locallocallocallocal1',
         cols: 100,
         rows: 40,
         scopedWorktreePath: path.resolve(WORKTREE_PATH),
@@ -90,7 +90,7 @@ describe('terminal session ensurer', () => {
     expect(result).toMatchObject({
       ok: true,
       action: 'created',
-      terminalSessionId: 'session-local',
+      terminalSessionId: 'term-locallocallocallocal1',
       canonicalCols: 100,
       canonicalRows: 40,
     })
@@ -106,7 +106,7 @@ describe('terminal session ensurer', () => {
       repoRoot: path.resolve(REPO_ROOT),
       repoInstanceId: REPO_INSTANCE_ID,
       branch: BRANCH_NAME,
-      terminalSessionId: 'session-local',
+      terminalSessionId: 'term-locallocallocallocal1',
       worktreePath: path.resolve(WORKTREE_PATH),
       cwd: path.resolve(WORKTREE_PATH),
       cols: 100,
@@ -140,7 +140,7 @@ describe('terminal session ensurer', () => {
           worktreePath: WORKTREE_PATH,
         },
         {
-          terminalSessionId: 'session-local',
+          terminalSessionId: 'term-locallocallocallocal1',
           cols: 80,
           rows: 24,
           scopedWorktreePath: path.resolve(WORKTREE_PATH),
@@ -170,7 +170,7 @@ describe('terminal session ensurer', () => {
         startupShellCommand: 'pwd',
       },
       {
-        terminalSessionId: 'session-remote',
+        terminalSessionId: 'term-remoteremoteremote001',
         cols: 120,
         rows: 32,
         scopedWorktreePath: REMOTE_WORKTREE_PATH,
@@ -181,7 +181,7 @@ describe('terminal session ensurer', () => {
     expect(result).toMatchObject({
       ok: true,
       action: 'reused',
-      terminalSessionId: 'session-remote',
+      terminalSessionId: 'term-remoteremoteremote001',
       canonicalCols: 120,
       canonicalRows: 32,
     })
@@ -195,7 +195,7 @@ describe('terminal session ensurer', () => {
         repoRoot: REMOTE_REPO_ROOT,
         repoInstanceId: REPO_INSTANCE_ID,
         branch: BRANCH_NAME,
-        terminalSessionId: 'session-remote',
+        terminalSessionId: 'term-remoteremoteremote001',
         worktreePath: REMOTE_WORKTREE_PATH,
         cwd: process.cwd(),
         cols: 120,
@@ -229,7 +229,7 @@ describe('terminal session ensurer', () => {
           worktreePath: REMOTE_WORKTREE_PATH,
         },
         {
-          terminalSessionId: 'session-remote',
+          terminalSessionId: 'term-remoteremoteremote001',
           cols: 80,
           rows: 24,
           scopedWorktreePath: REMOTE_WORKTREE_PATH,

@@ -9,31 +9,31 @@ describe('terminal session eviction helpers', () => {
     const orphaned = countOrphanedTerminalSessionIds({
       repoRoot: '/repo',
       repoInstanceId: 'repo-instance-test',
-      localTerminalSessionIds: ['session-a', 'session-b', 'session-c'],
-      getRepoRootForTerminalSessionId: (terminalSessionId) => (terminalSessionId === 'session-c' ? '/other' : '/repo'),
+      localTerminalSessionIds: ['term-aaaaaaaaaaaaaaaaaaaaa', 'term-bbbbbbbbbbbbbbbbbbbbb', 'term-ccccccccccccccccccccc'],
+      getRepoRootForTerminalSessionId: (terminalSessionId) => (terminalSessionId === 'term-ccccccccccccccccccccc' ? '/other' : '/repo'),
       getRepoInstanceIdForTerminalSessionId: () => 'repo-instance-test',
-      hasTerminalRuntimeSessionIdForTerminalSessionId: (terminalSessionId) => terminalSessionId !== 'session-b',
-      serverTerminalSessionIds: new Set(['session-a']),
+      hasTerminalRuntimeSessionIdForTerminalSessionId: (terminalSessionId) => terminalSessionId !== 'term-bbbbbbbbbbbbbbbbbbbbb',
+      serverTerminalSessionIds: new Set(['term-aaaaaaaaaaaaaaaaaaaaa']),
     })
     expect(orphaned).toEqual([])
 
     const orphaned2 = countOrphanedTerminalSessionIds({
       repoRoot: '/repo',
       repoInstanceId: 'repo-instance-test',
-      localTerminalSessionIds: ['session-a', 'session-b', 'session-c'],
-      getRepoRootForTerminalSessionId: (terminalSessionId) => (terminalSessionId === 'session-c' ? '/other' : '/repo'),
+      localTerminalSessionIds: ['term-aaaaaaaaaaaaaaaaaaaaa', 'term-bbbbbbbbbbbbbbbbbbbbb', 'term-ccccccccccccccccccccc'],
+      getRepoRootForTerminalSessionId: (terminalSessionId) => (terminalSessionId === 'term-ccccccccccccccccccccc' ? '/other' : '/repo'),
       getRepoInstanceIdForTerminalSessionId: () => 'repo-instance-test',
-      hasTerminalRuntimeSessionIdForTerminalSessionId: (terminalSessionId) => terminalSessionId === 'session-b',
-      serverTerminalSessionIds: new Set(['session-a']),
+      hasTerminalRuntimeSessionIdForTerminalSessionId: (terminalSessionId) => terminalSessionId === 'term-bbbbbbbbbbbbbbbbbbbbb',
+      serverTerminalSessionIds: new Set(['term-aaaaaaaaaaaaaaaaaaaaa']),
     })
-    expect(orphaned2).toEqual(['session-b'])
+    expect(orphaned2).toEqual(['term-bbbbbbbbbbbbbbbbbbbbb'])
   })
 
   test('selects the adjacent tab after removing the active terminal', () => {
-    expect(resolveAdjacentTerminalSelectionAfterRemoval(['session-a', 'session-b', 'session-c'], 'session-b')).toBe(
-      'session-c',
+    expect(resolveAdjacentTerminalSelectionAfterRemoval(['term-aaaaaaaaaaaaaaaaaaaaa', 'term-bbbbbbbbbbbbbbbbbbbbb', 'term-ccccccccccccccccccccc'], 'term-bbbbbbbbbbbbbbbbbbbbb')).toBe(
+      'term-ccccccccccccccccccccc',
     )
-    expect(resolveAdjacentTerminalSelectionAfterRemoval(['session-a', 'session-b'], 'session-b')).toBe('session-a')
-    expect(resolveAdjacentTerminalSelectionAfterRemoval(['session-a'], 'session-a')).toBeNull()
+    expect(resolveAdjacentTerminalSelectionAfterRemoval(['term-aaaaaaaaaaaaaaaaaaaaa', 'term-bbbbbbbbbbbbbbbbbbbbb'], 'term-bbbbbbbbbbbbbbbbbbbbb')).toBe('term-aaaaaaaaaaaaaaaaaaaaa')
+    expect(resolveAdjacentTerminalSelectionAfterRemoval(['term-aaaaaaaaaaaaaaaaaaaaa'], 'term-aaaaaaaaaaaaaaaaaaaaa')).toBeNull()
   })
 })

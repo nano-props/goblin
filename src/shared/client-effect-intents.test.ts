@@ -22,9 +22,9 @@ describe('isClientEffectIntent', () => {
     expect(isClientEffectIntent({ type: 'lang-pref-set-requested', pref: 'zh' })).toBe(true)
     expect(isClientEffectIntent({ type: 'lang-pref-set-requested', pref: 'fr' })).toBe(false)
     expect(
-      isClientEffectIntent({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', terminalSessionId: 'session-1' }),
+      isClientEffectIntent({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', terminalSessionId: 'term-111111111111111111111' }),
     ).toBe(true)
-    expect(isClientEffectIntent({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', key: 'session-1' })).toBe(false)
+    expect(isClientEffectIntent({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', key: 'term-111111111111111111111' })).toBe(false)
     expect(isClientEffectIntent({ type: 'terminal-bell-click', repoRoot: '/tmp/repo', terminalSessionId: 1 })).toBe(
       false,
     )

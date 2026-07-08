@@ -26,7 +26,7 @@ describe('workspace pane tabs query cache', () => {
         worktreePath: null,
         tabs: [
           workspacePaneStaticTabEntry('status'),
-          workspacePaneRuntimeTabEntry('terminal', 'session-stale'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1'),
           workspacePaneStaticTabEntry('files'),
         ],
       },
@@ -83,7 +83,7 @@ describe('workspace pane tabs query cache', () => {
         repoInstanceId: REPO_INSTANCE_ID,
         branchName: 'feature/old',
         worktreePath: '/tmp/worktree',
-        tabs: [workspacePaneRuntimeTabEntry('terminal', 'session-1'), workspacePaneStaticTabEntry('status')],
+        tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'), workspacePaneStaticTabEntry('status')],
       },
       queryClient,
     )
@@ -98,7 +98,7 @@ describe('workspace pane tabs query cache', () => {
         },
         queryClient,
       ),
-    ).toEqual([workspacePaneRuntimeTabEntry('terminal', 'session-1'), workspacePaneStaticTabEntry('status')])
+    ).toEqual([workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'), workspacePaneStaticTabEntry('status')])
 
     setWorkspacePaneTabsForTargetQueryData(
       {
@@ -106,7 +106,7 @@ describe('workspace pane tabs query cache', () => {
         repoInstanceId: REPO_INSTANCE_ID,
         branchName: 'feature/new',
         worktreePath: '/tmp/worktree',
-        tabs: [workspacePaneRuntimeTabEntry('terminal', 'session-1'), workspacePaneStaticTabEntry('history')],
+        tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'), workspacePaneStaticTabEntry('history')],
       },
       queryClient,
     )
@@ -115,7 +115,7 @@ describe('workspace pane tabs query cache', () => {
       queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, REPO_INSTANCE_ID)),
     ).toEqual([
       entry('feature/new', '/tmp/worktree', [
-        workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
         workspacePaneStaticTabEntry('history'),
       ]),
     ])
@@ -136,13 +136,13 @@ describe('workspace pane tabs query cache', () => {
     expect(
       workspacePaneTabsByTargetFromQueryData([
         entry('feature/current', '/tmp/worktree', [
-          workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
           workspacePaneStaticTabEntry('status'),
         ]),
         entry('feature/current', null, [workspacePaneStaticTabEntry('history')]),
       ]),
     ).toEqual({
-      [worktreeTargetKey]: [workspacePaneRuntimeTabEntry('terminal', 'session-1'), workspacePaneStaticTabEntry('status')],
+      [worktreeTargetKey]: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'), workspacePaneStaticTabEntry('status')],
       [branchTargetKey]: [workspacePaneStaticTabEntry('history')],
     })
   })

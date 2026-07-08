@@ -68,9 +68,9 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     installWorkspacePaneTabsTestBridge({
       updateWorkspaceTabs: async () => await serverTabs,
     })
-    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
-    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
-    const canonicalServerTabs = [terminalEntry('session-1'), staticEntry('status')]
+    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
+    const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
+    const canonicalServerTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
     seedWorkspacePaneTabs(sourceTabs)
     renderMutationHook({ canonicalTabs: sourceTabs })
 
@@ -109,9 +109,9 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
         return await serverTabs
       },
     })
-    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
-    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
-    const canonicalServerTabs = [terminalEntry('session-1'), staticEntry('history')]
+    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
+    const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
+    const canonicalServerTabs = [terminalEntry('term-111111111111111111111'), staticEntry('history')]
     seedWorkspacePaneTabs(sourceTabs)
     renderMutationHook({ canonicalTabs: sourceTabs })
 
@@ -139,11 +139,11 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
   })
 
   test('applies consecutive optimistic reorders without a client queue', async () => {
-    const sourceTabs = [terminalEntry('session-1'), staticEntry('status'), staticEntry('history')]
+    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status'), staticEntry('history')]
     const requests = installDeferredUpdateWorkspaceTabs()
-    const firstReorderTabs = [staticEntry('status'), terminalEntry('session-1'), staticEntry('history')]
-    const secondDraggedTabs = [terminalEntry('session-1'), staticEntry('status')]
-    const expectedSecondCommitTabs = [terminalEntry('session-1'), staticEntry('status'), staticEntry('history')]
+    const firstReorderTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111'), staticEntry('history')]
+    const secondDraggedTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
+    const expectedSecondCommitTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status'), staticEntry('history')]
     seedWorkspacePaneTabs(sourceTabs)
     renderMutationHook({ canonicalTabs: sourceTabs })
 
@@ -163,7 +163,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     })
     expect(requests[1]!.input.operation).toEqual({
       type: 'reorder',
-      tabIdentities: ['terminal:session-1', 'workspace-pane:status'],
+      tabIdentities: ['terminal:term-111111111111111111111', 'workspace-pane:status'],
     })
     expect(readWorkspacePaneTabs()).toEqual(expectedSecondCommitTabs)
 
@@ -184,10 +184,10 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
 
   test('keeps a newer optimistic reorder when an earlier reorder fails', async () => {
     const onReorderRejected = vi.fn()
-    const sourceTabs = [terminalEntry('session-1'), staticEntry('status'), staticEntry('history')]
+    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status'), staticEntry('history')]
     const requests = installDeferredUpdateWorkspaceTabs()
-    const firstReorderTabs = [staticEntry('status'), terminalEntry('session-1'), staticEntry('history')]
-    const secondReorderTabs = [staticEntry('history'), staticEntry('status'), terminalEntry('session-1')]
+    const firstReorderTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111'), staticEntry('history')]
+    const secondReorderTabs = [staticEntry('history'), staticEntry('status'), terminalEntry('term-111111111111111111111')]
     seedWorkspacePaneTabs(sourceTabs)
     renderMutationHook({ canonicalTabs: sourceTabs, onReorderRejected })
 
@@ -230,8 +230,8 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
         throw new Error('server unavailable')
       },
     })
-    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
-    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
+    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
+    const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
     seedWorkspacePaneTabs(sourceTabs)
     renderMutationHook({ canonicalTabs: sourceTabs, onReorderRejected })
 
@@ -247,9 +247,9 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
 
   test('does not roll cache back over a newer same-target projection after server reject', async () => {
     const requests = installDeferredUpdateWorkspaceTabs()
-    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
-    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
-    const newerProjectionTabs = [staticEntry('history'), terminalEntry('session-2')]
+    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
+    const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
+    const newerProjectionTabs = [staticEntry('history'), terminalEntry('term-222222222222222222222')]
     seedWorkspacePaneTabs(sourceTabs)
     renderMutationHook({ canonicalTabs: sourceTabs })
 
@@ -284,8 +284,8 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
 
   test('rolls back only the failed branch when another branch updates while reorder is pending', async () => {
     const requests = installDeferredUpdateWorkspaceTabs()
-    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
-    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
+    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
+    const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
     const otherBranchName = 'feature/other'
     seedWorkspacePaneTabs(sourceTabs)
     setWorkspacePaneTabsForTargetQueryData(
@@ -341,7 +341,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
   test('does not commit no-op reorder', () => {
     const updateWorkspaceTabs = vi.fn(async () => [])
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
-    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
+    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
     renderMutationHook({ canonicalTabs: sourceTabs })
 
     act(() => {
@@ -354,11 +354,11 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
   test('uses the latest repo runtime instance when the repo instance changes', async () => {
     const updateWorkspaceTabs = vi.fn(async (_input: WorkspacePaneTabsUpdateInput) => [
       staticEntry('status'),
-      terminalEntry('session-1'),
+      terminalEntry('term-111111111111111111111'),
     ])
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
-    const sourceTabs = [terminalEntry('session-1'), staticEntry('status')]
-    const reorderedTabs = [staticEntry('status'), terminalEntry('session-1')]
+    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
+    const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
     seedWorkspacePaneTabs(sourceTabs, NEXT_REPO_INSTANCE_ID)
     const renderResult = renderMutationHook({ canonicalTabs: sourceTabs })
 
@@ -388,11 +388,11 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
         worktreePath: WORKTREE_PATH,
         operation: {
           type: 'reorder',
-          tabIdentities: ['workspace-pane:status', 'terminal:session-1'],
+          tabIdentities: ['workspace-pane:status', 'terminal:term-111111111111111111111'],
         },
       })
     })
-    expect(readWorkspacePaneTabs(NEXT_REPO_INSTANCE_ID)).toEqual([staticEntry('status'), terminalEntry('session-1')])
+    expect(readWorkspacePaneTabs(NEXT_REPO_INSTANCE_ID)).toEqual([staticEntry('status'), terminalEntry('term-111111111111111111111')])
   })
 })
 

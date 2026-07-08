@@ -47,7 +47,7 @@ function renderability(input: {
 
 const terminalView: WorkspacePaneTabSummary = {
   type: 'terminal',
-  terminalSessionId: 'session-1',
+  terminalSessionId: 'term-111111111111111111111',
   terminalWorktreeKey: 'repo\0worktree',
   index: 1,
   title: 'Terminal 1',
@@ -157,10 +157,10 @@ describe('workspace pane tab providers', () => {
     expect(workspacePaneStaticTabProvider('status').buttonId('workspace-pane')).toBe('workspace-pane-status-tab')
     expect(workspacePaneStaticTabProvider('status').panelId('workspace-pane')).toBe('workspace-pane-status-panel')
     expect(workspacePaneStaticTabProvider('changes').tabEntry()).toEqual(workspacePaneStaticTabEntry('changes'))
-    expect(terminalWorkspacePaneTabProvider.identity('session-1')).toBe('terminal:session-1')
+    expect(terminalWorkspacePaneTabProvider.identity('term-111111111111111111111')).toBe('terminal:term-111111111111111111111')
     expect(terminalWorkspacePaneTabProvider.buttonId('workspace-pane', 0)).toBe('workspace-pane-workspace-pane-tab')
     expect(terminalWorkspacePaneTabProvider.buttonId('workspace-pane', 2)).toBe('workspace-pane-workspace-pane-tab-2')
-    expect(terminalWorkspacePaneTabProvider.tabEntry('session-1')).toEqual(workspacePaneRuntimeTabEntry('terminal', 'session-1'))
+    expect(terminalWorkspacePaneTabProvider.tabEntry('term-111111111111111111111')).toEqual(workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'))
     expect(changesWorkspacePaneTabProvider.label({ t, branchName: 'main', statusCount: 3 })).toBe(
       'tab.changes-with-count:{"count":3}',
     )
@@ -236,7 +236,7 @@ describe('workspace pane tab providers', () => {
       terminalWorkspacePaneTabProvider.close({
         repoId: '/repo',
         branchName: 'main',
-        runtimeSessionId: 'session-1',
+        runtimeSessionId: 'term-111111111111111111111',
       }),
     ).resolves.toBe(false)
   })

@@ -94,7 +94,7 @@ describe('app bootstrap hooks', () => {
       restoredRepoId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 45,
-      selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'session-2' },
+      selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'term-222222222222222222222' },
       preferredWorkspacePaneTabByTargetByRepo: {},
       workspacePaneTabsByTargetByRepo: {
         '/tmp/repo': {
@@ -127,7 +127,7 @@ describe('app bootstrap hooks', () => {
     expect(state.zenMode).toBe(false)
     expect(state.workspacePaneSize).toBe(45)
     expect(state.selectedTerminalSessionIdByTerminalWorktree).toEqual({
-      '/tmp/repo\0/tmp/worktree': 'session-2',
+      '/tmp/repo\0/tmp/worktree': 'term-222222222222222222222',
     })
     expect(useFiletreeInteractionStore.getState().interactionByScope).toMatchObject({
       [filetreeInteractionScopeKey('/tmp/repo', '/tmp/worktree')]: {

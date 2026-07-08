@@ -162,11 +162,11 @@ describe('createPrimaryWindowNavigationActions', () => {
       routeNavigation: navigation,
     })
 
-    actions.showRepoBranchTerminalSession(REPO_ID, BRANCH_NAME, 'session-1')
+    actions.showRepoBranchTerminalSession(REPO_ID, BRANCH_NAME, 'term-111111111111111111111')
 
-    expect(navigation.openRepoBranchTerminal).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, 'session-1')
+    expect(navigation.openRepoBranchTerminal).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, 'term-111111111111111111111')
     expect(preferredWorkspacePaneTab()).toBe('terminal')
-    expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[WORKTREE_KEY]).toBe('session-1')
+    expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[WORKTREE_KEY]).toBe('term-111111111111111111111')
   })
 
   test('blocks workspace pane route navigation while terminal creation is pending', () => {
@@ -178,7 +178,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     })
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => createPendingWorktreeSnapshot(),
-      createTerminal: vi.fn(async () => 'session-1'),
+      createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
     })
     const navigation = routeNavigation()
@@ -190,7 +190,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     })
 
     actions.showRepoBranchWorkspacePaneTab(REPO_ID, BRANCH_NAME, 'history')
-    actions.showRepoBranchTerminalSession(REPO_ID, BRANCH_NAME, 'session-1')
+    actions.showRepoBranchTerminalSession(REPO_ID, BRANCH_NAME, 'term-111111111111111111111')
 
     expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
     expect(navigation.openRepoBranchTerminal).not.toHaveBeenCalled()
@@ -221,7 +221,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     useReposStore.getState().recordWorkspaceNavigation(branch)
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => createPendingWorktreeSnapshot(),
-      createTerminal: vi.fn(async () => 'session-1'),
+      createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
     })
     const goBackInWorkspaceNavigation = vi.fn((repoId: string) =>

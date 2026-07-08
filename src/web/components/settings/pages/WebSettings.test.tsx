@@ -80,7 +80,7 @@ function seedElectronBootstrap() {
       create: vi.fn(async () => ({
         ok: true as const,
         action: 'created' as const,
-        terminalSessionId: 'k',
+        terminalSessionId: 'term-111111111111111111111',
         tabs: [],
         sessions: [],
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -160,7 +160,7 @@ function seedWebBootstrap() {
       create: vi.fn(async () => ({
         ok: true as const,
         action: 'created' as const,
-        terminalSessionId: 'k',
+        terminalSessionId: 'term-111111111111111111111',
         tabs: [],
         sessions: [],
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',

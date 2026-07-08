@@ -24,7 +24,7 @@ describe('client effect intent plans', () => {
     const plan = createTerminalBellIntentPlan(repo, readRepoBranchQueryProjection(repo), {
       type: 'terminal-bell-click',
       repoRoot: repo.id,
-      terminalSessionId: 'session-2',
+      terminalSessionId: 'term-222222222222222222222',
       terminalWorktreeKey: '/tmp/repo\0/tmp/repo-feature',
     })
 
@@ -32,7 +32,7 @@ describe('client effect intent plans', () => {
       kind: 'show-worktree-terminal',
       repoId: repo.id,
       branch: 'feature/test',
-      terminalSessionId: 'session-2',
+      terminalSessionId: 'term-222222222222222222222',
       terminalWorktreeKey: '/tmp/repo\0/tmp/repo-feature',
     })
   })
@@ -41,7 +41,7 @@ describe('client effect intent plans', () => {
     const plan = createTerminalBellIntentPlan({ id: '/tmp/repo' }, null, {
       type: 'terminal-bell-click',
       repoRoot: '/tmp/repo',
-      terminalSessionId: 'session-2',
+      terminalSessionId: 'term-222222222222222222222',
       terminalWorktreeKey: '/tmp/repo\0/tmp/repo-feature',
     })
 

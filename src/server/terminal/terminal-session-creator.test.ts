@@ -32,17 +32,17 @@ describe('terminal session creator', () => {
       scope: SCOPE,
       branchName: BRANCH_NAME,
       worktreePath: path.resolve(WORKTREE_PATH),
-      tabs: [workspacePaneRuntimeTabEntry('terminal', 'session-stale'), workspacePaneStaticTabEntry('status')],
+      tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1'), workspacePaneStaticTabEntry('status')],
     })
     const ensureOrRestore = vi.fn(async (_clientId, _userId, input) => {
-      sessions.push(terminalSession(input.terminalSessionId ?? 'session-created'))
-      return ensureResult(input.terminalSessionId ?? 'session-created')
+      sessions.push(terminalSession(input.terminalSessionId ?? 'term-createdcreatedcreated'))
+      return ensureResult(input.terminalSessionId ?? 'term-createdcreatedcreated')
     })
     const cleanupStaleCreate = vi.fn(async () => {})
     const creator = createTerminalSessionCreator({
       createCoordinator: createTerminalSessionCreateCoordinator({
         manager,
-        createSessionId: () => 'session-created',
+        createSessionId: () => 'term-createdcreatedcreated',
       }),
       workspaceTabsCoordinator: createWorkspacePaneTabsCoordinator({
         workspaceTabs,
@@ -69,19 +69,19 @@ describe('terminal session creator', () => {
       USER_ID,
       expect.objectContaining({
         clientId: TERMINAL_CLIENT_ID,
-        terminalSessionId: 'session-created',
+        terminalSessionId: 'term-createdcreatedcreated',
       }),
     )
-    expect(result.sessions).toEqual([terminalSession('session-created')])
+    expect(result.sessions).toEqual([terminalSession('term-createdcreatedcreated')])
     expect(result.tabs).toEqual([
       workspacePaneStaticTabEntry('status'),
-      workspacePaneRuntimeTabEntry('terminal', 'session-created'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-createdcreatedcreated'),
     ])
     expect(cleanupStaleCreate).not.toHaveBeenCalled()
   })
 
   test('orders returned sessions by the canonical workspace tab order after insert', async () => {
-    const sessions: TerminalSessionSummary[] = [terminalSession('session-1'), terminalSession('session-2')]
+    const sessions: TerminalSessionSummary[] = [terminalSession('term-111111111111111111111'), terminalSession('term-222222222222222222222')]
     const manager = {
       listSessionsForUser: vi.fn(async () => sessions),
     }
@@ -92,19 +92,19 @@ describe('terminal session creator', () => {
       branchName: BRANCH_NAME,
       worktreePath: path.resolve(WORKTREE_PATH),
       tabs: [
-        workspacePaneRuntimeTabEntry('terminal', 'session-1'),
-        workspacePaneRuntimeTabEntry('terminal', 'session-2'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-222222222222222222222'),
       ],
     })
     const ensureOrRestore = vi.fn(async (_clientId, _userId, input) => {
-      sessions.push(terminalSession(input.terminalSessionId ?? 'session-3'))
-      return ensureResult(input.terminalSessionId ?? 'session-3')
+      sessions.push(terminalSession(input.terminalSessionId ?? 'term-333333333333333333333'))
+      return ensureResult(input.terminalSessionId ?? 'term-333333333333333333333')
     })
     const cleanupStaleCreate = vi.fn(async () => {})
     const creator = createTerminalSessionCreator({
       createCoordinator: createTerminalSessionCreateCoordinator({
         manager,
-        createSessionId: () => 'session-3',
+        createSessionId: () => 'term-333333333333333333333',
       }),
       workspaceTabsCoordinator: createWorkspacePaneTabsCoordinator({
         workspaceTabs,
@@ -121,17 +121,17 @@ describe('terminal session creator', () => {
       clientId: CLIENT_ID,
       terminalClientId: TERMINAL_CLIENT_ID,
       userId: USER_ID,
-      request: createRequest({ insertAfterIdentity: 'terminal:session-1' }),
+      request: createRequest({ insertAfterIdentity: 'terminal:term-111111111111111111111' }),
     })
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.tabs).toEqual([
-      workspacePaneRuntimeTabEntry('terminal', 'session-1'),
-      workspacePaneRuntimeTabEntry('terminal', 'session-3'),
-      workspacePaneRuntimeTabEntry('terminal', 'session-2'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-333333333333333333333'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-222222222222222222222'),
     ])
-    expect(result.sessions.map((session) => session.terminalSessionId)).toEqual(['session-1', 'session-3', 'session-2'])
+    expect(result.sessions.map((session) => session.terminalSessionId)).toEqual(['term-111111111111111111111', 'term-333333333333333333333', 'term-222222222222222222222'])
     expect(cleanupStaleCreate).not.toHaveBeenCalled()
   })
 
@@ -139,12 +139,12 @@ describe('terminal session creator', () => {
     const manager = {
       listSessionsForUser: vi.fn(async () => []),
     }
-    const ensureOrRestore = vi.fn(async () => ensureResult('session-created'))
+    const ensureOrRestore = vi.fn(async () => ensureResult('term-createdcreatedcreated'))
     const cleanupStaleCreate = vi.fn(async () => {})
     const creator = createTerminalSessionCreator({
       createCoordinator: createTerminalSessionCreateCoordinator({
         manager,
-        createSessionId: () => 'session-created',
+        createSessionId: () => 'term-createdcreatedcreated',
       }),
       workspaceTabsCoordinator: createWorkspacePaneTabsCoordinator({
         workspaceTabs: createWorkspacePaneTabsRuntime<string>(),
@@ -176,8 +176,8 @@ describe('terminal session creator', () => {
     }
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     const ensureOrRestore = vi.fn(async (_clientId, _userId, input) => {
-      sessions.push(terminalSession(input.terminalSessionId ?? 'session-created'))
-      return ensureResult(input.terminalSessionId ?? 'session-created')
+      sessions.push(terminalSession(input.terminalSessionId ?? 'term-createdcreatedcreated'))
+      return ensureResult(input.terminalSessionId ?? 'term-createdcreatedcreated')
     })
     const rejectStaleCreateIfNeeded = vi.fn(() => ({ ok: false as const, message: 'error.repo-instance-stale' }))
     const cleanupStaleCreate = vi.fn(async () => {
@@ -186,7 +186,7 @@ describe('terminal session creator', () => {
     const creator = createTerminalSessionCreator({
       createCoordinator: createTerminalSessionCreateCoordinator({
         manager,
-        createSessionId: () => 'session-created',
+        createSessionId: () => 'term-createdcreatedcreated',
       }),
       workspaceTabsCoordinator: createWorkspacePaneTabsCoordinator({
         workspaceTabs,

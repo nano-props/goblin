@@ -127,7 +127,7 @@ describe('settings command handlers', () => {
         preferredWorkspacePaneTabByTargetByRepo: {},
         workspacePaneTabsByTargetByRepo: {
           '/tmp/repo': {
-            [targetKey]: [{ type: 'terminal', runtimeSessionId: 'session-1' }],
+            [targetKey]: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
           },
         },
         filetreeViewStateByWorktreeByRepo: {},

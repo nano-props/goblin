@@ -448,7 +448,7 @@ const hostOpenExternalUrl = vi.fn<NonNullable<Window['goblinNative']['host']>['o
 const mockFonts = new MockFontFaceSet()
 
 const descriptor = {
-  terminalSessionId: 'session-1',
+  terminalSessionId: 'term-111111111111111111111',
   terminalWorktreeKey: '/repo\0/worktree',
   index: 1,
 
@@ -597,18 +597,18 @@ beforeEach(() => {
         input?.kind === 'primary'
           ? {
               action: 'reused' as const,
-              terminalSessionId: 'session-1',
+              terminalSessionId: 'term-111111111111111111111',
               tabs: [],
               sessions: [],
-              ...createFirstFrame('session-1'),
+              ...createFirstFrame('term-111111111111111111111'),
               ok: true as const,
             }
           : {
               action: 'created' as const,
-              terminalSessionId: 'session-2',
+              terminalSessionId: 'term-222222222222222222222',
               tabs: [],
               sessions: [],
-              ...createFirstFrame('session-2'),
+              ...createFirstFrame('term-222222222222222222222'),
               ok: true as const,
             },
       ),
@@ -1314,7 +1314,7 @@ describe('TerminalSession', () => {
     hydrateManagedSession(session)
 
     session.hydrate({
-      terminalRuntimeSessionId: 'session-remote',
+      terminalRuntimeSessionId: 'term-remoteremoteremote001',
       phase: 'open',
       message: null,
       processName: 'node',
@@ -1343,7 +1343,7 @@ describe('TerminalSession', () => {
     hydrateManagedSession(session)
 
     session.hydrate({
-      terminalRuntimeSessionId: 'session-remote',
+      terminalRuntimeSessionId: 'term-remoteremoteremote001',
       phase: 'open',
       message: null,
       processName: 'node',
@@ -1424,7 +1424,7 @@ describe('TerminalSession', () => {
     term.write.mockClear()
 
     session.hydrate({
-      terminalRuntimeSessionId: 'session-remote',
+      terminalRuntimeSessionId: 'term-remoteremoteremote001',
       phase: 'open',
       message: null,
       processName: 'node',
@@ -1442,7 +1442,7 @@ describe('TerminalSession', () => {
     // applyHydratedSnapshotToActiveView passes a callback as the second arg
     // so it can clear the field after the write resolves.
     expect(term.write).toHaveBeenCalledWith('remote-screen', expect.any(Function))
-    expect(session.currentTerminalRuntimeSessionId()).toBe('session-remote')
+    expect(session.currentTerminalRuntimeSessionId()).toBe('term-remoteremoteremote001')
   })
 
   test('drops pending live output when hydrate switches to a different session id', async () => {
@@ -1459,7 +1459,7 @@ describe('TerminalSession', () => {
 
     session.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       data: 'old-pending-output',
       seq: 1,
       outputEra: 0,
@@ -1468,7 +1468,7 @@ describe('TerminalSession', () => {
     expect(term.write).not.toHaveBeenCalled()
 
     session.hydrate({
-      terminalRuntimeSessionId: 'session-remote',
+      terminalRuntimeSessionId: 'term-remoteremoteremote001',
       phase: 'open',
       message: null,
       processName: 'node',
@@ -1603,7 +1603,7 @@ describe('TerminalSession', () => {
 
     session.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'term-111111111111111111111',
       data: 'prompt',
       seq: 1,
       outputEra: 0,
@@ -2242,7 +2242,7 @@ describe('TerminalSession', () => {
 
     session.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       data: 'prompt',
       seq: 1,
       outputEra: 0,
@@ -2250,7 +2250,7 @@ describe('TerminalSession', () => {
     })
     session.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       data: 'next',
       seq: 2,
       outputEra: 0,
@@ -2276,7 +2276,7 @@ describe('TerminalSession', () => {
     xtermMocks.deferWriteCallbacks(true)
     session.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       data: 'live-2',
       seq: 2,
       outputEra: 0,
@@ -2296,7 +2296,7 @@ describe('TerminalSession', () => {
     xtermMocks.deferWriteCallbacks(false)
     session.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       data: 'live-2-again',
       seq: 2,
       outputEra: 0,
@@ -2319,8 +2319,8 @@ describe('TerminalSession', () => {
     notify.mockClear()
 
     session.handleOutput({
-      terminalRuntimeSessionId: 'other-session',
-      terminalSessionId: 'other-session',
+      terminalRuntimeSessionId: 'pty_session_otheraaaaaa',
+      terminalSessionId: 'term-999999999999999999999',
       data: 'ignored',
       seq: 1,
       outputEra: 0,
@@ -2328,7 +2328,7 @@ describe('TerminalSession', () => {
     })
     session.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'term-111111111111111111111',
       data: 'first',
       seq: 1,
       outputEra: 0,
@@ -2336,7 +2336,7 @@ describe('TerminalSession', () => {
     })
     session.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'term-111111111111111111111',
       data: 'second',
       seq: 2,
       outputEra: 0,
@@ -2363,19 +2363,22 @@ describe('TerminalSession', () => {
 
     session.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'term-111111111111111111111',
       data: 'before exit',
       seq: 1,
       outputEra: 0,
       processName: 'zsh',
     })
-    expect(session.handleExit({ terminalRuntimeSessionId: 'other-session', terminalSessionId: 'other-session' })).toBe(
-      false,
-    )
+    expect(
+      session.handleExit({
+        terminalRuntimeSessionId: 'pty_session_otheraaaaaa',
+        terminalSessionId: 'term-999999999999999999999',
+      }),
+    ).toBe(false)
     expect(
       session.handleExit({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalSessionId: 'term-111111111111111111111',
       }),
     ).toBe(true)
     session.dispose()

@@ -63,7 +63,7 @@ const terminalReadContext: TerminalSessionReadContextValue = {
 }
 
 const terminalCommandContext: TerminalSessionContextValue = {
-  createTerminal: vi.fn(async () => 'session-1'),
+  createTerminal: vi.fn(async () => 'term-111111111111111111111'),
   registerHost: vi.fn(),
   unregisterHost: vi.fn(),
   selectTerminal: vi.fn(),
@@ -283,11 +283,11 @@ describe('RepoWorkspace', () => {
         branchName: 'feature/a',
         workspacePaneTab: 'terminal' as const,
         terminalWorktreeKey,
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
       },
     }
     const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
-      const terminalSessionId = 'session-1'
+      const terminalSessionId = 'term-111111111111111111111'
       setWorkspacePaneTabsForTargetQueryData({
         repoRoot: base.repoRoot,
         repoInstanceId: base.repoInstanceId!,
@@ -329,12 +329,12 @@ describe('RepoWorkspace', () => {
       screen.getByRole('button', { name: 'terminal.new' }).click()
       await new Promise((resolve) => setTimeout(resolve, 0))
     })
-    expect(route.openRepoBranchTerminal).toHaveBeenCalledWith(REPO_ID, 'feature/a', 'session-1')
+    expect(route.openRepoBranchTerminal).toHaveBeenCalledWith(REPO_ID, 'feature/a', 'term-111111111111111111111')
 
     rerender(
       workspace(
-        { kind: 'terminal', terminalSessionId: 'session-1' },
-        terminalReadContextWithSession(terminalWorktreeKey, 'session-1'),
+        { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
+        terminalReadContextWithSession(terminalWorktreeKey, 'term-111111111111111111111'),
       ),
     )
 
@@ -359,12 +359,12 @@ describe('RepoWorkspace', () => {
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
-        [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-1')],
+        [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
       },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
     const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
-    const readContext = terminalReadContextWithSession(terminalWorktreeKey, 'session-1')
+    const readContext = terminalReadContextWithSession(terminalWorktreeKey, 'term-111111111111111111111')
     const route = routeNavigation()
     const expectedCurrentEntry = {
       repoId: REPO_ID,
@@ -422,14 +422,14 @@ describe('RepoWorkspace', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
         [branchName]: [
-          workspacePaneRuntimeTabEntry('terminal', 'session-1'),
-          workspacePaneRuntimeTabEntry('terminal', 'session-2'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-222222222222222222222'),
         ],
       },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
     const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
-    useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'session-1')
+    useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'term-111111111111111111111')
     const route = routeNavigation()
 
     render(
@@ -437,14 +437,14 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext
-              value={terminalReadContextWithSessions(terminalWorktreeKey, ['session-1', 'session-2'])}
+              value={terminalReadContextWithSessions(terminalWorktreeKey, ['term-111111111111111111111', 'term-222222222222222222222'])}
             >
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName={branchName}
                 workspacePaneRouteContext={{
                   kind: 'routed',
-                  route: { kind: 'terminal', terminalSessionId: 'session-2' },
+                  route: { kind: 'terminal', terminalSessionId: 'term-222222222222222222222' },
                 }}
               />
             </TerminalSessionReadContext>
@@ -455,7 +455,7 @@ describe('RepoWorkspace', () => {
 
     await waitFor(() => {
       expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]).toBe(
-        'session-2',
+        'term-222222222222222222222',
       )
     })
     expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
@@ -471,13 +471,13 @@ describe('RepoWorkspace', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
         [branchName]: [
-          workspacePaneRuntimeTabEntry('terminal', 'session-1'),
-          workspacePaneRuntimeTabEntry('terminal', 'session-2'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-222222222222222222222'),
         ],
       },
     })
     const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
-    useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'session-2')
+    useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'term-222222222222222222222')
     const route = routeNavigation()
 
     render(
@@ -485,14 +485,14 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext
-              value={terminalReadContextWithSessions(terminalWorktreeKey, ['session-1', 'session-2'])}
+              value={terminalReadContextWithSessions(terminalWorktreeKey, ['term-111111111111111111111', 'term-222222222222222222222'])}
             >
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName={branchName}
                 workspacePaneRouteContext={{
                   kind: 'routed',
-                  route: { kind: 'terminal', terminalSessionId: 'session-1' },
+                  route: { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
                 }}
               />
             </TerminalSessionReadContext>
@@ -507,7 +507,7 @@ describe('RepoWorkspace', () => {
 
     expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
     expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]).toBeUndefined()
-    expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]).toBe('session-2')
+    expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]).toBe('term-222222222222222222222')
   })
 
   test('preserves existing app history when canonicalizing a stale terminal route from another page', async () => {
@@ -519,7 +519,7 @@ describe('RepoWorkspace', () => {
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
-        [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-1')],
+        [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
       },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
@@ -531,7 +531,7 @@ describe('RepoWorkspace', () => {
       <QueryClientProvider client={primaryWindowQueryClient}>
         <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
           <TerminalSessionContext value={terminalCommandContext}>
-            <TerminalSessionReadContext value={terminalReadContextWithSession(terminalWorktreeKey, 'session-1')}>
+            <TerminalSessionReadContext value={terminalReadContextWithSession(terminalWorktreeKey, 'term-111111111111111111111')}>
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName={branchName}
@@ -577,14 +577,14 @@ describe('RepoWorkspace', () => {
       workspacePaneTabsByBranch: {
         [branchName]: [
           workspacePaneStaticTabEntry('status'),
-          workspacePaneRuntimeTabEntry('terminal', 'session-1'),
-          workspacePaneRuntimeTabEntry('terminal', 'session-2'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-222222222222222222222'),
         ],
       },
     })
     const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
-    useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'session-2')
-    const readContext = terminalReadContextWithSessions(terminalWorktreeKey, ['session-1', 'session-2'], 'session-2')
+    useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'term-222222222222222222222')
+    const readContext = terminalReadContextWithSessions(terminalWorktreeKey, ['term-111111111111111111111', 'term-222222222222222222222'], 'term-222222222222222222222')
     const route = routeNavigation()
 
     render(
@@ -612,7 +612,7 @@ describe('RepoWorkspace', () => {
 
     expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
     expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]).toBeUndefined()
-    expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]).toBe('session-2')
+    expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey]).toBe('term-222222222222222222222')
   })
 
   test('does not reconcile a stale terminal route while terminal creation is pending', async () => {
@@ -624,7 +624,7 @@ describe('RepoWorkspace', () => {
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
-        [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-1')],
+        [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
       },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
@@ -636,7 +636,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext
-              value={terminalReadContextWithSessions(terminalWorktreeKey, ['session-1'], 'session-1', {
+              value={terminalReadContextWithSessions(terminalWorktreeKey, ['term-111111111111111111111'], 'term-111111111111111111111', {
                 createPending: true,
               })}
             >

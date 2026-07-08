@@ -794,7 +794,7 @@ describe('RepoWorkspaceContent', () => {
       workspacePaneTabsByBranch: { 'feature/terminal-loading': [staticEntry('status')] },
     })
     const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
-    const createTerminal = vi.fn(async () => 'session-1')
+    const createTerminal = vi.fn(async () => 'term-111111111111111111111')
     const registerHost = vi.fn()
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
       ...emptyWorktreeSnapshot,
@@ -834,7 +834,7 @@ describe('RepoWorkspaceContent', () => {
       currentBranchName: 'feature/terminal-reordered',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
-        'feature/terminal-reordered': [terminalEntry('t2'), staticEntry('status'), terminalEntry('t1')],
+        'feature/terminal-reordered': [terminalEntry('term-222222222222222222222'), staticEntry('status'), terminalEntry('term-111111111111111111111')],
       },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
@@ -844,8 +844,8 @@ describe('RepoWorkspaceContent', () => {
       ...emptyWorktreeSnapshot,
       terminalWorktreeKey,
       sessions: [
-        terminalSession('t1', 1, false, terminalWorktreeKey),
-        terminalSession('t2', 2, true, terminalWorktreeKey),
+        terminalSession('term-111111111111111111111', 1, false, terminalWorktreeKey),
+        terminalSession('term-222222222222222222222', 2, true, terminalWorktreeKey),
       ],
       count: 2,
     }
@@ -896,7 +896,7 @@ describe('RepoWorkspaceContent', () => {
     let resolvedStartupShellCommand: string | null = null
     const createTerminal: TerminalSessionContextValue['createTerminal'] = vi.fn(async (_base, options) => {
       resolvedStartupShellCommand = (await options?.resolveStartupShellCommand?.()) ?? null
-      return 'session-1'
+      return 'term-111111111111111111111'
     })
     const writeInput = vi.fn()
     const showRepoBranchWorkspacePaneTab = vi.fn()
@@ -950,7 +950,7 @@ describe('RepoWorkspaceContent', () => {
       await Promise.resolve()
     })
 
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/filetree-open', 'session-1')
+    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/filetree-open', 'term-111111111111111111111')
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(createTerminal).toHaveBeenCalledWith(
       { repoRoot: REPO_ID, repoInstanceId: repo.instanceId, branch: branchName, worktreePath },
@@ -970,7 +970,7 @@ describe('RepoWorkspaceContent', () => {
     expect(
       useReposStore.getState().tabOpenerIdentityByScope[
         tabOpenerScopeKey({ repoRoot: REPO_ID, branchName, worktreePath })
-      ]?.['terminal:session-1'],
+      ]?.['terminal:term-111111111111111111111'],
     ).toBe('workspace-pane:files')
   })
 
@@ -1151,7 +1151,7 @@ const emptyTerminalReadContext: TerminalSessionReadContextValue = {
 
 function terminalCommandContextWith(overrides: Partial<TerminalSessionContextValue> = {}): TerminalSessionContextValue {
   return {
-    createTerminal: vi.fn(async () => 'session-1'),
+    createTerminal: vi.fn(async () => 'term-111111111111111111111'),
     registerHost: vi.fn(),
     unregisterHost: vi.fn(),
     selectTerminal: vi.fn(),

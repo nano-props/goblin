@@ -81,7 +81,7 @@ describe('useKeyboard', () => {
       workspacePaneTabsByBranch: {
         'feature/worktree': [
           workspacePaneStaticTabEntry('status'),
-          workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
         ],
       },
     })
@@ -90,7 +90,7 @@ describe('useKeyboard', () => {
     const showRepoBranchTerminalSession = vi.fn()
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => terminalWorktreeSnapshot(),
-      createTerminal: vi.fn(async () => 'session-1'),
+      createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal,
     })
     await renderHookHost({
@@ -104,7 +104,7 @@ describe('useKeyboard', () => {
       await Promise.resolve()
     })
 
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'session-1')
+    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'term-111111111111111111111')
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(selectTerminal).not.toHaveBeenCalled()
   })
@@ -195,7 +195,7 @@ describe('useKeyboard', () => {
       workspacePaneTabsByBranch: {
         'feature/worktree': [
           workspacePaneStaticTabEntry('status'),
-          workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
         ],
       },
     })
@@ -204,7 +204,7 @@ describe('useKeyboard', () => {
     const showRepoBranchTerminalSession = vi.fn()
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => terminalWorktreeSnapshot(),
-      createTerminal: vi.fn(async () => 'session-1'),
+      createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal,
     })
     await renderHookHost({
@@ -223,7 +223,7 @@ describe('useKeyboard', () => {
       await Promise.resolve()
     })
 
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'session-1')
+    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'term-111111111111111111111')
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(selectTerminal).not.toHaveBeenCalled()
     terminalHost.remove()
@@ -239,11 +239,11 @@ describe('useKeyboard', () => {
       workspacePaneTabsByBranch: {
         'feature/worktree': [
           workspacePaneStaticTabEntry('status'),
-          workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
         ],
       },
     })
-    const createTerminal = vi.fn(async () => 'session-2')
+    const createTerminal = vi.fn(async () => 'term-222222222222222222222')
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => terminalWorktreeSnapshot(),
       createTerminal,
@@ -384,11 +384,11 @@ describe('useKeyboard', () => {
       workspacePaneTabsByBranch: {
         'feature/worktree': [
           workspacePaneStaticTabEntry('status'),
-          workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
         ],
       },
     })
-    const createTerminal = vi.fn(async () => 'session-2')
+    const createTerminal = vi.fn(async () => 'term-222222222222222222222')
     const closeTerminalByDescriptor = vi.fn(async () => true)
     const openCreateWorktree = vi.fn()
     setTerminalSessionCommandBridge({
@@ -422,14 +422,14 @@ describe('useKeyboard', () => {
       workspacePaneTabsByBranch: {
         'feature/worktree': [
           workspacePaneStaticTabEntry('status'),
-          workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
         ],
       },
     })
     const closeTerminalByDescriptor = vi.fn(async () => true)
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => terminalWorktreeSnapshot(),
-      createTerminal: vi.fn(async () => 'session-1'),
+      createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
     })
@@ -440,7 +440,7 @@ describe('useKeyboard', () => {
       await Promise.resolve()
     })
 
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-1', {
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', {
       repoRoot: REPO_ID,
 
       repoInstanceId: repoInstanceIdForTest(),
@@ -537,7 +537,7 @@ function terminalWorktreeSnapshot(): TerminalWorktreeSnapshot {
   return {
     terminalWorktreeKey: WORKTREE_KEY,
     selectedDescriptor: {
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalWorktreeKey: WORKTREE_KEY,
       index: 1,
       repoRoot: REPO_ID,
@@ -550,7 +550,7 @@ function terminalWorktreeSnapshot(): TerminalWorktreeSnapshot {
     sessions: [
       {
         type: 'terminal',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         terminalWorktreeKey: WORKTREE_KEY,
         index: 1,
         title: 'terminal 1',
