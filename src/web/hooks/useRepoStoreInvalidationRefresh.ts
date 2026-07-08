@@ -6,7 +6,6 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 export function useRepoStoreInvalidationRefresh() {
   useEffect(() => {
     return subscribeRepoQueryInvalidation((event) => {
-      if (event.query !== 'repo-snapshot') return
       const state = useReposStore.getState()
       const repo = state.repos[event.repoId]
       if (!repo || isRepoUnavailable(repo)) return

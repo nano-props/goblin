@@ -5,6 +5,13 @@ import { getRepoLog, getRepoOperations, getRepoProjection, getRepoRemoteBranches
 import type { RepoOperationsSnapshot, RepoRuntimeProjection, RepoServerOperationState } from '#/shared/api-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT, type PullRequestFetchMode } from '#/shared/git-types.ts'
 
+interface CoalescedRepoRefetch {
+  inFlight: Promise<void> | null
+  rerunRequested: boolean
+}
+
+const coalescedRepoRefetchesByClient = new WeakMap<QueryClient, Map<string, CoalescedRepoRefetch>>()
+
 export function repoProjectionQueryKey(
   repoRoot: string,
   repoInstanceId: string,
@@ -34,6 +41,61 @@ function repoProjectionQueryPrefix(repoRoot: string, repoInstanceId: string) {
 
 function repoOperationsQueryPrefix(repoRoot: string, repoInstanceId: string) {
   return ['repo-data', repoRoot, repoInstanceId, 'operations'] as const
+}
+
+function coalescedRepoRefetchMap(queryClient: QueryClient): Map<string, CoalescedRepoRefetch> {
+  let map = coalescedRepoRefetchesByClient.get(queryClient)
+  if (!map) {
+    map = new Map()
+    coalescedRepoRefetchesByClient.set(queryClient, map)
+  }
+  return map
+}
+
+function markRepoQueryKeysInvalidated(queryClient: QueryClient, queryKeys: ReadonlyArray<readonly unknown[]>): void {
+  for (const queryKey of queryKeys) {
+    void queryClient.invalidateQueries({ queryKey, refetchType: 'none' })
+  }
+}
+
+async function refetchActiveRepoQueryKeys(
+  queryClient: QueryClient,
+  queryKeys: ReadonlyArray<readonly unknown[]>,
+): Promise<void> {
+  await Promise.all(
+    queryKeys.map(async (queryKey) => {
+      await queryClient.refetchQueries({ queryKey, type: 'active' }, { cancelRefetch: false })
+    }),
+  )
+}
+
+function requestCoalescedActiveRepoRefetch(
+  queryClient: QueryClient,
+  key: string,
+  queryKeys: ReadonlyArray<readonly unknown[]>,
+): void {
+  markRepoQueryKeysInvalidated(queryClient, queryKeys)
+  const map = coalescedRepoRefetchMap(queryClient)
+  const runtime = map.get(key) ?? { inFlight: null, rerunRequested: false }
+  map.set(key, runtime)
+  if (runtime.inFlight) {
+    runtime.rerunRequested = true
+    return
+  }
+
+  const run = () => {
+    runtime.inFlight = refetchActiveRepoQueryKeys(queryClient, queryKeys).finally(() => {
+      runtime.inFlight = null
+      if (runtime.rerunRequested) {
+        runtime.rerunRequested = false
+        run()
+        return
+      }
+      if (map.get(key) === runtime) map.delete(key)
+    })
+  }
+
+  run()
 }
 
 function repoLogQueryKey(repoRoot: string, repoInstanceId: string, branch: string, count: number, skip: number) {
@@ -276,12 +338,23 @@ export function seedRepoProjectionQueryData(
   )
 }
 
+export async function fetchRepoProjectionReadModel(
+  repoRoot: string,
+  branch: string | null | undefined,
+  mode: PullRequestFetchMode | undefined,
+  signal?: AbortSignal,
+): Promise<RepoRuntimeProjection> {
+  return await getRepoProjection(repoRoot, branch, { mode }, signal)
+}
+
 export function invalidateRepoDataQueries(
   repoRoot: string,
   repoInstanceId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
-  void queryClient.invalidateQueries({ queryKey: repoDataQueryKey(repoRoot, repoInstanceId) })
+  requestCoalescedActiveRepoRefetch(queryClient, `repo-data:${repoRoot}\0${repoInstanceId}`, [
+    repoDataQueryKey(repoRoot, repoInstanceId),
+  ])
 }
 
 export function invalidateRepoRuntimeProjectionQueries(
@@ -289,6 +362,8 @@ export function invalidateRepoRuntimeProjectionQueries(
   repoInstanceId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
-  void queryClient.invalidateQueries({ queryKey: repoProjectionQueryPrefix(repoRoot, repoInstanceId) })
-  void queryClient.invalidateQueries({ queryKey: repoOperationsQueryPrefix(repoRoot, repoInstanceId) })
+  requestCoalescedActiveRepoRefetch(queryClient, `repo-runtime:${repoRoot}\0${repoInstanceId}`, [
+    repoProjectionQueryPrefix(repoRoot, repoInstanceId),
+    repoOperationsQueryPrefix(repoRoot, repoInstanceId),
+  ])
 }

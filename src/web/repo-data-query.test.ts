@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query'
+import { QueryClient, QueryObserver } from '@tanstack/react-query'
 import { describe, expect, test, vi } from 'vitest'
 import {
   getRepoOperationsQueryData,
@@ -204,15 +204,84 @@ describe('repo projection query data', () => {
   test('invalidates runtime projection queries once per server-owned lifecycle signal', () => {
     const queryClient = new QueryClient()
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
+    const refetchQueries = vi.spyOn(queryClient, 'refetchQueries')
 
     invalidateRepoRuntimeProjectionQueries('/tmp/repo', 'repo-instance-1', queryClient)
 
     expect(invalidateQueries).toHaveBeenCalledTimes(2)
     expect(invalidateQueries).toHaveBeenNthCalledWith(1, {
       queryKey: ['repo-data', '/tmp/repo', 'repo-instance-1', 'projection'],
+      refetchType: 'none',
     })
     expect(invalidateQueries).toHaveBeenNthCalledWith(2, {
       queryKey: ['repo-data', '/tmp/repo', 'repo-instance-1', 'operations'],
+      refetchType: 'none',
     })
+    expect(refetchQueries).toHaveBeenCalledTimes(2)
+    expect(refetchQueries).toHaveBeenNthCalledWith(
+      1,
+      { queryKey: ['repo-data', '/tmp/repo', 'repo-instance-1', 'projection'], type: 'active' },
+      { cancelRefetch: false },
+    )
+    expect(refetchQueries).toHaveBeenNthCalledWith(
+      2,
+      { queryKey: ['repo-data', '/tmp/repo', 'repo-instance-1', 'operations'], type: 'active' },
+      { cancelRefetch: false },
+    )
+    refetchQueries.mockRestore()
+    invalidateQueries.mockRestore()
+  })
+
+  test('coalesces runtime projection invalidations without aborting in-flight refetches', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const signals: AbortSignal[] = []
+    const releases: Array<(projection: RepoRuntimeProjection) => void> = []
+    const observer = new QueryObserver<RepoRuntimeProjection>(queryClient, {
+      queryKey: repoProjectionQueryKey('/tmp/repo', 'repo-instance-1', 'feature/a', 'full'),
+      queryFn: ({ signal }) =>
+        new Promise<RepoRuntimeProjection>((resolve) => {
+          signals.push(signal)
+          releases.push(resolve)
+        }),
+      initialData: repoProjectionForTest(0),
+      staleTime: Number.POSITIVE_INFINITY,
+    })
+    const unsubscribe = observer.subscribe(() => {})
+    try {
+      invalidateRepoRuntimeProjectionQueries('/tmp/repo', 'repo-instance-1', queryClient)
+      await vi.waitFor(() => {
+        expect(releases).toHaveLength(1)
+      })
+
+      invalidateRepoRuntimeProjectionQueries('/tmp/repo', 'repo-instance-1', queryClient)
+      expect(signals[0]?.aborted).toBe(false)
+      expect(releases).toHaveLength(1)
+
+      releases[0]!(repoProjectionForTest(1))
+      await vi.waitFor(() => {
+        expect(releases).toHaveLength(2)
+      })
+      expect(signals[0]?.aborted).toBe(false)
+      expect(signals[1]?.aborted).toBe(false)
+
+      releases[1]!(repoProjectionForTest(2))
+      await vi.waitFor(() => {
+        expect(observer.getCurrentResult().data?.loadedAt).toBe(2)
+      })
+    } finally {
+      unsubscribe()
+      queryClient.clear()
+    }
   })
 })
+
+function repoProjectionForTest(loadedAt: number): RepoRuntimeProjection {
+  return {
+    snapshot: { branches: [], current: 'main' },
+    status: [],
+    pullRequests: null,
+    operations: { operations: [], loadedAt },
+    requested: { branch: 'feature/a', pullRequestMode: 'full' },
+    loadedAt,
+  }
+}

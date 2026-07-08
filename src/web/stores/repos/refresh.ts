@@ -11,8 +11,7 @@ import {
 } from '#/web/stores/repos/refresh-state.ts'
 import { createRefreshSyncHelpers } from '#/web/stores/repos/refresh-sync.ts'
 import { finishDataLoadError, finishDataLoadSuccess, startDataLoad } from '#/web/stores/repos/repo-data-load-state.ts'
-import { getRepoProjection } from '#/web/repo-client.ts'
-import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
+import { fetchRepoProjectionReadModel, setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { RepoRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
 import type {
@@ -111,7 +110,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       operationKey,
       priority,
       targets,
-      task: (signal) => getRepoProjection(id, branchName, { mode: 'full' }, signal),
+      task: (signal) => fetchRepoProjectionReadModel(id, branchName, 'full', signal),
       errorFromResult: (projection) => (projection.snapshot ? null : 'error.failed-read-repo'),
       onResult: async (projection: RepoRuntimeProjection, ctx) => {
         const previousBranchModel = ctx.isCurrent()
