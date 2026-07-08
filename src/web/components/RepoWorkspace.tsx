@@ -223,14 +223,15 @@ function RepoWorkspacePane({
   branchActions,
   onBackToBranchNavigator,
 }: RepoWorkspacePaneProps) {
-  const workspacePaneRoute = workspacePaneRouteContext.kind === 'routed' ? workspacePaneRouteContext.route : null
+  const workspacePaneRoute = workspacePaneRouteContext.kind === 'routed' ? workspacePaneRouteContext.route : undefined
+  const routeControllerRoute = workspacePaneRouteContext.kind === 'routed' ? workspacePaneRouteContext.route : null
   const workspacePaneTabModel = useRepoWorkspaceTabModel(repo, detail, workspacePaneRoute)
   useWorkspacePaneRouteController({
     enabled: workspacePaneRouteContext.kind === 'routed',
     repoId: repo.id,
     branchName: detail.branch?.name ?? null,
     worktreePath: detail.branch?.worktree?.path ?? null,
-    route: workspacePaneRoute,
+    route: routeControllerRoute,
     model: workspacePaneTabModel,
   })
 
@@ -277,7 +278,7 @@ function BranchActionWorkspacePane({
   toolbarTrafficLightOffset = false,
   onBackToBranchNavigator,
 }: BranchActionWorkspacePaneProps) {
-  const workspacePaneRoute = workspacePaneRouteContext.kind === 'routed' ? workspacePaneRouteContext.route : null
+  const workspacePaneRoute = workspacePaneRouteContext.kind === 'routed' ? workspacePaneRouteContext.route : undefined
   const branchActions = useBranchActions(repo, branch)
   const actions = useBranchActionItems(repo, branch, branchActions, { workspacePaneRoute })
   useBranchActionShortcutRegistry(actions, shortcutsEnabled)

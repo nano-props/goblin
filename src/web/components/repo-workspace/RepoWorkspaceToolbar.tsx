@@ -54,7 +54,7 @@ interface Props {
   repo: RepoWorkspaceRepo
   detail: CurrentRepoWorkspacePresentation
   workspacePaneId: string
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
   workspacePaneTabModel: RepoWorkspaceTabModel
   trafficLightOffset?: boolean
   branchActions?: BranchActions

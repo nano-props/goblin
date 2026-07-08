@@ -126,7 +126,7 @@ function defaultRuntimeExternalAppSettings() {
 type RepoWorkspaceToolbarHarnessProps = Omit<
   ComponentProps<typeof RepoWorkspaceToolbar>,
   'workspacePaneTabModel' | 'branchActions'
-> & { workspacePaneRoute: RepoBranchWorkspacePaneRoute | null }
+> & { workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined }
 
 function RepoWorkspaceToolbarHarness(props: RepoWorkspaceToolbarHarnessProps) {
   const workspacePaneTabModel = useRepoWorkspaceTabModel(props.repo, props.detail, props.workspacePaneRoute)

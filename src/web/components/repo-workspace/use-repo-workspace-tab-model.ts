@@ -20,7 +20,7 @@ import { useSyncWorkspacePaneRuntimeTabProviderSelection } from '#/web/workspace
 export function useRepoWorkspaceTabModel(
   repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'ui'>,
   detail: CurrentRepoWorkspacePresentation,
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null,
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined,
 ) {
   const input = useRepoWorkspaceTabModelInput(repo, detail, workspacePaneRoute)
   const model = useMemo(() => createRepoWorkspaceTabModel(input), [input])
@@ -35,7 +35,7 @@ export function useRepoWorkspaceTabModel(
 export function useRepoWorkspaceTabModelInput(
   repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'ui'>,
   detail: CurrentRepoWorkspacePresentation,
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null,
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined,
 ): RepoWorkspaceTabModelInput {
   const { branch } = detail
   const branchName = branch?.name ?? null
