@@ -72,6 +72,27 @@ describe('terminal create command', () => {
     expect(createTerminal).not.toHaveBeenCalled()
     expect(showCreatedTerminalTab).not.toHaveBeenCalled()
   })
+
+  test('fast-fails before create when the base has no repo instance id at the trigger boundary', async () => {
+    const createTerminal = vi.fn(async () => 'session-1')
+    const showCreatedTerminalTab = vi.fn()
+
+    await expect(
+      runCreateTerminalTabCommand({
+        base: {
+          repoRoot: REPO_ID,
+          branch: 'main',
+          worktreePath: WORKTREE_PATH,
+        },
+        createTerminal,
+        openerIdentity: null,
+        showCreatedTerminalTab,
+      }),
+    ).resolves.toMatchObject({ ok: false, messageKey: 'error.terminal-create-failed' })
+
+    expect(createTerminal).not.toHaveBeenCalled()
+    expect(showCreatedTerminalTab).not.toHaveBeenCalled()
+  })
 })
 
 function worktreeSnapshot(input: { createPending: boolean }): TerminalWorktreeSnapshot {

@@ -15,10 +15,7 @@ import {
   type RepoWorkspaceTabModel,
 } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
-import {
-  isWorkspacePaneStaticTabProvider,
-  workspacePaneTabProvider,
-} from '#/web/workspace-pane/tab-providers.ts'
+import { isWorkspacePaneStaticTabProvider, workspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import { selectWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-actions.ts'
 import { readWorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-action-context.ts'
 import {
@@ -238,6 +235,7 @@ async function closeWorkspacePaneTabCommand(options: CloseWorkspacePaneTabComman
       view: tab.view,
       target: {
         repoRoot: target.repoId,
+        repoInstanceId: target.repoInstanceId,
         branchName: target.branchName,
         worktreePath: target.worktreePath,
       },
@@ -278,11 +276,13 @@ function preferredWorkspacePaneTab(repoId: string, branchName: string): Workspac
 
 function closeConfirmedTerminalWorkspacePaneTab(options: ConfirmCloseTerminalWorkspacePaneTabCommandOptions): boolean {
   const { repoId, navigation, targetIdentity, confirmedTerminal } = options
+  if (!confirmedTerminal.base.repoInstanceId) return false
   const confirmed: ConfirmedWorkspacePaneRuntimeTabClose = {
     type: 'terminal',
     sessionId: confirmedTerminal.terminalSessionId,
     target: {
       repoRoot: confirmedTerminal.base.repoRoot,
+      repoInstanceId: confirmedTerminal.base.repoInstanceId,
       branchName: confirmedTerminal.base.branch,
       worktreePath: confirmedTerminal.base.worktreePath,
     },

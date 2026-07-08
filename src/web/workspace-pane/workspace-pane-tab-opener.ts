@@ -4,7 +4,6 @@ import {
   workspacePaneTabTargetForBranch,
   type WorkspacePaneTabTargetOptions,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { hasFreshRepoInstance, type RepoInstanceHandle } from '#/web/stores/repos/repo-guards.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 // Chrome-tab-style "opener" tracking, covering every workspace pane tab,
@@ -12,7 +11,7 @@ import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 // commands so none of them need to duplicate this bookkeeping. Kept
 // dependency-free of command modules to avoid cycles between them.
 
-export type WorkspacePaneTabOpenerRecordResult = 'recorded' | 'missing' | 'stale-instance' | 'unavailable'
+export type WorkspacePaneTabOpenerRecordResult = 'recorded' | 'missing' | 'unavailable'
 
 /** Snapshots the identity of the tab currently active for `repoId`. Callers
  *  must capture this *before* switching into the newly-opened tab (e.g.
@@ -42,12 +41,10 @@ export function recordWorkspacePaneTabOpener(
   branchName: string,
   childIdentity: string,
   openerIdentity: string,
-  repoInstance?: RepoInstanceHandle | null,
 ): WorkspacePaneTabOpenerRecordResult {
   const state = useReposStore.getState()
   const repo = state.repos[repoId]
   if (!repo) return 'missing'
-  if (repoInstance && !hasFreshRepoInstance(state, repoInstance)) return 'stale-instance'
   const branchModel = readRepoBranchQueryProjection(repo)
   if (!branchModel) return 'unavailable'
   if (!branchModel.branches.some((branch) => branch.name === branchName)) return 'missing'

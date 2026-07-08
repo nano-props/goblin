@@ -6,6 +6,7 @@ import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/worksp
 
 export interface WorkspacePaneRuntimeTabCloseTarget {
   repoRoot: string
+  repoInstanceId: string
   branchName: string | null
   worktreePath: string | null
 }
@@ -156,6 +157,7 @@ export function terminalBaseForRuntimeTabCloseTarget(
   if (!target.branchName || !target.worktreePath) return null
   return {
     repoRoot: target.repoRoot,
+    repoInstanceId: target.repoInstanceId,
     branch: target.branchName,
     worktreePath: target.worktreePath,
   }

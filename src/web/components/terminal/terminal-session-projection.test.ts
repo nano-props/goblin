@@ -24,6 +24,7 @@ describe('terminal session projection helpers', () => {
     const projected = projectServerTerminalSession({
       repoIndex: makeRepoIndex(),
       repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       clientId: 'client_a',
       index: 2,
       serverSession: {
@@ -55,6 +56,7 @@ describe('terminal session projection helpers', () => {
         terminalSessionId: 'session-2',
         terminalWorktreeKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
         index: 2,
+        repoInstanceId: REPO_INSTANCE_ID,
         repoRoot: REPO_ROOT,
         branch: 'main',
         worktreePath: WORKTREE_PATH,
@@ -82,6 +84,7 @@ describe('terminal session projection helpers', () => {
     const projected = projectServerTerminalSession({
       repoIndex: makeRepoIndex(),
       repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       clientId: 'client_b',
       index: 1,
       serverSession: {
@@ -109,6 +112,34 @@ describe('terminal session projection helpers', () => {
     expect(projected?.controlsTerminal).toBe(false)
   })
 
+  test('rejects server sessions from a different repo instance', () => {
+    const projected = projectServerTerminalSession({
+      repoIndex: makeRepoIndex(),
+      repoRoot: REPO_ROOT,
+      repoInstanceId: 'repo-instance-current',
+      clientId: 'client_b',
+      index: 1,
+      serverSession: {
+        terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
+        terminalSessionId: 'session-1',
+        repoInstanceId: REPO_INSTANCE_ID,
+        repoRoot: REPO_ROOT,
+        branch: 'main',
+        worktreePath: WORKTREE_PATH,
+        cwd: WORKTREE_PATH,
+        controller: null,
+        processName: 'bash',
+        canonicalTitle: null,
+        phase: 'open',
+        message: null,
+        cols: 80,
+        rows: 24,
+      },
+    })
+
+    expect(projected).toBeNull()
+  })
+
   test('uses server session branch metadata when the repo branch index is not loaded', () => {
     const projected = projectServerTerminalSession({
       repoIndex: {
@@ -118,6 +149,7 @@ describe('terminal session projection helpers', () => {
         },
       },
       repoRoot: REPO_ROOT,
+      repoInstanceId: REPO_INSTANCE_ID,
       clientId: 'client_b',
       index: 1,
       serverSession: {

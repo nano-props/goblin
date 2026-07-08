@@ -617,6 +617,9 @@ describe('RepoWorkspaceToolbar', () => {
 
     expect(mocks.closeTerminalByDescriptor).toHaveBeenCalledWith('t1', {
       repoRoot: REPO_ID,
+
+      repoInstanceId: repoInstanceIdForTest(),
+
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
@@ -1063,6 +1066,9 @@ describe('RepoWorkspaceToolbar', () => {
 
     expect(mocks.closeTerminalByDescriptor).toHaveBeenCalledWith('t1', {
       repoRoot: REPO_ID,
+
+      repoInstanceId: repoInstanceIdForTest(),
+
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
@@ -1087,7 +1093,7 @@ describe('RepoWorkspaceToolbar', () => {
     // Once the provider calls markProjectionReady() (which the real Provider
     // does at the end of a successful terminal session reconcile), the
     // busy state clears and the real button appears.
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, 'repo-instance-test')
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repoInstanceIdForTest())
     await flush()
     expect(c.querySelector('button[aria-label="terminal.new"]')).not.toBeNull()
   })
@@ -1276,6 +1282,9 @@ function renderToolbar(options: {
         terminalWorktreeKey: sessions[0].terminalWorktreeKey,
         index: sessions[0].index,
         repoRoot: REPO_ID,
+
+        repoInstanceId: repo.instanceId,
+
         branch: branchName,
         worktreePath: WORKTREE_PATH,
       }
@@ -1332,14 +1341,10 @@ function renderToolbar(options: {
   })
 
   const queryClient = new QueryClient()
-  const workspacePaneTabs =
-    options.workspacePaneTabs ??
-    (options.workspacePaneStaticTabs || options.terminalCount > 0
-      ? [
-          ...(options.workspacePaneStaticTabs?.map((type) => staticEntry(type)) ?? [staticEntry('status')]),
-          ...sessions.map((session) => terminalEntry(session.terminalSessionId)),
-        ]
-      : undefined)
+  const workspacePaneTabs = options.workspacePaneTabs ?? [
+    ...(options.workspacePaneStaticTabs?.map((type) => staticEntry(type)) ?? [staticEntry('status')]),
+    ...sessions.map((session) => terminalEntry(session.terminalSessionId)),
+  ]
   if (workspacePaneTabs) {
     const repoInstanceId = useReposStore.getState().repos[REPO_ID]!.instanceId
     const workspacePaneTabsQueryInput = {
@@ -1453,6 +1458,12 @@ function tabsFor(branchName: string): WorkspacePaneTabEntry[] {
       )
     : null
   return target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : []
+}
+
+function repoInstanceIdForTest(): string {
+  const repo = useReposStore.getState().repos[REPO_ID]
+  if (!repo) throw new Error(`expected seeded repo ${REPO_ID}`)
+  return repo.instanceId
 }
 
 function staticEntry(type: WorkspacePaneStaticTabType): WorkspacePaneTabEntry {

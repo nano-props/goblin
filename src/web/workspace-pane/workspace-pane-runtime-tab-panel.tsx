@@ -66,14 +66,13 @@ function TerminalWorkspacePaneRuntimeTabPanel({
   runtimeState,
 }: WorkspacePaneRuntimeTabPanelProps) {
   const t = useT()
-  const { createTerminal, createOwnedTerminal } = useTerminalSessionContext()
+  const { createTerminal } = useTerminalSessionContext()
   const navigation = usePrimaryWindowNavigation()
   const createTerminalForSlot = useCallback(
     async (base: TerminalSessionBase) => {
       await runCreateTerminalTabCommand({
         base,
         createTerminal,
-        createOwnedTerminal,
         openerIdentity: null,
         showCreatedTerminalTab: (terminalSessionId) =>
           navigation.showRepoBranchTerminalSession(base.repoRoot, base.branch, terminalSessionId),
@@ -81,7 +80,7 @@ function TerminalWorkspacePaneRuntimeTabPanel({
         logMessage: 'workspace pane terminal create failed',
       })
     },
-    [createOwnedTerminal, createTerminal, navigation, t],
+    [createTerminal, navigation, t],
   )
 
   if (!target.branchName || !target.worktreePath) return null

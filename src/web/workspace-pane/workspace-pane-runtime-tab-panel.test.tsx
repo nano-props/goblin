@@ -71,9 +71,8 @@ describe('workspace pane runtime tab panel', () => {
 
   test('delegates terminal empty-slot create to the terminal create command', async () => {
     const createTerminal = vi.fn(async () => 'session-1')
-    const createOwnedTerminal = vi.fn(async () => 'session-1')
     const { navigation } = renderPanel({
-      terminalContext: terminalCommandContextWith({ createTerminal, createOwnedTerminal }),
+      terminalContext: terminalCommandContextWith({ createTerminal }),
     })
 
     const base: TerminalSessionBase = {
@@ -91,7 +90,6 @@ describe('workspace pane runtime tab panel', () => {
       expect.objectContaining({
         base,
         createTerminal,
-        createOwnedTerminal,
         openerIdentity: null,
         logMessage: 'workspace pane terminal create failed',
       }),

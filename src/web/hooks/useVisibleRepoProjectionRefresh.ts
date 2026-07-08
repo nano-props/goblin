@@ -51,12 +51,7 @@ function isVisibleProjectionWorkspacePaneTab(tab: WorkspacePaneTabType | null): 
 
 function visibleProjectionRefreshKey(repo: RepoVisibleProjectionRefreshState): string | null {
   if (!repo.visibleProjectionViewOpen || !repo.branchName || !repo.renderedWorkspacePaneTab) return null
-  return [
-    repo.id,
-    repo.repoInstanceId,
-    repo.branchName,
-    repo.renderedWorkspacePaneTab,
-  ].join('\0')
+  return [repo.id, repo.repoInstanceId, repo.branchName, repo.renderedWorkspacePaneTab].join('\0')
 }
 
 export function useVisibleRepoProjectionRefresh({
@@ -86,7 +81,13 @@ export function useVisibleRepoProjectionRefresh({
   const repoRoot = currentRepoShell?.id ?? ''
   const repoInstanceId = currentRepoShell?.repoInstanceId ?? ''
   const repoEnabled = currentRepoShell !== null
-  const projectionReadModel = useRepoProjectionReadModel(repoRoot, repoInstanceId, currentBranchName, 'full', repoEnabled)
+  const projectionReadModel = useRepoProjectionReadModel(
+    repoRoot,
+    repoInstanceId,
+    currentBranchName,
+    'full',
+    repoEnabled,
+  )
   const projection = projectionReadModel.data
   const branchReadModel = useMemo(
     () => (projection?.snapshot ? repoBranchReadModelFromSnapshot(projection.snapshot, projection.status) : null),
@@ -124,6 +125,7 @@ export function useVisibleRepoProjectionRefresh({
     if (!currentRepoShell || !branchName) return null
     return createRepoWorkspaceTabModel({
       repoId: currentRepoShell.id,
+      repoInstanceId,
       branchName,
       worktreePath,
       preferredTab: preferredWorkspacePaneTab,

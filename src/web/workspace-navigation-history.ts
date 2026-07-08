@@ -9,10 +9,7 @@ import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { isWorkspacePaneStaticTabType, type WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { workspaceNavigationHistoryEntryEqual } from '#/web/stores/repos/navigation-history-entry.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
-import {
-  workspacePanePreferenceTargetOptions,
-  workspacePaneTabInteractionBlockedForBranch,
-} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import { workspacePaneRouteNavigationBlockedForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
 export type WorkspaceNavigationRouteContext =
   | { kind: 'empty'; repoId: string }
@@ -235,10 +232,14 @@ export function restoreWorkspaceNavigationEntry(
         routeNavigation.openRepoBranch(entry.repoId, entry.route.branchName)
         return
       }
+      if (!isWorkspacePaneStaticTabType(entry.route.workspacePaneTab)) {
+        routeNavigation.openRepoBranch(entry.repoId, entry.route.branchName)
+        return
+      }
       routeNavigation.openRepoBranchTab(
         entry.repoId,
         entry.route.branchName,
-        isWorkspacePaneStaticTabType(entry.route.workspacePaneTab) ? entry.route.workspacePaneTab : 'status',
+        entry.route.workspacePaneTab,
       )
       return
   }
@@ -257,13 +258,16 @@ export function workspaceNavigationHistoryRestoreBlocked(repoId: string, directi
 function workspaceNavigationEntryBlocksWorkspacePaneInteraction(
   entry: WorkspaceNavigationHistoryEntry | null,
 ): boolean {
-  return entry?.route.kind === 'branch'
-    ? workspacePaneTabInteractionBlockedForBranch(
-        entry.repoId,
-        entry.route.branchName,
-        workspacePanePreferenceTargetOptions,
-      )
-    : false
+  if (entry?.route.kind !== 'branch') return false
+  if (!workspaceNavigationBranchEntryTargetsWorkspacePane(entry)) return false
+  return workspacePaneRouteNavigationBlockedForBranch(entry.repoId, entry.route.branchName)
+}
+
+function workspaceNavigationBranchEntryTargetsWorkspacePane(entry: WorkspaceNavigationHistoryEntry): boolean {
+  if (entry.route.kind !== 'branch') return false
+  if (!entry.route.workspacePaneTab) return false
+  if (entry.route.workspacePaneTab !== 'terminal') return true
+  return !!entry.route.terminalSessionId
 }
 
 function workspaceNavigationBrowserHistoryTraversal(

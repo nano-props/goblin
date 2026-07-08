@@ -37,6 +37,7 @@ import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/sha
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 const REPO_ID = '/tmp/repo-workspace-container-repo'
 
@@ -113,7 +114,7 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={navigation}>
           <TerminalSessionContext value={terminalCommandContext}>
             <TerminalSessionReadContext value={terminalReadContext}>
-              <RepoWorkspace repoId={REPO_ID} workspacePaneRoute={null} />
+              <RepoWorkspace repoId={REPO_ID} workspacePaneRouteContext={{ kind: 'routed', route: null }} />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
@@ -149,7 +150,7 @@ describe('RepoWorkspace', () => {
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName="feature/a"
-                workspacePaneRoute={{ kind: 'static', tab: 'status' }}
+                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -171,7 +172,7 @@ describe('RepoWorkspace', () => {
                 <RepoWorkspace
                   repoId={REPO_ID}
                   currentBranchName="feature/b"
-                  workspacePaneRoute={{ kind: 'static', tab: 'status' }}
+                  workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
                 />
               </TerminalSessionReadContext>
             </TerminalSessionContext>
@@ -197,7 +198,7 @@ describe('RepoWorkspace', () => {
                 <RepoWorkspace
                   repoId={REPO_ID}
                   currentBranchName="feature/a"
-                  workspacePaneRoute={{ kind: 'static', tab: 'status' }}
+                  workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
                 />
               </TerminalSessionReadContext>
             </TerminalSessionContext>
@@ -238,7 +239,7 @@ describe('RepoWorkspace', () => {
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName="feature/a"
-                workspacePaneRoute={{ kind: 'static', tab: 'status' }}
+                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -299,14 +300,14 @@ describe('RepoWorkspace', () => {
     const testNavigation = navigationWithStore(route)
 
     const workspace = (
-      workspacePaneRoute: Parameters<typeof RepoWorkspace>[0]['workspacePaneRoute'],
+      workspacePaneRoute: RepoBranchWorkspacePaneRoute | null,
       readContext: TerminalSessionReadContextValue = terminalReadContext,
     ) => (
       <QueryClientProvider client={primaryWindowQueryClient}>
         <PrimaryWindowNavigationProvider value={testNavigation}>
           <TerminalSessionContext value={{ ...terminalCommandContext, createTerminal }}>
             <TerminalSessionReadContext value={readContext}>
-              <RepoWorkspace repoId={REPO_ID} currentBranchName="feature/a" workspacePaneRoute={workspacePaneRoute} />
+              <RepoWorkspace repoId={REPO_ID} currentBranchName="feature/a" workspacePaneRouteContext={{ kind: 'routed', route: workspacePaneRoute }} />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
@@ -381,7 +382,7 @@ describe('RepoWorkspace', () => {
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName={branchName}
-                workspacePaneRoute={{ kind: 'terminal', terminalSessionId: 'missing-session' }}
+                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'terminal', terminalSessionId: 'missing-session' } }}
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -431,7 +432,7 @@ describe('RepoWorkspace', () => {
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName={branchName}
-                workspacePaneRoute={{ kind: 'terminal', terminalSessionId: 'session-2' }}
+                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'terminal', terminalSessionId: 'session-2' } }}
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -476,7 +477,7 @@ describe('RepoWorkspace', () => {
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName={branchName}
-                workspacePaneRoute={{ kind: 'terminal', terminalSessionId: 'session-1' }}
+                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'terminal', terminalSessionId: 'session-1' } }}
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -518,7 +519,7 @@ describe('RepoWorkspace', () => {
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName={branchName}
-                workspacePaneRoute={{ kind: 'terminal', terminalSessionId: 'missing-session' }}
+                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'terminal', terminalSessionId: 'missing-session' } }}
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -575,7 +576,7 @@ describe('RepoWorkspace', () => {
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName={branchName}
-                workspacePaneRoute={{ kind: 'terminal', terminalSessionId: 'missing-session' }}
+                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'terminal', terminalSessionId: 'missing-session' } }}
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -620,7 +621,7 @@ describe('RepoWorkspace', () => {
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName={branchName}
-                workspacePaneRoute={{ kind: 'terminal', terminalSessionId: 'missing-session' }}
+                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'terminal', terminalSessionId: 'missing-session' } }}
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -648,7 +649,7 @@ describe('RepoWorkspace', () => {
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName={branchName}
-                workspacePaneRoute={{ kind: 'static', tab: 'history' }}
+                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'history' } }}
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -702,7 +703,7 @@ describe('RepoWorkspace', () => {
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName={branchName}
-                workspacePaneRoute={{ kind: 'static', tab: 'changes' }}
+                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'changes' } }}
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -752,7 +753,7 @@ describe('RepoWorkspace', () => {
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName={branchName}
-                workspacePaneRoute={{ kind: 'static', tab: 'changes' }}
+                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'changes' } }}
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -812,7 +813,7 @@ describe('RepoWorkspace', () => {
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName="feature/query"
-                workspacePaneRoute={{ kind: 'static', tab: 'status' }}
+                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -853,7 +854,7 @@ describe('RepoWorkspace', () => {
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName="feature/pr"
-                workspacePaneRoute={{ kind: 'static', tab: 'status' }}
+                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'status' } }}
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>

@@ -8,6 +8,7 @@ import {
 } from '#/web/components/repo-workspace/workspace-pane-route-reconciliation.ts'
 
 const REPO_ID = '/tmp/gbl-route-reconciliation-repo'
+const REPO_INSTANCE_ID = 'repo-instance-test'
 const WORKTREE_PATH = '/tmp/gbl-route-reconciliation-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
@@ -31,6 +32,8 @@ describe('workspace pane route reconciliation', () => {
   test('waits for tab entries before replacing a routed terminal session', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
+
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: 'feature/route',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -70,6 +73,8 @@ describe('workspace pane route reconciliation', () => {
   test('leaves a routed terminal session unverified while tab-entry projection has failed', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
+
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: 'feature/route',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'terminal',
@@ -113,6 +118,8 @@ describe('workspace pane route reconciliation', () => {
   test('waits for tab entries before replacing a missing routed static tab', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
+
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: 'feature/route',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'history',
@@ -130,6 +137,8 @@ describe('workspace pane route reconciliation', () => {
   test('leaves a static route unverified while tab-entry projection has failed', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
+
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: 'feature/route',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'history',
@@ -147,6 +156,8 @@ describe('workspace pane route reconciliation', () => {
   test('does not verify a materialized static route while tab-entry projection has failed', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
+
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: 'feature/route',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'history',
@@ -170,6 +181,8 @@ describe('workspace pane route reconciliation', () => {
   test('waits for terminal creation before replacing a missing routed static tab', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
+
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: 'feature/route',
       worktreePath: WORKTREE_PATH,
       preferredTab: 'history',
@@ -187,6 +200,8 @@ describe('workspace pane route reconciliation', () => {
   test('replaces an unmaterialized static route with the bare branch route', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
+
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: 'feature/route',
       worktreePath: null,
       preferredTab: 'changes',
@@ -206,6 +221,8 @@ describe('workspace pane route reconciliation', () => {
   test('replaces an invalid static route with the bare branch route', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
+
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: 'feature/route',
       worktreePath: null,
       preferredTab: null,
@@ -225,6 +242,8 @@ describe('workspace pane route reconciliation', () => {
   test('leaves an invalid static route unverified while tab-entry projection has failed', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
+
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: 'feature/route',
       worktreePath: null,
       preferredTab: null,
@@ -244,6 +263,8 @@ describe('workspace pane route reconciliation', () => {
   test('replaces an unmaterialized route with the bare branch route when the pane is empty', () => {
     const model = createRepoWorkspaceTabModel({
       repoId: REPO_ID,
+
+      repoInstanceId: REPO_INSTANCE_ID,
       branchName: 'feature/route',
       worktreePath: null,
       preferredTab: 'changes',
@@ -268,6 +289,8 @@ function terminalModel(input: {
 }) {
   return createRepoWorkspaceTabModel({
     repoId: REPO_ID,
+
+    repoInstanceId: REPO_INSTANCE_ID,
     branchName: 'feature/route',
     worktreePath: WORKTREE_PATH,
     preferredTab: 'terminal',

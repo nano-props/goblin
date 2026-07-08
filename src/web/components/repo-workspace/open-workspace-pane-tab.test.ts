@@ -166,6 +166,9 @@ describe('openWorkspacePaneTab', () => {
       branches: [createRepoBranch('feature/no-worktree')],
       currentBranchName: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'status',
+      workspacePaneTabsByBranch: {
+        'feature/no-worktree': [workspacePaneStaticTabEntry('status')],
+      },
     })
     const refreshRuntimeProjection = vi.fn(async () => {})
     useReposStore.setState({
@@ -194,6 +197,9 @@ describe('openWorkspacePaneTab', () => {
       branches: [createRepoBranch('feature/no-worktree')],
       currentBranchName: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'changes',
+      workspacePaneTabsByBranch: {
+        'feature/no-worktree': [workspacePaneStaticTabEntry('status')],
+      },
     })
 
     await expect(
@@ -374,7 +380,7 @@ describe('openWorkspacePaneTab', () => {
     expect(openers[tabOpenerScopeKey(REPO_ID, 'feature/b')]).toBeUndefined()
   })
 
-  test('does not record an opener if the repo closes before the open commit resolves', async () => {
+  test('does not record an opener when the server rejects a stale repo instance commit', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/a', { worktree: { path: WORKTREE_PATH } })],
@@ -384,7 +390,7 @@ describe('openWorkspacePaneTab', () => {
         'feature/a': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
       },
     })
-    let resolveCommit!: (tabs: ReturnType<typeof workspacePaneStaticTabEntry>[]) => void
+    let rejectCommit!: (error: unknown) => void
     let resolveCommitStarted!: () => void
     const commitStarted = new Promise<void>((resolve) => {
       resolveCommitStarted = resolve
@@ -392,8 +398,8 @@ describe('openWorkspacePaneTab', () => {
     installWorkspacePaneTabsTestBridge({
       updateWorkspaceTabs: () => {
         resolveCommitStarted()
-        return new Promise((resolve) => {
-          resolveCommit = resolve
+        return new Promise((_, reject) => {
+          rejectCommit = reject
         })
       },
     })
@@ -409,17 +415,74 @@ describe('openWorkspacePaneTab', () => {
     await commitStarted
 
     useReposStore.getState().closeRepo(REPO_ID)
-    resolveCommit([
-      workspacePaneStaticTabEntry('status'),
-      workspacePaneStaticTabEntry('files'),
-      workspacePaneStaticTabEntry('changes'),
-    ])
+    rejectCommit(new Error('error.repo-instance-stale'))
     await expect(openPromise).resolves.toBe(false)
 
     expect(useReposStore.getState().tabOpenerIdentityByScope[tabOpenerScopeKey(REPO_ID, 'feature/a')]).toBeUndefined()
   })
 
-  test('does not select a stale opened tab after the repo closes and reopens before the commit resolves', async () => {
+  test('does not select a stale opened tab when the server rejects a stale repo instance commit', async () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/a', { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: 'feature/a',
+      preferredWorkspacePaneTab: 'files',
+      workspacePaneTabsByBranch: {
+        'feature/a': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
+      },
+    })
+    let rejectCommit!: (error: unknown) => void
+    let resolveCommitStarted!: () => void
+    const commitStarted = new Promise<void>((resolve) => {
+      resolveCommitStarted = resolve
+    })
+    installWorkspacePaneTabsTestBridge({
+      updateWorkspaceTabs: () => {
+        resolveCommitStarted()
+        return new Promise((_, reject) => {
+          rejectCommit = reject
+        })
+      },
+    })
+
+    const showRepoBranchWorkspacePaneTab = vi.fn((repoId, branch, tab) => {
+      const state = useReposStore.getState()
+      useReposStore.setState({ restoredRepoId: repoId })
+      state.setWorkspacePaneTab(repoId, branch, tab)
+    })
+
+    const openPromise = openWorkspacePaneTab({
+      workspacePaneRoute: undefined,
+      repoId: REPO_ID,
+      branchName: 'feature/a',
+      worktreePath: WORKTREE_PATH,
+      type: 'changes',
+      navigation: {
+        ...navigationWithStoreActions(),
+        showRepoBranchWorkspacePaneTab,
+      },
+    })
+    await commitStarted
+
+    useReposStore.getState().closeRepo(REPO_ID)
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/reopened', { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: 'feature/reopened',
+      preferredWorkspacePaneTab: 'status',
+      workspacePaneTabsByBranch: {
+        'feature/reopened': [workspacePaneStaticTabEntry('status')],
+      },
+    })
+    rejectCommit(new Error('error.repo-instance-stale'))
+
+    await expect(openPromise).resolves.toBe(false)
+
+    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
+    expect(preferredWorkspacePaneTab()).toBe('status')
+  })
+
+  test('does not select a stale opened tab when the old repo instance commit succeeds after reopen', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/a', { worktree: { path: WORKTREE_PATH } })],
@@ -465,6 +528,7 @@ describe('openWorkspacePaneTab', () => {
     useReposStore.getState().closeRepo(REPO_ID)
     seedRepoWithReadModelForTest({
       id: REPO_ID,
+      instanceId: 'repo-instance-reopened',
       branches: [createRepoBranch('feature/reopened', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/reopened',
       preferredWorkspacePaneTab: 'status',
@@ -481,7 +545,8 @@ describe('openWorkspacePaneTab', () => {
     await expect(openPromise).resolves.toBe(false)
 
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
-    expect(preferredWorkspacePaneTab()).toBe('status')
+    expect(useReposStore.getState().tabOpenerIdentityByScope[tabOpenerScopeKey(REPO_ID, 'feature/a')]).toBeUndefined()
+    expect(preferredWorkspacePaneTab('feature/reopened')).toBe('status')
   })
 
   test('scopes recorded openers per repo/branch so identical static tab identities do not bleed across targets', async () => {
@@ -577,6 +642,9 @@ function seedWorktreeRepo(preferredWorkspacePaneTab: WorkspacePaneStaticTabType)
     branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
     currentBranchName: 'feature/worktree',
     preferredWorkspacePaneTab,
+    workspacePaneTabsByBranch: {
+      'feature/worktree': [workspacePaneStaticTabEntry('status')],
+    },
   })
 }
 

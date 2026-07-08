@@ -7,8 +7,7 @@ import {
   workspaceNavigationHistoryRestoreBlocked,
 } from '#/web/workspace-navigation-history.ts'
 import {
-  workspacePanePreferenceTargetOptions,
-  workspacePaneTabInteractionBlockedForBranch,
+  workspacePaneRouteNavigationBlockedForBranch,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
 export interface PrimaryWindowNavigationActions {
@@ -70,12 +69,12 @@ export function createPrimaryWindowNavigationActions({
       routeNavigation.openRepoBranch(repoId, branch, options)
     },
     showRepoBranchWorkspacePaneTab(repoId, branch, tab, options) {
-      if (workspacePaneTabInteractionBlockedForBranch(repoId, branch, workspacePanePreferenceTargetOptions)) return
+      if (workspacePaneRouteNavigationBlockedForBranch(repoId, branch)) return
       if (options) routeNavigation.openRepoBranchTab(repoId, branch, tab, options)
       else routeNavigation.openRepoBranchTab(repoId, branch, tab)
     },
     showRepoBranchTerminalSession(repoId, branch, terminalSessionId, options) {
-      if (workspacePaneTabInteractionBlockedForBranch(repoId, branch, workspacePanePreferenceTargetOptions)) return
+      if (workspacePaneRouteNavigationBlockedForBranch(repoId, branch)) return
       if (options) routeNavigation.openRepoBranchTerminal(repoId, branch, terminalSessionId, options)
       else routeNavigation.openRepoBranchTerminal(repoId, branch, terminalSessionId)
     },

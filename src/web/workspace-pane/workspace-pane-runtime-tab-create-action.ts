@@ -2,7 +2,7 @@ import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
-import type { TerminalCreateOptions, TerminalCreateOwner } from '#/web/components/terminal/types.ts'
+import type { TerminalCreateOptions } from '#/web/components/terminal/types.ts'
 
 export interface WorkspacePaneRuntimeTabCreateAction {
   label: string
@@ -25,11 +25,6 @@ export type WorkspacePaneRuntimeTabCreateStateByType = Record<WorkspacePaneRunti
 export interface WorkspacePaneTerminalCreateActionContext {
   base: TerminalSessionBase | null
   createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
-  createOwnedTerminal?: (
-    base: TerminalSessionBase,
-    owner: TerminalCreateOwner,
-    options?: TerminalCreateOptions,
-  ) => Promise<string>
   openerIdentity: string | null
 }
 
@@ -68,7 +63,6 @@ function terminalRuntimeTabCreateAction(
       void runCreateTerminalTabCommand({
         base,
         createTerminal: terminal.createTerminal,
-        createOwnedTerminal: terminal.createOwnedTerminal,
         openerIdentity: terminal.openerIdentity,
         showCreatedTerminalTab: (terminalSessionId) => context.showCreatedRuntimeTab('terminal', terminalSessionId),
         t: context.t,

@@ -330,6 +330,9 @@ function worktreeSnapshotWithTerminal(): TerminalWorktreeSnapshot {
       terminalWorktreeKey: WORKTREE_KEY,
       index: 1,
       repoRoot: REPO_ID,
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     },

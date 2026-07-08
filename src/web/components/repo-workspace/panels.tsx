@@ -168,7 +168,7 @@ function FiletreeTab({
 }) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
-  const { createTerminal, createOwnedTerminal } = useTerminalSessionContext()
+  const { createTerminal } = useTerminalSessionContext()
   const openTrashFileConfirm = useFiletreeActionDialogsStore((s) => s.openTrashFileConfirm)
   const interactionScopeKey = useMemo(() => filetreeInteractionScopeKey(repoId, worktreePath), [repoId, worktreePath])
   const selectedKeyList = useFiletreeInteractionStore(
@@ -245,7 +245,6 @@ function FiletreeTab({
         await runCreateTerminalTabCommand({
           base: { repoRoot: repoId, repoInstanceId, branch: branchName, worktreePath },
           createTerminal,
-          createOwnedTerminal,
           openerIdentity,
           showCreatedTerminalTab: (terminalSessionId) =>
             navigation.showRepoBranchTerminalSession(repoId, branchName, terminalSessionId),
@@ -266,7 +265,6 @@ function FiletreeTab({
     [
       beginOpeningFile,
       branchName,
-      createOwnedTerminal,
       createTerminal,
       endOpeningFile,
       openingFileKeyPrefix,

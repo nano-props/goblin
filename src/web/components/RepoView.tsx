@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
-import { RepoWorkspace } from '#/web/components/RepoWorkspace.tsx'
+import { RepoWorkspace, type RepoWorkspacePaneRouteContext } from '#/web/components/RepoWorkspace.tsx'
 import {
   BranchNavigatorSkeleton,
   RepoWorkspaceLayoutSkeleton,
@@ -99,10 +99,10 @@ export function RepoView({
   const compactWorkspaceTransitioning =
     compact && compactWorkspaceCurrentBranchName !== null && compactWorkspaceCurrentBranchName !== currentBranchName
   const workspaceCurrentBranchName = compact ? compactWorkspaceCurrentBranchName : currentBranchName
-  const workspacePaneRoute =
+  const workspacePaneRouteContext: RepoWorkspacePaneRouteContext =
     routeView?.kind === 'branch' && routeView.branchName === workspaceCurrentBranchName
-      ? routeView.workspacePaneRoute
-      : null
+      ? { kind: 'routed', route: routeView.workspacePaneRoute }
+      : { kind: 'inactive' }
   useEffect(() => {
     if (!compactWorkspaceTransitioning) {
       setCompactWorkspaceTransitioning(false)
@@ -249,7 +249,7 @@ export function RepoView({
             <RepoWorkspace
               repoId={repoId}
               currentBranchName={workspaceCurrentBranchName}
-              workspacePaneRoute={workspacePaneRoute}
+              workspacePaneRouteContext={workspacePaneRouteContext}
               shortcutsEnabled={!compact || singlePane === 'workspace'}
               toolbarTrafficLightOffset={workspaceTrafficLightOffset}
               onBackToBranchNavigator={routeView ? () => onOpenRepoRoot?.(repo.id) : undefined}

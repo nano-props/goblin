@@ -308,7 +308,7 @@ function completeServerSession(session: TestTerminalSessionSummary): TerminalSes
   return {
     ...session,
     terminalSessionId: normalizeTestSessionId(session.terminalSessionId),
-    repoInstanceId: session.repoInstanceId ?? 'repo-instance-test',
+    repoInstanceId: session.repoInstanceId ?? useReposStore.getState().repos[REPO_ID]!.instanceId,
     repoRoot: session.repoRoot ?? REPO_ID,
     branch: session.branch ?? BRANCH_NAME,
     worktreePath: session.worktreePath ?? WORKTREE_PATH,
@@ -1634,12 +1634,12 @@ describe('TerminalSessionProvider', () => {
     expect(readTerminalSessionCommandBridge()).toBeNull()
   })
 
-  test('registers owned terminal creation on the command bridge', async () => {
+  test('registers terminal creation on the command bridge', async () => {
     const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
     const { getContext, unmount } = await renderProviderWithProbe(terminalWorktreeKey)
 
     try {
-      expect(readTerminalSessionCommandBridge()?.createOwnedTerminal).toBe(getContext().createOwnedTerminal)
+      expect(readTerminalSessionCommandBridge()?.createTerminal).toBe(getContext().createTerminal)
     } finally {
       await unmount()
     }

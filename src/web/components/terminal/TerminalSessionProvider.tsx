@@ -81,7 +81,6 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     const disposeCommandBridge = setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: projection.terminalWorktreeSnapshot,
       createTerminal: projection.createTerminal,
-      createOwnedTerminal: projection.createOwnedTerminal,
       selectTerminal: projection.selectTerminal,
       closeTerminalByDescriptor: projection.closeTerminalByDescriptor,
       closeTerminalsForWorktree: projection.closeTerminalsForWorktree,
@@ -102,7 +101,6 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   const commandValue = useMemo<TerminalSessionContextValue>(
     () => ({
       createTerminal: projection.createTerminal,
-      createOwnedTerminal: projection.createOwnedTerminal,
       registerHost: projection.registerHost,
       unregisterHost: projection.unregisterHost,
       selectTerminal: projection.selectTerminal,

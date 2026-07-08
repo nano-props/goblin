@@ -12,7 +12,10 @@ import {
   runTerminalPrimaryActionCommand,
 } from '#/web/commands/workspace-commands.ts'
 import { closeWorkspacePaneTabsForWorktree } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import {
+  setTerminalSessionCommandBridge,
+  type TerminalSessionCommandBridge,
+} from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import {
   createRepoBranch,
   installWorkspacePaneTabsTestBridge,
@@ -239,8 +242,9 @@ describe('workspace commands', () => {
       const refreshRuntimeProjection = vi.fn(async () => {})
       const repoInstanceId = useReposStore.getState().repos[REPO_ID]!.instanceId
       useReposStore.setState({
-        refreshRuntimeProjection:
-          refreshRuntimeProjection as ReturnType<typeof useReposStore.getState>['refreshRuntimeProjection'],
+        refreshRuntimeProjection: refreshRuntimeProjection as ReturnType<
+          typeof useReposStore.getState
+        >['refreshRuntimeProjection'],
       })
 
       await expect(
@@ -267,6 +271,7 @@ describe('workspace commands', () => {
       branches: [createRepoBranch('feature/no-worktree')],
       currentBranchName: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: { 'feature/no-worktree': [staticEntry('status')] },
     })
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => ({
@@ -302,6 +307,7 @@ describe('workspace commands', () => {
       branches: [createRepoBranch('feature/no-worktree')],
       currentBranchName: 'feature/no-worktree',
       preferredWorkspacePaneTab: 'terminal',
+      workspacePaneTabsByBranch: { 'feature/no-worktree': [staticEntry('status')] },
     })
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => ({
@@ -365,12 +371,15 @@ describe('workspace commands', () => {
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'session-1')
     // "Click the Terminal menu" is a generic entry — no insertion anchor is
     // passed, so the new terminal appends to the end of the strip.
-    expect(createTerminal).toHaveBeenCalledWith({
-      repoRoot: REPO_ID,
-      repoInstanceId: useReposStore.getState().repos[REPO_ID]!.instanceId,
-      branch: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
-    })
+    expect(createTerminal).toHaveBeenCalledWith(
+      {
+        repoRoot: REPO_ID,
+        repoInstanceId: useReposStore.getState().repos[REPO_ID]!.instanceId,
+        branch: 'feature/worktree',
+        worktreePath: WORKTREE_PATH,
+      },
+      undefined,
+    )
   })
 
   test('terminal primary action focuses the first existing terminal instead of creating a new one', async () => {
@@ -508,6 +517,9 @@ describe('workspace commands', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [staticEntry('status'), terminalEntry('session-1')],
+      },
     })
     const createTerminal = createTerminalWithProjection(async () => 'session-2')
     setTerminalSessionCommandBridge({
@@ -529,12 +541,15 @@ describe('workspace commands', () => {
     expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[WORKTREE_KEY]).toBe('session-2')
     // Cmd+T / File → New Terminal Tab is a generic entry — no insertion
     // anchor is passed, so the new terminal appends to the end of the strip.
-    expect(createTerminal).toHaveBeenCalledWith({
-      repoRoot: REPO_ID,
-      repoInstanceId: useReposStore.getState().repos[REPO_ID]!.instanceId,
-      branch: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
-    })
+    expect(createTerminal).toHaveBeenCalledWith(
+      {
+        repoRoot: REPO_ID,
+        repoInstanceId: useReposStore.getState().repos[REPO_ID]!.instanceId,
+        branch: 'feature/worktree',
+        worktreePath: WORKTREE_PATH,
+      },
+      undefined,
+    )
   })
 
   test('new terminal tab command keeps a reused terminal id in its existing tab position', async () => {
@@ -599,7 +614,7 @@ describe('workspace commands', () => {
     expect(tabsFor('feature/worktree')).toEqual([staticEntry('status')])
   })
 
-  test('new terminal tab command does not show feedback when owned create is canceled', async () => {
+  test('new terminal tab command does not show feedback when create is canceled', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -609,13 +624,12 @@ describe('workspace commands', () => {
         'feature/worktree': [staticEntry('status')],
       },
     })
-    const createOwnedTerminal = vi.fn(async () => {
+    const createTerminal = vi.fn(async () => {
       throw new Error('terminal create request canceled')
     })
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(),
-      createTerminal: vi.fn(async () => 'session-ignored'),
-      createOwnedTerminal,
+      createTerminal,
       selectTerminal: vi.fn(),
     })
 
@@ -629,7 +643,7 @@ describe('workspace commands', () => {
       }),
     ).resolves.toBe(false)
 
-    expect(createOwnedTerminal).toHaveBeenCalledTimes(1)
+    expect(createTerminal).toHaveBeenCalledTimes(1)
     expect(toastMocks.error).not.toHaveBeenCalled()
     expect(tabsFor('feature/worktree')).toEqual([staticEntry('status')])
   })
@@ -658,6 +672,7 @@ describe('workspace commands', () => {
       repoId: REPO_ID,
       branchName: 'feature/worktree',
       navigation: navigationWith({ showRepoBranchTerminalSession }),
+      t: (key) => key,
     })
     await vi.waitFor(() => expect(createTerminal).toHaveBeenCalledTimes(1))
 
@@ -674,7 +689,7 @@ describe('workspace commands', () => {
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'session-2')
   })
 
-  test('new terminal tab command does not create a terminal after the repo is closed and reopened', async () => {
+  test('new terminal tab command does not navigate when the server rejects a stale repo instance', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -684,7 +699,10 @@ describe('workspace commands', () => {
         'feature/worktree': [staticEntry('status')],
       },
     })
-    const createTerminal = vi.fn(async () => 'session-reopened-should-not-exist')
+    const createTerminal = vi.fn(async () => {
+      await Promise.resolve()
+      throw new Error('error.repo-instance-stale')
+    })
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal,
@@ -712,6 +730,7 @@ describe('workspace commands', () => {
     await expect(command).resolves.toBe(false)
     expect(createTerminal).toHaveBeenCalledOnce()
     expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
+    expect(toastMocks.error).not.toHaveBeenCalled()
     expect(preferredWorkspacePaneTab()).toBe('status')
   })
 
@@ -746,6 +765,9 @@ describe('workspace commands', () => {
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-1', {
       repoRoot: REPO_ID,
+
+      repoInstanceId: repoInstanceIdForTest(),
+
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
@@ -826,6 +848,9 @@ describe('workspace commands', () => {
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-1', {
       repoRoot: REPO_ID,
+
+      repoInstanceId: repoInstanceIdForTest(),
+
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
@@ -875,6 +900,9 @@ describe('workspace commands', () => {
       workspacePaneRoute,
       terminalBase: {
         repoRoot: REPO_ID,
+
+        repoInstanceId: repoInstanceIdForTest(),
+
         branch: 'feature/worktree',
         worktreePath: WORKTREE_PATH,
       },
@@ -899,6 +927,9 @@ describe('workspace commands', () => {
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-1', {
       repoRoot: REPO_ID,
+
+      repoInstanceId: repoInstanceIdForTest(),
+
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
@@ -956,6 +987,9 @@ describe('workspace commands', () => {
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-1', {
       repoRoot: REPO_ID,
+
+      repoInstanceId: repoInstanceIdForTest(),
+
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
@@ -1027,6 +1061,9 @@ describe('workspace commands', () => {
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-1', {
       repoRoot: REPO_ID,
+
+      repoInstanceId: repoInstanceIdForTest(),
+
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
@@ -1077,6 +1114,9 @@ describe('workspace commands', () => {
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-1', {
       repoRoot: REPO_ID,
+
+      repoInstanceId: repoInstanceIdForTest(),
+
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
@@ -1141,11 +1181,17 @@ describe('workspace commands', () => {
 
     expect(closeTerminalByDescriptor).toHaveBeenNthCalledWith(1, 'session-1', {
       repoRoot: REPO_ID,
+
+      repoInstanceId: repoInstanceIdForTest(),
+
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
     expect(closeTerminalByDescriptor).toHaveBeenNthCalledWith(2, 'session-2', {
       repoRoot: REPO_ID,
+
+      repoInstanceId: repoInstanceIdForTest(),
+
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
@@ -1187,6 +1233,9 @@ describe('workspace commands', () => {
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-2', {
       repoRoot: REPO_ID,
+
+      repoInstanceId: repoInstanceIdForTest(),
+
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
@@ -1753,6 +1802,9 @@ describe('workspace commands', () => {
 
     expect(closeTerminalsForWorktree).toHaveBeenCalledWith({
       repoRoot: REPO_ID,
+
+      repoInstanceId: repoInstanceIdForTest(),
+
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
@@ -1788,6 +1840,9 @@ describe('workspace commands', () => {
 
     expect(closeTerminalsForWorktree).toHaveBeenCalledWith({
       repoRoot: REPO_ID,
+
+      repoInstanceId: repoInstanceIdForTest(),
+
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
@@ -1976,6 +2031,12 @@ function tabsFor(branch: string): WorkspacePaneTabEntry[] {
   return target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : []
 }
 
+function repoInstanceIdForTest(repoId = REPO_ID): string {
+  const repo = useReposStore.getState().repos[repoId]
+  if (!repo) throw new Error(`expected seeded repo ${repoId}`)
+  return repo.instanceId
+}
+
 function createTerminalWithProjection(resolveSessionId: () => string | Promise<string>) {
   return vi.fn(async (base: TerminalSessionBase) => {
     const terminalSessionId = await resolveSessionId()
@@ -2035,6 +2096,9 @@ function worktreeSnapshotWithTerminal(options: { processName?: string } = {}): T
       terminalWorktreeKey: WORKTREE_KEY,
       index: 1,
       repoRoot: REPO_ID,
+
+      repoInstanceId: repoInstanceIdForTest(),
+
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     },
@@ -2094,6 +2158,9 @@ function worktreeSnapshotForSessions(terminalSessionIds: string[]): TerminalWork
           terminalWorktreeKey: WORKTREE_KEY,
           index: selectedSession.index,
           repoRoot: REPO_ID,
+
+          repoInstanceId: repoInstanceIdForTest(),
+
           branch: 'feature/worktree',
           worktreePath: WORKTREE_PATH,
         }
@@ -2114,6 +2181,9 @@ function worktreeSnapshotWithSecondTerminalSelected(): TerminalWorktreeSnapshot 
       terminalWorktreeKey: WORKTREE_KEY,
       index: 2,
       repoRoot: REPO_ID,
+
+      repoInstanceId: repoInstanceIdForTest(),
+
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     },

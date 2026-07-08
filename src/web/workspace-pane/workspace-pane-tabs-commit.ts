@@ -2,6 +2,8 @@ import type { QueryClient } from '@tanstack/react-query'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs.ts'
 import { gblLog } from '#/web/logger.ts'
+import { currentRepoInstanceId } from '#/web/stores/repos/repo-guards.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
   cancelWorkspacePaneTabs,
   setWorkspacePaneTabsForTargetQueryData,
@@ -38,6 +40,7 @@ export interface WorkspacePaneTabsMutationFailure {
   worktreePath: string | null
   message: string
   error: unknown
+  canceled?: boolean
 }
 
 export type WorkspacePaneTabsMutationResult = WorkspacePaneTabsMutationSuccess | WorkspacePaneTabsMutationFailure
@@ -98,14 +101,14 @@ async function commitWorkspacePaneTabsNow(
   try {
     await cancelWorkspacePaneTabs(input.repoRoot, input.repoInstanceId)
     const serverTabs = await replaceWorkspacePaneTabsOnServer(input)
-    await writeCanonicalWorkspacePaneTabsForTarget({
+    const accepted = await writeCanonicalWorkspacePaneTabsForTarget({
       repoRoot: input.repoRoot,
       repoInstanceId: input.repoInstanceId,
       branchName: input.branchName,
       worktreePath: input.worktreePath,
       tabs: serverTabs,
     })
-    return { ok: true }
+    return accepted ? { ok: true } : canceledWorkspacePaneTabsMutation('commit', input)
   } catch (err) {
     return reportWorkspacePaneTabsFailure({
       operation: 'commit',
@@ -123,14 +126,14 @@ async function updateWorkspacePaneTabsNow(
   try {
     await cancelWorkspacePaneTabs(input.repoRoot, input.repoInstanceId)
     const serverTabs = await updateWorkspacePaneTabsOnServer(input)
-    await writeCanonicalWorkspacePaneTabsForTarget({
+    const accepted = await writeCanonicalWorkspacePaneTabsForTarget({
       repoRoot: input.repoRoot,
       repoInstanceId: input.repoInstanceId,
       branchName: input.branchName,
       worktreePath: input.worktreePath,
       tabs: serverTabs,
     })
-    return { ok: true }
+    return accepted ? { ok: true } : canceledWorkspacePaneTabsMutation('update', input)
   } catch (err) {
     return reportWorkspacePaneTabsFailure({
       operation: 'update',
@@ -145,14 +148,17 @@ async function updateWorkspacePaneTabsNow(
 export async function writeCanonicalWorkspacePaneTabsForTarget(
   input: CommitWorkspacePaneTabsInput,
   queryClient?: QueryClient,
-): Promise<void> {
+): Promise<boolean> {
+  if (!workspacePaneTabsProjectionScopeAccepted(input)) return false
   // Server-returned tabs are the canonical runtime projection. Session
   // persistence may observe this query cache later, but it is not a
   // runtime source for tabs after boot restore.
   // A list query may have started while the server write was in flight.
   // Cancel again so stale list results cannot overwrite the canonical tabs.
   await cancelWorkspacePaneTabs(input.repoRoot, input.repoInstanceId, queryClient)
+  if (!workspacePaneTabsProjectionScopeAccepted(input)) return false
   setWorkspacePaneTabsForTargetQueryData(input, queryClient)
+  return true
 }
 
 export async function replaceWorkspacePaneTabsOnServer(
@@ -177,4 +183,27 @@ export async function updateWorkspacePaneTabsOnServer(
     worktreePath: input.worktreePath,
     operation: input.operation,
   })
+}
+
+function workspacePaneTabsProjectionScopeAccepted(
+  input: Pick<CommitWorkspacePaneTabsInput, 'repoRoot' | 'repoInstanceId'>,
+): boolean {
+  return currentRepoInstanceId(useReposStore.getState(), input.repoRoot) === input.repoInstanceId
+}
+
+function canceledWorkspacePaneTabsMutation(
+  operation: WorkspacePaneTabsMutationOperation,
+  input: Pick<CommitWorkspacePaneTabsInput, 'repoRoot' | 'branchName' | 'worktreePath'>,
+): WorkspacePaneTabsMutationFailure {
+  const error = new Error('error.repo-instance-stale')
+  return {
+    ok: false,
+    operation,
+    repoRoot: input.repoRoot,
+    branchName: input.branchName,
+    worktreePath: input.worktreePath,
+    message: error.message,
+    error,
+    canceled: true,
+  }
 }

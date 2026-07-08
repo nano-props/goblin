@@ -8,9 +8,11 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   resolveWorkspacePaneTabTargetForBranch,
   workspacePanePreferenceTargetOptions,
+  workspacePaneTabInteractionBlockedForBranch,
   workspacePaneTabTargetForBranch,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
@@ -43,6 +45,29 @@ describe('workspace pane tab target read model', () => {
     expect(workspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions)).toBeNull()
   })
 
+  test('marks target resolution unavailable while workspace pane tabs projection is not ready', () => {
+    const repo = emptyRepo(REPO_ID, 'workspace-pane-target-repo', 'repo-instance-workspace-pane-no-tabs')
+    useReposStore.setState((s) => ({
+      repos: { ...s.repos, [REPO_ID]: repo },
+      order: [...s.order, REPO_ID],
+      restoredRepoId: REPO_ID,
+    }))
+    seedRepoReadModelQueryData(repo, {
+      branches: [createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH } })],
+      currentBranch: 'feature/query',
+    })
+    expect(
+      resolveWorkspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions),
+    ).toEqual({
+      kind: 'unavailable',
+      reason: 'workspace-pane-tabs-pending',
+    })
+    expect(workspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions)).toBeNull()
+    expect(workspacePaneTabInteractionBlockedForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions)).toBe(
+      true,
+    )
+  })
+
   test('resolves branch targets from the React Query projection when store branches are stale', () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -53,6 +78,13 @@ describe('workspace pane tab target read model', () => {
     seedRepoReadModelQueryData(repo, {
       branches: [createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH } })],
       currentBranch: 'feature/query',
+    })
+    setWorkspacePaneTabsForTargetQueryData({
+      repoRoot: REPO_ID,
+      repoInstanceId: repo.instanceId,
+      branchName: 'feature/query',
+      worktreePath: WORKTREE_PATH,
+      tabs: [workspacePaneStaticTabEntry('status')],
     })
 
     const target = workspacePaneTabTargetForBranch(REPO_ID, 'feature/query', workspacePanePreferenceTargetOptions)

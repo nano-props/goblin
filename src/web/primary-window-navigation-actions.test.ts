@@ -46,6 +46,26 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(navigation.openRepoBranchTab).toHaveBeenCalledWith('/tmp/repo-b', 'feature/test', 'history')
   })
 
+  test('does not block explicit workspace pane route navigation while tabs projection is pending', () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: BRANCH_NAME,
+      preferredWorkspacePaneTab: 'status',
+    })
+    const navigation = routeNavigation()
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: REPO_ID,
+      order: [REPO_ID],
+      closeRepo: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    actions.showRepoBranchWorkspacePaneTab(REPO_ID, BRANCH_NAME, 'history')
+
+    expect(navigation.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, 'history')
+  })
+
   test('opens branch terminal sessions through route navigation', () => {
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
@@ -268,6 +288,75 @@ describe('createPrimaryWindowNavigationActions', () => {
 
     expect(goBackInWorkspaceNavigation).toHaveBeenCalledWith('/tmp/repo-a')
     expect(navigation.openRepoBranch).toHaveBeenCalledWith('/tmp/repo-a', 'feature/test')
+  })
+
+  test('does not block bare branch history restore while tabs projection is pending', () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: BRANCH_NAME,
+      preferredWorkspacePaneTab: 'status',
+    })
+    const branch = {
+      repoId: REPO_ID,
+      route: {
+        kind: 'branch',
+        branchName: BRANCH_NAME,
+        workspacePaneTab: null,
+        terminalWorktreeKey: null,
+        terminalSessionId: null,
+      },
+    } satisfies WorkspaceNavigationHistoryEntry
+    const dashboard = {
+      repoId: REPO_ID,
+      route: { kind: 'dashboard' },
+    } satisfies WorkspaceNavigationHistoryEntry
+    useReposStore.getState().recordWorkspaceNavigation(branch)
+    useReposStore.getState().recordWorkspaceNavigation(dashboard)
+    const navigation = routeNavigation()
+    const goBackInWorkspaceNavigation = vi.fn((repoId: string) =>
+      useReposStore.getState().goBackInWorkspaceNavigation(repoId),
+    )
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: REPO_ID,
+      order: [REPO_ID],
+      closeRepo: vi.fn(),
+      goBackInWorkspaceNavigation,
+      routeNavigation: navigation,
+    })
+
+    actions.goBack(REPO_ID)
+
+    expect(goBackInWorkspaceNavigation).toHaveBeenCalledWith(REPO_ID)
+    expect(navigation.openRepoBranch).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME)
+  })
+
+  test('restores a malformed terminal history entry as the bare branch route', () => {
+    const navigation = routeNavigation()
+    const goBackInWorkspaceNavigation = vi.fn(() => ({
+      repoId: '/tmp/repo-a',
+      route: {
+        kind: 'branch' as const,
+        branchName: 'feature/test',
+        workspacePaneTab: 'terminal' as const,
+        terminalWorktreeKey: '/tmp/repo-a\0/tmp/worktree',
+        terminalSessionId: null,
+      },
+    }))
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: '/tmp/repo-a',
+      order: ['/tmp/repo-a'],
+      closeRepo: vi.fn(),
+      goBackInWorkspaceNavigation,
+      routeNavigation: navigation,
+    })
+
+    actions.goBack('/tmp/repo-a')
+
+    expect(goBackInWorkspaceNavigation).toHaveBeenCalledWith('/tmp/repo-a')
+    expect(navigation.openRepoBranch).toHaveBeenCalledWith('/tmp/repo-a', 'feature/test')
+    expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
+    expect(navigation.openRepoBranchTerminal).not.toHaveBeenCalled()
   })
 
   test('does not open create worktree without a current repo', () => {

@@ -63,7 +63,6 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
   const result = await runCreateTerminalTabCommand({
     base: terminal.base,
     createTerminal: terminal.bridge.createTerminal,
-    createOwnedTerminal: terminal.bridge.createOwnedTerminal,
     openerIdentity: terminal.openerIdentity,
     showCreatedTerminalTab: terminal.showTerminalSession,
     t: terminal.t,
@@ -81,7 +80,6 @@ async function runNewTerminalAction(context: WorkspacePaneRuntimeTabCommandConte
   const result = await runCreateTerminalTabCommand({
     base: terminal.base,
     createTerminal: terminal.bridge.createTerminal,
-    createOwnedTerminal: terminal.bridge.createOwnedTerminal,
     openerIdentity: terminal.openerIdentity,
     showCreatedTerminalTab: terminal.showTerminalSession,
     t: terminal.t,

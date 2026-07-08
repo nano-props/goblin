@@ -49,19 +49,21 @@ vi.mock('#/web/components/BranchNavigator.tsx', () => ({
 vi.mock('#/web/components/RepoWorkspace.tsx', () => ({
   RepoWorkspace: ({
     currentBranchName,
-    workspacePaneRoute,
+    workspacePaneRouteContext,
     shortcutsEnabled = true,
     toolbarTrafficLightOffset = false,
   }: {
     currentBranchName?: string | null
-    workspacePaneRoute?: { kind: string } | null
+    workspacePaneRouteContext?: { kind: 'routed'; route: { kind: string } | null } | { kind: 'inactive' }
     shortcutsEnabled?: boolean
     toolbarTrafficLightOffset?: boolean
   }) => (
     <div
       data-testid="repo-workspace"
       data-current-branch-name={currentBranchName ?? ''}
-      data-workspace-pane-route-kind={workspacePaneRoute?.kind ?? ''}
+      data-workspace-pane-route-kind={
+        workspacePaneRouteContext?.kind === 'routed' ? (workspacePaneRouteContext.route?.kind ?? 'bare') : 'inactive'
+      }
       data-shortcuts-enabled={shortcutsEnabled ? 'true' : 'false'}
       data-traffic-light-offset={toolbarTrafficLightOffset ? 'true' : 'false'}
     />
@@ -929,6 +931,7 @@ describe('RepoView workspace navigation', () => {
       expect(compactWorkspace(container)?.dataset.activePane).toBe('navigator')
       expect(compactPane(container, 'workspace')?.getAttribute('aria-hidden')).toBe('true')
       expect(repoWorkspace(container)?.dataset.currentBranchName).toBe('feature/a')
+      expect(repoWorkspace(container)?.dataset.workspacePaneRouteKind).toBe('inactive')
       expect(repoWorkspace(container)?.dataset.shortcutsEnabled).toBe('false')
 
       act(() => {

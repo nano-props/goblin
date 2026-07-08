@@ -10,13 +10,16 @@ import {
   workspacePaneRuntimeTabConfirmedCloseIdentity,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
 
+const REPO_INSTANCE_ID = 'repo-instance-test'
 const terminalBase: TerminalSessionBase = {
   repoRoot: '/repo',
+  repoInstanceId: REPO_INSTANCE_ID,
   branch: 'main',
   worktreePath: '/repo-worktree',
 }
 const closeTarget = {
   repoRoot: terminalBase.repoRoot,
+  repoInstanceId: REPO_INSTANCE_ID,
   branchName: terminalBase.branch,
   worktreePath: terminalBase.worktreePath,
 }
@@ -79,7 +82,11 @@ describe('workspace pane runtime tab close actions', () => {
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-1', terminalBase)
     expect(
-      workspacePaneRuntimeTabConfirmedCloseBranchName({ type: 'terminal', sessionId: 'session-1', target: closeTarget }),
+      workspacePaneRuntimeTabConfirmedCloseBranchName({
+        type: 'terminal',
+        sessionId: 'session-1',
+        target: closeTarget,
+      }),
     ).toBe('main')
     expect(
       workspacePaneRuntimeTabConfirmedCloseIdentity({ type: 'terminal', sessionId: 'session-1', target: closeTarget }),

@@ -12,6 +12,7 @@ export interface TerminalDescriptor {
   terminalWorktreeKey: string
   terminalSessionId: string
   index: number
+  repoInstanceId: string
   repoRoot: string
   branch: string
   worktreePath: string
@@ -144,22 +145,6 @@ export interface TerminalCreateOptions {
   insertAfterIdentity?: string | null
 }
 
-export interface TerminalCreateOwner {
-  /**
-   * Stable ownership identity for stale-result rejection.
-   * This tracks which repo/runtime instance "owns" the create result
-   * so a reopen can invalidate it before local projection publishes.
-   */
-  key: string
-  /**
-   * Freshness predicate evaluated before the create result is projected
-   * into local terminal state. If it flips false while the server create
-   * is in flight, the projection disposes the server session and rejects
-   * instead of publishing a stale local session.
-   */
-  isFresh: () => boolean
-}
-
 export interface TerminalRepoSnapshot {
   instanceId: string
   branchByWorktreePath: Record<string, string>
@@ -194,11 +179,6 @@ export interface TerminalWorktreeSnapshot {
 
 export interface TerminalSessionContextValue {
   createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
-  createOwnedTerminal?: (
-    base: TerminalSessionBase,
-    owner: TerminalCreateOwner,
-    options?: TerminalCreateOptions,
-  ) => Promise<string>
   registerHost: (terminalWorktreeKey: string, host: HTMLElement) => void
   unregisterHost: (terminalWorktreeKey: string, host: HTMLElement) => void
   selectTerminal: (terminalWorktreeKey: string, terminalSessionId: string) => void

@@ -27,7 +27,7 @@ describe('workspace pane runtime tab create action', () => {
       t: translate,
       terminal: {
         base: null,
-        createTerminal: vi.fn(),
+        createTerminal: vi.fn(async () => 'session-1'),
         openerIdentity: null,
       },
     })
@@ -43,7 +43,6 @@ describe('workspace pane runtime tab create action', () => {
       worktreePath: '/repo-worktree',
     }
     const createTerminal = vi.fn(async () => 'session-1')
-    const createOwnedTerminal = vi.fn(async () => 'session-1')
     const showCreatedRuntimeTab = vi.fn()
 
     const action = workspacePaneRuntimeTabCreateAction('terminal', {
@@ -55,7 +54,6 @@ describe('workspace pane runtime tab create action', () => {
       terminal: {
         base,
         createTerminal,
-        createOwnedTerminal,
         openerIdentity: 'opener-tab',
       },
     })
@@ -70,7 +68,6 @@ describe('workspace pane runtime tab create action', () => {
       expect.objectContaining({
         base,
         createTerminal,
-        createOwnedTerminal,
         openerIdentity: 'opener-tab',
         t: translate,
       }),
@@ -99,7 +96,7 @@ describe('workspace pane runtime tab create action', () => {
       t: translate,
       terminal: {
         base,
-        createTerminal: vi.fn(),
+        createTerminal: vi.fn(async () => 'session-1'),
         openerIdentity: null,
       },
     })
@@ -114,7 +111,7 @@ describe('workspace pane runtime tab create action', () => {
       t: translate,
       terminal: {
         base,
-        createTerminal: vi.fn(),
+        createTerminal: vi.fn(async () => 'session-1'),
         openerIdentity: null,
       },
     })

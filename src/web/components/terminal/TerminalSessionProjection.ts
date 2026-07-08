@@ -40,7 +40,6 @@ import { buildTerminalWorktreeSnapshot } from '#/web/components/terminal/termina
 import type {
   TerminalDescriptor,
   TerminalCreateOptions,
-  TerminalCreateOwner,
   TerminalIdentityRealtimeEvent,
   TerminalLifecycleRealtimeEvent,
   TerminalRepoIndex,
@@ -60,7 +59,6 @@ const MAX_PENDING_SERVER_BELLS = 99
 
 interface TerminalCreateQueueRequest {
   createOptions: TerminalCreateOptions
-  owner: TerminalCreateOwner | null
   dedupeKey: string | null
 }
 
@@ -72,7 +70,7 @@ interface ResolvedTerminalCreateOptions {
 type TerminalWorkspaceTabsChangedHandler = (
   base: TerminalSessionBase,
   tabs: readonly WorkspacePaneTabEntry[],
-) => void | Promise<void>
+) => boolean | Promise<boolean>
 
 /**
  * Client-level authority for terminal session state.
@@ -163,7 +161,7 @@ export class TerminalSessionProjection {
 
   constructor(
     onSelectedWorktreeChange: (terminalWorktreeKey: string, terminalSessionId: string | null) => void = () => {},
-    onWorkspaceTabsChanged: TerminalWorkspaceTabsChangedHandler = () => {},
+    onWorkspaceTabsChanged: TerminalWorkspaceTabsChangedHandler = () => true,
   ) {
     this.onSelectedWorktreeChange = onSelectedWorktreeChange
     this.onWorkspaceTabsChanged = onWorkspaceTabsChanged
@@ -342,23 +340,24 @@ export class TerminalSessionProjection {
   }
 
   reconcileServerSessions(
-    repoRoot: string,
+    scope: { repoRoot: string; repoInstanceId: string },
     serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
     snapshotsByTerminalRuntimeSessionId: ReadonlyMap<string, TerminalHydrationSnapshot> = EMPTY_SERVER_SNAPSHOTS,
-  ): void {
-    if (!this.repoIndex[repoRoot]) return
+  ): boolean {
+    if (this.repoIndex[scope.repoRoot]?.instanceId !== scope.repoInstanceId) return false
 
     const { controllerTerminalSessionIdByWorktree, touchedWorktrees, tabsChangedWorktrees } =
-      this.materializeServerSessions(repoRoot, serverSessions, clientId, snapshotsByTerminalRuntimeSessionId)
+      this.materializeServerSessions(scope, serverSessions, clientId, snapshotsByTerminalRuntimeSessionId)
 
     const serverTerminalSessionIds = new Set(serverSessions.map((session) => session.terminalSessionId))
-    this.evictOrphanedLocalSessions(repoRoot, serverTerminalSessionIds)
+    this.evictOrphanedLocalSessions(scope, serverTerminalSessionIds)
 
     this.resolveSelectedTerminalSessionIdsForTouchedWorktrees(touchedWorktrees, controllerTerminalSessionIdByWorktree)
     for (const terminalWorktreeKey of tabsChangedWorktrees) {
       this.notifyWorktree(terminalWorktreeKey)
     }
+    return true
   }
 
   // Phase 1: for each server session, ensure a local TerminalSession
@@ -366,7 +365,7 @@ export class TerminalSessionProjection {
   // which worktrees saw any change. Side effects: ensureSession,
   // session.hydrate, terminalSessionIdsByTerminalWorktree, syncTerminalRuntimeSessionIdIndex.
   private materializeServerSessions(
-    repoRoot: string,
+    scope: { repoRoot: string; repoInstanceId: string },
     serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
     snapshotsByTerminalRuntimeSessionId: ReadonlyMap<string, TerminalHydrationSnapshot>,
@@ -385,7 +384,8 @@ export class TerminalSessionProjection {
       const index = (nextIndexByWorktree.get(terminalWorktreeKey) ?? 0) + 1
       const projected = projectServerTerminalSession({
         repoIndex: this.repoIndex,
-        repoRoot,
+        repoRoot: scope.repoRoot,
+        repoInstanceId: scope.repoInstanceId,
         serverSession,
         clientId,
         index,
@@ -423,12 +423,18 @@ export class TerminalSessionProjection {
   // (i.e. have a terminalRuntimeSessionId in our index) are eligible for eviction;
   // never-attached local shells (purely UI placeholders) are left
   // alone. Returns the count for the debug log.
-  private evictOrphanedLocalSessions(repoRoot: string, serverTerminalSessionIds: Set<string>): number {
+  private evictOrphanedLocalSessions(
+    scope: { repoRoot: string; repoInstanceId: string },
+    serverTerminalSessionIds: Set<string>,
+  ): number {
     const orphanedTerminalSessionIds = countOrphanedTerminalSessionIds({
-      repoRoot,
+      repoRoot: scope.repoRoot,
+      repoInstanceId: scope.repoInstanceId,
       localTerminalSessionIds: Array.from(this.sessions.keys()),
       getRepoRootForTerminalSessionId: (terminalSessionId) =>
         this.sessions.get(terminalSessionId)?.descriptor.repoRoot ?? null,
+      getRepoInstanceIdForTerminalSessionId: (terminalSessionId) =>
+        this.sessions.get(terminalSessionId)?.descriptor.repoInstanceId ?? null,
       hasTerminalRuntimeSessionIdForTerminalSessionId: (terminalSessionId) =>
         this.terminalRuntimeSessionIdByTerminalSessionId.has(terminalSessionId),
       serverTerminalSessionIds,
@@ -468,19 +474,7 @@ export class TerminalSessionProjection {
   createTerminal = (base: TerminalSessionBase, options: TerminalCreateOptions = {}): Promise<string> =>
     this.enqueueCreateRequest(base, formatTerminalWorktreeKey(base.repoRoot, base.worktreePath), {
       createOptions: options,
-      owner: null,
       dedupeKey: terminalCreateDedupeKey(options),
-    })
-
-  createOwnedTerminal = (
-    base: TerminalSessionBase,
-    owner: TerminalCreateOwner,
-    options: TerminalCreateOptions = {},
-  ): Promise<string> =>
-    this.enqueueCreateRequest(base, formatTerminalWorktreeKey(base.repoRoot, base.worktreePath), {
-      createOptions: options,
-      owner,
-      dedupeKey: null,
     })
 
   registerHost = (terminalWorktreeKey: string, host: HTMLElement): void => {
@@ -516,9 +510,6 @@ export class TerminalSessionProjection {
   ): Promise<string> {
     this.requireCurrentCreateRequest(terminalWorktreeKey, pending)
     const request = pending.options
-    if (request.owner && !request.owner.isFresh()) {
-      throw new Error('terminal create request canceled')
-    }
     const clientId = readOrCreateWebTerminalClientId()
     const createKind = createOptions.startupShellCommand
       ? 'additional'
@@ -553,32 +544,33 @@ export class TerminalSessionProjection {
       await this.disposeStaleCreateResult(result.terminalSessionId, result.terminalRuntimeSessionId)
       throw new Error('terminal create request canceled')
     }
-    if (request.owner && !request.owner.isFresh()) {
-      await this.disposeStaleCreateResult(result.terminalSessionId, result.terminalRuntimeSessionId)
-      throw new Error('terminal create request canceled')
-    }
     const projectedCreate = projectCreateResultForClient(base, result)
+    let workspaceTabsAccepted = false
     try {
-      await this.onWorkspaceTabsChanged(base, result.tabs)
+      workspaceTabsAccepted = await this.onWorkspaceTabsChanged(base, result.tabs)
     } catch (error) {
       await this.disposeStaleCreateResult(result.terminalSessionId, result.terminalRuntimeSessionId)
       throw error
+    }
+    if (!workspaceTabsAccepted) {
+      await this.disposeStaleCreateResult(result.terminalSessionId, result.terminalRuntimeSessionId)
+      throw new Error('terminal create request canceled')
     }
     if (this.lifecycleQueues.getCreate(terminalWorktreeKey) !== pending) {
       await this.disposeStaleCreateResult(result.terminalSessionId, result.terminalRuntimeSessionId)
       throw new Error('terminal create request canceled')
     }
-    if (request.owner && !request.owner.isFresh()) {
-      await this.disposeStaleCreateResult(result.terminalSessionId, result.terminalRuntimeSessionId)
-      throw new Error('terminal create request canceled')
-    }
-    this.setPreferredSelectedTerminalSessionId(terminalWorktreeKey, result.terminalSessionId)
-    this.reconcileServerSessions(
-      base.repoRoot,
+    const projected = this.reconcileServerSessions(
+      { repoRoot: base.repoRoot, repoInstanceId: requireRepoInstanceId(base) },
       projectedCreate.serverSessions,
       clientId,
       projectedCreate.snapshotByTerminalRuntimeSessionId,
     )
+    if (!projected) {
+      await this.disposeStaleCreateResult(result.terminalSessionId, result.terminalRuntimeSessionId)
+      throw new Error('terminal create request canceled')
+    }
+    this.setPreferredSelectedTerminalSessionId(terminalWorktreeKey, result.terminalSessionId)
     return result.terminalSessionId
   }
 
@@ -665,17 +657,8 @@ export class TerminalSessionProjection {
   ): Promise<ResolvedTerminalCreateOptions> {
     this.requireCurrentCreateRequest(terminalWorktreeKey, pending)
     const request = pending.options
-    if (request.owner && !request.owner.isFresh()) {
-      throw new Error('terminal create request canceled')
-    }
-    const createOptions = await resolveTerminalCreateOptionsUntilCreateSettles(
-      request.createOptions,
-      pending.promise,
-    )
+    const createOptions = await resolveTerminalCreateOptionsUntilCreateSettles(request.createOptions, pending.promise)
     this.requireCurrentCreateRequest(terminalWorktreeKey, pending)
-    if (request.owner && !request.owner.isFresh()) {
-      throw new Error('terminal create request canceled')
-    }
     return createOptions
   }
 
@@ -867,9 +850,11 @@ export class TerminalSessionProjection {
   }
 
   closeTerminalByDescriptor = async (terminalSessionId: string, base: TerminalSessionBase): Promise<boolean> => {
+    if (!base.repoInstanceId) return false
     const session = this.sessions.get(terminalSessionId)
     if (
       !session ||
+      session.descriptor.repoInstanceId !== base.repoInstanceId ||
       session.descriptor.terminalWorktreeKey !== formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
     )
       return false
@@ -877,11 +862,16 @@ export class TerminalSessionProjection {
   }
 
   closeTerminalsForWorktree = async (base: TerminalSessionBase): Promise<boolean> => {
+    if (!base.repoInstanceId) return false
     const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
+    const pendingCreate = this.lifecycleQueues.getCreate(terminalWorktreeKey)
+    if (pendingCreate && pendingCreate.base.repoInstanceId !== base.repoInstanceId) return false
     await this.settleCreateRequestForWorktree(terminalWorktreeKey)
-    const terminalSessionIds = this.sessionsForWorktreeList(terminalWorktreeKey).map(
-      (session) => session.descriptor.terminalSessionId,
-    )
+    const sessionsForWorktree = this.sessionsForWorktreeList(terminalWorktreeKey)
+    const terminalSessionIds = sessionsForWorktree
+      .filter((session) => session.descriptor.repoInstanceId === base.repoInstanceId)
+      .map((session) => session.descriptor.terminalSessionId)
+    if (sessionsForWorktree.length > 0 && terminalSessionIds.length === 0) return false
     // When no terminal sessions exist there is nothing to release. Skip the
     // durable-close wait so a stale pending close (e.g. from an earlier tab
     // that already left the worktree) cannot block worktree removal.
@@ -1169,10 +1159,16 @@ export class TerminalSessionProjection {
 
   private pruneSessionsMissingFromRepoIndex(): void {
     const sessionIdsToRemove = Array.from(this.sessions.entries())
-      .filter(([, session]) => !this.repoIndex[session.descriptor.repoRoot])
+      .filter(([, session]) => !this.sessionBelongsToCurrentRepoIndex(session))
       .map(([terminalSessionId]) => terminalSessionId)
     for (const terminalSessionId of sessionIdsToRemove)
       this.removeSession(terminalSessionId, { dispose: true, closeSession: false })
+  }
+
+  private sessionBelongsToCurrentRepoIndex(session: TerminalSession): boolean {
+    const current = this.repoIndex[session.descriptor.repoRoot]
+    if (!current) return false
+    return current.instanceId === session.descriptor.repoInstanceId
   }
 
   private ensureSession(descriptor: TerminalDescriptor): TerminalSession {

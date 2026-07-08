@@ -8,6 +8,7 @@ function makeDescriptor(terminalSessionId: string, index: number): TerminalDescr
     terminalWorktreeKey: '/repo\0/repo',
     index,
     repoRoot: '/repo',
+    repoInstanceId: 'repo-instance-test',
     branch: 'main',
     worktreePath: '/repo',
   }

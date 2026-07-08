@@ -9,9 +9,17 @@ export function terminalDescriptor(
 ): TerminalDescriptor {
   const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
   return {
-    ...base,
-    terminalWorktreeKey: terminalWorktreeKey,
+    repoRoot: base.repoRoot,
+    repoInstanceId: requireRepoInstanceId(base),
+    branch: base.branch,
+    worktreePath: base.worktreePath,
+    terminalWorktreeKey,
     terminalSessionId,
     index,
   }
+}
+
+function requireRepoInstanceId(base: TerminalSessionBase): string {
+  if (typeof base.repoInstanceId === 'string' && base.repoInstanceId.length > 0) return base.repoInstanceId
+  throw new Error('error.repo-instance-stale')
 }

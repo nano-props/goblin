@@ -110,12 +110,14 @@ export function useTerminalWorktreeSessionDescriptor({
   terminalWorktreeKey,
   terminalSessionId,
   repoRoot,
+  repoInstanceId,
   branch,
   worktreePath,
 }: {
   terminalWorktreeKey: string | null
   terminalSessionId: string | null
   repoRoot: string
+  repoInstanceId: string
   branch: string
   worktreePath: string
 }): TerminalDescriptor | null {
@@ -142,10 +144,11 @@ export function useTerminalWorktreeSessionDescriptor({
       terminalSessionId: snapshotTerminalSessionId,
       index: Number(indexText) || 0,
       repoRoot,
+      repoInstanceId,
       branch,
       worktreePath,
     }
-  }, [branch, descriptorSnapshot, repoRoot, terminalWorktreeKey, worktreePath])
+  }, [branch, descriptorSnapshot, repoInstanceId, repoRoot, terminalWorktreeKey, worktreePath])
 }
 
 export function useTerminalSessionSummaries(terminalWorktreeKey: string | null): TerminalSessionSummary[] {

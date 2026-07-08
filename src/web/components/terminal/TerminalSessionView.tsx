@@ -33,7 +33,6 @@ import { MobileTerminalToolbar } from '#/web/components/terminal/mobile-terminal
 import { isMobileDevice } from '#/web/components/terminal/mobile-detection.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalProjectionHydrationPhase } from '#/web/stores/terminal-projection-hydration.ts'
-import { showTerminalCreateErrorToast } from '#/web/components/terminal/terminal-create-feedback.ts'
 
 const DEFAULT_TERMINAL_ERROR_MESSAGE_KEY = 'error.unknown'
 
@@ -45,7 +44,7 @@ interface TerminalSessionViewProps {
   selectedTerminalSessionId?: string | null
   projectionPhase?: TerminalProjectionHydrationPhase
   projectionErrorMessage?: string
-  createTerminalForSlot?: (base: TerminalSessionBase) => Promise<unknown>
+  createTerminalForSlot: (base: TerminalSessionBase) => Promise<unknown>
 }
 
 export function TerminalSessionView({
@@ -79,7 +78,6 @@ export function TerminalSessionView({
     takeover,
     restart,
     focusTerminal,
-    createTerminal,
   } = context
   const terminalWorktreeKey = formatTerminalWorktreeKey(repoRoot, worktreePath)
   useLayoutEffect(() => {
@@ -102,6 +100,7 @@ export function TerminalSessionView({
     terminalWorktreeKey,
     terminalSessionId: selectedTerminalSessionId ?? null,
     repoRoot,
+    repoInstanceId,
     branch,
     worktreePath,
   })
@@ -534,12 +533,7 @@ export function TerminalSessionView({
         // loading state is still the right user signal).
         <EmptyTerminalCta
           onCreate={async () => {
-            try {
-              await (createTerminalForSlot ?? createTerminal)({ repoRoot, repoInstanceId, branch, worktreePath })
-            } catch (err) {
-              const messageKey = showTerminalCreateErrorToast(err, t)
-              terminalLog.warn('empty-state terminal create failed', { err, messageKey })
-            }
+            await createTerminalForSlot({ repoRoot, repoInstanceId, branch, worktreePath })
           }}
           emptyLabel={t('terminal.empty')}
           newTerminalLabel={t('terminal.new')}

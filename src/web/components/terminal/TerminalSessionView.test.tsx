@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
 import { act } from '@testing-library/react'
+import type { ComponentProps } from 'react'
 import { describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { TerminalSessionView } from '#/web/components/terminal/TerminalSessionView.tsx'
+import { TerminalSessionView as TerminalSessionViewComponent } from '#/web/components/terminal/TerminalSessionView.tsx'
 import {
   TerminalSessionContext,
   TerminalSessionReadContext,
@@ -42,6 +43,22 @@ vi.mock('#/web/components/terminal/mobile-detection.ts', () => ({
 // `renderInJsdom` registers `cleanup` via `afterEach`, which
 // unmounts all rendered components and removes their containers.
 
+type TestTerminalSessionViewProps = Omit<
+  ComponentProps<typeof TerminalSessionViewComponent>,
+  'createTerminalForSlot'
+> & {
+  createTerminalForSlot?: ComponentProps<typeof TerminalSessionViewComponent>['createTerminalForSlot']
+}
+
+const defaultCreateTerminalForSlot = vi.fn(async () => {})
+
+function TerminalSessionView({
+  createTerminalForSlot = defaultCreateTerminalForSlot,
+  ...props
+}: TestTerminalSessionViewProps) {
+  return <TerminalSessionViewComponent {...props} createTerminalForSlot={createTerminalForSlot} />
+}
+
 type TestTerminalSummary = Omit<TerminalSessionSummary, 'type' | 'hasRecentOutput'> &
   Partial<Pick<TerminalSessionSummary, 'type' | 'hasRecentOutput'>>
 
@@ -71,8 +88,13 @@ async function renderTerminalSession() {
     terminalSessionId: 'session-1',
     terminalWorktreeKey: '/repo\0/worktree',
     index: 1,
+
     repoRoot: '/repo',
+
+    repoInstanceId: 'repo-instance-test',
+
     branch: 'feature',
+
     worktreePath: '/worktree',
   }
   const terminalWorktreeSnapshot = {
@@ -218,8 +240,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = completeWorktreeSnapshot({
@@ -310,8 +337,13 @@ describe('TerminalSessionView', () => {
         expect.objectContaining({
           terminalSessionId: 'session-2',
           index: 2,
+
           repoRoot: '/repo',
+
+          repoInstanceId: 'repo-instance-test',
+
           branch: 'feature',
+
           worktreePath: '/worktree',
         }),
         expect.any(HTMLDivElement),
@@ -330,8 +362,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     let terminalWorktreeSnapshot = completeWorktreeSnapshot({
@@ -461,8 +498,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -614,8 +656,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -755,8 +802,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -864,8 +916,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -981,8 +1038,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -1096,8 +1158,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -1216,8 +1283,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -1355,8 +1427,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -1466,8 +1543,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -1589,8 +1671,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -1868,8 +1955,13 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const terminalWorktreeSnapshot = {
@@ -2000,16 +2092,26 @@ describe('TerminalSessionView', () => {
       terminalSessionId: 'session-1',
       terminalWorktreeKey: '/repo\0/worktree',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree',
     }
     const descriptorB = {
       terminalSessionId: 'session-2',
       terminalWorktreeKey: '/repo\0/worktree-other',
       index: 1,
+
       repoRoot: '/repo',
+
+      repoInstanceId: 'repo-instance-test',
+
       branch: 'feature',
+
       worktreePath: '/worktree-other',
     }
     const worktreeSnapshotA = {
@@ -2170,12 +2272,13 @@ describe('TerminalSessionView', () => {
     }
   })
 
-  test('empty worktree shows a New terminal CTA that calls createTerminal', async () => {
+  test('empty worktree shows a New terminal CTA that calls the supplied create operation', async () => {
     // Regression for the "blank screen on first click" symptom: when
     // a worktree has no sessions yet, the session renders a CTA so the
     // user doesn't see a featureless black box and can discover the
     // affordance without reaching for the per-worktree "+" tab.
-    const createTerminal = vi.fn(async () => 'session-1')
+    const createTerminal = vi.fn(async () => 'raw-session')
+    const createTerminalForSlot = vi.fn(async () => 'session-1')
     const emptyWorktreeSnapshot = {
       terminalWorktreeKey: '/repo\0/worktree',
       selectedDescriptor: null,
@@ -2221,6 +2324,7 @@ describe('TerminalSessionView', () => {
             repoInstanceId={'repo-instance-test'}
             branch="feature"
             worktreePath="/worktree"
+            createTerminalForSlot={createTerminalForSlot}
           />
         </TerminalSessionReadContext>
       </TerminalSessionContext>,
@@ -2243,89 +2347,13 @@ describe('TerminalSessionView', () => {
         button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
 
-      expect(createTerminal).toHaveBeenCalledTimes(1)
-      expect(createTerminal).toHaveBeenCalledWith({
+      expect(createTerminal).not.toHaveBeenCalled()
+      expect(createTerminalForSlot).toHaveBeenCalledTimes(1)
+      expect(createTerminalForSlot).toHaveBeenCalledWith({
         repoRoot: '/repo',
         repoInstanceId: 'repo-instance-test',
         branch: 'feature',
         worktreePath: '/worktree',
-      })
-    } finally {
-      unmount()
-    }
-  })
-
-  test('empty-state CTA failure uses terminal create feedback toast', async () => {
-    // Locks the failure path of the new empty-state CTA. The create
-    // throws (e.g., server rejected with error.terminal-create-failed),
-    // and the session surfaces that to the user via sonner.error so they
-    // can retry instead of staring at a still-empty session.
-    const createTerminal = vi.fn(async () => {
-      throw new Error('error.terminal-create-failed')
-    })
-    const { toast } = await import('sonner')
-    const emptyWorktreeSnapshot = {
-      terminalWorktreeKey: '/repo\0/worktree',
-      selectedDescriptor: null,
-      sessions: [],
-      count: 0,
-      createPending: false,
-    }
-    const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
-    const context: TerminalSessionContextValue = {
-      createTerminal,
-      registerHost: vi.fn(),
-      unregisterHost: vi.fn(),
-      selectTerminal: vi.fn(),
-      scrollToBottom: vi.fn(),
-      scrollLines: vi.fn(),
-      clearBell: vi.fn(() => false),
-      closeTerminalByDescriptor: vi.fn(async () => true),
-      attach: vi.fn(),
-      detach: vi.fn(),
-      restart: vi.fn(),
-      isTerminalFocusTarget: vi.fn(() => false),
-      findNext: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
-      findPrevious: vi.fn(() => ({ resultIndex: -1, resultCount: 0, found: false })),
-      clearSearch: vi.fn(),
-      writeInput: vi.fn(),
-      takeover: vi.fn(),
-      focusTerminal: vi.fn(),
-    }
-    const readContext: TerminalSessionReadContextValue = {
-      terminalWorktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
-      subscribeTerminalWorktree: () => () => {},
-      repoBellCount: () => 0,
-      subscribeRepoBellCount: () => () => {},
-      snapshot: () => emptySnapshot,
-      subscribeSnapshot: () => () => {},
-    }
-
-    const { container, unmount } = renderInJsdom(
-      <TerminalSessionContext value={context}>
-        <TerminalSessionReadContext value={readContext}>
-          <TerminalSessionView
-            repoRoot="/repo"
-            repoInstanceId={'repo-instance-test'}
-            branch="feature"
-            worktreePath="/worktree"
-          />
-        </TerminalSessionReadContext>
-      </TerminalSessionContext>,
-    )
-
-    try {
-      vi.mocked(toast.error).mockClear()
-      const button = Array.from(container.querySelectorAll('button')).find(
-        (node) => node.textContent === 'terminal.new',
-      )
-      expect(button).toBeDefined()
-      await act(async () => {
-        button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-        await new Promise((r) => setTimeout(r, 0))
-      })
-      expect(toast.error).toHaveBeenCalledWith('action.result-error', {
-        description: 'error.terminal-create-failed',
       })
     } finally {
       unmount()

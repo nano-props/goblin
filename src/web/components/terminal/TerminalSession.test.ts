@@ -451,8 +451,13 @@ const descriptor = {
   terminalSessionId: 'session-1',
   terminalWorktreeKey: '/repo\0/worktree',
   index: 1,
+
   repoRoot: '/repo',
+
+  repoInstanceId: 'repo-instance-test',
+
   branch: 'feature',
+
   worktreePath: '/worktree',
 }
 
@@ -1319,7 +1324,7 @@ describe('TerminalSession', () => {
       canonicalRows: 40,
       snapshot: 'hydrated-screen',
       snapshotSeq: 5,
-    outputEra: 0,
+      outputEra: 0,
     })
     session.attach(host)
     await flushTerminalStart()
@@ -1539,7 +1544,7 @@ describe('TerminalSession', () => {
       canonicalRows: 30,
       snapshot: 'older-replay',
       snapshotSeq: 10,
-    outputEra: 0,
+      outputEra: 0,
     })
     session.hydrate({
       terminalRuntimeSessionId: 'pty_session_3_aaaaaaaaa',
@@ -1552,7 +1557,7 @@ describe('TerminalSession', () => {
       canonicalRows: 30,
       snapshot: 'newer-replay',
       snapshotSeq: 11,
-    outputEra: 0,
+      outputEra: 0,
     })
 
     xtermMocks.flushNextDeferredWriteCallback()
@@ -1779,7 +1784,7 @@ describe('TerminalSession', () => {
         canonicalRows: 24,
         snapshot: 'post-takeover-screen',
         snapshotSeq: 8,
-      outputEra: 0,
+        outputEra: 0,
       }),
     )
     const host = document.createElement('div')
@@ -1861,7 +1866,7 @@ describe('TerminalSession', () => {
         canonicalRows: 30,
         snapshot: 'reclaimed-after-hydrate',
         snapshotSeq: 10,
-      outputEra: 0,
+        outputEra: 0,
       }),
     )
     const host = document.createElement('div')
@@ -1890,7 +1895,7 @@ describe('TerminalSession', () => {
       canonicalRows: 40,
       snapshot: '',
       snapshotSeq: 0,
-    outputEra: 0,
+      outputEra: 0,
     })
     await flushTerminalStart()
 
@@ -2054,7 +2059,7 @@ describe('TerminalSession', () => {
           canonicalRows: 30,
           snapshot: 'reclaimed-screen',
           snapshotSeq: 9,
-        outputEra: 0,
+          outputEra: 0,
         }),
       )
     const host = document.createElement('div')

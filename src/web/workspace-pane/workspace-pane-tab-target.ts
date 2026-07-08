@@ -6,14 +6,17 @@ import {
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 
 export type WorkspacePaneTabTargetResolution =
   | { kind: 'ready'; target: RepoWorkspaceTabModel }
   | { kind: 'missing' }
-  | { kind: 'unavailable'; reason: 'branch-read-model-unavailable' }
+  | {
+      kind: 'unavailable'
+      reason: 'branch-read-model-unavailable' | 'workspace-pane-tabs-pending' | 'workspace-pane-tabs-failed'
+    }
 
 export interface WorkspacePaneTabTargetOptions {
   /**
@@ -40,8 +43,25 @@ export function workspacePaneTabInteractionBlockedForBranch(
   branchName: string,
   options: WorkspacePaneTabTargetOptions,
 ): boolean {
-  const target = workspacePaneTabTargetForBranch(repoId, branchName, options)
-  return target ? repoWorkspaceTabModelBlocksTabInteraction(target) : false
+  const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, branchName, options)
+  if (resolution.kind === 'unavailable') return true
+  return resolution.kind === 'ready' ? repoWorkspaceTabModelBlocksTabInteraction(resolution.target) : false
+}
+
+export function workspacePaneRouteNavigationBlockedForBranch(repoId: string, branchName: string): boolean {
+  const state = useReposStore.getState()
+  const repo = state.repos[repoId]
+  if (!repo) return false
+  const branchModel = readRepoBranchQueryProjection(repo)
+  if (!branchModel) return false
+  const branch = branchModel.branches.find((candidate) => candidate.name === branchName)
+  if (!branch) return false
+  const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
+    repoRoot: repo.id,
+    repoInstanceId: repo.instanceId,
+    worktreePath: branch.worktree?.path ?? null,
+  })
+  return Object.values(runtimeProjection.runtimeTabStateByType).some((state) => state.createPending)
 }
 
 export function resolveWorkspacePaneTabTargetForBranch(
@@ -62,20 +82,29 @@ export function resolveWorkspacePaneTabTargetForBranch(
     repoInstanceId: repo.instanceId,
     worktreePath,
   })
+  const tabEntriesProjection = readWorkspacePaneTabsProjectionForTarget({
+    repoRoot: repoId,
+    repoInstanceId: repo.instanceId,
+    branchName,
+    worktreePath,
+  })
+  if (tabEntriesProjection.phase !== 'ready') {
+    return {
+      kind: 'unavailable',
+      reason: tabEntriesProjection.phase === 'failed' ? 'workspace-pane-tabs-failed' : 'workspace-pane-tabs-pending',
+    }
+  }
   return {
     kind: 'ready',
     target: createRepoWorkspaceTabModel({
       repoId,
+      repoInstanceId: repo.instanceId,
       branchName,
       worktreePath,
       preferredTab: preferredWorkspacePaneTabForRoute(repo.ui, { repoRoot: repoId, branchName, worktreePath }, options),
       allowPreferredTabFallback: options.workspacePaneRoute === undefined,
-      tabEntries: readWorkspacePaneTabsForTarget({
-        repoRoot: repoId,
-        repoInstanceId: repo.instanceId,
-        branchName,
-        worktreePath,
-      }),
+      tabEntries: tabEntriesProjection.tabs,
+      tabEntriesProjectionPhase: tabEntriesProjection.phase,
       runtimeTabViews: runtimeProjection.runtimeTabViews,
       runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
       requestedSessionIdByRuntimeType:

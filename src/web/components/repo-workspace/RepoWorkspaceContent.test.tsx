@@ -120,9 +120,10 @@ function workspacePaneRouteForStaticPreferredTab(tab: WorkspacePaneTabType): Rep
 function repoWorkspaceRepo(repo: RepoState): RepoWorkspaceRepo {
   const branchModel = readRepoBranchQueryProjection(repo)
   if (!branchModel) throw new Error('missing branch read model')
+  const currentBranchName = branchModel.currentBranch || branchModel.branches[0]?.name || null
   return {
     ...repo,
-    ui: { ...repo.ui, currentBranchName: branchModel.branches[0]?.name ?? null },
+    ui: { ...repo.ui, currentBranchName },
     branchAction: repo.operations.branchAction,
     branchModel: { ...branchModel, statusReady: true },
   }
@@ -205,7 +206,9 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const presentationRepo = repoWorkspaceRepo(repo)
+    const detail = getCurrentRepoWorkspacePresentation(presentationRepo)
+    const workspacePaneTabModel = preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/changes')
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
@@ -218,7 +221,12 @@ describe('RepoWorkspaceContent', () => {
             onSelect: onCopyPatch,
           })}
         >
-          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContent
+            repo={presentationRepo}
+            detail={detail}
+            workspacePaneId="workspace"
+            workspacePaneTabModel={workspacePaneTabModel}
+          />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -427,12 +435,19 @@ describe('RepoWorkspaceContent', () => {
         hasGitHubRemote: true,
       },
     })
-    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const presentationRepo = repoWorkspaceRepo(repo)
+    const detail = getCurrentRepoWorkspacePresentation(presentationRepo)
+    const workspacePaneTabModel = preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/open-links')
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContent
+            repo={presentationRepo}
+            detail={detail}
+            workspacePaneId="workspace"
+            workspacePaneTabModel={workspacePaneTabModel}
+          />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -536,12 +551,19 @@ describe('RepoWorkspaceContent', () => {
         },
       ],
     })
-    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const presentationRepo = repoWorkspaceRepo(repo)
+    const detail = getCurrentRepoWorkspacePresentation(presentationRepo)
+    const workspacePaneTabModel = preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/changes-panel')
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContent
+            repo={presentationRepo}
+            detail={detail}
+            workspacePaneId="workspace"
+            workspacePaneTabModel={workspacePaneTabModel}
+          />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -958,14 +980,22 @@ describe('RepoWorkspaceContent', () => {
       preferredWorkspacePaneTab: 'history',
       workspacePaneTabsByBranch: {
         'feature/a': [staticEntry('status'), staticEntry('history')],
+        'feature/b': [staticEntry('status')],
       },
     })
-    const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
+    const presentationRepo = repoWorkspaceRepo(repo)
+    const detail = getCurrentRepoWorkspacePresentation(presentationRepo)
+    const workspacePaneTabModel = preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/b')
 
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContent
+            repo={presentationRepo}
+            detail={detail}
+            workspacePaneId="workspace"
+            workspacePaneTabModel={workspacePaneTabModel}
+          />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )

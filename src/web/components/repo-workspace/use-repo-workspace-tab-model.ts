@@ -14,9 +14,7 @@ import {
   useWorkspacePaneTabsQuery,
   workspacePaneTabsForTargetFromQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import {
-  useWorkspacePaneRuntimeTabTargetProjection,
-} from '#/web/workspace-pane/use-workspace-pane-runtime-tab-target-projection.ts'
+import { useWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-target-projection.ts'
 import { useSyncWorkspacePaneRuntimeTabProviderSelection } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
 
 export function useRepoWorkspaceTabModel(
@@ -77,6 +75,7 @@ export function useRepoWorkspaceTabModelInput(
   const input = useMemo<RepoWorkspaceTabModelInput>(
     () => ({
       repoId: repo.id,
+      repoInstanceId: repo.instanceId,
       branchName,
       worktreePath,
       preferredTab,
@@ -89,6 +88,7 @@ export function useRepoWorkspaceTabModelInput(
     }),
     [
       repo.id,
+      repo.instanceId,
       branchName,
       worktreePath,
       preferredTab,

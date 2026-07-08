@@ -1,6 +1,5 @@
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
-import { hasFreshRepoInstance, repoInstanceHandle } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
@@ -33,7 +32,6 @@ export async function openWorkspacePaneTab(input: {
   const state = useReposStore.getState()
   const repo = state.repos[input.repoId]
   if (!repo) return false
-  const repoInstance = repoInstanceHandle(repo)
   const branchName = input.branchName
   const target = {
     repoRoot: input.repoId,
@@ -59,15 +57,8 @@ export async function openWorkspacePaneTab(input: {
     },
   })
   if (!committed.ok) return false
-  if (!hasFreshRepoInstance(useReposStore.getState(), repoInstance)) return false
   if (openerIdentity) {
-    recordWorkspacePaneTabOpener(
-      input.repoId,
-      branchName,
-      workspacePaneStaticTabId(input.type),
-      openerIdentity,
-      repoInstance,
-    )
+    recordWorkspacePaneTabOpener(input.repoId, branchName, workspacePaneStaticTabId(input.type), openerIdentity)
   }
   showWorkspacePaneTab(input)
   if (provider.refreshOnOpen) requestVisibleRepoProjectionRefresh(useReposStore.getState, input.repoId, branchName)
