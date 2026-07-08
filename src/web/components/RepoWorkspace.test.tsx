@@ -2,6 +2,7 @@
 
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
+import { useMemo, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoWorkspace } from '#/web/components/RepoWorkspace.tsx'
 import {
@@ -25,6 +26,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
   createPullRequest,
   createRepoBranch,
+  installWorkspacePaneTabsTestBridge,
   resetReposStore,
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
@@ -98,6 +100,7 @@ const navigation: PrimaryWindowNavigationActions = {
 beforeEach(() => {
   primaryWindowQueryClient.clear()
   resetReposStore()
+  installWorkspacePaneTabsTestBridge()
   useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
 })
 
@@ -742,6 +745,125 @@ describe('RepoWorkspace', () => {
             worktreePath: null,
           }),
       ).toBeNull()
+    })
+  })
+
+  test('uses the persisted workspace pane tab when the pane has no active route context', () => {
+    const branchName = 'feature/inactive-route'
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(branchName, { worktree: { path: '/tmp/repo-workspace-inactive-worktree' } })],
+      currentBranchName: branchName,
+      preferredWorkspacePaneTab: 'files',
+      workspacePaneTabsByBranch: {
+        [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
+      },
+    })
+    const route = routeNavigation()
+
+    const { container } = render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName={branchName}
+                workspacePaneRouteContext={{ kind: 'inactive' }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    expect(container.textContent).not.toContain('workspace-pane-tabs.empty')
+    expect(container.querySelector('[id$="-files-panel"]')).not.toBeNull()
+    expect(route.openRepoBranch).not.toHaveBeenCalled()
+  })
+
+  test('returns from the files tab to status when files is opened from the status panel', async () => {
+    const branchName = 'feature/status-files'
+    const worktreePath = '/tmp/repo-workspace-status-files'
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
+      currentBranchName: branchName,
+      preferredWorkspacePaneTab: 'status',
+      workspacePaneTabsByBranch: {
+        [branchName]: [workspacePaneStaticTabEntry('status')],
+      },
+    })
+
+    function RoutedWorkspaceHarness() {
+      const [route, setRoute] = useState<RepoBranchWorkspacePaneRoute | null>({ kind: 'static', tab: 'status' })
+      const navigationWithRoute = useMemo<PrimaryWindowNavigationActions>(
+        () => ({
+          ...navigation,
+          showRepoBranchEmptyWorkspacePane: (repoId, nextBranch) => {
+            useReposStore.getState().setWorkspacePaneTab(repoId, nextBranch, null)
+            setRoute(null)
+            return true
+          },
+          showRepoBranchWorkspacePaneTab: (repoId, nextBranch, tab) => {
+            useReposStore.getState().setWorkspacePaneTab(repoId, nextBranch, tab)
+            setRoute({ kind: 'static', tab })
+            return true
+          },
+          showRepoBranchTerminalSession: () => false,
+        }),
+        [],
+      )
+      const routeLabel = route?.kind === 'static' ? route.tab : route?.kind === 'terminal' ? 'terminal' : 'empty'
+      return (
+        <PrimaryWindowNavigationProvider value={navigationWithRoute}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <div data-testid="workspace-route">{routeLabel}</div>
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName={branchName}
+                workspacePaneRouteContext={{ kind: 'routed', route }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      )
+    }
+
+    const { container } = render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <RoutedWorkspaceHarness />
+      </QueryClientProvider>,
+    )
+
+    const pathButton = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent === worktreePath,
+    )
+    expect(pathButton).not.toBeNull()
+
+    act(() => {
+      pathButton?.click()
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('workspace-route').textContent).toBe('files')
+    })
+
+    const filesTab = container.querySelector('[data-workspace-pane-tab-tooltip-id="workspace-pane:files"]')
+    const filesCloseButton = filesTab
+      ? Array.from(filesTab.querySelectorAll<HTMLButtonElement>('button')).find((button) =>
+          (button.getAttribute('aria-label') ?? '').includes('workspace-pane-tabs.close-named'),
+        )
+      : null
+    expect(filesCloseButton).not.toBeNull()
+
+    act(() => {
+      filesCloseButton?.click()
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('workspace-route').textContent).toBe('status')
     })
   })
 

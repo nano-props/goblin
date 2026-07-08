@@ -734,6 +734,51 @@ describe('workspace commands', () => {
     expect(showRepoBranchEmptyWorkspacePane).not.toHaveBeenCalled()
   })
 
+  test('close workspace tab command returns from files to status when files was opened from the status route', async () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: 'feature/worktree',
+      preferredWorkspacePaneTab: 'status',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [staticEntry('status')],
+      },
+    })
+    const showRepoBranchWorkspacePaneTab = vi.fn((repoId, branch, tab) => {
+      useReposStore.getState().setWorkspacePaneTab(repoId, branch, tab)
+      return true
+    })
+    const showRepoBranchEmptyWorkspacePane = vi.fn(() => true)
+    const navigation = navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchEmptyWorkspacePane })
+
+    expect(
+      await runShowWorkspacePaneTabCommand({
+        workspacePaneRoute: { kind: 'static', tab: 'status' },
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        tab: 'files',
+        navigation,
+      }),
+    ).toBe(true)
+    expect(workspacePaneTabOpener(REPO_ID, 'feature/worktree', 'workspace-pane:files')).toBe('workspace-pane:status')
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenLastCalledWith(REPO_ID, 'feature/worktree', 'files')
+    showRepoBranchWorkspacePaneTab.mockClear()
+
+    expect(
+      await runCloseWorkspacePaneTabCommand({
+        workspacePaneRoute: { kind: 'static', tab: 'files' },
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        targetIdentity: 'workspace-pane:files',
+        navigation,
+      }),
+    ).toBe(true)
+
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'status')
+    expect(showRepoBranchEmptyWorkspacePane).not.toHaveBeenCalled()
+    expect(preferredWorkspacePaneTab('feature/worktree')).toBe('status')
+  })
+
   test('new terminal tab command keeps a reused terminal id in its existing tab position', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
