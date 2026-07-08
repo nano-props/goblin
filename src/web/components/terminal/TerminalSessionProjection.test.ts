@@ -535,6 +535,50 @@ describe('TerminalSessionProjection', () => {
       expect(projection.isKnownSession(terminalSessionId)).toBe(false)
     })
 
+    test('keeps closing sessions projected when server reconciliation removes them before close settles', async () => {
+      projection.setRepoIndex(makeRepoIndex())
+      projection.reconcileServerSessions(
+        { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'session-1')],
+        'client_local',
+        new Map(),
+      )
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const session = (projection as any).sessions.get(terminalSessionId)
+      let resolveClose!: () => void
+      vi.spyOn(session, 'closeServerResourcesAndWait').mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveClose = resolve
+          }),
+      )
+
+      const closePromise = projection.closeTerminalByDescriptor(terminalSessionId, {
+        repoRoot: REPO_ROOT,
+        repoInstanceId: REPO_INSTANCE_ID,
+        branch: BRANCH,
+        worktreePath: WORKTREE_PATH,
+      })
+      await Promise.resolve()
+
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).closingSessionIds).toEqual([terminalSessionId])
+
+      projection.reconcileServerSessions(
+        { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID },
+        [],
+        'client_local',
+        new Map(),
+      )
+
+      expect(projection.isKnownSession(terminalSessionId)).toBe(false)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions).toEqual([])
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).closingSessionIds).toEqual([terminalSessionId])
+
+      resolveClose()
+      await expect(closePromise).resolves.toBe(true)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).closingSessionIds ?? []).toEqual([])
+    })
+
     test('durable close callback does not require a fresh repo instance id', async () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(

@@ -2,6 +2,7 @@ import { isWorkspacePaneSessionTabType, isWorkspacePaneStaticTabType } from '#/s
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import {
+  INITIAL_WORKSPACE_PANE_TAB,
   preferredWorkspacePaneTabForTarget,
   preferredWorkspacePaneTabByTargetRecordWith,
   workspacePaneTabsTargetForRepoTargetKey,
@@ -78,8 +79,9 @@ function restoredPreferredWorkspacePaneTabs(
       targetKey,
     )
     if (!target) return { status: 'failed', reason: 'target', targetKey }
-    if (!isWorkspacePaneSessionTabType(tab)) return { status: 'failed', reason: 'tab', targetKey }
+    if (tab !== null && !isWorkspacePaneSessionTabType(tab)) return { status: 'failed', reason: 'tab', targetKey }
     if (
+      tab !== null &&
       isWorkspacePaneStaticTabType(tab) &&
       tab !== 'status' &&
       !workspacePaneStaticTabsFromEntries(tabsByTarget[targetKey] ?? []).includes(tab)
@@ -88,7 +90,9 @@ function restoredPreferredWorkspacePaneTabs(
     const current =
       next === repo.ui.preferredWorkspacePaneTabByTarget
         ? preferredWorkspacePaneTabForTarget(repo.ui, target)
-        : (next[targetKey] ?? 'status')
+        : Object.hasOwn(next, targetKey)
+          ? next[targetKey]
+          : INITIAL_WORKSPACE_PANE_TAB
     if (current === tab) continue
     const source =
       next === repo.ui.preferredWorkspacePaneTabByTarget ? repo.ui : { preferredWorkspacePaneTabByTarget: next }

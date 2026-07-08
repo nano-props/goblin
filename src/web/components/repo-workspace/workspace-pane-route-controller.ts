@@ -82,7 +82,7 @@ function useReconcileWorkspacePaneRoute({
   repoId: string
   branchName: string | null
   reconciliation: WorkspacePaneRouteReconciliation
-  navigation: Pick<PrimaryWindowNavigationActions, 'selectRepoBranch'>
+  navigation: Pick<PrimaryWindowNavigationActions, 'showRepoBranchEmptyWorkspacePane'>
 }): void {
   useEffect(() => {
     if (!enabled) return
@@ -155,12 +155,12 @@ function applyWorkspacePaneRouteReconciliation({
   repoId: string
   branchName: string
   reconciliation: WorkspacePaneRouteReconciliation
-  navigation: Pick<PrimaryWindowNavigationActions, 'selectRepoBranch'>
+  navigation: Pick<PrimaryWindowNavigationActions, 'showRepoBranchEmptyWorkspacePane'>
 }): void {
   if (reconciliation.kind === 'none' || reconciliation.kind === 'pending' || reconciliation.kind === 'unverified') {
     return
   }
-  navigation.selectRepoBranch(repoId, branchName, { replace: true })
+  navigation.showRepoBranchEmptyWorkspacePane(repoId, branchName, { replace: true })
 }
 
 function useSyncRoutedWorkspacePaneSelection({
@@ -181,7 +181,7 @@ function useSyncRoutedWorkspacePaneSelection({
   const setWorkspacePaneTab = useReposStore((s) => s.setWorkspacePaneTab)
   useEffect(() => {
     if (!enabled) return
-    if (!branchName || !route) return
+    if (!branchName) return
     if (reconciliation.kind !== 'none') return
     const state = useReposStore.getState()
     const repo = state.repos[repoId]
@@ -191,8 +191,8 @@ function useSyncRoutedWorkspacePaneSelection({
       branchName,
       worktreePath,
     }
-    if (route.kind === 'invalid-static') return
-    const routeTab = route.kind === 'static' ? route.tab : 'terminal'
+    if (route?.kind === 'invalid-static') return
+    const routeTab = route === null ? null : route.kind === 'static' ? route.tab : 'terminal'
     if (preferredWorkspacePaneTabForTarget(repo.ui, target) !== routeTab) {
       setWorkspacePaneTab(repoId, branchName, routeTab)
     }

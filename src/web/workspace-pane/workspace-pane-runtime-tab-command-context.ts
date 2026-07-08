@@ -14,7 +14,7 @@ export interface WorkspacePaneRuntimeTabCommandContextInput {
   repoId: string
   branchName: string
   workspacePaneRoute: WorkspacePaneCommandRoute
-  showRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => void | Promise<void>
+  showRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => boolean | Promise<boolean>
   terminalCreateTranslator?: TerminalCreateTranslator
 }
 

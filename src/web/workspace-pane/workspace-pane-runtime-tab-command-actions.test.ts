@@ -16,7 +16,7 @@ describe('workspace pane runtime tab command actions', () => {
   test('primary terminal action focuses the first existing runtime session', async () => {
     const createTerminal = vi.fn(async () => 'created-session')
     const selectTerminal = vi.fn()
-    const showTerminalSession = vi.fn()
+    const showTerminalSession = vi.fn(() => true)
     const bridge: TerminalSessionCommandBridge = {
       terminalWorktreeSnapshot: () => ({
         terminalWorktreeKey: '/repo\0/repo-worktree',
@@ -49,7 +49,7 @@ describe('workspace pane runtime tab command actions', () => {
 
   test('terminal actions no-op while a terminal create is pending', async () => {
     const createTerminal = vi.fn(async () => 'created-session')
-    const showTerminalSession = vi.fn()
+    const showTerminalSession = vi.fn(() => true)
     const bridge: TerminalSessionCommandBridge = {
       terminalWorktreeSnapshot: () => ({
         terminalWorktreeKey: '/repo\0/repo-worktree',
@@ -90,7 +90,7 @@ describe('workspace pane runtime tab command actions', () => {
   })
 
   test('primary terminal action rejects when no bridge is available', async () => {
-    const showTerminalSession = vi.fn()
+    const showTerminalSession = vi.fn(() => true)
 
     await expect(
       runWorkspacePaneRuntimePrimaryAction('terminal', {

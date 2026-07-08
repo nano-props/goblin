@@ -9,6 +9,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
+import { workspacePaneTabsInteractionBlockedForTarget } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 
 export type WorkspacePaneTabTargetResolution =
   | { kind: 'ready'; target: RepoWorkspaceTabModel }
@@ -45,7 +46,7 @@ export function workspacePaneTabInteractionBlockedForBranch(
 ): boolean {
   const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, branchName, options)
   if (resolution.kind === 'unavailable') return true
-  return resolution.kind === 'ready' ? repoWorkspaceTabModelBlocksTabInteraction(resolution.target) : false
+  return resolution.kind === 'ready' ? workspacePaneTabTargetBlocksInteraction(resolution.target) : false
 }
 
 export function workspacePaneRouteNavigationBlockedForBranch(repoId: string, branchName: string): boolean {
@@ -56,6 +57,14 @@ export function workspacePaneRouteNavigationBlockedForBranch(repoId: string, bra
   if (!branchModel) return false
   const branch = branchModel.branches.find((candidate) => candidate.name === branchName)
   if (!branch) return false
+  if (
+    workspacePaneTabsInteractionBlockedForTarget({
+      repoRoot: repo.id,
+      branchName,
+      worktreePath: branch.worktree?.path ?? null,
+    })
+  )
+    return true
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     repoRoot: repo.id,
     repoInstanceId: repo.instanceId,
@@ -126,4 +135,15 @@ function preferredWorkspacePaneTabForRoute(
   if (route.kind === 'static') return route.tab
   if (route.kind === 'terminal') return 'terminal'
   return null
+}
+
+export function workspacePaneTabTargetBlocksInteraction(model: RepoWorkspaceTabModel): boolean {
+  return (
+    repoWorkspaceTabModelBlocksTabInteraction(model) ||
+    workspacePaneTabsInteractionBlockedForTarget({
+      repoRoot: model.repoId,
+      branchName: model.branchName,
+      worktreePath: model.worktreePath,
+    })
+  )
 }

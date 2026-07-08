@@ -60,7 +60,7 @@ export async function openWorkspacePaneTab(input: {
   if (openerIdentity) {
     recordWorkspacePaneTabOpener(input.repoId, branchName, workspacePaneStaticTabId(input.type), openerIdentity)
   }
-  showWorkspacePaneTab(input)
+  if (!showWorkspacePaneTab(input)) return false
   if (provider.refreshOnOpen) requestVisibleRepoProjectionRefresh(useReposStore.getState, input.repoId, branchName)
   return true
 }
@@ -70,6 +70,6 @@ function showWorkspacePaneTab(input: {
   branchName: string
   type: WorkspacePaneStaticTabType
   navigation: Pick<PrimaryWindowNavigationActions, 'showRepoBranchWorkspacePaneTab'>
-}): void {
-  input.navigation.showRepoBranchWorkspacePaneTab(input.repoId, input.branchName, input.type)
+}): boolean {
+  return input.navigation.showRepoBranchWorkspacePaneTab(input.repoId, input.branchName, input.type)
 }

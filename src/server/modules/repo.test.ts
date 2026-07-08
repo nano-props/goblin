@@ -162,12 +162,9 @@ vi.mock('#/server/modules/background-sync.ts', () => ({
 }))
 
 beforeEach(async () => {
-  const { resetRepoServerOperationRegistryForTests } = await import(
-    '#/server/modules/repo-operation-registry.ts'
-  )
-  const { resetRepoWriteOperationCoordinatorForTests } = await import(
-    '#/server/modules/repo-write-operation-coordinator.ts'
-  )
+  const { resetRepoServerOperationRegistryForTests } = await import('#/server/modules/repo-operation-registry.ts')
+  const { resetRepoWriteOperationCoordinatorForTests } =
+    await import('#/server/modules/repo-write-operation-coordinator.ts')
   resetRepoServerOperationRegistryForTests()
   resetRepoWriteOperationCoordinatorForTests()
   vi.clearAllMocks()
@@ -284,6 +281,27 @@ function deferred<T>(): {
   return { promise, resolve, reject }
 }
 
+type TestRepoQueryInvalidation = { repoId: string; query: 'repo-snapshot' | 'repo-runtime' }
+type TestRepoSnapshotInvalidation = { repoId: string; query: 'repo-snapshot' }
+
+function repoQueryInvalidationEvents(): TestRepoQueryInvalidation[] {
+  return mocks.publishRepoQueryInvalidation.mock.calls.map(([event]) => event as TestRepoQueryInvalidation)
+}
+
+function repoSnapshotInvalidations(): TestRepoSnapshotInvalidation[] {
+  return repoQueryInvalidationEvents().filter(
+    (event): event is TestRepoSnapshotInvalidation => event.query === 'repo-snapshot',
+  )
+}
+
+function expectRepoSnapshotInvalidations(...events: TestRepoSnapshotInvalidation[]): void {
+  expect(repoSnapshotInvalidations()).toEqual(events)
+}
+
+function expectNoRepoSnapshotInvalidations(): void {
+  expectRepoSnapshotInvalidations()
+}
+
 describe('getRepoSnapshot', () => {
   test('reads git state directly without publishing invalidation', async () => {
     mocks.getWorktrees.mockResolvedValueOnce([])
@@ -296,7 +314,7 @@ describe('getRepoSnapshot', () => {
     const result = await getRepoSnapshot('/tmp/repo')
 
     expect(result).toEqual(snapshot)
-    expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
+    expectNoRepoSnapshotInvalidations()
   })
 })
 
@@ -308,7 +326,7 @@ describe('getRepoPullRequests', () => {
     const result = await getRepoPullRequests('/tmp/repo', ['feature/a'], { mode: 'full' })
 
     expect(result).toEqual(fresh)
-    expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
+    expectNoRepoSnapshotInvalidations()
   })
 
   test('returns single-branch pull requests without publishing invalidation', async () => {
@@ -318,7 +336,7 @@ describe('getRepoPullRequests', () => {
     const result = await getRepoPullRequests('/tmp/repo', ['feature/a'], { mode: 'summary' })
 
     expect(result).toEqual([{ branch: 'feature/a', pullRequest: pullRequest(2) }])
-    expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
+    expectNoRepoSnapshotInvalidations()
   })
 
   test('returns multi-branch pull requests without publishing invalidation', async () => {
@@ -336,7 +354,7 @@ describe('getRepoPullRequests', () => {
       { branch: 'feature/a', pullRequest: pullRequest(3) },
       { branch: 'feature/b', pullRequest: pullRequest(4) },
     ])
-    expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
+    expectNoRepoSnapshotInvalidations()
   })
 })
 
@@ -367,7 +385,7 @@ describe('fetchRepo invalidation publishing', () => {
     const result = await fetchRepo('/tmp/repo', 'user', caller.signal)
 
     expect(result).toEqual({ ok: false, message: 'cancelled' })
-    expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
+    expectNoRepoSnapshotInvalidations()
   })
 
   test('publishes snapshot invalidation after a successful sync', async () => {
@@ -377,11 +395,10 @@ describe('fetchRepo invalidation publishing', () => {
     const result = await fetchRepo('/tmp/repo', 'user')
 
     expect(result).toEqual({ ok: true, message: 'fetched' })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(1, {
+    expectRepoSnapshotInvalidations({
       repoId: '/tmp/repo',
       query: 'repo-snapshot',
     })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledTimes(1)
   })
 
   test('publishes sibling worktree snapshot invalidations after a successful sync', async () => {
@@ -395,15 +412,16 @@ describe('fetchRepo invalidation publishing', () => {
     const result = await fetchRepo('/tmp/repo', 'user')
 
     expect(result).toEqual({ ok: true, message: 'fetched' })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(1, {
-      repoId: '/tmp/repo',
-      query: 'repo-snapshot',
-    })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(2, {
-      repoId: '/tmp/repo-linked',
-      query: 'repo-snapshot',
-    })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledTimes(2)
+    expectRepoSnapshotInvalidations(
+      {
+        repoId: '/tmp/repo',
+        query: 'repo-snapshot',
+      },
+      {
+        repoId: '/tmp/repo-linked',
+        query: 'repo-snapshot',
+      },
+    )
   })
 
   test('user sync waits for and reuses an active background sync result without duplicating invalidation', async () => {
@@ -428,8 +446,7 @@ describe('fetchRepo invalidation publishing', () => {
     expect(backgroundResult).toEqual({ ok: true, message: 'fetched in background' })
     expect(userResult).toEqual({ ok: true, message: 'fetched in background' })
     expect(mocks.fetchAll).toHaveBeenCalledTimes(1)
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledTimes(1)
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
+    expectRepoSnapshotInvalidations({
       repoId: '/tmp/repo',
       query: 'repo-snapshot',
     })
@@ -451,12 +468,11 @@ describe('fetchRepo invalidation publishing', () => {
 
     await expect(user).resolves.toEqual({ ok: false, message: 'cancelled' })
     expect(mocks.fetchAll).toHaveBeenCalledTimes(1)
-    expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
+    expectNoRepoSnapshotInvalidations()
 
     fetch.resolve({ ok: true, message: 'fetched in background' })
     await expect(background).resolves.toEqual({ ok: true, message: 'fetched in background' })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledTimes(1)
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
+    expectRepoSnapshotInvalidations({
       repoId: '/tmp/repo',
       query: 'repo-snapshot',
     })
@@ -513,7 +529,7 @@ describe('fetchRepo invalidation publishing', () => {
     const result = await fetchRepo('/tmp/repo', 'background')
 
     expect(result).toEqual({ ok: false, message: 'fatal: offline' })
-    expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
+    expectNoRepoSnapshotInvalidations()
   })
 })
 
@@ -533,12 +549,14 @@ describe('cloneRepo cancellation', () => {
 
   test('merges caller abort signal into clone operations', async () => {
     const caller = new AbortController()
-    mocks.cloneGitRepo.mockImplementationOnce(async (_parentPath: string, _directoryName: string, _url: string, signal) => {
-      expect(signal?.aborted).toBe(false)
-      caller.abort('stopped')
-      expect(signal?.aborted).toBe(true)
-      return { ok: false, message: 'cancelled' }
-    })
+    mocks.cloneGitRepo.mockImplementationOnce(
+      async (_parentPath: string, _directoryName: string, _url: string, signal) => {
+        expect(signal?.aborted).toBe(false)
+        caller.abort('stopped')
+        expect(signal?.aborted).toBe(true)
+        return { ok: false, message: 'cancelled' }
+      },
+    )
 
     const { cloneRepo } = await import('#/server/modules/repo-write-paths.ts')
     const result = await cloneRepo('https://example.com/repo.git', '/tmp', 'repo', caller.signal)
@@ -560,7 +578,9 @@ describe('cloneRepo cancellation', () => {
     const work = cloneRepo('https://example.com/repo.git', '/tmp', 'repo', caller.signal)
     let operationId = ''
     await vi.waitFor(() => {
-      const operation = listRepoServerOperations({ includeSettled: true }).find((operation) => operation.kind === 'clone')
+      const operation = listRepoServerOperations({ includeSettled: true }).find(
+        (operation) => operation.kind === 'clone',
+      )
       expect(operation).toMatchObject({
         kind: 'clone',
         phase: 'running',
@@ -571,7 +591,9 @@ describe('cloneRepo cancellation', () => {
 
     caller.abort('stopped')
     await expect(work).resolves.toEqual({ ok: false, message: 'cancelled' })
-    expect(listRepoServerOperations({ includeSettled: true }).find((operation) => operation.id === operationId)).toMatchObject({
+    expect(
+      listRepoServerOperations({ includeSettled: true }).find((operation) => operation.id === operationId),
+    ).toMatchObject({
       kind: 'clone',
       phase: 'failed',
       cancellation: {
@@ -638,7 +660,7 @@ describe('repo mutation invalidation publishing', () => {
     const result = await run(repo)
 
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
+    expect(repoSnapshotInvalidations()).toContainEqual({
       repoId: '/tmp/repo',
       query: 'repo-snapshot',
     })
@@ -657,19 +679,20 @@ describe('repo mutation invalidation publishing', () => {
     })
 
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(1, {
-      repoId: '/tmp/repo',
-      query: 'repo-snapshot',
-    })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(2, {
-      repoId: '/tmp/repo-linked',
-      query: 'repo-snapshot',
-    })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(3, {
-      repoId: '/tmp/repo-worktree',
-      query: 'repo-snapshot',
-    })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledTimes(3)
+    expectRepoSnapshotInvalidations(
+      {
+        repoId: '/tmp/repo',
+        query: 'repo-snapshot',
+      },
+      {
+        repoId: '/tmp/repo-linked',
+        query: 'repo-snapshot',
+      },
+      {
+        repoId: '/tmp/repo-worktree',
+        query: 'repo-snapshot',
+      },
+    )
   })
 
   test('createRepoWorktree skips bootstrap unless run is explicitly requested', async () => {
@@ -1206,7 +1229,7 @@ describe('repo mutation invalidation publishing', () => {
 
     await run(repo)
 
-    expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
+    expectNoRepoSnapshotInvalidations()
   })
 
   test('createRepoWorktree publishes invalidation when bootstrap fails after git created the worktree', async () => {
@@ -1350,7 +1373,7 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(result).toEqual({ ok: false, message: 'error.invalid-path' })
     expect(mocks.createWorktree).not.toHaveBeenCalled()
-    expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
+    expectNoRepoSnapshotInvalidations()
   })
 
   test('createRepoWorktree rejects malformed mode input', async () => {
@@ -1399,23 +1422,22 @@ describe('repo mutation invalidation publishing', () => {
     const result = await deleteRepoBranch(repoId, 'feature/a', { alsoDeleteUpstream: true })
 
     expect(result).toEqual({ ok: false, message: 'remote rejected delete', repoChanged: true })
-    expect(mocks.deleteRemoteBranch).toHaveBeenCalledWith(
-      expect.objectContaining({ remotePath: '/srv/repo' }),
+    expect(mocks.deleteRemoteBranch).toHaveBeenCalledWith(expect.objectContaining({ remotePath: '/srv/repo' }), {
+      branch: 'feature/a',
+      force: undefined,
+      alsoDeleteUpstream: true,
+      signal: undefined,
+    })
+    expectRepoSnapshotInvalidations(
       {
-        branch: 'feature/a',
-        force: undefined,
-        alsoDeleteUpstream: true,
-        signal: undefined,
+        repoId,
+        query: 'repo-snapshot',
+      },
+      {
+        repoId: linkedRepoId,
+        query: 'repo-snapshot',
       },
     )
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(1, {
-      repoId,
-      query: 'repo-snapshot',
-    })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(2, {
-      repoId: linkedRepoId,
-      query: 'repo-snapshot',
-    })
   })
 
   test.each([
@@ -1444,15 +1466,16 @@ describe('repo mutation invalidation publishing', () => {
     const result = await run(repo)
 
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(1, {
-      repoId: '/tmp/repo',
-      query: 'repo-snapshot',
-    })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(2, {
-      repoId: '/tmp/repo-linked',
-      query: 'repo-snapshot',
-    })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledTimes(2)
+    expectRepoSnapshotInvalidations(
+      {
+        repoId: '/tmp/repo',
+        query: 'repo-snapshot',
+      },
+      {
+        repoId: '/tmp/repo-linked',
+        query: 'repo-snapshot',
+      },
+    )
   })
 
   test('deleteRepoBranch refuses protected branches before touching git', async () => {
@@ -1463,7 +1486,7 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(result).toEqual({ ok: false, message: 'error.cannot-delete-protected-branch' })
     expect(mocks.deleteBranch).not.toHaveBeenCalled()
-    expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
+    expectNoRepoSnapshotInvalidations()
   })
 
   test('deleteRepoBranch uses current HEAD semantics for safe deletes', async () => {
@@ -1486,7 +1509,7 @@ describe('repo mutation invalidation publishing', () => {
 
     await deleteRepoBranch('/tmp/repo', 'feature/a')
 
-    expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
+    expectNoRepoSnapshotInvalidations()
   })
 
   test('removeRepoWorktree publishes snapshot invalidations for affected worktrees after removal success', async () => {
@@ -1521,15 +1544,16 @@ describe('repo mutation invalidation publishing', () => {
       phase: 'done',
       target: { branch: 'feature/a', worktreePath: '/tmp/repo-worktree' },
     })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(1, {
-      repoId: '/tmp/repo',
-      query: 'repo-snapshot',
-    })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(2, {
-      repoId: '/tmp/repo-worktree',
-      query: 'repo-snapshot',
-    })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledTimes(2)
+    expectRepoSnapshotInvalidations(
+      {
+        repoId: '/tmp/repo',
+        query: 'repo-snapshot',
+      },
+      {
+        repoId: '/tmp/repo-worktree',
+        query: 'repo-snapshot',
+      },
+    )
   })
 
   test('removeRepoWorktree publishes affected snapshot invalidations once after worktree and branch deletion success', async () => {
@@ -1553,15 +1577,16 @@ describe('repo mutation invalidation publishing', () => {
     })
 
     expect(result).toEqual({ ok: true, message: 'ok' })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(1, {
-      repoId: '/tmp/repo',
-      query: 'repo-snapshot',
-    })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(2, {
-      repoId: '/tmp/repo-worktree',
-      query: 'repo-snapshot',
-    })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledTimes(2)
+    expectRepoSnapshotInvalidations(
+      {
+        repoId: '/tmp/repo',
+        query: 'repo-snapshot',
+      },
+      {
+        repoId: '/tmp/repo-worktree',
+        query: 'repo-snapshot',
+      },
+    )
   })
 
   test('removeRepoWorktree publishes affected invalidations after branch deletion fails post-removal', async () => {
@@ -1588,15 +1613,16 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(result).toEqual({ ok: false, message: 'fatal: delete failed' })
     expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', undefined)
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(1, {
-      repoId: '/tmp/repo',
-      query: 'repo-snapshot',
-    })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(2, {
-      repoId: '/tmp/repo-worktree',
-      query: 'repo-snapshot',
-    })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledTimes(2)
+    expectRepoSnapshotInvalidations(
+      {
+        repoId: '/tmp/repo',
+        query: 'repo-snapshot',
+      },
+      {
+        repoId: '/tmp/repo-worktree',
+        query: 'repo-snapshot',
+      },
+    )
   })
 
   test('removeRepoWorktree can remove and delete the currently opened linked worktree', async () => {
@@ -1624,15 +1650,16 @@ describe('repo mutation invalidation publishing', () => {
     expect(mocks.getCurrentBranch).toHaveBeenCalledWith('/tmp/repo', { signal: undefined })
     expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-linked', undefined)
     expect(mocks.deleteBranch).toHaveBeenCalledWith('/tmp/repo', 'feature/a', { force: undefined, signal: undefined })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(1, {
-      repoId: '/tmp/repo-linked',
-      query: 'repo-snapshot',
-    })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenNthCalledWith(2, {
-      repoId: '/tmp/repo',
-      query: 'repo-snapshot',
-    })
-    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledTimes(2)
+    expectRepoSnapshotInvalidations(
+      {
+        repoId: '/tmp/repo-linked',
+        query: 'repo-snapshot',
+      },
+      {
+        repoId: '/tmp/repo',
+        query: 'repo-snapshot',
+      },
+    )
     expect(mocks.pruneServerRepoSettingsForRemovedWorktree).toHaveBeenCalledWith({
       repoId: '/tmp/repo-linked',
       worktreePath: '/tmp/repo-linked',
@@ -1695,7 +1722,7 @@ describe('repo mutation invalidation publishing', () => {
     expect(result).toEqual({ ok: false, message: 'error.cannot-remove-unpushed-worktree' })
     expect(mocks.removeWorktree).not.toHaveBeenCalled()
     expect(mocks.deleteBranch).not.toHaveBeenCalled()
-    expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalled()
+    expectNoRepoSnapshotInvalidations()
   })
 
   test('removeRepoWorktree refuses locked worktrees before calling git remove', async () => {

@@ -30,9 +30,7 @@ import {
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import {
-  setRepoProjectionQueryData,
-} from '#/web/repo-data-query.ts'
+import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -88,6 +86,7 @@ const navigation: PrimaryWindowNavigationActions = {
   closeRepo: vi.fn(),
   cycleRepo: vi.fn(),
   selectRepoBranch: vi.fn(),
+  showRepoBranchEmptyWorkspacePane: () => true,
   showRepoBranchWorkspacePaneTab: vi.fn(),
   showRepoBranchTerminalSession: vi.fn(),
   goBack: vi.fn(),
@@ -307,7 +306,11 @@ describe('RepoWorkspace', () => {
         <PrimaryWindowNavigationProvider value={testNavigation}>
           <TerminalSessionContext value={{ ...terminalCommandContext, createTerminal }}>
             <TerminalSessionReadContext value={readContext}>
-              <RepoWorkspace repoId={REPO_ID} currentBranchName="feature/a" workspacePaneRouteContext={{ kind: 'routed', route: workspacePaneRoute }} />
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName="feature/a"
+                workspacePaneRouteContext={{ kind: 'routed', route: workspacePaneRoute }}
+              />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
         </PrimaryWindowNavigationProvider>
@@ -372,6 +375,7 @@ describe('RepoWorkspace', () => {
     }
     vi.mocked(route.openRepoBranch).mockImplementation(() => {
       expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]?.current).toEqual(expectedCurrentEntry)
+      return true
     })
 
     const { container } = render(
@@ -382,7 +386,10 @@ describe('RepoWorkspace', () => {
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName={branchName}
-                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'terminal', terminalSessionId: 'missing-session' } }}
+                workspacePaneRouteContext={{
+                  kind: 'routed',
+                  route: { kind: 'terminal', terminalSessionId: 'missing-session' },
+                }}
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -432,7 +439,10 @@ describe('RepoWorkspace', () => {
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName={branchName}
-                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'terminal', terminalSessionId: 'session-2' } }}
+                workspacePaneRouteContext={{
+                  kind: 'routed',
+                  route: { kind: 'terminal', terminalSessionId: 'session-2' },
+                }}
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -477,7 +487,10 @@ describe('RepoWorkspace', () => {
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName={branchName}
-                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'terminal', terminalSessionId: 'session-1' } }}
+                workspacePaneRouteContext={{
+                  kind: 'routed',
+                  route: { kind: 'terminal', terminalSessionId: 'session-1' },
+                }}
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -519,7 +532,10 @@ describe('RepoWorkspace', () => {
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName={branchName}
-                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'terminal', terminalSessionId: 'missing-session' } }}
+                workspacePaneRouteContext={{
+                  kind: 'routed',
+                  route: { kind: 'terminal', terminalSessionId: 'missing-session' },
+                }}
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -576,7 +592,10 @@ describe('RepoWorkspace', () => {
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName={branchName}
-                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'terminal', terminalSessionId: 'missing-session' } }}
+                workspacePaneRouteContext={{
+                  kind: 'routed',
+                  route: { kind: 'terminal', terminalSessionId: 'missing-session' },
+                }}
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -621,7 +640,10 @@ describe('RepoWorkspace', () => {
               <RepoWorkspace
                 repoId={REPO_ID}
                 currentBranchName={branchName}
-                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'terminal', terminalSessionId: 'missing-session' } }}
+                workspacePaneRouteContext={{
+                  kind: 'routed',
+                  route: { kind: 'terminal', terminalSessionId: 'missing-session' },
+                }}
               />
             </TerminalSessionReadContext>
           </TerminalSessionContext>
@@ -679,6 +701,47 @@ describe('RepoWorkspace', () => {
             worktreePath: null,
           }),
       ).toBe('history')
+    })
+  })
+
+  test('syncs a routed bare branch as an empty workspace pane preference', async () => {
+    const branchName = 'feature/empty-route'
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(branchName)],
+      currentBranchName: branchName,
+      preferredWorkspacePaneTab: 'status',
+      workspacePaneTabsByBranch: {
+        [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+      },
+    })
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={navigationWithStore()}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName={branchName}
+                workspacePaneRouteContext={{ kind: 'routed', route: null }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    await waitFor(() => {
+      const repo = useReposStore.getState().repos[REPO_ID]
+      expect(
+        repo &&
+          preferredWorkspacePaneTabForTarget(repo.ui, {
+            repoRoot: REPO_ID,
+            branchName,
+            worktreePath: null,
+          }),
+      ).toBeNull()
     })
   })
 

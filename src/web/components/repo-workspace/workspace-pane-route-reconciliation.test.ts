@@ -107,6 +107,18 @@ describe('workspace pane route reconciliation', () => {
     })
   })
 
+  test('waits for terminal close before replacing the current routed terminal session', () => {
+    const model = terminalModel({
+      routedSessionId: 'missing-session',
+      terminalProjectionPhase: 'ready',
+      closingSessionIds: ['missing-session'],
+    })
+
+    expect(reconcileWorkspacePaneRoute({ kind: 'terminal', terminalSessionId: 'missing-session' }, model)).toEqual({
+      kind: 'pending',
+    })
+  })
+
   test('replaces a stale terminal route with the bare branch route', () => {
     const model = terminalModel({ routedSessionId: 'missing-session', terminalProjectionPhase: 'ready' })
 
@@ -286,6 +298,7 @@ function terminalModel(input: {
   routedSessionId: string
   terminalProjectionPhase: 'pending' | 'ready' | 'failed'
   createPending?: boolean
+  closingSessionIds?: readonly string[]
 }) {
   return createRepoWorkspaceTabModel({
     repoId: REPO_ID,
@@ -300,6 +313,7 @@ function terminalModel(input: {
     runtimeTabStateByType: {
       terminal: {
         createPending: input.createPending ?? false,
+        closingSessionIds: input.closingSessionIds,
         projectionPhase: input.terminalProjectionPhase,
         selectedSessionId: null,
       },

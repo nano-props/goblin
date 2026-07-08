@@ -21,7 +21,7 @@ const terminalView: WorkspacePaneTerminalTabSummary = {
 
 describe('workspace pane runtime tab actions', () => {
   test('selects a terminal runtime tab through the runtime action registry', () => {
-    const showRuntimeTab = vi.fn()
+    const showRuntimeTab = vi.fn(() => true)
 
     expect(
       selectWorkspacePaneRuntimeTab(terminalView, {
@@ -33,7 +33,7 @@ describe('workspace pane runtime tab actions', () => {
   })
 
   test('reselects a terminal runtime tab through the runtime action registry', () => {
-    const showRuntimeTab = vi.fn()
+    const showRuntimeTab = vi.fn(() => true)
     const scrollToBottom = vi.fn()
 
     expect(

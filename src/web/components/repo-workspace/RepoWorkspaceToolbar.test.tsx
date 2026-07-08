@@ -175,7 +175,7 @@ afterEach(() => {
 
 describe('RepoWorkspaceToolbar', () => {
   test('renders a status tab for a selected branch without a worktree', async () => {
-    const showRepoBranchWorkspacePaneTab = vi.fn()
+    const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
     const { container: c, terminalTab } = renderToolbar({
       terminalCount: 0,
       worktree: false,
@@ -580,8 +580,8 @@ describe('RepoWorkspaceToolbar', () => {
   })
 
   test('lands on the adjacent terminal after closing the active status tab', async () => {
-    const showRepoBranchWorkspacePaneTab = vi.fn()
-    const showRepoBranchTerminalSession = vi.fn()
+    const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
+    const showRepoBranchTerminalSession = vi.fn(() => true)
     const { container: c } = renderToolbar({
       terminalCount: 1,
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
@@ -828,8 +828,8 @@ describe('RepoWorkspaceToolbar', () => {
   })
 
   test('clicking the new-terminal button navigates and creates a terminal', async () => {
-    const showRepoBranchWorkspacePaneTab = vi.fn()
-    const showRepoBranchTerminalSession = vi.fn()
+    const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
+    const showRepoBranchTerminalSession = vi.fn(() => true)
     const { terminalTab, mocks } = renderToolbar({
       terminalCount: 0,
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
@@ -879,8 +879,8 @@ describe('RepoWorkspaceToolbar', () => {
   })
 
   test('clicking a selected session tab when not in terminal panel navigates to terminal', async () => {
-    const showRepoBranchWorkspacePaneTab = vi.fn()
-    const showRepoBranchTerminalSession = vi.fn()
+    const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
+    const showRepoBranchTerminalSession = vi.fn(() => true)
     const { terminalTab, mocks } = renderToolbar({
       terminalCount: 2,
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
@@ -898,8 +898,8 @@ describe('RepoWorkspaceToolbar', () => {
   })
 
   test('clicking a selected session tab in terminal panel scrolls to bottom', async () => {
-    const showRepoBranchWorkspacePaneTab = vi.fn()
-    const showRepoBranchTerminalSession = vi.fn()
+    const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
+    const showRepoBranchTerminalSession = vi.fn(() => true)
     const { terminalTab, mocks } = renderToolbar({
       terminalCount: 2,
       preferredWorkspacePaneTab: 'terminal',
@@ -919,8 +919,8 @@ describe('RepoWorkspaceToolbar', () => {
   })
 
   test('clicking an unselected session tab navigates and selects it', async () => {
-    const showRepoBranchWorkspacePaneTab = vi.fn()
-    const showRepoBranchTerminalSession = vi.fn()
+    const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
+    const showRepoBranchTerminalSession = vi.fn(() => true)
     const { container: c, mocks } = renderToolbar({
       terminalCount: 2,
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
@@ -954,7 +954,7 @@ describe('RepoWorkspaceToolbar', () => {
 
   test('keeps terminal focus when pressing End on the compact terminal tab', async () => {
     compactUi = true
-    const showRepoBranchWorkspacePaneTab = vi.fn()
+    const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
     const { container: c } = renderToolbar({
       terminalCount: 2,
       preferredWorkspacePaneTab: 'terminal',
@@ -974,8 +974,8 @@ describe('RepoWorkspaceToolbar', () => {
   })
 
   test('moves focus across opened status, changes, and terminal tabs with keyboard navigation', async () => {
-    const showRepoBranchWorkspacePaneTab = vi.fn()
-    const showRepoBranchTerminalSession = vi.fn()
+    const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
+    const showRepoBranchTerminalSession = vi.fn(() => true)
     const { container: c } = renderToolbar({
       terminalCount: 2,
       changeCount: 1,
@@ -1015,8 +1015,8 @@ describe('RepoWorkspaceToolbar', () => {
   })
 
   test('skips the changes tab in keyboard navigation when it is not open', async () => {
-    const showRepoBranchWorkspacePaneTab = vi.fn()
-    const showRepoBranchTerminalSession = vi.fn()
+    const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
+    const showRepoBranchTerminalSession = vi.fn(() => true)
     const { container: c } = renderToolbar({
       terminalCount: 2,
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
@@ -1048,7 +1048,7 @@ describe('RepoWorkspaceToolbar', () => {
   })
 
   test('lands on the spatial neighbor after closing the active terminal tab', async () => {
-    const showRepoBranchWorkspacePaneTab = vi.fn()
+    const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
     const { container: c, mocks } = renderToolbar({
       terminalCount: 1,
       workspacePaneTabs: [staticEntry('status'), terminalEntry('t1'), staticEntry('changes')],
@@ -1420,9 +1420,10 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
     activateRepo: () => {},
     closeRepo: () => {},
     cycleRepo: () => {},
-    selectRepoBranch: () => {},
-    showRepoBranchWorkspacePaneTab: () => {},
-    showRepoBranchTerminalSession: () => {},
+    selectRepoBranch: () => true,
+    showRepoBranchEmptyWorkspacePane: () => true,
+    showRepoBranchWorkspacePaneTab: () => true,
+    showRepoBranchTerminalSession: () => true,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},

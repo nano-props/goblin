@@ -11,6 +11,7 @@ import type { TerminalSnapshot, TerminalDescriptor, TerminalSessionSummary } fro
 
 const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = { phase: 'opening', message: null, processName: 'terminal' }
 const EMPTY_TERMINAL_SESSION_SUMMARIES: TerminalSessionSummary[] = []
+const EMPTY_TERMINAL_CLOSING_SESSION_IDS: string[] = []
 const MISSING_TERMINAL_DESCRIPTOR_SNAPSHOT = ''
 
 export function useTerminalWorktreeCount(terminalWorktreeKey: string | null): number {
@@ -36,6 +37,23 @@ export function useTerminalWorktreeCreatePending(terminalWorktreeKey: string | n
   )
   const getSnapshot = useCallback(
     () => (terminalWorktreeKey ? terminalWorktreeSnapshot(terminalWorktreeKey).createPending : false),
+    [terminalWorktreeKey, terminalWorktreeSnapshot],
+  )
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+}
+
+export function useTerminalWorktreeClosingSessionIds(terminalWorktreeKey: string | null): readonly string[] {
+  const { terminalWorktreeSnapshot, subscribeTerminalWorktree } = useTerminalSessionReadContext()
+  const subscribe = useCallback(
+    (listener: () => void) =>
+      terminalWorktreeKey ? subscribeTerminalWorktree(terminalWorktreeKey, listener) : () => {},
+    [terminalWorktreeKey, subscribeTerminalWorktree],
+  )
+  const getSnapshot = useCallback(
+    () =>
+      terminalWorktreeKey
+        ? (terminalWorktreeSnapshot(terminalWorktreeKey).closingSessionIds ?? EMPTY_TERMINAL_CLOSING_SESSION_IDS)
+        : EMPTY_TERMINAL_CLOSING_SESSION_IDS,
     [terminalWorktreeKey, terminalWorktreeSnapshot],
   )
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)

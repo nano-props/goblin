@@ -28,7 +28,7 @@ describe('workspace pane runtime tab create action', () => {
       terminal: {
         base: null,
         createTerminal: vi.fn(async () => 'session-1'),
-        openerIdentity: null,
+        captureOpenerIdentity: vi.fn(() => null),
       },
     })
 
@@ -44,6 +44,7 @@ describe('workspace pane runtime tab create action', () => {
     }
     const createTerminal = vi.fn(async () => 'session-1')
     const showCreatedRuntimeTab = vi.fn()
+    const captureOpenerIdentity = vi.fn(() => 'opener-tab')
 
     const action = workspacePaneRuntimeTabCreateAction('terminal', {
       repoRoot: '/repo',
@@ -54,16 +55,18 @@ describe('workspace pane runtime tab create action', () => {
       terminal: {
         base,
         createTerminal,
-        openerIdentity: 'opener-tab',
+        captureOpenerIdentity,
       },
     })
 
     expect(action?.label).toBe('terminal.new')
     expect(action?.busy).toBe(false)
     expect(action?.blocksTabInteraction).toBe(false)
+    expect(captureOpenerIdentity).not.toHaveBeenCalled()
 
     action?.onCreate()
 
+    expect(captureOpenerIdentity).toHaveBeenCalledOnce()
     expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).toHaveBeenCalledWith(
       expect.objectContaining({
         base,
@@ -74,7 +77,7 @@ describe('workspace pane runtime tab create action', () => {
     )
 
     const commandCalls = terminalCreateCommandMocks.runCreateTerminalTabCommand.mock.calls as unknown as Array<
-      [{ showCreatedTerminalTab: (terminalSessionId: string) => void | Promise<void> }]
+      [{ showCreatedTerminalTab: (terminalSessionId: string) => boolean | Promise<boolean> }]
     >
     const commandInput = commandCalls[0]?.[0]
     await commandInput?.showCreatedTerminalTab('session-1')
@@ -97,7 +100,7 @@ describe('workspace pane runtime tab create action', () => {
       terminal: {
         base,
         createTerminal: vi.fn(async () => 'session-1'),
-        openerIdentity: null,
+        captureOpenerIdentity: vi.fn(() => null),
       },
     })
     expect(pendingAction?.busy).toBe(true)
@@ -112,7 +115,7 @@ describe('workspace pane runtime tab create action', () => {
       terminal: {
         base,
         createTerminal: vi.fn(async () => 'session-1'),
-        openerIdentity: null,
+        captureOpenerIdentity: vi.fn(() => null),
       },
     })
     expect(hydratingAction?.busy).toBe(true)

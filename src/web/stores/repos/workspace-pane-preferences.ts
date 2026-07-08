@@ -6,6 +6,8 @@ import {
 import type { RepoUiState } from '#/web/stores/repos/types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 
+export const INITIAL_WORKSPACE_PANE_TAB: WorkspacePaneTabType = 'status'
+
 interface WorkspacePaneTargetBranches {
   repoRoot: string
   branches: ReadonlyArray<{ name: string; worktree?: { path?: string } | undefined }>
@@ -49,17 +51,19 @@ export function workspacePaneTabsTargetForRepoTargetKey(
 export function preferredWorkspacePaneTabForTarget(
   ui: Pick<RepoUiState, 'preferredWorkspacePaneTabByTarget'>,
   target: WorkspacePaneTabsTarget | null | undefined,
-): WorkspacePaneTabType {
-  return target
-    ? (ui.preferredWorkspacePaneTabByTarget[workspacePaneTabsTargetIdentityKey(target)] ?? 'status')
-    : 'status'
+): WorkspacePaneTabType | null {
+  if (!target) return null
+  const targetKey = workspacePaneTabsTargetIdentityKey(target)
+  return Object.hasOwn(ui.preferredWorkspacePaneTabByTarget, targetKey)
+    ? ui.preferredWorkspacePaneTabByTarget[targetKey]
+    : INITIAL_WORKSPACE_PANE_TAB
 }
 
 export function preferredWorkspacePaneTabByTargetRecordWith(
   ui: Pick<RepoUiState, 'preferredWorkspacePaneTabByTarget'>,
   target: WorkspacePaneTabsTarget,
-  view: WorkspacePaneTabType,
-): Record<string, WorkspacePaneTabType> {
+  view: WorkspacePaneTabType | null,
+): Record<string, WorkspacePaneTabType | null> {
   return {
     ...ui.preferredWorkspacePaneTabByTarget,
     [workspacePaneTabsTargetIdentityKey(target)]: view,

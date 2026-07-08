@@ -114,6 +114,39 @@ describe('restorable-workspace-state', () => {
     })
   })
 
+  test('persists an explicit empty workspace pane preference', () => {
+    const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
+    const repo = seedRepoWithReadModelForTest({
+      id: '/tmp/repo',
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
+      currentBranchName: 'feature/worktree',
+      preferredWorkspacePaneTab: null,
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [workspacePaneStaticTabEntry('status')],
+      },
+    })
+
+    expect(
+      workspaceSessionStateFromRestorableWorkspaceState({
+        repos: { [repo.id]: repo },
+        restorableWorkspaceState: {
+          order: [repo.id],
+          restoredRepoId: repo.id,
+          zenMode: false,
+          workspacePaneSize: 55,
+          selectedTerminalSessionIdByTerminalWorktree: {},
+        },
+      }),
+    ).toMatchObject({
+      preferredWorkspacePaneTabByTargetByRepo: { '/tmp/repo': { [targetKey]: null } },
+      workspacePaneTabsByTargetByRepo: {
+        '/tmp/repo': {
+          [targetKey]: [workspacePaneStaticTabEntry('status')],
+        },
+      },
+    })
+  })
+
   test('does not persist a branch preferred tab whose tab is closed', () => {
     const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
     const repo = seedRepoWithReadModelForTest({

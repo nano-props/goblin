@@ -1,5 +1,6 @@
 import PQueue from 'p-queue'
 import { resolveRepoWriteBoundaryKey } from '#/server/modules/repo-source.ts'
+import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
 import type {
   RepoOperationCancellationReason,
   RepoOperationFailureReason,
@@ -144,22 +145,26 @@ function beginRepoWriteOperation(
     canCancelUnderlying: input.canCancelUnderlying ?? true,
   }
   runtime.operations.set(operation.id, operation)
+  publishRepoRuntimeInvalidation(operation)
   return {
     id: operation.id,
     start() {
       operation.phase = operation.cancellation.underlyingRequested ? 'cancelling' : 'running'
       operation.startedAt = Date.now()
+      publishRepoRuntimeInvalidation(operation)
     },
     requestCancel(reason) {
       operation.cancellation.underlyingRequested = true
       operation.cancellation.reason = reason
       operation.cancellation.requestedAt = Date.now()
       if (operation.phase === 'queued' || operation.phase === 'running') operation.phase = 'cancelling'
+      publishRepoRuntimeInvalidation(operation)
     },
     recordWaitCancellation(reason) {
       operation.cancellation.waitCancelledCount += 1
       operation.cancellation.lastWaitCancelledAt = Date.now()
       operation.cancellation.lastWaitCancellationReason = reason
+      publishRepoRuntimeInvalidation(operation)
     },
     settle(result) {
       if (settled) return
@@ -173,9 +178,15 @@ function beginRepoWriteOperation(
             message: result.message ?? 'error.failed-read-repo',
             reason: operationFailureReasonForMessage(result.message, cancellationReason),
           }
+      publishRepoRuntimeInvalidation(operation)
       pruneSettledOperations()
     },
   }
+}
+
+function publishRepoRuntimeInvalidation(operation: Pick<RepoServerOperationState, 'repoId'>): void {
+  if (!operation.repoId) return
+  publishRepoQueryInvalidation({ repoId: operation.repoId, query: 'repo-runtime' })
 }
 
 async function acquireRepoWriteOperationAdmission(): Promise<() => void> {

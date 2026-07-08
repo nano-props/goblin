@@ -72,6 +72,7 @@ export type RepoWorkspaceTab = RepoWorkspaceMaterializedTab | RepoWorkspacePendi
 export interface RepoWorkspaceRuntimeTabState {
   type: WorkspacePaneRuntimeTabType
   createPending: boolean
+  closingSessionIds: readonly string[]
   projectionPhase: WorkspacePaneRuntimeProjectionPhase
   projectionErrorMessage?: string
   selectedSessionId: string | null
@@ -84,6 +85,7 @@ export type RepoWorkspaceRequestedRuntimeSessionByType = Partial<Record<Workspac
 
 export interface RepoWorkspaceRuntimeTabStateInput {
   createPending?: boolean
+  closingSessionIds?: readonly string[]
   projectionPhase?: WorkspacePaneRuntimeProjectionPhase
   projectionErrorMessage?: string
   selectedSessionId?: string | null
@@ -417,6 +419,7 @@ function runtimeTabStateByTypeFromInput(input: RepoWorkspaceTabModelInput): Repo
     runtimeTabStateByType[type] = {
       type,
       createPending: state?.createPending ?? false,
+      closingSessionIds: state?.closingSessionIds ?? [],
       projectionPhase: state?.projectionPhase ?? 'pending',
       projectionErrorMessage: state?.projectionErrorMessage,
       selectedSessionId: state?.selectedSessionId ?? null,

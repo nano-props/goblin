@@ -150,10 +150,10 @@ function createRuntimeWorkspacePreferenceActions(set: ReposSet, get: ReposGet): 
       if (changed && repoInstanceId !== undefined) afterWorkspacePreferenceChange(id, repoInstanceId)
     },
 
-    setWorkspacePaneTab(id: string, branch: string, tab: WorkspacePaneTabType) {
-      // Persists the user's target-scoped preferred tab type verbatim.
+    setWorkspacePaneTab(id: string, branch: string, tab: WorkspacePaneTabType | null) {
+      // Persists the user's target-scoped preferred pane selection verbatim.
       // Opening/closing branch tabs is owned by explicit open/close actions;
-      // this action only changes the target-scoped preferred tab.
+      // this action only changes the target-scoped preferred tab/empty pane.
       let changed = false
       let repoInstanceId: string | undefined
       set((s) => {

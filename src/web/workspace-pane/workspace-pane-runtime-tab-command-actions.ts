@@ -10,7 +10,7 @@ export interface WorkspacePaneRuntimeTabCommandContext {
     base: TerminalSessionBase | null
     bridge: TerminalSessionCommandBridge | null
     openerIdentity: string | null
-    showTerminalSession: (terminalSessionId: string) => void | Promise<void>
+    showTerminalSession: (terminalSessionId: string) => boolean | Promise<boolean>
     t?: TerminalCreateTranslator
   }
 }
@@ -57,8 +57,7 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
     // The primary action should land on a working runtime session when one
     // already exists instead of leaving selection wherever it previously was.
     const firstSession = worktree.sessions[0]
-    if (firstSession) await terminal.showTerminalSession(firstSession.terminalSessionId)
-    return true
+    return firstSession ? await terminal.showTerminalSession(firstSession.terminalSessionId) : false
   }
   const result = await runCreateTerminalTabCommand({
     base: terminal.base,

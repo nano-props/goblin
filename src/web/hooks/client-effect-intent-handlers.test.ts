@@ -60,11 +60,7 @@ describe('client effect intent handlers', () => {
       d,
     )
 
-    expect(d.navigation.showRepoBranchTerminalSession).toHaveBeenCalledWith(
-      REPO_ID,
-      'feature/query',
-      'session-query',
-    )
+    expect(d.navigation.showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/query', 'session-query')
   })
 
   test('returns false when changes cannot be shown for a branch without a worktree', async () => {
@@ -172,9 +168,11 @@ function navigationWithStoreActions(): PrimaryWindowNavigationActions {
     closeRepo: (repoId) => useReposStore.getState().closeRepo(repoId),
     cycleRepo: vi.fn(),
     selectRepoBranch: vi.fn(),
+    showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {
       const state = useReposStore.getState()
       state.setWorkspacePaneTab(repoId, branch, tab)
+      return true
     },
     showRepoBranchTerminalSession: vi.fn(),
     goBack: vi.fn(),

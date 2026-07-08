@@ -15,7 +15,7 @@ import {
   workspacePaneTabInteractionBlockedForBranch,
   workspacePaneTabTargetForBranch,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 
@@ -126,10 +126,30 @@ describe('workspace pane tab target read model', () => {
     recordWorkspacePaneTabOpener(REPO_ID, 'feature/query', 'workspace-pane:changes', 'workspace-pane:status')
 
     expect(
-      useReposStore.getState().tabOpenerIdentityByScope[tabOpenerScopeKey(REPO_ID, 'feature/query')]?.[
+      useReposStore.getState().tabOpenerIdentityByScope[
+        tabOpenerScopeKey({ repoRoot: REPO_ID, branchName: 'feature/query', worktreePath: null })
+      ]?.[
         'workspace-pane:changes'
       ],
     ).toBe('workspace-pane:status')
+  })
+
+  test('scopes worktree tab openers by workspace pane target instead of branch name', () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/old', { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: 'feature/old',
+    })
+
+    expect(
+      recordWorkspacePaneTabOpener(REPO_ID, 'feature/old', 'workspace-pane:changes', 'workspace-pane:status'),
+    ).toBe('recorded')
+    seedRepoReadModelQueryData(repo, {
+      branches: [createRepoBranch('feature/new', { worktree: { path: WORKTREE_PATH } })],
+      currentBranch: 'feature/new',
+    })
+
+    expect(workspacePaneTabOpener(REPO_ID, 'feature/new', 'workspace-pane:changes')).toBe('workspace-pane:status')
   })
 
   test('marks opener recording unavailable when the repo branch read model is unavailable', () => {

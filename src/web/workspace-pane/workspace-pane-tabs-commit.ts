@@ -9,6 +9,7 @@ import {
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 export interface CommitWorkspacePaneTabsInput {
   repoRoot: string
@@ -44,6 +45,8 @@ export interface WorkspacePaneTabsMutationFailure {
 }
 
 export type WorkspacePaneTabsMutationResult = WorkspacePaneTabsMutationSuccess | WorkspacePaneTabsMutationFailure
+
+const blockingWorkspacePaneTabsMutationsByTarget = new Map<string, number>()
 
 /**
  * Logs a workspace-pane-tabs mutation failure and returns the structured
@@ -86,13 +89,63 @@ export function reportWorkspacePaneTabsFailure(input: {
 export async function commitWorkspacePaneTabs(
   input: CommitWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabsMutationResult> {
-  return await commitWorkspacePaneTabsNow(input)
+  return await withWorkspacePaneTabsInteractionBlock(input, true, () => commitWorkspacePaneTabsNow(input))
 }
 
 export async function updateWorkspacePaneTabs(
   input: UpdateWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabsMutationResult> {
-  return await updateWorkspacePaneTabsNow(input)
+  return await withWorkspacePaneTabsInteractionBlock(
+    input,
+    workspacePaneTabsUpdateBlocksInteraction(input.operation),
+    () => updateWorkspacePaneTabsNow(input),
+  )
+}
+
+export function workspacePaneTabsInteractionBlockedForTarget(input: {
+  repoRoot: string
+  branchName: string | null | undefined
+  worktreePath: string | null
+}): boolean {
+  const branchName = input.branchName
+  if (!branchName) return false
+  return (
+    blockingWorkspacePaneTabsMutationsByTarget.get(
+      workspacePaneTabsTargetIdentityKey({
+        repoRoot: input.repoRoot,
+        branchName,
+        worktreePath: input.worktreePath,
+      }),
+    ) ?? 0
+  ) > 0
+}
+
+function workspacePaneTabsUpdateBlocksInteraction(operation: WorkspacePaneTabsUpdateOperation): boolean {
+  return operation.type !== 'open-static'
+}
+
+async function withWorkspacePaneTabsInteractionBlock<T>(
+  input: {
+    repoRoot: string
+    branchName: string
+    worktreePath: string | null
+  },
+  blocksInteraction: boolean,
+  run: () => Promise<T>,
+): Promise<T> {
+  if (!blocksInteraction) return await run()
+  const key = workspacePaneTabsTargetIdentityKey(input)
+  blockingWorkspacePaneTabsMutationsByTarget.set(
+    key,
+    (blockingWorkspacePaneTabsMutationsByTarget.get(key) ?? 0) + 1,
+  )
+  try {
+    return await run()
+  } finally {
+    const nextCount = (blockingWorkspacePaneTabsMutationsByTarget.get(key) ?? 1) - 1
+    if (nextCount > 0) blockingWorkspacePaneTabsMutationsByTarget.set(key, nextCount)
+    else blockingWorkspacePaneTabsMutationsByTarget.delete(key)
+  }
 }
 
 async function commitWorkspacePaneTabsNow(

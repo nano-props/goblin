@@ -4,9 +4,9 @@ import {
   getRepoOperationsQueryData,
   getRepoProjectionPlaceholderData,
   getRepoProjectionQueryData,
+  invalidateRepoRuntimeProjectionQueries,
   repoOperationsQueryKey,
   repoProjectionQueryKey,
-  scheduleRepoRuntimeProjectionRefresh,
   seedRepoProjectionQueryData,
   setRepoOperationsQueryData,
   setRepoProjectionQueryData,
@@ -201,31 +201,18 @@ describe('repo projection query data', () => {
     })
   })
 
-  test('schedules precise runtime projection invalidations', () => {
-    vi.useFakeTimers()
-    try {
-      const queryClient = new QueryClient()
-      const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
+  test('invalidates runtime projection queries once per server-owned lifecycle signal', () => {
+    const queryClient = new QueryClient()
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
 
-      scheduleRepoRuntimeProjectionRefresh('/tmp/repo', 'repo-instance-1', {
-        queryClient,
-        delaysMs: [10, 20],
-      })
+    invalidateRepoRuntimeProjectionQueries('/tmp/repo', 'repo-instance-1', queryClient)
 
-      expect(invalidateQueries).toHaveBeenCalledTimes(2)
-      expect(invalidateQueries).toHaveBeenNthCalledWith(1, {
-        queryKey: ['repo-data', '/tmp/repo', 'repo-instance-1', 'projection'],
-      })
-      expect(invalidateQueries).toHaveBeenNthCalledWith(2, {
-        queryKey: ['repo-data', '/tmp/repo', 'repo-instance-1', 'operations'],
-      })
-
-      vi.advanceTimersByTime(10)
-      expect(invalidateQueries).toHaveBeenCalledTimes(4)
-      vi.advanceTimersByTime(10)
-      expect(invalidateQueries).toHaveBeenCalledTimes(6)
-    } finally {
-      vi.useRealTimers()
-    }
+    expect(invalidateQueries).toHaveBeenCalledTimes(2)
+    expect(invalidateQueries).toHaveBeenNthCalledWith(1, {
+      queryKey: ['repo-data', '/tmp/repo', 'repo-instance-1', 'projection'],
+    })
+    expect(invalidateQueries).toHaveBeenNthCalledWith(2, {
+      queryKey: ['repo-data', '/tmp/repo', 'repo-instance-1', 'operations'],
+    })
   })
 })

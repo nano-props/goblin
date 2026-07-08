@@ -95,7 +95,7 @@ describe('workspace pane runtime tab panel', () => {
       }),
     )
     const commandCalls = terminalCreateCommandMocks.runCreateTerminalTabCommand.mock.calls as unknown as Array<
-      [{ showCreatedTerminalTab: (terminalSessionId: string) => void | Promise<void> }]
+      [{ showCreatedTerminalTab: (terminalSessionId: string) => boolean | Promise<boolean> }]
     >
     await commandCalls[0]?.[0].showCreatedTerminalTab('session-1')
     expect(navigation.showRepoBranchTerminalSession).toHaveBeenCalledWith('/repo', 'main', 'session-1')
@@ -135,6 +135,7 @@ function navigationWith(): PrimaryWindowNavigationActions {
     closeRepo: vi.fn(),
     cycleRepo: vi.fn(),
     selectRepoBranch: vi.fn(),
+    showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: vi.fn(),
     showRepoBranchTerminalSession: vi.fn(),
     goBack: vi.fn(),

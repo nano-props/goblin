@@ -1,8 +1,5 @@
 import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useTerminalActionDialogsStore } from '#/web/stores/repos/terminal-action-dialogs.ts'
-import { gblLog } from '#/web/logger.ts'
-import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
@@ -10,7 +7,6 @@ import {
   adjacentRepoWorkspaceTab,
   isRepoWorkspaceRuntimeTab,
   nextRepoWorkspaceTabAfterClose,
-  repoWorkspaceTabModelBlocksTabInteraction,
   type RepoWorkspaceTab,
   type RepoWorkspaceTabModel,
 } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
@@ -39,12 +35,9 @@ import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/work
 import { beginWorkspacePaneTabClose } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
 import {
   resolveWorkspacePaneTabTargetForBranch,
+  workspacePaneTabTargetBlocksInteraction,
   workspacePaneTabTargetForBranch,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import {
-  preferredWorkspacePaneTabForTarget,
-  workspacePaneTabsTargetForRepoBranch,
-} from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { clearWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
@@ -173,7 +166,8 @@ export async function runTerminalPrimaryActionCommand({
       branchName,
       workspacePaneRoute,
       showRuntimeTab: (type, sessionId) => {
-        if (type === 'terminal') navigation.showRepoBranchTerminalSession(repoId, branchName, sessionId)
+        if (type === 'terminal') return navigation.showRepoBranchTerminalSession(repoId, branchName, sessionId)
+        return false
       },
       terminalCreateTranslator: t,
     }),
@@ -195,7 +189,8 @@ export async function runNewTerminalTabCommand({
       branchName,
       workspacePaneRoute,
       showRuntimeTab: (type, sessionId) => {
-        if (type === 'terminal') navigation.showRepoBranchTerminalSession(repoId, branchName, sessionId)
+        if (type === 'terminal') return navigation.showRepoBranchTerminalSession(repoId, branchName, sessionId)
+        return false
       },
       terminalCreateTranslator: t,
     }),
@@ -222,7 +217,7 @@ async function closeWorkspacePaneTabCommand(options: CloseWorkspacePaneTabComman
         })
       : null
   if (!target) return false
-  if (repoWorkspaceTabModelBlocksTabInteraction(target)) return true
+  if (workspacePaneTabTargetBlocksInteraction(target)) return true
   const tab = targetIdentity
     ? (target?.tabs.find((candidate) => candidate.identity === targetIdentity) ?? null)
     : (target?.activeTab ?? null)
@@ -245,36 +240,20 @@ async function closeWorkspacePaneTabCommand(options: CloseWorkspacePaneTabComman
 
   const closingIdentity = tab.identity
   const wasActive = target.activeTab?.identity === closingIdentity
-  const preferredBeforeClose = target.branchName ? preferredWorkspacePaneTab(target.repoId, target.branchName) : null
   const openerIdentity =
     wasActive && target.branchName ? workspacePaneTabOpener(target.repoId, target.branchName, closingIdentity) : null
   const nextTab = wasActive ? nextRepoWorkspaceTabAfterClose(target.tabs, closingIdentity, openerIdentity) : null
   const close = beginWorkspacePaneTabClose(target, tab)
   if (!close.accepted) return false
-  observeWorkspacePaneTabClose(close.completion, target.repoId, target.branchName, closingIdentity)
-  if (tab.kind === 'static') {
-    if (!(await close.completion)) return false
-    if (target.branchName && preferredWorkspacePaneTab(target.repoId, target.branchName) !== preferredBeforeClose)
-      return true
-  }
-
-  if (nextTab) {
-    showWorkspacePaneCommandTab(target, nextTab, navigation)
-  }
+  if (!(await close.completion)) return false
+  completeWorkspacePaneTabClose(target.repoId, target.branchName, closingIdentity)
+  if (wasActive) return showWorkspacePaneCloseBackTarget(target, nextTab, navigation)
   return true
 }
 
-function preferredWorkspacePaneTab(repoId: string, branchName: string): WorkspacePaneTabType | null {
-  const repo = useReposStore.getState().repos[repoId]
-  const branchModel = repo ? readRepoBranchQueryProjection(repo) : null
-  if (!repo || !branchModel) return null
-  return preferredWorkspacePaneTabForTarget(
-    repo.ui,
-    workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branchName),
-  )
-}
-
-function closeConfirmedTerminalWorkspacePaneTab(options: ConfirmCloseTerminalWorkspacePaneTabCommandOptions): boolean {
+async function closeConfirmedTerminalWorkspacePaneTab(
+  options: ConfirmCloseTerminalWorkspacePaneTabCommandOptions,
+): Promise<boolean> {
   const { repoId, navigation, targetIdentity, confirmedTerminal } = options
   if (!confirmedTerminal.base.repoInstanceId) return false
   const confirmed: ConfirmedWorkspacePaneRuntimeTabClose = {
@@ -302,7 +281,7 @@ function closeConfirmedTerminalWorkspacePaneTab(options: ConfirmCloseTerminalWor
           workspacePaneRoute: options.currentWorkspacePaneRoute,
         })
       : null
-  if (closeTarget && repoWorkspaceTabModelBlocksTabInteraction(closeTarget)) return false
+  if (closeTarget && workspacePaneTabTargetBlocksInteraction(closeTarget)) return false
   const tab = closeTarget?.tabs.find((candidate) => candidate.identity === confirmedIdentity) ?? null
   const wasActive =
     !!currentTarget &&
@@ -320,17 +299,13 @@ function closeConfirmedTerminalWorkspacePaneTab(options: ConfirmCloseTerminalWor
       : null
   const closeContext = readWorkspacePaneRuntimeTabCloseContext()
   if (!canConfirmWorkspacePaneRuntimeTabCloseWithContext(confirmed, closeContext)) return false
-  observeWorkspacePaneTabClose(
-    confirmWorkspacePaneRuntimeTabClose(confirmed, closeContext),
+  if (!(await confirmWorkspacePaneRuntimeTabClose(confirmed, closeContext))) return false
+  completeWorkspacePaneTabClose(
     repoId,
-    // The confirmed-close payload carries the branch the runtime tab actually
-    // belongs to — more reliable than `target.branchName`, which reflects
-    // whatever branch is currently selected and may have changed since
-    // the confirm dialog was opened.
     confirmedBranchName,
     targetIdentity ?? workspacePaneRuntimeTabConfirmedCloseIdentity(confirmed),
   )
-  if (closeTarget && nextTab) showWorkspacePaneCommandTab(closeTarget, nextTab, navigation)
+  if (wasActive && closeTarget) return showWorkspacePaneCloseBackTarget(closeTarget, nextTab, navigation)
   return true
 }
 
@@ -380,10 +355,9 @@ export function runSelectWorkspacePaneTabByIndexCommand({
   const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute })
   const tab = target?.tabs[tabIndex - 1]
   if (!target || !tab) return false
-  if (repoWorkspaceTabModelBlocksTabInteraction(target)) return false
+  if (workspacePaneTabTargetBlocksInteraction(target)) return false
   if (tab.kind === 'pending') return false
-  showWorkspacePaneCommandTab(target, tab, navigation)
-  return true
+  return showWorkspacePaneCommandTab(target, tab, navigation)
 }
 
 export function runMoveWorkspacePaneTabCommand({
@@ -397,9 +371,8 @@ export function runMoveWorkspacePaneTabCommand({
   const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute })
   const tab = target ? adjacentRepoWorkspaceTab(target.tabs, target.activeTab?.identity, direction) : null
   if (!target || !tab) return false
-  if (repoWorkspaceTabModelBlocksTabInteraction(target)) return false
-  showWorkspacePaneCommandTab(target, tab, navigation)
-  return true
+  if (workspacePaneTabTargetBlocksInteraction(target)) return false
+  return showWorkspacePaneCommandTab(target, tab, navigation)
 }
 
 function selectedRepoWorkspaceTarget(
@@ -417,36 +390,32 @@ function showWorkspacePaneCommandTab(
   target: RepoWorkspaceTabModel,
   tab: RepoWorkspaceTab,
   navigation: PrimaryWindowNavigationActions,
-): void {
+): boolean {
   const branchName = target.branchName
-  if (!branchName) return
+  if (!branchName) return false
   if (isRepoWorkspaceRuntimeTab(tab)) {
     if (tab.runtimeType === 'terminal') {
-      navigation.showRepoBranchTerminalSession(target.repoId, branchName, tab.sessionId)
+      return navigation.showRepoBranchTerminalSession(target.repoId, branchName, tab.sessionId)
     }
-    return
+    return false
   }
-  if (tab.kind === 'static') navigation.showRepoBranchWorkspacePaneTab(target.repoId, branchName, tab.type)
+  if (tab.kind === 'static') return navigation.showRepoBranchWorkspacePaneTab(target.repoId, branchName, tab.type)
+  return false
 }
 
-function observeWorkspacePaneTabClose(
-  completion: Promise<boolean>,
-  repoId: string | null,
-  branchName: string | null,
-  identity: string,
-): void {
-  void completion.then(
-    (ok) => {
-      if (ok) {
-        if (repoId && branchName) clearWorkspacePaneTabOpener(repoId, branchName, identity)
-      } else {
-        gblLog.warn('workspace pane tab close did not complete', { identity })
-      }
-    },
-    (err) => {
-      gblLog.warn('workspace pane tab close failed', { identity, err })
-    },
-  )
+function showWorkspacePaneCloseBackTarget(
+  target: RepoWorkspaceTabModel,
+  nextTab: RepoWorkspaceTab | null,
+  navigation: PrimaryWindowNavigationActions,
+): boolean {
+  if (nextTab) return showWorkspacePaneCommandTab(target, nextTab, navigation)
+  const branchName = target.branchName
+  if (!branchName) return false
+  return navigation.showRepoBranchEmptyWorkspacePane(target.repoId, branchName)
+}
+
+function completeWorkspacePaneTabClose(repoId: string | null, branchName: string | null, identity: string): void {
+  if (repoId && branchName) clearWorkspacePaneTabOpener(repoId, branchName, identity)
 }
 
 function resolveCloseWorkspaceSurfaceIntent(options: CloseWorkspacePaneTabCommandOptions): CloseWorkspaceSurfaceIntent {

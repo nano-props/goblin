@@ -10,6 +10,7 @@ Use this doc for app shell and process control rules.
 - Use direct native-host actions only for native-only work.
 - Let the server own settings and app data.
 - Prefer server-first runtime authority. The client should send intent plus explicit preconditions, and the server should accept or reject with fast-fail semantics.
+- Keep user commands sequential. Resolve route/state supplements at the action boundary, perform the accepted write, then navigate to the precomputed result. Do not use effects, background observers, or client-only tokens to repair command state after the fact.
 - Model runtime lifecycle as server-owned state transitions, not client-synchronized snapshots. For repo instances this means the server mints the live `repoInstanceId` on open and invalidates it on close/reopen.
 - Do not treat a stable locator such as `repoRoot` as a full runtime identity when reopen/recreate can mint a new live instance.
 - Do not add client-side freshness heuristics when the server can reject stale work directly. Push runtime validity checks into shared protocol contracts first, and let stale mutations fail instead of trying to "heal" them in the client.

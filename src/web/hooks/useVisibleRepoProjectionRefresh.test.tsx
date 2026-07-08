@@ -21,6 +21,7 @@ import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-proje
 import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import type { BranchSnapshotInfo, WorktreeStatus } from '#/web/types.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 const originalRefreshRuntimeProjection = useReposStore.getState().refreshRuntimeProjection
 const emptyTerminalWorktreeSnapshots = new Map<string, TerminalWorktreeSnapshot>()
@@ -53,18 +54,31 @@ const terminalReadContext: TerminalSessionReadContextValue = {
 function Harness({
   repoId = '/repo-a',
   branchName = 'main',
-}: { repoId?: string | null; branchName?: string | null } = {}) {
+  workspacePaneRoute,
+}: {
+  repoId?: string | null
+  branchName?: string | null
+  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
+} = {}) {
   return (
     <QueryClientProvider client={primaryWindowQueryClient}>
       <TerminalSessionReadContext value={terminalReadContext}>
-        <HarnessEffect repoId={repoId} branchName={branchName} />
+        <HarnessEffect repoId={repoId} branchName={branchName} workspacePaneRoute={workspacePaneRoute} />
       </TerminalSessionReadContext>
     </QueryClientProvider>
   )
 }
 
-function HarnessEffect({ repoId, branchName }: { repoId: string | null; branchName: string | null }) {
-  useVisibleRepoProjectionRefresh({ hydratedRouteRepoId: repoId, currentBranchName: branchName })
+function HarnessEffect({
+  repoId,
+  branchName,
+  workspacePaneRoute,
+}: {
+  repoId: string | null
+  branchName: string | null
+  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
+}) {
+  useVisibleRepoProjectionRefresh({ hydratedRouteRepoId: repoId, currentBranchName: branchName, workspacePaneRoute })
   return null
 }
 
@@ -551,6 +565,44 @@ describe('useVisibleRepoProjectionRefresh', () => {
       repoInstanceId: 'repo-instance-test-a',
       scope: 'visible-status',
       branchName: 'feature/a',
+    })
+  })
+
+  test('does not refresh a bare branch route as though it rendered the preferred status tab', async () => {
+    const repo = createRepo('/repo-a', {
+      preferredWorkspacePaneTab: 'status',
+      workspacePaneTabs: [workspacePaneStaticTabEntry('status')],
+    })
+    await act(async () => {
+      useReposStore.setState({
+        repos: { '/repo-a': repo },
+        order: ['/repo-a'],
+        restoredRepoId: '/repo-a',
+      })
+      root.render(<Harness workspacePaneRoute={null} />)
+    })
+
+    expect(refreshRuntimeProjection).not.toHaveBeenCalled()
+  })
+
+  test('refreshes a routed status tab without consulting the stored preferred tab', async () => {
+    const repo = createRepo('/repo-a', {
+      preferredWorkspacePaneTab: 'history',
+      workspacePaneTabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+    })
+    await act(async () => {
+      useReposStore.setState({
+        repos: { '/repo-a': repo },
+        order: ['/repo-a'],
+        restoredRepoId: '/repo-a',
+      })
+      root.render(<Harness workspacePaneRoute={{ kind: 'static', tab: 'status' }} />)
+    })
+
+    expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
+      repoInstanceId: 'repo-instance-test-a',
+      scope: 'visible-status',
+      branchName: 'main',
     })
   })
 })

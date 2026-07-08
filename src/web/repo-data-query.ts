@@ -1,17 +1,9 @@
 import { useEffect } from 'react'
 import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import {
-  getRepoLog,
-  getRepoOperations,
-  getRepoProjection,
-  getRepoRemoteBranches,
-} from '#/web/repo-client.ts'
+import { getRepoLog, getRepoOperations, getRepoProjection, getRepoRemoteBranches } from '#/web/repo-client.ts'
 import type { RepoOperationsSnapshot, RepoRuntimeProjection, RepoServerOperationState } from '#/shared/api-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT, type PullRequestFetchMode } from '#/shared/git-types.ts'
-
-const ACTIVE_REPO_OPERATION_REFETCH_INTERVAL_MS = 1_000
-const RUNTIME_PROJECTION_REFRESH_DELAYS_MS = [50, 250] as const
 
 export function repoProjectionQueryKey(
   repoRoot: string,
@@ -19,7 +11,13 @@ export function repoProjectionQueryKey(
   branch?: string | null,
   mode?: PullRequestFetchMode,
 ) {
-  return ['repo-data', repoRoot, repoInstanceId, 'projection', { branch: branch || null, mode: mode ?? 'full' }] as const
+  return [
+    'repo-data',
+    repoRoot,
+    repoInstanceId,
+    'projection',
+    { branch: branch || null, mode: mode ?? 'full' },
+  ] as const
 }
 
 export function repoOperationsQueryKey(repoRoot: string, repoInstanceId: string, includeSettled = false) {
@@ -57,22 +55,12 @@ export function repoProjectionQueryOptions(
     queryKey: repoProjectionQueryKey(repoRoot, repoInstanceId, branch, mode),
     queryFn: ({ signal }) => getRepoProjection(repoRoot, branch, { mode }, signal),
     placeholderData,
-    refetchInterval: (query) =>
-      repoOperationsSnapshotHasActiveOperations(query.state.data?.operations)
-        ? ACTIVE_REPO_OPERATION_REFETCH_INTERVAL_MS
-        : false,
     staleTime: Number.POSITIVE_INFINITY,
   })
 }
 
 export function repoServerOperationActive(operation: Pick<RepoServerOperationState, 'phase'>): boolean {
   return operation.phase === 'queued' || operation.phase === 'running' || operation.phase === 'cancelling'
-}
-
-export function repoOperationsSnapshotHasActiveOperations(snapshot: RepoOperationsSnapshot | undefined): boolean {
-  return !!snapshot?.operations.some(
-    (operation) => repoServerOperationActive(operation),
-  )
 }
 
 export function getRepoProjectionPlaceholderData(
@@ -84,7 +72,13 @@ export function getRepoProjectionPlaceholderData(
 ): RepoRuntimeProjection | undefined {
   const requestedBranch = branch || null
   const requestedMode = mode ?? 'full'
-  const cached = findRepoProjectionPlaceholderSource(repoRoot, repoInstanceId, requestedBranch, requestedMode, queryClient)
+  const cached = findRepoProjectionPlaceholderSource(
+    repoRoot,
+    repoInstanceId,
+    requestedBranch,
+    requestedMode,
+    queryClient,
+  )
   if (!cached?.snapshot) return undefined
   const operations = getRepoOperationsQueryData(repoRoot, repoInstanceId, queryClient) ?? cached.operations
   return {
@@ -111,7 +105,9 @@ function findRepoProjectionPlaceholderSource(
     .getQueriesData<RepoRuntimeProjection>({ queryKey: repoProjectionQueryPrefix(repoRoot, repoInstanceId) })
     .map(([_key, projection]) => projection)
     .filter((projection): projection is RepoRuntimeProjection => !!projection?.snapshot)
-  candidates.sort((a, b) => repoProjectionPlaceholderRank(a, branch, mode) - repoProjectionPlaceholderRank(b, branch, mode))
+  candidates.sort(
+    (a, b) => repoProjectionPlaceholderRank(a, branch, mode) - repoProjectionPlaceholderRank(b, branch, mode),
+  )
   return candidates[0]
 }
 
@@ -162,10 +158,6 @@ export function repoOperationsQueryOptions(
     queryKey: repoOperationsQueryKey(repoRoot, repoInstanceId, includeSettled),
     queryFn: ({ signal }) => getRepoOperations(repoRoot, { includeSettled, signal }),
     enabled: options.enabled,
-    refetchInterval: (query) =>
-      repoOperationsSnapshotHasActiveOperations(query.state.data)
-        ? ACTIVE_REPO_OPERATION_REFETCH_INTERVAL_MS
-        : false,
     staleTime: Number.POSITIVE_INFINITY,
   })
 }
@@ -299,19 +291,4 @@ export function invalidateRepoRuntimeProjectionQueries(
 ): void {
   void queryClient.invalidateQueries({ queryKey: repoProjectionQueryPrefix(repoRoot, repoInstanceId) })
   void queryClient.invalidateQueries({ queryKey: repoOperationsQueryPrefix(repoRoot, repoInstanceId) })
-}
-
-export function scheduleRepoRuntimeProjectionRefresh(
-  repoRoot: string,
-  repoInstanceId: string,
-  options: { queryClient?: QueryClient; delaysMs?: readonly number[] } = {},
-): void {
-  const queryClient = options.queryClient ?? primaryWindowQueryClient
-  const delaysMs = options.delaysMs ?? RUNTIME_PROJECTION_REFRESH_DELAYS_MS
-  invalidateRepoRuntimeProjectionQueries(repoRoot, repoInstanceId, queryClient)
-  for (const delayMs of delaysMs) {
-    globalThis.setTimeout(() => {
-      invalidateRepoRuntimeProjectionQueries(repoRoot, repoInstanceId, queryClient)
-    }, delayMs)
-  }
 }

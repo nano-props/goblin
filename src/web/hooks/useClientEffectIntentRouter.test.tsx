@@ -10,12 +10,23 @@ import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
-import { createBranchSnapshot, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import { createBranchSnapshot, createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import {
+  setTerminalSessionCommandBridge,
+} from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
+import {
+  readWorkspacePaneTabsForTarget,
+  setWorkspacePaneTabsForTargetQueryData,
+} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 const appDataClientMocks = vi.hoisted(() => ({
   clearRecentRepoHistory: vi.fn(async () => {}),
@@ -35,6 +46,8 @@ const closeAllOverlays = vi.fn()
 let overlayOpen = false
 let workspaceShortcutSuppressed = false
 let currentRepoId: string | null = null
+let currentBranchName: string | null = null
+let currentWorkspacePaneRoute: RepoBranchWorkspacePaneRoute | null = null
 let navigation!: PrimaryWindowNavigationActions
 const activateRepoSpy = vi.fn()
 const closeRepoSpy = vi.fn()
@@ -56,6 +69,9 @@ beforeEach(() => {
   overlayOpen = false
   workspaceShortcutSuppressed = false
   currentRepoId = null
+  currentBranchName = null
+  currentWorkspacePaneRoute = null
+  setTerminalSessionCommandBridge(null)
   navigation = {
     activateRepo: (repoId) => {
       activateRepoSpy(repoId)
@@ -65,14 +81,17 @@ beforeEach(() => {
       useReposStore.getState().closeRepo(repoId)
     },
     cycleRepo: () => {},
-    selectRepoBranch: () => {},
+    selectRepoBranch: () => true,
+    showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {
       showRepoBranchWorkspacePaneTabSpy(repoId, branch, tab)
       const state = useReposStore.getState()
       state.setWorkspacePaneTab(repoId, branch, tab)
+      return true
     },
     showRepoBranchTerminalSession: (repoId, branch, terminalSessionId) => {
       showRepoBranchTerminalSessionSpy(repoId, branch, terminalSessionId)
+      return true
     },
     goBack: () => {},
     goForward: () => {},
@@ -125,6 +144,7 @@ afterEach(() => {
   ipcEventListeners.clear()
   intentListeners.clear()
   setClientBridgeForTests(null)
+  setTerminalSessionCommandBridge(null)
 })
 
 describe('useClientEffectIntentRouter', () => {
@@ -192,8 +212,10 @@ describe('useClientEffectIntentRouter', () => {
     navigation = {
       ...navigation,
       selectRepoBranch: vi.fn(),
+      showRepoBranchEmptyWorkspacePane: () => true,
       showRepoBranchTerminalSession: (repoId, branch, terminalSessionId) => {
         routeNavigationCalls.push({ repoId, branch, terminalSessionId })
+        return true
       },
     }
     currentRepoId = repo.id
@@ -342,6 +364,87 @@ describe('useClientEffectIntentRouter', () => {
     expect(closeRepoSpy).not.toHaveBeenCalled()
   })
 
+  test('native new-terminal and close intents preserve a static route opener', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: '/tmp/repo',
+      currentBranch: 'main',
+      currentBranchName: 'main',
+      preferredWorkspacePaneTab: 'status',
+      branches: [createRepoBranch('main', { worktree: { path: '/tmp/repo-worktree' } })],
+      workspacePaneTabsByBranch: {
+        main: [
+          workspacePaneStaticTabEntry('status'),
+          workspacePaneStaticTabEntry('history'),
+          workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+        ],
+      },
+    })
+    currentRepoId = repo.id
+    currentBranchName = 'main'
+    currentWorkspacePaneRoute = { kind: 'static', tab: 'status' }
+    const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, '/tmp/repo-worktree')
+    let visibleSessionIds = ['session-1']
+    useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'session-1')
+    const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
+      const terminalSessionId = 'session-2'
+      const currentTabs = readWorkspacePaneTabsForTarget({
+        repoRoot: base.repoRoot,
+        repoInstanceId: base.repoInstanceId!,
+        branchName: base.branch,
+        worktreePath: base.worktreePath,
+      })
+      setWorkspacePaneTabsForTargetQueryData({
+        repoRoot: base.repoRoot,
+        repoInstanceId: base.repoInstanceId!,
+        branchName: base.branch,
+        worktreePath: base.worktreePath,
+        tabs: [...currentTabs, workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
+      })
+      visibleSessionIds = [...visibleSessionIds, terminalSessionId]
+      useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, terminalSessionId)
+      return terminalSessionId
+    })
+    const closeTerminalByDescriptor = vi.fn((terminalSessionId: string) => {
+      visibleSessionIds = visibleSessionIds.filter((id) => id !== terminalSessionId)
+      return Promise.resolve(true)
+    })
+    setTerminalSessionCommandBridge({
+      terminalWorktreeSnapshot: () => terminalWorktreeSnapshot(terminalWorktreeKey, visibleSessionIds),
+      createTerminal,
+      selectTerminal: vi.fn(),
+      closeTerminalByDescriptor,
+    })
+    const host = renderInJsdom(<HookHost />)
+
+    await act(async () => {
+      for (const listener of intentListeners) listener({ type: 'terminal-new-tab-requested' })
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(showRepoBranchTerminalSessionSpy).toHaveBeenCalledWith(repo.id, 'main', 'session-2')
+
+    currentWorkspacePaneRoute = { kind: 'terminal', terminalSessionId: 'session-2' }
+    host.rerender(<HookHost />)
+    showRepoBranchWorkspacePaneTabSpy.mockClear()
+    showRepoBranchTerminalSessionSpy.mockClear()
+
+    await act(async () => {
+      for (const listener of intentListeners) listener({ type: 'workspace-pane-close-tab-or-window-requested' })
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-2', {
+      repoRoot: repo.id,
+      repoInstanceId: repo.instanceId,
+      branch: 'main',
+      worktreePath: '/tmp/repo-worktree',
+    })
+    expect(showRepoBranchWorkspacePaneTabSpy).toHaveBeenCalledWith(repo.id, 'main', 'status')
+    expect(showRepoBranchTerminalSessionSpy).not.toHaveBeenCalled()
+  })
+
   test('drains externally opened repo paths through the centralized intent router', async () => {
     useReposStore.setState({
       ensureWorkspaceOpen: vi.fn(async (path: string | { id: string }) => ({
@@ -426,6 +529,8 @@ function HookHost() {
   useClientEffectIntentRouter({
     navigation,
     currentRepoId,
+    currentBranchName,
+    currentWorkspacePaneRoute,
     closeAllOverlays,
     openRepoPathDialog: () => {},
     openCloneRepo: () => {},
@@ -435,4 +540,42 @@ function HookHost() {
     isWorkspaceShortcutSuppressed: () => workspaceShortcutSuppressed,
   })
   return null
+}
+
+function terminalWorktreeSnapshot(
+  terminalWorktreeKey: string,
+  terminalSessionIds: readonly string[],
+): TerminalWorktreeSnapshot {
+  const selectedKey = useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[terminalWorktreeKey] ?? null
+  const sessions = terminalSessionIds.map((terminalSessionId, index) => ({
+    type: 'terminal' as const,
+    terminalSessionId,
+    terminalWorktreeKey,
+    index: index + 1,
+    title: `terminal ${index + 1}`,
+    phase: 'open' as const,
+    selected: terminalSessionId === selectedKey,
+    hasBell: false,
+    hasRecentOutput: false,
+  }))
+  const selectedSession = sessions.find((session) => session.terminalSessionId === selectedKey) ?? null
+  return {
+    terminalWorktreeKey,
+    selectedDescriptor: selectedSession
+      ? {
+          terminalSessionId: selectedSession.terminalSessionId,
+          terminalWorktreeKey,
+          index: selectedSession.index,
+          repoRoot: '/tmp/repo',
+          repoInstanceId: useReposStore.getState().repos['/tmp/repo']?.instanceId ?? '',
+          branch: 'main',
+          worktreePath: '/tmp/repo-worktree',
+        }
+      : null,
+    sessions,
+    count: sessions.length,
+    bellCount: 0,
+    outputActiveCount: 0,
+    createPending: false,
+  }
 }

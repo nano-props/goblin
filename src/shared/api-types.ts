@@ -83,7 +83,7 @@ export interface WorkspaceSessionState {
   workspacePaneSize: number
   selectedTerminalSessionIdByTerminalWorktree: Record<string, string>
   /** Per-repo, per-target workspace pane tab preference that session restore can make renderable. */
-  preferredWorkspacePaneTabByTargetByRepo: Record<string, Record<string, WorkspacePaneSessionTabType>>
+  preferredWorkspacePaneTabByTargetByRepo: Record<string, Record<string, WorkspacePaneSessionTabType | null>>
   /** Per-repo, per-target mixed workspace pane tab list. Empty arrays are meaningful. */
   workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>
   /** Per-repo, per-worktree file tree view state. */

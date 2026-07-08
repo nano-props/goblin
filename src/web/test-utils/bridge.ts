@@ -94,7 +94,7 @@ export function seedRepoShellForTest(options: {
   id: string
   name?: string
   currentBranchName?: string | null
-  preferredWorkspacePaneTabByTarget?: Record<string, WorkspacePaneTabType>
+  preferredWorkspacePaneTabByTarget?: Record<string, WorkspacePaneTabType | null>
   instanceId?: string
   remote?: Partial<RepoState['remote']>
 }): RepoState {
@@ -890,8 +890,8 @@ export function seedRepoWithReadModelForTest(options: {
   branchSnapshots?: BranchSnapshotInfo[]
   currentBranch?: string
   currentBranchName?: string | null
-  preferredWorkspacePaneTab?: WorkspacePaneTabType
-  preferredWorkspacePaneTabByTarget?: Record<string, WorkspacePaneTabType>
+  preferredWorkspacePaneTab?: WorkspacePaneTabType | null
+  preferredWorkspacePaneTabByTarget?: Record<string, WorkspacePaneTabType | null>
   workspacePaneTabsByBranch?: Record<string, WorkspacePaneTabEntry[]>
   instanceId?: string
   status?: WorktreeStatus[]

@@ -334,16 +334,28 @@ describe('repo lifecycle', () => {
     })
     useReposStore
       .getState()
-      .setTabOpener(tabOpenerScopeKey(REPO_A, 'feature/a'), 'workspace-pane:changes', 'workspace-pane:status')
+      .setTabOpener(
+        tabOpenerScopeKey({ repoRoot: REPO_A, branchName: 'feature/a', worktreePath: null }),
+        'workspace-pane:changes',
+        'workspace-pane:status',
+      )
     useReposStore
       .getState()
-      .setTabOpener(tabOpenerScopeKey(REPO_B, 'feature/b'), 'workspace-pane:changes', 'workspace-pane:status')
+      .setTabOpener(
+        tabOpenerScopeKey({ repoRoot: REPO_B, branchName: 'feature/b', worktreePath: null }),
+        'workspace-pane:changes',
+        'workspace-pane:status',
+      )
 
     useReposStore.getState().closeRepo(REPO_A)
 
     const openers = useReposStore.getState().tabOpenerIdentityByScope
-    expect(openers[tabOpenerScopeKey(REPO_A, 'feature/a')]).toBeUndefined()
-    expect(openers[tabOpenerScopeKey(REPO_B, 'feature/b')]?.['workspace-pane:changes']).toBe('workspace-pane:status')
+    expect(openers[tabOpenerScopeKey({ repoRoot: REPO_A, branchName: 'feature/a', worktreePath: null })]).toBeUndefined()
+    expect(
+      openers[tabOpenerScopeKey({ repoRoot: REPO_B, branchName: 'feature/b', worktreePath: null })]?.[
+        'workspace-pane:changes'
+      ],
+    ).toBe('workspace-pane:status')
   })
 
   test('closeRepo clears workspace navigation history scoped to that repo', () => {

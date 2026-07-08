@@ -178,6 +178,7 @@ function AuthenticatedWorkspaceShell() {
               <VisibleRepoProjectionRefreshEffect
                 hydratedRouteRepoId={hydratedRouteRepoId}
                 currentBranchName={currentBranchName}
+                currentWorkspacePaneRoute={currentWorkspacePaneRoute}
               />
               <div
                 className="relative flex h-full flex-col"
@@ -388,11 +389,17 @@ function AuthenticatedWorkspaceSideEffects({
 function VisibleRepoProjectionRefreshEffect({
   hydratedRouteRepoId,
   currentBranchName,
+  currentWorkspacePaneRoute,
 }: {
   hydratedRouteRepoId: string | null
   currentBranchName: string | null
+  currentWorkspacePaneRoute: RepoBranchWorkspacePaneRoute | null
 }) {
-  useVisibleRepoProjectionRefresh({ hydratedRouteRepoId, currentBranchName })
+  useVisibleRepoProjectionRefresh({
+    hydratedRouteRepoId,
+    currentBranchName,
+    workspacePaneRoute: currentWorkspacePaneRoute,
+  })
   return null
 }
 

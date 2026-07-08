@@ -12,19 +12,19 @@ export interface PrimaryWindowRouteNavigation {
   closeSettings: () => void
   openRepoRoot: (repoId: string) => void
   openRepoDashboard: (repoId: string) => void
-  openRepoBranch: (repoId: string, branchName: string, options?: { replace?: boolean }) => void
+  openRepoBranch: (repoId: string, branchName: string, options?: { replace?: boolean }) => boolean
   openRepoBranchTab: (
     repoId: string,
     branchName: string,
     tab: WorkspacePaneStaticTabType,
     options?: { replace?: boolean },
-  ) => void
+  ) => boolean
   openRepoBranchTerminal: (
     repoId: string,
     branchName: string,
     terminalSessionId: string,
     options?: { replace?: boolean },
-  ) => void
+  ) => boolean
   openRepoNewWorktree: (repoId: string, options?: { returnTo: string | null }) => void
   cancelRepoNewWorktree: (repoId: string) => void
 }
@@ -63,30 +63,33 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
       },
       openRepoBranch(repoId, branchName, options) {
         const repoSlug = repoSlugForId(repoId)
-        if (!repoSlug) return
-        void router?.navigate({
+        if (!repoSlug || !router) return false
+        void router.navigate({
           to: '/repo/$repoSlug/branch/$branchSlug',
           params: { repoSlug, branchSlug: branchSlugFromName(branchName) },
           replace: options?.replace,
         })
+        return true
       },
       openRepoBranchTab(repoId, branchName, tab, options) {
         const repoSlug = repoSlugForId(repoId)
-        if (!repoSlug) return
-        void router?.navigate({
+        if (!repoSlug || !router) return false
+        void router.navigate({
           to: '/repo/$repoSlug/branch/$branchSlug/tab/$tabKey',
           params: { repoSlug, branchSlug: branchSlugFromName(branchName), tabKey: tab },
           replace: options?.replace,
         })
+        return true
       },
       openRepoBranchTerminal(repoId, branchName, terminalSessionId, options) {
         const repoSlug = repoSlugForId(repoId)
-        if (!repoSlug) return
-        void router?.navigate({
+        if (!repoSlug || !router) return false
+        void router.navigate({
           to: '/repo/$repoSlug/branch/$branchSlug/terminal/$terminalSessionId',
           params: { repoSlug, branchSlug: branchSlugFromName(branchName), terminalSessionId },
           replace: options?.replace,
         })
+        return true
       },
       openRepoNewWorktree(repoId, options) {
         const repoSlug = repoSlugForId(repoId)

@@ -15,7 +15,7 @@ export interface WorkspacePaneRuntimeTabCreateActionContext {
   repoRoot: string
   runtimeTabStateByType: WorkspacePaneRuntimeTabCreateStateByType
   initialRuntimeProjectionHydrating: boolean
-  showCreatedRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => void | Promise<void>
+  showCreatedRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => boolean | Promise<boolean>
   t: TerminalCreateTranslator
   terminal?: WorkspacePaneTerminalCreateActionContext
 }
@@ -25,7 +25,7 @@ export type WorkspacePaneRuntimeTabCreateStateByType = Record<WorkspacePaneRunti
 export interface WorkspacePaneTerminalCreateActionContext {
   base: TerminalSessionBase | null
   createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
-  openerIdentity: string | null
+  captureOpenerIdentity: () => string | null
 }
 
 interface WorkspacePaneRuntimeTabCreateActionResolver {
@@ -60,10 +60,11 @@ function terminalRuntimeTabCreateAction(
     blocksTabInteraction: context.runtimeTabStateByType.terminal.createPending,
     onCreate: () => {
       // "+" is a generic entry; opener only drives close-back focus, not insertion.
+      const openerIdentity = terminal.captureOpenerIdentity()
       void runCreateTerminalTabCommand({
         base,
         createTerminal: terminal.createTerminal,
-        openerIdentity: terminal.openerIdentity,
+        openerIdentity,
         showCreatedTerminalTab: (terminalSessionId) => context.showCreatedRuntimeTab('terminal', terminalSessionId),
         t: context.t,
       })

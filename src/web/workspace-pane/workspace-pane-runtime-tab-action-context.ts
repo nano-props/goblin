@@ -2,7 +2,7 @@ import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-actions.ts'
 
 export interface WorkspacePaneRuntimeTabActionContextInput {
-  showRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => void
+  showRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => boolean
   terminal?: NonNullable<WorkspacePaneRuntimeTabActionContext['terminal']>
 }
 
@@ -35,7 +35,7 @@ export function createWorkspacePaneRuntimeTabActionContext(
 }
 
 export function readWorkspacePaneRuntimeTabActionContext(input: {
-  showRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => void
+  showRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => boolean
 }): WorkspacePaneRuntimeTabActionContext {
   return createWorkspacePaneRuntimeTabActionContext({
     showRuntimeTab: input.showRuntimeTab,

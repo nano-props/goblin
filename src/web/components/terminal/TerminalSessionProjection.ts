@@ -127,7 +127,7 @@ export class TerminalSessionProjection {
   // User-initiated close hides the session from worktree snapshots
   // synchronously while server cleanup runs. This is terminal-runtime
   // visibility, not workspace pane selection state.
-  private readonly hiddenClosingTerminalSessionIds = new Set<string>()
+  private readonly closingTerminalWorktreeKeyBySessionId = new Map<string, string>()
   private readonly closeCompletionByTerminalSessionId = new Map<string, Promise<boolean>>()
   // Selector publication caches only. They memoize lightweight UI snapshots
   // for React subscribers and do not contain terminal render buffers.
@@ -203,7 +203,7 @@ export class TerminalSessionProjection {
     this.preferredSelectedTerminalSessionIdByTerminalWorktree.clear()
     this.hostByWorktree.clear()
     this.startupGeometryHintByWorktree.clear()
-    this.hiddenClosingTerminalSessionIds.clear()
+    this.closingTerminalWorktreeKeyBySessionId.clear()
     this.closeCompletionByTerminalSessionId.clear()
     this.snapshotCache.clear()
     this.worktreeSnapshotCache.clear()
@@ -755,7 +755,7 @@ export class TerminalSessionProjection {
 
   private selectedDescriptor(terminalWorktreeKey: string): TerminalDescriptor | null {
     const selectedKey = this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey)
-    if (selectedKey && this.hiddenClosingTerminalSessionIds.has(selectedKey)) return null
+    if (selectedKey && this.closingTerminalWorktreeKeyBySessionId.has(selectedKey)) return null
     return selectedKey ? (this.sessions.get(selectedKey)?.descriptor ?? null) : null
   }
 
@@ -784,6 +784,7 @@ export class TerminalSessionProjection {
       selectedDescriptor: this.selectedDescriptor(terminalWorktreeKey),
       createPending: this.lifecycleQueues.hasCreate(terminalWorktreeKey),
       sessions: this.visibleSessionsForWorktree(terminalWorktreeKey),
+      closingSessionIds: this.closingSessionIdsForWorktree(terminalWorktreeKey),
       selectedTerminalSessionId: this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) ?? null,
       getCachedSnapshot: (terminalSessionId) => this.snapshotCache.get(terminalSessionId) ?? null,
       cacheSnapshot: (terminalSessionId, nextSnapshot) => this.snapshotCache.set(terminalSessionId, nextSnapshot),
@@ -804,7 +805,7 @@ export class TerminalSessionProjection {
       const terminalSessionId = session.descriptor.terminalSessionId
       if (
         session.descriptor.repoRoot === repoRoot &&
-        !this.hiddenClosingTerminalSessionIds.has(terminalSessionId) &&
+        !this.closingTerminalWorktreeKeyBySessionId.has(terminalSessionId) &&
         this.bellState.hasBell(terminalSessionId)
       )
         count++
@@ -826,7 +827,7 @@ export class TerminalSessionProjection {
     const session = this.sessions.get(terminalSessionId)
     if (
       !session ||
-      this.hiddenClosingTerminalSessionIds.has(terminalSessionId) ||
+      this.closingTerminalWorktreeKeyBySessionId.has(terminalSessionId) ||
       session.descriptor.terminalWorktreeKey !== terminalWorktreeKey
     )
       return
@@ -1057,8 +1058,11 @@ export class TerminalSessionProjection {
       (item) => item.descriptor.terminalSessionId,
     )
     const wasSelected = this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) === terminalSessionId
-    this.hiddenClosingTerminalSessionIds.delete(terminalSessionId)
-    this.closeCompletionByTerminalSessionId.delete(terminalSessionId)
+    const closePending = this.closeCompletionByTerminalSessionId.has(terminalSessionId)
+    if (!closePending) {
+      this.finishClosingSession(terminalSessionId)
+      this.closeCompletionByTerminalSessionId.delete(terminalSessionId)
+    }
     this.pendingServerBellByTerminalSessionId.delete(terminalSessionId)
     this.syncTerminalRuntimeSessionIdIndex(terminalSessionId, null)
     this.sessions.delete(terminalSessionId)
@@ -1087,8 +1091,10 @@ export class TerminalSessionProjection {
     const promise = this.runClose(terminalSessionId, session)
     this.closeCompletionByTerminalSessionId.set(terminalSessionId, promise)
     const cleanup = () => {
-      if (this.closeCompletionByTerminalSessionId.get(terminalSessionId) === promise)
+      if (this.closeCompletionByTerminalSessionId.get(terminalSessionId) === promise) {
         this.closeCompletionByTerminalSessionId.delete(terminalSessionId)
+        this.finishClosingSession(terminalSessionId)
+      }
     }
     void promise.then(cleanup, cleanup)
     return promise
@@ -1108,13 +1114,13 @@ export class TerminalSessionProjection {
   }
 
   private hideClosingSession(terminalSessionId: string, session: TerminalSession): void {
-    if (this.hiddenClosingTerminalSessionIds.has(terminalSessionId)) return
+    if (this.closingTerminalWorktreeKeyBySessionId.has(terminalSessionId)) return
     const terminalWorktreeKey = session.descriptor.terminalWorktreeKey
     const visibleSessionIdsBeforeClose = this.visibleSessionsForWorktree(terminalWorktreeKey).map(
       (item) => item.descriptor.terminalSessionId,
     )
     const wasSelected = this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) === terminalSessionId
-    this.hiddenClosingTerminalSessionIds.add(terminalSessionId)
+    this.closingTerminalWorktreeKeyBySessionId.set(terminalSessionId, terminalWorktreeKey)
     if (wasSelected) {
       const nextSessionId = resolveAdjacentTerminalSelectionAfterRemoval(
         visibleSessionIdsBeforeClose,
@@ -1128,7 +1134,7 @@ export class TerminalSessionProjection {
   private restoreClosingSession(terminalSessionId: string, session: TerminalSession): void {
     if (this.sessions.get(terminalSessionId) !== session) return
     const terminalWorktreeKey = session.descriptor.terminalWorktreeKey
-    if (!this.hiddenClosingTerminalSessionIds.delete(terminalSessionId)) return
+    if (!this.closingTerminalWorktreeKeyBySessionId.delete(terminalSessionId)) return
     if (!this.selectedTerminalSessionIdByTerminalWorktree.has(terminalWorktreeKey)) {
       this.selectTerminalSessionId(terminalWorktreeKey, terminalSessionId, { notify: false })
     }
@@ -1241,15 +1247,40 @@ export class TerminalSessionProjection {
 
   private isSelectedTerminalSessionIdValid(terminalWorktreeKey: string, terminalSessionId: string): boolean {
     return (
-      !this.hiddenClosingTerminalSessionIds.has(terminalSessionId) &&
+      !this.closingTerminalWorktreeKeyBySessionId.has(terminalSessionId) &&
       this.sessions.get(terminalSessionId)?.descriptor.terminalWorktreeKey === terminalWorktreeKey
     )
   }
 
   private visibleSessionsForWorktree(terminalWorktreeKey: string): TerminalSession[] {
     return this.sessionsForWorktreeList(terminalWorktreeKey).filter(
-      (session) => !this.hiddenClosingTerminalSessionIds.has(session.descriptor.terminalSessionId),
+      (session) => !this.closingTerminalWorktreeKeyBySessionId.has(session.descriptor.terminalSessionId),
     )
+  }
+
+  private closingSessionIdsForWorktree(terminalWorktreeKey: string): string[] {
+    const listedSessionIds = new Set<string>()
+    const listedClosingSessionIds = this.sessionsForWorktreeList(terminalWorktreeKey).flatMap((session) => {
+      const terminalSessionId = session.descriptor.terminalSessionId
+      listedSessionIds.add(terminalSessionId)
+      return this.closingTerminalWorktreeKeyBySessionId.get(terminalSessionId) === terminalWorktreeKey
+        ? [terminalSessionId]
+        : []
+    })
+    const unlistedClosingSessionIds = Array.from(this.closingTerminalWorktreeKeyBySessionId).flatMap(
+      ([terminalSessionId, closingTerminalWorktreeKey]) =>
+        closingTerminalWorktreeKey === terminalWorktreeKey && !listedSessionIds.has(terminalSessionId)
+          ? [terminalSessionId]
+          : [],
+    )
+    return [...listedClosingSessionIds, ...unlistedClosingSessionIds]
+  }
+
+  private finishClosingSession(terminalSessionId: string): void {
+    const terminalWorktreeKey = this.closingTerminalWorktreeKeyBySessionId.get(terminalSessionId)
+    if (!terminalWorktreeKey) return
+    this.closingTerminalWorktreeKeyBySessionId.delete(terminalSessionId)
+    this.notifyWorktree(terminalWorktreeKey)
   }
 
   private sessionsForWorktreeList(terminalWorktreeKey: string): TerminalSession[] {

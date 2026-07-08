@@ -1,13 +1,15 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
+import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import {
   type WorkspacePaneRuntimeTabCreateAction,
   type WorkspacePaneRuntimeTabCreateStateByType,
   workspacePaneRuntimeTabCreateAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 export interface UseWorkspacePaneRuntimeTabCreateActionInput {
   repoRoot: string
@@ -16,8 +18,8 @@ export interface UseWorkspacePaneRuntimeTabCreateActionInput {
   worktreePath: string | null
   runtimeTabStateByType: WorkspacePaneRuntimeTabCreateStateByType
   initialRuntimeProjectionHydrating: boolean
-  openerIdentity: string | null
-  showCreatedRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => void
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
+  showCreatedRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => boolean | Promise<boolean>
   t: TerminalCreateTranslator
 }
 
@@ -28,7 +30,7 @@ export function useWorkspacePaneRuntimeTabCreateAction({
   worktreePath,
   runtimeTabStateByType,
   initialRuntimeProjectionHydrating,
-  openerIdentity,
+  workspacePaneRoute,
   showCreatedRuntimeTab,
   t,
 }: UseWorkspacePaneRuntimeTabCreateActionInput): WorkspacePaneRuntimeTabCreateAction | null {
@@ -45,6 +47,15 @@ export function useWorkspacePaneRuntimeTabCreateAction({
         : null,
     [branchName, repoInstanceId, repoRoot, worktreePath],
   )
+  const captureOpenerIdentity = useCallback(
+    () =>
+      branchName
+        ? captureWorkspacePaneActiveTabIdentity(repoRoot, branchName, {
+            workspacePaneRoute,
+          })
+        : null,
+    [branchName, repoRoot, workspacePaneRoute],
+  )
 
   return useMemo(
     () =>
@@ -57,13 +68,13 @@ export function useWorkspacePaneRuntimeTabCreateAction({
         terminal: {
           base: terminalBase,
           createTerminal,
-          openerIdentity,
+          captureOpenerIdentity,
         },
       }),
     [
+      captureOpenerIdentity,
       createTerminal,
       initialRuntimeProjectionHydrating,
-      openerIdentity,
       repoRoot,
       runtimeTabStateByType,
       showCreatedRuntimeTab,

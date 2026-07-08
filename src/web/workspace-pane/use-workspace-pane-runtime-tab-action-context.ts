@@ -5,7 +5,7 @@ import { createWorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane
 import type { WorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-actions.ts'
 
 export interface UseWorkspacePaneRuntimeTabActionContextInput {
-  showRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => void
+  showRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => boolean
 }
 
 export function useWorkspacePaneRuntimeTabActionContext({

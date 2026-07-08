@@ -29,7 +29,7 @@ export async function runCreateTerminalTabCommand(input: {
    */
   openerIdentity: string | null
   /** Opens the concrete terminal route after the server has created a session. */
-  showCreatedTerminalTab?: (terminalSessionId: string) => void | Promise<void>
+  showCreatedTerminalTab?: (terminalSessionId: string) => boolean | Promise<boolean>
   /**
    * Insertion anchor for the new terminal tab. Callers decide explicitly:
    * supply the captured opener's identity when the terminal is opened from
@@ -52,7 +52,6 @@ export async function runCreateTerminalTabCommand(input: {
   }
   try {
     const terminalSessionId = await input.createTerminal(input.base, input.options)
-    if (input.showCreatedTerminalTab) await input.showCreatedTerminalTab(terminalSessionId)
     if (input.openerIdentity) {
       recordWorkspacePaneTabOpener(
         input.base.repoRoot,
@@ -60,6 +59,14 @@ export async function runCreateTerminalTabCommand(input: {
         terminalWorkspacePaneTabProvider.identity(terminalSessionId),
         input.openerIdentity,
       )
+    }
+    const navigationAccepted = input.showCreatedTerminalTab ? await input.showCreatedTerminalTab(terminalSessionId) : true
+    if (!navigationAccepted) {
+      return {
+        ok: false,
+        error: new Error('workspace pane navigation rejected'),
+        messageKey: 'error.terminal-create-failed',
+      }
     }
     return { ok: true, terminalSessionId }
   } catch (error) {

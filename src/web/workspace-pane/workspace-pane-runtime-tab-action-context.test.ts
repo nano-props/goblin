@@ -6,7 +6,7 @@ import {
 
 describe('workspace pane runtime tab action context', () => {
   test('creates runtime action context from explicit terminal capabilities', () => {
-    const showRuntimeTab = vi.fn()
+    const showRuntimeTab = vi.fn(() => true)
     const scrollToBottom = vi.fn()
 
     const context = createWorkspacePaneRuntimeTabActionContext({
@@ -24,7 +24,7 @@ describe('workspace pane runtime tab action context', () => {
   })
 
   test('reads runtime action context from explicit route navigation capabilities', () => {
-    const showRuntimeTab = vi.fn()
+    const showRuntimeTab = vi.fn(() => true)
 
     const context = readWorkspacePaneRuntimeTabActionContext({ showRuntimeTab })
 

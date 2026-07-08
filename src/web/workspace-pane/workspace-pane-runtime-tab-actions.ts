@@ -2,7 +2,7 @@ import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 
 export interface WorkspacePaneRuntimeTabActionContext {
-  showRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => void
+  showRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => boolean
   terminal?: {
     scrollToBottom?: (terminalSessionId: string) => void
   }
@@ -40,8 +40,7 @@ function selectTerminalRuntimeTab(
   context: WorkspacePaneRuntimeTabActionContext,
 ): boolean {
   if (view.type !== 'terminal') return false
-  context.showRuntimeTab('terminal', view.terminalSessionId)
-  return true
+  return context.showRuntimeTab('terminal', view.terminalSessionId)
 }
 
 function reselectTerminalRuntimeTab(
@@ -49,7 +48,7 @@ function reselectTerminalRuntimeTab(
   context: WorkspacePaneRuntimeTabActionContext,
 ): boolean {
   if (view.type !== 'terminal') return false
-  context.showRuntimeTab('terminal', view.terminalSessionId)
+  if (!context.showRuntimeTab('terminal', view.terminalSessionId)) return false
   context.terminal?.scrollToBottom?.(view.terminalSessionId)
   return true
 }

@@ -33,7 +33,7 @@ const ipcHandlers: Record<string, (input: any) => unknown> = {}
 function seedRepo(options: {
   currentBranchName?: string | null
   currentBranch?: string
-  preferredWorkspacePaneTab?: WorkspacePaneTabType
+  preferredWorkspacePaneTab?: WorkspacePaneTabType | null
   workspacePaneStaticTabs?: WorkspacePaneStaticTabType[]
   branches?: BranchSnapshotInfo[]
 }) {
@@ -47,7 +47,8 @@ function seedRepo(options: {
     ],
     currentBranch: options.currentBranch ?? 'main',
     currentBranchName,
-    preferredWorkspacePaneTab: options.preferredWorkspacePaneTab ?? 'status',
+    preferredWorkspacePaneTab:
+      options.preferredWorkspacePaneTab === undefined ? 'status' : options.preferredWorkspacePaneTab,
     workspacePaneTabsByBranch:
       currentBranchName && options.workspacePaneStaticTabs
         ? {
@@ -306,6 +307,24 @@ describe('setWorkspacePaneTab', () => {
 
     expect(preferredTabFor('main')).toBe('changes')
     expect(preferredTabFor('feature/plain')).toBe('history')
+  })
+
+  test('persists an intentional empty workspace pane preference', () => {
+    seedRepo({ currentBranchName: 'main', preferredWorkspacePaneTab: 'status' })
+
+    useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'main', null)
+
+    expect(preferredTabFor('main')).toBeNull()
+  })
+
+  test('restores an intentional empty workspace pane preference from session state', () => {
+    seedRepo({ currentBranchName: 'main', preferredWorkspacePaneTab: 'status', workspacePaneStaticTabs: ['status'] })
+
+    restoreWorkspacePaneState({
+      preferredWorkspacePaneTabByTargetByRepo: { [REPO_ID]: { [worktreeTargetKey('main', '/repo')]: null } },
+    })
+
+    expect(preferredTabFor('main')).toBeNull()
   })
 
   test('persists the changes tab immediately', async () => {

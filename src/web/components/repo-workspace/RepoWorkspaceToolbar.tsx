@@ -94,8 +94,9 @@ export function RepoWorkspaceToolbar({
 
   const showCreatedWorkspacePaneRuntimeTab = useCallback(
     (type: WorkspacePaneRuntimeTabType, sessionId: string) => {
-      if (!branchName) return
-      if (type === 'terminal') navigation.showRepoBranchTerminalSession(repo.id, branchName, sessionId)
+      if (!branchName) return false
+      if (type === 'terminal') return navigation.showRepoBranchTerminalSession(repo.id, branchName, sessionId)
+      return false
     },
     [branchName, navigation, repo.id],
   )
@@ -109,7 +110,7 @@ export function RepoWorkspaceToolbar({
     worktreePath,
     runtimeTabStateByType: workspacePaneTabModel.runtimeTabStateByType,
     initialRuntimeProjectionHydrating: isInitialRuntimeProjectionHydrating,
-    openerIdentity: workspacePaneTabModel.activeTab?.identity ?? null,
+    workspacePaneRoute,
     showCreatedRuntimeTab: showCreatedWorkspacePaneRuntimeTab,
     t,
   })

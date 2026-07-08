@@ -171,6 +171,7 @@ export interface TerminalWorktreeSnapshot {
   terminalWorktreeKey: string
   selectedDescriptor: TerminalDescriptor | null
   sessions: TerminalSessionSummary[]
+  closingSessionIds?: string[]
   count: number
   bellCount: number
   outputActiveCount: number

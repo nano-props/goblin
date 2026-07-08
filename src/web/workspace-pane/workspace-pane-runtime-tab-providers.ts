@@ -5,6 +5,7 @@ import { readTerminalSessionCommandBridge } from '#/web/components/terminal/term
 import {
   useTerminalRepoProjectionHydrationEntry,
   useTerminalSessionSummaries,
+  useTerminalWorktreeClosingSessionIds,
   useTerminalWorktreeCreatePending,
 } from '#/web/components/terminal/terminal-session-store.ts'
 import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
@@ -139,6 +140,7 @@ function readTerminalRuntimeTabProviderProjection(input: {
     selectedSessionId,
     state: {
       createPending: snapshot?.createPending ?? false,
+      closingSessionIds: snapshot?.closingSessionIds ?? [],
       projectionPhase: projectionState.phase,
       projectionErrorMessage: projectionState.errorMessage,
       selectedSessionId,
@@ -158,6 +160,7 @@ function useTerminalRuntimeTabProviderProjection({
   const targetKey = terminalRuntimeTabTargetKey({ repoRoot, worktreePath })
   const terminalSessionSummaries = useTerminalSessionSummaries(targetKey)
   const terminalCreatePending = useTerminalWorktreeCreatePending(targetKey)
+  const terminalClosingSessionIds = useTerminalWorktreeClosingSessionIds(targetKey)
   const terminalProjectionHydration = useTerminalRepoProjectionHydrationEntry(repoRoot)
   const selectedTerminalSessionId = useReposStore((s) =>
     targetKey ? s.selectedTerminalSessionIdByTerminalWorktree[targetKey] : undefined,
@@ -174,6 +177,7 @@ function useTerminalRuntimeTabProviderProjection({
       selectedSessionId,
       state: {
         createPending: terminalCreatePending,
+        closingSessionIds: terminalClosingSessionIds,
         projectionPhase: currentHydration?.phase ?? 'pending',
         projectionErrorMessage: currentHydration?.errorMessage,
         selectedSessionId,
@@ -183,6 +187,7 @@ function useTerminalRuntimeTabProviderProjection({
     repoInstanceId,
     selectedTerminalSessionId,
     targetKey,
+    terminalClosingSessionIds,
     terminalCreatePending,
     terminalProjectionHydration,
     terminalSessionSummaries,

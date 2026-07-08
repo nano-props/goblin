@@ -119,8 +119,9 @@ describe('useKeyboard', () => {
         'feature/no-worktree': [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
       },
     })
-    const showRepoBranchWorkspacePaneTab = vi.fn((repoId, tab) => {
-      useReposStore.getState().setWorkspacePaneTab(repoId, 'feature/no-worktree', tab)
+    const showRepoBranchWorkspacePaneTab = vi.fn((repoId, branch, tab) => {
+      useReposStore.getState().setWorkspacePaneTab(repoId, branch, tab)
+      return true
     })
     await renderHookHost({
       currentRepoId: REPO_ID,
@@ -502,9 +503,10 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
     activateRepo: () => {},
     closeRepo: () => {},
     cycleRepo: () => {},
-    selectRepoBranch: () => {},
-    showRepoBranchWorkspacePaneTab: () => {},
-    showRepoBranchTerminalSession: () => {},
+    selectRepoBranch: () => true,
+    showRepoBranchEmptyWorkspacePane: () => true,
+    showRepoBranchWorkspacePaneTab: () => true,
+    showRepoBranchTerminalSession: () => true,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},

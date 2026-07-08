@@ -17,6 +17,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { ReposStore } from '#/web/stores/repos/types.ts'
 import { usePrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import { openRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
 
 const rootRoute = createRootRoute()
 
@@ -191,11 +192,12 @@ function useRepoRouteNavigation() {
     },
     onOpenRepoRoot: (repoId: string) => routeNavigation.openRepoRoot(repoId),
     onOpenRepoDashboard: (repoId: string) => routeNavigation.openRepoDashboard(repoId),
-    onOpenRepoBranch: (repoId: string, branchName: string) => routeNavigation.openRepoBranch(repoId, branchName),
+    onOpenRepoBranch: (repoId: string, branchName: string) =>
+      openRepoBranchWorkspacePaneRoute(routeNavigation, repoId, branchName),
     onOpenRepoNewWorktree: (repoId: string) => routeNavigation.openRepoNewWorktree(repoId),
     onCancelRepoNewWorktree: (repoId: string) => routeNavigation.cancelRepoNewWorktree(repoId),
     onReplaceRepoBranch: (repoId: string, branchName: string) =>
-      routeNavigation.openRepoBranch(repoId, branchName, { replace: true }),
+      openRepoBranchWorkspacePaneRoute(routeNavigation, repoId, branchName, { replace: true }),
   }
 }
 

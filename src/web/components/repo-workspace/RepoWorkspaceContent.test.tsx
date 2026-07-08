@@ -113,7 +113,7 @@ function useHarnessWorkspacePaneRoute(props: RepoWorkspaceContentHarnessProps): 
   return workspacePaneRouteForStaticPreferredTab(preferredTab)
 }
 
-function workspacePaneRouteForStaticPreferredTab(tab: WorkspacePaneTabType): RepoBranchWorkspacePaneRoute | null {
+function workspacePaneRouteForStaticPreferredTab(tab: WorkspacePaneTabType | null): RepoBranchWorkspacePaneRoute | null {
   return isWorkspacePaneStaticTabType(tab) ? { kind: 'static', tab } : null
 }
 
@@ -966,9 +966,11 @@ describe('RepoWorkspaceContent', () => {
 
     // Chrome-tab-style opener tracking: the terminal this opened should be
     // attributed to "files" (the only tab open, and active, when the file
-    // was double-clicked), scoped to this branch.
+    // was double-clicked), scoped to this workspace pane target.
     expect(
-      useReposStore.getState().tabOpenerIdentityByScope[tabOpenerScopeKey(REPO_ID, branchName)]?.['terminal:session-1'],
+      useReposStore.getState().tabOpenerIdentityByScope[
+        tabOpenerScopeKey({ repoRoot: REPO_ID, branchName, worktreePath })
+      ]?.['terminal:session-1'],
     ).toBe('workspace-pane:files')
   })
 
@@ -1190,9 +1192,10 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
     activateRepo: () => {},
     closeRepo: () => {},
     cycleRepo: () => {},
-    selectRepoBranch: () => {},
-    showRepoBranchWorkspacePaneTab: () => {},
-    showRepoBranchTerminalSession: () => {},
+    selectRepoBranch: () => true,
+    showRepoBranchEmptyWorkspacePane: () => true,
+    showRepoBranchWorkspacePaneTab: () => true,
+    showRepoBranchTerminalSession: () => true,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},

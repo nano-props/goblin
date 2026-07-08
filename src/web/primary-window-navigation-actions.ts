@@ -6,27 +6,30 @@ import {
   restoreWorkspaceNavigationEntry,
   workspaceNavigationHistoryRestoreBlocked,
 } from '#/web/workspace-navigation-history.ts'
-import {
-  workspacePaneRouteNavigationBlockedForBranch,
-} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import { workspacePaneRouteNavigationBlockedForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import { openRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 
 export interface PrimaryWindowNavigationActions {
   activateRepo: (repoId: string) => void
   closeRepo: (repoId: string) => void
   cycleRepo: (direction: 1 | -1) => void
-  selectRepoBranch: (repoId: string, branch: string, options?: { replace?: boolean }) => void
+  selectRepoBranch: (repoId: string, branch: string, options?: { replace?: boolean }) => boolean
+  showRepoBranchEmptyWorkspacePane: (repoId: string, branch: string, options?: { replace?: boolean }) => boolean
   showRepoBranchWorkspacePaneTab: (
     repoId: string,
     branch: string,
     tab: WorkspacePaneStaticTabType,
     options?: { replace?: boolean },
-  ) => void
+  ) => boolean
   showRepoBranchTerminalSession: (
     repoId: string,
     branch: string,
     terminalSessionId: string,
     options?: { replace?: boolean },
-  ) => void
+  ) => boolean
   goBack: (repoId: string) => void
   goForward: (repoId: string) => void
   openSettings: (page: SettingsPage) => void
@@ -66,17 +69,30 @@ export function createPrimaryWindowNavigationActions({
       if (repoId) routeNavigation.openRepoDashboard(repoId)
     },
     selectRepoBranch(repoId, branch, options) {
-      routeNavigation.openRepoBranch(repoId, branch, options)
+      return openRepoBranchWorkspacePaneRoute(routeNavigation, repoId, branch, options)
+    },
+    showRepoBranchEmptyWorkspacePane(repoId, branch, options) {
+      if (!routeNavigation.openRepoBranch(repoId, branch, options)) return false
+      rememberWorkspacePaneRouteSelection(repoId, branch, { kind: 'empty' })
+      return true
     },
     showRepoBranchWorkspacePaneTab(repoId, branch, tab, options) {
-      if (workspacePaneRouteNavigationBlockedForBranch(repoId, branch)) return
-      if (options) routeNavigation.openRepoBranchTab(repoId, branch, tab, options)
-      else routeNavigation.openRepoBranchTab(repoId, branch, tab)
+      if (workspacePaneRouteNavigationBlockedForBranch(repoId, branch)) return false
+      const accepted = options
+        ? routeNavigation.openRepoBranchTab(repoId, branch, tab, options)
+        : routeNavigation.openRepoBranchTab(repoId, branch, tab)
+      if (!accepted) return false
+      rememberWorkspacePaneRouteSelection(repoId, branch, { kind: 'static', tab })
+      return true
     },
     showRepoBranchTerminalSession(repoId, branch, terminalSessionId, options) {
-      if (workspacePaneRouteNavigationBlockedForBranch(repoId, branch)) return
-      if (options) routeNavigation.openRepoBranchTerminal(repoId, branch, terminalSessionId, options)
-      else routeNavigation.openRepoBranchTerminal(repoId, branch, terminalSessionId)
+      if (workspacePaneRouteNavigationBlockedForBranch(repoId, branch)) return false
+      const accepted = options
+        ? routeNavigation.openRepoBranchTerminal(repoId, branch, terminalSessionId, options)
+        : routeNavigation.openRepoBranchTerminal(repoId, branch, terminalSessionId)
+      if (!accepted) return false
+      rememberWorkspacePaneRouteSelection(repoId, branch, { kind: 'terminal', terminalSessionId })
+      return true
     },
     goBack(repoId) {
       if (workspaceNavigationHistoryRestoreBlocked(repoId, 'back')) return
@@ -96,6 +112,32 @@ export function createPrimaryWindowNavigationActions({
       routeNavigation.openRepoNewWorktree(currentRepoId)
     },
   }
+}
+
+type WorkspacePaneRememberedRoute =
+  | { kind: 'empty' }
+  | { kind: 'static'; tab: WorkspacePaneStaticTabType }
+  | { kind: 'terminal'; terminalSessionId: string }
+
+function rememberWorkspacePaneRouteSelection(
+  repoId: string,
+  branchName: string,
+  route: WorkspacePaneRememberedRoute,
+): void {
+  const state = useReposStore.getState()
+  const repo = state.repos[repoId]
+  const branchModel = repo ? readRepoBranchQueryProjection(repo) : null
+  const branch = branchModel?.branches.find((candidate) => candidate.name === branchName)
+  if (!repo || !branchModel || !branch) return
+  state.setWorkspacePaneTab(
+    repoId,
+    branchName,
+    route.kind === 'empty' ? null : route.kind === 'static' ? route.tab : 'terminal',
+  )
+  if (route.kind !== 'terminal') return
+  const worktreePath = branch.worktree?.path ?? null
+  if (!worktreePath) return
+  state.setSelectedTerminal(formatTerminalWorktreeKey(repoId, worktreePath), route.terminalSessionId)
 }
 
 function nextNavigationRepoIdAfterClose(order: string[], closingRepoId: string): string | null {

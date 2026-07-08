@@ -60,7 +60,7 @@ describe('openWorkspacePaneTab', () => {
     ).resolves.toBe(true)
 
     expect(openTabsFor('feature/worktree')).toEqual(['status'])
-    expect(preferredWorkspacePaneTab()).toBe('status')
+    expect(preferredWorkspacePaneTab('feature/worktree')).toBe('status')
     expect(refreshRuntimeProjection).toHaveBeenCalledWith(REPO_ID, {
       repoInstanceId,
       scope: 'visible-status',
@@ -154,7 +154,7 @@ describe('openWorkspacePaneTab', () => {
 
     expect(openTabsFor('feature/worktree')).toEqual(['status', 'files', 'history', 'changes'])
     expect(
-      useReposStore.getState().tabOpenerIdentityByScope[tabOpenerScopeKey(REPO_ID, 'feature/worktree')]?.[
+      useReposStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)]?.[
         'workspace-pane:changes'
       ],
     ).toBe('workspace-pane:files')
@@ -186,7 +186,7 @@ describe('openWorkspacePaneTab', () => {
       }),
     ).resolves.toBe(false)
 
-    expect(preferredWorkspacePaneTab()).toBe('status')
+    expect(preferredWorkspacePaneTab('feature/no-worktree')).toBe('status')
     expect(openTabsFor('feature/no-worktree')).toEqual(['status'])
     expect(refreshRuntimeProjection).not.toHaveBeenCalled()
   })
@@ -213,7 +213,7 @@ describe('openWorkspacePaneTab', () => {
       }),
     ).resolves.toBe(true)
 
-    expect(preferredWorkspacePaneTab()).toBe('status')
+    expect(preferredWorkspacePaneTab('feature/no-worktree')).toBe('status')
   })
 
   test('opens history as a branch-static workspace pane tab', async () => {
@@ -261,7 +261,7 @@ describe('openWorkspacePaneTab', () => {
     ).resolves.toBe(false)
 
     expect(updateWorkspaceTabs).not.toHaveBeenCalled()
-    expect(preferredWorkspacePaneTab()).toBe('status')
+    expect(preferredWorkspacePaneTab('feature/worktree')).toBe('status')
   })
 
   test('records the active tab as the opener when opening a new static tab', async () => {
@@ -287,7 +287,7 @@ describe('openWorkspacePaneTab', () => {
     ).resolves.toBe(true)
 
     expect(
-      useReposStore.getState().tabOpenerIdentityByScope[tabOpenerScopeKey(REPO_ID, 'feature/worktree')]?.[
+      useReposStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)]?.[
         'workspace-pane:changes'
       ],
     ).toBe('workspace-pane:files')
@@ -325,7 +325,7 @@ describe('openWorkspacePaneTab', () => {
     })
 
     expect(
-      useReposStore.getState().tabOpenerIdentityByScope[tabOpenerScopeKey(REPO_ID, 'feature/worktree')]?.[
+      useReposStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)]?.[
         'workspace-pane:changes'
       ],
     ).toBe('workspace-pane:files')
@@ -373,11 +373,13 @@ describe('openWorkspacePaneTab', () => {
     await openPromise
 
     const openers = useReposStore.getState().tabOpenerIdentityByScope
-    // Recorded under feature/a (the branch the operation targeted)...
-    expect(openers[tabOpenerScopeKey(REPO_ID, 'feature/a')]?.['workspace-pane:changes']).toBe('workspace-pane:files')
-    // ...never under feature/b (the branch that merely happened to be
-    // selected by the time the commit resolved).
-    expect(openers[tabOpenerScopeKey(REPO_ID, 'feature/b')]).toBeUndefined()
+    // Recorded under feature/a's workspace pane target (the operation target)...
+    expect(openers[openerScopeKey(REPO_ID, 'feature/a', WORKTREE_PATH)]?.['workspace-pane:changes']).toBe(
+      'workspace-pane:files',
+    )
+    // ...never under feature/b's branch-only target (the branch that merely
+    // happened to be selected by the time the commit resolved).
+    expect(openers[openerScopeKey(REPO_ID, 'feature/b', null)]).toBeUndefined()
   })
 
   test('does not record an opener when the server rejects a stale repo instance commit', async () => {
@@ -418,7 +420,7 @@ describe('openWorkspacePaneTab', () => {
     rejectCommit(new Error('error.repo-instance-stale'))
     await expect(openPromise).resolves.toBe(false)
 
-    expect(useReposStore.getState().tabOpenerIdentityByScope[tabOpenerScopeKey(REPO_ID, 'feature/a')]).toBeUndefined()
+    expect(useReposStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/a', WORKTREE_PATH)]).toBeUndefined()
   })
 
   test('does not select a stale opened tab when the server rejects a stale repo instance commit', async () => {
@@ -449,6 +451,7 @@ describe('openWorkspacePaneTab', () => {
       const state = useReposStore.getState()
       useReposStore.setState({ restoredRepoId: repoId })
       state.setWorkspacePaneTab(repoId, branch, tab)
+      return true
     })
 
     const openPromise = openWorkspacePaneTab({
@@ -479,7 +482,7 @@ describe('openWorkspacePaneTab', () => {
     await expect(openPromise).resolves.toBe(false)
 
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
-    expect(preferredWorkspacePaneTab()).toBe('status')
+    expect(preferredWorkspacePaneTab('feature/reopened')).toBe('status')
   })
 
   test('does not select a stale opened tab when the old repo instance commit succeeds after reopen', async () => {
@@ -510,6 +513,7 @@ describe('openWorkspacePaneTab', () => {
       const state = useReposStore.getState()
       useReposStore.setState({ restoredRepoId: repoId })
       state.setWorkspacePaneTab(repoId, branch, tab)
+      return true
     })
 
     const openPromise = openWorkspacePaneTab({
@@ -545,11 +549,11 @@ describe('openWorkspacePaneTab', () => {
     await expect(openPromise).resolves.toBe(false)
 
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
-    expect(useReposStore.getState().tabOpenerIdentityByScope[tabOpenerScopeKey(REPO_ID, 'feature/a')]).toBeUndefined()
+    expect(useReposStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/a', WORKTREE_PATH)]).toBeUndefined()
     expect(preferredWorkspacePaneTab('feature/reopened')).toBe('status')
   })
 
-  test('scopes recorded openers per repo/branch so identical static tab identities do not bleed across targets', async () => {
+  test('scopes recorded openers per workspace pane target so identical static tab identities do not bleed', async () => {
     const OTHER_REPO_ID = '/tmp/workspace-pane-tab-other-repo'
     const OTHER_WORKTREE_PATH = '/tmp/workspace-pane-tab-other-worktree'
     // seedRepoWithReadModelForTest replaces the whole `repos` map, so seed both repos
@@ -599,10 +603,12 @@ describe('openWorkspacePaneTab', () => {
     })
 
     const openers = useReposStore.getState().tabOpenerIdentityByScope
-    expect(openers[tabOpenerScopeKey(REPO_ID, 'feature/worktree')]?.['workspace-pane:changes']).toBe(
+    expect(openers[openerScopeKey(REPO_ID, 'feature/worktree', WORKTREE_PATH)]?.['workspace-pane:changes']).toBe(
       'workspace-pane:files',
     )
-    expect(openers[tabOpenerScopeKey(OTHER_REPO_ID, 'main')]?.['workspace-pane:changes']).toBe('workspace-pane:status')
+    expect(openers[openerScopeKey(OTHER_REPO_ID, 'main', OTHER_WORKTREE_PATH)]?.['workspace-pane:changes']).toBe(
+      'workspace-pane:status',
+    )
   })
 
   test('preserves concurrent static tab opens through server-canonical updates', async () => {
@@ -674,12 +680,17 @@ function preferredWorkspacePaneTab(branchName = 'feature/worktree') {
     : null
 }
 
+function openerScopeKey(repoRoot: string, branchName: string, worktreePath: string | null): string {
+  return tabOpenerScopeKey({ repoRoot, branchName, worktreePath })
+}
+
 function navigationWithStoreActions(): Pick<PrimaryWindowNavigationActions, 'showRepoBranchWorkspacePaneTab'> {
   return {
     showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {
       const state = useReposStore.getState()
       useReposStore.setState({ restoredRepoId: repoId })
       state.setWorkspacePaneTab(repoId, branch, tab)
+      return true
     },
   }
 }

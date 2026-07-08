@@ -211,37 +211,33 @@ function workspaceNavigationHistoryRouteSnapshotEqual(
 export function restoreWorkspaceNavigationEntry(
   entry: WorkspaceNavigationHistoryEntry,
   routeNavigation: PrimaryWindowRouteNavigation,
-): void {
-  if (workspaceNavigationEntryBlocksWorkspacePaneInteraction(entry)) return
+): boolean {
+  if (workspaceNavigationEntryBlocksWorkspacePaneInteraction(entry)) return false
   switch (entry.route.kind) {
     case 'empty':
       routeNavigation.openRepoRoot(entry.repoId)
-      return
+      return true
     case 'dashboard':
       routeNavigation.openRepoDashboard(entry.repoId)
-      return
+      return true
     case 'newWorktree':
       routeNavigation.openRepoNewWorktree(entry.repoId, { returnTo: entry.route.returnTo })
-      return
+      return true
     case 'branch':
       if (entry.route.workspacePaneTab === 'terminal' && entry.route.terminalSessionId) {
-        routeNavigation.openRepoBranchTerminal(entry.repoId, entry.route.branchName, entry.route.terminalSessionId)
-        return
+        return routeNavigation.openRepoBranchTerminal(entry.repoId, entry.route.branchName, entry.route.terminalSessionId)
       }
       if (!entry.route.workspacePaneTab) {
-        routeNavigation.openRepoBranch(entry.repoId, entry.route.branchName)
-        return
+        return routeNavigation.openRepoBranch(entry.repoId, entry.route.branchName)
       }
       if (!isWorkspacePaneStaticTabType(entry.route.workspacePaneTab)) {
-        routeNavigation.openRepoBranch(entry.repoId, entry.route.branchName)
-        return
+        return routeNavigation.openRepoBranch(entry.repoId, entry.route.branchName)
       }
-      routeNavigation.openRepoBranchTab(
+      return routeNavigation.openRepoBranchTab(
         entry.repoId,
         entry.route.branchName,
         entry.route.workspacePaneTab,
       )
-      return
   }
 }
 

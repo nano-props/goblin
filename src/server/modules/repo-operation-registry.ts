@@ -7,6 +7,7 @@ import type {
   RepoServerOperationState,
   RepoServerOperationTarget,
 } from '#/shared/api-types.ts'
+import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
 
 interface BeginRepoServerOperationInput {
   id?: string
@@ -99,6 +100,7 @@ export function beginRepoServerOperation(input: BeginRepoServerOperationInput): 
     canCancelUnderlying: input.canCancelUnderlying ?? true,
   }
   operations.set(id, operation)
+  publishRepoRuntimeInvalidation(operation)
   return cloneOperation(operation)
 }
 
@@ -107,6 +109,7 @@ export function startRepoServerOperation(id: string): RepoServerOperationState |
   if (!operation) return null
   operation.phase = operation.cancellation.underlyingRequested ? 'cancelling' : 'running'
   operation.startedAt = Date.now()
+  publishRepoRuntimeInvalidation(operation)
   return cloneOperation(operation)
 }
 
@@ -120,6 +123,7 @@ export function requestRepoServerOperationCancel(
   operation.cancellation.reason = reason
   operation.cancellation.requestedAt = Date.now()
   if (operation.phase === 'queued' || operation.phase === 'running') operation.phase = 'cancelling'
+  publishRepoRuntimeInvalidation(operation)
   return cloneOperation(operation)
 }
 
@@ -132,6 +136,7 @@ export function recordRepoServerOperationWaitCancellation(
   operation.cancellation.waitCancelledCount += 1
   operation.cancellation.lastWaitCancelledAt = Date.now()
   operation.cancellation.lastWaitCancellationReason = reason
+  publishRepoRuntimeInvalidation(operation)
   return cloneOperation(operation)
 }
 
@@ -150,13 +155,17 @@ export function settleRepoServerOperation(
         message: result.message ?? 'error.failed-read-repo',
         reason: operationFailureReasonForMessage(result.message, cancellationReason),
       }
+  publishRepoRuntimeInvalidation(operation)
   pruneSettledOperations()
   return cloneOperation(operation)
 }
 
-export function listRepoServerOperations(
-  options: ListRepoServerOperationsOptions = {},
-): RepoServerOperationState[] {
+function publishRepoRuntimeInvalidation(operation: Pick<RepoServerOperationState, 'repoId'>): void {
+  if (!operation.repoId) return
+  publishRepoQueryInvalidation({ repoId: operation.repoId, query: 'repo-runtime' })
+}
+
+export function listRepoServerOperations(options: ListRepoServerOperationsOptions = {}): RepoServerOperationState[] {
   const includeSettled = options.includeSettled === true
   return sortedOperations(
     [...operations.values()].filter((operation) => {

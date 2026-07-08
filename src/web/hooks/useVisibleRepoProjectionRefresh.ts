@@ -18,6 +18,7 @@ import {
 import { useWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-target-projection.ts'
 import { createRepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { useRepoProjectionReadModel } from '#/web/repo-data-query.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 export { isRepoVisibleProjectionRefreshable }
 
@@ -57,9 +58,11 @@ function visibleProjectionRefreshKey(repo: RepoVisibleProjectionRefreshState): s
 export function useVisibleRepoProjectionRefresh({
   hydratedRouteRepoId = null,
   currentBranchName = null,
+  workspacePaneRoute,
 }: {
   hydratedRouteRepoId?: string | null
   currentBranchName?: string | null
+  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
 } = {}) {
   const currentRepoShell = useStoreWithEqualityFn(
     useReposStore,
@@ -114,13 +117,17 @@ export function useVisibleRepoProjectionRefresh({
     repoInstanceId,
     worktreePath,
   })
-  const preferredWorkspacePaneTab = useMemo(() => {
-    if (!currentRepoShell || !branchReadModel) return 'status'
+  const preferredWorkspacePaneTab = useMemo<WorkspacePaneTabType | null>(() => {
+    if (workspacePaneRoute === null) return null
+    if (workspacePaneRoute?.kind === 'static') return workspacePaneRoute.tab
+    if (workspacePaneRoute?.kind === 'terminal') return 'terminal'
+    if (workspacePaneRoute?.kind === 'invalid-static') return null
+    if (!currentRepoShell || !branchReadModel) return null
     return preferredWorkspacePaneTabForTarget(
       { preferredWorkspacePaneTabByTarget: currentRepoShell.preferredWorkspacePaneTabByTarget },
       branchName ? { repoRoot: currentRepoShell.id, branchName, worktreePath } : null,
     )
-  }, [branchName, branchReadModel, currentRepoShell, worktreePath])
+  }, [branchName, branchReadModel, currentRepoShell, workspacePaneRoute, worktreePath])
   const renderedWorkspacePaneTab = useMemo<WorkspacePaneTabType | null>(() => {
     if (!currentRepoShell || !branchName) return null
     return createRepoWorkspaceTabModel({
@@ -129,6 +136,7 @@ export function useVisibleRepoProjectionRefresh({
       branchName,
       worktreePath,
       preferredTab: preferredWorkspacePaneTab,
+      allowPreferredTabFallback: workspacePaneRoute === undefined,
       tabEntries: workspacePaneTabEntries,
       runtimeTabViews: runtimeProjection.runtimeTabViews,
       runtimeTabStateByType: runtimeProjection.runtimeTabStateByType,
@@ -140,6 +148,7 @@ export function useVisibleRepoProjectionRefresh({
     runtimeProjection.runtimeTabStateByType,
     runtimeProjection.runtimeTabViews,
     workspacePaneTabEntries,
+    workspacePaneRoute,
     worktreePath,
   ])
   const currentRepoRefreshState = useMemo<RepoVisibleProjectionRefreshState | null>(
