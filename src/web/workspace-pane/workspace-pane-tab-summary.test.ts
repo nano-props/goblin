@@ -9,7 +9,7 @@ import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pan
 
 const terminalView: WorkspacePaneTabSummary = {
   type: 'terminal',
-  terminalSessionId: 'session-1',
+  terminalSessionId: 'term-111111111111111111111',
   terminalWorktreeKey: 'repo\0worktree',
   index: 1,
   title: 'terminal 1',
@@ -25,13 +25,13 @@ describe('workspace pane tab model', () => {
   })
 
   test('derives runtime summary identities from the runtime session id', () => {
-    expect(workspacePaneRuntimeTabSummarySessionId(terminalView)).toBe('session-1')
-    expect(workspacePaneRuntimeTabSummaryIdentity(terminalView)).toBe('terminal:session-1')
+    expect(workspacePaneRuntimeTabSummarySessionId(terminalView)).toBe('term-111111111111111111111')
+    expect(workspacePaneRuntimeTabSummaryIdentity(terminalView)).toBe('terminal:term-111111111111111111111')
     const genericView: WorkspacePaneGenericRuntimeTabSummary<'terminal'> = {
       type: 'terminal',
-      runtimeSessionId: 'session-2',
+      runtimeSessionId: 'term-222222222222222222222',
     }
-    expect(workspacePaneRuntimeTabSummarySessionId(genericView)).toBe('session-2')
-    expect(workspacePaneRuntimeTabSummaryIdentity(genericView)).toBe('terminal:session-2')
+    expect(workspacePaneRuntimeTabSummarySessionId(genericView)).toBe('term-222222222222222222222')
+    expect(workspacePaneRuntimeTabSummaryIdentity(genericView)).toBe('terminal:term-222222222222222222222')
   })
 })

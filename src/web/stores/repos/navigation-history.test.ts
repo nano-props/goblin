@@ -67,9 +67,9 @@ describe('workspace navigation history', () => {
   test('updates branch metadata without adding a back entry', () => {
     const store = useReposStore.getState()
     store.recordWorkspaceNavigation(branchEntry({ tab: 'status', terminalSessionId: null }))
-    store.recordWorkspaceNavigation(branchEntry({ tab: 'status', terminalSessionId: 'session-1' }))
+    store.recordWorkspaceNavigation(branchEntry({ tab: 'status', terminalSessionId: 'term-111111111111111111111' }))
 
-    expect(history().current).toEqual(branchEntry({ tab: 'status', terminalSessionId: 'session-1' }))
+    expect(history().current).toEqual(branchEntry({ tab: 'status', terminalSessionId: 'term-111111111111111111111' }))
     expect(history().backStack).toEqual([])
   })
 
@@ -77,7 +77,7 @@ describe('workspace navigation history', () => {
     const store = useReposStore.getState()
     const status = branchEntry({ tab: 'status', terminalSessionId: null })
     const pendingTerminal = branchEntry({ tab: 'terminal', terminalSessionId: null })
-    const createdTerminal = branchEntry({ tab: 'terminal', terminalSessionId: 'session-1' })
+    const createdTerminal = branchEntry({ tab: 'terminal', terminalSessionId: 'term-111111111111111111111' })
 
     store.recordWorkspaceNavigation(status)
     store.recordWorkspaceNavigation(pendingTerminal)
@@ -89,8 +89,8 @@ describe('workspace navigation history', () => {
 
   test('records explicit terminal session switches as navigation', () => {
     const store = useReposStore.getState()
-    const firstTerminal = branchEntry({ tab: 'terminal', terminalSessionId: 'session-1' })
-    const secondTerminal = branchEntry({ tab: 'terminal', terminalSessionId: 'session-2' })
+    const firstTerminal = branchEntry({ tab: 'terminal', terminalSessionId: 'term-111111111111111111111' })
+    const secondTerminal = branchEntry({ tab: 'terminal', terminalSessionId: 'term-222222222222222222222' })
 
     store.recordWorkspaceNavigation(firstTerminal)
     store.recordWorkspaceNavigation(secondTerminal)
@@ -103,7 +103,7 @@ describe('workspace navigation history', () => {
     const store = useReposStore.getState()
     const dashboard = entry('dashboard')
     const status = branchEntry({ tab: 'status', terminalSessionId: null })
-    const terminal = branchEntry({ tab: 'terminal', terminalSessionId: 'session-1' })
+    const terminal = branchEntry({ tab: 'terminal', terminalSessionId: 'term-111111111111111111111' })
 
     store.recordWorkspaceNavigation(dashboard)
     store.recordWorkspaceNavigation(status)
@@ -119,7 +119,7 @@ describe('workspace navigation history', () => {
     const store = useReposStore.getState()
     const dashboard = entry('dashboard')
     const status = branchEntry({ tab: 'status', terminalSessionId: null })
-    const terminal = branchEntry({ tab: 'terminal', terminalSessionId: 'session-1' })
+    const terminal = branchEntry({ tab: 'terminal', terminalSessionId: 'term-111111111111111111111' })
 
     store.recordWorkspaceNavigation(dashboard)
     store.recordWorkspaceNavigation(status)
@@ -136,7 +136,7 @@ describe('workspace navigation history', () => {
     const store = useReposStore.getState()
     const dashboard = entry('dashboard')
     const status = branchEntry({ tab: 'status', terminalSessionId: null })
-    const terminal = branchEntry({ tab: 'terminal', terminalSessionId: 'session-1' })
+    const terminal = branchEntry({ tab: 'terminal', terminalSessionId: 'term-111111111111111111111' })
 
     store.recordWorkspaceNavigation(dashboard)
     store.recordWorkspaceNavigation(status)

@@ -22,15 +22,15 @@ describe('workspace pane runtime tabs projection', () => {
             worktreePath: WORKTREE_PATH,
             tabs: [
               workspacePaneStaticTabEntry('status'),
-              workspacePaneRuntimeTabEntry('terminal', 'session-stale'),
+              workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1'),
               workspacePaneStaticTabEntry('history'),
-              workspacePaneRuntimeTabEntry('terminal', 'session-live'),
+              workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
             ],
           },
         ],
         liveSessions: [
-          { sessionId: 'session-live', branch: BRANCH_NAME },
-          { sessionId: 'session-missing', branch: BRANCH_NAME },
+          { sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME },
+          { sessionId: 'term-missingmissingmissing', branch: BRANCH_NAME },
         ],
       }),
     ).toEqual([
@@ -40,8 +40,8 @@ describe('workspace pane runtime tabs projection', () => {
         tabs: [
           workspacePaneStaticTabEntry('status'),
           workspacePaneStaticTabEntry('history'),
-          workspacePaneRuntimeTabEntry('terminal', 'session-live'),
-          workspacePaneRuntimeTabEntry('terminal', 'session-missing'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-missingmissingmissing'),
         ],
       },
     ])
@@ -59,13 +59,13 @@ describe('workspace pane runtime tabs projection', () => {
             tabs: [workspacePaneStaticTabEntry('status')],
           },
         ],
-        liveSessions: [{ sessionId: 'session-live', branch: 'feature/from-session' }],
+        liveSessions: [{ sessionId: 'term-livelivelivelivelive1', branch: 'feature/from-session' }],
       }),
     ).toEqual([
       {
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
-        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-live')],
+        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')],
       },
     ])
   })
@@ -76,13 +76,13 @@ describe('workspace pane runtime tabs projection', () => {
         runtimeType: 'terminal',
         worktreePath: WORKTREE_PATH,
         entries: [],
-        liveSessions: [{ sessionId: 'session-live', branch: BRANCH_NAME }],
+        liveSessions: [{ sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME }],
       }),
     ).toEqual([
       {
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
-        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-live')],
+        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')],
       },
     ])
   })
@@ -96,7 +96,7 @@ describe('workspace pane runtime tabs projection', () => {
           {
             branchName: BRANCH_NAME,
             worktreePath: WORKTREE_PATH,
-            tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-stale')],
+            tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1')],
           },
         ],
         liveSessions: [],
@@ -114,15 +114,15 @@ describe('workspace pane runtime tabs projection', () => {
     expect(
       workspaceTabsWithoutStaleRuntimeEntries(
         [
-          workspacePaneRuntimeTabEntry('terminal', 'session-live'),
-          workspacePaneRuntimeTabEntry('terminal', 'session-live'),
-          workspacePaneRuntimeTabEntry('terminal', 'session-stale'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1'),
           workspacePaneStaticTabEntry('status'),
           workspacePaneStaticTabEntry('status'),
         ],
         'terminal',
-        ['session-live'],
+        ['term-livelivelivelivelive1'],
       ),
-    ).toEqual([workspacePaneRuntimeTabEntry('terminal', 'session-live'), workspacePaneStaticTabEntry('status')])
+    ).toEqual([workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'), workspacePaneStaticTabEntry('status')])
   })
 })

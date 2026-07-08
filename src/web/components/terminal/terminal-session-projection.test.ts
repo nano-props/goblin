@@ -29,7 +29,7 @@ describe('terminal session projection helpers', () => {
       index: 2,
       serverSession: {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
-        terminalSessionId: 'session-2',
+        terminalSessionId: 'term-222222222222222222222',
         repoInstanceId: REPO_INSTANCE_ID,
         repoRoot: REPO_ROOT,
         branch: 'main',
@@ -53,7 +53,7 @@ describe('terminal session projection helpers', () => {
 
     expect(projected).toEqual({
       descriptor: {
-        terminalSessionId: 'session-2',
+        terminalSessionId: 'term-222222222222222222222',
         terminalWorktreeKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
         index: 2,
         repoInstanceId: REPO_INSTANCE_ID,
@@ -89,7 +89,7 @@ describe('terminal session projection helpers', () => {
       index: 1,
       serverSession: {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         repoInstanceId: REPO_INSTANCE_ID,
         repoRoot: REPO_ROOT,
         branch: 'main',
@@ -121,7 +121,7 @@ describe('terminal session projection helpers', () => {
       index: 1,
       serverSession: {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         repoInstanceId: REPO_INSTANCE_ID,
         repoRoot: REPO_ROOT,
         branch: 'main',
@@ -154,7 +154,7 @@ describe('terminal session projection helpers', () => {
       index: 1,
       serverSession: {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         repoInstanceId: REPO_INSTANCE_ID,
         repoRoot: REPO_ROOT,
         branch: 'feature/restored',
@@ -202,7 +202,7 @@ describe('terminal session projection helpers', () => {
       {
         ok: true,
         action: 'created',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         tabs: [],
         sessions: [],
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
@@ -222,7 +222,7 @@ describe('terminal session projection helpers', () => {
     expect(projected.serverSessions).toEqual([
       {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         repoInstanceId: REPO_INSTANCE_ID,
         repoRoot: REPO_ROOT,
         branch: 'main',
@@ -248,7 +248,7 @@ describe('terminal session projection helpers', () => {
   test('uses authoritative create first-frame metadata when sessions projection already includes the target', () => {
     const existingSession = {
       terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       repoInstanceId: REPO_INSTANCE_ID,
       repoRoot: '/server/repo',
       branch: 'server/main',
@@ -268,7 +268,7 @@ describe('terminal session projection helpers', () => {
       {
         ok: true,
         action: 'created',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         tabs: [],
         sessions: [existingSession],
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
@@ -289,7 +289,7 @@ describe('terminal session projection helpers', () => {
       {
         ...existingSession,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         processName: 'new-shell',
         canonicalTitle: 'new title',
         phase: 'open',
@@ -303,7 +303,7 @@ describe('terminal session projection helpers', () => {
   test('replaces stale create projection entry for the same terminal session id', () => {
     const staleSession = {
       terminalRuntimeSessionId: 'pty_session_old_aaaaaaaaa',
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       repoInstanceId: REPO_INSTANCE_ID,
       repoRoot: REPO_ROOT,
       branch: 'main',
@@ -323,7 +323,7 @@ describe('terminal session projection helpers', () => {
       {
         ok: true,
         action: 'restored',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         tabs: [],
         sessions: [staleSession],
         terminalRuntimeSessionId: 'pty_session_new_aaaaaaaaa',
@@ -343,7 +343,7 @@ describe('terminal session projection helpers', () => {
     expect(projected.serverSessions).toEqual([
       expect.objectContaining({
         terminalRuntimeSessionId: 'pty_session_new_aaaaaaaaa',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         processName: 'zsh',
         canonicalTitle: 'new-shell',
         cols: 120,

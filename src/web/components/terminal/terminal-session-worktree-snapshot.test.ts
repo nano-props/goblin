@@ -48,7 +48,7 @@ function makeSession(
 
 describe('terminal session worktree snapshot helper', () => {
   test('builds summaries and populates snapshot cache lazily', () => {
-    const descriptor = makeDescriptor('session-1', 1)
+    const descriptor = makeDescriptor('term-111111111111111111111', 1)
     const session = makeSession(descriptor, {
       phase: 'open',
       message: null,
@@ -105,7 +105,7 @@ describe('terminal session worktree snapshot helper', () => {
   })
 
   test('projects closing terminal session ids when present', () => {
-    const descriptor = makeDescriptor('session-1', 1)
+    const descriptor = makeDescriptor('term-111111111111111111111', 1)
     const session = makeSession(descriptor, {
       phase: 'open',
       message: null,

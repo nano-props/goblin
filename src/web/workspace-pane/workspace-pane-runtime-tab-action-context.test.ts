@@ -16,11 +16,11 @@ describe('workspace pane runtime tab action context', () => {
       },
     })
 
-    context.showRuntimeTab('terminal', 'session-1')
-    context.terminal?.scrollToBottom?.('session-1')
+    context.showRuntimeTab('terminal', 'term-111111111111111111111')
+    context.terminal?.scrollToBottom?.('term-111111111111111111111')
 
-    expect(showRuntimeTab).toHaveBeenCalledWith('terminal', 'session-1')
-    expect(scrollToBottom).toHaveBeenCalledWith('session-1')
+    expect(showRuntimeTab).toHaveBeenCalledWith('terminal', 'term-111111111111111111111')
+    expect(scrollToBottom).toHaveBeenCalledWith('term-111111111111111111111')
   })
 
   test('reads runtime action context from explicit route navigation capabilities', () => {
@@ -28,9 +28,9 @@ describe('workspace pane runtime tab action context', () => {
 
     const context = readWorkspacePaneRuntimeTabActionContext({ showRuntimeTab })
 
-    context.showRuntimeTab('terminal', 'session-1')
+    context.showRuntimeTab('terminal', 'term-111111111111111111111')
 
-    expect(showRuntimeTab).toHaveBeenCalledWith('terminal', 'session-1')
+    expect(showRuntimeTab).toHaveBeenCalledWith('terminal', 'term-111111111111111111111')
   })
 
   test('omits terminal runtime actions unless explicitly provided', () => {

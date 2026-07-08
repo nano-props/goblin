@@ -83,7 +83,7 @@ describe('settings snapshot partitions', () => {
         restoredRepoId: '/tmp/repo-b',
         zenMode: false,
         workspacePaneSize: 50,
-        selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'session-1' },
+        selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'term-111111111111111111111' },
         preferredWorkspacePaneTabByTargetByRepo: {},
         workspacePaneTabsByTargetByRepo: {
           '/tmp/repo-b': {
@@ -110,7 +110,7 @@ describe('settings snapshot partitions', () => {
       restoredRepoId: '/tmp/repo-b',
       zenMode: false,
       workspacePaneSize: 50,
-      selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'session-1' },
+      selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'term-111111111111111111111' },
       preferredWorkspacePaneTabByTargetByRepo: {},
       workspacePaneTabsByTargetByRepo: {
         '/tmp/repo-b': {

@@ -31,7 +31,7 @@ function makeActions(
       options.getSlotScope?.(userId, terminalRuntimeSessionId)
         ? ({
             terminalRuntimeSessionId,
-            terminalSessionId: 'terminal-session-1',
+            terminalSessionId: 'term-111111111111111111111',
             repoInstanceId: REPO_INSTANCE_ID,
             repoRoot: options.getSlotScope(userId, terminalRuntimeSessionId),
             branch: 'feature/worktree',
@@ -93,7 +93,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     sessionService.create.mockResolvedValue({
       ok: true,
       action: 'created',
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       tabs: [],
       sessions: [],
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,
@@ -180,7 +180,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     expect(broadcasts).toHaveBeenCalledWith(USER_ID, {
       type: 'session-closed',
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,
-      terminalSessionId: 'terminal-session-1',
+      terminalSessionId: 'term-111111111111111111111',
       repoRoot: '/repo',
       worktreePath: '/repo',
     })

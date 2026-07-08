@@ -288,7 +288,7 @@ export function installWorkspacePaneTabsTestBridge(
       create: async () => ({
         ok: true as const,
         action: 'created' as const,
-        terminalSessionId: 'terminal-session-test-1',
+        terminalSessionId: 'term-testtesttesttesttest1',
         tabs: [],
         sessions: [],
         terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
@@ -579,7 +579,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return {
             ok: true,
             action: terminalKind === 'primary' ? 'reused' : 'created',
-            terminalSessionId: terminalKind === 'primary' ? 'terminal-session-test-1' : 'terminal-session-test-2',
+            terminalSessionId: terminalKind === 'primary' ? 'term-testtesttesttesttest1' : 'term-testtesttesttesttest2',
             tabs: [],
             sessions: [],
             terminalRuntimeSessionId,

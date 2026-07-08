@@ -32,7 +32,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
     installWorkspacePaneTabsTestBridge({
       replaceWorkspaceTabs: async () => [
         workspacePaneStaticTabEntry('status'),
-        workspacePaneRuntimeTabEntry('terminal', 'session-live'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
       ],
     })
 
@@ -41,7 +41,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
         [REPO_ID]: {
           [worktreeTargetKey()]: [
             workspacePaneStaticTabEntry('status'),
-            workspacePaneRuntimeTabEntry('terminal', 'session-stale'),
+            workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1'),
           ],
         },
       }),
@@ -49,7 +49,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
 
     expect(readTabsFor('feature/worktree', WORKTREE_PATH)).toEqual([
       workspacePaneStaticTabEntry('status'),
-      workspacePaneRuntimeTabEntry('terminal', 'session-live'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
     ])
   })
 
@@ -70,7 +70,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
         [REPO_ID]: {
           [branchTargetKey('feature/no-worktree')]: [
             workspacePaneStaticTabEntry('status'),
-            workspacePaneRuntimeTabEntry('terminal', 'session-stale'),
+            workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1'),
           ],
         },
       }),
@@ -81,7 +81,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
       repoInstanceId: useReposStore.getState().repos[REPO_ID]!.instanceId,
       branchName: 'feature/no-worktree',
       worktreePath: null,
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-stale')],
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1')],
     })
     expect(readTabsFor('feature/no-worktree', null)).toEqual([workspacePaneStaticTabEntry('status')])
   })

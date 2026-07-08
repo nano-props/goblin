@@ -85,7 +85,7 @@ describe('useSessionPersistence', () => {
       workspaceMembershipReady: true,
       sessionPersistenceReady: true,
       selectedTerminalSessionIdByTerminalWorktree: {
-        '/tmp/repo\0/tmp/worktree': 'session-2',
+        '/tmp/repo\0/tmp/worktree': 'term-222222222222222222222',
       },
     })
 
@@ -96,7 +96,7 @@ describe('useSessionPersistence', () => {
         openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
         restoredRepoId: '/tmp/repo',
         selectedTerminalSessionIdByTerminalWorktree: {
-          '/tmp/repo\0/tmp/worktree': 'session-2',
+          '/tmp/repo\0/tmp/worktree': 'term-222222222222222222222',
         },
         workspacePaneTabsByTargetByRepo: {
           '/tmp/repo': {
@@ -536,7 +536,7 @@ describe('useSessionPersistence', () => {
 
     flushSync(() => {
       useReposStore.setState({
-        selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'session-2' },
+        selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'term-222222222222222222222' },
       })
     })
     expect(persistWorkspaceSessionStateMock).not.toHaveBeenCalled()
@@ -548,7 +548,7 @@ describe('useSessionPersistence', () => {
 
     expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'session-2' },
+        selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'term-222222222222222222222' },
       }),
     )
   })

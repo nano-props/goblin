@@ -54,13 +54,13 @@ describe('client effect intent handlers', () => {
       {
         type: 'terminal-bell-click',
         repoRoot: REPO_ID,
-        terminalSessionId: 'session-query',
+        terminalSessionId: 'term-queryqueryqueryquery1',
         terminalWorktreeKey: `${REPO_ID}\0/tmp/bell-worktree`,
       },
       d,
     )
 
-    expect(d.navigation.showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/query', 'session-query')
+    expect(d.navigation.showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/query', 'term-queryqueryqueryquery1')
   })
 
   test('returns false when changes cannot be shown for a branch without a worktree', async () => {

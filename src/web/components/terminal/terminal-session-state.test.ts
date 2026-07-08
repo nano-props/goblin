@@ -226,7 +226,7 @@ describe('TerminalSessionState', () => {
     state.beginReplay({ outputEra: 0, seq: 1 })
     state.captureReplayOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'term-111111111111111111111',
       data: 'live',
       seq: 2,
       outputEra: 0,

@@ -65,7 +65,7 @@ describe('TerminalSessionRuntime', () => {
     expect(
       runtime.handleOutput({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalSessionId: 'term-111111111111111111111',
         data: 'old',
         seq: 1,
         outputEra: 0,
@@ -78,7 +78,7 @@ describe('TerminalSessionRuntime', () => {
     expect(
       runtime.handleOutput({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalSessionId: 'term-111111111111111111111',
         data: 'new',
         seq: 3,
         outputEra: 0,
@@ -92,7 +92,7 @@ describe('TerminalSessionRuntime', () => {
     expect(runtime.finishReplay()).toEqual([
       {
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalSessionId: 'term-111111111111111111111',
         data: 'new',
         seq: 3,
         outputEra: 0,
@@ -126,7 +126,7 @@ describe('TerminalSessionRuntime', () => {
     expect(
       runtime.handleOutput({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         data: 'prompt',
         seq: 1,
         outputEra: 0,
@@ -136,7 +136,7 @@ describe('TerminalSessionRuntime', () => {
     expect(
       runtime.handleOutput({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         data: 'next',
         seq: 2,
         outputEra: 0,
@@ -170,7 +170,7 @@ describe('TerminalSessionRuntime', () => {
     expect(
       runtime.handleOutput({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         data: 'next',
         seq: 2,
         outputEra: 0,
@@ -190,7 +190,7 @@ describe('TerminalSessionRuntime', () => {
     expect(
       runtime.handleOutput({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         data: 'next-again',
         seq: 2,
         outputEra: 0,
@@ -211,7 +211,7 @@ describe('TerminalSessionRuntime', () => {
     expect(
       runtime.handleOutput({
         terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         data: 'new-session-output',
         seq: 1,
         outputEra: 0,
@@ -249,7 +249,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.beginReplay({ outputEra: 0, seq: 2 })
     runtime.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'term-111111111111111111111',
       data: 'new',
       seq: 3,
       outputEra: 0,
@@ -295,7 +295,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.beginReplay({ outputEra: 0, seq: 2 })
     runtime.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'term-111111111111111111111',
       data: 'preload-old',
       seq: 3,
       outputEra: 0,
@@ -303,7 +303,7 @@ describe('TerminalSessionRuntime', () => {
     })
     runtime.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'term-111111111111111111111',
       data: 'preload-new',
       seq: 6,
       outputEra: 0,
@@ -315,7 +315,7 @@ describe('TerminalSessionRuntime', () => {
     runtime.beginReplay({ outputEra: 0, seq: 5 })
     runtime.handleOutput({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'term-111111111111111111111',
       data: 'post-attach',
       seq: 7,
       outputEra: 0,
@@ -364,7 +364,7 @@ describe('TerminalSessionRuntime', () => {
 
     expect(
       runtime.hydrateRepoSession({
-        terminalRuntimeSessionId: 'session-remote',
+        terminalRuntimeSessionId: 'term-remoteremoteremote001',
         phase: 'open',
         message: null,
         processName: 'node',
@@ -375,7 +375,7 @@ describe('TerminalSessionRuntime', () => {
       }),
     ).toBe(true)
 
-    expect(runtime.currentTerminalRuntimeSessionId()).toBe('session-remote')
+    expect(runtime.currentTerminalRuntimeSessionId()).toBe('term-remoteremoteremote001')
     expect(runtime.phase()).toBe('open')
     expect(runtime.snapshot().attachment).toMatchObject({
       role: 'viewer',
@@ -387,8 +387,8 @@ describe('TerminalSessionRuntime', () => {
     })
     expect(
       runtime.handleOutput({
-        terminalRuntimeSessionId: 'session-remote',
-        terminalSessionId: 'session-remote',
+        terminalRuntimeSessionId: 'term-remoteremoteremote001',
+        terminalSessionId: 'term-remoteremoteremote001',
         data: 'tick',
         seq: 1,
         outputEra: 0,

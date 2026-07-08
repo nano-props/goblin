@@ -9,18 +9,18 @@ describe('workspace pane tabs runtime', () => {
     runtime.replaceTabs({
       ...target(),
       tabs: [
-        workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
         workspacePaneStaticTabEntry('status'),
-        workspacePaneRuntimeTabEntry('terminal', 'session-2'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-222222222222222222222'),
       ],
     })
 
     expect(runtime.tabs(target())).toEqual([
-      workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
       workspacePaneStaticTabEntry('status'),
-      workspacePaneRuntimeTabEntry('terminal', 'session-2'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-222222222222222222222'),
     ])
-    expect(runtime.runtimeSessionIds(worktree(), 'terminal')).toEqual(['session-1', 'session-2'])
+    expect(runtime.runtimeSessionIds(worktree(), 'terminal')).toEqual(['term-111111111111111111111', 'term-222222222222222222222'])
   })
 
   test('appends new runtime tabs to the mixed list', () => {
@@ -28,13 +28,13 @@ describe('workspace pane tabs runtime', () => {
 
     runtime.replaceTabs({
       ...target(),
-      tabs: [workspacePaneRuntimeTabEntry('terminal', 'session-1'), workspacePaneStaticTabEntry('status')],
+      tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'), workspacePaneStaticTabEntry('status')],
     })
 
-    expect(runtime.ensureRuntimeTab(target(), 'terminal', 'session-2')).toEqual([
-      workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+    expect(runtime.ensureRuntimeTab(target(), 'terminal', 'term-222222222222222222222')).toEqual([
+      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
       workspacePaneStaticTabEntry('status'),
-      workspacePaneRuntimeTabEntry('terminal', 'session-2'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-222222222222222222222'),
     ])
   })
 
@@ -42,15 +42,15 @@ describe('workspace pane tabs runtime', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
     runtime.replaceTabs({
       ...target(),
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-1')],
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
     })
 
     expect(
-      runtime.ensureRuntimeTab(target(), 'terminal', 'session-2', { insertAfterIdentity: 'workspace-pane:status' }),
+      runtime.ensureRuntimeTab(target(), 'terminal', 'term-222222222222222222222', { insertAfterIdentity: 'workspace-pane:status' }),
     ).toEqual([
       workspacePaneStaticTabEntry('status'),
-      workspacePaneRuntimeTabEntry('terminal', 'session-2'),
-      workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-222222222222222222222'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
     ])
   })
 
@@ -58,15 +58,15 @@ describe('workspace pane tabs runtime', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
     runtime.replaceTabs({
       ...target(),
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-1')],
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
     })
 
     expect(
-      runtime.ensureRuntimeTab(target(), 'terminal', 'session-2', { insertAfterIdentity: 'terminal:session-1' }),
+      runtime.ensureRuntimeTab(target(), 'terminal', 'term-222222222222222222222', { insertAfterIdentity: 'terminal:term-111111111111111111111' }),
     ).toEqual([
       workspacePaneStaticTabEntry('status'),
-      workspacePaneRuntimeTabEntry('terminal', 'session-1'),
-      workspacePaneRuntimeTabEntry('terminal', 'session-2'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-222222222222222222222'),
     ])
   })
 
@@ -74,15 +74,15 @@ describe('workspace pane tabs runtime', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
     runtime.replaceTabs({
       ...target(),
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-1')],
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
     })
 
     expect(
-      runtime.ensureRuntimeTab(target(), 'terminal', 'session-2', { insertAfterIdentity: 'terminal:missing' }),
+      runtime.ensureRuntimeTab(target(), 'terminal', 'term-222222222222222222222', { insertAfterIdentity: 'terminal:missing' }),
     ).toEqual([
       workspacePaneStaticTabEntry('status'),
-      workspacePaneRuntimeTabEntry('terminal', 'session-1'),
-      workspacePaneRuntimeTabEntry('terminal', 'session-2'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-222222222222222222222'),
     ])
   })
 
@@ -113,7 +113,7 @@ describe('workspace pane tabs runtime', () => {
       ...target(),
       tabs: [
         workspacePaneStaticTabEntry('status'),
-        workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
         workspacePaneStaticTabEntry('history'),
       ],
     })
@@ -121,7 +121,7 @@ describe('workspace pane tabs runtime', () => {
     expect(runtime.openStaticTab(target(), 'changes', { insertAfterIdentity: 'workspace-pane:status' })).toEqual([
       workspacePaneStaticTabEntry('status'),
       workspacePaneStaticTabEntry('changes'),
-      workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
       workspacePaneStaticTabEntry('history'),
     ])
   })
@@ -132,14 +132,14 @@ describe('workspace pane tabs runtime', () => {
       ...target(),
       tabs: [
         workspacePaneStaticTabEntry('status'),
-        workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
         workspacePaneStaticTabEntry('history'),
       ],
     })
 
-    expect(runtime.openStaticTab(target(), 'changes', { insertAfterIdentity: 'terminal:session-1' })).toEqual([
+    expect(runtime.openStaticTab(target(), 'changes', { insertAfterIdentity: 'terminal:term-111111111111111111111' })).toEqual([
       workspacePaneStaticTabEntry('status'),
-      workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
       workspacePaneStaticTabEntry('changes'),
       workspacePaneStaticTabEntry('history'),
     ])
@@ -149,12 +149,12 @@ describe('workspace pane tabs runtime', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
     runtime.replaceTabs({
       ...target(),
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-1')],
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
     })
 
     expect(runtime.openStaticTab(target(), 'files', { insertAfterIdentity: 'terminal:missing-session' })).toEqual([
       workspacePaneStaticTabEntry('status'),
-      workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
       workspacePaneStaticTabEntry('files'),
     ])
   })
@@ -164,7 +164,7 @@ describe('workspace pane tabs runtime', () => {
     runtime.replaceTabs({
       ...target(),
       tabs: [
-        workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
         workspacePaneStaticTabEntry('status'),
         workspacePaneStaticTabEntry('history'),
       ],
@@ -173,12 +173,12 @@ describe('workspace pane tabs runtime', () => {
     expect(
       runtime.reorderTabsByIdentity(target(), [
         'workspace-pane:status',
-        'terminal:session-1',
+        'terminal:term-111111111111111111111',
         'workspace-pane:closed-before-reorder',
       ]),
     ).toEqual([
       workspacePaneStaticTabEntry('status'),
-      workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
       workspacePaneStaticTabEntry('history'),
     ])
   })
@@ -189,7 +189,7 @@ describe('workspace pane tabs runtime', () => {
     runtime.replaceTabs({
       ...target(),
       branchName: 'feature/old',
-      tabs: [workspacePaneRuntimeTabEntry('terminal', 'session-1'), workspacePaneStaticTabEntry('status')],
+      tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'), workspacePaneStaticTabEntry('status')],
     })
 
     const retargeted = {
@@ -197,11 +197,11 @@ describe('workspace pane tabs runtime', () => {
       branchName: 'feature/new',
     }
     expect(runtime.tabs(retargeted)).toEqual([
-      workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
       workspacePaneStaticTabEntry('status'),
     ])
     expect(runtime.openStaticTab(retargeted, 'history')).toEqual([
-      workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
       workspacePaneStaticTabEntry('status'),
       workspacePaneStaticTabEntry('history'),
     ])
@@ -210,7 +210,7 @@ describe('workspace pane tabs runtime', () => {
         branchName: 'feature/new',
         worktreePath: '/repo-linked',
         tabs: [
-          workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
           workspacePaneStaticTabEntry('status'),
           workspacePaneStaticTabEntry('history'),
         ],
@@ -227,7 +227,7 @@ describe('workspace pane tabs runtime', () => {
       worktreePath: null,
       tabs: [
         workspacePaneStaticTabEntry('status'),
-        workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
         workspacePaneStaticTabEntry('files'),
       ],
     })
@@ -246,16 +246,16 @@ describe('workspace pane tabs runtime', () => {
 
     runtime.replaceTabs({
       ...target(),
-      tabs: [workspacePaneRuntimeTabEntry('terminal', 'session-1')],
+      tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
     })
     runtime.replaceTabs({
       ...target(),
       userId: 'user-b',
-      tabs: [workspacePaneRuntimeTabEntry('terminal', 'session-1')],
+      tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
     })
 
-    expect(runtime.runtimeSessionIds(worktree(), 'terminal')).toEqual(['session-1'])
-    expect(runtime.runtimeSessionIds({ ...worktree(), userId: 'user-b' }, 'terminal')).toEqual(['session-1'])
+    expect(runtime.runtimeSessionIds(worktree(), 'terminal')).toEqual(['term-111111111111111111111'])
+    expect(runtime.runtimeSessionIds({ ...worktree(), userId: 'user-b' }, 'terminal')).toEqual(['term-111111111111111111111'])
   })
 
   test('removes all tabs for a detached user', () => {
@@ -263,18 +263,18 @@ describe('workspace pane tabs runtime', () => {
 
     runtime.replaceTabs({
       ...target(),
-      tabs: [workspacePaneRuntimeTabEntry('terminal', 'session-1')],
+      tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
     })
     runtime.replaceTabs({
       ...target(),
       userId: 'user-b',
-      tabs: [workspacePaneRuntimeTabEntry('terminal', 'session-1')],
+      tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
     })
 
     runtime.closeTabsForUser('user-a')
 
     expect(runtime.tabs(target())).toEqual([workspacePaneStaticTabEntry('status')])
-    expect(runtime.runtimeSessionIds({ ...worktree(), userId: 'user-b' }, 'terminal')).toEqual(['session-1'])
+    expect(runtime.runtimeSessionIds({ ...worktree(), userId: 'user-b' }, 'terminal')).toEqual(['term-111111111111111111111'])
   })
 
   test('lists scopes owned by a user', () => {

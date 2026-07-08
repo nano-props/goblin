@@ -72,7 +72,7 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
         terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         panelActive
-        sessions={[session({ terminalSessionId: 't1', selected: true })]}
+        sessions={[session({ terminalSessionId: 'term-111111111111111111111', selected: true })]}
         onNew={() => {}}
         onSelect={() => {}}
         onScrollToBottom={() => {}}
@@ -81,7 +81,7 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
       />,
     )
 
-    const tabChrome = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:t1"]')
+    const tabChrome = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:term-111111111111111111111"]')
     if (!(tabChrome instanceof HTMLDivElement)) throw new Error('missing terminal tab')
     expect(tabChrome.className).toContain('bg-selected')
     expect(tabChrome.className).toContain('cursor-grabbing')
@@ -97,8 +97,8 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
         terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
         sessions={[
-          session({ terminalSessionId: 't1', selected: true }),
-          session({ terminalSessionId: 'session-2', selected: false, index: 2 }),
+          session({ terminalSessionId: 'term-111111111111111111111', selected: true }),
+          session({ terminalSessionId: 'term-222222222222222222222', selected: false, index: 2 }),
         ]}
         onNew={() => {}}
         onSelect={() => {}}
@@ -116,7 +116,7 @@ describe('WorkspacePaneTabStrip keyboard dnd wiring', () => {
 
     const tab = document.body.querySelector('#workspace-workspace-pane-tab')
     if (!(tab instanceof HTMLButtonElement)) throw new Error('missing terminal tab')
-    const tabChrome = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:t1"]')
+    const tabChrome = document.body.querySelector('[data-workspace-pane-tab-tooltip-id="terminal:term-111111111111111111111"]')
     if (!(tabChrome instanceof HTMLDivElement)) throw new Error('missing terminal chrome')
 
     expect(tabChrome.dataset.titleBarChromeRegion).toBe('interactive')
@@ -197,7 +197,7 @@ function makeWorkspacePaneTabStrip(
 }
 
 function session(overrides: Partial<TerminalSessionSummary> = {}): TerminalSessionSummary {
-  const terminalSessionId = overrides.terminalSessionId ?? 't1'
+  const terminalSessionId = overrides.terminalSessionId ?? 'term-111111111111111111111'
   const title = overrides.title ?? 'term-1'
   return {
     type: 'terminal',

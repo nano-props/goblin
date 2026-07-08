@@ -21,7 +21,7 @@ describe('workspace pane runtime tab command actions', () => {
       terminalWorktreeSnapshot: () => ({
         terminalWorktreeKey: '/repo\0/repo-worktree',
         selectedDescriptor: null,
-        sessions: [terminalSession('session-1', true), terminalSession('session-2', false)],
+        sessions: [terminalSession('term-111111111111111111111', true), terminalSession('term-222222222222222222222', false)],
         count: 2,
         bellCount: 0,
         outputActiveCount: 0,
@@ -42,7 +42,7 @@ describe('workspace pane runtime tab command actions', () => {
       }),
     ).resolves.toBe(true)
 
-    expect(showTerminalSession).toHaveBeenCalledWith('session-1')
+    expect(showTerminalSession).toHaveBeenCalledWith('term-111111111111111111111')
     expect(selectTerminal).not.toHaveBeenCalled()
     expect(createTerminal).not.toHaveBeenCalled()
   })
@@ -54,7 +54,7 @@ describe('workspace pane runtime tab command actions', () => {
       terminalWorktreeSnapshot: () => ({
         terminalWorktreeKey: '/repo\0/repo-worktree',
         selectedDescriptor: null,
-        sessions: [terminalSession('session-1', true)],
+        sessions: [terminalSession('term-111111111111111111111', true)],
         count: 1,
         bellCount: 0,
         outputActiveCount: 0,
@@ -125,7 +125,7 @@ function terminalSession(terminalSessionId: string, selected: boolean) {
     type: 'terminal' as const,
     terminalSessionId,
     terminalWorktreeKey: '/repo\0/repo-worktree',
-    index: terminalSessionId === 'session-1' ? 1 : 2,
+    index: terminalSessionId === 'term-111111111111111111111' ? 1 : 2,
     title: terminalSessionId,
     fullTitle: terminalSessionId,
     originalTitle: terminalSessionId,

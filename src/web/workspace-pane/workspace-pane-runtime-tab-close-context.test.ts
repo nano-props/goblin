@@ -38,14 +38,14 @@ describe('workspace pane runtime tab close context', () => {
     expect(canCloseWorkspacePaneRuntimeTabWithContext({ type: 'terminal', target: closeTarget }, context)).toBe(true)
     expect(
       canConfirmWorkspacePaneRuntimeTabCloseWithContext(
-        { type: 'terminal', sessionId: 'session-1', target: closeTarget },
+        { type: 'terminal', sessionId: 'term-111111111111111111111', target: closeTarget },
         context,
       ),
     ).toBe(true)
     const terminalContext = terminalRuntimeTabCloseContext(context)
-    await expect(terminalContext?.closeTerminalByDescriptor?.('session-1', terminalBase)).resolves.toBe(true)
+    await expect(terminalContext?.closeTerminalByDescriptor?.('term-111111111111111111111', terminalBase)).resolves.toBe(true)
     await expect(terminalContext?.closeTerminalsForWorktree?.(terminalBase)).resolves.toBe(true)
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-1', terminalBase)
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', terminalBase)
     expect(closeTerminalsForWorktree).toHaveBeenCalledWith(terminalBase)
   })
 
@@ -56,7 +56,7 @@ describe('workspace pane runtime tab close context', () => {
     expect(canCloseWorkspacePaneRuntimeTabWithContext({ type: 'terminal', target: closeTarget }, context)).toBe(false)
     expect(
       canConfirmWorkspacePaneRuntimeTabCloseWithContext(
-        { type: 'terminal', sessionId: 'session-1', target: closeTarget },
+        { type: 'terminal', sessionId: 'term-111111111111111111111', target: closeTarget },
         context,
       ),
     ).toBe(false)
@@ -75,7 +75,7 @@ describe('workspace pane runtime tab close context', () => {
     ).toBe(false)
     expect(
       canConfirmWorkspacePaneRuntimeTabCloseWithContext(
-        { type: 'terminal', sessionId: 'session-1', target: { ...closeTarget, worktreePath: null } },
+        { type: 'terminal', sessionId: 'term-111111111111111111111', target: { ...closeTarget, worktreePath: null } },
         context,
       ),
     ).toBe(false)
@@ -99,7 +99,7 @@ function terminalCommandBridge({
       outputActiveCount: 0,
       createPending: false,
     }),
-    createTerminal: vi.fn(async () => 'session-1'),
+    createTerminal: vi.fn(async () => 'term-111111111111111111111'),
     selectTerminal: vi.fn(),
     closeTerminalByDescriptor,
     closeTerminalsForWorktree,

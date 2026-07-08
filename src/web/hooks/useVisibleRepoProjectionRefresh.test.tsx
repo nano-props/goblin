@@ -544,7 +544,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
     const repo = createRepo('/repo-a', {
       preferredWorkspacePaneTab: 'terminal',
       branchNames: ['main', 'feature/a'],
-      workspacePaneTabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'session-1')],
+      workspacePaneTabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady('/repo-a', 'repo-instance-test-a')
     await act(async () => {

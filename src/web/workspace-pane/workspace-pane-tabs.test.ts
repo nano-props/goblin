@@ -9,8 +9,8 @@ import {
 
 describe('orderWorkspacePaneItemsByTabEntries', () => {
   test('orders materialized items by tab entries without creating missing items', () => {
-    const terminalOne = terminalEntry('session-1')
-    const terminalTwo = terminalEntry('session-2')
+    const terminalOne = terminalEntry('term-111111111111111111111')
+    const terminalTwo = terminalEntry('term-222222222222222222222')
     const status = staticEntry('status')
     const items = [
       item('terminal-1', terminalOne),
@@ -27,7 +27,7 @@ describe('orderWorkspacePaneItemsByTabEntries', () => {
 
 describe('workspacePaneTabsWithDraggedOrder', () => {
   test('reorders current tabs by dragged tabs while preserving tabs absent from the drag snapshot', () => {
-    const terminalOne = terminalEntry('session-1')
+    const terminalOne = terminalEntry('term-111111111111111111111')
     const status = staticEntry('status')
     const history = staticEntry('history')
 

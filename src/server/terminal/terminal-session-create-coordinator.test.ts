@@ -11,10 +11,10 @@ const OTHER_WORKTREE_PATH = '/repo/other-worktree'
 
 describe('terminal session create coordinator', () => {
   test('reuses an existing worktree session for primary creates', async () => {
-    const createSessionId = vi.fn(() => 'session-new')
+    const createSessionId = vi.fn(() => 'term-newnewnewnewnewnewnew')
     const coordinator = createTerminalSessionCreateCoordinator({
       manager: {
-        listSessionsForUser: vi.fn(async () => [terminalSession('session-existing')]),
+        listSessionsForUser: vi.fn(async () => [terminalSession('term-existingexisting00001')]),
       },
       createSessionId,
     })
@@ -24,17 +24,17 @@ describe('terminal session create coordinator', () => {
         { userId: USER_ID, scope: SCOPE, worktreePath: WORKTREE_PATH, kind: 'primary' },
         async ({ terminalSessionId }) => terminalSessionId,
       ),
-    ).resolves.toBe('session-existing')
+    ).resolves.toBe('term-existingexisting00001')
     expect(createSessionId).not.toHaveBeenCalled()
   })
 
   test('reuses an in-flight reservation for primary creates and releases it afterward', async () => {
-    const sessionIds = ['session-reserved', 'session-after-release']
+    const sessionIds = ['term-reservedreserved00001', 'term-afterreleaseafterrel1']
     const coordinator = createTerminalSessionCreateCoordinator({
       manager: {
         listSessionsForUser: vi.fn(async () => []),
       },
-      createSessionId: () => sessionIds.shift() ?? 'session-extra',
+      createSessionId: () => sessionIds.shift() ?? 'term-extraextraextraextra1',
     })
 
     let nestedPrimarySessionId: string | null = null
@@ -53,9 +53,9 @@ describe('terminal session create coordinator', () => {
       async ({ terminalSessionId }) => terminalSessionId,
     )
 
-    expect(outerSessionId).toBe('session-reserved')
-    expect(nestedPrimarySessionId).toBe('session-reserved')
-    expect(afterReleaseSessionId).toBe('session-after-release')
+    expect(outerSessionId).toBe('term-reservedreserved00001')
+    expect(nestedPrimarySessionId).toBe('term-reservedreserved00001')
+    expect(afterReleaseSessionId).toBe('term-afterreleaseafterrel1')
   })
 
   test('serializes creates for the same user scope and worktree', async () => {
@@ -63,7 +63,7 @@ describe('terminal session create coordinator', () => {
       manager: {
         listSessionsForUser: vi.fn(async () => []),
       },
-      createSessionId: () => 'session-unused',
+      createSessionId: () => 'term-unusedunusedunused001',
     })
     const events: string[] = []
     let releaseFirstTask: () => void = () => {}
@@ -105,7 +105,7 @@ describe('terminal session create coordinator', () => {
       manager: {
         listSessionsForUser: vi.fn(async () => []),
       },
-      createSessionId: () => 'session-unused',
+      createSessionId: () => 'term-unusedunusedunused001',
     })
     const events: string[] = []
     let releaseFirstTask: () => void = () => {}

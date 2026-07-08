@@ -7,29 +7,29 @@ describe('terminal session index helper', () => {
     const terminalSessionIdByTerminalRuntimeSessionId = new Map<string, string>()
 
     syncTerminalRuntimeSessionIdIndex({
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
       terminalRuntimeSessionIdByTerminalSessionId,
       terminalSessionIdByTerminalRuntimeSessionId,
     })
-    expect(terminalRuntimeSessionIdByTerminalSessionId.get('session-1')).toBe('pty_session_a_aaaaaaaaa')
-    expect(terminalSessionIdByTerminalRuntimeSessionId.get('pty_session_a_aaaaaaaaa')).toBe('session-1')
+    expect(terminalRuntimeSessionIdByTerminalSessionId.get('term-111111111111111111111')).toBe('pty_session_a_aaaaaaaaa')
+    expect(terminalSessionIdByTerminalRuntimeSessionId.get('pty_session_a_aaaaaaaaa')).toBe('term-111111111111111111111')
 
     syncTerminalRuntimeSessionIdIndex({
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalRuntimeSessionId: 'pty_session_b_aaaaaaaaa',
       terminalRuntimeSessionIdByTerminalSessionId,
       terminalSessionIdByTerminalRuntimeSessionId,
     })
     expect(terminalSessionIdByTerminalRuntimeSessionId.has('pty_session_a_aaaaaaaaa')).toBe(false)
-    expect(terminalSessionIdByTerminalRuntimeSessionId.get('pty_session_b_aaaaaaaaa')).toBe('session-1')
+    expect(terminalSessionIdByTerminalRuntimeSessionId.get('pty_session_b_aaaaaaaaa')).toBe('term-111111111111111111111')
 
     syncTerminalRuntimeSessionIdIndex({
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalRuntimeSessionId: null,
       terminalRuntimeSessionIdByTerminalSessionId,
       terminalSessionIdByTerminalRuntimeSessionId,
     })
-    expect(terminalRuntimeSessionIdByTerminalSessionId.has('session-1')).toBe(false)
+    expect(terminalRuntimeSessionIdByTerminalSessionId.has('term-111111111111111111111')).toBe(false)
   })
 })

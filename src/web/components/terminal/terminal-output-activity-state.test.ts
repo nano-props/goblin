@@ -12,13 +12,13 @@ describe('terminal output activity state', () => {
     const notify = vi.fn()
     const state = createTerminalOutputActivityState(notify)
 
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
 
-    expect(state.hasRecentOutput('session-1')).toBe(false)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(false)
     expect(notify).not.toHaveBeenCalled()
 
     vi.advanceTimersByTime(5000)
-    expect(state.hasRecentOutput('session-1')).toBe(false)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(false)
     expect(notify).not.toHaveBeenCalled()
   })
 
@@ -28,23 +28,23 @@ describe('terminal output activity state', () => {
     const notify = vi.fn()
     const state = createTerminalOutputActivityState(notify)
 
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
     vi.advanceTimersByTime(2000)
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
 
-    expect(state.hasRecentOutput('session-1')).toBe(false)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(false)
     expect(notify).not.toHaveBeenCalled()
 
     vi.advanceTimersByTime(2999)
-    expect(state.hasRecentOutput('session-1')).toBe(false)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(false)
     expect(notify).not.toHaveBeenCalled()
 
     vi.advanceTimersByTime(1)
-    expect(state.hasRecentOutput('session-1')).toBe(false)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(false)
     expect(notify).not.toHaveBeenCalled()
 
-    state.markOutput('session-1', 'worktree-1')
-    expect(state.hasRecentOutput('session-1')).toBe(true)
+    state.markOutput('term-111111111111111111111', 'worktree-1')
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(true)
     expect(notify).toHaveBeenCalledTimes(1)
     expect(notify).toHaveBeenCalledWith('worktree-1')
   })
@@ -55,20 +55,20 @@ describe('terminal output activity state', () => {
     const notify = vi.fn()
     const state = createTerminalOutputActivityState(notify)
 
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
     vi.advanceTimersByTime(2000)
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
     vi.advanceTimersByTime(3000)
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
 
-    expect(state.hasRecentOutput('session-1')).toBe(true)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(true)
     expect(notify).toHaveBeenCalledTimes(1)
 
     vi.advanceTimersByTime(4999)
-    expect(state.hasRecentOutput('session-1')).toBe(true)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(true)
 
     vi.advanceTimersByTime(1)
-    expect(state.hasRecentOutput('session-1')).toBe(false)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(false)
     expect(notify).toHaveBeenCalledTimes(2)
     expect(notify).toHaveBeenLastCalledWith('worktree-1')
   })
@@ -79,22 +79,22 @@ describe('terminal output activity state', () => {
     const notify = vi.fn()
     const state = createTerminalOutputActivityState(notify)
 
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
     vi.advanceTimersByTime(2000)
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
     vi.advanceTimersByTime(3000)
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
 
-    expect(state.hasRecentOutput('session-1')).toBe(true)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(true)
     expect(notify).toHaveBeenCalledTimes(1)
 
     vi.advanceTimersByTime(1000)
     vi.setSystemTime(new Date('2026-06-29T00:00:00.000Z'))
     vi.advanceTimersByTime(3999)
-    expect(state.hasRecentOutput('session-1')).toBe(true)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(true)
 
     vi.advanceTimersByTime(1)
-    expect(state.hasRecentOutput('session-1')).toBe(false)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(false)
     expect(notify).toHaveBeenCalledTimes(2)
     expect(notify).toHaveBeenLastCalledWith('worktree-1')
   })
@@ -105,21 +105,21 @@ describe('terminal output activity state', () => {
     const notify = vi.fn()
     const state = createTerminalOutputActivityState(notify)
 
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
     vi.advanceTimersByTime(500)
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
     vi.advanceTimersByTime(4500)
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
 
-    expect(state.hasRecentOutput('session-1')).toBe(true)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(true)
     expect(notify).toHaveBeenCalledTimes(1)
 
     vi.advanceTimersByTime(4999)
-    expect(state.hasRecentOutput('session-1')).toBe(true)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(true)
     expect(notify).toHaveBeenCalledTimes(1)
 
     vi.advanceTimersByTime(1)
-    expect(state.hasRecentOutput('session-1')).toBe(false)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(false)
     expect(notify).toHaveBeenCalledTimes(2)
   })
 
@@ -129,24 +129,24 @@ describe('terminal output activity state', () => {
     const notify = vi.fn()
     const state = createTerminalOutputActivityState(notify)
 
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
     vi.advanceTimersByTime(2000)
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
     vi.advanceTimersByTime(3000)
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
 
-    expect(state.hasRecentOutput('session-1')).toBe(true)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(true)
     expect(notify).toHaveBeenCalledTimes(1)
 
     vi.advanceTimersByTime(1999)
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
     expect(notify).toHaveBeenCalledTimes(1)
 
     vi.advanceTimersByTime(4999)
-    expect(state.hasRecentOutput('session-1')).toBe(true)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(true)
 
     vi.advanceTimersByTime(1)
-    expect(state.hasRecentOutput('session-1')).toBe(false)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(false)
     expect(notify).toHaveBeenCalledTimes(2)
   })
 
@@ -156,33 +156,33 @@ describe('terminal output activity state', () => {
     const notify = vi.fn()
     const state = createTerminalOutputActivityState(notify)
 
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
     vi.advanceTimersByTime(2000)
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
     vi.advanceTimersByTime(3000)
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
     vi.advanceTimersByTime(5000)
 
-    expect(state.hasRecentOutput('session-1')).toBe(false)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(false)
     expect(notify).toHaveBeenCalledTimes(2)
 
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
     vi.advanceTimersByTime(2000)
-    state.markOutput('session-1', 'worktree-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
 
-    expect(state.hasRecentOutput('session-1')).toBe(false)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(false)
     expect(notify).toHaveBeenCalledTimes(2)
 
     vi.advanceTimersByTime(2999)
-    expect(state.hasRecentOutput('session-1')).toBe(false)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(false)
     expect(notify).toHaveBeenCalledTimes(2)
 
     vi.advanceTimersByTime(1)
-    expect(state.hasRecentOutput('session-1')).toBe(false)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(false)
     expect(notify).toHaveBeenCalledTimes(2)
 
-    state.markOutput('session-1', 'worktree-1')
-    expect(state.hasRecentOutput('session-1')).toBe(true)
+    state.markOutput('term-111111111111111111111', 'worktree-1')
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(true)
     expect(notify).toHaveBeenCalledTimes(3)
   })
 
@@ -192,11 +192,11 @@ describe('terminal output activity state', () => {
     const notify = vi.fn()
     const state = createTerminalOutputActivityState(notify)
 
-    state.markOutput('session-1', 'worktree-1')
-    state.remove('session-1')
+    state.markOutput('term-111111111111111111111', 'worktree-1')
+    state.remove('term-111111111111111111111')
     vi.advanceTimersByTime(5000)
 
-    expect(state.hasRecentOutput('session-1')).toBe(false)
+    expect(state.hasRecentOutput('term-111111111111111111111')).toBe(false)
     expect(notify).not.toHaveBeenCalled()
   })
 })

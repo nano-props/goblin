@@ -26,7 +26,7 @@ const closeTarget = {
 
 const terminalView: WorkspacePaneTerminalTabSummary = {
   type: 'terminal',
-  terminalSessionId: 'session-1',
+  terminalSessionId: 'term-111111111111111111111',
   terminalWorktreeKey: 'repo\0worktree',
   index: 1,
   title: 'Terminal 1',
@@ -44,15 +44,15 @@ describe('workspace pane runtime tab close actions', () => {
     expect(
       workspacePaneRuntimeTabCloseConfirmRequest({
         type: 'terminal',
-        identity: 'terminal:session-1',
-        sessionId: 'session-1',
+        identity: 'terminal:term-111111111111111111111',
+        sessionId: 'term-111111111111111111111',
         view: terminalView,
         target: closeTarget,
       }),
     ).toEqual({
       type: 'terminal',
-      identity: 'terminal:session-1',
-      sessionId: 'session-1',
+      identity: 'terminal:term-111111111111111111111',
+      sessionId: 'term-111111111111111111111',
       target: closeTarget,
       processName: 'node',
     })
@@ -62,8 +62,8 @@ describe('workspace pane runtime tab close actions', () => {
     expect(
       workspacePaneRuntimeTabCloseConfirmRequest({
         type: 'terminal',
-        identity: 'terminal:session-1',
-        sessionId: 'session-1',
+        identity: 'terminal:term-111111111111111111111',
+        sessionId: 'term-111111111111111111111',
         view: { ...terminalView, processName: 'zsh' },
         target: closeTarget,
       }),
@@ -75,22 +75,22 @@ describe('workspace pane runtime tab close actions', () => {
 
     await expect(
       confirmWorkspacePaneRuntimeTabClose(
-        { type: 'terminal', sessionId: 'session-1', target: closeTarget },
+        { type: 'terminal', sessionId: 'term-111111111111111111111', target: closeTarget },
         { byType: { terminal: { closeTerminalByDescriptor } } },
       ),
     ).resolves.toBe(true)
 
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-1', terminalBase)
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', terminalBase)
     expect(
       workspacePaneRuntimeTabConfirmedCloseBranchName({
         type: 'terminal',
-        sessionId: 'session-1',
+        sessionId: 'term-111111111111111111111',
         target: closeTarget,
       }),
     ).toBe('main')
     expect(
-      workspacePaneRuntimeTabConfirmedCloseIdentity({ type: 'terminal', sessionId: 'session-1', target: closeTarget }),
-    ).toBe('terminal:session-1')
+      workspacePaneRuntimeTabConfirmedCloseIdentity({ type: 'terminal', sessionId: 'term-111111111111111111111', target: closeTarget }),
+    ).toBe('terminal:term-111111111111111111111')
   })
 
   test('closes terminal worktree sessions through the runtime close registry', async () => {

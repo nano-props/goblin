@@ -816,7 +816,7 @@ describe('server terminal runtime', () => {
     expect(resolveRemoteTarget).toHaveBeenCalledWith({ alias: 'prod', remotePath: '/srv/repo' })
     expect(result.sessions).toEqual([
       expect.objectContaining({
-        terminalSessionId: expect.stringMatching(/^terminal-session-[A-Za-z0-9_-]{21}$/),
+        terminalSessionId: expect.stringMatching(/^term-[A-Za-z0-9_-]{21}$/),
         repoRoot: 'ssh-config://prod/srv/repo',
         worktreePath: '/srv/repo',
       }),

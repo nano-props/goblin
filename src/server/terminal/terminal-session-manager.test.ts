@@ -13,7 +13,7 @@ const CLIENT_ID = 'client_terminal_session_manager'
 const SCOPE = '/repo'
 const BRANCH_NAME = 'feature/test'
 const WORKTREE_PATH = '/repo'
-const TERMINAL_SESSION_ID = 'session-1'
+const TERMINAL_SESSION_ID = 'term-111111111111111111111'
 
 function createDeferredPtySupervisor(): PtySupervisor & {
   spawns: Array<(result: PtySpawnResult) => void>

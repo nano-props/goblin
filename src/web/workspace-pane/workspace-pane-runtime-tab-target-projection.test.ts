@@ -29,23 +29,23 @@ describe('workspace pane runtime tab target projection', () => {
         {
           type: 'terminal',
           targetKey: '/repo\0/repo-worktree',
-          views: [terminalView('session-1')],
-          selectedSessionId: 'session-1',
+          views: [terminalView('term-111111111111111111111')],
+          selectedSessionId: 'term-111111111111111111111',
           state: {
             createPending: true,
             projectionPhase: 'ready',
-            selectedSessionId: 'session-1',
+            selectedSessionId: 'term-111111111111111111111',
           },
         },
       ],
     })
 
-    expect(projection.runtimeTabViews).toEqual([terminalView('session-1')])
+    expect(projection.runtimeTabViews).toEqual([terminalView('term-111111111111111111111')])
     expect(projection.runtimeTabStateByType.terminal).toEqual({
       createPending: true,
       projectionPhase: 'ready',
       projectionErrorMessage: undefined,
-      selectedSessionId: 'session-1',
+      selectedSessionId: 'term-111111111111111111111',
     })
   })
 
@@ -74,7 +74,7 @@ describe('workspace pane runtime tab target projection', () => {
     const terminalWorktreeSnapshot = vi.fn(() => ({
       terminalWorktreeKey,
       selectedDescriptor: null,
-      sessions: [terminalView('session-1')],
+      sessions: [terminalView('term-111111111111111111111')],
       count: 1,
       bellCount: 0,
       outputActiveCount: 0,
@@ -83,12 +83,12 @@ describe('workspace pane runtime tab target projection', () => {
     useTerminalProjectionHydrationStore.getState().markProjectionReady('/repo', 'repo-instance-1')
     useReposStore.setState({
       selectedTerminalSessionIdByTerminalWorktree: {
-        [terminalWorktreeKey]: 'session-1',
+        [terminalWorktreeKey]: 'term-111111111111111111111',
       },
     })
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot,
-      createTerminal: vi.fn(async () => 'session-2'),
+      createTerminal: vi.fn(async () => 'term-222222222222222222222'),
       selectTerminal: vi.fn(),
     })
 
@@ -99,11 +99,11 @@ describe('workspace pane runtime tab target projection', () => {
     })
 
     expect(terminalWorktreeSnapshot).toHaveBeenCalledWith(terminalWorktreeKey)
-    expect(projection.runtimeTabViews).toEqual([terminalView('session-1')])
+    expect(projection.runtimeTabViews).toEqual([terminalView('term-111111111111111111111')])
     expect(projection.runtimeTabStateByType.terminal).toMatchObject({
       createPending: true,
       projectionPhase: 'ready',
-      selectedSessionId: 'session-1',
+      selectedSessionId: 'term-111111111111111111111',
     })
   })
 
@@ -113,18 +113,18 @@ describe('workspace pane runtime tab target projection', () => {
       terminalWorktreeSnapshot: vi.fn(() => ({
         terminalWorktreeKey,
         selectedDescriptor: null,
-        sessions: [terminalView('session-1'), terminalView('session-2')],
+        sessions: [terminalView('term-111111111111111111111'), terminalView('term-222222222222222222222')],
         count: 2,
         bellCount: 0,
         outputActiveCount: 0,
         createPending: false,
       })),
-      createTerminal: vi.fn(async () => 'session-3'),
+      createTerminal: vi.fn(async () => 'term-333333333333333333333'),
       selectTerminal: vi.fn(),
     })
     useReposStore.setState({
       selectedTerminalSessionIdByTerminalWorktree: {
-        [terminalWorktreeKey]: 'session-2',
+        [terminalWorktreeKey]: 'term-222222222222222222222',
       },
     })
 
@@ -134,7 +134,7 @@ describe('workspace pane runtime tab target projection', () => {
       worktreePath: '/repo-worktree',
     })
 
-    expect(projection.runtimeTabStateByType.terminal.selectedSessionId).toBe('session-2')
+    expect(projection.runtimeTabStateByType.terminal.selectedSessionId).toBe('term-222222222222222222222')
   })
 
   test('formats the current runtime target key', () => {

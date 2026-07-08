@@ -124,7 +124,7 @@ describe('shared terminal validators', () => {
           repoInstanceId: 'repo-instance-test',
           branchName: 'main',
           worktreePath: '/repo',
-          tabs: [{ type: 'terminal', runtimeSessionId: 'session-1' }],
+          tabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
         },
       }),
     ).toMatchObject({ type: 'request', action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace })
@@ -254,7 +254,7 @@ describe('shared terminal validators', () => {
       normalizeTerminalCreateResult({
         ok: true,
         action: 'created',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         tabs: [],
         sessions: [],
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
@@ -271,7 +271,7 @@ describe('shared terminal validators', () => {
       }),
     ).toMatchObject({
       ok: true,
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       snapshotSeq: 1,
       outputEra: 0,
@@ -281,7 +281,7 @@ describe('shared terminal validators', () => {
       normalizeTerminalCreateResult({
         ok: true,
         action: 'created',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         tabs: [],
         sessions: [],
       }),
@@ -298,7 +298,7 @@ describe('shared terminal validators', () => {
         type: 'output',
         event: {
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
-          terminalSessionId: 'session-1',
+          terminalSessionId: 'term-111111111111111111111',
           data: 'hi',
           seq: 1,
           outputEra: 0,
@@ -309,7 +309,7 @@ describe('shared terminal validators', () => {
       type: 'output',
       event: {
         terminalRuntimeSessionId: 'pty_1234567890abcdef',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         data: 'hi',
         seq: 1,
         outputEra: 0,
@@ -413,7 +413,7 @@ describe('shared terminal validators', () => {
         payload: {
           ok: true,
           action: 'created',
-          terminalSessionId: 'session-1',
+          terminalSessionId: 'term-111111111111111111111',
           tabs: [],
           sessions: [],
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
@@ -442,14 +442,14 @@ describe('shared terminal validators', () => {
       normalizeTerminalSocketServerMessage({
         type: 'session-closed',
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalSessionId: 'session-1',
+        terminalSessionId: 'term-111111111111111111111',
         repoRoot: '/repo',
         worktreePath: '/repo/worktree',
       }),
     ).toEqual({
       type: 'session-closed',
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-      terminalSessionId: 'session-1',
+      terminalSessionId: 'term-111111111111111111111',
       repoRoot: '/repo',
       worktreePath: '/repo/worktree',
     })

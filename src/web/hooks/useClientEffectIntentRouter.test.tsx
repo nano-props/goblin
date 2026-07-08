@@ -182,7 +182,7 @@ describe('useClientEffectIntentRouter', () => {
       ],
     })
     currentRepoId = repo.id
-    const terminalSessionId = 'session-2'
+    const terminalSessionId = 'term-222222222222222222222'
     const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, '/tmp/repo-feature')
 
     await renderHookHost()
@@ -219,7 +219,7 @@ describe('useClientEffectIntentRouter', () => {
       },
     }
     currentRepoId = repo.id
-    const terminalSessionId = 'session-2'
+    const terminalSessionId = 'term-222222222222222222222'
     const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, '/tmp/repo-feature')
 
     await renderHookHost()
@@ -375,7 +375,7 @@ describe('useClientEffectIntentRouter', () => {
         main: [
           workspacePaneStaticTabEntry('status'),
           workspacePaneStaticTabEntry('history'),
-          workspacePaneRuntimeTabEntry('terminal', 'session-1'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
         ],
       },
     })
@@ -383,10 +383,10 @@ describe('useClientEffectIntentRouter', () => {
     currentBranchName = 'main'
     currentWorkspacePaneRoute = { kind: 'static', tab: 'status' }
     const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, '/tmp/repo-worktree')
-    let visibleSessionIds = ['session-1']
-    useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'session-1')
+    let visibleSessionIds = ['term-111111111111111111111']
+    useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'term-111111111111111111111')
     const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
-      const terminalSessionId = 'session-2'
+      const terminalSessionId = 'term-222222222222222222222'
       const currentTabs = readWorkspacePaneTabsForTarget({
         repoRoot: base.repoRoot,
         repoInstanceId: base.repoInstanceId!,
@@ -422,9 +422,9 @@ describe('useClientEffectIntentRouter', () => {
       await Promise.resolve()
     })
 
-    expect(showRepoBranchTerminalSessionSpy).toHaveBeenCalledWith(repo.id, 'main', 'session-2')
+    expect(showRepoBranchTerminalSessionSpy).toHaveBeenCalledWith(repo.id, 'main', 'term-222222222222222222222')
 
-    currentWorkspacePaneRoute = { kind: 'terminal', terminalSessionId: 'session-2' }
+    currentWorkspacePaneRoute = { kind: 'terminal', terminalSessionId: 'term-222222222222222222222' }
     host.rerender(<HookHost />)
     showRepoBranchWorkspacePaneTabSpy.mockClear()
     showRepoBranchTerminalSessionSpy.mockClear()
@@ -435,7 +435,7 @@ describe('useClientEffectIntentRouter', () => {
       await Promise.resolve()
     })
 
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('session-2', {
+    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-222222222222222222222', {
       repoRoot: repo.id,
       repoInstanceId: repo.instanceId,
       branch: 'main',
