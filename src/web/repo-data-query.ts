@@ -11,6 +11,7 @@ interface CoalescedRepoRefetch {
 }
 
 const coalescedRepoRefetchesByClient = new WeakMap<QueryClient, Map<string, CoalescedRepoRefetch>>()
+const runtimeProjectionInvalidationVersionsByClient = new WeakMap<QueryClient, Map<string, number>>()
 
 export function repoProjectionQueryKey(
   repoRoot: string,
@@ -76,6 +77,37 @@ function coalescedRepoRefetchMap(queryClient: QueryClient): Map<string, Coalesce
     coalescedRepoRefetchesByClient.set(queryClient, map)
   }
   return map
+}
+
+function runtimeProjectionInvalidationKey(repoRoot: string, repoRuntimeId: string): string {
+  return `${repoRoot}\0${repoRuntimeId}`
+}
+
+function runtimeProjectionInvalidationVersionMap(queryClient: QueryClient): Map<string, number> {
+  let map = runtimeProjectionInvalidationVersionsByClient.get(queryClient)
+  if (!map) {
+    map = new Map()
+    runtimeProjectionInvalidationVersionsByClient.set(queryClient, map)
+  }
+  return map
+}
+
+export function getRepoRuntimeProjectionInvalidationVersion(
+  repoRoot: string,
+  repoRuntimeId: string,
+  queryClient: QueryClient = primaryWindowQueryClient,
+): number {
+  return runtimeProjectionInvalidationVersionMap(queryClient).get(runtimeProjectionInvalidationKey(repoRoot, repoRuntimeId)) ?? 0
+}
+
+function bumpRepoRuntimeProjectionInvalidationVersion(
+  repoRoot: string,
+  repoRuntimeId: string,
+  queryClient: QueryClient,
+): void {
+  const map = runtimeProjectionInvalidationVersionMap(queryClient)
+  const key = runtimeProjectionInvalidationKey(repoRoot, repoRuntimeId)
+  map.set(key, (map.get(key) ?? 0) + 1)
 }
 
 function markRepoQueryKeysInvalidated(queryClient: QueryClient, queryKeys: ReadonlyArray<readonly unknown[]>): void {
@@ -414,6 +446,7 @@ export async function refreshRepoProjectionReadModel(
   let projection: RepoRuntimeProjection
   for (;;) {
     let invalidatedDuringFetch = false
+    const startedInvalidationVersion = getRepoRuntimeProjectionInvalidationVersion(repoRoot, repoRuntimeId, queryClient)
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
       if (event.type !== 'updated') return
       if (event.action.type !== 'invalidate') return
@@ -435,7 +468,13 @@ export async function refreshRepoProjectionReadModel(
       unsubscribe()
     }
     options.signal?.throwIfAborted()
-    if (!invalidatedDuringFetch && queryClient.getQueryState(queryOptions.queryKey)?.isInvalidated !== true) break
+    if (
+      !invalidatedDuringFetch &&
+      getRepoRuntimeProjectionInvalidationVersion(repoRoot, repoRuntimeId, queryClient) === startedInvalidationVersion &&
+      queryClient.getQueryState(queryOptions.queryKey)?.isInvalidated !== true
+    ) {
+      break
+    }
     await queryClient.invalidateQueries({ queryKey: queryOptions.queryKey, exact: true, refetchType: 'none' })
     options.signal?.throwIfAborted()
   }
@@ -458,6 +497,7 @@ export function invalidateRepoRuntimeProjectionQueries(
   repoRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
+  bumpRepoRuntimeProjectionInvalidationVersion(repoRoot, repoRuntimeId, queryClient)
   requestCoalescedActiveRepoRefetch(queryClient, `repo-runtime:${repoRoot}\0${repoRuntimeId}`, [
     repoProjectionQueryPrefix(repoRoot, repoRuntimeId),
     repoOperationsQueryPrefix(repoRoot, repoRuntimeId),

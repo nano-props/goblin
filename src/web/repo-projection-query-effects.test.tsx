@@ -108,12 +108,20 @@ describe('repo projection query effects', () => {
       setRepoOperationsQueryData('/repo', repo.repoRuntimeId, false, { operations: [], loadedAt: 1 }, queryClient)
       expect(pruneTerminals).not.toHaveBeenCalled()
 
-      releases[1]!(projection(2, 'fresh'))
+      invalidateRepoRuntimeProjectionQueries('/repo', repo.repoRuntimeId, queryClient)
+      releases[1]!(projection(2, 'stale-rerun'))
+      await vi.waitFor(() => {
+        expect(releases).toHaveLength(3)
+      })
+      expect(pruneTerminals).not.toHaveBeenCalled()
+      expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(1)
+
+      releases[2]!(projection(3, 'fresh'))
       await vi.waitFor(() => {
         expect(pruneTerminals).toHaveBeenCalledTimes(1)
         expect(useReposStore.getState().repos['/repo']?.projection.source).toBe('fresh')
-        expect(useReposStore.getState().repos['/repo']?.dataLoads.repoReadModel.loadedAt).toBe(2)
-        expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(2)
+        expect(useReposStore.getState().repos['/repo']?.dataLoads.repoReadModel.loadedAt).toBe(3)
+        expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(3)
       })
     } finally {
       unsubscribe()

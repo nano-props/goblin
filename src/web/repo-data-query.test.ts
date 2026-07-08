@@ -489,6 +489,41 @@ describe('repo projection query data', () => {
       queryClient.clear()
     }
   })
+
+  test('imperative projection refresh reruns after invalidation of an already invalidated cached query', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const releases: Array<(projection: RepoRuntimeProjection) => void> = []
+    setRepoProjectionQueryData('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', repoProjectionForTest(0), queryClient)
+    repoClientMocks.getRepoProjection.mockImplementation(
+      () =>
+        new Promise<RepoRuntimeProjection>((resolve) => {
+          releases.push(resolve)
+        }),
+    )
+
+    try {
+      const refresh = refreshRepoProjectionReadModel('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', { queryClient })
+      await vi.waitFor(() => {
+        expect(releases).toHaveLength(1)
+      })
+      expect(
+        queryClient.getQueryState(repoProjectionQueryKey('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full'))
+          ?.isInvalidated,
+      ).toBe(true)
+
+      invalidateRepoRuntimeProjectionQueries('/tmp/repo', 'repo-runtime-1', queryClient)
+      releases[0]!(repoProjectionForTest(1))
+      await vi.waitFor(() => {
+        expect(releases).toHaveLength(2)
+      })
+
+      releases[1]!(repoProjectionForTest(2))
+      await expect(refresh).resolves.toMatchObject({ loadedAt: 2 })
+      expect(getRepoOperationsQueryData('/tmp/repo', 'repo-runtime-1', queryClient)?.loadedAt).toBe(2)
+    } finally {
+      queryClient.clear()
+    }
+  })
 })
 
 function repoProjectionForTest(loadedAt: number): RepoRuntimeProjection {
