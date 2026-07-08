@@ -159,4 +159,48 @@ describe('repo projection read-model effects', () => {
       loadedAt: projection.loadedAt,
     })
   })
+
+  test('duplicate core projection acceptance from operations-only rewrites does not settle visible status', () => {
+    const repo = seedRepoShellForTest({
+      id: '/repo',
+      repoRuntimeId: 'repo-runtime-test-2',
+      currentBranchName: 'feature/a',
+    })
+    const projection = acceptedProjection()
+
+    acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {
+      repoRoot: '/repo',
+      repoRuntimeId: repo.repoRuntimeId,
+      projection,
+    })
+    useReposStore.setState((state) => {
+      const current = state.repos['/repo']!
+      return {
+        repos: {
+          ...state.repos,
+          '/repo': {
+            ...current,
+            dataLoads: {
+              ...current.dataLoads,
+              visibleStatus: { phase: 'loading', loadedAt: null, error: null, stale: false },
+            },
+          },
+        },
+      }
+    })
+
+    acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {
+      repoRoot: '/repo',
+      repoRuntimeId: repo.repoRuntimeId,
+      projection: {
+        ...projection,
+        operations: { operations: [], loadedAt: projection.operations.loadedAt + 1 },
+      },
+    })
+
+    expect(useReposStore.getState().repos['/repo']?.dataLoads.visibleStatus).toMatchObject({
+      phase: 'loading',
+      loadedAt: null,
+    })
+  })
 })

@@ -78,15 +78,18 @@ export function acceptRepoProjectionReadModel(
   const coreReadModel = projection.requested.branch === null
   const repoBefore = get().repos[repoRoot]
   if (!repoBefore || repoBefore.repoRuntimeId !== repoRuntimeId) return
-  const settleVisibleStatus = options.settleVisibleStatus ?? coreReadModel
+  const explicitVisibleStatusSettle = options.settleVisibleStatus === true
+  const settleVisibleStatus = explicitVisibleStatusSettle || (options.settleVisibleStatus === undefined && coreReadModel)
+  if (!projection.snapshot && !coreReadModel && !settleVisibleStatus) return
+  const accepted = markProjectionAccepted(input)
+  if (!accepted && !explicitVisibleStatusSettle) return
   if (settleVisibleStatus) {
     updateIfFresh(set, repoRoot, repoRuntimeId, (repo) => {
       if (projection.snapshot) finishDataLoadSuccess(repo.dataLoads.visibleStatus, projection.loadedAt)
       else finishDataLoadError(repo.dataLoads.visibleStatus, 'error.failed-read-repo')
     })
   }
-  if (!projection.snapshot && !coreReadModel && !settleVisibleStatus) return
-  if (!markProjectionAccepted(input)) return
+  if (!accepted) return
 
   if (!projection.snapshot) {
     updateIfFresh(set, repoRoot, repoRuntimeId, (repo) => {
