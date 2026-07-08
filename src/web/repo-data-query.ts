@@ -487,6 +487,7 @@ export function invalidateRepoDataQueries(
   repoRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
+  bumpRepoRuntimeProjectionInvalidationVersion(repoRoot, repoRuntimeId, queryClient)
   requestCoalescedActiveRepoRefetch(queryClient, `repo-data:${repoRoot}\0${repoRuntimeId}`, [
     repoDataQueryKey(repoRoot, repoRuntimeId),
   ])
