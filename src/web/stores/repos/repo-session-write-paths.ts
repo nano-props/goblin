@@ -8,18 +8,18 @@ import { disposeRepoOperationScheduler } from '#/web/stores/repos/repo-operation
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
   abortRepoOperation,
-  closeRepoRuntimeInstance,
+  closeRepoRuntime,
   openRepoRuntimeForInput,
-  openRepoRuntimeInstance,
+  openRepoRuntime,
   probeRepo,
 } from '#/web/repo-client.ts'
 import { resolveRemoteRepositoryTarget } from '#/web/remote-client.ts'
 import { recordRecentRepo } from '#/web/settings-actions.ts'
 import {
-  invalidateRepoRuntimeInstances,
-  removeRepoRuntimeInstanceFromCache,
-  refreshRepoRuntimeInstances,
-  updateRepoRuntimeInstanceCache,
+  invalidateRepoRuntimes,
+  removeRepoRuntimeFromCache,
+  refreshRepoRuntimes,
+  updateRepoRuntimeCache,
 } from '#/web/repo-runtime-query.ts'
 import { clearWorkspacePaneTabsProjectionState } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { reposLog } from '#/web/logger.ts'
@@ -66,12 +66,12 @@ export interface RuntimeOpenResolvedRepo {
   input: string
   reason: string | null
   repo: ResolvedRepo | null
-  repoInstanceId: string | null
+  repoRuntimeId: string | null
 }
 
 export interface InitialRepoRefresh {
   id: string
-  repoInstanceId: string
+  repoRuntimeId: string
 }
 
 function sessionEntryFromInput(input: string | RepoSessionEntry): RepoSessionEntry {
@@ -128,34 +128,34 @@ export async function openLocalRepoRuntimeForInput(input: string | RepoSessionEn
       input: opened.input,
       reason: opened.reason,
       repo: null,
-      repoInstanceId: null,
+      repoRuntimeId: null,
     }
   }
-  await updateRepoRuntimeInstanceCache({ repoRoot: opened.repo.id, repoInstanceId: opened.repoInstanceId })
+  await updateRepoRuntimeCache({ repoRoot: opened.repo.id, repoRuntimeId: opened.repoRuntimeId })
   return {
     input: entry.id,
     reason: null,
     repo: opened.repo,
-    repoInstanceId: opened.repoInstanceId,
+    repoRuntimeId: opened.repoRuntimeId,
   }
 }
 
-export async function openRepoRuntimeInstanceWithCache(repoRoot: string): Promise<string> {
-  const repoInstanceId = await openRepoRuntimeInstance(repoRoot)
-  await updateRepoRuntimeInstanceCache({ repoRoot, repoInstanceId })
-  return repoInstanceId
+export async function openRepoRuntimeWithCache(repoRoot: string): Promise<string> {
+  const repoRuntimeId = await openRepoRuntime(repoRoot)
+  await updateRepoRuntimeCache({ repoRoot, repoRuntimeId })
+  return repoRuntimeId
 }
 
-export async function closeRepoRuntimeInstanceWithCache(repoRoot: string, repoInstanceId: string): Promise<void> {
+export async function closeRepoRuntimeWithCache(repoRoot: string, repoRuntimeId: string): Promise<void> {
   try {
-    const closed = await closeRepoRuntimeInstance(repoRoot, repoInstanceId)
-    if (closed) await removeRepoRuntimeInstanceFromCache({ repoRoot, repoInstanceId })
-    else await refreshRepoRuntimeInstances()
+    const closed = await closeRepoRuntime(repoRoot, repoRuntimeId)
+    if (closed) await removeRepoRuntimeFromCache({ repoRoot, repoRuntimeId })
+    else await refreshRepoRuntimes()
   } catch (err) {
-    await refreshRepoRuntimeInstances()
+    await refreshRepoRuntimes()
     throw err
   } finally {
-    clearWorkspacePaneTabsProjectionState(repoRoot, repoInstanceId)
+    clearWorkspacePaneTabsProjectionState(repoRoot, repoRuntimeId)
   }
 }
 
@@ -218,13 +218,13 @@ function buildNewRepo(
   s: Pick<ReposStore, 'repoSnapshotCache'>,
   id: string,
   nameHints: ReadonlyArray<string | undefined | null>,
-  instanceId: string,
+  repoRuntimeId: string,
 ): RepoState {
   const cached = s.repoSnapshotCache[id]
   const hint = nameHints.find((value): value is string => !!value)
   const name = hint ?? cached?.name ?? lastPathSegment(id)
-  seedRepoProjectionQueryFromCacheEntry(id, instanceId, cached)
-  const repo = restoreRepoProjectionFromCacheEntry(emptyRepo(id, name, instanceId), cached)
+  seedRepoProjectionQueryFromCacheEntry(id, repoRuntimeId, cached)
+  const repo = restoreRepoProjectionFromCacheEntry(emptyRepo(id, name, repoRuntimeId), cached)
   return hint ? { ...repo, name: hint } : repo
 }
 
@@ -282,13 +282,13 @@ function upsertRepo(
 export function addResolvedRepo(
   s: Pick<ReposStore, 'repos' | 'repoSnapshotCache' | 'order'>,
   resolvedRepo: ResolvedRepo,
-  instanceId: string,
+  repoRuntimeId: string,
   rankById?: ReadonlyMap<string, number>,
 ): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean; id: string } {
   return upsertRepo(s, resolvedRepo.id, {
     rankById,
     create: () => {
-      const repo = buildNewRepo(s, resolvedRepo.id, [resolvedRepo.name], instanceId)
+      const repo = buildNewRepo(s, resolvedRepo.id, [resolvedRepo.name], repoRuntimeId)
       // Local resolves carry no target, so `lifecycle` stays null
       // (emptyRepo's default). Remote resolves with a target settle
       // to 'ready'. The `addResolvedRepo` write path is only ever
@@ -298,13 +298,13 @@ export function addResolvedRepo(
       return repo
     },
     update: (existing) => {
-      const instanceChanged = existing.instanceId !== instanceId
+      const instanceChanged = existing.repoRuntimeId !== repoRuntimeId
       const nameChanged = resolvedRepo.name.length > 0 && existing.name !== resolvedRepo.name
       if (!resolvedRepo.target) {
         if (!instanceChanged) return null
         return {
           ...existing,
-          instanceId,
+          repoRuntimeId,
         }
       }
       const lifecycleReady = existing.remote.lifecycle?.kind === 'ready'
@@ -319,7 +319,7 @@ export function addResolvedRepo(
       // equality alone does not prove the repo is already ready.
       const next: RepoState = {
         ...existing,
-        instanceId: instanceChanged ? instanceId : existing.instanceId,
+        repoRuntimeId: instanceChanged ? repoRuntimeId : existing.repoRuntimeId,
         name: nameChanged ? resolvedRepo.name : existing.name,
         remote: { ...existing.remote },
       }
@@ -344,21 +344,21 @@ export function addUnavailableRepo(
   s: Pick<ReposStore, 'repos' | 'repoSnapshotCache' | 'order'>,
   id: string,
   reason: string,
-  instanceId: string,
+  repoRuntimeId: string,
   target?: RemoteRepoTarget,
   rankById?: ReadonlyMap<string, number>,
 ): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean; id: string } {
   return upsertRepo(s, id, {
     rankById,
     create: () => {
-      const repo = buildNewRepo(s, id, [target?.displayName], instanceId)
+      const repo = buildNewRepo(s, id, [target?.displayName], repoRuntimeId)
       // New repo: write the failed lifecycle (with last-known target
       // if the probe got far enough to resolve one).
       markRemoteLifecycleFailed(repo, reason, target)
       return repo
     },
     update: (existing) => {
-      const instanceChanged = existing.instanceId !== instanceId
+      const instanceChanged = existing.repoRuntimeId !== repoRuntimeId
       // Existing repo: refresh the failed lifecycle with the new
       // reason. Preserve the last-known target if the new failure
       // didn't pin down a fresh one — the user can still see the
@@ -369,7 +369,7 @@ export function addUnavailableRepo(
       const retainedTarget = target ?? remoteRepoConnectionTarget(existing.remote.lifecycle) ?? undefined
       const next: RepoState = {
         ...existing,
-        instanceId: instanceChanged ? instanceId : existing.instanceId,
+        repoRuntimeId: instanceChanged ? repoRuntimeId : existing.repoRuntimeId,
         remote: { ...existing.remote },
       }
       markRemoteLifecycleFailed(next, reason, retainedTarget)
@@ -397,14 +397,14 @@ export function addUnavailableRepo(
 export function insertPlaceholderRepo(
   s: Pick<ReposStore, 'repos' | 'repoSnapshotCache' | 'order'>,
   entry: RepoSessionEntry,
-  instanceId: string,
+  repoRuntimeId: string,
   rankById?: ReadonlyMap<string, number>,
 ): Pick<ReposStore, 'repos' | 'order'> & { changed: boolean; id: string } {
   return upsertRepo(s, entry.id, {
     rankById,
     create: () => {
       const fallbackName = entry.kind === 'remote' ? entry.ref.displayName : null
-      const repo = buildNewRepo(s, entry.id, [fallbackName], instanceId)
+      const repo = buildNewRepo(s, entry.id, [fallbackName], repoRuntimeId)
       // Placeholders exist only to occupy the repo switcher slot during a
       // remote-repo lifecycle run. For a local placeholder the
       // lifecycle stays null (local repos don't have one); for a
@@ -425,12 +425,12 @@ export function insertPlaceholderRepo(
 
 export function refreshInitialRepoState(get: ReposGet, refresh: InitialRepoRefresh) {
   const repo = get().repos[refresh.id]
-  if (!repo || repo.instanceId !== refresh.repoInstanceId) return
+  if (!repo || repo.repoRuntimeId !== refresh.repoRuntimeId) return
   void runRepoRefreshIntent(get, {
     kind: 'core-data-changed',
     reason: 'initial-load',
     id: refresh.id,
-    repoInstanceId: refresh.repoInstanceId,
+    repoRuntimeId: refresh.repoRuntimeId,
   })
 }
 
@@ -452,12 +452,12 @@ export function createRuntimeRepoSessionActions(
         // store entry; the orchestrator will fill in target +
         // trigger refresh on settle.
         if (!get().repos[entry.id]) {
-          const instanceId = await openRepoRuntimeInstanceWithCache(entry.id)
+          const repoRuntimeId = await openRepoRuntimeWithCache(entry.id)
           set((s) => {
             const result = insertPlaceholderRepo(
               { repos: s.repos, repoSnapshotCache: s.repoSnapshotCache, order: s.order },
               entry,
-              instanceId,
+              repoRuntimeId,
             )
             return { ...s, repos: result.repos, order: result.order }
           })
@@ -473,22 +473,22 @@ export function createRuntimeRepoSessionActions(
       // Local repos use the direct runtime-open path — there's no remote
       // lifecycle to converge and no orchestrator concern.
       const resolved = await openLocalRepoRuntimeForInput(entry)
-      if (!resolved.repo || !resolved.repoInstanceId)
+      if (!resolved.repo || !resolved.repoRuntimeId)
         return { ok: false, message: resolved.reason ?? 'error.not-git-repo' }
       const repo = resolved.repo
       const { id } = repo
-      const instanceId = resolved.repoInstanceId
+      const repoRuntimeId = resolved.repoRuntimeId
       let initialRefresh: InitialRepoRefresh | null = null
       const recentEntry = repo.target ? remoteRepoSessionEntry(repo.target) : { kind: 'local' as const, id }
 
       set((s) => {
-        const { repos, order, changed } = addResolvedRepo(s, repo, instanceId)
+        const { repos, order, changed } = addResolvedRepo(s, repo, repoRuntimeId)
         // Only kick off an initial refresh when the resolved probe
         // actually changed the store (new repo, or existing placeholder
         // got a new target). A matching target is a no-op set and the
         // cached data is already coherent — re-running the snapshot/
         // status pipeline would just duplicate the in-flight work.
-        if (changed) initialRefresh = { id, repoInstanceId: repos[id]!.instanceId }
+        if (changed) initialRefresh = { id, repoRuntimeId: repos[id]!.repoRuntimeId }
         return changed ? { repos, order } : s
       })
 
@@ -497,7 +497,7 @@ export function createRuntimeRepoSessionActions(
     },
 
     closeRepo(id: string) {
-      const repoInstanceId = get().repos[id]?.instanceId ?? null
+      const repoRuntimeId = get().repos[id]?.repoRuntimeId ?? null
       disposeRepoOperationScheduler(id)
       // Tell main to abort any cancellable network op for this repo —
       // otherwise a `git push` started right before the user closed the
@@ -507,13 +507,13 @@ export function createRuntimeRepoSessionActions(
         /* main may have nothing to abort — ignore */
       })
       set((s) => removeRepoFromSessionState(s, id))
-      if (typeof repoInstanceId === 'string') {
-        void closeRepoRuntimeInstanceWithCache(id, repoInstanceId).catch((err) => {
-          reposLog.warn('failed to close repo runtime instance', { id, repoInstanceId, err })
-          void invalidateRepoRuntimeInstances().catch((refreshErr) => {
+      if (typeof repoRuntimeId === 'string') {
+        void closeRepoRuntimeWithCache(id, repoRuntimeId).catch((err) => {
+          reposLog.warn('failed to close repo runtime', { id, repoRuntimeId, err })
+          void invalidateRepoRuntimes().catch((refreshErr) => {
             reposLog.warn('failed to refresh repo runtime membership after close failure', {
               id,
-              repoInstanceId,
+              repoRuntimeId,
               err: refreshErr,
             })
           })

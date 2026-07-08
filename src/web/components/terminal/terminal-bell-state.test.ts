@@ -12,7 +12,7 @@ const descriptor: TerminalDescriptor = {
   terminalWorktreeKey: 'worktree-key',
   index: 1,
   repoRoot: '/tmp/repo',
-  repoInstanceId: 'repo-instance-test',
+  repoRuntimeId: 'repo-runtime-test',
   branch: 'feature/test',
   worktreePath: '/tmp/repo-worktree',
 }

@@ -47,7 +47,7 @@ export interface TerminalEnsureSessionInput<TUser extends string | number> {
   userId: TUser
   scope: string
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   branch: string
   terminalSessionId: string
   worktreePath: string
@@ -63,7 +63,7 @@ export interface TerminalEnsureSessionInput<TUser extends string | number> {
 
 interface TerminalSessionView<TUser extends string | number> extends TerminalPtySessionState<TUser> {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   scope: string
   branch: string
   terminalSessionId: string
@@ -142,7 +142,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       id,
       userId,
       repoRoot: input.repoRoot,
-      repoInstanceId: input.repoInstanceId,
+      repoRuntimeId: input.repoRuntimeId,
       scope: input.scope,
       branch: input.branch,
       terminalSessionId: input.terminalSessionId,
@@ -353,7 +353,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       this.sessionsForWorktreeTabs(userId, scope, worktreePath, sessions).map((session) => ({
         terminalRuntimeSessionId: session.id,
         terminalSessionId: session.terminalSessionId,
-        repoInstanceId: session.repoInstanceId,
+        repoRuntimeId: session.repoRuntimeId,
         repoRoot: session.repoRoot,
         branch: session.branch,
         worktreePath: session.worktreePath,
@@ -441,7 +441,7 @@ export class TerminalSessionManager<TUser extends string | number> {
     return {
       terminalRuntimeSessionId: session.id,
       terminalSessionId: session.terminalSessionId,
-      repoInstanceId: session.repoInstanceId,
+      repoRuntimeId: session.repoRuntimeId,
       repoRoot: session.repoRoot,
       branch: session.branch,
       worktreePath: session.worktreePath,

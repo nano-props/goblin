@@ -13,7 +13,7 @@ import { terminalClient } from '#/web/terminal.ts'
 // client-side state surface to keep in sync with the projection.
 export async function loadTerminalSessions(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
 ): Promise<TerminalSessionSummary[]> {
-  return await terminalClient.listSessions({ repoRoot, repoInstanceId })
+  return await terminalClient.listSessions({ repoRoot, repoRuntimeId })
 }

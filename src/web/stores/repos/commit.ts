@@ -3,10 +3,10 @@ import type { ExecResult } from '#/web/types.ts'
 import type { RepoResultEventOptions, ReposSet } from '#/web/stores/repos/types.ts'
 export function createCommitActions(set: ReposSet) {
   return {
-    setLastResult(id: string, result: ExecResult, repoInstanceId: string, options?: RepoResultEventOptions) {
+    setLastResult(id: string, result: ExecResult, repoRuntimeId: string, options?: RepoResultEventOptions) {
       set((s) => {
         const repo = s.repos[id]
-        if (!repo || repo.instanceId !== repoInstanceId) return s
+        if (!repo || repo.repoRuntimeId !== repoRuntimeId) return s
         return replaceRepoState(s, repo, (r) => {
           r.events = appendRepoEvent(r.events, resultEvent(result, options))
         })
@@ -27,10 +27,10 @@ export function createCommitActions(set: ReposSet) {
       })
     },
 
-    clearFetchFailed(id: string, repoInstanceId: string) {
+    clearFetchFailed(id: string, repoRuntimeId: string) {
       set((s) => {
         const repo = s.repos[id]
-        if (!repo || repo.instanceId !== repoInstanceId) return s
+        if (!repo || repo.repoRuntimeId !== repoRuntimeId) return s
         if (!repo.remote.fetchFailed) return s
         return replaceRepoState(s, repo, (r) => {
           r.remote.fetchFailed = false

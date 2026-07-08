@@ -6,7 +6,7 @@ import { invalidateRepoDataQueries, invalidateRepoRuntimeProjectionQueries } fro
 
 interface RepoRefreshIntentBase {
   id: string
-  repoInstanceId: string
+  repoRuntimeId: string
 }
 
 type CoreRepoRefreshReason = 'initial-load' | 'branch-action'
@@ -22,7 +22,7 @@ export type RepoRefreshIntent =
 
 export interface RepoVisibleProjectionRefreshState {
   id: string
-  repoInstanceId: string
+  repoRuntimeId: string
   preferredWorkspacePaneTab: WorkspacePaneTabType | null
   renderedWorkspacePaneTab: WorkspacePaneTabType | null
   branchName: string | null
@@ -42,14 +42,14 @@ function isRepoStateVisibleProjectionRefreshable(repo: RepoState): boolean {
 async function runVisibleRuntimeProjectionRefresh(
   get: ReposGet,
   id: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
   branchName: string | null,
 ): Promise<void> {
   const state = get()
   const repo = state.repos[id]
-  if (!repo || repo.instanceId !== repoInstanceId) return
+  if (!repo || repo.repoRuntimeId !== repoRuntimeId) return
   if (!isRepoStateVisibleProjectionRefreshable(repo)) return
-  await state.refreshRuntimeProjection(id, { repoInstanceId, scope: 'visible-status', branchName })
+  await state.refreshRuntimeProjection(id, { repoRuntimeId, scope: 'visible-status', branchName })
 }
 
 export function requestVisibleRepoProjectionRefresh(get: ReposGet, id: string, branchName: string | null): void {
@@ -59,7 +59,7 @@ export function requestVisibleRepoProjectionRefresh(get: ReposGet, id: string, b
     kind: 'visible-runtime-projection-requested',
     reason: 'visible-projection-view-opened',
     id,
-    repoInstanceId: repo.instanceId,
+    repoRuntimeId: repo.repoRuntimeId,
     branchName,
   })
 }
@@ -67,17 +67,17 @@ export function requestVisibleRepoProjectionRefresh(get: ReposGet, id: string, b
 export async function handleRepoInvalidationRefresh(
   get: ReposGet,
   event: Pick<RepoQueryInvalidationEvent, 'repoId' | 'query'>,
-  repoInstanceId: string,
+  repoRuntimeId: string,
 ): Promise<void> {
   const repoId = event.repoId
   const repo = get().repos[repoId]
-  if (!repo || repo.instanceId !== repoInstanceId || isRepoUnavailable(repo)) return
+  if (!repo || repo.repoRuntimeId !== repoRuntimeId || isRepoUnavailable(repo)) return
   if (event.query === 'repo-runtime') {
-    invalidateRepoRuntimeProjectionQueries(repoId, repoInstanceId)
+    invalidateRepoRuntimeProjectionQueries(repoId, repoRuntimeId)
     return
   }
-  invalidateRepoDataQueries(repoId, repoInstanceId)
-  await get().refreshCoreData(repoId, { repoInstanceId })
+  invalidateRepoDataQueries(repoId, repoRuntimeId)
+  await get().refreshCoreData(repoId, { repoRuntimeId })
 }
 
 export function resetRepoRefreshCoordinatorState(): void {}
@@ -85,13 +85,13 @@ export function resetRepoRefreshCoordinatorState(): void {}
 export async function runRepoRefreshIntent(get: ReposGet, intent: RepoRefreshIntent): Promise<void> {
   switch (intent.kind) {
     case 'manual-refresh-requested':
-      await get().syncAndRefresh(intent.id, { repoInstanceId: intent.repoInstanceId })
+      await get().syncAndRefresh(intent.id, { repoRuntimeId: intent.repoRuntimeId })
       return
     case 'core-data-changed':
-      await get().refreshCoreData(intent.id, { repoInstanceId: intent.repoInstanceId })
+      await get().refreshCoreData(intent.id, { repoRuntimeId: intent.repoRuntimeId })
       return
     case 'visible-runtime-projection-requested':
-      await runVisibleRuntimeProjectionRefresh(get, intent.id, intent.repoInstanceId, intent.branchName)
+      await runVisibleRuntimeProjectionRefresh(get, intent.id, intent.repoRuntimeId, intent.branchName)
       return
   }
   const exhaustive: never = intent

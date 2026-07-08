@@ -20,7 +20,7 @@ describe('repo refresh workflows', () => {
     installGoblinTestBridge({})
     const repo = seedRepoShellForTest({
       id: '/repo',
-      instanceId: 'repo-instance-test-2',
+      repoRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
     })
     seedRepoReadModelQueryData(repo, {
@@ -30,7 +30,7 @@ describe('repo refresh workflows', () => {
 
     await runSnapshotSuccessWorkflow(useReposStore.setState, useReposStore.getState, {
       id: '/repo',
-      repoInstanceId: repo.instanceId,
+      repoRuntimeId: repo.repoRuntimeId,
       isSnapshotCurrent: () => true,
     })
 
@@ -51,7 +51,7 @@ describe('repo refresh workflows', () => {
     })
     const repo = seedRepoShellForTest({
       id: '/repo',
-      instanceId: 'repo-instance-test-2',
+      repoRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
     })
     seedRepoReadModelQueryData(repo, {
@@ -62,7 +62,7 @@ describe('repo refresh workflows', () => {
     await expect(
       runSnapshotSuccessWorkflow(useReposStore.setState, useReposStore.getState, {
         id: '/repo',
-        repoInstanceId: repo.instanceId,
+        repoRuntimeId: repo.repoRuntimeId,
         isSnapshotCurrent: () => true,
       }),
     ).resolves.toBeUndefined()
@@ -75,7 +75,7 @@ describe('repo refresh workflows', () => {
     })
     const repo = seedRepoShellForTest({
       id: '/repo',
-      instanceId: 'repo-instance-test-2',
+      repoRuntimeId: 'repo-runtime-test-2',
       currentBranchName: 'feature/a',
     })
     seedRepoReadModelQueryData(repo, {
@@ -85,7 +85,7 @@ describe('repo refresh workflows', () => {
 
     await runSnapshotSuccessWorkflow(useReposStore.setState, useReposStore.getState, {
       id: '/repo',
-      repoInstanceId: repo.instanceId,
+      repoRuntimeId: repo.repoRuntimeId,
       isSnapshotCurrent: () => false,
     })
 

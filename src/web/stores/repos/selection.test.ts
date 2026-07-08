@@ -67,7 +67,7 @@ function seedRepo(options: {
 }
 
 function seedRepoShellWithoutBranchReadModel(): void {
-  const repo = emptyRepo(REPO_ID, 'selection-test-repo', 'repo-instance-selection-no-query')
+  const repo = emptyRepo(REPO_ID, 'selection-test-repo', 'repo-runtime-selection-no-query')
   useReposStore.setState((s) => ({
     repos: { ...s.repos, [REPO_ID]: repo },
     order: [...s.order, REPO_ID],
@@ -83,7 +83,7 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
       ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branchName)
       : null
   return workspacePaneStaticTabsFromEntries(
-    target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : [],
+    target ? readWorkspacePaneTabsForTarget({ ...target, repoRuntimeId: repo.repoRuntimeId }) : [],
   )
 }
 

@@ -124,7 +124,7 @@ describe('BranchList', () => {
 })
 
 function branchListRepo(branches: ReturnType<typeof createRepoBranch>[], currentBranch: string) {
-  return repoPresentationForTest(emptyRepo('/tmp/repo', 'repo', 'repo-instance-test'), {
+  return repoPresentationForTest(emptyRepo('/tmp/repo', 'repo', 'repo-runtime-test'), {
     branches,
     currentBranch,
     status: [],

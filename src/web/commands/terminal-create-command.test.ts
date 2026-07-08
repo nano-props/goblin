@@ -7,7 +7,7 @@ import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.t
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 
 const REPO_ID = '/tmp/gbl-terminal-create-command-repo'
-const REPO_INSTANCE_ID = 'repo-instance-terminal-create-command'
+const REPO_RUNTIME_ID = 'repo-runtime-terminal-create-command'
 const WORKTREE_PATH = '/tmp/gbl-terminal-create-command-worktree'
 const WORKTREE_KEY = formatTerminalWorktreeKey(REPO_ID, WORKTREE_PATH)
 
@@ -17,7 +17,7 @@ beforeEach(() => {
   seedRepoWithReadModelForTest({
     id: REPO_ID,
     name: 'terminal-create-command-repo',
-    instanceId: REPO_INSTANCE_ID,
+    repoRuntimeId: REPO_RUNTIME_ID,
     branches: [createRepoBranch('main', { worktree: { path: WORKTREE_PATH } })],
     currentBranchName: 'main',
   })
@@ -36,7 +36,7 @@ describe('terminal create command', () => {
       runCreateTerminalTabCommand({
         base: {
           repoRoot: REPO_ID,
-          repoInstanceId: REPO_INSTANCE_ID,
+          repoRuntimeId: REPO_RUNTIME_ID,
           branch: 'main',
           worktreePath: WORKTREE_PATH,
         },
@@ -61,7 +61,7 @@ describe('terminal create command', () => {
       runCreateTerminalTabCommand({
         base: {
           repoRoot: REPO_ID,
-          repoInstanceId: REPO_INSTANCE_ID,
+          repoRuntimeId: REPO_RUNTIME_ID,
           branch: 'main',
           worktreePath: WORKTREE_PATH,
         },
@@ -83,7 +83,7 @@ describe('terminal create command', () => {
       runCreateTerminalTabCommand({
         base: {
           repoRoot: REPO_ID,
-          repoInstanceId: REPO_INSTANCE_ID,
+          repoRuntimeId: REPO_RUNTIME_ID,
           branch: 'main',
           worktreePath: WORKTREE_PATH,
         },
@@ -110,7 +110,7 @@ describe('terminal create command', () => {
       runCreateTerminalTabCommand({
         base: {
           repoRoot: REPO_ID,
-          repoInstanceId: REPO_INSTANCE_ID,
+          repoRuntimeId: REPO_RUNTIME_ID,
           branch: 'main',
           worktreePath: WORKTREE_PATH,
         },
@@ -124,7 +124,7 @@ describe('terminal create command', () => {
     expect(showCreatedTerminalTab).not.toHaveBeenCalled()
   })
 
-  test('fast-fails before create when the base has no repo instance id at the trigger boundary', async () => {
+  test('fast-fails before create when the base has no repo runtime id at the trigger boundary', async () => {
     const createTerminal = vi.fn(async () => 'term-111111111111111111111')
     const showCreatedTerminalTab = vi.fn(() => true)
 

@@ -40,8 +40,8 @@ export async function runCreateTerminalTabCommand(input: {
   t?: TerminalCreateTranslator
   logMessage?: string
 }): Promise<TerminalCreateCommandResult> {
-  if (!input.base.repoInstanceId) {
-    return { ok: false, error: new Error('repo instance unavailable'), messageKey: 'error.terminal-create-failed' }
+  if (!input.base.repoRuntimeId) {
+    return { ok: false, error: new Error('repo runtime unavailable'), messageKey: 'error.terminal-create-failed' }
   }
   if (terminalCreatePending(input.base)) {
     return {
@@ -89,6 +89,6 @@ function terminalCreatePending(base: TerminalSessionBase): boolean {
 function isTerminalCreateCanceled(error: unknown): boolean {
   return (
     error instanceof Error &&
-    (error.message === TERMINAL_CREATE_CANCELED_MESSAGE || error.message === 'error.repo-instance-stale')
+    (error.message === TERMINAL_CREATE_CANCELED_MESSAGE || error.message === 'error.repo-runtime-stale')
   )
 }

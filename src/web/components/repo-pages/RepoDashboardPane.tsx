@@ -74,14 +74,14 @@ export function RepoDashboardPane({
         ? {
             id: state.id,
             name: state.name,
-            instanceId: state.instanceId,
+            repoRuntimeId: state.repoRuntimeId,
             projection: state.projection,
             remote: state.remote,
           }
         : null
     }),
   )
-  const projectionReadModel = useRepoProjectionReadModel(repoId, repo?.instanceId ?? '', null, 'summary', !!repo)
+  const projectionReadModel = useRepoProjectionReadModel(repoId, repo?.repoRuntimeId ?? '', null, 'summary', !!repo)
   const projection = projectionReadModel.data
   const branchModel = useMemo(
     () => (projection?.snapshot ? repoBranchReadModelFromSnapshot(projection.snapshot, projection.status) : null),

@@ -74,8 +74,8 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     // there — the broadcast is multi-window safe by construction.
     const offSessionClosed = terminalClient.onSessionClosed((event) => {
       projection.handleSessionClosed(event)
-      const repoInstanceId = useReposStore.getState().repos[event.repoRoot]?.instanceId
-      if (typeof repoInstanceId === 'string') refreshWorkspacePaneTabs(event.repoRoot, repoInstanceId)
+      const repoRuntimeId = useReposStore.getState().repos[event.repoRoot]?.repoRuntimeId
+      if (typeof repoRuntimeId === 'string') refreshWorkspacePaneTabs(event.repoRoot, repoRuntimeId)
     })
 
     const disposeCommandBridge = setTerminalSessionCommandBridge({

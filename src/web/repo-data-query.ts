@@ -14,33 +14,33 @@ const coalescedRepoRefetchesByClient = new WeakMap<QueryClient, Map<string, Coal
 
 export function repoProjectionQueryKey(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
   branch?: string | null,
   mode?: PullRequestFetchMode,
 ) {
   return [
     'repo-data',
     repoRoot,
-    repoInstanceId,
+    repoRuntimeId,
     'projection',
     { branch: branch || null, mode: mode ?? 'full' },
   ] as const
 }
 
-export function repoOperationsQueryKey(repoRoot: string, repoInstanceId: string, includeSettled = false) {
-  return ['repo-data', repoRoot, repoInstanceId, 'operations', { includeSettled }] as const
+export function repoOperationsQueryKey(repoRoot: string, repoRuntimeId: string, includeSettled = false) {
+  return ['repo-data', repoRoot, repoRuntimeId, 'operations', { includeSettled }] as const
 }
 
-export function repoDataQueryKey(repoRoot: string, repoInstanceId: string) {
-  return ['repo-data', repoRoot, repoInstanceId] as const
+export function repoDataQueryKey(repoRoot: string, repoRuntimeId: string) {
+  return ['repo-data', repoRoot, repoRuntimeId] as const
 }
 
-function repoProjectionQueryPrefix(repoRoot: string, repoInstanceId: string) {
-  return ['repo-data', repoRoot, repoInstanceId, 'projection'] as const
+function repoProjectionQueryPrefix(repoRoot: string, repoRuntimeId: string) {
+  return ['repo-data', repoRoot, repoRuntimeId, 'projection'] as const
 }
 
-function repoOperationsQueryPrefix(repoRoot: string, repoInstanceId: string) {
-  return ['repo-data', repoRoot, repoInstanceId, 'operations'] as const
+function repoOperationsQueryPrefix(repoRoot: string, repoRuntimeId: string) {
+  return ['repo-data', repoRoot, repoRuntimeId, 'operations'] as const
 }
 
 function coalescedRepoRefetchMap(queryClient: QueryClient): Map<string, CoalescedRepoRefetch> {
@@ -98,23 +98,23 @@ function requestCoalescedActiveRepoRefetch(
   run()
 }
 
-function repoLogQueryKey(repoRoot: string, repoInstanceId: string, branch: string, count: number, skip: number) {
-  return ['repo-data', repoRoot, repoInstanceId, 'log', branch, count, skip] as const
+function repoLogQueryKey(repoRoot: string, repoRuntimeId: string, branch: string, count: number, skip: number) {
+  return ['repo-data', repoRoot, repoRuntimeId, 'log', branch, count, skip] as const
 }
 
-function repoRemoteBranchesQueryKey(repoRoot: string, repoInstanceId: string) {
-  return ['repo-data', repoRoot, repoInstanceId, 'remote-branches'] as const
+function repoRemoteBranchesQueryKey(repoRoot: string, repoRuntimeId: string) {
+  return ['repo-data', repoRoot, repoRuntimeId, 'remote-branches'] as const
 }
 
 export function repoProjectionQueryOptions(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
   branch?: string | null,
   mode?: PullRequestFetchMode,
 ) {
-  const placeholderData = getRepoProjectionPlaceholderData(repoRoot, repoInstanceId, branch, mode)
+  const placeholderData = getRepoProjectionPlaceholderData(repoRoot, repoRuntimeId, branch, mode)
   return queryOptions({
-    queryKey: repoProjectionQueryKey(repoRoot, repoInstanceId, branch, mode),
+    queryKey: repoProjectionQueryKey(repoRoot, repoRuntimeId, branch, mode),
     queryFn: ({ signal }) => getRepoProjection(repoRoot, branch, { mode }, signal),
     placeholderData,
     staleTime: Number.POSITIVE_INFINITY,
@@ -127,7 +127,7 @@ export function repoServerOperationActive(operation: Pick<RepoServerOperationSta
 
 export function getRepoProjectionPlaceholderData(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
   branch?: string | null,
   mode?: PullRequestFetchMode,
   queryClient: QueryClient = primaryWindowQueryClient,
@@ -136,13 +136,13 @@ export function getRepoProjectionPlaceholderData(
   const requestedMode = mode ?? 'full'
   const cached = findRepoProjectionPlaceholderSource(
     repoRoot,
-    repoInstanceId,
+    repoRuntimeId,
     requestedBranch,
     requestedMode,
     queryClient,
   )
   if (!cached?.snapshot) return undefined
-  const operations = getRepoOperationsQueryData(repoRoot, repoInstanceId, queryClient) ?? cached.operations
+  const operations = getRepoOperationsQueryData(repoRoot, repoRuntimeId, queryClient) ?? cached.operations
   return {
     snapshot: cached.snapshot,
     status: cached.status,
@@ -158,13 +158,13 @@ export function getRepoProjectionPlaceholderData(
 
 function findRepoProjectionPlaceholderSource(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
   branch: string | null,
   mode: PullRequestFetchMode,
   queryClient: QueryClient,
 ): RepoRuntimeProjection | undefined {
   const candidates = queryClient
-    .getQueriesData<RepoRuntimeProjection>({ queryKey: repoProjectionQueryPrefix(repoRoot, repoInstanceId) })
+    .getQueriesData<RepoRuntimeProjection>({ queryKey: repoProjectionQueryPrefix(repoRoot, repoRuntimeId) })
     .map(([_key, projection]) => projection)
     .filter((projection): projection is RepoRuntimeProjection => !!projection?.snapshot)
   candidates.sort(
@@ -189,22 +189,22 @@ function repoProjectionPlaceholderRank(
 
 function repoLogQueryOptions(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
   branch: string,
   options: { count?: number; skip?: number; enabled?: boolean } = {},
 ) {
   const count = options.count ?? DEFAULT_REPOSITORY_LOG_COUNT
   const skip = options.skip ?? 0
   return queryOptions({
-    queryKey: repoLogQueryKey(repoRoot, repoInstanceId, branch, count, skip),
+    queryKey: repoLogQueryKey(repoRoot, repoRuntimeId, branch, count, skip),
     queryFn: ({ signal }) => getRepoLog(repoRoot, branch, { count, skip, signal }),
     enabled: options.enabled,
   })
 }
 
-function repoRemoteBranchesQueryOptions(repoRoot: string, repoInstanceId: string, options: { enabled?: boolean } = {}) {
+function repoRemoteBranchesQueryOptions(repoRoot: string, repoRuntimeId: string, options: { enabled?: boolean } = {}) {
   return queryOptions({
-    queryKey: repoRemoteBranchesQueryKey(repoRoot, repoInstanceId),
+    queryKey: repoRemoteBranchesQueryKey(repoRoot, repoRuntimeId),
     queryFn: ({ signal }) => getRepoRemoteBranches(repoRoot, signal),
     enabled: options.enabled,
   })
@@ -212,12 +212,12 @@ function repoRemoteBranchesQueryOptions(repoRoot: string, repoInstanceId: string
 
 export function repoOperationsQueryOptions(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
   options: { includeSettled?: boolean; enabled?: boolean } = {},
 ) {
   const includeSettled = options.includeSettled === true
   return queryOptions({
-    queryKey: repoOperationsQueryKey(repoRoot, repoInstanceId, includeSettled),
+    queryKey: repoOperationsQueryKey(repoRoot, repoRuntimeId, includeSettled),
     queryFn: ({ signal }) => getRepoOperations(repoRoot, { includeSettled, signal }),
     enabled: options.enabled,
     staleTime: Number.POSITIVE_INFINITY,
@@ -226,77 +226,77 @@ export function repoOperationsQueryOptions(
 
 export function useRepoProjectionReadModel(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
   branch: string | null | undefined,
   mode: PullRequestFetchMode | undefined,
   enabled: boolean,
 ) {
   const query = useQuery({
-    ...repoProjectionQueryOptions(repoRoot, repoInstanceId, branch, mode),
+    ...repoProjectionQueryOptions(repoRoot, repoRuntimeId, branch, mode),
     enabled,
     subscribed: enabled,
   })
   useEffect(() => {
     if (!enabled || !query.data || query.isPlaceholderData) return
-    setRepoProjectionQueryData(repoRoot, repoInstanceId, branch, mode, query.data)
-  }, [branch, enabled, mode, query.data, query.isPlaceholderData, repoInstanceId, repoRoot])
+    setRepoProjectionQueryData(repoRoot, repoRuntimeId, branch, mode, query.data)
+  }, [branch, enabled, mode, query.data, query.isPlaceholderData, repoRuntimeId, repoRoot])
   return query
 }
 
 export function useRepoLogQuery(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
   branch: string,
   options: { count?: number; skip?: number; enabled?: boolean } = {},
 ) {
-  return useQuery(repoLogQueryOptions(repoRoot, repoInstanceId, branch, options))
+  return useQuery(repoLogQueryOptions(repoRoot, repoRuntimeId, branch, options))
 }
 
 export function useRepoRemoteBranchesQuery(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
   options: { enabled?: boolean } = {},
 ) {
-  return useQuery(repoRemoteBranchesQueryOptions(repoRoot, repoInstanceId, options))
+  return useQuery(repoRemoteBranchesQueryOptions(repoRoot, repoRuntimeId, options))
 }
 
 export function useRepoOperationsReadModel(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
   options: { includeSettled?: boolean; enabled?: boolean } = {},
 ) {
   const includeSettled = options.includeSettled === true
   const enabled = options.enabled !== false
   const query = useQuery({
-    ...repoOperationsQueryOptions(repoRoot, repoInstanceId, { includeSettled, enabled }),
+    ...repoOperationsQueryOptions(repoRoot, repoRuntimeId, { includeSettled, enabled }),
     subscribed: enabled,
   })
   useEffect(() => {
     if (!enabled || !query.data) return
-    setRepoOperationsQueryData(repoRoot, repoInstanceId, includeSettled, query.data)
-  }, [enabled, includeSettled, query.data, repoInstanceId, repoRoot])
+    setRepoOperationsQueryData(repoRoot, repoRuntimeId, includeSettled, query.data)
+  }, [enabled, includeSettled, query.data, repoRuntimeId, repoRoot])
   return query
 }
 
 export function getRepoOperationsQueryData(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): RepoOperationsSnapshot | undefined {
-  return queryClient.getQueryData<RepoOperationsSnapshot>(repoOperationsQueryKey(repoRoot, repoInstanceId, false))
+  return queryClient.getQueryData<RepoOperationsSnapshot>(repoOperationsQueryKey(repoRoot, repoRuntimeId, false))
 }
 
 export function setRepoOperationsQueryData(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
   includeSettled: boolean,
   operations: RepoOperationsSnapshot,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
-  queryClient.setQueryData(repoOperationsQueryKey(repoRoot, repoInstanceId, includeSettled), operations)
+  queryClient.setQueryData(repoOperationsQueryKey(repoRoot, repoRuntimeId, includeSettled), operations)
   if (!includeSettled) {
     queryClient.setQueriesData<RepoRuntimeProjection>(
-      { queryKey: repoProjectionQueryPrefix(repoRoot, repoInstanceId) },
+      { queryKey: repoProjectionQueryPrefix(repoRoot, repoRuntimeId) },
       (current) => (current ? { ...current, operations } : current),
     )
   }
@@ -304,36 +304,36 @@ export function setRepoOperationsQueryData(
 
 export function getRepoProjectionQueryData(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
   branch: string | null | undefined,
   mode: PullRequestFetchMode | undefined,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): RepoRuntimeProjection | undefined {
-  return queryClient.getQueryData<RepoRuntimeProjection>(repoProjectionQueryKey(repoRoot, repoInstanceId, branch, mode))
+  return queryClient.getQueryData<RepoRuntimeProjection>(repoProjectionQueryKey(repoRoot, repoRuntimeId, branch, mode))
 }
 
 export function setRepoProjectionQueryData(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
   branch: string | null | undefined,
   mode: PullRequestFetchMode | undefined,
   projection: RepoRuntimeProjection,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
-  queryClient.setQueryData(repoProjectionQueryKey(repoRoot, repoInstanceId, branch, mode), projection)
-  setRepoOperationsQueryData(repoRoot, repoInstanceId, false, projection.operations, queryClient)
+  queryClient.setQueryData(repoProjectionQueryKey(repoRoot, repoRuntimeId, branch, mode), projection)
+  setRepoOperationsQueryData(repoRoot, repoRuntimeId, false, projection.operations, queryClient)
 }
 
 export function seedRepoProjectionQueryData(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
   projection: RepoRuntimeProjection,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
   // Cache/session restore seed data is a UI placeholder, not an authoritative
   // server read, so do not seed the active operations cache here.
   queryClient.setQueryData(
-    repoProjectionQueryKey(repoRoot, repoInstanceId, projection.requested.branch, projection.requested.pullRequestMode),
+    repoProjectionQueryKey(repoRoot, repoRuntimeId, projection.requested.branch, projection.requested.pullRequestMode),
     projection,
   )
 }
@@ -349,21 +349,21 @@ export async function fetchRepoProjectionReadModel(
 
 export function invalidateRepoDataQueries(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
-  requestCoalescedActiveRepoRefetch(queryClient, `repo-data:${repoRoot}\0${repoInstanceId}`, [
-    repoDataQueryKey(repoRoot, repoInstanceId),
+  requestCoalescedActiveRepoRefetch(queryClient, `repo-data:${repoRoot}\0${repoRuntimeId}`, [
+    repoDataQueryKey(repoRoot, repoRuntimeId),
   ])
 }
 
 export function invalidateRepoRuntimeProjectionQueries(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
-  requestCoalescedActiveRepoRefetch(queryClient, `repo-runtime:${repoRoot}\0${repoInstanceId}`, [
-    repoProjectionQueryPrefix(repoRoot, repoInstanceId),
-    repoOperationsQueryPrefix(repoRoot, repoInstanceId),
+  requestCoalescedActiveRepoRefetch(queryClient, `repo-runtime:${repoRoot}\0${repoRuntimeId}`, [
+    repoProjectionQueryPrefix(repoRoot, repoRuntimeId),
+    repoOperationsQueryPrefix(repoRoot, repoRuntimeId),
   ])
 }

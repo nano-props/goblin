@@ -112,8 +112,8 @@ export interface RepoState {
   /** Absolute repo root — also the unique id. */
   id: string
   name: string
-  /** Bumped on every fresh open so async writers can detect close-and-reopen. */
-  instanceId: string
+  /** Current repo runtime authority for this repo; mirrors the runtime endpoint `repoRuntimeId`. */
+  repoRuntimeId: string
   dataLoads: RepoDataLoadBundle
   operations: RepoOperationsState
   ui: RepoUiState
@@ -261,9 +261,9 @@ interface RuntimeCoherentRepoProjectionActions {
   setWorkspacePaneTab: (id: string, branch: string, tab: WorkspacePaneTabType | null) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   refreshRuntimeProjection: (id: string, options: RepoRuntimeProjectionRefreshOptions) => Promise<void>
-  refreshCoreData: (id: string, options?: { repoInstanceId?: string }) => Promise<void>
-  syncAndRefresh: (id: string, options?: { repoInstanceId?: string }) => Promise<void>
-  setLastResult: (id: string, result: ExecResult, repoInstanceId: string, options?: RepoResultEventOptions) => void
+  refreshCoreData: (id: string, options?: { repoRuntimeId?: string }) => Promise<void>
+  syncAndRefresh: (id: string, options?: { repoRuntimeId?: string }) => Promise<void>
+  setLastResult: (id: string, result: ExecResult, repoRuntimeId: string, options?: RepoResultEventOptions) => void
   clearEvents: (id: string, eventIds: number[]) => void
   hydrateRepoSession: (
     openRepoEntries: RepoSessionEntry[],
@@ -273,13 +273,13 @@ interface RuntimeCoherentRepoProjectionActions {
   /** Clear the fetchFailed flag — called by manual fetch success and
    *  by an explicit refresh, so a stale badge doesn't follow the user
    *  around forever. */
-  clearFetchFailed: (id: string, repoInstanceId: string) => void
+  clearFetchFailed: (id: string, repoRuntimeId: string) => void
 }
 
 export type RepoRuntimeProjectionRefreshScope = 'repo-read-model' | 'visible-status'
 export type RepoRuntimeProjectionRefreshOptions =
-  | { repoInstanceId?: string; scope: 'repo-read-model' }
-  | { repoInstanceId?: string; scope: 'visible-status'; branchName: string | null }
+  | { repoRuntimeId?: string; scope: 'repo-read-model' }
+  | { repoRuntimeId?: string; scope: 'visible-status'; branchName: string | null }
 
 interface RepoMutationActions {
   runBranchAction: (

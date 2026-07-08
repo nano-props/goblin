@@ -39,7 +39,7 @@ const DEFAULT_BRANCH_HISTORY_ERROR_KEY = 'error.failed-read-repo'
 
 export interface WorkspacePanePanelRenderInput {
   type: WorkspacePaneTabType
-  repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'branchModel' | 'ui'> & {
+  repo: Pick<RepoWorkspaceRepo, 'id' | 'repoRuntimeId' | 'branchModel' | 'ui'> & {
     branchModel: RepoWorkspaceRepo['branchModel']
   }
   detail: CurrentRepoWorkspacePresentation
@@ -72,7 +72,7 @@ export function renderRepoWorkspacePanePanel(input: WorkspacePanePanelRenderInpu
       selectedSessionId: selectedRuntimeSessionId(selection, type),
       target: {
         repoRoot: input.repo.id,
-        repoInstanceId: input.repo.instanceId,
+        repoRuntimeId: input.repo.repoRuntimeId,
         branchName: input.detail.branch?.name ?? null,
         worktreePath: input.detail.branch?.worktree?.path ?? null,
       },
@@ -108,7 +108,7 @@ function HistoryWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }
   return (
     <BranchHistoryTab
       repoId={repo.id}
-      repoInstanceId={repo.instanceId}
+      repoRuntimeId={repo.repoRuntimeId}
       branchName={branch.name}
       workspacePaneId={workspacePaneId}
       panelLabel={panelLabel}
@@ -147,7 +147,7 @@ function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: 
     <WorkspacePanePanelFrame id={`${workspacePaneId}-files-panel`} {...panelLabel}>
       <FiletreeTab
         repoId={repo.id}
-        repoInstanceId={repo.instanceId}
+        repoRuntimeId={repo.repoRuntimeId}
         branchName={branch.name}
         worktreePath={worktreePath}
       />
@@ -157,12 +157,12 @@ function FilesWorkspacePanePanel({ repo, detail, workspacePaneId, panelLabel }: 
 
 function FiletreeTab({
   repoId,
-  repoInstanceId,
+  repoRuntimeId,
   branchName,
   worktreePath,
 }: {
   repoId: string
-  repoInstanceId: string
+  repoRuntimeId: string
   branchName: string
   worktreePath: string
 }) {
@@ -243,7 +243,7 @@ function FiletreeTab({
       try {
         const openerIdentity = workspacePaneStaticTabId('files')
         await runCreateTerminalTabCommand({
-          base: { repoRoot: repoId, repoInstanceId, branch: branchName, worktreePath },
+          base: { repoRoot: repoId, repoRuntimeId, branch: branchName, worktreePath },
           createTerminal,
           openerIdentity,
           showCreatedTerminalTab: (terminalSessionId) =>
@@ -270,7 +270,7 @@ function FiletreeTab({
       openingFileKeyPrefix,
       navigation,
       repoId,
-      repoInstanceId,
+      repoRuntimeId,
       t,
       worktreePath,
     ],
@@ -340,19 +340,19 @@ function usePendingKeySet() {
 
 function BranchHistoryTab({
   repoId,
-  repoInstanceId,
+  repoRuntimeId,
   branchName,
   workspacePaneId,
   panelLabel,
 }: {
   repoId: string
-  repoInstanceId: string
+  repoRuntimeId: string
   branchName: string
   workspacePaneId: string
   panelLabel: WorkspacePanePanelLabel
 }) {
   const t = useT()
-  const historyQuery = useRepoLogQuery(repoId, repoInstanceId, branchName, {
+  const historyQuery = useRepoLogQuery(repoId, repoRuntimeId, branchName, {
     count: DEFAULT_REPOSITORY_LOG_COUNT,
   })
   const entries = historyQuery.data ?? []

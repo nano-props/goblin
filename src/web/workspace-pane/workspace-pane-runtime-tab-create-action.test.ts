@@ -38,7 +38,7 @@ describe('workspace pane runtime tab create action', () => {
   test('builds a terminal create action that delegates to the terminal create command', async () => {
     const base: TerminalSessionBase = {
       repoRoot: '/repo',
-      repoInstanceId: 'repo-instance-1',
+      repoRuntimeId: 'repo-runtime-1',
       branch: 'main',
       worktreePath: '/repo-worktree',
     }

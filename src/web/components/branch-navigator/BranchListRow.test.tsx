@@ -89,7 +89,7 @@ function baseProps(
 }
 
 function branchListRowRepo(): BranchActionRepo {
-  const repo = repoPresentationForTest(emptyRepo('/tmp/repo', 'repo', 'repo-instance-test'), {
+  const repo = repoPresentationForTest(emptyRepo('/tmp/repo', 'repo', 'repo-runtime-test'), {
     branches: [],
     currentBranch: '',
     status: [],
@@ -97,7 +97,7 @@ function branchListRowRepo(): BranchActionRepo {
   })
   return {
     id: repo.id,
-    instanceId: repo.instanceId,
+    repoRuntimeId: repo.repoRuntimeId,
     branchModel: repo.branchModel,
     branchAction: repo.operations.branchAction,
     remote: repo.remote,

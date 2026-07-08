@@ -12,10 +12,10 @@ export function useTerminalSessionProjection(): TerminalSessionProjection {
     getTerminalSessionProjection({
       onSelectedWorktreeChange: setSelectedTerminal,
       onWorkspaceTabsChanged: async (base, tabs) => {
-        if (typeof base.repoInstanceId !== 'string') return false
+        if (typeof base.repoRuntimeId !== 'string') return false
         return await writeCanonicalWorkspacePaneTabsForTarget({
           repoRoot: base.repoRoot,
-          repoInstanceId: base.repoInstanceId,
+          repoRuntimeId: base.repoRuntimeId,
           branchName: base.branch,
           worktreePath: base.worktreePath,
           tabs: [...tabs],

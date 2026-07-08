@@ -23,6 +23,6 @@ export function terminalSessionScope(repoRoot: string): string {
   return isRemoteRepoId(repoRoot) ? repoRoot : path.resolve(repoRoot)
 }
 
-export function terminalSessionRuntimeScope(repoRoot: string, repoInstanceId: string): string {
-  return `${terminalSessionScope(repoRoot)}\0${repoInstanceId}`
+export function terminalSessionRuntimeScope(repoRoot: string, repoRuntimeId: string): string {
+  return `${terminalSessionScope(repoRoot)}\0${repoRuntimeId}`
 }

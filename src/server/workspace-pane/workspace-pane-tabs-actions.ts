@@ -8,7 +8,7 @@ import type {
 } from '#/shared/workspace-pane-tabs.ts'
 
 export interface WorkspacePaneTabsActionService {
-  listWorkspaceTabs(userId: string, repoRoot: string, repoInstanceId: string): Promise<WorkspacePaneTabsEntry[]>
+  listWorkspaceTabs(userId: string, repoRoot: string, repoRuntimeId: string): Promise<WorkspacePaneTabsEntry[]>
   replaceTabs(userId: string, input: WorkspacePaneTabsReplaceInput): Promise<WorkspacePaneTabEntry[]>
   updateTabs(userId: string, input: WorkspacePaneTabsUpdateInput): Promise<WorkspacePaneTabEntry[]>
 }
@@ -16,7 +16,7 @@ export interface WorkspacePaneTabsActionService {
 export interface WorkspacePaneTabsActionDependencies {
   sessionService: WorkspacePaneTabsActionService
   isValidClientId(value: unknown): value is string
-  isCurrentRepoInstance(userId: string, repoRoot: string, repoInstanceId: string): boolean
+  isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
   broadcastWorkspaceTabsChanged(userId: string, repoRoot: string): void
 }
 
@@ -32,7 +32,7 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       if (!isValidClientId(clientId)) return []
       if (!isValidRepoLocator(input?.repoRoot)) return []
       if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return []
-      assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
+      assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
       const tabs = await sessionService.replaceTabs(userId, input)
       deps.broadcastWorkspaceTabsChanged(userId, input.repoRoot)
       return tabs
@@ -46,7 +46,7 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       if (!isValidClientId(clientId)) return []
       if (!isValidRepoLocator(input?.repoRoot)) return []
       if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return []
-      assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
+      assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
       const tabs = await sessionService.updateTabs(userId, input)
       deps.broadcastWorkspaceTabsChanged(userId, input.repoRoot)
       return tabs
@@ -59,14 +59,14 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
     ): Promise<WorkspacePaneTabsEntry[]> {
       if (!isValidClientId(clientId)) return []
       if (!isValidRepoLocator(input?.repoRoot)) return []
-      assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
-      return await sessionService.listWorkspaceTabs(userId, input.repoRoot, input.repoInstanceId)
+      assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
+      return await sessionService.listWorkspaceTabs(userId, input.repoRoot, input.repoRuntimeId)
     },
   }
 
-  function assertCurrentRepoInstance(userId: string, repoRoot: string, repoInstanceId: string): void {
-    if (!deps.isCurrentRepoInstance(userId, repoRoot, repoInstanceId)) {
-      throw new Error('error.repo-instance-stale')
+  function assertCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): void {
+    if (!deps.isCurrentRepoRuntime(userId, repoRoot, repoRuntimeId)) {
+      throw new Error('error.repo-runtime-stale')
     }
   }
 }

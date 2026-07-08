@@ -9,14 +9,14 @@ import type { RepoSnapshot } from '#/shared/api-types.ts'
 
 export interface TerminalRepoIndexEntry {
   id: string
-  instanceId: string
+  repoRuntimeId: string
 }
 
 export function useTerminalRepoIndex(): TerminalRepoIndex {
   const entries = useStoreWithEqualityFn(useReposStore, (s) => terminalRepoIndexEntriesFromRepos(s.repos), entriesEqual)
   const projectionQueries = useQueries({
     queries: entries.map((entry) => ({
-      ...repoProjectionQueryOptions(entry.id, entry.instanceId, null, 'full'),
+      ...repoProjectionQueryOptions(entry.id, entry.repoRuntimeId, null, 'full'),
       enabled: true,
       subscribed: true,
     })),
@@ -42,7 +42,7 @@ export function repoIndexFromEntries(
       if (worktreePath) branchByWorktreePath[worktreePath] = branch.name
     }
     index[repo.id] = {
-      instanceId: repo.instanceId,
+      repoRuntimeId: repo.repoRuntimeId,
       branchByWorktreePath,
     }
   })
@@ -58,7 +58,7 @@ export function repoIndexEqual(a: TerminalRepoIndex, b: TerminalRepoIndex): bool
     const current = a[repoRoot]
     const next = b[repoRoot]
     if (!current || !next) return false
-    if (current.instanceId !== next.instanceId) return false
+    if (current.repoRuntimeId !== next.repoRuntimeId) return false
     const currentPaths = Object.keys(current.branchByWorktreePath)
     const nextPaths = Object.keys(next.branchByWorktreePath)
     if (currentPaths.length !== nextPaths.length) return false
@@ -80,7 +80,7 @@ export function branchForTerminalWorktree(
 function terminalRepoIndexEntriesFromRepos(repos: ReposStore['repos']): TerminalRepoIndexEntry[] {
   return Object.values(repos).map((repo) => ({
     id: repo.id,
-    instanceId: repo.instanceId,
+    repoRuntimeId: repo.repoRuntimeId,
   }))
 }
 
@@ -92,7 +92,7 @@ function entriesEqual(a: readonly TerminalRepoIndexEntry[], b: readonly Terminal
     const next = b[index]
     if (!current || !next) return false
     if (current.id !== next.id) return false
-    if (current.instanceId !== next.instanceId) return false
+    if (current.repoRuntimeId !== next.repoRuntimeId) return false
   }
   return true
 }

@@ -13,7 +13,7 @@ const storeState = {
     '/tmp/repo': {
       id: '/tmp/repo',
       availability: { phase: 'available' },
-      instanceId: 'repo-instance-test-7',
+      repoRuntimeId: 'repo-runtime-test-7',
       dataLoads: {
         repoReadModel: { phase: 'idle', loadedAt: 0, stale: false, error: null },
         visibleStatus: { phase: 'idle', loadedAt: 0, stale: false, error: null },
@@ -53,7 +53,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
     storeState.repos['/tmp/repo'] = {
       id: '/tmp/repo',
       availability: { phase: 'available' },
-      instanceId: 'repo-instance-test-7',
+      repoRuntimeId: 'repo-runtime-test-7',
       dataLoads: {
         repoReadModel: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
         visibleStatus: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
@@ -78,9 +78,9 @@ describe('useRepoStoreInvalidationRefresh', () => {
         listener({ type: 'repo-query-invalidated', repoId: '/tmp/repo', query: 'repo-snapshot' })
     })
 
-    expect(storeState.refreshCoreData).toHaveBeenCalledWith('/tmp/repo', { repoInstanceId: 'repo-instance-test-7' })
+    expect(storeState.refreshCoreData).toHaveBeenCalledWith('/tmp/repo', { repoRuntimeId: 'repo-runtime-test-7' })
     expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: repoDataQueryKey('/tmp/repo', 'repo-instance-test-7'),
+      queryKey: repoDataQueryKey('/tmp/repo', 'repo-runtime-test-7'),
       refetchType: 'none',
     })
     invalidateSpy.mockRestore()
@@ -98,19 +98,19 @@ describe('useRepoStoreInvalidationRefresh', () => {
 
     expect(storeState.refreshCoreData).not.toHaveBeenCalled()
     expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['repo-data', '/tmp/repo', 'repo-instance-test-7', 'projection'],
+      queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-test-7', 'projection'],
       refetchType: 'none',
     })
     expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['repo-data', '/tmp/repo', 'repo-instance-test-7', 'operations'],
+      queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-test-7', 'operations'],
       refetchType: 'none',
     })
     expect(refetchSpy).toHaveBeenCalledWith(
-      { queryKey: ['repo-data', '/tmp/repo', 'repo-instance-test-7', 'projection'], type: 'active' },
+      { queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-test-7', 'projection'], type: 'active' },
       { cancelRefetch: false },
     )
     expect(refetchSpy).toHaveBeenCalledWith(
-      { queryKey: ['repo-data', '/tmp/repo', 'repo-instance-test-7', 'operations'], type: 'active' },
+      { queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-test-7', 'operations'], type: 'active' },
       { cancelRefetch: false },
     )
     refetchSpy.mockRestore()
@@ -130,6 +130,6 @@ describe('useRepoStoreInvalidationRefresh', () => {
         })
     })
 
-    expect(storeState.refreshCoreData).toHaveBeenCalledWith('/tmp/repo', { repoInstanceId: 'repo-instance-test-7' })
+    expect(storeState.refreshCoreData).toHaveBeenCalledWith('/tmp/repo', { repoRuntimeId: 'repo-runtime-test-7' })
   })
 })

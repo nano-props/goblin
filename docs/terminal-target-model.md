@@ -30,7 +30,7 @@ A session is the long-lived terminal business object.
 It owns:
 
 - session identity
-- target metadata (`repoRoot`, `repoInstanceId`, `branch`, `worktreePath`)
+- target metadata (`repoRoot`, `repoRuntimeId`, `branch`, `worktreePath`)
 - worktree identity
 - canonical geometry
 - PTY lifecycle association
@@ -94,7 +94,7 @@ publishes the resulting canonical geometry.
 At a high level, the server-side session model should evolve toward:
 
 - session identity and scope
-- target metadata: `repoRoot`, `repoInstanceId`, `branch`, `worktreePath`
+- target metadata: `repoRoot`, `repoRuntimeId`, `branch`, `worktreePath`
 - lifecycle phase
 - canonical geometry
 - PTY binding information

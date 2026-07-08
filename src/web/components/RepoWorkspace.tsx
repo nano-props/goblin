@@ -48,7 +48,7 @@ function repoWorkspaceRepoShellEqual(
     (!!a &&
       !!b &&
       a.id === b.id &&
-      a.instanceId === b.instanceId &&
+      a.repoRuntimeId === b.repoRuntimeId &&
       a.ui.currentBranchName === b.ui.currentBranchName &&
       a.ui.preferredWorkspacePaneTabByTarget === b.ui.preferredWorkspacePaneTabByTarget &&
       a.dataLoads.visibleStatus === b.dataLoads.visibleStatus &&
@@ -79,7 +79,7 @@ export function RepoWorkspace({
       return repo
         ? {
             id: repo.id,
-            instanceId: repo.instanceId,
+            repoRuntimeId: repo.repoRuntimeId,
             ui: {
               currentBranchName: currentBranch,
               preferredWorkspacePaneTabByTarget: repo.ui.preferredWorkspacePaneTabByTarget,
@@ -135,7 +135,7 @@ function RepoWorkspaceLoaded({
   const currentBranchName = repoShell.ui.currentBranchName
   const projectionReadModel = useRepoProjectionReadModel(
     repoShell.id,
-    repoShell.instanceId,
+    repoShell.repoRuntimeId,
     currentBranchName,
     'full',
     true,

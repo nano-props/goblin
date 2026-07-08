@@ -18,7 +18,7 @@ import { useWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane
 import { useSyncWorkspacePaneRuntimeTabProviderSelection } from '#/web/workspace-pane/workspace-pane-runtime-tab-providers.ts'
 
 export function useRepoWorkspaceTabModel(
-  repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'ui'>,
+  repo: Pick<RepoWorkspaceRepo, 'id' | 'repoRuntimeId' | 'ui'>,
   detail: CurrentRepoWorkspacePresentation,
   workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined,
 ) {
@@ -33,7 +33,7 @@ export function useRepoWorkspaceTabModel(
  * projection.
  */
 export function useRepoWorkspaceTabModelInput(
-  repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'ui'>,
+  repo: Pick<RepoWorkspaceRepo, 'id' | 'repoRuntimeId' | 'ui'>,
   detail: CurrentRepoWorkspacePresentation,
   workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined,
 ): RepoWorkspaceTabModelInput {
@@ -42,10 +42,10 @@ export function useRepoWorkspaceTabModelInput(
   const worktreePath = branch?.worktree?.path ?? null
   const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
     repoRoot: repo.id,
-    repoInstanceId: repo.instanceId,
+    repoRuntimeId: repo.repoRuntimeId,
     worktreePath,
   })
-  const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(repo.id, repo.instanceId)
+  const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(repo.id, repo.repoRuntimeId)
   const requestedSessionIdByRuntimeType = useMemo(
     () => (workspacePaneRoute?.kind === 'terminal' ? { terminal: workspacePaneRoute.terminalSessionId } : undefined),
     [workspacePaneRoute],
@@ -58,7 +58,7 @@ export function useRepoWorkspaceTabModelInput(
         branchName,
         worktreePath,
       }),
-    [workspacePaneTabsQuery.data, repo.id, repo.instanceId, branchName, worktreePath],
+    [workspacePaneTabsQuery.data, repo.id, repo.repoRuntimeId, branchName, worktreePath],
   )
 
   const preferredTab = useMemo(() => {
@@ -75,7 +75,7 @@ export function useRepoWorkspaceTabModelInput(
   const input = useMemo<RepoWorkspaceTabModelInput>(
     () => ({
       repoId: repo.id,
-      repoInstanceId: repo.instanceId,
+      repoRuntimeId: repo.repoRuntimeId,
       branchName,
       worktreePath,
       preferredTab,
@@ -88,7 +88,7 @@ export function useRepoWorkspaceTabModelInput(
     }),
     [
       repo.id,
-      repo.instanceId,
+      repo.repoRuntimeId,
       branchName,
       worktreePath,
       preferredTab,

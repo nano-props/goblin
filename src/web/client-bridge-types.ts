@@ -41,7 +41,7 @@ export interface ClientTerminal {
   takeover: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>
   close: (input: TerminalSessionInput) => Promise<TerminalMutationResult>
   create: (input: TerminalCreateInput) => Promise<TerminalCreateResult>
-  pruneTerminals: (repoRoot: string, repoInstanceId: string) => Promise<{ pruned: number; remaining: number }>
+  pruneTerminals: (repoRoot: string, repoRuntimeId: string) => Promise<{ pruned: number; remaining: number }>
   listSessions: (input: TerminalListSessionsInput) => Promise<TerminalSessionSummary[]>
   recoverSessions: (input: TerminalListSessionsInput) => Promise<TerminalSessionsRecoveryResult>
   notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>

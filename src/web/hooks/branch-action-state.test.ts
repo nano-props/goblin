@@ -81,7 +81,7 @@ describe('branch action state projection', () => {
   test('projects a branch action repo without exposing the local operations wrapper', () => {
     const repo = {
       id: REPO_ID,
-      instanceId: 'repo-instance-1',
+      repoRuntimeId: 'repo-runtime-1',
       operations: {
         branchAction: idleOperation(),
       },
@@ -95,7 +95,7 @@ describe('branch action state projection', () => {
     expect('operations' in projected).toBe(false)
     expect(projected).toMatchObject({
       id: REPO_ID,
-      instanceId: 'repo-instance-1',
+      repoRuntimeId: 'repo-runtime-1',
       remote: { hasRemotes: true },
       branchAction: {
         phase: 'running',
@@ -125,7 +125,7 @@ function serverOperation(
   return {
     id: `repo-op-${overrides.kind}-${overrides.phase}`,
     repoId: REPO_ID,
-    repoInstanceId: 'repo-instance-1',
+    repoRuntimeId: 'repo-runtime-1',
     kind: overrides.kind,
     phase: overrides.phase,
     source: 'user',

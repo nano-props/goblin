@@ -357,8 +357,8 @@ describe('useKeyboard', () => {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/worktree',
     })
-    setRepoOperationsQueryData(REPO_ID, repo.instanceId, false, {
-      operations: [serverOperation(repo.instanceId, { kind: 'create-worktree', phase: 'running' })],
+    setRepoOperationsQueryData(REPO_ID, repo.repoRuntimeId, false, {
+      operations: [serverOperation(repo.repoRuntimeId, { kind: 'create-worktree', phase: 'running' })],
       loadedAt: 123,
     })
     const openCreateWorktree = vi.fn()
@@ -443,7 +443,7 @@ describe('useKeyboard', () => {
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', {
       repoRoot: REPO_ID,
 
-      repoInstanceId: repoInstanceIdForTest(),
+      repoRuntimeId: repoRuntimeIdForTest(),
 
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
@@ -456,13 +456,13 @@ function renderHookHost(overrides: Partial<HookHostOptions> = {}) {
 }
 
 function serverOperation(
-  repoInstanceId: string,
+  repoRuntimeId: string,
   overrides: Pick<RepoServerOperationState, 'kind' | 'phase'>,
 ): RepoServerOperationState {
   return {
     id: `repo-op-${overrides.kind}-${overrides.phase}`,
     repoId: REPO_ID,
-    repoInstanceId,
+    repoRuntimeId,
     kind: overrides.kind,
     phase: overrides.phase,
     source: 'user',
@@ -515,10 +515,10 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
   }
 }
 
-function repoInstanceIdForTest(): string {
+function repoRuntimeIdForTest(): string {
   const repo = useReposStore.getState().repos[REPO_ID]
   if (!repo) throw new Error(`expected seeded repo ${REPO_ID}`)
-  return repo.instanceId
+  return repo.repoRuntimeId
 }
 
 function installNativeBridgeStub() {
@@ -542,7 +542,7 @@ function terminalWorktreeSnapshot(): TerminalWorktreeSnapshot {
       index: 1,
       repoRoot: REPO_ID,
 
-      repoInstanceId: repoInstanceIdForTest(),
+      repoRuntimeId: repoRuntimeIdForTest(),
 
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,

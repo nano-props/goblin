@@ -3,10 +3,10 @@ import type { RepoSessionHydrationOptions, ReposGet, ReposSet, ReposStore } from
 import {
   insertPlaceholderRepo,
   addResolvedRepo,
-  closeRepoRuntimeInstanceWithCache,
+  closeRepoRuntimeWithCache,
   createRuntimeRepoSessionActions,
   openLocalRepoRuntimeForInput,
-  openRepoRuntimeInstanceWithCache,
+  openRepoRuntimeWithCache,
   refreshInitialRepoState,
   type RuntimeOpenResolvedRepo,
 } from '#/web/stores/repos/repo-session-write-paths.ts'
@@ -17,7 +17,7 @@ import { restoreSessionWorkspacePaneStateInRepos } from '#/web/stores/repos/work
 
 interface InitialRepoRefresh {
   id: string
-  repoInstanceId: string
+  repoRuntimeId: string
 }
 
 type RestorableWorkspaceLifecycleActions = Pick<ReposStore, 'hydrateRepoSession'>
@@ -40,7 +40,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       // server-authoritative placeholders before full refresh finishes:
       //   1. Establish runtime authority. Local entries go through
       //     the server's canonical open path (probe input -> canonical
-      //     root -> repoInstanceId) before any repo state is written. Remote
+      //     root -> repoRuntimeId) before any repo state is written. Remote
       //     entries keep their remote id and are opened directly.
       //   2. Settle the restored repos. Local entries promote the
       //     canonical placeholder to a resolved repo and kick off initial
@@ -54,14 +54,14 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         if (!rankById.has(entry.id)) rankById.set(entry.id, index)
       })
       const limitLocalRuntimeOpen = pLimit(SESSION_PROBE_CONCURRENCY)
-      const runtimeInstanceIdPromiseByRepoId = new Map<string, Promise<string>>()
+      const repoRuntimeIdPromiseByRepoId = new Map<string, Promise<string>>()
       const localRuntimeOpenPromiseByRepoId = new Map<string, Promise<RuntimeOpenResolvedRepo>>()
-      const runtimeInstanceIdFor = (repoId: string): Promise<string> => {
+      const repoRuntimeIdFor = (repoId: string): Promise<string> => {
         if (signal?.aborted) throw new Error('aborted')
-        const existing = runtimeInstanceIdPromiseByRepoId.get(repoId)
+        const existing = repoRuntimeIdPromiseByRepoId.get(repoId)
         if (existing) return existing
-        const created = openRepoRuntimeInstanceWithCache(repoId)
-        runtimeInstanceIdPromiseByRepoId.set(repoId, created)
+        const created = openRepoRuntimeWithCache(repoId)
+        repoRuntimeIdPromiseByRepoId.set(repoId, created)
         return created
       }
       const localRuntimeOpenFor = (entry: RepoSessionEntry): Promise<RuntimeOpenResolvedRepo> => {
@@ -83,19 +83,19 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         openRepoEntries.map(async (entry) => {
           let placeholderEntry = entry
           let runtimeRepoRoot = entry.id
-          let instanceId: string
+          let repoRuntimeId: string
           try {
             if (isRemoteRepoId(entry.id)) {
-              instanceId = await runtimeInstanceIdFor(entry.id)
+              repoRuntimeId = await repoRuntimeIdFor(entry.id)
             } else {
               const opened = await localRuntimeOpenFor(entry)
-              if (!opened.repo || !opened.repoInstanceId) {
+              if (!opened.repo || !opened.repoRuntimeId) {
                 markOpenEntryFailed(entry)
                 return
               }
               placeholderEntry = localRepoSessionEntry(opened.repo.id)
               runtimeRepoRoot = opened.repo.id
-              instanceId = opened.repoInstanceId
+              repoRuntimeId = opened.repoRuntimeId
             }
           } catch (err) {
             if (signal?.aborted || isAbortError(err)) return
@@ -103,14 +103,14 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
             return
           }
           if (signal?.aborted) {
-            await closeRepoRuntimeInstanceWithCache(runtimeRepoRoot, instanceId)
+            await closeRepoRuntimeWithCache(runtimeRepoRoot, repoRuntimeId)
             return
           }
           set((s) => {
             const { repos, order, changed } = insertPlaceholderRepo(
               { repos: s.repos, repoSnapshotCache: s.repoSnapshotCache, order: s.order },
               placeholderEntry,
-              instanceId,
+              repoRuntimeId,
               rankById,
             )
             let nextRepos = repos
@@ -148,7 +148,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
             if (signal?.aborted) return
             if (isRemoteRepoId(entry.id)) {
               try {
-                await runtimeInstanceIdFor(entry.id)
+                await repoRuntimeIdFor(entry.id)
               } catch (err) {
                 if (!signal?.aborted && !isAbortError(err)) markOpenEntryFailed(entry)
                 return
@@ -181,16 +181,16 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
             }
             const probe = await localRuntimeOpenFor(entry)
             if (signal?.aborted) return
-            if (!probe.repo || !probe.repoInstanceId) {
+            if (!probe.repo || !probe.repoRuntimeId) {
               markOpenEntryFailed(entry)
               return
             }
 
             const resolvedRepo = probe.repo
-            const repoInstanceId = probe.repoInstanceId
+            const repoRuntimeId = probe.repoRuntimeId
             let initialRefresh: InitialRepoRefresh | null = null
             set((s) => {
-              const { repos, order } = addResolvedRepo(s, resolvedRepo, repoInstanceId, rankById)
+              const { repos, order } = addResolvedRepo(s, resolvedRepo, repoRuntimeId, rankById)
               // Hydration always kicks off an initial refresh: even
               // when the resolved probe matches the existing target
               // (or returns no target at all, for a local probe), the
@@ -200,7 +200,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
               // "open an already-open repo" use case is just a focus
               // action.
               const repo = repos[resolvedRepo.id]
-              if (repo) initialRefresh = { id: repo.id, repoInstanceId: repo.instanceId }
+              if (repo) initialRefresh = { id: repo.id, repoRuntimeId: repo.repoRuntimeId }
               const nextRestoredRepoId = restoredRepoIdAfterWorkspaceHydration(
                 s.restoredRepoId,
                 repos,

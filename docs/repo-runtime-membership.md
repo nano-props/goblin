@@ -9,9 +9,9 @@ client-window-owned.
 
 The server owns:
 
-- the current `repoInstanceId` for a `(userId, repoRoot)` runtime scope
-- stale instance rejection
-- terminal/session cleanup when a repo runtime instance closes
+- the current `repoRuntimeId` for a `(userId, repoRoot)` runtime scope
+- stale runtime rejection
+- terminal/session cleanup when a repo runtime closes
 
 The client window owns:
 
@@ -28,21 +28,21 @@ would make a close in one window implicitly close the repo in another window,
 which is not the current product model.
 
 The server still needs to own runtime identity because repo-scoped terminal
-and mutation paths must fail fast when a client targets a stale instance.
+and mutation paths must fail fast when a client targets a stale runtime.
 
 ## Data Flow
 
 Open:
 
-1. The client asks the server to open or resolve a repo runtime instance.
-2. The server returns a canonical `repoInstanceId`.
+1. The client asks the server to open or resolve a repo runtime.
+2. The server returns a canonical `repoRuntimeId`.
 3. The client inserts or updates its window-local repo projection with that
    runtime id.
 
 Close:
 
 1. The client removes the repo from its window-local projection.
-2. The client asks the server to close the matching `repoInstanceId`.
+2. The client asks the server to close the matching `repoRuntimeId`.
 3. If the server id is already stale, close is a no-op.
 4. Server-side repo-runtime close events clean up runtime-scoped terminal
    resources.
@@ -50,7 +50,7 @@ Close:
 Restore:
 
 1. `WorkspaceSessionState.openRepoEntries` is boot-only restore input.
-2. Restore reopens runtime instances through the server before writing any
+2. Restore reopens runtimes through the server before writing any
    repo projection.
 3. After boot, session persistence records window-local membership for the
    next launch; it is not live runtime truth.
@@ -61,11 +61,11 @@ Restore:
   changes to cross-window repo membership.
 - Do not make `WorkspaceSessionState.openRepoEntries` a live synchronization
   source.
-- Do not let the client mint or validate `repoInstanceId` locally.
+- Do not let the client mint or validate `repoRuntimeId` locally.
 - Server routes that mutate repo-scoped runtime resources should validate the
-  server-owned `repoInstanceId` when the operation targets runtime state.
+  server-owned `repoRuntimeId` when the operation targets runtime state.
 - Client cache keys for runtime-scoped resources should include
-  `repoInstanceId` where stale instance separation matters.
+  `repoRuntimeId` where stale runtime separation matters.
 
 ## React Query Implication
 

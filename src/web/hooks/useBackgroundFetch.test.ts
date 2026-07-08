@@ -56,7 +56,7 @@ function createRepo(input: {
   return {
     id: input.id,
     name: 'repo',
-    instanceId: 'repo-instance-test',
+    repoRuntimeId: 'repo-runtime-test',
     dataLoads: {
       repoReadModel: { phase: 'idle', loadedAt: null, stale: false, error: null },
       visibleStatus: { phase: 'idle', loadedAt: null, stale: false, error: null },

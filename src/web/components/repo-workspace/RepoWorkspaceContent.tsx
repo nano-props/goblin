@@ -16,7 +16,7 @@ import {
 import { renderRepoWorkspacePanePanel } from '#/web/components/repo-workspace/panels.tsx'
 
 interface Props {
-  repo: Pick<RepoWorkspaceRepo, 'id' | 'instanceId' | 'branchModel' | 'ui'>
+  repo: Pick<RepoWorkspaceRepo, 'id' | 'repoRuntimeId' | 'branchModel' | 'ui'>
   detail: CurrentRepoWorkspacePresentation
   workspacePaneId: string
   workspacePaneTabModel: RepoWorkspaceTabModel

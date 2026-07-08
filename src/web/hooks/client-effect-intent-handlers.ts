@@ -154,7 +154,7 @@ export async function handleWorkspaceClientIntent(
       if (!currentRepo) return true
       const branchAction = projectBranchActionOperation(
         currentRepo.operations.branchAction,
-        getRepoOperationsQueryData(currentRepo.id, currentRepo.instanceId)?.operations,
+        getRepoOperationsQueryData(currentRepo.id, currentRepo.repoRuntimeId)?.operations,
       )
       if (branchAction.phase !== 'idle') {
         toast.error(deps.t('action.create-worktree-busy'))
@@ -194,7 +194,7 @@ export async function handleWorkspaceClientIntent(
       await runRepoRefreshIntent(useReposStore.getState, {
         kind: 'manual-refresh-requested',
         id: plan.repoId,
-        repoInstanceId: plan.repoInstanceId,
+        repoRuntimeId: plan.repoRuntimeId,
       })
       return true
     case 'show-workspace-pane-tab':

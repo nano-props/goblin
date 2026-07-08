@@ -13,7 +13,7 @@ import {
 
 export interface UseWorkspacePaneRuntimeTabTargetProjectionInput {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   worktreePath: string | null
 }
 
@@ -25,7 +25,7 @@ export interface WorkspacePaneRuntimeTabTargetProjectionHookResult extends Works
 
 export function useWorkspacePaneRuntimeTabTargetProjection({
   repoRoot,
-  repoInstanceId,
+  repoRuntimeId,
   worktreePath,
 }: UseWorkspacePaneRuntimeTabTargetProjectionInput): WorkspacePaneRuntimeTabTargetProjectionHookResult {
   const runtimeTabTargetKey = workspacePaneRuntimeTabTargetKey({ repoRoot, worktreePath })
@@ -35,7 +35,7 @@ export function useWorkspacePaneRuntimeTabTargetProjection({
   )
   const providerProjections = useWorkspacePaneRuntimeTabProviderProjections({
     repoRoot,
-    repoInstanceId,
+    repoRuntimeId,
     worktreePath,
   })
 

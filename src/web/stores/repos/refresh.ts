@@ -7,7 +7,7 @@ import { persistRepoSnapshotCacheEntry } from '#/web/stores/repos/persistence.ts
 import { runCoreDataRefreshWorkflow, runSnapshotSuccessWorkflow } from '#/web/stores/repos/refresh-workflows.ts'
 import {
   applySnapshotToRepoProjection,
-  resolveActionRepoInstanceId,
+  resolveActionRepoRuntimeId,
 } from '#/web/stores/repos/refresh-state.ts'
 import { createRefreshSyncHelpers } from '#/web/stores/repos/refresh-sync.ts'
 import { finishDataLoadError, finishDataLoadSuccess, startDataLoad } from '#/web/stores/repos/repo-data-load-state.ts'
@@ -64,32 +64,32 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
 
   async function runSnapshotSuccessFlow(
     id: string,
-    repoInstanceId: string,
+    repoRuntimeId: string,
     snap: RepoSnapshot,
     previousSnapshotBranches: RepoSnapshot['branches'] | null,
     isSnapshotCurrent: () => boolean,
   ): Promise<void> {
     const validBranches = new Set(snap.branches.map((b) => b.name))
-    updateIfFresh(set, id, repoInstanceId, (r) => {
+    updateIfFresh(set, id, repoRuntimeId, (r) => {
       applySnapshotToRepoProjection(r, snap, validBranches, previousSnapshotBranches)
     })
     await runSnapshotSuccessWorkflow(set, get, {
       id,
-      repoInstanceId,
+      repoRuntimeId,
       isSnapshotCurrent,
     })
   }
 
   async function runRuntimeProjectionRefresh(
     id: string,
-    repoInstanceId: string,
+    repoRuntimeId: string,
     options: RepoRuntimeProjectionRefreshOptions,
   ): Promise<void> {
     const { scope } = options
     const { wantsReadModelLoad, wantsVisibleStatusLoad, operationKey, priority, targets } = projectionRefreshPlan(scope)
     const branchName = scope === 'visible-status' ? options.branchName : null
 
-    updateIfFresh(set, id, repoInstanceId, (r) => {
+    updateIfFresh(set, id, repoRuntimeId, (r) => {
       if (wantsReadModelLoad) {
         startDataLoad(r.dataLoads.repoReadModel, {
           hasData: (readRepoBranchQueryProjection(r)?.branches.length ?? 0) > 0,
@@ -105,7 +105,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       set,
       get,
       id,
-      repoInstanceId,
+      repoRuntimeId,
       lane: 'read',
       operationKey,
       priority,
@@ -114,21 +114,21 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       errorFromResult: (projection) => (projection.snapshot ? null : 'error.failed-read-repo'),
       onResult: async (projection: RepoRuntimeProjection, ctx) => {
         const previousBranchModel = ctx.isCurrent()
-          ? readRepoBranchQueryProjection({ id, instanceId: repoInstanceId })
+          ? readRepoBranchQueryProjection({ id, repoRuntimeId: repoRuntimeId })
           : null
-        if (ctx.isCurrent()) setRepoProjectionQueryData(id, repoInstanceId, branchName, 'full', projection)
+        if (ctx.isCurrent()) setRepoProjectionQueryData(id, repoRuntimeId, branchName, 'full', projection)
 
         if (wantsVisibleStatusLoad) {
-          updateIfFresh(set, id, repoInstanceId, (r) => {
+          updateIfFresh(set, id, repoRuntimeId, (r) => {
             if (projection.snapshot) finishDataLoadSuccess(r.dataLoads.visibleStatus)
             else finishDataLoadError(r.dataLoads.visibleStatus, 'error.failed-read-repo')
           })
         }
         if (projection.status.length > 0 && ctx.isCurrent()) {
-          persistRepoSnapshotCacheEntry(set, get().repos[id], repoInstanceId)
+          persistRepoSnapshotCacheEntry(set, get().repos[id], repoRuntimeId)
         }
         if (!projection.snapshot) {
-          updateIfFresh(set, id, repoInstanceId, (r) => {
+          updateIfFresh(set, id, repoRuntimeId, (r) => {
             if (wantsReadModelLoad) finishDataLoadError(r.dataLoads.repoReadModel, 'error.failed-read-repo')
             r.events = appendRepoEvent(r.events, errorEvent('error.failed-read-repo'))
           })
@@ -137,7 +137,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         if (wantsReadModelLoad) {
           await runSnapshotSuccessFlow(
             id,
-            repoInstanceId,
+            repoRuntimeId,
             projection.snapshot,
             previousBranchModel?.branches ?? null,
             ctx.isCurrent,
@@ -146,7 +146,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       },
       onError: (message) => {
         if (wantsVisibleStatusLoad && !wantsReadModelLoad) refreshStatusLog.warn('failed', { err: new Error(message) })
-        updateIfFresh(set, id, repoInstanceId, (r) => {
+        updateIfFresh(set, id, repoRuntimeId, (r) => {
           if (isRepoUnavailableReason(message)) markRepoUnavailable(r, message)
           if (wantsReadModelLoad) finishDataLoadError(r.dataLoads.repoReadModel, message)
           if (wantsVisibleStatusLoad) finishDataLoadError(r.dataLoads.visibleStatus, message)
@@ -157,21 +157,21 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
   }
 
   return {
-    async refreshCoreData(id: string, options?: { repoInstanceId?: string }) {
-      const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
+    async refreshCoreData(id: string, options?: { repoRuntimeId?: string }) {
+      const resolved = resolveActionRepoRuntimeId(get, id, options?.repoRuntimeId)
       if (!resolved) return
-      const { repoInstanceId } = resolved
-      await runCoreDataRefreshWorkflow(get, { id, repoInstanceId })
+      const { repoRuntimeId } = resolved
+      await runCoreDataRefreshWorkflow(get, { id, repoRuntimeId })
     },
 
     async refreshRuntimeProjection(
       id: string,
       options: RepoRuntimeProjectionRefreshOptions,
     ) {
-      const resolved = resolveActionRepoInstanceId(get, id, options.repoInstanceId)
+      const resolved = resolveActionRepoRuntimeId(get, id, options.repoRuntimeId)
       if (!resolved) return
-      const { repoInstanceId } = resolved
-      await runRuntimeProjectionRefresh(id, repoInstanceId, options)
+      const { repoRuntimeId } = resolved
+      await runRuntimeProjectionRefresh(id, repoRuntimeId, options)
     },
 
     /** Unified sync pipeline — local and remote repos follow the same path.
@@ -179,19 +179,19 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
      *  2) Always refresh the server runtime projection afterwards.
      *  Bookkeeping (setLastResult, clearFetchFailed) is handled inline
      *  so there is one source of truth for post-sync cleanup. */
-    async syncAndRefresh(id: string, options?: { repoInstanceId?: string }) {
-      const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
+    async syncAndRefresh(id: string, options?: { repoRuntimeId?: string }) {
+      const resolved = resolveActionRepoRuntimeId(get, id, options?.repoRuntimeId)
       if (!resolved) return
-      const { repoInstanceId } = resolved
+      const { repoRuntimeId } = resolved
       await runExclusiveOperation({
         set,
         get,
         id,
-        repoInstanceId,
+        repoRuntimeId,
         lane: 'read',
         priority: 100,
         targets: [{ key: 'manualRefresh', reason: 'manual-refresh' }],
-        task: async () => await runManualSyncPipeline(id, repoInstanceId),
+        task: async () => await runManualSyncPipeline(id, repoRuntimeId),
       })
     },
   }

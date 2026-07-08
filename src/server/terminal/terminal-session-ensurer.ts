@@ -18,7 +18,7 @@ import {
 
 export interface TerminalSessionEnsureInput {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   branch: string
   worktreePath: string
   terminalSessionId?: string
@@ -51,7 +51,7 @@ export interface TerminalSessionEnsureManagerInput {
   userId: string
   scope: string
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   branch: string
   terminalSessionId: string
   worktreePath: string
@@ -123,9 +123,9 @@ class TerminalSessionEnsurer {
     )
     const result = await this.options.manager.ensureSession({
       userId,
-      scope: terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId),
+      scope: terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId),
       repoRoot: input.repoRoot,
-      repoInstanceId: input.repoInstanceId,
+      repoRuntimeId: input.repoRuntimeId,
       branch: input.branch,
       terminalSessionId: context.terminalSessionId,
       worktreePath: context.scopedWorktreePath,
@@ -161,9 +161,9 @@ class TerminalSessionEnsurer {
       : undefined
     const result = await this.options.manager.ensureSession({
       userId,
-      scope: terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId),
+      scope: terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId),
       repoRoot,
-      repoInstanceId: input.repoInstanceId,
+      repoRuntimeId: input.repoRuntimeId,
       branch: input.branch,
       terminalSessionId: context.terminalSessionId,
       worktreePath: worktreePath,

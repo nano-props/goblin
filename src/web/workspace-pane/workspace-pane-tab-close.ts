@@ -39,7 +39,7 @@ export function beginWorkspacePaneTabClose(
   const closeContext = readWorkspacePaneRuntimeTabCloseContext()
   const closeTarget = {
     repoRoot: target.repoId,
-    repoInstanceId: target.repoInstanceId,
+    repoRuntimeId: target.repoRuntimeId,
     branchName: target.branchName,
     worktreePath: target.worktreePath,
   }
@@ -98,7 +98,7 @@ export async function closeWorkspacePaneTabsForWorktree({
   const closeContext = readWorkspacePaneRuntimeTabCloseContext()
   const runtimeCloseTarget = {
     repoRoot: repoId,
-    repoInstanceId: repo.instanceId,
+    repoRuntimeId: repo.repoRuntimeId,
     branchName,
     worktreePath,
   }
@@ -130,7 +130,7 @@ function closeStaticTabWithCommit(worktreePath: string | null) {
     if (!repo) return false
     const result = await updateWorkspacePaneTabs({
       repoRoot: repoId,
-      repoInstanceId: repo.instanceId,
+      repoRuntimeId: repo.repoRuntimeId,
       branchName,
       worktreePath,
       operation: { type: 'close-static', tabType: type },

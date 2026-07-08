@@ -10,8 +10,8 @@ import { repoRouteContextFromMatches } from '#/web/Layout.tsx'
 
 describe('primary window initial route', () => {
   test('prefers the restored repo over the first repo in order', () => {
-    const repoA = emptyRepo('/repo-a', 'repo-a', 'repo-instance-a')
-    const repoB = emptyRepo('/repo-b', 'repo-b', 'repo-instance-b')
+    const repoA = emptyRepo('/repo-a', 'repo-a', 'repo-runtime-a')
+    const repoB = emptyRepo('/repo-b', 'repo-b', 'repo-runtime-b')
 
     expect(
       initialRepoRouteSlugFromStore({
@@ -24,7 +24,7 @@ describe('primary window initial route', () => {
   })
 
   test('waits for workspace membership restore instead of routing to the first partial repo', () => {
-    const repoA = emptyRepo('/repo-a', 'repo-a', 'repo-instance-a')
+    const repoA = emptyRepo('/repo-a', 'repo-a', 'repo-runtime-a')
 
     expect(
       initialRepoRouteSlugFromStore({
@@ -37,7 +37,7 @@ describe('primary window initial route', () => {
   })
 
   test('falls back to the first ordered repo when restore has settled without a restored repo', () => {
-    const repoA = emptyRepo('/repo-a', 'repo-a', 'repo-instance-a')
+    const repoA = emptyRepo('/repo-a', 'repo-a', 'repo-runtime-a')
 
     expect(
       initialRepoRouteSlugFromStore({

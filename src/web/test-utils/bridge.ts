@@ -95,10 +95,10 @@ export function seedRepoShellForTest(options: {
   name?: string
   currentBranchName?: string | null
   preferredWorkspacePaneTabByTarget?: Record<string, WorkspacePaneTabType | null>
-  instanceId?: string
+  repoRuntimeId?: string
   remote?: Partial<RepoState['remote']>
 }): RepoState {
-  const base = emptyRepo(options.id, options.name ?? 'repo', options.instanceId ?? createOpaqueId('repo-instance'))
+  const base = emptyRepo(options.id, options.name ?? 'repo', options.repoRuntimeId ?? createOpaqueId('repo-runtime'))
   const repo: RepoState = {
     ...base,
     ui: {
@@ -409,7 +409,7 @@ export function resetReposStore(): void {
 }
 
 export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>): void {
-  const repoRuntimeState = new Map<string, { currentInstanceId: string | null }>()
+  const repoRuntimeState = new Map<string, { currentRepoRuntimeId: string | null }>()
   const hostOpenExternalUrl = handlers['app.openExternalUrl']
   const hostOpenDirectoryDialog = handlers['repo.openDialog']
   const hostConsumeExternalOpenPaths = handlers['repo.consumeExternalOpenPaths']
@@ -764,37 +764,37 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           if (!probe.ok || !probe.root) {
             return { ok: false as const, input: repoInput, reason: probe.message ?? 'error.not-git-repo' }
           }
-          const state = repoRuntimeState.get(probe.root) ?? { currentInstanceId: null }
-          if (!state.currentInstanceId) state.currentInstanceId = createOpaqueId('repo-instance')
+          const state = repoRuntimeState.get(probe.root) ?? { currentRepoRuntimeId: null }
+          if (!state.currentRepoRuntimeId) state.currentRepoRuntimeId = createOpaqueId('repo-runtime')
           repoRuntimeState.set(probe.root, state)
           return {
             ok: true as const,
             repo: { id: probe.root, name: probe.name ?? probe.root.split('/').at(-1) ?? probe.root },
-            repoInstanceId: state.currentInstanceId,
+            repoRuntimeId: state.currentRepoRuntimeId,
           }
         }
         if (typeof repoRoot !== 'string' || repoRoot.length === 0) throw new Error('runtime-open requires repoRoot')
-        const state = repoRuntimeState.get(repoRoot) ?? { currentInstanceId: null }
-        const repoInstanceId = createOpaqueId('repo-instance')
-        state.currentInstanceId = repoInstanceId
+        const state = repoRuntimeState.get(repoRoot) ?? { currentRepoRuntimeId: null }
+        const repoRuntimeId = createOpaqueId('repo-runtime')
+        state.currentRepoRuntimeId = repoRuntimeId
         repoRuntimeState.set(repoRoot, state)
-        return { ok: true as const, repoInstanceId }
+        return { ok: true as const, repoRuntimeId }
       }
       const closeRepoRuntime = (payload: unknown) => {
         const repoRoot = typeof payload === 'object' && payload && 'repoRoot' in payload ? payload.repoRoot : null
-        const repoInstanceId =
-          typeof payload === 'object' && payload && 'repoInstanceId' in payload ? payload.repoInstanceId : null
-        if (typeof repoRoot !== 'string' || typeof repoInstanceId !== 'string') {
-          throw new Error('runtime-close requires repoRoot and repoInstanceId')
+        const repoRuntimeId =
+          typeof payload === 'object' && payload && 'repoRuntimeId' in payload ? payload.repoRuntimeId : null
+        if (typeof repoRoot !== 'string' || typeof repoRuntimeId !== 'string') {
+          throw new Error('runtime-close requires repoRoot and repoRuntimeId')
         }
         const state = repoRuntimeState.get(repoRoot)
-        const closed = !!state && state.currentInstanceId === repoInstanceId
-        if (closed && state) state.currentInstanceId = null
+        const closed = !!state && state.currentRepoRuntimeId === repoRuntimeId
+        if (closed && state) state.currentRepoRuntimeId = null
         return { ok: true as const, closed }
       }
       const listRepoRuntime = () => ({
-        instances: Array.from(repoRuntimeState.entries()).flatMap(([repoRoot, state]) =>
-          state.currentInstanceId ? [{ repoRoot, repoInstanceId: state.currentInstanceId }] : [],
+        runtimes: Array.from(repoRuntimeState.entries()).flatMap(([repoRoot, state]) =>
+          state.currentRepoRuntimeId ? [{ repoRoot, repoRuntimeId: state.currentRepoRuntimeId }] : [],
         ),
       })
       const result = (() => {
@@ -893,7 +893,7 @@ export function seedRepoWithReadModelForTest(options: {
   preferredWorkspacePaneTab?: WorkspacePaneTabType | null
   preferredWorkspacePaneTabByTarget?: Record<string, WorkspacePaneTabType | null>
   workspacePaneTabsByBranch?: Record<string, WorkspacePaneTabEntry[]>
-  instanceId?: string
+  repoRuntimeId?: string
   status?: WorktreeStatus[]
   remote?: Partial<RepoState['remote']>
 }): RepoState {
@@ -915,7 +915,7 @@ export function seedRepoWithReadModelForTest(options: {
   const repo = seedRepoShellForTest({
     id: options.id,
     name: options.name,
-    instanceId: options.instanceId,
+    repoRuntimeId: options.repoRuntimeId,
     currentBranchName,
     ...(preferredWorkspacePaneTabByTarget ? { preferredWorkspacePaneTabByTarget } : {}),
     remote: options.remote,
@@ -930,7 +930,7 @@ export function seedRepoWithReadModelForTest(options: {
     if (!branch) continue
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: options.id,
-      repoInstanceId: repo.instanceId,
+      repoRuntimeId: repo.repoRuntimeId,
       branchName,
       worktreePath: branch.worktree?.path ?? null,
       tabs,
@@ -940,7 +940,7 @@ export function seedRepoWithReadModelForTest(options: {
 }
 
 export function seedRepoReadModelQueryData(
-  repo: Pick<RepoState, 'id' | 'instanceId'>,
+  repo: Pick<RepoState, 'id' | 'repoRuntimeId'>,
   readModel: {
     branches: BranchSnapshotInfo[]
     currentBranch: string
@@ -961,9 +961,9 @@ export function seedRepoReadModelQueryData(
     },
     loadedAt: 0,
   }
-  setRepoProjectionQueryData(repo.id, repo.instanceId, null, 'full', projection)
+  setRepoProjectionQueryData(repo.id, repo.repoRuntimeId, null, 'full', projection)
   if (readModel.currentBranch) {
-    setRepoProjectionQueryData(repo.id, repo.instanceId, readModel.currentBranch, 'full', {
+    setRepoProjectionQueryData(repo.id, repo.repoRuntimeId, readModel.currentBranch, 'full', {
       ...projection,
       requested: {
         branch: readModel.currentBranch,

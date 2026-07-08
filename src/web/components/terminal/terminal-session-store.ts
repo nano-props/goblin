@@ -128,14 +128,14 @@ export function useTerminalWorktreeSessionDescriptor({
   terminalWorktreeKey,
   terminalSessionId,
   repoRoot,
-  repoInstanceId,
+  repoRuntimeId,
   branch,
   worktreePath,
 }: {
   terminalWorktreeKey: string | null
   terminalSessionId: string | null
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   branch: string
   worktreePath: string
 }): TerminalDescriptor | null {
@@ -162,11 +162,11 @@ export function useTerminalWorktreeSessionDescriptor({
       terminalSessionId: snapshotTerminalSessionId,
       index: Number(indexText) || 0,
       repoRoot,
-      repoInstanceId,
+      repoRuntimeId,
       branch,
       worktreePath,
     }
-  }, [branch, descriptorSnapshot, repoInstanceId, repoRoot, terminalWorktreeKey, worktreePath])
+  }, [branch, descriptorSnapshot, repoRuntimeId, repoRoot, terminalWorktreeKey, worktreePath])
 }
 
 export function useTerminalSessionSummaries(terminalWorktreeKey: string | null): TerminalSessionSummary[] {
@@ -185,13 +185,13 @@ export function useTerminalSessionSummaries(terminalWorktreeKey: string | null):
 }
 
 export function useTerminalRepoProjectionPhase(repoRoot: string | null): TerminalProjectionHydrationPhase {
-  const instanceId = useReposStore((s) => (repoRoot ? s.repos[repoRoot]?.instanceId : undefined))
-  return useTerminalProjectionHydrationPhase(repoRoot, instanceId)
+  const repoRuntimeId = useReposStore((s) => (repoRoot ? s.repos[repoRoot]?.repoRuntimeId : undefined))
+  return useTerminalProjectionHydrationPhase(repoRoot, repoRuntimeId)
 }
 
 export function useTerminalRepoProjectionHydrationEntry(repoRoot: string | null): TerminalProjectionHydrationEntry {
-  const instanceId = useReposStore((s) => (repoRoot ? s.repos[repoRoot]?.instanceId : undefined))
-  return useTerminalProjectionHydrationEntry(repoRoot, instanceId)
+  const repoRuntimeId = useReposStore((s) => (repoRoot ? s.repos[repoRoot]?.repoRuntimeId : undefined))
+  return useTerminalProjectionHydrationEntry(repoRoot, repoRuntimeId)
 }
 
 export function useTerminalRepoProjectionReady(repoRoot: string | null): boolean {

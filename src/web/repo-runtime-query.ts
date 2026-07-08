@@ -1,64 +1,64 @@
 import { queryOptions, type QueryClient } from '@tanstack/react-query'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import type { RepoRuntimeInstanceEntry, RepoRuntimeInstancesSnapshot } from '#/shared/api-types.ts'
-import { listRepoRuntimeInstances } from '#/web/repo-client.ts'
+import type { RepoRuntimeEntry, RepoRuntimesSnapshot } from '#/shared/api-types.ts'
+import { listRepoRuntimes } from '#/web/repo-client.ts'
 
-export function repoRuntimeInstancesQueryKey() {
-  return ['repo-runtime', 'instances'] as const
+export function repoRuntimesQueryKey() {
+  return ['repo-runtime', 'runtimes'] as const
 }
 
-export function repoRuntimeInstancesQueryOptions() {
+export function repoRuntimesQueryOptions() {
   return queryOptions({
-    queryKey: repoRuntimeInstancesQueryKey(),
-    queryFn: ({ signal }) => listRepoRuntimeInstances(signal),
+    queryKey: repoRuntimesQueryKey(),
+    queryFn: ({ signal }) => listRepoRuntimes(signal),
     staleTime: Number.POSITIVE_INFINITY,
     gcTime: Number.POSITIVE_INFINITY,
   })
 }
 
-export async function refreshRepoRuntimeInstances(
+export async function refreshRepoRuntimes(
   queryClient: QueryClient = primaryWindowQueryClient,
-): Promise<RepoRuntimeInstancesSnapshot> {
-  await queryClient.cancelQueries({ queryKey: repoRuntimeInstancesQueryKey(), exact: true })
-  await queryClient.invalidateQueries({ queryKey: repoRuntimeInstancesQueryKey(), exact: true, refetchType: 'none' })
-  return await queryClient.fetchQuery(repoRuntimeInstancesQueryOptions())
+): Promise<RepoRuntimesSnapshot> {
+  await queryClient.cancelQueries({ queryKey: repoRuntimesQueryKey(), exact: true })
+  await queryClient.invalidateQueries({ queryKey: repoRuntimesQueryKey(), exact: true, refetchType: 'none' })
+  return await queryClient.fetchQuery(repoRuntimesQueryOptions())
 }
 
-export async function updateRepoRuntimeInstanceCache(
-  entry: RepoRuntimeInstanceEntry,
+export async function updateRepoRuntimeCache(
+  entry: RepoRuntimeEntry,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): Promise<void> {
-  await queryClient.cancelQueries({ queryKey: repoRuntimeInstancesQueryKey(), exact: true })
-  queryClient.setQueryData<RepoRuntimeInstancesSnapshot>(repoRuntimeInstancesQueryKey(), (current) => {
-    const existing = current?.instances ?? []
-    const instances = existing.filter((item) => item.repoRoot !== entry.repoRoot)
-    instances.push(entry)
-    return { instances }
+  await queryClient.cancelQueries({ queryKey: repoRuntimesQueryKey(), exact: true })
+  queryClient.setQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey(), (current) => {
+    const existing = current?.runtimes ?? []
+    const runtimes = existing.filter((item) => item.repoRoot !== entry.repoRoot)
+    runtimes.push(entry)
+    return { runtimes }
   })
 }
 
-export async function removeRepoRuntimeInstanceFromCache(
-  entry: RepoRuntimeInstanceEntry,
+export async function removeRepoRuntimeFromCache(
+  entry: RepoRuntimeEntry,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): Promise<void> {
-  await queryClient.cancelQueries({ queryKey: repoRuntimeInstancesQueryKey(), exact: true })
+  await queryClient.cancelQueries({ queryKey: repoRuntimesQueryKey(), exact: true })
   let foundMatchingEntry = false
-  queryClient.setQueryData<RepoRuntimeInstancesSnapshot>(repoRuntimeInstancesQueryKey(), (current) => {
+  queryClient.setQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey(), (current) => {
     if (!current) return current
-    const instances = current.instances.filter((item) => {
-      const matches = item.repoRoot === entry.repoRoot && item.repoInstanceId === entry.repoInstanceId
+    const runtimes = current.runtimes.filter((item) => {
+      const matches = item.repoRoot === entry.repoRoot && item.repoRuntimeId === entry.repoRuntimeId
       if (matches) foundMatchingEntry = true
       return !matches
     })
-    return instances.length === current.instances.length ? current : { instances }
+    return runtimes.length === current.runtimes.length ? current : { runtimes }
   })
   if (!foundMatchingEntry) {
-    await refreshRepoRuntimeInstances(queryClient)
+    await refreshRepoRuntimes(queryClient)
   }
 }
 
-export async function invalidateRepoRuntimeInstances(
+export async function invalidateRepoRuntimes(
   queryClient: QueryClient = primaryWindowQueryClient,
-): Promise<RepoRuntimeInstancesSnapshot> {
-  return await refreshRepoRuntimeInstances(queryClient)
+): Promise<RepoRuntimesSnapshot> {
+  return await refreshRepoRuntimes(queryClient)
 }

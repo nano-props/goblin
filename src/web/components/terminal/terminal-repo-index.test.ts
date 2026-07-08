@@ -14,7 +14,7 @@ describe('terminal repo index', () => {
     const entries: TerminalRepoIndexEntry[] = [
       {
         id: REPO_ID,
-        instanceId: 'repo-instance-terminal-index',
+        repoRuntimeId: 'repo-runtime-terminal-index',
       },
     ]
 

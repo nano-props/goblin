@@ -482,7 +482,7 @@ function branchActionMenuShell(container: HTMLElement): HTMLDivElement | undefin
 }
 
 function branchRowRepo() {
-  return repoPresentationForTest(emptyRepo('/tmp/repo', 'repo', 'repo-instance-test'), {
+  return repoPresentationForTest(emptyRepo('/tmp/repo', 'repo', 'repo-runtime-test'), {
     branches: [],
     currentBranch: '',
     status: [],

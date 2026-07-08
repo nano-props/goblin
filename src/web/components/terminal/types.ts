@@ -12,7 +12,7 @@ export interface TerminalDescriptor {
   terminalWorktreeKey: string
   terminalSessionId: string
   index: number
-  repoInstanceId: string
+  repoRuntimeId: string
   repoRoot: string
   branch: string
   worktreePath: string
@@ -146,7 +146,7 @@ export interface TerminalCreateOptions {
 }
 
 export interface TerminalRepoSnapshot {
-  instanceId: string
+  repoRuntimeId: string
   branchByWorktreePath: Record<string, string>
 }
 

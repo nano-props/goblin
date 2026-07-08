@@ -19,7 +19,7 @@ import type {
 import { isValidTerminalRuntimeSessionId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
-import { isCurrentRepoRuntimeInstance } from '#/server/modules/repo-runtime-instances.ts'
+import { isCurrentRepoRuntime as isCurrentRepoRuntimeOpen } from '#/server/modules/repo-runtimes.ts'
 import { broadcastWorkspacePaneTabsChanged } from '#/server/workspace-pane/workspace-pane-tabs-realtime.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
@@ -30,9 +30,9 @@ interface TerminalSessionServiceLike {
     clientId: string,
     userId: string,
     repoRoot: string,
-    repoInstanceId: string,
+    repoRuntimeId: string,
   ): Promise<{ pruned: number; remaining: number }>
-  listSessions(userId: string, repoRoot: string, repoInstanceId: string): Promise<TerminalSessionSummary[]>
+  listSessions(userId: string, repoRoot: string, repoRuntimeId: string): Promise<TerminalSessionSummary[]>
 }
 
 interface TerminalRuntimeActionDependencies {
@@ -100,8 +100,8 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       ) {
         return { ok: false, message: 'error.invalid-arguments' }
       }
-      if (!isCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)) {
-        return { ok: false, message: 'error.repo-instance-stale' }
+      if (!isCurrentRepoRuntimeOpen(userId, input.repoRoot, input.repoRuntimeId)) {
+        return { ok: false, message: 'error.repo-runtime-stale' }
       }
       const result = await sessionService.create(clientId, userId, input)
       if (result.ok) broadcastRepoWorkspaceTabsChanged(userId, input.repoRoot)
@@ -115,8 +115,8 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     ): Promise<{ pruned: number; remaining: number }> {
       if (!isValidTerminalClientId(clientId)) return { pruned: 0, remaining: 0 }
       if (!isValidRepoLocator(input.repoRoot)) return { pruned: 0, remaining: 0 }
-      assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
-      return await sessionService.prune(clientId, userId, input.repoRoot, input.repoInstanceId)
+      assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
+      return await sessionService.prune(clientId, userId, input.repoRoot, input.repoRuntimeId)
     },
 
     write(clientId: string, userId: string, input: TerminalWriteInput): TerminalMutationResult {
@@ -188,8 +188,8 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     ): Promise<TerminalSessionSummary[]> {
       if (!isValidTerminalClientId(clientId)) return []
       if (!isValidRepoLocator(input.repoRoot)) return []
-      assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
-      return await sessionService.listSessions(userId, input.repoRoot, input.repoInstanceId)
+      assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
+      return await sessionService.listSessions(userId, input.repoRoot, input.repoRuntimeId)
     },
 
     async recoverSessions(
@@ -199,10 +199,10 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     ): Promise<TerminalSessionsRecoveryResult> {
       if (!isValidTerminalClientId(clientId)) return { sessions: [], snapshots: [] }
       if (!isValidRepoLocator(input.repoRoot)) return { sessions: [], snapshots: [] }
-      assertCurrentRepoInstance(userId, input.repoRoot, input.repoInstanceId)
+      assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
       return await manager.recoverSessionsForUser(
         userId,
-        terminalSessionRuntimeScope(input.repoRoot, input.repoInstanceId),
+        terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId),
       )
     },
   }
@@ -215,13 +215,9 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
     broadcastWorkspacePaneTabsChanged(broker, userId, repoRoot)
   }
 
-  function assertCurrentRepoInstance(userId: string, repoRoot: string, repoInstanceId: string): void {
-    if (!isCurrentRepoInstance(userId, repoRoot, repoInstanceId)) {
-      throw new Error('error.repo-instance-stale')
+  function assertCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): void {
+    if (!isCurrentRepoRuntimeOpen(userId, repoRoot, repoRuntimeId)) {
+      throw new Error('error.repo-runtime-stale')
     }
-  }
-
-  function isCurrentRepoInstance(userId: string, repoRoot: string, repoInstanceId: string): boolean {
-    return isCurrentRepoRuntimeInstance(userId, repoRoot, repoInstanceId)
   }
 }

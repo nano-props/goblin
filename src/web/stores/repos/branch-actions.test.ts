@@ -45,7 +45,7 @@ beforeEach(() => {
   resetReposStore()
   seedRepoWithReadModelForTest({
     id: REPO_ID,
-    instanceId: 'repo-instance-test',
+    repoRuntimeId: 'repo-runtime-test',
     branches: [createRepoBranch('feature/a'), createRepoBranch('feature/b')],
   })
 })
@@ -396,7 +396,7 @@ describe('runBranchAction', () => {
 
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      instanceId: 'repo-instance-test-2',
+      repoRuntimeId: 'repo-runtime-test-2',
       branches: [createRepoBranch('feature/reopened')],
       currentBranch: 'feature/reopened',
     })
@@ -406,7 +406,7 @@ describe('runBranchAction', () => {
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(deleteCalls).toBe(0)
-    expect(repo?.instanceId).toBe('repo-instance-test-2')
+    expect(repo?.repoRuntimeId).toBe('repo-runtime-test-2')
     expect(repo?.operations.branchAction).toMatchObject({
       phase: 'idle',
       target: null,
@@ -663,7 +663,7 @@ describe('runBranchAction', () => {
 
     await useReposStore
       .getState()
-      .runBranchAction(REPO_ID, createWorktreeAction(), { repoInstanceId: 'repo-instance-test', refreshOnError: false })
+      .runBranchAction(REPO_ID, createWorktreeAction(), { repoRuntimeId: 'repo-runtime-test', refreshOnError: false })
 
     expect(useReposStore.getState().repos[REPO_ID]?.events.at(-1)).toMatchObject({
       kind: 'result',
@@ -682,7 +682,7 @@ describe('runBranchAction', () => {
 
     await useReposStore
       .getState()
-      .runBranchAction(REPO_ID, createWorktreeAction(), { repoInstanceId: 'repo-instance-test' })
+      .runBranchAction(REPO_ID, createWorktreeAction(), { repoRuntimeId: 'repo-runtime-test' })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.branchViewMode).toBe('all')
@@ -694,7 +694,7 @@ describe('runBranchAction', () => {
 
     await useReposStore
       .getState()
-      .runBranchAction(REPO_ID, createWorktreeAction(), { repoInstanceId: 'repo-instance-test' })
+      .runBranchAction(REPO_ID, createWorktreeAction(), { repoRuntimeId: 'repo-runtime-test' })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.branchViewMode).toBe('worktrees')
@@ -711,7 +711,7 @@ describe('runBranchAction', () => {
 
     await useReposStore
       .getState()
-      .runBranchAction(REPO_ID, createWorktreeAction(), { repoInstanceId: 'repo-instance-test', refreshOnError: false })
+      .runBranchAction(REPO_ID, createWorktreeAction(), { repoRuntimeId: 'repo-runtime-test', refreshOnError: false })
 
     const repo = useReposStore.getState().repos[REPO_ID]
     expect(repo?.ui.branchViewMode).toBe('worktrees')
@@ -723,7 +723,7 @@ describe('runBranchAction', () => {
       onSnapshot: () => {
         seedRepoWithReadModelForTest({
           id: REPO_ID,
-          instanceId: 'repo-instance-test-2',
+          repoRuntimeId: 'repo-runtime-test-2',
           branches: [createRepoBranch('feature/a'), createRepoBranch('feature/new')],
           currentBranchName: 'feature/a',
         })
@@ -733,10 +733,10 @@ describe('runBranchAction', () => {
 
     await useReposStore
       .getState()
-      .runBranchAction(REPO_ID, createWorktreeAction(), { repoInstanceId: 'repo-instance-test' })
+      .runBranchAction(REPO_ID, createWorktreeAction(), { repoRuntimeId: 'repo-runtime-test' })
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.instanceId).toBe('repo-instance-test-2')
+    expect(repo?.repoRuntimeId).toBe('repo-runtime-test-2')
     expect(repo?.ui.branchViewMode).toBe('worktrees')
   })
 
@@ -755,7 +755,7 @@ describe('runBranchAction', () => {
     await flushAsyncWork()
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      instanceId: 'repo-instance-test-2',
+      repoRuntimeId: 'repo-runtime-test-2',
       branches: [createRepoBranch('feature/new-instance')],
       currentBranch: 'feature/new-instance',
     })
@@ -764,7 +764,7 @@ describe('runBranchAction', () => {
     await work
 
     const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo?.instanceId).toBe('repo-instance-test-2')
+    expect(repo?.repoRuntimeId).toBe('repo-runtime-test-2')
     expect(repoCurrentBranch()).toBe('feature/new-instance')
     expect(repoBranchNames()).toEqual(['feature/new-instance'])
   })
@@ -788,7 +788,7 @@ describe('runBranchAction', () => {
       .runBranchAction(
         REPO_ID,
         { kind: 'deleteBranch', branch: 'feature/b', force: false },
-        { repoInstanceId: 'repo-instance-test' },
+        { repoRuntimeId: 'repo-runtime-test' },
       )
 
     const repo = useReposStore.getState().repos[REPO_ID]

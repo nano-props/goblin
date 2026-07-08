@@ -11,8 +11,8 @@ Use this doc for app shell and process control rules.
 - Let the server own settings and app data.
 - Prefer server-first runtime authority. The client should send intent plus explicit preconditions, and the server should accept or reject with fast-fail semantics.
 - Keep user commands sequential. Resolve route/state supplements at the action boundary, perform the accepted write, then navigate to the precomputed result. Do not use effects, background observers, or client-only tokens to repair command state after the fact.
-- Model runtime lifecycle as server-owned state transitions, not client-synchronized snapshots. For repo instances this means the server mints the live `repoInstanceId` on open and invalidates it on close/reopen.
-- Do not treat a stable locator such as `repoRoot` as a full runtime identity when reopen/recreate can mint a new live instance.
+- Model runtime lifecycle as server-owned state transitions, not client-synchronized snapshots. For repo runtimes this means the server mints the live `repoRuntimeId` on open and invalidates it on close/reopen.
+- Do not treat a stable locator such as `repoRoot` as a full runtime identity when reopen/recreate can mint a new live runtime.
 - Do not add client-side freshness heuristics when the server can reject stale work directly. Push runtime validity checks into shared protocol contracts first, and let stale mutations fail instead of trying to "heal" them in the client.
 - When a server-owned runtime id already identifies the write target precisely enough, use that id directly and let the server decide. Do not add a second client-side freshness dependency "just in case" if it can only make a valid server action fail locally.
 - Server push should be the default way client projections converge after a successful write. Avoid immediate client-issued read-backs on the same path unless the server contract truly cannot return or broadcast the authoritative post-write state.
@@ -28,8 +28,8 @@ Workspace Pane tabs have two classes:
 - static tabs, identified by a fixed `tabId`
 - runtime tabs, identified by `{ type, runtimeSessionId }`
 
-Runtime tabs are server-owned session tabs. A runtime tab may have multiple
-instances for the same runtime type, may be closed, may be restored from a
+Runtime tabs are server-owned session tabs. Multiple runtime tabs for the same
+type may be open, closed, and restored from a
 server projection, and may surface pending/realtime/lifecycle state through
 its provider. The tab strip must treat these as generic runtime items, not as
 terminal-specific tabs.

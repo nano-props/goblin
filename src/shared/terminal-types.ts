@@ -24,12 +24,12 @@ export interface TerminalSessionBase {
   repoRoot: string
   branch: string
   worktreePath: string
-  repoInstanceId?: string
+  repoRuntimeId?: string
 }
 
-export interface RepoInstanceRuntimeInput {
+export interface RepoRuntimeInput {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
 }
 
 export interface TerminalAttachInput {
@@ -48,7 +48,7 @@ export interface TerminalAttachInput {
 
 export interface TerminalCreateInput {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   branch: string
   worktreePath: string
   kind: 'primary' | 'additional'
@@ -213,18 +213,18 @@ export interface TerminalTestNotificationInput {
 
 export interface TerminalListSessionsInput {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
 }
 
 export interface TerminalPruneInput {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
 }
 
 export interface TerminalSessionSummary {
   terminalRuntimeSessionId: string
   terminalSessionId: string
-  repoInstanceId: string
+  repoRuntimeId: string
   repoRoot: string
   branch: string
   worktreePath: string

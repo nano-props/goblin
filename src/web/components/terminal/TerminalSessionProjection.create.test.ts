@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
   clientIdMock: vi.fn(() => 'client_local'),
 }))
 
-const REPO_INSTANCE_ID = 'repo-instance-test'
+const REPO_RUNTIME_ID = 'repo-runtime-test'
 
 vi.mock('#/web/terminal.ts', () => ({
   terminalClient: {
@@ -142,7 +142,7 @@ let originalResizeObserver: typeof ResizeObserver | undefined
 function makeRepoIndex() {
   return {
     [REPO_ROOT]: {
-      instanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       branchByWorktreePath: { [WORKTREE_PATH]: BRANCH },
     },
   }
@@ -151,7 +151,7 @@ function makeRepoIndex() {
 function terminalBase() {
   return {
     repoRoot: REPO_ROOT,
-    repoInstanceId: REPO_INSTANCE_ID,
+    repoRuntimeId: REPO_RUNTIME_ID,
     branch: BRANCH,
     worktreePath: WORKTREE_PATH,
   }
@@ -178,7 +178,7 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
       {
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
         terminalSessionId: 'term-111111111111111111111',
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
         cwd: WORKTREE_PATH,
@@ -266,7 +266,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.estimateManagedTerminalGeometryMock).toHaveBeenCalledWith(host)
     expect(mocks.createMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       branch: BRANCH,
       worktreePath: WORKTREE_PATH,
       kind: 'primary',
@@ -285,7 +285,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     expect(mocks.createMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       branch: BRANCH,
       worktreePath: WORKTREE_PATH,
       kind: 'additional',
@@ -313,7 +313,7 @@ describe('TerminalSessionProjection create flow', () => {
     await expect(create).resolves.toBe('term-111111111111111111111')
     expect(mocks.createMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       branch: BRANCH,
       worktreePath: WORKTREE_PATH,
       kind: 'additional',
@@ -359,7 +359,7 @@ describe('TerminalSessionProjection create flow', () => {
     await expect(
       projection.closeTerminalsForWorktree({
         ...terminalBase(),
-        repoInstanceId: 'repo-instance-new',
+        repoRuntimeId: 'repo-runtime-new',
       }),
     ).resolves.toBe(false)
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
@@ -467,7 +467,7 @@ describe('TerminalSessionProjection create flow', () => {
     await expect(secondCreate).resolves.toBe('term-222222222222222222222')
     expect(mocks.createMock).toHaveBeenLastCalledWith({
       repoRoot: REPO_ROOT,
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       branch: BRANCH,
       worktreePath: WORKTREE_PATH,
       kind: 'additional',
@@ -512,7 +512,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
   })
 
-  test('rejects and closes a create result that no longer belongs to the current repo instance projection', async () => {
+  test('rejects and closes a create result that no longer belongs to the current repo runtime projection', async () => {
     projection.destroy()
     const tabsWrite = Promise.withResolvers<void>()
     const onWorkspaceTabsChanged = vi.fn(async (): Promise<boolean> => {
@@ -527,7 +527,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     projection.setRepoIndex({
       [REPO_ROOT]: {
-        instanceId: 'repo-instance-new',
+        repoRuntimeId: 'repo-runtime-new',
         branchByWorktreePath: { [WORKTREE_PATH]: BRANCH },
       },
     })
@@ -560,7 +560,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
     expect(mocks.createMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       branch: BRANCH,
       worktreePath: WORKTREE_PATH,
       kind: 'primary',
@@ -675,7 +675,7 @@ describe('TerminalSessionProjection create flow', () => {
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
     expect(mocks.createMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       branch: BRANCH,
       worktreePath: WORKTREE_PATH,
       kind: 'primary',
@@ -703,7 +703,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
     expect(mocks.createMock).toHaveBeenCalledWith({
       repoRoot: REPO_ROOT,
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       branch: BRANCH,
       worktreePath: WORKTREE_PATH,
       kind: 'primary',
@@ -1060,7 +1060,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     projection.setRepoIndex({
       [REPO_ROOT]: {
-        instanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branchByWorktreePath: {},
       },
     })

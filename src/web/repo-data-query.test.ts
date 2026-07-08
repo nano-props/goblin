@@ -16,17 +16,17 @@ import type { WorktreeStatus } from '#/shared/git-types.ts'
 
 describe('repo data query keys', () => {
   test('separates projection branch and fetch mode', () => {
-    expect(repoProjectionQueryKey('/tmp/repo', 'repo-instance-1', 'feature/a', 'summary')).not.toEqual(
-      repoProjectionQueryKey('/tmp/repo', 'repo-instance-1', 'feature/a', 'full'),
+    expect(repoProjectionQueryKey('/tmp/repo', 'repo-runtime-1', 'feature/a', 'summary')).not.toEqual(
+      repoProjectionQueryKey('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full'),
     )
-    expect(repoProjectionQueryKey('/tmp/repo', 'repo-instance-1', 'feature/a', 'full')).not.toEqual(
-      repoProjectionQueryKey('/tmp/repo', 'repo-instance-1', 'feature/b', 'full'),
+    expect(repoProjectionQueryKey('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full')).not.toEqual(
+      repoProjectionQueryKey('/tmp/repo', 'repo-runtime-1', 'feature/b', 'full'),
     )
   })
 
   test('separates operation snapshots by settled inclusion', () => {
-    expect(repoOperationsQueryKey('/tmp/repo', 'repo-instance-1', false)).not.toEqual(
-      repoOperationsQueryKey('/tmp/repo', 'repo-instance-1', true),
+    expect(repoOperationsQueryKey('/tmp/repo', 'repo-runtime-1', false)).not.toEqual(
+      repoOperationsQueryKey('/tmp/repo', 'repo-runtime-1', true),
     )
   })
 })
@@ -54,9 +54,9 @@ describe('repo projection query data', () => {
       loadedAt: 123,
     }
 
-    seedRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', cachedProjection, queryClient)
+    seedRepoProjectionQueryData('/tmp/repo', 'repo-runtime-1', cachedProjection, queryClient)
 
-    expect(getRepoProjectionPlaceholderData('/tmp/repo', 'repo-instance-1', 'feature/a', 'full', queryClient)).toEqual({
+    expect(getRepoProjectionPlaceholderData('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', queryClient)).toEqual({
       snapshot: cachedProjection.snapshot,
       status,
       pullRequests: null,
@@ -85,11 +85,11 @@ describe('repo projection query data', () => {
       loadedAt: 202,
     }
 
-    seedRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', branchProjection, queryClient)
-    seedRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', repoProjection, queryClient)
+    seedRepoProjectionQueryData('/tmp/repo', 'repo-runtime-1', branchProjection, queryClient)
+    seedRepoProjectionQueryData('/tmp/repo', 'repo-runtime-1', repoProjection, queryClient)
 
     expect(
-      getRepoProjectionPlaceholderData('/tmp/repo', 'repo-instance-1', 'feature/a', 'full', queryClient),
+      getRepoProjectionPlaceholderData('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', queryClient),
     ).toMatchObject({
       snapshot: repoProjection.snapshot,
       status: repoProjection.status,
@@ -122,12 +122,12 @@ describe('repo projection query data', () => {
       loadedAt: 123,
     }
 
-    setRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', 'feature/a', 'full', projection, queryClient)
+    setRepoProjectionQueryData('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', projection, queryClient)
 
-    expect(getRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', 'feature/a', 'full', queryClient)).toEqual(
+    expect(getRepoProjectionQueryData('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', queryClient)).toEqual(
       projection,
     )
-    expect(getRepoOperationsQueryData('/tmp/repo', 'repo-instance-1', queryClient)).toEqual({
+    expect(getRepoOperationsQueryData('/tmp/repo', 'repo-runtime-1', queryClient)).toEqual({
       operations: [],
       loadedAt: 123,
     })
@@ -144,12 +144,12 @@ describe('repo projection query data', () => {
       loadedAt: 123,
     }
 
-    seedRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', projection, queryClient)
+    seedRepoProjectionQueryData('/tmp/repo', 'repo-runtime-1', projection, queryClient)
 
-    expect(getRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', 'feature/a', 'summary', queryClient)).toEqual({
+    expect(getRepoProjectionQueryData('/tmp/repo', 'repo-runtime-1', 'feature/a', 'summary', queryClient)).toEqual({
       ...projection,
     })
-    expect(getRepoOperationsQueryData('/tmp/repo', 'repo-instance-1', queryClient)).toBeUndefined()
+    expect(getRepoOperationsQueryData('/tmp/repo', 'repo-runtime-1', queryClient)).toBeUndefined()
   })
 
   test('projects active operation snapshots into projection caches', () => {
@@ -167,7 +167,7 @@ describe('repo projection query data', () => {
         {
           id: 'repo-op-1',
           repoId: '/tmp/repo',
-          repoInstanceId: null,
+          repoRuntimeId: null,
           kind: 'fetch' as const,
           phase: 'running' as const,
           source: 'background' as const,
@@ -191,11 +191,11 @@ describe('repo projection query data', () => {
       loadedAt: 456,
     }
 
-    setRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', 'feature/a', 'full', projection, queryClient)
-    setRepoOperationsQueryData('/tmp/repo', 'repo-instance-1', false, operations, queryClient)
+    setRepoProjectionQueryData('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', projection, queryClient)
+    setRepoOperationsQueryData('/tmp/repo', 'repo-runtime-1', false, operations, queryClient)
 
-    expect(getRepoOperationsQueryData('/tmp/repo', 'repo-instance-1', queryClient)).toEqual(operations)
-    expect(getRepoProjectionQueryData('/tmp/repo', 'repo-instance-1', 'feature/a', 'full', queryClient)).toEqual({
+    expect(getRepoOperationsQueryData('/tmp/repo', 'repo-runtime-1', queryClient)).toEqual(operations)
+    expect(getRepoProjectionQueryData('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', queryClient)).toEqual({
       ...projection,
       operations,
     })
@@ -206,26 +206,26 @@ describe('repo projection query data', () => {
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
     const refetchQueries = vi.spyOn(queryClient, 'refetchQueries')
 
-    invalidateRepoRuntimeProjectionQueries('/tmp/repo', 'repo-instance-1', queryClient)
+    invalidateRepoRuntimeProjectionQueries('/tmp/repo', 'repo-runtime-1', queryClient)
 
     expect(invalidateQueries).toHaveBeenCalledTimes(2)
     expect(invalidateQueries).toHaveBeenNthCalledWith(1, {
-      queryKey: ['repo-data', '/tmp/repo', 'repo-instance-1', 'projection'],
+      queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-1', 'projection'],
       refetchType: 'none',
     })
     expect(invalidateQueries).toHaveBeenNthCalledWith(2, {
-      queryKey: ['repo-data', '/tmp/repo', 'repo-instance-1', 'operations'],
+      queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-1', 'operations'],
       refetchType: 'none',
     })
     expect(refetchQueries).toHaveBeenCalledTimes(2)
     expect(refetchQueries).toHaveBeenNthCalledWith(
       1,
-      { queryKey: ['repo-data', '/tmp/repo', 'repo-instance-1', 'projection'], type: 'active' },
+      { queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-1', 'projection'], type: 'active' },
       { cancelRefetch: false },
     )
     expect(refetchQueries).toHaveBeenNthCalledWith(
       2,
-      { queryKey: ['repo-data', '/tmp/repo', 'repo-instance-1', 'operations'], type: 'active' },
+      { queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-1', 'operations'], type: 'active' },
       { cancelRefetch: false },
     )
     refetchQueries.mockRestore()
@@ -237,7 +237,7 @@ describe('repo projection query data', () => {
     const signals: AbortSignal[] = []
     const releases: Array<(projection: RepoRuntimeProjection) => void> = []
     const observer = new QueryObserver<RepoRuntimeProjection>(queryClient, {
-      queryKey: repoProjectionQueryKey('/tmp/repo', 'repo-instance-1', 'feature/a', 'full'),
+      queryKey: repoProjectionQueryKey('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full'),
       queryFn: ({ signal }) =>
         new Promise<RepoRuntimeProjection>((resolve) => {
           signals.push(signal)
@@ -248,12 +248,12 @@ describe('repo projection query data', () => {
     })
     const unsubscribe = observer.subscribe(() => {})
     try {
-      invalidateRepoRuntimeProjectionQueries('/tmp/repo', 'repo-instance-1', queryClient)
+      invalidateRepoRuntimeProjectionQueries('/tmp/repo', 'repo-runtime-1', queryClient)
       await vi.waitFor(() => {
         expect(releases).toHaveLength(1)
       })
 
-      invalidateRepoRuntimeProjectionQueries('/tmp/repo', 'repo-instance-1', queryClient)
+      invalidateRepoRuntimeProjectionQueries('/tmp/repo', 'repo-runtime-1', queryClient)
       expect(signals[0]?.aborted).toBe(false)
       expect(releases).toHaveLength(1)
 

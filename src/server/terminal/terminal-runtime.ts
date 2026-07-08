@@ -35,7 +35,7 @@ import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { type ServerTerminalActionHost, type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
-import { isCurrentRepoRuntimeInstance, onRepoRuntimeInstanceClosed } from '#/server/modules/repo-runtime-instances.ts'
+import { isCurrentRepoRuntime, onRepoRuntimeClosed } from '#/server/modules/repo-runtimes.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { createAppRealtimeHost } from '#/server/realtime/app-realtime-runtime.ts'
 
@@ -118,7 +118,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     isValidTerminalSessionId,
     manager,
     workspaceTabsCoordinator,
-    isCurrentRepoInstance: isCurrentRepoRuntimeInstance,
+    isCurrentRepoRuntime: isCurrentRepoRuntime,
     broadcastSessionsChanged(userId, repoRoot) {
       broadcastRepoSessionsChanged(userId, repoRoot)
     },
@@ -127,8 +127,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     },
     gCommand: options.gCommand,
   })
-  const unsubscribeRepoRuntimeInstanceClosed = onRepoRuntimeInstanceClosed((event) => {
-    const scope = terminalSessionRuntimeScope(event.repoRoot, event.repoInstanceId)
+  const unsubscribeRepoRuntimeClosed = onRepoRuntimeClosed((event) => {
+    const scope = terminalSessionRuntimeScope(event.repoRoot, event.repoRuntimeId)
     manager.closeSessionsForRepo(event.userId, scope)
     broadcastRepoSessionsChanged(event.userId, event.repoRoot)
     void workspaceTabsCoordinator
@@ -138,8 +138,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       })
       .catch((err) => {
         terminalRuntimeLogger.warn(
-          { userId: event.userId, repoRoot: event.repoRoot, repoInstanceId: event.repoInstanceId, err },
-          'failed to close workspace tabs after repo instance close',
+          { userId: event.userId, repoRoot: event.repoRoot, repoRuntimeId: event.repoRuntimeId, err },
+          'failed to close workspace tabs after repo runtime close',
         )
       })
   })
@@ -154,7 +154,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   const workspacePaneTabsActions = createWorkspacePaneTabsActions({
     sessionService,
     isValidClientId: isValidTerminalClientId,
-    isCurrentRepoInstance: isCurrentRepoRuntimeInstance,
+    isCurrentRepoRuntime: isCurrentRepoRuntime,
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
   })
   const workspacePaneTabsHost: ServerWorkspacePaneTabsHost = {
@@ -230,7 +230,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     onShutdown() {
       if (shuttingDown) return
       shuttingDown = true
-      unsubscribeRepoRuntimeInstanceClosed()
+      unsubscribeRepoRuntimeClosed()
       coordinator.shutdown()
       manager.closeAll()
       ptySupervisor.shutdown()

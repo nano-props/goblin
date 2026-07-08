@@ -2,7 +2,7 @@ import type { QueryClient } from '@tanstack/react-query'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs.ts'
 import { gblLog } from '#/web/logger.ts'
-import { currentRepoInstanceId } from '#/web/stores/repos/repo-guards.ts'
+import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
   cancelWorkspacePaneTabs,
@@ -13,7 +13,7 @@ import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs
 
 export interface CommitWorkspacePaneTabsInput {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   branchName: string
   worktreePath: string | null
   tabs: WorkspacePaneTabEntry[]
@@ -21,7 +21,7 @@ export interface CommitWorkspacePaneTabsInput {
 
 export interface UpdateWorkspacePaneTabsInput {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   branchName: string
   worktreePath: string | null
   operation: WorkspacePaneTabsUpdateOperation
@@ -152,11 +152,11 @@ async function commitWorkspacePaneTabsNow(
   input: CommitWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabsMutationResult> {
   try {
-    await cancelWorkspacePaneTabs(input.repoRoot, input.repoInstanceId)
+    await cancelWorkspacePaneTabs(input.repoRoot, input.repoRuntimeId)
     const serverTabs = await replaceWorkspacePaneTabsOnServer(input)
     const accepted = await writeCanonicalWorkspacePaneTabsForTarget({
       repoRoot: input.repoRoot,
-      repoInstanceId: input.repoInstanceId,
+      repoRuntimeId: input.repoRuntimeId,
       branchName: input.branchName,
       worktreePath: input.worktreePath,
       tabs: serverTabs,
@@ -177,11 +177,11 @@ async function updateWorkspacePaneTabsNow(
   input: UpdateWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabsMutationResult> {
   try {
-    await cancelWorkspacePaneTabs(input.repoRoot, input.repoInstanceId)
+    await cancelWorkspacePaneTabs(input.repoRoot, input.repoRuntimeId)
     const serverTabs = await updateWorkspacePaneTabsOnServer(input)
     const accepted = await writeCanonicalWorkspacePaneTabsForTarget({
       repoRoot: input.repoRoot,
-      repoInstanceId: input.repoInstanceId,
+      repoRuntimeId: input.repoRuntimeId,
       branchName: input.branchName,
       worktreePath: input.worktreePath,
       tabs: serverTabs,
@@ -208,7 +208,7 @@ export async function writeCanonicalWorkspacePaneTabsForTarget(
   // runtime source for tabs after boot restore.
   // A list query may have started while the server write was in flight.
   // Cancel again so stale list results cannot overwrite the canonical tabs.
-  await cancelWorkspacePaneTabs(input.repoRoot, input.repoInstanceId, queryClient)
+  await cancelWorkspacePaneTabs(input.repoRoot, input.repoRuntimeId, queryClient)
   if (!workspacePaneTabsProjectionScopeAccepted(input)) return false
   setWorkspacePaneTabsForTargetQueryData(input, queryClient)
   return true
@@ -219,7 +219,7 @@ export async function replaceWorkspacePaneTabsOnServer(
 ): Promise<WorkspacePaneTabEntry[]> {
   return await workspacePaneTabsClient.replace({
     repoRoot: input.repoRoot,
-    repoInstanceId: input.repoInstanceId,
+    repoRuntimeId: input.repoRuntimeId,
     branchName: input.branchName,
     worktreePath: input.worktreePath,
     tabs: input.tabs,
@@ -231,7 +231,7 @@ export async function updateWorkspacePaneTabsOnServer(
 ): Promise<WorkspacePaneTabEntry[]> {
   return await workspacePaneTabsClient.update({
     repoRoot: input.repoRoot,
-    repoInstanceId: input.repoInstanceId,
+    repoRuntimeId: input.repoRuntimeId,
     branchName: input.branchName,
     worktreePath: input.worktreePath,
     operation: input.operation,
@@ -239,16 +239,16 @@ export async function updateWorkspacePaneTabsOnServer(
 }
 
 function workspacePaneTabsProjectionScopeAccepted(
-  input: Pick<CommitWorkspacePaneTabsInput, 'repoRoot' | 'repoInstanceId'>,
+  input: Pick<CommitWorkspacePaneTabsInput, 'repoRoot' | 'repoRuntimeId'>,
 ): boolean {
-  return currentRepoInstanceId(useReposStore.getState(), input.repoRoot) === input.repoInstanceId
+  return currentRepoRuntimeId(useReposStore.getState(), input.repoRoot) === input.repoRuntimeId
 }
 
 function canceledWorkspacePaneTabsMutation(
   operation: WorkspacePaneTabsMutationOperation,
   input: Pick<CommitWorkspacePaneTabsInput, 'repoRoot' | 'branchName' | 'worktreePath'>,
 ): WorkspacePaneTabsMutationFailure {
-  const error = new Error('error.repo-instance-stale')
+  const error = new Error('error.repo-runtime-stale')
   return {
     ok: false,
     operation,

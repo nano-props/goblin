@@ -78,7 +78,7 @@ describe('runRemoteRepoConnection', () => {
       const repo: RepoState = {
         id: REMOTE_ID,
         name: 'example:repo',
-        instanceId: 'repo-instance-test',
+        repoRuntimeId: 'repo-runtime-test',
         dataLoads: {
           repoReadModel: { phase: 'idle', loadedAt: null, stale: false, error: null },
           visibleStatus: { phase: 'idle', loadedAt: null, stale: false, error: null },
@@ -126,7 +126,7 @@ describe('runRemoteRepoConnection', () => {
       const repo: RepoState = {
         id: REMOTE_ID,
         name: 'example:repo',
-        instanceId: 'repo-instance-test',
+        repoRuntimeId: 'repo-runtime-test',
         dataLoads: emptyDataLoads(),
         operations: emptyOperations(),
         ui: {
@@ -170,7 +170,7 @@ describe('runRemoteRepoConnection', () => {
       const repo: RepoState = {
         id: REMOTE_ID,
         name: 'example:repo',
-        instanceId: 'repo-instance-test',
+        repoRuntimeId: 'repo-runtime-test',
         dataLoads: emptyDataLoads(),
         operations: emptyOperations(),
         ui: {
@@ -214,7 +214,7 @@ describe('runRemoteRepoConnection', () => {
       const repo: RepoState = {
         id: REMOTE_ID,
         name: 'example:repo',
-        instanceId: 'repo-instance-test',
+        repoRuntimeId: 'repo-runtime-test',
         dataLoads: emptyDataLoads(),
         operations: emptyOperations(),
         ui: {
@@ -254,7 +254,7 @@ describe('runRemoteRepoConnection', () => {
     const target = remoteTargetFixture()
     installGoblin()
     useReposStore.setState((s) => {
-      const repo = emptyRepo(REMOTE_ID, 'example:/', 'repo-instance-test')
+      const repo = emptyRepo(REMOTE_ID, 'example:/', 'repo-runtime-test')
       repo.remote.lifecycle = { kind: 'failed', reason: 'unreachable', target }
       repo.availability = { phase: 'unavailable', reason: 'unreachable', checkedAt: 0 }
       return { ...s, repos: { ...s.repos, [REMOTE_ID]: repo }, order: [REMOTE_ID] }
@@ -291,7 +291,7 @@ describe('runRemoteRepoConnection', () => {
       const repo: RepoState = {
         id: REMOTE_ID,
         name: 'example:repo',
-        instanceId: 'repo-instance-test',
+        repoRuntimeId: 'repo-runtime-test',
         dataLoads: emptyDataLoads(),
         operations: emptyOperations(),
         ui: {
@@ -355,7 +355,7 @@ describe('runRemoteRepoConnection', () => {
         const repo: RepoState = {
           id: REMOTE_ID,
           name: 'example:repo',
-          instanceId: 'repo-instance-test',
+          repoRuntimeId: 'repo-runtime-test',
           dataLoads: emptyDataLoads(),
           operations: emptyOperations(),
           ui: {

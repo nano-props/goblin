@@ -88,7 +88,7 @@ describe('branch action dispatch', () => {
         alsoDeleteUpstream: false,
       },
       {
-        repoInstanceId: repo.instanceId,
+        repoRuntimeId: repo.repoRuntimeId,
         deferResultMessages: [],
       },
     )
@@ -331,7 +331,7 @@ function worktreeSnapshotWithTerminal(): TerminalWorktreeSnapshot {
       index: 1,
       repoRoot: REPO_ID,
 
-      repoInstanceId: 'repo-instance-test',
+      repoRuntimeId: 'repo-runtime-test',
 
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,

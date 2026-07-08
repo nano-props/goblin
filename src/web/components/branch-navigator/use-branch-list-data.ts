@@ -24,7 +24,7 @@ type BranchListRepoShell = Omit<BranchListRepo, 'branchModel' | 'branchAction'> 
 
 const branchListRepoShellEqualFields: Array<keyof BranchListRepoShell> = [
   'id',
-  'instanceId',
+  'repoRuntimeId',
   'ui',
   'operations',
   'remote',
@@ -65,7 +65,7 @@ export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
       return repo
         ? {
             id: repo.id,
-            instanceId: repo.instanceId,
+            repoRuntimeId: repo.repoRuntimeId,
             ui: {
               branchViewMode: repo.ui.branchViewMode,
             },
@@ -85,10 +85,10 @@ export function useBranchListRepo(repoId: string): BranchListRepo | undefined {
     },
     branchListRepoShellEqual,
   )
-  const operationsReadModel = useRepoOperationsReadModel(repoShell?.id ?? '', repoShell?.instanceId ?? '', {
+  const operationsReadModel = useRepoOperationsReadModel(repoShell?.id ?? '', repoShell?.repoRuntimeId ?? '', {
     enabled: !!repoShell,
   })
-  const branchReadModel = useRepoBranchReadModel(repoShell?.id ?? '', repoShell?.instanceId ?? '', !!repoShell)
+  const branchReadModel = useRepoBranchReadModel(repoShell?.id ?? '', repoShell?.repoRuntimeId ?? '', !!repoShell)
   if (!repoShell || !branchReadModel) return undefined
   return {
     ...projectBranchActionRepo(repoShell, operationsReadModel.data?.operations),

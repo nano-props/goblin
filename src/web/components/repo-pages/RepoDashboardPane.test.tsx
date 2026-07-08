@@ -51,7 +51,7 @@ describe('RepoDashboardPane', () => {
       branches: [featureBranch, mainBranch],
       currentBranchName: 'main',
     })
-    setRepoProjectionQueryData(REPO_ID, repo.instanceId, null, 'summary', {
+    setRepoProjectionQueryData(REPO_ID, repo.repoRuntimeId, null, 'summary', {
       snapshot: { current: 'main', branches: [featureBranch, mainBranch] },
       status: [],
       pullRequests: [

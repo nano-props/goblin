@@ -7,7 +7,7 @@ import {
 } from '#/shared/workspace-pane.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
 
-const RepoInstanceIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
+const RepoRuntimeIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
 
 export const WorkspacePaneTabIdentitySchema = v.pipe(
   v.string(),
@@ -18,7 +18,7 @@ export const WorkspacePaneOptionalTabIdentitySchema = v.optional(v.nullable(Work
 
 export const WorkspacePaneTabsListInputSchema = v.object({
   repoRoot: v.string(),
-  repoInstanceId: RepoInstanceIdSchema,
+  repoRuntimeId: RepoRuntimeIdSchema,
 })
 
 export const WorkspacePaneStaticTabEntrySchema = v.variant('type', [
@@ -39,7 +39,7 @@ export const WorkspacePaneTabEntrySchema = v.union([
 
 export const WorkspacePaneTabsReplaceInputSchema = v.object({
   repoRoot: v.string(),
-  repoInstanceId: RepoInstanceIdSchema,
+  repoRuntimeId: RepoRuntimeIdSchema,
   branchName: v.string(),
   worktreePath: v.nullable(v.string()),
   tabs: v.array(WorkspacePaneTabEntrySchema),
@@ -47,7 +47,7 @@ export const WorkspacePaneTabsReplaceInputSchema = v.object({
 
 export const WorkspacePaneTabsUpdateInputSchema = v.object({
   repoRoot: v.string(),
-  repoInstanceId: RepoInstanceIdSchema,
+  repoRuntimeId: RepoRuntimeIdSchema,
   branchName: v.string(),
   worktreePath: v.nullable(v.string()),
   operation: v.variant('type', [

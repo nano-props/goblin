@@ -17,7 +17,7 @@ import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { DEFAULT_LOADING_DELAY_MS, DEFAULT_MIN_LOADING_VISIBLE_MS } from '#/web/hooks/useLoadingVisibility.ts'
 
 const REPO_ID = '/repo'
-const REPO_INSTANCE_ID = 'repo-instance-test'
+const REPO_RUNTIME_ID = 'repo-runtime-test'
 
 const surfaceMocks = vi.hoisted(() => ({
   createRequest: {
@@ -85,7 +85,7 @@ beforeEach(() => {
     message: 'error.failed-read-repo',
   }))
   primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot({ repoSettings: [] }))
-  seedRepoShellForTest({ id: REPO_ID, instanceId: REPO_INSTANCE_ID })
+  seedRepoShellForTest({ id: REPO_ID, repoRuntimeId: REPO_RUNTIME_ID })
 })
 
 afterEach(() => {

@@ -7,7 +7,7 @@ import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/sha
 
 const USER_ID = 'user-workspace-pane-tabs'
 const REPO_ROOT = '/repo'
-const SCOPE = 'repo-instance-scope'
+const SCOPE = 'repo-runtime-scope'
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/repo/worktree'
 
@@ -210,10 +210,10 @@ describe('workspace pane tabs coordinator', () => {
         operation: { type: 'open-static', tabType: 'history' },
         assertCurrent: () => {
           assertCalls += 1
-          if (assertCalls === 2) throw new Error('error.repo-instance-stale')
+          if (assertCalls === 2) throw new Error('error.repo-runtime-stale')
         },
       }),
-    ).rejects.toThrow('error.repo-instance-stale')
+    ).rejects.toThrow('error.repo-runtime-stale')
     expect(workspaceTabs.tabs(workspaceTarget())).toEqual([workspacePaneStaticTabEntry('status')])
   })
 

@@ -24,7 +24,7 @@ export { isRepoVisibleProjectionRefreshable }
 
 interface RepoVisibleProjectionShell {
   id: string
-  repoInstanceId: string
+  repoRuntimeId: string
   preferredWorkspacePaneTabByTarget: RepoState['ui']['preferredWorkspacePaneTabByTarget']
   unavailable: boolean
   visibleStatusPhase: 'idle' | 'loading' | 'refreshing'
@@ -39,7 +39,7 @@ function currentRepoVisibleProjectionShellEqual(
     (!!a &&
       !!b &&
       a.id === b.id &&
-      a.repoInstanceId === b.repoInstanceId &&
+      a.repoRuntimeId === b.repoRuntimeId &&
       a.preferredWorkspacePaneTabByTarget === b.preferredWorkspacePaneTabByTarget &&
       a.unavailable === b.unavailable &&
       a.visibleStatusPhase === b.visibleStatusPhase)
@@ -52,7 +52,7 @@ function isVisibleProjectionWorkspacePaneTab(tab: WorkspacePaneTabType | null): 
 
 function visibleProjectionRefreshKey(repo: RepoVisibleProjectionRefreshState): string | null {
   if (!repo.visibleProjectionViewOpen || !repo.branchName || !repo.renderedWorkspacePaneTab) return null
-  return [repo.id, repo.repoInstanceId, repo.branchName, repo.renderedWorkspacePaneTab].join('\0')
+  return [repo.id, repo.repoRuntimeId, repo.branchName, repo.renderedWorkspacePaneTab].join('\0')
 }
 
 export function useVisibleRepoProjectionRefresh({
@@ -72,7 +72,7 @@ export function useVisibleRepoProjectionRefresh({
       return repo
         ? {
             id: repo.id,
-            repoInstanceId: repo.instanceId,
+            repoRuntimeId: repo.repoRuntimeId,
             preferredWorkspacePaneTabByTarget: repo.ui.preferredWorkspacePaneTabByTarget,
             unavailable: isRepoUnavailable(repo),
             visibleStatusPhase: repo.dataLoads.visibleStatus.phase,
@@ -82,11 +82,11 @@ export function useVisibleRepoProjectionRefresh({
     currentRepoVisibleProjectionShellEqual,
   )
   const repoRoot = currentRepoShell?.id ?? ''
-  const repoInstanceId = currentRepoShell?.repoInstanceId ?? ''
+  const repoRuntimeId = currentRepoShell?.repoRuntimeId ?? ''
   const repoEnabled = currentRepoShell !== null
   const projectionReadModel = useRepoProjectionReadModel(
     repoRoot,
-    repoInstanceId,
+    repoRuntimeId,
     currentBranchName,
     'full',
     repoEnabled,
@@ -102,7 +102,7 @@ export function useVisibleRepoProjectionRefresh({
   )
   const branchName = branch?.name ?? null
   const worktreePath = branch?.worktree?.path ?? null
-  const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(repoRoot, repoInstanceId, { enabled: repoEnabled })
+  const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(repoRoot, repoRuntimeId, { enabled: repoEnabled })
   const workspacePaneTabEntries = useMemo(
     () =>
       workspacePaneTabsForTargetFromQueryData(workspacePaneTabsQuery.data ?? [], {
@@ -114,7 +114,7 @@ export function useVisibleRepoProjectionRefresh({
   )
   const runtimeProjection = useWorkspacePaneRuntimeTabTargetProjection({
     repoRoot,
-    repoInstanceId,
+    repoRuntimeId,
     worktreePath,
   })
   const preferredWorkspacePaneTab = useMemo<WorkspacePaneTabType | null>(() => {
@@ -132,7 +132,7 @@ export function useVisibleRepoProjectionRefresh({
     if (!currentRepoShell || !branchName) return null
     return createRepoWorkspaceTabModel({
       repoId: currentRepoShell.id,
-      repoInstanceId,
+      repoRuntimeId,
       branchName,
       worktreePath,
       preferredTab: preferredWorkspacePaneTab,
@@ -156,7 +156,7 @@ export function useVisibleRepoProjectionRefresh({
       currentRepoShell
         ? {
             id: currentRepoShell.id,
-            repoInstanceId: currentRepoShell.repoInstanceId,
+            repoRuntimeId: currentRepoShell.repoRuntimeId,
             preferredWorkspacePaneTab,
             renderedWorkspacePaneTab,
             branchName,
@@ -194,7 +194,7 @@ export function useVisibleRepoProjectionRefresh({
           ? 'visible-projection-branch-changed'
           : 'visible-projection-view-opened',
       id: currentRepoRefreshState.id,
-      repoInstanceId: currentRepoRefreshState.repoInstanceId,
+      repoRuntimeId: currentRepoRefreshState.repoRuntimeId,
       branchName: currentRepoRefreshState.branchName,
     })
   }, [currentRepoRefreshState])

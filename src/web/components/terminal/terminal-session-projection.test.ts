@@ -7,13 +7,13 @@ import {
 import type { TerminalRepoIndex } from '#/web/components/terminal/types.ts'
 
 const REPO_ROOT = '/repo'
-const REPO_INSTANCE_ID = 'repo-instance-test'
+const REPO_RUNTIME_ID = 'repo-runtime-test'
 const WORKTREE_PATH = '/repo'
 
 function makeRepoIndex(): TerminalRepoIndex {
   return {
     [REPO_ROOT]: {
-      instanceId: 'repo-instance-test',
+      repoRuntimeId: 'repo-runtime-test',
       branchByWorktreePath: { [WORKTREE_PATH]: 'main' },
     },
   }
@@ -24,13 +24,13 @@ describe('terminal session projection helpers', () => {
     const projected = projectServerTerminalSession({
       repoIndex: makeRepoIndex(),
       repoRoot: REPO_ROOT,
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       clientId: 'client_a',
       index: 2,
       serverSession: {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalSessionId: 'term-222222222222222222222',
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         repoRoot: REPO_ROOT,
         branch: 'main',
         worktreePath: WORKTREE_PATH,
@@ -56,7 +56,7 @@ describe('terminal session projection helpers', () => {
         terminalSessionId: 'term-222222222222222222222',
         terminalWorktreeKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
         index: 2,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         repoRoot: REPO_ROOT,
         branch: 'main',
         worktreePath: WORKTREE_PATH,
@@ -84,13 +84,13 @@ describe('terminal session projection helpers', () => {
     const projected = projectServerTerminalSession({
       repoIndex: makeRepoIndex(),
       repoRoot: REPO_ROOT,
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       clientId: 'client_b',
       index: 1,
       serverSession: {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalSessionId: 'term-111111111111111111111',
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         repoRoot: REPO_ROOT,
         branch: 'main',
         worktreePath: WORKTREE_PATH,
@@ -112,17 +112,17 @@ describe('terminal session projection helpers', () => {
     expect(projected?.controlsTerminal).toBe(false)
   })
 
-  test('rejects server sessions from a different repo instance', () => {
+  test('rejects server sessions from a different repo runtime', () => {
     const projected = projectServerTerminalSession({
       repoIndex: makeRepoIndex(),
       repoRoot: REPO_ROOT,
-      repoInstanceId: 'repo-instance-current',
+      repoRuntimeId: 'repo-runtime-current',
       clientId: 'client_b',
       index: 1,
       serverSession: {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalSessionId: 'term-111111111111111111111',
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         repoRoot: REPO_ROOT,
         branch: 'main',
         worktreePath: WORKTREE_PATH,
@@ -144,18 +144,18 @@ describe('terminal session projection helpers', () => {
     const projected = projectServerTerminalSession({
       repoIndex: {
         [REPO_ROOT]: {
-          instanceId: REPO_INSTANCE_ID,
+          repoRuntimeId: REPO_RUNTIME_ID,
           branchByWorktreePath: {},
         },
       },
       repoRoot: REPO_ROOT,
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       clientId: 'client_b',
       index: 1,
       serverSession: {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalSessionId: 'term-111111111111111111111',
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         repoRoot: REPO_ROOT,
         branch: 'feature/restored',
         worktreePath: WORKTREE_PATH,
@@ -198,7 +198,7 @@ describe('terminal session projection helpers', () => {
 
   test('materializes create projection from first-frame payload when sessions list lags', () => {
     const projected = projectCreateResultForClient(
-      { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID, branch: 'main', worktreePath: WORKTREE_PATH },
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branch: 'main', worktreePath: WORKTREE_PATH },
       {
         ok: true,
         action: 'created',
@@ -223,7 +223,7 @@ describe('terminal session projection helpers', () => {
       {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
         terminalSessionId: 'term-111111111111111111111',
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         repoRoot: REPO_ROOT,
         branch: 'main',
         worktreePath: WORKTREE_PATH,
@@ -249,7 +249,7 @@ describe('terminal session projection helpers', () => {
     const existingSession = {
       terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
       terminalSessionId: 'term-111111111111111111111',
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       repoRoot: '/server/repo',
       branch: 'server/main',
       worktreePath: '/server/repo/worktree',
@@ -264,7 +264,7 @@ describe('terminal session projection helpers', () => {
     }
 
     const projected = projectCreateResultForClient(
-      { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID, branch: 'main', worktreePath: WORKTREE_PATH },
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branch: 'main', worktreePath: WORKTREE_PATH },
       {
         ok: true,
         action: 'created',
@@ -304,7 +304,7 @@ describe('terminal session projection helpers', () => {
     const staleSession = {
       terminalRuntimeSessionId: 'pty_session_old_aaaaaaaaa',
       terminalSessionId: 'term-111111111111111111111',
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       repoRoot: REPO_ROOT,
       branch: 'main',
       worktreePath: WORKTREE_PATH,
@@ -319,7 +319,7 @@ describe('terminal session projection helpers', () => {
     }
 
     const projected = projectCreateResultForClient(
-      { repoRoot: REPO_ROOT, repoInstanceId: REPO_INSTANCE_ID, branch: 'main', worktreePath: WORKTREE_PATH },
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branch: 'main', worktreePath: WORKTREE_PATH },
       {
         ok: true,
         action: 'restored',

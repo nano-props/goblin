@@ -10,7 +10,7 @@ import {
   WORKSPACE_PANE_TABS_SOCKET_ACTIONS,
 } from '#/shared/workspace-pane-tabs.ts'
 let wsMock: WebSocketMockHandle
-const REPO_INSTANCE_ID = 'repo-instance-test'
+const REPO_RUNTIME_ID = 'repo-runtime-test'
 describe('terminal web host client', () => {
   beforeEach(() => {
     wsMock = installWebSocketMock({ autoOpen: false })
@@ -198,7 +198,7 @@ describe('terminal web host client', () => {
 
     const createPromise = terminalClient.create({
       repoRoot: '/tmp/repo',
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
       worktreePath: '/tmp/repo',
       kind: 'primary',
@@ -211,7 +211,7 @@ describe('terminal web host client', () => {
       action: 'create',
       input: {
         repoRoot: '/tmp/repo',
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branch: 'feature',
         worktreePath: '/tmp/repo',
         kind: 'primary',
@@ -244,7 +244,7 @@ describe('terminal web host client', () => {
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
 
-    const listPromise = terminalClient.listSessions({ repoRoot: '/tmp/repo', repoInstanceId: REPO_INSTANCE_ID })
+    const listPromise = terminalClient.listSessions({ repoRoot: '/tmp/repo', repoRuntimeId: REPO_RUNTIME_ID })
     socket?.emitOpen()
     await Promise.resolve()
     const request = socket?.sent
@@ -255,7 +255,7 @@ describe('terminal web host client', () => {
       action: 'list-sessions',
       input: {
         repoRoot: '/tmp/repo',
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
       },
     })
     socket?.emitMessage(
@@ -277,7 +277,7 @@ describe('terminal web host client', () => {
     const fetchMock = mockFetch()
     const { workspacePaneTabsClient } = await import('#/web/workspace-pane/workspace-pane-tabs-client.ts')
 
-    const listPromise = workspacePaneTabsClient.list({ repoRoot: '/tmp/repo', repoInstanceId: REPO_INSTANCE_ID })
+    const listPromise = workspacePaneTabsClient.list({ repoRoot: '/tmp/repo', repoRuntimeId: REPO_RUNTIME_ID })
     const socket = wsMock.instances[0]
     socket?.emitOpen()
     await Promise.resolve()
@@ -289,7 +289,7 @@ describe('terminal web host client', () => {
       action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
       input: {
         repoRoot: '/tmp/repo',
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
       },
     })
     socket?.emitMessage(
@@ -316,7 +316,7 @@ describe('terminal web host client', () => {
     dispose()
     staleSocket.readyState = wsMock.CLOSED
 
-    const listPromise = terminalClient.listSessions({ repoRoot: '/tmp/repo', repoInstanceId: REPO_INSTANCE_ID })
+    const listPromise = terminalClient.listSessions({ repoRoot: '/tmp/repo', repoRuntimeId: REPO_RUNTIME_ID })
     expect(wsMock.instances).toHaveLength(2)
     const socket = wsMock.instances[1]
     socket?.emitOpen()
@@ -346,7 +346,7 @@ describe('terminal web host client', () => {
     if (!socket) throw new Error('missing web terminal socket')
 
     dispose()
-    const listPromise = terminalClient.listSessions({ repoRoot: '/tmp/repo', repoInstanceId: REPO_INSTANCE_ID })
+    const listPromise = terminalClient.listSessions({ repoRoot: '/tmp/repo', repoRuntimeId: REPO_RUNTIME_ID })
     expect(wsMock.instances).toHaveLength(1)
     socket.emitOpen()
     await Promise.resolve()
@@ -375,7 +375,7 @@ describe('terminal web host client', () => {
     const socket = wsMock.instances[0]
     const createPromise = terminalClient.create({
       repoRoot: '/tmp/repo',
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
       worktreePath: '/tmp/repo',
       kind: 'primary',
@@ -393,7 +393,7 @@ describe('terminal web host client', () => {
     const { terminalClient } = await import('#/web/terminal.ts')
     const createPromise = terminalClient.create({
       repoRoot: '/tmp/repo',
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
       worktreePath: '/tmp/repo',
       kind: 'primary',
@@ -415,7 +415,7 @@ describe('terminal web host client', () => {
       const { terminalClient } = await import('#/web/terminal.ts')
       const createPromise = terminalClient.create({
         repoRoot: '/tmp/repo',
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branch: 'feature',
         worktreePath: '/tmp/repo',
         kind: 'primary',
@@ -441,7 +441,7 @@ describe('terminal web host client', () => {
       const { terminalClient } = await import('#/web/terminal.ts')
       const listPromise = terminalClient.listSessions({
         repoRoot: '/tmp/repo',
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
       })
       const socket = wsMock.instances[0]
       if (!socket) throw new Error('missing web terminal socket')
@@ -462,7 +462,7 @@ describe('terminal web host client', () => {
     const { terminalClient } = await import('#/web/terminal.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
-    const listPromise = terminalClient.listSessions({ repoRoot: '/tmp/repo', repoInstanceId: REPO_INSTANCE_ID })
+    const listPromise = terminalClient.listSessions({ repoRoot: '/tmp/repo', repoRuntimeId: REPO_RUNTIME_ID })
 
     socket?.close()
 
@@ -476,7 +476,7 @@ describe('terminal web host client', () => {
     const { terminalClient } = await import('#/web/terminal.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
-    const prunePromise = terminalClient.pruneTerminals('/tmp/repo', REPO_INSTANCE_ID)
+    const prunePromise = terminalClient.pruneTerminals('/tmp/repo', REPO_RUNTIME_ID)
 
     socket?.close()
 
@@ -490,14 +490,14 @@ describe('terminal web host client', () => {
     const { terminalClient } = await import('#/web/terminal.ts')
     const dispose = terminalClient.onOutput(() => {})
     const socket = wsMock.instances[0]
-    const prunePromise = terminalClient.pruneTerminals('/tmp/repo', REPO_INSTANCE_ID)
+    const prunePromise = terminalClient.pruneTerminals('/tmp/repo', REPO_RUNTIME_ID)
     socket?.emitOpen()
     await Promise.resolve()
     const request = socket?.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'prune')
     expect(request).toMatchObject({
       type: 'request',
       action: 'prune',
-      input: { repoRoot: '/tmp/repo', repoInstanceId: REPO_INSTANCE_ID },
+      input: { repoRoot: '/tmp/repo', repoRuntimeId: REPO_RUNTIME_ID },
     })
     socket?.emitMessage(
       JSON.stringify({
@@ -516,7 +516,7 @@ describe('terminal web host client', () => {
 
   test('closes an idle terminal socket after a one-shot websocket request resolves without subscribers', async () => {
     const { terminalClient } = await import('#/web/terminal.ts')
-    const prunePromise = terminalClient.pruneTerminals('/tmp/repo', REPO_INSTANCE_ID)
+    const prunePromise = terminalClient.pruneTerminals('/tmp/repo', REPO_RUNTIME_ID)
     const socket = wsMock.instances[0]
     if (!socket) throw new Error('missing web terminal socket')
 
@@ -541,7 +541,7 @@ describe('terminal web host client', () => {
     vi.useFakeTimers()
     try {
       const { terminalClient } = await import('#/web/terminal.ts')
-      const prunePromise = terminalClient.pruneTerminals('/tmp/repo', REPO_INSTANCE_ID)
+      const prunePromise = terminalClient.pruneTerminals('/tmp/repo', REPO_RUNTIME_ID)
       const socket = wsMock.instances[0]
       if (!socket) throw new Error('missing web terminal socket')
 
@@ -551,7 +551,7 @@ describe('terminal web host client', () => {
       expect(request).toMatchObject({
         type: 'request',
         action: 'prune',
-        input: { repoRoot: '/tmp/repo', repoInstanceId: REPO_INSTANCE_ID },
+        input: { repoRoot: '/tmp/repo', repoRuntimeId: REPO_RUNTIME_ID },
       })
       const expectation = expect(prunePromise).rejects.toThrow('App realtime request timed out')
 
@@ -591,13 +591,13 @@ describe('terminal web host client', () => {
       if (!socket) throw new Error('missing web terminal socket')
       socket.emitOpen()
       await vi.advanceTimersByTimeAsync(1_000)
-      const prunePromise = terminalClient.pruneTerminals('/tmp/repo', REPO_INSTANCE_ID)
+      const prunePromise = terminalClient.pruneTerminals('/tmp/repo', REPO_RUNTIME_ID)
       await Promise.resolve()
       const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'prune')
       expect(request).toMatchObject({
         type: 'request',
         action: 'prune',
-        input: { repoRoot: '/tmp/repo', repoInstanceId: REPO_INSTANCE_ID },
+        input: { repoRoot: '/tmp/repo', repoRuntimeId: REPO_RUNTIME_ID },
       })
       socket.send = vi.fn(() => {
         throw new Error('send failed')
@@ -626,13 +626,13 @@ describe('terminal web host client', () => {
       socket.emitOpen()
       await Promise.resolve()
 
-      const prunePromise = terminalClient.pruneTerminals('/tmp/repo', REPO_INSTANCE_ID)
+      const prunePromise = terminalClient.pruneTerminals('/tmp/repo', REPO_RUNTIME_ID)
       await Promise.resolve()
       const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'prune')
       expect(request).toMatchObject({
         type: 'request',
         action: 'prune',
-        input: { repoRoot: '/tmp/repo', repoInstanceId: REPO_INSTANCE_ID },
+        input: { repoRoot: '/tmp/repo', repoRuntimeId: REPO_RUNTIME_ID },
       })
       const expectation = expect(prunePromise).rejects.toThrow('App realtime request timed out')
 
@@ -655,7 +655,7 @@ describe('terminal web host client', () => {
     const socket = wsMock.instances[0]
     const createPromise = terminalClient.create({
       repoRoot: '/tmp/repo',
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
       worktreePath: '/tmp/repo',
       kind: 'primary',
@@ -685,7 +685,7 @@ describe('terminal web host client', () => {
     const socket = wsMock.instances[0]
     const createPromise = terminalClient.create({
       repoRoot: '/tmp/repo',
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
       worktreePath: '/tmp/repo',
       kind: 'primary',
@@ -1016,7 +1016,7 @@ describe('terminal web host client', () => {
     dispose()
     const createPromise = terminalClient.create({
       repoRoot: '/tmp/repo',
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
       worktreePath: '/tmp/repo',
       kind: 'primary',

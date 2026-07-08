@@ -214,7 +214,7 @@ turning into session deletion.
 sessions and the workspace-pane tab strip.
 
 When the server lists workspace tabs it reconciles against live terminal
-sessions for the same user and repo instance:
+sessions for the same user and repo runtime:
 
 - live sessions materialize missing terminal runtime tab entries
 - stale terminal runtime tab entries are removed

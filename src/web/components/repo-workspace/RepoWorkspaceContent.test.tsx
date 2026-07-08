@@ -679,7 +679,7 @@ describe('RepoWorkspaceContent', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/terminal-empty': [staticEntry('status')] },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
     const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
 
     const { container } = renderInJsdom(
@@ -714,7 +714,7 @@ describe('RepoWorkspaceContent', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { 'feature/terminal-pending': [staticEntry('status')] },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
     const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     const registerHost = vi.fn()
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
@@ -756,7 +756,7 @@ describe('RepoWorkspaceContent', () => {
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: { [branchName]: [] },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, seededRepo.instanceId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, seededRepo.repoRuntimeId)
     const repo = useReposStore.getState().repos[REPO_ID]!
     const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     const registerHost = vi.fn()
@@ -837,7 +837,7 @@ describe('RepoWorkspaceContent', () => {
         'feature/terminal-reordered': [terminalEntry('term-222222222222222222222'), staticEntry('status'), terminalEntry('term-111111111111111111111')],
       },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
     const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     const registerHost = vi.fn()
     const terminalWorktreeSnapshot: TerminalWorktreeSnapshot = {
@@ -891,7 +891,7 @@ describe('RepoWorkspaceContent', () => {
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: { [branchName]: [staticEntry('files'), staticEntry('status')] },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
     const detail = getCurrentRepoWorkspacePresentation(repoWorkspaceRepo(repo))
     let resolvedStartupShellCommand: string | null = null
     const createTerminal: TerminalSessionContextValue['createTerminal'] = vi.fn(async (_base, options) => {
@@ -953,7 +953,7 @@ describe('RepoWorkspaceContent', () => {
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/filetree-open', 'term-111111111111111111111')
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(createTerminal).toHaveBeenCalledWith(
-      { repoRoot: REPO_ID, repoInstanceId: repo.instanceId, branch: branchName, worktreePath },
+      { repoRoot: REPO_ID, repoRuntimeId: repo.repoRuntimeId, branch: branchName, worktreePath },
       {
         resolveStartupShellCommand: expect.any(Function),
         insertAfterIdentity: 'workspace-pane:files',

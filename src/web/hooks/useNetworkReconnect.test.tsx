@@ -110,7 +110,7 @@ function seedRepo(id: string, lifecycle: RemoteRepoConnectionLifecycle | null) {
       [id]: {
         id,
         name: id,
-        instanceId: 'repo-instance-test',
+        repoRuntimeId: 'repo-runtime-test',
         dataLoads: {
           repoReadModel: { phase: 'idle', loadedAt: null, stale: false, error: null },
           visibleStatus: { phase: 'idle', loadedAt: null, stale: false, error: null },

@@ -70,8 +70,8 @@ export function createServerTerminalClient(options: {
         return result
       })
     },
-    pruneTerminals(repoRoot, repoInstanceId) {
-      return options.realtime.request('prune', { repoRoot, repoInstanceId })
+    pruneTerminals(repoRoot, repoRuntimeId) {
+      return options.realtime.request('prune', { repoRoot, repoRuntimeId })
     },
     listSessions(input) {
       return options.realtime.request('list-sessions', input).then((value) => {

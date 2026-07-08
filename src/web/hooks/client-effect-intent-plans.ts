@@ -56,7 +56,7 @@ export type WorkspaceIntentPlan =
   | { kind: 'close-repo'; repoId: string }
   | { kind: 'close-window' }
   | { kind: 'cycle-repo'; direction: 1 | -1 }
-  | { kind: 'refresh-repo'; repoId: string; repoInstanceId: string }
+  | { kind: 'refresh-repo'; repoId: string; repoRuntimeId: string }
   | { kind: 'show-workspace-pane-tab'; repoId: string; tab: WorkspacePaneTabType }
   | { kind: 'terminal-primary-action'; repoId: string }
   | { kind: 'toggle-zen-mode' }
@@ -72,7 +72,7 @@ interface WorkspaceIntentPlanContext {
   workspaceShortcutSuppressed: boolean
   terminalFocused: boolean
   currentRepoId: string | null
-  currentRepo: Pick<RepoState, 'id' | 'instanceId'> | null
+  currentRepo: Pick<RepoState, 'id' | 'repoRuntimeId'> | null
 }
 
 export function createTerminalBellIntentPlan(
@@ -153,7 +153,7 @@ export function createWorkspaceIntentPlan(
     case 'repo-refresh-requested':
       if (context.workspaceShortcutSuppressed || context.terminalFocused || !context.currentRepo)
         return { kind: 'noop' }
-      return { kind: 'refresh-repo', repoId: context.currentRepo.id, repoInstanceId: context.currentRepo.instanceId }
+      return { kind: 'refresh-repo', repoId: context.currentRepo.id, repoRuntimeId: context.currentRepo.repoRuntimeId }
     case 'show-workspace-pane-tab-requested':
       if (context.workspaceShortcutSuppressed || !context.currentRepoId) return { kind: 'noop' }
       return { kind: 'show-workspace-pane-tab', repoId: context.currentRepoId, tab: event.tab }
