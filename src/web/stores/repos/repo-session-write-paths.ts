@@ -298,10 +298,10 @@ export function addResolvedRepo(
       return repo
     },
     update: (existing) => {
-      const instanceChanged = existing.repoRuntimeId !== repoRuntimeId
+      const runtimeChanged = existing.repoRuntimeId !== repoRuntimeId
       const nameChanged = resolvedRepo.name.length > 0 && existing.name !== resolvedRepo.name
       if (!resolvedRepo.target) {
-        if (!instanceChanged) return null
+        if (!runtimeChanged) return null
         return {
           ...existing,
           repoRuntimeId,
@@ -312,14 +312,14 @@ export function addResolvedRepo(
         remoteRepoConnectionTarget(existing.remote.lifecycle),
         resolvedRepo.target,
       )
-      if (!instanceChanged && !nameChanged && lifecycleReady && !targetChanged) return null
+      if (!runtimeChanged && !nameChanged && lifecycleReady && !targetChanged) return null
       // Promote the existing remote repo from 'connecting' or
       // 'failed' to 'ready' even when the retained target is the
       // same. The converged lifecycle result is authoritative; target
       // equality alone does not prove the repo is already ready.
       const next: RepoState = {
         ...existing,
-        repoRuntimeId: instanceChanged ? repoRuntimeId : existing.repoRuntimeId,
+        repoRuntimeId: runtimeChanged ? repoRuntimeId : existing.repoRuntimeId,
         name: nameChanged ? resolvedRepo.name : existing.name,
         remote: { ...existing.remote },
       }
@@ -358,7 +358,7 @@ export function addUnavailableRepo(
       return repo
     },
     update: (existing) => {
-      const instanceChanged = existing.repoRuntimeId !== repoRuntimeId
+      const runtimeChanged = existing.repoRuntimeId !== repoRuntimeId
       // Existing repo: refresh the failed lifecycle with the new
       // reason. Preserve the last-known target if the new failure
       // didn't pin down a fresh one — the user can still see the
@@ -369,7 +369,7 @@ export function addUnavailableRepo(
       const retainedTarget = target ?? remoteRepoConnectionTarget(existing.remote.lifecycle) ?? undefined
       const next: RepoState = {
         ...existing,
-        repoRuntimeId: instanceChanged ? repoRuntimeId : existing.repoRuntimeId,
+        repoRuntimeId: runtimeChanged ? repoRuntimeId : existing.repoRuntimeId,
         remote: { ...existing.remote },
       }
       markRemoteLifecycleFailed(next, reason, retainedTarget)

@@ -499,7 +499,7 @@ describe('core refresh request ordering', () => {
     ipcHandlers['repo.projection'] = async () => {
       // Reopen the repo while the projection is in flight. With the new
       // atomic flow the snapshot result is stale and should be dropped
-      // (the new instance keeps its own data).
+      // (the new runtime keeps its own data).
       seedRepo([branch('reopened')], 'repo-runtime-test-2')
       return {
         snapshot: { branches: [branch('stale')], current: 'stale' },

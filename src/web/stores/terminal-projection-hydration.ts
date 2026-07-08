@@ -21,7 +21,7 @@ export interface TerminalProjectionHydrationEntry {
 interface TerminalProjectionHydrationState {
   /** Minimum gap between focus-triggered projection refreshes. */
   refreshCooldownMs: number
-  /** repoRoot -> hydration state for the current terminal projection instance. */
+  /** repoRoot -> hydration state for the current terminal projection runtime. */
   hydrationByRepo: Map<string, TerminalProjectionHydrationEntry>
   /** repoRoot -> ms-since-epoch recorded by the latest successful projection hydrate. */
   refreshedAtByRepo: Map<string, number>
