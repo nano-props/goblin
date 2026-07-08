@@ -46,7 +46,7 @@ describe('openWorkspacePaneTab', () => {
     useReposStore.setState({
       refreshRuntimeProjection: refreshRuntimeProjection as typeof originalRefreshRuntimeProjection,
     })
-    const repoInstanceId = useReposStore.getState().repos[REPO_ID]!.instanceId
+    const repoRuntimeId = useReposStore.getState().repos[REPO_ID]!.repoRuntimeId
 
     await expect(
       openWorkspacePaneTab({
@@ -62,7 +62,7 @@ describe('openWorkspacePaneTab', () => {
     expect(openTabsFor('feature/worktree')).toEqual(['status'])
     expect(preferredWorkspacePaneTab('feature/worktree')).toBe('status')
     expect(refreshRuntimeProjection).toHaveBeenCalledWith(REPO_ID, {
-      repoInstanceId,
+      repoRuntimeId,
       scope: 'visible-status',
       branchName: 'feature/worktree',
     })
@@ -74,7 +74,7 @@ describe('openWorkspacePaneTab', () => {
     useReposStore.setState({
       refreshRuntimeProjection: refreshRuntimeProjection as typeof originalRefreshRuntimeProjection,
     })
-    const repoInstanceId = useReposStore.getState().repos[REPO_ID]!.instanceId
+    const repoRuntimeId = useReposStore.getState().repos[REPO_ID]!.repoRuntimeId
 
     await expect(
       openWorkspacePaneTab({
@@ -90,7 +90,7 @@ describe('openWorkspacePaneTab', () => {
     expect(openTabsFor('feature/worktree')).toEqual(['status', 'changes'])
     expect(preferredWorkspacePaneTab()).toBe('changes')
     expect(refreshRuntimeProjection).toHaveBeenCalledWith(REPO_ID, {
-      repoInstanceId,
+      repoRuntimeId,
       scope: 'visible-status',
       branchName: 'feature/worktree',
     })
@@ -382,7 +382,7 @@ describe('openWorkspacePaneTab', () => {
     expect(openers[openerScopeKey(REPO_ID, 'feature/b', null)]).toBeUndefined()
   })
 
-  test('does not record an opener when the server rejects a stale repo instance commit', async () => {
+  test('does not record an opener when the server rejects a stale repo runtime commit', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/a', { worktree: { path: WORKTREE_PATH } })],
@@ -417,13 +417,13 @@ describe('openWorkspacePaneTab', () => {
     await commitStarted
 
     useReposStore.getState().closeRepo(REPO_ID)
-    rejectCommit(new Error('error.repo-instance-stale'))
+    rejectCommit(new Error('error.repo-runtime-stale'))
     await expect(openPromise).resolves.toBe(false)
 
     expect(useReposStore.getState().tabOpenerIdentityByScope[openerScopeKey(REPO_ID, 'feature/a', WORKTREE_PATH)]).toBeUndefined()
   })
 
-  test('does not select a stale opened tab when the server rejects a stale repo instance commit', async () => {
+  test('does not select a stale opened tab when the server rejects a stale repo runtime commit', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/a', { worktree: { path: WORKTREE_PATH } })],
@@ -477,7 +477,7 @@ describe('openWorkspacePaneTab', () => {
         'feature/reopened': [workspacePaneStaticTabEntry('status')],
       },
     })
-    rejectCommit(new Error('error.repo-instance-stale'))
+    rejectCommit(new Error('error.repo-runtime-stale'))
 
     await expect(openPromise).resolves.toBe(false)
 
@@ -485,7 +485,7 @@ describe('openWorkspacePaneTab', () => {
     expect(preferredWorkspacePaneTab('feature/reopened')).toBe('status')
   })
 
-  test('does not select a stale opened tab when the old repo instance commit succeeds after reopen', async () => {
+  test('does not select a stale opened tab when the old repo runtime commit succeeds after reopen', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/a', { worktree: { path: WORKTREE_PATH } })],
@@ -532,7 +532,7 @@ describe('openWorkspacePaneTab', () => {
     useReposStore.getState().closeRepo(REPO_ID)
     seedRepoWithReadModelForTest({
       id: REPO_ID,
-      instanceId: 'repo-instance-reopened',
+      repoRuntimeId: 'repo-runtime-reopened',
       branches: [createRepoBranch('feature/reopened', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/reopened',
       preferredWorkspacePaneTab: 'status',
@@ -663,7 +663,7 @@ function openTabsFor(branchName: string): WorkspacePaneStaticTabType[] {
       )
     : null
   return workspacePaneStaticTabsFromEntries(
-    target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : [],
+    target ? readWorkspacePaneTabsForTarget({ ...target, repoRuntimeId: repo.repoRuntimeId }) : [],
   )
 }
 

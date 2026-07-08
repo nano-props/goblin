@@ -10,16 +10,16 @@ import {
   workspacePaneRuntimeTabConfirmedCloseIdentity,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
 
-const REPO_INSTANCE_ID = 'repo-instance-test'
+const REPO_RUNTIME_ID = 'repo-runtime-test'
 const terminalBase: TerminalSessionBase = {
   repoRoot: '/repo',
-  repoInstanceId: REPO_INSTANCE_ID,
+  repoRuntimeId: REPO_RUNTIME_ID,
   branch: 'main',
   worktreePath: '/repo-worktree',
 }
 const closeTarget = {
   repoRoot: terminalBase.repoRoot,
-  repoInstanceId: REPO_INSTANCE_ID,
+  repoRuntimeId: REPO_RUNTIME_ID,
   branchName: terminalBase.branch,
   worktreePath: terminalBase.worktreePath,
 }

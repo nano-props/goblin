@@ -4,7 +4,7 @@ import type {
   CloneRepoResult,
   RepoOperationsSnapshot,
   RepoRuntimeProjection,
-  RepoRuntimeInstancesSnapshot,
+  RepoRuntimesSnapshot,
   RepoRuntimeOpenResult,
   RepoLogResponse,
 } from '#/shared/api-types.ts'
@@ -208,28 +208,28 @@ export async function setBackgroundSyncRepos(repoIds: string[]): Promise<void> {
   await postServerJson('/api/repo/background-sync-repos', { repoIds })
 }
 
-export async function openRepoRuntimeInstance(repoRoot: string): Promise<string> {
-  const result = await postServerJson<{ repoRoot: string }, { repoInstanceId: string }>('/api/repo/runtime-open', {
+export async function openRepoRuntime(repoRoot: string): Promise<string> {
+  const result = await postServerJson<{ repoRoot: string }, { repoRuntimeId: string }>('/api/repo/runtime-open', {
     repoRoot,
   })
-  return result.repoInstanceId
+  return result.repoRuntimeId
 }
 
 export async function openRepoRuntimeForInput(repoInput: string): Promise<RepoRuntimeOpenResult> {
   return await postServerJson<{ repoInput: string }, RepoRuntimeOpenResult>('/api/repo/runtime-open', { repoInput })
 }
 
-export async function closeRepoRuntimeInstance(repoRoot: string, repoInstanceId: string): Promise<boolean> {
-  const result = await postServerJson<{ repoRoot: string; repoInstanceId: string }, { ok: boolean; closed: boolean }>(
+export async function closeRepoRuntime(repoRoot: string, repoRuntimeId: string): Promise<boolean> {
+  const result = await postServerJson<{ repoRoot: string; repoRuntimeId: string }, { ok: boolean; closed: boolean }>(
     '/api/repo/runtime-close',
     {
       repoRoot,
-      repoInstanceId,
+      repoRuntimeId,
     },
   )
   return result.closed
 }
 
-export async function listRepoRuntimeInstances(signal?: AbortSignal): Promise<RepoRuntimeInstancesSnapshot> {
-  return await postServerJson<{}, RepoRuntimeInstancesSnapshot>('/api/repo/runtime-list', {}, { signal })
+export async function listRepoRuntimes(signal?: AbortSignal): Promise<RepoRuntimesSnapshot> {
+  return await postServerJson<{}, RepoRuntimesSnapshot>('/api/repo/runtime-list', {}, { signal })
 }

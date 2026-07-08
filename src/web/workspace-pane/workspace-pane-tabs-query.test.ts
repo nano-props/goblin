@@ -12,7 +12,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 const REPO_ROOT = '/tmp/workspace-pane-tabs-query-repo'
-const REPO_INSTANCE_ID = 'repo-instance-test'
+const REPO_RUNTIME_ID = 'repo-runtime-test'
 
 describe('workspace pane tabs query cache', () => {
   test('keeps no-worktree branch cache entries static-only', () => {
@@ -21,7 +21,7 @@ describe('workspace pane tabs query cache', () => {
     setWorkspacePaneTabsForTargetQueryData(
       {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branchName: 'feature/no-worktree',
         worktreePath: null,
         tabs: [
@@ -37,7 +37,7 @@ describe('workspace pane tabs query cache', () => {
       readWorkspacePaneTabsForTarget(
         {
           repoRoot: REPO_ROOT,
-          repoInstanceId: REPO_INSTANCE_ID,
+          repoRuntimeId: REPO_RUNTIME_ID,
           branchName: 'feature/no-worktree',
           worktreePath: null,
         },
@@ -45,13 +45,13 @@ describe('workspace pane tabs query cache', () => {
       ),
     ).toEqual([workspacePaneStaticTabEntry('status')])
     expect(
-      queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, REPO_INSTANCE_ID)),
+      queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, REPO_RUNTIME_ID)),
     ).toEqual([entry('feature/no-worktree', null, [workspacePaneStaticTabEntry('status')])])
   })
 
   test('dedupes polluted branch cache entries on write', () => {
     const queryClient = new QueryClient()
-    queryClient.setQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, REPO_INSTANCE_ID), [
+    queryClient.setQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, REPO_RUNTIME_ID), [
       entry('feature/duplicate', '/tmp/worktree', [workspacePaneStaticTabEntry('status')]),
       entry('feature/duplicate', '/tmp/worktree', [workspacePaneStaticTabEntry('history')]),
     ])
@@ -59,7 +59,7 @@ describe('workspace pane tabs query cache', () => {
     setWorkspacePaneTabsForTargetQueryData(
       {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branchName: 'feature/new',
         worktreePath: null,
         tabs: [workspacePaneStaticTabEntry('status')],
@@ -68,7 +68,7 @@ describe('workspace pane tabs query cache', () => {
     )
 
     expect(
-      queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, REPO_INSTANCE_ID)),
+      queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, REPO_RUNTIME_ID)),
     ).toEqual([
       entry('feature/duplicate', '/tmp/worktree', [workspacePaneStaticTabEntry('history')]),
       entry('feature/new', null, [workspacePaneStaticTabEntry('status')]),
@@ -80,7 +80,7 @@ describe('workspace pane tabs query cache', () => {
     setWorkspacePaneTabsForTargetQueryData(
       {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branchName: 'feature/old',
         worktreePath: '/tmp/worktree',
         tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'), workspacePaneStaticTabEntry('status')],
@@ -92,7 +92,7 @@ describe('workspace pane tabs query cache', () => {
       readWorkspacePaneTabsForTarget(
         {
           repoRoot: REPO_ROOT,
-          repoInstanceId: REPO_INSTANCE_ID,
+          repoRuntimeId: REPO_RUNTIME_ID,
           branchName: 'feature/new',
           worktreePath: '/tmp/worktree',
         },
@@ -103,7 +103,7 @@ describe('workspace pane tabs query cache', () => {
     setWorkspacePaneTabsForTargetQueryData(
       {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branchName: 'feature/new',
         worktreePath: '/tmp/worktree',
         tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'), workspacePaneStaticTabEntry('history')],
@@ -112,7 +112,7 @@ describe('workspace pane tabs query cache', () => {
     )
 
     expect(
-      queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, REPO_INSTANCE_ID)),
+      queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, REPO_RUNTIME_ID)),
     ).toEqual([
       entry('feature/new', '/tmp/worktree', [
         workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),

@@ -67,7 +67,7 @@ export function workspacePaneRouteNavigationBlockedForBranch(repoId: string, bra
     return true
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     repoRoot: repo.id,
-    repoInstanceId: repo.instanceId,
+    repoRuntimeId: repo.repoRuntimeId,
     worktreePath: branch.worktree?.path ?? null,
   })
   return Object.values(runtimeProjection.runtimeTabStateByType).some((state) => state.createPending)
@@ -88,12 +88,12 @@ export function resolveWorkspacePaneTabTargetForBranch(
   const worktreePath = branch.worktree?.path ?? null
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     repoRoot: repo.id,
-    repoInstanceId: repo.instanceId,
+    repoRuntimeId: repo.repoRuntimeId,
     worktreePath,
   })
   const tabEntriesProjection = readWorkspacePaneTabsProjectionForTarget({
     repoRoot: repoId,
-    repoInstanceId: repo.instanceId,
+    repoRuntimeId: repo.repoRuntimeId,
     branchName,
     worktreePath,
   })
@@ -107,7 +107,7 @@ export function resolveWorkspacePaneTabTargetForBranch(
     kind: 'ready',
     target: createRepoWorkspaceTabModel({
       repoId,
-      repoInstanceId: repo.instanceId,
+      repoRuntimeId: repo.repoRuntimeId,
       branchName,
       worktreePath,
       preferredTab: preferredWorkspacePaneTabForRoute(repo.ui, { repoRoot: repoId, branchName, worktreePath }, options),

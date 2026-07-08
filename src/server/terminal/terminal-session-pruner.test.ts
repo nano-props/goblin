@@ -12,7 +12,7 @@ vi.mock('#/system/git/worktrees.ts', () => ({
 }))
 
 const USER_ID = 'user_terminal_pruner'
-const SCOPE = 'repo-instance-terminal-pruner'
+const SCOPE = 'repo-runtime-terminal-pruner'
 const REPO_ROOT = '/repo'
 const LIVE_WORKTREE_PATH = '/repo/live-worktree'
 const STALE_WORKTREE_PATH = '/repo/stale-worktree'
@@ -82,10 +82,10 @@ describe('terminal session pruner', () => {
     expect(closeSession).not.toHaveBeenCalled()
   })
 
-  test('checks repo instance freshness after reading local worktrees and before closing sessions', async () => {
+  test('checks repo runtime freshness after reading local worktrees and before closing sessions', async () => {
     const closeSession = vi.fn()
     const assertCurrent = vi.fn(() => {
-      throw new Error('error.repo-instance-stale')
+      throw new Error('error.repo-runtime-stale')
     })
     const pruner = createTerminalSessionPruner({
       manager: {
@@ -103,7 +103,7 @@ describe('terminal session pruner', () => {
         scope: SCOPE,
         assertCurrent,
       }),
-    ).rejects.toThrow('error.repo-instance-stale')
+    ).rejects.toThrow('error.repo-runtime-stale')
     expect(getWorktrees).toHaveBeenCalledWith(REPO_ROOT, { includeStatus: false })
     expect(assertCurrent).toHaveBeenCalledTimes(1)
     expect(closeSession).not.toHaveBeenCalled()
@@ -117,7 +117,7 @@ function terminalSession(
   return {
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
     terminalSessionId,
-    repoInstanceId: 'repo-instance-test',
+    repoRuntimeId: 'repo-runtime-test',
     repoRoot: overrides.repoRoot ?? REPO_ROOT,
     branch: 'feature/worktree',
     worktreePath: overrides.worktreePath ?? LIVE_WORKTREE_PATH,

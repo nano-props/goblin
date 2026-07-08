@@ -264,7 +264,7 @@ describe('RepoWorkspace', () => {
         'feature/a': [workspacePaneStaticTabEntry('status')],
       },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
     const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
     const statusEntry = {
       repoId: REPO_ID,
@@ -290,7 +290,7 @@ describe('RepoWorkspace', () => {
       const terminalSessionId = 'term-111111111111111111111'
       setWorkspacePaneTabsForTargetQueryData({
         repoRoot: base.repoRoot,
-        repoInstanceId: base.repoInstanceId!,
+        repoRuntimeId: base.repoRuntimeId!,
         branchName: base.branch,
         worktreePath: base.worktreePath,
         tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
@@ -362,7 +362,7 @@ describe('RepoWorkspace', () => {
         [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
       },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
     const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
     const readContext = terminalReadContextWithSession(terminalWorktreeKey, 'term-111111111111111111111')
     const route = routeNavigation()
@@ -427,7 +427,7 @@ describe('RepoWorkspace', () => {
         ],
       },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
     const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
     useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'term-111111111111111111111')
     const route = routeNavigation()
@@ -522,7 +522,7 @@ describe('RepoWorkspace', () => {
         [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
       },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
     useReposStore.getState().recordWorkspaceNavigation({ repoId: REPO_ID, route: { kind: 'dashboard' } })
     const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
     const route = routeNavigation()
@@ -627,7 +627,7 @@ describe('RepoWorkspace', () => {
         [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
       },
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.instanceId)
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
     const terminalWorktreeKey = formatTerminalWorktreeKey(REPO_ID, worktreePath)
     const route = routeNavigation()
 
@@ -1022,7 +1022,7 @@ describe('RepoWorkspace', () => {
       },
     })
     const pullRequest = createPullRequest(42, { headRefName: 'feature/pr' })
-    setRepoProjectionQueryData(REPO_ID, repo.instanceId, 'feature/pr', 'full', {
+    setRepoProjectionQueryData(REPO_ID, repo.repoRuntimeId, 'feature/pr', 'full', {
       snapshot: { current: 'feature/pr', branches: [branch] },
       status: [],
       pullRequests: [{ branch: 'feature/pr', pullRequest }],

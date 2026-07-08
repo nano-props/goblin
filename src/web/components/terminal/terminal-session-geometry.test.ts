@@ -42,7 +42,7 @@ function descriptor(): TerminalDescriptor {
     terminalWorktreeKey: '/repo\0/repo',
     index: 1,
     repoRoot: '/repo',
-    repoInstanceId: 'repo-instance-test',
+    repoRuntimeId: 'repo-runtime-test',
     branch: 'main',
     worktreePath: '/repo',
   }

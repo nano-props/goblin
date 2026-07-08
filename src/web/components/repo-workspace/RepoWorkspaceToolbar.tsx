@@ -78,7 +78,7 @@ export function RepoWorkspaceToolbar({
   // flight, keep the runtime create affordance visible but busy. The current
   // signal comes from terminal projection hydration until more runtime tab
   // providers exist.
-  const isInitialRuntimeProjectionHydrating = useIsInitialTerminalProjectionHydrating(repo.id, repo.instanceId)
+  const isInitialRuntimeProjectionHydrating = useIsInitialTerminalProjectionHydrating(repo.id, repo.repoRuntimeId)
   const branchName = detail.branch?.name ?? null
   const worktreePath = detail.branch?.worktree?.path ?? null
   const workspacePaneTabTargetKey = branchName
@@ -105,7 +105,7 @@ export function RepoWorkspaceToolbar({
   })
   const workspacePaneCreateAction = useWorkspacePaneRuntimeTabCreateAction({
     repoRoot: repo.id,
-    repoInstanceId: repo.instanceId,
+    repoRuntimeId: repo.repoRuntimeId,
     branchName,
     worktreePath,
     runtimeTabStateByType: workspacePaneTabModel.runtimeTabStateByType,
@@ -145,14 +145,14 @@ export function RepoWorkspaceToolbar({
     clearDragPreview: clearWorkspacePaneTabDragPreview,
   } = useWorkspacePaneTabDragPreview({
     repoRoot: repo.id,
-    repoInstanceId: repo.instanceId,
+    repoRuntimeId: repo.repoRuntimeId,
     branchName,
     worktreePath,
     canonicalTabs: workspacePaneTabModel.tabEntries,
   })
   const { reorderTabs: reorderWorkspacePaneTabs } = useWorkspacePaneTabsReorderMutation({
     repoRoot: repo.id,
-    repoInstanceId: repo.instanceId,
+    repoRuntimeId: repo.repoRuntimeId,
     branchName,
     worktreePath,
     canonicalTabs: workspacePaneTabModel.tabEntries,

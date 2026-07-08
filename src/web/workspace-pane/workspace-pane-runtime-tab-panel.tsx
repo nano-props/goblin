@@ -17,7 +17,7 @@ export interface WorkspacePaneRuntimeTabPanelState {
 
 export interface WorkspacePaneRuntimeTabPanelTarget {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   branchName: string | null
   worktreePath: string | null
 }
@@ -88,7 +88,7 @@ function TerminalWorkspacePaneRuntimeTabPanel({
     <WorkspacePanePanelFrame id={`${workspacePaneId}-terminal-panel`} {...panelLabel}>
       <TerminalSessionView
         repoRoot={target.repoRoot}
-        repoInstanceId={target.repoInstanceId}
+        repoRuntimeId={target.repoRuntimeId}
         branch={target.branchName}
         worktreePath={target.worktreePath}
         selectedTerminalSessionId={selectedSessionId}

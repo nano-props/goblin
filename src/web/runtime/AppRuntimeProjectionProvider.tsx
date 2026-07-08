@@ -16,8 +16,8 @@ interface AppRuntimeProjectionProviderProps {
 }
 
 export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRuntimeProjectionProviderProps) {
-  const currentRepoInstanceId = useReposStore((s) =>
-    currentRepoId ? (s.repos[currentRepoId]?.instanceId ?? null) : null,
+  const currentRepoRuntimeId = useReposStore((s) =>
+    currentRepoId ? (s.repos[currentRepoId]?.repoRuntimeId ?? null) : null,
   )
   const workspaceMembershipReady = useReposStore((s) => s.workspaceMembershipReady)
   const terminalProjection = useTerminalSessionProjection()
@@ -25,30 +25,30 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
   const recoverTerminalSessionsFromServer = useCallback(
     async (
       repoRoot: string,
-      expectedRepoInstanceId?: string,
+      expectedRepoRuntimeId?: string,
       options?: { markInitialHydrationFailure?: boolean },
     ): Promise<void> => {
-      const repoInstanceId = repoInstanceIdForRoot(repoRoot)
-      if (!repoRoot || !repoInstanceId) return
-      if (expectedRepoInstanceId && repoInstanceId !== expectedRepoInstanceId) return
+      const repoRuntimeId = repoRuntimeIdForRoot(repoRoot)
+      if (!repoRoot || !repoRuntimeId) return
+      if (expectedRepoRuntimeId && repoRuntimeId !== expectedRepoRuntimeId) return
       try {
         const clientId = readOrCreateWebTerminalClientId()
-        const recovery = await terminalClient.recoverSessions({ repoRoot, repoInstanceId })
-        if (repoInstanceIdForRoot(repoRoot) !== repoInstanceId) return
+        const recovery = await terminalClient.recoverSessions({ repoRoot, repoRuntimeId })
+        if (repoRuntimeIdForRoot(repoRoot) !== repoRuntimeId) return
         const reconciled = terminalProjection.reconcileServerSessions(
-          { repoRoot, repoInstanceId },
+          { repoRoot, repoRuntimeId },
           recovery.sessions,
           clientId,
           terminalHydrationSnapshotMap(recovery.snapshots),
         )
         if (!reconciled) return
-        useTerminalProjectionHydrationStore.getState().markProjectionReady(repoRoot, repoInstanceId)
+        useTerminalProjectionHydrationStore.getState().markProjectionReady(repoRoot, repoRuntimeId)
       } catch (err) {
         appRuntimeProjectionLog.debug('failed to reconcile terminal sessions from server', { err })
-        if (options?.markInitialHydrationFailure && repoInstanceIdForRoot(repoRoot) === repoInstanceId) {
+        if (options?.markInitialHydrationFailure && repoRuntimeIdForRoot(repoRoot) === repoRuntimeId) {
           useTerminalProjectionHydrationStore
             .getState()
-            .markProjectionFailed(repoRoot, repoInstanceId, projectionHydrationFailureMessage(err))
+            .markProjectionFailed(repoRoot, repoRuntimeId, projectionHydrationFailureMessage(err))
         }
       }
     },
@@ -56,9 +56,9 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
   )
 
   const recoverKnownServerState = useCallback(() => {
-    for (const repo of currentRepoInstances()) {
-      void recoverTerminalSessionsFromServer(repo.repoRoot, repo.repoInstanceId)
-      refreshWorkspacePaneTabs(repo.repoRoot, repo.repoInstanceId)
+    for (const repo of currentRepoRuntimes()) {
+      void recoverTerminalSessionsFromServer(repo.repoRoot, repo.repoRuntimeId)
+      refreshWorkspacePaneTabs(repo.repoRoot, repo.repoRuntimeId)
     }
   }, [recoverTerminalSessionsFromServer])
 
@@ -80,12 +80,12 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
   }, [])
 
   useEffect(() => {
-    if (!workspaceMembershipReady || !currentRepoId || !currentRepoInstanceId) return
+    if (!workspaceMembershipReady || !currentRepoId || !currentRepoRuntimeId) return
     const repoRoot = currentRepoId
-    const repoInstanceId = currentRepoInstanceId
+    const repoRuntimeId = currentRepoRuntimeId
     let disposed = false
-    useTerminalProjectionHydrationStore.getState().beginProjectionHydration(repoRoot, repoInstanceId)
-    void recoverTerminalSessionsFromServer(repoRoot, repoInstanceId, { markInitialHydrationFailure: true })
+    useTerminalProjectionHydrationStore.getState().beginProjectionHydration(repoRoot, repoRuntimeId)
+    void recoverTerminalSessionsFromServer(repoRoot, repoRuntimeId, { markInitialHydrationFailure: true })
 
     const handleFocus = () => {
       if (!currentRepoId) return
@@ -113,8 +113,8 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
       recoverKnownServerState()
     })
     const offWorkspaceTabsChanged = workspacePaneTabsClient.onChanged((repoRoot) => {
-      const repoInstanceId = repoInstanceIdForRoot(repoRoot)
-      if (typeof repoInstanceId === 'string') refreshWorkspacePaneTabs(repoRoot, repoInstanceId)
+      const repoRuntimeId = repoRuntimeIdForRoot(repoRoot)
+      if (typeof repoRuntimeId === 'string') refreshWorkspacePaneTabs(repoRoot, repoRuntimeId)
     })
 
     return () => {
@@ -128,7 +128,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
   }, [
     workspaceMembershipReady,
     currentRepoId,
-    currentRepoInstanceId,
+    currentRepoRuntimeId,
     recoverTerminalSessionsFromServer,
     recoverKnownServerState,
   ])
@@ -136,14 +136,14 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
   return <>{children}</>
 }
 
-function repoInstanceIdForRoot(repoRoot: string): string | null {
-  return useReposStore.getState().repos[repoRoot]?.instanceId ?? null
+function repoRuntimeIdForRoot(repoRoot: string): string | null {
+  return useReposStore.getState().repos[repoRoot]?.repoRuntimeId ?? null
 }
 
-function currentRepoInstances(): Array<{ repoRoot: string; repoInstanceId: string }> {
+function currentRepoRuntimes(): Array<{ repoRoot: string; repoRuntimeId: string }> {
   return Object.values(useReposStore.getState().repos).map((repo) => ({
     repoRoot: repo.id,
-    repoInstanceId: repo.instanceId,
+    repoRuntimeId: repo.repoRuntimeId,
   }))
 }
 

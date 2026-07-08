@@ -160,10 +160,10 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     const json = (await response.json()) as {
       ok: true
       repo: { id: string; name: string }
-      repoInstanceId: string
+      repoRuntimeId: string
     }
     expect(json).toMatchObject({ ok: true, repo: { id: '/tmp/repo', name: 'repo' } })
-    expect(json.repoInstanceId).toMatch(/^repo-instance-/)
+    expect(json.repoRuntimeId).toMatch(/^repo-runtime-/)
     expect(mocks.probeRepo).toHaveBeenCalledWith('/tmp/repo/subdir')
   })
 
@@ -183,7 +183,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     await expect(response.json()).resolves.toEqual({ ok: false, input: '/missing', reason: 'missing' })
   })
 
-  test('runtime-list returns the server-owned open runtime instances for the user', async () => {
+  test('runtime-list returns the server-owned open runtimes for the user', async () => {
     const app = createTestRepoRoutes()
 
     const openResponse = await app.request(
@@ -193,7 +193,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
         body: JSON.stringify({ repoRoot: '/tmp/runtime-list-repo' }),
       }),
     )
-    const opened = (await openResponse.json()) as { ok: true; repoInstanceId: string }
+    const opened = (await openResponse.json()) as { ok: true; repoRuntimeId: string }
 
     const response = await app.request(
       new Request('http://localhost/runtime-list', {
@@ -204,8 +204,8 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     )
 
     expect(response.status).toBe(200)
-    const json = (await response.json()) as { instances: Array<{ repoRoot: string; repoInstanceId: string }> }
-    expect(json.instances).toContainEqual({ repoRoot: '/tmp/runtime-list-repo', repoInstanceId: opened.repoInstanceId })
+    const json = (await response.json()) as { runtimes: Array<{ repoRoot: string; repoRuntimeId: string }> }
+    expect(json.runtimes).toContainEqual({ repoRoot: '/tmp/runtime-list-repo', repoRuntimeId: opened.repoRuntimeId })
   })
 
   test('passes worktree bootstrap preview requests through to the module layer', async () => {
@@ -269,7 +269,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
         {
           id: 'repo-op-1',
           repoId: '/tmp/repo',
-          repoInstanceId: null,
+          repoRuntimeId: null,
           kind: 'fetch',
           phase: 'running',
           source: 'background',

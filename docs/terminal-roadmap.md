@@ -111,7 +111,7 @@ This is manageable now, but it will become a maintenance bottleneck as the featu
 ## P1.6: Split terminal session service responsibilities (completed)
 
 **Status: completed.** `TerminalSessionService` is now a public facade for
-validation and repo-instance guard wiring. The previously inline
+validation and repo-runtime guard wiring. The previously inline
 responsibilities are split into focused server modules:
 
 - `terminal-session-creator.ts` owns create orchestration

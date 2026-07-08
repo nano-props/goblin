@@ -105,7 +105,7 @@ function selectedWorkspacePaneTab(repoId: string, branchName = 'feature/worktree
 function repoTerminalBase() {
   return {
     repoRoot: REPO_ID,
-    repoInstanceId: useReposStore.getState().repos[REPO_ID]!.instanceId,
+    repoRuntimeId: useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
     branch: 'feature/worktree',
     worktreePath: WORKTREE_PATH,
   }
@@ -301,11 +301,11 @@ let sessionClosedHandler:
   | null = null
 type TestTerminalSessionSummary = Omit<
   TerminalSessionSummary,
-  'repoInstanceId' | 'repoRoot' | 'branch' | 'worktreePath'
+  'repoRuntimeId' | 'repoRoot' | 'branch' | 'worktreePath'
 > &
-  Partial<Pick<TerminalSessionSummary, 'repoInstanceId' | 'repoRoot' | 'branch' | 'worktreePath'>>
+  Partial<Pick<TerminalSessionSummary, 'repoRuntimeId' | 'repoRoot' | 'branch' | 'worktreePath'>>
 const listSessionsMock = vi.fn<
-  (...args: Array<{ repoRoot: string; repoInstanceId?: string }>) => Promise<TestTerminalSessionSummary[]>
+  (...args: Array<{ repoRoot: string; repoRuntimeId?: string }>) => Promise<TestTerminalSessionSummary[]>
 >(async () => [])
 const listWorkspaceTabsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<WorkspacePaneTabsEntry[]>>(
   async () => [],
@@ -318,7 +318,7 @@ function completeServerSession(session: TestTerminalSessionSummary): TerminalSes
   return {
     ...session,
     terminalSessionId: normalizeTestSessionId(session.terminalSessionId),
-    repoInstanceId: session.repoInstanceId ?? useReposStore.getState().repos[REPO_ID]!.instanceId,
+    repoRuntimeId: session.repoRuntimeId ?? useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
     repoRoot: session.repoRoot ?? REPO_ID,
     branch: session.branch ?? BRANCH_NAME,
     worktreePath: session.worktreePath ?? WORKTREE_PATH,
@@ -341,7 +341,7 @@ function tabsFor(repoRoot: string, branchName: string): WorkspacePaneTabEntry[] 
         branchName,
       )
     : null
-  return target ? readWorkspacePaneTabsForTarget({ ...target, repoInstanceId: repo.instanceId }) : []
+  return target ? readWorkspacePaneTabsForTarget({ ...target, repoRuntimeId: repo.repoRuntimeId }) : []
 }
 
 function normalizeTestSessionId(terminalSessionId: string): string {
@@ -397,7 +397,7 @@ beforeEach(() => {
   createTerminalMock.mockImplementation(async (input) => {
     const currentSessions = await listSessionsMock({
       repoRoot: input.repoRoot,
-      repoInstanceId: input.repoInstanceId,
+      repoRuntimeId: input.repoRuntimeId,
     })
     const allocatedSessionId =
       input.kind === 'primary'
@@ -448,7 +448,7 @@ beforeEach(() => {
       {
         terminalRuntimeSessionId: terminalSessionId,
         terminalSessionId,
-        repoInstanceId: input.repoInstanceId,
+        repoRuntimeId: input.repoRuntimeId,
         repoRoot: input.repoRoot,
         worktreePath: input.worktreePath,
         cwd: input.worktreePath,
@@ -1204,7 +1204,7 @@ describe('TerminalSessionProvider', () => {
     })
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: REPO_ID,
-      repoInstanceId: useReposStore.getState().repos[REPO_ID]!.instanceId,
+      repoRuntimeId: useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
       branchName: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
       tabs: [

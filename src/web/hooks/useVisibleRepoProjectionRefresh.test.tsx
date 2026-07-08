@@ -83,12 +83,12 @@ function HarnessEffect({
 }
 
 function seedBranchScopedReadModelQueryData(
-  repo: Pick<RepoState, 'id' | 'instanceId'>,
+  repo: Pick<RepoState, 'id' | 'repoRuntimeId'>,
   branchName: string,
   branches: BranchSnapshotInfo[],
   status: WorktreeStatus[] = [],
 ): void {
-  setRepoProjectionQueryData(repo.id, repo.instanceId, branchName, 'full', {
+  setRepoProjectionQueryData(repo.id, repo.repoRuntimeId, branchName, 'full', {
     snapshot: {
       branches,
       current: branchName,
@@ -145,13 +145,13 @@ function createRepo(
     visibleStatusPhase?: 'idle' | 'loading' | 'refreshing'
   } = {},
 ) {
-  const repo = emptyRepo(id, 'repo', 'repo-instance-test')
+  const repo = emptyRepo(id, 'repo', 'repo-runtime-test')
   const branchNames = options.branchNames ?? ['main']
   const branches = branchNames.map((branchName) => {
     const worktreePath = `${id}/${branchName.replaceAll('/', '-')}`
     return createRepoBranch(branchName, { worktree: { path: worktreePath } })
   })
-  repo.instanceId = id === '/repo-a' ? 'repo-instance-test-a' : 'repo-instance-test-b'
+  repo.repoRuntimeId = id === '/repo-a' ? 'repo-runtime-test-a' : 'repo-runtime-test-b'
   seedRepoReadModelQueryData(repo, { branches, currentBranch: 'main', status: [] })
   for (const branch of branches) seedBranchScopedReadModelQueryData(repo, branch.name, branches)
   for (const branch of branches) {
@@ -159,7 +159,7 @@ function createRepo(
     if (!worktreePath) continue
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: id,
-      repoInstanceId: repo.instanceId,
+      repoRuntimeId: repo.repoRuntimeId,
       branchName: branch.name,
       worktreePath,
       tabs: options.workspacePaneTabs ?? [workspacePaneStaticTabEntry('status')],
@@ -180,7 +180,7 @@ describe('isRepoVisibleProjectionRefreshable', () => {
     expect(
       isRepoVisibleProjectionRefreshable({
         id: '/r',
-        repoInstanceId: 'repo-instance-test',
+        repoRuntimeId: 'repo-runtime-test',
         preferredWorkspacePaneTab: 'status',
         renderedWorkspacePaneTab: 'status',
         branchName: 'main',
@@ -195,7 +195,7 @@ describe('isRepoVisibleProjectionRefreshable', () => {
     expect(
       isRepoVisibleProjectionRefreshable({
         id: '/r',
-        repoInstanceId: 'repo-instance-test',
+        repoRuntimeId: 'repo-runtime-test',
         preferredWorkspacePaneTab: 'status',
         renderedWorkspacePaneTab: 'status',
         branchName: 'main',
@@ -210,7 +210,7 @@ describe('isRepoVisibleProjectionRefreshable', () => {
     expect(
       isRepoVisibleProjectionRefreshable({
         id: '/r',
-        repoInstanceId: 'repo-instance-test',
+        repoRuntimeId: 'repo-runtime-test',
         preferredWorkspacePaneTab: 'status',
         renderedWorkspacePaneTab: 'status',
         branchName: 'main',
@@ -222,7 +222,7 @@ describe('isRepoVisibleProjectionRefreshable', () => {
     expect(
       isRepoVisibleProjectionRefreshable({
         id: '/r',
-        repoInstanceId: 'repo-instance-test',
+        repoRuntimeId: 'repo-runtime-test',
         preferredWorkspacePaneTab: 'status',
         renderedWorkspacePaneTab: 'status',
         branchName: 'main',
@@ -288,7 +288,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
     })
 
     expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-b', {
-      repoInstanceId: 'repo-instance-test-b',
+      repoRuntimeId: 'repo-runtime-test-b',
       scope: 'visible-status',
       branchName: 'main',
     })
@@ -312,7 +312,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
     await act(async () => {
       setWorkspacePaneTabsForTargetQueryData({
         repoRoot: '/repo-a',
-        repoInstanceId: 'repo-instance-test-a',
+        repoRuntimeId: 'repo-runtime-test-a',
         branchName: 'main',
         worktreePath: '/repo-a/main',
         tabs: [workspacePaneStaticTabEntry('history'), workspacePaneStaticTabEntry('status')],
@@ -321,7 +321,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
     })
 
     expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
-      repoInstanceId: 'repo-instance-test-a',
+      repoRuntimeId: 'repo-runtime-test-a',
       scope: 'visible-status',
       branchName: 'main',
     })
@@ -345,7 +345,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
     await act(async () => {
       setWorkspacePaneTabsForTargetQueryData({
         repoRoot: '/repo-a',
-        repoInstanceId: 'repo-instance-test-a',
+        repoRuntimeId: 'repo-runtime-test-a',
         branchName: 'main',
         worktreePath: '/repo-a/main',
         tabs: [workspacePaneStaticTabEntry('history'), workspacePaneStaticTabEntry('changes')],
@@ -354,7 +354,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
     })
 
     expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
-      repoInstanceId: 'repo-instance-test-a',
+      repoRuntimeId: 'repo-runtime-test-a',
       scope: 'visible-status',
       branchName: 'main',
     })
@@ -384,7 +384,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
       useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'status')
     })
     expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
-      repoInstanceId: 'repo-instance-test-a',
+      repoRuntimeId: 'repo-runtime-test-a',
       scope: 'visible-status',
       branchName: 'main',
     })
@@ -445,29 +445,29 @@ describe('useVisibleRepoProjectionRefresh', () => {
     })
 
     expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
-      repoInstanceId: 'repo-instance-test-a',
+      repoRuntimeId: 'repo-runtime-test-a',
       scope: 'visible-status',
       branchName: 'feature/a',
     })
   })
 
   test('uses the branch-scoped projection when resolving linked-worktree tab targets', async () => {
-    const repo = emptyRepo('/repo-a', 'repo', 'repo-instance-test-a')
-    repo.instanceId = 'repo-instance-test-a'
+    const repo = emptyRepo('/repo-a', 'repo', 'repo-runtime-test-a')
+    repo.repoRuntimeId = 'repo-runtime-test-a'
     const staleBranch = createRepoBranch('feature/a', { worktree: { path: '/repo-a/stale-worktree' } })
     const scopedBranch = createRepoBranch('feature/a', { worktree: { path: '/repo-a/live-worktree' } })
     seedRepoReadModelQueryData(repo, { branches: [staleBranch], currentBranch: 'feature/a', status: [] })
     seedBranchScopedReadModelQueryData(repo, 'feature/a', [scopedBranch])
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: '/repo-a',
-      repoInstanceId: 'repo-instance-test-a',
+      repoRuntimeId: 'repo-runtime-test-a',
       branchName: 'feature/a',
       worktreePath: '/repo-a/stale-worktree',
       tabs: [workspacePaneStaticTabEntry('history')],
     })
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: '/repo-a',
-      repoInstanceId: 'repo-instance-test-a',
+      repoRuntimeId: 'repo-runtime-test-a',
       branchName: 'feature/a',
       worktreePath: '/repo-a/live-worktree',
       tabs: [workspacePaneStaticTabEntry('status')],
@@ -493,7 +493,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
     })
 
     expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
-      repoInstanceId: 'repo-instance-test-a',
+      repoRuntimeId: 'repo-runtime-test-a',
       scope: 'visible-status',
       branchName: 'feature/a',
     })
@@ -518,7 +518,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
       root.render(<Harness branchName="feature/a" />)
     })
     expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
-      repoInstanceId: 'repo-instance-test-a',
+      repoRuntimeId: 'repo-runtime-test-a',
       scope: 'visible-status',
       branchName: 'feature/a',
     })
@@ -534,7 +534,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
       setVisibleStatusPhase('/repo-a', 'idle')
     })
     expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
-      repoInstanceId: 'repo-instance-test-a',
+      repoRuntimeId: 'repo-runtime-test-a',
       scope: 'visible-status',
       branchName: 'feature/b',
     })
@@ -546,7 +546,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
       branchNames: ['main', 'feature/a'],
       workspacePaneTabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')],
     })
-    useTerminalProjectionHydrationStore.getState().markProjectionReady('/repo-a', 'repo-instance-test-a')
+    useTerminalProjectionHydrationStore.getState().markProjectionReady('/repo-a', 'repo-runtime-test-a')
     await act(async () => {
       useReposStore.setState({
         repos: { '/repo-a': repo },
@@ -562,7 +562,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
     })
 
     expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
-      repoInstanceId: 'repo-instance-test-a',
+      repoRuntimeId: 'repo-runtime-test-a',
       scope: 'visible-status',
       branchName: 'feature/a',
     })
@@ -600,7 +600,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
     })
 
     expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
-      repoInstanceId: 'repo-instance-test-a',
+      repoRuntimeId: 'repo-runtime-test-a',
       scope: 'visible-status',
       branchName: 'main',
     })

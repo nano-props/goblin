@@ -10,7 +10,7 @@
 // Query authoritative and is composed into presentation models at the UI edge.
 //
 // Race-condition defenses
-//   - `instanceId`: every time a repo is created/reset we mint a new
+//   - `repoRuntimeId`: every time a repo is created/reset we mint a new
 //     id. Async writers capture the id at call time and bail when
 //     they observe a different id in `set()` — this guards against
 //     a stale snapshot from before close-and-reopen overwriting fresh

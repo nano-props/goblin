@@ -31,11 +31,11 @@ import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-brok
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import {
-  closeRepoRuntimeInstance,
-  getOrOpenRepoRuntimeInstance,
-  listRepoRuntimeInstances,
-  openRepoRuntimeInstance,
-} from '#/server/modules/repo-runtime-instances.ts'
+  closeRepoRuntime,
+  getOrOpenRepoRuntime,
+  listRepoRuntimes,
+  openRepoRuntime,
+} from '#/server/modules/repo-runtimes.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import type { RepoLogResponse } from '#/shared/api-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
@@ -263,22 +263,22 @@ export function createRepoRoutes() {
       return c.json({
         ok: true as const,
         repo,
-        repoInstanceId: getOrOpenRepoRuntimeInstance(userId, repo.id),
+        repoRuntimeId: getOrOpenRepoRuntime(userId, repo.id),
       })
     }
-    return c.json({ ok: true as const, repoInstanceId: openRepoRuntimeInstance(userId, input.repoRoot) })
+    return c.json({ ok: true as const, repoRuntimeId: openRepoRuntime(userId, input.repoRoot) })
   })
   app.post('/runtime-list', async (c) => {
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
     await parseHttpBody(REPO_PROCEDURE_SCHEMAS.runtimeList, c)
-    return c.json({ instances: listRepoRuntimeInstances(userId) })
+    return c.json({ runtimes: listRepoRuntimes(userId) })
   })
   app.post('/runtime-close', async (c) => {
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
-    const { repoRoot, repoInstanceId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.runtimeClose, c)
-    return c.json({ ok: true as const, closed: closeRepoRuntimeInstance(userId, repoRoot, repoInstanceId) })
+    const { repoRoot, repoRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.runtimeClose, c)
+    return c.json({ ok: true as const, closed: closeRepoRuntime(userId, repoRoot, repoRuntimeId) })
   })
   app.post('/abort', async (c) => {
     const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.abort, c)

@@ -65,7 +65,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', instanceId: 'repo-instance-test-7' },
+        currentRepo: { id: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
       },
     )
 
@@ -80,7 +80,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', instanceId: 'repo-instance-test-7' },
+        currentRepo: { id: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
       },
     )
 
@@ -95,7 +95,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', instanceId: 'repo-instance-test-7' },
+        currentRepo: { id: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
       },
     )
 
@@ -125,14 +125,14 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', instanceId: 'repo-instance-test-7' },
+        currentRepo: { id: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
       },
     )
 
     expect(plan).toEqual({ kind: 'new-terminal-tab', repoId: '/tmp/repo' })
   })
 
-  test('creates a refresh plan from the current repo instance id', () => {
+  test('creates a refresh plan from the current repo runtime id', () => {
     const plan = createWorkspaceIntentPlan(
       { type: 'repo-refresh-requested' },
       {
@@ -140,11 +140,11 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
         currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', instanceId: 'repo-instance-test-7' },
+        currentRepo: { id: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
       },
     )
 
-    expect(plan).toEqual({ kind: 'refresh-repo', repoId: '/tmp/repo', repoInstanceId: 'repo-instance-test-7' })
+    expect(plan).toEqual({ kind: 'refresh-repo', repoId: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' })
   })
 
   test('creates a zen mode toggle plan for the current workspace', () => {
@@ -155,7 +155,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
         currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', instanceId: 'repo-instance-test-7' },
+        currentRepo: { id: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
       },
     )
 
@@ -170,7 +170,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', instanceId: 'repo-instance-test-7' },
+        currentRepo: { id: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
       },
     )
 
@@ -185,7 +185,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: false,
         terminalFocused: true,
         currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', instanceId: 'repo-instance-test-7' },
+        currentRepo: { id: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
       },
     )
 
@@ -200,7 +200,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: false,
         terminalFocused: false,
         currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', instanceId: 'repo-instance-test-7' },
+        currentRepo: { id: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
       },
     )
 
@@ -230,7 +230,7 @@ describe('client effect intent plans', () => {
         workspaceShortcutSuppressed: true,
         terminalFocused: false,
         currentRepoId: '/tmp/repo',
-        currentRepo: { id: '/tmp/repo', instanceId: 'repo-instance-test-7' },
+        currentRepo: { id: '/tmp/repo', repoRuntimeId: 'repo-runtime-test-7' },
       },
     )
 

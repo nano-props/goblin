@@ -521,7 +521,7 @@ export const en = {
   'error.trash-unavailable': 'System Trash is not available',
   'error.failed-trash-file': 'Could not move the file to Trash',
   'error.invalid-arguments': 'Invalid arguments',
-  'error.repo-instance-stale': 'Repository instance is stale',
+  'error.repo-runtime-stale': 'Repository runtime is stale',
   'error.not-controller': 'Another session is controlling this terminal',
   'error.network-op-in-progress': 'Another git network operation is already running.',
   'error.request-timeout': 'Request timed out. Try again.',

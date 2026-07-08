@@ -34,7 +34,7 @@ export function workspacePaneTabsChangedRealtimeMessage(repoRoot: string): Works
 
 export interface WorkspacePaneTabsListInput {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
 }
 
 export interface WorkspacePaneTabsReplaceInput extends WorkspacePaneTabsTarget, WorkspacePaneTabsListInput {

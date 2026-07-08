@@ -21,26 +21,26 @@ function callsGet() {
       repos: {
         '/repo': {
           id: '/repo',
-          instanceId: 'repo-instance-test-9',
+          repoRuntimeId: 'repo-runtime-test-9',
           availability: { phase: 'available' },
           dataLoads: {
             visibleStatus: { phase: 'idle', loadedAt: null, error: null, stale: false },
           },
         },
       },
-      syncAndRefresh: (id: string, options?: { repoInstanceId?: string }) => {
-        calls.push(`manual:${id}:${options?.repoInstanceId ?? ''}`)
+      syncAndRefresh: (id: string, options?: { repoRuntimeId?: string }) => {
+        calls.push(`manual:${id}:${options?.repoRuntimeId ?? ''}`)
         return Promise.resolve()
       },
-      refreshCoreData: (id: string, options?: { repoInstanceId?: string }) => {
-        calls.push(`core:${id}:${options?.repoInstanceId ?? ''}`)
+      refreshCoreData: (id: string, options?: { repoRuntimeId?: string }) => {
+        calls.push(`core:${id}:${options?.repoRuntimeId ?? ''}`)
         return Promise.resolve()
       },
       refreshRuntimeProjection: (
         id: string,
         options: RepoRuntimeProjectionRefreshOptions,
       ) => {
-        calls.push(`projection:${id}:${options.repoInstanceId ?? ''}:${options.scope}`)
+        calls.push(`projection:${id}:${options.repoRuntimeId ?? ''}:${options.scope}`)
         return Promise.resolve()
       },
     }) as unknown as ReturnType<ReposGet>
@@ -65,10 +65,10 @@ describe('repo refresh coordinator', () => {
       kind: 'core-data-changed',
       reason: 'initial-load',
       id: '/repo',
-      repoInstanceId: 'repo-instance-test-7',
+      repoRuntimeId: 'repo-runtime-test-7',
     })
 
-    expect(calls).toEqual(['core:/repo:repo-instance-test-7'])
+    expect(calls).toEqual(['core:/repo:repo-runtime-test-7'])
   })
 
   test('routes manual refresh requests through syncAndRefresh', async () => {
@@ -77,10 +77,10 @@ describe('repo refresh coordinator', () => {
     await runRepoRefreshIntent(get, {
       kind: 'manual-refresh-requested',
       id: '/repo',
-      repoInstanceId: 'repo-instance-test-5',
+      repoRuntimeId: 'repo-runtime-test-5',
     })
 
-    expect(calls).toEqual(['manual:/repo:repo-instance-test-5'])
+    expect(calls).toEqual(['manual:/repo:repo-runtime-test-5'])
   })
 
   test('routes visible projection views through a visible projection refresh', async () => {
@@ -90,7 +90,7 @@ describe('repo refresh coordinator', () => {
       branches: [createRepoBranch('feature/query', { worktree: { path: '/tmp/query-worktree' } })],
       currentBranchName: 'feature/query',
       preferredWorkspacePaneTab: 'status',
-      instanceId: 'repo-instance-test-9',
+      repoRuntimeId: 'repo-runtime-test-9',
       workspacePaneTabsByBranch: {
         'feature/query': [workspacePaneStaticTabEntry('status')],
       },
@@ -100,7 +100,7 @@ describe('repo refresh coordinator', () => {
         ...useReposStore.getState(),
         refreshRuntimeProjection: (id: string, options: RepoRuntimeProjectionRefreshOptions) => {
           calls.push(
-            `projection:${id}:${options.repoInstanceId ?? ''}:${options.scope}:${
+            `projection:${id}:${options.repoRuntimeId ?? ''}:${options.scope}:${
               options.scope === 'visible-status' ? options.branchName : ''
             }`,
           )
@@ -112,19 +112,19 @@ describe('repo refresh coordinator', () => {
       kind: 'visible-runtime-projection-requested',
       reason: 'visible-projection-view-opened',
       id: '/repo',
-      repoInstanceId: repo.instanceId,
+      repoRuntimeId: repo.repoRuntimeId,
       branchName: 'feature/query',
     })
 
-    expect(calls).toEqual(['projection:/repo:repo-instance-test-9:visible-status:feature/query'])
+    expect(calls).toEqual(['projection:/repo:repo-runtime-test-9:visible-status:feature/query'])
   })
 
   test('routes repo invalidation refreshes directly through the core refresh path', async () => {
     const { calls, get } = callsGet()
 
-    await handleRepoInvalidationRefresh(get, { repoId: '/repo', query: 'repo-snapshot' }, 'repo-instance-test-9')
+    await handleRepoInvalidationRefresh(get, { repoId: '/repo', query: 'repo-snapshot' }, 'repo-runtime-test-9')
 
-    expect(calls).toEqual(['core:/repo:repo-instance-test-9'])
+    expect(calls).toEqual(['core:/repo:repo-runtime-test-9'])
   })
 
   test('does not change invalidation behavior when the coordinated core refresh throws', async () => {
@@ -138,7 +138,7 @@ describe('repo refresh coordinator', () => {
         kind: 'core-data-changed',
         reason: 'branch-action',
         id: '/repo',
-        repoInstanceId: 'repo-instance-test-13',
+        repoRuntimeId: 'repo-runtime-test-13',
       }),
     ).rejects.toThrow('boom')
   })

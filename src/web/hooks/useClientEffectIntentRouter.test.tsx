@@ -389,13 +389,13 @@ describe('useClientEffectIntentRouter', () => {
       const terminalSessionId = 'term-222222222222222222222'
       const currentTabs = readWorkspacePaneTabsForTarget({
         repoRoot: base.repoRoot,
-        repoInstanceId: base.repoInstanceId!,
+        repoRuntimeId: base.repoRuntimeId!,
         branchName: base.branch,
         worktreePath: base.worktreePath,
       })
       setWorkspacePaneTabsForTargetQueryData({
         repoRoot: base.repoRoot,
-        repoInstanceId: base.repoInstanceId!,
+        repoRuntimeId: base.repoRuntimeId!,
         branchName: base.branch,
         worktreePath: base.worktreePath,
         tabs: [...currentTabs, workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
@@ -437,7 +437,7 @@ describe('useClientEffectIntentRouter', () => {
 
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-222222222222222222222', {
       repoRoot: repo.id,
-      repoInstanceId: repo.instanceId,
+      repoRuntimeId: repo.repoRuntimeId,
       branch: 'main',
       worktreePath: '/tmp/repo-worktree',
     })
@@ -567,7 +567,7 @@ function terminalWorktreeSnapshot(
           terminalWorktreeKey,
           index: selectedSession.index,
           repoRoot: '/tmp/repo',
-          repoInstanceId: useReposStore.getState().repos['/tmp/repo']?.instanceId ?? '',
+          repoRuntimeId: useReposStore.getState().repos['/tmp/repo']?.repoRuntimeId ?? '',
           branch: 'main',
           worktreePath: '/tmp/repo-worktree',
         }

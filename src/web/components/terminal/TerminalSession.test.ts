@@ -454,7 +454,7 @@ const descriptor = {
 
   repoRoot: '/repo',
 
-  repoInstanceId: 'repo-instance-test',
+  repoRuntimeId: 'repo-runtime-test',
 
   branch: 'feature',
 

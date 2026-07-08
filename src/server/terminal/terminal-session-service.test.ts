@@ -25,13 +25,13 @@ vi.mock('#/shared/worktree-guards.ts', () => ({
 
 const USER_ID = 'user_terminal_service'
 const REPO_ROOT = '/repo'
-const REPO_INSTANCE_ID = 'repo-instance-test'
-const RUNTIME_SCOPE = terminalSessionRuntimeScope(REPO_ROOT, REPO_INSTANCE_ID)
+const REPO_RUNTIME_ID = 'repo-runtime-test'
+const RUNTIME_SCOPE = terminalSessionRuntimeScope(REPO_ROOT, REPO_RUNTIME_ID)
 const WORKTREE_PATH = '/repo/worktree'
 const BRANCH_NAME = 'feature/worktree'
 const REMOTE_REPO_ROOT = 'ssh-config://prod/srv/repo'
-const REMOTE_REPO_INSTANCE_ID = 'repo-instance-remote-test'
-const REMOTE_RUNTIME_SCOPE = terminalSessionRuntimeScope(REMOTE_REPO_ROOT, REMOTE_REPO_INSTANCE_ID)
+const REMOTE_REPO_RUNTIME_ID = 'repo-runtime-remote-test'
+const REMOTE_RUNTIME_SCOPE = terminalSessionRuntimeScope(REMOTE_REPO_ROOT, REMOTE_REPO_RUNTIME_ID)
 const REMOTE_WORKTREE_PATH = '/srv/repo'
 const REMOTE_BRANCH_NAME = 'feature/remote'
 
@@ -71,7 +71,7 @@ describe('terminal session service facade', () => {
 
     const result = await service.create('client_terminal_service', USER_ID, {
       repoRoot: REPO_ROOT,
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       branch: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       kind: 'additional',
@@ -87,7 +87,7 @@ describe('terminal session service facade', () => {
     ])
   })
 
-  test('create closes the runtime session when the repo instance goes stale after ensure', async () => {
+  test('create closes the runtime session when the repo runtime goes stale after ensure', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     let current = true
     let createdTerminalSessionId: string | null = null
@@ -96,7 +96,7 @@ describe('terminal session service facade', () => {
       sessions: () => (createdTerminalSessionId ? [terminalSession(createdTerminalSessionId)] : []),
       workspaceTabs,
       closeSession,
-      isCurrentRepoInstance: () => current,
+      isCurrentRepoRuntime: () => current,
       ensureSession: vi.fn(async (input) => {
         createdTerminalSessionId = input.terminalSessionId
         current = false
@@ -121,14 +121,14 @@ describe('terminal session service facade', () => {
     await expect(
       service.create('client_terminal_service', USER_ID, {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branch: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         kind: 'additional',
         cols: 80,
         rows: 24,
       }),
-    ).resolves.toEqual({ ok: false, message: 'error.repo-instance-stale' })
+    ).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
 
     expect(closeSession).toHaveBeenCalledWith('pty_session_created')
     expect(
@@ -141,7 +141,7 @@ describe('terminal session service facade', () => {
     ).toEqual([workspacePaneStaticTabEntry('status')])
   })
 
-  test('create rejects before writing tabs when the repo instance goes stale during live-session lookup', async () => {
+  test('create rejects before writing tabs when the repo runtime goes stale during live-session lookup', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
       userId: USER_ID,
@@ -162,7 +162,7 @@ describe('terminal session service facade', () => {
       },
       workspaceTabs,
       closeSession,
-      isCurrentRepoInstance: () => current,
+      isCurrentRepoRuntime: () => current,
       ensureSession: vi.fn(async (input) => {
         createdTerminalSessionId = input.terminalSessionId
         return terminalAttachResult(input)
@@ -172,20 +172,20 @@ describe('terminal session service facade', () => {
     await expect(
       service.create('client_terminal_service', USER_ID, {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branch: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         kind: 'additional',
         cols: 80,
         rows: 24,
       }),
-    ).resolves.toEqual({ ok: false, message: 'error.repo-instance-stale' })
+    ).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
 
     expect(closeSession).toHaveBeenCalledWith('pty_session_created')
     expect(workspaceTabs.tabsForScope({ userId: USER_ID, scope: RUNTIME_SCOPE })).toEqual([])
   })
 
-  test('create clears old-scope tabs when the repo instance goes stale after tab write', async () => {
+  test('create clears old-scope tabs when the repo runtime goes stale after tab write', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     let currentCheckCount = 0
     let createdTerminalSessionId: string | null = null
@@ -194,7 +194,7 @@ describe('terminal session service facade', () => {
       sessions: () => (createdTerminalSessionId ? [terminalSession(createdTerminalSessionId)] : []),
       workspaceTabs,
       closeSession,
-      isCurrentRepoInstance: () => {
+      isCurrentRepoRuntime: () => {
         currentCheckCount += 1
         return currentCheckCount < 5
       },
@@ -207,14 +207,14 @@ describe('terminal session service facade', () => {
     await expect(
       service.create('client_terminal_service', USER_ID, {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branch: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         kind: 'additional',
         cols: 80,
         rows: 24,
       }),
-    ).resolves.toEqual({ ok: false, message: 'error.repo-instance-stale' })
+    ).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
 
     expect(closeSession).toHaveBeenCalledWith('pty_session_created')
     expect(workspaceTabs.tabsForScope({ userId: USER_ID, scope: RUNTIME_SCOPE })).toEqual([])
@@ -224,7 +224,7 @@ describe('terminal session service facade', () => {
     const ensureSession = vi.fn(async (input) => terminalAttachResult(input))
     const ensureInput = {
       repoRoot: REPO_ROOT,
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       branch: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       terminalSessionId: 'term-actionactionaction001',
@@ -287,7 +287,7 @@ describe('terminal session service facade', () => {
     await expect(
       service.replaceTabs(USER_ID, {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         tabs: [
@@ -313,7 +313,7 @@ describe('terminal session service facade', () => {
     await expect(
       service.replaceTabs(USER_ID, {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         tabs: [workspacePaneStaticTabEntry('status')],
@@ -324,7 +324,7 @@ describe('terminal session service facade', () => {
     ])
   })
 
-  test('replaceTabs rejects before writing when the repo instance goes stale during live-session lookup', async () => {
+  test('replaceTabs rejects before writing when the repo runtime goes stale during live-session lookup', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
       userId: USER_ID,
@@ -340,18 +340,18 @@ describe('terminal session service facade', () => {
         return [terminalSession('term-livelivelivelivelive1')]
       },
       workspaceTabs,
-      isCurrentRepoInstance: () => current,
+      isCurrentRepoRuntime: () => current,
     })
 
     await expect(
       service.replaceTabs(USER_ID, {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         tabs: [workspacePaneStaticTabEntry('history'), workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')],
       }),
-    ).rejects.toThrow('error.repo-instance-stale')
+    ).rejects.toThrow('error.repo-runtime-stale')
 
     expect(
       workspaceTabs.tabs({
@@ -381,7 +381,7 @@ describe('terminal session service facade', () => {
       workspaceTabs,
     })
 
-    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).resolves.toEqual([
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_RUNTIME_ID)).resolves.toEqual([
       {
         repoRoot: REPO_ROOT,
         branchName: BRANCH_NAME,
@@ -398,7 +398,7 @@ describe('terminal session service facade', () => {
       tabs: [workspacePaneStaticTabEntry('history')],
     })
 
-    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).resolves.toEqual([
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_RUNTIME_ID)).resolves.toEqual([
       {
         repoRoot: REPO_ROOT,
         branchName: 'feature/static-only',
@@ -442,7 +442,7 @@ describe('terminal session service facade', () => {
       broadcastWorkspaceTabsChanged,
     })
 
-    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).resolves.toEqual([
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_RUNTIME_ID)).resolves.toEqual([
       {
         repoRoot: REPO_ROOT,
         branchName: BRANCH_NAME,
@@ -481,7 +481,7 @@ describe('terminal session service facade', () => {
       workspaceTabs,
     })
 
-    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).resolves.toEqual([
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_RUNTIME_ID)).resolves.toEqual([
       {
         repoRoot: REPO_ROOT,
         branchName: BRANCH_NAME,
@@ -497,7 +497,7 @@ describe('terminal session service facade', () => {
     await expect(
       service.updateTabs(USER_ID, {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         operation: { type: 'reorder', tabIdentities: ['workspace-pane:history', 'workspace-pane:status'] },
@@ -523,7 +523,7 @@ describe('terminal session service facade', () => {
       workspaceTabs,
     })
 
-    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).resolves.toEqual([
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_RUNTIME_ID)).resolves.toEqual([
       {
         repoRoot: REPO_ROOT,
         branchName: BRANCH_NAME,
@@ -540,7 +540,7 @@ describe('terminal session service facade', () => {
       workspaceTabs,
     })
 
-    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).resolves.toEqual([
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_RUNTIME_ID)).resolves.toEqual([
       {
         repoRoot: REPO_ROOT,
         branchName: BRANCH_NAME,
@@ -636,7 +636,7 @@ describe('terminal session service facade', () => {
 
     const reorder = service.updateTabs(USER_ID, {
       repoRoot: REPO_ROOT,
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       operation: { type: 'reorder', tabIdentities: ['workspace-pane:history', 'workspace-pane:status'] },
@@ -672,7 +672,7 @@ describe('terminal session service facade', () => {
     await expect(
       service.replaceTabs(USER_ID, {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branchName: 'feature/no-worktree',
         worktreePath: null,
         tabs: [
@@ -714,7 +714,7 @@ describe('terminal session service facade', () => {
     await expect(
       service.updateTabs(USER_ID, {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         operation: { type: 'close-static', tabType: 'history' },
@@ -727,7 +727,7 @@ describe('terminal session service facade', () => {
     await expect(
       service.updateTabs(USER_ID, {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         operation: {
@@ -758,7 +758,7 @@ describe('terminal session service facade', () => {
     await expect(
       service.updateTabs(USER_ID, {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branchName: 'feature/new',
         worktreePath: WORKTREE_PATH,
         operation: { type: 'open-static', tabType: 'history' },
@@ -769,7 +769,7 @@ describe('terminal session service facade', () => {
       workspacePaneStaticTabEntry('history'),
     ])
 
-    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).resolves.toEqual([
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_RUNTIME_ID)).resolves.toEqual([
       {
         repoRoot: REPO_ROOT,
         branchName: 'feature/new',
@@ -797,7 +797,7 @@ describe('terminal session service facade', () => {
       workspaceTabs,
     })
 
-    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).resolves.toEqual([
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_RUNTIME_ID)).resolves.toEqual([
       {
         repoRoot: REPO_ROOT,
         branchName: 'feature/new',
@@ -823,7 +823,7 @@ describe('terminal session service facade', () => {
       broadcastWorkspaceTabsChanged,
     })
 
-    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).resolves.toEqual([
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_RUNTIME_ID)).resolves.toEqual([
       {
         repoRoot: REPO_ROOT,
         branchName: BRANCH_NAME,
@@ -834,7 +834,7 @@ describe('terminal session service facade', () => {
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith(USER_ID, REPO_ROOT)
   })
 
-  test('listWorkspaceTabs does not materialize terminal tabs after repo instance goes stale during projection', async () => {
+  test('listWorkspaceTabs does not materialize terminal tabs after repo runtime goes stale during projection', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
       userId: USER_ID,
@@ -849,7 +849,7 @@ describe('terminal session service facade', () => {
     const service = createService({
       sessions: [terminalSession('term-livelivelivelivelive1')],
       workspaceTabs,
-      isCurrentRepoInstance: () => {
+      isCurrentRepoRuntime: () => {
         currentChecks += 1
         if (currentChecks === 2) current = false
         return current
@@ -857,8 +857,8 @@ describe('terminal session service facade', () => {
       broadcastWorkspaceTabsChanged,
     })
 
-    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).rejects.toThrow(
-      'error.repo-instance-stale',
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_RUNTIME_ID)).rejects.toThrow(
+      'error.repo-runtime-stale',
     )
     expect(
       workspaceTabs.tabs({
@@ -885,7 +885,7 @@ describe('terminal session service facade', () => {
       sessions: [
         terminalSession('term-remoteremoteremote001', {
           repoRoot: REMOTE_REPO_ROOT,
-          repoInstanceId: REMOTE_REPO_INSTANCE_ID,
+          repoRuntimeId: REMOTE_REPO_RUNTIME_ID,
           branch: REMOTE_BRANCH_NAME,
           worktreePath: REMOTE_WORKTREE_PATH,
         }),
@@ -894,7 +894,7 @@ describe('terminal session service facade', () => {
       broadcastWorkspaceTabsChanged,
     })
 
-    await expect(service.listWorkspaceTabs(USER_ID, REMOTE_REPO_ROOT, REMOTE_REPO_INSTANCE_ID)).resolves.toEqual([
+    await expect(service.listWorkspaceTabs(USER_ID, REMOTE_REPO_ROOT, REMOTE_REPO_RUNTIME_ID)).resolves.toEqual([
       {
         repoRoot: REMOTE_REPO_ROOT,
         branchName: REMOTE_BRANCH_NAME,
@@ -921,7 +921,7 @@ describe('terminal session service facade', () => {
       broadcastWorkspaceTabsChanged,
     })
 
-    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)).resolves.toEqual([
+    await expect(service.listWorkspaceTabs(USER_ID, REPO_ROOT, REPO_RUNTIME_ID)).resolves.toEqual([
       {
         repoRoot: REPO_ROOT,
         branchName: BRANCH_NAME,
@@ -938,7 +938,7 @@ function createService(options: {
   workspaceTabs: WorkspacePaneTabsRuntime<string>
   ensureSession?: (input: EnsureSessionInput) => Promise<TerminalAttachResult>
   closeSession?: (terminalRuntimeSessionId: string) => void
-  isCurrentRepoInstance?: (userId: string, repoRoot: string, repoInstanceId: string) => boolean
+  isCurrentRepoRuntime?: (userId: string, repoRoot: string, repoRuntimeId: string) => boolean
   broadcastWorkspaceTabsChanged?: (userId: string, repoRoot: string) => void
 }) {
   const manager = {
@@ -962,7 +962,7 @@ function createService(options: {
     isValidTerminalSessionId: (value): value is string => typeof value === 'string' && value.length > 0,
     manager,
     workspaceTabsCoordinator,
-    isCurrentRepoInstance: options.isCurrentRepoInstance ?? (() => true),
+    isCurrentRepoRuntime: options.isCurrentRepoRuntime ?? (() => true),
     broadcastSessionsChanged: vi.fn(),
     broadcastWorkspaceTabsChanged: options.broadcastWorkspaceTabsChanged ?? vi.fn(),
   })
@@ -976,12 +976,12 @@ interface EnsureSessionInput {
 
 function terminalSession(
   terminalSessionId: string,
-  overrides: Partial<Pick<TerminalSessionSummary, 'repoRoot' | 'repoInstanceId' | 'branch' | 'worktreePath'>> = {},
+  overrides: Partial<Pick<TerminalSessionSummary, 'repoRoot' | 'repoRuntimeId' | 'branch' | 'worktreePath'>> = {},
 ): TerminalSessionSummary {
   return {
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
     terminalSessionId,
-    repoInstanceId: overrides.repoInstanceId ?? REPO_INSTANCE_ID,
+    repoRuntimeId: overrides.repoRuntimeId ?? REPO_RUNTIME_ID,
     repoRoot: overrides.repoRoot ?? path.resolve(REPO_ROOT),
     branch: overrides.branch ?? BRANCH_NAME,
     worktreePath: overrides.worktreePath ?? path.resolve(WORKTREE_PATH),

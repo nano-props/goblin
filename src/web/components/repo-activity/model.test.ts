@@ -79,7 +79,7 @@ function serverOperation(
   return {
     id: `repo-op-${overrides.kind}-${overrides.phase}`,
     repoId: REPO_ID,
-    repoInstanceId: null,
+    repoRuntimeId: null,
     kind: overrides.kind,
     phase: overrides.phase,
     source: 'user',

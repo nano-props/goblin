@@ -17,7 +17,7 @@ stubI18n()
 
 interface CapturedTerminalSessionViewProps {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   branch: string
   worktreePath: string
   selectedTerminalSessionId?: string | null
@@ -60,7 +60,7 @@ describe('workspace pane runtime tab panel', () => {
     expect(container.querySelector('[data-testid="terminal-session-view"]')).not.toBeNull()
     expect(terminalSessionViewMocks.props[0]).toMatchObject({
       repoRoot: '/repo',
-      repoInstanceId: 'repo-instance-1',
+      repoRuntimeId: 'repo-runtime-1',
       branch: 'main',
       worktreePath: '/repo-worktree',
       selectedTerminalSessionId: 'term-111111111111111111111',
@@ -77,7 +77,7 @@ describe('workspace pane runtime tab panel', () => {
 
     const base: TerminalSessionBase = {
       repoRoot: '/repo',
-      repoInstanceId: 'repo-instance-1',
+      repoRuntimeId: 'repo-runtime-1',
       branch: 'main',
       worktreePath: '/repo-worktree',
     }
@@ -113,7 +113,7 @@ function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = 
           panelLabel: { label: 'Terminal' },
           target: {
             repoRoot: '/repo',
-            repoInstanceId: 'repo-instance-1',
+            repoRuntimeId: 'repo-runtime-1',
             branchName: 'main',
             worktreePath: '/repo-worktree',
           },

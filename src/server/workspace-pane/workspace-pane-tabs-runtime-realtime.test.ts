@@ -18,13 +18,13 @@ describe('createWorkspacePaneTabsRealtimeHandlers', () => {
     await expect(
       handlers[WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list]('client_a', 'user_a', {
         repoRoot: '/repo',
-        repoInstanceId: 'repo-instance-test',
+        repoRuntimeId: 'repo-runtime-test',
       }),
     ).resolves.toEqual([])
     await expect(
       handlers[WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace]('client_a', 'user_a', {
         repoRoot: '/repo',
-        repoInstanceId: 'repo-instance-test',
+        repoRuntimeId: 'repo-runtime-test',
         branchName: 'main',
         worktreePath: '/repo',
         tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
@@ -33,7 +33,7 @@ describe('createWorkspacePaneTabsRealtimeHandlers', () => {
     await expect(
       handlers[WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update]('client_a', 'user_a', {
         repoRoot: '/repo',
-        repoInstanceId: 'repo-instance-test',
+        repoRuntimeId: 'repo-runtime-test',
         branchName: 'main',
         worktreePath: '/repo',
         operation: { type: 'open-static', tabType: 'history' },
@@ -42,18 +42,18 @@ describe('createWorkspacePaneTabsRealtimeHandlers', () => {
 
     expect(host.listWorkspaceTabs).toHaveBeenCalledWith('client_a', 'user_a', {
       repoRoot: '/repo',
-      repoInstanceId: 'repo-instance-test',
+      repoRuntimeId: 'repo-runtime-test',
     })
     expect(host.replaceTabs).toHaveBeenCalledWith('client_a', 'user_a', {
       repoRoot: '/repo',
-      repoInstanceId: 'repo-instance-test',
+      repoRuntimeId: 'repo-runtime-test',
       branchName: 'main',
       worktreePath: '/repo',
       tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
     })
     expect(host.updateTabs).toHaveBeenCalledWith('client_a', 'user_a', {
       repoRoot: '/repo',
-      repoInstanceId: 'repo-instance-test',
+      repoRuntimeId: 'repo-runtime-test',
       branchName: 'main',
       worktreePath: '/repo',
       operation: { type: 'open-static', tabType: 'history' },
@@ -83,7 +83,7 @@ describe('createWorkspacePaneTabsRealtimeHandlers', () => {
         type: 'request',
         requestId: 'request_1',
         action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
-        input: { repoRoot: '/repo', repoInstanceId: 'repo-instance-test' },
+        input: { repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test' },
       },
       onSendFailed,
     )

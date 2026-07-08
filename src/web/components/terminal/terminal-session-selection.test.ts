@@ -8,7 +8,7 @@ function descriptor(terminalSessionId: string): TerminalDescriptor {
     terminalWorktreeKey: 'repo\0wt',
     index: 1,
     repoRoot: '/repo',
-    repoInstanceId: 'repo-instance-test',
+    repoRuntimeId: 'repo-runtime-test',
     branch: 'main',
     worktreePath: '/repo',
   }

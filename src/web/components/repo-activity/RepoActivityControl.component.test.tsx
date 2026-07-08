@@ -32,8 +32,8 @@ beforeEach(() => {
 describe('RepoActivityControl component', () => {
   test('disables the primary refresh button while server projection reports an active fetch', () => {
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
-    setRepoOperationsQueryData(REPO_ID, repo.instanceId, false, {
-      operations: [serverOperation(repo.instanceId, { kind: 'fetch', phase: 'running' })],
+    setRepoOperationsQueryData(REPO_ID, repo.repoRuntimeId, false, {
+      operations: [serverOperation(repo.repoRuntimeId, { kind: 'fetch', phase: 'running' })],
       loadedAt: 123,
     })
 
@@ -45,9 +45,9 @@ describe('RepoActivityControl component', () => {
 
   test('renders branch action activity from server operation projection', async () => {
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
-    setRepoOperationsQueryData(REPO_ID, repo.instanceId, false, {
+    setRepoOperationsQueryData(REPO_ID, repo.repoRuntimeId, false, {
       operations: [
-        serverOperation(repo.instanceId, {
+        serverOperation(repo.repoRuntimeId, {
           kind: 'push',
           phase: 'queued',
           branch: 'feature/a',
@@ -153,18 +153,18 @@ function renderControl() {
 
 function seedRepoForControl(input: Parameters<typeof seedRepoShellForTest>[0]) {
   const repo = seedRepoShellForTest(input)
-  setRepoOperationsQueryData(repo.id, repo.instanceId, false, { operations: [], loadedAt: 0 })
+  setRepoOperationsQueryData(repo.id, repo.repoRuntimeId, false, { operations: [], loadedAt: 0 })
   return repo
 }
 
 function serverOperation(
-  repoInstanceId: string,
+  repoRuntimeId: string,
   overrides: Pick<RepoServerOperationState, 'kind' | 'phase'> & { branch?: string },
 ): RepoServerOperationState {
   return {
     id: `repo-op-${overrides.kind}-${overrides.phase}`,
     repoId: REPO_ID,
-    repoInstanceId,
+    repoRuntimeId,
     kind: overrides.kind,
     phase: overrides.phase,
     source: 'user',

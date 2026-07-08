@@ -5,7 +5,7 @@ import { createTerminalSessionCreateCoordinator } from '#/server/terminal/termin
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 
 const USER_ID = 'user_terminal_create_coordinator'
-const SCOPE = 'repo-instance-terminal-create'
+const SCOPE = 'repo-runtime-terminal-create'
 const WORKTREE_PATH = '/repo/worktree'
 const OTHER_WORKTREE_PATH = '/repo/other-worktree'
 
@@ -146,7 +146,7 @@ function terminalSession(terminalSessionId: string): TerminalSessionSummary {
   return {
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
     terminalSessionId,
-    repoInstanceId: 'repo-instance-test',
+    repoRuntimeId: 'repo-runtime-test',
     repoRoot: '/repo',
     branch: 'feature/worktree',
     worktreePath: WORKTREE_PATH,

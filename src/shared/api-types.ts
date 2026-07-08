@@ -106,13 +106,13 @@ export interface RuntimeRecentReposState {
   recentRepos: RepoSessionEntry[]
 }
 
-export interface RepoRuntimeInstanceEntry {
+export interface RepoRuntimeEntry {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
 }
 
-export interface RepoRuntimeInstancesSnapshot {
-  instances: RepoRuntimeInstanceEntry[]
+export interface RepoRuntimesSnapshot {
+  runtimes: RepoRuntimeEntry[]
 }
 
 export interface RepoSettingsState {
@@ -223,9 +223,9 @@ export interface ProbeResult {
 }
 
 export type RepoRuntimeOpenResult =
-  | { ok: true; repo: { id: string; name: string }; repoInstanceId: string }
+  | { ok: true; repo: { id: string; name: string }; repoRuntimeId: string }
   | { ok: false; input: string; reason: string }
-export type RepoRuntimeOpenResponse = { ok: true; repoInstanceId: string } | RepoRuntimeOpenResult
+export type RepoRuntimeOpenResponse = { ok: true; repoRuntimeId: string } | RepoRuntimeOpenResult
 
 export interface CloneRepoResult extends ExecResult {
   path?: string
@@ -279,7 +279,7 @@ export interface RepoServerOperationError {
 export interface RepoServerOperationState {
   id: string
   repoId: string | null
-  repoInstanceId: string | null
+  repoRuntimeId: string | null
   kind: RepoServerOperationKind
   phase: RepoServerOperationPhase
   source: RepoServerOperationSource
@@ -341,8 +341,8 @@ export interface AppIpcHandlers {
   repo: {
     probe: (input: { cwd: string }) => Promise<ProbeResult>
     runtimeOpen: (input: { repoRoot: string } | { repoInput: string }) => Promise<RepoRuntimeOpenResponse>
-    runtimeList: () => Promise<RepoRuntimeInstancesSnapshot>
-    runtimeClose: (input: { repoRoot: string; repoInstanceId: string }) => Promise<{ ok: boolean; closed: boolean }>
+    runtimeList: () => Promise<RepoRuntimesSnapshot>
+    runtimeClose: (input: { repoRoot: string; repoRuntimeId: string }) => Promise<{ ok: boolean; closed: boolean }>
     clone: (input: {
       url: string
       parentPath: string

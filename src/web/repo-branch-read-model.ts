@@ -40,10 +40,10 @@ export function repoBranchReadModelFromSnapshot(
 
 export function useRepoBranchReadModel(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
   enabled: boolean,
 ): RepoBranchReadModelData | null {
-  const projectionReadModel = useRepoProjectionReadModel(repoRoot, repoInstanceId, null, 'full', enabled)
+  const projectionReadModel = useRepoProjectionReadModel(repoRoot, repoRuntimeId, null, 'full', enabled)
   if (!enabled) return null
   const projection = projectionReadModel.data
   if (!projection?.snapshot) return null
@@ -51,18 +51,18 @@ export function useRepoBranchReadModel(
 }
 
 export function readRepoBranchQueryProjection(
-  repo: Pick<RepoState, 'id' | 'instanceId'>,
+  repo: Pick<RepoState, 'id' | 'repoRuntimeId'>,
   queryClient?: QueryClient,
 ): RepoBranchReadModelData | null {
   const projection =
-    getRepoProjectionQueryData(repo.id, repo.instanceId, null, 'full', queryClient) ??
-    getRepoProjectionPlaceholderData(repo.id, repo.instanceId, null, 'full', queryClient)
+    getRepoProjectionQueryData(repo.id, repo.repoRuntimeId, null, 'full', queryClient) ??
+    getRepoProjectionPlaceholderData(repo.id, repo.repoRuntimeId, null, 'full', queryClient)
   if (projection?.snapshot) return repoBranchReadModelFromSnapshot(projection.snapshot, projection.status)
   return null
 }
 
 export function requireRepoBranchQueryProjection(
-  repo: Pick<RepoState, 'id' | 'instanceId'>,
+  repo: Pick<RepoState, 'id' | 'repoRuntimeId'>,
   queryClient?: QueryClient,
 ): RepoBranchReadModelData {
   const projection = readRepoBranchQueryProjection(repo, queryClient)

@@ -12,7 +12,7 @@ interface WorkspacePaneTabDragPreviewSnapshot {
 
 export interface WorkspacePaneTabDragPreviewInput {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   branchName: string | null
   worktreePath: string | null
   canonicalTabs: readonly WorkspacePaneTabEntry[]
@@ -36,12 +36,12 @@ export function useWorkspacePaneTabDragPreview(
       input.branchName
         ? workspacePaneTabDragPreviewTargetKey({
             repoRoot: input.repoRoot,
-            repoInstanceId: input.repoInstanceId,
+            repoRuntimeId: input.repoRuntimeId,
             branchName: input.branchName,
             worktreePath: input.worktreePath,
           })
         : null,
-    [input.branchName, input.repoInstanceId, input.repoRoot, input.worktreePath],
+    [input.branchName, input.repoRuntimeId, input.repoRoot, input.worktreePath],
   )
   const canonicalTabsIdentity = useMemo(
     () => workspacePaneTabEntryListIdentity(input.canonicalTabs),
@@ -93,9 +93,9 @@ export function useWorkspacePaneTabDragPreview(
 
 function workspacePaneTabDragPreviewTargetKey(input: {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   branchName: string
   worktreePath: string | null
 }): string {
-  return `${workspacePaneTabsTargetIdentityKey(input)}::${input.repoInstanceId}`
+  return `${workspacePaneTabsTargetIdentityKey(input)}::${input.repoRuntimeId}`
 }

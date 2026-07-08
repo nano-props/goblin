@@ -35,7 +35,7 @@ vi.mock('#/system/ssh/config.ts', () => ({
 
 const USER_ID = 'user_terminal_ensurer'
 const REPO_ROOT = '/repo'
-const REPO_INSTANCE_ID = 'repo-instance-ensure'
+const REPO_RUNTIME_ID = 'repo-runtime-ensure'
 const WORKTREE_PATH = '/repo/worktree'
 const BRANCH_NAME = 'feature/worktree'
 const REMOTE_REPO_ROOT = 'ssh-config://prod/srv/repo'
@@ -72,7 +72,7 @@ describe('terminal session ensurer', () => {
       USER_ID,
       {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branch: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         startupShellCommand: 'echo ready',
@@ -102,9 +102,9 @@ describe('terminal session ensurer', () => {
     )
     expect(ensureSession).toHaveBeenCalledWith({
       userId: USER_ID,
-      scope: terminalSessionRuntimeScope(REPO_ROOT, REPO_INSTANCE_ID),
+      scope: terminalSessionRuntimeScope(REPO_ROOT, REPO_RUNTIME_ID),
       repoRoot: path.resolve(REPO_ROOT),
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       branch: BRANCH_NAME,
       terminalSessionId: 'term-locallocallocallocal1',
       worktreePath: path.resolve(WORKTREE_PATH),
@@ -135,7 +135,7 @@ describe('terminal session ensurer', () => {
         USER_ID,
         {
           repoRoot: REPO_ROOT,
-          repoInstanceId: REPO_INSTANCE_ID,
+          repoRuntimeId: REPO_RUNTIME_ID,
           branch: BRANCH_NAME,
           worktreePath: WORKTREE_PATH,
         },
@@ -164,7 +164,7 @@ describe('terminal session ensurer', () => {
       USER_ID,
       {
         repoRoot: REMOTE_REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branch: BRANCH_NAME,
         worktreePath: REMOTE_WORKTREE_PATH,
         startupShellCommand: 'pwd',
@@ -191,9 +191,9 @@ describe('terminal session ensurer', () => {
     expect(input).toEqual(
       expect.objectContaining({
         userId: USER_ID,
-        scope: terminalSessionRuntimeScope(REMOTE_REPO_ROOT, REPO_INSTANCE_ID),
+        scope: terminalSessionRuntimeScope(REMOTE_REPO_ROOT, REPO_RUNTIME_ID),
         repoRoot: REMOTE_REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branch: BRANCH_NAME,
         terminalSessionId: 'term-remoteremoteremote001',
         worktreePath: REMOTE_WORKTREE_PATH,
@@ -224,7 +224,7 @@ describe('terminal session ensurer', () => {
         USER_ID,
         {
           repoRoot: REMOTE_REPO_ROOT,
-          repoInstanceId: REPO_INSTANCE_ID,
+          repoRuntimeId: REPO_RUNTIME_ID,
           branch: BRANCH_NAME,
           worktreePath: REMOTE_WORKTREE_PATH,
         },

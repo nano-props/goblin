@@ -66,7 +66,7 @@ function selectedTerminalBase(
   if (!repo || !target?.worktreePath) return null
   return {
     repoRoot: repoId,
-    repoInstanceId: repo.instanceId,
+    repoRuntimeId: repo.repoRuntimeId,
     branch: target.branchName,
     worktreePath: target.worktreePath,
   }

@@ -206,7 +206,7 @@ export function useKeyboard({
           if (!repo) return
           const branchAction = projectBranchActionOperation(
             repo.operations.branchAction,
-            getRepoOperationsQueryData(repo.id, repo.instanceId)?.operations,
+            getRepoOperationsQueryData(repo.id, repo.repoRuntimeId)?.operations,
           )
           if (branchAction.phase === 'idle') {
             openCreateWorktreeRef.current()

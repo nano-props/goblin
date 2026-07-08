@@ -16,7 +16,7 @@ describe('RepoActivityControl', () => {
         {
           id: 'repo-op-1',
           repoId: REPO_ID,
-          repoInstanceId: repo.instanceId,
+          repoRuntimeId: repo.repoRuntimeId,
           kind: 'fetch',
           phase: 'running',
           source: 'user',

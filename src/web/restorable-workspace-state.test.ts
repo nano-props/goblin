@@ -56,7 +56,7 @@ describe('restorable-workspace-state', () => {
   })
 
   test('persists workspace shell when an open repo has no branch read model', () => {
-    const repo = emptyRepo('/tmp/repo-without-query-model', 'repo-without-query-model', 'repo-instance-without-query')
+    const repo = emptyRepo('/tmp/repo-without-query-model', 'repo-without-query-model', 'repo-runtime-without-query')
 
     expect(
       workspaceSessionStateFromRestorableWorkspaceState({

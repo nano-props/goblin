@@ -69,7 +69,7 @@ export function UnavailableRepoView({ repo }: Props) {
                   void runRepoRefreshIntent(useReposStore.getState, {
                     kind: 'manual-refresh-requested',
                     id: repo.id,
-                    repoInstanceId: repo.instanceId,
+                    repoRuntimeId: repo.repoRuntimeId,
                   })
                 }
               >

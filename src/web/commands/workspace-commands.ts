@@ -230,7 +230,7 @@ async function closeWorkspacePaneTabCommand(options: CloseWorkspacePaneTabComman
       view: tab.view,
       target: {
         repoRoot: target.repoId,
-        repoInstanceId: target.repoInstanceId,
+        repoRuntimeId: target.repoRuntimeId,
         branchName: target.branchName,
         worktreePath: target.worktreePath,
       },
@@ -255,13 +255,13 @@ async function closeConfirmedTerminalWorkspacePaneTab(
   options: ConfirmCloseTerminalWorkspacePaneTabCommandOptions,
 ): Promise<boolean> {
   const { repoId, navigation, targetIdentity, confirmedTerminal } = options
-  if (!confirmedTerminal.base.repoInstanceId) return false
+  if (!confirmedTerminal.base.repoRuntimeId) return false
   const confirmed: ConfirmedWorkspacePaneRuntimeTabClose = {
     type: 'terminal',
     sessionId: confirmedTerminal.terminalSessionId,
     target: {
       repoRoot: confirmedTerminal.base.repoRoot,
-      repoInstanceId: confirmedTerminal.base.repoInstanceId,
+      repoRuntimeId: confirmedTerminal.base.repoRuntimeId,
       branchName: confirmedTerminal.base.branch,
       worktreePath: confirmedTerminal.base.worktreePath,
     },

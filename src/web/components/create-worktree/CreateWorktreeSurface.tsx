@@ -43,7 +43,7 @@ const MODE_OPTIONS = [
 
 interface CreateWorktreeRepo {
   id: RepoState['id']
-  instanceId: RepoState['instanceId']
+  repoRuntimeId: RepoState['repoRuntimeId']
   branchModel: RepoBranchReadModelData
   branchAction: RepoOperationState
   remote: Pick<RepoState['remote'], 'lifecycle'>
@@ -91,7 +91,7 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
   const [localBranch, setLocalBranch] = useState('')
   const [worktreePath, setWorktreePath] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const remoteBranchesQuery = useRepoRemoteBranchesQuery(repo.id, repo.instanceId, {
+  const remoteBranchesQuery = useRepoRemoteBranchesQuery(repo.id, repo.repoRuntimeId, {
     enabled: mode === 'trackRemoteBranch',
   })
   const remoteBranches = remoteBranchesQuery.data ?? []

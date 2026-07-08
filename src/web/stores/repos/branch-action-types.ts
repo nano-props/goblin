@@ -18,7 +18,7 @@ export type RepoBranchAction =
 export type RepoBranchActionKind = RepoBranchAction['kind']
 
 export interface RunBranchActionOptions {
-  repoInstanceId?: string
+  repoRuntimeId?: string
   deferResultMessages?: string[]
   refreshOnError?: boolean
   /** Internal override for tests that exercise queued refresh wait timeouts. */

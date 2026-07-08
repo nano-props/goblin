@@ -10,7 +10,7 @@ export function terminalDescriptor(
   const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
   return {
     repoRoot: base.repoRoot,
-    repoInstanceId: requireRepoInstanceId(base),
+    repoRuntimeId: requireRepoRuntimeId(base),
     branch: base.branch,
     worktreePath: base.worktreePath,
     terminalWorktreeKey,
@@ -19,7 +19,7 @@ export function terminalDescriptor(
   }
 }
 
-function requireRepoInstanceId(base: TerminalSessionBase): string {
-  if (typeof base.repoInstanceId === 'string' && base.repoInstanceId.length > 0) return base.repoInstanceId
-  throw new Error('error.repo-instance-stale')
+function requireRepoRuntimeId(base: TerminalSessionBase): string {
+  if (typeof base.repoRuntimeId === 'string' && base.repoRuntimeId.length > 0) return base.repoRuntimeId
+  throw new Error('error.repo-runtime-stale')
 }

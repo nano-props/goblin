@@ -35,7 +35,7 @@ const EMPTY_EVENTS: RepoEvent[] = []
 
 type RepoActivityControlRepo = Pick<
   RepoState,
-  'id' | 'instanceId' | 'dataLoads' | 'availability' | 'projection' | 'remote'
+  'id' | 'repoRuntimeId' | 'dataLoads' | 'availability' | 'projection' | 'remote'
 > &
   RepoActivityProjectionRepo
 
@@ -57,7 +57,7 @@ function repoActivityControlRepoEqual(
     (!!a &&
       !!b &&
       a.id === b.id &&
-      a.instanceId === b.instanceId &&
+      a.repoRuntimeId === b.repoRuntimeId &&
       a.dataLoads === b.dataLoads &&
       a.branchAction === b.branchAction &&
       a.availability === b.availability &&
@@ -74,7 +74,7 @@ export function RepoActivityControl({ repoId }: Props) {
       return repo
         ? {
             id: repo.id,
-            instanceId: repo.instanceId,
+            repoRuntimeId: repo.repoRuntimeId,
             dataLoads: repo.dataLoads,
             branchAction: repo.operations.branchAction,
             availability: repo.availability,
@@ -90,7 +90,7 @@ export function RepoActivityControl({ repoId }: Props) {
 }
 
 function RepoActivityControlView({ repo }: { repo: RepoActivityControlRepo }) {
-  const operationsReadModel = useRepoOperationsReadModel(repo.id, repo.instanceId)
+  const operationsReadModel = useRepoOperationsReadModel(repo.id, repo.repoRuntimeId)
   const visibleActivity = useRepoActivityControlPresentation(repo, operationsReadModel.data)
   const completion = useRepoCompletion(repo.id)
   const view = getRepoActivityControlView({
@@ -157,14 +157,14 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControl
   const label = t('action.refresh')
 
   function handleSync() {
-    const repoInstanceId = repo.instanceId
+    const repoRuntimeId = repo.repoRuntimeId
     // Fire-and-forget so AsyncButton's internal pending state does not fight
     // the external manualSyncBusy prop. The visual loading state is owned by
     // the operation, not the click promise.
     void runRepoRefreshIntent(useReposStore.getState, {
       kind: 'manual-refresh-requested',
       id: repo.id,
-      repoInstanceId,
+      repoRuntimeId,
     })
   }
 

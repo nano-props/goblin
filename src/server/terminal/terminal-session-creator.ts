@@ -26,14 +26,14 @@ interface TerminalSessionCreatorOptions {
     userId: string,
     input: TerminalSessionEnsureInput,
   ): Promise<TerminalSessionEnsureResult>
-  isCurrentRepoInstance(userId: string, repoRoot: string, repoInstanceId: string): boolean
+  isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
   rejectStaleCreateIfNeeded(
     userId: string,
-    input: Pick<TerminalCreateInput, 'repoRoot' | 'repoInstanceId'>,
+    input: Pick<TerminalCreateInput, 'repoRoot' | 'repoRuntimeId'>,
     terminalRuntimeSessionId: string,
   ): TerminalCreateFailure | null
-  cleanupStaleCreate(userId: string, input: Pick<TerminalCreateInput, 'repoRoot' | 'repoInstanceId'>): Promise<void>
-  listSessions(userId: string, repoRoot: string, repoInstanceId: string): Promise<TerminalSessionSummary[]>
+  cleanupStaleCreate(userId: string, input: Pick<TerminalCreateInput, 'repoRoot' | 'repoRuntimeId'>): Promise<void>
+  listSessions(userId: string, repoRoot: string, repoRuntimeId: string): Promise<TerminalSessionSummary[]>
 }
 
 class TerminalSessionCreator {
@@ -49,13 +49,13 @@ class TerminalSessionCreator {
     userId: string
     request: TerminalCreateInput
   }): Promise<TerminalCreateResult> {
-    const sessionScope = terminalSessionRuntimeScope(input.request.repoRoot, input.request.repoInstanceId)
+    const sessionScope = terminalSessionRuntimeScope(input.request.repoRoot, input.request.repoRuntimeId)
     const scopedWorktreePath = terminalWorktreePath(input.request.repoRoot, input.request.worktreePath)
     return await this.options.createCoordinator.runInWorktreeQueue(
       { userId: input.userId, scope: sessionScope, worktreePath: scopedWorktreePath },
       async () => {
-        if (!this.options.isCurrentRepoInstance(input.userId, input.request.repoRoot, input.request.repoInstanceId)) {
-          return { ok: false, message: 'error.repo-instance-stale' }
+        if (!this.options.isCurrentRepoRuntime(input.userId, input.request.repoRoot, input.request.repoRuntimeId)) {
+          return { ok: false, message: 'error.repo-runtime-stale' }
         }
         const createResult = await this.options.createCoordinator.withSessionIdAllocation(
           { userId: input.userId, scope: sessionScope, worktreePath: scopedWorktreePath, kind: input.request.kind },
@@ -76,7 +76,7 @@ class TerminalSessionCreator {
         const sessions = await this.options.listSessions(
           input.userId,
           input.request.repoRoot,
-          input.request.repoInstanceId,
+          input.request.repoRuntimeId,
         )
         const staleAfterList = await this.rejectStaleCreateIfNeeded(
           input.userId,
@@ -138,7 +138,7 @@ class TerminalSessionCreator {
 
   private async rejectStaleCreateIfNeeded(
     userId: string,
-    input: Pick<TerminalCreateInput, 'repoRoot' | 'repoInstanceId'>,
+    input: Pick<TerminalCreateInput, 'repoRoot' | 'repoRuntimeId'>,
     terminalRuntimeSessionId: string,
   ): Promise<TerminalCreateFailure | null> {
     const failure = this.options.rejectStaleCreateIfNeeded(userId, input, terminalRuntimeSessionId)

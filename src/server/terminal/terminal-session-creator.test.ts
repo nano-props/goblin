@@ -15,8 +15,8 @@ const USER_ID = 'user_terminal_creator'
 const CLIENT_ID = 'client_terminal_creator'
 const TERMINAL_CLIENT_ID = 'client_terminal_controller'
 const REPO_ROOT = '/repo'
-const REPO_INSTANCE_ID = 'repo-instance-terminal-creator'
-const SCOPE = terminalSessionRuntimeScope(REPO_ROOT, REPO_INSTANCE_ID)
+const REPO_RUNTIME_ID = 'repo-runtime-terminal-creator'
+const SCOPE = terminalSessionRuntimeScope(REPO_ROOT, REPO_RUNTIME_ID)
 const WORKTREE_PATH = '/repo/worktree'
 const BRANCH_NAME = 'feature/worktree'
 
@@ -49,7 +49,7 @@ describe('terminal session creator', () => {
         runtimeProviders: [terminalRuntimeTabsProvider(manager)],
       }),
       ensureOrRestore,
-      isCurrentRepoInstance: vi.fn(() => true),
+      isCurrentRepoRuntime: vi.fn(() => true),
       rejectStaleCreateIfNeeded: vi.fn(() => null),
       cleanupStaleCreate,
       listSessions: vi.fn(async () => sessions),
@@ -111,7 +111,7 @@ describe('terminal session creator', () => {
         runtimeProviders: [terminalRuntimeTabsProvider(manager)],
       }),
       ensureOrRestore,
-      isCurrentRepoInstance: vi.fn(() => true),
+      isCurrentRepoRuntime: vi.fn(() => true),
       rejectStaleCreateIfNeeded: vi.fn(() => null),
       cleanupStaleCreate,
       listSessions: vi.fn(async () => sessions),
@@ -135,7 +135,7 @@ describe('terminal session creator', () => {
     expect(cleanupStaleCreate).not.toHaveBeenCalled()
   })
 
-  test('rejects before ensuring when the repo instance is already stale', async () => {
+  test('rejects before ensuring when the repo runtime is already stale', async () => {
     const manager = {
       listSessionsForUser: vi.fn(async () => []),
     }
@@ -151,7 +151,7 @@ describe('terminal session creator', () => {
         runtimeProviders: [terminalRuntimeTabsProvider(manager)],
       }),
       ensureOrRestore,
-      isCurrentRepoInstance: vi.fn(() => false),
+      isCurrentRepoRuntime: vi.fn(() => false),
       rejectStaleCreateIfNeeded: vi.fn(() => null),
       cleanupStaleCreate,
       listSessions: vi.fn(async () => []),
@@ -164,7 +164,7 @@ describe('terminal session creator', () => {
         userId: USER_ID,
         request: createRequest(),
       }),
-    ).resolves.toEqual({ ok: false, message: 'error.repo-instance-stale' })
+    ).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
     expect(ensureOrRestore).not.toHaveBeenCalled()
     expect(cleanupStaleCreate).not.toHaveBeenCalled()
   })
@@ -179,7 +179,7 @@ describe('terminal session creator', () => {
       sessions.push(terminalSession(input.terminalSessionId ?? 'term-createdcreatedcreated'))
       return ensureResult(input.terminalSessionId ?? 'term-createdcreatedcreated')
     })
-    const rejectStaleCreateIfNeeded = vi.fn(() => ({ ok: false as const, message: 'error.repo-instance-stale' }))
+    const rejectStaleCreateIfNeeded = vi.fn(() => ({ ok: false as const, message: 'error.repo-runtime-stale' }))
     const cleanupStaleCreate = vi.fn(async () => {
       workspaceTabs.closeTabsForScope(USER_ID, SCOPE)
     })
@@ -193,7 +193,7 @@ describe('terminal session creator', () => {
         runtimeProviders: [terminalRuntimeTabsProvider(manager)],
       }),
       ensureOrRestore,
-      isCurrentRepoInstance: vi.fn(() => true),
+      isCurrentRepoRuntime: vi.fn(() => true),
       rejectStaleCreateIfNeeded,
       cleanupStaleCreate,
       listSessions: vi.fn(async () => sessions),
@@ -206,11 +206,11 @@ describe('terminal session creator', () => {
         userId: USER_ID,
         request: createRequest(),
       }),
-    ).resolves.toEqual({ ok: false, message: 'error.repo-instance-stale' })
+    ).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
     expect(rejectStaleCreateIfNeeded).toHaveBeenCalledTimes(1)
     expect(cleanupStaleCreate).toHaveBeenCalledWith(USER_ID, {
       repoRoot: REPO_ROOT,
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       branch: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       kind: 'additional',
@@ -224,7 +224,7 @@ describe('terminal session creator', () => {
 function createRequest(overrides: Partial<TerminalCreateInput> = {}): TerminalCreateInput {
   return {
     repoRoot: REPO_ROOT,
-    repoInstanceId: REPO_INSTANCE_ID,
+    repoRuntimeId: REPO_RUNTIME_ID,
     branch: BRANCH_NAME,
     worktreePath: WORKTREE_PATH,
     kind: 'additional',
@@ -238,7 +238,7 @@ function terminalSession(terminalSessionId: string): TerminalSessionSummary {
   return {
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
     terminalSessionId,
-    repoInstanceId: REPO_INSTANCE_ID,
+    repoRuntimeId: REPO_RUNTIME_ID,
     repoRoot: path.resolve(REPO_ROOT),
     branch: BRANCH_NAME,
     worktreePath: path.resolve(WORKTREE_PATH),

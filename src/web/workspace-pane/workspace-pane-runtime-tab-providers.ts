@@ -19,7 +19,7 @@ export type WorkspacePaneRuntimeTabTargetKeyByType = Partial<Record<WorkspacePan
 
 export interface WorkspacePaneRuntimeTabTargetInput {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   worktreePath: string | null
 }
 
@@ -93,7 +93,7 @@ export function workspacePaneRuntimeTabTargetKeyByType(
 
 export function readWorkspacePaneRuntimeTabProviderProjections(input: {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   worktreePath: string | null
 }): WorkspacePaneRuntimeTabProviderProjection[] {
   return workspacePaneRuntimeTabProjectionProviders().map((provider) => provider.readProjection(input))
@@ -126,13 +126,13 @@ function terminalRuntimeTabTargetKey(
 
 function readTerminalRuntimeTabProviderProjection(input: {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   worktreePath: string | null
 }): WorkspacePaneRuntimeTabProviderProjection {
   const targetKey = terminalRuntimeTabTargetKey(input)
   const snapshot = targetKey ? (readTerminalSessionCommandBridge()?.terminalWorktreeSnapshot(targetKey) ?? null) : null
   const selectedSessionId = targetKey ? readTerminalSelectedSessionId(targetKey) : null
-  const projectionState = readTerminalRuntimeProjectionState(input.repoRoot, input.repoInstanceId)
+  const projectionState = readTerminalRuntimeProjectionState(input.repoRoot, input.repoRuntimeId)
   return {
     type: 'terminal',
     targetKey,
@@ -154,7 +154,7 @@ function readTerminalSelectedSessionId(terminalWorktreeKey: string): string | nu
 
 function useTerminalRuntimeTabProviderProjection({
   repoRoot,
-  repoInstanceId,
+  repoRuntimeId,
   worktreePath,
 }: WorkspacePaneRuntimeTabTargetInput): WorkspacePaneRuntimeTabProviderProjection {
   const targetKey = terminalRuntimeTabTargetKey({ repoRoot, worktreePath })
@@ -169,7 +169,7 @@ function useTerminalRuntimeTabProviderProjection({
   return useMemo(() => {
     const selectedSessionId = targetKey ? (selectedTerminalSessionId ?? null) : null
     const currentHydration =
-      terminalProjectionHydration.instanceId === repoInstanceId ? terminalProjectionHydration : null
+      terminalProjectionHydration.repoRuntimeId === repoRuntimeId ? terminalProjectionHydration : null
     return {
       type: 'terminal',
       targetKey,
@@ -184,7 +184,7 @@ function useTerminalRuntimeTabProviderProjection({
       },
     }
   }, [
-    repoInstanceId,
+    repoRuntimeId,
     selectedTerminalSessionId,
     targetKey,
     terminalClosingSessionIds,
@@ -215,11 +215,11 @@ function useSyncTerminalRuntimeTabSelection(
 
 function readTerminalRuntimeProjectionState(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
 ): WorkspacePaneRuntimeProjectionState {
   const terminalProjectionHydration = useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(repoRoot)
   const currentTerminalProjectionHydration =
-    terminalProjectionHydration?.instanceId === repoInstanceId ? terminalProjectionHydration : null
+    terminalProjectionHydration?.repoRuntimeId === repoRuntimeId ? terminalProjectionHydration : null
   return {
     phase: currentTerminalProjectionHydration?.phase ?? 'pending',
     errorMessage: currentTerminalProjectionHydration?.errorMessage,

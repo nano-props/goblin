@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, test, vi } from 'vitest'
-import { clearRepoRuntimeInstancesForUser, openRepoRuntimeInstance } from '#/server/modules/repo-runtime-instances.ts'
+import { clearRepoRuntimesForUser, openRepoRuntime } from '#/server/modules/repo-runtimes.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { WORKSPACE_PANE_TABS_REALTIME_EVENTS } from '#/shared/workspace-pane-tabs.ts'
 
@@ -12,7 +12,7 @@ const CLIENT_ID = 'client_terminal_actions'
 // don't have to mock the derivation helper.
 const USER_ID = 'user_terminal_actions'
 const REPO_ROOT = '/repo'
-let REPO_INSTANCE_ID = ''
+let REPO_RUNTIME_ID = ''
 // 16+ alphanumerics, matches TERMINAL_RUNTIME_SESSION_ID_RE in
 // shared/terminal-validators.ts.
 const RUNTIME_SESSION_ID = 'session_aaaaaaaaaaaaaa'
@@ -32,7 +32,7 @@ function makeActions(
         ? ({
             terminalRuntimeSessionId,
             terminalSessionId: 'term-111111111111111111111',
-            repoInstanceId: REPO_INSTANCE_ID,
+            repoRuntimeId: REPO_RUNTIME_ID,
             repoRoot: options.getSlotScope(userId, terminalRuntimeSessionId),
             branch: 'feature/worktree',
             worktreePath: '/repo',
@@ -81,14 +81,14 @@ function makeActions(
   }
 }
 
-function syncCurrentRepoInstance(): void {
-  REPO_INSTANCE_ID = openRepoRuntimeInstance(USER_ID, REPO_ROOT)
+function syncCurrentRepoRuntime(): void {
+  REPO_RUNTIME_ID = openRepoRuntime(USER_ID, REPO_ROOT)
 }
 
 describe('terminal-runtime-actions close broadcast', () => {
   test('emits workspace tab invalidation after a successful create', async () => {
-    clearRepoRuntimeInstancesForUser(USER_ID)
-    syncCurrentRepoInstance()
+    clearRepoRuntimesForUser(USER_ID)
+    syncCurrentRepoRuntime()
     const { actions, broadcasts, sessionService } = makeActions()
     sessionService.create.mockResolvedValue({
       ok: true,
@@ -112,7 +112,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     await expect(
       actions.create(CLIENT_ID, USER_ID, {
         repoRoot: '/repo',
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branch: 'feature/worktree',
         worktreePath: '/repo',
         kind: 'additional',
@@ -126,15 +126,15 @@ describe('terminal-runtime-actions close broadcast', () => {
   })
 
   test('does not emit workspace tab invalidation after a failed create', async () => {
-    clearRepoRuntimeInstancesForUser(USER_ID)
-    syncCurrentRepoInstance()
+    clearRepoRuntimesForUser(USER_ID)
+    syncCurrentRepoRuntime()
     const { actions, broadcasts, sessionService } = makeActions()
     sessionService.create.mockResolvedValue({ ok: false, message: 'error.invalid-arguments' })
 
     await expect(
       actions.create(CLIENT_ID, USER_ID, {
         repoRoot: '/repo',
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branch: 'feature/worktree',
         worktreePath: '/repo',
         kind: 'additional',
@@ -144,14 +144,14 @@ describe('terminal-runtime-actions close broadcast', () => {
     expect(broadcasts).not.toHaveBeenCalled()
   })
 
-  test('rejects invalid create input before checking repo instance freshness', async () => {
-    clearRepoRuntimeInstancesForUser(USER_ID)
+  test('rejects invalid create input before checking repo runtime freshness', async () => {
+    clearRepoRuntimesForUser(USER_ID)
     const { actions, broadcasts, sessionService } = makeActions()
 
     await expect(
       actions.create(CLIENT_ID, USER_ID, {
         repoRoot: '',
-        repoInstanceId: 'repo-instance-stale',
+        repoRuntimeId: 'repo-runtime-stale',
         branch: 'feature/worktree',
         worktreePath: '/repo',
         kind: 'additional',
@@ -249,17 +249,17 @@ describe('terminal-runtime-actions close broadcast', () => {
 })
 
 describe('terminal-runtime-actions prune', () => {
-  test('rejects stale repo-instance prune requests before touching session state', async () => {
-    clearRepoRuntimeInstancesForUser(USER_ID)
-    syncCurrentRepoInstance()
+  test('rejects stale repo-runtime prune requests before touching session state', async () => {
+    clearRepoRuntimesForUser(USER_ID)
+    syncCurrentRepoRuntime()
     const { actions, broadcasts, sessionService } = makeActions({ closeSessionForUser: () => false })
 
     await expect(
       actions.prune(CLIENT_ID, USER_ID, {
         repoRoot: '/repo',
-        repoInstanceId: 'repo-instance-stale',
+        repoRuntimeId: 'repo-runtime-stale',
       }),
-    ).rejects.toThrow('error.repo-instance-stale')
+    ).rejects.toThrow('error.repo-runtime-stale')
 
     expect(sessionService.prune).not.toHaveBeenCalled()
     expect(broadcasts).not.toHaveBeenCalled()

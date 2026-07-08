@@ -80,7 +80,7 @@ export function restoreRepoProjectionFromCacheEntry(
 
 export function seedRepoProjectionQueryFromCacheEntry(
   repoRoot: string,
-  repoInstanceId: string,
+  repoRuntimeId: string,
   snapshot: RepoSnapshotCacheEntry | undefined,
 ): void {
   if (!snapshot || isExpired(snapshot.savedAt)) return
@@ -95,11 +95,11 @@ export function seedRepoProjectionQueryFromCacheEntry(
     operations: { operations: [], loadedAt: 0 },
     loadedAt: 0,
   }
-  seedRepoProjectionQueryData(repoRoot, repoInstanceId, {
+  seedRepoProjectionQueryData(repoRoot, repoRuntimeId, {
     ...cachedProjection,
     requested: { branch: null, pullRequestMode: 'full' },
   })
-  seedRepoProjectionQueryData(repoRoot, repoInstanceId, {
+  seedRepoProjectionQueryData(repoRoot, repoRuntimeId, {
     ...cachedProjection,
     requested: { branch: null, pullRequestMode: 'summary' },
   })
@@ -108,15 +108,15 @@ export function seedRepoProjectionQueryFromCacheEntry(
 export function persistRepoSnapshotCacheEntry(
   set: ReposSet,
   repo: RepoState | undefined,
-  repoInstanceId: string,
+  repoRuntimeId: string,
 ): void {
   if (!repo) return
-  if (repo.instanceId !== repoInstanceId) return
+  if (repo.repoRuntimeId !== repoRuntimeId) return
   const branchModel = readRepoBranchQueryProjection(repo)
   const entry = branchModel ? repoSnapshotCacheEntryFromRepo(repo, branchModel) : null
   if (!entry) return
   set((s) => {
-    if (s.repos[repo.id]?.instanceId !== repoInstanceId) return s
+    if (s.repos[repo.id]?.repoRuntimeId !== repoRuntimeId) return s
     const repoSnapshotCache = trimRepoCache({ ...s.repoSnapshotCache, [repo.id]: entry })
     return { repoSnapshotCache }
   })

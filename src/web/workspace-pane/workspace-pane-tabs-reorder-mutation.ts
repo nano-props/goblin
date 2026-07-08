@@ -24,7 +24,7 @@ import {
 
 export interface WorkspacePaneTabsReorderMutationInput {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   branchName: string | null
   worktreePath: string | null
   canonicalTabs: readonly WorkspacePaneTabEntry[]
@@ -44,12 +44,12 @@ export function useWorkspacePaneTabsReorderMutation(
       input.branchName
         ? {
             repoRoot: input.repoRoot,
-            repoInstanceId: input.repoInstanceId,
+            repoRuntimeId: input.repoRuntimeId,
             branchName: input.branchName,
             worktreePath: input.worktreePath,
           }
         : null,
-    [input.branchName, input.repoInstanceId, input.repoRoot, input.worktreePath],
+    [input.branchName, input.repoRuntimeId, input.repoRoot, input.worktreePath],
   )
   const canonicalTabsIdentity = useMemo(
     () => workspacePaneTabEntryListIdentity(input.canonicalTabs),
@@ -73,7 +73,7 @@ export function useWorkspacePaneTabsReorderMutation(
 async function runWorkspacePaneTabsReorder(
   target: {
     repoRoot: string
-    repoInstanceId: string
+    repoRuntimeId: string
     branchName: string
     worktreePath: string | null
   },
@@ -84,9 +84,9 @@ async function runWorkspacePaneTabsReorder(
   const currentTabs = readWorkspacePaneTabsForTarget(target, queryClient)
   const nextTabs = workspacePaneTabsWithDraggedOrder(currentTabs, draggedTabs)
   if (workspacePaneTabEntryListIdentity(nextTabs) === workspacePaneTabEntryListIdentity(currentTabs)) return
-  const cancelListQueries = cancelWorkspacePaneTabs(target.repoRoot, target.repoInstanceId, queryClient)
+  const cancelListQueries = cancelWorkspacePaneTabs(target.repoRoot, target.repoRuntimeId, queryClient)
   const previousTargetEntry = queryClient
-    .getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(target.repoRoot, target.repoInstanceId))
+    .getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(target.repoRoot, target.repoRuntimeId))
     ?.find((entry) => workspacePaneTabsEntryMatchesTarget(entry, target))
   setWorkspacePaneTabsForTargetQueryData({ ...target, tabs: nextTabs }, queryClient)
   const optimisticTargetVersion = workspacePaneTabsTargetVersion(target)

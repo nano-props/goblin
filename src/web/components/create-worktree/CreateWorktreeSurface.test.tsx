@@ -210,7 +210,7 @@ describe('CreateWorktreePageBody', () => {
 })
 
 function createRepo(): RepoPresentationForTest {
-  const repo = emptyRepo('/tmp/goblin-repo', 'goblin-repo', 'repo-instance-test')
+  const repo = emptyRepo('/tmp/goblin-repo', 'goblin-repo', 'repo-runtime-test')
   const branches = [createRepoBranch('main'), createRepoBranch('feature/base')]
   seedRepoReadModelQueryData(repo, { branches, currentBranch: 'main', status: [] })
   return repoPresentationForTest(repo, { currentBranch: 'main', branches, status: [], worktreesByPath: {} })

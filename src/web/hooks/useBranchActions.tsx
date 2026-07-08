@@ -88,7 +88,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   const setLastResult = useReposStore((s) => s.setLastResult)
   const runBranchAction = useReposStore((s) => s.runBranchAction)
   const copyPatchMutation = useMutation({
-    mutationKey: ['repo-data', repo.id, repo.instanceId, 'patch'],
+    mutationKey: ['repo-data', repo.id, repo.repoRuntimeId, 'patch'],
     mutationFn: async (worktreePath: string) => await getRepoPatch(repo.id, worktreePath),
   })
   const branchActionBusy = isBranchActionBlocked(repo)
@@ -113,7 +113,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
     options?: { deferResultMessages?: string[]; handleResult?: (result: ExecResult) => boolean },
   ): void {
     if (guardBusy()) return
-    void dispatchRepoBranchAction(repo.id, repo.instanceId, action, runBranchAction, {
+    void dispatchRepoBranchAction(repo.id, repo.repoRuntimeId, action, runBranchAction, {
       deferResultMessages: options?.deferResultMessages,
       handleResult: options?.handleResult,
     })
@@ -126,7 +126,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   ): Promise<ExecResult | null> {
     if (guardBusy()) return Promise.resolve(null)
     const pending = runPendingLocalAction(op, async () => {
-      const result = await dispatchRepoUiAction(repo.id, repo.instanceId, op, fn, setLastResult, {
+      const result = await dispatchRepoUiAction(repo.id, repo.repoRuntimeId, op, fn, setLastResult, {
         silentSuccessOps: SILENT_SUCCESS_OPS,
         handleResult: options?.handleResult,
       })

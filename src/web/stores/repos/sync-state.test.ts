@@ -18,7 +18,7 @@ interface RepoOverrides {
 }
 
 function repo(overrides: RepoOverrides = {}): RepoState {
-  const base = emptyRepo('/tmp/goblin-sync-state-test', 'repo', 'repo-instance-test')
+  const base = emptyRepo('/tmp/goblin-sync-state-test', 'repo', 'repo-runtime-test')
   if (overrides.fetchBusy) {
     markRepoOperationTargets(base.id, nextRepoOperationId(base.id), [{ key: 'fetch', reason: 'fetch' }], 'running')
   }

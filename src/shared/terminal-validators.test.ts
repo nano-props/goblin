@@ -121,7 +121,7 @@ describe('shared terminal validators', () => {
         action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
         input: {
           repoRoot: '/repo',
-          repoInstanceId: 'repo-instance-test',
+          repoRuntimeId: 'repo-runtime-test',
           branchName: 'main',
           worktreePath: '/repo',
           tabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
@@ -136,7 +136,7 @@ describe('shared terminal validators', () => {
         action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
         input: {
           repoRoot: '/repo',
-          repoInstanceId: 'repo-instance-test',
+          repoRuntimeId: 'repo-runtime-test',
           branchName: 'main',
           worktreePath: '/repo',
           tabs: [{ type: 'terminal', terminalSessionId: '' }],
@@ -151,7 +151,7 @@ describe('shared terminal validators', () => {
         action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
         input: {
           repoRoot: '/repo',
-          repoInstanceId: 'repo-instance-test',
+          repoRuntimeId: 'repo-runtime-test',
           branchName: 'main',
           worktreePath: '/repo',
           tabs: [{ type: 'terminal', runtimeSessionId: '' }],
@@ -168,7 +168,7 @@ describe('shared terminal validators', () => {
         action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
         input: {
           repoRoot: '/repo',
-          repoInstanceId: 'repo-instance-test',
+          repoRuntimeId: 'repo-runtime-test',
           branchName: 'main',
           worktreePath: '/repo',
           operation: { type: 'open-static', tabType: 'history' },
@@ -183,7 +183,7 @@ describe('shared terminal validators', () => {
         action: 'update-tabs',
         input: {
           repoRoot: '/repo',
-          repoInstanceId: 'repo-instance-test',
+          repoRuntimeId: 'repo-runtime-test',
           branchName: 'main',
           worktreePath: '/repo',
           operation: { type: 'open-static', tabType: 'history' },
@@ -198,7 +198,7 @@ describe('shared terminal validators', () => {
         action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
         input: {
           repoRoot: '/repo',
-          repoInstanceId: 'repo-instance-test',
+          repoRuntimeId: 'repo-runtime-test',
           branchName: 'main',
           worktreePath: '/repo',
           operation: { type: 'reorder', tabIdentities: ['workspace-pane:status', 'bad\0identity'] },
@@ -207,7 +207,7 @@ describe('shared terminal validators', () => {
     ).toBeNull()
   })
 
-  test('rejects prune requests without a repo instance id', () => {
+  test('rejects prune requests without a repo runtime id', () => {
     expect(
       normalizeTerminalClientMessage({
         type: 'request',
@@ -226,7 +226,7 @@ describe('shared terminal validators', () => {
         action: 'prune',
         input: {
           repoRoot: '/repo',
-          repoInstanceId: 'repo-instance-test',
+          repoRuntimeId: 'repo-runtime-test',
         },
       }),
     ).toMatchObject({ type: 'request', action: 'prune' })

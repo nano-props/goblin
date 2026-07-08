@@ -9,26 +9,26 @@ export async function runSnapshotSuccessWorkflow(
   get: ReposGet,
   options: {
     id: string
-    repoInstanceId: string
+    repoRuntimeId: string
     isSnapshotCurrent: () => boolean
   },
 ): Promise<void> {
   if (!options.isSnapshotCurrent()) return
-  persistRepoSnapshotCacheEntry(set, get().repos[options.id], options.repoInstanceId)
-  void terminalClient.pruneTerminals(options.id, options.repoInstanceId).catch((err) => {
+  persistRepoSnapshotCacheEntry(set, get().repos[options.id], options.repoRuntimeId)
+  void terminalClient.pruneTerminals(options.id, options.repoRuntimeId).catch((err) => {
     terminalLog.warn('failed to prune repo sessions', { err })
   })
 }
 
 export async function runCoreDataRefreshWorkflow(
   get: ReposGet,
-  options: { id: string; repoInstanceId: string },
+  options: { id: string; repoRuntimeId: string },
 ): Promise<void> {
   await get().refreshRuntimeProjection(options.id, {
-    repoInstanceId: options.repoInstanceId,
+    repoRuntimeId: options.repoRuntimeId,
     scope: 'repo-read-model',
   })
   const after = get().repos[options.id]
-  if (!after || after.instanceId !== options.repoInstanceId) return
+  if (!after || after.repoRuntimeId !== options.repoRuntimeId) return
   if (isRepoUnavailable(after)) return
 }

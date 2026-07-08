@@ -33,9 +33,9 @@ const WORKTREE_PATH = '/tmp/gbl-runtime-provider-worktree'
 
 type TestTerminalSessionSummary = Omit<
   TerminalSessionSummary,
-  'repoInstanceId' | 'repoRoot' | 'branch' | 'worktreePath'
+  'repoRuntimeId' | 'repoRoot' | 'branch' | 'worktreePath'
 > &
-  Partial<Pick<TerminalSessionSummary, 'repoInstanceId' | 'repoRoot' | 'branch' | 'worktreePath'>>
+  Partial<Pick<TerminalSessionSummary, 'repoRuntimeId' | 'repoRoot' | 'branch' | 'worktreePath'>>
 
 let sessionsChangedHandler: ((repoRoot: string) => void) | null = null
 let workspaceTabsChangedHandler: ((repoRoot: string) => void) | null = null
@@ -44,7 +44,7 @@ const kickReconnectMock = vi.fn(() => {})
 const recoverSessionsMock =
   vi.fn<
     (
-      ...args: Array<{ repoRoot: string; repoInstanceId: string }>
+      ...args: Array<{ repoRoot: string; repoRuntimeId: string }>
     ) => Promise<{ sessions: TerminalSessionSummary[]; snapshots: [] }>
   >()
 const listWorkspaceTabsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<WorkspacePaneTabsEntry[]>>()
@@ -127,8 +127,8 @@ describe('AppRuntimeProjectionProvider', () => {
     const result = renderRuntimeProvider(REPO_ID)
     try {
       expect(recoverSessionsMock).not.toHaveBeenCalled()
-      expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)?.instanceId).not.toBe(
-        repo.instanceId,
+      expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)?.repoRuntimeId).not.toBe(
+        repo.repoRuntimeId,
       )
 
       await act(async () => {
@@ -137,13 +137,13 @@ describe('AppRuntimeProjectionProvider', () => {
 
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
       expect(projectionMocks.reconcileServerSessions).toHaveBeenCalledWith(
-        { repoRoot: REPO_ID, repoInstanceId: repo.instanceId },
+        { repoRoot: REPO_ID, repoRuntimeId: repo.repoRuntimeId },
         [completeServerSession(serverSession('term-111111111111111111111'))],
         'client_sharedterminal',
         expect.any(Map),
       )
       expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
-        instanceId: repo.instanceId,
+        repoRuntimeId: repo.repoRuntimeId,
         phase: 'ready',
       })
     } finally {
@@ -155,7 +155,7 @@ describe('AppRuntimeProjectionProvider', () => {
     const repo = seedCurrentRepo()
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: REPO_ID,
-      repoInstanceId: repo.instanceId,
+      repoRuntimeId: repo.repoRuntimeId,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneStaticTabEntry('status')],
@@ -180,7 +180,7 @@ describe('AppRuntimeProjectionProvider', () => {
 
       await vi.waitFor(() => expect(listWorkspaceTabsMock).toHaveBeenCalledTimes(1))
       expect(recoverSessionsMock).not.toHaveBeenCalled()
-      expect(tabsFor(repo.instanceId)).toEqual([workspacePaneStaticTabEntry('history')])
+      expect(tabsFor(repo.repoRuntimeId)).toEqual([workspacePaneStaticTabEntry('history')])
     } finally {
       result.unmount()
     }
@@ -210,7 +210,7 @@ describe('AppRuntimeProjectionProvider', () => {
     const repo = seedCurrentRepo()
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: REPO_ID,
-      repoInstanceId: repo.instanceId,
+      repoRuntimeId: repo.repoRuntimeId,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneStaticTabEntry('status')],
@@ -240,12 +240,12 @@ describe('AppRuntimeProjectionProvider', () => {
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
       await vi.waitFor(() => expect(listWorkspaceTabsMock).toHaveBeenCalledTimes(1))
       expect(projectionMocks.reconcileServerSessions).toHaveBeenLastCalledWith(
-        { repoRoot: REPO_ID, repoInstanceId: repo.instanceId },
+        { repoRoot: REPO_ID, repoRuntimeId: repo.repoRuntimeId },
         [completeServerSession(serverSession('term-111111111111111111111'))],
         'client_sharedterminal',
         expect.any(Map),
       )
-      expect(tabsFor(repo.instanceId)).toEqual([workspacePaneStaticTabEntry('history')])
+      expect(tabsFor(repo.repoRuntimeId)).toEqual([workspacePaneStaticTabEntry('history')])
     } finally {
       result.unmount()
     }
@@ -257,7 +257,7 @@ describe('AppRuntimeProjectionProvider', () => {
     const result = renderRuntimeProvider(REPO_ID)
     try {
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
-      expect(recoverSessionsMock).toHaveBeenCalledWith({ repoRoot: REPO_ID, repoInstanceId: firstRepo.instanceId })
+      expect(recoverSessionsMock).toHaveBeenCalledWith({ repoRoot: REPO_ID, repoRuntimeId: firstRepo.repoRuntimeId })
     } finally {
       result.unmount()
     }
@@ -277,13 +277,13 @@ describe('AppRuntimeProjectionProvider', () => {
       })
 
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
-      expect(recoverSessionsMock).toHaveBeenCalledWith({ repoRoot: REPO_ID, repoInstanceId: firstRepo.instanceId })
+      expect(recoverSessionsMock).toHaveBeenCalledWith({ repoRoot: REPO_ID, repoRuntimeId: firstRepo.repoRuntimeId })
     } finally {
       result.unmount()
     }
   })
 
-  test('drops a recovered terminal projection when the repo instance changed before publish', async () => {
+  test('drops a recovered terminal projection when the repo runtime changed before publish', async () => {
     const firstRepo = seedCurrentRepo()
     const recovery = Promise.withResolvers<{ sessions: TerminalSessionSummary[]; snapshots: [] }>()
     recoverSessionsMock.mockReturnValueOnce(recovery.promise)
@@ -294,7 +294,7 @@ describe('AppRuntimeProjectionProvider', () => {
       useReposStore.getState().closeRepo(REPO_ID)
       seedRepoWithReadModelForTest({
         id: REPO_ID,
-        instanceId: 'repo-instance-reopened',
+        repoRuntimeId: 'repo-runtime-reopened',
         branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
         currentBranchName: BRANCH_NAME,
         preferredWorkspacePaneTab: 'terminal',
@@ -305,7 +305,7 @@ describe('AppRuntimeProjectionProvider', () => {
 
       await act(async () => {
         recovery.resolve({
-          sessions: [completeServerSession({ ...serverSession('term-111111111111111111111'), repoInstanceId: firstRepo.instanceId })],
+          sessions: [completeServerSession({ ...serverSession('term-111111111111111111111'), repoRuntimeId: firstRepo.repoRuntimeId })],
           snapshots: [],
         })
         await Promise.resolve()
@@ -313,7 +313,7 @@ describe('AppRuntimeProjectionProvider', () => {
 
       expect(projectionMocks.reconcileServerSessions).not.toHaveBeenCalled()
       expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).not.toMatchObject({
-        instanceId: firstRepo.instanceId,
+        repoRuntimeId: firstRepo.repoRuntimeId,
         phase: 'ready',
       })
     } finally {
@@ -323,14 +323,14 @@ describe('AppRuntimeProjectionProvider', () => {
 
   test('failed initial terminal projection hydrate marks the repo failed', async () => {
     const repo = seedCurrentRepo()
-    recoverSessionsMock.mockRejectedValueOnce(new Error('error.repo-instance-stale'))
+    recoverSessionsMock.mockRejectedValueOnce(new Error('error.repo-runtime-stale'))
     const result = renderRuntimeProvider(REPO_ID)
     try {
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
       expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
-        instanceId: repo.instanceId,
+        repoRuntimeId: repo.repoRuntimeId,
         phase: 'failed',
-        errorMessage: 'error.repo-instance-stale',
+        errorMessage: 'error.repo-runtime-stale',
       })
     } finally {
       result.unmount()
@@ -344,7 +344,7 @@ describe('AppRuntimeProjectionProvider', () => {
     try {
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
       expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
-        instanceId: repo.instanceId,
+        repoRuntimeId: repo.repoRuntimeId,
         phase: 'ready',
       })
 
@@ -356,7 +356,7 @@ describe('AppRuntimeProjectionProvider', () => {
 
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
       expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
-        instanceId: repo.instanceId,
+        repoRuntimeId: repo.repoRuntimeId,
         phase: 'ready',
       })
     } finally {
@@ -393,7 +393,7 @@ function seedSecondRepo() {
     branches: [createRepoBranch('feature/other', { worktree: { path: '/tmp/gbl-runtime-provider-worktree-2' } })],
     currentBranchName: 'feature/other',
     preferredWorkspacePaneTab: 'terminal',
-    instanceId: 'repo-instance-second',
+    repoRuntimeId: 'repo-runtime-second',
   })
   useReposStore.setState((state) => ({
     ...state,
@@ -513,17 +513,17 @@ function serverSession(terminalSessionId: string): TestTerminalSessionSummary {
 function completeServerSession(session: TestTerminalSessionSummary): TerminalSessionSummary {
   return {
     ...session,
-    repoInstanceId: session.repoInstanceId ?? useReposStore.getState().repos[REPO_ID]!.instanceId,
+    repoRuntimeId: session.repoRuntimeId ?? useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
     repoRoot: session.repoRoot ?? REPO_ID,
     branch: session.branch ?? BRANCH_NAME,
     worktreePath: session.worktreePath ?? WORKTREE_PATH,
   }
 }
 
-function tabsFor(repoInstanceId: string) {
+function tabsFor(repoRuntimeId: string) {
   return readWorkspacePaneTabsForTarget({
     repoRoot: REPO_ID,
-    repoInstanceId,
+    repoRuntimeId,
     branchName: BRANCH_NAME,
     worktreePath: WORKTREE_PATH,
   })

@@ -37,25 +37,25 @@ export function applySnapshotToRepoProjection(
   finishDataLoadSuccess(r.dataLoads.repoReadModel)
 }
 
-export function shouldAttemptFetch(repo: RepoState | null | undefined, repoInstanceId: string): boolean {
-  return !!repo && repo.instanceId === repoInstanceId && repo.remote.hasRemotes === true && !isRepoUnavailable(repo)
+export function shouldAttemptFetch(repo: RepoState | null | undefined, repoRuntimeId: string): boolean {
+  return !!repo && repo.repoRuntimeId === repoRuntimeId && repo.remote.hasRemotes === true && !isRepoUnavailable(repo)
 }
 
-export function repoIfFresh(get: ReposGet, id: string, repoInstanceId: string): RepoState | null {
+export function repoIfFresh(get: ReposGet, id: string, repoRuntimeId: string): RepoState | null {
   const repo = get().repos[id]
-  return repo && repo.instanceId === repoInstanceId ? repo : null
+  return repo && repo.repoRuntimeId === repoRuntimeId ? repo : null
 }
 
-export function resolveActionRepoInstanceId(
+export function resolveActionRepoRuntimeId(
   get: ReposGet,
   id: string,
-  requestedRepoInstanceId?: string,
-): { repo: RepoState; repoInstanceId: string } | null {
+  requestedRepoRuntimeId?: string,
+): { repo: RepoState; repoRuntimeId: string } | null {
   const repo = get().repos[id]
   if (!repo) return null
-  const repoInstanceId = requestedRepoInstanceId ?? repo.instanceId
-  if (repo.instanceId !== repoInstanceId) return null
-  return { repo, repoInstanceId }
+  const repoRuntimeId = requestedRepoRuntimeId ?? repo.repoRuntimeId
+  if (repo.repoRuntimeId !== repoRuntimeId) return null
+  return { repo, repoRuntimeId }
 }
 
 export function applyFetchDataLoadResult(r: RepoState, result: ExecResult): void {

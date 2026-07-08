@@ -35,7 +35,7 @@ export async function openWorkspacePaneTab(input: {
   const branchName = input.branchName
   const target = {
     repoRoot: input.repoId,
-    repoInstanceId: repo.instanceId,
+    repoRuntimeId: repo.repoRuntimeId,
     branchName,
     worktreePath: input.worktreePath ?? null,
   }
@@ -49,7 +49,7 @@ export async function openWorkspacePaneTab(input: {
   const insertAfterIdentity = input.insertAfterIdentity === undefined ? openerIdentity : input.insertAfterIdentity
   const committed = await updateWorkspacePaneTabs({
     ...target,
-    repoInstanceId: repo.instanceId,
+    repoRuntimeId: repo.repoRuntimeId,
     operation: {
       type: 'open-static',
       tabType: input.type,

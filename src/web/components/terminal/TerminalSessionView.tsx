@@ -38,7 +38,7 @@ const DEFAULT_TERMINAL_ERROR_MESSAGE_KEY = 'error.unknown'
 
 interface TerminalSessionViewProps {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   branch: string
   worktreePath: string
   selectedTerminalSessionId?: string | null
@@ -49,7 +49,7 @@ interface TerminalSessionViewProps {
 
 export function TerminalSessionView({
   repoRoot,
-  repoInstanceId,
+  repoRuntimeId,
   branch,
   worktreePath,
   selectedTerminalSessionId,
@@ -100,7 +100,7 @@ export function TerminalSessionView({
     terminalWorktreeKey,
     terminalSessionId: selectedTerminalSessionId ?? null,
     repoRoot,
-    repoInstanceId,
+    repoRuntimeId,
     branch,
     worktreePath,
   })
@@ -533,7 +533,7 @@ export function TerminalSessionView({
         // loading state is still the right user signal).
         <EmptyTerminalCta
           onCreate={async () => {
-            await createTerminalForSlot({ repoRoot, repoInstanceId, branch, worktreePath })
+            await createTerminalForSlot({ repoRoot, repoRuntimeId, branch, worktreePath })
           }}
           emptyLabel={t('terminal.empty')}
           newTerminalLabel={t('terminal.new')}

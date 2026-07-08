@@ -13,7 +13,7 @@ import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 export interface UseWorkspacePaneRuntimeTabCreateActionInput {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   branchName: string | null
   worktreePath: string | null
   runtimeTabStateByType: WorkspacePaneRuntimeTabCreateStateByType
@@ -25,7 +25,7 @@ export interface UseWorkspacePaneRuntimeTabCreateActionInput {
 
 export function useWorkspacePaneRuntimeTabCreateAction({
   repoRoot,
-  repoInstanceId,
+  repoRuntimeId,
   branchName,
   worktreePath,
   runtimeTabStateByType,
@@ -40,12 +40,12 @@ export function useWorkspacePaneRuntimeTabCreateAction({
       branchName && worktreePath
         ? {
             repoRoot,
-            repoInstanceId,
+            repoRuntimeId,
             branch: branchName,
             worktreePath,
           }
         : null,
-    [branchName, repoInstanceId, repoRoot, worktreePath],
+    [branchName, repoRuntimeId, repoRoot, worktreePath],
   )
   const captureOpenerIdentity = useCallback(
     () =>

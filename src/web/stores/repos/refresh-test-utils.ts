@@ -43,11 +43,11 @@ export function repoProjection(
   }
 }
 
-export function seedRepo(branches: BranchSnapshotInfo[], instanceId = 'repo-instance-test'): string {
+export function seedRepo(branches: BranchSnapshotInfo[], repoRuntimeId = 'repo-runtime-test'): string {
   return seedRepoWithReadModelForTest({
     id: REPO_ID,
     branchSnapshots: branches,
-    instanceId,
+    repoRuntimeId,
     remote: {
       remotes: ['origin'],
       hasRemotes: true,
@@ -56,7 +56,7 @@ export function seedRepo(branches: BranchSnapshotInfo[], instanceId = 'repo-inst
       remoteProviders: { origin: 'github' },
       hasGitHubRemote: true,
     },
-  }).instanceId
+  }).repoRuntimeId
 }
 
 export function resetRefreshTest(): void {

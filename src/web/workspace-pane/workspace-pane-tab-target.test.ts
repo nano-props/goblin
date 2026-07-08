@@ -29,7 +29,7 @@ beforeEach(() => {
 
 describe('workspace pane tab target read model', () => {
   test('marks target resolution unavailable when the repo branch read model is unavailable', () => {
-    const repo = emptyRepo(REPO_ID, 'workspace-pane-target-repo', 'repo-instance-workspace-pane-no-query')
+    const repo = emptyRepo(REPO_ID, 'workspace-pane-target-repo', 'repo-runtime-workspace-pane-no-query')
     useReposStore.setState((s) => ({
       repos: { ...s.repos, [REPO_ID]: repo },
       order: [...s.order, REPO_ID],
@@ -46,7 +46,7 @@ describe('workspace pane tab target read model', () => {
   })
 
   test('marks target resolution unavailable while workspace pane tabs projection is not ready', () => {
-    const repo = emptyRepo(REPO_ID, 'workspace-pane-target-repo', 'repo-instance-workspace-pane-no-tabs')
+    const repo = emptyRepo(REPO_ID, 'workspace-pane-target-repo', 'repo-runtime-workspace-pane-no-tabs')
     useReposStore.setState((s) => ({
       repos: { ...s.repos, [REPO_ID]: repo },
       order: [...s.order, REPO_ID],
@@ -81,7 +81,7 @@ describe('workspace pane tab target read model', () => {
     })
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: REPO_ID,
-      repoInstanceId: repo.instanceId,
+      repoRuntimeId: repo.repoRuntimeId,
       branchName: 'feature/query',
       worktreePath: WORKTREE_PATH,
       tabs: [workspacePaneStaticTabEntry('status')],
@@ -153,7 +153,7 @@ describe('workspace pane tab target read model', () => {
   })
 
   test('marks opener recording unavailable when the repo branch read model is unavailable', () => {
-    const repo = emptyRepo(REPO_ID, 'workspace-pane-target-repo', 'repo-instance-workspace-pane-no-query')
+    const repo = emptyRepo(REPO_ID, 'workspace-pane-target-repo', 'repo-runtime-workspace-pane-no-query')
     useReposStore.setState((s) => ({
       repos: { ...s.repos, [REPO_ID]: repo },
       order: [...s.order, REPO_ID],

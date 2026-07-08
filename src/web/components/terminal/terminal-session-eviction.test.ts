@@ -8,10 +8,10 @@ describe('terminal session eviction helpers', () => {
   test('finds orphaned local sessions that no longer exist on the server', () => {
     const orphaned = countOrphanedTerminalSessionIds({
       repoRoot: '/repo',
-      repoInstanceId: 'repo-instance-test',
+      repoRuntimeId: 'repo-runtime-test',
       localTerminalSessionIds: ['term-aaaaaaaaaaaaaaaaaaaaa', 'term-bbbbbbbbbbbbbbbbbbbbb', 'term-ccccccccccccccccccccc'],
       getRepoRootForTerminalSessionId: (terminalSessionId) => (terminalSessionId === 'term-ccccccccccccccccccccc' ? '/other' : '/repo'),
-      getRepoInstanceIdForTerminalSessionId: () => 'repo-instance-test',
+      getRepoRuntimeIdForTerminalSessionId: () => 'repo-runtime-test',
       hasTerminalRuntimeSessionIdForTerminalSessionId: (terminalSessionId) => terminalSessionId !== 'term-bbbbbbbbbbbbbbbbbbbbb',
       serverTerminalSessionIds: new Set(['term-aaaaaaaaaaaaaaaaaaaaa']),
     })
@@ -19,10 +19,10 @@ describe('terminal session eviction helpers', () => {
 
     const orphaned2 = countOrphanedTerminalSessionIds({
       repoRoot: '/repo',
-      repoInstanceId: 'repo-instance-test',
+      repoRuntimeId: 'repo-runtime-test',
       localTerminalSessionIds: ['term-aaaaaaaaaaaaaaaaaaaaa', 'term-bbbbbbbbbbbbbbbbbbbbb', 'term-ccccccccccccccccccccc'],
       getRepoRootForTerminalSessionId: (terminalSessionId) => (terminalSessionId === 'term-ccccccccccccccccccccc' ? '/other' : '/repo'),
-      getRepoInstanceIdForTerminalSessionId: () => 'repo-instance-test',
+      getRepoRuntimeIdForTerminalSessionId: () => 'repo-runtime-test',
       hasTerminalRuntimeSessionIdForTerminalSessionId: (terminalSessionId) => terminalSessionId === 'term-bbbbbbbbbbbbbbbbbbbbb',
       serverTerminalSessionIds: new Set(['term-aaaaaaaaaaaaaaaaaaaaa']),
     })

@@ -80,7 +80,7 @@ describe('workspace pane runtime tab target projection', () => {
       outputActiveCount: 0,
       createPending: true,
     }))
-    useTerminalProjectionHydrationStore.getState().markProjectionReady('/repo', 'repo-instance-1')
+    useTerminalProjectionHydrationStore.getState().markProjectionReady('/repo', 'repo-runtime-1')
     useReposStore.setState({
       selectedTerminalSessionIdByTerminalWorktree: {
         [terminalWorktreeKey]: 'term-111111111111111111111',
@@ -94,7 +94,7 @@ describe('workspace pane runtime tab target projection', () => {
 
     const projection = readWorkspacePaneRuntimeTabTargetProjection({
       repoRoot: '/repo',
-      repoInstanceId: 'repo-instance-1',
+      repoRuntimeId: 'repo-runtime-1',
       worktreePath: '/repo-worktree',
     })
 
@@ -130,7 +130,7 @@ describe('workspace pane runtime tab target projection', () => {
 
     const projection = readWorkspacePaneRuntimeTabTargetProjection({
       repoRoot: '/repo',
-      repoInstanceId: 'repo-instance-1',
+      repoRuntimeId: 'repo-runtime-1',
       worktreePath: '/repo-worktree',
     })
 

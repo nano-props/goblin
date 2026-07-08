@@ -58,7 +58,7 @@ const RepoSessionEntrySchema = v.variant('kind', [
 const RepoRuntimeOpenSchema = v.union([v.object({ repoRoot: v.string() }), v.object({ repoInput: v.string() })])
 const RepoRuntimeCloseSchema = v.object({
   repoRoot: v.string(),
-  repoInstanceId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
+  repoRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
 })
 const EmptyBodySchema = v.optional(v.object({}))
 

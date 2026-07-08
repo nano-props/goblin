@@ -45,7 +45,7 @@ beforeEach(() => {
 
 describe('useSessionPersistence', () => {
   test('persists the workspace shell when branch read models are unavailable', () => {
-    const repo = emptyRepo('/tmp/repo-without-query-model', 'repo-without-query-model', 'repo-instance-without-query')
+    const repo = emptyRepo('/tmp/repo-without-query-model', 'repo-without-query-model', 'repo-runtime-without-query')
     useReposStore.setState({
       repos: { [repo.id]: repo },
       order: [repo.id],
@@ -108,8 +108,8 @@ describe('useSessionPersistence', () => {
   })
 
   test('persists the routed repo as the restored session repo', () => {
-    const inactiveRepo = emptyRepo('/tmp/inactive-repo', 'inactive-repo', 'inactive-repo-instance')
-    const visibleRepo = emptyRepo('/tmp/visible-repo', 'visible-repo', 'visible-repo-instance')
+    const inactiveRepo = emptyRepo('/tmp/inactive-repo', 'inactive-repo', 'inactive-repo-runtime')
+    const visibleRepo = emptyRepo('/tmp/visible-repo', 'visible-repo', 'visible-repo-runtime')
     useReposStore.setState({
       repos: { [inactiveRepo.id]: inactiveRepo, [visibleRepo.id]: visibleRepo },
       order: [inactiveRepo.id, visibleRepo.id],
@@ -128,8 +128,8 @@ describe('useSessionPersistence', () => {
   })
 
   test('keeps the last routed repo restored while rendering a non-repo route', async () => {
-    const inactiveRepo = emptyRepo('/tmp/inactive-repo', 'inactive-repo', 'inactive-repo-instance')
-    const visibleRepo = emptyRepo('/tmp/visible-repo', 'visible-repo', 'visible-repo-instance')
+    const inactiveRepo = emptyRepo('/tmp/inactive-repo', 'inactive-repo', 'inactive-repo-runtime')
+    const visibleRepo = emptyRepo('/tmp/visible-repo', 'visible-repo', 'visible-repo-runtime')
     useReposStore.setState({
       repos: { [inactiveRepo.id]: inactiveRepo, [visibleRepo.id]: visibleRepo },
       order: [inactiveRepo.id, visibleRepo.id],
@@ -157,8 +157,8 @@ describe('useSessionPersistence', () => {
   })
 
   test('flushes the latest route-visible session during unload', () => {
-    const inactiveRepo = emptyRepo('/tmp/inactive-repo', 'inactive-repo', 'inactive-repo-instance')
-    const visibleRepo = emptyRepo('/tmp/visible-repo', 'visible-repo', 'visible-repo-instance')
+    const inactiveRepo = emptyRepo('/tmp/inactive-repo', 'inactive-repo', 'inactive-repo-runtime')
+    const visibleRepo = emptyRepo('/tmp/visible-repo', 'visible-repo', 'visible-repo-runtime')
     useReposStore.setState({
       repos: { [inactiveRepo.id]: inactiveRepo, [visibleRepo.id]: visibleRepo },
       order: [inactiveRepo.id, visibleRepo.id],
@@ -214,7 +214,7 @@ describe('useSessionPersistence', () => {
     })
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: repo.id,
-      repoInstanceId: repo.instanceId,
+      repoRuntimeId: repo.repoRuntimeId,
       branchName: 'feature/worktree',
       worktreePath: '/tmp/worktree',
       tabs: [workspacePaneStaticTabEntry('history')],
@@ -257,7 +257,7 @@ describe('useSessionPersistence', () => {
     persistWorkspaceSessionStateMock.mockClear()
 
     act(() => {
-      replaceWorkspacePaneTabsQueryData(repo.id, repo.instanceId, [
+      replaceWorkspacePaneTabsQueryData(repo.id, repo.repoRuntimeId, [
         {
           repoRoot: repo.id,
           branchName: 'feature/worktree',
@@ -295,7 +295,7 @@ describe('useSessionPersistence', () => {
     })
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: repo.id,
-      repoInstanceId: repo.instanceId,
+      repoRuntimeId: repo.repoRuntimeId,
       branchName: 'feature/query-worktree',
       worktreePath: '/tmp/query-worktree',
       tabs: [workspacePaneStaticTabEntry('history')],
@@ -314,26 +314,26 @@ describe('useSessionPersistence', () => {
     )
   })
 
-  test('persists workspace pane tabs from the current repo runtime instance', () => {
+  test('persists workspace pane tabs from the current repo runtime', () => {
     const targetKey = worktreeTargetKey('/tmp/repo', 'feature/worktree', '/tmp/worktree')
-    const oldInstanceId = 'repo-instance-old'
-    const currentInstanceId = 'repo-instance-current'
+    const oldRepoRuntimeId = 'repo-runtime-old'
+    const currentRepoRuntimeId = 'repo-runtime-current'
     const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
-      instanceId: oldInstanceId,
+      repoRuntimeId: oldRepoRuntimeId,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       currentBranchName: 'feature/worktree',
     })
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: repo.id,
-      repoInstanceId: oldInstanceId,
+      repoRuntimeId: oldRepoRuntimeId,
       branchName: 'feature/worktree',
       worktreePath: '/tmp/worktree',
       tabs: [workspacePaneStaticTabEntry('status')],
     })
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: repo.id,
-      repoInstanceId: currentInstanceId,
+      repoRuntimeId: currentRepoRuntimeId,
       branchName: 'feature/worktree',
       worktreePath: '/tmp/worktree',
       tabs: [workspacePaneStaticTabEntry('history')],
@@ -342,11 +342,11 @@ describe('useSessionPersistence', () => {
       repos: {
         [repo.id]: {
           ...repo,
-          instanceId: currentInstanceId,
+          repoRuntimeId: currentRepoRuntimeId,
         },
       },
     })
-    seedRepoReadModelQueryData({ id: repo.id, instanceId: currentInstanceId }, {
+    seedRepoReadModelQueryData({ id: repo.id, repoRuntimeId: currentRepoRuntimeId }, {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
       currentBranch: 'feature/worktree',
       status: [],
@@ -456,7 +456,7 @@ describe('useSessionPersistence', () => {
       <QueryClientProvider client={primaryWindowQueryClient}>
         <>
           <Harness />
-          <WorkspacePaneTabsObserver repoId={repo.id} repoInstanceId={repo.instanceId} />
+          <WorkspacePaneTabsObserver repoId={repo.id} repoRuntimeId={repo.repoRuntimeId} />
         </>
       </QueryClientProvider>,
     )
@@ -559,8 +559,8 @@ function Harness({ routedRepoId = null }: { routedRepoId?: string | null }) {
   return null
 }
 
-function WorkspacePaneTabsObserver({ repoId, repoInstanceId }: { repoId: string; repoInstanceId: string }) {
-  useWorkspacePaneTabsQuery(repoId, repoInstanceId)
+function WorkspacePaneTabsObserver({ repoId, repoRuntimeId }: { repoId: string; repoRuntimeId: string }) {
+  useWorkspacePaneTabsQuery(repoId, repoRuntimeId)
   return null
 }
 

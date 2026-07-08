@@ -81,14 +81,14 @@ const TerminalResizeInputSchema = TerminalAttachInputSchema
 const TerminalSessionInputSchema = v.object({
   terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
 })
-const RepoInstanceIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
+const RepoRuntimeIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
 const TerminalListSessionsInputSchema = v.object({
   repoRoot: v.string(),
-  repoInstanceId: RepoInstanceIdSchema,
+  repoRuntimeId: RepoRuntimeIdSchema,
 })
 const TerminalCreateInputSchema = v.object({
   repoRoot: v.string(),
-  repoInstanceId: RepoInstanceIdSchema,
+  repoRuntimeId: RepoRuntimeIdSchema,
   branch: v.string(),
   worktreePath: v.string(),
   kind: v.picklist(['primary', 'additional']),
@@ -100,12 +100,12 @@ const TerminalCreateInputSchema = v.object({
 })
 const TerminalPruneInputSchema = v.object({
   repoRoot: v.string(),
-  repoInstanceId: RepoInstanceIdSchema,
+  repoRuntimeId: RepoRuntimeIdSchema,
 })
 const TerminalSessionSummarySchema = v.object({
   terminalRuntimeSessionId: v.string(),
   terminalSessionId: v.string(),
-  repoInstanceId: RepoInstanceIdSchema,
+  repoRuntimeId: RepoRuntimeIdSchema,
   repoRoot: v.string(),
   branch: v.string(),
   worktreePath: v.string(),

@@ -29,7 +29,7 @@ import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '
 type ConfigTrustChoice = { key: string; value: boolean } | null
 type BootstrapLoad = {
   repoId: string
-  repoInstanceId: string
+  repoRuntimeId: string
   previewResult: WorktreeBootstrapPreviewResult
   settingsSnapshot?: SettingsSnapshot
   settingsError: boolean
@@ -52,17 +52,17 @@ export function CreateWorktreePagePane({
 }: CreateWorktreePagePaneProps) {
   const liveRepo = useReposStore((s) => s.repos[repoId])
   const runBranchAction = useReposStore((s) => s.runBranchAction)
-  const branchReadModel = useRepoBranchReadModel(liveRepo?.id ?? '', liveRepo?.instanceId ?? '', !!liveRepo)
-  const operationsReadModel = useRepoOperationsReadModel(liveRepo?.id ?? '', liveRepo?.instanceId ?? '', {
+  const branchReadModel = useRepoBranchReadModel(liveRepo?.id ?? '', liveRepo?.repoRuntimeId ?? '', !!liveRepo)
+  const operationsReadModel = useRepoOperationsReadModel(liveRepo?.id ?? '', liveRepo?.repoRuntimeId ?? '', {
     enabled: !!liveRepo,
   })
-  const repoInstanceId = liveRepo?.instanceId ?? null
+  const repoRuntimeId = liveRepo?.repoRuntimeId ?? null
   const [configTrustChoice, setConfigTrustChoice] = useState<ConfigTrustChoice>(null)
   const [bootstrapLoad, setBootstrapLoad] = useState<BootstrapLoad | null>(null)
   const [bootstrapLoading, setBootstrapLoading] = useState(false)
 
   useEffect(() => {
-    if (repoInstanceId === null) {
+    if (repoRuntimeId === null) {
       setBootstrapLoad(null)
       setBootstrapLoading(false)
       setConfigTrustChoice(null)
@@ -75,7 +75,7 @@ export function CreateWorktreePagePane({
     setBootstrapLoading(true)
     setConfigTrustChoice(null)
 
-    void loadBootstrap(repoId, repoInstanceId, controller.signal)
+    void loadBootstrap(repoId, repoRuntimeId, controller.signal)
       .then((load) => {
         if (!ignore) setBootstrapLoad(load)
       })
@@ -87,16 +87,16 @@ export function CreateWorktreePagePane({
       ignore = true
       controller.abort()
     }
-  }, [repoId, repoInstanceId])
+  }, [repoId, repoRuntimeId])
 
   const activeBootstrapLoad =
-    repoInstanceId && isBootstrapLoadForRepo(bootstrapLoad, repoId, repoInstanceId) ? bootstrapLoad : null
+    repoRuntimeId && isBootstrapLoadForRepo(bootstrapLoad, repoId, repoRuntimeId) ? bootstrapLoad : null
   const bootstrapPreviewResult = activeBootstrapLoad?.previewResult
   const bootstrapPreview = bootstrapPreviewResult?.ok ? bootstrapPreviewResult.preview : null
   const bootstrapPreviewError = bootstrapPreviewResult?.ok === false
   const bootstrapConfigHash = bootstrapPreview?.configHash ?? null
   const bootstrapTrustKey = bootstrapConfigHash
-    ? `${repoId}\u0000${repoInstanceId ?? ''}\u0000${bootstrapConfigHash}`
+    ? `${repoId}\u0000${repoRuntimeId ?? ''}\u0000${bootstrapConfigHash}`
     : null
   const effectiveConfigTrustChoice =
     configTrustChoice && configTrustChoice.key === bootstrapTrustKey ? configTrustChoice.value : null
@@ -164,7 +164,7 @@ export function CreateWorktreePagePane({
 
   async function handleCreateWorktree(request: CreateWorktreeRequest): Promise<boolean> {
     const currentRepo = useReposStore.getState().repos[repoId]
-    if (!currentRepo || currentRepo.instanceId !== liveRepo.instanceId) return false
+    if (!currentRepo || currentRepo.repoRuntimeId !== liveRepo.repoRuntimeId) return false
     const branchAction = projectBranchActionOperation(
       currentRepo.operations.branchAction,
       operationsReadModel.data?.operations,
@@ -173,7 +173,7 @@ export function CreateWorktreePagePane({
     const result = await runBranchAction(
       repoId,
       { kind: 'createWorktree', input: request.input, worktreeBootstrap: currentWorktreeBootstrapDecision() },
-      { repoInstanceId: liveRepo.instanceId, refreshOnError: false },
+      { repoRuntimeId: liveRepo.repoRuntimeId, refreshOnError: false },
     )
     if (result?.ok) onCreated(createWorktreeTargetBranch(request.input))
     return false
@@ -234,11 +234,11 @@ function createWorktreeTargetBranch(input: CreateWorktreeRequest['input']): stri
   return exhaustive
 }
 
-function isBootstrapLoadForRepo(load: BootstrapLoad | null, repoId: string, repoInstanceId: string): boolean {
-  return load?.repoId === repoId && load.repoInstanceId === repoInstanceId
+function isBootstrapLoadForRepo(load: BootstrapLoad | null, repoId: string, repoRuntimeId: string): boolean {
+  return load?.repoId === repoId && load.repoRuntimeId === repoRuntimeId
 }
 
-async function loadBootstrap(repoId: string, repoInstanceId: string, signal: AbortSignal): Promise<BootstrapLoad> {
+async function loadBootstrap(repoId: string, repoRuntimeId: string, signal: AbortSignal): Promise<BootstrapLoad> {
   const previewResult = await getRepoWorktreeBootstrapPreview(repoId, signal).catch(
     (): WorktreeBootstrapPreviewResult => ({ ok: false, message: 'error.failed-read-repo' }),
   )
@@ -254,5 +254,5 @@ async function loadBootstrap(repoId: string, repoInstanceId: string, signal: Abo
     }
   }
 
-  return { repoId, repoInstanceId, previewResult, settingsSnapshot, settingsError }
+  return { repoId, repoRuntimeId, previewResult, settingsSnapshot, settingsError }
 }

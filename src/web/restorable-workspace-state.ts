@@ -106,7 +106,7 @@ function workspaceSessionRepoShells(
 }
 
 function workspacePaneTabsByTargetByRepoFromQueryCache(
-  repos: Record<string, Pick<ReposStore['repos'][string], 'instanceId'> | undefined>,
+  repos: Record<string, Pick<ReposStore['repos'][string], 'repoRuntimeId'> | undefined>,
   order: readonly string[],
 ): Record<string, Record<string, WorkspacePaneTabEntry[]>> {
   const byRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>> = {}
@@ -114,7 +114,7 @@ function workspacePaneTabsByTargetByRepoFromQueryCache(
     const repo = repos[id]
     if (!repo) continue
     const data = primaryWindowQueryClient.getQueryData<WorkspacePaneTabsQueryData>(
-      workspacePaneTabsQueryKey(id, repo.instanceId),
+      workspacePaneTabsQueryKey(id, repo.repoRuntimeId),
     )
     if (!data) continue
     const byTarget = workspacePaneTabsByTargetFromQueryData(data)

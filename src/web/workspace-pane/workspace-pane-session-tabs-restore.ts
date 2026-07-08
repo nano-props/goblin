@@ -47,7 +47,7 @@ export async function restoreServerWorkspacePaneTabsFromSession(
         unresolvedTargets.push({ repoRoot, targetKey })
         continue
       }
-      commits.push(restoreWorkspacePaneTabs({ ...target, repoInstanceId: repo.instanceId, tabs }))
+      commits.push(restoreWorkspacePaneTabs({ ...target, repoRuntimeId: repo.repoRuntimeId, tabs }))
     }
   }
   const results = await Promise.all(commits)
@@ -72,7 +72,7 @@ export async function restoreServerWorkspacePaneTabsFromSession(
 
 async function restoreWorkspacePaneTabs(input: {
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   branchName: string
   worktreePath: string | null
   tabs: WorkspacePaneTabEntry[]

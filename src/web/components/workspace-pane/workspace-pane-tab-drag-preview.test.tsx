@@ -17,8 +17,8 @@ import {
 } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
 
 const REPO_ROOT = '/tmp/workspace-pane-tab-drag-preview-repo'
-const REPO_INSTANCE_ID = 'repo-instance-test'
-const NEXT_REPO_INSTANCE_ID = 'repo-instance-next'
+const REPO_RUNTIME_ID = 'repo-runtime-test'
+const NEXT_REPO_RUNTIME_ID = 'repo-runtime-next'
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-drag-preview-worktree'
 
@@ -50,7 +50,7 @@ describe('useWorkspacePaneTabDragPreview', () => {
     setWorkspacePaneTabsForTargetQueryData(
       {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         tabs: sourceTabs,
@@ -146,7 +146,7 @@ describe('useWorkspacePaneTabDragPreview', () => {
     expect(currentControls().visualTabs).toEqual(sourceTabs)
   })
 
-  test('clears a staged preview when the repo runtime instance changes', () => {
+  test('clears a staged preview when the repo runtime changes', () => {
     const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
     const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
     const renderResult = renderPreviewHook({ canonicalTabs: sourceTabs })
@@ -160,7 +160,7 @@ describe('useWorkspacePaneTabDragPreview', () => {
       renderResult.rerender(
         <HookHost
           input={previewInput({
-            repoInstanceId: NEXT_REPO_INSTANCE_ID,
+            repoRuntimeId: NEXT_REPO_RUNTIME_ID,
             canonicalTabs: sourceTabs,
           })}
         />,
@@ -178,7 +178,7 @@ function renderPreviewHook(input: Partial<WorkspacePaneTabDragPreviewInput> = {}
 function previewInput(input: Partial<WorkspacePaneTabDragPreviewInput> = {}): WorkspacePaneTabDragPreviewInput {
   return {
     repoRoot: REPO_ROOT,
-    repoInstanceId: REPO_INSTANCE_ID,
+    repoRuntimeId: REPO_RUNTIME_ID,
     branchName: BRANCH_NAME,
     worktreePath: WORKTREE_PATH,
     canonicalTabs: [],
@@ -200,7 +200,7 @@ function readWorkspacePaneTabsFromQueryCache(queryClient: QueryClient): Workspac
   return readWorkspacePaneTabsForTarget(
     {
       repoRoot: REPO_ROOT,
-      repoInstanceId: REPO_INSTANCE_ID,
+      repoRuntimeId: REPO_RUNTIME_ID,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
     },

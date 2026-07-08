@@ -2,20 +2,20 @@
 
 import { describe, expect, test, vi } from 'vitest'
 import {
-  clearRepoRuntimeInstancesForUser,
-  isCurrentRepoRuntimeInstance,
-  openRepoRuntimeInstance,
-} from '#/server/modules/repo-runtime-instances.ts'
+  clearRepoRuntimesForUser,
+  isCurrentRepoRuntime,
+  openRepoRuntime,
+} from '#/server/modules/repo-runtimes.ts'
 import { createWorkspacePaneTabsActions } from '#/server/workspace-pane/workspace-pane-tabs-actions.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 const CLIENT_ID = 'client_workspace_pane_tabs_actions'
 const USER_ID = 'user_workspace_pane_tabs_actions'
 const REPO_ROOT = '/repo'
-let REPO_INSTANCE_ID = ''
+let REPO_RUNTIME_ID = ''
 
-function syncCurrentRepoInstance(): void {
-  REPO_INSTANCE_ID = openRepoRuntimeInstance(USER_ID, REPO_ROOT)
+function syncCurrentRepoRuntime(): void {
+  REPO_RUNTIME_ID = openRepoRuntime(USER_ID, REPO_ROOT)
 }
 
 function makeActions(
@@ -43,7 +43,7 @@ function makeActions(
     actions: createWorkspacePaneTabsActions({
       sessionService,
       isValidClientId,
-      isCurrentRepoInstance: isCurrentRepoRuntimeInstance,
+      isCurrentRepoRuntime: isCurrentRepoRuntime,
       broadcastWorkspaceTabsChanged: broadcasts as unknown as (userId: string, repoRoot: string) => void,
     }),
     broadcasts,
@@ -53,14 +53,14 @@ function makeActions(
 
 describe('workspace-pane-tabs-actions', () => {
   test('lists workspace tabs through the workspace-pane service boundary', async () => {
-    clearRepoRuntimeInstancesForUser(USER_ID)
-    syncCurrentRepoInstance()
+    clearRepoRuntimesForUser(USER_ID)
+    syncCurrentRepoRuntime()
     const { actions, sessionService } = makeActions()
 
     await expect(
       actions.listWorkspaceTabs(CLIENT_ID, USER_ID, {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
       }),
     ).resolves.toEqual([
       {
@@ -71,18 +71,18 @@ describe('workspace-pane-tabs-actions', () => {
       },
     ])
 
-    expect(sessionService.listWorkspaceTabs).toHaveBeenCalledWith(USER_ID, REPO_ROOT, REPO_INSTANCE_ID)
+    expect(sessionService.listWorkspaceTabs).toHaveBeenCalledWith(USER_ID, REPO_ROOT, REPO_RUNTIME_ID)
   })
 
   test('emits a workspace tabs invalidation after replaceTabs succeeds', async () => {
-    clearRepoRuntimeInstancesForUser(USER_ID)
-    syncCurrentRepoInstance()
+    clearRepoRuntimesForUser(USER_ID)
+    syncCurrentRepoRuntime()
     const { actions, broadcasts } = makeActions()
 
     await expect(
       actions.replaceTabs(CLIENT_ID, USER_ID, {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branchName: 'feature/worktree',
         worktreePath: '/repo',
         tabs: [workspacePaneStaticTabEntry('status')],
@@ -94,14 +94,14 @@ describe('workspace-pane-tabs-actions', () => {
   })
 
   test('emits a workspace tabs invalidation after updateTabs succeeds', async () => {
-    clearRepoRuntimeInstancesForUser(USER_ID)
-    syncCurrentRepoInstance()
+    clearRepoRuntimesForUser(USER_ID)
+    syncCurrentRepoRuntime()
     const { actions, broadcasts } = makeActions()
 
     await expect(
       actions.updateTabs(CLIENT_ID, USER_ID, {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branchName: 'feature/worktree',
         worktreePath: '/repo',
         operation: { type: 'open-static', tabType: 'status' },
@@ -113,14 +113,14 @@ describe('workspace-pane-tabs-actions', () => {
   })
 
   test('rejects invalid replaceTabs input without emitting', async () => {
-    clearRepoRuntimeInstancesForUser(USER_ID)
-    syncCurrentRepoInstance()
+    clearRepoRuntimesForUser(USER_ID)
+    syncCurrentRepoRuntime()
     const { actions, broadcasts, sessionService } = makeActions()
 
     await expect(
       actions.replaceTabs(CLIENT_ID, USER_ID, {
         repoRoot: '',
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
         branchName: 'feature/worktree',
         worktreePath: '/repo',
         tabs: [workspacePaneStaticTabEntry('status')],
@@ -131,34 +131,34 @@ describe('workspace-pane-tabs-actions', () => {
     expect(broadcasts).not.toHaveBeenCalled()
   })
 
-  test('rejects stale repo instances before touching workspace tab state', async () => {
-    clearRepoRuntimeInstancesForUser(USER_ID)
-    syncCurrentRepoInstance()
+  test('rejects stale repo runtimes before touching workspace tab state', async () => {
+    clearRepoRuntimesForUser(USER_ID)
+    syncCurrentRepoRuntime()
     const { actions, broadcasts, sessionService } = makeActions()
 
     await expect(
       actions.updateTabs(CLIENT_ID, USER_ID, {
         repoRoot: REPO_ROOT,
-        repoInstanceId: 'repo-instance-stale',
+        repoRuntimeId: 'repo-runtime-stale',
         branchName: 'feature/worktree',
         worktreePath: '/repo',
         operation: { type: 'open-static', tabType: 'status' },
       }),
-    ).rejects.toThrow('error.repo-instance-stale')
+    ).rejects.toThrow('error.repo-runtime-stale')
 
     expect(sessionService.updateTabs).not.toHaveBeenCalled()
     expect(broadcasts).not.toHaveBeenCalled()
   })
 
   test('rejects invalid client ids before touching workspace tab state', async () => {
-    clearRepoRuntimeInstancesForUser(USER_ID)
-    syncCurrentRepoInstance()
+    clearRepoRuntimesForUser(USER_ID)
+    syncCurrentRepoRuntime()
     const { actions, broadcasts, sessionService } = makeActions()
 
     await expect(
       actions.listWorkspaceTabs('not_a_client', USER_ID, {
         repoRoot: REPO_ROOT,
-        repoInstanceId: REPO_INSTANCE_ID,
+        repoRuntimeId: REPO_RUNTIME_ID,
       }),
     ).resolves.toEqual([])
 

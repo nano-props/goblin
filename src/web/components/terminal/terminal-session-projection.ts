@@ -74,14 +74,14 @@ export function projectCreateResultForClient(
 export function projectServerTerminalSession(input: {
   repoIndex: TerminalRepoIndex
   repoRoot: string
-  repoInstanceId: string
+  repoRuntimeId: string
   serverSession: ServerTerminalSessionSummary
   clientId: string
   index: number
   serverSnapshot?: TerminalHydrationSnapshot | null
 }): ProjectedServerTerminalSession | null {
   if (input.serverSession.repoRoot !== input.repoRoot) return null
-  if (input.serverSession.repoInstanceId !== input.repoInstanceId) return null
+  if (input.serverSession.repoRuntimeId !== input.repoRuntimeId) return null
   const branch =
     input.serverSession.branch ||
     branchForTerminalWorktree(input.repoIndex, input.serverSession.repoRoot, input.serverSession.worktreePath)
@@ -89,7 +89,7 @@ export function projectServerTerminalSession(input: {
   const descriptor = terminalDescriptor(
     {
       repoRoot: input.serverSession.repoRoot,
-      repoInstanceId: input.serverSession.repoInstanceId,
+      repoRuntimeId: input.serverSession.repoRuntimeId,
       branch,
       worktreePath: input.serverSession.worktreePath,
     },
@@ -127,7 +127,7 @@ function createSessionSummaryFromCreate(
   return {
     terminalRuntimeSessionId: result.terminalRuntimeSessionId,
     terminalSessionId: result.terminalSessionId,
-    repoInstanceId: serverSession?.repoInstanceId ?? requireBaseRepoInstanceId(base),
+    repoRuntimeId: serverSession?.repoRuntimeId ?? requireBaseRepoRuntimeId(base),
     repoRoot: serverSession?.repoRoot ?? base.repoRoot,
     branch: serverSession?.branch ?? base.branch,
     worktreePath: serverSession?.worktreePath ?? base.worktreePath,
@@ -142,7 +142,7 @@ function createSessionSummaryFromCreate(
   }
 }
 
-function requireBaseRepoInstanceId(base: TerminalSessionBase): string {
-  if (typeof base.repoInstanceId === 'string' && base.repoInstanceId.length > 0) return base.repoInstanceId
-  throw new Error('error.repo-instance-stale')
+function requireBaseRepoRuntimeId(base: TerminalSessionBase): string {
+  if (typeof base.repoRuntimeId === 'string' && base.repoRuntimeId.length > 0) return base.repoRuntimeId
+  throw new Error('error.repo-runtime-stale')
 }

@@ -12,7 +12,7 @@ import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-brok
 interface BeginRepoServerOperationInput {
   id?: string
   repoId?: string | null
-  repoInstanceId?: string | null
+  repoRuntimeId?: string | null
   kind: RepoServerOperationKind
   source: RepoServerOperationSource
   target?: RepoServerOperationTarget | null
@@ -79,7 +79,7 @@ export function beginRepoServerOperation(input: BeginRepoServerOperationInput): 
   const operation: RepoServerOperationState = {
     id,
     repoId: input.repoId ?? null,
-    repoInstanceId: input.repoInstanceId ?? null,
+    repoRuntimeId: input.repoRuntimeId ?? null,
     kind: input.kind,
     phase: 'queued',
     source: input.source,

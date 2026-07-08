@@ -17,7 +17,7 @@ interface RunLatestDataLoadOperationOptions<T> {
   set: ReposSet
   get: ReposGet
   id: string
-  repoInstanceId: string
+  repoRuntimeId: string
   lane: RepoOperationLane
   operationKey: string
   priority: number
@@ -39,7 +39,7 @@ interface RunLatestDataLoadOperationOptions<T> {
 }
 
 export async function runLatestDataLoadOperation<T>(options: RunLatestDataLoadOperationOptions<T>): Promise<void> {
-  updateIfFresh(options.set, options.id, options.repoInstanceId, (repo) => {
+  updateIfFresh(options.set, options.id, options.repoRuntimeId, (repo) => {
     const startOptions = options.start?.(repo)
     startDataLoad(options.selectDataLoad(repo), startOptions ?? undefined)
   })
@@ -47,14 +47,14 @@ export async function runLatestDataLoadOperation<T>(options: RunLatestDataLoadOp
     set: options.set,
     get: options.get,
     id: options.id,
-    repoInstanceId: options.repoInstanceId,
+    repoRuntimeId: options.repoRuntimeId,
     lane: options.lane,
     operationKey: options.operationKey,
     priority: options.priority,
     targets: [options.target],
     task: options.task,
     onResult: async (result, ctx) => {
-      updateIfFresh(options.set, options.id, options.repoInstanceId, (repo) => {
+      updateIfFresh(options.set, options.id, options.repoRuntimeId, (repo) => {
         const shouldFinish = options.applyResult?.(repo, result)
         if (shouldFinish === false) return
         finishDataLoadSuccess(options.selectDataLoad(repo))
@@ -63,7 +63,7 @@ export async function runLatestDataLoadOperation<T>(options: RunLatestDataLoadOp
     },
     onError: (message) => {
       options.onErrorLog?.(message)
-      updateIfFresh(options.set, options.id, options.repoInstanceId, (repo) => {
+      updateIfFresh(options.set, options.id, options.repoRuntimeId, (repo) => {
         finishDataLoadError(options.selectDataLoad(repo), message)
         options.onError?.(message, repo)
         repo.events = appendRepoEvent(repo.events, errorEvent(message))

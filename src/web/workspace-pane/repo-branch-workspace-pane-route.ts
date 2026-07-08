@@ -31,7 +31,7 @@ export function resolveRepoBranchWorkspacePaneRoute(
   if (!target) return { kind: 'missing' }
   const tabEntriesProjection = readWorkspacePaneTabsProjectionForTarget({
     ...target,
-    repoInstanceId: repo.instanceId,
+    repoRuntimeId: repo.repoRuntimeId,
   })
   if (tabEntriesProjection.phase !== 'ready') {
     return {
@@ -42,12 +42,12 @@ export function resolveRepoBranchWorkspacePaneRoute(
   }
   const runtimeProjection = readWorkspacePaneRuntimeTabTargetProjection({
     repoRoot: repo.id,
-    repoInstanceId: repo.instanceId,
+    repoRuntimeId: repo.repoRuntimeId,
     worktreePath: target.worktreePath,
   })
   const model = createRepoWorkspaceTabModel({
     repoId: repo.id,
-    repoInstanceId: repo.instanceId,
+    repoRuntimeId: repo.repoRuntimeId,
     branchName: target.branchName,
     worktreePath: target.worktreePath,
     preferredTab: preferredWorkspacePaneTabForTarget(repo.ui, target),

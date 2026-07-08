@@ -78,7 +78,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
 
     expect(replaceWorkspaceTabs).toHaveBeenCalledWith({
       repoRoot: REPO_ID,
-      repoInstanceId: useReposStore.getState().repos[REPO_ID]!.instanceId,
+      repoRuntimeId: useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
       branchName: 'feature/no-worktree',
       worktreePath: null,
       tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1')],
@@ -101,7 +101,7 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
 
     expect(replaceWorkspaceTabs).toHaveBeenCalledWith({
       repoRoot: REPO_ID,
-      repoInstanceId: useReposStore.getState().repos[REPO_ID]!.instanceId,
+      repoRuntimeId: useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
       branchName: 'feature/worktree',
       worktreePath: null,
       tabs: [workspacePaneStaticTabEntry('history')],
@@ -199,7 +199,7 @@ function seedRepo(): void {
 function readTabsFor(branchName: string, worktreePath: string | null) {
   return readWorkspacePaneTabsForTarget({
     repoRoot: REPO_ID,
-    repoInstanceId: useReposStore.getState().repos[REPO_ID]!.instanceId,
+    repoRuntimeId: useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
     branchName,
     worktreePath,
   })

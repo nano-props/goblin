@@ -19,31 +19,31 @@ function remoteTargetFixture() {
 
 describe('deriveConnectivity', () => {
   test('local repos always read as connected', () => {
-    const repo = emptyRepo('/tmp/local-repo', 'local', 'repo-instance-test')
+    const repo = emptyRepo('/tmp/local-repo', 'local', 'repo-runtime-test')
     expect(deriveConnectivity(repo)).toBe('connected')
   })
 
   test('a remote repo with lifecycle=connecting reads as connecting', () => {
-    const repo = emptyRepo(REMOTE_ID, 'remote', 'repo-instance-test')
+    const repo = emptyRepo(REMOTE_ID, 'remote', 'repo-runtime-test')
     repo.remote.lifecycle = { kind: 'connecting' }
     expect(deriveConnectivity(repo)).toBe('connecting')
   })
 
   test('a remote repo with lifecycle=ready reads as connected', () => {
-    const repo = emptyRepo(REMOTE_ID, 'remote', 'repo-instance-test')
+    const repo = emptyRepo(REMOTE_ID, 'remote', 'repo-runtime-test')
     const target = remoteTargetFixture()
     repo.remote.lifecycle = { kind: 'ready', target }
     expect(deriveConnectivity(repo)).toBe('connected')
   })
 
   test('a remote repo with lifecycle=failed reads as unreachable', () => {
-    const repo = emptyRepo(REMOTE_ID, 'remote', 'repo-instance-test')
+    const repo = emptyRepo(REMOTE_ID, 'remote', 'repo-runtime-test')
     repo.remote.lifecycle = { kind: 'failed', reason: 'unreachable' }
     expect(deriveConnectivity(repo)).toBe('unreachable')
   })
 
   test('a remote repo with lifecycle=failed but a retained target still reads as unreachable', () => {
-    const repo = emptyRepo(REMOTE_ID, 'remote', 'repo-instance-test')
+    const repo = emptyRepo(REMOTE_ID, 'remote', 'repo-runtime-test')
     const target = remoteTargetFixture()
     repo.remote.lifecycle = { kind: 'failed', reason: 'timeout', target }
     expect(deriveConnectivity(repo)).toBe('unreachable')
@@ -55,7 +55,7 @@ describe('deriveConnectivity', () => {
     // recorded yet. Test fixtures and persistence restores are the only
     // expected callers that can construct this shape.
     // should hit this branch.
-    const repo = emptyRepo(REMOTE_ID, 'remote', 'repo-instance-test')
+    const repo = emptyRepo(REMOTE_ID, 'remote', 'repo-runtime-test')
     expect(deriveConnectivity(repo)).toBe('connecting')
   })
 })

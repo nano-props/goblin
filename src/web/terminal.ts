@@ -27,8 +27,8 @@ export const terminalClient: ClientTerminal = {
   create(input) {
     return getTerminalClient().create(input)
   },
-  pruneTerminals(repoRoot, repoInstanceId) {
-    return getTerminalClient().pruneTerminals(repoRoot, repoInstanceId)
+  pruneTerminals(repoRoot, repoRuntimeId) {
+    return getTerminalClient().pruneTerminals(repoRoot, repoRuntimeId)
   },
   listSessions(input) {
     return getTerminalClient().listSessions(input)
