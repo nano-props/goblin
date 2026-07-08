@@ -95,7 +95,12 @@ async function runRuntimeProjectionRefresh(
     errorFromResult: (projection) => (projection.snapshot ? null : 'error.failed-read-repo'),
     onResult: (projection: RepoRuntimeProjection, ctx) => {
       if (!ctx.isCurrent()) return
-      acceptRepoProjectionReadModel(store.set, store.get, { repoRoot: id, repoRuntimeId, projection })
+      acceptRepoProjectionReadModel(
+        store.set,
+        store.get,
+        { repoRoot: id, repoRuntimeId, projection },
+        { settleVisibleStatus: wantsVisibleStatusLoad },
+      )
     },
     onError: (message) => {
       if (wantsVisibleStatusLoad && !wantsReadModelLoad) refreshStatusLog.warn('failed', { err: new Error(message) })

@@ -14,6 +14,10 @@ interface AcceptedRepoProjectionReadModel {
   projection: RepoRuntimeProjection
 }
 
+interface AcceptRepoProjectionReadModelOptions {
+  settleVisibleStatus?: boolean
+}
+
 interface AcceptedProjectionSignature {
   loadedAt: number
   snapshot: RepoRuntimeProjection['snapshot']
@@ -67,18 +71,26 @@ export function acceptRepoProjectionReadModel(
   set: ReposSet,
   get: ReposGet,
   input: AcceptedRepoProjectionReadModel,
+  options: AcceptRepoProjectionReadModelOptions = {},
 ): void {
   const { repoRoot, repoRuntimeId, projection } = input
   if (!authoritativeProjection(projection)) return
   const coreReadModel = projection.requested.branch === null
   const repoBefore = get().repos[repoRoot]
   if (!repoBefore || repoBefore.repoRuntimeId !== repoRuntimeId) return
+  const settleVisibleStatus = options.settleVisibleStatus ?? coreReadModel
+  if (settleVisibleStatus) {
+    updateIfFresh(set, repoRoot, repoRuntimeId, (repo) => {
+      if (projection.snapshot) finishDataLoadSuccess(repo.dataLoads.visibleStatus, projection.loadedAt)
+      else finishDataLoadError(repo.dataLoads.visibleStatus, 'error.failed-read-repo')
+    })
+  }
+  if (!projection.snapshot && !coreReadModel && !settleVisibleStatus) return
   if (!markProjectionAccepted(input)) return
 
   if (!projection.snapshot) {
     updateIfFresh(set, repoRoot, repoRuntimeId, (repo) => {
       if (coreReadModel) finishDataLoadError(repo.dataLoads.repoReadModel, 'error.failed-read-repo')
-      finishDataLoadError(repo.dataLoads.visibleStatus, 'error.failed-read-repo')
       repo.events = appendRepoEvent(repo.events, errorEvent('error.failed-read-repo'))
     })
     return
@@ -89,7 +101,6 @@ export function acceptRepoProjectionReadModel(
     if (coreReadModel) {
       applySnapshotToRepoProjection(repo, projection.snapshot!, validBranches, null, projection.loadedAt)
     }
-    finishDataLoadSuccess(repo.dataLoads.visibleStatus, projection.loadedAt)
   })
 
   if (!coreReadModel) return

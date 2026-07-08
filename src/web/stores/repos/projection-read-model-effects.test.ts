@@ -17,7 +17,8 @@ beforeEach(() => {
 })
 
 describe('repo projection read-model effects', () => {
-  function acceptedProjection(): RepoRuntimeProjection {
+  function acceptedProjection(branch: string | null = null): RepoRuntimeProjection {
+    const loadedAt = Date.now()
     return {
       snapshot: {
         branches: [createBranchSnapshot('feature/a'), createBranchSnapshot('feature/b')],
@@ -25,9 +26,9 @@ describe('repo projection read-model effects', () => {
       },
       status: [],
       pullRequests: null,
-      operations: { operations: [], loadedAt: Date.now() },
-      requested: { branch: null, pullRequestMode: 'full' },
-      loadedAt: Date.now(),
+      operations: { operations: [], loadedAt },
+      requested: { branch, pullRequestMode: 'full' },
+      loadedAt,
     }
   }
 
@@ -106,5 +107,56 @@ describe('repo projection read-model effects', () => {
 
     expect(pruneTerminals).not.toHaveBeenCalled()
     expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
+  })
+
+  test('branch-scoped query-cache acceptance does not settle the visible status load', () => {
+    const repo = seedRepoShellForTest({
+      id: '/repo',
+      repoRuntimeId: 'repo-runtime-test-2',
+      currentBranchName: 'feature/a',
+    })
+    useReposStore.setState((state) => {
+      const current = state.repos['/repo']!
+      return {
+        repos: {
+          ...state.repos,
+          '/repo': {
+            ...current,
+            dataLoads: {
+              ...current.dataLoads,
+              visibleStatus: { phase: 'loading', loadedAt: null, error: null, stale: false },
+            },
+          },
+        },
+      }
+    })
+    const projection = acceptedProjection('feature/a')
+
+    acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {
+      repoRoot: '/repo',
+      repoRuntimeId: repo.repoRuntimeId,
+      projection,
+    })
+
+    expect(useReposStore.getState().repos['/repo']?.dataLoads.visibleStatus).toMatchObject({
+      phase: 'loading',
+      loadedAt: null,
+    })
+
+    acceptRepoProjectionReadModel(
+      useReposStore.setState,
+      useReposStore.getState,
+      {
+        repoRoot: '/repo',
+        repoRuntimeId: repo.repoRuntimeId,
+        projection,
+      },
+      { settleVisibleStatus: true },
+    )
+
+    expect(useReposStore.getState().repos['/repo']?.dataLoads.visibleStatus).toMatchObject({
+      phase: 'idle',
+      loadedAt: projection.loadedAt,
+    })
   })
 })

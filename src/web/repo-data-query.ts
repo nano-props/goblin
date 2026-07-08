@@ -113,6 +113,19 @@ function requestCoalescedActiveRepoRefetch(
   run()
 }
 
+function abortSignalAny(signals: AbortSignal[]): AbortSignal {
+  const aborted = signals.find((signal) => signal.aborted)
+  if (aborted) return aborted
+  const ctrl = new AbortController()
+  const abort = (event: Event) => {
+    const signal = event.target as AbortSignal
+    for (const current of signals) current.removeEventListener('abort', abort)
+    ctrl.abort(signal.reason)
+  }
+  for (const signal of signals) signal.addEventListener('abort', abort, { once: true })
+  return ctrl.signal
+}
+
 function repoLogQueryKey(repoRoot: string, repoRuntimeId: string, branch: string, count: number, skip: number) {
   return ['repo-data', repoRoot, repoRuntimeId, 'log', branch, count, skip] as const
 }
@@ -363,10 +376,14 @@ export async function refreshRepoProjectionReadModel(
   options.signal?.throwIfAborted()
   const queryClient = options.queryClient ?? primaryWindowQueryClient
   const queryOptions = repoProjectionQueryOptions(repoRoot, repoRuntimeId, branch, mode)
+  await queryClient.cancelQueries({ queryKey: queryOptions.queryKey, exact: true })
+  await queryClient.invalidateQueries({ queryKey: queryOptions.queryKey, exact: true, refetchType: 'none' })
+  options.signal?.throwIfAborted()
   const projection = await queryClient.fetchQuery({
     ...queryOptions,
     staleTime: 0,
-    queryFn: ({ signal }) => getRepoProjection(repoRoot, branch, { mode }, signal),
+    queryFn: ({ signal }) =>
+      getRepoProjection(repoRoot, branch, { mode }, options.signal ? abortSignalAny([signal, options.signal]) : signal),
   })
   setRepoOperationsQueryData(repoRoot, repoRuntimeId, false, projection.operations, queryClient)
   return projection

@@ -1,18 +1,36 @@
 import { QueryClient, QueryObserver } from '@tanstack/react-query'
-import { describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   getRepoOperationsQueryData,
   getRepoProjectionPlaceholderData,
   getRepoProjectionQueryData,
   invalidateRepoRuntimeProjectionQueries,
   repoOperationsQueryKey,
+  repoProjectionQueryOptions,
   repoProjectionQueryKey,
+  refreshRepoProjectionReadModel,
   seedRepoProjectionQueryData,
   setRepoOperationsQueryData,
   setRepoProjectionQueryData,
 } from '#/web/repo-data-query.ts'
 import type { PullRequestEntry, RepoRuntimeProjection } from '#/shared/api-types.ts'
 import type { WorktreeStatus } from '#/shared/git-types.ts'
+
+const repoClientMocks = vi.hoisted(() => ({
+  getRepoLog: vi.fn(),
+  getRepoOperations: vi.fn(),
+  getRepoProjection: vi.fn(),
+  getRepoRemoteBranches: vi.fn(),
+}))
+
+vi.mock('#/web/repo-client.ts', () => repoClientMocks)
+
+beforeEach(() => {
+  repoClientMocks.getRepoLog.mockReset()
+  repoClientMocks.getRepoOperations.mockReset()
+  repoClientMocks.getRepoProjection.mockReset()
+  repoClientMocks.getRepoRemoteBranches.mockReset()
+})
 
 describe('repo data query keys', () => {
   test('separates projection branch and fetch mode', () => {
@@ -270,6 +288,46 @@ describe('repo projection query data', () => {
       })
     } finally {
       unsubscribe()
+      queryClient.clear()
+    }
+  })
+
+  test('imperative projection refresh cancels an active matching projection query before reading', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const signals: AbortSignal[] = []
+    const releases: Array<(projection: RepoRuntimeProjection) => void> = []
+    repoClientMocks.getRepoProjection.mockImplementation(
+      (_repoRoot: string, _branch: string | null | undefined, _options: unknown, signal?: AbortSignal) =>
+        new Promise<RepoRuntimeProjection>((resolve, reject) => {
+          if (!signal) throw new Error('missing projection abort signal')
+          signals.push(signal)
+          const abort = () => reject(new Error('cancelled'))
+          signal.addEventListener('abort', abort, { once: true })
+          releases.push((projection) => {
+            signal.removeEventListener('abort', abort)
+            resolve(projection)
+          })
+        }),
+    )
+    const active = queryClient
+      .fetchQuery(repoProjectionQueryOptions('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full'))
+      .catch(() => null)
+
+    try {
+      await vi.waitFor(() => {
+        expect(signals).toHaveLength(1)
+      })
+
+      const refresh = refreshRepoProjectionReadModel('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', { queryClient })
+      await vi.waitFor(() => {
+        expect(signals).toHaveLength(2)
+      })
+
+      expect(signals[0]?.aborted).toBe(true)
+      releases[1]?.(repoProjectionForTest(2))
+      await expect(refresh).resolves.toMatchObject({ loadedAt: 2 })
+      await active
+    } finally {
       queryClient.clear()
     }
   })

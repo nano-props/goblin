@@ -84,7 +84,9 @@ describe('remote fetch timestamps', () => {
       })
 
     const work = requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, { repoRuntimeId, scope: 'repo-read-model' })
-    await Promise.resolve()
+    await vi.waitFor(() => {
+      expect(resolveSnapshot).toEqual(expect.any(Function))
+    })
 
     expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.repoReadModel.phase).toBe('refreshing')
 
@@ -607,7 +609,9 @@ describe('projection refresh request ordering', () => {
     })
     const fresh = [{ path: '/repo', isMain: true, entries: [{ x: 'M', y: ' ', path: 'fresh.ts' }] }]
 
-    expect(callCount).toBe(1)
+    await vi.waitFor(() => {
+      expect(callCount).toBe(1)
+    })
     resolveFirst(fresh)
     await Promise.all([first, second])
     expect(cachedRepoProjection(repoRuntimeId)?.status).toEqual(fresh)
@@ -884,6 +888,9 @@ describe('projection refresh request ordering', () => {
       stale: false,
     })
 
+    await vi.waitFor(() => {
+      expect(resolveStatus).toEqual(expect.any(Function))
+    })
     resolveStatus(status)
     await work
 
@@ -931,7 +938,9 @@ describe('projection refresh request ordering', () => {
       }),
     )
 
-    expect(resolvers).toHaveLength(1)
+    await vi.waitFor(() => {
+      expect(resolvers).toHaveLength(1)
+    })
     expect(repoOperation(REPO_ID, 'visibleStatus').phase).toBe('running')
 
     resolvers[0]?.([])
@@ -959,7 +968,9 @@ describe('projection refresh request ordering', () => {
         branchName: null,
       }),
     )
-    expect(callCount).toBe(1)
+    await vi.waitFor(() => {
+      expect(callCount).toBe(1)
+    })
     expect(repoOperation(REPO_ID, 'visibleStatus').phase).not.toBe('idle')
 
     useReposStore.getState().closeRepo(REPO_ID)
@@ -969,7 +980,7 @@ describe('projection refresh request ordering', () => {
     expect(useReposStore.getState().repos[REPO_ID]).toBeUndefined()
   })
 
-  test('coalesces repeated visible projection refreshes before they start', async () => {
+  test('coalesces repeated visible projection refreshes into one in-flight query', async () => {
     const repoRuntimeId = seedRepo([branch('feature/a')])
     const resolvers: Array<(value: WorktreeStatus[]) => void> = []
     ipcHandlers['repo.projection'] = () =>
@@ -988,12 +999,10 @@ describe('projection refresh request ordering', () => {
     )
     const fresh = [{ path: '/repo', isMain: true, entries: [{ x: 'M', y: ' ', path: 'fresh.ts' }] }]
 
-    expect(resolvers).toHaveLength(1)
-    resolvers[0]?.([])
     await vi.waitFor(() => {
-      expect(resolvers).toHaveLength(2)
+      expect(resolvers).toHaveLength(1)
     })
-    resolvers[1]?.(fresh)
+    resolvers[0]?.(fresh)
     await Promise.all(works)
 
     expect(cachedRepoProjection(repoRuntimeId)?.status).toEqual(fresh)
@@ -1021,7 +1030,9 @@ describe('projection refresh request ordering', () => {
       scope: 'repo-read-model',
     })
 
-    expect(callCount).toBe(1)
+    await vi.waitFor(() => {
+      expect(callCount).toBe(1)
+    })
     resolveFirst({ branches: [branch('fresh')], current: 'fresh' })
     await Promise.all([first, second])
     expect(repoCurrentBranch()).toBe('fresh')
