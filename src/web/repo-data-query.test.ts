@@ -292,6 +292,44 @@ describe('repo projection query data', () => {
     }
   })
 
+  test('reruns runtime projection invalidation after a pre-existing active fetch settles', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const signals: AbortSignal[] = []
+    const releases: Array<(projection: RepoRuntimeProjection) => void> = []
+    const observer = new QueryObserver<RepoRuntimeProjection>(queryClient, {
+      queryKey: repoProjectionQueryKey('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full'),
+      queryFn: ({ signal }) =>
+        new Promise<RepoRuntimeProjection>((resolve) => {
+          signals.push(signal)
+          releases.push(resolve)
+        }),
+      staleTime: Number.POSITIVE_INFINITY,
+    })
+    const unsubscribe = observer.subscribe(() => {})
+    try {
+      await vi.waitFor(() => {
+        expect(releases).toHaveLength(1)
+      })
+
+      invalidateRepoRuntimeProjectionQueries('/tmp/repo', 'repo-runtime-1', queryClient)
+      expect(releases).toHaveLength(1)
+
+      releases[0]!(repoProjectionForTest(1))
+      await vi.waitFor(() => {
+        expect(releases).toHaveLength(2)
+      })
+      expect(signals[0]?.aborted).toBe(false)
+
+      releases[1]!(repoProjectionForTest(2))
+      await vi.waitFor(() => {
+        expect(observer.getCurrentResult().data?.loadedAt).toBe(2)
+      })
+    } finally {
+      unsubscribe()
+      queryClient.clear()
+    }
+  })
+
   test('imperative projection refresh cancels an active matching projection query before reading', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const signals: AbortSignal[] = []

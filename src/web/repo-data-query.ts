@@ -84,15 +84,29 @@ async function refetchActiveRepoQueryKeys(
   )
 }
 
+function activeRepoQueryKeysFetching(
+  queryClient: QueryClient,
+  queryKeys: ReadonlyArray<readonly unknown[]>,
+): boolean {
+  return queryKeys.some((queryKey) =>
+    queryClient
+      .getQueryCache()
+      .findAll({ queryKey, type: 'active' })
+      .some((query) => query.state.fetchStatus === 'fetching'),
+  )
+}
+
 function requestCoalescedActiveRepoRefetch(
   queryClient: QueryClient,
   key: string,
   queryKeys: ReadonlyArray<readonly unknown[]>,
 ): void {
+  const wasAlreadyFetching = activeRepoQueryKeysFetching(queryClient, queryKeys)
   markRepoQueryKeysInvalidated(queryClient, queryKeys)
   const map = coalescedRepoRefetchMap(queryClient)
   const runtime = map.get(key) ?? { inFlight: null, rerunRequested: false }
   map.set(key, runtime)
+  if (wasAlreadyFetching) runtime.rerunRequested = true
   if (runtime.inFlight) {
     runtime.rerunRequested = true
     return
