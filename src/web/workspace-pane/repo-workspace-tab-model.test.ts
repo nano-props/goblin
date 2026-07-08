@@ -126,6 +126,25 @@ describe('repo workspace pane tab model', () => {
     expect(model.activeTab).toBeNull()
   })
 
+  test('does not render a runtime host for a verified missing explicit terminal route', () => {
+    const model = createModel({
+      repoId: REPO_ID,
+      branchName: 'feature/model',
+      worktreePath: WORKTREE_PATH,
+      preferredTab: 'terminal',
+      allowPreferredTabFallback: false,
+      tabEntries: [staticEntry('status'), terminalEntry('session-1'), terminalEntry('session-2')],
+      runtimeTabViews: [terminalView('session-1', 1, false), terminalView('session-2', 2, false)],
+      terminalProjectionPhase: 'ready',
+      selectedTerminalSessionId: 'session-2',
+      requestedSessionIdByRuntimeType: { terminal: 'missing-session' },
+    })
+
+    expect(model.selection).toBeNull()
+    expect(model.renderedTab).toBeNull()
+    expect(model.activeTab).toBeNull()
+  })
+
   test('creates pending runtime tabs from runtime tab state', () => {
     const model = createModel({
       repoId: REPO_ID,
@@ -298,6 +317,25 @@ describe('repo workspace pane tab model', () => {
     })
     expect(model.renderedTab).toBe('status')
     expect(model.activeTab?.identity).toBe('workspace-pane:status')
+  })
+
+  test('does not fall back when an explicit static route is not materialized', () => {
+    const model = createModel({
+      repoId: REPO_ID,
+      branchName: 'feature/model',
+      worktreePath: WORKTREE_PATH,
+      preferredTab: 'changes',
+      allowPreferredTabFallback: false,
+      tabEntries: [staticEntry('status')],
+      runtimeTabViews: [],
+      terminalProjectionPhase: 'ready',
+      selectedTerminalSessionId: null,
+    })
+
+    expect(model.tabs.map((tab) => tab.identity)).toEqual(['workspace-pane:status'])
+    expect(model.selection).toBeNull()
+    expect(model.renderedTab).toBeNull()
+    expect(model.activeTab).toBeNull()
   })
 
   test('falls back to the first materialized tab when a branch preference names a closed tab', () => {

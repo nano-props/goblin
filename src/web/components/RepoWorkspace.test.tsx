@@ -96,6 +96,7 @@ const navigation: PrimaryWindowNavigationActions = {
 }
 
 beforeEach(() => {
+  primaryWindowQueryClient.clear()
   resetReposStore()
   useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
 })
@@ -372,7 +373,7 @@ describe('RepoWorkspace', () => {
       expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]?.current).toEqual(expectedCurrentEntry)
     })
 
-    render(
+    const { container } = render(
       <QueryClientProvider client={primaryWindowQueryClient}>
         <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
           <TerminalSessionContext value={terminalCommandContext}>
@@ -388,6 +389,7 @@ describe('RepoWorkspace', () => {
       </QueryClientProvider>,
     )
 
+    expect(container.textContent).toContain('workspace-pane-tabs.empty')
     await waitFor(() => {
       expect(route.openRepoBranch).toHaveBeenCalledWith(REPO_ID, branchName, { replace: true })
       expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
@@ -692,7 +694,7 @@ describe('RepoWorkspace', () => {
     })
     const route = routeNavigation()
 
-    render(
+    const { container } = render(
       <QueryClientProvider client={primaryWindowQueryClient}>
         <PrimaryWindowNavigationProvider value={navigationWithStore(route)}>
           <TerminalSessionContext value={terminalCommandContext}>
@@ -708,6 +710,7 @@ describe('RepoWorkspace', () => {
       </QueryClientProvider>,
     )
 
+    expect(container.textContent).toContain('workspace-pane-tabs.empty')
     await waitFor(() => {
       expect(route.openRepoBranch).toHaveBeenCalledWith(REPO_ID, branchName, { replace: true })
       expect(route.openRepoBranchTab).not.toHaveBeenCalled()

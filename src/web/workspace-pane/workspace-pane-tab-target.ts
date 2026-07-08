@@ -69,6 +69,7 @@ export function resolveWorkspacePaneTabTargetForBranch(
       branchName,
       worktreePath,
       preferredTab: preferredWorkspacePaneTabForRoute(repo.ui, { repoRoot: repoId, branchName, worktreePath }, options),
+      allowPreferredTabFallback: options.workspacePaneRoute === undefined,
       tabEntries: readWorkspacePaneTabsForTarget({
         repoRoot: repoId,
         repoInstanceId: repo.instanceId,

@@ -182,6 +182,9 @@ pane URLs should fast-fail to the bare branch route. Do not replace
 `/terminal/{missingSessionId}` or `/tab/{unrenderableTab}` with a different live
 tab just because one exists. The resulting workspace history entry should record
 the empty pane (`workspacePaneTab: null`) rather than inventing a tab hit.
+The tab model must apply the same rule before reconciliation effects run:
+generic preferred-tab fallback is only for persisted preferences, never for an
+explicit URL route.
 
 URL-backed terminal routes are requested selection, not projection state. A
 route such as `/terminal/{sessionId}` may ask the tab model to render that

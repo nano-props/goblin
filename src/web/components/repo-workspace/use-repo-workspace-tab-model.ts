@@ -80,6 +80,7 @@ export function useRepoWorkspaceTabModelInput(
       branchName,
       worktreePath,
       preferredTab,
+      allowPreferredTabFallback: false,
       tabEntries: workspacePaneTabEntries,
       tabEntriesProjectionPhase: workspacePaneTabsProjectionPhase(workspacePaneTabsQuery.status),
       runtimeTabViews: runtimeProjection.runtimeTabViews,

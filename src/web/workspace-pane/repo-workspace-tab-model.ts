@@ -139,6 +139,13 @@ export interface RepoWorkspaceTabModelInput {
   branchName: string | null
   worktreePath: string | null
   preferredTab: WorkspacePaneTabType | null
+  /**
+   * Persisted preferences may fall back to the first materialized tab when
+   * their preferred tab no longer has backing state. Explicit route requests
+   * must not: a route miss is an empty pane until reconciliation replaces the
+   * URL with the bare branch route.
+   */
+  allowPreferredTabFallback?: boolean
   tabEntries: readonly WorkspacePaneTabEntry[]
   tabEntriesProjectionPhase?: RepoWorkspaceTabEntriesProjectionPhase
   runtimeTabViews: readonly WorkspacePaneTabSummary[]
@@ -176,7 +183,15 @@ export function createRepoWorkspaceTabModel(input: RepoWorkspaceTabModelInput): 
       )
     : null
   const selection =
-    input.preferredTab === null ? null : workspacePaneSelection(candidateTab, materializedActiveTab, materializedTabs)
+    input.preferredTab === null
+      ? null
+      : workspacePaneSelection({
+          renderableTab: candidateTab,
+          activeTab: materializedActiveTab,
+          materializedTabs,
+          runtimeTabStateByType,
+          allowFallback: input.allowPreferredTabFallback ?? true,
+        })
   const pendingTab =
     selection?.kind === 'runtime-host' && runtimeTabStateByType[selection.runtimeType].createPending
       ? pendingRuntimeWorkspacePaneTab(selection.runtimeType)
@@ -331,18 +346,29 @@ function materializedWorkspacePaneTabs(input: {
   return tabs
 }
 
-function workspacePaneSelection(
-  renderableTab: WorkspacePaneTabType | null,
-  activeTab: RepoWorkspaceMaterializedTab | null,
-  materializedTabs: readonly RepoWorkspaceMaterializedTab[],
-): RepoWorkspaceSelection | null {
+function workspacePaneSelection({
+  renderableTab,
+  activeTab,
+  materializedTabs,
+  runtimeTabStateByType,
+  allowFallback,
+}: {
+  renderableTab: WorkspacePaneTabType | null
+  activeTab: RepoWorkspaceMaterializedTab | null
+  materializedTabs: readonly RepoWorkspaceMaterializedTab[]
+  runtimeTabStateByType: RepoWorkspaceRuntimeTabStateByType
+  allowFallback: boolean
+}): RepoWorkspaceSelection | null {
   if (activeTab) return { kind: 'materialized-tab', tab: activeTab.type, materializedTab: activeTab }
   // Runtime-host is reserved for the "actively waiting" states: the user
   // wants a server-owned runtime tab but no session exists yet, so the
   // runtime affordance and host remain mounted.
   if (isWorkspacePaneRuntimeTabType(renderableTab)) {
+    const runtimeState = runtimeTabStateByType[renderableTab]
+    if (!allowFallback && runtimeState.projectionPhase === 'ready' && !runtimeState.createPending) return null
     return { kind: 'runtime-host', tab: renderableTab, runtimeType: renderableTab, materializedTab: null }
   }
+  if (!allowFallback) return null
   // Generic fallback: the preferred tab is unrenderable (no backing tab)
   // so surface the first materialized tab instead of landing on an empty pane.
   const firstTab = materializedTabs[0]

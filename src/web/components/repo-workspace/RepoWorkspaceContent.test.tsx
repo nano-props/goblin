@@ -41,6 +41,10 @@ import {
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
+import {
+  workspacePanePreferenceTargetOptions,
+  workspacePaneTabTargetForBranch,
+} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import {
   PrimaryWindowNavigationProvider,
@@ -124,7 +128,14 @@ function repoWorkspaceRepo(repo: RepoState): RepoWorkspaceRepo {
   }
 }
 
+function preferenceBackedWorkspacePaneTabModel(repoId: string, branchName: string) {
+  const model = workspacePaneTabTargetForBranch(repoId, branchName, workspacePanePreferenceTargetOptions)
+  if (!model) throw new Error('missing preference-backed workspace pane tab model')
+  return model
+}
+
 beforeEach(() => {
+  primaryWindowQueryClient.clear()
   resetReposStore()
   installWorkspacePaneTabsTestBridge()
   useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
@@ -619,7 +630,12 @@ describe('RepoWorkspaceContent', () => {
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContent
+            repo={repoWorkspaceRepo(repo)}
+            detail={detail}
+            workspacePaneId="workspace"
+            workspacePaneTabModel={preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/no-worktree')}
+          />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
@@ -647,7 +663,12 @@ describe('RepoWorkspaceContent', () => {
     const { container } = renderInJsdom(
       <TerminalSessionReadContext value={emptyTerminalReadContext}>
         <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
-          <RepoWorkspaceContentHarness repo={repoWorkspaceRepo(repo)} detail={detail} workspacePaneId="workspace" />
+          <RepoWorkspaceContent
+            repo={repoWorkspaceRepo(repo)}
+            detail={detail}
+            workspacePaneId="workspace"
+            workspacePaneTabModel={preferenceBackedWorkspacePaneTabModel(REPO_ID, 'feature/terminal-empty')}
+          />
         </BranchActionSurfaceContext>
       </TerminalSessionReadContext>,
     )
