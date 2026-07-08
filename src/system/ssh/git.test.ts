@@ -168,6 +168,92 @@ describe('remote git helpers', () => {
     )
   })
 
+  test('deleteRemoteBranch deletes the configured upstream when requested', async () => {
+    const run = vi.fn(async (command: { type: string }) => {
+      switch (command.type) {
+        case 'gitSnapshot':
+          return okRemoteResult(
+            [
+              '__GOBLIN_REMOTE_CURRENT__',
+              'release/1.0',
+              '__GOBLIN_REMOTE_DEFAULT__',
+              'main',
+              '__GOBLIN_REMOTE_BRANCHES__',
+              'release/1.0\x1ff00ba4\x1fRelease\x1f2024-01-01T00:00:00Z\x1fAlice\x1forigin/release/1.0\x1f',
+              'feature/test\x1fba5eba1\x1fFeature\x1f2024-01-02T00:00:00Z\x1fAlice\x1ffork/topic/feature-test\x1f',
+            ].join('\n'),
+          )
+        case 'gitWorktreeList':
+          return okRemoteResult('worktree /srv/repo\nHEAD f00ba4\nbranch refs/heads/release/1.0\n')
+        case 'gitStatus':
+          return okRemoteResult('')
+        case 'gitIsAncestor':
+          return okRemoteResult('')
+        case 'gitUpstream':
+          return okRemoteResult('fork/topic/feature-test')
+        case 'gitBranchDelete':
+          return okRemoteResult('Deleted branch feature/test')
+        case 'gitPushDeleteBranch':
+          return okRemoteResult('deleted upstream')
+        default:
+          return okRemoteResult('')
+      }
+    })
+
+    const result = await deleteRemoteBranch(TARGET, {
+      branch: 'feature/test',
+      alsoDeleteUpstream: true,
+      run: run as any,
+    })
+
+    expect(result).toEqual({ ok: true, message: 'deleted upstream' })
+    expect(run).toHaveBeenCalledWith(
+      { type: 'gitPushDeleteBranch', path: '/srv/repo', remote: 'fork', branch: 'topic/feature-test' },
+      TARGET,
+      { signal: undefined, timeoutMs: 180_000 },
+    )
+  })
+
+  test('deleteRemoteBranch reports upstream delete failure after deleting the local branch', async () => {
+    const run = vi.fn(async (command: { type: string }) => {
+      switch (command.type) {
+        case 'gitSnapshot':
+          return okRemoteResult(
+            [
+              '__GOBLIN_REMOTE_CURRENT__',
+              'release/1.0',
+              '__GOBLIN_REMOTE_DEFAULT__',
+              'main',
+              '__GOBLIN_REMOTE_BRANCHES__',
+              'feature/test\x1fba5eba1\x1fFeature\x1f2024-01-02T00:00:00Z\x1fAlice\x1forigin/feature/test\x1f',
+            ].join('\n'),
+          )
+        case 'gitWorktreeList':
+          return okRemoteResult('worktree /srv/repo\nHEAD f00ba4\nbranch refs/heads/release/1.0\n')
+        case 'gitStatus':
+          return okRemoteResult('')
+        case 'gitIsAncestor':
+          return okRemoteResult('')
+        case 'gitUpstream':
+          return okRemoteResult('origin/feature/test')
+        case 'gitBranchDelete':
+          return okRemoteResult('Deleted branch feature/test')
+        case 'gitPushDeleteBranch':
+          return failRemoteResult('remote rejected delete')
+        default:
+          return okRemoteResult('')
+      }
+    })
+
+    const result = await deleteRemoteBranch(TARGET, {
+      branch: 'feature/test',
+      alsoDeleteUpstream: true,
+      run: run as any,
+    })
+
+    expect(result).toEqual({ ok: false, message: 'remote rejected delete', repoChanged: true })
+  })
+
   test('removeRemoteWorktree allows deleting branch when merged into current HEAD without upstream', async () => {
     const run = vi.fn(
       async (command: {
@@ -236,6 +322,77 @@ describe('remote git helpers', () => {
     )
     expect(run).toHaveBeenCalledWith(
       { type: 'gitBranchDelete', path: '/srv/repo', branch: 'feature/test', force: false },
+      TARGET,
+      { signal: undefined, timeoutMs: 180_000 },
+    )
+  })
+
+  test('removeRemoteWorktree deletes the configured upstream after worktree and branch deletion', async () => {
+    const run = vi.fn(
+      async (command: {
+        type: string
+        descendant?: string
+        worktreePath?: string
+        branch?: string
+        force?: boolean
+      }) => {
+        switch (command.type) {
+          case 'gitWorktreeList':
+            return okRemoteResult(
+              [
+                'worktree /srv/repo',
+                'HEAD f00ba4',
+                'branch refs/heads/main',
+                '',
+                'worktree /srv/repo-feature',
+                'HEAD ba5eba1',
+                'branch refs/heads/feature/test',
+              ].join('\n'),
+            )
+          case 'gitStatus':
+            return okRemoteResult('')
+          case 'gitSnapshot':
+            return okRemoteResult(
+              [
+                '__GOBLIN_REMOTE_CURRENT__',
+                'main',
+                '__GOBLIN_REMOTE_DEFAULT__',
+                'main',
+                '__GOBLIN_REMOTE_BRANCHES__',
+                '',
+              ].join('\n'),
+            )
+          case 'gitIsAncestor':
+            return okRemoteResult('')
+          case 'gitUpstream':
+            return okRemoteResult('fork/topic/feature-test')
+          case 'gitWorktreeRemove':
+            return okRemoteResult('Removed worktree')
+          case 'gitBranchDelete':
+            return okRemoteResult('Deleted branch feature/test')
+          case 'gitPushDeleteBranch':
+            return okRemoteResult('deleted upstream')
+          default:
+            return okRemoteResult('')
+        }
+      },
+    )
+
+    const result = await removeRemoteWorktree(TARGET, {
+      branch: 'feature/test',
+      worktreePath: '/srv/repo-feature',
+      alsoDeleteBranch: true,
+      alsoDeleteUpstream: true,
+      run: run as any,
+    })
+
+    expect(result).toEqual({
+      ok: true,
+      message: 'deleted upstream',
+      affectedWorktreePaths: ['/srv/repo', '/srv/repo-feature'],
+    })
+    expect(run).toHaveBeenCalledWith(
+      { type: 'gitPushDeleteBranch', path: '/srv/repo', remote: 'fork', branch: 'topic/feature-test' },
       TARGET,
       { signal: undefined, timeoutMs: 180_000 },
     )

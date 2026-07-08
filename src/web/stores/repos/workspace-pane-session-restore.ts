@@ -8,14 +8,14 @@ import {
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import type { RepoState, SessionWorkspacePaneRestoreState } from '#/web/stores/repos/types.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import { getRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 export type RestoreSessionWorkspacePaneStateResult =
   | { status: 'restored'; repos: Record<string, RepoState> }
   | {
       status: 'failed'
       repos: Record<string, RepoState>
-      missingSnapshots: string[]
+      missingProjections: string[]
       unresolvedTargets: Array<{ repoId: string; targetKey: string; reason: 'target' | 'tab' }>
     }
 
@@ -26,7 +26,7 @@ export function restoreSessionWorkspacePaneStateInRepos(
   if (!restoreState) return { status: 'restored', repos }
 
   let nextRepos = repos
-  const missingSnapshots: string[] = []
+  const missingProjections: string[] = []
   const unresolvedTargets: Array<{ repoId: string; targetKey: string; reason: 'target' | 'tab' }> = []
   const repoIds = new Set(Object.keys(restoreState.preferredWorkspacePaneTabByTargetByRepo))
 
@@ -41,7 +41,7 @@ export function restoreSessionWorkspacePaneStateInRepos(
       ? restoredPreferredWorkspacePaneTabs(repo, preferredTabByTarget, tabsByTarget ?? {})
       : { status: 'restored' as const, preferredWorkspacePaneTabByTarget: repo.ui.preferredWorkspacePaneTabByTarget }
     if (restoredPreferred.status === 'failed') {
-      if (restoredPreferred.reason === 'snapshot') missingSnapshots.push(id)
+      if (restoredPreferred.reason === 'projection') missingProjections.push(id)
       else
         unresolvedTargets.push({ repoId: id, targetKey: restoredPreferred.targetKey, reason: restoredPreferred.reason })
       continue
@@ -55,8 +55,8 @@ export function restoreSessionWorkspacePaneStateInRepos(
     })
   }
 
-  if (missingSnapshots.length > 0 || unresolvedTargets.length > 0) {
-    return { status: 'failed', repos: nextRepos, missingSnapshots, unresolvedTargets }
+  if (missingProjections.length > 0 || unresolvedTargets.length > 0) {
+    return { status: 'failed', repos: nextRepos, missingProjections, unresolvedTargets }
   }
   return { status: 'restored', repos: nextRepos }
 }
@@ -67,14 +67,14 @@ function restoredPreferredWorkspacePaneTabs(
   tabsByTarget: Record<string, readonly WorkspacePaneTabEntry[]>,
 ):
   | { status: 'restored'; preferredWorkspacePaneTabByTarget: RepoState['ui']['preferredWorkspacePaneTabByTarget'] }
-  | { status: 'failed'; reason: 'snapshot' }
+  | { status: 'failed'; reason: 'projection' }
   | { status: 'failed'; reason: 'target' | 'tab'; targetKey: string } {
-  const snapshot = getRepoSnapshotQueryData(repo.id, repo.instanceId)
-  if (!snapshot) return { status: 'failed', reason: 'snapshot' }
+  const branchModel = readRepoBranchQueryProjection(repo)
+  if (!branchModel) return { status: 'failed', reason: 'projection' }
   let next = repo.ui.preferredWorkspacePaneTabByTarget
   for (const [targetKey, tab] of Object.entries(preferredTabByTarget)) {
     const target = workspacePaneTabsTargetForRepoTargetKey(
-      { repoRoot: repo.id, branches: snapshot.branches },
+      { repoRoot: repo.id, branches: branchModel.branches },
       targetKey,
     )
     if (!target) return { status: 'failed', reason: 'target', targetKey }

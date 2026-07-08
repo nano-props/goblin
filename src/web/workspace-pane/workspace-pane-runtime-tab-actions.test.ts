@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import type { WorkspacePaneTerminalTabSummary } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
+import type { WorkspacePaneTerminalTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import {
   reselectWorkspacePaneRuntimeTab,
   selectWorkspacePaneRuntimeTab,

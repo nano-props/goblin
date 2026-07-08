@@ -7,12 +7,12 @@ import type {
   RepoWorkspaceTab,
   RepoWorkspaceSelection,
   RepoWorkspaceRuntimeTabStateByType,
-} from '#/web/components/repo-workspace/tab-model.ts'
+} from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import {
   workspacePaneRuntimeTabProvider,
   workspacePaneStaticTabProvider,
   type WorkspacePanePanelLabel,
-} from '#/web/components/workspace-pane/tab-providers.ts'
+} from '#/web/workspace-pane/tab-providers.ts'
 import { renderRepoWorkspacePanePanel } from '#/web/components/repo-workspace/panels.tsx'
 
 interface Props {

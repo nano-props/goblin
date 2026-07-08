@@ -12,7 +12,6 @@ import {
   workspaceNavigationHistoryEntryEqual,
 } from '#/web/stores/repos/navigation-history-entry.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
-import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   preferredWorkspacePaneTabByTargetRecordWith,
@@ -129,17 +128,10 @@ function createRuntimeWorkspacePreferenceActions(set: ReposSet, get: ReposGet): 
   function afterWorkspacePreferenceChange(
     id: string,
     repoInstanceId: string,
-    branchForPullRequest: string | null,
   ): void {
     const repo = get().repos[id]
     if (!repo) return
     persistRepoSnapshotCacheEntry(set, repo, repoInstanceId)
-    void runRepoRefreshIntent(get, {
-      kind: 'visible-pull-request-changed',
-      id,
-      repoInstanceId,
-      branch: branchForPullRequest,
-    })
   }
 
   return {
@@ -155,7 +147,7 @@ function createRuntimeWorkspacePreferenceActions(set: ReposSet, get: ReposGet): 
           r.ui.branchViewMode = viewMode
         })
       })
-      if (changed && repoInstanceId !== undefined) afterWorkspacePreferenceChange(id, repoInstanceId, null)
+      if (changed && repoInstanceId !== undefined) afterWorkspacePreferenceChange(id, repoInstanceId)
     },
 
     setWorkspacePaneTab(id: string, branch: string, tab: WorkspacePaneTabType) {
@@ -181,17 +173,7 @@ function createRuntimeWorkspacePreferenceActions(set: ReposSet, get: ReposGet): 
         })
       })
       if (!changed || repoInstanceId === undefined) return
-      const repo = get().repos[id]
-      const branchModel = repo ? requireRepoBranchQueryProjection(repo) : null
-      const target =
-        repo && branchModel
-          ? workspacePaneTabsTargetForRepoBranch({ repoRoot: repo.id, branches: branchModel.branches }, branch)
-          : null
-      afterWorkspacePreferenceChange(
-        id,
-        repoInstanceId,
-        repo && target && preferredWorkspacePaneTabForTarget(repo.ui, target) === 'status' ? branch : null,
-      )
+      afterWorkspacePreferenceChange(id, repoInstanceId)
     },
   }
 }

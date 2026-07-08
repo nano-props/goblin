@@ -19,7 +19,6 @@ import {
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsEntry, WorkspacePaneTabsUpdateInput } from '#/shared/workspace-pane-tabs.ts'
-import { clearWorkspacePaneTabsOperationQueuesForTests } from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 
 const REPO_ROOT = '/tmp/workspace-pane-tabs-reorder-mutation-repo'
 const REPO_INSTANCE_ID = 'repo-instance-test'
@@ -37,7 +36,6 @@ let queryClient: QueryClient
 let controls: WorkspacePaneTabsReorderMutationResult | null = null
 
 beforeEach(() => {
-  clearWorkspacePaneTabsOperationQueuesForTests()
   resetReposStore()
   queryClient = new QueryClient({
     defaultOptions: {
@@ -49,7 +47,6 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  clearWorkspacePaneTabsOperationQueuesForTests()
   queryClient.clear()
   resetReposStore()
   setClientBridgeForTests(null)
@@ -135,7 +132,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     expect(readWorkspacePaneTabs()).toEqual(canonicalServerTabs)
   })
 
-  test('queues reorders and recomputes the next reorder from current cached tabs', async () => {
+  test('applies consecutive optimistic reorders without a client queue', async () => {
     const sourceTabs = [terminalEntry('session-1'), staticEntry('status'), staticEntry('history')]
     const requests = installDeferredUpdateWorkspaceTabs()
     const firstReorderTabs = [staticEntry('status'), terminalEntry('session-1'), staticEntry('history')]
@@ -155,18 +152,18 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     act(() => {
       currentControls().reorderTabs(secondDraggedTabs)
     })
-    expect(readWorkspacePaneTabs()).toEqual(firstReorderTabs)
-
-    await act(async () => {
-      requests[0]!.resolve(firstReorderTabs)
-      await flushMicrotasks()
-    })
     await vi.waitFor(() => {
       expect(requests).toHaveLength(2)
     })
     expect(requests[1]!.input.operation).toEqual({
       type: 'reorder',
       tabIdentities: ['terminal:session-1', 'workspace-pane:status'],
+    })
+    expect(readWorkspacePaneTabs()).toEqual(expectedSecondCommitTabs)
+
+    await act(async () => {
+      requests[0]!.resolve(firstReorderTabs)
+      await flushMicrotasks()
     })
     expect(readWorkspacePaneTabs()).toEqual(expectedSecondCommitTabs)
 
@@ -179,7 +176,7 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     })
   })
 
-  test('continues to the next queued reorder after an earlier reorder fails', async () => {
+  test('keeps a newer optimistic reorder when an earlier reorder fails', async () => {
     const onReorderRejected = vi.fn()
     const sourceTabs = [terminalEntry('session-1'), staticEntry('status'), staticEntry('history')]
     const requests = installDeferredUpdateWorkspaceTabs()
@@ -199,14 +196,14 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     act(() => {
       currentControls().reorderTabs(secondReorderTabs)
     })
-    expect(readWorkspacePaneTabs()).toEqual(firstReorderTabs)
+    await vi.waitFor(() => {
+      expect(requests).toHaveLength(2)
+    })
+    expect(readWorkspacePaneTabs()).toEqual(secondReorderTabs)
 
     await act(async () => {
       requests[0]!.reject(new Error('first reorder failed'))
       await flushMicrotasks()
-    })
-    await vi.waitFor(() => {
-      expect(requests).toHaveLength(2)
     })
     expect(readWorkspacePaneTabs()).toEqual(secondReorderTabs)
     expect(onReorderRejected).toHaveBeenCalledTimes(1)

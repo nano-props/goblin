@@ -67,6 +67,7 @@ vi.mock('#/web/repo-branch-read-model.ts', () => ({
 
 vi.mock('#/web/repo-client.ts', () => ({
   getRepoWorktreeBootstrapPreview: vi.fn(async () => ({ ok: false, message: 'error.failed-read-repo' })),
+  getRepoOperations: vi.fn(async () => ({ operations: [], loadedAt: 0 })),
 }))
 
 beforeEach(() => {

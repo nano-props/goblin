@@ -1,57 +1,41 @@
+import { useEffect } from 'react'
 import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
   getRepoLog,
-  getRepoPullRequests,
+  getRepoOperations,
+  getRepoProjection,
   getRepoRemoteBranches,
-  getRepoSnapshot,
-  getRepoStatus,
 } from '#/web/repo-client.ts'
-import type { PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
-import { DEFAULT_REPOSITORY_LOG_COUNT, type PullRequestFetchMode, type WorktreeStatus } from '#/shared/git-types.ts'
+import type { RepoOperationsSnapshot, RepoRuntimeProjection, RepoServerOperationState } from '#/shared/api-types.ts'
+import { DEFAULT_REPOSITORY_LOG_COUNT, type PullRequestFetchMode } from '#/shared/git-types.ts'
 
-interface RepoBulkReadCacheEntry {
-  snapshot: RepoSnapshot | null
-  status: WorktreeStatus[]
-  pullRequests: PullRequestEntry[] | null
-}
+const ACTIVE_REPO_OPERATION_REFETCH_INTERVAL_MS = 1_000
+const RUNTIME_PROJECTION_REFRESH_DELAYS_MS = [50, 250] as const
 
-export function repoSnapshotQueryKey(repoRoot: string, repoInstanceId: string) {
-  return ['repo-data', repoRoot, repoInstanceId, 'snapshot'] as const
-}
-
-export function repoStatusQueryKey(repoRoot: string, repoInstanceId: string) {
-  return ['repo-data', repoRoot, repoInstanceId, 'status'] as const
-}
-
-export function repoPullRequestsQueryKey(
+export function repoProjectionQueryKey(
   repoRoot: string,
   repoInstanceId: string,
-  branches?: readonly string[],
+  branch?: string | null,
   mode?: PullRequestFetchMode,
 ) {
-  return [
-    'repo-data',
-    repoRoot,
-    repoInstanceId,
-    'pull-requests',
-    {
-      branches: branches ? [...branches].sort() : null,
-      mode: mode ?? 'full',
-    },
-  ] as const
+  return ['repo-data', repoRoot, repoInstanceId, 'projection', { branch: branch || null, mode: mode ?? 'full' }] as const
 }
 
-export function repoBulkReadQueryKey(
-  repoRoot: string,
-  repoInstanceId: string,
-  include?: ReadonlyArray<'snapshot' | 'status' | 'pullRequests'>,
-) {
-  return ['repo-data', repoRoot, repoInstanceId, 'bulk', { include: include ? [...include].sort() : null }] as const
+export function repoOperationsQueryKey(repoRoot: string, repoInstanceId: string, includeSettled = false) {
+  return ['repo-data', repoRoot, repoInstanceId, 'operations', { includeSettled }] as const
 }
 
 export function repoDataQueryKey(repoRoot: string, repoInstanceId: string) {
   return ['repo-data', repoRoot, repoInstanceId] as const
+}
+
+function repoProjectionQueryPrefix(repoRoot: string, repoInstanceId: string) {
+  return ['repo-data', repoRoot, repoInstanceId, 'projection'] as const
+}
+
+function repoOperationsQueryPrefix(repoRoot: string, repoInstanceId: string) {
+  return ['repo-data', repoRoot, repoInstanceId, 'operations'] as const
 }
 
 function repoLogQueryKey(repoRoot: string, repoInstanceId: string, branch: string, count: number, skip: number) {
@@ -62,33 +46,87 @@ function repoRemoteBranchesQueryKey(repoRoot: string, repoInstanceId: string) {
   return ['repo-data', repoRoot, repoInstanceId, 'remote-branches'] as const
 }
 
-export function repoSnapshotQueryOptions(repoRoot: string, repoInstanceId: string) {
-  return queryOptions({
-    queryKey: repoSnapshotQueryKey(repoRoot, repoInstanceId),
-    queryFn: ({ signal }) => getRepoSnapshot(repoRoot, signal),
-    staleTime: Number.POSITIVE_INFINITY,
-  })
-}
-
-function repoStatusQueryOptions(repoRoot: string, repoInstanceId: string) {
-  return queryOptions({
-    queryKey: repoStatusQueryKey(repoRoot, repoInstanceId),
-    queryFn: ({ signal }) => getRepoStatus(repoRoot, signal),
-    staleTime: Number.POSITIVE_INFINITY,
-  })
-}
-
-function repoPullRequestsQueryOptions(
+export function repoProjectionQueryOptions(
   repoRoot: string,
   repoInstanceId: string,
-  branches?: readonly string[],
+  branch?: string | null,
   mode?: PullRequestFetchMode,
 ) {
+  const placeholderData = getRepoProjectionPlaceholderData(repoRoot, repoInstanceId, branch, mode)
   return queryOptions({
-    queryKey: repoPullRequestsQueryKey(repoRoot, repoInstanceId, branches, mode),
-    queryFn: ({ signal }) => getRepoPullRequests(repoRoot, branches ? [...branches] : undefined, { mode }, signal),
+    queryKey: repoProjectionQueryKey(repoRoot, repoInstanceId, branch, mode),
+    queryFn: ({ signal }) => getRepoProjection(repoRoot, branch, { mode }, signal),
+    placeholderData,
+    refetchInterval: (query) =>
+      repoOperationsSnapshotHasActiveOperations(query.state.data?.operations)
+        ? ACTIVE_REPO_OPERATION_REFETCH_INTERVAL_MS
+        : false,
     staleTime: Number.POSITIVE_INFINITY,
   })
+}
+
+export function repoServerOperationActive(operation: Pick<RepoServerOperationState, 'phase'>): boolean {
+  return operation.phase === 'queued' || operation.phase === 'running' || operation.phase === 'cancelling'
+}
+
+export function repoOperationsSnapshotHasActiveOperations(snapshot: RepoOperationsSnapshot | undefined): boolean {
+  return !!snapshot?.operations.some(
+    (operation) => repoServerOperationActive(operation),
+  )
+}
+
+export function getRepoProjectionPlaceholderData(
+  repoRoot: string,
+  repoInstanceId: string,
+  branch?: string | null,
+  mode?: PullRequestFetchMode,
+  queryClient: QueryClient = primaryWindowQueryClient,
+): RepoRuntimeProjection | undefined {
+  const requestedBranch = branch || null
+  const requestedMode = mode ?? 'full'
+  const cached = findRepoProjectionPlaceholderSource(repoRoot, repoInstanceId, requestedBranch, requestedMode, queryClient)
+  if (!cached?.snapshot) return undefined
+  const operations = getRepoOperationsQueryData(repoRoot, repoInstanceId, queryClient) ?? cached.operations
+  return {
+    snapshot: cached.snapshot,
+    status: cached.status,
+    pullRequests: null,
+    operations,
+    requested: {
+      branch: requestedBranch,
+      pullRequestMode: requestedMode,
+    },
+    loadedAt: 0,
+  }
+}
+
+function findRepoProjectionPlaceholderSource(
+  repoRoot: string,
+  repoInstanceId: string,
+  branch: string | null,
+  mode: PullRequestFetchMode,
+  queryClient: QueryClient,
+): RepoRuntimeProjection | undefined {
+  const candidates = queryClient
+    .getQueriesData<RepoRuntimeProjection>({ queryKey: repoProjectionQueryPrefix(repoRoot, repoInstanceId) })
+    .map(([_key, projection]) => projection)
+    .filter((projection): projection is RepoRuntimeProjection => !!projection?.snapshot)
+  candidates.sort((a, b) => repoProjectionPlaceholderRank(a, branch, mode) - repoProjectionPlaceholderRank(b, branch, mode))
+  return candidates[0]
+}
+
+function repoProjectionPlaceholderRank(
+  projection: RepoRuntimeProjection,
+  branch: string | null,
+  mode: PullRequestFetchMode,
+): number {
+  const requested = projection.requested
+  if (requested.branch === branch && requested.pullRequestMode === mode) return 0
+  if (requested.branch === null && requested.pullRequestMode === mode) return 1
+  if (requested.branch === null && requested.pullRequestMode === 'full') return 2
+  if (requested.branch === null) return 3
+  if (requested.pullRequestMode === mode) return 4
+  return 5
 }
 
 function repoLogQueryOptions(
@@ -114,34 +152,41 @@ function repoRemoteBranchesQueryOptions(repoRoot: string, repoInstanceId: string
   })
 }
 
-export function useRepoSnapshotReadModel(repoRoot: string, repoInstanceId: string, enabled: boolean) {
-  return useQuery({
-    ...repoSnapshotQueryOptions(repoRoot, repoInstanceId),
-    enabled,
-    subscribed: enabled,
-  })
-}
-
-export function useRepoStatusReadModel(repoRoot: string, repoInstanceId: string, enabled: boolean) {
-  return useQuery({
-    ...repoStatusQueryOptions(repoRoot, repoInstanceId),
-    enabled,
-    subscribed: enabled,
-  })
-}
-
-export function useRepoPullRequestsReadModel(
+export function repoOperationsQueryOptions(
   repoRoot: string,
   repoInstanceId: string,
-  branches: readonly string[] | undefined,
+  options: { includeSettled?: boolean; enabled?: boolean } = {},
+) {
+  const includeSettled = options.includeSettled === true
+  return queryOptions({
+    queryKey: repoOperationsQueryKey(repoRoot, repoInstanceId, includeSettled),
+    queryFn: ({ signal }) => getRepoOperations(repoRoot, { includeSettled, signal }),
+    enabled: options.enabled,
+    refetchInterval: (query) =>
+      repoOperationsSnapshotHasActiveOperations(query.state.data)
+        ? ACTIVE_REPO_OPERATION_REFETCH_INTERVAL_MS
+        : false,
+    staleTime: Number.POSITIVE_INFINITY,
+  })
+}
+
+export function useRepoProjectionReadModel(
+  repoRoot: string,
+  repoInstanceId: string,
+  branch: string | null | undefined,
   mode: PullRequestFetchMode | undefined,
   enabled: boolean,
 ) {
-  return useQuery({
-    ...repoPullRequestsQueryOptions(repoRoot, repoInstanceId, branches, mode),
+  const query = useQuery({
+    ...repoProjectionQueryOptions(repoRoot, repoInstanceId, branch, mode),
     enabled,
     subscribed: enabled,
   })
+  useEffect(() => {
+    if (!enabled || !query.data || query.isPlaceholderData) return
+    setRepoProjectionQueryData(repoRoot, repoInstanceId, branch, mode, query.data)
+  }, [branch, enabled, mode, query.data, query.isPlaceholderData, repoInstanceId, repoRoot])
+  return query
 }
 
 export function useRepoLogQuery(
@@ -161,81 +206,82 @@ export function useRepoRemoteBranchesQuery(
   return useQuery(repoRemoteBranchesQueryOptions(repoRoot, repoInstanceId, options))
 }
 
-export function setRepoSnapshotQueryData(
+export function useRepoOperationsReadModel(
   repoRoot: string,
   repoInstanceId: string,
-  snapshot: RepoSnapshot,
+  options: { includeSettled?: boolean; enabled?: boolean } = {},
+) {
+  const includeSettled = options.includeSettled === true
+  const enabled = options.enabled !== false
+  const query = useQuery({
+    ...repoOperationsQueryOptions(repoRoot, repoInstanceId, { includeSettled, enabled }),
+    subscribed: enabled,
+  })
+  useEffect(() => {
+    if (!enabled || !query.data) return
+    setRepoOperationsQueryData(repoRoot, repoInstanceId, includeSettled, query.data)
+  }, [enabled, includeSettled, query.data, repoInstanceId, repoRoot])
+  return query
+}
+
+export function getRepoOperationsQueryData(
+  repoRoot: string,
+  repoInstanceId: string,
+  queryClient: QueryClient = primaryWindowQueryClient,
+): RepoOperationsSnapshot | undefined {
+  return queryClient.getQueryData<RepoOperationsSnapshot>(repoOperationsQueryKey(repoRoot, repoInstanceId, false))
+}
+
+export function setRepoOperationsQueryData(
+  repoRoot: string,
+  repoInstanceId: string,
+  includeSettled: boolean,
+  operations: RepoOperationsSnapshot,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
-  queryClient.setQueryData(repoSnapshotQueryKey(repoRoot, repoInstanceId), snapshot)
+  queryClient.setQueryData(repoOperationsQueryKey(repoRoot, repoInstanceId, includeSettled), operations)
+  if (!includeSettled) {
+    queryClient.setQueriesData<RepoRuntimeProjection>(
+      { queryKey: repoProjectionQueryPrefix(repoRoot, repoInstanceId) },
+      (current) => (current ? { ...current, operations } : current),
+    )
+  }
 }
 
-export function getRepoSnapshotQueryData(
+export function getRepoProjectionQueryData(
   repoRoot: string,
   repoInstanceId: string,
-  queryClient: QueryClient = primaryWindowQueryClient,
-): RepoSnapshot | undefined {
-  return queryClient.getQueryData<RepoSnapshot>(repoSnapshotQueryKey(repoRoot, repoInstanceId))
-}
-
-export function getRepoStatusQueryData(
-  repoRoot: string,
-  repoInstanceId: string,
-  queryClient: QueryClient = primaryWindowQueryClient,
-): WorktreeStatus[] | undefined {
-  return queryClient.getQueryData<WorktreeStatus[]>(repoStatusQueryKey(repoRoot, repoInstanceId))
-}
-
-export function getRepoPullRequestsQueryData(
-  repoRoot: string,
-  repoInstanceId: string,
-  branches: readonly string[] | undefined,
+  branch: string | null | undefined,
   mode: PullRequestFetchMode | undefined,
   queryClient: QueryClient = primaryWindowQueryClient,
-): PullRequestEntry[] | null | undefined {
-  return queryClient.getQueryData<PullRequestEntry[] | null>(
-    repoPullRequestsQueryKey(repoRoot, repoInstanceId, branches, mode),
+): RepoRuntimeProjection | undefined {
+  return queryClient.getQueryData<RepoRuntimeProjection>(repoProjectionQueryKey(repoRoot, repoInstanceId, branch, mode))
+}
+
+export function setRepoProjectionQueryData(
+  repoRoot: string,
+  repoInstanceId: string,
+  branch: string | null | undefined,
+  mode: PullRequestFetchMode | undefined,
+  projection: RepoRuntimeProjection,
+  queryClient: QueryClient = primaryWindowQueryClient,
+): void {
+  queryClient.setQueryData(repoProjectionQueryKey(repoRoot, repoInstanceId, branch, mode), projection)
+  setRepoOperationsQueryData(repoRoot, repoInstanceId, false, projection.operations, queryClient)
+}
+
+export function seedRepoProjectionQueryData(
+  repoRoot: string,
+  repoInstanceId: string,
+  projection: RepoRuntimeProjection,
+  queryClient: QueryClient = primaryWindowQueryClient,
+): void {
+  // Cache/session restore seed data is a UI placeholder, not an authoritative
+  // server read, so do not seed the active operations cache here.
+  queryClient.setQueryData(
+    repoProjectionQueryKey(repoRoot, repoInstanceId, projection.requested.branch, projection.requested.pullRequestMode),
+    projection,
   )
-}
-
-export function setRepoStatusQueryData(
-  repoRoot: string,
-  repoInstanceId: string,
-  status: WorktreeStatus[],
-  queryClient: QueryClient = primaryWindowQueryClient,
-): void {
-  queryClient.setQueryData(repoStatusQueryKey(repoRoot, repoInstanceId), status)
-}
-
-export function setRepoPullRequestsQueryData(
-  repoRoot: string,
-  repoInstanceId: string,
-  branches: readonly string[] | undefined,
-  mode: PullRequestFetchMode | undefined,
-  pullRequests: PullRequestEntry[] | null,
-  queryClient: QueryClient = primaryWindowQueryClient,
-): void {
-  queryClient.setQueryData(repoPullRequestsQueryKey(repoRoot, repoInstanceId, branches, mode), pullRequests)
-}
-
-export function setRepoBulkReadQueryData(
-  repoRoot: string,
-  repoInstanceId: string,
-  include: ReadonlyArray<'snapshot' | 'status' | 'pullRequests'> | undefined,
-  result: RepoBulkReadCacheEntry,
-  queryClient: QueryClient = primaryWindowQueryClient,
-): void {
-  const included = include ?? ['snapshot', 'status', 'pullRequests']
-  queryClient.setQueryData(repoBulkReadQueryKey(repoRoot, repoInstanceId, include), result)
-  if (included.includes('snapshot') && result.snapshot) {
-    setRepoSnapshotQueryData(repoRoot, repoInstanceId, result.snapshot, queryClient)
-  }
-  if (included.includes('status')) {
-    setRepoStatusQueryData(repoRoot, repoInstanceId, result.status, queryClient)
-  }
-  if (included.includes('pullRequests')) {
-    setRepoPullRequestsQueryData(repoRoot, repoInstanceId, undefined, undefined, result.pullRequests, queryClient)
-  }
 }
 
 export function invalidateRepoDataQueries(
@@ -244,4 +290,28 @@ export function invalidateRepoDataQueries(
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
   void queryClient.invalidateQueries({ queryKey: repoDataQueryKey(repoRoot, repoInstanceId) })
+}
+
+export function invalidateRepoRuntimeProjectionQueries(
+  repoRoot: string,
+  repoInstanceId: string,
+  queryClient: QueryClient = primaryWindowQueryClient,
+): void {
+  void queryClient.invalidateQueries({ queryKey: repoProjectionQueryPrefix(repoRoot, repoInstanceId) })
+  void queryClient.invalidateQueries({ queryKey: repoOperationsQueryPrefix(repoRoot, repoInstanceId) })
+}
+
+export function scheduleRepoRuntimeProjectionRefresh(
+  repoRoot: string,
+  repoInstanceId: string,
+  options: { queryClient?: QueryClient; delaysMs?: readonly number[] } = {},
+): void {
+  const queryClient = options.queryClient ?? primaryWindowQueryClient
+  const delaysMs = options.delaysMs ?? RUNTIME_PROJECTION_REFRESH_DELAYS_MS
+  invalidateRepoRuntimeProjectionQueries(repoRoot, repoInstanceId, queryClient)
+  for (const delayMs of delaysMs) {
+    globalThis.setTimeout(() => {
+      invalidateRepoRuntimeProjectionQueries(repoRoot, repoInstanceId, queryClient)
+    }, delayMs)
+  }
 }

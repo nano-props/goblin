@@ -53,4 +53,47 @@ describe('architecture boundary rules', () => {
       ),
     ])
   })
+
+  test('rejects legacy direct repo read surfaces in web code', () => {
+    expect(
+      checkArchitectureSources([
+        {
+          relativeFilePath: '/src/web/repo-client.ts',
+          source: "await requestGoblin('repo.status', { cwd })\n",
+        },
+        {
+          relativeFilePath: '/src/web/repo-client.ts',
+          source: "await postServerJson('/api/repo/snapshot', { cwd })\n",
+        },
+        {
+          relativeFilePath: '/src/web/repo-client.ts',
+          source: 'await getRepoSnapshot(cwd)\n',
+        },
+        {
+          relativeFilePath: '/src/web/repo-client.ts',
+          source: 'const schema = REPO_PROCEDURE_SCHEMAS.status\n',
+        },
+      ]),
+    ).toEqual([
+      expect.stringContaining('legacy repo IPC read route'),
+      expect.stringContaining('legacy repo HTTP read route'),
+      expect.stringContaining('legacy repo read helper'),
+      expect.stringContaining('legacy repo procedure schema key'),
+    ])
+  })
+
+  test('allows projection payload and invalidation names in web code', () => {
+    expect(
+      checkArchitectureSources([
+        {
+          relativeFilePath: '/src/web/repo-branch-read-model.ts',
+          source: "repoBranchReadModelFromSnapshot(projection.snapshot, projection.status)\n",
+        },
+        {
+          relativeFilePath: '/src/web/hooks/useRepoStoreInvalidationRefresh.ts',
+          source: "if (event.query === 'repo-snapshot') refreshCoreData(event.repoId)\n",
+        },
+      ]),
+    ).toEqual([])
+  })
 })

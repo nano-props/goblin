@@ -55,7 +55,7 @@ The ownership split is:
   runtime-session materialization/pruning.
 - `src/web/workspace-pane/*` owns client query/cache projection and mutation
   orchestration for server-owned tab state.
-- `src/web/components/workspace-pane/tab-providers.ts` owns per-tab-type
+- `src/web/workspace-pane/tab-providers.ts` owns per-tab-type
   labels, icons, pending state, attention state, renderability, and close
   behavior.
 - `WorkspacePaneTabStrip` owns generic tab chrome only: selection,
@@ -80,7 +80,7 @@ mirrors:
 - `src/web/workspace-pane/workspace-pane-runtime-tab-*.ts*`: add provider
   projection, target key, create, command, close, and panel entries for the
   new type.
-- `src/web/components/workspace-pane/tab-providers.ts`: add labels, icons,
+- `src/web/workspace-pane/tab-providers.ts`: add labels, icons,
   pending/attention state, close policy, and renderability for the new type.
 
 Compatibility note: old workspace tab protocol names

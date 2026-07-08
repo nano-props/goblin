@@ -9,10 +9,10 @@ describe('backgroundSyncRepoIdsFromStore', () => {
       remote: { hasRemotes: true, hasGitHubRemote: true },
       availability: { phase: 'available' },
     })
-    repo.dataLoads.snapshot.phase = 'refreshing'
-    repo.dataLoads.status.phase = 'refreshing'
-    repo.operations.snapshot.phase = 'running'
-    repo.operations.status.phase = 'running'
+    repo.dataLoads.repoReadModel.phase = 'refreshing'
+    repo.dataLoads.visibleStatus.phase = 'refreshing'
+    repo.operations.repoReadModel.phase = 'running'
+    repo.operations.visibleStatus.phase = 'running'
 
     expect(backgroundSyncRepoIdsFromStore({ repos: { '/repo': repo } }, '/repo')).toEqual(['/repo'])
   })
@@ -58,11 +58,9 @@ function createRepo(input: {
     name: 'repo',
     instanceId: 'repo-instance-test',
     dataLoads: {
+      repoReadModel: { phase: 'idle', loadedAt: null, stale: false, error: null },
+      visibleStatus: { phase: 'idle', loadedAt: null, stale: false, error: null },
       fetch: { phase: 'idle', loadedAt: null, stale: false, error: null },
-      snapshot: { phase: 'idle', loadedAt: null, stale: false, error: null },
-      status: { phase: 'idle', loadedAt: null, stale: false, error: null },
-      pullRequests: { phase: 'idle', loadedAt: null, stale: false, error: null, mode: null },
-      pullRequestsByBranch: {},
     },
     operations: {
       fetch: {
@@ -83,7 +81,7 @@ function createRepo(input: {
         settledAt: null,
         error: null,
       },
-      snapshot: {
+      repoReadModel: {
         operationId: 0,
         phase: 'idle',
         reason: null,
@@ -92,16 +90,7 @@ function createRepo(input: {
         settledAt: null,
         error: null,
       },
-      status: {
-        operationId: 0,
-        phase: 'idle',
-        reason: null,
-        target: null,
-        startedAt: null,
-        settledAt: null,
-        error: null,
-      },
-      pullRequests: {
+      visibleStatus: {
         operationId: 0,
         phase: 'idle',
         reason: null,
@@ -119,7 +108,6 @@ function createRepo(input: {
         settledAt: null,
         error: null,
       },
-      pullRequestsByBranch: {},
     },
     ui: {
       currentBranchName: null,

@@ -206,7 +206,7 @@ function createRepoOperationScheduler(): RepoOperationScheduler {
       read: new RepoOperationLaneQueue(3),
       write: new RepoOperationLaneQueue(1),
       // Lifecycle runs are long-lived (resolveTarget + testRemote =
-      // up to 20s) and must not block snapshot/status refreshes.
+      // up to 20s) and must not block runtime projection refreshes.
       // Concurrency 1 per repo: a lifecycle run is its own critical
       // section — concurrent runs of the same repo would race the
       // lifecycle union writes.
@@ -241,6 +241,36 @@ export function repoOperation(repoId: string, key: string): RepoOperationState {
 
 export function repoOperationBusy(repoId: string, key: string): boolean {
   return operationBusy(repoOperation(repoId, key))
+}
+
+export function repoLocalPrimaryRefreshBusy(repoId: string): boolean {
+  return repoOperationBusy(repoId, 'manualRefresh') || repoOperationBusy(repoId, 'fetch')
+}
+
+export function repoLocalCoreProjectionRefreshBusy(repoId: string): boolean {
+  return repoOperationBusy(repoId, 'repoReadModel') || repoOperationBusy(repoId, 'visibleStatus')
+}
+
+export function repoLocalRemoteFetchBlocked(repoId: string): boolean {
+  return (
+    repoOperationBusy(repoId, 'fetch') ||
+    repoOperationBusy(repoId, 'branchAction') ||
+    repoLocalCoreProjectionRefreshBusy(repoId)
+  )
+}
+
+export function repoLocalBranchActionScheduleGuard(repoId: string): {
+  fetchBusy: boolean
+  branchOperationPhase: RepoOperationState['phase']
+  coreRefreshBusy: boolean
+} {
+  const fetchOperation = repoOperation(repoId, 'fetch')
+  const branchOperation = repoOperation(repoId, 'branchAction')
+  return {
+    fetchBusy: fetchOperation.phase !== 'idle',
+    branchOperationPhase: branchOperation.phase,
+    coreRefreshBusy: repoLocalCoreProjectionRefreshBusy(repoId),
+  }
 }
 
 export function repoOperationCurrent(repoId: string, key: string, operationId: number): boolean {
@@ -327,15 +357,6 @@ export function waitForRepoOperationsIdle(repoId: string, keys: string[], signal
     signal?.addEventListener('abort', abort, { once: true })
     check()
   })
-}
-
-export function pruneRepoBranchPullRequestOperations(repoId: string, validBranches: Set<string>): void {
-  const operations = repoOperationSchedulers.get(repoId)?.operations
-  if (!operations) return
-  for (const key of Object.keys(operations) as RepoOperationKey[]) {
-    if (!key.startsWith('pullRequest:')) continue
-    if (!validBranches.has(key.slice('pullRequest:'.length))) delete operations[key]
-  }
 }
 
 export function scheduleRepoOperation<T>(

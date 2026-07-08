@@ -3,10 +3,53 @@ import { getRepoActivityControlView, isRepoPrimaryRefreshBusy } from '#/web/comp
 import { seedRepoShellForTest, resetReposStore } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { markRepoOperationTargets, nextRepoOperationId } from '#/web/stores/repos/repo-operation-scheduler.ts'
+import type { RepoOperationsSnapshot } from '#/shared/api-types.ts'
 
 const REPO_ID = '/tmp/repo-activity-control'
 
 describe('RepoActivityControl', () => {
+  test('marks the primary refresh button busy from server operation projection', () => {
+    resetReposStore()
+    const repo = seedRepoShellForTest({ id: REPO_ID })
+    const operations: RepoOperationsSnapshot = {
+      operations: [
+        {
+          id: 'repo-op-1',
+          repoId: REPO_ID,
+          repoInstanceId: repo.instanceId,
+          kind: 'fetch',
+          phase: 'running',
+          source: 'user',
+          target: null,
+          queuedAt: 100,
+          startedAt: 101,
+          deadlineAt: null,
+          settledAt: null,
+          error: null,
+          cancellation: {
+            underlyingRequested: false,
+            reason: null,
+            requestedAt: null,
+            waitCancelledCount: 0,
+            lastWaitCancelledAt: null,
+            lastWaitCancellationReason: null,
+          },
+          canCancelUnderlying: true,
+        },
+      ],
+      loadedAt: 123,
+    }
+
+    expect(isRepoPrimaryRefreshBusy(repo, operations)).toBe(true)
+    expect(
+      getRepoActivityControlView({
+        visibleActivity: null,
+        completion: null,
+        manualSyncBusy: isRepoPrimaryRefreshBusy(repo, operations),
+      }),
+    ).toMatchObject({ kind: 'refresh-button', manualSyncBusy: true })
+  })
+
   test('marks the primary refresh button busy during any fetch', () => {
     resetReposStore()
     seedRepoShellForTest({ id: REPO_ID })
@@ -23,10 +66,10 @@ describe('RepoActivityControl', () => {
     ).toMatchObject({ kind: 'refresh-button', manualSyncBusy: true })
   })
 
-  test('keeps the primary refresh button idle during contextual status refreshes', () => {
+  test('keeps the primary refresh button idle during contextual visible projection refreshes', () => {
     resetReposStore()
     seedRepoShellForTest({ id: REPO_ID })
-    markRepoOperationTargets(REPO_ID, nextRepoOperationId(REPO_ID), [{ key: 'status', reason: 'status' }], 'running')
+    markRepoOperationTargets(REPO_ID, nextRepoOperationId(REPO_ID), [{ key: 'visibleStatus', reason: 'visible-status' }], 'running')
 
     const repo = useReposStore.getState().repos[REPO_ID]!
     expect(isRepoPrimaryRefreshBusy(repo)).toBe(false)

@@ -17,6 +17,7 @@ import {
   createRepoBranch,
   installWorkspacePaneTabsTestBridge,
   resetReposStore,
+  seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
@@ -42,7 +43,6 @@ import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 const toastMocks = vi.hoisted(() => ({
@@ -184,16 +184,16 @@ describe('workspace commands', () => {
     expect(openTabsFor('feature/worktree')).toEqual(['changes'])
   })
 
-  test('show workspace pane tab command uses the explicit route branch', async () => {
+  test('show workspace pane tab command fast-fails when the target branch projection is missing', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       currentBranchName: 'feature/query',
       preferredWorkspacePaneTab: 'status',
     })
-    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
-      current: 'feature/query',
+    seedRepoReadModelQueryData(repo, {
       branches: [createRepoBranch('feature/query', { worktree: { path: WORKTREE_PATH } })],
+      currentBranch: 'feature/query',
     })
     const showRepoBranchWorkspacePaneTab = vi.fn((repoId, branch, tab) => {
       useReposStore.getState().setWorkspacePaneTab(repoId, branch, tab)
@@ -208,9 +208,9 @@ describe('workspace commands', () => {
         tab: 'changes',
         navigation,
       }),
-    ).resolves.toBe(true)
+    ).resolves.toBe(false)
 
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'changes')
+    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
   })
 
   test.each(['status', 'changes'] as const)(
@@ -236,10 +236,11 @@ describe('workspace commands', () => {
         createTerminal: vi.fn(async () => 'session-1'),
         selectTerminal: vi.fn(),
       })
-      const refreshStatus = vi.fn(async () => {})
+      const refreshRuntimeProjection = vi.fn(async () => {})
       const repoInstanceId = useReposStore.getState().repos[REPO_ID]!.instanceId
       useReposStore.setState({
-        refreshStatus: refreshStatus as ReturnType<typeof useReposStore.getState>['refreshStatus'],
+        refreshRuntimeProjection:
+          refreshRuntimeProjection as ReturnType<typeof useReposStore.getState>['refreshRuntimeProjection'],
       })
 
       await expect(
@@ -252,7 +253,11 @@ describe('workspace commands', () => {
         }),
       ).resolves.toBe(true)
 
-      expect(refreshStatus).toHaveBeenCalledWith(REPO_ID, { repoInstanceId })
+      expect(refreshRuntimeProjection).toHaveBeenCalledWith(REPO_ID, {
+        repoInstanceId,
+        scope: 'visible-status',
+        branchName: 'feature/worktree',
+      })
     },
   )
 
@@ -317,12 +322,12 @@ describe('workspace commands', () => {
       runShowWorkspacePaneTabCommand({
         workspacePaneRoute: undefined,
         repoId: REPO_ID,
-        branchName: 'feature/worktree',
+        branchName: 'feature/no-worktree',
         tab: 'status',
         navigation,
       }),
     ).resolves.toBe(true)
-    expect(preferredWorkspacePaneTab()).toBe('status')
+    expect(preferredWorkspacePaneTab('feature/no-worktree')).toBe('status')
   })
 
   test('terminal primary action opens the terminal tab and creates the first terminal when missing', async () => {

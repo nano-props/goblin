@@ -18,10 +18,10 @@ import { isWorkspacePaneRuntimeTabType, workspacePaneStaticTabId } from '#/share
 import type {
   RepoWorkspaceRuntimeTabStateByType,
   RepoWorkspaceSelection,
-} from '#/web/components/repo-workspace/tab-model.ts'
+} from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
-import type { WorkspacePanePanelLabel } from '#/web/components/workspace-pane/tab-providers.ts'
+import type { WorkspacePanePanelLabel } from '#/web/workspace-pane/tab-providers.ts'
 import { WorkspacePanePanelFrame } from '#/web/components/workspace-pane/WorkspacePanePanelFrame.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { useFiletreeActionDialogsStore } from '#/web/stores/repos/filetree-action-dialogs.ts'

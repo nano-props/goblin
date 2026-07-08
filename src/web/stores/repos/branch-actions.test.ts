@@ -19,6 +19,7 @@ import type { RepoBranchAction } from '#/web/stores/repos/branch-action-types.ts
 import type { BranchViewMode } from '#/web/stores/repos/types.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { repoProjection } from '#/web/stores/repos/refresh-test-utils.ts'
 const REPO_ID = '/tmp/gbl-branch-actions-test-repo'
 
 function branchBrowserRemoteProvider(
@@ -97,15 +98,9 @@ function installSuccessfulCreateWorktreeBridge(options?: { onSnapshot?: () => vo
   }
   installGoblinTestBridge({
     'repo.createWorktree': async () => ({ ok: true, message: 'ok' }),
-    'repo.snapshot': async () => {
+    'repo.projection': async () => {
       options?.onSnapshot?.()
-      return snapshot
-    },
-    'repo.status': async () => [],
-    'repo.pullRequests': async () => [],
-    'repo.composite': async () => {
-      options?.onSnapshot?.()
-      return { snapshot, status: [], pullRequests: null }
+      return repoProjection(snapshot)
     },
   })
 }
@@ -121,15 +116,9 @@ function installSuccessfulCreateWorktreeBridgeWithExistingWorktree(options?: { o
   }
   installGoblinTestBridge({
     'repo.createWorktree': async () => ({ ok: true, message: 'ok' }),
-    'repo.snapshot': async () => {
+    'repo.projection': async () => {
       options?.onSnapshot?.()
-      return snapshot
-    },
-    'repo.status': async () => [],
-    'repo.pullRequests': async () => [],
-    'repo.composite': async () => {
-      options?.onSnapshot?.()
-      return { snapshot, status: [], pullRequests: null }
+      return repoProjection(snapshot)
     },
   })
 }
@@ -327,9 +316,8 @@ describe('runBranchAction', () => {
         pullCalls += 1
         return { ok: true, message: 'ok' }
       },
-      'repo.snapshot': async () => ({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
-      'repo.status': async () => [],
-      'repo.pullRequests': async () => [],
+      'repo.projection': async () =>
+        repoProjection({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
     })
 
     const syncWork = useReposStore.getState().syncAndRefresh(REPO_ID)
@@ -379,19 +367,20 @@ describe('runBranchAction', () => {
     let deleteCalls = 0
     let resolveStatus!: (value: never[]) => void
     installGoblinTestBridge({
-      'repo.status': () =>
+      'repo.projection': () =>
         new Promise((resolve) => {
-          resolveStatus = () => resolve([])
+          resolveStatus = () =>
+            resolve(repoProjection({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }))
         }),
       'repo.deleteBranch': async () => {
         deleteCalls += 1
         return { ok: true, message: 'ok' }
       },
-      'repo.snapshot': async () => ({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
-      'repo.pullRequests': async () => [],
     })
 
-    const statusWork = useReposStore.getState().refreshStatus(REPO_ID)
+    const statusWork = useReposStore
+      .getState()
+      .refreshRuntimeProjection(REPO_ID, { scope: 'visible-status', branchName: null })
     await flushAsyncWork()
     const deleteWork = useReposStore.getState().runBranchAction(REPO_ID, {
       kind: 'deleteBranch',
@@ -428,16 +417,16 @@ describe('runBranchAction', () => {
   test('times out queued branch actions that wait too long for core refreshes', async () => {
     let deleteCalls = 0
     installGoblinTestBridge({
-      'repo.status': () => new Promise(() => {}),
+      'repo.projection': () => new Promise(() => {}),
       'repo.deleteBranch': async () => {
         deleteCalls += 1
         return { ok: true, message: 'ok' }
       },
-      'repo.snapshot': async () => ({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
-      'repo.pullRequests': async () => [],
     })
 
-    void useReposStore.getState().refreshStatus(REPO_ID)
+    void useReposStore
+      .getState()
+      .refreshRuntimeProjection(REPO_ID, { scope: 'visible-status', branchName: null })
     await flushAsyncWork()
     const result = await useReposStore.getState().runBranchAction(
       REPO_ID,
@@ -469,15 +458,11 @@ describe('runBranchAction', () => {
     let statusCalls = 0
     installGoblinTestBridge({
       'repo.pull': async () => ({ ok: false, message: 'error.network-op-in-progress' }),
-      'repo.snapshot': async () => {
+      'repo.projection': async () => {
         snapshotCalls += 1
-        return { branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }
-      },
-      'repo.status': async () => {
         statusCalls += 1
-        return []
+        return repoProjection({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' })
       },
-      'repo.pullRequests': async () => [],
     })
 
     const result = await useReposStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
@@ -498,9 +483,8 @@ describe('runBranchAction', () => {
   test('clears operation phase after failed branch network actions', async () => {
     installGoblinTestBridge({
       'repo.pull': async () => ({ ok: false, message: 'boom' }),
-      'repo.snapshot': async () => ({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
-      'repo.status': async () => [],
-      'repo.pullRequests': async () => [],
+      'repo.projection': async () =>
+        repoProjection({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
     })
 
     const result = await useReposStore
@@ -520,11 +504,14 @@ describe('runBranchAction', () => {
     let resolveStatus!: (value: never[]) => void
     let resolvePull!: (value: { ok: true; message: string }) => void
     installGoblinTestBridge({
-      'repo.status': () => {
+      'repo.projection': () => {
         statusCalls += 1
-        if (statusCalls > 1) return []
+        if (statusCalls > 1) {
+          return repoProjection({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' })
+        }
         return new Promise((resolve) => {
-          resolveStatus = () => resolve([])
+          resolveStatus = () =>
+            resolve(repoProjection({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }))
         })
       },
       'repo.pull': () => {
@@ -533,11 +520,11 @@ describe('runBranchAction', () => {
           resolvePull = () => resolve({ ok: true, message: 'ok' })
         })
       },
-      'repo.snapshot': async () => ({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
-      'repo.pullRequests': async () => [],
     })
 
-    const statusWork = useReposStore.getState().refreshStatus(REPO_ID)
+    const statusWork = useReposStore
+      .getState()
+      .refreshRuntimeProjection(REPO_ID, { scope: 'visible-status', branchName: null })
     await flushAsyncWork()
     const pullWork = useReposStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
     await flushAsyncWork()
@@ -582,18 +569,21 @@ describe('runBranchAction', () => {
             resolveAction = () => resolve({ ok: true, message: 'ok' })
           })
         },
-        'repo.status': () => {
+        'repo.projection': () => {
           statusCalls += 1
-          if (statusCalls > 1) return []
+          if (statusCalls > 1) {
+            return repoProjection({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' })
+          }
           return new Promise((resolve) => {
-            resolveStatus = () => resolve([])
+            resolveStatus = () =>
+              resolve(repoProjection({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }))
           })
         },
-        'repo.snapshot': async () => ({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
-        'repo.pullRequests': async () => [],
       })
 
-      const statusWork = useReposStore.getState().refreshStatus(REPO_ID)
+      const statusWork = useReposStore
+        .getState()
+        .refreshRuntimeProjection(REPO_ID, { scope: 'visible-status', branchName: null })
       await flushAsyncWork()
       const actionWork = useReposStore.getState().runBranchAction(REPO_ID, action)
       await flushAsyncWork()
@@ -650,9 +640,8 @@ describe('runBranchAction', () => {
         new Promise((resolve) => {
           release = () => resolve({ ok: true, message: 'ok' })
         }),
-      'repo.snapshot': async () => ({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
-      'repo.status': async () => [],
-      'repo.pullRequests': async () => [],
+      'repo.projection': async () =>
+        repoProjection({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
     })
 
     useReposStore.getState().submitBranchAction(REPO_ID, createWorktreeAction())
@@ -755,23 +744,10 @@ describe('runBranchAction', () => {
     let resolveSnapshot!: () => void
     installGoblinTestBridge({
       'repo.pull': async () => ({ ok: true, message: 'ok' }),
-      'repo.snapshot': () =>
+      'repo.projection': () =>
         new Promise((resolve) => {
           resolveSnapshot = () =>
-            resolve({ branches: [createBranchSnapshot('feature/stale')], current: 'feature/stale' })
-        }),
-      'repo.status': async () => [],
-      'repo.pullRequests': async () => [],
-      // Post-write refresh now goes through the composite endpoint, so
-      // its handler must mirror the snapshot contract for this test.
-      'repo.composite': () =>
-        new Promise((resolve) => {
-          resolveSnapshot = () =>
-            resolve({
-              snapshot: { branches: [createBranchSnapshot('feature/stale')], current: 'feature/stale' },
-              status: [],
-              pullRequests: null,
-            })
+            resolve(repoProjection({ branches: [createBranchSnapshot('feature/stale')], current: 'feature/stale' }))
         }),
     })
 
@@ -797,15 +773,14 @@ describe('runBranchAction', () => {
     setBranchViewModeForTest('worktrees')
     installGoblinTestBridge({
       'repo.deleteBranch': async () => ({ ok: true, message: 'ok' }),
-      'repo.snapshot': async () => ({
-        branches: [
-          createBranchSnapshot('feature/a'),
-          createBranchSnapshot('feature/new', { worktree: { path: '/tmp/gbl-branch-actions-test-worktree' } }),
-        ],
-        current: 'feature/a',
-      }),
-      'repo.status': async () => [],
-      'repo.pullRequests': async () => [],
+      'repo.projection': async () =>
+        repoProjection({
+          branches: [
+            createBranchSnapshot('feature/a'),
+            createBranchSnapshot('feature/new', { worktree: { path: '/tmp/gbl-branch-actions-test-worktree' } }),
+          ],
+          current: 'feature/a',
+        }),
     })
 
     await useReposStore

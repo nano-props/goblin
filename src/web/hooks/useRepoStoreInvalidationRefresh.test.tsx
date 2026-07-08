@@ -3,7 +3,6 @@ import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { resetRepoRefreshCoordinatorState } from '#/web/stores/repos/refresh-coordinator.ts'
-import { beginRepoInvalidationSource, settleRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { repoDataQueryKey } from '#/web/repo-data-query.ts'
@@ -16,8 +15,9 @@ const storeState = {
       availability: { phase: 'available' },
       instanceId: 'repo-instance-test-7',
       dataLoads: {
-        snapshot: { phase: 'idle', loadedAt: 0, stale: false, error: null },
-        status: { phase: 'idle', loadedAt: 0, stale: false, error: null },
+        repoReadModel: { phase: 'idle', loadedAt: 0, stale: false, error: null },
+        visibleStatus: { phase: 'idle', loadedAt: 0, stale: false, error: null },
+        fetch: { phase: 'idle', loadedAt: 0, stale: false, error: null },
       },
     },
   },
@@ -55,8 +55,9 @@ describe('useRepoStoreInvalidationRefresh', () => {
       availability: { phase: 'available' },
       instanceId: 'repo-instance-test-7',
       dataLoads: {
-        snapshot: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
-        status: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
+        repoReadModel: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
+        visibleStatus: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
+        fetch: { phase: 'idle', loadedAt: Date.now(), stale: false, error: null },
       },
     }
   })
@@ -68,7 +69,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
     vi.useRealTimers()
   })
 
-  test('refreshes snapshot and status when a repo-snapshot invalidation arrives', async () => {
+  test('refreshes the runtime projection when a repo-snapshot invalidation arrives', async () => {
     const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
     renderInJsdom(<Harness />)
 
@@ -82,10 +83,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
     invalidateSpy.mockRestore()
   })
 
-  test('skips duplicate invalidation refreshes from an active local source token', async () => {
-    const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
-    beginRepoInvalidationSource('repo_branch_1')
-
+  test('refreshes invalidations even when extra transport metadata is present', async () => {
     renderInJsdom(<Harness />)
 
     await act(async () => {
@@ -94,46 +92,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
           type: 'repo-query-invalidated',
           repoId: '/tmp/repo',
           query: 'repo-snapshot',
-          sourceToken: 'repo_branch_1',
-        })
-    })
-
-    expect(storeState.refreshCoreData).not.toHaveBeenCalled()
-    expect(invalidateSpy).not.toHaveBeenCalled()
-    invalidateSpy.mockRestore()
-  })
-
-  test('skips duplicate invalidation refreshes from a recently settled local source token', async () => {
-    beginRepoInvalidationSource('repo_manual_1')
-    settleRepoInvalidationSource('repo_manual_1')
-
-    renderInJsdom(<Harness />)
-
-    await act(async () => {
-      for (const listener of listeners)
-        listener({
-          type: 'repo-query-invalidated',
-          repoId: '/tmp/repo',
-          query: 'repo-snapshot',
-          sourceToken: 'repo_manual_1',
-        })
-    })
-
-    expect(storeState.refreshCoreData).not.toHaveBeenCalled()
-  })
-
-  test('refreshes when invalidation source token does not match a local action', async () => {
-    beginRepoInvalidationSource('repo_manual_2')
-
-    renderInJsdom(<Harness />)
-
-    await act(async () => {
-      for (const listener of listeners)
-        listener({
-          type: 'repo-query-invalidated',
-          repoId: '/tmp/repo',
-          query: 'repo-snapshot',
-          sourceToken: 'repo_manual_other',
+          ignoredMetadata: 'repo_manual_other',
         })
     })
 

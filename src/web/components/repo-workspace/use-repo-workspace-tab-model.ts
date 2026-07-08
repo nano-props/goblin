@@ -8,7 +8,7 @@ import {
   type RepoWorkspaceTabEntriesProjectionPhase,
   type RepoWorkspaceTabModel,
   type RepoWorkspaceTabModelInput,
-} from '#/web/components/repo-workspace/tab-model.ts'
+} from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
   useWorkspacePaneTabsQuery,

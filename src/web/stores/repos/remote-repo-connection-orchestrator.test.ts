@@ -80,21 +80,11 @@ describe('runRemoteRepoConnection', () => {
         name: 'example:repo',
         instanceId: 'repo-instance-test',
         dataLoads: {
+          repoReadModel: { phase: 'idle', loadedAt: null, stale: false, error: null },
+          visibleStatus: { phase: 'idle', loadedAt: null, stale: false, error: null },
           fetch: { phase: 'idle', loadedAt: null, stale: false, error: null },
-          snapshot: { phase: 'idle', loadedAt: null, stale: false, error: null },
-          status: { phase: 'idle', loadedAt: null, stale: false, error: null },
-          pullRequests: { phase: 'idle', loadedAt: null, stale: false, error: null, mode: null },
-          pullRequestsByBranch: {},
         },
-        operations: {
-          fetch: idle(),
-          manualRefresh: idle(),
-          snapshot: idle(),
-          status: idle(),
-          pullRequests: idle(),
-          branchAction: idle(),
-          pullRequestsByBranch: {},
-        },
+        operations: emptyOperations(),
         ui: {
           branchViewMode: 'all',
           preferredWorkspacePaneTabByTarget: {},
@@ -431,10 +421,8 @@ function idleDataLoad() {
 function emptyDataLoads() {
   return {
     fetch: idleDataLoad(),
-    snapshot: idleDataLoad(),
-    status: idleDataLoad(),
-    pullRequests: { ...idleDataLoad(), mode: null },
-    pullRequestsByBranch: {},
+    repoReadModel: idleDataLoad(),
+    visibleStatus: idleDataLoad(),
   }
 }
 
@@ -442,10 +430,8 @@ function emptyOperations() {
   return {
     fetch: idle(),
     manualRefresh: idle(),
-    snapshot: idle(),
-    status: idle(),
-    pullRequests: idle(),
+    repoReadModel: idle(),
+    visibleStatus: idle(),
     branchAction: idle(),
-    pullRequestsByBranch: {},
   }
 }

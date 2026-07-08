@@ -13,12 +13,14 @@ import {
   repoWorkspaceTabModelBlocksTabInteraction,
   type RepoWorkspaceTab,
   type RepoWorkspaceTabModel,
-} from '#/web/components/repo-workspace/tab-model.ts'
+} from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import {
   isWorkspacePaneStaticTabProvider,
   workspacePaneTabProvider,
-} from '#/web/components/workspace-pane/tab-providers.ts'
+} from '#/web/workspace-pane/tab-providers.ts'
+import { selectWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-actions.ts'
+import { readWorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-action-context.ts'
 import {
   confirmWorkspacePaneRuntimeTabClose,
   workspacePaneRuntimeTabCloseConfirmRequest,
@@ -143,19 +145,16 @@ async function showWorkspacePaneTabCommand({
   const provider = workspacePaneTabProvider(tab)
   if (isWorkspacePaneStaticTabProvider(provider)) {
     const target = selectedRepoWorkspaceTarget(repoId, branchName, workspacePaneRoute)
-    if (target) {
-      return await openWorkspacePaneTab({
-        repoId,
-        branchName: target.branchName,
-        worktreePath: target.worktreePath,
-        type: provider.type,
-        workspacePaneRoute,
-        insertAfterIdentity: null,
-        navigation,
-      })
-    }
-    navigation.showRepoBranchWorkspacePaneTab(repoId, branchName, provider.type)
-    return true
+    if (!target) return false
+    return await openWorkspacePaneTab({
+      repoId,
+      branchName: target.branchName,
+      worktreePath: target.worktreePath,
+      type: provider.type,
+      workspacePaneRoute,
+      insertAfterIdentity: null,
+      navigation,
+    })
   }
   if (tab === 'terminal')
     return await runTerminalPrimaryActionCommand({ repoId, branchName, workspacePaneRoute, navigation })

@@ -174,9 +174,7 @@ function repo(): BranchActionRepo {
       status: [],
       worktreesByPath: {},
     },
-    operations: {
-      branchAction: idleOperation(),
-    },
+    branchAction: idleOperation(),
     remote: {
       lifecycle: null,
       hasRemotes: true,

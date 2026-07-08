@@ -544,12 +544,12 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      const activeKey = projection
+      const activeSessionId = projection
         .terminalWorktreeSnapshot(WORKTREE_KEY)
         .sessions.find((session) => session.terminalSessionId === 'session-2')?.terminalSessionId
-      if (!activeKey) throw new Error('missing session-2')
-      projection.selectTerminal(WORKTREE_KEY, activeKey)
-      const session = (projection as any).sessions.get(activeKey)
+      if (!activeSessionId) throw new Error('missing session-2')
+      projection.selectTerminal(WORKTREE_KEY, activeSessionId)
+      const session = (projection as any).sessions.get(activeSessionId)
       let resolveClose!: () => void
       vi.spyOn(session, 'closeServerResourcesAndWait').mockImplementation(
         () =>
@@ -558,7 +558,7 @@ describe('TerminalSessionProjection', () => {
           }),
       )
 
-      const closePromise = projection.closeTerminalByDescriptor(activeKey, {
+      const closePromise = projection.closeTerminalByDescriptor(activeSessionId, {
         repoRoot: REPO_ROOT,
         branch: BRANCH,
         worktreePath: WORKTREE_PATH,
@@ -695,13 +695,13 @@ describe('TerminalSessionProjection', () => {
       )
 
       const snapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
-      const activeKey = snapshot.sessions.find(
+      const activeSessionId = snapshot.sessions.find(
         (session) => session.terminalSessionId === 'session-2',
       )?.terminalSessionId
-      if (!activeKey) throw new Error('missing session-2')
+      if (!activeSessionId) throw new Error('missing session-2')
 
-      projection.selectTerminal(WORKTREE_KEY, activeKey)
-      ;(projection as any).removeSession(activeKey, { dispose: false, closeSession: false })
+      projection.selectTerminal(WORKTREE_KEY, activeSessionId)
+      ;(projection as any).removeSession(activeSessionId, { dispose: false, closeSession: false })
 
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe('session-1')
     })

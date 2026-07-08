@@ -7,7 +7,12 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useSessionPersistence } from '#/web/hooks/useSessionPersistence.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import {
+  createRepoBranch,
+  resetReposStore,
+  seedRepoReadModelQueryData,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import {
@@ -21,7 +26,6 @@ import {
   setWorkspacePaneTabsForTargetQueryData,
   useWorkspacePaneTabsQuery,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { setRepoSnapshotQueryData, setRepoStatusQueryData } from '#/web/repo-data-query.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 
 const persistWorkspaceSessionStateMock = vi.fn(async (_session: unknown) => {})
@@ -284,11 +288,11 @@ describe('useSessionPersistence', () => {
       currentBranchName: 'main',
       preferredWorkspacePaneTab: 'history',
     })
-    setRepoSnapshotQueryData(repo.id, repo.instanceId, {
+    seedRepoReadModelQueryData(repo, {
       branches: [createRepoBranch('feature/query-worktree', { worktree: { path: '/tmp/query-worktree' } })],
-      current: 'feature/query-worktree',
+      currentBranch: 'feature/query-worktree',
+      status: [],
     })
-    setRepoStatusQueryData(repo.id, repo.instanceId, [])
     setWorkspacePaneTabsForTargetQueryData({
       repoRoot: repo.id,
       repoInstanceId: repo.instanceId,
@@ -342,11 +346,11 @@ describe('useSessionPersistence', () => {
         },
       },
     })
-    setRepoSnapshotQueryData(repo.id, currentInstanceId, {
-      current: 'feature/worktree',
+    seedRepoReadModelQueryData({ id: repo.id, instanceId: currentInstanceId }, {
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
+      currentBranch: 'feature/worktree',
+      status: [],
     })
-    setRepoStatusQueryData(repo.id, currentInstanceId, [])
 
     renderInJsdom(<Harness />)
 

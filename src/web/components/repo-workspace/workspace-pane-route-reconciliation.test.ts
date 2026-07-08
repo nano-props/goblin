@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-import { createRepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
-import type { WorkspacePaneTabSummary } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
+import { createRepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+import type { WorkspacePaneTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import {
   reconcileWorkspacePaneRoute,
   workspacePaneRouteHistoryResolution,

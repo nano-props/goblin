@@ -20,9 +20,9 @@ describe('runLatestOperation', () => {
       id: REPO_ID,
       repoInstanceId: 'repo-instance-test',
       lane: 'network',
-      operationKey: 'status',
+      operationKey: 'visible-status',
       priority: 1,
-      targets: [{ key: 'status', reason: 'status' }],
+      targets: [{ key: 'visibleStatus', reason: 'visible-status' }],
       task: () =>
         new Promise<string>((resolve) => {
           starts.push('active')
@@ -35,9 +35,9 @@ describe('runLatestOperation', () => {
       id: REPO_ID,
       repoInstanceId: 'repo-instance-test',
       lane: 'network',
-      operationKey: 'status',
+      operationKey: 'visible-status',
       priority: 1,
-      targets: [{ key: 'status', reason: 'status' }],
+      targets: [{ key: 'visibleStatus', reason: 'visible-status' }],
       task: async () => {
         starts.push('replaced')
         return 'replaced'
@@ -49,25 +49,25 @@ describe('runLatestOperation', () => {
       id: REPO_ID,
       repoInstanceId: 'repo-instance-test',
       lane: 'network',
-      operationKey: 'status',
+      operationKey: 'visible-status',
       priority: 1,
-      targets: [{ key: 'status', reason: 'status' }],
+      targets: [{ key: 'visibleStatus', reason: 'visible-status' }],
       task: async () => {
         starts.push('latest')
         return 'latest'
       },
     })
 
-    expect(repoOperation(REPO_ID, 'status').phase).toBe('queued')
-    expect(useReposStore.getState().repos[REPO_ID]?.operations.status.phase).toBe('queued')
+    expect(repoOperation(REPO_ID, 'visibleStatus').phase).toBe('queued')
+    expect(useReposStore.getState().repos[REPO_ID]?.operations.visibleStatus.phase).toBe('queued')
     releaseActive()
 
     await expect(active).resolves.toBeNull()
     await expect(replaced).resolves.toBeNull()
     await expect(latest).resolves.toBe('latest')
     expect(starts).toEqual(['active', 'latest'])
-    expect(repoOperation(REPO_ID, 'status').phase).toBe('idle')
-    expect(useReposStore.getState().repos[REPO_ID]?.operations.status.phase).toBe('idle')
+    expect(repoOperation(REPO_ID, 'visibleStatus').phase).toBe('idle')
+    expect(useReposStore.getState().repos[REPO_ID]?.operations.visibleStatus.phase).toBe('idle')
   })
 })
 
@@ -357,7 +357,7 @@ describe('runLatestOperation active-task cancellation', () => {
       repoInstanceId: 'repo-instance-test',
       lane: 'read',
       priority: 1,
-      targets: [{ key: 'snapshot', reason: 'snapshot' }],
+      targets: [{ key: 'repoReadModel', reason: 'repo-read-model' }],
       task: () =>
         new Promise<{ ok: true }>((resolve) => {
           reads.push('started')
@@ -377,13 +377,13 @@ describe('runLatestOperation active-task cancellation', () => {
       id: REPO_ID,
       repoInstanceId: 'repo-instance-test',
       lane: 'read',
-      operationKey: 'status',
+      operationKey: 'visible-status',
       priority: 1,
-      targets: [{ key: 'status', reason: 'status' }],
+      targets: [{ key: 'visibleStatus', reason: 'visible-status' }],
       task: async () => ({ ok: true }),
     })
     // `read` is still running. The cancelActiveByKey for
-    // `read:status` finds no active match (the active one is
+    // `read:visible-status` finds no active match (the active one is
     // keyed `undefined`). So the original read is NOT aborted.
     await new Promise((r) => setTimeout(r, 0))
     expect(reads).toEqual(['started'])

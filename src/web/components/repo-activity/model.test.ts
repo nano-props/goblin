@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest'
-import { getRepoActivity, isRepoPrimaryRefreshBusy } from '#/web/components/repo-activity/model.ts'
+import {
+  getRepoActivity,
+  isRepoPrimaryRefreshBusy,
+  type RepoActivityProjectionRepo,
+  repoOperationsSnapshotHasPrimaryRefresh,
+} from '#/web/components/repo-activity/model.ts'
 import { seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore } from '#/web/test-utils/bridge.ts'
@@ -8,40 +13,39 @@ import {
   nextRepoOperationId,
   settleRepoOperationTargets,
 } from '#/web/stores/repos/repo-operation-scheduler.ts'
+import type { RepoState } from '#/web/stores/repos/types.ts'
+import type { RepoOperationsSnapshot, RepoServerOperationState } from '#/shared/api-types.ts'
 
 const REPO_ID = '/tmp/gbl-repo-activity-model'
 
 describe('repo activity model', () => {
-  test('does not surface summary pull request refreshes in the main repo activity control', () => {
+  test('marks the primary refresh control busy from server fetch operations', () => {
     resetReposStore()
-    seedRepoShellForTest({ id: REPO_ID })
-    useReposStore.setState((state) => {
-      const repo = state.repos[REPO_ID]
-      if (!repo) return state
-      repo.dataLoads.pullRequests.phase = 'refreshing'
-      repo.dataLoads.pullRequests.mode = 'summary'
-      return { repos: { ...state.repos, [REPO_ID]: { ...repo } } }
-    })
+    const repo = seedRepoShellForTest({ id: REPO_ID })
+    const operations = operationsSnapshot([serverOperation({ kind: 'fetch', phase: 'running' })])
 
-    const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo).toBeDefined()
-    expect(getRepoActivity(repo!)).toBeNull()
+    expect(repoOperationsSnapshotHasPrimaryRefresh(operations)).toBe(true)
+    expect(isRepoPrimaryRefreshBusy(repo, operations)).toBe(true)
   })
 
-  test('does not surface full pull request refreshes in the main repo activity control', () => {
+  test('does not treat non-fetch server operations as primary refresh busy', () => {
     resetReposStore()
-    seedRepoShellForTest({ id: REPO_ID })
-    useReposStore.setState((state) => {
-      const repo = state.repos[REPO_ID]
-      if (!repo) return state
-      repo.dataLoads.pullRequests.phase = 'refreshing'
-      repo.dataLoads.pullRequests.mode = 'full'
-      return { repos: { ...state.repos, [REPO_ID]: { ...repo } } }
-    })
+    const repo = seedRepoShellForTest({ id: REPO_ID })
+    const operations = operationsSnapshot([serverOperation({ kind: 'pull', phase: 'running' })])
 
-    const repo = useReposStore.getState().repos[REPO_ID]
-    expect(repo).toBeDefined()
-    expect(getRepoActivity(repo!)).toBeNull()
+    expect(repoOperationsSnapshotHasPrimaryRefresh(operations)).toBe(false)
+    expect(isRepoPrimaryRefreshBusy(repo, operations)).toBe(false)
+  })
+
+  test('projects branch action activity from server operations', () => {
+    resetReposStore()
+    const repo = seedRepoShellForTest({ id: REPO_ID })
+    const operations = operationsSnapshot([serverOperation({ kind: 'push', phase: 'queued' })])
+
+    expect(getRepoActivity(activityRepo(repo), operations)).toMatchObject({
+      kind: 'branch-action',
+      labelKey: 'action.push-queued',
+    })
   })
 
   test('marks the primary refresh control busy while a manual refresh is active', () => {
@@ -57,3 +61,42 @@ describe('repo activity model', () => {
     expect(isRepoPrimaryRefreshBusy(useReposStore.getState().repos[REPO_ID]!)).toBe(false)
   })
 })
+
+function operationsSnapshot(operations: RepoServerOperationState[]): RepoOperationsSnapshot {
+  return { operations, loadedAt: 123 }
+}
+
+function activityRepo(repo: RepoState): RepoActivityProjectionRepo {
+  return {
+    id: repo.id,
+    branchAction: repo.operations.branchAction,
+  }
+}
+
+function serverOperation(
+  overrides: Pick<RepoServerOperationState, 'kind' | 'phase'>,
+): RepoServerOperationState {
+  return {
+    id: `repo-op-${overrides.kind}-${overrides.phase}`,
+    repoId: REPO_ID,
+    repoInstanceId: null,
+    kind: overrides.kind,
+    phase: overrides.phase,
+    source: 'user',
+    target: null,
+    queuedAt: 100,
+    startedAt: overrides.phase === 'queued' ? null : 101,
+    deadlineAt: null,
+    settledAt: null,
+    error: null,
+    cancellation: {
+      underlyingRequested: false,
+      reason: null,
+      requestedAt: null,
+      waitCancelledCount: 0,
+      lastWaitCancelledAt: null,
+      lastWaitCancellationReason: null,
+    },
+    canCancelUnderlying: true,
+  }
+}

@@ -37,7 +37,7 @@ Representative examples:
 - `useThemeStore`
 - `useI18nStore`
 - recent repos
-- repo snapshot, status, and pull request state
+- repo runtime projections, including branch, status, pull request, and operation state
 - terminal sessions and control
 
 Notes:
@@ -45,7 +45,7 @@ Notes:
 - `useReposStore` is not a shared cross-window store.
 - `RuntimeCoherentRepoProjectionState` names the runtime-coherent repo projection slice.
 - `useReposStore.repos` is a client-local projection of runtime-coherent repo truth.
-- React Query is the client read model for repo snapshot/status/pull-request server data. UI and command paths should read through query-backed helpers such as `useRepoBranchReadModel` or `readRepoWithBranchReadModel` instead of treating `useReposStore.repos[*].data.branches` as authoritative runtime truth.
+- React Query is the client read model for server-owned repo runtime projections. UI and command paths should read through query-backed helpers such as `useRepoBranchReadModel` or `readRepoBranchQueryProjection` instead of treating `useReposStore.repos[*]` fields as authoritative runtime truth.
 - React Query is also the client projection for server-owned settings snapshots and workspace pane tab lists. Mutation helpers should update or invalidate those caches from server-returned canonical data, not from client intent payloads.
 - Store repo data may still exist as a projection for UI orchestration, action state, warm restore, and in-place server response application. New runtime reads should prefer the query-backed projection unless they are explicitly write-side projection code.
 - `ReposStore` actions are also grouped by local, restorable, runtime-coherent, and mutation responsibilities.

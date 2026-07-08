@@ -1,6 +1,6 @@
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { WORKSPACE_PANE_RUNTIME_TAB_TYPES } from '#/shared/workspace-pane.ts'
-import type { RepoWorkspaceTabModel } from '#/web/components/repo-workspace/tab-model.ts'
+import type { RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 
 export type WorkspacePaneRouteReconciliation =
   { kind: 'none' } | { kind: 'pending' } | { kind: 'unverified' } | { kind: 'replace-empty-pane' }

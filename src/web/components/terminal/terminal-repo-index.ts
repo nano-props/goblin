@@ -3,7 +3,7 @@ import { useStoreWithEqualityFn } from 'zustand/traditional'
 import type { ReposStore } from '#/web/stores/repos/types.ts'
 import type { TerminalRepoIndex } from '#/web/components/terminal/types.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { repoSnapshotQueryOptions } from '#/web/repo-data-query.ts'
+import { repoProjectionQueryOptions } from '#/web/repo-data-query.ts'
 import { repoBranchSnapshotDataFromSnapshot } from '#/web/repo-branch-read-model.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 
@@ -14,16 +14,16 @@ export interface TerminalRepoIndexEntry {
 
 export function useTerminalRepoIndex(): TerminalRepoIndex {
   const entries = useStoreWithEqualityFn(useReposStore, (s) => terminalRepoIndexEntriesFromRepos(s.repos), entriesEqual)
-  const snapshotQueries = useQueries({
+  const projectionQueries = useQueries({
     queries: entries.map((entry) => ({
-      ...repoSnapshotQueryOptions(entry.id, entry.instanceId),
+      ...repoProjectionQueryOptions(entry.id, entry.instanceId, null, 'full'),
       enabled: true,
       subscribed: true,
     })),
   })
   return repoIndexFromEntries(
     entries,
-    snapshotQueries.map((query) => query.data ?? null),
+    projectionQueries.map((query) => query.data?.snapshot ?? null),
   )
 }
 

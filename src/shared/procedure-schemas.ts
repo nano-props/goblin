@@ -21,7 +21,6 @@ import { GIT_HASH_RE } from '#/shared/git-types.ts'
 import { WORKTREE_BOOTSTRAP_CONFIG_HASH_RE } from '#/shared/repo-settings.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
 
-const SourceToken = v.optional(v.string())
 const StringArray = v.array(v.string())
 const TerminalAppSchema = v.picklist(['ghostty', 'terminal', 'windowsTerminal'])
 const EditorAppSchema = v.picklist(['vscode'])
@@ -68,22 +67,18 @@ export const REPO_PROCEDURE_SCHEMAS = {
   fetch: v.object({
     cwd: v.string(),
     kind: v.optional(v.picklist(['user', 'background'])),
-    sourceToken: SourceToken,
   }),
   clone: v.object({
-    operationId: v.string(),
     url: v.string(),
     parentPath: v.string(),
     directoryName: v.string(),
   }),
-  abortClone: v.object({ operationId: v.string() }),
   pull: v.object({
     cwd: v.string(),
     branch: v.string(),
     worktreePath: v.optional(v.string()),
-    sourceToken: SourceToken,
   }),
-  push: v.object({ cwd: v.string(), branch: v.string(), sourceToken: SourceToken }),
+  push: v.object({ cwd: v.string(), branch: v.string() }),
   createWorktree: v.object({
     cwd: v.string(),
     worktreePath: v.string(),
@@ -93,7 +88,6 @@ export const REPO_PROCEDURE_SCHEMAS = {
       v.object({ kind: v.literal('trackRemoteBranch'), remoteRef: v.string(), localBranch: v.string() }),
     ]),
     worktreeBootstrap: WorktreeBootstrapDecisionSchema,
-    sourceToken: SourceToken,
   }),
   getRemoteBranches: CwdInput,
   worktreeBootstrapPreview: CwdInput,
@@ -102,7 +96,6 @@ export const REPO_PROCEDURE_SCHEMAS = {
     branch: v.string(),
     force: v.optional(v.boolean()),
     alsoDeleteUpstream: v.optional(v.boolean()),
-    sourceToken: SourceToken,
   }),
   removeWorktree: v.object({
     cwd: v.string(),
@@ -111,7 +104,6 @@ export const REPO_PROCEDURE_SCHEMAS = {
     alsoDeleteBranch: v.boolean(),
     forceDeleteBranch: v.optional(v.boolean()),
     alsoDeleteUpstream: v.optional(v.boolean()),
-    sourceToken: SourceToken,
   }),
   openUrl: v.object({ cwd: v.string(), target: RepoUrlTargetSchema }),
   openTerminal: v.object({ path: v.string(), app: TerminalAppSchema }),
@@ -123,8 +115,6 @@ export const REPO_PROCEDURE_SCHEMAS = {
   runtimeClose: RepoRuntimeCloseSchema,
   abort: CwdInput,
   probe: CwdInput,
-  snapshot: CwdInput,
-  status: CwdInput,
   log: v.object({
     cwd: v.string(),
     branch: v.string(),
@@ -151,24 +141,14 @@ export const REPO_PROCEDURE_SCHEMAS = {
     cwd: v.string(),
     worktreePath: v.string(),
   }),
-  pullRequests: v.object({
+  projection: v.object({
     cwd: v.string(),
-    branches: v.optional(StringArray),
+    branch: v.optional(v.string()),
     mode: v.optional(v.picklist(['summary', 'full'])),
   }),
-  // Composite read — picks which sub-reads to fold into one round trip.
-  // Body shape: `{ cwd, include?, branches?, mode?, timeoutMs? }`. `include`
-  // and `branches` travel as JSON arrays; `timeoutMs` is a real number
-  // (no string coercion — query-string parsing is gone).
-  composite: v.object({
-    cwd: v.string(),
-    include: v.optional(v.array(v.picklist(['snapshot', 'status', 'pullRequests']))),
-    branches: v.optional(StringArray),
-    mode: v.optional(v.picklist(['summary', 'full'])),
-    // Per-section timeout in ms. The perimeter rejects non-numbers,
-    // non-integers, negative values, and values above 600000; accepted
-    // values are already safe for server-side timeout handling.
-    timeoutMs: v.optional(v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(600_000))),
+  operations: v.object({
+    cwd: v.optional(v.string()),
+    includeSettled: v.optional(v.boolean()),
   }),
 } as const
 

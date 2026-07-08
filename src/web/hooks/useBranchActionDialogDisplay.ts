@@ -73,9 +73,11 @@ import {
   useBranchActionDialogsStore,
 } from '#/web/stores/repos/branch-action-dialogs.ts'
 import type { RepoBranchState, RepoState } from '#/web/stores/repos/types.ts'
-import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+import { projectBranchActionOperation, type BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import { useLastNonNull } from '#/web/hooks/useLastNonNull.ts'
 import { useRepoBranchReadModel, type RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
+import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
+import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
 type BranchActionDialogRepo = Omit<BranchActionRepo, 'branchModel'> & {
   branchModel: RepoBranchReadModelData
@@ -122,7 +124,10 @@ export function useBranchActionDialogDisplay<P>(
   const entry = useLastNonNull(slot)
   const slotRepo = slot ? repos[slot.repoId] : null
   const branchReadModel = useRepoBranchReadModel(slot?.repoId ?? '', slotRepo?.instanceId ?? '', !!slotRepo)
-  const liveContext = slot ? resolveContext(repos, slot, branchReadModel) : null
+  const operationsReadModel = useRepoOperationsReadModel(slot?.repoId ?? '', slotRepo?.instanceId ?? '', {
+    enabled: !!slotRepo,
+  })
+  const liveContext = slot ? resolveContext(repos, slot, branchReadModel, operationsReadModel.data?.operations) : null
   // Retain the last non-null `liveContext` for the close-animation
   // window. After the user clicks Confirm/Cancel, `slot` is null and
   // `liveContext` is null, but the host still needs a stable context
@@ -149,6 +154,7 @@ function resolveContext<P>(
   repos: Record<string, RepoState>,
   entry: BranchActionDialogEntry<P>,
   branchReadModel: RepoBranchReadModelData | null,
+  operations: readonly RepoServerOperationState[] | undefined,
 ): BranchActionDialogContext | null {
   const repoFromStore = repos[entry.repoId]
   if (!repoFromStore || !branchReadModel) return null
@@ -156,9 +162,7 @@ function resolveContext<P>(
     id: repoFromStore.id,
     instanceId: repoFromStore.instanceId,
     branchModel: branchReadModel,
-    operations: {
-      branchAction: repoFromStore.operations.branchAction,
-    },
+    branchAction: projectBranchActionOperation(repoFromStore.operations.branchAction, operations, entry.branchName),
     remote: {
       lifecycle: repoFromStore.remote.lifecycle,
       hasRemotes: repoFromStore.remote.hasRemotes,

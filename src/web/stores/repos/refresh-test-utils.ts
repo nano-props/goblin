@@ -1,4 +1,5 @@
-import type { BranchSnapshotInfo, PullRequestInfo } from '#/web/types.ts'
+import type { RepoRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
+import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
 import {
   createBranchSnapshot,
   createPullRequest,
@@ -27,6 +28,21 @@ export function pullRequestWithHealth(number: number): PullRequestInfo {
   })
 }
 
+export function repoProjection(
+  snapshot: RepoSnapshot | null,
+  status: WorktreeStatus[] = [],
+  options: Partial<Pick<RepoRuntimeProjection, 'pullRequests' | 'operations' | 'requested' | 'loadedAt'>> = {},
+): RepoRuntimeProjection {
+  return {
+    snapshot,
+    status,
+    pullRequests: options.pullRequests ?? null,
+    operations: options.operations ?? { operations: [], loadedAt: 0 },
+    requested: options.requested ?? { branch: null, pullRequestMode: 'full' },
+    loadedAt: options.loadedAt ?? 0,
+  }
+}
+
 export function seedRepo(branches: BranchSnapshotInfo[], instanceId = 'repo-instance-test'): string {
   return seedRepoWithReadModelForTest({
     id: REPO_ID,
@@ -49,23 +65,8 @@ export function resetRefreshTest(): void {
   installGoblinTestBridge(ipcHandlers)
   ipcHandlers['repo.abort'] = async () => false
   ipcHandlers['repo.fetch'] = async () => ({ ok: true, message: 'ok' })
-  // `repo.snapshot`, `repo.status`, and `repo.pullRequests` are no
-  // longer called by the `refreshCoreData` flow (it goes through
-  // `repo.composite` instead), but `branch-actions` and a few other
-  // tests still drive these individual procedures directly, so the
-  // defaults are kept here. Tests that want a different response
-  // shape can override the handler after `installRefreshTestBridge`.
-  ipcHandlers['repo.snapshot'] = async () => ({ branches: [], current: '' })
-  ipcHandlers['repo.pullRequests'] = async () => []
-  ipcHandlers['repo.status'] = async () => []
-  // Composite read defaults to empty so the new `refreshCoreData` flow
-  // works out of the box. Tests that care about the response set the
-  // handler explicitly.
-  ipcHandlers['repo.composite'] = async () => ({
-    snapshot: { branches: [], current: '' },
-    status: [],
-    pullRequests: null,
-  })
+  // Tests that need repo read responses install `repo.projection`
+  // directly; snapshot/status are no longer standalone read routes.
   ipcHandlers['terminal.create'] = async (input: { kind?: string }) => ({
     ok: true,
     action: input?.kind === 'primary' ? 'reused' : 'created',

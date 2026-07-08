@@ -7,10 +7,10 @@ import {
   useTerminalSessionSummaries,
   useTerminalWorktreeCreatePending,
 } from '#/web/components/terminal/terminal-session-store.ts'
-import type { WorkspacePaneRuntimeTabSummary } from '#/web/components/workspace-pane/workspace-pane-tab-summary.ts'
+import type { WorkspacePaneRuntimeTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { RepoWorkspaceRuntimeTabStateInput } from '#/web/components/repo-workspace/tab-model.ts'
+import type { RepoWorkspaceRuntimeTabStateInput } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import type { WorkspacePaneRuntimeProjectionState } from '#/web/workspace-pane/workspace-pane-runtime-state.ts'
 
 export type WorkspacePaneRuntimeTabTargetSelectionByType = Partial<Record<WorkspacePaneRuntimeTabType, string | null>>

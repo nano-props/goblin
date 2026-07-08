@@ -3,7 +3,11 @@ import {
   disposeAllRepoOperationSchedulers,
   disposeRepoOperationScheduler,
   markRepoOperationTargets,
-  pruneRepoBranchPullRequestOperations,
+  nextRepoOperationId,
+  repoLocalBranchActionScheduleGuard,
+  repoLocalCoreProjectionRefreshBusy,
+  repoLocalPrimaryRefreshBusy,
+  repoLocalRemoteFetchBlocked,
   repoOperation,
   repoOperationBusy,
   scheduleRepoOperation,
@@ -66,7 +70,7 @@ describe('repo runtime task scheduling', () => {
           releaseFirst = () => resolve('first')
         }),
     )
-    const replaced = scheduleRepoOperation(REPO_ID, 'network', async () => 'replaced', { replaceQueuedKey: 'status' })
+    const replaced = scheduleRepoOperation(REPO_ID, 'network', async () => 'replaced', { replaceQueuedKey: 'visible-status' })
     const latest = scheduleRepoOperation(
       REPO_ID,
       'network',
@@ -74,7 +78,7 @@ describe('repo runtime task scheduling', () => {
         starts.push('latest')
         return 'latest'
       },
-      { replaceQueuedKey: 'status' },
+      { replaceQueuedKey: 'visible-status' },
     )
 
     await expect(replaced).rejects.toThrow('cancelled')
@@ -140,32 +144,45 @@ describe('repo runtime task scheduling', () => {
     expect(repoOperation(REPO_ID, 'fetch').phase).toBe('idle')
   })
 
-  test('prunes pull request operation state for removed branches', () => {
+  test('local guard helpers name the scheduler-only busy sets', () => {
+    expect(repoLocalPrimaryRefreshBusy(REPO_ID)).toBe(false)
+    expect(repoLocalCoreProjectionRefreshBusy(REPO_ID)).toBe(false)
+    expect(repoLocalRemoteFetchBlocked(REPO_ID)).toBe(false)
+    expect(repoLocalBranchActionScheduleGuard(REPO_ID)).toEqual({
+      fetchBusy: false,
+      branchOperationPhase: 'idle',
+      coreRefreshBusy: false,
+    })
+
     markRepoOperationTargets(
       REPO_ID,
-      1,
-      [
-        { key: 'pullRequests', reason: 'summary' },
-        { key: 'pullRequest:feature/a', reason: 'summary' },
-        { key: 'pullRequest:feature/stale', reason: 'summary' },
-      ],
+      nextRepoOperationId(REPO_ID),
+      [{ key: 'manualRefresh', reason: 'manual-refresh' }],
       'running',
     )
-    settleRepoOperationTargets(
+    expect(repoLocalPrimaryRefreshBusy(REPO_ID)).toBe(true)
+    expect(repoLocalRemoteFetchBlocked(REPO_ID)).toBe(false)
+
+    markRepoOperationTargets(
       REPO_ID,
-      1,
-      [
-        { key: 'pullRequests', reason: 'summary' },
-        { key: 'pullRequest:feature/a', reason: 'summary' },
-        { key: 'pullRequest:feature/stale', reason: 'summary' },
-      ],
-      null,
+      nextRepoOperationId(REPO_ID),
+      [{ key: 'visibleStatus', reason: 'visible-status' }],
+      'running',
     )
+    expect(repoLocalCoreProjectionRefreshBusy(REPO_ID)).toBe(true)
+    expect(repoLocalRemoteFetchBlocked(REPO_ID)).toBe(true)
 
-    pruneRepoBranchPullRequestOperations(REPO_ID, new Set(['feature/a']))
-
-    expect(repoOperation(REPO_ID, 'pullRequests').operationId).toBe(1)
-    expect(repoOperation(REPO_ID, 'pullRequest:feature/a').operationId).toBe(1)
-    expect(repoOperation(REPO_ID, 'pullRequest:feature/stale').operationId).toBe(0)
+    markRepoOperationTargets(
+      REPO_ID,
+      nextRepoOperationId(REPO_ID),
+      [{ key: 'branchAction', reason: 'branch:pull', target: 'feature/a' }],
+      'queued',
+    )
+    expect(repoLocalBranchActionScheduleGuard(REPO_ID)).toMatchObject({
+      fetchBusy: false,
+      branchOperationPhase: 'queued',
+      coreRefreshBusy: true,
+    })
   })
+
 })

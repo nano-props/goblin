@@ -35,6 +35,8 @@ import { translate } from '#/web/stores/i18n.ts'
 import { toast } from 'sonner'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import { getRepoOperationsQueryData } from '#/web/repo-data-query.ts'
+import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 
 type MoveDirection = 1 | -1
 const INTERACTIVE_SHORTCUT_TARGET_SELECTOR =
@@ -202,7 +204,11 @@ export function useKeyboard({
           e.preventDefault()
           const repo = repoId ? useReposStore.getState().repos[repoId] : null
           if (!repo) return
-          if (repo.operations.branchAction.phase === 'idle') {
+          const branchAction = projectBranchActionOperation(
+            repo.operations.branchAction,
+            getRepoOperationsQueryData(repo.id, repo.instanceId)?.operations,
+          )
+          if (branchAction.phase === 'idle') {
             openCreateWorktreeRef.current()
           } else {
             toast.error(translate('action.create-worktree-busy'))

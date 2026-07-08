@@ -4,7 +4,6 @@ import type {
   BrowserRemoteProvider,
   ExecResult,
   GitRemoteInfo,
-  PullRequestFetchMode,
 } from '#/web/types.ts'
 import type { RemoteRepoConnectionLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspaceSessionState } from '#/shared/api-types.ts'
@@ -260,20 +259,7 @@ interface RuntimeCoherentRepoProjectionActions {
    *  target-scoped user intent. */
   setWorkspacePaneTab: (id: string, branch: string, tab: WorkspacePaneTabType) => void
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
-  refreshSnapshot: (id: string, options?: { skipLogBackfill?: boolean; repoInstanceId?: string }) => Promise<void>
-  refreshSnapshotAndStatus: (
-    id: string,
-    options?: { skipLogBackfill?: boolean; repoInstanceId?: string },
-  ) => Promise<void>
-  refreshPullRequests: (
-    id: string,
-    branches?: string[],
-    options?: {
-      repoInstanceId?: string
-      mode?: PullRequestFetchMode
-    },
-  ) => Promise<void>
-  refreshStatus: (id: string, options?: { repoInstanceId?: string }) => Promise<void>
+  refreshRuntimeProjection: (id: string, options: RepoRuntimeProjectionRefreshOptions) => Promise<void>
   refreshCoreData: (id: string, options?: { repoInstanceId?: string }) => Promise<void>
   syncAndRefresh: (id: string, options?: { repoInstanceId?: string }) => Promise<void>
   setLastResult: (id: string, result: ExecResult, repoInstanceId: string, options?: RepoResultEventOptions) => void
@@ -288,6 +274,11 @@ interface RuntimeCoherentRepoProjectionActions {
    *  around forever. */
   clearFetchFailed: (id: string, repoInstanceId: string) => void
 }
+
+export type RepoRuntimeProjectionRefreshScope = 'repo-read-model' | 'visible-status'
+export type RepoRuntimeProjectionRefreshOptions =
+  | { repoInstanceId?: string; scope: 'repo-read-model' }
+  | { repoInstanceId?: string; scope: 'visible-status'; branchName: string | null }
 
 interface RepoMutationActions {
   runBranchAction: (

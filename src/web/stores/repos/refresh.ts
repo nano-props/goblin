@@ -1,84 +1,67 @@
 import { appendRepoEvent, errorEvent } from '#/web/stores/repos/repo-state-factory.ts'
 import { updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
-import { refreshPullRequestsLog, refreshStatusLog } from '#/web/logger.ts'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
+import { refreshStatusLog } from '#/web/logger.ts'
 import { isRepoUnavailableReason, markRepoUnavailable } from '#/web/stores/repos/availability.ts'
 import { runExclusiveOperation, runLatestOperation } from '#/web/stores/repos/operation-runner.ts'
 import { persistRepoSnapshotCacheEntry } from '#/web/stores/repos/persistence.ts'
-import { runLatestDataLoadOperation } from '#/web/stores/repos/data-load-runner.ts'
-import { pruneRepoBranchPullRequestOperations } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { runCoreDataRefreshWorkflow, runSnapshotSuccessWorkflow } from '#/web/stores/repos/refresh-workflows.ts'
 import {
-  applyPullRequestRefreshErrorState,
-  applyPullRequestRefreshStaleState,
-  applyPullRequestRefreshSuccessState,
-  applyPullRequestRefreshUnavailableState,
   applySnapshotToRepoProjection,
   resolveActionRepoInstanceId,
-  startPullRequestRefreshDataLoads,
 } from '#/web/stores/repos/refresh-state.ts'
 import { createRefreshSyncHelpers } from '#/web/stores/repos/refresh-sync.ts'
-import { runWithRepoInvalidationSource } from '#/web/stores/repos/invalidation-sources.ts'
 import { finishDataLoadError, finishDataLoadSuccess, startDataLoad } from '#/web/stores/repos/repo-data-load-state.ts'
-import { getRepoPullRequests, getRepoSnapshot, getRepoStatus, readRepoBulk } from '#/web/repo-client.ts'
-import {
-  setRepoBulkReadQueryData,
-  getRepoSnapshotQueryData,
-  getRepoStatusQueryData,
-  setRepoPullRequestsQueryData,
-  setRepoSnapshotQueryData,
-  setRepoStatusQueryData,
-} from '#/web/repo-data-query.ts'
+import { getRepoProjection } from '#/web/repo-client.ts'
+import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import type { RepoSnapshot } from '#/shared/api-types.ts'
-import type { RepoPullRequestReason } from '#/web/stores/repos/operations.ts'
-import type { RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
-import type { PullRequestFetchMode } from '#/web/types.ts'
+import type { RepoRuntimeProjection, RepoSnapshot } from '#/shared/api-types.ts'
+import type {
+  RepoRuntimeProjectionRefreshOptions,
+  RepoRuntimeProjectionRefreshScope,
+  ReposGet,
+  ReposSet,
+} from '#/web/stores/repos/types.ts'
 
-function resolvePullRequestRefreshRequest(
-  repo: Pick<RepoState, 'id' | 'instanceId' | 'availability' | 'remote'>,
-  branchesArg?: string[],
-  options?: {
-    mode?: PullRequestFetchMode
-  },
-): {
-  branchNames: string[]
-  mode: PullRequestFetchMode
-} | null {
-  // The caller passes a focused repo shape, so keep the availability
-  // check local: local repos carry failure in `availability.phase`;
-  // remote repos carry it in `remote.lifecycle.kind`.
-  if (isRemoteRepoId(repo.id)) {
-    if (repo.remote.lifecycle?.kind === 'failed') return null
-  } else if (repo.availability.phase === 'unavailable') {
-    return null
-  }
-  const mode = options?.mode ?? 'full'
-  const branchProjection = branchesArg ? null : readRepoBranchQueryProjection(repo)
-  const branchNames = branchesArg ?? branchProjection?.branches.map((branch) => branch.name) ?? []
-  if (branchNames.length === 0) return null
-  if (repo.remote.hasGitHubRemote !== true) return null
-  return { branchNames, mode }
+type ProjectionRefreshTarget =
+  | { key: 'repoReadModel'; reason: 'repo-read-model' }
+  | { key: 'visibleStatus'; reason: 'visible-status' }
+
+interface ProjectionRefreshPlan {
+  wantsReadModelLoad: boolean
+  wantsVisibleStatusLoad: boolean
+  operationKey: string
+  priority: number
+  targets: [ProjectionRefreshTarget, ...ProjectionRefreshTarget[]]
 }
 
-function currentBranchNamesFromReadModel(id: string, repoInstanceId: string): Set<string> {
-  const branchProjection = readRepoBranchQueryProjection({ id, instanceId: repoInstanceId })
-  return new Set(branchProjection?.branches.map((branch) => branch.name) ?? [])
+function projectionRefreshPlan(scope: RepoRuntimeProjectionRefreshScope): ProjectionRefreshPlan {
+  switch (scope) {
+    case 'repo-read-model':
+      return {
+        wantsReadModelLoad: true,
+        wantsVisibleStatusLoad: true,
+        operationKey: 'repo-read-model',
+        priority: 50,
+        targets: [
+          { key: 'repoReadModel', reason: 'repo-read-model' },
+          { key: 'visibleStatus', reason: 'visible-status' },
+        ],
+      }
+    case 'visible-status':
+      return {
+        wantsReadModelLoad: false,
+        wantsVisibleStatusLoad: true,
+        operationKey: 'visible-status',
+        priority: 40,
+        targets: [{ key: 'visibleStatus', reason: 'visible-status' }],
+      }
+  }
+  const exhaustive: never = scope
+  return exhaustive
 }
 
 export function createRefreshActions(set: ReposSet, get: ReposGet) {
   const { runManualSyncPipeline } = createRefreshSyncHelpers(set, get)
-
-  function pullRequestReason(mode: PullRequestFetchMode): RepoPullRequestReason {
-    switch (mode) {
-      case 'summary':
-        return 'summary'
-      case 'full':
-        return 'full'
-    }
-    const exhaustive: never = mode
-    return exhaustive
-  }
 
   async function runSnapshotSuccessFlow(
     id: string,
@@ -86,194 +69,95 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
     snap: RepoSnapshot,
     previousSnapshotBranches: RepoSnapshot['branches'] | null,
     isSnapshotCurrent: () => boolean,
-    options?: { skipLogBackfill?: boolean },
   ): Promise<void> {
     const validBranches = new Set(snap.branches.map((b) => b.name))
     updateIfFresh(set, id, repoInstanceId, (r) => {
       applySnapshotToRepoProjection(r, snap, validBranches, previousSnapshotBranches)
     })
-    pruneRepoBranchPullRequestOperations(id, validBranches)
-    const branchNames = snap.branches.map((branch) => branch.name)
-    const worktreePaths = snap.branches
-      .map((branch) => branch.worktree?.path)
-      .filter((p): p is string => typeof p === 'string' && p.length > 0)
     await runSnapshotSuccessWorkflow(set, get, {
       id,
       repoInstanceId,
-      branchNames,
-      worktreePaths,
       isSnapshotCurrent,
-      skipLogBackfill: options?.skipLogBackfill,
     })
   }
 
-  function applyPullRequestRefreshUnavailable(
+  async function runRuntimeProjectionRefresh(
     id: string,
     repoInstanceId: string,
-    branchNames: string[],
-    mode: PullRequestFetchMode,
-  ): void {
-    const existingBranches = currentBranchNamesFromReadModel(id, repoInstanceId)
-    updateIfFresh(set, id, repoInstanceId, (r) => {
-      applyPullRequestRefreshUnavailableState(r, branchNames, existingBranches, mode)
-    })
-  }
+    options: RepoRuntimeProjectionRefreshOptions,
+  ): Promise<void> {
+    const { scope } = options
+    const { wantsReadModelLoad, wantsVisibleStatusLoad, operationKey, priority, targets } = projectionRefreshPlan(scope)
+    const branchName = scope === 'visible-status' ? options.branchName : null
 
-  function applyPullRequestRefreshSuccess(
-    id: string,
-    repoInstanceId: string,
-    branchNames: string[],
-    mode: PullRequestFetchMode,
-  ): void {
-    const existingBranches = currentBranchNamesFromReadModel(id, repoInstanceId)
     updateIfFresh(set, id, repoInstanceId, (r) => {
-      applyPullRequestRefreshSuccessState(r, branchNames, existingBranches, mode)
+      if (wantsReadModelLoad) {
+        startDataLoad(r.dataLoads.repoReadModel, {
+          hasData: (readRepoBranchQueryProjection(r)?.branches.length ?? 0) > 0,
+        })
+      }
+      if (wantsVisibleStatusLoad) {
+        startDataLoad(r.dataLoads.visibleStatus, {
+          hasData: (readRepoBranchQueryProjection(r)?.status.length ?? 0) > 0,
+        })
+      }
     })
-  }
+    await runLatestOperation({
+      set,
+      get,
+      id,
+      repoInstanceId,
+      lane: 'read',
+      operationKey,
+      priority,
+      targets,
+      task: (signal) => getRepoProjection(id, branchName, { mode: 'full' }, signal),
+      errorFromResult: (projection) => (projection.snapshot ? null : 'error.failed-read-repo'),
+      onResult: async (projection: RepoRuntimeProjection, ctx) => {
+        const previousBranchModel = ctx.isCurrent()
+          ? readRepoBranchQueryProjection({ id, instanceId: repoInstanceId })
+          : null
+        if (ctx.isCurrent()) setRepoProjectionQueryData(id, repoInstanceId, branchName, 'full', projection)
 
-  function applyPullRequestRefreshStale(
-    id: string,
-    repoInstanceId: string,
-    branchNames: string[],
-    mode: PullRequestFetchMode,
-    operationId: number,
-  ): void {
-    const existingBranches = currentBranchNamesFromReadModel(id, repoInstanceId)
-    updateIfFresh(set, id, repoInstanceId, (r) => {
-      applyPullRequestRefreshStaleState(r, branchNames, existingBranches, mode, operationId)
-    })
-  }
-
-  function applyPullRequestRefreshError(id: string, repoInstanceId: string, branchNames: string[], err: unknown): void {
-    const message = err instanceof Error ? err.message : String(err)
-    const existingBranches = currentBranchNamesFromReadModel(id, repoInstanceId)
-    refreshPullRequestsLog.warn('failed', { err })
-    updateIfFresh(set, id, repoInstanceId, (r) => {
-      applyPullRequestRefreshErrorState(r, branchNames, existingBranches, message)
-      r.events = appendRepoEvent(r.events, errorEvent(message))
+        if (wantsVisibleStatusLoad) {
+          updateIfFresh(set, id, repoInstanceId, (r) => {
+            if (projection.snapshot) finishDataLoadSuccess(r.dataLoads.visibleStatus)
+            else finishDataLoadError(r.dataLoads.visibleStatus, 'error.failed-read-repo')
+          })
+        }
+        if (projection.status.length > 0 && ctx.isCurrent()) {
+          persistRepoSnapshotCacheEntry(set, get().repos[id], repoInstanceId)
+        }
+        if (!projection.snapshot) {
+          updateIfFresh(set, id, repoInstanceId, (r) => {
+            if (wantsReadModelLoad) finishDataLoadError(r.dataLoads.repoReadModel, 'error.failed-read-repo')
+            r.events = appendRepoEvent(r.events, errorEvent('error.failed-read-repo'))
+          })
+          return
+        }
+        if (wantsReadModelLoad) {
+          await runSnapshotSuccessFlow(
+            id,
+            repoInstanceId,
+            projection.snapshot,
+            previousBranchModel?.branches ?? null,
+            ctx.isCurrent,
+          )
+        }
+      },
+      onError: (message) => {
+        if (wantsVisibleStatusLoad && !wantsReadModelLoad) refreshStatusLog.warn('failed', { err: new Error(message) })
+        updateIfFresh(set, id, repoInstanceId, (r) => {
+          if (isRepoUnavailableReason(message)) markRepoUnavailable(r, message)
+          if (wantsReadModelLoad) finishDataLoadError(r.dataLoads.repoReadModel, message)
+          if (wantsVisibleStatusLoad) finishDataLoadError(r.dataLoads.visibleStatus, message)
+          r.events = appendRepoEvent(r.events, errorEvent(message))
+        })
+      },
     })
   }
 
   return {
-    async refreshSnapshot(id: string, options?: { skipLogBackfill?: boolean; repoInstanceId?: string }) {
-      const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
-      if (!resolved) return
-      const { repoInstanceId } = resolved
-      updateIfFresh(set, id, repoInstanceId, (r) => {
-        startDataLoad(r.dataLoads.snapshot, { hasData: (readRepoBranchQueryProjection(r)?.branches.length ?? 0) > 0 })
-      })
-      await runLatestOperation({
-        set,
-        get,
-        id,
-        repoInstanceId,
-        lane: 'read',
-        operationKey: 'snapshot',
-        priority: 50,
-        targets: [{ key: 'snapshot', reason: 'snapshot' }],
-        task: (signal) => getRepoSnapshot(id, signal),
-        errorFromResult: (snap) => (snap ? null : 'error.failed-read-repo'),
-        onResult: async (snap, ctx) => {
-          const previousSnapshot = ctx.isCurrent() ? getRepoSnapshotQueryData(id, repoInstanceId) : null
-          if (ctx.isCurrent()) setRepoSnapshotQueryData(id, repoInstanceId, snap)
-          if (!snap) {
-            updateIfFresh(set, id, repoInstanceId, (r) => {
-              finishDataLoadError(r.dataLoads.snapshot, 'error.failed-read-repo')
-              r.events = appendRepoEvent(r.events, errorEvent('error.failed-read-repo'))
-            })
-            return
-          }
-          await runSnapshotSuccessFlow(id, repoInstanceId, snap, previousSnapshot?.branches ?? null, ctx.isCurrent, {
-            skipLogBackfill: options?.skipLogBackfill,
-          })
-        },
-        onError: (message) => {
-          updateIfFresh(set, id, repoInstanceId, (r) => {
-            if (isRepoUnavailableReason(message)) markRepoUnavailable(r, message)
-            finishDataLoadError(r.dataLoads.snapshot, message)
-            r.events = appendRepoEvent(r.events, errorEvent(message))
-          })
-        },
-      })
-    },
-
-    async refreshPullRequests(
-      id: string,
-      branchesArg?: string[],
-      options?: {
-        repoInstanceId?: string
-        mode?: PullRequestFetchMode
-      },
-    ) {
-      const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
-      if (!resolved) return
-      const { repo: repoBefore, repoInstanceId } = resolved
-      const request = resolvePullRequestRefreshRequest(repoBefore, branchesArg, options)
-      if (!request) return
-      const { branchNames, mode } = request
-      updateIfFresh(set, id, repoInstanceId, (r) => {
-        startPullRequestRefreshDataLoads(r, branchNames, mode)
-      })
-      await runLatestOperation({
-        set,
-        get,
-        id,
-        repoInstanceId,
-        lane: 'read',
-        operationKey: 'pullRequests',
-        priority: 10,
-        targets: [
-          { key: 'pullRequests', reason: pullRequestReason(mode) },
-          ...branchNames.map((branch) => ({ key: `pullRequest:${branch}` as const, reason: pullRequestReason(mode) })),
-        ],
-        task: (signal) => getRepoPullRequests(id, branchNames, { mode }, signal),
-        onResult: (entries, ctx) => {
-          if (ctx.isCurrent()) setRepoPullRequestsQueryData(id, repoInstanceId, branchNames, mode, entries)
-          if (entries === null) {
-            applyPullRequestRefreshUnavailable(id, repoInstanceId, branchNames, mode)
-            return
-          }
-          applyPullRequestRefreshSuccess(id, repoInstanceId, branchNames, mode)
-        },
-        onStale: (ctx) => {
-          applyPullRequestRefreshStale(id, repoInstanceId, branchNames, mode, ctx.operationId)
-        },
-        onError: (message) => {
-          applyPullRequestRefreshError(id, repoInstanceId, branchNames, message)
-        },
-      })
-    },
-
-    async refreshStatus(id: string, options?: { repoInstanceId?: string }) {
-      const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
-      if (!resolved) return
-      const { repoInstanceId } = resolved
-      await runLatestDataLoadOperation({
-        set,
-        get,
-        id,
-        repoInstanceId,
-        lane: 'read',
-        operationKey: 'status',
-        priority: 40,
-        target: { key: 'status', reason: 'status' },
-        selectDataLoad: (r) => r.dataLoads.status,
-        start: (r) => ({ hasData: (getRepoStatusQueryData(r.id, r.instanceId)?.length ?? 0) > 0 }),
-        task: (signal) => getRepoStatus(id, signal),
-        onSuccess: (_status, ctx) => {
-          if (ctx.isCurrent()) setRepoStatusQueryData(id, repoInstanceId, _status)
-          const repoAfterStatus = get().repos[id]
-          if (ctx.isCurrent()) persistRepoSnapshotCacheEntry(set, repoAfterStatus, repoInstanceId)
-        },
-        onError: (message, r) => {
-          if (isRepoUnavailableReason(message)) markRepoUnavailable(r, message)
-        },
-        onErrorLog: (message) => {
-          refreshStatusLog.warn('failed', { err: new Error(message) })
-        },
-      })
-    },
-
     async refreshCoreData(id: string, options?: { repoInstanceId?: string }) {
       const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
       if (!resolved) return
@@ -281,87 +165,19 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
       await runCoreDataRefreshWorkflow(get, { id, repoInstanceId })
     },
 
-    /**
-     * Combined snapshot + status refresh backed by the
-     * `POST /api/repo/composite` endpoint. Saves a round trip on
-     * initial repo load by folding the two reads into one. Pull
-     * requests are still fetched separately (different lane, different
-     * retry semantics, different priority).
-     */
-    async refreshSnapshotAndStatus(id: string, options?: { skipLogBackfill?: boolean; repoInstanceId?: string }) {
-      const resolved = resolveActionRepoInstanceId(get, id, options?.repoInstanceId)
+    async refreshRuntimeProjection(
+      id: string,
+      options: RepoRuntimeProjectionRefreshOptions,
+    ) {
+      const resolved = resolveActionRepoInstanceId(get, id, options.repoInstanceId)
       if (!resolved) return
       const { repoInstanceId } = resolved
-      updateIfFresh(set, id, repoInstanceId, (r) => {
-        startDataLoad(r.dataLoads.snapshot, { hasData: (readRepoBranchQueryProjection(r)?.branches.length ?? 0) > 0 })
-        startDataLoad(r.dataLoads.status, { hasData: (getRepoStatusQueryData(r.id, r.instanceId)?.length ?? 0) > 0 })
-      })
-      await runLatestOperation({
-        set,
-        get,
-        id,
-        repoInstanceId,
-        lane: 'read',
-        operationKey: 'snapshot+status',
-        priority: 50,
-        targets: [
-          { key: 'snapshot', reason: 'snapshot' },
-          { key: 'status', reason: 'status' },
-        ],
-        task: (signal) => readRepoBulk(id, { include: ['snapshot', 'status'], signal }),
-        errorFromResult: (result) => {
-          // null on either side means soft-fail; treat as snapshot error
-          // (status is allowed to be empty).
-          return result.snapshot === null ? 'error.failed-read-repo' : null
-        },
-        onResult: async (result, ctx) => {
-          const previousSnapshot = ctx.isCurrent() ? getRepoSnapshotQueryData(id, repoInstanceId) : null
-          if (ctx.isCurrent()) setRepoBulkReadQueryData(id, repoInstanceId, ['snapshot', 'status'], result)
-          // Apply status first (leaf, no follow-up).
-          updateIfFresh(set, id, repoInstanceId, (r) => {
-            // The composite started the status data load above but, unlike
-            // snapshot which has a dedicated success flow that calls
-            // finishDataLoadSuccess, status has no follow-up path. Without
-            // this reset, the data load stays in 'loading'/'refreshing'
-            // forever, blocking useRepoStatusRefresh's gate from firing
-            // on the next status/changes tab open.
-            finishDataLoadSuccess(r.dataLoads.status)
-          })
-          if (result.status.length > 0 && ctx.isCurrent()) {
-            persistRepoSnapshotCacheEntry(set, get().repos[id], repoInstanceId)
-          }
-          if (result.snapshot === null) {
-            updateIfFresh(set, id, repoInstanceId, (r) => {
-              finishDataLoadError(r.dataLoads.snapshot, 'error.failed-read-repo')
-              r.events = appendRepoEvent(r.events, errorEvent('error.failed-read-repo'))
-            })
-            return
-          }
-          await runSnapshotSuccessFlow(
-            id,
-            repoInstanceId,
-            result.snapshot,
-            previousSnapshot?.branches ?? null,
-            ctx.isCurrent,
-            {
-              skipLogBackfill: options?.skipLogBackfill,
-            },
-          )
-        },
-        onError: (message) => {
-          updateIfFresh(set, id, repoInstanceId, (r) => {
-            if (isRepoUnavailableReason(message)) markRepoUnavailable(r, message)
-            finishDataLoadError(r.dataLoads.snapshot, message)
-            finishDataLoadError(r.dataLoads.status, message)
-            r.events = appendRepoEvent(r.events, errorEvent(message))
-          })
-        },
-      })
+      await runRuntimeProjectionRefresh(id, repoInstanceId, options)
     },
 
     /** Unified sync pipeline — local and remote repos follow the same path.
      *  1) Attempt a best-effort fetch when remotes are configured.
-     *  2) Always refresh the local snapshot + status afterwards.
+     *  2) Always refresh the server runtime projection afterwards.
      *  Bookkeeping (setLastResult, clearFetchFailed) is handled inline
      *  so there is one source of truth for post-sync cleanup. */
     async syncAndRefresh(id: string, options?: { repoInstanceId?: string }) {
@@ -376,11 +192,7 @@ export function createRefreshActions(set: ReposSet, get: ReposGet) {
         lane: 'read',
         priority: 100,
         targets: [{ key: 'manualRefresh', reason: 'manual-refresh' }],
-        task: async () =>
-          await runWithRepoInvalidationSource(
-            'manual',
-            async (sourceToken) => await runManualSyncPipeline(id, repoInstanceId, sourceToken),
-          ),
+        task: async () => await runManualSyncPipeline(id, repoInstanceId),
       })
     },
   }

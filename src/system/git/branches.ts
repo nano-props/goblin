@@ -1,3 +1,4 @@
+import path from 'node:path'
 import { git, gitResultWithOptions, NETWORK_TIMEOUT_MS } from '#/system/git/git-exec.ts'
 import { FIELD_SEP, parseBranches, parseLog } from '#/system/git/parsers.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
@@ -21,6 +22,15 @@ export async function isGitRepo(cwd: string): Promise<boolean> {
 export async function getRepoRoot(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
   try {
     return await git(cwd, ['rev-parse', '--show-toplevel'], { signal: options?.signal })
+  } catch {
+    return ''
+  }
+}
+
+export async function getRepoCommonDir(cwd: string, options?: { signal?: AbortSignal }): Promise<string> {
+  try {
+    const commonDir = await git(cwd, ['rev-parse', '--git-common-dir'], { signal: options?.signal })
+    return path.isAbsolute(commonDir) ? path.normalize(commonDir) : path.resolve(cwd, commonDir)
   } catch {
     return ''
   }

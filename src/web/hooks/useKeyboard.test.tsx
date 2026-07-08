@@ -12,14 +12,20 @@ vi.mock('sonner', () => ({
     success: vi.fn(),
   },
 }))
-import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import {
+  createRepoBranch,
+  resetReposStore,
+  seedRepoReadModelQueryData,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { setRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
+import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
 const testWindow = window as unknown as { goblinNative?: Window['goblinNative'] }
 const REPO_ID = '/tmp/keyboard-repo'
@@ -124,15 +130,15 @@ describe('useKeyboard', () => {
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/no-worktree', 'history')
   })
 
-  test('branch navigation shortcuts use the React Query snapshot read model for branch order', async () => {
+  test('branch navigation shortcuts use the React Query projection read model for branch order', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
       currentBranchName: 'main',
     })
-    setRepoSnapshotQueryData(REPO_ID, repo.instanceId, {
-      current: 'main',
+    seedRepoReadModelQueryData(repo, {
       branches: [createRepoBranch('main'), createRepoBranch('feature/query')],
+      currentBranch: 'main',
     })
     const selectRepoBranch = vi.fn()
     await renderHookHost({
@@ -331,6 +337,29 @@ describe('useKeyboard', () => {
     expect(toast.error).toHaveBeenCalledWith('action.create-worktree-busy')
   })
 
+  test('primary modifier plus n reads busy state from server operations projection', async () => {
+    Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: 'feature/worktree',
+    })
+    setRepoOperationsQueryData(REPO_ID, repo.instanceId, false, {
+      operations: [serverOperation(repo.instanceId, { kind: 'create-worktree', phase: 'running' })],
+      loadedAt: 123,
+    })
+    const openCreateWorktree = vi.fn()
+    await renderHookHost({ currentRepoId: REPO_ID, openCreateWorktree })
+
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'n', code: 'KeyN', ctrlKey: true, bubbles: true }))
+      await Promise.resolve()
+    })
+
+    expect(openCreateWorktree).not.toHaveBeenCalled()
+    expect(toast.error).toHaveBeenCalledWith('action.create-worktree-busy')
+  })
+
   test('does not run menu-backed primary shortcuts from the client in electron', async () => {
     Object.defineProperty(window.navigator, 'platform', { configurable: true, value: 'Linux x86_64' })
     installNativeBridgeStub()
@@ -402,6 +431,35 @@ describe('useKeyboard', () => {
 
 function renderHookHost(overrides: Partial<HookHostOptions> = {}) {
   return renderInJsdom(<HookHost {...overrides} />)
+}
+
+function serverOperation(
+  repoInstanceId: string,
+  overrides: Pick<RepoServerOperationState, 'kind' | 'phase'>,
+): RepoServerOperationState {
+  return {
+    id: `repo-op-${overrides.kind}-${overrides.phase}`,
+    repoId: REPO_ID,
+    repoInstanceId,
+    kind: overrides.kind,
+    phase: overrides.phase,
+    source: 'user',
+    target: null,
+    queuedAt: 100,
+    startedAt: overrides.phase === 'queued' ? null : 101,
+    deadlineAt: null,
+    settledAt: null,
+    error: null,
+    cancellation: {
+      underlyingRequested: false,
+      reason: null,
+      requestedAt: null,
+      waitCancelledCount: 0,
+      lastWaitCancelledAt: null,
+      lastWaitCancellationReason: null,
+    },
+    canCancelUnderlying: true,
+  }
 }
 
 function HookHost(overrides: Partial<HookHostOptions>) {

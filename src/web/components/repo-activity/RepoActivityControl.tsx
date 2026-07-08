@@ -7,7 +7,11 @@ import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { Tip } from '#/web/components/Tip.tsx'
 import { AsyncButton } from '#/web/components/AsyncButton.tsx'
 import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
-import type { RepoActivity, RepoCompletion } from '#/web/components/repo-activity/model.ts'
+import type {
+  RepoActivity,
+  RepoActivityProjectionRepo,
+  RepoCompletion,
+} from '#/web/components/repo-activity/model.ts'
 import {
   getRepoActivity,
   getRepoActivityControlView,
@@ -19,6 +23,9 @@ import { Button } from '#/web/components/ui/button.tsx'
 import { repoEventActionSuccessLabel } from '#/web/stores/repos/action-labels.ts'
 import { formatRelativeTime } from '#/web/lib/dates.ts'
 import { latestRepoSyncTime } from '#/web/stores/repos/sync-time.ts'
+import { useRepoOperationsReadModel } from '#/web/repo-data-query.ts'
+import type { RepoOperationsSnapshot } from '#/shared/api-types.ts'
+
 interface Props {
   repoId: string
 }
@@ -26,8 +33,14 @@ interface Props {
 const COMPLETION_VISIBLE_MS = 1500
 const EMPTY_EVENTS: RepoEvent[] = []
 
-function useRepoActivityControlPresentation(repo: RepoState) {
-  const rawActivity = getRepoActivity(repo)
+type RepoActivityControlRepo = Pick<
+  RepoState,
+  'id' | 'instanceId' | 'dataLoads' | 'availability' | 'projection' | 'remote'
+> &
+  RepoActivityProjectionRepo
+
+function useRepoActivityControlPresentation(repo: RepoActivityProjectionRepo, serverOperations?: RepoOperationsSnapshot) {
+  const rawActivity = getRepoActivity(repo, serverOperations)
   const rawActivityKey = rawActivity
     ? `${rawActivity.kind}:${rawActivity.labelKey}:${JSON.stringify(rawActivity.labelParams ?? {})}`
     : null
@@ -35,7 +48,10 @@ function useRepoActivityControlPresentation(repo: RepoState) {
   return useVisibleLoadingValue(stableRawActivity)
 }
 
-function repoActivityControlRepoEqual(a: RepoState | undefined, b: RepoState | undefined): boolean {
+function repoActivityControlRepoEqual(
+  a: RepoActivityControlRepo | undefined,
+  b: RepoActivityControlRepo | undefined,
+): boolean {
   return (
     a === b ||
     (!!a &&
@@ -43,9 +59,7 @@ function repoActivityControlRepoEqual(a: RepoState | undefined, b: RepoState | u
       a.id === b.id &&
       a.instanceId === b.instanceId &&
       a.dataLoads === b.dataLoads &&
-      a.operations.fetch === b.operations.fetch &&
-      a.operations.manualRefresh === b.operations.manualRefresh &&
-      a.operations.branchAction === b.operations.branchAction &&
+      a.branchAction === b.branchAction &&
       a.availability === b.availability &&
       a.projection === b.projection &&
       a.remote === b.remote)
@@ -53,18 +67,36 @@ function repoActivityControlRepoEqual(a: RepoState | undefined, b: RepoState | u
 }
 
 export function RepoActivityControl({ repoId }: Props) {
-  const repo = useStoreWithEqualityFn(useReposStore, (s) => s.repos[repoId], repoActivityControlRepoEqual)
+  const repo = useStoreWithEqualityFn(
+    useReposStore,
+    (s): RepoActivityControlRepo | undefined => {
+      const repo = s.repos[repoId]
+      return repo
+        ? {
+            id: repo.id,
+            instanceId: repo.instanceId,
+            dataLoads: repo.dataLoads,
+            branchAction: repo.operations.branchAction,
+            availability: repo.availability,
+            projection: repo.projection,
+            remote: repo.remote,
+          }
+        : undefined
+    },
+    repoActivityControlRepoEqual,
+  )
   if (!repo) return null
   return <RepoActivityControlView repo={repo} />
 }
 
-function RepoActivityControlView({ repo }: { repo: RepoState }) {
-  const visibleActivity = useRepoActivityControlPresentation(repo)
+function RepoActivityControlView({ repo }: { repo: RepoActivityControlRepo }) {
+  const operationsReadModel = useRepoOperationsReadModel(repo.id, repo.instanceId)
+  const visibleActivity = useRepoActivityControlPresentation(repo, operationsReadModel.data)
   const completion = useRepoCompletion(repo.id)
   const view = getRepoActivityControlView({
     visibleActivity,
     completion,
-    manualSyncBusy: isRepoPrimaryRefreshBusy(repo),
+    manualSyncBusy: isRepoPrimaryRefreshBusy(repo, operationsReadModel.data),
   })
 
   switch (view.kind) {
@@ -119,7 +151,7 @@ function useRepoCompletion(repoId: string): RepoCompletion | null {
   return completion
 }
 
-function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoState; manualSyncBusy: boolean }) {
+function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControlRepo; manualSyncBusy: boolean }) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
   const label = t('action.refresh')
@@ -224,7 +256,7 @@ function RepoCompletionIndicator({ completion }: { completion: RepoCompletion })
   )
 }
 
-function RepoCacheIndicator({ repo }: { repo: RepoState }) {
+function RepoCacheIndicator({ repo }: { repo: RepoActivityControlRepo }) {
   const t = useT()
 
   if (repo.projection.source !== 'cache') return null
@@ -240,7 +272,7 @@ function RepoCacheIndicator({ repo }: { repo: RepoState }) {
   )
 }
 
-function RepoFetchFailureIndicator({ repo }: { repo: RepoState }) {
+function RepoFetchFailureIndicator({ repo }: { repo: RepoActivityControlRepo }) {
   const t = useT()
 
   if (repo.remote.fetchFailed) {

@@ -1,26 +1,21 @@
 // @vitest-environment jsdom
 import { act } from '@testing-library/react'
-import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { CloneRepositoryDialog } from '#/web/components/CloneRepositoryDialog.tsx'
+import {
+  CloneRepositoryDialog,
+  type CloneRepositoryRequest,
+} from '#/web/components/CloneRepositoryDialog.tsx'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import type { CloneRepoResult } from '#/shared/api-types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 
-let ipcCalls: Array<{ path: string; input?: unknown }> = []
 const testWindow = window as unknown as { goblinNative?: unknown; __GOBLIN_BOOTSTRAP__?: unknown }
-const fetchMock = mockFetch(async () => ({
-  ok: true,
-  json: async () => true,
-}))
 
 beforeEach(() => {
-  ipcCalls = []
   setClientBridgeForTests(null)
-  fetchMock.mockClear()
   testWindow.__GOBLIN_BOOTSTRAP__ = {
     runtime: {
       kind: 'electron',
@@ -53,11 +48,7 @@ beforeEach(() => {
         capabilities: [...ELECTRON_CLIENT_CAPABILITIES],
       },
       pathForFile: () => '',
-      invokeIpc: async (request: { path: string; input?: unknown }) => {
-        ipcCalls.push(request)
-        if (request.path === 'repo.abortClone') return { ok: true }
-        return null
-      },
+      invokeIpc: async () => null,
       abortIpc: async () => true,
       onEvent: () => () => {},
     },
@@ -98,7 +89,7 @@ describe('CloneRepositoryDialog', () => {
   test('waits for clone success before closing and hides the close button while pending', async () => {
     const deferred = createDeferred<CloneRepoResult>()
     const onClose = vi.fn()
-    const onClone = vi.fn(() => deferred.promise)
+    const onClone = vi.fn((_request: CloneRepositoryRequest) => deferred.promise)
 
     renderInJsdom(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
 
@@ -107,10 +98,10 @@ describe('CloneRepositoryDialog', () => {
     click('button[type="submit"]')
 
     expect(onClone).toHaveBeenCalledWith({
-      operationId: expect.any(String),
       url: 'https://example.com/repo.git',
       parentPath: '/Users/tester/Developer',
       directoryName: 'repo',
+      signal: expect.any(AbortSignal),
     })
     expect(onClose).not.toHaveBeenCalled()
     expect(buttonByText('dialog.cancel').disabled).toBe(false)
@@ -142,22 +133,19 @@ describe('CloneRepositoryDialog', () => {
   test('cancel aborts an in-flight clone and closes the dialog', async () => {
     const deferred = createDeferred<CloneRepoResult>()
     const onClose = vi.fn()
-    const onClone = vi.fn(() => deferred.promise)
+    const onClone = vi.fn((_request: CloneRepositoryRequest) => deferred.promise)
 
     renderInJsdom(<CloneRepositoryDialog open onClose={onClose} onClone={onClone} />)
 
     setInputValue('#clone-url', 'https://example.com/repo.git')
     setInputValue('#clone-directory-name', 'repo')
     click('button[type="submit"]')
+    const request = onClone.mock.calls[0]?.[0]
     clickButtonByText('dialog.cancel')
     await flush()
 
     expect(onClose).toHaveBeenCalledTimes(1)
-    expect(
-      fetchMock.mock.calls.some(
-        (call) => new URL(String((call as unknown as [unknown])[0])).pathname === '/api/repo/abort-clone',
-      ),
-    ).toBe(true)
+    expect(request?.signal.aborted).toBe(true)
 
     deferred.resolve({ ok: true, message: 'ok', path: '/Users/tester/Developer/repo' })
     await flush()

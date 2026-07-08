@@ -5,7 +5,7 @@ import {
   commitWorkspacePaneTabs,
   type WorkspacePaneTabsMutationResult,
 } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
-import { getRepoSnapshotQueryData } from '#/web/repo-data-query.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 interface WorkspacePaneTabsRestoreDetails {
   unresolvedRepos: string[]
@@ -39,9 +39,9 @@ export async function restoreServerWorkspacePaneTabsFromSession(
     }
     for (const [targetKey, tabs] of Object.entries(tabsByTarget)) {
       if (options.signal?.aborted) return { status: 'cancelled', ...details() }
-      const snapshot = getRepoSnapshotQueryData(repo.id, repo.instanceId)
-      const target = snapshot
-        ? workspacePaneTabsTargetForRepoTargetKey({ repoRoot: repo.id, branches: snapshot.branches }, targetKey)
+      const branchModel = readRepoBranchQueryProjection(repo)
+      const target = branchModel
+        ? workspacePaneTabsTargetForRepoTargetKey({ repoRoot: repo.id, branches: branchModel.branches }, targetKey)
         : null
       if (!target) {
         unresolvedTargets.push({ repoRoot, targetKey })

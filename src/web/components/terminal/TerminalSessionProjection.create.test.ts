@@ -116,10 +116,6 @@ import {
   TerminalSessionProjection,
   setTerminalSessionProjectionForTests,
 } from '#/web/components/terminal/TerminalSessionProjection.ts'
-import {
-  clearWorkspacePaneTabsOperationQueuesForTests,
-  runWorkspacePaneTabsOperation,
-} from '#/web/workspace-pane/workspace-pane-tabs-operation-queue.ts'
 
 const REPO_ROOT = '/repo'
 const WORKTREE_PATH = '/repo'
@@ -219,20 +215,10 @@ function durableCloseInput() {
   }
 }
 
-function workspacePaneTabsOperationTarget() {
-  return {
-    repoRoot: REPO_ROOT,
-    repoInstanceId: REPO_INSTANCE_ID,
-    branchName: BRANCH,
-    worktreePath: WORKTREE_PATH,
-  }
-}
-
 describe('TerminalSessionProjection create flow', () => {
   let projection: TerminalSessionProjection
 
   beforeEach(() => {
-    clearWorkspacePaneTabsOperationQueuesForTests()
     mocks.createMock.mockReset()
     mocks.createMock.mockResolvedValue(makeCreateResult())
     mocks.closeMock.mockReset()
@@ -256,7 +242,6 @@ describe('TerminalSessionProjection create flow', () => {
 
   afterEach(() => {
     projection.destroy()
-    clearWorkspacePaneTabsOperationQueuesForTests()
     setTerminalSessionProjectionForTests(null)
     document.body.innerHTML = ''
     if (originalResizeObserver) {
@@ -792,7 +777,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(settled).toBe(true)
   })
 
-  test('canceling create during async startup resolution releases the workspace pane tab queue', async () => {
+  test('canceling create during async startup resolution releases the terminal create queue', async () => {
     const startup = Promise.withResolvers<string>()
     const createPromise = projection
       .createTerminal(terminalBase(), {
@@ -808,10 +793,9 @@ describe('TerminalSessionProjection create flow', () => {
     await expect(projection.closeTerminalsForWorktree(terminalBase())).resolves.toBe(true)
     await expect(createPromise).resolves.toBe('terminal create request canceled')
 
-    await expect(runWorkspacePaneTabsOperation(workspacePaneTabsOperationTarget(), async () => 'released')).resolves.toBe(
-      'released',
-    )
     expect(mocks.createMock).not.toHaveBeenCalled()
+    await expect(projection.createTerminal(terminalBase())).resolves.toBe('session-1')
+    expect(mocks.createMock).toHaveBeenCalledTimes(1)
   })
 
   test('durable close: awaits an in-flight close for the same worktree before creating', async () => {

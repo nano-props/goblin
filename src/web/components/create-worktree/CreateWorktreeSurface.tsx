@@ -23,6 +23,7 @@ import { useRemotePathSuggestions } from '#/web/hooks/useRemotePathSuggestions.t
 import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
+import type { RepoOperationState } from '#/web/stores/repos/operations.ts'
 import { useT } from '#/web/stores/i18n.ts'
 import { useRepoRemoteBranchesQuery } from '#/web/repo-data-query.ts'
 import type { RepoBranchReadModelData } from '#/web/repo-branch-read-model.ts'
@@ -40,7 +41,13 @@ const MODE_OPTIONS = [
   { id: 'trackRemoteBranch', labelKey: 'action.create-worktree-mode-remote', icon: RadioTower },
 ] satisfies Array<{ id: CreateWorktreeMode; labelKey: string; icon: LucideIcon }>
 
-type CreateWorktreeRepo = RepoState & { branchModel: RepoBranchReadModelData }
+interface CreateWorktreeRepo {
+  id: RepoState['id']
+  instanceId: RepoState['instanceId']
+  branchModel: RepoBranchReadModelData
+  branchAction: RepoOperationState
+  remote: Pick<RepoState['remote'], 'lifecycle'>
+}
 
 export interface WorktreeBootstrapPromptState {
   loading: boolean
@@ -98,7 +105,7 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
     t,
   )
 
-  const branchActionBusy = repo.operations.branchAction.phase !== 'idle'
+  const branchActionBusy = repo.branchAction.phase !== 'idle'
   const bootstrapBusy = worktreeBootstrap?.loading === true
   const canSubmit = !!derived.input && derived.validPath && !branchActionBusy && !bootstrapBusy && !submitting
 

@@ -2,7 +2,7 @@ import {
   createRepoWorkspaceTabModel,
   repoWorkspaceTabModelBlocksTabInteraction,
   type RepoWorkspaceTabModel,
-} from '#/web/components/repo-workspace/tab-model.ts'
+} from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'

@@ -5,10 +5,14 @@ import type { LogEntry, WorktreeStatus } from '#/shared/git-types.ts'
 
 const mocks = vi.hoisted(() => ({
   runWithRepoSource: vi.fn(),
+  listRepoWriteOperationsForRepo: vi.fn(),
 }))
 
 vi.mock('#/server/modules/repo-source.ts', () => ({
   runWithRepoSource: mocks.runWithRepoSource,
+}))
+vi.mock('#/server/modules/repo-write-operation-coordinator.ts', () => ({
+  listRepoWriteOperationsForRepo: mocks.listRepoWriteOperationsForRepo,
 }))
 
 // Tests only need the read surface; cast to the full interface at the
@@ -60,6 +64,8 @@ function makeSource(overrides: Partial<ReadSource> = {}): ReadSource {
 
 beforeEach(() => {
   mocks.runWithRepoSource.mockReset()
+  mocks.listRepoWriteOperationsForRepo.mockReset()
+  mocks.listRepoWriteOperationsForRepo.mockResolvedValue([])
   mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) => task(asRepoSource(makeSource())))
 })
 
@@ -129,6 +135,99 @@ describe('getRepoWorktreeBootstrapPreview', () => {
       preview: { hasOperations: true },
     })
     expect(getWorktreeBootstrapPreview).toHaveBeenCalledWith(signal)
+  })
+})
+
+describe('readRepoProjection', () => {
+  test('reads snapshot, status, and current-branch pull requests through one server projection', async () => {
+    const snapshot: RepoSnapshot = {
+      branches: [],
+      current: 'main',
+    }
+    const status: WorktreeStatus[] = [{ path: '/tmp/repo', branch: 'main', isMain: true, entries: [] }]
+    const pullRequests: PullRequestEntry[] = [
+      {
+        branch: 'feature/a',
+        pullRequest: {
+          number: 229,
+          title: 'Converge repo data authority',
+          url: 'https://github.com/acme/repo/pull/229',
+          state: 'open',
+        },
+      },
+    ]
+    const getSnapshot = vi.fn(() => Promise.resolve(snapshot))
+    const getStatus = vi.fn(() => Promise.resolve(status))
+    const getPullRequests = vi.fn(() => Promise.resolve(pullRequests))
+    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
+      task(asRepoSource(makeSource({ getSnapshot, getStatus, getPullRequests }))),
+    )
+    const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
+    const signal = new AbortController().signal
+
+    const result = await readRepoProjection('/tmp/repo', { branch: 'feature/a', mode: 'full', signal })
+
+    expect(result).toMatchObject({
+      snapshot,
+      status,
+      pullRequests,
+      requested: { branch: 'feature/a', pullRequestMode: 'full' },
+    })
+    expect(result.loadedAt).toEqual(expect.any(Number))
+    expect(getSnapshot).toHaveBeenCalledWith(expect.any(AbortSignal))
+    expect(getStatus).toHaveBeenCalledWith(expect.any(AbortSignal))
+    expect(getPullRequests).toHaveBeenCalledWith(['feature/a'], {
+      mode: 'full',
+      signal: expect.any(AbortSignal),
+    })
+  })
+
+  test('does not read all pull requests when no branch is requested', async () => {
+    const getPullRequests = vi.fn(() => Promise.resolve<PullRequestEntry[] | null>([]))
+    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
+      task(asRepoSource(makeSource({ getPullRequests }))),
+    )
+    const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
+
+    const result = await readRepoProjection('/tmp/repo')
+
+    expect(result).toMatchObject({
+      snapshot: null,
+      status: [],
+      pullRequests: null,
+      requested: { branch: null, pullRequestMode: 'full' },
+    })
+    expect(getPullRequests).not.toHaveBeenCalled()
+  })
+
+  test('reads all pull request summaries when the dashboard projection asks for summary mode', async () => {
+    const pullRequests: PullRequestEntry[] = [
+      {
+        branch: 'feature/a',
+        pullRequest: {
+          number: 230,
+          title: 'Dashboard summary projection',
+          url: 'https://github.com/acme/repo/pull/230',
+          state: 'open',
+        },
+      },
+    ]
+    const getPullRequests = vi.fn(() => Promise.resolve<PullRequestEntry[] | null>(pullRequests))
+    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
+      task(asRepoSource(makeSource({ getPullRequests }))),
+    )
+    const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
+
+    const result = await readRepoProjection('/tmp/repo', { mode: 'summary' })
+
+    expect(result).toMatchObject({
+      pullRequests,
+      requested: { branch: null, pullRequestMode: 'summary' },
+    })
+    expect(getPullRequests).toHaveBeenCalledWith(undefined, {
+      mode: 'summary',
+      signal: expect.any(AbortSignal),
+    })
   })
 })
 

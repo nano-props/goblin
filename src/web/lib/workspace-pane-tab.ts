@@ -10,7 +10,7 @@ import {
 import {
   workspacePaneTabProvider,
   type WorkspacePaneRuntimeTabAvailabilityByType,
-} from '#/web/components/workspace-pane/tab-providers.ts'
+} from '#/web/workspace-pane/tab-providers.ts'
 
 export type BranchLevelWorkspacePaneTab = WorkspacePaneBranchTabType
 export type WorktreeLevelWorkspacePaneTab = Exclude<WorkspacePaneTabType, BranchLevelWorkspacePaneTab>
