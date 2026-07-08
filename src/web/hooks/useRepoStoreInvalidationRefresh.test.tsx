@@ -69,7 +69,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
     vi.useRealTimers()
   })
 
-  test('refreshes the runtime projection when a repo-snapshot invalidation arrives', async () => {
+  test('handles repo-snapshot invalidations through query invalidation and core refresh', async () => {
     const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
     renderInJsdom(<Harness />)
 
@@ -79,7 +79,41 @@ describe('useRepoStoreInvalidationRefresh', () => {
     })
 
     expect(storeState.refreshCoreData).toHaveBeenCalledWith('/tmp/repo', { repoInstanceId: 'repo-instance-test-7' })
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: repoDataQueryKey('/tmp/repo', 'repo-instance-test-7') })
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: repoDataQueryKey('/tmp/repo', 'repo-instance-test-7'),
+      refetchType: 'none',
+    })
+    invalidateSpy.mockRestore()
+  })
+
+  test('handles repo-runtime invalidations through runtime projection query invalidation', async () => {
+    const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
+    const refetchSpy = vi.spyOn(primaryWindowQueryClient, 'refetchQueries')
+    renderInJsdom(<Harness />)
+
+    await act(async () => {
+      for (const listener of listeners)
+        listener({ type: 'repo-query-invalidated', repoId: '/tmp/repo', query: 'repo-runtime' })
+    })
+
+    expect(storeState.refreshCoreData).not.toHaveBeenCalled()
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['repo-data', '/tmp/repo', 'repo-instance-test-7', 'projection'],
+      refetchType: 'none',
+    })
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['repo-data', '/tmp/repo', 'repo-instance-test-7', 'operations'],
+      refetchType: 'none',
+    })
+    expect(refetchSpy).toHaveBeenCalledWith(
+      { queryKey: ['repo-data', '/tmp/repo', 'repo-instance-test-7', 'projection'], type: 'active' },
+      { cancelRefetch: false },
+    )
+    expect(refetchSpy).toHaveBeenCalledWith(
+      { queryKey: ['repo-data', '/tmp/repo', 'repo-instance-test-7', 'operations'], type: 'active' },
+      { cancelRefetch: false },
+    )
+    refetchSpy.mockRestore()
     invalidateSpy.mockRestore()
   })
 
