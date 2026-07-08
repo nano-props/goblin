@@ -5,6 +5,7 @@ import {
   nextRepoOperationId,
   repoOperation,
 } from '#/web/stores/repos/repo-operation-scheduler.ts'
+import { requestRepoRuntimeProjectionRefresh, runManualRepoSync } from '#/web/stores/repos/refresh.ts'
 import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { getBranchActionCapabilities } from '#/web/hooks/useBranchActions.tsx'
 import {
@@ -21,6 +22,7 @@ import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { repoProjection } from '#/web/stores/repos/refresh-test-utils.ts'
 const REPO_ID = '/tmp/gbl-branch-actions-test-repo'
+const refreshStoreAccess = { get: useReposStore.getState, set: useReposStore.setState }
 
 function branchBrowserRemoteProvider(
   repo: NonNullable<ReturnType<typeof useReposStore.getState>['repos'][string]>,
@@ -320,7 +322,7 @@ describe('runBranchAction', () => {
         repoProjection({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
     })
 
-    const syncWork = useReposStore.getState().syncAndRefresh(REPO_ID)
+    const syncWork = runManualRepoSync(refreshStoreAccess, REPO_ID)
     await flushAsyncWork()
     const result = await useReposStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
 
@@ -378,9 +380,10 @@ describe('runBranchAction', () => {
       },
     })
 
-    const statusWork = useReposStore
-      .getState()
-      .refreshRuntimeProjection(REPO_ID, { scope: 'visible-status', branchName: null })
+    const statusWork = requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
+      scope: 'visible-status',
+      branchName: null,
+    })
     await flushAsyncWork()
     const deleteWork = useReposStore.getState().runBranchAction(REPO_ID, {
       kind: 'deleteBranch',
@@ -424,9 +427,7 @@ describe('runBranchAction', () => {
       },
     })
 
-    void useReposStore
-      .getState()
-      .refreshRuntimeProjection(REPO_ID, { scope: 'visible-status', branchName: null })
+    void requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, { scope: 'visible-status', branchName: null })
     await flushAsyncWork()
     const result = await useReposStore.getState().runBranchAction(
       REPO_ID,
@@ -522,9 +523,10 @@ describe('runBranchAction', () => {
       },
     })
 
-    const statusWork = useReposStore
-      .getState()
-      .refreshRuntimeProjection(REPO_ID, { scope: 'visible-status', branchName: null })
+    const statusWork = requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
+      scope: 'visible-status',
+      branchName: null,
+    })
     await flushAsyncWork()
     const pullWork = useReposStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
     await flushAsyncWork()
@@ -581,9 +583,10 @@ describe('runBranchAction', () => {
         },
       })
 
-      const statusWork = useReposStore
-        .getState()
-        .refreshRuntimeProjection(REPO_ID, { scope: 'visible-status', branchName: null })
+      const statusWork = requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
+        scope: 'visible-status',
+        branchName: null,
+      })
       await flushAsyncWork()
       const actionWork = useReposStore.getState().runBranchAction(REPO_ID, action)
       await flushAsyncWork()

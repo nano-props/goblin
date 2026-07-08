@@ -27,6 +27,21 @@ export function repoProjectionQueryKey(
   ] as const
 }
 
+export interface ParsedRepoProjectionQueryKey {
+  repoRoot: string
+  repoRuntimeId: string
+}
+
+export function parseRepoProjectionQueryKey(queryKey: readonly unknown[]): ParsedRepoProjectionQueryKey | null {
+  if (queryKey.length < 5) return null
+  if (queryKey[0] !== 'repo-data') return null
+  if (queryKey[3] !== 'projection') return null
+  const repoRoot = queryKey[1]
+  const repoRuntimeId = queryKey[2]
+  if (typeof repoRoot !== 'string' || typeof repoRuntimeId !== 'string') return null
+  return { repoRoot, repoRuntimeId }
+}
+
 export function repoOperationsQueryKey(repoRoot: string, repoRuntimeId: string, includeSettled = false) {
   return ['repo-data', repoRoot, repoRuntimeId, 'operations', { includeSettled }] as const
 }
@@ -238,7 +253,7 @@ export function useRepoProjectionReadModel(
   })
   useEffect(() => {
     if (!enabled || !query.data || query.isPlaceholderData) return
-    setRepoProjectionQueryData(repoRoot, repoRuntimeId, branch, mode, query.data)
+    setRepoOperationsQueryData(repoRoot, repoRuntimeId, false, query.data.operations)
   }, [branch, enabled, mode, query.data, query.isPlaceholderData, repoRuntimeId, repoRoot])
   return query
 }
@@ -338,13 +353,23 @@ export function seedRepoProjectionQueryData(
   )
 }
 
-export async function fetchRepoProjectionReadModel(
+export async function refreshRepoProjectionReadModel(
   repoRoot: string,
+  repoRuntimeId: string,
   branch: string | null | undefined,
   mode: PullRequestFetchMode | undefined,
-  signal?: AbortSignal,
+  options: { signal?: AbortSignal; queryClient?: QueryClient } = {},
 ): Promise<RepoRuntimeProjection> {
-  return await getRepoProjection(repoRoot, branch, { mode }, signal)
+  options.signal?.throwIfAborted()
+  const queryClient = options.queryClient ?? primaryWindowQueryClient
+  const queryOptions = repoProjectionQueryOptions(repoRoot, repoRuntimeId, branch, mode)
+  const projection = await queryClient.fetchQuery({
+    ...queryOptions,
+    staleTime: 0,
+    queryFn: ({ signal }) => getRepoProjection(repoRoot, branch, { mode }, signal),
+  })
+  setRepoOperationsQueryData(repoRoot, repoRuntimeId, false, projection.operations, queryClient)
+  return projection
 }
 
 export function invalidateRepoDataQueries(

@@ -423,11 +423,11 @@ export function insertPlaceholderRepo(
   })
 }
 
-export function refreshInitialRepoState(get: ReposGet, refresh: InitialRepoRefresh) {
+export function refreshInitialRepoState(set: ReposSet, get: ReposGet, refresh: InitialRepoRefresh) {
   const repo = get().repos[refresh.id]
   if (!repo || repo.repoRuntimeId !== refresh.repoRuntimeId) return
-  void runRepoRefreshIntent(get, {
-    kind: 'core-data-changed',
+  void runRepoRefreshIntent({ get, set }, {
+    kind: 'projection-read-model-refresh-requested',
     reason: 'initial-load',
     id: refresh.id,
     repoRuntimeId: refresh.repoRuntimeId,
@@ -492,7 +492,7 @@ export function createRuntimeRepoSessionActions(
         return changed ? { repos, order } : s
       })
 
-      if (initialRefresh) refreshInitialRepoState(get, initialRefresh)
+      if (initialRefresh) refreshInitialRepoState(set, get, initialRefresh)
       return { ok: true, id, postOpenEffects: recordRecentRepoPostOpen(recentEntry) }
     },
 

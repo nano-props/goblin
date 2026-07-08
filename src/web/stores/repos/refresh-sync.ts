@@ -16,7 +16,11 @@ import type { RepoOperationReason } from '#/web/stores/repos/operations.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import type { ExecResult } from '#/web/types.ts'
 
-export function createRefreshSyncHelpers(set: ReposSet, get: ReposGet) {
+export function createRefreshSyncHelpers(
+  set: ReposSet,
+  get: ReposGet,
+  options: { refreshProjectionReadModel: (id: string, repoRuntimeId: string) => Promise<void> },
+) {
   async function runNetworkTask(
     id: string,
     task: (signal: AbortSignal) => Promise<ExecResult>,
@@ -96,7 +100,7 @@ export function createRefreshSyncHelpers(set: ReposSet, get: ReposGet) {
       fetchResult = await attemptFetch(id, repoRuntimeId)
     }
     if (repoIfFresh(get, id, repoRuntimeId)) {
-      await get().refreshCoreData(id, { repoRuntimeId })
+      await options.refreshProjectionReadModel(id, repoRuntimeId)
     }
     finalizeSyncFetchResult(id, repoRuntimeId, fetchResult)
   }

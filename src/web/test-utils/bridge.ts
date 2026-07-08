@@ -27,6 +27,7 @@ import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import type { ClientBridge } from '#/web/client-bridge-types.ts'
 import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { resetAcceptedRepoProjectionReadModelState } from '#/web/stores/repos/projection-read-model-effects.ts'
 import {
   readWorkspacePaneTabsForTarget,
   setWorkspacePaneTabsForTargetQueryData,
@@ -391,6 +392,7 @@ function workspacePaneTabsWithIdentityOrder(
 
 export function resetReposStore(): void {
   disposeAllRepoOperationSchedulers()
+  resetAcceptedRepoProjectionReadModelState()
   primaryWindowQueryClient.clear()
   useReposStore.setState({
     repos: {},

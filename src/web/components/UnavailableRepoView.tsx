@@ -66,7 +66,7 @@ export function UnavailableRepoView({ repo }: Props) {
                 type="button"
                 variant="default"
                 onClick={() =>
-                  void runRepoRefreshIntent(useReposStore.getState, {
+                  void runRepoRefreshIntent({ get: useReposStore.getState, set: useReposStore.setState }, {
                     kind: 'manual-refresh-requested',
                     id: repo.id,
                     repoRuntimeId: repo.repoRuntimeId,

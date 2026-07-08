@@ -293,7 +293,10 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
         if (result.ok || result.repoChanged || options?.refreshOnError !== false) {
           const repo = get().repos[id]
           if (repo?.repoRuntimeId === repoRuntimeId) {
-            await runRepoRefreshIntent(get, { kind: 'core-data-changed', reason: 'branch-action', id, repoRuntimeId })
+            await runRepoRefreshIntent(
+              { get, set },
+              { kind: 'projection-read-model-refresh-requested', reason: 'branch-action', id, repoRuntimeId },
+            )
           }
         }
         if (result.ok && network) get().clearFetchFailed(id, repoRuntimeId)

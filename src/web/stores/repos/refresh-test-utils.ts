@@ -39,7 +39,7 @@ export function repoProjection(
     pullRequests: options.pullRequests ?? null,
     operations: options.operations ?? { operations: [], loadedAt: 0 },
     requested: options.requested ?? { branch: null, pullRequestMode: 'full' },
-    loadedAt: options.loadedAt ?? 0,
+    loadedAt: options.loadedAt ?? Date.now(),
   }
 }
 

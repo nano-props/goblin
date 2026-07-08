@@ -15,6 +15,7 @@ export function applySnapshotToRepoProjection(
   snap: RepoSnapshot,
   validBranches: Set<string>,
   previousSnapshotBranches: RepoSnapshot['branches'] | null,
+  loadedAt = Date.now(),
 ): void {
   void previousSnapshotBranches
   void validBranches
@@ -34,7 +35,7 @@ export function applySnapshotToRepoProjection(
   markRepoAvailable(r)
   r.projection.source = 'fresh'
   r.projection.savedAt = null
-  finishDataLoadSuccess(r.dataLoads.repoReadModel)
+  finishDataLoadSuccess(r.dataLoads.repoReadModel, loadedAt)
 }
 
 export function shouldAttemptFetch(repo: RepoState | null | undefined, repoRuntimeId: string): boolean {

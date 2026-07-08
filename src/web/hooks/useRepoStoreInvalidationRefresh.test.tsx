@@ -21,7 +21,6 @@ const storeState = {
       },
     },
   },
-  refreshCoreData: vi.fn(),
 }
 
 vi.mock('#/web/repo-query-invalidation-ingress.ts', () => ({
@@ -34,6 +33,7 @@ vi.mock('#/web/repo-query-invalidation-ingress.ts', () => ({
 vi.mock('#/web/stores/repos/store.ts', () => ({
   useReposStore: {
     getState: () => storeState,
+    setState: vi.fn(),
   },
 }))
 
@@ -49,7 +49,6 @@ describe('useRepoStoreInvalidationRefresh', () => {
     listeners.clear()
     primaryWindowQueryClient.clear()
     resetRepoRefreshCoordinatorState()
-    storeState.refreshCoreData.mockReset()
     storeState.repos['/tmp/repo'] = {
       id: '/tmp/repo',
       availability: { phase: 'available' },
@@ -69,7 +68,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
     vi.useRealTimers()
   })
 
-  test('handles repo-snapshot invalidations through query invalidation and core refresh', async () => {
+  test('handles repo-snapshot invalidations through query invalidation only', async () => {
     const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
     renderInJsdom(<Harness />)
 
@@ -78,7 +77,6 @@ describe('useRepoStoreInvalidationRefresh', () => {
         listener({ type: 'repo-query-invalidated', repoId: '/tmp/repo', query: 'repo-snapshot' })
     })
 
-    expect(storeState.refreshCoreData).toHaveBeenCalledWith('/tmp/repo', { repoRuntimeId: 'repo-runtime-test-7' })
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: repoDataQueryKey('/tmp/repo', 'repo-runtime-test-7'),
       refetchType: 'none',
@@ -96,7 +94,6 @@ describe('useRepoStoreInvalidationRefresh', () => {
         listener({ type: 'repo-query-invalidated', repoId: '/tmp/repo', query: 'repo-runtime' })
     })
 
-    expect(storeState.refreshCoreData).not.toHaveBeenCalled()
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-test-7', 'projection'],
       refetchType: 'none',
@@ -118,6 +115,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
   })
 
   test('refreshes invalidations even when extra transport metadata is present', async () => {
+    const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
     renderInJsdom(<Harness />)
 
     await act(async () => {
@@ -130,6 +128,10 @@ describe('useRepoStoreInvalidationRefresh', () => {
         })
     })
 
-    expect(storeState.refreshCoreData).toHaveBeenCalledWith('/tmp/repo', { repoRuntimeId: 'repo-runtime-test-7' })
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: repoDataQueryKey('/tmp/repo', 'repo-runtime-test-7'),
+      refetchType: 'none',
+    })
+    invalidateSpy.mockRestore()
   })
 })

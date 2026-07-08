@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { runSnapshotSuccessWorkflow } from '#/web/stores/repos/refresh-workflows.ts'
+import { acceptRepoProjectionReadModel } from '#/web/stores/repos/projection-read-model-effects.ts'
 import {
   createBranchSnapshot,
   installGoblinTestBridge,
@@ -9,14 +9,29 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
 
 beforeEach(() => {
   resetReposStore()
   primaryWindowQueryClient.clear()
 })
 
-describe('repo refresh workflows', () => {
-  test('snapshot success persists snapshot cache without triggering pull request summary backfill', async () => {
+describe('repo projection read-model effects', () => {
+  function acceptedProjection(): RepoRuntimeProjection {
+    return {
+      snapshot: {
+        branches: [createBranchSnapshot('feature/a'), createBranchSnapshot('feature/b')],
+        current: 'feature/a',
+      },
+      status: [],
+      pullRequests: null,
+      operations: { operations: [], loadedAt: Date.now() },
+      requested: { branch: null, pullRequestMode: 'full' },
+      loadedAt: Date.now(),
+    }
+  }
+
+  test('snapshot success persists snapshot cache without triggering pull request summary backfill', () => {
     installGoblinTestBridge({})
     const repo = seedRepoShellForTest({
       id: '/repo',
@@ -28,10 +43,10 @@ describe('repo refresh workflows', () => {
       currentBranch: 'feature/a',
     })
 
-    await runSnapshotSuccessWorkflow(useReposStore.setState, useReposStore.getState, {
-      id: '/repo',
+    acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {
+      repoRoot: '/repo',
       repoRuntimeId: repo.repoRuntimeId,
-      isSnapshotCurrent: () => true,
+      projection: acceptedProjection(),
     })
 
     expect(useReposStore.getState().repoSnapshotCache['/repo']).toMatchObject({
@@ -42,7 +57,7 @@ describe('repo refresh workflows', () => {
     })
   })
 
-  test('snapshot success does not block on terminal prune completion', async () => {
+  test('snapshot success does not block on terminal prune completion', () => {
     installGoblinTestBridge({
       'terminal.prune': async () => {
         await new Promise<void>(() => {})
@@ -59,16 +74,16 @@ describe('repo refresh workflows', () => {
       currentBranch: 'feature/a',
     })
 
-    await expect(
-      runSnapshotSuccessWorkflow(useReposStore.setState, useReposStore.getState, {
-        id: '/repo',
+    expect(() => {
+      acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {
+        repoRoot: '/repo',
         repoRuntimeId: repo.repoRuntimeId,
-        isSnapshotCurrent: () => true,
-      }),
-    ).resolves.toBeUndefined()
+        projection: acceptedProjection(),
+      })
+    }).not.toThrow()
   })
 
-  test('snapshot success skips side effects when the snapshot is stale', async () => {
+  test('snapshot success skips side effects when the snapshot is stale', () => {
     const pruneTerminals = vi.fn(() => Promise.resolve({ pruned: 0, remaining: 0 }))
     installGoblinTestBridge({
       'terminal.prune': pruneTerminals,
@@ -83,10 +98,10 @@ describe('repo refresh workflows', () => {
       currentBranch: 'feature/a',
     })
 
-    await runSnapshotSuccessWorkflow(useReposStore.setState, useReposStore.getState, {
-      id: '/repo',
-      repoRuntimeId: repo.repoRuntimeId,
-      isSnapshotCurrent: () => false,
+    acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-stale',
+      projection: acceptedProjection(),
     })
 
     expect(pruneTerminals).not.toHaveBeenCalled()
