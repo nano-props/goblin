@@ -214,7 +214,7 @@ async function invalidateExactRepoProjectionQuery(
   await queryClient.invalidateQueries({ queryKey, exact: true, refetchType: 'none' })
 }
 
-function repoProjectionFetchAlreadyActive(
+function hasRepoProjectionFetchInProgress(
   queryClient: QueryClient,
   queryKey: ReturnType<typeof repoProjectionQueryKey>,
 ): boolean {
@@ -556,7 +556,7 @@ async function beginRepoProjectionReadModelRefresh(input: RepoProjectionRefreshR
 
 async function fetchRepoProjectionReadModelOnce(input: RepoProjectionRefreshReadInput): Promise<RepoRuntimeProjection> {
   const projectionQueryOptions = repoProjectionQueryOptions(input.repoRoot, input.repoRuntimeId, input.branch, input.mode)
-  const sharedFetchAlreadyActive = repoProjectionFetchAlreadyActive(input.queryClient, input.queryKey)
+  const hasSharedFetchInProgress = hasRepoProjectionFetchInProgress(input.queryClient, input.queryKey)
   const projectionPromise = input.queryClient.fetchQuery({
     ...projectionQueryOptions,
     staleTime: 0,
@@ -566,7 +566,7 @@ async function fetchRepoProjectionReadModelOnce(input: RepoProjectionRefreshRead
         input.repoRuntimeId,
         input.branch,
         input.mode,
-        input.signal && !sharedFetchAlreadyActive ? abortSignalAny([signal, input.signal]) : signal,
+        input.signal && !hasSharedFetchInProgress ? abortSignalAny([signal, input.signal]) : signal,
         input.queryClient,
       ),
   })
