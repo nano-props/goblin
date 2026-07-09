@@ -585,6 +585,49 @@ describe('fetchRepo invalidation publishing', () => {
     )
   })
 
+  test('remote syncs for different repos under the same alias use distinct write boundaries', async () => {
+    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo-a' })
+    const otherRepoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo-b' })
+    mocks.resolveRemoteTarget.mockImplementation(async (ref: { alias: string; remotePath: string }) => ({
+      target: {
+        id: normalizeRemoteRepoId(ref),
+        alias: ref.alias,
+        host: 'example.test',
+        user: 'deploy',
+        port: 22,
+        remotePath: ref.remotePath,
+        displayName: `${ref.alias}:${ref.remotePath}`,
+      },
+    }))
+    mocks.getRemoteRepoWriteGroupPath.mockImplementation(async (target: { remotePath: string }) => target.remotePath)
+    const first = deferred<{ ok: true; message: string }>()
+    const second = deferred<{ ok: true; message: string }>()
+    const fetchPaths: string[] = []
+    mocks.fetchRemoteRepo.mockImplementation(async (target: { remotePath: string }) => {
+      fetchPaths.push(target.remotePath)
+      if (target.remotePath === '/srv/repo-a') return await first.promise
+      if (target.remotePath === '/srv/repo-b') return await second.promise
+      return { ok: true, message: 'fetched' }
+    })
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const active = fetchRepo(repoId, 'background')
+    await vi.waitFor(() => {
+      expect(fetchPaths).toEqual(['/srv/repo-a'])
+    })
+
+    const other = fetchRepo(otherRepoId, 'background')
+    await vi.waitFor(() => {
+      expect(fetchPaths).toEqual(['/srv/repo-a', '/srv/repo-b'])
+    })
+
+    first.resolve({ ok: true, message: 'fetched first' })
+    second.resolve({ ok: true, message: 'fetched second' })
+
+    await expect(active).resolves.toEqual({ ok: true, message: 'fetched first' })
+    await expect(other).resolves.toEqual({ ok: true, message: 'fetched second' })
+  })
+
   test('caller abort cancels a queued user sync without cancelling the active background sync', async () => {
     const fetch = deferred<{ ok: true; message: string }>()
     mocks.fetchAll.mockImplementationOnce(() => fetch.promise)
