@@ -8,6 +8,7 @@ import {
   type RepoOperationState,
   type RepoOperationTarget,
 } from '#/web/stores/repos/operations.ts'
+import { RepoOperationCancelledError } from '#/web/stores/repos/operation-cancellation.ts'
 export type RepoOperationLane = 'network' | 'read' | 'write' | 'lifecycle'
 export type { RepoOperationKey, RepoOperationTarget }
 
@@ -32,9 +33,9 @@ interface RepoOperationLaneOptions {
   onStart?: (wasQueued: boolean) => void
 }
 
-function rejectQueuedTask(task: QueuedRepoOperation<unknown>, message: string): void {
+function rejectQueuedTask(task: QueuedRepoOperation<unknown>, reason: unknown): void {
   queueMicrotask(() => {
-    task.reject(new Error(message))
+    task.reject(reason)
   })
 }
 
@@ -82,7 +83,10 @@ class RepoOperationLaneQueue {
           queuedTask.timeout = globalThis.setTimeout(() => {
             if (this.removeQueued(queuedTask as QueuedRepoOperation<unknown>)) {
               queuedTask.ctrl.abort(options.queuedTimeoutMessage)
-              rejectQueuedTask(queuedTask as QueuedRepoOperation<unknown>, options.queuedTimeoutMessage ?? 'cancelled')
+              rejectQueuedTask(
+                queuedTask as QueuedRepoOperation<unknown>,
+                new Error(options.queuedTimeoutMessage ?? 'cancelled'),
+              )
             }
           }, options.queuedTimeoutMs)
         }
@@ -92,13 +96,14 @@ class RepoOperationLaneQueue {
   }
 
   cancelAll(): void {
-    for (const ctrl of this.activeControllers) ctrl.abort()
+    for (const ctrl of this.activeControllers) ctrl.abort(new RepoOperationCancelledError())
     const queued = this.queued
     this.queued = []
     for (const task of queued) {
       if (task.timeout) globalThis.clearTimeout(task.timeout)
-      task.ctrl.abort()
-      rejectQueuedTask(task, 'cancelled')
+      const reason = new RepoOperationCancelledError()
+      task.ctrl.abort(reason)
+      rejectQueuedTask(task, reason)
     }
     // Clear the active-key index — every active task is being
     // canceled, so the index is stale by definition. `start`'s
@@ -151,8 +156,9 @@ class RepoOperationLaneQueue {
       }
       cancelled = true
       if (task.timeout) globalThis.clearTimeout(task.timeout)
-      task.ctrl.abort()
-      rejectQueuedTask(task, 'cancelled')
+      const reason = new RepoOperationCancelledError()
+      task.ctrl.abort(reason)
+      rejectQueuedTask(task, reason)
     }
     this.queued = keep
     return cancelled
@@ -161,14 +167,14 @@ class RepoOperationLaneQueue {
   /**
    * Abort the active task for a given `replaceKey` if one is in
    * flight. Returns whether an active task was found. The aborted
-   * task's promise rejects with an `AbortError`, its `.finally()`
-   * cleans up the index, and the next queued task (if any) is
-   * drained into the freed concurrency slot.
+   * task's promise rejects through the operation-cancellation path,
+   * its `.finally()` cleans up the index, and the next queued task
+   * (if any) is drained into the freed concurrency slot.
    */
   private cancelActiveByKey(replaceKey: string): boolean {
     const ctrl = this.activeByReplaceKey.get(replaceKey)
     if (!ctrl) return false
-    ctrl.abort()
+    ctrl.abort(new RepoOperationCancelledError())
     return true
   }
 
@@ -337,18 +343,18 @@ export function waitForRepoOperationsIdle(repoId: string, keys: string[], signal
       cleanup()
       resolve()
     }
-    const fail = () => {
+    const fail = (reason: unknown) => {
       if (settled) return
       settled = true
       cleanup()
-      reject(new Error('cancelled'))
+      reject(reason)
     }
     const check = () => {
       if (keys.every((key) => !repoOperationBusy(repoId, key))) finish()
     }
-    const abort = () => fail()
+    const abort = () => fail(signal?.reason ?? new RepoOperationCancelledError())
     if (signal?.aborted) {
-      fail()
+      abort()
       return
     }
     const waiters = operationIdleWaiters.get(repoId) ?? new Set<() => void>()

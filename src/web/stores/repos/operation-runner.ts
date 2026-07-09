@@ -7,6 +7,7 @@ import {
   settleRepoOperationTargets,
   type RepoOperationLane,
 } from '#/web/stores/repos/repo-operation-scheduler.ts'
+import { isExpectedRepoOperationCancellation } from '#/web/stores/repos/operation-cancellation.ts'
 import { updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
 import {
   markRepoOperationViews,
@@ -140,7 +141,9 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
       outcome = { kind: 'success', result, error: options.errorFromResult?.(result) ?? null }
     }
   } catch (err) {
-    outcome = { kind: 'error', error: err instanceof Error ? err.message : String(err), original: err }
+    outcome = isExpectedRepoOperationCancellation(err)
+      ? { kind: 'stale' }
+      : { kind: 'error', error: err instanceof Error ? err.message : String(err), original: err }
   }
 
   // Settle operation state exactly once before running side effects.

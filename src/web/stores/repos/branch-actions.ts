@@ -3,6 +3,7 @@ import {
   runLatestOperation,
   type RepoOperationTarget,
 } from '#/web/stores/repos/operation-runner.ts'
+import { RepoOperationCancelledError } from '#/web/stores/repos/operation-cancellation.ts'
 import type { RepoBranchActionReason, RepoOperationReason } from '#/web/stores/repos/operations.ts'
 import { isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
 import {
@@ -140,7 +141,7 @@ function evaluateRepoBranchActionSchedule(repo: RepoState, action: RepoBranchAct
 }
 
 function throwIfStale(get: ReposGet, id: string, repoRuntimeId: string): void {
-  if (get().repos[id]?.repoRuntimeId !== repoRuntimeId) throw new Error('cancelled')
+  if (get().repos[id]?.repoRuntimeId !== repoRuntimeId) throw new RepoOperationCancelledError()
 }
 
 function syncNetworkFetchDataLoadState(
