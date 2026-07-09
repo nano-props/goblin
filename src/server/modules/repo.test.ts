@@ -428,14 +428,10 @@ describe('fetchRepo invalidation publishing', () => {
     )
   })
 
-  test('user sync waits for and reuses an active background sync result without duplicating invalidation', async () => {
-    let resolveFetch!: (value: { ok: true; message: string }) => void
-    mocks.fetchAll.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          resolveFetch = resolve
-        }),
-    )
+  test('user sync waits for an active background sync before fetching', async () => {
+    const backgroundFetch = deferred<{ ok: true; message: string }>()
+    mocks.fetchAll.mockImplementationOnce(() => backgroundFetch.promise)
+    mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched by user' })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const background = fetchRepo('/tmp/repo', 'background')
@@ -444,28 +440,35 @@ describe('fetchRepo invalidation publishing', () => {
     })
     const user = fetchRepo('/tmp/repo', 'user')
 
-    resolveFetch({ ok: true, message: 'fetched in background' })
+    backgroundFetch.resolve({ ok: true, message: 'fetched in background' })
     const [backgroundResult, userResult] = await Promise.all([background, user])
 
     expect(backgroundResult).toEqual({ ok: true, message: 'fetched in background' })
-    expect(userResult).toEqual({ ok: true, message: 'fetched in background' })
-    expect(mocks.fetchAll).toHaveBeenCalledTimes(1)
-    expectRepoSnapshotInvalidations({
-      repoId: '/tmp/repo',
-      query: 'repo-snapshot',
-    })
+    expect(userResult).toEqual({ ok: true, message: 'fetched by user' })
+    expect(mocks.fetchAll).toHaveBeenCalledTimes(2)
+    expectRepoSnapshotInvalidations(
+      {
+        repoId: '/tmp/repo',
+        query: 'repo-snapshot',
+      },
+      {
+        repoId: '/tmp/repo',
+        query: 'repo-snapshot',
+      },
+    )
   })
 
-  test('user sync reuses an active background sync from a sibling worktree', async () => {
+  test('user sync waits for an active sibling worktree background sync before fetching', async () => {
     mocks.getRepoCommonDir.mockImplementation(async (cwd: string) =>
       cwd === '/tmp/repo' || cwd === '/tmp/repo-linked' ? '/tmp/repo/.git' : `${cwd}/.git`,
     )
-    mocks.getWorktrees.mockResolvedValueOnce([
+    mocks.getWorktrees.mockResolvedValue([
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
       { path: '/tmp/repo-linked', branch: 'feature/a', isBare: false, isPrimary: false, isDirty: false },
     ])
     const fetch = deferred<{ ok: true; message: string }>()
     mocks.fetchAll.mockImplementationOnce(() => fetch.promise)
+    mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched by user' })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const background = fetchRepo('/tmp/repo', 'background')
@@ -478,8 +481,8 @@ describe('fetchRepo invalidation publishing', () => {
     const [backgroundResult, userResult] = await Promise.all([background, user])
 
     expect(backgroundResult).toEqual({ ok: true, message: 'fetched in background' })
-    expect(userResult).toEqual({ ok: true, message: 'fetched in background' })
-    expect(mocks.fetchAll).toHaveBeenCalledTimes(1)
+    expect(userResult).toEqual({ ok: true, message: 'fetched by user' })
+    expect(mocks.fetchAll).toHaveBeenCalledTimes(2)
     expectRepoSnapshotInvalidations(
       {
         repoId: '/tmp/repo',
@@ -489,17 +492,24 @@ describe('fetchRepo invalidation publishing', () => {
         repoId: '/tmp/repo-linked',
         query: 'repo-snapshot',
       },
+      {
+        repoId: '/tmp/repo-linked',
+        query: 'repo-snapshot',
+      },
+      {
+        repoId: '/tmp/repo',
+        query: 'repo-snapshot',
+      },
     )
   })
 
-  test('user sync reuses background sync when remote boundary resolution drifts', async () => {
+  test('user sync waits for an active remote background sync with the same alias', async () => {
     const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
     const linkedRepoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo-linked' })
-    mocks.getRemoteRepoWriteGroupPath.mockRejectedValueOnce(new Error('remote paths unavailable'))
-    mocks.getRemoteRepoWriteGroupPath.mockResolvedValue('/srv/repo')
     mocks.getRemoteRepoWorktreePaths.mockResolvedValue(['/srv/repo', '/srv/repo-linked'])
     const fetch = deferred<{ ok: true; message: string }>()
     mocks.fetchRemoteRepo.mockImplementationOnce(async () => await fetch.promise)
+    mocks.fetchRemoteRepo.mockResolvedValueOnce({ ok: true, message: 'fetched by user' })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const background = fetchRepo(repoId, 'background')
@@ -512,8 +522,8 @@ describe('fetchRepo invalidation publishing', () => {
     const [backgroundResult, userResult] = await Promise.all([background, user])
 
     expect(backgroundResult).toEqual({ ok: true, message: 'fetched in background' })
-    expect(userResult).toEqual({ ok: true, message: 'fetched in background' })
-    expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(1)
+    expect(userResult).toEqual({ ok: true, message: 'fetched by user' })
+    expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(2)
     expectRepoSnapshotInvalidations(
       {
         repoId,
@@ -523,17 +533,24 @@ describe('fetchRepo invalidation publishing', () => {
         repoId: linkedRepoId,
         query: 'repo-snapshot',
       },
+      {
+        repoId: linkedRepoId,
+        query: 'repo-snapshot',
+      },
+      {
+        repoId,
+        query: 'repo-snapshot',
+      },
     )
   })
 
-  test('user sync reuses linked background sync when remote boundary resolution later canonicalizes', async () => {
+  test('user sync waits for an active linked remote background sync with the same alias', async () => {
     const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
     const linkedRepoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo-linked' })
-    mocks.getRemoteRepoWriteGroupPath.mockRejectedValueOnce(new Error('remote paths unavailable'))
-    mocks.getRemoteRepoWriteGroupPath.mockResolvedValue('/srv/repo')
     mocks.getRemoteRepoWorktreePaths.mockResolvedValue(['/srv/repo', '/srv/repo-linked'])
     const fetch = deferred<{ ok: true; message: string }>()
     mocks.fetchRemoteRepo.mockImplementationOnce(async () => await fetch.promise)
+    mocks.fetchRemoteRepo.mockResolvedValueOnce({ ok: true, message: 'fetched by user' })
 
     const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
     const background = fetchRepo(linkedRepoId, 'background')
@@ -546,8 +563,8 @@ describe('fetchRepo invalidation publishing', () => {
     const [backgroundResult, userResult] = await Promise.all([background, user])
 
     expect(backgroundResult).toEqual({ ok: true, message: 'fetched in background' })
-    expect(userResult).toEqual({ ok: true, message: 'fetched in background' })
-    expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(1)
+    expect(userResult).toEqual({ ok: true, message: 'fetched by user' })
+    expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(2)
     expectRepoSnapshotInvalidations(
       {
         repoId: linkedRepoId,
@@ -557,10 +574,18 @@ describe('fetchRepo invalidation publishing', () => {
         repoId,
         query: 'repo-snapshot',
       },
+      {
+        repoId,
+        query: 'repo-snapshot',
+      },
+      {
+        repoId: linkedRepoId,
+        query: 'repo-snapshot',
+      },
     )
   })
 
-  test('caller abort stops waiting for a reused background sync without cancelling it', async () => {
+  test('caller abort cancels a queued user sync without cancelling the active background sync', async () => {
     const fetch = deferred<{ ok: true; message: string }>()
     mocks.fetchAll.mockImplementationOnce(() => fetch.promise)
 
@@ -586,7 +611,7 @@ describe('fetchRepo invalidation publishing', () => {
     })
   })
 
-  test('caller abort records wait cancellation when reused background sync is still queued', async () => {
+  test('caller abort records wait cancellation for a queued user sync', async () => {
     const deleteBranch = deferred<{ ok: true; message: string }>()
     mocks.deleteBranch.mockImplementationOnce(async () => await deleteBranch.promise)
     mocks.fetchAll.mockResolvedValueOnce({ ok: true, message: 'fetched' })
@@ -608,18 +633,28 @@ describe('fetchRepo invalidation publishing', () => {
 
     const caller = new AbortController()
     const user = fetchRepo('/tmp/repo', 'user', caller.signal)
+    await vi.waitFor(async () => {
+      expect((await readRepoOperationsSnapshot('/tmp/repo')).operations).toEqual(
+        expect.arrayContaining([expect.objectContaining({ kind: 'fetch', phase: 'queued', source: 'user' })]),
+      )
+    })
     caller.abort('client disconnected')
 
     await expect(user).resolves.toEqual({ ok: false, message: 'cancelled' })
     expect(mocks.fetchAll).not.toHaveBeenCalled()
-    await expect(readRepoOperationsSnapshot('/tmp/repo')).resolves.toMatchObject({
+    await expect(readRepoOperationsSnapshot('/tmp/repo', { includeSettled: true })).resolves.toMatchObject({
       operations: expect.arrayContaining([
         expect.objectContaining({
           kind: 'fetch',
-          phase: 'queued',
+          source: 'user',
+          phase: 'failed',
           cancellation: expect.objectContaining({
             waitCancelledCount: 1,
             lastWaitCancellationReason: 'caller-abort',
+          }),
+          error: expect.objectContaining({
+            message: 'cancelled',
+            reason: 'caller-abort',
           }),
         }),
       ]),

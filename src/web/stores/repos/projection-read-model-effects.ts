@@ -14,18 +14,13 @@ interface AcceptedRepoProjectionReadModel {
   projection: RepoRuntimeProjection
 }
 
+type AcceptRepoProjectionReadModelScope = 'query-cache' | 'repo-read-model' | 'visible-status'
+
 interface AcceptRepoProjectionReadModelOptions {
-  settleVisibleStatus?: boolean
+  scope: AcceptRepoProjectionReadModelScope
 }
 
-interface AcceptedProjectionSignature {
-  loadedAt: number
-  snapshot: RepoRuntimeProjection['snapshot']
-  status: RepoRuntimeProjection['status']
-  pullRequests: RepoRuntimeProjection['pullRequests']
-}
-
-const acceptedRepoProjectionSignatureByKey = new Map<string, AcceptedProjectionSignature>()
+const acceptedCoreRepoProjectionLoadedAtByKey = new Map<string, number>()
 
 function acceptedProjectionKey(input: AcceptedRepoProjectionReadModel): string {
   return [
@@ -42,71 +37,51 @@ function authoritativeProjection(projection: RepoRuntimeProjection): boolean {
   return projection.loadedAt > 0
 }
 
-function markProjectionAccepted(input: AcceptedRepoProjectionReadModel): boolean {
+function markCoreProjectionAccepted(input: AcceptedRepoProjectionReadModel): boolean {
   const key = acceptedProjectionKey(input)
-  const previous = acceptedRepoProjectionSignatureByKey.get(key)
-  if (
-    previous &&
-    previous.loadedAt === input.projection.loadedAt &&
-    previous.snapshot === input.projection.snapshot &&
-    previous.status === input.projection.status &&
-    previous.pullRequests === input.projection.pullRequests
-  ) {
-    return false
-  }
-  acceptedRepoProjectionSignatureByKey.set(key, {
-    loadedAt: input.projection.loadedAt,
-    snapshot: input.projection.snapshot,
-    status: input.projection.status,
-    pullRequests: input.projection.pullRequests,
-  })
+  if (acceptedCoreRepoProjectionLoadedAtByKey.get(key) === input.projection.loadedAt) return false
+  acceptedCoreRepoProjectionLoadedAtByKey.set(key, input.projection.loadedAt)
   return true
 }
 
 export function resetAcceptedRepoProjectionReadModelState(): void {
-  acceptedRepoProjectionSignatureByKey.clear()
+  acceptedCoreRepoProjectionLoadedAtByKey.clear()
 }
 
 export function acceptRepoProjectionReadModel(
   set: ReposSet,
   get: ReposGet,
   input: AcceptedRepoProjectionReadModel,
-  options: AcceptRepoProjectionReadModelOptions = {},
+  options: AcceptRepoProjectionReadModelOptions,
 ): void {
   const { repoRoot, repoRuntimeId, projection } = input
   if (!authoritativeProjection(projection)) return
-  const coreReadModel = projection.requested.branch === null && projection.requested.pullRequestMode === 'full'
+  const coreProjection = projection.requested.branch === null && projection.requested.pullRequestMode === 'full'
+  const acceptCoreReadModel = options.scope === 'repo-read-model' && coreProjection
+  const settleVisibleStatus = options.scope === 'visible-status' || acceptCoreReadModel
   const repoBefore = get().repos[repoRoot]
   if (!repoBefore || repoBefore.repoRuntimeId !== repoRuntimeId) return
-  const explicitVisibleStatusSettle = options.settleVisibleStatus === true
-  const settleVisibleStatus =
-    explicitVisibleStatusSettle || (options.settleVisibleStatus === undefined && coreReadModel)
-  if (!projection.snapshot && !coreReadModel && !settleVisibleStatus) return
-  const accepted = markProjectionAccepted(input)
-  if (!accepted && !explicitVisibleStatusSettle) return
   if (settleVisibleStatus) {
     updateIfFresh(set, repoRoot, repoRuntimeId, (repo) => {
       if (projection.snapshot) finishDataLoadSuccess(repo.dataLoads.visibleStatus, projection.loadedAt)
       else finishDataLoadError(repo.dataLoads.visibleStatus, 'error.failed-read-repo')
     })
   }
-  if (!accepted) return
+  if (!acceptCoreReadModel) return
+  if (!markCoreProjectionAccepted(input)) return
 
   if (!projection.snapshot) {
     updateIfFresh(set, repoRoot, repoRuntimeId, (repo) => {
-      if (coreReadModel) finishDataLoadError(repo.dataLoads.repoReadModel, 'error.failed-read-repo')
+      finishDataLoadError(repo.dataLoads.repoReadModel, 'error.failed-read-repo')
       repo.events = appendRepoEvent(repo.events, errorEvent('error.failed-read-repo'))
     })
     return
   }
 
   updateIfFresh(set, repoRoot, repoRuntimeId, (repo) => {
-    if (coreReadModel) {
-      applyRepoSnapshotShellState(repo, projection.snapshot!, projection.loadedAt)
-    }
+    applyRepoSnapshotShellState(repo, projection.snapshot!, projection.loadedAt)
   })
 
-  if (!coreReadModel) return
   persistRepoSnapshotCacheEntry(set, get().repos[repoRoot], repoRuntimeId)
   void terminalClient.pruneTerminals(repoRoot, repoRuntimeId).catch((err) => {
     terminalLog.warn('failed to prune repo sessions', { err })

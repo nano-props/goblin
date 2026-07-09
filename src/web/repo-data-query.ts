@@ -1,23 +1,17 @@
 import { useEffect } from 'react'
-import { queryOptions, useQuery, type Query, type QueryClient } from '@tanstack/react-query'
+import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { getRepoLog, getRepoOperations, getRepoProjection, getRepoRemoteBranches } from '#/web/repo-client.ts'
 import type { RepoOperationsSnapshot, RepoRuntimeProjection, RepoServerOperationState } from '#/shared/api-types.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT, type PullRequestFetchMode } from '#/shared/git-types.ts'
 
-interface CoalescedRepoRefetch {
-  inFlight: Promise<void> | null
-  rerunRequested: boolean
-}
-
-class StaleRepoProjectionReadError extends Error {
+class StaleRepoRuntimeReadError extends Error {
   constructor() {
-    super('Stale repo projection read')
-    this.name = 'StaleRepoProjectionReadError'
+    super('Stale repo runtime read')
+    this.name = 'StaleRepoRuntimeReadError'
   }
 }
 
-const coalescedRepoRefetchesByClient = new WeakMap<QueryClient, Map<string, CoalescedRepoRefetch>>()
 const runtimeProjectionInvalidationVersionsByClient = new WeakMap<QueryClient, Map<string, number>>()
 const repoProjectionFetchInvalidationVersionsByClient = new WeakMap<QueryClient, Map<string, number>>()
 
@@ -80,15 +74,6 @@ function repoProjectionQueryPrefix(repoRoot: string, repoRuntimeId: string) {
 
 function repoOperationsQueryPrefix(repoRoot: string, repoRuntimeId: string) {
   return ['repo-data', repoRoot, repoRuntimeId, 'operations'] as const
-}
-
-function coalescedRepoRefetchMap(queryClient: QueryClient): Map<string, CoalescedRepoRefetch> {
-  let map = coalescedRepoRefetchesByClient.get(queryClient)
-  if (!map) {
-    map = new Map()
-    coalescedRepoRefetchesByClient.set(queryClient, map)
-  }
-  return map
 }
 
 function runtimeProjectionInvalidationKey(repoRoot: string, repoRuntimeId: string): string {
@@ -155,8 +140,8 @@ function markRepoProjectionFetchStarted(
   return version
 }
 
-function isStaleRepoProjectionReadError(err: unknown): boolean {
-  return err instanceof StaleRepoProjectionReadError
+function isStaleRepoRuntimeReadError(err: unknown): boolean {
+  return err instanceof StaleRepoRuntimeReadError
 }
 
 export function getRepoProjectionFetchInvalidationVersion(
@@ -193,106 +178,10 @@ export function markRepoRuntimeProjectionInvalidated(
   bumpRepoRuntimeProjectionInvalidationVersion(repoRoot, repoRuntimeId, queryClient)
 }
 
-function markRepoQueryKeysInvalidated(queryClient: QueryClient, queryKeys: ReadonlyArray<readonly unknown[]>): void {
+function invalidateActiveRepoQueryKeys(queryClient: QueryClient, queryKeys: ReadonlyArray<readonly unknown[]>): void {
   for (const queryKey of queryKeys) {
-    void queryClient.invalidateQueries({ queryKey, refetchType: 'none' })
+    void queryClient.invalidateQueries({ queryKey, refetchType: 'active' }, { cancelRefetch: false })
   }
-}
-
-async function refetchActiveRepoQueryKeys(
-  queryClient: QueryClient,
-  queryKeys: ReadonlyArray<readonly unknown[]>,
-): Promise<void> {
-  const queriesByHash = new Map<string, Query>()
-  for (const queryKey of queryKeys) {
-    for (const query of queryClient.getQueryCache().findAll({ queryKey, type: 'active' })) {
-      queriesByHash.set(query.queryHash, query)
-    }
-  }
-  await Promise.all(
-    Array.from(queriesByHash.values()).map(async (query) => {
-      if (query.state.fetchStatus === 'fetching') await waitForRepoQueryFetchIdle(queryClient, query)
-      if (!query.isActive()) return
-      if (!shouldRefetchActiveRepoQueryAfterInvalidation(queryClient, query)) return
-      await queryClient.invalidateQueries({ queryKey: query.queryKey, exact: true, refetchType: 'none' })
-      await queryClient.refetchQueries({ queryKey: query.queryKey, exact: true, type: 'active' }, { cancelRefetch: false })
-    }),
-  )
-}
-
-function shouldRefetchActiveRepoQueryAfterInvalidation(queryClient: QueryClient, query: Query): boolean {
-  if (query.state.isInvalidated) return true
-  const parsedProjectionKey = parseRepoProjectionQueryKey(query.queryKey)
-  if (!parsedProjectionKey) return true
-  const fetchInvalidationVersion = getRepoProjectionFetchInvalidationVersion(
-    parsedProjectionKey.repoRoot,
-    parsedProjectionKey.repoRuntimeId,
-    parsedProjectionKey.branch,
-    parsedProjectionKey.mode,
-    queryClient,
-  )
-  if (fetchInvalidationVersion === null) return true
-  return (
-    fetchInvalidationVersion <
-    getRepoRuntimeProjectionInvalidationVersion(parsedProjectionKey.repoRoot, parsedProjectionKey.repoRuntimeId, queryClient)
-  )
-}
-
-function waitForRepoQueryFetchIdle(queryClient: QueryClient, query: Query): Promise<void> {
-  if (query.state.fetchStatus !== 'fetching') return Promise.resolve()
-  return new Promise((resolve) => {
-    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
-      if (event.query !== query) return
-      if (event.type === 'removed' || query.state.fetchStatus !== 'fetching') {
-        unsubscribe()
-        resolve()
-      }
-    })
-  })
-}
-
-function activeRepoQueryKeysFetching(
-  queryClient: QueryClient,
-  queryKeys: ReadonlyArray<readonly unknown[]>,
-): boolean {
-  return queryKeys.some((queryKey) =>
-    queryClient
-      .getQueryCache()
-      .findAll({ queryKey, type: 'active' })
-      .some((query) => query.state.fetchStatus === 'fetching'),
-  )
-}
-
-function requestCoalescedActiveRepoRefetch(
-  queryClient: QueryClient,
-  key: string,
-  queryKeys: ReadonlyArray<readonly unknown[]>,
-): void {
-  const wasAlreadyFetching = activeRepoQueryKeysFetching(queryClient, queryKeys)
-  markRepoQueryKeysInvalidated(queryClient, queryKeys)
-  const map = coalescedRepoRefetchMap(queryClient)
-  const runtime = map.get(key) ?? { inFlight: null, rerunRequested: false }
-  map.set(key, runtime)
-  if (wasAlreadyFetching) runtime.rerunRequested = true
-  if (runtime.inFlight) {
-    runtime.rerunRequested = true
-    return
-  }
-
-  const run = () => {
-    runtime.inFlight = refetchActiveRepoQueryKeys(queryClient, queryKeys).finally(() => {
-      runtime.inFlight = null
-      if (runtime.rerunRequested) {
-        runtime.rerunRequested = false
-        markRepoQueryKeysInvalidated(queryClient, queryKeys)
-        run()
-        return
-      }
-      if (map.get(key) === runtime) map.delete(key)
-    })
-  }
-
-  run()
 }
 
 function abortSignalAny(signals: AbortSignal[]): AbortSignal {
@@ -329,7 +218,7 @@ export function repoProjectionQueryOptions(
     queryKey: repoProjectionQueryKey(repoRoot, repoRuntimeId, requestedBranch, requestedMode),
     queryFn: ({ signal, client }) =>
       fetchRepoProjectionReadModel(repoRoot, repoRuntimeId, requestedBranch, requestedMode, signal, client),
-    retry: (_failureCount, err) => isStaleRepoProjectionReadError(err),
+    retry: (_failureCount, err) => isStaleRepoRuntimeReadError(err),
     retryDelay: 0,
     placeholderData,
     staleTime: Number.POSITIVE_INFINITY,
@@ -348,7 +237,7 @@ async function fetchRepoProjectionReadModel(
   const projection = await getRepoProjection(repoRoot, branch, { mode }, signal)
   signal.throwIfAborted()
   if (startedVersion < getRepoRuntimeProjectionInvalidationVersion(repoRoot, repoRuntimeId, queryClient)) {
-    throw new StaleRepoProjectionReadError()
+    throw new StaleRepoRuntimeReadError()
   }
   return projection
 }
@@ -450,10 +339,28 @@ export function repoOperationsQueryOptions(
   const includeSettled = options.includeSettled === true
   return queryOptions({
     queryKey: repoOperationsQueryKey(repoRoot, repoRuntimeId, includeSettled),
-    queryFn: ({ signal }) => getRepoOperations(repoRoot, { includeSettled, signal }),
+    queryFn: ({ signal, client }) => fetchRepoOperationsReadModel(repoRoot, repoRuntimeId, includeSettled, signal, client),
+    retry: (_failureCount, err) => isStaleRepoRuntimeReadError(err),
+    retryDelay: 0,
     enabled: options.enabled,
     staleTime: Number.POSITIVE_INFINITY,
   })
+}
+
+async function fetchRepoOperationsReadModel(
+  repoRoot: string,
+  repoRuntimeId: string,
+  includeSettled: boolean,
+  signal: AbortSignal,
+  queryClient: QueryClient,
+): Promise<RepoOperationsSnapshot> {
+  const startedVersion = getRepoRuntimeProjectionInvalidationVersion(repoRoot, repoRuntimeId, queryClient)
+  const operations = await getRepoOperations(repoRoot, { includeSettled, signal })
+  signal.throwIfAborted()
+  if (startedVersion < getRepoRuntimeProjectionInvalidationVersion(repoRoot, repoRuntimeId, queryClient)) {
+    throw new StaleRepoRuntimeReadError()
+  }
+  return operations
 }
 
 export function useRepoProjectionReadModel(
@@ -609,7 +516,7 @@ export async function refreshRepoProjectionReadModel(
           ),
       })
     } catch (err) {
-      if (!isStaleRepoProjectionReadError(err)) throw err
+      if (!isStaleRepoRuntimeReadError(err)) throw err
       await queryClient.invalidateQueries({ queryKey: queryOptions.queryKey, exact: true, refetchType: 'none' })
       options.signal?.throwIfAborted()
       continue
@@ -641,7 +548,7 @@ export function invalidateRepoDataQueries(
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
   markRepoRuntimeProjectionInvalidated(repoRoot, repoRuntimeId, queryClient)
-  requestCoalescedActiveRepoRefetch(queryClient, `repo-data:${repoRoot}\0${repoRuntimeId}`, [
+  invalidateActiveRepoQueryKeys(queryClient, [
     repoDataQueryKey(repoRoot, repoRuntimeId),
   ])
 }
@@ -652,7 +559,7 @@ export function invalidateRepoRuntimeProjectionQueries(
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
   markRepoRuntimeProjectionInvalidated(repoRoot, repoRuntimeId, queryClient)
-  requestCoalescedActiveRepoRefetch(queryClient, `repo-runtime:${repoRoot}\0${repoRuntimeId}`, [
+  invalidateActiveRepoQueryKeys(queryClient, [
     repoProjectionQueryPrefix(repoRoot, repoRuntimeId),
     repoOperationsQueryPrefix(repoRoot, repoRuntimeId),
   ])

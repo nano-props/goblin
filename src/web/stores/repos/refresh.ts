@@ -99,7 +99,7 @@ async function runRuntimeProjectionRefresh(
         store.set,
         store.get,
         { repoRoot: id, repoRuntimeId, projection },
-        { settleVisibleStatus: wantsVisibleStatusLoad },
+        { scope },
       )
     },
     onError: (message) => {

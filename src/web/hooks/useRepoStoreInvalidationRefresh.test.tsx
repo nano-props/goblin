@@ -77,16 +77,18 @@ describe('useRepoStoreInvalidationRefresh', () => {
         listener({ type: 'repo-query-invalidated', repoId: '/tmp/repo', query: 'repo-snapshot' })
     })
 
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: repoDataQueryKey('/tmp/repo', 'repo-runtime-test-7'),
-      refetchType: 'none',
-    })
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      {
+        queryKey: repoDataQueryKey('/tmp/repo', 'repo-runtime-test-7'),
+        refetchType: 'active',
+      },
+      { cancelRefetch: false },
+    )
     invalidateSpy.mockRestore()
   })
 
   test('handles repo-runtime invalidations through runtime projection query invalidation', async () => {
     const invalidateSpy = vi.spyOn(primaryWindowQueryClient, 'invalidateQueries')
-    const refetchSpy = vi.spyOn(primaryWindowQueryClient, 'refetchQueries')
     renderInJsdom(<Harness />)
 
     await act(async () => {
@@ -94,16 +96,20 @@ describe('useRepoStoreInvalidationRefresh', () => {
         listener({ type: 'repo-query-invalidated', repoId: '/tmp/repo', query: 'repo-runtime' })
     })
 
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-test-7', 'projection'],
-      refetchType: 'none',
-    })
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-test-7', 'operations'],
-      refetchType: 'none',
-    })
-    expect(refetchSpy).not.toHaveBeenCalled()
-    refetchSpy.mockRestore()
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      {
+        queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-test-7', 'projection'],
+        refetchType: 'active',
+      },
+      { cancelRefetch: false },
+    )
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      {
+        queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-test-7', 'operations'],
+        refetchType: 'active',
+      },
+      { cancelRefetch: false },
+    )
     invalidateSpy.mockRestore()
   })
 
@@ -121,10 +127,13 @@ describe('useRepoStoreInvalidationRefresh', () => {
         })
     })
 
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: repoDataQueryKey('/tmp/repo', 'repo-runtime-test-7'),
-      refetchType: 'none',
-    })
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      {
+        queryKey: repoDataQueryKey('/tmp/repo', 'repo-runtime-test-7'),
+        refetchType: 'active',
+      },
+      { cancelRefetch: false },
+    )
     invalidateSpy.mockRestore()
   })
 })

@@ -7,8 +7,6 @@ import {
   startRepoServerOperation,
 } from '#/server/modules/repo-operation-registry.ts'
 import {
-  resolveRepoWriteBoundaryAliases,
-  resolveRepoWriteBoundaryKey,
   resolveRepoSource,
   runWithRepoSource,
   type RepoMutationResult,
@@ -16,7 +14,6 @@ import {
 import {
   abortRepoWriteNetworkOperation,
   enqueueRepoWriteOperation,
-  type RepoWriteOperationLifecycle,
   type RepoWriteOperationContext,
 } from '#/server/modules/repo-write-operation-coordinator.ts'
 import {
@@ -46,49 +43,6 @@ const MAX_CLONE_URL_LENGTH = 4096
 const MAX_CLONE_DIR_NAME_LENGTH = 255
 const CLONE_URL_SCHEME_RE = /^(?:https?|ssh|git|file):\/\/\S+$/i
 const SCP_LIKE_CLONE_URL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+:[^\s]+$/
-interface ActiveBackgroundFetch {
-  promise: Promise<{ ok: boolean; message: string }>
-  operationRef: { current: RepoWriteOperationLifecycle | null }
-  keys: readonly string[]
-}
-
-const activeBackgroundFetches = new Map<string, ActiveBackgroundFetch>()
-
-type RepoExecResult = { ok: boolean; message: string }
-
-function activeBackgroundFetchFor(keys: readonly string[]): ActiveBackgroundFetch | null {
-  for (const key of keys) {
-    const active = activeBackgroundFetches.get(key)
-    if (active) return active
-  }
-  return null
-}
-
-function setActiveBackgroundFetch(active: ActiveBackgroundFetch): void {
-  for (const key of active.keys) activeBackgroundFetches.set(key, active)
-}
-
-function deleteActiveBackgroundFetch(active: ActiveBackgroundFetch): void {
-  for (const key of active.keys) {
-    if (activeBackgroundFetches.get(key) === active) activeBackgroundFetches.delete(key)
-  }
-}
-
-function registerActiveBackgroundFetch(
-  keys: readonly string[],
-  operationRef: ActiveBackgroundFetch['operationRef'],
-  run: () => Promise<{ ok: boolean; message: string }>,
-): ActiveBackgroundFetch {
-  let active!: ActiveBackgroundFetch
-  const promise = Promise.resolve()
-    .then(run)
-    .finally(() => {
-      deleteActiveBackgroundFetch(active)
-    })
-  active = { promise, operationRef, keys }
-  setActiveBackgroundFetch(active)
-  return active
-}
 
 async function probeWritableDirectory(cwd: string): Promise<ProbeAvailability> {
   try {
@@ -164,37 +118,6 @@ function publishRepoSnapshotInvalidations(cwd: string, affectedRepoIds: readonly
 function execResultOnly(result: RepoMutationResult & { affectedWorktreePaths?: readonly string[] }): ExecResult {
   const { affectedRepoIds: _affectedRepoIds, affectedWorktreePaths: _affectedWorktreePaths, ...execResult } = result
   return execResult
-}
-
-async function waitForResultOrCallerAbort<T extends RepoExecResult>(
-  promise: Promise<T>,
-  signal?: AbortSignal,
-  operationRef?: { current: RepoWriteOperationLifecycle | null },
-): Promise<T> {
-  if (!signal) return await promise
-  if (signal.aborted) {
-    operationRef?.current?.recordWaitCancellation('caller-abort')
-    return { ok: false, message: 'cancelled' } as T
-  }
-  return await new Promise<T>((resolve, reject) => {
-    const cleanup = () => signal.removeEventListener('abort', abort)
-    const abort = () => {
-      cleanup()
-      operationRef?.current?.recordWaitCancellation('caller-abort')
-      resolve({ ok: false, message: 'cancelled' } as T)
-    }
-    signal.addEventListener('abort', abort, { once: true })
-    promise.then(
-      (result) => {
-        cleanup()
-        resolve(result)
-      },
-      (err) => {
-        cleanup()
-        reject(err)
-      },
-    )
-  })
 }
 
 async function runUserNetworkMutation(
@@ -339,9 +262,6 @@ export async function fetchRepo(
   kind: NetworkOpKind = 'user',
   signal?: AbortSignal,
 ): Promise<{ ok: boolean; message: string }> {
-  const backgroundFetchKey = await resolveRepoWriteBoundaryKey(cwd, signal)
-  const backgroundFetchKeys = await resolveRepoWriteBoundaryAliases(cwd, backgroundFetchKey, signal)
-
   async function runFetch(
     task: (signal: AbortSignal) => Promise<RepoMutationResult>,
     context: RepoWriteOperationContext,
@@ -349,49 +269,21 @@ export async function fetchRepo(
     const result = await context.runNetworkOperation(async (networkSignal) => await task(networkSignal))
     return await publishSnapshotInvalidationAfterMutation(cwd, result)
   }
-  async function executeFetch(
-    operationRef?: { current: RepoWriteOperationLifecycle | null },
-  ): Promise<{ ok: boolean; message: string }> {
-    return await enqueueRepoWriteOperation(
-      cwd,
-      signal,
-      {
-        repoId: cwd,
-        kind: 'fetch',
-        source: kind,
-        canCancelUnderlying: true,
-      },
-      (operation, context) => {
-        if (operationRef) operationRef.current = operation
-        return async () =>
-          await runWithRepoSource(
-            cwd,
-            async (source) => await runFetch((signal) => source.fetch(signal), context),
-          )
-      },
-      { boundaryKey: backgroundFetchKey },
-    )
-  }
-
-  if (kind === 'user') {
-    const backgroundFetch = activeBackgroundFetchFor(backgroundFetchKeys)
-    if (backgroundFetch) {
-      return await waitForResultOrCallerAbort(backgroundFetch.promise, signal, backgroundFetch.operationRef)
-    }
-    return await executeFetch()
-  }
-
-  const existingBackgroundFetch = activeBackgroundFetchFor(backgroundFetchKeys)
-  if (existingBackgroundFetch) {
-    return await waitForResultOrCallerAbort(existingBackgroundFetch.promise, signal, existingBackgroundFetch.operationRef)
-  }
-  const operationRef = { current: null as RepoWriteOperationLifecycle | null }
-  const active = registerActiveBackgroundFetch(
-    backgroundFetchKeys,
-    operationRef,
-    async () => await executeFetch(operationRef),
+  return await enqueueRepoWriteOperation(
+    cwd,
+    signal,
+    {
+      repoId: cwd,
+      kind: 'fetch',
+      source: kind,
+      canCancelUnderlying: true,
+    },
+    (_operation, context) => async () =>
+      await runWithRepoSource(
+        cwd,
+        async (source) => await runFetch((signal) => source.fetch(signal), context),
+      ),
   )
-  return await active.promise
 }
 
 export async function pullRepoBranch(

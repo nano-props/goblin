@@ -112,10 +112,13 @@ describe('repo refresh coordinator', () => {
     expect(requestRepoProjectionReadModelRefresh).not.toHaveBeenCalled()
     expect(requestRepoRuntimeProjectionRefresh).not.toHaveBeenCalled()
     expect(runManualRepoSync).not.toHaveBeenCalled()
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: repoDataQueryKey('/repo', 'repo-runtime-test-9'),
-      refetchType: 'none',
-    })
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      {
+        queryKey: repoDataQueryKey('/repo', 'repo-runtime-test-9'),
+        refetchType: 'active',
+      },
+      { cancelRefetch: false },
+    )
     invalidateSpy.mockRestore()
   })
 

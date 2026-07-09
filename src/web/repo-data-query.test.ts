@@ -243,21 +243,26 @@ describe('repo projection query data', () => {
   test('marks runtime projection queries invalidated once per server-owned lifecycle signal', () => {
     const queryClient = new QueryClient()
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
-    const refetchQueries = vi.spyOn(queryClient, 'refetchQueries')
 
     invalidateRepoRuntimeProjectionQueries('/tmp/repo', 'repo-runtime-1', queryClient)
 
     expect(invalidateQueries).toHaveBeenCalledTimes(2)
-    expect(invalidateQueries).toHaveBeenNthCalledWith(1, {
-      queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-1', 'projection'],
-      refetchType: 'none',
-    })
-    expect(invalidateQueries).toHaveBeenNthCalledWith(2, {
-      queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-1', 'operations'],
-      refetchType: 'none',
-    })
-    expect(refetchQueries).not.toHaveBeenCalled()
-    refetchQueries.mockRestore()
+    expect(invalidateQueries).toHaveBeenNthCalledWith(
+      1,
+      {
+        queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-1', 'projection'],
+        refetchType: 'active',
+      },
+      { cancelRefetch: false },
+    )
+    expect(invalidateQueries).toHaveBeenNthCalledWith(
+      2,
+      {
+        queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-1', 'operations'],
+        refetchType: 'active',
+      },
+      { cancelRefetch: false },
+    )
     invalidateQueries.mockRestore()
   })
 
@@ -265,16 +270,19 @@ describe('repo projection query data', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const signals: AbortSignal[] = []
     const releases: Array<(projection: RepoRuntimeProjection) => void> = []
-    const observer = new QueryObserver<RepoRuntimeProjection>(queryClient, {
-      queryKey: repoProjectionQueryKey('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full'),
-      queryFn: ({ signal }) =>
+    setRepoProjectionQueryData('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', repoProjectionForTest(0), queryClient)
+    repoClientMocks.getRepoProjection.mockImplementation(
+      (_repoRoot: string, _branch: string | null | undefined, _options: unknown, signal?: AbortSignal) =>
         new Promise<RepoRuntimeProjection>((resolve) => {
+          if (!signal) throw new Error('missing projection abort signal')
           signals.push(signal)
           releases.push(resolve)
         }),
-      initialData: repoProjectionForTest(0),
-      staleTime: Number.POSITIVE_INFINITY,
-    })
+    )
+    const observer = new QueryObserver(
+      queryClient,
+      repoProjectionQueryOptions('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full'),
+    )
     const unsubscribe = observer.subscribe(() => {})
     try {
       invalidateRepoRuntimeProjectionQueries('/tmp/repo', 'repo-runtime-1', queryClient)
@@ -295,7 +303,7 @@ describe('repo projection query data', () => {
 
       releases[1]!(repoProjectionForTest(2))
       await vi.waitFor(() => {
-        expect(observer.getCurrentResult().data?.loadedAt).toBe(2)
+        expect((observer.getCurrentResult().data as RepoRuntimeProjection | undefined)?.loadedAt).toBe(2)
       })
     } finally {
       unsubscribe()
@@ -307,15 +315,18 @@ describe('repo projection query data', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const signals: AbortSignal[] = []
     const releases: Array<(projection: RepoRuntimeProjection) => void> = []
-    const observer = new QueryObserver<RepoRuntimeProjection>(queryClient, {
-      queryKey: repoProjectionQueryKey('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full'),
-      queryFn: ({ signal }) =>
+    repoClientMocks.getRepoProjection.mockImplementation(
+      (_repoRoot: string, _branch: string | null | undefined, _options: unknown, signal?: AbortSignal) =>
         new Promise<RepoRuntimeProjection>((resolve) => {
+          if (!signal) throw new Error('missing projection abort signal')
           signals.push(signal)
           releases.push(resolve)
         }),
-      staleTime: Number.POSITIVE_INFINITY,
-    })
+    )
+    const observer = new QueryObserver(
+      queryClient,
+      repoProjectionQueryOptions('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full'),
+    )
     const unsubscribe = observer.subscribe(() => {})
     try {
       await vi.waitFor(() => {
@@ -333,7 +344,7 @@ describe('repo projection query data', () => {
 
       releases[1]!(repoProjectionForTest(2))
       await vi.waitFor(() => {
-        expect(observer.getCurrentResult().data?.loadedAt).toBe(2)
+        expect((observer.getCurrentResult().data as RepoRuntimeProjection | undefined)?.loadedAt).toBe(2)
       })
     } finally {
       unsubscribe()

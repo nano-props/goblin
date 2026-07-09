@@ -7,11 +7,9 @@ import {
   invalidateRepoRuntimeProjectionQueries,
   getRepoOperationsQueryData,
   invalidateRepoDataQueries,
-  repoOperationsQueryKey,
   repoProjectionQueryOptions,
   repoProjectionQueryKey,
   setRepoOperationsQueryData,
-  setRepoProjectionQueryData,
 } from '#/web/repo-data-query.ts'
 import {
   createBranchSnapshot,
@@ -43,52 +41,70 @@ describe('repo projection query effects', () => {
     resetReposStore()
   })
 
-  test('derives store side effects from accepted projection query data', async () => {
-    const pruneTerminals = vi.fn(async () => ({ pruned: 0, remaining: 0 }))
-    installGoblinTestBridge({ 'terminal.prune': pruneTerminals })
-    const repo = seedRepoShellForTest({ id: '/repo', repoRuntimeId: 'repo-runtime-test-1' })
-    renderInJsdom(<Harness />)
-
-    setRepoProjectionQueryData('/repo', repo.repoRuntimeId, null, 'full', projection(123))
-
-    await vi.waitFor(() => {
-      expect(useReposStore.getState().repoSnapshotCache['/repo']).toMatchObject({
-        data: { currentBranch: 'main', branches: [{ name: 'main' }] },
-      })
-    })
-    await vi.waitFor(() => {
-      expect(pruneTerminals).toHaveBeenCalled()
-    })
-  })
-
-  test('ignores warm-start placeholder projection query data', () => {
-    const pruneTerminals = vi.fn(async () => ({ pruned: 0, remaining: 0 }))
-    installGoblinTestBridge({ 'terminal.prune': pruneTerminals })
-    const repo = seedRepoShellForTest({ id: '/repo', repoRuntimeId: 'repo-runtime-test-1' })
-    renderInJsdom(<Harness />)
-
-    setRepoProjectionQueryData('/repo', repo.repoRuntimeId, null, 'full', projection(0))
-
-    expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
-    expect(pruneTerminals).not.toHaveBeenCalled()
-  })
-
-  test('skips successes from projection fetches invalidated while in flight', async () => {
+  test('copies fetched projection operations into the active operations cache', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const pruneTerminals = vi.fn(async () => ({ pruned: 0, remaining: 0 }))
     installGoblinTestBridge({ 'terminal.prune': pruneTerminals })
     const repo = seedRepoShellForTest({ id: '/repo', repoRuntimeId: 'repo-runtime-test-1' })
     renderInJsdom(<Harness queryClient={queryClient} />)
-    setRepoOperationsQueryData('/repo', repo.repoRuntimeId, false, { operations: [], loadedAt: 0 }, queryClient)
+
+    try {
+      await queryClient.fetchQuery({
+        queryKey: repoProjectionQueryKey('/repo', repo.repoRuntimeId, null, 'full'),
+        queryFn: async () => projection(123),
+        staleTime: Number.POSITIVE_INFINITY,
+      })
+
+      await vi.waitFor(() => {
+        expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(123)
+      })
+      expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
+      expect(pruneTerminals).not.toHaveBeenCalled()
+    } finally {
+      queryClient.clear()
+    }
+  })
+
+  test('ignores warm-start placeholder projection query data', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const pruneTerminals = vi.fn(async () => ({ pruned: 0, remaining: 0 }))
+    installGoblinTestBridge({ 'terminal.prune': pruneTerminals })
+    const repo = seedRepoShellForTest({ id: '/repo', repoRuntimeId: 'repo-runtime-test-1' })
+    renderInJsdom(<Harness queryClient={queryClient} />)
+
+    try {
+      await queryClient.fetchQuery({
+        queryKey: repoProjectionQueryKey('/repo', repo.repoRuntimeId, null, 'full'),
+        queryFn: async () => projection(0),
+        staleTime: Number.POSITIVE_INFINITY,
+      })
+
+      expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)).toBeUndefined()
+      expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
+      expect(pruneTerminals).not.toHaveBeenCalled()
+    } finally {
+      queryClient.clear()
+    }
+  })
+
+  test('skips projection fetches invalidated while in flight', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const pruneTerminals = vi.fn(async () => ({ pruned: 0, remaining: 0 }))
     const releases: Array<(projection: RepoRuntimeProjection) => void> = []
-    const observer = new QueryObserver<RepoRuntimeProjection>(queryClient, {
-      queryKey: repoProjectionQueryKey('/repo', repo.repoRuntimeId, null, 'full'),
-      queryFn: () =>
+    installGoblinTestBridge({
+      'terminal.prune': pruneTerminals,
+      'repo.projection': () =>
         new Promise<RepoRuntimeProjection>((resolve) => {
           releases.push(resolve)
         }),
-      staleTime: Number.POSITIVE_INFINITY,
     })
+    const repo = seedRepoShellForTest({ id: '/repo', repoRuntimeId: 'repo-runtime-test-1' })
+    renderInJsdom(<Harness queryClient={queryClient} />)
+    setRepoOperationsQueryData('/repo', repo.repoRuntimeId, false, { operations: [], loadedAt: 0 }, queryClient)
+    const observer = new QueryObserver(
+      queryClient,
+      repoProjectionQueryOptions('/repo', repo.repoRuntimeId, null, 'full'),
+    )
     const unsubscribe = observer.subscribe(() => {})
     try {
       await vi.waitFor(() => {
@@ -96,56 +112,45 @@ describe('repo projection query effects', () => {
       })
 
       invalidateRepoRuntimeProjectionQueries('/repo', repo.repoRuntimeId, queryClient)
-      expect(queryClient.getQueryState(repoOperationsQueryKey('/repo', repo.repoRuntimeId))?.isInvalidated).toBe(true)
       releases[0]!(projection(1, 'stale'))
       await vi.waitFor(() => {
         expect(releases).toHaveLength(2)
       })
 
-      expect(queryClient.getQueryState(repoOperationsQueryKey('/repo', repo.repoRuntimeId))?.isInvalidated).toBe(true)
       expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(0)
       expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
       expect(pruneTerminals).not.toHaveBeenCalled()
 
-      setRepoOperationsQueryData('/repo', repo.repoRuntimeId, false, { operations: [], loadedAt: 1 }, queryClient)
-      expect(pruneTerminals).not.toHaveBeenCalled()
-
-      invalidateRepoRuntimeProjectionQueries('/repo', repo.repoRuntimeId, queryClient)
-      releases[1]!(projection(2, 'stale-rerun'))
+      releases[1]!(projection(2, 'fresh'))
       await vi.waitFor(() => {
-        expect(releases).toHaveLength(3)
+        expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(2)
       })
+      expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
       expect(pruneTerminals).not.toHaveBeenCalled()
-      expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(1)
-
-      releases[2]!(projection(3, 'fresh'))
-      await vi.waitFor(() => {
-        expect(pruneTerminals).toHaveBeenCalledTimes(1)
-        expect(useReposStore.getState().repos['/repo']?.projection.source).toBe('fresh')
-        expect(useReposStore.getState().repos['/repo']?.dataLoads.repoReadModel.loadedAt).toBe(3)
-        expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(3)
-      })
     } finally {
       unsubscribe()
       queryClient.clear()
     }
   })
 
-  test('skips successes from projection fetches invalidated by repo data invalidations', async () => {
+  test('skips projection fetches invalidated by repo data invalidations', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const pruneTerminals = vi.fn(async () => ({ pruned: 0, remaining: 0 }))
-    installGoblinTestBridge({ 'terminal.prune': pruneTerminals })
-    const repo = seedRepoShellForTest({ id: '/repo', repoRuntimeId: 'repo-runtime-test-1' })
-    renderInJsdom(<Harness queryClient={queryClient} />)
     const releases: Array<(projection: RepoRuntimeProjection) => void> = []
-    const observer = new QueryObserver<RepoRuntimeProjection>(queryClient, {
-      queryKey: repoProjectionQueryKey('/repo', repo.repoRuntimeId, null, 'full'),
-      queryFn: () =>
+    installGoblinTestBridge({
+      'terminal.prune': pruneTerminals,
+      'repo.projection': () =>
         new Promise<RepoRuntimeProjection>((resolve) => {
           releases.push(resolve)
         }),
-      staleTime: Number.POSITIVE_INFINITY,
     })
+    const repo = seedRepoShellForTest({ id: '/repo', repoRuntimeId: 'repo-runtime-test-1' })
+    renderInJsdom(<Harness queryClient={queryClient} />)
+    setRepoOperationsQueryData('/repo', repo.repoRuntimeId, false, { operations: [], loadedAt: 0 }, queryClient)
+    const observer = new QueryObserver(
+      queryClient,
+      repoProjectionQueryOptions('/repo', repo.repoRuntimeId, null, 'full'),
+    )
     const unsubscribe = observer.subscribe(() => {})
     try {
       await vi.waitFor(() => {
@@ -158,6 +163,7 @@ describe('repo projection query effects', () => {
         expect(releases).toHaveLength(2)
       })
       expect(pruneTerminals).not.toHaveBeenCalled()
+      expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(0)
 
       invalidateRepoDataQueries('/repo', repo.repoRuntimeId, queryClient)
       releases[1]!(projection(2, 'stale-rerun'))
@@ -165,12 +171,14 @@ describe('repo projection query effects', () => {
         expect(releases).toHaveLength(3)
       })
       expect(pruneTerminals).not.toHaveBeenCalled()
+      expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(0)
 
       releases[2]!(projection(3, 'fresh'))
       await vi.waitFor(() => {
-        expect(pruneTerminals).toHaveBeenCalledTimes(1)
-        expect(useReposStore.getState().repos['/repo']?.dataLoads.repoReadModel.loadedAt).toBe(3)
+        expect(getRepoOperationsQueryData('/repo', repo.repoRuntimeId, queryClient)?.loadedAt).toBe(3)
       })
+      expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
+      expect(pruneTerminals).not.toHaveBeenCalled()
     } finally {
       unsubscribe()
       queryClient.clear()

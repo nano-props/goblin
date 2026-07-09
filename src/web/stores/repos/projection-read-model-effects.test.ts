@@ -48,7 +48,7 @@ describe('repo projection read-model effects', () => {
       repoRoot: '/repo',
       repoRuntimeId: repo.repoRuntimeId,
       projection: acceptedProjection(),
-    })
+    }, { scope: 'repo-read-model' })
 
     expect(useReposStore.getState().repoSnapshotCache['/repo']).toMatchObject({
       data: {
@@ -80,7 +80,7 @@ describe('repo projection read-model effects', () => {
         repoRoot: '/repo',
         repoRuntimeId: repo.repoRuntimeId,
         projection: acceptedProjection(),
-      })
+      }, { scope: 'repo-read-model' })
     }).not.toThrow()
   })
 
@@ -103,7 +103,7 @@ describe('repo projection read-model effects', () => {
       repoRoot: '/repo',
       repoRuntimeId: 'repo-runtime-stale',
       projection: acceptedProjection(),
-    })
+    }, { scope: 'repo-read-model' })
 
     expect(pruneTerminals).not.toHaveBeenCalled()
     expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
@@ -136,7 +136,7 @@ describe('repo projection read-model effects', () => {
       repoRoot: '/repo',
       repoRuntimeId: repo.repoRuntimeId,
       projection,
-    })
+    }, { scope: 'query-cache' })
 
     expect(useReposStore.getState().repos['/repo']?.dataLoads.visibleStatus).toMatchObject({
       phase: 'loading',
@@ -151,7 +151,7 @@ describe('repo projection read-model effects', () => {
         repoRuntimeId: repo.repoRuntimeId,
         projection,
       },
-      { settleVisibleStatus: true },
+      { scope: 'visible-status' },
     )
 
     expect(useReposStore.getState().repos['/repo']?.dataLoads.visibleStatus).toMatchObject({
@@ -172,7 +172,7 @@ describe('repo projection read-model effects', () => {
       repoRoot: '/repo',
       repoRuntimeId: repo.repoRuntimeId,
       projection,
-    })
+    }, { scope: 'repo-read-model' })
     useReposStore.setState((state) => {
       const current = state.repos['/repo']!
       return {
@@ -196,7 +196,7 @@ describe('repo projection read-model effects', () => {
         ...projection,
         operations: { operations: [], loadedAt: projection.operations.loadedAt + 1 },
       },
-    })
+    }, { scope: 'query-cache' })
 
     expect(useReposStore.getState().repos['/repo']?.dataLoads.visibleStatus).toMatchObject({
       phase: 'loading',
@@ -234,7 +234,7 @@ describe('repo projection read-model effects', () => {
       repoRoot: '/repo',
       repoRuntimeId: repo.repoRuntimeId,
       projection: acceptedProjection(null, 'summary'),
-    })
+    }, { scope: 'query-cache' })
 
     expect(useReposStore.getState().repos['/repo']?.dataLoads.repoReadModel).toMatchObject({
       phase: 'loading',

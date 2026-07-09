@@ -55,7 +55,6 @@ import {
   getRemoteLog,
   getRemotePatch,
   getRemoteRepoWorktreePaths,
-  getRemoteRepoWriteGroupPath,
   getRemoteSnapshot,
   getRemoteStatus,
   getRemoteWorktreeBootstrapPreview,
@@ -150,35 +149,12 @@ export async function resolveRepoSource(repoId: string): Promise<RepoSource> {
 
 export async function resolveRepoWriteBoundaryKey(repoId: string, signal?: AbortSignal): Promise<string> {
   if (isRemoteRepoId(repoId)) {
-    try {
-      const target = await resolveRemoteRepoTarget(repoId)
-      const writeBoundaryPath = await getRemoteRepoWriteGroupPath(target, { signal })
-      const boundaryRef = writeBoundaryPath ? normalizeRemoteRepoRef({ ...target, remotePath: writeBoundaryPath }) : null
-      return boundaryRef?.id ?? repoId
-    } catch {
-      signal?.throwIfAborted()
-      return repoId
-    }
+    signal?.throwIfAborted()
+    const remote = parseRemoteRepoId(repoId)
+    return remote ? `remote-alias:${remote.alias}` : repoId
   }
   const commonDir = await getRepoCommonDir(repoId, { signal })
   return commonDir ? `local-git:${commonDir}` : `local-path:${path.resolve(repoId)}`
-}
-
-export async function resolveRepoWriteBoundaryAliases(
-  repoId: string,
-  boundaryKey: string,
-  signal?: AbortSignal,
-): Promise<string[]> {
-  const aliases = new Set([boundaryKey, repoId])
-  if (isRemoteRepoId(repoId)) {
-    try {
-      const target = await resolveRemoteRepoTarget(repoId)
-      for (const affectedRepoId of await readRemoteAffectedRepoIds(target, signal)) aliases.add(affectedRepoId)
-    } catch {
-      signal?.throwIfAborted()
-    }
-  }
-  return Array.from(aliases)
 }
 
 function withAffectedRepoIds(result: ExecResult, affectedRepoIds: readonly string[]): RepoMutationResult {

@@ -216,14 +216,45 @@ function scheduleRepoWriteOperationQueueCleanup(boundaryKey: string, runtime: Re
   })
 }
 
-async function runResolvedRepoWriteOperation<T>(
+function cancelledRepoWriteResult<T extends ExecResult>(): T {
+  return { ok: false, message: 'cancelled' } as T
+}
+
+async function runResolvedRepoWriteOperation<T extends ExecResult>(
   boundaryKey: string,
   runtime: RepoWriteOperationQueueRuntime,
+  operation: RepoWriteOperationLifecycle,
   task: () => Promise<T>,
+  callerSignal?: AbortSignal,
 ): Promise<T> {
+  const queuedAbortCtrl = callerSignal ? new AbortController() : null
+  let started = false
+  let queuedCancelled = false
+  const cancelQueuedOperation = () => {
+    if (started || queuedCancelled) return
+    queuedCancelled = true
+    operation.recordWaitCancellation('caller-abort')
+    operation.settle(cancelledRepoWriteResult())
+    queuedAbortCtrl?.abort(callerSignal?.reason)
+  }
+
+  if (callerSignal?.aborted) cancelQueuedOperation()
+  else callerSignal?.addEventListener('abort', cancelQueuedOperation, { once: true })
+
   try {
-    return await runtime.queue.add(task)
+    return await runtime.queue.add(
+      async () => {
+        started = true
+        callerSignal?.removeEventListener('abort', cancelQueuedOperation)
+        return await task()
+      },
+      queuedAbortCtrl ? { signal: queuedAbortCtrl.signal } : undefined,
+    )
+  } catch (err) {
+    if (queuedCancelled) return cancelledRepoWriteResult()
+    throw err
   } finally {
+    callerSignal?.removeEventListener('abort', cancelQueuedOperation)
     scheduleRepoWriteOperationQueueCleanup(boundaryKey, runtime)
   }
 }
@@ -283,17 +314,24 @@ function createRepoWriteOperationContext(
   }
 }
 
-export async function enqueueRepoWriteOperation<T>(
+export async function enqueueRepoWriteOperation<T extends ExecResult>(
   repoId: string,
   signal: AbortSignal | undefined,
   operationInput: BeginRepoWriteOperationInput,
   prepareTask: (operation: RepoWriteOperationLifecycle, context: RepoWriteOperationContext) => () => Promise<T>,
-  options: { boundaryKey?: string } = {},
 ): Promise<T> {
+  if (signal?.aborted) return cancelledRepoWriteResult()
   const releaseAdmission = await acquireRepoWriteOperationAdmission()
   let work!: Promise<T>
   try {
-    const boundaryKey = options.boundaryKey ?? (await resolveRepoWriteBoundaryKey(repoId, signal))
+    let boundaryKey: string
+    try {
+      boundaryKey = await resolveRepoWriteBoundaryKey(repoId, signal)
+    } catch (err) {
+      if (signal?.aborted) return cancelledRepoWriteResult()
+      throw err
+    }
+    if (signal?.aborted) return cancelledRepoWriteResult()
     const runtime = repoWriteOperationRuntimeForBoundary(boundaryKey)
     const operation = beginRepoWriteOperation(runtime, operationInput)
     const context = createRepoWriteOperationContext(runtime, operation, signal)
@@ -304,14 +342,14 @@ export async function enqueueRepoWriteOperation<T>(
       operation.settle({ ok: false, message: err instanceof Error ? err.message : String(err) })
       throw err
     }
-    work = runResolvedRepoWriteOperation(boundaryKey, runtime, async () => {
+    work = runResolvedRepoWriteOperation(boundaryKey, runtime, operation, async () => {
       try {
         return await task()
       } catch (err) {
         operation.settle({ ok: false, message: err instanceof Error ? err.message : String(err) })
         throw err
       }
-    })
+    }, signal)
   } finally {
     releaseAdmission()
   }
