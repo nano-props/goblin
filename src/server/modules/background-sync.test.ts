@@ -207,6 +207,33 @@ describe('server background sync scheduler', () => {
     expect(bCalls.length).toBe(1)
   })
 
+  test('coalesces repeated schedule ticks into one idle drain while a fetch is running', async () => {
+    let resolveFetchA: (value: { ok: boolean; message: string }) => void = () => {}
+    mocks.fetchRepo.mockImplementation(async (repoId: string) => {
+      if (repoId === '/repo-a') {
+        return await new Promise<{ ok: boolean; message: string }>((resolve) => {
+          resolveFetchA = resolve
+        })
+      }
+      return { ok: true, message: 'ok' }
+    })
+    const { getBackgroundSyncDiagnostics, setBackgroundSyncRepos } = await import('#/server/modules/background-sync.ts')
+
+    await setBackgroundSyncRepos(['/repo-a'])
+    await vi.runOnlyPendingTimersAsync()
+    expect(mocks.fetchRepo).toHaveBeenCalledWith('/repo-a', 'background', expect.any(AbortSignal))
+
+    await setBackgroundSyncRepos(['/repo-b'])
+    await vi.advanceTimersByTimeAsync(15_000)
+    expect(getBackgroundSyncDiagnostics().idleDrainScheduled).toBe(true)
+    expect(mocks.fetchRepo.mock.calls.filter((call) => call[0] === '/repo-b')).toHaveLength(0)
+
+    resolveFetchA({ ok: true, message: 'ok' })
+    await vi.waitFor(() => expect(mocks.fetchRepo).toHaveBeenCalledWith('/repo-b', 'background', expect.any(AbortSignal)))
+    expect(getBackgroundSyncDiagnostics().idleDrainScheduled).toBe(false)
+    expect(mocks.fetchRepo.mock.calls.filter((call) => call[0] === '/repo-b')).toHaveLength(1)
+  })
+
   test('backs off retries after a fetch failure and resumes normal cadence after success', async () => {
     mocks.fetchRepo
       .mockResolvedValueOnce({ ok: false, message: 'fatal: offline' })

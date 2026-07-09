@@ -18,6 +18,7 @@ type AcceptRepoProjectionReadModelScope = 'query-cache' | 'repo-read-model' | 'v
 
 interface AcceptRepoProjectionReadModelOptions {
   scope: AcceptRepoProjectionReadModelScope
+  settleVisibleStatus?: boolean
 }
 
 interface CoreRepoProjectionAcceptanceSignature {
@@ -88,7 +89,8 @@ export function acceptRepoProjectionReadModel(
   if (!authoritativeProjection(projection)) return
   const coreProjection = projection.requested.branch === null && projection.requested.pullRequestMode === 'full'
   const acceptCoreReadModel = options.scope === 'repo-read-model' && coreProjection
-  const settleVisibleStatus = options.scope === 'visible-status' || acceptCoreReadModel
+  const settleVisibleStatus =
+    options.settleVisibleStatus ?? (options.scope === 'visible-status' || acceptCoreReadModel)
   const repoBefore = get().repos[repoRoot]
   if (!repoBefore || repoBefore.repoRuntimeId !== repoRuntimeId) return
   if (settleVisibleStatus) {

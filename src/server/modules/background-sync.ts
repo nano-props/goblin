@@ -19,6 +19,7 @@ interface BackgroundSyncState {
   generation: number
   nextRepoIndex: number
   pendingScheduleGeneration: number | null
+  idleDrainScheduled: boolean
   activeFetch: BackgroundSyncActiveFetch | null
 }
 
@@ -28,6 +29,7 @@ export interface BackgroundSyncDiagnostics {
   repoIds: string[]
   nextRepoIndex: number
   tickRunning: boolean
+  idleDrainScheduled: boolean
   queuePending: number
   queueSize: number
   repos: Array<{
@@ -49,6 +51,7 @@ const state: BackgroundSyncState = {
   generation: 0,
   nextRepoIndex: 0,
   pendingScheduleGeneration: null,
+  idleDrainScheduled: false,
   activeFetch: null,
 }
 
@@ -68,6 +71,7 @@ function ensureBackgroundSyncJob(generation: number): void {
   stopBackgroundSyncJob()
   syncQueue.clear()
   state.pendingScheduleGeneration = null
+  state.idleDrainScheduled = false
   if (state.repoIds.length === 0 || state.intervalMs <= 0) return
   state.job = new Cron('* * * * * *', () => {
     requestScheduledFetch(generation)
@@ -150,7 +154,13 @@ function requestScheduledFetch(generation: number): void {
   if (generation !== state.generation || state.intervalMs <= 0) return
   state.pendingScheduleGeneration = generation
   if (syncQueue.pending + syncQueue.size > 0) {
-    void syncQueue.onIdle().then(drainScheduledFetchQueue)
+    if (!state.idleDrainScheduled) {
+      state.idleDrainScheduled = true
+      void syncQueue.onIdle().then(() => {
+        state.idleDrainScheduled = false
+        drainScheduledFetchQueue()
+      })
+    }
     return
   }
   drainScheduledFetchQueue()
@@ -252,6 +262,7 @@ export function stopBackgroundSync(): void {
   state.intervalMs = 0
   state.nextRepoIndex = 0
   state.pendingScheduleGeneration = null
+  state.idleDrainScheduled = false
   state.activeFetch = null
   syncQueue.clear()
   stopBackgroundSyncJob()
@@ -268,6 +279,7 @@ export function getBackgroundSyncDiagnostics(now: number = Date.now()): Backgrou
     repoIds: [...state.repoIds],
     nextRepoIndex: state.nextRepoIndex,
     tickRunning: syncQueue.pending > 0,
+    idleDrainScheduled: state.idleDrainScheduled,
     queuePending: syncQueue.pending,
     queueSize: syncQueue.size,
     repos: state.repoIds.map((repoId) => ({

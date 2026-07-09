@@ -5,7 +5,7 @@ import { isRepoUnavailableReason, markRepoUnavailable } from '#/web/stores/repos
 import { runExclusiveOperation, runLatestOperation } from '#/web/stores/repos/operation-runner.ts'
 import { resolveActionRepoRuntimeId } from '#/web/stores/repos/refresh-state.ts'
 import { createRefreshSyncHelpers } from '#/web/stores/repos/refresh-sync.ts'
-import { finishDataLoadError, startDataLoad } from '#/web/stores/repos/repo-data-load-state.ts'
+import { cancelDataLoad, finishDataLoadError, startDataLoad } from '#/web/stores/repos/repo-data-load-state.ts'
 import { refreshRepoProjectionReadModel } from '#/web/repo-data-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { acceptRepoProjectionReadModel } from '#/web/stores/repos/projection-read-model-effects.ts'
@@ -99,16 +99,27 @@ async function runRuntimeProjectionRefresh(
         store.set,
         store.get,
         { repoRoot: id, repoRuntimeId, projection },
-        { scope },
+        { scope, settleVisibleStatus: ctx.ownsTarget('visibleStatus') },
       )
     },
-    onError: (message) => {
-      if (wantsVisibleStatusLoad && !wantsReadModelLoad) refreshStatusLog.warn('failed', { err: new Error(message) })
+    onError: (message, ctx) => {
+      const ownsReadModelLoad = wantsReadModelLoad && ctx.ownsTarget('repoReadModel')
+      const ownsVisibleStatusLoad = wantsVisibleStatusLoad && ctx.ownsTarget('visibleStatus')
+      if (ownsVisibleStatusLoad && !ownsReadModelLoad) refreshStatusLog.warn('failed', { err: new Error(message) })
       updateIfFresh(store.set, id, repoRuntimeId, (r) => {
         if (isRepoUnavailableReason(message)) markRepoUnavailable(r, message)
-        if (wantsReadModelLoad) finishDataLoadError(r.dataLoads.repoReadModel, message)
-        if (wantsVisibleStatusLoad) finishDataLoadError(r.dataLoads.visibleStatus, message)
+        if (ownsReadModelLoad) finishDataLoadError(r.dataLoads.repoReadModel, message)
+        if (ownsVisibleStatusLoad) finishDataLoadError(r.dataLoads.visibleStatus, message)
         r.events = appendRepoEvent(r.events, errorEvent(message))
+      })
+    },
+    onStale: (ctx) => {
+      const ownsReadModelLoad = wantsReadModelLoad && ctx.ownsTarget('repoReadModel')
+      const ownsVisibleStatusLoad = wantsVisibleStatusLoad && ctx.ownsTarget('visibleStatus')
+      if (!ownsReadModelLoad && !ownsVisibleStatusLoad) return
+      updateIfFresh(store.set, id, repoRuntimeId, (r) => {
+        if (ownsReadModelLoad) cancelDataLoad(r.dataLoads.repoReadModel)
+        if (ownsVisibleStatusLoad) cancelDataLoad(r.dataLoads.visibleStatus)
       })
     },
   })

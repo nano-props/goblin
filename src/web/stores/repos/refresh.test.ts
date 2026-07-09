@@ -1,3 +1,4 @@
+import { CancelledError } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import { terminalLog } from '#/web/logger.ts'
@@ -917,6 +918,83 @@ describe('projection refresh request ordering', () => {
       loadedAt,
       error: 'status failed',
       stale: true,
+    })
+  })
+
+  test('cancels projection data-load state when a read is cancelled without a successor', async () => {
+    const repoRuntimeId = seedRepo([branch('feature/a')])
+    ipcHandlers['repo.projection'] = async () => {
+      throw new CancelledError()
+    }
+
+    await requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
+      repoRuntimeId,
+      scope: 'repo-read-model',
+    })
+
+    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.repoReadModel).toMatchObject({
+      phase: 'idle',
+      error: null,
+    })
+    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.visibleStatus).toMatchObject({
+      phase: 'idle',
+      error: null,
+    })
+  })
+
+  test('does not let an older repo read-model refresh settle a newer visible-status load', async () => {
+    const repoRuntimeId = seedRepo([branch('feature/a')])
+    const resolveReadModels: Array<() => void> = []
+    let resolveVisibleStatus!: () => void
+    ipcHandlers['repo.projection'] = (input: { branch?: string }) =>
+      new Promise((resolve) => {
+        if (input.branch === 'feature/a') {
+          resolveVisibleStatus = () =>
+            resolve(
+              repoProjection(
+                { branches: [branch('feature/a')], current: 'feature/a' },
+                [{ path: REPO_ID, branch: 'feature/a', isMain: true, entries: [] }],
+              ),
+            )
+          return
+        }
+        resolveReadModels.push(() => resolve(repoProjection({ branches: [branch('feature/a')], current: 'feature/a' })))
+      })
+
+    const readModel = requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
+      repoRuntimeId,
+      scope: 'repo-read-model',
+    })
+    await vi.waitFor(() => {
+      expect(resolveReadModels).toHaveLength(1)
+    })
+    const visibleStatus = requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
+      repoRuntimeId,
+      scope: 'visible-status',
+      branchName: 'feature/a',
+    })
+    await vi.waitFor(() => {
+      expect(resolveVisibleStatus).toEqual(expect.any(Function))
+    })
+
+    resolveReadModels[0]?.()
+    await vi.waitFor(() => {
+      expect(resolveReadModels).toHaveLength(2)
+    })
+    resolveReadModels[1]?.()
+    await readModel
+
+    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.repoReadModel).toMatchObject({ phase: 'idle' })
+    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.visibleStatus).toMatchObject({
+      phase: 'loading',
+      error: null,
+    })
+
+    resolveVisibleStatus()
+    await visibleStatus
+    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.visibleStatus).toMatchObject({
+      phase: 'idle',
+      error: null,
     })
   })
 
