@@ -17,7 +17,7 @@ import {
 import type { RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 export type { RepoOperationTarget }
 
-interface RepoOperationContext {
+export interface RepoOperationContext {
   id: string
   repoRuntimeId: string
   operationId: number

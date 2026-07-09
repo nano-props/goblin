@@ -37,6 +37,8 @@ interface BeginRepoWriteOperationInput {
 }
 
 interface RepoWriteOperationQueueRuntime {
+  boundaryKey: string
+  repoIds: Set<string>
   queue: RepoWriteOperationQueue
   operations: Map<string, RepoServerOperationState>
   activeNetworkOperation: ActiveRepoWriteNetworkOperation | null
@@ -51,6 +53,7 @@ const MAX_SETTLED_OPERATIONS = 100
 
 let nextWriteOperationId = 1
 const repoWriteOperationRuntimesByBoundary = new Map<string, RepoWriteOperationQueueRuntime>()
+const repoWriteOperationRepoIdsByBoundary = new Map<string, Set<string>>()
 let repoWriteOperationAdmission: Promise<void> = Promise.resolve()
 
 function freshWriteOperationId(): string {
@@ -145,26 +148,27 @@ function beginRepoWriteOperation(
     canCancelUnderlying: input.canCancelUnderlying ?? true,
   }
   runtime.operations.set(operation.id, operation)
-  publishRepoRuntimeInvalidation(operation)
+  registerRepoWriteOperationBoundaryRepoId(runtime.boundaryKey, operation.repoId)
+  publishRepoRuntimeInvalidation(runtime, operation)
   return {
     id: operation.id,
     start() {
       operation.phase = operation.cancellation.underlyingRequested ? 'cancelling' : 'running'
       operation.startedAt = Date.now()
-      publishRepoRuntimeInvalidation(operation)
+      publishRepoRuntimeInvalidation(runtime, operation)
     },
     requestCancel(reason) {
       operation.cancellation.underlyingRequested = true
       operation.cancellation.reason = reason
       operation.cancellation.requestedAt = Date.now()
       if (operation.phase === 'queued' || operation.phase === 'running') operation.phase = 'cancelling'
-      publishRepoRuntimeInvalidation(operation)
+      publishRepoRuntimeInvalidation(runtime, operation)
     },
     recordWaitCancellation(reason) {
       operation.cancellation.waitCancelledCount += 1
       operation.cancellation.lastWaitCancelledAt = Date.now()
       operation.cancellation.lastWaitCancellationReason = reason
-      publishRepoRuntimeInvalidation(operation)
+      publishRepoRuntimeInvalidation(runtime, operation)
     },
     settle(result) {
       if (settled) return
@@ -178,15 +182,21 @@ function beginRepoWriteOperation(
             message: result.message ?? 'error.failed-read-repo',
             reason: operationFailureReasonForMessage(result.message, cancellationReason),
           }
-      publishRepoRuntimeInvalidation(operation)
+      publishRepoRuntimeInvalidation(runtime, operation)
       pruneSettledOperations()
     },
   }
 }
 
-function publishRepoRuntimeInvalidation(operation: Pick<RepoServerOperationState, 'repoId'>): void {
-  if (!operation.repoId) return
-  publishRepoQueryInvalidation({ repoId: operation.repoId, query: 'repo-runtime' })
+function publishRepoRuntimeInvalidation(
+  runtime: RepoWriteOperationQueueRuntime,
+  operation: Pick<RepoServerOperationState, 'repoId'>,
+): void {
+  const repoIds = new Set(runtime.repoIds)
+  if (operation.repoId) repoIds.add(operation.repoId)
+  for (const repoId of repoIds) {
+    publishRepoQueryInvalidation({ repoId, query: 'repo-runtime' })
+  }
 }
 
 async function acquireRepoWriteOperationAdmission(): Promise<() => void> {
@@ -200,10 +210,30 @@ async function acquireRepoWriteOperationAdmission(): Promise<() => void> {
   return release
 }
 
-function repoWriteOperationRuntimeForBoundary(boundaryKey: string): RepoWriteOperationQueueRuntime {
+function registerRepoWriteOperationBoundaryRepoId(boundaryKey: string, repoId: string | null | undefined): Set<string> {
+  let repoIds = repoWriteOperationRepoIdsByBoundary.get(boundaryKey)
+  if (!repoIds) {
+    repoIds = new Set()
+    repoWriteOperationRepoIdsByBoundary.set(boundaryKey, repoIds)
+  }
+  if (repoId) repoIds.add(repoId)
+  return repoIds
+}
+
+function repoWriteOperationRuntimeForBoundary(
+  boundaryKey: string,
+  repoId?: string | null,
+): RepoWriteOperationQueueRuntime {
+  const repoIds = registerRepoWriteOperationBoundaryRepoId(boundaryKey, repoId)
   let runtime = repoWriteOperationRuntimesByBoundary.get(boundaryKey)
   if (!runtime) {
-    runtime = { queue: new PQueue({ concurrency: 1 }), operations: new Map(), activeNetworkOperation: null }
+    runtime = {
+      boundaryKey,
+      repoIds,
+      queue: new PQueue({ concurrency: 1 }),
+      operations: new Map(),
+      activeNetworkOperation: null,
+    }
     repoWriteOperationRuntimesByBoundary.set(boundaryKey, runtime)
   }
   return runtime
@@ -332,7 +362,7 @@ export async function enqueueRepoWriteOperation<T extends ExecResult>(
       throw err
     }
     if (signal?.aborted) return cancelledRepoWriteResult()
-    const runtime = repoWriteOperationRuntimeForBoundary(boundaryKey)
+    const runtime = repoWriteOperationRuntimeForBoundary(boundaryKey, repoId)
     const operation = beginRepoWriteOperation(runtime, operationInput)
     const context = createRepoWriteOperationContext(runtime, operation, signal)
     let task: () => Promise<T>
@@ -361,6 +391,7 @@ export async function abortRepoWriteNetworkOperation(
   options: { signal?: AbortSignal } = {},
 ): Promise<boolean> {
   const boundaryKey = await resolveRepoWriteBoundaryKey(repoId, options.signal)
+  registerRepoWriteOperationBoundaryRepoId(boundaryKey, repoId)
   const active = repoWriteOperationRuntimesByBoundary.get(boundaryKey)?.activeNetworkOperation
   if (!active) return false
   active.operation.requestCancel('user-cancel')
@@ -376,6 +407,7 @@ export async function listRepoWriteOperationsForRepo(
   let runtimes: RepoWriteOperationQueueRuntime[]
   if (repoId) {
     const boundaryKey = await resolveRepoWriteBoundaryKey(repoId, options.signal)
+    registerRepoWriteOperationBoundaryRepoId(boundaryKey, repoId)
     const runtime = repoWriteOperationRuntimesByBoundary.get(boundaryKey)
     if (!runtime) return []
     runtimes = [runtime]
@@ -394,6 +426,7 @@ export async function listRepoWriteOperationsForRepo(
 
 export function resetRepoWriteOperationCoordinatorForTests(): void {
   repoWriteOperationRuntimesByBoundary.clear()
+  repoWriteOperationRepoIdsByBoundary.clear()
   repoWriteOperationAdmission = Promise.resolve()
   nextWriteOperationId = 1
 }

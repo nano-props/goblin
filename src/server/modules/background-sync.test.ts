@@ -45,6 +45,19 @@ describe('server background sync scheduler', () => {
     expect(mocks.fetchRepo).toHaveBeenNthCalledWith(3, '/tmp/repo-a', 'background', expect.any(AbortSignal))
   })
 
+  test('drains all initially due repos without waiting for repeated cron ticks', async () => {
+    mocks.fetchRepo.mockResolvedValue({ ok: true, message: 'ok' })
+    const { setBackgroundSyncRepos } = await import('#/server/modules/background-sync.ts')
+
+    await setBackgroundSyncRepos(['/tmp/repo-a', '/tmp/repo-b', '/tmp/repo-c'])
+    await vi.runOnlyPendingTimersAsync()
+
+    await vi.waitFor(() => expect(mocks.fetchRepo).toHaveBeenCalledTimes(3))
+    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(1, '/tmp/repo-a', 'background', expect.any(AbortSignal))
+    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(2, '/tmp/repo-b', 'background', expect.any(AbortSignal))
+    expect(mocks.fetchRepo).toHaveBeenNthCalledWith(3, '/tmp/repo-c', 'background', expect.any(AbortSignal))
+  })
+
   test('stops scheduling when the repo set is cleared', async () => {
     mocks.fetchRepo.mockResolvedValue({ ok: true, message: 'ok' })
     const { setBackgroundSyncRepos } = await import('#/server/modules/background-sync.ts')

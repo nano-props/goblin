@@ -106,6 +106,18 @@ function findNextDueRepo(now: number): string | null {
   return null
 }
 
+function hasDueRepo(now: number): boolean {
+  if (state.repoIds.length === 0 || state.intervalMs <= 0) return false
+  for (const repoId of state.repoIds) {
+    const lastFetchAt = state.lastFetchAtByRepo[repoId]
+    const nextIntervalAt = lastFetchAt === null || lastFetchAt === undefined ? now : lastFetchAt + state.intervalMs
+    const backoffUntil = state.backoffUntilByRepo[repoId] ?? null
+    const nextEligibleAt = Math.max(nextIntervalAt, backoffUntil ?? 0)
+    if (now >= nextEligibleAt) return true
+  }
+  return false
+}
+
 function clearRepoBackoff(repoId: string): void {
   delete state.failureCountByRepo[repoId]
   delete state.backoffUntilByRepo[repoId]
@@ -229,6 +241,9 @@ async function runScheduledFetch(generation: number): Promise<void> {
     )
   } finally {
     if (state.activeFetch === activeFetch) state.activeFetch = null
+    if (generation === state.generation && state.intervalMs > 0 && hasDueRepo(Date.now())) {
+      requestScheduledFetch(generation)
+    }
   }
 }
 

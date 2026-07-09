@@ -7,6 +7,7 @@ import {
 } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { requestRepoRuntimeProjectionRefresh, runManualRepoSync } from '#/web/stores/repos/refresh.ts'
 import { replaceRepo } from '#/web/stores/repos/repo-state-factory.ts'
+import { runLatestOperation } from '#/web/stores/repos/operation-runner.ts'
 import { getBranchActionCapabilities } from '#/web/hooks/useBranchActions.tsx'
 import {
   createBranchSnapshot,
@@ -363,6 +364,48 @@ describe('runBranchAction', () => {
     })
     expect(repoOperation(REPO_ID, 'branchAction').phase).toBe('idle')
     expect(repoOperation(REPO_ID, 'branchAction').target).toBeNull()
+  })
+
+  test('does not let an older network branch action settle a newer fetch data load owner', async () => {
+    let resolvePull!: (value: { ok: true; message: string }) => void
+    installGoblinTestBridge({
+      'repo.pull': () =>
+        new Promise((resolve) => {
+          resolvePull = resolve
+        }),
+      'repo.projection': async () =>
+        repoProjection({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
+    })
+
+    const pullWork = useReposStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
+    await flushAsyncWork()
+    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.fetch.phase).toBe('loading')
+
+    let releaseFetchOwner!: () => void
+    const fetchOwner = runLatestOperation({
+      set: useReposStore.setState,
+      get: useReposStore.getState,
+      id: REPO_ID,
+      repoRuntimeId: 'repo-runtime-test',
+      lane: 'read',
+      operationKey: 'fetch-owner-test',
+      priority: 100,
+      targets: [{ key: 'fetch', reason: 'fetch' }],
+      task: () =>
+        new Promise<string>((resolve) => {
+          releaseFetchOwner = () => resolve('fetch-owner')
+        }),
+    })
+    await flushAsyncWork()
+
+    resolvePull({ ok: true, message: 'ok' })
+    await pullWork
+
+    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.fetch.phase).toBe('loading')
+    expect(repoOperation(REPO_ID, 'fetch').phase).toBe('running')
+
+    releaseFetchOwner()
+    await fetchOwner
   })
 
   test('does not run a queued local branch action after the repo is reopened', async () => {

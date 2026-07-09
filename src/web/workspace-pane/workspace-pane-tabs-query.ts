@@ -20,6 +20,18 @@ export interface WorkspacePaneTabsTargetProjection {
   tabs: WorkspacePaneTabEntry[]
 }
 
+interface WorkspacePaneTabsManualRefreshScope {
+  projectionKey: string
+  requestVersion: number
+  startedProjectionVersion: number
+}
+
+interface WorkspacePaneTabsVersionTarget {
+  repoRoot: string
+  branchName: string
+  worktreePath: string | null
+}
+
 class StaleWorkspacePaneTabsProjectionReadError extends Error {
   constructor() {
     super('Stale workspace pane tabs projection read')
@@ -31,7 +43,12 @@ let workspacePaneTabsPersistenceVersion = 0
 const workspacePaneTabsPersistenceListeners = new Set<() => void>()
 const workspacePaneTabsProjectionVersion = new Map<string, number>()
 const workspacePaneTabsTargetGeneration = new Map<string, number>()
+const workspacePaneTabsManualRefreshVersion = new Map<string, number>()
+// Explicit cache writes accept data before calling setQueryData. React Query can
+// still run structuralSharing for that set, so accepted arrays skip bookkeeping.
+const acceptedWorkspacePaneTabsQueryData = new WeakSet<WorkspacePaneTabsQueryData>()
 let workspacePaneTabsNextProjectionVersion = 0
+let workspacePaneTabsNextManualRefreshVersion = 0
 
 export function workspacePaneTabsQueryKey(repoRoot: string, repoRuntimeId: string) {
   return ['workspace-pane-tabs', repoRoot, repoRuntimeId] as const
@@ -41,6 +58,16 @@ export function workspacePaneTabsQueryOptions(repoRoot: string, repoRuntimeId: s
   return queryOptions({
     queryKey: workspacePaneTabsQueryKey(repoRoot, repoRuntimeId),
     queryFn: async () => fetchWorkspacePaneTabsReadModel(repoRoot, repoRuntimeId),
+    structuralSharing: (oldData, newData) => {
+      if (!Array.isArray(newData)) return newData
+      const current = Array.isArray(oldData) ? (oldData as WorkspacePaneTabsQueryData) : undefined
+      const next = newData as WorkspacePaneTabsQueryData
+      if (acceptedWorkspacePaneTabsQueryData.has(next)) return next
+      return acceptWorkspacePaneTabsQueryData(repoRoot, repoRuntimeId, current, next, [
+        ...(current ?? []),
+        ...next,
+      ])
+    },
     retry: (_failureCount, err) => isStaleWorkspacePaneTabsProjectionReadError(err),
     retryDelay: 0,
     staleTime: Number.POSITIVE_INFINITY,
@@ -123,16 +150,21 @@ export function setWorkspacePaneTabsForTargetQueryData(
   },
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
-  updateWorkspacePaneTabsQueryData(input.repoRoot, input.repoRuntimeId, queryClient, (current) => [
-    ...(current ?? []).filter((entry) => !workspacePaneTabsEntryMatchesTarget(entry, input)),
-    {
-      repoRoot: input.repoRoot,
-      branchName: input.branchName,
-      worktreePath: input.worktreePath,
-      tabs: [...input.tabs],
-    },
-  ])
-  bumpWorkspacePaneTabsTargetVersion(input)
+  updateWorkspacePaneTabsQueryData(
+    input.repoRoot,
+    input.repoRuntimeId,
+    queryClient,
+    (current) => [
+      ...(current ?? []).filter((entry) => !workspacePaneTabsEntryMatchesTarget(entry, input)),
+      {
+        repoRoot: input.repoRoot,
+        branchName: input.branchName,
+        worktreePath: input.worktreePath,
+        tabs: [...input.tabs],
+      },
+    ],
+    [input],
+  )
 }
 
 export function replaceWorkspacePaneTabsQueryData(
@@ -143,8 +175,10 @@ export function replaceWorkspacePaneTabsQueryData(
 ): void {
   const currentEntries =
     queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(repoRoot, repoRuntimeId)) ?? []
-  updateWorkspacePaneTabsQueryData(repoRoot, repoRuntimeId, queryClient, () => entries)
-  bumpWorkspacePaneTabsTargetVersions(repoRoot, repoRuntimeId, [...currentEntries, ...entries])
+  updateWorkspacePaneTabsQueryData(repoRoot, repoRuntimeId, queryClient, () => entries, [
+    ...currentEntries,
+    ...entries,
+  ])
 }
 
 export function restoreWorkspacePaneTabsTargetQueryData(
@@ -164,11 +198,16 @@ export function restoreWorkspacePaneTabsTargetQueryData(
   ) {
     return false
   }
-  updateWorkspacePaneTabsQueryData(input.repoRoot, input.repoRuntimeId, queryClient, (current) => [
-    ...(current ?? []).filter((entry) => !workspacePaneTabsEntryMatchesTarget(entry, input)),
-    ...(input.previousTargetEntry ? [input.previousTargetEntry] : []),
-  ])
-  bumpWorkspacePaneTabsTargetVersion(input)
+  updateWorkspacePaneTabsQueryData(
+    input.repoRoot,
+    input.repoRuntimeId,
+    queryClient,
+    (current) => [
+      ...(current ?? []).filter((entry) => !workspacePaneTabsEntryMatchesTarget(entry, input)),
+      ...(input.previousTargetEntry ? [input.previousTargetEntry] : []),
+    ],
+    [input],
+  )
   return true
 }
 
@@ -195,8 +234,12 @@ export async function refreshWorkspacePaneTabsQueryData(
   repoRuntimeId: string,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): Promise<void> {
+  const refreshScope = startWorkspacePaneTabsManualRefresh(repoRoot, repoRuntimeId)
   try {
-    const entries = await fetchWorkspacePaneTabsReadModel(repoRoot, repoRuntimeId)
+    const entries = await fetchWorkspacePaneTabsReadModel(repoRoot, repoRuntimeId, {
+      startedProjectionVersion: refreshScope.startedProjectionVersion,
+    })
+    if (!workspacePaneTabsManualRefreshCurrent(refreshScope)) return
     replaceWorkspacePaneTabsQueryData(repoRoot, repoRuntimeId, entries, queryClient)
   } catch (err) {
     if (!isStaleWorkspacePaneTabsProjectionReadError(err)) throw err
@@ -205,7 +248,9 @@ export async function refreshWorkspacePaneTabsQueryData(
 
 export function clearWorkspacePaneTabsProjectionState(repoRoot: string, repoRuntimeId: string): void {
   bumpWorkspacePaneTabsProjectionVersion(repoRoot, repoRuntimeId)
-  clearWorkspacePaneTabsTargetVersions(workspacePaneTabsProjectionKey(repoRoot, repoRuntimeId))
+  const projectionKey = workspacePaneTabsProjectionKey(repoRoot, repoRuntimeId)
+  workspacePaneTabsManualRefreshVersion.delete(projectionKey)
+  clearWorkspacePaneTabsTargetVersions(projectionKey)
 }
 
 export function workspacePaneTabsTargetVersion(input: {
@@ -260,20 +305,10 @@ function workspacePaneTabsTargetProjectionKey(input: {
   )}`
 }
 
-function bumpWorkspacePaneTabsTargetVersion(input: {
-  repoRoot: string
-  repoRuntimeId: string
-  branchName: string
-  worktreePath: string | null
-}): void {
-  const key = workspacePaneTabsTargetProjectionKey(input)
-  workspacePaneTabsTargetGeneration.set(key, (workspacePaneTabsTargetGeneration.get(key) ?? 0) + 1)
-}
-
 function bumpWorkspacePaneTabsTargetVersions(
   repoRoot: string,
   repoRuntimeId: string,
-  targets: readonly WorkspacePaneTabsEntry[],
+  targets: readonly WorkspacePaneTabsVersionTarget[],
 ): void {
   const targetKeys = new Set<string>()
   for (const target of targets) {
@@ -307,6 +342,24 @@ function bumpWorkspacePaneTabsProjectionVersion(repoRoot: string, repoRuntimeId:
   workspacePaneTabsProjectionVersion.set(key, ++workspacePaneTabsNextProjectionVersion)
 }
 
+function startWorkspacePaneTabsManualRefresh(
+  repoRoot: string,
+  repoRuntimeId: string,
+): WorkspacePaneTabsManualRefreshScope {
+  const projectionKey = workspacePaneTabsProjectionKey(repoRoot, repoRuntimeId)
+  const requestVersion = ++workspacePaneTabsNextManualRefreshVersion
+  workspacePaneTabsManualRefreshVersion.set(projectionKey, requestVersion)
+  return {
+    projectionKey,
+    requestVersion,
+    startedProjectionVersion: currentWorkspacePaneTabsProjectionVersion(repoRoot, repoRuntimeId),
+  }
+}
+
+function workspacePaneTabsManualRefreshCurrent(scope: WorkspacePaneTabsManualRefreshScope): boolean {
+  return workspacePaneTabsManualRefreshVersion.get(scope.projectionKey) === scope.requestVersion
+}
+
 function isStaleWorkspacePaneTabsProjectionReadError(err: unknown): boolean {
   return err instanceof StaleWorkspacePaneTabsProjectionReadError
 }
@@ -314,8 +367,10 @@ function isStaleWorkspacePaneTabsProjectionReadError(err: unknown): boolean {
 async function fetchWorkspacePaneTabsReadModel(
   repoRoot: string,
   repoRuntimeId: string,
+  options: { startedProjectionVersion?: number } = {},
 ): Promise<WorkspacePaneTabsQueryData> {
-  const startedVersion = currentWorkspacePaneTabsProjectionVersion(repoRoot, repoRuntimeId)
+  const startedVersion =
+    options.startedProjectionVersion ?? currentWorkspacePaneTabsProjectionVersion(repoRoot, repoRuntimeId)
   const entries = normalizeWorkspacePaneTabsQueryData(await workspacePaneTabsClient.list({ repoRoot, repoRuntimeId }))
   if (startedVersion < currentWorkspacePaneTabsProjectionVersion(repoRoot, repoRuntimeId)) {
     throw new StaleWorkspacePaneTabsProjectionReadError()
@@ -328,12 +383,37 @@ function updateWorkspacePaneTabsQueryData(
   repoRuntimeId: string,
   queryClient: QueryClient,
   update: (current: WorkspacePaneTabsQueryData | undefined) => readonly WorkspacePaneTabsEntry[],
+  affectedTargets: readonly WorkspacePaneTabsVersionTarget[],
 ): void {
-  queryClient.setQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(repoRoot, repoRuntimeId), (current) =>
-    normalizeWorkspacePaneTabsQueryData(update(current)),
+  const queryKey = workspacePaneTabsQueryKey(repoRoot, repoRuntimeId)
+  const current = queryClient.getQueryData<WorkspacePaneTabsQueryData>(queryKey)
+  const accepted = acceptWorkspacePaneTabsQueryData(
+    repoRoot,
+    repoRuntimeId,
+    current,
+    update(current),
+    affectedTargets,
   )
-  bumpWorkspacePaneTabsProjectionVersion(repoRoot, repoRuntimeId)
+  queryClient.setQueryData<WorkspacePaneTabsQueryData>(queryKey, accepted)
   notifyWorkspacePaneTabsPersistenceChanged()
+}
+
+function acceptWorkspacePaneTabsQueryData(
+  repoRoot: string,
+  repoRuntimeId: string,
+  current: WorkspacePaneTabsQueryData | undefined,
+  next: readonly WorkspacePaneTabsEntry[],
+  affectedTargets: readonly WorkspacePaneTabsVersionTarget[],
+): WorkspacePaneTabsQueryData {
+  const accepted = normalizeWorkspacePaneTabsQueryData(next)
+  acceptedWorkspacePaneTabsQueryData.add(accepted)
+  bumpWorkspacePaneTabsProjectionVersion(repoRoot, repoRuntimeId)
+  bumpWorkspacePaneTabsTargetVersions(
+    repoRoot,
+    repoRuntimeId,
+    affectedTargets.length > 0 ? affectedTargets : [...(current ?? []), ...accepted],
+  )
+  return accepted
 }
 
 function normalizeWorkspacePaneTabsQueryData(entries: readonly WorkspacePaneTabsEntry[]): WorkspacePaneTabsQueryData {
