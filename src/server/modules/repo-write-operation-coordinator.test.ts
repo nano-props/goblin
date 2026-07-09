@@ -189,6 +189,39 @@ describe('repo write operation coordinator', () => {
     })
   })
 
+  test('stops invalidating a repo after it resolves to another write boundary', async () => {
+    let linkedBoundary = '/tmp/repo/.git'
+    mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (repoId: string) => {
+      if (repoId === '/tmp/repo') return '/tmp/repo/.git'
+      if (repoId === '/tmp/repo-linked') return linkedBoundary
+      return repoId
+    })
+    await expect(listRepoWriteOperationsForRepo('/tmp/repo-linked')).resolves.toEqual([])
+    linkedBoundary = '/tmp/repo-linked/.git'
+    await expect(listRepoWriteOperationsForRepo('/tmp/repo-linked')).resolves.toEqual([])
+    mocks.publishRepoQueryInvalidation.mockClear()
+
+    await enqueueRepoWriteOperation(
+      '/tmp/repo',
+      undefined,
+      { repoId: '/tmp/repo', kind: 'fetch', source: 'background' },
+      (operation) => async () => {
+        operation.start()
+        operation.settle({ ok: true, message: 'ok' })
+        return { ok: true, message: 'ok' }
+      },
+    )
+
+    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
+      repoId: '/tmp/repo',
+      query: 'repo-runtime',
+    })
+    expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalledWith({
+      repoId: '/tmp/repo-linked',
+      query: 'repo-runtime',
+    })
+  })
+
   test('records caller cancellation for a running network operation', async () => {
     const caller = new AbortController()
     let resolveTaskSignal!: (signal: AbortSignal) => void

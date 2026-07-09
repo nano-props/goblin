@@ -13,6 +13,7 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import {
   readWorkspacePaneTabsForTarget,
+  refreshWorkspacePaneTabsQueryData,
   setWorkspacePaneTabsForTargetQueryData,
   workspacePaneTabsQueryOptions,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -136,6 +137,49 @@ describe('useWorkspacePaneTabsReorderMutation', () => {
     await fetch
 
     expect(readWorkspacePaneTabs()).toEqual(canonicalServerTabs)
+  })
+
+  test('applies successful reorder response after an intervening stale refresh writes old tabs', async () => {
+    const requests: DeferredUpdateWorkspaceTabsRequest[] = []
+    let resolveListTabs!: (tabs: WorkspacePaneTabsEntry[]) => void
+    installWorkspacePaneTabsTestBridge({
+      listWorkspaceTabs: async () =>
+        await new Promise<WorkspacePaneTabsEntry[]>((resolve) => {
+          resolveListTabs = resolve
+        }),
+      updateWorkspaceTabs: async (input) =>
+        await new Promise<WorkspacePaneTabEntry[]>((resolve, reject) => {
+          requests.push({ input, resolve, reject })
+        }),
+    })
+    const sourceTabs = [terminalEntry('term-111111111111111111111'), staticEntry('status')]
+    const reorderedTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111')]
+    const canonicalServerTabs = [staticEntry('status'), terminalEntry('term-111111111111111111111'), staticEntry('history')]
+    seedWorkspacePaneTabs(sourceTabs)
+    renderMutationHook({ canonicalTabs: sourceTabs })
+
+    act(() => {
+      currentControls().reorderTabs(reorderedTabs)
+    })
+    await vi.waitFor(() => {
+      expect(readWorkspacePaneTabs()).toEqual(reorderedTabs)
+      expect(requests).toHaveLength(1)
+    })
+
+    const refresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, REPO_RUNTIME_ID, queryClient)
+    await Promise.resolve()
+    resolveListTabs([entry(sourceTabs)])
+    await refresh
+    expect(readWorkspacePaneTabs()).toEqual(sourceTabs)
+
+    await act(async () => {
+      requests[0]!.resolve(canonicalServerTabs)
+      await flushMicrotasks()
+    })
+
+    await vi.waitFor(() => {
+      expect(readWorkspacePaneTabs()).toEqual(canonicalServerTabs)
+    })
   })
 
   test('applies consecutive optimistic reorders without a client queue', async () => {
@@ -446,6 +490,15 @@ function seedWorkspacePaneTabs(tabs: WorkspacePaneTabEntry[], repoRuntimeId: str
     },
     queryClient,
   )
+}
+
+function entry(tabs: WorkspacePaneTabEntry[]): WorkspacePaneTabsEntry {
+  return {
+    repoRoot: REPO_ROOT,
+    branchName: BRANCH_NAME,
+    worktreePath: WORKTREE_PATH,
+    tabs,
+  }
 }
 
 function seedWorkspacePaneTabsRepo(repoRuntimeId: string): void {

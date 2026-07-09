@@ -43,6 +43,7 @@ let workspacePaneTabsPersistenceVersion = 0
 const workspacePaneTabsPersistenceListeners = new Set<() => void>()
 const workspacePaneTabsProjectionVersion = new Map<string, number>()
 const workspacePaneTabsTargetGeneration = new Map<string, number>()
+const workspacePaneTabsTargetWriteGeneration = new Map<string, number>()
 const workspacePaneTabsManualRefreshVersion = new Map<string, number>()
 // Explicit cache writes accept data before calling setQueryData. React Query can
 // still run structuralSharing for that set, so accepted arrays skip bookkeeping.
@@ -164,6 +165,7 @@ export function setWorkspacePaneTabsForTargetQueryData(
       },
     ],
     [input],
+    { writeTargets: [input] },
   )
 }
 
@@ -207,6 +209,7 @@ export function restoreWorkspacePaneTabsTargetQueryData(
       ...(input.previousTargetEntry ? [input.previousTargetEntry] : []),
     ],
     [input],
+    { writeTargets: [input] },
   )
   return true
 }
@@ -251,6 +254,7 @@ export function clearWorkspacePaneTabsProjectionState(repoRoot: string, repoRunt
   const projectionKey = workspacePaneTabsProjectionKey(repoRoot, repoRuntimeId)
   workspacePaneTabsManualRefreshVersion.delete(projectionKey)
   clearWorkspacePaneTabsTargetVersions(projectionKey)
+  clearWorkspacePaneTabsTargetWriteVersions(projectionKey)
 }
 
 export function workspacePaneTabsTargetVersion(input: {
@@ -260,6 +264,15 @@ export function workspacePaneTabsTargetVersion(input: {
   worktreePath: string | null
 }): number {
   return workspacePaneTabsTargetGeneration.get(workspacePaneTabsTargetProjectionKey(input)) ?? 0
+}
+
+export function workspacePaneTabsTargetWriteVersion(input: {
+  repoRoot: string
+  repoRuntimeId: string
+  branchName: string
+  worktreePath: string | null
+}): number {
+  return workspacePaneTabsTargetWriteGeneration.get(workspacePaneTabsTargetProjectionKey(input)) ?? 0
 }
 
 export function workspacePaneTabsByTargetFromQueryData(
@@ -326,10 +339,38 @@ function bumpWorkspacePaneTabsTargetVersions(
   }
 }
 
+function bumpWorkspacePaneTabsTargetWriteVersions(
+  repoRoot: string,
+  repoRuntimeId: string,
+  targets: readonly WorkspacePaneTabsVersionTarget[],
+): void {
+  const targetKeys = new Set<string>()
+  for (const target of targets) {
+    targetKeys.add(
+      workspacePaneTabsTargetProjectionKey({
+        repoRoot,
+        repoRuntimeId,
+        branchName: target.branchName,
+        worktreePath: target.worktreePath,
+      }),
+    )
+  }
+  for (const key of targetKeys) {
+    workspacePaneTabsTargetWriteGeneration.set(key, (workspacePaneTabsTargetWriteGeneration.get(key) ?? 0) + 1)
+  }
+}
+
 function clearWorkspacePaneTabsTargetVersions(projectionKey: string): void {
   const prefix = `${projectionKey}\0`
   for (const key of workspacePaneTabsTargetGeneration.keys()) {
     if (key.startsWith(prefix)) workspacePaneTabsTargetGeneration.delete(key)
+  }
+}
+
+function clearWorkspacePaneTabsTargetWriteVersions(projectionKey: string): void {
+  const prefix = `${projectionKey}\0`
+  for (const key of workspacePaneTabsTargetWriteGeneration.keys()) {
+    if (key.startsWith(prefix)) workspacePaneTabsTargetWriteGeneration.delete(key)
   }
 }
 
@@ -384,6 +425,7 @@ function updateWorkspacePaneTabsQueryData(
   queryClient: QueryClient,
   update: (current: WorkspacePaneTabsQueryData | undefined) => readonly WorkspacePaneTabsEntry[],
   affectedTargets: readonly WorkspacePaneTabsVersionTarget[],
+  options: { writeTargets?: readonly WorkspacePaneTabsVersionTarget[] } = {},
 ): void {
   const queryKey = workspacePaneTabsQueryKey(repoRoot, repoRuntimeId)
   const current = queryClient.getQueryData<WorkspacePaneTabsQueryData>(queryKey)
@@ -393,6 +435,7 @@ function updateWorkspacePaneTabsQueryData(
     current,
     update(current),
     affectedTargets,
+    options,
   )
   queryClient.setQueryData<WorkspacePaneTabsQueryData>(queryKey, accepted)
   notifyWorkspacePaneTabsPersistenceChanged()
@@ -404,6 +447,7 @@ function acceptWorkspacePaneTabsQueryData(
   current: WorkspacePaneTabsQueryData | undefined,
   next: readonly WorkspacePaneTabsEntry[],
   affectedTargets: readonly WorkspacePaneTabsVersionTarget[],
+  options: { writeTargets?: readonly WorkspacePaneTabsVersionTarget[] } = {},
 ): WorkspacePaneTabsQueryData {
   const accepted = normalizeWorkspacePaneTabsQueryData(next)
   acceptedWorkspacePaneTabsQueryData.add(accepted)
@@ -413,6 +457,9 @@ function acceptWorkspacePaneTabsQueryData(
     repoRuntimeId,
     affectedTargets.length > 0 ? affectedTargets : [...(current ?? []), ...accepted],
   )
+  if (options.writeTargets && options.writeTargets.length > 0) {
+    bumpWorkspacePaneTabsTargetWriteVersions(repoRoot, repoRuntimeId, options.writeTargets)
+  }
   return accepted
 }
 

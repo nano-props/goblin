@@ -1,6 +1,7 @@
 import PQueue from 'p-queue'
 import { resolveRepoWriteBoundaryKey } from '#/server/modules/repo-source.ts'
 import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
+import { onRepoRuntimeClosed } from '#/server/modules/repo-runtimes.ts'
 import type {
   RepoOperationCancellationReason,
   RepoOperationFailureReason,
@@ -54,7 +55,9 @@ const MAX_SETTLED_OPERATIONS = 100
 let nextWriteOperationId = 1
 const repoWriteOperationRuntimesByBoundary = new Map<string, RepoWriteOperationQueueRuntime>()
 const repoWriteOperationRepoIdsByBoundary = new Map<string, Set<string>>()
+const repoWriteOperationBoundaryByRepoId = new Map<string, string>()
 let repoWriteOperationAdmission: Promise<void> = Promise.resolve()
+let repoRuntimeCloseSubscription: (() => void) | null = null
 
 function freshWriteOperationId(): string {
   return `repo-write-op-${nextWriteOperationId++}`
@@ -95,6 +98,7 @@ function deleteIdleEmptyRuntimes(): void {
       !runtime.activeNetworkOperation
     ) {
       repoWriteOperationRuntimesByBoundary.delete(boundaryKey)
+      deleteRepoWriteOperationBoundaryIfEmpty(boundaryKey)
     }
   }
 }
@@ -211,13 +215,44 @@ async function acquireRepoWriteOperationAdmission(): Promise<() => void> {
 }
 
 function registerRepoWriteOperationBoundaryRepoId(boundaryKey: string, repoId: string | null | undefined): Set<string> {
+  ensureRepoRuntimeCloseSubscription()
   let repoIds = repoWriteOperationRepoIdsByBoundary.get(boundaryKey)
   if (!repoIds) {
     repoIds = new Set()
     repoWriteOperationRepoIdsByBoundary.set(boundaryKey, repoIds)
   }
-  if (repoId) repoIds.add(repoId)
+  if (repoId) {
+    const previousBoundaryKey = repoWriteOperationBoundaryByRepoId.get(repoId)
+    if (previousBoundaryKey && previousBoundaryKey !== boundaryKey) {
+      repoWriteOperationRepoIdsByBoundary.get(previousBoundaryKey)?.delete(repoId)
+      deleteRepoWriteOperationBoundaryIfEmpty(previousBoundaryKey)
+    }
+    repoWriteOperationBoundaryByRepoId.set(repoId, boundaryKey)
+    repoIds.add(repoId)
+  }
   return repoIds
+}
+
+function unregisterRepoWriteOperationBoundaryRepoId(repoId: string): void {
+  const boundaryKey = repoWriteOperationBoundaryByRepoId.get(repoId)
+  if (!boundaryKey) return
+  repoWriteOperationBoundaryByRepoId.delete(repoId)
+  repoWriteOperationRepoIdsByBoundary.get(boundaryKey)?.delete(repoId)
+  deleteRepoWriteOperationBoundaryIfEmpty(boundaryKey)
+}
+
+function deleteRepoWriteOperationBoundaryIfEmpty(boundaryKey: string): void {
+  const repoIds = repoWriteOperationRepoIdsByBoundary.get(boundaryKey)
+  if (repoIds && repoIds.size > 0) return
+  if (repoWriteOperationRuntimesByBoundary.has(boundaryKey)) return
+  repoWriteOperationRepoIdsByBoundary.delete(boundaryKey)
+}
+
+function ensureRepoRuntimeCloseSubscription(): void {
+  if (repoRuntimeCloseSubscription) return
+  repoRuntimeCloseSubscription = onRepoRuntimeClosed((event) => {
+    unregisterRepoWriteOperationBoundaryRepoId(event.repoRoot)
+  })
 }
 
 function repoWriteOperationRuntimeForBoundary(
@@ -427,6 +462,9 @@ export async function listRepoWriteOperationsForRepo(
 export function resetRepoWriteOperationCoordinatorForTests(): void {
   repoWriteOperationRuntimesByBoundary.clear()
   repoWriteOperationRepoIdsByBoundary.clear()
+  repoWriteOperationBoundaryByRepoId.clear()
   repoWriteOperationAdmission = Promise.resolve()
+  repoRuntimeCloseSubscription?.()
+  repoRuntimeCloseSubscription = null
   nextWriteOperationId = 1
 }
