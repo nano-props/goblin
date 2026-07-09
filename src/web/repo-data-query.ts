@@ -542,8 +542,9 @@ export async function refreshRepoProjectionReadModel(
   let projection: RepoRuntimeProjection
   for (;;) {
     try {
+      const matchingProjectionFetchStatus = queryClient.getQueryState(queryOptions.queryKey)?.fetchStatus
       const matchingProjectionFetchAlreadyActive =
-        queryClient.getQueryState(queryOptions.queryKey)?.fetchStatus !== 'idle'
+        matchingProjectionFetchStatus === 'fetching' || matchingProjectionFetchStatus === 'paused'
       projection = await abortablePromise(
         queryClient.fetchQuery({
           ...queryOptions,
