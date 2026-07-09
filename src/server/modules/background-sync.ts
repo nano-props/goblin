@@ -18,7 +18,7 @@ interface BackgroundSyncState {
   job: Cron | null
   generation: number
   nextRepoIndex: number
-  tickRunning: boolean
+  pendingScheduleGeneration: number | null
   activeFetch: BackgroundSyncActiveFetch | null
 }
 
@@ -48,7 +48,7 @@ const state: BackgroundSyncState = {
   job: null,
   generation: 0,
   nextRepoIndex: 0,
-  tickRunning: false,
+  pendingScheduleGeneration: null,
   activeFetch: null,
 }
 
@@ -67,11 +67,12 @@ function stopBackgroundSyncJob(): void {
 function ensureBackgroundSyncJob(generation: number): void {
   stopBackgroundSyncJob()
   syncQueue.clear()
+  state.pendingScheduleGeneration = null
   if (state.repoIds.length === 0 || state.intervalMs <= 0) return
   state.job = new Cron('* * * * * *', () => {
-    void enqueueScheduledFetch(generation)
+    requestScheduledFetch(generation)
   })
-  void enqueueScheduledFetch(generation)
+  requestScheduledFetch(generation)
 }
 
 async function ensureSettingsSubscription(): Promise<void> {
@@ -145,38 +146,28 @@ function abortActiveFetch(): void {
   state.activeFetch = null
 }
 
-async function enqueueScheduledFetch(generation: number): Promise<void> {
+function requestScheduledFetch(generation: number): void {
   if (generation !== state.generation || state.intervalMs <= 0) return
+  state.pendingScheduleGeneration = generation
+  if (syncQueue.pending + syncQueue.size > 0) {
+    void syncQueue.onIdle().then(drainScheduledFetchQueue)
+    return
+  }
+  drainScheduledFetchQueue()
+}
+
+function drainScheduledFetchQueue(): void {
   if (syncQueue.pending + syncQueue.size > 0) return
-  await syncQueue.add(async () => {
+  const generation = state.pendingScheduleGeneration
+  if (generation === null) return
+  state.pendingScheduleGeneration = null
+  void syncQueue.add(async () => {
     await runScheduledFetch(generation)
   })
 }
 
-// Used from `runScheduledFetch`'s `finally` to pick up a repo that was
-// registered while the queue was busy — its initial fetch was skipped by the
-// in-flight check in `enqueueScheduledFetch`, and waiting for the per-second
-// cron would delay a "sync on switch" by up to one tick.
-//
-// We can't go through `enqueueScheduledFetch` here: it's gated on
-// `pending + size > 0`, and the current task is still occupying p-queue's
-// running slot at this point, so the new fetch would be skipped. Calling
-// `syncQueue.add` directly lets p-queue pick the new task up on its own
-// once the current slot releases, preserving the concurrency=1 invariant.
-function enqueuePendingRegistrationFetch(): void {
-  if (state.repoIds.length === 0 || state.intervalMs <= 0) return
-  const hasUnfetched = state.repoIds.some(
-    (repoId) => state.lastFetchAtByRepo[repoId] === null || state.lastFetchAtByRepo[repoId] === undefined,
-  )
-  if (!hasUnfetched) return
-  void syncQueue.add(async () => {
-    await runScheduledFetch(state.generation)
-  })
-}
-
 async function runScheduledFetch(generation: number): Promise<void> {
-  if (generation !== state.generation || state.tickRunning) return
-  state.tickRunning = true
+  if (generation !== state.generation || state.intervalMs <= 0) return
   const now = Date.now()
   let repoId: string | null = null
   let activeFetch: BackgroundSyncActiveFetch | null = null
@@ -228,8 +219,6 @@ async function runScheduledFetch(generation: number): Promise<void> {
     )
   } finally {
     if (state.activeFetch === activeFetch) state.activeFetch = null
-    state.tickRunning = false
-    enqueuePendingRegistrationFetch()
   }
 }
 
@@ -262,7 +251,7 @@ export function stopBackgroundSync(): void {
   state.backoffUntilByRepo = {}
   state.intervalMs = 0
   state.nextRepoIndex = 0
-  state.tickRunning = false
+  state.pendingScheduleGeneration = null
   state.activeFetch = null
   syncQueue.clear()
   stopBackgroundSyncJob()
@@ -278,7 +267,7 @@ export function getBackgroundSyncDiagnostics(now: number = Date.now()): Backgrou
     intervalSec: Math.round(state.intervalMs / 1000),
     repoIds: [...state.repoIds],
     nextRepoIndex: state.nextRepoIndex,
-    tickRunning: state.tickRunning,
+    tickRunning: syncQueue.pending > 0,
     queuePending: syncQueue.pending,
     queueSize: syncQueue.size,
     repos: state.repoIds.map((repoId) => ({

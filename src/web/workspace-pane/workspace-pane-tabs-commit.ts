@@ -46,7 +46,59 @@ export interface WorkspacePaneTabsMutationFailure {
 
 export type WorkspacePaneTabsMutationResult = WorkspacePaneTabsMutationSuccess | WorkspacePaneTabsMutationFailure
 
-const blockingWorkspacePaneTabsMutationsByTarget = new Map<string, number>()
+interface WorkspacePaneTabsInteractionTarget {
+  repoRoot: string
+  branchName: string
+  worktreePath: string | null
+}
+
+function createWorkspacePaneTabsInteractionBlocker() {
+  const blockedCountsByTarget = new Map<string, number>()
+
+  function acquire(input: WorkspacePaneTabsInteractionTarget): () => void {
+    const key = workspacePaneTabsTargetIdentityKey(input)
+    blockedCountsByTarget.set(key, (blockedCountsByTarget.get(key) ?? 0) + 1)
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      const nextCount = (blockedCountsByTarget.get(key) ?? 1) - 1
+      if (nextCount > 0) blockedCountsByTarget.set(key, nextCount)
+      else blockedCountsByTarget.delete(key)
+    }
+  }
+
+  return {
+    isBlocked(input: {
+      repoRoot: string
+      branchName: string | null | undefined
+      worktreePath: string | null
+    }): boolean {
+      const branchName = input.branchName
+      if (!branchName) return false
+      const key = workspacePaneTabsTargetIdentityKey({
+        repoRoot: input.repoRoot,
+        branchName,
+        worktreePath: input.worktreePath,
+      })
+      return (blockedCountsByTarget.get(key) ?? 0) > 0
+    },
+    async run<T>(
+      input: WorkspacePaneTabsInteractionTarget,
+      blocksInteraction: boolean,
+      task: () => Promise<T>,
+    ): Promise<T> {
+      const release = blocksInteraction ? acquire(input) : null
+      try {
+        return await task()
+      } finally {
+        release?.()
+      }
+    },
+  }
+}
+
+const workspacePaneTabsInteractionBlocker = createWorkspacePaneTabsInteractionBlocker()
 
 /**
  * Logs a workspace-pane-tabs mutation failure and returns the structured
@@ -89,13 +141,13 @@ export function reportWorkspacePaneTabsFailure(input: {
 export async function commitWorkspacePaneTabs(
   input: CommitWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabsMutationResult> {
-  return await withWorkspacePaneTabsInteractionBlock(input, true, () => commitWorkspacePaneTabsNow(input))
+  return await workspacePaneTabsInteractionBlocker.run(input, true, () => commitWorkspacePaneTabsNow(input))
 }
 
 export async function updateWorkspacePaneTabs(
   input: UpdateWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabsMutationResult> {
-  return await withWorkspacePaneTabsInteractionBlock(
+  return await workspacePaneTabsInteractionBlocker.run(
     input,
     workspacePaneTabsUpdateBlocksInteraction(input.operation),
     () => updateWorkspacePaneTabsNow(input),
@@ -107,45 +159,11 @@ export function workspacePaneTabsInteractionBlockedForTarget(input: {
   branchName: string | null | undefined
   worktreePath: string | null
 }): boolean {
-  const branchName = input.branchName
-  if (!branchName) return false
-  return (
-    blockingWorkspacePaneTabsMutationsByTarget.get(
-      workspacePaneTabsTargetIdentityKey({
-        repoRoot: input.repoRoot,
-        branchName,
-        worktreePath: input.worktreePath,
-      }),
-    ) ?? 0
-  ) > 0
+  return workspacePaneTabsInteractionBlocker.isBlocked(input)
 }
 
 function workspacePaneTabsUpdateBlocksInteraction(operation: WorkspacePaneTabsUpdateOperation): boolean {
   return operation.type !== 'open-static'
-}
-
-async function withWorkspacePaneTabsInteractionBlock<T>(
-  input: {
-    repoRoot: string
-    branchName: string
-    worktreePath: string | null
-  },
-  blocksInteraction: boolean,
-  run: () => Promise<T>,
-): Promise<T> {
-  if (!blocksInteraction) return await run()
-  const key = workspacePaneTabsTargetIdentityKey(input)
-  blockingWorkspacePaneTabsMutationsByTarget.set(
-    key,
-    (blockingWorkspacePaneTabsMutationsByTarget.get(key) ?? 0) + 1,
-  )
-  try {
-    return await run()
-  } finally {
-    const nextCount = (blockingWorkspacePaneTabsMutationsByTarget.get(key) ?? 1) - 1
-    if (nextCount > 0) blockingWorkspacePaneTabsMutationsByTarget.set(key, nextCount)
-    else blockingWorkspacePaneTabsMutationsByTarget.delete(key)
-  }
 }
 
 async function commitWorkspacePaneTabsNow(

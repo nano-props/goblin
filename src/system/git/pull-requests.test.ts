@@ -245,7 +245,7 @@ describe('getBranchPullRequests request coordination', () => {
     expect(execaMock).toHaveBeenCalledTimes(2)
   })
 
-  test('does not let a signaled caller abort an unsignaled shared request', async () => {
+  test('does not share a pending fetch across different abort scopes', async () => {
     const repo = '/tmp/repo'
     const ctrl = new AbortController()
     // Spy on pino's child logger, not `console.warn` — after the
@@ -281,6 +281,7 @@ describe('getBranchPullRequests request coordination', () => {
 
     const [, secondResult] = await Promise.all([first, second])
     expect(secondResult?.get('feature/a')?.number).toBe(7)
+    expect(fetchCalls).toBe(2)
     expect(warn).not.toHaveBeenCalled()
   })
 

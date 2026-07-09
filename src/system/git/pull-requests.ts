@@ -27,10 +27,13 @@ interface BranchPrCacheEntry {
   pr: PullRequestInfo | null
 }
 
+type PullRequestMapResult = Map<string, PullRequestInfo> | null
+type PendingPullRequestFetches = Map<string, Promise<PullRequestMapResult>>
+
 const prCache = new Map<string, PrCacheEntry>()
 const branchPrCache = new Map<string, BranchPrCacheEntry>()
-const pendingRepoRequests = new Map<string, Promise<Map<string, PullRequestInfo> | null>>()
-const pendingBranchRequests = new Map<string, Promise<Map<string, PullRequestInfo> | null>>()
+const pendingRepoFetches: PendingPullRequestFetches = new Map()
+const pendingBranchFetches: PendingPullRequestFetches = new Map()
 const loggedGraphqlErrors = new Map<string, number>()
 
 interface GhPullRequest {
@@ -193,17 +196,36 @@ async function hasPullRequestQueryCapability(repo: GitHubRepoRef, signal?: Abort
   return canQueryGitHubHost(repo.host, signal)
 }
 
-const signalIds = new WeakMap<AbortSignal, number>()
-let nextSignalId = 1
+const abortScopeIds = new WeakMap<AbortSignal, number>()
+let nextAbortScopeId = 1
 
-function pendingRequestKey(key: string, signal?: AbortSignal): string {
-  if (!signal) return key
-  let id = signalIds.get(signal)
+function pendingFetchKey(requestKey: string, signal?: AbortSignal): string {
+  if (!signal) return `${requestKey}\0abort-scope:shared`
+  let id = abortScopeIds.get(signal)
   if (id === undefined) {
-    id = nextSignalId++
-    signalIds.set(signal, id)
+    id = nextAbortScopeId++
+    abortScopeIds.set(signal, id)
   }
-  return `${key}\0signal:${id}`
+  return `${requestKey}\0abort-scope:${id}`
+}
+
+function runPendingPullRequestFetch(
+  pendingFetches: PendingPullRequestFetches,
+  requestKey: string,
+  signal: AbortSignal | undefined,
+  fetch: () => Promise<PullRequestMapResult>,
+): Promise<PullRequestMapResult> {
+  // The GraphQL transport passes the caller signal to the underlying
+  // `gh` process. Coalesce only within the same abort scope; result
+  // caches below remain keyed by repo/branch/mode, not by signal.
+  const key = pendingFetchKey(requestKey, signal)
+  const existing = pendingFetches.get(key)
+  if (existing) return existing
+  const promise = fetch().finally(() => {
+    if (pendingFetches.get(key) === promise) pendingFetches.delete(key)
+  })
+  pendingFetches.set(key, promise)
+  return promise
 }
 
 function getCachedBranchPullRequest(
@@ -509,27 +531,22 @@ export async function getBranchPullRequestsForRepoRef(
       }
       if (!(await hasPullRequestQueryCapability(repo, options?.signal))) return null
 
-      const key = pendingRequestKey(branchCacheKey(scopeId, repo, singleBranch, mode), options?.signal)
-      const existing = pendingBranchRequests.get(key)
-      const byBranch = existing ?? fetchSingleBranchPullRequestMap(scopeId, repo, singleBranch, mode, options?.signal)
-      if (!existing) pendingBranchRequests.set(key, byBranch)
-      try {
-        return await byBranch
-      } finally {
-        if (pendingBranchRequests.get(key) === byBranch) pendingBranchRequests.delete(key)
-      }
+      return await runPendingPullRequestFetch(
+        pendingBranchFetches,
+        branchCacheKey(scopeId, repo, singleBranch, mode),
+        options?.signal,
+        () => fetchSingleBranchPullRequestMap(scopeId, repo, singleBranch, mode, options?.signal),
+      )
     }
 
-    const key = pendingRequestKey(repoRequestKey(scopeId, repo, mode), options?.signal)
     if (!(await hasPullRequestQueryCapability(repo, options?.signal))) return null
-    const existing = pendingRepoRequests.get(key)
-    const byBranch = existing ?? fetchRepoPullRequestMap(scopeId, repo, mode, options?.signal)
-    if (!existing) pendingRepoRequests.set(key, byBranch)
-    try {
-      return filterPullRequests(await byBranch, branchNames)
-    } finally {
-      if (pendingRepoRequests.get(key) === byBranch) pendingRepoRequests.delete(key)
-    }
+    const byBranch = await runPendingPullRequestFetch(
+      pendingRepoFetches,
+      repoRequestKey(scopeId, repo, mode),
+      options?.signal,
+      () => fetchRepoPullRequestMap(scopeId, repo, mode, options?.signal),
+    )
+    return filterPullRequests(byBranch, branchNames)
   } catch (err) {
     if (options?.signal?.aborted) return null
     if (!singleBranch) {
@@ -557,8 +574,8 @@ export async function getBranchPullRequests(
 export function resetPullRequestCachesForTests(): void {
   prCache.clear()
   branchPrCache.clear()
-  pendingRepoRequests.clear()
-  pendingBranchRequests.clear()
+  pendingRepoFetches.clear()
+  pendingBranchFetches.clear()
   loggedGraphqlErrors.clear()
   resetGitHubCooldownStateForTests()
 }
@@ -577,15 +594,13 @@ export async function getBranchPullRequest(
     if (cached.hit) return cached.pr
     if (isGitHubHostCoolingDown(repo.host)) return null
     if (!(await hasPullRequestQueryCapability(repo, options?.signal))) return null
-    const key = pendingRequestKey(branchCacheKey(cwd, repo, branch, 'full'), options?.signal)
-    const existing = pendingBranchRequests.get(key)
-    const byBranch = existing ?? fetchSingleBranchPullRequestMap(cwd, repo, branch, 'full', options?.signal)
-    if (!existing) pendingBranchRequests.set(key, byBranch)
-    try {
-      return (await byBranch)?.get(branch) ?? null
-    } finally {
-      if (pendingBranchRequests.get(key) === byBranch) pendingBranchRequests.delete(key)
-    }
+    const byBranch = await runPendingPullRequestFetch(
+      pendingBranchFetches,
+      branchCacheKey(cwd, repo, branch, 'full'),
+      options?.signal,
+      () => fetchSingleBranchPullRequestMap(cwd, repo, branch, 'full', options?.signal),
+    )
+    return byBranch?.get(branch) ?? null
   } catch {
     return null
   }
