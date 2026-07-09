@@ -78,6 +78,8 @@ interface CreateWorktreeFormProps {
   onCreate: (request: CreateWorktreeRequest) => boolean | void | Promise<boolean | void>
 }
 
+type CreateWorktreeFormPhase = 'editing' | 'creating'
+
 export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate }: CreateWorktreeFormProps) {
   const t = useT()
   const compact = useIsCompactUi()
@@ -90,9 +92,10 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
   const [remoteRef, setRemoteRef] = useState('')
   const [localBranch, setLocalBranch] = useState('')
   const [worktreePath, setWorktreePath] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+  const [formPhase, setFormPhase] = useState<CreateWorktreeFormPhase>('editing')
+  const creating = formPhase === 'creating'
   const remoteBranchesQuery = useRepoRemoteBranchesQuery(repo.id, repo.repoRuntimeId, {
-    enabled: mode === 'trackRemoteBranch',
+    enabled: mode === 'trackRemoteBranch' && !creating,
   })
   const remoteBranches = remoteBranchesQuery.data ?? []
   const remoteBranchesLoading = remoteBranchesQuery.isLoading
@@ -107,24 +110,29 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
 
   const branchActionBusy = repo.branchAction.phase !== 'idle'
   const bootstrapBusy = worktreeBootstrap?.loading === true
-  const canSubmit = !!derived.input && derived.validPath && !branchActionBusy && !bootstrapBusy && !submitting
+  const canSubmit =
+    !!derived.input && derived.validPath && !branchActionBusy && !bootstrapBusy && formPhase === 'editing'
+  const baseError = creating ? '' : derived.baseError
+  const branchError = creating ? '' : derived.branchError
+  const existingBranchError = creating ? '' : derived.existingBranchError
+  const localBranchError = creating ? '' : derived.localBranchError
 
   async function handleSubmit(): Promise<void> {
     const nextInput = derived.input
-    if (!nextInput || branchActionBusy || bootstrapBusy || submitting) return
-    setSubmitting(true)
+    if (!nextInput || branchActionBusy || bootstrapBusy || formPhase !== 'editing') return
+    setFormPhase('creating')
     let shouldClose = false
     try {
       const result = await onCreate({ input: nextInput })
       shouldClose = result !== false
     } finally {
-      setSubmitting(false)
+      setFormPhase('editing')
     }
     if (shouldClose) onCancel()
   }
 
   const remotePathSuggestions = useRemotePathSuggestions({
-    enabled: !!remoteTarget && derived.pathName.length > 0,
+    enabled: !creating && !!remoteTarget && derived.pathName.length > 0,
     alias: remoteTarget?.alias ?? '',
     remotePath: remoteTarget?.remotePath ?? '/',
     prefix: worktreePath,
@@ -134,6 +142,7 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
     <div>
       <form
         className="space-y-3"
+        aria-busy={creating}
         onSubmit={(e) => {
           e.preventDefault()
           void handleSubmit()
@@ -150,6 +159,7 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
             variant="outline"
             size="sm"
             className="w-full"
+            disabled={creating}
             aria-label={t('action.create-worktree-mode-label')}
           >
             {MODE_OPTIONS.map((option) => {
@@ -172,13 +182,13 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
           <div className="space-y-3">
             {mode === 'newBranch' && (
               <>
-                <Field className="gap-2" data-invalid={derived.baseError ? true : undefined}>
+                <Field className="gap-2" data-invalid={baseError ? true : undefined}>
                   <FieldLabel htmlFor="cwt-base">{t('action.create-worktree-base-label')}</FieldLabel>
-                  <Select value={base} onValueChange={setBase}>
+                  <Select value={base} onValueChange={setBase} disabled={creating}>
                     <SelectTrigger
                       id="cwt-base"
                       className="h-10 w-full text-sm"
-                      aria-invalid={!!derived.baseError}
+                      aria-invalid={!!baseError}
                       aria-describedby="cwt-base-error"
                     >
                       <SelectValue placeholder={t('action.create-worktree-base-placeholder')} />
@@ -197,36 +207,37 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
                     </SelectContent>
                   </Select>
                   <FieldError id="cwt-base-error" reserveHeight aria-live="polite" aria-atomic="true">
-                    {derived.baseError}
+                    {baseError}
                   </FieldError>
                 </Field>
 
-                <Field className="gap-2" data-invalid={derived.branchError ? true : undefined}>
+                <Field className="gap-2" data-invalid={branchError ? true : undefined}>
                   <FieldLabel htmlFor="cwt-branch">{t('action.create-worktree-branch-label')}</FieldLabel>
                   <Input
                     id="cwt-branch"
                     className="h-10 text-sm"
                     value={branch}
+                    disabled={creating}
                     onChange={(e) => setBranch(e.target.value)}
                     placeholder={t('action.create-worktree-branch-placeholder')}
-                    aria-invalid={!!derived.branchError}
+                    aria-invalid={!!branchError}
                     aria-describedby="cwt-branch-error"
                   />
                   <FieldError id="cwt-branch-error" reserveHeight aria-live="polite" aria-atomic="true">
-                    {derived.branchError}
+                    {branchError}
                   </FieldError>
                 </Field>
               </>
             )}
 
             {mode === 'existingBranch' && (
-              <Field className="gap-2" data-invalid={derived.existingBranchError ? true : undefined}>
+              <Field className="gap-2" data-invalid={existingBranchError ? true : undefined}>
                 <FieldLabel htmlFor="cwt-existing-branch">{t('action.create-worktree-existing-label')}</FieldLabel>
-                <Select value={existingBranch} onValueChange={setExistingBranch}>
+                <Select value={existingBranch} onValueChange={setExistingBranch} disabled={creating}>
                   <SelectTrigger
                     id="cwt-existing-branch"
                     className="h-10 w-full text-sm"
-                    aria-invalid={!!derived.existingBranchError}
+                    aria-invalid={!!existingBranchError}
                     aria-describedby="cwt-existing-branch-error"
                   >
                     <SelectValue placeholder={t('action.create-worktree-existing-placeholder')} />
@@ -240,7 +251,7 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
                   </SelectContent>
                 </Select>
                 <FieldError id="cwt-existing-branch-error" reserveHeight aria-live="polite" aria-atomic="true">
-                  {derived.existingBranchError}
+                  {existingBranchError}
                 </FieldError>
               </Field>
             )}
@@ -255,7 +266,7 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
                       setRemoteRef(next)
                       setLocalBranch('')
                     }}
-                    disabled={remoteBranches.length === 0}
+                    disabled={creating || remoteBranches.length === 0}
                   >
                     <SelectTrigger id="cwt-remote-ref" className="h-10 w-full text-sm">
                       <SelectValue placeholder={t('action.create-worktree-remote-placeholder')} />
@@ -277,19 +288,20 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
                   </FieldDescription>
                 </Field>
 
-                <Field className="gap-2" data-invalid={derived.localBranchError ? true : undefined}>
+                <Field className="gap-2" data-invalid={localBranchError ? true : undefined}>
                   <FieldLabel htmlFor="cwt-local-branch">{t('action.create-worktree-local-branch-label')}</FieldLabel>
                   <Input
                     id="cwt-local-branch"
                     className="h-10 text-sm"
                     value={localBranch}
+                    disabled={creating}
                     onChange={(e) => setLocalBranch(e.target.value)}
                     placeholder={derived.derivedLocalBranch || t('action.create-worktree-local-branch-placeholder')}
-                    aria-invalid={!!derived.localBranchError}
+                    aria-invalid={!!localBranchError}
                     aria-describedby="cwt-local-branch-error"
                   />
                   <FieldError id="cwt-local-branch-error" reserveHeight aria-live="polite" aria-atomic="true">
-                    {derived.localBranchError}
+                    {localBranchError}
                   </FieldError>
                 </Field>
               </>
@@ -303,7 +315,7 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
             <RemotePathSuggestions
               id="cwt-path"
               value={worktreePath}
-              disabled={!derived.pathName}
+              disabled={creating || !derived.pathName}
               onChange={setWorktreePath}
               suggestions={remotePathSuggestions.suggestions}
               isLoading={remotePathSuggestions.isLoading}
@@ -316,7 +328,7 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
             <Input
               id="cwt-path"
               value={worktreePath}
-              disabled={!derived.pathName}
+              disabled={creating || !derived.pathName}
               onChange={(e) => setWorktreePath(e.target.value)}
               placeholder={derived.displayDefaultPath}
               aria-describedby="cwt-path-hint"
@@ -333,14 +345,20 @@ export function CreateWorktreeForm({ repo, worktreeBootstrap, onCancel, onCreate
           </FieldDescription>
         </Field>
 
-        <WorktreeBootstrapTrustRow state={worktreeBootstrap} />
+        <WorktreeBootstrapTrustRow state={worktreeBootstrap} disabled={creating} />
 
         <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" className={cn(compact && 'w-full')} onClick={onCancel}>
+          <Button
+            type="button"
+            variant="outline"
+            className={cn(compact && 'w-full')}
+            disabled={creating}
+            onClick={onCancel}
+          >
             {t('action.create-worktree-cancel')}
           </Button>
           <Button type="submit" className={cn('min-w-28', compact && 'w-full min-w-0')} disabled={!canSubmit}>
-            {t('action.create-worktree-confirm')}
+            {creating ? t('action.create-worktree-creating-title') : t('action.create-worktree-confirm')}
           </Button>
         </div>
       </form>
@@ -352,18 +370,30 @@ function CreateWorktreeAnimatedSection({ children, present = true }: { children:
   return <CollapseTransition present={present}>{children}</CollapseTransition>
 }
 
-function WorktreeBootstrapTrustRow({ state }: { state: WorktreeBootstrapPromptState | undefined }) {
+function WorktreeBootstrapTrustRow({
+  state,
+  disabled = false,
+}: {
+  state: WorktreeBootstrapPromptState | undefined
+  disabled?: boolean
+}) {
   if (!shouldShowWorktreeBootstrapTrust(state)) return null
-  return <WorktreeBootstrapTrustCheckbox state={state} />
+  return <WorktreeBootstrapTrustCheckbox state={state} disabled={disabled} />
 }
 
-function WorktreeBootstrapTrustCheckbox({ state }: { state: WorktreeBootstrapPromptState | undefined }) {
+function WorktreeBootstrapTrustCheckbox({
+  state,
+  disabled = false,
+}: {
+  state: WorktreeBootstrapPromptState | undefined
+  disabled?: boolean
+}) {
   const t = useT()
   if (!state) return null
 
   return (
     <div className="pt-0.5 text-sm">
-      <ConfirmCheckbox checked={state.configTrusted} onCheckedChange={state.onConfigTrustedChange}>
+      <ConfirmCheckbox checked={state.configTrusted} disabled={disabled} onCheckedChange={state.onConfigTrustedChange}>
         {t('action.create-worktree-bootstrap-config-trusted')}
       </ConfirmCheckbox>
     </div>

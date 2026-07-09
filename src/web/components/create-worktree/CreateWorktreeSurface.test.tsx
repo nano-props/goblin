@@ -101,6 +101,45 @@ describe('CreateWorktreePageBody', () => {
     expect(onCancel).toHaveBeenCalledTimes(1)
   })
 
+  test('keeps the form in creating state when live branch data gains the submitted worktree', async () => {
+    const user = userEvent.setup()
+    const onCancel = vi.fn()
+    let resolveCreate!: () => void
+    const onCreate = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveCreate = resolve
+        }),
+    )
+
+    const view = render(<CreateWorktreePageBody repo={createRepo()} onCancel={onCancel} onCreate={onCreate} />)
+
+    await user.type(screen.getByRole('textbox', { name: /action.create-worktree-branch-label/i }), 'feature/new')
+    await user.click(screen.getByRole('button', { name: /action.create-worktree-confirm/i }))
+
+    expect(
+      (screen.getByRole('button', { name: /action.create-worktree-creating-title/i }) as HTMLButtonElement).disabled,
+    ).toBe(true)
+
+    view.rerender(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <CreateWorktreePageBody repo={createRepoWithCreatedWorktree()} onCancel={onCancel} onCreate={onCreate} />
+      </QueryClientProvider>,
+    )
+
+    const branchInput = screen.getByRole('textbox', { name: /action.create-worktree-branch-label/i })
+    expect(branchInput.getAttribute('aria-invalid')).toBe('false')
+    expect(screen.queryByText(/action.create-worktree-has-worktree/i)).toBeNull()
+    expect(
+      (screen.getByRole('button', { name: /action.create-worktree-creating-title/i }) as HTMLButtonElement).disabled,
+    ).toBe(true)
+
+    resolveCreate()
+    await waitFor(() => {
+      expect(onCancel).toHaveBeenCalledTimes(1)
+    })
+  })
+
   test('switches to existingBranch mode and submits the selected branch', async () => {
     const user = userEvent.setup()
     const onCreate = vi.fn(async () => {})
@@ -212,6 +251,17 @@ describe('CreateWorktreePageBody', () => {
 function createRepo(): RepoPresentationForTest {
   const repo = emptyRepo('/tmp/goblin-repo', 'goblin-repo', 'repo-runtime-test')
   const branches = [createRepoBranch('main'), createRepoBranch('feature/base')]
+  seedRepoReadModelQueryData(repo, { branches, currentBranch: 'main', status: [] })
+  return repoPresentationForTest(repo, { currentBranch: 'main', branches, status: [], worktreesByPath: {} })
+}
+
+function createRepoWithCreatedWorktree(): RepoPresentationForTest {
+  const repo = emptyRepo('/tmp/goblin-repo', 'goblin-repo', 'repo-runtime-test')
+  const branches = [
+    createRepoBranch('main'),
+    createRepoBranch('feature/base'),
+    createRepoBranch('feature/new', { worktree: { path: '/tmp/goblin-repo-feature-new' } }),
+  ]
   seedRepoReadModelQueryData(repo, { branches, currentBranch: 'main', status: [] })
   return repoPresentationForTest(repo, { currentBranch: 'main', branches, status: [], worktreesByPath: {} })
 }
