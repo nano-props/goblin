@@ -5,7 +5,7 @@ One workspace for Git branches and worktrees.
 ## Requirements
 
 - Bun
-- Node.js 24+
+- Node.js 24.13+
 
 ## Core features
 
