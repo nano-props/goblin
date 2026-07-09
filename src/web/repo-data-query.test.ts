@@ -421,7 +421,82 @@ describe('repo projection query data', () => {
     }
   })
 
-  test('imperative projection refresh cancels an active matching projection query before reading', async () => {
+  test('imperative projection refresh does not spawn and cancel a matching active observer refetch', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const signals: AbortSignal[] = []
+    const releases: Array<(projection: RepoRuntimeProjection) => void> = []
+    const queryKey = repoProjectionQueryKey('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full')
+    setRepoProjectionQueryData('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', repoProjectionForTest(0), queryClient)
+    repoClientMocks.getRepoProjection.mockImplementation(
+      (_repoRoot: string, _branch: string | null | undefined, _options: unknown, signal?: AbortSignal) =>
+        new Promise<RepoRuntimeProjection>((resolve, reject) => {
+          if (!signal) throw new Error('missing projection abort signal')
+          signals.push(signal)
+          const abort = () => reject(new Error('cancelled'))
+          signal.addEventListener('abort', abort, { once: true })
+          releases.push((projection) => {
+            signal.removeEventListener('abort', abort)
+            resolve(projection)
+          })
+        }),
+    )
+    const observer = new QueryObserver(
+      queryClient,
+      repoProjectionQueryOptions('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full'),
+    )
+    const unsubscribe = observer.subscribe(() => {})
+    try {
+      expect(queryClient.getQueryData(queryKey)).toMatchObject({ loadedAt: 0 })
+      expect(repoClientMocks.getRepoProjection).not.toHaveBeenCalled()
+
+      const refresh = refreshRepoProjectionReadModel('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', { queryClient })
+      await vi.waitFor(() => {
+        expect(signals).toHaveLength(1)
+      })
+
+      expect(signals[0]?.aborted).toBe(false)
+      releases[0]?.(repoProjectionForTest(2))
+      await expect(refresh).resolves.toMatchObject({ loadedAt: 2 })
+      expect(signals).toHaveLength(1)
+      expect(signals[0]?.aborted).toBe(false)
+    } finally {
+      unsubscribe()
+      queryClient.clear()
+    }
+  })
+
+  test('imperative projection refresh forwards caller abort to a cold projection fetch', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const signals: AbortSignal[] = []
+    repoClientMocks.getRepoProjection.mockImplementation(
+      (_repoRoot: string, _branch: string | null | undefined, _options: unknown, signal?: AbortSignal) =>
+        new Promise<RepoRuntimeProjection>((_resolve, reject) => {
+          if (!signal) throw new Error('missing projection abort signal')
+          signals.push(signal)
+          signal.addEventListener('abort', () => reject(signal.reason ?? new Error('aborted')), { once: true })
+        }),
+    )
+    const controller = new AbortController()
+
+    try {
+      const refresh = refreshRepoProjectionReadModel('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', {
+        queryClient,
+        signal: controller.signal,
+      })
+      await vi.waitFor(() => {
+        expect(signals).toHaveLength(1)
+      })
+
+      controller.abort(new Error('stopped'))
+
+      expect(signals[0]?.aborted).toBe(true)
+      await expect(refresh).rejects.toThrow('stopped')
+    } finally {
+      queryClient.clear()
+    }
+  })
+
+  test('imperative projection refresh reuses a pre-existing active matching projection query', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const signals: AbortSignal[] = []
     const releases: Array<(projection: RepoRuntimeProjection) => void> = []
@@ -448,11 +523,15 @@ describe('repo projection query data', () => {
       })
 
       const refresh = refreshRepoProjectionReadModel('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', { queryClient })
+
+      expect(signals).toHaveLength(1)
+      expect(signals[0]?.aborted).toBe(false)
+      releases[0]?.(repoProjectionForTest(1))
       await vi.waitFor(() => {
         expect(signals).toHaveLength(2)
       })
-
-      expect(signals[0]?.aborted).toBe(true)
+      expect(signals[0]?.aborted).toBe(false)
+      expect(signals[1]?.aborted).toBe(false)
       releases[1]?.(repoProjectionForTest(2))
       await expect(refresh).resolves.toMatchObject({ loadedAt: 2 })
       await active
