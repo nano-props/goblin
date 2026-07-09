@@ -4,7 +4,7 @@ interface BranchActionScheduleInput {
   actionKind: RepoBranchActionKind
   fetchBusy: boolean
   branchOperationPhase: RepoOperationPhase
-  coreRefreshBusy: boolean
+  projectionReadBusy: boolean
 }
 
 interface BranchActionScheduleDecision {

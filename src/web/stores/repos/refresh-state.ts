@@ -1,24 +1,12 @@
 import { markRepoAvailable } from '#/web/stores/repos/availability.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
-import {
-  cancelDataLoad,
-  finishDataLoadError,
-  finishDataLoadSuccess,
-} from '#/web/stores/repos/repo-data-load-state.ts'
+import { cancelDataLoad, finishDataLoadError, finishDataLoadSuccess } from '#/web/stores/repos/repo-data-load-state.ts'
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
 import type { RepoSnapshot } from '#/shared/api-types.ts'
 import type { RepoState, ReposGet } from '#/web/stores/repos/types.ts'
 import type { ExecResult } from '#/web/types.ts'
 
-export function applySnapshotToRepoProjection(
-  r: RepoState,
-  snap: RepoSnapshot,
-  validBranches: Set<string>,
-  previousSnapshotBranches: RepoSnapshot['branches'] | null,
-  loadedAt = Date.now(),
-): void {
-  void previousSnapshotBranches
-  void validBranches
+export function applyRepoSnapshotShellState(r: RepoState, snap: RepoSnapshot, loadedAt = Date.now()): void {
   if (snap.remote) {
     r.remote.remotes = snap.remote.remotes.map((remote) => remote.name)
     r.remote.remoteDetails = snap.remote.remotes

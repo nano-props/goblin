@@ -417,7 +417,7 @@ describe('runBranchAction', () => {
     expect(repoCurrentBranch()).toBe('feature/reopened')
   })
 
-  test('times out queued branch actions that wait too long for core refreshes', async () => {
+  test('times out queued branch actions that wait too long for projection reads', async () => {
     let deleteCalls = 0
     installGoblinTestBridge({
       'repo.projection': () => new Promise(() => {}),
@@ -499,7 +499,7 @@ describe('runBranchAction', () => {
     })
   })
 
-  test('waits for core refresh reads before running queued branch network actions', async () => {
+  test('waits for projection reads before running queued branch network actions', async () => {
     let pullCalls = 0
     let statusCalls = 0
     let resolveStatus!: (value: never[]) => void
@@ -558,7 +558,7 @@ describe('runBranchAction', () => {
       'repo.removeWorktree',
     ],
   ] satisfies Array<[string, RepoBranchAction, string]>)(
-    'waits for core refresh reads before running queued %s actions',
+    'waits for projection reads before running queued %s actions',
     async (_label, action, ipcPath) => {
       let actionCalls = 0
       let statusCalls = 0

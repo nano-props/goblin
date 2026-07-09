@@ -8,7 +8,7 @@ import { isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/repo-guards
 import {
   repoOperation,
   repoLocalBranchActionScheduleGuard,
-  repoLocalCoreProjectionRefreshBusy,
+  repoLocalProjectionReadBusy,
   waitForRepoOperationsIdle,
 } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import {
@@ -135,7 +135,7 @@ function evaluateRepoBranchActionSchedule(repo: RepoState, action: RepoBranchAct
     actionKind: action.kind,
     fetchBusy: guard.fetchBusy,
     branchOperationPhase: guard.branchOperationPhase,
-    coreRefreshBusy: guard.coreRefreshBusy,
+    projectionReadBusy: guard.projectionReadBusy,
   })
 }
 
@@ -308,7 +308,7 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
       }
       const runActionTask = async (signal: AbortSignal, ctx: { setPhase: (phase: 'queued' | 'running') => void }) => {
         try {
-          if (repoLocalCoreProjectionRefreshBusy(id)) {
+          if (repoLocalProjectionReadBusy(id)) {
             ctx.setPhase('queued')
             signal.throwIfAborted()
             await waitForBranchActionIdle(id, ['repoReadModel', 'visibleStatus'], signal, options?.waitTimeoutMs)

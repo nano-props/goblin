@@ -3,7 +3,7 @@ import { terminalClient } from '#/web/terminal.ts'
 import { appendRepoEvent, errorEvent } from '#/web/stores/repos/repo-state-factory.ts'
 import { updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
 import { persistRepoSnapshotCacheEntry } from '#/web/stores/repos/persistence.ts'
-import { applySnapshotToRepoProjection } from '#/web/stores/repos/refresh-state.ts'
+import { applyRepoSnapshotShellState } from '#/web/stores/repos/refresh-state.ts'
 import { finishDataLoadError, finishDataLoadSuccess } from '#/web/stores/repos/repo-data-load-state.ts'
 import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
@@ -79,7 +79,8 @@ export function acceptRepoProjectionReadModel(
   const repoBefore = get().repos[repoRoot]
   if (!repoBefore || repoBefore.repoRuntimeId !== repoRuntimeId) return
   const explicitVisibleStatusSettle = options.settleVisibleStatus === true
-  const settleVisibleStatus = explicitVisibleStatusSettle || (options.settleVisibleStatus === undefined && coreReadModel)
+  const settleVisibleStatus =
+    explicitVisibleStatusSettle || (options.settleVisibleStatus === undefined && coreReadModel)
   if (!projection.snapshot && !coreReadModel && !settleVisibleStatus) return
   const accepted = markProjectionAccepted(input)
   if (!accepted && !explicitVisibleStatusSettle) return
@@ -99,10 +100,9 @@ export function acceptRepoProjectionReadModel(
     return
   }
 
-  const validBranches = new Set(projection.snapshot.branches.map((branch) => branch.name))
   updateIfFresh(set, repoRoot, repoRuntimeId, (repo) => {
     if (coreReadModel) {
-      applySnapshotToRepoProjection(repo, projection.snapshot!, validBranches, null, projection.loadedAt)
+      applyRepoSnapshotShellState(repo, projection.snapshot!, projection.loadedAt)
     }
   })
 

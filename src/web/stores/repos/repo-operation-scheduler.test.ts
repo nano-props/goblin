@@ -5,7 +5,7 @@ import {
   markRepoOperationTargets,
   nextRepoOperationId,
   repoLocalBranchActionScheduleGuard,
-  repoLocalCoreProjectionRefreshBusy,
+  repoLocalProjectionReadBusy,
   repoLocalPrimaryRefreshBusy,
   repoLocalRemoteFetchBlocked,
   repoOperation,
@@ -70,7 +70,9 @@ describe('repo runtime task scheduling', () => {
           releaseFirst = () => resolve('first')
         }),
     )
-    const replaced = scheduleRepoOperation(REPO_ID, 'network', async () => 'replaced', { replaceQueuedKey: 'visible-status' })
+    const replaced = scheduleRepoOperation(REPO_ID, 'network', async () => 'replaced', {
+      replaceQueuedKey: 'visible-status',
+    })
     const latest = scheduleRepoOperation(
       REPO_ID,
       'network',
@@ -146,12 +148,12 @@ describe('repo runtime task scheduling', () => {
 
   test('local guard helpers name the scheduler-only busy sets', () => {
     expect(repoLocalPrimaryRefreshBusy(REPO_ID)).toBe(false)
-    expect(repoLocalCoreProjectionRefreshBusy(REPO_ID)).toBe(false)
+    expect(repoLocalProjectionReadBusy(REPO_ID)).toBe(false)
     expect(repoLocalRemoteFetchBlocked(REPO_ID)).toBe(false)
     expect(repoLocalBranchActionScheduleGuard(REPO_ID)).toEqual({
       fetchBusy: false,
       branchOperationPhase: 'idle',
-      coreRefreshBusy: false,
+      projectionReadBusy: false,
     })
 
     markRepoOperationTargets(
@@ -169,7 +171,7 @@ describe('repo runtime task scheduling', () => {
       [{ key: 'visibleStatus', reason: 'visible-status' }],
       'running',
     )
-    expect(repoLocalCoreProjectionRefreshBusy(REPO_ID)).toBe(true)
+    expect(repoLocalProjectionReadBusy(REPO_ID)).toBe(true)
     expect(repoLocalRemoteFetchBlocked(REPO_ID)).toBe(true)
 
     markRepoOperationTargets(
@@ -181,8 +183,7 @@ describe('repo runtime task scheduling', () => {
     expect(repoLocalBranchActionScheduleGuard(REPO_ID)).toMatchObject({
       fetchBusy: false,
       branchOperationPhase: 'queued',
-      coreRefreshBusy: true,
+      projectionReadBusy: true,
     })
   })
-
 })
