@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query'
+import { hashKey, queryOptions, useQuery, type QueryClient } from '@tanstack/react-query'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { getRepoLog, getRepoOperations, getRepoProjection, getRepoRemoteBranches } from '#/web/repo-client.ts'
 import type { RepoOperationsSnapshot, RepoRuntimeProjection, RepoServerOperationState } from '#/shared/api-types.ts'
@@ -184,6 +184,29 @@ function invalidateActiveRepoQueryKeys(queryClient: QueryClient, queryKeys: Read
   }
 }
 
+function invalidateActiveRepoRuntimeProjectionQueries(
+  repoRoot: string,
+  repoRuntimeId: string,
+  queryClient: QueryClient,
+  options: { excludeProjectionQueryKey?: readonly unknown[] } = {},
+): void {
+  const excludedProjectionHash = options.excludeProjectionQueryKey
+    ? hashKey(options.excludeProjectionQueryKey)
+    : null
+  void queryClient.invalidateQueries(
+    {
+      queryKey: repoProjectionQueryPrefix(repoRoot, repoRuntimeId),
+      refetchType: 'active',
+      predicate: excludedProjectionHash ? (query) => query.queryHash !== excludedProjectionHash : undefined,
+    },
+    { cancelRefetch: false },
+  )
+  void queryClient.invalidateQueries(
+    { queryKey: repoOperationsQueryPrefix(repoRoot, repoRuntimeId), refetchType: 'active' },
+    { cancelRefetch: false },
+  )
+}
+
 function abortSignalAny(signals: AbortSignal[]): AbortSignal {
   const aborted = signals.find((signal) => signal.aborted)
   if (aborted) return aborted
@@ -195,6 +218,21 @@ function abortSignalAny(signals: AbortSignal[]): AbortSignal {
   }
   for (const signal of signals) signal.addEventListener('abort', abort, { once: true })
   return ctrl.signal
+}
+
+async function abortablePromise<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return await promise
+  signal.throwIfAborted()
+  let abort: (() => void) | null = null
+  const abortPromise = new Promise<never>((_resolve, reject) => {
+    abort = () => reject(signal.reason ?? new DOMException('Aborted', 'AbortError'))
+    signal.addEventListener('abort', abort, { once: true })
+  })
+  try {
+    return await Promise.race([promise, abortPromise])
+  } finally {
+    if (abort) signal.removeEventListener('abort', abort)
+  }
 }
 
 function repoLogQueryKey(repoRoot: string, repoRuntimeId: string, branch: string, count: number, skip: number) {
@@ -494,27 +532,34 @@ export async function refreshRepoProjectionReadModel(
   const queryClient = options.queryClient ?? primaryWindowQueryClient
   const requestedBranch = normalizeProjectionBranch(branch)
   const requestedMode = normalizeProjectionMode(mode)
-  invalidateRepoRuntimeProjectionQueries(repoRoot, repoRuntimeId, queryClient)
   const queryOptions = repoProjectionQueryOptions(repoRoot, repoRuntimeId, requestedBranch, requestedMode)
-  await queryClient.cancelQueries({ queryKey: queryOptions.queryKey, exact: true })
+  markRepoRuntimeProjectionInvalidated(repoRoot, repoRuntimeId, queryClient)
+  invalidateActiveRepoRuntimeProjectionQueries(repoRoot, repoRuntimeId, queryClient, {
+    excludeProjectionQueryKey: queryOptions.queryKey,
+  })
   await queryClient.invalidateQueries({ queryKey: queryOptions.queryKey, exact: true, refetchType: 'none' })
   options.signal?.throwIfAborted()
   let projection: RepoRuntimeProjection
   for (;;) {
     try {
-      projection = await queryClient.fetchQuery({
-        ...queryOptions,
-        staleTime: 0,
-        queryFn: ({ signal }) =>
-          fetchRepoProjectionReadModel(
-            repoRoot,
-            repoRuntimeId,
-            requestedBranch,
-            requestedMode,
-            options.signal ? abortSignalAny([signal, options.signal]) : signal,
-            queryClient,
-          ),
-      })
+      const matchingProjectionFetchAlreadyActive =
+        queryClient.getQueryState(queryOptions.queryKey)?.fetchStatus !== 'idle'
+      projection = await abortablePromise(
+        queryClient.fetchQuery({
+          ...queryOptions,
+          staleTime: 0,
+          queryFn: ({ signal }) =>
+            fetchRepoProjectionReadModel(
+              repoRoot,
+              repoRuntimeId,
+              requestedBranch,
+              requestedMode,
+              options.signal && !matchingProjectionFetchAlreadyActive ? abortSignalAny([signal, options.signal]) : signal,
+              queryClient,
+            ),
+        }),
+        options.signal,
+      )
     } catch (err) {
       if (!isStaleRepoRuntimeReadError(err)) throw err
       await queryClient.invalidateQueries({ queryKey: queryOptions.queryKey, exact: true, refetchType: 'none' })
@@ -559,8 +604,5 @@ export function invalidateRepoRuntimeProjectionQueries(
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
   markRepoRuntimeProjectionInvalidated(repoRoot, repoRuntimeId, queryClient)
-  invalidateActiveRepoQueryKeys(queryClient, [
-    repoProjectionQueryPrefix(repoRoot, repoRuntimeId),
-    repoOperationsQueryPrefix(repoRoot, repoRuntimeId),
-  ])
+  invalidateActiveRepoRuntimeProjectionQueries(repoRoot, repoRuntimeId, queryClient)
 }
