@@ -1,10 +1,12 @@
-import { describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import {
   runWorkspacePaneRuntimeNewAction,
   runWorkspacePaneRuntimePrimaryAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
+import { resetWorkspacePaneTabControllerForTest } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 
 const terminalBase: TerminalSessionBase = {
   repoRoot: '/repo',
@@ -14,6 +16,10 @@ const terminalBase: TerminalSessionBase = {
 }
 
 describe('workspace pane runtime tab command actions', () => {
+  beforeEach(() => {
+    resetWorkspacePaneTabControllerForTest()
+  })
+
   test('primary terminal action focuses the first existing runtime session', async () => {
     const createTerminal = vi.fn(async () => 'created-session')
     const selectTerminal = vi.fn()
@@ -44,6 +50,63 @@ describe('workspace pane runtime tab command actions', () => {
     ).resolves.toBe(true)
 
     expect(showTerminalSession).toHaveBeenCalledWith('term-111111111111111111111')
+    expect(selectTerminal).not.toHaveBeenCalled()
+    expect(createTerminal).not.toHaveBeenCalled()
+  })
+
+  test('primary terminal action queues existing-session focus behind workspace pane coordination', async () => {
+    let releaseCoordinator!: () => void
+    let markCoordinatorStarted!: () => void
+    const coordinatorStarted = new Promise<void>((resolve) => {
+      markCoordinatorStarted = resolve
+    })
+    const coordinatorBlocker = runWorkspacePaneTabCoordinatorTask(
+      { repoId: terminalBase.repoRoot, branchName: terminalBase.branch, worktreePath: terminalBase.worktreePath },
+      async () => {
+        markCoordinatorStarted()
+        await new Promise<void>((resolve) => {
+          releaseCoordinator = resolve
+        })
+      },
+    )
+    await coordinatorStarted
+
+    let sessions = [terminalSession('term-111111111111111111111', true)]
+    const createTerminal = vi.fn(async () => 'created-session')
+    const selectTerminal = vi.fn()
+    const showTerminalSession = vi.fn(() => true)
+    const bridge: TerminalSessionCommandBridge = {
+      terminalWorktreeSnapshot: () => ({
+        terminalWorktreeKey: '/repo\0/repo-worktree',
+        selectedDescriptor: null,
+        sessions,
+        count: sessions.length,
+        bellCount: 0,
+        outputActiveCount: 0,
+        createPending: false,
+      }),
+      createTerminal,
+      selectTerminal,
+    }
+
+    const actionPromise = runWorkspacePaneRuntimePrimaryAction('terminal', {
+      terminal: {
+        base: terminalBase,
+        bridge,
+        openerIdentity: null,
+        showTerminalSession,
+      },
+    })
+    await Promise.resolve()
+
+    expect(showTerminalSession).not.toHaveBeenCalled()
+
+    sessions = [terminalSession('term-222222222222222222222', true)]
+    releaseCoordinator()
+    await coordinatorBlocker
+
+    await expect(actionPromise).resolves.toBe(true)
+    expect(showTerminalSession).toHaveBeenCalledWith('term-222222222222222222222')
     expect(selectTerminal).not.toHaveBeenCalled()
     expect(createTerminal).not.toHaveBeenCalled()
   })

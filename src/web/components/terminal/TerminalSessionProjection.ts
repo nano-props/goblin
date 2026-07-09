@@ -63,6 +63,11 @@ interface TerminalCreateQueueRequest {
   dedupeKey: string | null
 }
 
+export interface TerminalCreateCommandAdmissionResult {
+  terminalSessionId: string
+  ownsCreate: boolean
+}
+
 interface ResolvedTerminalCreateOptions {
   startupShellCommand?: string
   insertAfterIdentity?: string | null
@@ -125,10 +130,9 @@ export class TerminalSessionProjection {
   // Failures are logged (the old path swallowed them silently) so any
   // future regression is visible in `terminalLog` rather than invisible
   // shell ghosts in the buffer.
-  // User-initiated close hides the session from worktree snapshots
-  // synchronously while server cleanup runs. This is terminal-runtime
-  // visibility, not workspace pane selection state.
-  private readonly closingTerminalWorktreeKeyBySessionId = new Map<string, string>()
+  // User-initiated close remains visible until server cleanup succeeds. The
+  // promise map is the lifecycle owner for dedupe and for ignoring server
+  // echoes that arrive before the close command settles.
   private readonly closeCompletionByTerminalSessionId = new Map<string, Promise<boolean>>()
   // Selector publication caches only. They memoize lightweight UI snapshots
   // for React subscribers and do not contain terminal render buffers.
@@ -204,7 +208,6 @@ export class TerminalSessionProjection {
     this.preferredSelectedTerminalSessionIdByTerminalWorktree.clear()
     this.hostByWorktree.clear()
     this.startupGeometryHintByWorktree.clear()
-    this.closingTerminalWorktreeKeyBySessionId.clear()
     this.closeCompletionByTerminalSessionId.clear()
     this.snapshotCache.clear()
     this.worktreeSnapshotCache.clear()
@@ -476,7 +479,18 @@ export class TerminalSessionProjection {
     this.enqueueCreateRequest(base, formatTerminalWorktreeKey(base.repoRoot, base.worktreePath), {
       createOptions: options,
       dedupeKey: terminalCreateDedupeKey(options),
+    }).promise
+
+  createTerminalWithOwnership = async (
+    base: TerminalSessionBase,
+    options: TerminalCreateOptions = {},
+  ): Promise<TerminalCreateCommandAdmissionResult> => {
+    const admission = this.enqueueCreateRequest(base, formatTerminalWorktreeKey(base.repoRoot, base.worktreePath), {
+      createOptions: options,
+      dedupeKey: terminalCreateDedupeKey(options),
     })
+    return { terminalSessionId: await admission.promise, ownsCreate: admission.ownsCreate }
+  }
 
   registerHost = (terminalWorktreeKey: string, host: HTMLElement): void => {
     this.hostByWorktree.set(terminalWorktreeKey, host)
@@ -600,8 +614,8 @@ export class TerminalSessionProjection {
     base: TerminalSessionBase,
     terminalWorktreeKey: string,
     request: TerminalCreateQueueRequest,
-  ): Promise<string> {
-    const promise = this.lifecycleQueues.enqueueCreate({
+  ): { promise: Promise<string>; ownsCreate: boolean } {
+    const admission = this.lifecycleQueues.enqueueCreate({
       terminalWorktreeKey,
       base,
       options: request,
@@ -611,7 +625,7 @@ export class TerminalSessionProjection {
       },
     })
     this.notifyWorktree(terminalWorktreeKey)
-    return promise
+    return admission
   }
 
   private async flushCreateRequest(terminalWorktreeKey: string): Promise<void> {
@@ -762,7 +776,6 @@ export class TerminalSessionProjection {
 
   private selectedDescriptor(terminalWorktreeKey: string): TerminalDescriptor | null {
     const selectedKey = this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey)
-    if (selectedKey && this.closingTerminalWorktreeKeyBySessionId.has(selectedKey)) return null
     return selectedKey ? (this.sessions.get(selectedKey)?.descriptor ?? null) : null
   }
 
@@ -791,7 +804,6 @@ export class TerminalSessionProjection {
       selectedDescriptor: this.selectedDescriptor(terminalWorktreeKey),
       createPending: this.lifecycleQueues.hasCreate(terminalWorktreeKey),
       sessions: this.visibleSessionsForWorktree(terminalWorktreeKey),
-      closingSessionIds: this.closingSessionIdsForWorktree(terminalWorktreeKey),
       selectedTerminalSessionId: this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) ?? null,
       getCachedSnapshot: (terminalSessionId) => this.snapshotCache.get(terminalSessionId) ?? null,
       cacheSnapshot: (terminalSessionId, nextSnapshot) => this.snapshotCache.set(terminalSessionId, nextSnapshot),
@@ -810,11 +822,7 @@ export class TerminalSessionProjection {
     let count = 0
     for (const session of this.sessions.values()) {
       const terminalSessionId = session.descriptor.terminalSessionId
-      if (
-        session.descriptor.repoRoot === repoRoot &&
-        !this.closingTerminalWorktreeKeyBySessionId.has(terminalSessionId) &&
-        this.bellState.hasBell(terminalSessionId)
-      )
+      if (session.descriptor.repoRoot === repoRoot && this.bellState.hasBell(terminalSessionId))
         count++
     }
     return count
@@ -834,7 +842,6 @@ export class TerminalSessionProjection {
     const session = this.sessions.get(terminalSessionId)
     if (
       !session ||
-      this.closingTerminalWorktreeKeyBySessionId.has(terminalSessionId) ||
       session.descriptor.terminalWorktreeKey !== terminalWorktreeKey
     )
       return
@@ -1066,10 +1073,7 @@ export class TerminalSessionProjection {
     )
     const wasSelected = this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) === terminalSessionId
     const closePending = this.closeCompletionByTerminalSessionId.has(terminalSessionId)
-    if (!closePending) {
-      this.finishClosingSession(terminalSessionId)
-      this.closeCompletionByTerminalSessionId.delete(terminalSessionId)
-    }
+    if (!closePending) this.closeCompletionByTerminalSessionId.delete(terminalSessionId)
     this.pendingServerBellByTerminalSessionId.delete(terminalSessionId)
     this.syncTerminalRuntimeSessionIdIndex(terminalSessionId, null)
     this.sessions.delete(terminalSessionId)
@@ -1095,60 +1099,36 @@ export class TerminalSessionProjection {
     if (pending) return pending
     const session = this.sessions.get(terminalSessionId)
     if (!session) return false
-    const promise = this.runClose(terminalSessionId, session)
+    let resolve!: (value: boolean) => void
+    let reject!: (error: unknown) => void
+    const promise = new Promise<boolean>((innerResolve, innerReject) => {
+      resolve = innerResolve
+      reject = innerReject
+    })
     this.closeCompletionByTerminalSessionId.set(terminalSessionId, promise)
     const cleanup = () => {
       if (this.closeCompletionByTerminalSessionId.get(terminalSessionId) === promise) {
         this.closeCompletionByTerminalSessionId.delete(terminalSessionId)
-        this.finishClosingSession(terminalSessionId)
       }
     }
     void promise.then(cleanup, cleanup)
+    void this.runClose(terminalSessionId, session).then(resolve, reject)
     return promise
   }
 
   private async runClose(terminalSessionId: string, session: TerminalSession): Promise<boolean> {
-    this.hideClosingSession(terminalSessionId, session)
     try {
       await session.closeServerResourcesAndWait()
     } catch (err) {
       terminalSessionProviderLog.warn('terminal close failed', { terminalSessionId, err })
-      this.restoreClosingSession(terminalSessionId, session)
       return false
     }
     if (this.sessions.get(terminalSessionId) !== session) return true
     return this.removeSession(terminalSessionId, { dispose: true, closeSession: false })
   }
 
-  private hideClosingSession(terminalSessionId: string, session: TerminalSession): void {
-    if (this.closingTerminalWorktreeKeyBySessionId.has(terminalSessionId)) return
-    const terminalWorktreeKey = session.descriptor.terminalWorktreeKey
-    const visibleSessionIdsBeforeClose = this.visibleSessionsForWorktree(terminalWorktreeKey).map(
-      (item) => item.descriptor.terminalSessionId,
-    )
-    const wasSelected = this.selectedTerminalSessionIdByTerminalWorktree.get(terminalWorktreeKey) === terminalSessionId
-    this.closingTerminalWorktreeKeyBySessionId.set(terminalSessionId, terminalWorktreeKey)
-    if (wasSelected) {
-      const nextSessionId = resolveAdjacentTerminalSelectionAfterRemoval(
-        visibleSessionIdsBeforeClose,
-        terminalSessionId,
-      )
-      this.selectTerminalSessionId(terminalWorktreeKey, nextSessionId, { notify: false })
-    }
-    this.notifyWorktree(terminalWorktreeKey)
-  }
-
-  private restoreClosingSession(terminalSessionId: string, session: TerminalSession): void {
-    if (this.sessions.get(terminalSessionId) !== session) return
-    const terminalWorktreeKey = session.descriptor.terminalWorktreeKey
-    if (!this.closingTerminalWorktreeKeyBySessionId.delete(terminalSessionId)) return
-    if (!this.selectedTerminalSessionIdByTerminalWorktree.has(terminalWorktreeKey)) {
-      this.selectTerminalSessionId(terminalWorktreeKey, terminalSessionId, { notify: false })
-    }
-    this.notifyWorktree(terminalWorktreeKey)
-  }
-
   private discardLocalSessionAndDismissDetailIfLast(terminalSessionId: string, base: TerminalSessionBase): void {
+    if (this.closeCompletionByTerminalSessionId.has(terminalSessionId)) return
     const session = this.sessions.get(terminalSessionId)
     const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
     if (!session || session.descriptor.terminalWorktreeKey !== terminalWorktreeKey) return
@@ -1253,41 +1233,11 @@ export class TerminalSessionProjection {
   }
 
   private isSelectedTerminalSessionIdValid(terminalWorktreeKey: string, terminalSessionId: string): boolean {
-    return (
-      !this.closingTerminalWorktreeKeyBySessionId.has(terminalSessionId) &&
-      this.sessions.get(terminalSessionId)?.descriptor.terminalWorktreeKey === terminalWorktreeKey
-    )
+    return this.sessions.get(terminalSessionId)?.descriptor.terminalWorktreeKey === terminalWorktreeKey
   }
 
   private visibleSessionsForWorktree(terminalWorktreeKey: string): TerminalSession[] {
-    return this.sessionsForWorktreeList(terminalWorktreeKey).filter(
-      (session) => !this.closingTerminalWorktreeKeyBySessionId.has(session.descriptor.terminalSessionId),
-    )
-  }
-
-  private closingSessionIdsForWorktree(terminalWorktreeKey: string): string[] {
-    const listedSessionIds = new Set<string>()
-    const listedClosingSessionIds = this.sessionsForWorktreeList(terminalWorktreeKey).flatMap((session) => {
-      const terminalSessionId = session.descriptor.terminalSessionId
-      listedSessionIds.add(terminalSessionId)
-      return this.closingTerminalWorktreeKeyBySessionId.get(terminalSessionId) === terminalWorktreeKey
-        ? [terminalSessionId]
-        : []
-    })
-    const unlistedClosingSessionIds = Array.from(this.closingTerminalWorktreeKeyBySessionId).flatMap(
-      ([terminalSessionId, closingTerminalWorktreeKey]) =>
-        closingTerminalWorktreeKey === terminalWorktreeKey && !listedSessionIds.has(terminalSessionId)
-          ? [terminalSessionId]
-          : [],
-    )
-    return [...listedClosingSessionIds, ...unlistedClosingSessionIds]
-  }
-
-  private finishClosingSession(terminalSessionId: string): void {
-    const terminalWorktreeKey = this.closingTerminalWorktreeKeyBySessionId.get(terminalSessionId)
-    if (!terminalWorktreeKey) return
-    this.closingTerminalWorktreeKeyBySessionId.delete(terminalSessionId)
-    this.notifyWorktree(terminalWorktreeKey)
+    return this.sessionsForWorktreeList(terminalWorktreeKey)
   }
 
   private sessionsForWorktreeList(terminalWorktreeKey: string): TerminalSession[] {

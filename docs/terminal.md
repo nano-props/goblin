@@ -141,6 +141,17 @@ It is useful to keep three lifetimes separate:
 
 A Workspace Pane tab is not the authoritative owner of a terminal session. The tab is a workspace-pane tab entry in the UI; the terminal server (TerminalSessionManager) and client projection (TerminalSessionProjection) own terminal resource cleanup for the session rendered by that tab. The tab close path is the orchestration boundary that waits for those owners to finish.
 
+Closing a terminal tab is a sequential operation. The command may compute the
+close-back tab before it starts the close, but `TerminalSessionProjection` must
+keep the terminal session visible until the server/runtime close succeeds. Do
+not optimistically hide the session from the tab strip, clear selected terminal
+state, or expose a compensating `closingSessionIds` state for normal tab close.
+Those patterns make the UI render a state that is neither the old tab nor the
+planned close-back tab, and then force route reconciliation or render logic to
+repair it. On failure, the session should still be present because the close did
+not complete. On success, the close path removes the session and commits the
+planned close-back navigation.
+
 This distinction matters for destructive worktree operations. Before a worktree directory is removed, the client should close every worktree-scoped Workspace Pane tab for that worktree and await each tab's close contract. For terminal tabs, that close contract delegates to the client projection's worktree release barrier: cancel pending creates that have not reached the server, wait for in-flight creates that cannot be cancelled, close materialized sessions, and wait for pending durable closes to settle. For future worktree-scoped tabs, such as a file tree or another long-lived tool surface, the same tab close contract should release that tab's resources before the worktree mutation starts.
 
 Repo routes and server-side repo write paths should not know about Workspace Pane tabs or terminal UI resources. They remain responsible for repository mutation. UI resource release belongs to the Workspace Pane tab lifecycle on the client.

@@ -66,6 +66,31 @@ describe('terminal create command', () => {
     expect(workspacePaneTabOpener(REPO_ID, 'main', 'terminal:term-111111111111111111111')).toBe('terminal:term-000000000000000000000')
   })
 
+  test('does not repeat opener or navigation side effects for duplicate create joiners', async () => {
+    const createTerminal = vi.fn(async () => ({
+      terminalSessionId: 'term-111111111111111111111',
+      ownsCreate: false,
+    }))
+    const showCreatedTerminalTab = vi.fn(() => true)
+
+    await expect(
+      runCreateTerminalTabCommand({
+        base: {
+          repoRoot: REPO_ID,
+          repoRuntimeId: REPO_RUNTIME_ID,
+          branch: 'main',
+          worktreePath: WORKTREE_PATH,
+        },
+        createTerminal,
+        openerIdentity: 'terminal:term-000000000000000000000',
+        showCreatedTerminalTab,
+      }),
+    ).resolves.toEqual({ ok: true, terminalSessionId: 'term-111111111111111111111' })
+
+    expect(showCreatedTerminalTab).not.toHaveBeenCalled()
+    expect(workspacePaneTabOpener(REPO_ID, 'main', 'terminal:term-111111111111111111111')).toBeNull()
+  })
+
   test('reports failure if showing the created terminal route is rejected', async () => {
     const createTerminal = vi.fn(async () => 'term-111111111111111111111')
     const showCreatedTerminalTab = vi.fn(() => false)

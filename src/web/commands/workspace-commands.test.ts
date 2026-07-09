@@ -933,15 +933,17 @@ describe('workspace commands', () => {
       },
     })
     const firstCreate = Promise.withResolvers<string>()
-    const { createTerminal, createOperationCount } = createSingleFlightTerminalWithProjection(
+    const { createTerminal, createTerminalWithOwnership, createOperationCount } = createSingleFlightTerminalWithProjection(
       async () => await firstCreate.promise,
     )
+    const showRepoBranchTerminalSession = vi.fn(() => true)
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal,
+      createTerminalWithOwnership,
       selectTerminal: vi.fn(),
     })
-    const navigation = navigationWith()
+    const navigation = navigationWith({ showRepoBranchTerminalSession })
 
     const firstCommand = runNewTerminalTabCommand({
       workspacePaneRoute: undefined,
@@ -972,6 +974,12 @@ describe('workspace commands', () => {
     await expect(duplicateCommand).resolves.toBe(true)
     expect(createTerminal).toHaveBeenCalledTimes(2)
     expect(createOperationCount()).toBe(1)
+    expect(showRepoBranchTerminalSession).toHaveBeenCalledOnce()
+    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
+      REPO_ID,
+      'feature/worktree',
+      'term-222222222222222222222',
+    )
     expect(tabsFor('feature/worktree')).toEqual([staticEntry('status'), terminalEntry('term-222222222222222222222')])
   })
 
@@ -2724,7 +2732,11 @@ function createSingleFlightTerminalWithProjection(resolveSessionId: () => string
     })
     return pending
   })
-  return { createTerminal, createOperationCount: () => createOperationCount }
+  const createTerminalWithOwnership = vi.fn(async (base: TerminalSessionBase, options?: TerminalCreateOptions) => {
+    const ownsCreate = !pending
+    return { terminalSessionId: await createTerminal(base, options), ownsCreate }
+  })
+  return { createTerminal, createTerminalWithOwnership, createOperationCount: () => createOperationCount }
 }
 
 function recordCreatedTerminalInProjection(base: TerminalSessionBase, terminalSessionId: string): void {

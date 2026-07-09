@@ -11,6 +11,13 @@ import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-provi
 export type TerminalCreateCommandResult =
   { ok: true; terminalSessionId: string } | { ok: false; error: unknown; messageKey: string }
 
+export type TerminalCreateCommandAdmission =
+  | string
+  | {
+      terminalSessionId: string
+      ownsCreate: boolean
+    }
+
 const TERMINAL_CREATE_CANCELED_MESSAGE = 'terminal create request canceled'
 
 export async function runCreateTerminalTabCommand(input: {
@@ -18,7 +25,7 @@ export async function runCreateTerminalTabCommand(input: {
   createTerminal: (
     base: TerminalSessionBase,
     options?: TerminalCreateOptions,
-  ) => Promise<string>
+  ) => Promise<TerminalCreateCommandAdmission>
   /**
    * The tab this creation should be attributed to (used for close-back focus
    * via the workspace pane tab opener tracker). Captured by the caller at
@@ -44,9 +51,10 @@ export async function runCreateTerminalTabCommand(input: {
     return { ok: false, error: new Error('repo runtime unavailable'), messageKey: 'error.terminal-create-failed' }
   }
   try {
-    const terminalSessionId = await input.createTerminal(input.base, input.options)
+    const admission = terminalCreateCommandAdmission(await input.createTerminal(input.base, input.options))
+    if (!admission.ownsCreate) return { ok: true, terminalSessionId: admission.terminalSessionId }
     const runAfterCreate = input.options?.coordinateCreate ?? runTerminalCreateCommandStepDirectly
-    return await runAfterCreate(async () => finishCreateTerminalTabCommand(input, terminalSessionId))
+    return await runAfterCreate(async () => finishCreateTerminalTabCommand(input, admission.terminalSessionId))
   } catch (error) {
     if (isTerminalCreateCanceled(error)) {
       return { ok: false, error, messageKey: 'error.terminal-create-failed' }
@@ -55,6 +63,13 @@ export async function runCreateTerminalTabCommand(input: {
     terminalLog.warn(input.logMessage ?? 'failed to create terminal', { err: error, messageKey })
     return { ok: false, error, messageKey }
   }
+}
+
+function terminalCreateCommandAdmission(admission: TerminalCreateCommandAdmission): {
+  terminalSessionId: string
+  ownsCreate: boolean
+} {
+  return typeof admission === 'string' ? { terminalSessionId: admission, ownsCreate: true } : admission
 }
 
 async function finishCreateTerminalTabCommand(

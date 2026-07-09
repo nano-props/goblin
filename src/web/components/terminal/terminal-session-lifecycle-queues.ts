@@ -21,6 +21,11 @@ export interface TerminalCreateQueueEntry<TBase, TOptions> {
   creating: boolean
 }
 
+export interface TerminalCreateQueueAdmission {
+  promise: Promise<string>
+  ownsCreate: boolean
+}
+
 export interface PendingTerminalClose {
   terminalRuntimeSessionId: string
   terminalWorktreeKey: string
@@ -39,10 +44,10 @@ export class TerminalSessionLifecycleQueues<TBase, TOptions> {
     options: TOptions
     isSameRequest: (existing: TOptions, next: TOptions) => boolean
     flush: (terminalWorktreeKey: string) => void
-  }): Promise<string> {
+  }): TerminalCreateQueueAdmission {
     const queue = this.createQueue(input.terminalWorktreeKey)
     const existing = queue.find((entry) => input.isSameRequest(entry.options, input.options))
-    if (existing) return existing.promise
+    if (existing) return { promise: existing.promise, ownsCreate: false }
     let resolve!: (terminalSessionId: string) => void
     let reject!: (error: unknown) => void
     const promise = new Promise<string>((innerResolve, innerReject) => {
@@ -60,7 +65,7 @@ export class TerminalSessionLifecycleQueues<TBase, TOptions> {
       creating: false,
     })
     if (wasEmpty) input.flush(input.terminalWorktreeKey)
-    return promise
+    return { promise, ownsCreate: true }
   }
 
   getCreate(terminalWorktreeKey: string): TerminalCreateQueueEntry<TBase, TOptions> | undefined {

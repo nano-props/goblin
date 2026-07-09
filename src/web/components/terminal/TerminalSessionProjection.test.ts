@@ -525,8 +525,10 @@ describe('TerminalSessionProjection', () => {
       await Promise.resolve()
 
       expect(projection.isKnownSession(terminalSessionId)).toBe(true)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor).toBeNull()
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
+        terminalSessionId,
+      )
       expect(settled).toBe(false)
 
       resolveClose()
@@ -535,7 +537,7 @@ describe('TerminalSessionProjection', () => {
       expect(projection.isKnownSession(terminalSessionId)).toBe(false)
     })
 
-    test('keeps closing sessions projected when server reconciliation removes them before close settles', async () => {
+    test('keeps command-closing sessions visible when server reconciliation removes them before close settles', async () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
@@ -561,7 +563,10 @@ describe('TerminalSessionProjection', () => {
       })
       await Promise.resolve()
 
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).closingSessionIds).toEqual([terminalSessionId])
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId)).toEqual([
+        terminalSessionId,
+      ])
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).closingSessionIds ?? []).toEqual([])
 
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
@@ -570,13 +575,57 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      expect(projection.isKnownSession(terminalSessionId)).toBe(false)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions).toEqual([])
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).closingSessionIds).toEqual([terminalSessionId])
+      expect(projection.isKnownSession(terminalSessionId)).toBe(true)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId)).toEqual([
+        terminalSessionId,
+      ])
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).closingSessionIds ?? []).toEqual([])
 
       resolveClose()
       await expect(closePromise).resolves.toBe(true)
+      expect(projection.isKnownSession(terminalSessionId)).toBe(false)
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).closingSessionIds ?? []).toEqual([])
+    })
+
+    test('keeps command-closing sessions visible when a session-closed event arrives before close settles', async () => {
+      projection.setRepoIndex(makeRepoIndex())
+      projection.reconcileServerSessions(
+        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
+        'client_local',
+        new Map(),
+      )
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      const session = (projection as any).sessions.get(terminalSessionId)
+      let resolveClose!: () => void
+      vi.spyOn(session, 'closeServerResourcesAndWait').mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveClose = resolve
+          }),
+      )
+
+      const closePromise = projection.closeTerminalByDescriptor(terminalSessionId, {
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: REPO_RUNTIME_ID,
+        branch: BRANCH,
+        worktreePath: WORKTREE_PATH,
+      })
+      await Promise.resolve()
+
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalSessionId,
+      })
+
+      expect(projection.isKnownSession(terminalSessionId)).toBe(true)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((summary) => summary.terminalSessionId)).toEqual([
+        terminalSessionId,
+      ])
+
+      resolveClose()
+      await expect(closePromise).resolves.toBe(true)
+      expect(projection.isKnownSession(terminalSessionId)).toBe(false)
     })
 
     test('durable close callback does not require a fresh repo runtime id', async () => {
@@ -601,7 +650,7 @@ describe('TerminalSessionProjection', () => {
       }
     })
 
-    test('closeTerminalByDescriptor selects an adjacent terminal before server close settles', async () => {
+    test('closeTerminalByDescriptor selects an adjacent terminal after server close settles', async () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
@@ -637,15 +686,21 @@ describe('TerminalSessionProjection', () => {
       await Promise.resolve()
 
       const closingSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
-      expect(closingSnapshot.sessions.map((item) => item.terminalSessionId)).toEqual(['term-111111111111111111111', 'term-333333333333333333333'])
-      expect(closingSnapshot.selectedDescriptor?.terminalSessionId).toBe('term-333333333333333333333')
+      expect(closingSnapshot.sessions.map((item) => item.terminalSessionId)).toEqual([
+        'term-111111111111111111111',
+        'term-222222222222222222222',
+        'term-333333333333333333333',
+      ])
+      expect(closingSnapshot.selectedDescriptor?.terminalSessionId).toBe('term-222222222222222222222')
 
       resolveClose()
       await expect(closePromise).resolves.toBe(true)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((item) => item.terminalSessionId)).toEqual([
+      const closedSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
+      expect(closedSnapshot.sessions.map((item) => item.terminalSessionId)).toEqual([
         'term-111111111111111111111',
         'term-333333333333333333333',
       ])
+      expect(closedSnapshot.selectedDescriptor?.terminalSessionId).toBe('term-333333333333333333333')
     })
 
     test('closeTerminalByDescriptor deduplicates repeated closes for the same terminal session', async () => {
@@ -681,7 +736,7 @@ describe('TerminalSessionProjection', () => {
       await Promise.resolve()
 
       expect(closeServerResourcesAndWait).toHaveBeenCalledTimes(1)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
 
       resolveClose()
       await expect(firstClose).resolves.toBe(true)
@@ -716,7 +771,7 @@ describe('TerminalSessionProjection', () => {
       })
       await Promise.resolve()
 
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
 
       const expectation = expect(closePromise).resolves.toBe(false)
       rejectClose(new Error('close failed'))

@@ -130,11 +130,18 @@ return commitPlannedNavigation(plan.route)
 ```
 
 If a runtime write has a visible transitional lifecycle, project that lifecycle
-through the owning runtime model. For example, terminal close hides the session
-from the tab strip while close is in flight, and the terminal projection exposes
-that session id as closing. Route reconciliation can then wait on a real
-terminal lifecycle state instead of misclassifying the current URL as stale.
-That is acceptable projection state; it is not a command token or guard.
+through the owning runtime model without contradicting the current business
+state. Do not hide or remove an entity from a client projection before the
+runtime write that removes it has actually completed, then try to compensate
+with a secondary "closing" flag, render override, or route-reconciliation
+exception. That creates two sources of truth: the projection says the entity is
+gone, while the command still owns an in-flight close.
+
+The cleaner shape is sequential: the command captures the close-back target,
+awaits the owning runtime close, and only then commits both the projection
+removal and planned navigation. Reconciliation may wait on real runtime state,
+but it must not become a repair layer for an operation that prematurely hid its
+own target.
 
 ## Sync rules
 

@@ -435,6 +435,30 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
   })
 
+  test('reports ownership for identical in-flight creates', async () => {
+    const first = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
+    mocks.createMock.mockReset()
+    mocks.createMock.mockReturnValueOnce(first.promise)
+
+    const base = terminalBase()
+    const options = { startupShellCommand: "bat '/repo/a.ts'\r" }
+
+    const firstCreate = projection.createTerminalWithOwnership(base, options)
+    await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
+    const secondCreate = projection.createTerminalWithOwnership(base, { ...options })
+
+    first.resolve(makeCreateResult())
+    await expect(firstCreate).resolves.toEqual({
+      terminalSessionId: 'term-111111111111111111111',
+      ownsCreate: true,
+    })
+    await expect(secondCreate).resolves.toEqual({
+      terminalSessionId: 'term-111111111111111111111',
+      ownsCreate: false,
+    })
+    expect(mocks.createMock).toHaveBeenCalledTimes(1)
+  })
+
   test('queues a different startup shell command behind an in-flight create for the same worktree', async () => {
     const first = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
     const secondResult = makeCreateResult({
