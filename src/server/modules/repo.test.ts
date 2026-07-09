@@ -452,6 +452,42 @@ describe('fetchRepo invalidation publishing', () => {
     })
   })
 
+  test('user sync reuses an active background sync from a sibling worktree', async () => {
+    mocks.getRepoCommonDir.mockImplementation(async (cwd: string) =>
+      cwd === '/tmp/repo' || cwd === '/tmp/repo-linked' ? '/tmp/repo/.git' : `${cwd}/.git`,
+    )
+    mocks.getWorktrees.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
+      { path: '/tmp/repo-linked', branch: 'feature/a', isBare: false, isPrimary: false, isDirty: false },
+    ])
+    const fetch = deferred<{ ok: true; message: string }>()
+    mocks.fetchAll.mockImplementationOnce(() => fetch.promise)
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const background = fetchRepo('/tmp/repo', 'background')
+    await vi.waitFor(() => {
+      expect(mocks.fetchAll).toHaveBeenCalledTimes(1)
+    })
+    const user = fetchRepo('/tmp/repo-linked', 'user')
+
+    fetch.resolve({ ok: true, message: 'fetched in background' })
+    const [backgroundResult, userResult] = await Promise.all([background, user])
+
+    expect(backgroundResult).toEqual({ ok: true, message: 'fetched in background' })
+    expect(userResult).toEqual({ ok: true, message: 'fetched in background' })
+    expect(mocks.fetchAll).toHaveBeenCalledTimes(1)
+    expectRepoSnapshotInvalidations(
+      {
+        repoId: '/tmp/repo',
+        query: 'repo-snapshot',
+      },
+      {
+        repoId: '/tmp/repo-linked',
+        query: 'repo-snapshot',
+      },
+    )
+  })
+
   test('caller abort stops waiting for a reused background sync without cancelling it', async () => {
     const fetch = deferred<{ ok: true; message: string }>()
     mocks.fetchAll.mockImplementationOnce(() => fetch.promise)

@@ -64,9 +64,8 @@ const EmptyBodySchema = v.optional(v.object({}))
 
 export const REPO_PROCEDURE_SCHEMAS = {
   // Action endpoints — POST with a JSON body.
-  fetch: v.object({
+  fetch: v.strictObject({
     cwd: v.string(),
-    kind: v.optional(v.picklist(['user', 'background'])),
   }),
   clone: v.object({
     url: v.string(),

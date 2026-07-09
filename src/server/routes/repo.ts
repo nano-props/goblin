@@ -145,9 +145,9 @@ export function createRepoRoutes() {
     return c.json(await readRepoOperationsSnapshot(cwd, { includeSettled, signal: c.req.raw.signal }))
   })
   app.post('/fetch', async (c) => {
-    const { cwd, kind } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fetch, c)
+    const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fetch, c)
     return c.json(
-      await jsonOr(() => fetchRepo(cwd, kind ?? 'user', c.req.raw.signal), READ_REPO_ERROR, 'fetch'),
+      await jsonOr(() => fetchRepo(cwd, 'user', c.req.raw.signal), READ_REPO_ERROR, 'fetch'),
     )
   })
   app.post('/clone', async (c) => {

@@ -263,8 +263,8 @@ async function resolvePushTarget(cwd: string, branch: string, signal?: AbortSign
 }
 
 export async function fetchAll(cwd: string, signal?: AbortSignal): Promise<ExecResult> {
-  let remotes: GitRemoteInfo[] | null = null
-  let upstream: UpstreamParts | null = null
+  let remotes: GitRemoteInfo[]
+  let upstream: UpstreamParts | null
   try {
     const currentBranch = await getCurrentBranch(cwd, { signal })
     if (signal?.aborted) return { ok: false, message: 'cancelled' }
@@ -272,12 +272,13 @@ export async function fetchAll(cwd: string, signal?: AbortSignal): Promise<ExecR
       getRemotes(cwd, signal),
       currentBranch ? getUpstreamParts(cwd, currentBranch, signal) : Promise.resolve(null),
     ])
-  } catch {
-    remotes = null
+  } catch (err) {
+    if (signal?.aborted) return { ok: false, message: 'cancelled' }
+    return { ok: false, message: err instanceof Error ? err.message : 'error.failed-read-repo' }
   }
   if (signal?.aborted) return { ok: false, message: 'cancelled' }
-  if (remotes?.length === 0) return { ok: true, message: '' }
-  const remote = resolveFetchRemoteForRemotes(remotes ?? [], upstream)
+  if (remotes.length === 0) return { ok: true, message: '' }
+  const remote = resolveFetchRemoteForRemotes(remotes, upstream)
   if (!remote) return { ok: true, message: '' }
   return gitResultWithOptions(cwd, { timeoutMs: NETWORK_TIMEOUT_MS, signal }, 'fetch', '--prune', '--', remote)
 }

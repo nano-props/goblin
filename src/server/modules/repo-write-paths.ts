@@ -7,6 +7,7 @@ import {
   startRepoServerOperation,
 } from '#/server/modules/repo-operation-registry.ts'
 import {
+  resolveRepoWriteBoundaryKey,
   resolveRepoSource,
   runWithRepoSource,
   type RepoMutationResult,
@@ -303,6 +304,8 @@ export async function fetchRepo(
   kind: NetworkOpKind = 'user',
   signal?: AbortSignal,
 ): Promise<{ ok: boolean; message: string }> {
+  const backgroundFetchKey = await resolveRepoWriteBoundaryKey(cwd, signal)
+
   async function runFetch(
     task: (signal: AbortSignal) => Promise<RepoMutationResult>,
     context: RepoWriteOperationContext,
@@ -334,22 +337,24 @@ export async function fetchRepo(
   }
 
   if (kind === 'user') {
-    const backgroundFetch = activeBackgroundFetches.get(cwd)
+    const backgroundFetch = activeBackgroundFetches.get(backgroundFetchKey)
     if (backgroundFetch) {
       return await waitForResultOrCallerAbort(backgroundFetch.promise, signal, backgroundFetch.operationRef)
     }
     return await executeFetch()
   }
 
-  const existingBackgroundFetch = activeBackgroundFetches.get(cwd)
+  const existingBackgroundFetch = activeBackgroundFetches.get(backgroundFetchKey)
   if (existingBackgroundFetch) {
     return await waitForResultOrCallerAbort(existingBackgroundFetch.promise, signal, existingBackgroundFetch.operationRef)
   }
   const operationRef = { current: null as RepoWriteOperationLifecycle | null }
   const backgroundFetch = executeFetch(operationRef).finally(() => {
-    if (activeBackgroundFetches.get(cwd)?.promise === backgroundFetch) activeBackgroundFetches.delete(cwd)
+    if (activeBackgroundFetches.get(backgroundFetchKey)?.promise === backgroundFetch) {
+      activeBackgroundFetches.delete(backgroundFetchKey)
+    }
   })
-  activeBackgroundFetches.set(cwd, { promise: backgroundFetch, operationRef })
+  activeBackgroundFetches.set(backgroundFetchKey, { promise: backgroundFetch, operationRef })
   return await backgroundFetch
 }
 

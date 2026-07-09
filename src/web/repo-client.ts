@@ -95,10 +95,9 @@ export async function abortRepoOperation(cwd: string): Promise<boolean> {
 
 export async function fetchRepo(
   cwd: string,
-  kind?: 'user' | 'background',
   signal?: AbortSignal,
 ): Promise<{ ok: boolean; message: string }> {
-  return await postServerJson('/api/repo/fetch', kind ? { cwd, kind } : { cwd }, {
+  return await postServerJson('/api/repo/fetch', { cwd }, {
     signal,
     timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
   })
