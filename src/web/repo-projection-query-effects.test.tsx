@@ -8,6 +8,7 @@ import {
   getRepoOperationsQueryData,
   invalidateRepoDataQueries,
   repoOperationsQueryKey,
+  repoProjectionQueryOptions,
   repoProjectionQueryKey,
   setRepoOperationsQueryData,
   setRepoProjectionQueryData,
@@ -169,6 +170,46 @@ describe('repo projection query effects', () => {
       await vi.waitFor(() => {
         expect(pruneTerminals).toHaveBeenCalledTimes(1)
         expect(useReposStore.getState().repos['/repo']?.dataLoads.repoReadModel.loadedAt).toBe(3)
+      })
+    } finally {
+      unsubscribe()
+      queryClient.clear()
+    }
+  })
+
+  test('rejects stale projection successes when the effect mounts after the fetch started', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const pruneTerminals = vi.fn(async () => ({ pruned: 0, remaining: 0 }))
+    const releases: Array<(projection: RepoRuntimeProjection) => void> = []
+    installGoblinTestBridge({
+      'terminal.prune': pruneTerminals,
+      'repo.projection': () =>
+        new Promise<RepoRuntimeProjection>((resolve) => {
+          releases.push(resolve)
+        }),
+    })
+    const repo = seedRepoShellForTest({ id: '/repo', repoRuntimeId: 'repo-runtime-test-1' })
+    const observer = new QueryObserver(queryClient, repoProjectionQueryOptions('/repo', repo.repoRuntimeId, null, 'full'))
+    const unsubscribe = observer.subscribe(() => {})
+    try {
+      await vi.waitFor(() => {
+        expect(releases).toHaveLength(1)
+      })
+
+      invalidateRepoRuntimeProjectionQueries('/repo', repo.repoRuntimeId, queryClient)
+      renderInJsdom(<Harness queryClient={queryClient} />)
+      releases[0]!(projection(1, 'stale'))
+
+      await vi.waitFor(() => {
+        expect(releases).toHaveLength(2)
+      })
+      expect(observer.getCurrentResult().data).toBeUndefined()
+      expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
+      expect(pruneTerminals).not.toHaveBeenCalled()
+
+      releases[1]!(projection(2, 'fresh'))
+      await vi.waitFor(() => {
+        expect(observer.getCurrentResult().data?.loadedAt).toBe(2)
       })
     } finally {
       unsubscribe()

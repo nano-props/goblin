@@ -288,11 +288,12 @@ export async function enqueueRepoWriteOperation<T>(
   signal: AbortSignal | undefined,
   operationInput: BeginRepoWriteOperationInput,
   prepareTask: (operation: RepoWriteOperationLifecycle, context: RepoWriteOperationContext) => () => Promise<T>,
+  options: { boundaryKey?: string } = {},
 ): Promise<T> {
   const releaseAdmission = await acquireRepoWriteOperationAdmission()
   let work!: Promise<T>
   try {
-    const boundaryKey = await resolveRepoWriteBoundaryKey(repoId, signal)
+    const boundaryKey = options.boundaryKey ?? (await resolveRepoWriteBoundaryKey(repoId, signal))
     const runtime = repoWriteOperationRuntimeForBoundary(boundaryKey)
     const operation = beginRepoWriteOperation(runtime, operationInput)
     const context = createRepoWriteOperationContext(runtime, operation, signal)

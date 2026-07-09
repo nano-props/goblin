@@ -102,14 +102,7 @@ describe('useRepoStoreInvalidationRefresh', () => {
       queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-test-7', 'operations'],
       refetchType: 'none',
     })
-    expect(refetchSpy).toHaveBeenCalledWith(
-      { queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-test-7', 'projection'], type: 'active' },
-      { cancelRefetch: false },
-    )
-    expect(refetchSpy).toHaveBeenCalledWith(
-      { queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-test-7', 'operations'], type: 'active' },
-      { cancelRefetch: false },
-    )
+    expect(refetchSpy).not.toHaveBeenCalled()
     refetchSpy.mockRestore()
     invalidateSpy.mockRestore()
   })

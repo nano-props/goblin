@@ -36,8 +36,10 @@ const mocks = vi.hoisted(() => ({
   bootstrapRemoteWorktreeAfterCreate: vi.fn(),
   createRemoteWorktree: vi.fn(),
   deleteRemoteBranch: vi.fn(),
+  fetchRemoteRepo: vi.fn(),
   getWorktreeBootstrapPreview: vi.fn(),
   getRemoteRepoWorktreePaths: vi.fn(),
+  getRemoteRepoWriteGroupPath: vi.fn(),
   getRemoteWorktreeBootstrapPreview: vi.fn(),
   removeRemoteWorktree: vi.fn(),
   getServerRepoSettings: vi.fn(),
@@ -132,12 +134,12 @@ vi.mock('#/system/ssh/git.ts', () => ({
   bootstrapRemoteWorktreeAfterCreate: mocks.bootstrapRemoteWorktreeAfterCreate,
   createRemoteWorktree: mocks.createRemoteWorktree,
   deleteRemoteBranch: mocks.deleteRemoteBranch,
-  fetchRemoteRepo: vi.fn(),
+  fetchRemoteRepo: mocks.fetchRemoteRepo,
   getRemoteBrowserUrl: vi.fn(),
   getRemoteLog: vi.fn(),
   getRemotePatch: vi.fn(),
   getRemoteRepoWorktreePaths: mocks.getRemoteRepoWorktreePaths,
-  getRemoteRepoWriteGroupPath: vi.fn(async (target: { remotePath: string }) => target.remotePath),
+  getRemoteRepoWriteGroupPath: mocks.getRemoteRepoWriteGroupPath,
   getRemoteSnapshot: vi.fn(),
   getRemoteStatus: vi.fn(),
   getRemoteTrackingBranches: vi.fn(),
@@ -224,7 +226,9 @@ beforeEach(async () => {
   mocks.removeWorktree.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.deleteRemoteBranch.mockResolvedValue({ ok: true, message: 'ok' })
   mocks.removeRemoteWorktree.mockResolvedValue({ ok: true, message: 'ok' })
+  mocks.fetchRemoteRepo.mockResolvedValue({ ok: true, message: 'fetched' })
   mocks.getRemoteRepoWorktreePaths.mockResolvedValue([])
+  mocks.getRemoteRepoWriteGroupPath.mockImplementation(async (target: { remotePath: string }) => target.remotePath)
   mocks.getCurrentBranch.mockResolvedValue('main')
   mocks.getRepoCommonDir.mockImplementation(async (cwd: string) => `${cwd}/.git`)
   mocks.getRepoName.mockResolvedValue('repo')
@@ -483,6 +487,74 @@ describe('fetchRepo invalidation publishing', () => {
       },
       {
         repoId: '/tmp/repo-linked',
+        query: 'repo-snapshot',
+      },
+    )
+  })
+
+  test('user sync reuses background sync when remote boundary resolution drifts', async () => {
+    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
+    const linkedRepoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo-linked' })
+    mocks.getRemoteRepoWriteGroupPath.mockRejectedValueOnce(new Error('remote paths unavailable'))
+    mocks.getRemoteRepoWriteGroupPath.mockResolvedValue('/srv/repo')
+    mocks.getRemoteRepoWorktreePaths.mockResolvedValue(['/srv/repo', '/srv/repo-linked'])
+    const fetch = deferred<{ ok: true; message: string }>()
+    mocks.fetchRemoteRepo.mockImplementationOnce(async () => await fetch.promise)
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const background = fetchRepo(repoId, 'background')
+    await vi.waitFor(() => {
+      expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(1)
+    })
+    const user = fetchRepo(linkedRepoId, 'user')
+
+    fetch.resolve({ ok: true, message: 'fetched in background' })
+    const [backgroundResult, userResult] = await Promise.all([background, user])
+
+    expect(backgroundResult).toEqual({ ok: true, message: 'fetched in background' })
+    expect(userResult).toEqual({ ok: true, message: 'fetched in background' })
+    expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(1)
+    expectRepoSnapshotInvalidations(
+      {
+        repoId,
+        query: 'repo-snapshot',
+      },
+      {
+        repoId: linkedRepoId,
+        query: 'repo-snapshot',
+      },
+    )
+  })
+
+  test('user sync reuses linked background sync when remote boundary resolution later canonicalizes', async () => {
+    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
+    const linkedRepoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo-linked' })
+    mocks.getRemoteRepoWriteGroupPath.mockRejectedValueOnce(new Error('remote paths unavailable'))
+    mocks.getRemoteRepoWriteGroupPath.mockResolvedValue('/srv/repo')
+    mocks.getRemoteRepoWorktreePaths.mockResolvedValue(['/srv/repo', '/srv/repo-linked'])
+    const fetch = deferred<{ ok: true; message: string }>()
+    mocks.fetchRemoteRepo.mockImplementationOnce(async () => await fetch.promise)
+
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+    const background = fetchRepo(linkedRepoId, 'background')
+    await vi.waitFor(() => {
+      expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(1)
+    })
+    const user = fetchRepo(repoId, 'user')
+
+    fetch.resolve({ ok: true, message: 'fetched in background' })
+    const [backgroundResult, userResult] = await Promise.all([background, user])
+
+    expect(backgroundResult).toEqual({ ok: true, message: 'fetched in background' })
+    expect(userResult).toEqual({ ok: true, message: 'fetched in background' })
+    expect(mocks.fetchRemoteRepo).toHaveBeenCalledTimes(1)
+    expectRepoSnapshotInvalidations(
+      {
+        repoId: linkedRepoId,
+        query: 'repo-snapshot',
+      },
+      {
+        repoId,
         query: 'repo-snapshot',
       },
     )

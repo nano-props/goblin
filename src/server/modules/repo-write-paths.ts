@@ -7,6 +7,7 @@ import {
   startRepoServerOperation,
 } from '#/server/modules/repo-operation-registry.ts'
 import {
+  resolveRepoWriteBoundaryAliases,
   resolveRepoWriteBoundaryKey,
   resolveRepoSource,
   runWithRepoSource,
@@ -45,15 +46,49 @@ const MAX_CLONE_URL_LENGTH = 4096
 const MAX_CLONE_DIR_NAME_LENGTH = 255
 const CLONE_URL_SCHEME_RE = /^(?:https?|ssh|git|file):\/\/\S+$/i
 const SCP_LIKE_CLONE_URL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+:[^\s]+$/
-const activeBackgroundFetches = new Map<
-  string,
-  {
-    promise: Promise<{ ok: boolean; message: string }>
-    operationRef: { current: RepoWriteOperationLifecycle | null }
-  }
->()
+interface ActiveBackgroundFetch {
+  promise: Promise<{ ok: boolean; message: string }>
+  operationRef: { current: RepoWriteOperationLifecycle | null }
+  keys: readonly string[]
+}
+
+const activeBackgroundFetches = new Map<string, ActiveBackgroundFetch>()
 
 type RepoExecResult = { ok: boolean; message: string }
+
+function activeBackgroundFetchFor(keys: readonly string[]): ActiveBackgroundFetch | null {
+  for (const key of keys) {
+    const active = activeBackgroundFetches.get(key)
+    if (active) return active
+  }
+  return null
+}
+
+function setActiveBackgroundFetch(active: ActiveBackgroundFetch): void {
+  for (const key of active.keys) activeBackgroundFetches.set(key, active)
+}
+
+function deleteActiveBackgroundFetch(active: ActiveBackgroundFetch): void {
+  for (const key of active.keys) {
+    if (activeBackgroundFetches.get(key) === active) activeBackgroundFetches.delete(key)
+  }
+}
+
+function registerActiveBackgroundFetch(
+  keys: readonly string[],
+  operationRef: ActiveBackgroundFetch['operationRef'],
+  run: () => Promise<{ ok: boolean; message: string }>,
+): ActiveBackgroundFetch {
+  let active!: ActiveBackgroundFetch
+  const promise = Promise.resolve()
+    .then(run)
+    .finally(() => {
+      deleteActiveBackgroundFetch(active)
+    })
+  active = { promise, operationRef, keys }
+  setActiveBackgroundFetch(active)
+  return active
+}
 
 async function probeWritableDirectory(cwd: string): Promise<ProbeAvailability> {
   try {
@@ -305,6 +340,7 @@ export async function fetchRepo(
   signal?: AbortSignal,
 ): Promise<{ ok: boolean; message: string }> {
   const backgroundFetchKey = await resolveRepoWriteBoundaryKey(cwd, signal)
+  const backgroundFetchKeys = await resolveRepoWriteBoundaryAliases(cwd, backgroundFetchKey, signal)
 
   async function runFetch(
     task: (signal: AbortSignal) => Promise<RepoMutationResult>,
@@ -333,29 +369,29 @@ export async function fetchRepo(
             async (source) => await runFetch((signal) => source.fetch(signal), context),
           )
       },
+      { boundaryKey: backgroundFetchKey },
     )
   }
 
   if (kind === 'user') {
-    const backgroundFetch = activeBackgroundFetches.get(backgroundFetchKey)
+    const backgroundFetch = activeBackgroundFetchFor(backgroundFetchKeys)
     if (backgroundFetch) {
       return await waitForResultOrCallerAbort(backgroundFetch.promise, signal, backgroundFetch.operationRef)
     }
     return await executeFetch()
   }
 
-  const existingBackgroundFetch = activeBackgroundFetches.get(backgroundFetchKey)
+  const existingBackgroundFetch = activeBackgroundFetchFor(backgroundFetchKeys)
   if (existingBackgroundFetch) {
     return await waitForResultOrCallerAbort(existingBackgroundFetch.promise, signal, existingBackgroundFetch.operationRef)
   }
   const operationRef = { current: null as RepoWriteOperationLifecycle | null }
-  const backgroundFetch = executeFetch(operationRef).finally(() => {
-    if (activeBackgroundFetches.get(backgroundFetchKey)?.promise === backgroundFetch) {
-      activeBackgroundFetches.delete(backgroundFetchKey)
-    }
-  })
-  activeBackgroundFetches.set(backgroundFetchKey, { promise: backgroundFetch, operationRef })
-  return await backgroundFetch
+  const active = registerActiveBackgroundFetch(
+    backgroundFetchKeys,
+    operationRef,
+    async () => await executeFetch(operationRef),
+  )
+  return await active.promise
 }
 
 export async function pullRepoBranch(

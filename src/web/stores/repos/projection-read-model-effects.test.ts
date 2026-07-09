@@ -17,7 +17,7 @@ beforeEach(() => {
 })
 
 describe('repo projection read-model effects', () => {
-  function acceptedProjection(branch: string | null = null): RepoRuntimeProjection {
+  function acceptedProjection(branch: string | null = null, mode: 'summary' | 'full' = 'full'): RepoRuntimeProjection {
     const loadedAt = Date.now()
     return {
       snapshot: {
@@ -27,7 +27,7 @@ describe('repo projection read-model effects', () => {
       status: [],
       pullRequests: null,
       operations: { operations: [], loadedAt },
-      requested: { branch, pullRequestMode: 'full' },
+      requested: { branch, pullRequestMode: mode },
       loadedAt,
     }
   }
@@ -202,5 +202,45 @@ describe('repo projection read-model effects', () => {
       phase: 'loading',
       loadedAt: null,
     })
+  })
+
+  test('summary projections do not update the core read model cache', () => {
+    const pruneTerminals = vi.fn(() => Promise.resolve({ pruned: 0, remaining: 0 }))
+    installGoblinTestBridge({
+      'terminal.prune': pruneTerminals,
+    })
+    const repo = seedRepoShellForTest({
+      id: '/repo',
+      repoRuntimeId: 'repo-runtime-test-2',
+      currentBranchName: 'feature/a',
+    })
+    useReposStore.setState((state) => {
+      const current = state.repos['/repo']!
+      return {
+        repos: {
+          ...state.repos,
+          '/repo': {
+            ...current,
+            dataLoads: {
+              ...current.dataLoads,
+              repoReadModel: { phase: 'loading', loadedAt: null, error: null, stale: false },
+            },
+          },
+        },
+      }
+    })
+
+    acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {
+      repoRoot: '/repo',
+      repoRuntimeId: repo.repoRuntimeId,
+      projection: acceptedProjection(null, 'summary'),
+    })
+
+    expect(useReposStore.getState().repos['/repo']?.dataLoads.repoReadModel).toMatchObject({
+      phase: 'loading',
+      loadedAt: null,
+    })
+    expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
+    expect(pruneTerminals).not.toHaveBeenCalled()
   })
 })

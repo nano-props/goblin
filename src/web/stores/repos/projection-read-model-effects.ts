@@ -75,7 +75,7 @@ export function acceptRepoProjectionReadModel(
 ): void {
   const { repoRoot, repoRuntimeId, projection } = input
   if (!authoritativeProjection(projection)) return
-  const coreReadModel = projection.requested.branch === null
+  const coreReadModel = projection.requested.branch === null && projection.requested.pullRequestMode === 'full'
   const repoBefore = get().repos[repoRoot]
   if (!repoBefore || repoBefore.repoRuntimeId !== repoRuntimeId) return
   const explicitVisibleStatusSettle = options.settleVisibleStatus === true

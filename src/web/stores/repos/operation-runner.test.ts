@@ -488,4 +488,48 @@ describe('runLatestOperation active-task cancellation', () => {
       error: null,
     })
   })
+
+  test('an AbortError caused by the scheduler signal is stale', async () => {
+    const onError = vi.fn()
+    const onStale = vi.fn()
+    const abortError = () => {
+      const err = new Error('The operation was aborted.')
+      err.name = 'AbortError'
+      return err
+    }
+    const first = runLatestOperation<string>({
+      set: useReposStore.setState,
+      get: useReposStore.getState,
+      id: REPO_ID,
+      repoRuntimeId: 'repo-runtime-test',
+      lane: 'lifecycle',
+      operationKey: 'remoteLifecycle',
+      priority: 1,
+      targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
+      task: (signal) =>
+        new Promise<string>((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(abortError()), { once: true })
+        }),
+      onError,
+      onStale,
+    })
+    await Promise.resolve()
+
+    const second = runLatestOperation<string>({
+      set: useReposStore.setState,
+      get: useReposStore.getState,
+      id: REPO_ID,
+      repoRuntimeId: 'repo-runtime-test',
+      lane: 'lifecycle',
+      operationKey: 'remoteLifecycle',
+      priority: 1,
+      targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
+      task: async () => 'fresh',
+    })
+
+    await expect(first).resolves.toBeNull()
+    await expect(second).resolves.toBe('fresh')
+    expect(onError).not.toHaveBeenCalled()
+    expect(onStale).toHaveBeenCalledTimes(1)
+  })
 })

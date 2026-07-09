@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import type { QueryClient } from '@tanstack/react-query'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
+  clearRepoProjectionFetchInvalidationVersion,
+  getRepoProjectionFetchInvalidationVersion,
   getRepoRuntimeProjectionInvalidationVersion,
   parseRepoProjectionQueryKey,
   setRepoOperationsQueryData,
@@ -40,6 +42,16 @@ export function useRepoProjectionQueryEffects(queryClient: QueryClient = primary
     }
     return queryClient.getQueryCache().subscribe((event) => {
       if (event.type === 'removed') {
+        const parsed = parseRepoProjectionQueryKey(event.query.queryKey)
+        if (parsed) {
+          clearRepoProjectionFetchInvalidationVersion(
+            parsed.repoRoot,
+            parsed.repoRuntimeId,
+            parsed.branch,
+            parsed.mode,
+            queryClient,
+          )
+        }
         versionsByQueryHash.delete(event.query.queryHash)
         return
       }
@@ -61,9 +73,17 @@ export function useRepoProjectionQueryEffects(queryClient: QueryClient = primary
       }
       if (event.action.type !== 'success') return
       const manualSuccess = event.action.manual === true
-      if (!manualSuccess && state.fetchVersion !== null) {
+      const recordedFetchVersion = getRepoProjectionFetchInvalidationVersion(
+        parsed.repoRoot,
+        parsed.repoRuntimeId,
+        parsed.branch,
+        parsed.mode,
+        queryClient,
+      )
+      const fetchVersion = recordedFetchVersion ?? state.fetchVersion
+      if (!manualSuccess && fetchVersion !== null) {
         if (
-          state.fetchVersion <
+          fetchVersion <
           getRepoRuntimeProjectionInvalidationVersion(parsed.repoRoot, parsed.repoRuntimeId, queryClient)
         ) {
           state.fetchVersion = null

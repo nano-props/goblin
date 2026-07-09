@@ -7,12 +7,13 @@ export class RepoOperationCancelledError extends Error {
   }
 }
 
-function hasErrorName(err: unknown, name: string): boolean {
-  return typeof err === 'object' && err !== null && 'name' in err && err.name === name
+function isRepoOperationCancelledReason(reason: unknown): boolean {
+  return reason instanceof RepoOperationCancelledError
 }
 
-export function isExpectedRepoOperationCancellation(err: unknown): boolean {
+export function isExpectedRepoOperationCancellation(err: unknown, operationSignal?: AbortSignal | null): boolean {
   if (err instanceof RepoOperationCancelledError) return true
   if (err instanceof CancelledError) return true
-  return hasErrorName(err, 'AbortError')
+  if (operationSignal?.aborted && isRepoOperationCancelledReason(operationSignal.reason)) return true
+  return false
 }

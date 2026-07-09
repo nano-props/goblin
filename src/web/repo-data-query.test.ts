@@ -240,7 +240,7 @@ describe('repo projection query data', () => {
     )
   })
 
-  test('invalidates runtime projection queries once per server-owned lifecycle signal', () => {
+  test('marks runtime projection queries invalidated once per server-owned lifecycle signal', () => {
     const queryClient = new QueryClient()
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries')
     const refetchQueries = vi.spyOn(queryClient, 'refetchQueries')
@@ -256,17 +256,7 @@ describe('repo projection query data', () => {
       queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-1', 'operations'],
       refetchType: 'none',
     })
-    expect(refetchQueries).toHaveBeenCalledTimes(2)
-    expect(refetchQueries).toHaveBeenNthCalledWith(
-      1,
-      { queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-1', 'projection'], type: 'active' },
-      { cancelRefetch: false },
-    )
-    expect(refetchQueries).toHaveBeenNthCalledWith(
-      2,
-      { queryKey: ['repo-data', '/tmp/repo', 'repo-runtime-1', 'operations'], type: 'active' },
-      { cancelRefetch: false },
-    )
+    expect(refetchQueries).not.toHaveBeenCalled()
     refetchQueries.mockRestore()
     invalidateQueries.mockRestore()
   })
@@ -524,15 +514,77 @@ describe('repo projection query data', () => {
       queryClient.clear()
     }
   })
+
+  test('imperative projection refresh invalidates and reruns other active runtime projections', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    const releases: Array<{
+      branch: string | null
+      mode: 'summary' | 'full'
+      resolved: boolean
+      resolve: (projection: RepoRuntimeProjection) => void
+    }> = []
+    const resolveNextProjection = (branch: string | null, mode: 'summary' | 'full', loadedAt: number) => {
+      const release = releases.find((candidate) => {
+        return !candidate.resolved && candidate.branch === branch && candidate.mode === mode
+      })
+      expect(release).toBeDefined()
+      release!.resolved = true
+      release!.resolve(repoProjectionForTest(loadedAt, branch, mode))
+    }
+    repoClientMocks.getRepoProjection.mockImplementation(
+      (_repoRoot: string, branch: string | null | undefined, options?: { mode?: 'summary' | 'full' }) =>
+        new Promise<RepoRuntimeProjection>((resolve) => {
+          releases.push({ branch: branch ?? null, mode: options?.mode ?? 'full', resolved: false, resolve })
+        }),
+    )
+    const observer = new QueryObserver(
+      queryClient,
+      repoProjectionQueryOptions('/tmp/repo', 'repo-runtime-1', null, 'summary'),
+    )
+    const unsubscribe = observer.subscribe(() => {})
+    try {
+      await vi.waitFor(() => {
+        expect(releases).toHaveLength(1)
+      })
+
+      const refresh = refreshRepoProjectionReadModel('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', {
+        queryClient,
+      })
+      await vi.waitFor(() => {
+        expect(releases.some((release) => release.branch === 'feature/a' && release.mode === 'full')).toBe(true)
+      })
+
+      resolveNextProjection(null, 'summary', 1)
+      await vi.waitFor(() => {
+        expect(releases.filter((release) => release.branch === null && release.mode === 'summary')).toHaveLength(2)
+      })
+      expect(observer.getCurrentResult().data).toBeUndefined()
+
+      resolveNextProjection('feature/a', 'full', 2)
+      await expect(refresh).resolves.toMatchObject({ loadedAt: 2 })
+
+      resolveNextProjection(null, 'summary', 3)
+      await vi.waitFor(() => {
+        expect(observer.getCurrentResult().data?.loadedAt).toBe(3)
+      })
+    } finally {
+      unsubscribe()
+      queryClient.clear()
+    }
+  })
 })
 
-function repoProjectionForTest(loadedAt: number): RepoRuntimeProjection {
+function repoProjectionForTest(
+  loadedAt: number,
+  branch: string | null = 'feature/a',
+  mode: 'summary' | 'full' = 'full',
+): RepoRuntimeProjection {
   return {
     snapshot: { branches: [], current: 'main' },
     status: [],
     pullRequests: null,
     operations: { operations: [], loadedAt },
-    requested: { branch: 'feature/a', pullRequestMode: 'full' },
+    requested: { branch, pullRequestMode: mode },
     loadedAt,
   }
 }

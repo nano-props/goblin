@@ -129,6 +129,7 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
     | { kind: 'success'; result: T; error: string | null }
 
   let outcome: Outcome
+  let operationSignal: AbortSignal | null = null
   try {
     const scheduleOptions = {
       priority: options.priority,
@@ -140,7 +141,10 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
     const result = await scheduleRepoOperation<T>(
       options.id,
       options.lane,
-      (signal) => options.task(signal, ctx),
+      (signal) => {
+        operationSignal = signal
+        return options.task(signal, ctx)
+      },
       options.queuedTimeoutMs === undefined
         ? scheduleOptions
         : {
@@ -155,7 +159,7 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
       outcome = { kind: 'success', result, error: options.errorFromResult?.(result) ?? null }
     }
   } catch (err) {
-    outcome = isExpectedRepoOperationCancellation(err)
+    outcome = isExpectedRepoOperationCancellation(err, operationSignal)
       ? { kind: 'stale' }
       : { kind: 'error', error: err instanceof Error ? err.message : String(err), original: err }
   }
