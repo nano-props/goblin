@@ -872,12 +872,13 @@ describe('RepoWorkspace', () => {
 
   test('defers stale static route replacement while active tab close is pending', async () => {
     const branchName = 'feature/close-route-race'
+    const worktreePath = '/tmp/close-route-race-worktree'
     const route = routeNavigation()
     vi.mocked(route.openRepoBranchTab).mockReturnValue(true)
     const actions = navigationWithStore(route)
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
-      branches: [createRepoBranch(branchName, { worktree: { path: '/tmp/close-route-race-worktree' } })],
+      branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
       currentBranchName: branchName,
       preferredWorkspacePaneTab: 'files',
       workspacePaneTabsByBranch: {
@@ -913,6 +914,19 @@ describe('RepoWorkspace', () => {
         </PrimaryWindowNavigationProvider>
       </QueryClientProvider>,
     )
+    const filesHistoryEntry = {
+      repoId: REPO_ID,
+      route: {
+        kind: 'branch' as const,
+        branchName,
+        workspacePaneTab: 'files' as const,
+        terminalWorktreeKey: formatTerminalWorktreeKey(REPO_ID, worktreePath),
+        terminalSessionId: null,
+      },
+    }
+    await waitFor(() => {
+      expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]?.current).toEqual(filesHistoryEntry)
+    })
 
     const closePromise = runCloseWorkspacePaneTabCommand({
       repoId: REPO_ID,
@@ -927,14 +941,15 @@ describe('RepoWorkspace', () => {
         repoRoot: REPO_ID,
         repoRuntimeId: repo.repoRuntimeId,
         branchName,
-        worktreePath: '/tmp/close-route-race-worktree',
+        worktreePath,
         tabs: [workspacePaneStaticTabEntry('status')],
       })
     })
-    await Promise.resolve()
+    await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(route.openRepoBranch).not.toHaveBeenCalled()
     expect(route.openRepoBranchTab).not.toHaveBeenCalled()
+    expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]?.current).toEqual(filesHistoryEntry)
 
     resolveCommit([workspacePaneStaticTabEntry('status')])
 

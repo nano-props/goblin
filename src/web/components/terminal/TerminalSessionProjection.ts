@@ -47,6 +47,7 @@ import type {
   TerminalSnapshot,
 } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import { terminalCreateDedupeKey } from '#/web/components/terminal/terminal-create-dedupe.ts'
 
 const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   phase: 'opening',
@@ -622,22 +623,8 @@ export class TerminalSessionProjection {
     // bail and observe the same pending promise.
     pending.flushing = true
     try {
-      // Close-drain lives here (not at the top of `createTerminal`) so
-      // `enqueueCreateRequest` puts the entry into the map first and
-      // emits the synchronous `createPending: true` snapshot.
-      await this.flushPendingClosesForWorktree(terminalWorktreeKey)
-      if (this.lifecycleQueues.getCreate(terminalWorktreeKey) !== pending) {
-        throw new Error('terminal create request canceled')
-      }
-      const geometry = this.startupGeometryHint(terminalWorktreeKey)
-      if (this.lifecycleQueues.getCreate(terminalWorktreeKey) !== pending) {
-        throw new Error('terminal create request canceled')
-      }
-      const createOptions = await this.resolveCurrentCreateOptions(terminalWorktreeKey, pending)
-      this.requireCurrentCreateRequest(terminalWorktreeKey, pending)
-      pending.resolve(
-        await this.performCreateTerminal(pending.base, geometry, terminalWorktreeKey, pending, createOptions),
-      )
+      const coordinateCreate = pending.options.createOptions.coordinateCreate ?? runTerminalCreateOperationDirectly
+      pending.resolve(await coordinateCreate(async () => await this.flushCreateRequestNow(terminalWorktreeKey, pending)))
     } catch (error) {
       pending.reject(error)
     } finally {
@@ -649,6 +636,26 @@ export class TerminalSessionProjection {
         }
       }
     }
+  }
+
+  private async flushCreateRequestNow(
+    terminalWorktreeKey: string,
+    pending: TerminalCreateQueueEntry<TerminalSessionBase, TerminalCreateQueueRequest>,
+  ): Promise<string> {
+    // Close-drain lives here (not at the top of `createTerminal`) so
+    // `enqueueCreateRequest` puts the entry into the map first and
+    // emits the synchronous `createPending: true` snapshot.
+    await this.flushPendingClosesForWorktree(terminalWorktreeKey)
+    if (this.lifecycleQueues.getCreate(terminalWorktreeKey) !== pending) {
+      throw new Error('terminal create request canceled')
+    }
+    const geometry = this.startupGeometryHint(terminalWorktreeKey)
+    if (this.lifecycleQueues.getCreate(terminalWorktreeKey) !== pending) {
+      throw new Error('terminal create request canceled')
+    }
+    const createOptions = await this.resolveCurrentCreateOptions(terminalWorktreeKey, pending)
+    this.requireCurrentCreateRequest(terminalWorktreeKey, pending)
+    return await this.performCreateTerminal(pending.base, geometry, terminalWorktreeKey, pending, createOptions)
   }
 
   private async resolveCurrentCreateOptions(
@@ -1371,11 +1378,6 @@ async function resolveTerminalCreateOptionsUntilCreateSettles(
   }
 }
 
-function terminalCreateDedupeKey(options: TerminalCreateOptions): string | null {
-  if (options.resolveStartupShellCommand) return null
-  return options.startupShellCommand ?? ''
-}
-
 function pushUniqueMapList(map: Map<string, string[]>, mapKey: string, value: string): void {
   const current = map.get(mapKey)
   if (!current) {
@@ -1398,6 +1400,10 @@ function uniqueNonEmptyStrings(values: readonly string[]): string[] {
 
 function stringArraysEqual(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && b.every((value, index) => a[index] === value)
+}
+
+async function runTerminalCreateOperationDirectly<T>(operation: () => Promise<T>): Promise<T> {
+  return await operation()
 }
 
 export interface TerminalSessionProjectionDeps {

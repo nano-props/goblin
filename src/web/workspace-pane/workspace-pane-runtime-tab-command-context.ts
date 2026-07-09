@@ -46,7 +46,7 @@ function assignTerminalRuntimeTabCommandContext(
   input: WorkspacePaneRuntimeTabCommandContextInput,
 ): void {
   context.terminal = {
-    base: selectedTerminalBase(input.repoId, input.branchName, input.workspacePaneRoute),
+    base: selectedWorkspacePaneTerminalBase(input.repoId, input.branchName, input.workspacePaneRoute),
     bridge: readTerminalSessionCommandBridge(),
     openerIdentity: captureWorkspacePaneActiveTabIdentity(input.repoId, input.branchName, {
       workspacePaneRoute: input.workspacePaneRoute,
@@ -56,7 +56,7 @@ function assignTerminalRuntimeTabCommandContext(
   }
 }
 
-function selectedTerminalBase(
+export function selectedWorkspacePaneTerminalBase(
   repoId: string,
   branchName: string,
   workspacePaneRoute: WorkspacePaneCommandRoute,

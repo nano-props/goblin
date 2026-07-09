@@ -6,7 +6,7 @@ import {
 } from '#/web/commands/terminal-create-command.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import type { TerminalCreateOptions } from '#/web/components/terminal/types.ts'
-import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import { withWorkspacePaneTerminalCreateCoordination } from '#/web/workspace-pane/workspace-pane-terminal-create-coordination.ts'
 import {
   showWorkspacePaneControllerRoute,
   type WorkspacePaneTabControllerNavigation,
@@ -32,13 +32,19 @@ export type WorkspacePaneRuntimeTabCreateStateByType = Record<WorkspacePaneRunti
 
 export interface WorkspacePaneTerminalCreateActionContext {
   base: TerminalSessionBase | null
-  createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
+  createTerminal: (
+    base: TerminalSessionBase,
+    options?: TerminalCreateOptions,
+  ) => Promise<string>
   captureOpenerIdentity: () => string | null
 }
 
 export interface CreateTerminalWorkspacePaneRuntimeTabActionOptions {
   base: TerminalSessionBase
-  createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
+  createTerminal: (
+    base: TerminalSessionBase,
+    options?: TerminalCreateOptions,
+  ) => Promise<string>
   openerIdentity: string | null
   showCreatedTerminalTab?: (terminalSessionId: string) => boolean | Promise<boolean>
   options?: TerminalCreateOptions
@@ -69,10 +75,10 @@ export function workspacePaneRuntimeTabCreateAction(
 export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
   options: CreateTerminalWorkspacePaneRuntimeTabActionOptions,
 ): Promise<TerminalCreateCommandResult> {
-  return await runWorkspacePaneTabCoordinatorTask(
-    { repoId: options.base.repoRoot, branchName: options.base.branch, worktreePath: options.base.worktreePath },
-    () => runCreateTerminalTabCommand(options),
-  )
+  return await runCreateTerminalTabCommand({
+    ...options,
+    options: withWorkspacePaneTerminalCreateCoordination(options.base, options.options),
+  })
 }
 
 export function showCreatedTerminalWorkspacePaneRuntimeTab(

@@ -8,6 +8,7 @@ import {
 
 const terminalBase: TerminalSessionBase = {
   repoRoot: '/repo',
+  repoRuntimeId: 'repo-runtime-1',
   branch: 'main',
   worktreePath: '/repo-worktree',
 }
@@ -47,15 +48,15 @@ describe('workspace pane runtime tab command actions', () => {
     expect(createTerminal).not.toHaveBeenCalled()
   })
 
-  test('terminal actions no-op while a terminal create is pending', async () => {
+  test('primary terminal action does not enqueue a plain create while the first terminal is pending', async () => {
     const createTerminal = vi.fn(async () => 'created-session')
     const showTerminalSession = vi.fn(() => true)
     const bridge: TerminalSessionCommandBridge = {
       terminalWorktreeSnapshot: () => ({
         terminalWorktreeKey: '/repo\0/repo-worktree',
         selectedDescriptor: null,
-        sessions: [terminalSession('term-111111111111111111111', true)],
-        count: 1,
+        sessions: [],
+        count: 0,
         bellCount: 0,
         outputActiveCount: 0,
         createPending: true,
@@ -74,6 +75,28 @@ describe('workspace pane runtime tab command actions', () => {
         },
       }),
     ).resolves.toBe(true)
+
+    expect(showTerminalSession).not.toHaveBeenCalled()
+    expect(createTerminal).not.toHaveBeenCalled()
+  })
+
+  test('new terminal action leaves pending create admission to the terminal provider', async () => {
+    const createTerminal = vi.fn(async () => 'created-session')
+    const showTerminalSession = vi.fn(() => true)
+    const bridge: TerminalSessionCommandBridge = {
+      terminalWorktreeSnapshot: () => ({
+        terminalWorktreeKey: '/repo\0/repo-worktree',
+        selectedDescriptor: null,
+        sessions: [],
+        count: 0,
+        bellCount: 0,
+        outputActiveCount: 0,
+        createPending: true,
+      }),
+      createTerminal,
+      selectTerminal: vi.fn(),
+    }
+
     await expect(
       runWorkspacePaneRuntimeNewAction('terminal', {
         terminal: {
@@ -85,8 +108,11 @@ describe('workspace pane runtime tab command actions', () => {
       }),
     ).resolves.toBe(true)
 
-    expect(showTerminalSession).not.toHaveBeenCalled()
-    expect(createTerminal).not.toHaveBeenCalled()
+    expect(showTerminalSession).toHaveBeenCalledWith('created-session')
+    expect(createTerminal).toHaveBeenCalledWith(
+      terminalBase,
+      expect.objectContaining({ coordinateCreate: expect.any(Function) }),
+    )
   })
 
   test('primary terminal action rejects when no bridge is available', async () => {

@@ -12,10 +12,7 @@ import {
   runTerminalPrimaryActionCommand,
 } from '#/web/commands/workspace-commands.ts'
 import { closeWorkspacePaneTabsForWorktree } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
-import {
-  setTerminalSessionCommandBridge,
-  type TerminalSessionCommandBridge,
-} from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import {
   createRepoBranch,
   installWorkspacePaneTabsTestBridge,
@@ -40,7 +37,7 @@ import {
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
+import type { TerminalCreateOptions, TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
@@ -349,7 +346,10 @@ describe('workspace commands', () => {
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: { 'feature/worktree': [staticEntry('status')] },
     })
-    const createTerminal = vi.fn(async () => 'term-111111111111111111111')
+    const createTerminal = vi.fn(async (_base: TerminalSessionBase, options?: TerminalCreateOptions) => {
+      const run = options?.coordinateCreate ?? runTestTaskDirectly
+      return await run(async () => 'term-111111111111111111111')
+    })
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => ({
         terminalWorktreeKey: WORKTREE_KEY,
@@ -383,7 +383,7 @@ describe('workspace commands', () => {
         branch: 'feature/worktree',
         worktreePath: WORKTREE_PATH,
       },
-      undefined,
+      expect.objectContaining({ coordinateCreate: expect.any(Function) }),
     )
   })
 
@@ -554,7 +554,7 @@ describe('workspace commands', () => {
         branch: 'feature/worktree',
         worktreePath: WORKTREE_PATH,
       },
-      undefined,
+      expect.objectContaining({ coordinateCreate: expect.any(Function) }),
     )
   })
 
@@ -792,7 +792,10 @@ describe('workspace commands', () => {
         'feature/worktree': [terminalEntry('term-111111111111111111111'), staticEntry('status')],
       },
     })
-    const createTerminal = vi.fn(async () => 'term-111111111111111111111')
+    const createTerminal = vi.fn(async (_base: TerminalSessionBase, options?: TerminalCreateOptions) => {
+      const run = options?.coordinateCreate ?? runTestTaskDirectly
+      return await run(async () => 'term-111111111111111111111')
+    })
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(),
       createTerminal,
@@ -917,6 +920,59 @@ describe('workspace commands', () => {
     expect(preferredWorkspacePaneTab('feature/worktree')).toBe('status')
     expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[WORKTREE_KEY]).toBe('term-222222222222222222222')
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'term-222222222222222222222')
+  })
+
+  test('new terminal tab command lets the terminal provider single-flight duplicate create intents', async () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: 'feature/worktree',
+      preferredWorkspacePaneTab: 'status',
+      workspacePaneTabsByBranch: {
+        'feature/worktree': [staticEntry('status')],
+      },
+    })
+    const firstCreate = Promise.withResolvers<string>()
+    const { createTerminal, createOperationCount } = createSingleFlightTerminalWithProjection(
+      async () => await firstCreate.promise,
+    )
+    setTerminalSessionCommandBridge({
+      terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(),
+      createTerminal,
+      selectTerminal: vi.fn(),
+    })
+    const navigation = navigationWith()
+
+    const firstCommand = runNewTerminalTabCommand({
+      workspacePaneRoute: undefined,
+      repoId: REPO_ID,
+      branchName: 'feature/worktree',
+      navigation,
+    })
+    await vi.waitFor(() => expect(createTerminal).toHaveBeenCalledTimes(1))
+
+    let duplicateSettled = false
+    const duplicateCommand = runNewTerminalTabCommand({
+      workspacePaneRoute: undefined,
+      repoId: REPO_ID,
+      branchName: 'feature/worktree',
+      navigation,
+    }).then((result) => {
+      duplicateSettled = true
+      return result
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(duplicateSettled).toBe(false)
+    expect(createTerminal).toHaveBeenCalledTimes(2)
+    expect(createOperationCount()).toBe(1)
+
+    firstCreate.resolve('term-222222222222222222222')
+    await expect(firstCommand).resolves.toBe(true)
+    await expect(duplicateCommand).resolves.toBe(true)
+    expect(createTerminal).toHaveBeenCalledTimes(2)
+    expect(createOperationCount()).toBe(1)
+    expect(tabsFor('feature/worktree')).toEqual([staticEntry('status'), terminalEntry('term-222222222222222222222')])
   })
 
   test('new terminal tab command does not navigate when the server rejects a stale repo runtime', async () => {
@@ -1829,7 +1885,14 @@ describe('workspace commands', () => {
         })
       },
     })
-    const createTerminal = vi.fn(async () => 'term-111111111111111111111')
+    let terminalCreateOperationRan = false
+    const createTerminal = vi.fn(async (_base: TerminalSessionBase, options?: TerminalCreateOptions) => {
+      const run = options?.coordinateCreate ?? runTestTaskDirectly
+      return await run(async () => {
+        terminalCreateOperationRan = true
+        return 'term-111111111111111111111'
+      })
+    })
     const showRepoBranchTerminalSession = vi.fn(() => true)
     const navigation = navigationWith({ showRepoBranchTerminalSession })
     setTerminalSessionCommandBridge({
@@ -1859,13 +1922,15 @@ describe('workspace commands', () => {
     })
     await Promise.resolve()
     expect(terminalSettled).toBe(false)
-    expect(createTerminal).not.toHaveBeenCalled()
+    expect(createTerminal).toHaveBeenCalledOnce()
+    expect(terminalCreateOperationRan).toBe(false)
 
     resolveCommit([staticEntry('status')])
 
     await expect(closePromise).resolves.toBe(true)
     await expect(terminalPromise).resolves.toBe(true)
     expect(createTerminal).toHaveBeenCalledOnce()
+    expect(terminalCreateOperationRan).toBe(true)
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
       REPO_ID,
       'feature/worktree',
@@ -2633,26 +2698,56 @@ function repoRuntimeIdForTest(repoId = REPO_ID): string {
 }
 
 function createTerminalWithProjection(resolveSessionId: () => string | Promise<string>) {
-  return vi.fn(async (base: TerminalSessionBase) => {
-    const terminalSessionId = await resolveSessionId()
-    const currentTabs = readWorkspacePaneTabsForTarget({
-      repoRoot: base.repoRoot,
-      repoRuntimeId: base.repoRuntimeId!,
-      branchName: base.branch,
-      worktreePath: base.worktreePath,
+  return vi.fn(async (base: TerminalSessionBase, options?: TerminalCreateOptions) => {
+    const run = options?.coordinateCreate ?? runTestTaskDirectly
+    return await run(async () => {
+      const terminalSessionId = await resolveSessionId()
+      recordCreatedTerminalInProjection(base, terminalSessionId)
+      return terminalSessionId
     })
-    setWorkspacePaneTabsForTargetQueryData({
-      repoRoot: base.repoRoot,
-      repoRuntimeId: base.repoRuntimeId!,
-      branchName: base.branch,
-      worktreePath: base.worktreePath,
-      tabs: [...currentTabs, terminalEntry(terminalSessionId)],
-    })
-    useReposStore
-      .getState()
-      .setSelectedTerminal(formatTerminalWorktreeKey(base.repoRoot, base.worktreePath), terminalSessionId)
-    return terminalSessionId
   })
+}
+
+function createSingleFlightTerminalWithProjection(resolveSessionId: () => string | Promise<string>) {
+  let pending: Promise<string> | null = null
+  let createOperationCount = 0
+  const createTerminal = vi.fn((base: TerminalSessionBase, options?: TerminalCreateOptions) => {
+    if (pending) return pending
+    const run = options?.coordinateCreate ?? runTestTaskDirectly
+    pending = run(async () => {
+      createOperationCount += 1
+      const terminalSessionId = await resolveSessionId()
+      recordCreatedTerminalInProjection(base, terminalSessionId)
+      return terminalSessionId
+    }).finally(() => {
+      pending = null
+    })
+    return pending
+  })
+  return { createTerminal, createOperationCount: () => createOperationCount }
+}
+
+function recordCreatedTerminalInProjection(base: TerminalSessionBase, terminalSessionId: string): void {
+  const currentTabs = readWorkspacePaneTabsForTarget({
+    repoRoot: base.repoRoot,
+    repoRuntimeId: base.repoRuntimeId!,
+    branchName: base.branch,
+    worktreePath: base.worktreePath,
+  })
+  setWorkspacePaneTabsForTargetQueryData({
+    repoRoot: base.repoRoot,
+    repoRuntimeId: base.repoRuntimeId!,
+    branchName: base.branch,
+    worktreePath: base.worktreePath,
+    tabs: [...currentTabs, terminalEntry(terminalSessionId)],
+  })
+  useReposStore
+    .getState()
+    .setSelectedTerminal(formatTerminalWorktreeKey(base.repoRoot, base.worktreePath), terminalSessionId)
+}
+
+async function runTestTaskDirectly<T>(task: () => Promise<T>): Promise<T> {
+  return await task()
 }
 
 function staticEntry(type: WorkspacePaneStaticTabType) {

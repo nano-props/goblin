@@ -8,7 +8,7 @@ import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspacePaneTabControllerNavigation } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { showWorkspacePaneControllerRoute } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
-import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import { withWorkspacePaneTerminalCreateCoordination } from '#/web/workspace-pane/workspace-pane-terminal-create-coordination.ts'
 
 export interface WorkspacePaneRuntimeTabCommandContext {
   terminal?: {
@@ -26,6 +26,11 @@ export interface WorkspacePaneTerminalRuntimeCommandOptions {
   workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
   navigation: WorkspacePaneTabControllerNavigation
   t?: TerminalCreateTranslator
+}
+
+type ResolvedWorkspacePaneTerminalRuntimeCommandOptions = WorkspacePaneTerminalRuntimeCommandOptions & {
+  repoId: string
+  branchName: string
 }
 
 interface WorkspacePaneRuntimeTabCommandActions {
@@ -47,10 +52,7 @@ export async function dispatchTerminalRuntimePrimaryAction(
   options: WorkspacePaneTerminalRuntimeCommandOptions,
 ): Promise<boolean> {
   if (!options.repoId || !options.branchName) return false
-  return await runWorkspacePaneTabCoordinatorTask(
-    { repoId: options.repoId, branchName: options.branchName },
-    () => terminalRuntimePrimaryAction(options),
-  )
+  return await terminalRuntimePrimaryAction(options)
 }
 
 async function terminalRuntimePrimaryAction({
@@ -76,31 +78,26 @@ async function terminalRuntimePrimaryAction({
 export async function dispatchNewTerminalRuntimeTabAction(
   options: WorkspacePaneTerminalRuntimeCommandOptions,
 ): Promise<boolean> {
-  if (!options.repoId || !options.branchName) return false
-  return await runWorkspacePaneTabCoordinatorTask(
-    { repoId: options.repoId, branchName: options.branchName },
-    () => newTerminalRuntimeTabAction(options),
-  )
+  const { repoId, branchName } = options
+  if (!repoId || !branchName) return false
+  const context = newTerminalRuntimeTabActionContext({ ...options, repoId, branchName })
+  return await runWorkspacePaneRuntimeNewAction('terminal', context)
 }
 
-async function newTerminalRuntimeTabAction({
+function newTerminalRuntimeTabActionContext({
   repoId,
   branchName,
   workspacePaneRoute,
   navigation,
   t,
-}: WorkspacePaneTerminalRuntimeCommandOptions): Promise<boolean> {
-  if (!repoId || !branchName) return false
-  return await runWorkspacePaneRuntimeNewAction(
-    'terminal',
-    workspacePaneRuntimeTabCommandContext({
-      repoId,
-      branchName,
-      workspacePaneRoute,
-      showRuntimeTab: (type, sessionId) => showTerminalRuntimeTab(type, sessionId, repoId, branchName, navigation),
-      terminalCreateTranslator: t,
-    }),
-  )
+}: ResolvedWorkspacePaneTerminalRuntimeCommandOptions): WorkspacePaneRuntimeTabCommandContext {
+  return workspacePaneRuntimeTabCommandContext({
+    repoId,
+    branchName,
+    workspacePaneRoute,
+    showRuntimeTab: (type, sessionId) => showTerminalRuntimeTab(type, sessionId, repoId, branchName, navigation),
+    terminalCreateTranslator: t,
+  })
 }
 
 export async function runWorkspacePaneRuntimePrimaryAction(
@@ -133,19 +130,18 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
   if (!terminal?.base) return false
   if (!terminal.bridge) return false
   const terminalWorktreeKey = formatTerminalWorktreeKey(terminal.base.repoRoot, terminal.base.worktreePath)
-  // Synchronous local-state read (no network round trip), so there's no
-  // responsiveness cost to deciding before switching views.
   const worktree = terminal.bridge.terminalWorktreeSnapshot(terminalWorktreeKey)
-  if (worktree.createPending) return true
   if (worktree.count > 0) {
     // The primary action should land on a working runtime session when one
     // already exists instead of leaving selection wherever it previously was.
     const firstSession = worktree.sessions[0]
     return firstSession ? await terminal.showTerminalSession(firstSession.terminalSessionId) : false
   }
+  if (worktree.createPending) return true
   const result = await runCreateTerminalTabCommand({
     base: terminal.base,
     createTerminal: terminal.bridge.createTerminal,
+    options: withWorkspacePaneTerminalCreateCoordination(terminal.base),
     openerIdentity: terminal.openerIdentity,
     showCreatedTerminalTab: terminal.showTerminalSession,
     t: terminal.t,
@@ -158,11 +154,10 @@ async function runNewTerminalAction(context: WorkspacePaneRuntimeTabCommandConte
   const terminal = context.terminal
   if (!terminal?.base) return false
   if (!terminal.bridge) return false
-  const terminalWorktreeKey = formatTerminalWorktreeKey(terminal.base.repoRoot, terminal.base.worktreePath)
-  if (terminal.bridge.terminalWorktreeSnapshot(terminalWorktreeKey).createPending) return true
   const result = await runCreateTerminalTabCommand({
     base: terminal.base,
     createTerminal: terminal.bridge.createTerminal,
+    options: withWorkspacePaneTerminalCreateCoordination(terminal.base),
     openerIdentity: terminal.openerIdentity,
     showCreatedTerminalTab: terminal.showTerminalSession,
     t: terminal.t,

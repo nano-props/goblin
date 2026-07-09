@@ -1,16 +1,13 @@
 import { terminalLog } from '#/web/logger.ts'
 import type { TerminalCreateOptions } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
-import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import {
   showTerminalCreateErrorToast,
   terminalCreateErrorKey,
   type TerminalCreateTranslator,
 } from '#/web/components/terminal/terminal-create-feedback.ts'
-import { readTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
-
 export type TerminalCreateCommandResult =
   { ok: true; terminalSessionId: string } | { ok: false; error: unknown; messageKey: string }
 
@@ -18,7 +15,10 @@ const TERMINAL_CREATE_CANCELED_MESSAGE = 'terminal create request canceled'
 
 export async function runCreateTerminalTabCommand(input: {
   base: TerminalSessionBase
-  createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
+  createTerminal: (
+    base: TerminalSessionBase,
+    options?: TerminalCreateOptions,
+  ) => Promise<string>
   /**
    * The tab this creation should be attributed to (used for close-back focus
    * via the workspace pane tab opener tracker). Captured by the caller at
@@ -43,32 +43,10 @@ export async function runCreateTerminalTabCommand(input: {
   if (!input.base.repoRuntimeId) {
     return { ok: false, error: new Error('repo runtime unavailable'), messageKey: 'error.terminal-create-failed' }
   }
-  if (terminalCreatePending(input.base)) {
-    return {
-      ok: false,
-      error: new Error('terminal create already pending'),
-      messageKey: 'error.terminal-create-failed',
-    }
-  }
   try {
     const terminalSessionId = await input.createTerminal(input.base, input.options)
-    if (input.openerIdentity) {
-      recordWorkspacePaneTabOpener(
-        input.base.repoRoot,
-        input.base.branch,
-        terminalWorkspacePaneTabProvider.identity(terminalSessionId),
-        input.openerIdentity,
-      )
-    }
-    const navigationAccepted = input.showCreatedTerminalTab ? await input.showCreatedTerminalTab(terminalSessionId) : true
-    if (!navigationAccepted) {
-      return {
-        ok: false,
-        error: new Error('workspace pane navigation rejected'),
-        messageKey: 'error.terminal-create-failed',
-      }
-    }
-    return { ok: true, terminalSessionId }
+    const runAfterCreate = input.options?.coordinateCreate ?? runTerminalCreateCommandStepDirectly
+    return await runAfterCreate(async () => finishCreateTerminalTabCommand(input, terminalSessionId))
   } catch (error) {
     if (isTerminalCreateCanceled(error)) {
       return { ok: false, error, messageKey: 'error.terminal-create-failed' }
@@ -79,11 +57,35 @@ export async function runCreateTerminalTabCommand(input: {
   }
 }
 
-function terminalCreatePending(base: TerminalSessionBase): boolean {
-  const bridge = readTerminalSessionCommandBridge()
-  if (!bridge) return false
-  const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
-  return bridge.terminalWorktreeSnapshot(terminalWorktreeKey).createPending
+async function finishCreateTerminalTabCommand(
+  input: {
+    base: TerminalSessionBase
+    openerIdentity: string | null
+    showCreatedTerminalTab?: (terminalSessionId: string) => boolean | Promise<boolean>
+  },
+  terminalSessionId: string,
+): Promise<TerminalCreateCommandResult> {
+  if (input.openerIdentity) {
+    recordWorkspacePaneTabOpener(
+      input.base.repoRoot,
+      input.base.branch,
+      terminalWorkspacePaneTabProvider.identity(terminalSessionId),
+      input.openerIdentity,
+    )
+  }
+  const navigationAccepted = input.showCreatedTerminalTab ? await input.showCreatedTerminalTab(terminalSessionId) : true
+  if (!navigationAccepted) {
+    return {
+      ok: false,
+      error: new Error('workspace pane navigation rejected'),
+      messageKey: 'error.terminal-create-failed',
+    }
+  }
+  return { ok: true, terminalSessionId }
+}
+
+async function runTerminalCreateCommandStepDirectly<T>(operation: () => Promise<T>): Promise<T> {
+  return await operation()
 }
 
 function isTerminalCreateCanceled(error: unknown): boolean {

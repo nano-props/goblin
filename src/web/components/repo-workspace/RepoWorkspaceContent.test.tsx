@@ -1050,6 +1050,7 @@ describe('RepoWorkspaceContent', () => {
       {
         resolveStartupShellCommand: expect.any(Function),
         insertAfterIdentity: 'workspace-pane:files',
+        coordinateCreate: expect.any(Function),
       },
     )
     expect(resolvedStartupShellCommand).toBe(

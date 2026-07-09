@@ -324,6 +324,26 @@ describe('TerminalSessionProjection create flow', () => {
     })
   })
 
+  test('marks create pending while a caller-supplied create coordinator has not run the task yet', async () => {
+    const releaseCreate = Promise.withResolvers<void>()
+    const create = projection.createTerminal(terminalBase(), {
+      coordinateCreate: async (task) => {
+        await releaseCreate.promise
+        return await task()
+      },
+    })
+
+    await vi.waitFor(() => {
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
+    })
+    expect(mocks.createMock).not.toHaveBeenCalled()
+
+    releaseCreate.resolve()
+    await expect(create).resolves.toBe('term-111111111111111111111')
+    expect(mocks.createMock).toHaveBeenCalledTimes(1)
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
+  })
+
   test('closeTerminalsForWorktree cancels create while async startup shell command is resolving', async () => {
     const startupCommand = Promise.withResolvers<string>()
     const create = projection.createTerminal(terminalBase(), {

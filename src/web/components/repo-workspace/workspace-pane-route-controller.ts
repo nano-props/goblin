@@ -48,6 +48,14 @@ export function useWorkspacePaneRouteController({
     () => (enabled ? reconcileWorkspacePaneRoute(route, model) : { kind: 'none' as const }),
     [enabled, route, model],
   )
+  const historyReconciliation = workspacePaneRouteControllerHistoryReconciliation({
+    enabled,
+    repoId,
+    branchName,
+    worktreePath,
+    route,
+    reconciliation,
+  })
 
   useWorkspacePaneNavigationHistory({
     enabled,
@@ -55,7 +63,7 @@ export function useWorkspacePaneRouteController({
     branchName,
     worktreePath,
     route,
-    reconciliation,
+    reconciliation: historyReconciliation,
   })
   useSyncRoutedWorkspacePaneSelection({
     enabled,
@@ -77,6 +85,29 @@ export function useWorkspacePaneRouteController({
   })
 
   return reconciliation
+}
+
+function workspacePaneRouteControllerHistoryReconciliation(input: {
+  enabled: boolean
+  repoId: string
+  branchName: string | null
+  worktreePath: string | null
+  route: RepoBranchWorkspacePaneRoute | null
+  reconciliation: WorkspacePaneRouteReconciliation
+}): WorkspacePaneRouteReconciliation {
+  if (!input.enabled) return input.reconciliation
+  if (
+    workspacePaneTabControllerReconciliationDeferred({
+      repoId: input.repoId,
+      branchName: input.branchName,
+      worktreePath: input.worktreePath,
+      route: input.route,
+      reconciliation: input.reconciliation,
+    })
+  ) {
+    return { kind: 'pending' }
+  }
+  return input.reconciliation
 }
 
 function useReconcileWorkspacePaneRoute({

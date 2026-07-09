@@ -143,6 +143,12 @@ export interface TerminalCreateOptions {
    * different positions are still the same session shape.
    */
   insertAfterIdentity?: string | null
+  /**
+   * Optional caller scheduling policy for the create side effects. Terminal
+   * still owns admission/lifecycle; callers use this to serialize the actual
+   * create work with adjacent UI/domain mutations when needed.
+   */
+  coordinateCreate?: <T>(task: () => Promise<T>) => Promise<T>
 }
 
 export interface TerminalRepoSnapshot {
