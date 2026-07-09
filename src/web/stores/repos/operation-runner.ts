@@ -25,7 +25,7 @@ interface RepoOperationContext {
   setPhase: (phase: 'queued' | 'running') => void
 }
 
-interface RepoOperationBaseOptions<T> {
+interface RepoOperationBaseFields<T> {
   set: ReposSet
   get: ReposGet
   id: string
@@ -35,8 +35,6 @@ interface RepoOperationBaseOptions<T> {
   targets: [RepoOperationTarget, ...RepoOperationTarget[]]
   task: (signal: AbortSignal, ctx: RepoOperationContext) => Promise<T>
   operationKey?: string
-  queuedTimeoutMs?: number
-  queuedTimeoutMessage?: string
   errorFromResult?: (result: T) => string | null
   errorResult?: (message: string) => T
   onResult?: (result: T, ctx: RepoOperationContext) => void | Promise<void>
@@ -45,9 +43,15 @@ interface RepoOperationBaseOptions<T> {
   rethrow?: boolean
 }
 
+type RepoOperationBaseOptions<T> = RepoOperationBaseFields<T> &
+  (
+    | { queuedTimeoutMs?: undefined; queuedTimeoutMessage?: undefined }
+    | { queuedTimeoutMs: number; queuedTimeoutMessage: string }
+  )
+
 type RunLatestOperationOptions<T> = RepoOperationBaseOptions<T>
 
-interface RunExclusiveOperationOptions<T> extends RepoOperationBaseOptions<T> {
+type RunExclusiveOperationOptions<T> = RepoOperationBaseOptions<T> & {
   canStart?: (repo: RepoState) => boolean
   busyResult?: T
 }
@@ -126,15 +130,25 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
 
   let outcome: Outcome
   try {
-    const result = await scheduleRepoOperation(options.id, options.lane, (signal) => options.task(signal, ctx), {
+    const scheduleOptions = {
       priority: options.priority,
       replaceQueuedKey:
         options.policy === 'latest-wins' ? `${options.lane}:${options.operationKey ?? primary.key}` : undefined,
-      queuedTimeoutMs: options.queuedTimeoutMs,
-      queuedTimeoutMessage: options.queuedTimeoutMessage,
       onQueued: () => markOperationState(options, repoRuntimeId, operationId, 'queued'),
-      onStart: (wasQueued) => markOperationState(options, repoRuntimeId, operationId, 'running', wasQueued),
-    })
+      onStart: (wasQueued: boolean) => markOperationState(options, repoRuntimeId, operationId, 'running', wasQueued),
+    }
+    const result = await scheduleRepoOperation<T>(
+      options.id,
+      options.lane,
+      (signal) => options.task(signal, ctx),
+      options.queuedTimeoutMs === undefined
+        ? scheduleOptions
+        : {
+            ...scheduleOptions,
+            queuedTimeoutMs: options.queuedTimeoutMs,
+            queuedTimeoutMessage: options.queuedTimeoutMessage,
+          },
+    )
     if (!ctx.isCurrent()) {
       outcome = { kind: 'stale' }
     } else {

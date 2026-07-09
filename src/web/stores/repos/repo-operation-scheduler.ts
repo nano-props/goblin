@@ -23,15 +23,19 @@ interface QueuedRepoOperation<T> {
   reject: (reason: unknown) => void
 }
 
-interface RepoOperationLaneOptions {
+interface RepoOperationLaneBaseOptions {
   priority?: number
   // Includes the lane namespace because runRepoOperation builds it from lane + operationKey.
   replaceQueuedKey?: string
-  queuedTimeoutMs?: number
-  queuedTimeoutMessage?: string
   onQueued?: () => void
   onStart?: (wasQueued: boolean) => void
 }
+
+type RepoOperationLaneOptions = RepoOperationLaneBaseOptions &
+  (
+    | { queuedTimeoutMs?: undefined; queuedTimeoutMessage?: undefined }
+    | { queuedTimeoutMs: number; queuedTimeoutMessage: string }
+  )
 
 function rejectQueuedTask(task: QueuedRepoOperation<unknown>, reason: unknown): void {
   queueMicrotask(() => {
@@ -80,13 +84,11 @@ class RepoOperationLaneQueue {
       else {
         options?.onQueued?.()
         if (options?.queuedTimeoutMs !== undefined) {
+          const timeoutMessage = options.queuedTimeoutMessage
           queuedTask.timeout = globalThis.setTimeout(() => {
             if (this.removeQueued(queuedTask as QueuedRepoOperation<unknown>)) {
-              queuedTask.ctrl.abort(options.queuedTimeoutMessage)
-              rejectQueuedTask(
-                queuedTask as QueuedRepoOperation<unknown>,
-                new Error(options.queuedTimeoutMessage ?? 'cancelled'),
-              )
+              queuedTask.ctrl.abort(timeoutMessage)
+              rejectQueuedTask(queuedTask as QueuedRepoOperation<unknown>, new Error(timeoutMessage))
             }
           }, options.queuedTimeoutMs)
         }
