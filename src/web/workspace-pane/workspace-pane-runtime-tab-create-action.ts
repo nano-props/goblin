@@ -1,8 +1,16 @@
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
-import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
+import {
+  runCreateTerminalTabCommand,
+  type TerminalCreateCommandResult,
+} from '#/web/commands/terminal-create-command.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import type { TerminalCreateOptions } from '#/web/components/terminal/types.ts'
+import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import {
+  showWorkspacePaneControllerRoute,
+  type WorkspacePaneTabControllerNavigation,
+} from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 
 export interface WorkspacePaneRuntimeTabCreateAction {
   label: string
@@ -28,6 +36,16 @@ export interface WorkspacePaneTerminalCreateActionContext {
   captureOpenerIdentity: () => string | null
 }
 
+export interface CreateTerminalWorkspacePaneRuntimeTabActionOptions {
+  base: TerminalSessionBase
+  createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
+  openerIdentity: string | null
+  showCreatedTerminalTab?: (terminalSessionId: string) => boolean | Promise<boolean>
+  options?: TerminalCreateOptions
+  t?: TerminalCreateTranslator
+  logMessage?: string
+}
+
 interface WorkspacePaneRuntimeTabCreateActionResolver {
   resolve: (context: WorkspacePaneRuntimeTabCreateActionContext) => WorkspacePaneRuntimeTabCreateAction | null
 }
@@ -48,6 +66,28 @@ export function workspacePaneRuntimeTabCreateAction(
   return WORKSPACE_PANE_RUNTIME_TAB_CREATE_ACTION_RESOLVERS_BY_TYPE[type].resolve(context)
 }
 
+export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
+  options: CreateTerminalWorkspacePaneRuntimeTabActionOptions,
+): Promise<TerminalCreateCommandResult> {
+  return await runWorkspacePaneTabCoordinatorTask(
+    { repoId: options.base.repoRoot, branchName: options.base.branch, worktreePath: options.base.worktreePath },
+    () => runCreateTerminalTabCommand(options),
+  )
+}
+
+export function showCreatedTerminalWorkspacePaneRuntimeTab(
+  base: TerminalSessionBase,
+  terminalSessionId: string,
+  navigation: WorkspacePaneTabControllerNavigation,
+): boolean {
+  return showWorkspacePaneControllerRoute(
+    base.repoRoot,
+    base.branch,
+    { kind: 'terminal', terminalSessionId },
+    navigation,
+  )
+}
+
 function terminalRuntimeTabCreateAction(
   context: WorkspacePaneRuntimeTabCreateActionContext,
 ): WorkspacePaneRuntimeTabCreateAction | null {
@@ -61,7 +101,7 @@ function terminalRuntimeTabCreateAction(
     onCreate: () => {
       // "+" is a generic entry; opener only drives close-back focus, not insertion.
       const openerIdentity = terminal.captureOpenerIdentity()
-      void runCreateTerminalTabCommand({
+      void dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
         base,
         createTerminal: terminal.createTerminal,
         openerIdentity,

@@ -4,6 +4,11 @@ import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspacePaneTabControllerNavigation } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { showWorkspacePaneControllerRoute } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
+import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 
 export interface WorkspacePaneRuntimeTabCommandContext {
   terminal?: {
@@ -13,6 +18,14 @@ export interface WorkspacePaneRuntimeTabCommandContext {
     showTerminalSession: (terminalSessionId: string) => boolean | Promise<boolean>
     t?: TerminalCreateTranslator
   }
+}
+
+export interface WorkspacePaneTerminalRuntimeCommandOptions {
+  repoId: string | null
+  branchName: string | null
+  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
+  navigation: WorkspacePaneTabControllerNavigation
+  t?: TerminalCreateTranslator
 }
 
 interface WorkspacePaneRuntimeTabCommandActions {
@@ -30,6 +43,66 @@ const WORKSPACE_PANE_RUNTIME_TAB_COMMAND_ACTIONS_BY_TYPE: Record<
   },
 }
 
+export async function dispatchTerminalRuntimePrimaryAction(
+  options: WorkspacePaneTerminalRuntimeCommandOptions,
+): Promise<boolean> {
+  if (!options.repoId || !options.branchName) return false
+  return await runWorkspacePaneTabCoordinatorTask(
+    { repoId: options.repoId, branchName: options.branchName },
+    () => terminalRuntimePrimaryAction(options),
+  )
+}
+
+async function terminalRuntimePrimaryAction({
+  repoId,
+  branchName,
+  workspacePaneRoute,
+  navigation,
+  t,
+}: WorkspacePaneTerminalRuntimeCommandOptions): Promise<boolean> {
+  if (!repoId || !branchName) return false
+  return await runWorkspacePaneRuntimePrimaryAction(
+    'terminal',
+    workspacePaneRuntimeTabCommandContext({
+      repoId,
+      branchName,
+      workspacePaneRoute,
+      showRuntimeTab: (type, sessionId) => showTerminalRuntimeTab(type, sessionId, repoId, branchName, navigation),
+      terminalCreateTranslator: t,
+    }),
+  )
+}
+
+export async function dispatchNewTerminalRuntimeTabAction(
+  options: WorkspacePaneTerminalRuntimeCommandOptions,
+): Promise<boolean> {
+  if (!options.repoId || !options.branchName) return false
+  return await runWorkspacePaneTabCoordinatorTask(
+    { repoId: options.repoId, branchName: options.branchName },
+    () => newTerminalRuntimeTabAction(options),
+  )
+}
+
+async function newTerminalRuntimeTabAction({
+  repoId,
+  branchName,
+  workspacePaneRoute,
+  navigation,
+  t,
+}: WorkspacePaneTerminalRuntimeCommandOptions): Promise<boolean> {
+  if (!repoId || !branchName) return false
+  return await runWorkspacePaneRuntimeNewAction(
+    'terminal',
+    workspacePaneRuntimeTabCommandContext({
+      repoId,
+      branchName,
+      workspacePaneRoute,
+      showRuntimeTab: (type, sessionId) => showTerminalRuntimeTab(type, sessionId, repoId, branchName, navigation),
+      terminalCreateTranslator: t,
+    }),
+  )
+}
+
 export async function runWorkspacePaneRuntimePrimaryAction(
   type: WorkspacePaneRuntimeTabType,
   context: WorkspacePaneRuntimeTabCommandContext,
@@ -42,6 +115,17 @@ export async function runWorkspacePaneRuntimeNewAction(
   context: WorkspacePaneRuntimeTabCommandContext,
 ): Promise<boolean> {
   return await WORKSPACE_PANE_RUNTIME_TAB_COMMAND_ACTIONS_BY_TYPE[type].createNew(context)
+}
+
+function showTerminalRuntimeTab(
+  type: WorkspacePaneRuntimeTabType,
+  sessionId: string,
+  repoId: string,
+  branchName: string,
+  navigation: WorkspacePaneTabControllerNavigation,
+): boolean {
+  if (type !== 'terminal') return false
+  return showWorkspacePaneControllerRoute(repoId, branchName, { kind: 'terminal', terminalSessionId: sessionId }, navigation)
 }
 
 async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandContext): Promise<boolean> {

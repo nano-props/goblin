@@ -10,7 +10,7 @@ import {
 } from '#/web/hooks/branch-action-state.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePaneBranchTabType, WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
+import { dispatchOpenWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 export interface BranchActionItem {
   id: BranchActionItemId
@@ -65,7 +65,7 @@ export function useBranchActionItems(
     return t(loadingKey)
   }
   const openStaticWorkspacePaneTab = (type: WorkspacePaneBranchTabType | WorkspacePaneStaticTabType) => {
-    void openWorkspacePaneTab({
+    void dispatchOpenWorkspacePaneStaticTabAction({
       repoId: repo.id,
       branchName: branch.name,
       worktreePath: branch.worktree?.path,

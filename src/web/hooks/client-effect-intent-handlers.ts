@@ -31,6 +31,7 @@ import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { getRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
+import { dispatchShowWorkspacePaneTerminalRouteAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 
 interface TerminalBellIntentDeps {
   navigation: PrimaryWindowNavigationActions
@@ -72,7 +73,12 @@ export function handleTerminalBellClickIntent(
   deps.closeAllOverlays()
   switch (plan.kind) {
     case 'show-worktree-terminal':
-      deps.navigation.showRepoBranchTerminalSession(plan.repoId, plan.branch, plan.terminalSessionId)
+      void dispatchShowWorkspacePaneTerminalRouteAction({
+        repoId: plan.repoId,
+        branchName: plan.branch,
+        terminalSessionId: plan.terminalSessionId,
+        navigation: deps.navigation,
+      })
       return
   }
 }

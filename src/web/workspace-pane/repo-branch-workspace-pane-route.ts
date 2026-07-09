@@ -51,7 +51,7 @@ export function resolveRepoBranchWorkspacePaneRoute(
     branchName: target.branchName,
     worktreePath: target.worktreePath,
     preferredTab: preferredWorkspacePaneTabForTarget(repo.ui, target),
-    allowPreferredTabFallback: false,
+    allowPreferredTabFallback: true,
     tabEntries: tabEntriesProjection.tabs,
     tabEntriesProjectionPhase: tabEntriesProjection.phase,
     runtimeTabViews: runtimeProjection.runtimeTabViews,

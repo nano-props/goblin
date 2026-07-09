@@ -1,7 +1,10 @@
 import { useCallback, type ReactNode } from 'react'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
-import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
+import {
+  dispatchCreateTerminalWorkspacePaneRuntimeTabAction,
+  showCreatedTerminalWorkspacePaneRuntimeTab,
+} from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import { TerminalSessionView } from '#/web/components/terminal/TerminalSessionView.tsx'
 import { useTerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
@@ -70,12 +73,12 @@ function TerminalWorkspacePaneRuntimeTabPanel({
   const navigation = usePrimaryWindowNavigation()
   const createTerminalForSlot = useCallback(
     async (base: TerminalSessionBase) => {
-      await runCreateTerminalTabCommand({
+      await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
         base,
         createTerminal,
         openerIdentity: null,
         showCreatedTerminalTab: (terminalSessionId) =>
-          navigation.showRepoBranchTerminalSession(base.repoRoot, base.branch, terminalSessionId),
+          showCreatedTerminalWorkspacePaneRuntimeTab(base, terminalSessionId, navigation),
         t,
         logMessage: 'workspace pane terminal create failed',
       })

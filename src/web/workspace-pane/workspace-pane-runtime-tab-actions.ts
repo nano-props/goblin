@@ -21,6 +21,16 @@ const WORKSPACE_PANE_RUNTIME_TAB_ACTIONS_BY_TYPE: Record<WorkspacePaneRuntimeTab
     },
   }
 
+export function dispatchWorkspacePaneRuntimeTabPrimaryAction(
+  view: WorkspacePaneRuntimeTabSummary,
+  context: WorkspacePaneRuntimeTabActionContext,
+  options: { reselect?: boolean } = {},
+): boolean {
+  return options.reselect
+    ? reselectWorkspacePaneRuntimeTab(view, context)
+    : selectWorkspacePaneRuntimeTab(view, context)
+}
+
 export function selectWorkspacePaneRuntimeTab(
   view: WorkspacePaneRuntimeTabSummary,
   context: WorkspacePaneRuntimeTabActionContext,

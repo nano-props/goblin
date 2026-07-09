@@ -20,6 +20,7 @@ import {
   closeWorkspacePaneRuntimeTabsForWorktree,
   confirmWorkspacePaneRuntimeTabClose,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
+import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 
 interface CloseWorkspacePaneTabsForWorktreeOptions {
   repoId: string
@@ -79,7 +80,16 @@ export function beginWorkspacePaneTabClose(
   }
 }
 
-export async function closeWorkspacePaneTabsForWorktree({
+export async function closeWorkspacePaneTabsForWorktree(
+  options: CloseWorkspacePaneTabsForWorktreeOptions,
+): Promise<boolean> {
+  return await runWorkspacePaneTabCoordinatorTask(
+    { repoId: options.repoId, branchName: options.branchName, worktreePath: options.worktreePath },
+    () => closeWorkspacePaneTabsForWorktreeInQueue(options),
+  )
+}
+
+async function closeWorkspacePaneTabsForWorktreeInQueue({
   repoId,
   branchName,
   worktreePath,

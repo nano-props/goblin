@@ -38,6 +38,8 @@ import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import { resetWorkspacePaneTabControllerForTest } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 
 const REPO_ID = '/tmp/repo-workspace-container-repo'
 
@@ -98,6 +100,7 @@ const navigation: PrimaryWindowNavigationActions = {
 }
 
 beforeEach(() => {
+  resetWorkspacePaneTabControllerForTest()
   primaryWindowQueryClient.clear()
   resetReposStore()
   installWorkspacePaneTabsTestBridge()
@@ -802,12 +805,12 @@ describe('RepoWorkspace', () => {
           ...navigation,
           showRepoBranchEmptyWorkspacePane: (repoId, nextBranch) => {
             useReposStore.getState().setWorkspacePaneTab(repoId, nextBranch, null)
-            setRoute(null)
+            setTimeout(() => setRoute(null), 0)
             return true
           },
           showRepoBranchWorkspacePaneTab: (repoId, nextBranch, tab) => {
             useReposStore.getState().setWorkspacePaneTab(repoId, nextBranch, tab)
-            setRoute({ kind: 'static', tab })
+            setTimeout(() => setRoute({ kind: 'static', tab }), 0)
             return true
           },
           showRepoBranchTerminalSession: () => false,
@@ -865,6 +868,79 @@ describe('RepoWorkspace', () => {
     await waitFor(() => {
       expect(screen.getByTestId('workspace-route').textContent).toBe('status')
     })
+  })
+
+  test('defers stale static route replacement while active tab close is pending', async () => {
+    const branchName = 'feature/close-route-race'
+    const route = routeNavigation()
+    vi.mocked(route.openRepoBranchTab).mockReturnValue(true)
+    const actions = navigationWithStore(route)
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(branchName, { worktree: { path: '/tmp/close-route-race-worktree' } })],
+      currentBranchName: branchName,
+      preferredWorkspacePaneTab: 'files',
+      workspacePaneTabsByBranch: {
+        [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
+      },
+    })
+    let resolveCommit!: (tabs: Array<ReturnType<typeof workspacePaneStaticTabEntry>>) => void
+    let resolveCommitStarted!: () => void
+    const commitStarted = new Promise<void>((resolve) => {
+      resolveCommitStarted = resolve
+    })
+    installWorkspacePaneTabsTestBridge({
+      updateWorkspaceTabs: () => {
+        resolveCommitStarted()
+        return new Promise((resolve) => {
+          resolveCommit = resolve
+        })
+      },
+    })
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={actions}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName={branchName}
+                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'files' } }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+
+    const closePromise = runCloseWorkspacePaneTabCommand({
+      repoId: REPO_ID,
+      branchName,
+      workspacePaneRoute: { kind: 'static', tab: 'files' },
+      navigation: actions,
+    })
+    await commitStarted
+
+    act(() => {
+      setWorkspacePaneTabsForTargetQueryData({
+        repoRoot: REPO_ID,
+        repoRuntimeId: repo.repoRuntimeId,
+        branchName,
+        worktreePath: '/tmp/close-route-race-worktree',
+        tabs: [workspacePaneStaticTabEntry('status')],
+      })
+    })
+    await Promise.resolve()
+
+    expect(route.openRepoBranch).not.toHaveBeenCalled()
+    expect(route.openRepoBranchTab).not.toHaveBeenCalled()
+
+    resolveCommit([workspacePaneStaticTabEntry('status')])
+
+    await expect(closePromise).resolves.toBe(true)
+    expect(route.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, branchName, 'status')
+    expect(route.openRepoBranch).not.toHaveBeenCalled()
   })
 
   test('replaces an unrenderable static route with the bare branch route', async () => {

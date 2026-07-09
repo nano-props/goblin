@@ -48,6 +48,30 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(navigation.openRepoBranch).not.toHaveBeenCalled()
   })
 
+  test('selects branches by falling back when the preferred workspace pane tab is stale', () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: BRANCH_NAME,
+      preferredWorkspacePaneTab: 'history',
+      workspacePaneTabsByBranch: {
+        [BRANCH_NAME]: [workspacePaneStaticTabEntry('status')],
+      },
+    })
+    const navigation = routeNavigation()
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: REPO_ID,
+      order: [REPO_ID],
+      closeRepo: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    actions.selectRepoBranch(REPO_ID, BRANCH_NAME)
+
+    expect(navigation.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, 'status', undefined)
+    expect(navigation.openRepoBranch).not.toHaveBeenCalled()
+  })
+
   test('selects branches with an intentional empty workspace pane route', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,

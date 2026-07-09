@@ -22,6 +22,7 @@ import {
   workspacePaneTabEntryListIdentity,
   workspacePaneTabsWithDraggedOrder,
 } from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 
 export interface WorkspacePaneTabsReorderMutationInput {
   repoRoot: string
@@ -72,6 +73,23 @@ export function useWorkspacePaneTabsReorderMutation(
 }
 
 async function runWorkspacePaneTabsReorder(
+  target: {
+    repoRoot: string
+    repoRuntimeId: string
+    branchName: string
+    worktreePath: string | null
+  },
+  draggedTabs: readonly WorkspacePaneTabEntry[],
+  queryClient: QueryClient,
+  onReorderRejected: (() => void) | undefined,
+): Promise<void> {
+  await runWorkspacePaneTabCoordinatorTask(
+    { repoId: target.repoRoot, branchName: target.branchName, worktreePath: target.worktreePath },
+    () => runWorkspacePaneTabsReorderInQueue(target, draggedTabs, queryClient, onReorderRejected),
+  )
+}
+
+async function runWorkspacePaneTabsReorderInQueue(
   target: {
     repoRoot: string
     repoRuntimeId: string

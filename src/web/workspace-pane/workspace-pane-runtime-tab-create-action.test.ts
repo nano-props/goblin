@@ -1,9 +1,14 @@
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import {
+  dispatchCreateTerminalWorkspacePaneRuntimeTabAction,
   type WorkspacePaneRuntimeTabCreateStateByType,
   workspacePaneRuntimeTabCreateAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
+import {
+  resetWorkspacePaneTabCoordinatorForTest,
+  runWorkspacePaneTabCoordinatorTask,
+} from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 
 const terminalCreateCommandMocks = vi.hoisted(() => ({
   runCreateTerminalTabCommand: vi.fn(async () => ({ ok: true as const, terminalSessionId: 'term-111111111111111111111' })),
@@ -13,7 +18,12 @@ vi.mock('#/web/commands/terminal-create-command.ts', () => ({
   runCreateTerminalTabCommand: terminalCreateCommandMocks.runCreateTerminalTabCommand,
 }))
 
+beforeEach(() => {
+  resetWorkspacePaneTabCoordinatorForTest()
+})
+
 afterEach(() => {
+  resetWorkspacePaneTabCoordinatorForTest()
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockClear()
 })
 
@@ -82,6 +92,38 @@ describe('workspace pane runtime tab create action', () => {
     const commandInput = commandCalls[0]?.[0]
     await commandInput?.showCreatedTerminalTab('term-111111111111111111111')
     expect(showCreatedRuntimeTab).toHaveBeenCalledWith('terminal', 'term-111111111111111111111')
+  })
+
+  test('queues terminal create actions behind existing workspace pane tab work for the same target', async () => {
+    const base: TerminalSessionBase = {
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-1',
+      branch: 'main',
+      worktreePath: '/repo-worktree',
+    }
+    let releaseBlocker!: () => void
+    const blocker = runWorkspacePaneTabCoordinatorTask(
+      { repoId: base.repoRoot, branchName: base.branch, worktreePath: base.worktreePath },
+      async () =>
+        await new Promise<void>((resolve) => {
+          releaseBlocker = resolve
+        }),
+    )
+
+    const createPromise = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
+      base,
+      createTerminal: vi.fn(async () => 'term-111111111111111111111'),
+      openerIdentity: null,
+      t: translate,
+    })
+    await Promise.resolve()
+
+    expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).not.toHaveBeenCalled()
+
+    releaseBlocker()
+    await blocker
+    await expect(createPromise).resolves.toEqual({ ok: true, terminalSessionId: 'term-111111111111111111111' })
+    expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).toHaveBeenCalledOnce()
   })
 
   test('marks the terminal create action busy while projection or create is pending', () => {

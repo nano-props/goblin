@@ -12,8 +12,6 @@ import {
   createRuntimeWorkspacePaneTabItem,
   createStaticWorkspacePaneTabItem,
   isPendingWorkspacePaneTabItem,
-  isRuntimeWorkspacePaneTabItem,
-  isStaticWorkspacePaneTabItem,
   type WorkspacePaneTabItem,
 } from '#/web/components/workspace-pane/workspace-pane-tab-types.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
@@ -28,6 +26,7 @@ import { useIsCompactUi } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { useFocusRegistry } from '#/web/components/tab-strip/useFocusRegistry.ts'
 import { useIsInitialTerminalProjectionHydrating } from '#/web/stores/terminal-projection-hydration.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
+import { showCreatedTerminalWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import {
   workspacePaneRuntimeTabProvider,
@@ -45,7 +44,7 @@ import { WorkspaceOpenExternallyMenu } from '#/web/components/repo-workspace/Wor
 import type { BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import { useWorkspacePaneTabsReorderMutation } from '#/web/workspace-pane/workspace-pane-tabs-reorder-mutation.ts'
 import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import { reselectWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-actions.ts'
+import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
 import { useWorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-action-context.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
@@ -95,10 +94,16 @@ export function RepoWorkspaceToolbar({
   const showCreatedWorkspacePaneRuntimeTab = useCallback(
     (type: WorkspacePaneRuntimeTabType, sessionId: string) => {
       if (!branchName) return false
-      if (type === 'terminal') return navigation.showRepoBranchTerminalSession(repo.id, branchName, sessionId)
+      if (type === 'terminal' && worktreePath) {
+        return showCreatedTerminalWorkspacePaneRuntimeTab(
+          { repoRoot: repo.id, repoRuntimeId: repo.repoRuntimeId, branch: branchName, worktreePath },
+          sessionId,
+          navigation,
+        )
+      }
       return false
     },
-    [branchName, navigation, repo.id],
+    [branchName, navigation, repo.id, repo.repoRuntimeId, worktreePath],
   )
   const workspacePaneRuntimeTabActionContext = useWorkspacePaneRuntimeTabActionContext({
     showRuntimeTab: showCreatedWorkspacePaneRuntimeTab,
@@ -117,26 +122,31 @@ export function RepoWorkspaceToolbar({
 
   const showWorkspacePaneTabItem = useCallback(
     (item: WorkspacePaneTabItem) => {
-      if (isStaticWorkspacePaneTabItem(item)) {
-        if (branchName) navigation.showRepoBranchWorkspacePaneTab(repo.id, branchName, item.staticTabType)
-        return
-      }
-      if (isRuntimeWorkspacePaneTabItem(item)) {
-        if (branchName) navigation.showRepoBranchTerminalSession(repo.id, branchName, item.tabEntry.runtimeSessionId)
-      }
+      void dispatchSelectWorkspacePaneTabByIdentityAction({
+        repoId: repo.id,
+        branchName,
+        workspacePaneRoute,
+        identity: item.identity,
+        navigation,
+        runtimeActionContext: workspacePaneRuntimeTabActionContext,
+      })
     },
-    [branchName, navigation, repo.id],
+    [branchName, navigation, repo.id, workspacePaneRoute, workspacePaneRuntimeTabActionContext],
   )
 
   const reselectWorkspacePaneTabItem = useCallback(
     (item: WorkspacePaneTabItem) => {
-      if (isRuntimeWorkspacePaneTabItem(item)) {
-        reselectWorkspacePaneRuntimeTab(item.view, workspacePaneRuntimeTabActionContext)
-        return
-      }
-      showWorkspacePaneTabItem(item)
+      void dispatchSelectWorkspacePaneTabByIdentityAction({
+        repoId: repo.id,
+        branchName,
+        workspacePaneRoute,
+        identity: item.identity,
+        navigation,
+        runtimeActionContext: workspacePaneRuntimeTabActionContext,
+        reselect: true,
+      })
     },
-    [showWorkspacePaneTabItem, workspacePaneRuntimeTabActionContext],
+    [branchName, navigation, repo.id, workspacePaneRoute, workspacePaneRuntimeTabActionContext],
   )
 
   const {

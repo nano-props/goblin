@@ -11,7 +11,7 @@ import { idleOperation } from '#/web/stores/repos/operations.ts'
 const mocks = vi.hoisted(() => ({
   setDetailCollapsed: vi.fn(),
   useBranchActions: vi.fn(),
-  openWorkspacePaneTab: vi.fn(),
+  dispatchOpenWorkspacePaneStaticTabAction: vi.fn(),
 }))
 
 vi.mock('#/web/hooks/useBranchActions.tsx', () => ({
@@ -24,8 +24,8 @@ vi.mock('#/web/primary-window-navigation.tsx', () => ({
   }),
 }))
 
-vi.mock('#/web/components/repo-workspace/open-workspace-pane-tab.ts', () => ({
-  openWorkspacePaneTab: mocks.openWorkspacePaneTab,
+vi.mock('#/web/workspace-pane/workspace-pane-tab-open-action.ts', () => ({
+  dispatchOpenWorkspacePaneStaticTabAction: mocks.dispatchOpenWorkspacePaneStaticTabAction,
 }))
 
 vi.mock('#/web/runtime-settings-external-apps.ts', () => ({
@@ -43,7 +43,7 @@ vi.mock('#/web/stores/repos/store.ts', () => ({
 describe('useBranchActionItems', () => {
   beforeEach(() => {
     mocks.setDetailCollapsed.mockClear()
-    mocks.openWorkspacePaneTab.mockClear()
+    mocks.dispatchOpenWorkspacePaneStaticTabAction.mockClear()
     mocks.useBranchActions.mockReturnValue({
       blocked: false,
       busyAction: null,
@@ -120,7 +120,7 @@ describe('useBranchActionItems', () => {
 
     actions!.mainItems.find((item) => item.id === 'history')?.onSelect()
 
-    expect(mocks.openWorkspacePaneTab).toHaveBeenCalledWith(
+    expect(mocks.dispatchOpenWorkspacePaneStaticTabAction).toHaveBeenCalledWith(
       expect.objectContaining({
         repoId: '/tmp/gbl-action-items',
         branchName: 'feature/action-order',

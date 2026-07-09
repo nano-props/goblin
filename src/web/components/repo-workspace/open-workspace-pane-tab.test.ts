@@ -598,7 +598,7 @@ describe('openWorkspacePaneTab', () => {
     )
   })
 
-  test('preserves concurrent static tab opens through server-canonical updates', async () => {
+  test('serializes concurrent static tab opens through the workspace pane coordinator', async () => {
     seedWorktreeRepo('status')
 
     await expect(
@@ -622,10 +622,7 @@ describe('openWorkspacePaneTab', () => {
       ]),
     ).resolves.toEqual([true, true])
 
-    // Both opens anchor after "status" (the captured opener). The first commit
-    // (changes) lands between status and history's slot; the second commit
-    // (history) inserts immediately after status, pushing changes to position 3.
-    expect(openTabsFor('feature/worktree')).toEqual(['status', 'history', 'changes'])
+    expect(openTabsFor('feature/worktree')).toEqual(['status', 'changes', 'history'])
   })
 })
 

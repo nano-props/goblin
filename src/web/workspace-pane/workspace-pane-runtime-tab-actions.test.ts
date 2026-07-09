@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import type { WorkspacePaneTerminalTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import {
+  dispatchWorkspacePaneRuntimeTabPrimaryAction,
   reselectWorkspacePaneRuntimeTab,
   selectWorkspacePaneRuntimeTab,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-actions.ts'
@@ -41,6 +42,30 @@ describe('workspace pane runtime tab actions', () => {
         showRuntimeTab,
         terminal: { scrollToBottom },
       }),
+    ).toBe(true)
+
+    expect(showRuntimeTab).toHaveBeenCalledWith('terminal', 'term-111111111111111111111')
+    expect(scrollToBottom).toHaveBeenCalledWith('term-111111111111111111111')
+  })
+
+  test('dispatches runtime primary action as select by default', () => {
+    const showRuntimeTab = vi.fn(() => true)
+
+    expect(dispatchWorkspacePaneRuntimeTabPrimaryAction(terminalView, { showRuntimeTab })).toBe(true)
+
+    expect(showRuntimeTab).toHaveBeenCalledWith('terminal', 'term-111111111111111111111')
+  })
+
+  test('dispatches runtime primary action as reselect when requested', () => {
+    const showRuntimeTab = vi.fn(() => true)
+    const scrollToBottom = vi.fn()
+
+    expect(
+      dispatchWorkspacePaneRuntimeTabPrimaryAction(
+        terminalView,
+        { showRuntimeTab, terminal: { scrollToBottom } },
+        { reselect: true },
+      ),
     ).toBe(true)
 
     expect(showRuntimeTab).toHaveBeenCalledWith('terminal', 'term-111111111111111111111')

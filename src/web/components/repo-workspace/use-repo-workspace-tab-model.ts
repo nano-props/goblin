@@ -79,7 +79,7 @@ export function useRepoWorkspaceTabModelInput(
       branchName,
       worktreePath,
       preferredTab,
-      allowPreferredTabFallback: false,
+      allowPreferredTabFallback: workspacePaneRoute === undefined,
       tabEntries: workspacePaneTabEntries,
       tabEntriesProjectionPhase: workspacePaneTabsProjectionPhase(workspacePaneTabsQuery.status),
       runtimeTabViews: runtimeProjection.runtimeTabViews,
@@ -97,6 +97,7 @@ export function useRepoWorkspaceTabModelInput(
       runtimeProjection.runtimeTabViews,
       runtimeProjection.runtimeTabStateByType,
       requestedSessionIdByRuntimeType,
+      workspacePaneRoute,
     ],
   )
 
