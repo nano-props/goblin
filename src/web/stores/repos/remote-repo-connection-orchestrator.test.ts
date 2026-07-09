@@ -24,11 +24,26 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 // reliably intercept the orchestrator's already-evaluated
 // import of the function.
 let shouldThrowResolveLifecycle = false
+let shouldWaitForAbortResolveLifecycle = false
 vi.mock('#/web/remote-client.ts', async (importActual) => {
   const actual = await importActual<typeof import('#/web/remote-client.ts')>()
+  const abortError = () => {
+    const err = new Error('The operation was aborted.')
+    err.name = 'AbortError'
+    return err
+  }
   return {
     ...actual,
     resolveRemoteRepoConnection: vi.fn(async (input, signal) => {
+      if (shouldWaitForAbortResolveLifecycle) {
+        return await new Promise((_, reject) => {
+          if (signal?.aborted) {
+            reject(abortError())
+            return
+          }
+          signal?.addEventListener('abort', () => reject(abortError()), { once: true })
+        })
+      }
       if (shouldThrowResolveLifecycle) {
         throw new Error('aborted')
       }
@@ -393,6 +408,31 @@ describe('runRemoteRepoConnection', () => {
       // important thing is that an erroring run doesn't leave
       // a forever-spinner behind.
       expect(final?.kind === 'ready' || final?.kind === 'failed').toBe(true)
+    }
+  })
+
+  test('a caller AbortError without a successor settles the lifecycle to failed', async () => {
+    installGoblin({})
+    shouldWaitForAbortResolveLifecycle = true
+    try {
+      useReposStore.setState((s) => {
+        const repo = emptyRepo(REMOTE_ID, 'example:repo', 'repo-runtime-test')
+        return { ...s, repos: { ...s.repos, [REMOTE_ID]: repo }, order: [REMOTE_ID] }
+      })
+      const caller = new AbortController()
+      const outcome = runRemoteRepoConnection(useReposStore.setState, useReposStore.getState, REMOTE_ID, {
+        signal: caller.signal,
+      })
+
+      await vi.waitFor(() => {
+        expect(useReposStore.getState().repos[REMOTE_ID]?.remote.lifecycle?.kind).toBe('connecting')
+      })
+      caller.abort('hydration cancelled')
+
+      await expect(outcome).resolves.toBeNull()
+      expect(useReposStore.getState().repos[REMOTE_ID]?.remote.lifecycle?.kind).toBe('failed')
+    } finally {
+      shouldWaitForAbortResolveLifecycle = false
     }
   })
 })

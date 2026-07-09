@@ -7,6 +7,7 @@ import {
   settleRepoOperationTargets,
   type RepoOperationLane,
 } from '#/web/stores/repos/repo-operation-scheduler.ts'
+import { isExpectedRepoOperationCancellation } from '#/web/stores/repos/operation-cancellation.ts'
 import { updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
 import {
   markRepoOperationViews,
@@ -16,15 +17,16 @@ import {
 import type { RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 export type { RepoOperationTarget }
 
-interface RepoOperationContext {
+export interface RepoOperationContext {
   id: string
   repoRuntimeId: string
   operationId: number
   isCurrent: () => boolean
+  ownsTarget: (key: string) => boolean
   setPhase: (phase: 'queued' | 'running') => void
 }
 
-interface RepoOperationBaseOptions<T> {
+interface RepoOperationBaseFields<T> {
   set: ReposSet
   get: ReposGet
   id: string
@@ -34,8 +36,6 @@ interface RepoOperationBaseOptions<T> {
   targets: [RepoOperationTarget, ...RepoOperationTarget[]]
   task: (signal: AbortSignal, ctx: RepoOperationContext) => Promise<T>
   operationKey?: string
-  queuedTimeoutMs?: number
-  queuedTimeoutMessage?: string
   errorFromResult?: (result: T) => string | null
   errorResult?: (message: string) => T
   onResult?: (result: T, ctx: RepoOperationContext) => void | Promise<void>
@@ -44,9 +44,15 @@ interface RepoOperationBaseOptions<T> {
   rethrow?: boolean
 }
 
+type RepoOperationBaseOptions<T> = RepoOperationBaseFields<T> &
+  (
+    | { queuedTimeoutMs?: undefined; queuedTimeoutMessage?: undefined }
+    | { queuedTimeoutMs: number; queuedTimeoutMessage: string }
+  )
+
 type RunLatestOperationOptions<T> = RepoOperationBaseOptions<T>
 
-interface RunExclusiveOperationOptions<T> extends RepoOperationBaseOptions<T> {
+type RunExclusiveOperationOptions<T> = RepoOperationBaseOptions<T> & {
   canStart?: (repo: RepoState) => boolean
   busyResult?: T
 }
@@ -101,6 +107,7 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
   const repoRuntimeId = options.repoRuntimeId ?? repoBefore.repoRuntimeId
   if (repoBefore.repoRuntimeId !== repoRuntimeId) return null
   const primary = options.targets[0]
+  let ownedTargetKeysAtSettle: Set<string> | null = null
   if (options.policy !== 'latest-wins') {
     const busy = anyTargetBusy(options.id, options.targets)
     if (busy || (options.canStart && !options.canStart(repoBefore))) return options.busyResult ?? null
@@ -112,6 +119,12 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
     repoRuntimeId,
     operationId,
     isCurrent: () => operationCurrent(options.get, options.id, repoRuntimeId, operationId, primary),
+    ownsTarget: (key) =>
+      ownedTargetKeysAtSettle
+        ? ownedTargetKeysAtSettle.has(key)
+        : options.targets.some(
+            (target) => target.key === key && operationCurrent(options.get, options.id, repoRuntimeId, operationId, target),
+          ),
     setPhase: (phase) => {
       if (ctx.isCurrent()) markOperationState(options, repoRuntimeId, operationId, phase)
     },
@@ -124,26 +137,47 @@ async function runRepoOperation<T>(options: InternalRepoOperationOptions<T>): Pr
     | { kind: 'success'; result: T; error: string | null }
 
   let outcome: Outcome
+  let operationSignal: AbortSignal | null = null
   try {
-    const result = await scheduleRepoOperation(options.id, options.lane, (signal) => options.task(signal, ctx), {
+    const scheduleOptions = {
       priority: options.priority,
       replaceQueuedKey:
         options.policy === 'latest-wins' ? `${options.lane}:${options.operationKey ?? primary.key}` : undefined,
-      queuedTimeoutMs: options.queuedTimeoutMs,
-      queuedTimeoutMessage: options.queuedTimeoutMessage,
       onQueued: () => markOperationState(options, repoRuntimeId, operationId, 'queued'),
-      onStart: (wasQueued) => markOperationState(options, repoRuntimeId, operationId, 'running', wasQueued),
-    })
+      onStart: (wasQueued: boolean) => markOperationState(options, repoRuntimeId, operationId, 'running', wasQueued),
+    }
+    const result = await scheduleRepoOperation<T>(
+      options.id,
+      options.lane,
+      (signal) => {
+        operationSignal = signal
+        return options.task(signal, ctx)
+      },
+      options.queuedTimeoutMs === undefined
+        ? scheduleOptions
+        : {
+            ...scheduleOptions,
+            queuedTimeoutMs: options.queuedTimeoutMs,
+            queuedTimeoutMessage: options.queuedTimeoutMessage,
+          },
+    )
     if (!ctx.isCurrent()) {
       outcome = { kind: 'stale' }
     } else {
       outcome = { kind: 'success', result, error: options.errorFromResult?.(result) ?? null }
     }
   } catch (err) {
-    outcome = { kind: 'error', error: err instanceof Error ? err.message : String(err), original: err }
+    outcome = isExpectedRepoOperationCancellation(err, operationSignal)
+      ? { kind: 'stale' }
+      : { kind: 'error', error: err instanceof Error ? err.message : String(err), original: err }
   }
 
   // Settle operation state exactly once before running side effects.
+  ownedTargetKeysAtSettle = new Set(
+    options.targets
+      .filter((target) => operationCurrent(options.get, options.id, repoRuntimeId, operationId, target))
+      .map((target) => target.key),
+  )
   const settleError = outcome.kind === 'success' ? outcome.error : outcome.kind === 'error' ? outcome.error : null
   settleOperationState(options, repoRuntimeId, operationId, settleError)
 

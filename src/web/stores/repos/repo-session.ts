@@ -217,7 +217,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
             // See `openRepo`: status backs the selected-branch repo workspace badge,
             // so we hydrate it for every restored repo, not just the active
             // one — switching after boot shouldn't reveal a stale 0.
-            if (initialRefresh) refreshInitialRepoState(get, initialRefresh)
+            if (initialRefresh) refreshInitialRepoState(set, get, initialRefresh)
           }),
         ),
       )

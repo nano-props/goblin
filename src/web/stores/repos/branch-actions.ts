@@ -1,14 +1,16 @@
 import {
   runExclusiveOperation,
   runLatestOperation,
+  type RepoOperationContext,
   type RepoOperationTarget,
 } from '#/web/stores/repos/operation-runner.ts'
+import { RepoOperationCancelledError } from '#/web/stores/repos/operation-cancellation.ts'
 import type { RepoBranchActionReason, RepoOperationReason } from '#/web/stores/repos/operations.ts'
 import { isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
 import {
   repoOperation,
   repoLocalBranchActionScheduleGuard,
-  repoLocalCoreProjectionRefreshBusy,
+  repoLocalProjectionReadBusy,
   waitForRepoOperationsIdle,
 } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import {
@@ -135,22 +137,22 @@ function evaluateRepoBranchActionSchedule(repo: RepoState, action: RepoBranchAct
     actionKind: action.kind,
     fetchBusy: guard.fetchBusy,
     branchOperationPhase: guard.branchOperationPhase,
-    coreRefreshBusy: guard.coreRefreshBusy,
+    projectionReadBusy: guard.projectionReadBusy,
   })
 }
 
 function throwIfStale(get: ReposGet, id: string, repoRuntimeId: string): void {
-  if (get().repos[id]?.repoRuntimeId !== repoRuntimeId) throw new Error('cancelled')
+  if (get().repos[id]?.repoRuntimeId !== repoRuntimeId) throw new RepoOperationCancelledError()
 }
 
-function syncNetworkFetchDataLoadState(
+function settleNetworkFetchDataLoadState(
   set: ReposSet,
   id: string,
   repoRuntimeId: string,
-  network: boolean,
+  ownsFetchDataLoad: boolean,
   result: ExecResult | { ok: false; message: string },
 ): void {
-  if (!network) return
+  if (!ownsFetchDataLoad) return
   updateIfFresh(set, id, repoRuntimeId, (r) => {
     if (result.message === 'cancelled') {
       cancelDataLoad(r.dataLoads.fetch)
@@ -284,8 +286,11 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
       updateIfFresh(set, id, repoRuntimeId, (r) => {
         if (network) startDataLoad(r.dataLoads.fetch, { hasData: r.dataLoads.fetch.loadedAt !== null })
       })
-      const handleResult = async (result: ExecResult) => {
-        syncNetworkFetchDataLoadState(set, id, repoRuntimeId, network, result)
+      const ownsNetworkFetchDataLoad = (ctx: Pick<RepoOperationContext, 'ownsTarget'>) =>
+        network && ctx.ownsTarget('fetch')
+      const handleResult = async (result: ExecResult, ctx: RepoOperationContext) => {
+        const ownsFetchDataLoad = ownsNetworkFetchDataLoad(ctx)
+        settleNetworkFetchDataLoadState(set, id, repoRuntimeId, ownsFetchDataLoad, result)
         if (!shouldSuppressBranchActionResultMessage(result, options)) {
           get().setLastResult(id, result, repoRuntimeId, { action: branchActionEventAction(action) })
         }
@@ -293,19 +298,28 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
         if (result.ok || result.repoChanged || options?.refreshOnError !== false) {
           const repo = get().repos[id]
           if (repo?.repoRuntimeId === repoRuntimeId) {
-            await runRepoRefreshIntent(get, { kind: 'core-data-changed', reason: 'branch-action', id, repoRuntimeId })
+            await runRepoRefreshIntent(
+              { get, set },
+              { kind: 'projection-read-model-refresh-requested', reason: 'branch-action', id, repoRuntimeId },
+            )
           }
         }
-        if (result.ok && network) get().clearFetchFailed(id, repoRuntimeId)
+        if (result.ok && ownsFetchDataLoad) get().clearFetchFailed(id, repoRuntimeId)
       }
-      const handleError = (message: string) => {
-        syncNetworkFetchDataLoadState(set, id, repoRuntimeId, network, { ok: false, message })
+      const handleError = (message: string, ctx: RepoOperationContext) => {
+        settleNetworkFetchDataLoadState(set, id, repoRuntimeId, ownsNetworkFetchDataLoad(ctx), { ok: false, message })
         if (message === 'cancelled') return
         get().setLastResult(id, { ok: false, message }, repoRuntimeId, { action: branchActionEventAction(action) })
       }
+      const handleStale = (ctx: RepoOperationContext) => {
+        settleNetworkFetchDataLoadState(set, id, repoRuntimeId, ownsNetworkFetchDataLoad(ctx), {
+          ok: false,
+          message: 'cancelled',
+        })
+      }
       const runActionTask = async (signal: AbortSignal, ctx: { setPhase: (phase: 'queued' | 'running') => void }) => {
         try {
-          if (repoLocalCoreProjectionRefreshBusy(id)) {
+          if (repoLocalProjectionReadBusy(id)) {
             ctx.setPhase('queued')
             signal.throwIfAborted()
             await waitForBranchActionIdle(id, ['repoReadModel', 'visibleStatus'], signal, options?.waitTimeoutMs)
@@ -337,6 +351,7 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
           errorResult: branchActionErrorResult,
           onResult: handleResult,
           onError: handleError,
+          onStale: handleStale,
         })
       }
 

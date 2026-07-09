@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, test } from 'vitest'
+import { CancelledError } from '@tanstack/react-query'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { runExclusiveOperation, runLatestOperation } from '#/web/stores/repos/operation-runner.ts'
 import { repoOperation, repoOperationBusy } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -439,5 +440,96 @@ describe('runLatestOperation active-task cancellation', () => {
     // NEW: the actual task result, because this run is current.
     expect(await old).toBeNull()
     expect(await fresh).toBe('NEW')
+  })
+
+  test('query cancellation is stale even when the primary target is still current', async () => {
+    let rejectReadModel!: (reason: unknown) => void
+    const onError = vi.fn()
+    const onStale = vi.fn()
+    const readModel = runLatestOperation<string>({
+      set: useReposStore.setState,
+      get: useReposStore.getState,
+      id: REPO_ID,
+      repoRuntimeId: 'repo-runtime-test',
+      lane: 'read',
+      operationKey: 'repo-read-model',
+      priority: 50,
+      targets: [
+        { key: 'repoReadModel', reason: 'repo-read-model' },
+        { key: 'visibleStatus', reason: 'visible-status' },
+      ],
+      task: () =>
+        new Promise<string>((_resolve, reject) => {
+          rejectReadModel = reject
+        }),
+      onError,
+      onStale,
+    })
+    await Promise.resolve()
+
+    await runLatestOperation({
+      set: useReposStore.setState,
+      get: useReposStore.getState,
+      id: REPO_ID,
+      repoRuntimeId: 'repo-runtime-test',
+      lane: 'read',
+      operationKey: 'visible-status',
+      priority: 40,
+      targets: [{ key: 'visibleStatus', reason: 'visible-status' }],
+      task: async () => 'visible-status',
+    })
+    rejectReadModel(new CancelledError())
+
+    await expect(readModel).resolves.toBeNull()
+    expect(onError).not.toHaveBeenCalled()
+    expect(onStale).toHaveBeenCalledTimes(1)
+    expect(useReposStore.getState().repos[REPO_ID]?.operations.repoReadModel).toMatchObject({
+      phase: 'idle',
+      error: null,
+    })
+  })
+
+  test('an AbortError caused by the scheduler signal is stale', async () => {
+    const onError = vi.fn()
+    const onStale = vi.fn()
+    const abortError = () => {
+      const err = new Error('The operation was aborted.')
+      err.name = 'AbortError'
+      return err
+    }
+    const first = runLatestOperation<string>({
+      set: useReposStore.setState,
+      get: useReposStore.getState,
+      id: REPO_ID,
+      repoRuntimeId: 'repo-runtime-test',
+      lane: 'lifecycle',
+      operationKey: 'remoteLifecycle',
+      priority: 1,
+      targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
+      task: (signal) =>
+        new Promise<string>((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(abortError()), { once: true })
+        }),
+      onError,
+      onStale,
+    })
+    await Promise.resolve()
+
+    const second = runLatestOperation<string>({
+      set: useReposStore.setState,
+      get: useReposStore.getState,
+      id: REPO_ID,
+      repoRuntimeId: 'repo-runtime-test',
+      lane: 'lifecycle',
+      operationKey: 'remoteLifecycle',
+      priority: 1,
+      targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
+      task: async () => 'fresh',
+    })
+
+    await expect(first).resolves.toBeNull()
+    await expect(second).resolves.toBe('fresh')
+    expect(onError).not.toHaveBeenCalled()
+    expect(onStale).toHaveBeenCalledTimes(1)
   })
 })

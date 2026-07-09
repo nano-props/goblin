@@ -79,6 +79,11 @@ import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '
 
 type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
+type RepoWriteBoundary =
+  | { kind: 'local-git'; commonDir: string }
+  | { kind: 'local-path'; repoPath: string }
+  | { kind: 'remote-git'; repoId: string }
+
 export interface RepoMutationResult extends ExecResult {
   /**
    * Repo session ids whose repo snapshot changed even when the final
@@ -148,19 +153,43 @@ export async function resolveRepoSource(repoId: string): Promise<RepoSource> {
   return isRemoteRepoId(repoId) ? await createRemoteRepoSource(repoId) : createLocalRepoSource(repoId)
 }
 
-export async function resolveRepoWriteBoundaryKey(repoId: string, signal?: AbortSignal): Promise<string> {
-  if (isRemoteRepoId(repoId)) {
-    try {
-      const target = await resolveRemoteRepoTarget(repoId)
-      const writeBoundaryPath = await getRemoteRepoWriteGroupPath(target, { signal })
-      const boundaryRef = writeBoundaryPath ? normalizeRemoteRepoRef({ ...target, remotePath: writeBoundaryPath }) : null
-      return boundaryRef?.id ?? repoId
-    } catch {
-      return repoId
-    }
+function repoWriteBoundaryKey(boundary: RepoWriteBoundary): string {
+  switch (boundary.kind) {
+    case 'local-git':
+      return `local-git:${boundary.commonDir}`
+    case 'local-path':
+      return `local-path:${boundary.repoPath}`
+    case 'remote-git':
+      return `remote-git:${boundary.repoId}`
   }
+  const exhaustive: never = boundary
+  return exhaustive
+}
+
+async function resolveLocalRepoWriteBoundary(repoId: string, signal?: AbortSignal): Promise<RepoWriteBoundary> {
   const commonDir = await getRepoCommonDir(repoId, { signal })
-  return commonDir ? `local-git:${commonDir}` : `local-path:${path.resolve(repoId)}`
+  return commonDir ? { kind: 'local-git', commonDir } : { kind: 'local-path', repoPath: path.resolve(repoId) }
+}
+
+async function resolveRemoteRepoWriteBoundary(repoId: string, signal?: AbortSignal): Promise<RepoWriteBoundary> {
+  try {
+    const target = await resolveRemoteRepoTarget(repoId)
+    const writeGroupPath = await getRemoteRepoWriteGroupPath(target, { signal })
+    signal?.throwIfAborted()
+    const writeGroupRef = writeGroupPath ? normalizeRemoteRepoRef({ ...target, remotePath: writeGroupPath }) : null
+    return { kind: 'remote-git', repoId: writeGroupRef?.id ?? repoId }
+  } catch {
+    signal?.throwIfAborted()
+    return { kind: 'remote-git', repoId }
+  }
+}
+
+export async function resolveRepoWriteBoundaryKey(repoId: string, signal?: AbortSignal): Promise<string> {
+  return repoWriteBoundaryKey(
+    isRemoteRepoId(repoId)
+      ? await resolveRemoteRepoWriteBoundary(repoId, signal)
+      : await resolveLocalRepoWriteBoundary(repoId, signal),
+  )
 }
 
 function withAffectedRepoIds(result: ExecResult, affectedRepoIds: readonly string[]): RepoMutationResult {

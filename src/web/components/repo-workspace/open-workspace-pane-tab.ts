@@ -61,7 +61,9 @@ export async function openWorkspacePaneTab(input: {
     recordWorkspacePaneTabOpener(input.repoId, branchName, workspacePaneStaticTabId(input.type), openerIdentity)
   }
   if (!showWorkspacePaneTab(input)) return false
-  if (provider.refreshOnOpen) requestVisibleRepoProjectionRefresh(useReposStore.getState, input.repoId, branchName)
+  if (provider.refreshOnOpen) {
+    requestVisibleRepoProjectionRefresh({ get: useReposStore.getState, set: useReposStore.setState }, input.repoId, branchName)
+  }
   return true
 }
 

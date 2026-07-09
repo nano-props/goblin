@@ -8,7 +8,7 @@ import {
 } from '#/web/stores/repos/operations.ts'
 import { repoServerOperationActive } from '#/web/repo-data-query.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
-import type { RepoOperationsSnapshot } from '#/shared/api-types.ts'
+import type { RepoOperationsSnapshot, RepoServerOperationState } from '#/shared/api-types.ts'
 type RepoActivityKind = 'branch-action'
 
 export interface RepoActivity {
@@ -53,7 +53,11 @@ export function getRepoActivity(
 }
 
 export function repoOperationsSnapshotHasPrimaryRefresh(snapshot: RepoOperationsSnapshot | undefined): boolean {
-  return !!snapshot?.operations.some((operation) => operation.kind === 'fetch' && repoServerOperationActive(operation))
+  return !!snapshot?.operations.some(repoServerOperationIsPrimaryRefresh)
+}
+
+function repoServerOperationIsPrimaryRefresh(operation: RepoServerOperationState): boolean {
+  return operation.kind === 'fetch' && operation.source === 'user' && repoServerOperationActive(operation)
 }
 
 export function isRepoPrimaryRefreshBusy(

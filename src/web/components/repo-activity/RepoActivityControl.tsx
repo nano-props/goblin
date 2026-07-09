@@ -161,7 +161,7 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControl
     // Fire-and-forget so AsyncButton's internal pending state does not fight
     // the external manualSyncBusy prop. The visual loading state is owned by
     // the operation, not the click promise.
-    void runRepoRefreshIntent(useReposStore.getState, {
+    void runRepoRefreshIntent({ get: useReposStore.getState, set: useReposStore.setState }, {
       kind: 'manual-refresh-requested',
       id: repo.id,
       repoRuntimeId,

@@ -11,6 +11,7 @@ import {
   setWorkspacePaneTabsForTargetQueryData,
   workspacePaneTabsQueryKey,
   workspacePaneTabsTargetVersion,
+  workspacePaneTabsTargetWriteVersion,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   reportWorkspacePaneTabsFailure,
@@ -90,13 +91,14 @@ async function runWorkspacePaneTabsReorder(
     ?.find((entry) => workspacePaneTabsEntryMatchesTarget(entry, target))
   setWorkspacePaneTabsForTargetQueryData({ ...target, tabs: nextTabs }, queryClient)
   const optimisticTargetVersion = workspacePaneTabsTargetVersion(target)
+  const optimisticTargetWriteVersion = workspacePaneTabsTargetWriteVersion(target)
   try {
     await cancelListQueries
     const serverTabs = await updateWorkspacePaneTabsOnServer({
       ...target,
       operation: { type: 'reorder', tabIdentities: draggedTabs.map(workspacePaneTabEntryIdentity) },
     })
-    if (workspacePaneTabsTargetVersion(target) !== optimisticTargetVersion) return
+    if (workspacePaneTabsTargetWriteVersion(target) !== optimisticTargetWriteVersion) return
     const accepted = await writeCanonicalWorkspacePaneTabsForTarget({ ...target, tabs: serverTabs }, queryClient)
     if (!accepted) return
   } catch (err) {

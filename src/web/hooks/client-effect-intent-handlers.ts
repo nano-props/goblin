@@ -191,7 +191,7 @@ export async function handleWorkspaceClientIntent(
       deps.navigation.cycleRepo(plan.direction)
       return true
     case 'refresh-repo':
-      await runRepoRefreshIntent(useReposStore.getState, {
+      await runRepoRefreshIntent({ get: useReposStore.getState, set: useReposStore.setState }, {
         kind: 'manual-refresh-requested',
         id: plan.repoId,
         repoRuntimeId: plan.repoRuntimeId,

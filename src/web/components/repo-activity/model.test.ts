@@ -19,19 +19,28 @@ import type { RepoOperationsSnapshot, RepoServerOperationState } from '#/shared/
 const REPO_ID = '/tmp/gbl-repo-activity-model'
 
 describe('repo activity model', () => {
-  test('marks the primary refresh control busy from server fetch operations', () => {
+  test('marks the primary refresh control busy from user server fetch operations', () => {
     resetReposStore()
     const repo = seedRepoShellForTest({ id: REPO_ID })
-    const operations = operationsSnapshot([serverOperation({ kind: 'fetch', phase: 'running' })])
+    const operations = operationsSnapshot([serverOperation({ kind: 'fetch', phase: 'running', source: 'user' })])
 
     expect(repoOperationsSnapshotHasPrimaryRefresh(operations)).toBe(true)
     expect(isRepoPrimaryRefreshBusy(repo, operations)).toBe(true)
   })
 
+  test('keeps the primary refresh control idle during background server fetch operations', () => {
+    resetReposStore()
+    const repo = seedRepoShellForTest({ id: REPO_ID })
+    const operations = operationsSnapshot([serverOperation({ kind: 'fetch', phase: 'running', source: 'background' })])
+
+    expect(repoOperationsSnapshotHasPrimaryRefresh(operations)).toBe(false)
+    expect(isRepoPrimaryRefreshBusy(repo, operations)).toBe(false)
+  })
+
   test('does not treat non-fetch server operations as primary refresh busy', () => {
     resetReposStore()
     const repo = seedRepoShellForTest({ id: REPO_ID })
-    const operations = operationsSnapshot([serverOperation({ kind: 'pull', phase: 'running' })])
+    const operations = operationsSnapshot([serverOperation({ kind: 'pull', phase: 'running', source: 'user' })])
 
     expect(repoOperationsSnapshotHasPrimaryRefresh(operations)).toBe(false)
     expect(isRepoPrimaryRefreshBusy(repo, operations)).toBe(false)
@@ -40,7 +49,7 @@ describe('repo activity model', () => {
   test('projects branch action activity from server operations', () => {
     resetReposStore()
     const repo = seedRepoShellForTest({ id: REPO_ID })
-    const operations = operationsSnapshot([serverOperation({ kind: 'push', phase: 'queued' })])
+    const operations = operationsSnapshot([serverOperation({ kind: 'push', phase: 'queued', source: 'user' })])
 
     expect(getRepoActivity(activityRepo(repo), operations)).toMatchObject({
       kind: 'branch-action',
@@ -74,7 +83,7 @@ function activityRepo(repo: RepoState): RepoActivityProjectionRepo {
 }
 
 function serverOperation(
-  overrides: Pick<RepoServerOperationState, 'kind' | 'phase'>,
+  overrides: Pick<RepoServerOperationState, 'kind' | 'phase' | 'source'>,
 ): RepoServerOperationState {
   return {
     id: `repo-op-${overrides.kind}-${overrides.phase}`,
@@ -82,7 +91,7 @@ function serverOperation(
     repoRuntimeId: null,
     kind: overrides.kind,
     phase: overrides.phase,
-    source: 'user',
+    source: overrides.source,
     target: null,
     queuedAt: 100,
     startedAt: overrides.phase === 'queued' ? null : 101,

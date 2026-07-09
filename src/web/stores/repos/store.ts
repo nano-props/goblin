@@ -20,7 +20,6 @@ import { persist, type PersistStorage, type StorageValue } from 'zustand/middlew
 import { createBranchActions } from '#/web/stores/repos/branch-actions.ts'
 import { createCommitActions } from '#/web/stores/repos/commit.ts'
 import { createRepoSessionActions } from '#/web/stores/repos/repo-session.ts'
-import { createRefreshActions } from '#/web/stores/repos/refresh.ts'
 import { createSelectionActions } from '#/web/stores/repos/selection.ts'
 import { createTabOpenerActions } from '#/web/stores/repos/tab-opener.ts'
 import { reposLog } from '#/web/logger.ts'
@@ -118,7 +117,6 @@ export const useReposStore = create<ReposStore>()(
       ...createRepoSessionActions(set, get),
       ...createSelectionActions(set, get),
       ...createTabOpenerActions(set),
-      ...createRefreshActions(set, get),
       ...createBranchActions(set, get),
       ...createCommitActions(set),
     }),

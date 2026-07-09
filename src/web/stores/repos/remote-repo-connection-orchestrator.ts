@@ -139,8 +139,8 @@ export async function runRemoteRepoConnection(
         })
         const pending = refreshHolder.value
         if (pending) {
-          void runRepoRefreshIntent(get, {
-            kind: 'core-data-changed',
+          void runRepoRefreshIntent({ get, set }, {
+            kind: 'projection-read-model-refresh-requested',
             reason: 'initial-load',
             id: pending.id,
             repoRuntimeId: pending.repoRuntimeId,

@@ -144,11 +144,17 @@ describe('repo lifecycle', () => {
 
     const first = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
     if (first.ok) useReposStore.setState({ restoredRepoId: first.id })
+    await vi.waitFor(() => {
+      expect(snapshotResolvers).toHaveLength(1)
+    })
     const firstToken = useReposStore.getState().repos[REPO_A]?.repoRuntimeId
     useReposStore.getState().closeRepo(REPO_A)
     const second = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
     if (second.ok) useReposStore.setState({ restoredRepoId: second.id })
     const secondToken = useReposStore.getState().repos[REPO_A]?.repoRuntimeId
+    await vi.waitFor(() => {
+      expect(snapshotResolvers).toHaveLength(2)
+    })
 
     snapshotResolvers[1]?.({ branches: [branchSnapshot('fresh')], current: 'fresh' })
     await flushIpc()
@@ -311,7 +317,9 @@ describe('repo lifecycle', () => {
       kind: 'ready',
       target: newTarget,
     })
-    expect(calls.projection).toEqual([newTarget!.id])
+    await vi.waitFor(() => {
+      expect(calls.projection).toEqual([newTarget!.id])
+    })
   })
 
   test('closeRepo clears recorded tab openers scoped to that repo, but leaves other repos untouched', () => {

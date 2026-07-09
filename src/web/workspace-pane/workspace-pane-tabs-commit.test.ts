@@ -2,7 +2,11 @@
 
 import { afterEach, beforeEach, describe, expect, test } from 'vitest'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
-import { commitWorkspacePaneTabs, updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
+import {
+  commitWorkspacePaneTabs,
+  updateWorkspacePaneTabs,
+  workspacePaneTabsInteractionBlockedForTarget,
+} from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import {
   createRepoBranch,
   installWorkspacePaneTabsTestBridge,
@@ -38,6 +42,29 @@ afterEach(() => {
 })
 
 describe('commitWorkspacePaneTabs', () => {
+  test('blocks target interaction while a commit is in flight', async () => {
+    let resolveServerTabs!: (tabs: WorkspacePaneTabEntry[]) => void
+    const serverTabs = new Promise<WorkspacePaneTabEntry[]>((resolve) => {
+      resolveServerTabs = resolve
+    })
+    installWorkspacePaneTabsTestBridge({
+      replaceWorkspaceTabs: async () => await serverTabs,
+    })
+
+    const commit = commitWorkspacePaneTabs({
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: REPO_RUNTIME_ID,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+
+    expect(workspacePaneTabsInteractionBlocked()).toBe(true)
+    resolveServerTabs([workspacePaneStaticTabEntry('status')])
+    await expect(commit).resolves.toMatchObject({ ok: true })
+    expect(workspacePaneTabsInteractionBlocked()).toBe(false)
+  })
+
   test('writes canonical server tabs after a successful commit', async () => {
     let resolveServerTabs!: (tabs: WorkspacePaneTabEntry[]) => void
     const serverTabs = new Promise<WorkspacePaneTabEntry[]>((resolve) => {
@@ -276,6 +303,29 @@ describe('commitWorkspacePaneTabs', () => {
 })
 
 describe('updateWorkspacePaneTabs', () => {
+  test('does not block target interaction for open-static updates', async () => {
+    let resolveServerTabs!: (tabs: WorkspacePaneTabEntry[]) => void
+    const serverTabs = new Promise<WorkspacePaneTabEntry[]>((resolve) => {
+      resolveServerTabs = resolve
+    })
+    installWorkspacePaneTabsTestBridge({
+      updateWorkspaceTabs: async () => await serverTabs,
+    })
+
+    const update = updateWorkspacePaneTabs({
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: REPO_RUNTIME_ID,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      operation: { type: 'open-static', tabType: 'history' },
+    })
+
+    expect(workspacePaneTabsInteractionBlocked()).toBe(false)
+    resolveServerTabs([workspacePaneStaticTabEntry('history')])
+    await expect(update).resolves.toMatchObject({ ok: true })
+    expect(workspacePaneTabsInteractionBlocked()).toBe(false)
+  })
+
   test('sends a server operation and writes canonical server tabs', async () => {
     installWorkspacePaneTabsTestBridge({
       updateWorkspaceTabs: async (input) => {
@@ -417,6 +467,14 @@ function readWorkspacePaneTabs(): WorkspacePaneTabEntry[] {
   return readWorkspacePaneTabsForTarget({
     repoRoot: REPO_ROOT,
     repoRuntimeId: REPO_RUNTIME_ID,
+    branchName: BRANCH_NAME,
+    worktreePath: WORKTREE_PATH,
+  })
+}
+
+function workspacePaneTabsInteractionBlocked(): boolean {
+  return workspacePaneTabsInteractionBlockedForTarget({
+    repoRoot: REPO_ROOT,
     branchName: BRANCH_NAME,
     worktreePath: WORKTREE_PATH,
   })

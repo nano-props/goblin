@@ -8,12 +8,12 @@ function decision(input: {
   actionKind: RepoBranchActionKind
   fetchBusy?: boolean
   branchOperationPhase?: RepoOperationPhase
-  coreRefreshBusy?: boolean
+  projectionReadBusy?: boolean
 }) {
   return evaluateBranchActionSchedule({
     fetchBusy: false,
     branchOperationPhase: 'idle',
-    coreRefreshBusy: false,
+    projectionReadBusy: false,
     ...input,
   })
 }
@@ -40,7 +40,7 @@ describe('evaluateBranchActionSchedule', () => {
     })
   })
 
-  test.each(ACTIONS)('queues %s behind core refresh work', (actionKind) => {
-    expect(decision({ actionKind, coreRefreshBusy: true })).toEqual({})
+  test.each(ACTIONS)('queues %s behind projection read work', (actionKind) => {
+    expect(decision({ actionKind, projectionReadBusy: true })).toEqual({})
   })
 })

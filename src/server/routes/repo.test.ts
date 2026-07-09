@@ -537,13 +537,13 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 })
 
 describe('repo routes — POST body validation (action endpoints)', () => {
-  test('returns 400 for invalid picklist values in fetch body', async () => {
+  test('returns 400 when fetch body includes caller-controlled operation kind', async () => {
     const app = createTestRepoRoutes()
     const response = await app.request(
       new Request('http://localhost/fetch', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', kind: 'not-a-kind' }),
+        body: JSON.stringify({ cwd: '/tmp/repo', kind: 'background' }),
       }),
     )
     expect(response.status).toBe(400)
@@ -583,7 +583,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       new Request('http://localhost/fetch', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', kind: 'user' }),
+        body: JSON.stringify({ cwd: '/tmp/repo' }),
       }),
     )
     expect(response.status).toBe(200)

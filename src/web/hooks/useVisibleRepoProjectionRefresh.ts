@@ -187,7 +187,7 @@ export function useVisibleRepoProjectionRefresh({
     const previousBranchName = lastRequestedBranchName.current
     lastRequestedVisibleProjectionKey.current = nextVisibleProjectionKey
     lastRequestedBranchName.current = currentRepoRefreshState.branchName
-    void runRepoRefreshIntent(useReposStore.getState, {
+    void runRepoRefreshIntent({ get: useReposStore.getState, set: useReposStore.setState }, {
       kind: 'visible-runtime-projection-requested',
       reason:
         previousBranchName !== null && previousBranchName !== currentRepoRefreshState.branchName

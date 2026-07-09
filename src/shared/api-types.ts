@@ -375,7 +375,7 @@ export interface AppIpcHandlers {
     remoteBranches: (input: { cwd: string }) => Promise<string[]>
     pull: (input: { cwd: string; branch: string; worktreePath?: string }) => Promise<ExecResult>
     push: (input: { cwd: string; branch: string }) => Promise<ExecResult>
-    fetch: (input: { cwd: string; kind?: NetworkOpKind }) => Promise<ExecResult>
+    fetch: (input: { cwd: string }) => Promise<ExecResult>
     abort: (input: { cwd: string }) => Promise<boolean>
     openRemote: (input: { cwd: string; branch?: string }) => Promise<ExecResult>
   }

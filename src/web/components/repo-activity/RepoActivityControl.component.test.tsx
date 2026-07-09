@@ -30,10 +30,10 @@ beforeEach(() => {
 })
 
 describe('RepoActivityControl component', () => {
-  test('disables the primary refresh button while server projection reports an active fetch', () => {
+  test('disables the primary refresh button while server projection reports a user fetch', () => {
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
     setRepoOperationsQueryData(REPO_ID, repo.repoRuntimeId, false, {
-      operations: [serverOperation(repo.repoRuntimeId, { kind: 'fetch', phase: 'running' })],
+      operations: [serverOperation(repo.repoRuntimeId, { kind: 'fetch', phase: 'running', source: 'user' })],
       loadedAt: 123,
     })
 
@@ -43,6 +43,19 @@ describe('RepoActivityControl component', () => {
     expect(button(container).getAttribute('aria-busy')).toBe('true')
   })
 
+  test('keeps the primary refresh button idle while server projection reports a background fetch', () => {
+    const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
+    setRepoOperationsQueryData(REPO_ID, repo.repoRuntimeId, false, {
+      operations: [serverOperation(repo.repoRuntimeId, { kind: 'fetch', phase: 'running', source: 'background' })],
+      loadedAt: 123,
+    })
+
+    const { container } = renderControl()
+
+    expect(button(container).disabled).toBe(false)
+    expect(button(container).getAttribute('aria-busy')).toBeNull()
+  })
+
   test('renders branch action activity from server operation projection', async () => {
     const repo = seedRepoForControl({ id: REPO_ID, remote: { hasRemotes: true } })
     setRepoOperationsQueryData(REPO_ID, repo.repoRuntimeId, false, {
@@ -50,6 +63,7 @@ describe('RepoActivityControl component', () => {
         serverOperation(repo.repoRuntimeId, {
           kind: 'push',
           phase: 'queued',
+          source: 'user',
           branch: 'feature/a',
         }),
       ],
@@ -159,7 +173,7 @@ function seedRepoForControl(input: Parameters<typeof seedRepoShellForTest>[0]) {
 
 function serverOperation(
   repoRuntimeId: string,
-  overrides: Pick<RepoServerOperationState, 'kind' | 'phase'> & { branch?: string },
+  overrides: Pick<RepoServerOperationState, 'kind' | 'phase' | 'source'> & { branch?: string },
 ): RepoServerOperationState {
   return {
     id: `repo-op-${overrides.kind}-${overrides.phase}`,
@@ -167,7 +181,7 @@ function serverOperation(
     repoRuntimeId,
     kind: overrides.kind,
     phase: overrides.phase,
-    source: 'user',
+    source: overrides.source,
     target: overrides.branch ? { branch: overrides.branch } : null,
     queuedAt: 100,
     startedAt: overrides.phase === 'queued' ? null : 101,

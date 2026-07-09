@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from 'vitest'
 import {
   branchUrlForBrowserRemote,
   commitUrlForBrowserRemote,
+  fetchAll,
   getBrowserRepoUrl,
   getRepoUrlForRemotes,
   resolveFetchRemoteForRemotes,
@@ -275,5 +276,18 @@ describe('resolveFetchRemoteForRemotes', () => {
 
   test('returns null when no remotes exist', () => {
     expect(resolveFetchRemoteForRemotes([], null)).toBeNull()
+  })
+})
+
+describe('fetchAll', () => {
+  test('returns an error when remote metadata cannot be read', async () => {
+    gitMock.mockImplementation(async (_cwd: string, args: string[]) => {
+      if (args[0] === 'symbolic-ref') return 'main'
+      if (args[0] === 'remote' && args[1] === '-v') throw new Error('failed to read remotes')
+      if (args[0] === 'config') throw new Error('no upstream')
+      throw new Error(`Unexpected git call: ${args.join(' ')}`)
+    })
+
+    await expect(fetchAll('/tmp/repo')).resolves.toEqual({ ok: false, message: 'failed to read remotes' })
   })
 })

@@ -204,7 +204,7 @@ describe('repo-client', () => {
     })
 
     const { fetchRepo } = await import('#/web/repo-client.ts')
-    const request = fetchRepo('/tmp/repo', 'user')
+    const request = fetchRepo('/tmp/repo')
     const assertion = expect(request).rejects.toThrow('error.request-timeout')
 
     await vi.advanceTimersByTimeAsync(240_000)

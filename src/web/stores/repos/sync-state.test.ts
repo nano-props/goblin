@@ -8,7 +8,7 @@ import {
 import { canStartRemoteFetch } from '#/web/stores/repos/sync-state.ts'
 import type { RepoOperationTarget } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
-type CoreRemoteFetchBlockerKey = 'fetch' | 'branchAction' | 'repoReadModel' | 'visibleStatus'
+type RemoteFetchBlockerKey = 'fetch' | 'branchAction' | 'repoReadModel' | 'visibleStatus'
 
 interface RepoOverrides {
   fetchBusy?: boolean
@@ -54,7 +54,7 @@ afterEach(() => {
 })
 
 describe('canStartRemoteFetch', () => {
-  test('requires a repo that is not already busy with core refresh work', () => {
+  test('requires a repo that is not already busy with projection read work', () => {
     expect(canStartRemoteFetch(undefined)).toBe(false)
     expect(canStartRemoteFetch(repo())).toBe(true)
     expect(canStartRemoteFetch(repo({ fetchBusy: true }))).toBe(false)
@@ -63,7 +63,7 @@ describe('canStartRemoteFetch', () => {
     expect(canStartRemoteFetch(repo({ visibleStatusBusy: true }))).toBe(false)
   })
 
-  test.each<CoreRemoteFetchBlockerKey>(['fetch', 'branchAction', 'repoReadModel', 'visibleStatus'])(
+  test.each<RemoteFetchBlockerKey>(['fetch', 'branchAction', 'repoReadModel', 'visibleStatus'])(
     'is blocked while runtime %s work is active',
     (key) => {
       const r = repo()

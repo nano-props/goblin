@@ -19,34 +19,43 @@ import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-p
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
+
+vi.mock('#/web/stores/repos/refresh-coordinator.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#/web/stores/repos/refresh-coordinator.ts')>()
+  return { ...actual, requestVisibleRepoProjectionRefresh: vi.fn() }
+})
 
 const REPO_ID = '/tmp/workspace-pane-tab-repo'
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
-const originalRefreshRuntimeProjection = useReposStore.getState().refreshRuntimeProjection
+const requestVisibleRefresh = vi.mocked(requestVisibleRepoProjectionRefresh)
 
 beforeEach(() => {
   resetReposStore()
   installWorkspacePaneTabsTestBridge()
   setTerminalSessionCommandBridge(null)
+  requestVisibleRefresh.mockClear()
 })
 
 afterEach(() => {
   resetReposStore()
-  useReposStore.setState({ refreshRuntimeProjection: originalRefreshRuntimeProjection })
   setClientBridgeForTests(null)
   setTerminalSessionCommandBridge(null)
 })
 
+function expectVisibleRefreshRequested(branchName: string): void {
+  expect(requestVisibleRefresh).toHaveBeenCalledWith(
+    expect.objectContaining({ get: useReposStore.getState, set: useReposStore.setState }),
+    REPO_ID,
+    branchName,
+  )
+}
+
 describe('openWorkspacePaneTab', () => {
   test('opens status as a target-owned tab when the branch has a worktree', async () => {
     seedWorktreeRepo('status')
-    const refreshRuntimeProjection = vi.fn(async () => {})
-    useReposStore.setState({
-      refreshRuntimeProjection: refreshRuntimeProjection as typeof originalRefreshRuntimeProjection,
-    })
-    const repoRuntimeId = useReposStore.getState().repos[REPO_ID]!.repoRuntimeId
 
     await expect(
       openWorkspacePaneTab({
@@ -61,20 +70,11 @@ describe('openWorkspacePaneTab', () => {
 
     expect(openTabsFor('feature/worktree')).toEqual(['status'])
     expect(preferredWorkspacePaneTab('feature/worktree')).toBe('status')
-    expect(refreshRuntimeProjection).toHaveBeenCalledWith(REPO_ID, {
-      repoRuntimeId,
-      scope: 'visible-status',
-      branchName: 'feature/worktree',
-    })
+    expectVisibleRefreshRequested('feature/worktree')
   })
 
   test('registers changes as a workspace pane static tab and refreshes status', async () => {
     seedWorktreeRepo('changes')
-    const refreshRuntimeProjection = vi.fn(async () => {})
-    useReposStore.setState({
-      refreshRuntimeProjection: refreshRuntimeProjection as typeof originalRefreshRuntimeProjection,
-    })
-    const repoRuntimeId = useReposStore.getState().repos[REPO_ID]!.repoRuntimeId
 
     await expect(
       openWorkspacePaneTab({
@@ -89,11 +89,7 @@ describe('openWorkspacePaneTab', () => {
 
     expect(openTabsFor('feature/worktree')).toEqual(['status', 'changes'])
     expect(preferredWorkspacePaneTab()).toBe('changes')
-    expect(refreshRuntimeProjection).toHaveBeenCalledWith(REPO_ID, {
-      repoRuntimeId,
-      scope: 'visible-status',
-      branchName: 'feature/worktree',
-    })
+    expectVisibleRefreshRequested('feature/worktree')
   })
 
   test('can insert a newly opened static tab immediately after a specific tab', async () => {
@@ -170,11 +166,6 @@ describe('openWorkspacePaneTab', () => {
         'feature/no-worktree': [workspacePaneStaticTabEntry('status')],
       },
     })
-    const refreshRuntimeProjection = vi.fn(async () => {})
-    useReposStore.setState({
-      refreshRuntimeProjection: refreshRuntimeProjection as typeof originalRefreshRuntimeProjection,
-    })
-
     await expect(
       openWorkspacePaneTab({
         workspacePaneRoute: undefined,
@@ -188,7 +179,7 @@ describe('openWorkspacePaneTab', () => {
 
     expect(preferredWorkspacePaneTab('feature/no-worktree')).toBe('status')
     expect(openTabsFor('feature/no-worktree')).toEqual(['status'])
-    expect(refreshRuntimeProjection).not.toHaveBeenCalled()
+    expect(requestVisibleRefresh).not.toHaveBeenCalled()
   })
 
   test('opens status for a branch without a worktree', async () => {
@@ -218,10 +209,6 @@ describe('openWorkspacePaneTab', () => {
 
   test('opens history as a branch-static workspace pane tab', async () => {
     seedWorktreeRepo('history')
-    const refreshRuntimeProjection = vi.fn(async () => {})
-    useReposStore.setState({
-      refreshRuntimeProjection: refreshRuntimeProjection as typeof originalRefreshRuntimeProjection,
-    })
 
     await expect(
       openWorkspacePaneTab({
@@ -236,7 +223,7 @@ describe('openWorkspacePaneTab', () => {
 
     expect(openTabsFor('feature/worktree')).toContain('history')
     expect(preferredWorkspacePaneTab()).toBe('history')
-    expect(refreshRuntimeProjection).not.toHaveBeenCalled()
+    expect(requestVisibleRefresh).not.toHaveBeenCalled()
   })
 
   test('fast-fails before static tab mutation while terminal creation is pending', async () => {

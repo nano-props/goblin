@@ -19,11 +19,17 @@ import type { TerminalSessionReadContextValue, TerminalWorktreeSnapshot } from '
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
+import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import type { BranchSnapshotInfo, WorktreeStatus } from '#/web/types.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
-const originalRefreshRuntimeProjection = useReposStore.getState().refreshRuntimeProjection
+vi.mock('#/web/stores/repos/refresh-coordinator.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#/web/stores/repos/refresh-coordinator.ts')>()
+  return { ...actual, runRepoRefreshIntent: vi.fn(async () => {}) }
+})
+
+const refreshIntent = vi.mocked(runRepoRefreshIntent)
 const emptyTerminalWorktreeSnapshots = new Map<string, TerminalWorktreeSnapshot>()
 const emptyTerminalSnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
 const emptyTerminalWorktreeSnapshot = (terminalWorktreeKey: string): TerminalWorktreeSnapshot => {
@@ -123,6 +129,18 @@ function setVisibleStatusPhase(repoId: string, phase: 'idle' | 'loading' | 'refr
       },
     },
   })
+}
+
+function expectVisibleProjectionRefresh(repoId: string, repoRuntimeId: string, branchName: string): void {
+  expect(refreshIntent).toHaveBeenCalledWith(
+    expect.objectContaining({ get: useReposStore.getState, set: useReposStore.setState }),
+    expect.objectContaining({
+      kind: 'visible-runtime-projection-requested',
+      id: repoId,
+      repoRuntimeId,
+      branchName,
+    }),
+  )
 }
 
 function createRepo(
@@ -237,7 +255,6 @@ describe('isRepoVisibleProjectionRefreshable', () => {
 describe('useVisibleRepoProjectionRefresh', () => {
   let container: HTMLDivElement
   let root: Root
-  let refreshRuntimeProjection: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
     ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -251,10 +268,8 @@ describe('useVisibleRepoProjectionRefresh', () => {
     container = document.createElement('div')
     document.body.appendChild(container)
     root = createRoot(container)
-    refreshRuntimeProjection = vi.fn().mockResolvedValue(undefined)
-    useReposStore.setState({
-      refreshRuntimeProjection: refreshRuntimeProjection as typeof originalRefreshRuntimeProjection,
-    })
+    refreshIntent.mockReset()
+    refreshIntent.mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -266,7 +281,6 @@ describe('useVisibleRepoProjectionRefresh', () => {
       hydrationByRepo: new Map(),
       refreshedAtByRepo: new Map(),
     })
-    useReposStore.setState({ refreshRuntimeProjection: originalRefreshRuntimeProjection })
     ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false
   })
 
@@ -281,17 +295,13 @@ describe('useVisibleRepoProjectionRefresh', () => {
       })
       root.render(<Harness repoId="/repo-a" />)
     })
-    refreshRuntimeProjection.mockClear()
+    refreshIntent.mockClear()
 
     await act(async () => {
       root.render(<Harness repoId="/repo-b" />)
     })
 
-    expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-b', {
-      repoRuntimeId: 'repo-runtime-test-b',
-      scope: 'visible-status',
-      branchName: 'main',
-    })
+    expectVisibleProjectionRefresh('/repo-b', 'repo-runtime-test-b', 'main')
   })
 
   test('refreshes the visible projection when opening the status tab', async () => {
@@ -307,7 +317,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
       })
       root.render(<Harness />)
     })
-    refreshRuntimeProjection.mockClear()
+    refreshIntent.mockClear()
 
     await act(async () => {
       setWorkspacePaneTabsForTargetQueryData({
@@ -320,11 +330,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
       useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'status')
     })
 
-    expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
-      repoRuntimeId: 'repo-runtime-test-a',
-      scope: 'visible-status',
-      branchName: 'main',
-    })
+    expectVisibleProjectionRefresh('/repo-a', 'repo-runtime-test-a', 'main')
   })
 
   test('refreshes the visible projection when opening the changes tab', async () => {
@@ -340,7 +346,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
       })
       root.render(<Harness />)
     })
-    refreshRuntimeProjection.mockClear()
+    refreshIntent.mockClear()
 
     await act(async () => {
       setWorkspacePaneTabsForTargetQueryData({
@@ -353,11 +359,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
       useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'changes')
     })
 
-    expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
-      repoRuntimeId: 'repo-runtime-test-a',
-      scope: 'visible-status',
-      branchName: 'main',
-    })
+    expectVisibleProjectionRefresh('/repo-a', 'repo-runtime-test-a', 'main')
   })
 
   test('refreshes the visible projection when reopening the status tab after bouncing through history', async () => {
@@ -373,21 +375,17 @@ describe('useVisibleRepoProjectionRefresh', () => {
       })
       root.render(<Harness />)
     })
-    refreshRuntimeProjection.mockClear()
+    refreshIntent.mockClear()
 
     await act(async () => {
       useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'history')
     })
-    expect(refreshRuntimeProjection).not.toHaveBeenCalled()
+    expect(refreshIntent).not.toHaveBeenCalled()
 
     await act(async () => {
       useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'status')
     })
-    expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
-      repoRuntimeId: 'repo-runtime-test-a',
-      scope: 'visible-status',
-      branchName: 'main',
-    })
+    expectVisibleProjectionRefresh('/repo-a', 'repo-runtime-test-a', 'main')
   })
 
   test('skips refresh when the repo is unavailable', async () => {
@@ -400,13 +398,13 @@ describe('useVisibleRepoProjectionRefresh', () => {
       })
       root.render(<Harness />)
     })
-    refreshRuntimeProjection.mockClear()
+    refreshIntent.mockClear()
 
     await act(async () => {
       useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'status')
     })
 
-    expect(refreshRuntimeProjection).not.toHaveBeenCalled()
+    expect(refreshIntent).not.toHaveBeenCalled()
   })
 
   test('skips refresh when a visible projection refresh is already in flight', async () => {
@@ -419,13 +417,13 @@ describe('useVisibleRepoProjectionRefresh', () => {
       })
       root.render(<Harness />)
     })
-    refreshRuntimeProjection.mockClear()
+    refreshIntent.mockClear()
 
     await act(async () => {
       useReposStore.getState().setWorkspacePaneTab('/repo-a', 'main', 'status')
     })
 
-    expect(refreshRuntimeProjection).not.toHaveBeenCalled()
+    expect(refreshIntent).not.toHaveBeenCalled()
   })
 
   test('refreshes the visible projection when switching branches in the current repo', async () => {
@@ -438,17 +436,13 @@ describe('useVisibleRepoProjectionRefresh', () => {
       })
       root.render(<Harness />)
     })
-    refreshRuntimeProjection.mockClear()
+    refreshIntent.mockClear()
 
     await act(async () => {
       root.render(<Harness branchName="feature/a" />)
     })
 
-    expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
-      repoRuntimeId: 'repo-runtime-test-a',
-      scope: 'visible-status',
-      branchName: 'feature/a',
-    })
+    expectVisibleProjectionRefresh('/repo-a', 'repo-runtime-test-a', 'feature/a')
   })
 
   test('uses the branch-scoped projection when resolving linked-worktree tab targets', async () => {
@@ -492,11 +486,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
       root.render(<Harness branchName="feature/a" />)
     })
 
-    expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
-      repoRuntimeId: 'repo-runtime-test-a',
-      scope: 'visible-status',
-      branchName: 'feature/a',
-    })
+    expectVisibleProjectionRefresh('/repo-a', 'repo-runtime-test-a', 'feature/a')
   })
 
   test('refreshes the current branch after a busy visible refresh settles', async () => {
@@ -512,32 +502,24 @@ describe('useVisibleRepoProjectionRefresh', () => {
       })
       root.render(<Harness />)
     })
-    refreshRuntimeProjection.mockClear()
+    refreshIntent.mockClear()
 
     await act(async () => {
       root.render(<Harness branchName="feature/a" />)
     })
-    expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
-      repoRuntimeId: 'repo-runtime-test-a',
-      scope: 'visible-status',
-      branchName: 'feature/a',
-    })
-    refreshRuntimeProjection.mockClear()
+    expectVisibleProjectionRefresh('/repo-a', 'repo-runtime-test-a', 'feature/a')
+    refreshIntent.mockClear()
 
     await act(async () => {
       setVisibleStatusPhase('/repo-a', 'loading')
       root.render(<Harness branchName="feature/b" />)
     })
-    expect(refreshRuntimeProjection).not.toHaveBeenCalled()
+    expect(refreshIntent).not.toHaveBeenCalled()
 
     await act(async () => {
       setVisibleStatusPhase('/repo-a', 'idle')
     })
-    expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
-      repoRuntimeId: 'repo-runtime-test-a',
-      scope: 'visible-status',
-      branchName: 'feature/b',
-    })
+    expectVisibleProjectionRefresh('/repo-a', 'repo-runtime-test-a', 'feature/b')
   })
 
   test('refreshes after branch switches when status is rendered through stale runtime tab fallback', async () => {
@@ -555,17 +537,13 @@ describe('useVisibleRepoProjectionRefresh', () => {
       })
       root.render(<Harness />)
     })
-    refreshRuntimeProjection.mockClear()
+    refreshIntent.mockClear()
 
     await act(async () => {
       root.render(<Harness branchName="feature/a" />)
     })
 
-    expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
-      repoRuntimeId: 'repo-runtime-test-a',
-      scope: 'visible-status',
-      branchName: 'feature/a',
-    })
+    expectVisibleProjectionRefresh('/repo-a', 'repo-runtime-test-a', 'feature/a')
   })
 
   test('does not refresh a bare branch route as though it rendered the preferred status tab', async () => {
@@ -582,7 +560,7 @@ describe('useVisibleRepoProjectionRefresh', () => {
       root.render(<Harness workspacePaneRoute={null} />)
     })
 
-    expect(refreshRuntimeProjection).not.toHaveBeenCalled()
+    expect(refreshIntent).not.toHaveBeenCalled()
   })
 
   test('refreshes a routed status tab without consulting the stored preferred tab', async () => {
@@ -599,10 +577,6 @@ describe('useVisibleRepoProjectionRefresh', () => {
       root.render(<Harness workspacePaneRoute={{ kind: 'static', tab: 'status' }} />)
     })
 
-    expect(refreshRuntimeProjection).toHaveBeenCalledWith('/repo-a', {
-      repoRuntimeId: 'repo-runtime-test-a',
-      scope: 'visible-status',
-      branchName: 'main',
-    })
+    expectVisibleProjectionRefresh('/repo-a', 'repo-runtime-test-a', 'main')
   })
 })

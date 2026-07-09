@@ -48,10 +48,16 @@ import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
 
 const toastMocks = vi.hoisted(() => ({
   error: vi.fn(),
 }))
+
+vi.mock('#/web/stores/repos/refresh-coordinator.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#/web/stores/repos/refresh-coordinator.ts')>()
+  return { ...actual, requestVisibleRepoProjectionRefresh: vi.fn() }
+})
 
 vi.mock('sonner', () => ({
   toast: {
@@ -63,6 +69,7 @@ const REPO_ID = '/tmp/gbl-workspace-command-repo'
 const OTHER_REPO_ID = '/tmp/gbl-workspace-command-other-repo'
 const WORKTREE_PATH = '/tmp/gbl-workspace-command-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
+const requestVisibleRefresh = vi.mocked(requestVisibleRepoProjectionRefresh)
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()
@@ -70,6 +77,7 @@ beforeEach(() => {
   installWorkspacePaneTabsTestBridge()
   resetTerminalActionDialogsStore()
   useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
+  requestVisibleRefresh.mockClear()
 })
 
 afterEach(() => {
@@ -241,14 +249,6 @@ describe('workspace commands', () => {
         createTerminal: vi.fn(async () => 'term-111111111111111111111'),
         selectTerminal: vi.fn(),
       })
-      const refreshRuntimeProjection = vi.fn(async () => {})
-      const repoRuntimeId = useReposStore.getState().repos[REPO_ID]!.repoRuntimeId
-      useReposStore.setState({
-        refreshRuntimeProjection: refreshRuntimeProjection as ReturnType<
-          typeof useReposStore.getState
-        >['refreshRuntimeProjection'],
-      })
-
       await expect(
         runShowWorkspacePaneTabCommand({
           workspacePaneRoute: undefined,
@@ -259,11 +259,11 @@ describe('workspace commands', () => {
         }),
       ).resolves.toBe(true)
 
-      expect(refreshRuntimeProjection).toHaveBeenCalledWith(REPO_ID, {
-        repoRuntimeId,
-        scope: 'visible-status',
-        branchName: 'feature/worktree',
-      })
+      expect(requestVisibleRefresh).toHaveBeenCalledWith(
+        expect.objectContaining({ get: useReposStore.getState, set: useReposStore.setState }),
+        REPO_ID,
+        'feature/worktree',
+      )
     },
   )
 

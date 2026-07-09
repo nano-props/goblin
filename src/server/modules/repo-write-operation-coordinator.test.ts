@@ -8,16 +8,22 @@ import {
 
 const mocks = vi.hoisted(() => ({
   resolveRepoWriteBoundaryKey: vi.fn(async (repoId: string) => repoId),
+  publishRepoQueryInvalidation: vi.fn(),
 }))
 
 vi.mock('#/server/modules/repo-source.ts', () => ({
   resolveRepoWriteBoundaryKey: mocks.resolveRepoWriteBoundaryKey,
 }))
 
+vi.mock('#/server/modules/invalidation-broker.ts', () => ({
+  publishRepoQueryInvalidation: mocks.publishRepoQueryInvalidation,
+}))
+
 beforeEach(() => {
   resetRepoWriteOperationCoordinatorForTests()
   mocks.resolveRepoWriteBoundaryKey.mockReset()
   mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (repoId: string) => repoId)
+  mocks.publishRepoQueryInvalidation.mockReset()
   vi.useFakeTimers()
   vi.setSystemTime(0)
 })
@@ -153,6 +159,67 @@ describe('repo write operation coordinator', () => {
         },
       },
     ])
+  })
+
+  test('publishes repo-runtime invalidations to known sibling repos sharing a write boundary', async () => {
+    mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (repoId: string) =>
+      repoId === '/tmp/repo' || repoId === '/tmp/repo-linked' ? '/tmp/repo/.git' : repoId,
+    )
+    await expect(listRepoWriteOperationsForRepo('/tmp/repo-linked')).resolves.toEqual([])
+    mocks.publishRepoQueryInvalidation.mockClear()
+
+    await enqueueRepoWriteOperation(
+      '/tmp/repo',
+      undefined,
+      { repoId: '/tmp/repo', kind: 'fetch', source: 'background' },
+      (operation) => async () => {
+        operation.start()
+        operation.settle({ ok: true, message: 'ok' })
+        return { ok: true, message: 'ok' }
+      },
+    )
+
+    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
+      repoId: '/tmp/repo',
+      query: 'repo-runtime',
+    })
+    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
+      repoId: '/tmp/repo-linked',
+      query: 'repo-runtime',
+    })
+  })
+
+  test('stops invalidating a repo after it resolves to another write boundary', async () => {
+    let linkedBoundary = '/tmp/repo/.git'
+    mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (repoId: string) => {
+      if (repoId === '/tmp/repo') return '/tmp/repo/.git'
+      if (repoId === '/tmp/repo-linked') return linkedBoundary
+      return repoId
+    })
+    await expect(listRepoWriteOperationsForRepo('/tmp/repo-linked')).resolves.toEqual([])
+    linkedBoundary = '/tmp/repo-linked/.git'
+    await expect(listRepoWriteOperationsForRepo('/tmp/repo-linked')).resolves.toEqual([])
+    mocks.publishRepoQueryInvalidation.mockClear()
+
+    await enqueueRepoWriteOperation(
+      '/tmp/repo',
+      undefined,
+      { repoId: '/tmp/repo', kind: 'fetch', source: 'background' },
+      (operation) => async () => {
+        operation.start()
+        operation.settle({ ok: true, message: 'ok' })
+        return { ok: true, message: 'ok' }
+      },
+    )
+
+    expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
+      repoId: '/tmp/repo',
+      query: 'repo-runtime',
+    })
+    expect(mocks.publishRepoQueryInvalidation).not.toHaveBeenCalledWith({
+      repoId: '/tmp/repo-linked',
+      query: 'repo-runtime',
+    })
   })
 
   test('records caller cancellation for a running network operation', async () => {
