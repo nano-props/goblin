@@ -20,7 +20,14 @@ interface AcceptRepoProjectionReadModelOptions {
   scope: AcceptRepoProjectionReadModelScope
 }
 
-const acceptedCoreRepoProjectionLoadedAtByKey = new Map<string, number>()
+interface CoreRepoProjectionAcceptanceSignature {
+  readLoadedAt: number
+  snapshot: RepoRuntimeProjection['snapshot']
+  status: RepoRuntimeProjection['status']
+  pullRequests: RepoRuntimeProjection['pullRequests']
+}
+
+const acceptedCoreRepoProjectionSignaturesByKey = new Map<string, CoreRepoProjectionAcceptanceSignature>()
 
 function acceptedProjectionKey(input: AcceptedRepoProjectionReadModel): string {
   return [
@@ -37,15 +44,38 @@ function authoritativeProjection(projection: RepoRuntimeProjection): boolean {
   return projection.loadedAt > 0
 }
 
+function coreProjectionAcceptanceSignature(projection: RepoRuntimeProjection): CoreRepoProjectionAcceptanceSignature {
+  return {
+    readLoadedAt: projection.loadedAt,
+    snapshot: projection.snapshot,
+    status: projection.status,
+    pullRequests: projection.pullRequests,
+  }
+}
+
+function sameCoreProjectionAcceptanceSignature(
+  left: CoreRepoProjectionAcceptanceSignature,
+  right: CoreRepoProjectionAcceptanceSignature,
+): boolean {
+  return (
+    left.readLoadedAt === right.readLoadedAt &&
+    left.snapshot === right.snapshot &&
+    left.status === right.status &&
+    left.pullRequests === right.pullRequests
+  )
+}
+
 function markCoreProjectionAccepted(input: AcceptedRepoProjectionReadModel): boolean {
   const key = acceptedProjectionKey(input)
-  if (acceptedCoreRepoProjectionLoadedAtByKey.get(key) === input.projection.loadedAt) return false
-  acceptedCoreRepoProjectionLoadedAtByKey.set(key, input.projection.loadedAt)
+  const signature = coreProjectionAcceptanceSignature(input.projection)
+  const previous = acceptedCoreRepoProjectionSignaturesByKey.get(key)
+  if (previous && sameCoreProjectionAcceptanceSignature(previous, signature)) return false
+  acceptedCoreRepoProjectionSignaturesByKey.set(key, signature)
   return true
 }
 
 export function resetAcceptedRepoProjectionReadModelState(): void {
-  acceptedCoreRepoProjectionLoadedAtByKey.clear()
+  acceptedCoreRepoProjectionSignaturesByKey.clear()
 }
 
 export function acceptRepoProjectionReadModel(

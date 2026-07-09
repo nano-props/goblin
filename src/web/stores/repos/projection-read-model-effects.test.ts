@@ -8,6 +8,7 @@ import {
   seedRepoShellForTest,
 } from '#/web/test-utils/bridge.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
 
@@ -107,6 +108,53 @@ describe('repo projection read-model effects', () => {
 
     expect(pruneTerminals).not.toHaveBeenCalled()
     expect(useReposStore.getState().repoSnapshotCache['/repo']).toBeUndefined()
+  })
+
+  test('same-millisecond core projection changes are accepted', () => {
+    installGoblinTestBridge({})
+    const repo = seedRepoShellForTest({
+      id: '/repo',
+      repoRuntimeId: 'repo-runtime-test-2',
+      currentBranchName: 'feature/a',
+    })
+    const loadedAt = 123
+    const firstProjection: RepoRuntimeProjection = {
+      ...acceptedProjection(),
+      snapshot: {
+        branches: [createBranchSnapshot('feature/a')],
+        current: 'feature/a',
+      },
+      operations: { operations: [], loadedAt },
+      loadedAt,
+    }
+    const secondProjection: RepoRuntimeProjection = {
+      ...firstProjection,
+      snapshot: {
+        branches: [createBranchSnapshot('feature/b')],
+        current: 'feature/b',
+      },
+    }
+
+    setRepoProjectionQueryData('/repo', repo.repoRuntimeId, null, 'full', firstProjection)
+    acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {
+      repoRoot: '/repo',
+      repoRuntimeId: repo.repoRuntimeId,
+      projection: firstProjection,
+    }, { scope: 'repo-read-model' })
+
+    setRepoProjectionQueryData('/repo', repo.repoRuntimeId, null, 'full', secondProjection)
+    acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {
+      repoRoot: '/repo',
+      repoRuntimeId: repo.repoRuntimeId,
+      projection: secondProjection,
+    }, { scope: 'repo-read-model' })
+
+    expect(useReposStore.getState().repoSnapshotCache['/repo']).toMatchObject({
+      data: {
+        currentBranch: 'feature/b',
+        branches: [{ name: 'feature/b' }],
+      },
+    })
   })
 
   test('branch-scoped query-cache acceptance does not settle the visible status load', () => {
