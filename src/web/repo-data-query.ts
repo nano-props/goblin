@@ -546,7 +546,7 @@ interface RepoProjectionRefreshReadInput {
   signal?: AbortSignal
 }
 
-async function prepareRepoProjectionReadModelRefresh(input: RepoProjectionRefreshReadInput): Promise<void> {
+async function beginRepoProjectionReadModelRefresh(input: RepoProjectionRefreshReadInput): Promise<void> {
   markRepoRuntimeProjectionInvalidated(input.repoRoot, input.repoRuntimeId, input.queryClient)
   invalidateActiveRepoRuntimeProjectionQueries(input.repoRoot, input.repoRuntimeId, input.queryClient, {
     excludeProjectionQueryKey: input.queryKey,
@@ -629,7 +629,7 @@ export async function refreshRepoProjectionReadModel(
     queryKey,
     signal: options.signal,
   }
-  await prepareRepoProjectionReadModelRefresh(refreshReadInput)
+  await beginRepoProjectionReadModelRefresh(refreshReadInput)
   options.signal?.throwIfAborted()
   const projection = await fetchRepoProjectionReadModelUntilCurrent(refreshReadInput)
   setRepoOperationsQueryData(repoRoot, repoRuntimeId, false, projection.operations, queryClient)
