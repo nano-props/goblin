@@ -39,6 +39,7 @@ import {
   workspacePaneRuntimeTabEntry,
 } from '#/shared/workspace-pane.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
@@ -1293,7 +1294,7 @@ function terminalEntry(id: string) {
 }
 
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
-  return {
+  const navigation: PrimaryWindowNavigationActions = {
     activateRepo: () => {},
     closeRepo: () => {},
     cycleRepo: () => {},
@@ -1307,6 +1308,21 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
     openCreateWorktree: () => {},
     ...overrides,
   }
+  if (!overrides.commitRepoBranchWorkspacePaneRoute) {
+    navigation.commitRepoBranchWorkspacePaneRoute = (repoId, branch, route, options) =>
+      openResolvedRepoBranchWorkspacePaneRoute(
+        {
+          openRepoBranch: navigation.showRepoBranchEmptyWorkspacePane,
+          openRepoBranchTab: navigation.showRepoBranchWorkspacePaneTab,
+          openRepoBranchTerminal: navigation.showRepoBranchTerminalSession,
+        },
+        repoId,
+        branch,
+        route,
+        options,
+      )
+  }
+  return navigation
 }
 
 function terminalSession(

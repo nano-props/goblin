@@ -58,6 +58,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type { RepoSettingsEntry } from '#/shared/repo-settings.ts'
+import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 
 let compactUi = false
 const runtimeExternalAppSettings = vi.hoisted(() => ({
@@ -1361,11 +1362,14 @@ function renderToolbar(options: {
     settingsSnapshotQueryKey(),
     defaultSettingsSnapshot({ repoSettings: options.seedRepoSettings ?? [] }),
   )
+  const navigation = navigationWith({
+    ...options.navigation,
+    showRepoBranchWorkspacePaneTab,
+    showRepoBranchTerminalSession,
+  })
   const { container, rerender } = renderInJsdom(
     <QueryClientProvider client={queryClient}>
-      <PrimaryWindowNavigationProvider
-        value={{ ...options.navigation, showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }}
-      >
+      <PrimaryWindowNavigationProvider value={navigation}>
         <TerminalSessionContext value={commandContext}>
           <TerminalSessionReadContext value={readContext}>
             <RepoWorkspaceToolbarHarness
@@ -1416,7 +1420,7 @@ function workspacePaneRouteForPreferredTab(
 }
 
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
-  return {
+  const navigation: PrimaryWindowNavigationActions = {
     activateRepo: () => {},
     closeRepo: () => {},
     cycleRepo: () => {},
@@ -1430,6 +1434,21 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
     openCreateWorktree: () => {},
     ...overrides,
   }
+  if (!overrides.commitRepoBranchWorkspacePaneRoute) {
+    navigation.commitRepoBranchWorkspacePaneRoute = (repoId, branch, route, options) =>
+      openResolvedRepoBranchWorkspacePaneRoute(
+        {
+          openRepoBranch: navigation.showRepoBranchEmptyWorkspacePane,
+          openRepoBranchTab: navigation.showRepoBranchWorkspacePaneTab,
+          openRepoBranchTerminal: navigation.showRepoBranchTerminalSession,
+        },
+        repoId,
+        branch,
+        route,
+        options,
+      )
+  }
+  return navigation
 }
 
 async function flush() {

@@ -3,7 +3,10 @@ import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/sha
 import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
-import { showWorkspacePaneControllerRoute, type WorkspacePaneTabControllerNavigation } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import {
+  commitWorkspacePaneControllerRoute,
+  type WorkspacePaneTabControllerNavigation,
+} from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
@@ -109,20 +112,20 @@ async function openWorkspacePaneStaticTabAction(input: OpenWorkspacePaneStaticTa
   if (openerIdentity) {
     recordWorkspacePaneTabOpener(input.repoId, branchName, workspacePaneStaticTabId(input.type), openerIdentity)
   }
-  if (!showWorkspacePaneStaticTab(input)) return false
+  if (!commitWorkspacePaneStaticTab(input)) return false
   if (provider.refreshOnOpen) {
     requestVisibleRepoProjectionRefresh({ get: useReposStore.getState, set: useReposStore.setState }, input.repoId, branchName)
   }
   return true
 }
 
-function showWorkspacePaneStaticTab(input: {
+function commitWorkspacePaneStaticTab(input: {
   repoId: string
   branchName: string
   type: WorkspacePaneStaticTabType
   navigation: WorkspacePaneTabControllerNavigation
 }): boolean {
-  return showWorkspacePaneControllerRoute(
+  return commitWorkspacePaneControllerRoute(
     input.repoId,
     input.branchName,
     { kind: 'static', tab: input.type },

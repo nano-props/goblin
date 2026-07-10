@@ -31,6 +31,7 @@ import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/sha
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 
 const appDataClientMocks = vi.hoisted(() => ({
   clearRecentRepoHistory: vi.fn(async () => {}),
@@ -97,6 +98,18 @@ beforeEach(() => {
       showRepoBranchTerminalSessionSpy(repoId, branch, terminalSessionId)
       return true
     },
+    commitRepoBranchWorkspacePaneRoute: (repoId, branch, route, options) =>
+      openResolvedRepoBranchWorkspacePaneRoute(
+        {
+          openRepoBranch: navigation.showRepoBranchEmptyWorkspacePane,
+          openRepoBranchTab: navigation.showRepoBranchWorkspacePaneTab,
+          openRepoBranchTerminal: navigation.showRepoBranchTerminalSession,
+        },
+        repoId,
+        branch,
+        route,
+        options,
+      ),
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},

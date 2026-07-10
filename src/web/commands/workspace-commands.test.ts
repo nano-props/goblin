@@ -49,6 +49,7 @@ import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-
 import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
 import { resetWorkspacePaneTabControllerForTest } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
+import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 
 const toastMocks = vi.hoisted(() => ({
   error: vi.fn(),
@@ -2818,7 +2819,7 @@ function terminalEntry(id: string) {
 }
 
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {}): PrimaryWindowNavigationActions {
-  return {
+  const navigation: PrimaryWindowNavigationActions = {
     activateRepo: (repoId) => useReposStore.setState({ restoredRepoId: repoId }),
     closeRepo: () => {},
     cycleRepo: () => {},
@@ -2837,6 +2838,21 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
     openCreateWorktree: () => {},
     ...overrides,
   }
+  if (!overrides.commitRepoBranchWorkspacePaneRoute) {
+    navigation.commitRepoBranchWorkspacePaneRoute = (repoId, branch, route, options) =>
+      openResolvedRepoBranchWorkspacePaneRoute(
+        {
+          openRepoBranch: navigation.showRepoBranchEmptyWorkspacePane,
+          openRepoBranchTab: navigation.showRepoBranchWorkspacePaneTab,
+          openRepoBranchTerminal: navigation.showRepoBranchTerminalSession,
+        },
+        repoId,
+        branch,
+        route,
+        options,
+      )
+  }
+  return navigation
 }
 
 function worktreeSnapshotWithTerminal(options: { processName?: string } = {}): TerminalWorktreeSnapshot {

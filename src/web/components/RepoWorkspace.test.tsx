@@ -93,6 +93,7 @@ const navigation: PrimaryWindowNavigationActions = {
   showRepoBranchEmptyWorkspacePane: () => true,
   showRepoBranchWorkspacePaneTab: vi.fn(),
   showRepoBranchTerminalSession: vi.fn(),
+  commitRepoBranchWorkspacePaneRoute: vi.fn(() => false),
   goBack: vi.fn(),
   goForward: vi.fn(),
   openSettings: vi.fn(),
@@ -336,7 +337,6 @@ describe('RepoWorkspace', () => {
       REPO_ID,
       'feature/a',
       'term-111111111111111111111',
-      undefined,
     )
 
     rerender(
@@ -806,20 +806,36 @@ describe('RepoWorkspace', () => {
     function RoutedWorkspaceHarness() {
       const [route, setRoute] = useState<RepoBranchWorkspacePaneRoute | null>({ kind: 'static', tab: 'status' })
       const navigationWithRoute = useMemo<PrimaryWindowNavigationActions>(
-        () => ({
-          ...navigation,
-          showRepoBranchEmptyWorkspacePane: (repoId, nextBranch) => {
+        () => {
+          const showRepoBranchEmptyWorkspacePane: PrimaryWindowNavigationActions['showRepoBranchEmptyWorkspacePane'] = (
+            repoId,
+            nextBranch,
+          ) => {
             useReposStore.getState().setWorkspacePaneTab(repoId, nextBranch, null)
             setTimeout(() => setRoute(null), 0)
             return true
-          },
-          showRepoBranchWorkspacePaneTab: (repoId, nextBranch, tab) => {
+          }
+          const showRepoBranchWorkspacePaneTab: PrimaryWindowNavigationActions['showRepoBranchWorkspacePaneTab'] = (
+            repoId,
+            nextBranch,
+            tab,
+          ) => {
             useReposStore.getState().setWorkspacePaneTab(repoId, nextBranch, tab)
             setTimeout(() => setRoute({ kind: 'static', tab }), 0)
             return true
-          },
-          showRepoBranchTerminalSession: () => false,
-        }),
+          }
+          return {
+            ...navigation,
+            showRepoBranchEmptyWorkspacePane,
+            showRepoBranchWorkspacePaneTab,
+            showRepoBranchTerminalSession: () => false,
+            commitRepoBranchWorkspacePaneRoute: (repoId, nextBranch, nextRoute) => {
+              if (nextRoute === null) return showRepoBranchEmptyWorkspacePane(repoId, nextBranch)
+              if (nextRoute.kind === 'static') return showRepoBranchWorkspacePaneTab(repoId, nextBranch, nextRoute.tab)
+              return false
+            },
+          }
+        },
         [],
       )
       const routeLabel = route?.kind === 'static' ? route.tab : route?.kind === 'terminal' ? 'terminal' : 'empty'

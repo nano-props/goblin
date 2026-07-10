@@ -9,6 +9,7 @@ import {
 } from '#/web/workspace-navigation-history.ts'
 import { workspacePaneRouteNavigationBlockedForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { openRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
+import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
@@ -157,25 +158,18 @@ function commitRepoBranchWorkspacePaneRoute(
   route: RepoBranchWorkspacePaneRoute | null,
   options?: { replace?: boolean },
 ): boolean {
-  if (route === null) {
-    if (!routeNavigation.openRepoBranch(repoId, branchName, options)) return false
-    rememberWorkspacePaneRouteSelection(repoId, branchName, { kind: 'empty' })
-    return true
-  }
-  if (route.kind === 'static') {
-    if (!routeNavigation.openRepoBranchTab(repoId, branchName, route.tab, options)) return false
-    rememberWorkspacePaneRouteSelection(repoId, branchName, { kind: 'static', tab: route.tab })
-    return true
-  }
-  if (route.kind === 'terminal') {
-    if (!routeNavigation.openRepoBranchTerminal(repoId, branchName, route.terminalSessionId, options)) return false
-    rememberWorkspacePaneRouteSelection(repoId, branchName, {
-      kind: 'terminal',
-      terminalSessionId: route.terminalSessionId,
-    })
-    return true
-  }
-  return false
+  if (!openResolvedRepoBranchWorkspacePaneRoute(routeNavigation, repoId, branchName, route, options)) return false
+  const rememberedRoute = rememberedWorkspacePaneRoute(route)
+  if (!rememberedRoute) return false
+  rememberWorkspacePaneRouteSelection(repoId, branchName, rememberedRoute)
+  return true
+}
+
+function rememberedWorkspacePaneRoute(route: RepoBranchWorkspacePaneRoute | null): WorkspacePaneRememberedRoute | null {
+  if (route === null) return { kind: 'empty' }
+  if (route.kind === 'static') return { kind: 'static', tab: route.tab }
+  if (route.kind === 'terminal') return { kind: 'terminal', terminalSessionId: route.terminalSessionId }
+  return null
 }
 
 function nextNavigationRepoIdAfterClose(order: string[], closingRepoId: string): string | null {

@@ -11,6 +11,7 @@ import {
   PrimaryWindowNavigationProvider,
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
+import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 
 stubI18n()
@@ -130,7 +131,7 @@ function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = 
 }
 
 function navigationWith(): PrimaryWindowNavigationActions {
-  return {
+  const navigation: PrimaryWindowNavigationActions = {
     activateRepo: vi.fn(),
     closeRepo: vi.fn(),
     cycleRepo: vi.fn(),
@@ -143,6 +144,19 @@ function navigationWith(): PrimaryWindowNavigationActions {
     openSettings: vi.fn(),
     openCreateWorktree: vi.fn(),
   }
+  navigation.commitRepoBranchWorkspacePaneRoute = (repoId, branch, route, options) =>
+    openResolvedRepoBranchWorkspacePaneRoute(
+      {
+        openRepoBranch: navigation.showRepoBranchEmptyWorkspacePane,
+        openRepoBranchTab: navigation.showRepoBranchWorkspacePaneTab,
+        openRepoBranchTerminal: navigation.showRepoBranchTerminalSession,
+      },
+      repoId,
+      branch,
+      route,
+      options,
+    )
+  return navigation
 }
 
 function terminalCommandContextWith(overrides: Partial<TerminalSessionContextValue> = {}): TerminalSessionContextValue {

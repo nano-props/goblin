@@ -13,6 +13,7 @@ import {
   resetWorkspacePaneTabCoordinatorForTest,
   workspacePaneTabCoordinatorReconciliationDeferred,
 } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 
 export type WorkspacePaneTabControllerRoute = RepoBranchWorkspacePaneRoute | null
 export type WorkspacePaneTabControllerNavigation = Partial<
@@ -104,7 +105,7 @@ export function selectWorkspacePaneControllerTab(
   return showWorkspacePaneControllerRoute(target.repoId, branchName, route, navigation)
 }
 
-export function showWorkspacePaneControllerCloseBackTarget(
+export function commitWorkspacePaneControllerCloseBackTarget(
   target: RepoWorkspaceTabModel,
   nextTab: RepoWorkspaceTab | null,
   navigation: WorkspacePaneTabControllerNavigation,
@@ -113,7 +114,7 @@ export function showWorkspacePaneControllerCloseBackTarget(
   if (!branchName) return false
   const route = nextTab ? workspacePaneControllerRouteForTab(nextTab) : null
   if (route === undefined) return false
-  return showWorkspacePaneControllerRoute(target.repoId, branchName, route, navigation)
+  return commitWorkspacePaneControllerRoute(target.repoId, branchName, route, navigation)
 }
 
 export function showWorkspacePaneControllerRoute(
@@ -123,25 +124,17 @@ export function showWorkspacePaneControllerRoute(
   navigation: WorkspacePaneTabControllerNavigation,
   options?: { replace?: boolean },
 ): boolean {
-  if (route === null) {
-    if (!navigation.showRepoBranchEmptyWorkspacePane) return false
-    return options
-      ? navigation.showRepoBranchEmptyWorkspacePane(repoId, branchName, options)
-      : navigation.showRepoBranchEmptyWorkspacePane(repoId, branchName)
-  }
-  if (route.kind === 'static') {
-    if (!navigation.showRepoBranchWorkspacePaneTab) return false
-    return options
-      ? navigation.showRepoBranchWorkspacePaneTab(repoId, branchName, route.tab, options)
-      : navigation.showRepoBranchWorkspacePaneTab(repoId, branchName, route.tab)
-  }
-  if (route.kind === 'terminal') {
-    if (!navigation.showRepoBranchTerminalSession) return false
-    return options
-      ? navigation.showRepoBranchTerminalSession(repoId, branchName, route.terminalSessionId, options)
-      : navigation.showRepoBranchTerminalSession(repoId, branchName, route.terminalSessionId)
-  }
-  return false
+  return openResolvedRepoBranchWorkspacePaneRoute(
+    {
+      openRepoBranch: navigation.showRepoBranchEmptyWorkspacePane ?? (() => false),
+      openRepoBranchTab: navigation.showRepoBranchWorkspacePaneTab ?? (() => false),
+      openRepoBranchTerminal: navigation.showRepoBranchTerminalSession ?? (() => false),
+    },
+    repoId,
+    branchName,
+    route,
+    options,
+  )
 }
 
 export function commitWorkspacePaneControllerRoute(
@@ -151,8 +144,5 @@ export function commitWorkspacePaneControllerRoute(
   navigation: WorkspacePaneTabControllerNavigation,
   options?: { replace?: boolean },
 ): boolean {
-  if (navigation.commitRepoBranchWorkspacePaneRoute) {
-    return navigation.commitRepoBranchWorkspacePaneRoute(repoId, branchName, route, options)
-  }
-  return showWorkspacePaneControllerRoute(repoId, branchName, route, navigation, options)
+  return navigation.commitRepoBranchWorkspacePaneRoute?.(repoId, branchName, route, options) ?? false
 }

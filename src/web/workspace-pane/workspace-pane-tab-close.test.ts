@@ -1,5 +1,7 @@
-import { beforeEach, expect, test } from 'vitest'
+import { beforeEach, expect, test, vi } from 'vitest'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import { dispatchCloseWorkspacePaneTabAction } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
 import { closeWorkspacePaneTabsForWorktree } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
 import {
   resetWorkspacePaneTabCoordinatorForTest,
@@ -68,3 +70,54 @@ test('queues worktree tab close behind in-flight workspace pane tab operations',
   await expect(closePromise).resolves.toBe(true)
   expect(updateCalled).toBe(true)
 })
+
+test('commits active close-back route through command-owned navigation', async () => {
+  seedRepoWithReadModelForTest({
+    id: REPO_ID,
+    branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+    currentBranchName: BRANCH_NAME,
+    preferredWorkspacePaneTab: 'files',
+    workspacePaneTabsByBranch: {
+      [BRANCH_NAME]: [workspacePaneStaticTabEntry('files'), workspacePaneStaticTabEntry('status')],
+    },
+  })
+  const showRepoBranchWorkspacePaneTab = vi.fn(() => false)
+  const commitRepoBranchWorkspacePaneRoute = vi.fn(() => true)
+
+  await expect(
+    dispatchCloseWorkspacePaneTabAction({
+      repoId: REPO_ID,
+      branchName: BRANCH_NAME,
+      workspacePaneRoute: { kind: 'static', tab: 'files' },
+      navigation: navigationWith({
+        showRepoBranchWorkspacePaneTab,
+        commitRepoBranchWorkspacePaneRoute,
+      }),
+    }),
+  ).resolves.toBe(true)
+
+  expect(commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
+    REPO_ID,
+    BRANCH_NAME,
+    { kind: 'static', tab: 'status' },
+    undefined,
+  )
+  expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
+})
+
+function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {}): PrimaryWindowNavigationActions {
+  return {
+    activateRepo: vi.fn(),
+    closeRepo: vi.fn(),
+    cycleRepo: vi.fn(),
+    selectRepoBranch: vi.fn(() => true),
+    showRepoBranchEmptyWorkspacePane: vi.fn(() => true),
+    showRepoBranchWorkspacePaneTab: vi.fn(() => true),
+    showRepoBranchTerminalSession: vi.fn(() => true),
+    goBack: vi.fn(),
+    goForward: vi.fn(),
+    openSettings: vi.fn(),
+    openCreateWorktree: vi.fn(),
+    ...overrides,
+  }
+}

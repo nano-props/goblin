@@ -68,7 +68,7 @@ describe('createPrimaryWindowNavigationActions', () => {
 
     actions.selectRepoBranch(REPO_ID, BRANCH_NAME)
 
-    expect(navigation.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, 'status', undefined)
+    expect(navigation.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, 'status')
     expect(navigation.openRepoBranch).not.toHaveBeenCalled()
   })
 
@@ -92,7 +92,7 @@ describe('createPrimaryWindowNavigationActions', () => {
 
     actions.selectRepoBranch(REPO_ID, BRANCH_NAME)
 
-    expect(navigation.openRepoBranch).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, undefined)
+    expect(navigation.openRepoBranch).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME)
     expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
     expect(navigation.openRepoBranchTerminal).not.toHaveBeenCalled()
   })
@@ -250,7 +250,6 @@ describe('createPrimaryWindowNavigationActions', () => {
       REPO_ID,
       BRANCH_NAME,
       'term-111111111111111111111',
-      undefined,
     )
     expect(preferredWorkspacePaneTab()).toBe('terminal')
   })

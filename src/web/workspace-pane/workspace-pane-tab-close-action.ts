@@ -10,7 +10,7 @@ import {
 import {
   abortWorkspacePaneTabControllerTransition,
   beginWorkspacePaneCloseActiveTabTransition,
-  showWorkspacePaneControllerCloseBackTarget,
+  commitWorkspacePaneControllerCloseBackTarget,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { beginWorkspacePaneTabClose } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
 import {
@@ -82,7 +82,7 @@ async function closeWorkspacePaneTabAction(options: CloseWorkspacePaneTabActionO
   }
   completeWorkspacePaneTabClose(start.target.repoId, start.target.branchName, start.closingIdentity)
   if (start.wasActive) {
-    const shown = showWorkspacePaneControllerCloseBackTarget(start.target, start.nextTab, options.navigation)
+    const shown = commitWorkspacePaneControllerCloseBackTarget(start.target, start.nextTab, options.navigation)
     if (!shown) abortWorkspacePaneTabControllerTransition(start.transitionId)
     return shown
   }
@@ -163,7 +163,7 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
   }
   completeWorkspacePaneTabClose(repoId, confirmedBranchName, targetIdentity ?? workspacePaneRuntimeTabConfirmedCloseIdentity(confirmed))
   if (wasActive && closeTarget) {
-    const shown = showWorkspacePaneControllerCloseBackTarget(closeTarget, nextTab, navigation)
+    const shown = commitWorkspacePaneControllerCloseBackTarget(closeTarget, nextTab, navigation)
     if (!shown) abortWorkspacePaneTabControllerTransition(transitionId)
     return shown
   }
