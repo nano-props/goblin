@@ -16,7 +16,10 @@ import {
   dispatchNewTerminalRuntimeTabAction,
   dispatchTerminalRuntimePrimaryAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
-import { resolveWorkspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import {
+  resolveWorkspacePaneDestinationTarget,
+  resolveWorkspacePaneTabTargetForBranch,
+} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 type WorkspacePaneCommandRoute = ParsedRepoBranchWorkspacePaneRoute | null | undefined
@@ -107,11 +110,12 @@ async function showWorkspacePaneTabCommand({
   if (!repoId || !branchName) return false
   const provider = workspacePaneTabProvider(tab)
   if (isWorkspacePaneStaticTabProvider(provider)) {
+    const destination = resolveWorkspacePaneDestinationTarget(repoId, branchName)
+    if (destination.kind === 'no-worktree') return provider.canOpen({ hasWorktree: false })
     return await dispatchShowWorkspacePaneStaticTabAction({
       repoId,
       branchName,
       type: provider.type,
-      workspacePaneRoute,
       insertAfterIdentity: null,
       navigation,
     })

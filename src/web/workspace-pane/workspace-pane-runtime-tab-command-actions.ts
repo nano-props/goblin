@@ -5,10 +5,7 @@ import type { TerminalCreateTranslator } from '#/web/components/terminal/termina
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspacePaneTabControllerCommitNavigation } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
-import {
-  commitWorkspacePaneControllerTargetRoute,
-  WORKSPACE_PANE_CURRENT_TARGET_LEASE,
-} from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { commitWorkspacePaneCurrentTargetRoute } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import {
   runWorkspacePaneTabCoordinatorTask,
   workspacePaneTabCoordinatorObservedRoute,
@@ -134,12 +131,11 @@ function showTerminalRuntimeTab(
   if (type !== 'terminal') return false
   const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute })
   if (!target) return false
-  return commitWorkspacePaneControllerTargetRoute(
+  return commitWorkspacePaneCurrentTargetRoute(
     target,
     workspacePaneTabCoordinatorObservedRoute(target) ?? workspacePaneRoute,
     { kind: 'terminal', terminalSessionId: sessionId },
     navigation,
-    WORKSPACE_PANE_CURRENT_TARGET_LEASE,
   )
 }
 

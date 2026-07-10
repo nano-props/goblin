@@ -10,7 +10,7 @@ import { BranchList } from '#/web/components/branch-navigator/BranchList.tsx'
 import { useBranchListRepo } from '#/web/components/branch-navigator/use-branch-list-data.ts'
 import { EmptyState } from '#/web/components/Layout.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
-import { dispatchOpenWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
+import { dispatchShowWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 import { BranchNavigatorSkeleton } from '#/web/components/Skeleton.tsx'
 
 interface Props {
@@ -47,13 +47,10 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
   }
 
   const handleOpenBranchStatus = (branchName: string) => {
-    const branch = repo?.branchModel.branches.find((candidate) => candidate.name === branchName)
-    void dispatchOpenWorkspacePaneStaticTabAction({
+    void dispatchShowWorkspacePaneStaticTabAction({
       repoId,
       branchName,
-      worktreePath: branch?.worktree?.path ?? null,
       type: 'status',
-      workspacePaneRoute: undefined,
       insertAfterIdentity: null,
       navigation,
     })

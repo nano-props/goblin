@@ -2,10 +2,9 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   beginWorkspacePaneCloseActiveTabPresentationLease,
   commitWorkspacePaneControllerCloseBackTarget,
-  commitWorkspacePaneControllerTargetRoute,
+  commitWorkspacePaneCurrentTargetRoute,
   observeWorkspacePaneTabControllerRoute,
   resetWorkspacePaneTabControllerForTest,
-  WORKSPACE_PANE_CURRENT_TARGET_LEASE,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { RepoWorkspaceStaticTab, RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
@@ -22,12 +21,11 @@ describe('workspace pane tab controller transactions', () => {
     const target = workspacePaneTarget()
     observeWorkspacePaneTabControllerRoute({ ...target, route: SOURCE_ROUTE })
     const navigation = { commitRepoBranchWorkspacePaneRoute: vi.fn(() => true) }
-    const committed = commitWorkspacePaneControllerTargetRoute(
+    const committed = commitWorkspacePaneCurrentTargetRoute(
       target,
       SOURCE_ROUTE,
       TARGET_ROUTE,
       navigation,
-      WORKSPACE_PANE_CURRENT_TARGET_LEASE,
     )
     let settled = false
     void committed.then(() => {
@@ -45,12 +43,11 @@ describe('workspace pane tab controller transactions', () => {
   test('rejects accepted navigation when the observer reaches a different route', async () => {
     const target = workspacePaneTarget()
     observeWorkspacePaneTabControllerRoute({ ...target, route: SOURCE_ROUTE })
-    const committed = commitWorkspacePaneControllerTargetRoute(
+    const committed = commitWorkspacePaneCurrentTargetRoute(
       target,
       SOURCE_ROUTE,
       TARGET_ROUTE,
       { commitRepoBranchWorkspacePaneRoute: vi.fn(() => true) },
-      WORKSPACE_PANE_CURRENT_TARGET_LEASE,
     )
 
     observeWorkspacePaneTabControllerRoute({
@@ -64,12 +61,11 @@ describe('workspace pane tab controller transactions', () => {
   test('rejects a pending commit when a replacement runtime is observed', async () => {
     const target = workspacePaneTarget()
     observeWorkspacePaneTabControllerRoute({ ...target, route: SOURCE_ROUTE })
-    const committed = commitWorkspacePaneControllerTargetRoute(
+    const committed = commitWorkspacePaneCurrentTargetRoute(
       target,
       SOURCE_ROUTE,
       TARGET_ROUTE,
       { commitRepoBranchWorkspacePaneRoute: vi.fn(() => true) },
-      WORKSPACE_PANE_CURRENT_TARGET_LEASE,
     )
 
     observeWorkspacePaneTabControllerRoute({

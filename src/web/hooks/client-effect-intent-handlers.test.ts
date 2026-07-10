@@ -22,7 +22,6 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import {
   observedWorkspacePaneRouteCommitForTest,
-  seedInitialObservedWorkspacePaneRouteForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -53,14 +52,6 @@ describe('client effect intent handlers', () => {
     })
     const d = deps(REPO_ID)
     d.navigation.showRepoBranchTerminalSession = vi.fn(() => true)
-    seedInitialObservedWorkspacePaneRouteForTest({
-      repoId: repo.id,
-      repoRuntimeId: repo.repoRuntimeId,
-      branchName: 'feature/query',
-      worktreePath: '/tmp/bell-worktree',
-      route: { kind: 'static', tab: 'status' },
-    })
-
     handleTerminalBellClickIntent(
       {
         type: 'terminal-bell-click',

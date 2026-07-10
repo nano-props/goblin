@@ -1,5 +1,8 @@
 import PQueue from 'p-queue'
-import { terminalSessionScope, terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
+import {
+  physicalWorktreeIdentity,
+  physicalWorktreeIdentityKey,
+} from '#/server/worktree-removal/physical-worktree-identity.ts'
 
 export interface PhysicalWorktreeOperationTarget {
   repoRoot: string
@@ -86,7 +89,7 @@ export class PhysicalWorktreeOperationCoordinator {
 }
 
 function physicalWorktreeOperationKey(target: PhysicalWorktreeOperationTarget): string {
-  return `${terminalSessionScope(target.repoRoot)}\0${terminalSessionWorktreePath(target.repoRoot, target.worktreePath)}`
+  return physicalWorktreeIdentityKey(physicalWorktreeIdentity(target))
 }
 
 export function createPhysicalWorktreeOperationCoordinator(): PhysicalWorktreeOperationCoordinator {

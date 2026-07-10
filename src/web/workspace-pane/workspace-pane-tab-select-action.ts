@@ -2,14 +2,12 @@ import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { adjacentRepoWorkspaceTab, type RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import {
-  commitWorkspacePaneControllerTargetRoute,
   selectWorkspacePaneControllerTab,
-  WORKSPACE_PANE_DESTINATION_TARGET_NAVIGATION,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { dispatchWorkspacePaneDestinationRoute } from '#/web/workspace-pane/workspace-pane-destination-navigation.ts'
 import type { WorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-actions.ts'
 import {
   workspacePaneTabTargetBlocksInteraction,
-  workspacePaneTabCoordinatorTargetIdentityForBranch,
   workspacePaneTabTargetForBranch,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
@@ -116,17 +114,12 @@ export async function dispatchShowWorkspacePaneTerminalRouteAction(
   options: ShowWorkspacePaneTerminalRouteActionOptions,
 ): Promise<boolean> {
   if (!options.repoId || !options.branchName) return false
-  const coordinatorTarget = workspacePaneTabCoordinatorTargetIdentityForBranch(options.repoId, options.branchName)
-  if (!coordinatorTarget) return false
-  return await runWorkspacePaneTabCoordinatorTask(coordinatorTarget, () =>
-      commitWorkspacePaneControllerTargetRoute(
-        coordinatorTarget,
-        workspacePaneTabCoordinatorObservedRoute(coordinatorTarget),
-        { kind: 'terminal', terminalSessionId: options.terminalSessionId },
-        options.navigation,
-        WORKSPACE_PANE_DESTINATION_TARGET_NAVIGATION,
-      ),
-    )
+  return await dispatchWorkspacePaneDestinationRoute({
+    repoId: options.repoId,
+    branchName: options.branchName,
+    route: { kind: 'terminal', terminalSessionId: options.terminalSessionId },
+    navigation: options.navigation,
+  })
 }
 
 export async function dispatchMoveWorkspacePaneTabAction(options: MoveWorkspacePaneTabActionOptions): Promise<boolean> {

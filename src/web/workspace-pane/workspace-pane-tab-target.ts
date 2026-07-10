@@ -31,21 +31,53 @@ export interface WorkspacePaneTabTargetOptions {
 
 export const workspacePanePreferenceTargetOptions: WorkspacePaneTabTargetOptions = { workspacePaneRoute: undefined }
 
-export function workspacePaneTabCoordinatorTargetIdentityForBranch(
+export interface WorkspacePaneDestinationTargetLease extends WorkspacePaneTabCoordinatorTarget {
+  branchName: string
+  worktreePath: string
+}
+
+export type WorkspacePaneDestinationTargetResolution =
+  | { kind: 'ready'; lease: WorkspacePaneDestinationTargetLease }
+  | { kind: 'missing' }
+  | { kind: 'no-worktree' }
+
+export function resolveWorkspacePaneDestinationTarget(
   repoId: string,
   branchName: string,
-): WorkspacePaneTabCoordinatorTarget | null {
+): WorkspacePaneDestinationTargetResolution {
   const repo = useReposStore.getState().repos[repoId]
-  if (!repo) return null
+  if (!repo) return { kind: 'missing' }
   const branchModel = readRepoBranchQueryProjection(repo)
   const branch = branchModel?.branches.find((candidate) => candidate.name === branchName)
-  if (!branch) return null
+  if (!branch) return { kind: 'missing' }
+  const worktreePath = branch.worktree?.path
+  if (!worktreePath) return { kind: 'no-worktree' }
   return {
-    repoId,
-    repoRuntimeId: repo.repoRuntimeId,
-    branchName,
-    worktreePath: branch.worktree?.path ?? null,
+    kind: 'ready',
+    lease: {
+      repoId,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName,
+      worktreePath,
+    },
   }
+}
+
+export function resolveWorkspacePaneDestinationTargetLease(
+  repoId: string,
+  branchName: string,
+): WorkspacePaneDestinationTargetLease | null {
+  const resolution = resolveWorkspacePaneDestinationTarget(repoId, branchName)
+  return resolution.kind === 'ready' ? resolution.lease : null
+}
+
+export function workspacePaneDestinationTargetLeaseIsCurrent(lease: WorkspacePaneDestinationTargetLease): boolean {
+  const current = resolveWorkspacePaneDestinationTargetLease(lease.repoId, lease.branchName)
+  return (
+    current !== null &&
+    current.repoRuntimeId === lease.repoRuntimeId &&
+    current.worktreePath === lease.worktreePath
+  )
 }
 
 export function workspacePaneTabTargetForBranch(

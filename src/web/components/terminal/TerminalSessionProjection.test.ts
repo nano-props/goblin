@@ -51,10 +51,10 @@ function makeDescriptor(terminalSessionId: string, index: number): TerminalDescr
   }
 }
 
-function makeRepoIndex(): TerminalRepoIndex {
+function makeRepoIndex(repoRuntimeId = REPO_RUNTIME_ID): TerminalRepoIndex {
   return {
     [REPO_ROOT]: {
-      repoRuntimeId: REPO_RUNTIME_ID,
+      repoRuntimeId,
       branchByWorktreePath: { [WORKTREE_PATH]: BRANCH },
     },
   }
@@ -751,6 +751,183 @@ describe('TerminalSessionProjection', () => {
 
       serverClose.resolve(successfulRuntimeCloseSnapshot())
       await expect(closePromise).resolves.toBe(true)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    })
+
+    test('ignores a stale session-closed event after the durable terminal rebinds', () => {
+      projection.setRepoIndex(makeRepoIndex())
+      projection.reconcileServerSessions(
+        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+        [makeServerSession('pty_session_2_aaaaaaaaa', 'term-111111111111111111111')],
+        'client_local',
+        new Map(),
+      )
+
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalSessionId: 'term-111111111111111111111',
+      })
+
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
+        terminalSessionId: 'term-111111111111111111111',
+      })
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    })
+
+    test('uses the durable candidate for an exact close when the runtime reverse index is missing', () => {
+      projection.setRepoIndex(makeRepoIndex())
+      projection.reconcileServerSessions(
+        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
+        'client_local',
+        new Map(),
+      )
+      ;(projection as any).terminalSessionIdByTerminalRuntimeSessionId.clear()
+
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalSessionId: 'term-111111111111111111111',
+      })
+
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    })
+
+    test('keeps an unknown runtime bell when a stale runtime close arrives', () => {
+      projection.setRepoIndex(makeRepoIndex())
+      projection.handleServerBell({
+        terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
+        terminalSessionId: 'term-111111111111111111111',
+        repoRoot: REPO_ROOT,
+        worktreePath: WORKTREE_PATH,
+        processName: 'bash',
+        canonicalTitle: null,
+      })
+
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalSessionId: 'term-111111111111111111111',
+      })
+      projection.reconcileServerSessions(
+        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+        [makeServerSession('pty_session_2_aaaaaaaaa', 'term-111111111111111111111')],
+        'client_local',
+        new Map(),
+      )
+
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]?.hasBell).toBe(true)
+    })
+
+    test('clears an unknown runtime bell when its exact runtime close arrives', () => {
+      projection.setRepoIndex(makeRepoIndex())
+      projection.handleServerBell({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalSessionId: 'term-111111111111111111111',
+        repoRoot: REPO_ROOT,
+        worktreePath: WORKTREE_PATH,
+        processName: 'bash',
+        canonicalTitle: null,
+      })
+
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalSessionId: 'term-111111111111111111111',
+      })
+      projection.reconcileServerSessions(
+        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
+        'client_local',
+        new Map(),
+      )
+
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]?.hasBell).toBe(false)
+    })
+
+    test('keeps a rebound runtime when an older command close settles', async () => {
+      const terminalSessionId = 'term-111111111111111111111'
+      projection.setRepoIndex(makeRepoIndex())
+      projection.reconcileServerSessions(
+        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+        [makeServerSession('pty_session_1_aaaaaaaaa', terminalSessionId)],
+        'client_local',
+        new Map(),
+      )
+      const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
+      workspacePaneRuntimeMocks.close.mockReturnValueOnce(serverClose.promise)
+      const close = projection.closeTerminalByDescriptor(terminalSessionId, {
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: REPO_RUNTIME_ID,
+        branch: BRANCH,
+        worktreePath: WORKTREE_PATH,
+      })
+      await Promise.resolve()
+
+      projection.reconcileServerSessions(
+        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+        [makeServerSession('pty_session_2_aaaaaaaaa', terminalSessionId)],
+        'client_local',
+        new Map(),
+      )
+      serverClose.resolve(successfulRuntimeCloseSnapshot(terminalSessionId, 'pty_session_1_aaaaaaaaa'))
+
+      await expect(close).resolves.toBe(true)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect((projection as any).sessions.get(terminalSessionId)?.currentTerminalRuntimeSessionId()).toBe(
+        'pty_session_2_aaaaaaaaa',
+      )
+    })
+
+    test('does not reuse a pending close across repo runtime epochs', async () => {
+      const terminalSessionId = 'term-111111111111111111111'
+      const replacementRepoRuntimeId = 'repo-runtime-replacement'
+      projection.setRepoIndex(makeRepoIndex())
+      projection.reconcileServerSessions(
+        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+        [makeServerSession('pty_session_1_aaaaaaaaa', terminalSessionId)],
+        'client_local',
+        new Map(),
+      )
+      const firstServerClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
+      const secondServerClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
+      workspacePaneRuntimeMocks.close
+        .mockReturnValueOnce(firstServerClose.promise)
+        .mockReturnValueOnce(secondServerClose.promise)
+
+      const firstClose = projection.closeTerminalByDescriptor(terminalSessionId, {
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: REPO_RUNTIME_ID,
+        branch: BRANCH,
+        worktreePath: WORKTREE_PATH,
+      })
+      await Promise.resolve()
+
+      projection.setRepoIndex(makeRepoIndex(replacementRepoRuntimeId))
+      projection.reconcileServerSessions(
+        { repoRoot: REPO_ROOT, repoRuntimeId: replacementRepoRuntimeId },
+        [
+          makeServerSession('pty_session_2_aaaaaaaaa', terminalSessionId, {
+            repoRuntimeId: replacementRepoRuntimeId,
+          }),
+        ],
+        'client_local',
+        new Map(),
+      )
+      const secondClose = projection.closeTerminalByDescriptor(terminalSessionId, {
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: replacementRepoRuntimeId,
+        branch: BRANCH,
+        worktreePath: WORKTREE_PATH,
+      })
+      await Promise.resolve()
+
+      expect(workspacePaneRuntimeMocks.close).toHaveBeenCalledTimes(2)
+      firstServerClose.resolve(successfulRuntimeCloseSnapshot(terminalSessionId, 'pty_session_1_aaaaaaaaa'))
+      await expect(firstClose).resolves.toBe(true)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+
+      secondServerClose.resolve(successfulRuntimeCloseSnapshot(terminalSessionId, 'pty_session_2_aaaaaaaaa'))
+      await expect(secondClose).resolves.toBe(true)
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 

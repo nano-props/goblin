@@ -28,9 +28,16 @@ import {
 } from '#/server/terminal/terminal-controller.ts'
 import { createEmptyTerminalRenderState, replaySnapshot } from '#/server/terminal/terminal-render-state.ts'
 import { markTerminalSessionClosed, markTerminalSessionError } from '#/server/terminal/terminal-session-lifecycle.ts'
-import { TerminalPtyBinding, type TerminalPtySessionState } from '#/server/terminal/terminal-session-pty-lifecycle.ts'
+import {
+  TerminalPtyBinding,
+  type TerminalPtySessionState,
+  type TerminalPtySpawnResult,
+} from '#/server/terminal/terminal-session-pty-lifecycle.ts'
 import type { PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
-import { terminalSessionScopeBelongsToRepo } from '#/server/terminal/terminal-session-scope.ts'
+import {
+  physicalWorktreeIdentity,
+  physicalWorktreeIdentityKey,
+} from '#/server/worktree-removal/physical-worktree-identity.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 
@@ -307,8 +314,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       return { ok: false, message: authorityReasonToMessage(denyReason) }
     }
     restartTerminalClientControl(session, clientId, this.sessionPresence(session))
-    this.resetSessionState(session, size.cols, size.rows, 'restarting')
-    const spawn = await this.spawnAndAttachSession(session)
+    const spawn = await this.restartAndAttachSession(session, size.cols, size.rows)
     if (!spawn.result.ok && session.ptyBinding.isCurrentSpawn(session, spawn.generation)) {
       if (markTerminalSessionError(session, spawn.result.message)) this.emitLifecycle(session)
     }
@@ -408,9 +414,13 @@ export class TerminalSessionManager<TUser extends string | number> {
     repoRoot: string,
     worktreePath: string,
   ): Promise<TerminalPhysicalWorktreeQuiescenceResult<TUser>> {
+    const targetKey = physicalWorktreeIdentityKey(physicalWorktreeIdentity({ repoRoot, worktreePath }))
     const affected = new Map<string, TerminalPhysicalWorktreeScope<TUser>>()
     for (const session of Array.from(this.sessionsByTerminalRuntimeSessionId.values())) {
-      if (!terminalSessionScopeBelongsToRepo(session.scope, repoRoot) || session.worktreePath !== worktreePath) continue
+      const sessionKey = physicalWorktreeIdentityKey(
+        physicalWorktreeIdentity({ repoRoot: session.repoRoot, worktreePath: session.worktreePath }),
+      )
+      if (sessionKey !== targetKey) continue
       const key = `${String(session.userId)}\0${session.scope}`
       affected.set(key, { userId: session.userId, scope: session.scope })
       const closed = await this.closeSession(session.id, 'scope')
@@ -712,17 +722,24 @@ export class TerminalSessionManager<TUser extends string | number> {
     if (effect.emitIdentity) this.emitIdentity(session)
   }
 
-  private resetSessionState(
+  private async restartAndAttachSession(
     session: TerminalSessionView<TUser>,
     cols: number,
     rows: number,
-    phase: 'opening' | 'restarting' = 'opening',
-  ): void {
-    session.ptyBinding.reset(session, cols, rows, phase)
+  ): Promise<TerminalPtyAttachResult> {
+    const spawn = await session.ptyBinding.restart(session, cols, rows, 'restarting')
+    return await this.finishSpawnAndAttachSession(session, spawn)
   }
 
   private async spawnAndAttachSession(session: TerminalSessionView<TUser>): Promise<TerminalPtyAttachResult> {
     const spawn = await session.ptyBinding.spawn(session)
+    return await this.finishSpawnAndAttachSession(session, spawn)
+  }
+
+  private async finishSpawnAndAttachSession(
+    session: TerminalSessionView<TUser>,
+    spawn: TerminalPtySpawnResult,
+  ): Promise<TerminalPtyAttachResult> {
     if (!spawn.result.ok) return { generation: spawn.generation, result: spawn.result }
     this.advanceProjectionRevisionForProcessName(session, session.ptyBinding.processName())
     const attach = await this.attachResult(session)

@@ -69,7 +69,10 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
   private spawnGeneration = 0
   private pendingSpawn: Promise<TerminalPtySpawnResult> | null = null
   private readonly pendingSpawns = new Set<Promise<TerminalPtySpawnResult>>()
-  private readonly unconfirmedStaleHandles = new Map<string, PtyHandle>()
+  // Every handle whose exit has not yet been confirmed remains owned here.
+  // Reset/restart may detach it from the active binding, but only a successful
+  // supervisor `killAndWait` can release the retirement obligation.
+  private readonly retiringHandles = new Map<string, PtyHandle>()
 
   constructor(supervisor: PtySupervisor, events: TerminalPtyBindingEvents<TSession>) {
     this.supervisor = supervisor
@@ -89,6 +92,22 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     // manager builds attach first-frame results after a successful bind.
     const generation = this.beginSpawn()
     const spawn = this.resolveSpawn(session, generation)
+    return await this.trackPendingSpawn(spawn)
+  }
+
+  async restart(
+    session: TSession,
+    cols: number,
+    rows: number,
+    phase: 'opening' | 'restarting' = 'restarting',
+  ): Promise<TerminalPtySpawnResult> {
+    const generation = this.beginSpawn()
+    const olderSpawns = Array.from(this.pendingSpawns)
+    const spawn = this.resolveReplacement(session, generation, olderSpawns, cols, rows, phase)
+    return await this.trackPendingSpawn(spawn)
+  }
+
+  private async trackPendingSpawn(spawn: Promise<TerminalPtySpawnResult>): Promise<TerminalPtySpawnResult> {
     this.pendingSpawn = spawn
     this.pendingSpawns.add(spawn)
     try {
@@ -114,15 +133,33 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     return this.events.isSessionLive(session) && this.spawnGeneration === generation
   }
 
-  reset(session: TSession, cols: number, rows: number, phase: 'opening' | 'restarting' = 'opening'): void {
-    this.invalidateOwnership()
-    this.disposeResources(session)
+  private async resolveReplacement(
+    session: TSession,
+    generation: number,
+    olderSpawns: readonly Promise<TerminalPtySpawnResult>[],
+    cols: number,
+    rows: number,
+    phase: 'opening' | 'restarting' = 'opening',
+  ): Promise<TerminalPtySpawnResult> {
+    this.beginRetirement(session)
+    try {
+      await Promise.all(olderSpawns)
+      await this.drainRetiringHandles()
+    } catch (error) {
+      if (!this.isCurrentSpawn(session, generation)) return this.staleSpawnResult(generation)
+      return this.spawnResult(generation, {
+        ok: false,
+        message: error instanceof Error ? error.message : String(error),
+      })
+    }
+    if (!this.isCurrentSpawn(session, generation)) return this.staleSpawnResult(generation)
     session.cols = cols
     session.rows = rows
     const phaseChanged =
       phase === 'restarting' ? markTerminalSessionRestarting(session) : markTerminalSessionOpening(session)
     resetRender(session.render, cols, rows)
     if (phaseChanged) this.events.emitLifecycle(session)
+    return await this.resolveSpawn(session, generation)
   }
 
   invalidateOwnership(): void {
@@ -134,26 +171,10 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
   }
 
   async disposeAndWait(session: TSession): Promise<void> {
-    this.inputQueue = []
-    this.inputFlushScheduled = false
     while (this.pendingSpawns.size > 0) await Promise.all(Array.from(this.pendingSpawns))
-    const handle = this.handle
-    this.handle = null
-    try {
-      const handles = new Map(this.unconfirmedStaleHandles)
-      if (handle) handles.set(handle.ptySessionId, handle)
-      for (const pendingHandle of handles.values()) {
-        await this.supervisor.killAndWait(pendingHandle)
-        this.unconfirmedStaleHandles.delete(pendingHandle.ptySessionId)
-      }
-    } catch (error) {
-      // Keep the handle addressable so a later removal attempt can confirm
-      // termination instead of treating a timed-out kill as completed.
-      if (!this.handle) this.handle = handle
-      throw error
-    }
+    this.beginRetirement(session)
+    await this.drainRetiringHandles()
     disposeRender(session.render)
-    this.disposeListeners(session.id)
   }
 
   resize(session: TSession, cols: number, rows: number): boolean {
@@ -315,27 +336,36 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     try {
       await this.supervisor.killAndWait(handle)
     } catch (err) {
-      this.unconfirmedStaleHandles.set(handle.ptySessionId, handle)
+      this.retiringHandles.set(handle.ptySessionId, handle)
       ptyLifecycleLogger.warn({ terminalRuntimeSessionId, err }, 'failed to kill stale PTY')
     }
   }
 
   private disposeResources(session: TSession): void {
-    this.disposeListeners(session.id)
+    this.beginRetirement(session)
     disposeRender(session.render)
-    const handles = new Map(this.unconfirmedStaleHandles)
-    if (this.handle) handles.set(this.handle.ptySessionId, this.handle)
-    for (const handle of handles.values()) {
+    for (const handle of this.retiringHandles.values()) {
       try {
         this.supervisor.kill(handle)
       } catch (err) {
         ptyLifecycleLogger.warn({ terminalRuntimeSessionId: session.id, err }, 'failed to kill PTY')
       }
     }
-    this.unconfirmedStaleHandles.clear()
+  }
+
+  private beginRetirement(session: TSession): void {
+    this.disposeListeners(session.id)
+    if (this.handle) this.retiringHandles.set(this.handle.ptySessionId, this.handle)
     this.handle = null
     this.inputQueue = []
     this.inputFlushScheduled = false
+  }
+
+  private async drainRetiringHandles(): Promise<void> {
+    for (const handle of Array.from(this.retiringHandles.values())) {
+      await this.supervisor.killAndWait(handle)
+      this.retiringHandles.delete(handle.ptySessionId)
+    }
   }
 
   private disposeListeners(terminalRuntimeSessionId: string): void {

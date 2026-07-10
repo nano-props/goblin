@@ -14,9 +14,7 @@ import {
   resetWorkspacePaneTabCoordinatorForTest,
   waitForWorkspacePaneTabCoordinatorTransition,
   workspacePaneTabCoordinatorObservedRoute,
-  workspacePaneTabCoordinatorLatestObservedRouteForRepo,
   workspacePaneTabCoordinatorReconciliationDeferred,
-  workspacePaneTabCoordinatorRepoRuntimeIsCurrent,
   workspacePaneTabCoordinatorTargetIsCurrent,
   type WorkspacePaneTabCoordinatorTarget,
 } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
@@ -34,11 +32,6 @@ export type WorkspacePaneTabControllerCommitNavigation = Pick<
 >
 export type WorkspacePaneTabControllerNavigation = WorkspacePaneTabControllerShowNavigation &
   WorkspacePaneTabControllerCommitNavigation
-export type WorkspacePaneControllerTransactionPolicy =
-  | { kind: 'current-target-lease' }
-  | { kind: 'destination-target-navigation' }
-export const WORKSPACE_PANE_CURRENT_TARGET_LEASE = { kind: 'current-target-lease' } as const
-export const WORKSPACE_PANE_DESTINATION_TARGET_NAVIGATION = { kind: 'destination-target-navigation' } as const
 type WorkspacePaneTabControllerOptionalShowNavigation = Partial<
   Pick<
     PrimaryWindowNavigationActions,
@@ -105,7 +98,6 @@ export interface WorkspacePaneControllerPresentationLease {
   target: WorkspacePaneTabCoordinatorTarget
   fromRoute: WorkspacePaneTabControllerRoute
   toRoute: WorkspacePaneTabControllerRoute
-  policy: WorkspacePaneControllerTransactionPolicy
 }
 
 export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
@@ -133,7 +125,7 @@ export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
     fromRoute,
     toRoute,
   })
-  return { transitionId, target, fromRoute, toRoute, policy: WORKSPACE_PANE_CURRENT_TARGET_LEASE }
+  return { transitionId, target, fromRoute, toRoute }
 }
 
 function workspacePaneTabControllerRouteFromParsed(
@@ -153,13 +145,7 @@ export async function selectWorkspacePaneControllerTab(
   if (!branchName) return false
   const route = workspacePaneControllerRouteForTab(tab)
   if (route === undefined) return false
-  return await commitWorkspacePaneControllerTargetRoute(
-    target,
-    fromRoute,
-    route,
-    navigation,
-    WORKSPACE_PANE_CURRENT_TARGET_LEASE,
-  )
+  return await commitWorkspacePaneCurrentTargetRoute(target, fromRoute, route, navigation)
 }
 
 export function commitWorkspacePaneControllerCloseBackTarget(
@@ -199,30 +185,22 @@ export function commitWorkspacePaneControllerRoute(
   return navigation.commitRepoBranchWorkspacePaneRoute(repoId, branchName, route, options)
 }
 
-export async function commitWorkspacePaneControllerTargetRoute(
+export async function commitWorkspacePaneCurrentTargetRoute(
   target: WorkspacePaneTabCoordinatorTarget,
   fromRoute: WorkspacePaneTabControllerObservedRoute | undefined,
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneTabControllerCommitNavigation,
-  policy: WorkspacePaneControllerTransactionPolicy,
   options?: { replace?: boolean },
 ): Promise<boolean> {
   const branchName = target.branchName
   if (!branchName) return false
-  const observedRoute =
-    policy.kind === 'current-target-lease'
-      ? workspacePaneTabCoordinatorObservedRoute(target) ?? fromRoute
-      : workspacePaneTabCoordinatorLatestObservedRouteForRepo(target.repoId, target.repoRuntimeId)
-  if (policy.kind === 'current-target-lease') {
-    if (!workspacePaneTabCoordinatorTargetIsCurrent(target)) return false
-    if (
-      fromRoute !== undefined &&
-      observedRoute !== undefined &&
-      !workspacePaneTabControllerRoutesEqual(observedRoute, fromRoute)
-    ) {
-      return false
-    }
-  } else if (!workspacePaneTabCoordinatorRepoRuntimeIsCurrent(target)) {
+  const observedRoute = workspacePaneTabCoordinatorObservedRoute(target) ?? fromRoute
+  if (!workspacePaneTabCoordinatorTargetIsCurrent(target)) return false
+  if (
+    fromRoute !== undefined &&
+    observedRoute !== undefined &&
+    !workspacePaneTabControllerRoutesEqual(observedRoute, fromRoute)
+  ) {
     return false
   }
   if (
@@ -244,7 +222,6 @@ export async function commitWorkspacePaneControllerTargetRoute(
     target,
     fromRoute: sourceRoute,
     toRoute: route,
-    policy,
   }
   return await commitWorkspacePaneControllerPresentationLease(lease, navigation, options)
 }
@@ -255,17 +232,12 @@ export async function commitWorkspacePaneControllerPresentationLease(
   options?: { replace?: boolean },
 ): Promise<boolean> {
   const branchName = lease.target.branchName
-  const observedRoute =
-    lease.policy.kind === 'current-target-lease'
-      ? workspacePaneTabCoordinatorObservedRoute(lease.target)
-      : workspacePaneTabCoordinatorLatestObservedRouteForRepo(lease.target.repoId, lease.target.repoRuntimeId)
+  const observedRoute = workspacePaneTabCoordinatorObservedRoute(lease.target)
   const validLease =
     !!branchName &&
     observedRoute !== undefined &&
     workspacePaneTabControllerRoutesEqual(observedRoute, lease.fromRoute) &&
-    (lease.policy.kind === 'current-target-lease'
-      ? workspacePaneTabCoordinatorTargetIsCurrent(lease.target)
-      : workspacePaneTabCoordinatorRepoRuntimeIsCurrent(lease.target))
+    workspacePaneTabCoordinatorTargetIsCurrent(lease.target)
   if (!validLease) {
     abortWorkspacePaneTabControllerTransition(lease.transitionId)
     return false

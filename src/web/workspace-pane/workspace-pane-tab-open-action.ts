@@ -5,12 +5,10 @@ import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import {
-  commitWorkspacePaneControllerTargetRoute,
-  type WorkspacePaneControllerTransactionPolicy,
-  WORKSPACE_PANE_CURRENT_TARGET_LEASE,
-  WORKSPACE_PANE_DESTINATION_TARGET_NAVIGATION,
+  commitWorkspacePaneCurrentTargetRoute,
   type WorkspacePaneTabControllerCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { commitWorkspacePaneDestinationRoute } from '#/web/workspace-pane/workspace-pane-destination-navigation.ts'
 import { updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
@@ -19,6 +17,10 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import {
   resolveWorkspacePaneTabTargetForBranch,
+  resolveWorkspacePaneDestinationTarget,
+  resolveWorkspacePaneDestinationTargetLease,
+  workspacePaneDestinationTargetLeaseIsCurrent,
+  type WorkspacePaneDestinationTargetLease,
   workspacePaneTabInteractionBlockedForBranch,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
@@ -34,13 +36,11 @@ export interface OpenWorkspacePaneStaticTabActionOptions {
   workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
   insertAfterIdentity?: string | null
   navigation: WorkspacePaneTabControllerCommitNavigation
-  presentationPolicy?: WorkspacePaneControllerTransactionPolicy
 }
 
 export interface ShowWorkspacePaneStaticTabActionOptions {
   repoId: string | null
   branchName: string | null
-  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
   type: WorkspacePaneStaticTabType
   insertAfterIdentity?: string | null
   navigation: WorkspacePaneTabControllerCommitNavigation
@@ -54,25 +54,32 @@ type ResolvedOpenWorkspacePaneStaticTabActionOptions = Omit<OpenWorkspacePaneSta
 export async function dispatchShowWorkspacePaneStaticTabAction({
   repoId,
   branchName,
-  workspacePaneRoute,
   type,
   insertAfterIdentity,
   navigation,
 }: ShowWorkspacePaneStaticTabActionOptions): Promise<boolean> {
   if (!repoId || !branchName) return false
-  const resolution = resolveWorkspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute })
+  const resolution = resolveWorkspacePaneDestinationTarget(repoId, branchName)
+  if (resolution.kind === 'no-worktree') return false
   if (resolution.kind !== 'ready') return false
-  if (!resolution.target.branchName) return false
-  return await dispatchOpenWorkspacePaneStaticTabAction({
+  const lease = resolution.lease
+  const input: ResolvedOpenWorkspacePaneStaticTabActionOptions = {
     repoId,
-    branchName: resolution.target.branchName,
-    worktreePath: resolution.target.worktreePath,
+    repoRuntimeId: lease.repoRuntimeId,
+    branchName: lease.branchName,
+    worktreePath: lease.worktreePath,
     type,
-    workspacePaneRoute,
+    workspacePaneRoute: undefined,
     insertAfterIdentity,
     navigation,
-    presentationPolicy: WORKSPACE_PANE_DESTINATION_TARGET_NAVIGATION,
-  })
+  }
+  return await runWorkspacePaneTabCoordinatorTask(lease, () =>
+    openWorkspacePaneStaticTabAction(input, {
+      kind: 'destination',
+      lease,
+      sourceRoute: workspacePaneTabCoordinatorObservedRoute(lease),
+    }),
+  )
 }
 
 export async function dispatchOpenWorkspacePaneStaticTabAction(
@@ -92,16 +99,39 @@ export async function dispatchOpenWorkspacePaneStaticTabAction(
       branchName: input.branchName,
       worktreePath: resolvedInput.worktreePath,
     },
-    () => openWorkspacePaneStaticTabAction(resolvedInput),
+    () =>
+      openWorkspacePaneStaticTabAction(resolvedInput, {
+        kind: 'current',
+        sourceRoute:
+          workspacePaneTabCoordinatorObservedRoute({
+            repoId: input.repoId,
+            repoRuntimeId,
+            branchName: input.branchName,
+            worktreePath: resolvedInput.worktreePath,
+          }) ?? input.workspacePaneRoute,
+      }),
   )
 }
 
+type WorkspacePaneStaticTabRouteTransaction =
+  | {
+      kind: 'current'
+      sourceRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
+    }
+  | {
+      kind: 'destination'
+      lease: WorkspacePaneDestinationTargetLease
+      sourceRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
+    }
+
 async function openWorkspacePaneStaticTabAction(
   input: ResolvedOpenWorkspacePaneStaticTabActionOptions,
+  transaction: WorkspacePaneStaticTabRouteTransaction,
 ): Promise<boolean> {
   const provider = workspacePaneStaticTabProvider(input.type)
   if (!provider.canOpen({ hasWorktree: !!input.worktreePath })) return false
   if (
+    transaction.kind === 'current' &&
     workspacePaneTabInteractionBlockedForBranch(input.repoId, input.branchName, {
       workspacePaneRoute: input.workspacePaneRoute,
     })
@@ -117,7 +147,7 @@ async function openWorkspacePaneStaticTabAction(
     branchName,
     worktreePath: input.worktreePath,
   }
-  const sourceRoute = workspacePaneTabCoordinatorObservedRoute(coordinatorTarget) ?? input.workspacePaneRoute
+  const sourceRoute = transaction.sourceRoute
   const target = {
     repoRoot: input.repoId,
     repoRuntimeId: input.repoRuntimeId,
@@ -144,6 +174,9 @@ async function openWorkspacePaneStaticTabAction(
   })
   if (!committed.ok) return false
   if (currentRepoRuntimeId(useReposStore.getState(), input.repoId) !== input.repoRuntimeId) return false
+  if (transaction.kind === 'destination' && !workspacePaneDestinationTargetLeaseIsCurrent(transaction.lease)) {
+    return false
+  }
   if (openerIdentity) {
     recordWorkspacePaneTabOpener(
       input.repoId,
@@ -153,7 +186,7 @@ async function openWorkspacePaneStaticTabAction(
       openerIdentity,
     )
   }
-  if (!(await commitWorkspacePaneStaticTab(input, sourceRoute))) return false
+  if (!(await commitWorkspacePaneStaticTab(input, sourceRoute, transaction))) return false
   if (provider.refreshOnOpen) {
     requestVisibleRepoProjectionRefresh(
       { get: useReposStore.getState, set: useReposStore.setState },
@@ -171,9 +204,12 @@ function commitWorkspacePaneStaticTab(input: {
   worktreePath: string | null
   type: WorkspacePaneStaticTabType
   navigation: WorkspacePaneTabControllerCommitNavigation
-  presentationPolicy?: WorkspacePaneControllerTransactionPolicy
-}, sourceRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined): Promise<boolean> {
-  return commitWorkspacePaneControllerTargetRoute(
+}, sourceRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined, transaction: WorkspacePaneStaticTabRouteTransaction): Promise<boolean> {
+  const route = { kind: 'static' as const, tab: input.type }
+  if (transaction.kind === 'destination') {
+    return commitWorkspacePaneDestinationRoute(transaction.lease, route, input.navigation)
+  }
+  return commitWorkspacePaneCurrentTargetRoute(
     {
       repoId: input.repoId,
       repoRuntimeId: input.repoRuntimeId,
@@ -181,8 +217,7 @@ function commitWorkspacePaneStaticTab(input: {
       worktreePath: input.worktreePath,
     },
     sourceRoute,
-    { kind: 'static', tab: input.type },
+    route,
     input.navigation,
-    input.presentationPolicy ?? WORKSPACE_PANE_CURRENT_TARGET_LEASE,
   )
 }

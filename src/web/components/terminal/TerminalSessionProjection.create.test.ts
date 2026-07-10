@@ -871,20 +871,36 @@ describe('TerminalSessionProjection create flow', () => {
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
   })
 
-  test('durable close: handleSessionClosed falls back to terminalSessionId when the pty index misses', async () => {
+  test('durable close: exact runtime matching does not require the pty reverse index', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     projection.registerHost(WORKTREE_KEY, host)
     await projection.createTerminal(terminalBase())
 
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
+    ;(projection as any).terminalSessionIdByTerminalRuntimeSessionId.clear()
+
+    projection.handleSessionClosed({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      terminalSessionId: 'term-111111111111111111111',
+    })
+
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
+  })
+
+  test('durable close: runtime mismatch does not delete the durable candidate', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    projection.registerHost(WORKTREE_KEY, host)
+    await projection.createTerminal(terminalBase())
+    ;(projection as any).terminalSessionIdByTerminalRuntimeSessionId.clear()
 
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_missing_aaaaaaaaa',
       terminalSessionId: 'term-111111111111111111111',
     })
 
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(0)
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.length).toBe(1)
   })
 
   test('caps pending server bells for unknown sessions', () => {
@@ -899,10 +915,17 @@ describe('TerminalSessionProjection create flow', () => {
       })
     }
 
-    const pendingBells = (projection as any).pendingServerBellByTerminalSessionId as Map<string, unknown>
+    const pendingBells = (projection as any).pendingServerBellByRuntimeBindingKey as Map<
+      string,
+      { terminalSessionId: string; terminalRuntimeSessionId: string }
+    >
     expect(pendingBells.size).toBe(99)
-    expect(pendingBells.has('term-000000000000000000000')).toBe(false)
-    expect(pendingBells.has('term-000000000000000000099')).toBe(true)
+    expect(Array.from(pendingBells.values()).some((event) => event.terminalSessionId === 'term-000000000000000000000')).toBe(
+      false,
+    )
+    expect(Array.from(pendingBells.values()).some((event) => event.terminalSessionId === 'term-000000000000000000099')).toBe(
+      true,
+    )
   })
 
   test('clears pending server bell when an unknown session is closed', () => {
@@ -915,15 +938,55 @@ describe('TerminalSessionProjection create flow', () => {
       canonicalTitle: null,
     })
 
-    const pendingBells = (projection as any).pendingServerBellByTerminalSessionId as Map<string, unknown>
-    expect(pendingBells.has('term-unknownunknownunknown')).toBe(true)
+    const pendingBells = (projection as any).pendingServerBellByRuntimeBindingKey as Map<
+      string,
+      { terminalSessionId: string; terminalRuntimeSessionId: string }
+    >
+    expect(Array.from(pendingBells.values())).toContainEqual(
+      expect.objectContaining({
+        terminalSessionId: 'term-unknownunknownunknown',
+        terminalRuntimeSessionId: 'pty_session_unknown_aaaaaaaaa',
+      }),
+    )
 
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_unknown_aaaaaaaaa',
       terminalSessionId: 'term-unknownunknownunknown',
     })
 
-    expect(pendingBells.has('term-unknownunknownunknown')).toBe(false)
+    expect(Array.from(pendingBells.values())).not.toContainEqual(
+      expect.objectContaining({
+        terminalSessionId: 'term-unknownunknownunknown',
+        terminalRuntimeSessionId: 'pty_session_unknown_aaaaaaaaa',
+      }),
+    )
+  })
+
+  test('keeps a pending server bell when a stale runtime close arrives', () => {
+    projection.handleServerBell({
+      terminalRuntimeSessionId: 'pty_session_current_aaaaaaaaa',
+      terminalSessionId: 'term-unknownunknownunknown',
+      repoRoot: REPO_ROOT,
+      worktreePath: WORKTREE_PATH,
+      processName: 'zsh',
+      canonicalTitle: null,
+    })
+
+    projection.handleSessionClosed({
+      terminalRuntimeSessionId: 'pty_session_stale_aaaaaaaaa',
+      terminalSessionId: 'term-unknownunknownunknown',
+    })
+
+    const pendingBells = (projection as any).pendingServerBellByRuntimeBindingKey as Map<
+      string,
+      { terminalSessionId: string; terminalRuntimeSessionId: string }
+    >
+    expect(Array.from(pendingBells.values())).toContainEqual(
+      expect.objectContaining({
+        terminalSessionId: 'term-unknownunknownunknown',
+        terminalRuntimeSessionId: 'pty_session_current_aaaaaaaaa',
+      }),
+    )
   })
 
   test('prunes sessions missing from the repo index and clears their bell badge', async () => {

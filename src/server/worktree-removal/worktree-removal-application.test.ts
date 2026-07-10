@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import { createWorktreeRemovalApplication } from '#/server/worktree-removal/worktree-removal-application.ts'
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
+import { normalizeRemoteRepoId } from '#/shared/remote-repo.ts'
 
 const target = {
   repoRoot: '/repo',
@@ -28,7 +29,38 @@ describe('WorktreeRemovalApplication', () => {
     )
 
     expect(operations.isRemovalAdmitted({ repoRoot: target.repoRoot, worktreePath: target.worktreePath })).toBe(true)
-    expect(operations.isRemovalAdmitted({ repoRoot: '/other-repo', worktreePath: target.worktreePath })).toBe(false)
+    expect(operations.isRemovalAdmitted({ repoRoot: '/repo/worktree', worktreePath: target.worktreePath })).toBe(true)
+    expect(operations.isRemovalAdmitted({ repoRoot: '/other-repo', worktreePath: '/other-worktree' })).toBe(false)
+
+    finish.resolve()
+    await expect(removal).resolves.toEqual({ ok: true, message: 'removed' })
+  })
+
+  test('gates one remote endpoint across repository entries without blocking another host or worktree', async () => {
+    const operations = createPhysicalWorktreeOperationCoordinator()
+    const finish = deferred<void>()
+    const application = createApplication({ operations })
+    const primaryRepo = normalizeRemoteRepoId({ alias: 'build-host', remotePath: '/srv/repo' })
+    const linkedRepo = normalizeRemoteRepoId({ alias: 'build-host', remotePath: '/srv/repo-linked' })
+    const otherHost = normalizeRemoteRepoId({ alias: 'other-host', remotePath: '/srv/repo-linked' })
+    const removal = application.removeWorktree('user-a', {
+      repoRoot: primaryRepo,
+      repoRuntimeId: target.repoRuntimeId,
+      worktreePath: '/srv/repo-linked',
+      async remove(lifecycle) {
+        const prepared = await lifecycle.beforeRemove()
+        if (!prepared.ok) return prepared
+        await finish.promise
+        await lifecycle.afterWorktreeRemoved()
+        return { ok: true, message: 'removed' }
+      },
+    })
+    await vi.waitFor(() =>
+      expect(operations.isRemovalAdmitted({ repoRoot: linkedRepo, worktreePath: '/srv/repo-linked' })).toBe(true),
+    )
+
+    expect(operations.isRemovalAdmitted({ repoRoot: otherHost, worktreePath: '/srv/repo-linked' })).toBe(false)
+    expect(operations.isRemovalAdmitted({ repoRoot: linkedRepo, worktreePath: '/srv/repo-other' })).toBe(false)
 
     finish.resolve()
     await expect(removal).resolves.toEqual({ ok: true, message: 'removed' })

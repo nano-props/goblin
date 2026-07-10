@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { screen } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
@@ -19,6 +19,14 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import { TerminalSessionReadContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionReadContextValue } from '#/web/components/terminal/types.ts'
+
+const mocks = vi.hoisted(() => ({
+  dispatchShowWorkspacePaneStaticTabAction: vi.fn(),
+}))
+
+vi.mock('#/web/workspace-pane/workspace-pane-tab-open-action.ts', () => ({
+  dispatchShowWorkspacePaneStaticTabAction: mocks.dispatchShowWorkspacePaneStaticTabAction,
+}))
 
 const REPO_ID = '/tmp/gbl-branch-view-test-repo'
 const WORKTREE_PATH = '/tmp/gbl-branch-view-test-worktree'
@@ -76,6 +84,31 @@ describe('BranchView', () => {
     renderBranchView()
 
     expect(screen.getByText('feature/query')).toBeTruthy()
+  })
+
+  test('opens a non-current branch status through destination navigation', () => {
+    const destination = createRepoBranch('feature/destination', { worktree: { path: WORKTREE_PATH } })
+    const repo = seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch('feature/current'), destination],
+      currentBranchName: 'feature/current',
+    })
+    seedRepoReadModelQueryData(repo, {
+      branches: [createRepoBranch('feature/current'), destination],
+      currentBranch: 'feature/current',
+    })
+
+    renderBranchView()
+    fireEvent.doubleClick(screen.getByText('feature/destination'))
+
+    expect(mocks.dispatchShowWorkspacePaneStaticTabAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repoId: REPO_ID,
+        branchName: 'feature/destination',
+        type: 'status',
+        insertAfterIdentity: null,
+      }),
+    )
   })
 
   test('uses the React Query status read model for branch row dirty state when available', () => {

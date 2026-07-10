@@ -240,7 +240,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     )
   })
 
-  test('kills an older restart PTY when a newer restart generation wins', async () => {
+  test('supersedes an older restart before spawning the latest replacement', async () => {
     const supervisor = createDeferredPtySupervisor()
     const manager = createManager(supervisor)
     const created = await createSession(manager, supervisor)
@@ -248,7 +248,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const firstRestart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 100, 30, CLIENT_ID)
     const secondRestart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 120, 40, CLIENT_ID)
 
-    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_restart_one_123'))
+    await vi.waitFor(() => expect(supervisor.spawns).toHaveLength(1))
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_restart_two_123'))
 
     await expect(firstRestart).resolves.toEqual({ ok: false, message: 'error.unavailable' })
@@ -259,19 +259,16 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
       canonicalRows: 40,
     })
 
-    expect(supervisor.killed).toEqual(['pty_initial_123456', 'pty_restart_one_123'])
-    supervisor.emitData('pty_restart_one_123', 'stale output')
-
-    supervisor.emitExit('pty_restart_one_123')
+    expect(supervisor.killed).toEqual(['pty_initial_123456'])
     await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([
       expect.objectContaining({ terminalRuntimeSessionId: created.terminalRuntimeSessionId }),
     ])
 
     await expect(manager.closeSessionForUser(USER_ID, created.terminalRuntimeSessionId)).resolves.toBe(true)
-    expect(supervisor.killed).toEqual(['pty_initial_123456', 'pty_restart_one_123', 'pty_restart_two_123'])
+    expect(supervisor.killed).toEqual(['pty_initial_123456', 'pty_restart_two_123'])
   })
 
-  test('treats an older restart failure as stale when a newer restart generation wins', async () => {
+  test('publishes only the latest restart failure when an older restart is superseded', async () => {
     const supervisor = createDeferredPtySupervisor()
     const manager = createManager(supervisor)
     const created = await createSession(manager, supervisor)
@@ -279,22 +276,17 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const firstRestart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 100, 30, CLIENT_ID)
     const secondRestart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 120, 40, CLIENT_ID)
 
-    supervisor.spawns.shift()?.({ ok: false, message: 'old restart failed' })
-    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_restart_two_456'))
+    await vi.waitFor(() => expect(supervisor.spawns).toHaveLength(1))
+    supervisor.spawns.shift()?.({ ok: false, message: 'new restart failed' })
 
     await expect(firstRestart).resolves.toEqual({ ok: false, message: 'error.unavailable' })
-    await expect(secondRestart).resolves.toMatchObject({
-      ok: true,
-      terminalRuntimeSessionId: created.terminalRuntimeSessionId,
-      canonicalCols: 120,
-      canonicalRows: 40,
-    })
+    await expect(secondRestart).resolves.toEqual({ ok: false, message: 'new restart failed' })
 
     await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([
       expect.objectContaining({
         terminalRuntimeSessionId: created.terminalRuntimeSessionId,
-        phase: 'restarting',
-        message: null,
+        phase: 'error',
+        message: 'new restart failed',
       }),
     ])
   })
@@ -308,7 +300,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const attach = manager.attachSession(USER_ID, created.terminalRuntimeSessionId, 100, 30, CLIENT_ID)
     const secondRestart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 120, 40, CLIENT_ID)
 
-    supervisor.spawns.shift()?.({ ok: false, message: 'old restart failed' })
+    await vi.waitFor(() => expect(supervisor.spawns).toHaveLength(1))
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_restart_two_789'))
 
     await expect(firstRestart).resolves.toEqual({ ok: false, message: 'error.unavailable' })
@@ -431,6 +423,37 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     expect(onSessionClosed).toHaveBeenCalledOnce()
   })
 
+  test('quiesces a physical worktree opened through a different repository entry', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    supervisor.killAndWait = vi.fn(async () => {})
+    const manager = createManager(supervisor)
+    const linkedRepoRoot = '/repo-linked'
+    const physicalWorktreePath = '/repo-linked/worktree'
+    const scope = terminalSessionRuntimeScope(linkedRepoRoot, 'repo-runtime-linked')
+    const pending = manager.ensureSession({
+      userId: USER_ID,
+      scope,
+      repoRoot: linkedRepoRoot,
+      repoRuntimeId: 'repo-runtime-linked',
+      branch: BRANCH_NAME,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: physicalWorktreePath,
+      cwd: physicalWorktreePath,
+      cols: 80,
+      rows: 24,
+      clientId: CLIENT_ID,
+    })
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_cross_repo_root_123'))
+    const created = await pending
+    if (!created.ok) throw new Error(created.message)
+
+    await expect(manager.closeSessionsForPhysicalWorktree('/repo-primary', physicalWorktreePath)).resolves.toEqual({
+      ok: true,
+      scopes: [{ userId: USER_ID, scope }],
+    })
+    await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])
+  })
+
   test('waits for an in-flight spawn and its kill acknowledgement before reporting quiescence', async () => {
     const supervisor = createDeferredPtySupervisor()
     let acknowledgeKill!: () => void
@@ -510,6 +533,90 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     })
     expect(killAndWait).toHaveBeenCalledTimes(2)
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])
+  })
+
+  test('waits for pre-restart PTY termination before spawning the replacement', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const termination = Promise.withResolvers<void>()
+    supervisor.killAndWait = vi.fn(async () => await termination.promise)
+    const manager = createManager(supervisor)
+    const scope = terminalSessionRuntimeScope('/repo', 'repo-runtime-test')
+    const pending = manager.ensureSession({
+      userId: USER_ID,
+      scope,
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-test',
+      branch: BRANCH_NAME,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: WORKTREE_PATH,
+      cwd: WORKTREE_PATH,
+      cols: 80,
+      rows: 24,
+      clientId: CLIENT_ID,
+    })
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_before_barrier_123'))
+    const created = await pending
+    if (!created.ok) throw new Error(created.message)
+
+    const restart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 80, 24, CLIENT_ID)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(supervisor.spawns).toEqual([])
+
+    termination.resolve()
+    await vi.waitFor(() => expect(supervisor.spawns).toHaveLength(1))
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_after_barrier_1234'))
+    await expect(restart).resolves.toMatchObject({ ok: true })
+  })
+
+  test('retains a timed-out pre-restart PTY until late exit can be confirmed', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const retiredPtySessionId = 'pty_before_restart_123'
+    const replacementPtySessionId = 'pty_after_restart_1234'
+    let retiredExited = false
+    const killAndWait = vi.fn(async (handle: PtyHandle): Promise<void> => {
+      if (handle.ptySessionId === retiredPtySessionId && !retiredExited) {
+        throw new Error('PTY close timed out')
+      }
+    })
+    supervisor.killAndWait = killAndWait
+    const manager = createManager(supervisor)
+    const scope = terminalSessionRuntimeScope('/repo', 'repo-runtime-test')
+    const pending = manager.ensureSession({
+      userId: USER_ID,
+      scope,
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-test',
+      branch: BRANCH_NAME,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: WORKTREE_PATH,
+      cwd: WORKTREE_PATH,
+      cols: 80,
+      rows: 24,
+      clientId: CLIENT_ID,
+    })
+    supervisor.spawns.shift()?.(ptySpawnSuccess(retiredPtySessionId))
+    const created = await pending
+    if (!created.ok) throw new Error(created.message)
+
+    await expect(
+      manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 80, 24, CLIENT_ID),
+    ).resolves.toEqual({ ok: false, message: 'PTY close timed out' })
+    expect(supervisor.spawns).toEqual([])
+    expect(killAndWait.mock.calls.map(([handle]) => handle.ptySessionId)).toEqual([retiredPtySessionId])
+
+    retiredExited = true
+    supervisor.emitExit(retiredPtySessionId)
+    const retry = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 80, 24, CLIENT_ID)
+    await vi.waitFor(() => expect(supervisor.spawns).toHaveLength(1))
+    supervisor.spawns.shift()?.(ptySpawnSuccess(replacementPtySessionId))
+    await expect(retry).resolves.toMatchObject({ ok: true })
+    await expect(manager.closeSessionForUser(USER_ID, created.terminalRuntimeSessionId)).resolves.toBe(true)
+    expect(killAndWait.mock.calls.map(([handle]) => handle.ptySessionId)).toEqual([
+      retiredPtySessionId,
+      retiredPtySessionId,
+      replacementPtySessionId,
+    ])
   })
 })
 

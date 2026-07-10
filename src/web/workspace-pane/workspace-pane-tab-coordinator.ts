@@ -194,20 +194,6 @@ export function workspacePaneTabCoordinatorTargetIsCurrent(target: WorkspacePane
   return latestTargetKey === undefined || latestTargetKey === targetKey
 }
 
-export function workspacePaneTabCoordinatorRepoRuntimeIsCurrent(target: WorkspacePaneTabCoordinatorTarget): boolean {
-  const latestRuntimeId = latestRepoRuntimeIdByRepo.get(target.repoId)
-  return latestRuntimeId === undefined || latestRuntimeId === target.repoRuntimeId
-}
-
-export function workspacePaneTabCoordinatorLatestObservedRouteForRepo(
-  repoId: string,
-  repoRuntimeId: string,
-): WorkspacePaneTabCoordinatorObservedRoute | undefined {
-  if (latestRepoRuntimeIdByRepo.get(repoId) !== repoRuntimeId) return undefined
-  const latestTargetKey = latestObservedTargetKeyByRepo.get(repoId)
-  return latestTargetKey ? observedRoutesByTarget.get(latestTargetKey) : undefined
-}
-
 export function leaveWorkspacePaneTabCoordinatorTarget(target: WorkspacePaneTabCoordinatorTarget): void {
   const targetKey = workspacePaneTabCoordinatorTargetQueueKey(target)
   if (!targetKey) return

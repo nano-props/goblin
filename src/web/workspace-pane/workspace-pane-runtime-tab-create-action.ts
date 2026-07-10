@@ -10,8 +10,7 @@ import type { TerminalCreateLeaderAdmissionResult } from '#/web/components/termi
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import type { TerminalCreateOptions } from '#/web/components/terminal/types.ts'
 import {
-  commitWorkspacePaneControllerTargetRoute,
-  WORKSPACE_PANE_CURRENT_TARGET_LEASE,
+  commitWorkspacePaneCurrentTargetRoute,
   type WorkspacePaneTabControllerCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import {
@@ -132,12 +131,11 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
   const resolvedBase = terminalSessionBaseWithRuntime(base)
   if (!resolvedBase) return false
   const target = terminalWorkspacePaneCoordinatorTarget(resolvedBase)
-  return commitWorkspacePaneControllerTargetRoute(
+  return commitWorkspacePaneCurrentTargetRoute(
     target,
     workspacePaneTabCoordinatorObservedRoute(target),
     { kind: 'terminal', terminalSessionId },
     navigation,
-    WORKSPACE_PANE_CURRENT_TARGET_LEASE,
   )
 }
 
