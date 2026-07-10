@@ -58,10 +58,8 @@ import {
   workspacePaneTabsWithRuntimeTab,
 } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import {
-  readWorkspacePaneTabsForTarget,
-  setWorkspacePaneTabsForTargetQueryData,
-} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 
 const mockSessions = vi.hoisted(
   () =>

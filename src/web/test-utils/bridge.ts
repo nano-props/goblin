@@ -28,10 +28,8 @@ import type { ClientBridge } from '#/web/client-bridge-types.ts'
 import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { resetAcceptedRepoProjectionReadModelState } from '#/web/stores/repos/projection-read-model-effects.ts'
-import {
-  readWorkspacePaneTabsForTarget,
-  setWorkspacePaneTabsForTargetQueryData,
-} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import {
   workspacePaneTabsWithStaticTab,

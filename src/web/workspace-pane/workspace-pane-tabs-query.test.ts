@@ -6,13 +6,13 @@ import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs
 import {
   readWorkspacePaneTabsForTarget,
   refreshWorkspacePaneTabsQueryData,
-  setWorkspacePaneTabsForTargetQueryData,
   workspacePaneTabsByTargetFromQueryData,
   workspacePaneTabsQueryKey,
   workspacePaneTabsQueryOptions,
   writeWorkspacePaneTabsSnapshotQueryData,
   type WorkspacePaneTabsQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
 
 vi.mock('#/web/workspace-pane/workspace-pane-tabs-client.ts', () => ({
@@ -142,7 +142,7 @@ describe('workspace pane tabs revisioned query cache', () => {
     expect(readTabs(queryClient, 'feature/a', null)).toEqual([workspacePaneStaticTabEntry('history')])
   })
 
-  test('compatibility target seeds preserve the cached server revision', () => {
+  test('test target seeds preserve the cached server revision', () => {
     const queryClient = new QueryClient()
     writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, REPO_RUNTIME_ID, snapshot(5, []), queryClient)
 

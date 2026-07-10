@@ -118,7 +118,7 @@ mirrors:
 - `src/web/workspace-pane/tab-providers.ts`: add labels, icons,
   pending/attention state, close policy, and renderability for the new type.
 
-Compatibility note: old workspace tab protocol names
+Protocol contract: old workspace tab protocol names
 (`list-workspace-tabs`, `replace-tabs`, `update-tabs`,
 `workspace-tabs-changed`) and old terminal-specific tab entries are not part
 of the current contract. The canonical socket actions/events are

@@ -105,7 +105,7 @@ export function useVisibleRepoProjectionRefresh({
   const workspacePaneTabsQuery = useWorkspacePaneTabsQuery(repoRoot, repoRuntimeId, { enabled: repoEnabled })
   const workspacePaneTabEntries = useMemo(
     () =>
-      workspacePaneTabsForTargetFromQueryData(workspacePaneTabsQuery.data ?? [], {
+      workspacePaneTabsForTargetFromQueryData(workspacePaneTabsQuery.data ?? { revision: 0, entries: [] }, {
         repoRoot,
         branchName,
         worktreePath,

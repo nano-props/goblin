@@ -21,11 +21,11 @@ import {
   useFiletreeInteractionStore,
 } from '#/web/stores/repos/filetree-interaction-state.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import { useWorkspacePaneTabsQuery } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   replaceWorkspacePaneTabsQueryData,
   setWorkspacePaneTabsForTargetQueryData,
-  useWorkspacePaneTabsQuery,
-} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+} from '#/web/test-utils/workspace-pane-tabs.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 
 const persistWorkspaceSessionStateMock = vi.fn(async (_session: unknown) => {})

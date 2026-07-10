@@ -48,10 +48,8 @@ import {
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { workspacePaneTabsTargetForRepoBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import {
-  readWorkspacePaneTabsForTarget,
-  setWorkspacePaneTabsForTargetQueryData,
-} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'

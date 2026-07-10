@@ -190,7 +190,7 @@ Terminal creation has three architecture layers:
 
 - `TerminalSessionService` and its focused domain collaborators own terminal
   create/reuse/restore, PTY/session lifecycle, and terminal first-frame data.
-- `WorkspacePaneRuntimeApplication` owns composed open/close/worktree-close/removal
+- `WorkspacePaneRuntimeApplication` owns composed open/close/worktree-removal
   commands and their shared server worktree queue: invoke the provider,
   commit canonical runtime membership, publish invalidation, and return the
   provider result plus a revisioned full-scope snapshot.

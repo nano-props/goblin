@@ -11,10 +11,8 @@ import {
   resetReposStore,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
-import {
-  readWorkspacePaneTabsForTarget,
-  setWorkspacePaneTabsForTargetQueryData,
-} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
   type WorkspacePaneTabsReorderMutationInput,
   type WorkspacePaneTabsReorderMutationResult,

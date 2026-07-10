@@ -20,8 +20,6 @@ export interface WorkspacePaneTabsTargetProjection {
   tabs: WorkspacePaneTabEntry[]
 }
 
-type WorkspacePaneTabsQueryDataInput = WorkspacePaneTabsSnapshot | readonly WorkspacePaneTabsEntry[]
-
 let workspacePaneTabsPersistenceVersion = 0
 const workspacePaneTabsPersistenceListeners = new Set<() => void>()
 
@@ -94,7 +92,7 @@ export function readWorkspacePaneTabsProjectionForTarget(
 }
 
 export function workspacePaneTabsForTargetFromQueryData(
-  data: WorkspacePaneTabsQueryDataInput,
+  data: WorkspacePaneTabsSnapshot,
   target: {
     repoRoot: string
     branchName: string | null | undefined
@@ -102,61 +100,12 @@ export function workspacePaneTabsForTargetFromQueryData(
   },
 ): WorkspacePaneTabEntry[] {
   if (!target.branchName) return []
-  const entry = workspacePaneTabsEntryForTarget(workspacePaneTabsEntries(data), {
+  const entry = workspacePaneTabsEntryForTarget(data.entries, {
     repoRoot: target.repoRoot,
     branchName: target.branchName,
     worktreePath: target.worktreePath,
   })
   return [...(entry?.tabs ?? defaultWorkspacePaneTabs())]
-}
-
-/**
- * Compatibility/test seed helper. Runtime server responses must use
- * `writeWorkspacePaneTabsSnapshotQueryData`, which carries a server revision
- * and replaces the complete scope projection.
- */
-export function setWorkspacePaneTabsForTargetQueryData(
-  input: {
-    repoRoot: string
-    repoRuntimeId: string
-    branchName: string
-    worktreePath: string | null
-    tabs: readonly WorkspacePaneTabEntry[]
-  },
-  queryClient: QueryClient = primaryWindowQueryClient,
-): void {
-  const current = currentWorkspacePaneTabsSnapshot(input.repoRoot, input.repoRuntimeId, queryClient)
-  const entries = [
-    ...current.entries.filter((entry) => !workspacePaneTabsEntryMatchesTarget(entry, input)),
-    {
-      repoRoot: input.repoRoot,
-      branchName: input.branchName,
-      worktreePath: input.worktreePath,
-      tabs: [...input.tabs],
-    },
-  ]
-  setWorkspacePaneTabsQueryData(
-    input.repoRoot,
-    input.repoRuntimeId,
-    { revision: current.revision, entries },
-    queryClient,
-  )
-}
-
-/** Compatibility/test seed helper for boot-restored entries. */
-export function replaceWorkspacePaneTabsQueryData(
-  repoRoot: string,
-  repoRuntimeId: string,
-  entries: readonly WorkspacePaneTabsEntry[],
-  queryClient: QueryClient = primaryWindowQueryClient,
-): void {
-  const current = currentWorkspacePaneTabsSnapshot(repoRoot, repoRuntimeId, queryClient)
-  setWorkspacePaneTabsQueryData(
-    repoRoot,
-    repoRuntimeId,
-    { revision: current.revision, entries: [...entries] },
-    queryClient,
-  )
 }
 
 /**
@@ -206,10 +155,10 @@ export function clearWorkspacePaneTabsProjectionState(repoRoot: string, repoRunt
 }
 
 export function workspacePaneTabsByTargetFromQueryData(
-  data: WorkspacePaneTabsQueryDataInput,
+  data: WorkspacePaneTabsSnapshot,
 ): Record<string, WorkspacePaneTabEntry[]> {
   const byTarget: Record<string, WorkspacePaneTabEntry[]> = {}
-  for (const entry of workspacePaneTabsEntries(data)) {
+  for (const entry of data.entries) {
     byTarget[workspacePaneTabsTargetIdentityKey(entry)] = normalizeWorkspacePaneTabs(entry.tabs, {
       hasWorktree: entry.worktreePath !== null,
     })
@@ -240,30 +189,6 @@ async function fetchWorkspacePaneTabsSnapshot(
   return normalizeWorkspacePaneTabsSnapshot(await workspacePaneTabsClient.list({ repoRoot, repoRuntimeId }))
 }
 
-function setWorkspacePaneTabsQueryData(
-  repoRoot: string,
-  repoRuntimeId: string,
-  snapshot: WorkspacePaneTabsSnapshot,
-  queryClient: QueryClient,
-): void {
-  queryClient.setQueryData<WorkspacePaneTabsQueryData>(
-    workspacePaneTabsQueryKey(repoRoot, repoRuntimeId),
-    normalizeWorkspacePaneTabsSnapshot(snapshot),
-  )
-  notifyWorkspacePaneTabsPersistenceChanged()
-}
-
-function currentWorkspacePaneTabsSnapshot(
-  repoRoot: string,
-  repoRuntimeId: string,
-  queryClient: QueryClient,
-): WorkspacePaneTabsSnapshot {
-  return (
-    queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(repoRoot, repoRuntimeId)) ??
-    emptyWorkspacePaneTabsSnapshot()
-  )
-}
-
 /** The single revision acceptance rule for every server-snapshot cache entry. */
 function acceptedWorkspacePaneTabsSnapshot(
   current: WorkspacePaneTabsSnapshot | undefined,
@@ -292,10 +217,6 @@ function normalizeWorkspacePaneTabsQueryEntries(entries: readonly WorkspacePaneT
     })
   }
   return Array.from(byTarget.values())
-}
-
-function workspacePaneTabsEntries(data: WorkspacePaneTabsQueryDataInput): readonly WorkspacePaneTabsEntry[] {
-  return Array.isArray(data) ? (data as readonly WorkspacePaneTabsEntry[]) : (data as WorkspacePaneTabsSnapshot).entries
 }
 
 function emptyWorkspacePaneTabsSnapshot(): WorkspacePaneTabsSnapshot {
