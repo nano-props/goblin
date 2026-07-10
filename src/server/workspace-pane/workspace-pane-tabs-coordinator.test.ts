@@ -40,7 +40,10 @@ describe('workspace pane tabs coordinator', () => {
         repoRoot: REPO_ROOT,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
-        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')],
+        tabs: [
+          workspacePaneStaticTabEntry('status'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
+        ],
       },
     ])
     expect(broadcastChanged).toHaveBeenCalledOnce()
@@ -108,7 +111,10 @@ describe('workspace pane tabs coordinator', () => {
     ])
     expect(
       workspaceTabs.tabs({ userId: USER_ID, scope: SCOPE, branchName: BRANCH_NAME, worktreePath: WORKTREE_PATH }),
-    ).toEqual([workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')])
+    ).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
+    ])
   })
 
   test('materializes missing live runtime sessions when updating workspace tabs', async () => {
@@ -145,48 +151,6 @@ describe('workspace pane tabs coordinator', () => {
       workspacePaneStaticTabEntry('status'),
       workspacePaneStaticTabEntry('history'),
       workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
-    ])
-  })
-
-  test('opens a live runtime tab with an insertion anchor when updating workspace tabs', async () => {
-    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
-    workspaceTabs.replaceTabs({
-      userId: USER_ID,
-      scope: SCOPE,
-      branchName: BRANCH_NAME,
-      worktreePath: WORKTREE_PATH,
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
-    })
-    const coordinator = createWorkspacePaneTabsCoordinator({
-      workspaceTabs,
-      runtimeProviders: [
-        {
-          type: 'terminal',
-          listSessionsForUser: vi.fn(async () => [
-            { sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
-          ]),
-        },
-      ],
-    })
-
-    await expect(
-      coordinator.updateTabs({
-        userId: USER_ID,
-        scope: SCOPE,
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
-        operation: {
-          type: 'open-runtime',
-          runtimeType: 'terminal',
-          sessionId: 'term-livelivelivelivelive1',
-          insertAfterIdentity: 'workspace-pane:status',
-        },
-        assertCurrent: () => {},
-      }),
-    ).resolves.toEqual([
-      workspacePaneStaticTabEntry('status'),
-      workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
-      workspacePaneStaticTabEntry('history'),
     ])
   })
 
@@ -289,7 +253,10 @@ describe('workspace pane tabs coordinator', () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
       ...workspaceTarget(),
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1')],
+      tabs: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1'),
+      ],
     })
     const liveSessions = deferred<Array<{ sessionId: string; branch: string; worktreePath: string }>>()
     const listSessionsForUser = vi.fn(async () => await liveSessions.promise)
@@ -324,14 +291,19 @@ describe('workspace pane tabs coordinator', () => {
       assertCurrent: () => {},
     })
 
-    liveSessions.resolve([{ sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH }])
+    liveSessions.resolve([
+      { sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+    ])
 
     await expect(list).resolves.toEqual([
       {
         repoRoot: REPO_ROOT,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
-        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')],
+        tabs: [
+          workspacePaneStaticTabEntry('status'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
+        ],
       },
     ])
     await expect(update).resolves.toEqual([
@@ -350,7 +322,10 @@ describe('workspace pane tabs coordinator', () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
       ...workspaceTarget(),
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1')],
+      tabs: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1'),
+      ],
     })
     const liveSessions = deferred<Array<{ sessionId: string; branch: string; worktreePath: string }>>()
     const listSessionsForUser = vi.fn(async () => await liveSessions.promise)
@@ -363,7 +338,9 @@ describe('workspace pane tabs coordinator', () => {
     await vi.waitFor(() => expect(listSessionsForUser).toHaveBeenCalledTimes(1))
     const close = coordinator.closeScope({ userId: USER_ID, scope: SCOPE })
 
-    liveSessions.resolve([{ sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH }])
+    liveSessions.resolve([
+      { sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+    ])
     await Promise.all([reconcile, close])
 
     expect(workspaceTabs.tabsForScope({ userId: USER_ID, scope: SCOPE })).toEqual([])

@@ -103,6 +103,42 @@ describe('WorkspacePaneRuntimeApplication', () => {
     )
     expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
   })
+
+  test('returns terminal sessions in the canonical workspace tab order', async () => {
+    const runtime = terminalCreateSuccess()
+    const first = terminalSession('term-333333333333333333333', 'pty_session_3_aaaaaaaaa')
+    const second = terminalSession('term-222222222222222222222', 'pty_session_2_aaaaaaaaa')
+    const created = terminalSession(runtime.terminalSessionId, runtime.terminalRuntimeSessionId)
+    runtime.sessions = [first, second, created]
+    const tabs = [
+      { type: 'terminal' as const, runtimeSessionId: first.terminalSessionId },
+      { type: 'terminal' as const, runtimeSessionId: created.terminalSessionId },
+      { type: 'terminal' as const, runtimeSessionId: second.terminalSessionId },
+    ]
+    const application = createWorkspacePaneRuntimeApplication({
+      terminal: { create: async () => runtime },
+      workspaceTabsCoordinator: {
+        ensureRuntimeTabForSession: async () => tabs,
+      } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession'>,
+      isCurrentRepoRuntime: () => true,
+      broadcastWorkspaceTabsChanged: () => {},
+    })
+
+    const result = await application.open('client-test', 'user-test', {
+      runtimeType: 'terminal',
+      request,
+      insertAfterIdentity: `terminal:${first.terminalSessionId}`,
+    })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.tabs).toEqual(tabs)
+    expect(result.runtime.sessions.map((session) => session.terminalSessionId)).toEqual([
+      first.terminalSessionId,
+      created.terminalSessionId,
+      second.terminalSessionId,
+    ])
+  })
 })
 
 function terminalCreateSuccess(): Extract<TerminalCreateResult, { ok: true }> {
@@ -123,23 +159,25 @@ function terminalCreateSuccess(): Extract<TerminalCreateResult, { ok: true }> {
     controller: { clientId: 'client-test', status: 'connected' },
     canonicalCols: 100,
     canonicalRows: 30,
-    sessions: [
-      {
-        terminalRuntimeSessionId,
-        terminalSessionId,
-        repoRuntimeId: request.repoRuntimeId,
-        repoRoot: request.repoRoot,
-        branch: request.branch,
-        worktreePath: request.worktreePath,
-        cwd: request.worktreePath,
-        controller: { clientId: 'client-test', status: 'connected' },
-        processName: 'zsh',
-        canonicalTitle: null,
-        phase: 'open',
-        message: null,
-        cols: 100,
-        rows: 30,
-      },
-    ],
+    sessions: [terminalSession(terminalSessionId, terminalRuntimeSessionId)],
+  }
+}
+
+function terminalSession(terminalSessionId: string, terminalRuntimeSessionId: string) {
+  return {
+    terminalRuntimeSessionId,
+    terminalSessionId,
+    repoRuntimeId: request.repoRuntimeId,
+    repoRoot: request.repoRoot,
+    branch: request.branch,
+    worktreePath: request.worktreePath,
+    cwd: request.worktreePath,
+    controller: { clientId: 'client-test', status: 'connected' as const },
+    processName: 'zsh',
+    canonicalTitle: null,
+    phase: 'open' as const,
+    message: null,
+    cols: 100,
+    rows: 30,
   }
 }

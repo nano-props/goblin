@@ -1,6 +1,9 @@
 export const WORKSPACE_PANE_STATIC_TAB_TYPES = ['status', 'changes', 'history', 'files'] as const
 export const WORKSPACE_PANE_RUNTIME_TAB_TYPES = ['terminal'] as const
-export const WORKSPACE_PANE_TAB_TYPES = [...WORKSPACE_PANE_STATIC_TAB_TYPES, ...WORKSPACE_PANE_RUNTIME_TAB_TYPES] as const
+export const WORKSPACE_PANE_TAB_TYPES = [
+  ...WORKSPACE_PANE_STATIC_TAB_TYPES,
+  ...WORKSPACE_PANE_RUNTIME_TAB_TYPES,
+] as const
 export const WORKSPACE_PANE_STATIC_TAB_IDS = {
   status: 'workspace-pane:status',
   changes: 'workspace-pane:changes',
@@ -136,9 +139,7 @@ export function workspacePaneRuntimeTabIdentity(type: WorkspacePaneRuntimeTabTyp
   return `${type}:${sessionId}`
 }
 
-export function isWorkspacePaneRuntimeTabEntry(
-  entry: WorkspacePaneTabEntry,
-): entry is WorkspacePaneRuntimeTabEntry {
+export function isWorkspacePaneRuntimeTabEntry(entry: WorkspacePaneTabEntry): entry is WorkspacePaneRuntimeTabEntry {
   return isWorkspacePaneRuntimeTabType(entry.type)
 }
 
@@ -175,6 +176,29 @@ export function workspacePaneTabsMoveEntryAfterIdentity<TEntry extends Workspace
     return [...current]
   }
   return workspacePaneTabsInsertAfterIdentity(withoutEntry, entry, insertAfterIdentity)
+}
+
+export function workspacePaneTabsWithRuntimeTab(
+  current: readonly WorkspacePaneTabEntry[],
+  type: WorkspacePaneRuntimeTabType,
+  sessionId: string,
+  options?: { insertAfterIdentity?: string | null },
+): WorkspacePaneTabEntry[] {
+  if (sessionId.length === 0) return [...current]
+  const existingIndex = current.findIndex(
+    (entry) =>
+      isWorkspacePaneRuntimeTabEntry(entry) &&
+      entry.type === type &&
+      workspacePaneRuntimeTabSessionId(entry) === sessionId,
+  )
+  if (existingIndex !== -1) {
+    return workspacePaneTabsMoveEntryAfterIdentity(current, existingIndex, options?.insertAfterIdentity)
+  }
+  return workspacePaneTabsInsertAfterIdentity(
+    current,
+    workspacePaneRuntimeTabEntry(type, sessionId),
+    options?.insertAfterIdentity,
+  )
 }
 
 export function workspacePaneStaticTabId(type: WorkspacePaneStaticTabType): WorkspacePaneStaticTabId {

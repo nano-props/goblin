@@ -1,7 +1,6 @@
 import {
   isWorkspacePaneRuntimeTabEntry,
   type WorkspacePaneRuntimeTabType,
-  type WorkspacePaneStaticTabType,
   type WorkspacePaneTabEntry,
   workspacePaneRuntimeTabEntry,
   workspacePaneRuntimeTabSessionId,
@@ -14,13 +13,6 @@ import {
   workspacePaneTabsRuntimeScopePrefixKey,
   workspacePaneTabsRuntimeUserPrefixKey,
 } from '#/shared/workspace-pane-tabs-runtime-keys.ts'
-import {
-  workspacePaneTabEntryArraysEqual,
-  workspacePaneTabsWithIdentityOrder,
-  workspacePaneTabsWithRuntimeTab,
-  workspacePaneTabsWithoutStaticTab,
-  workspacePaneTabsWithStaticTab,
-} from '#/server/workspace-pane/workspace-pane-tabs-operations.ts'
 
 export interface WorkspacePaneTabsTargetInput<TUser extends string | number> {
   userId: TUser
@@ -77,46 +69,6 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
       tabs,
     })
     return [...tabs]
-  }
-
-  ensureRuntimeTab(
-    input: WorkspacePaneTabsTargetInput<TUser>,
-    type: WorkspacePaneRuntimeTabType,
-    sessionId: string,
-    options?: { insertAfterIdentity?: string | null },
-  ): WorkspacePaneTabEntry[] {
-    const current = this.tabs(input)
-    if (input.worktreePath === null || sessionId.length === 0) return current
-    const tabs = workspacePaneTabsWithRuntimeTab(current, type, sessionId, options)
-    return workspacePaneTabEntryArraysEqual(current, tabs) ? current : this.replaceTabs({ ...input, tabs })
-  }
-
-  openStaticTab(
-    input: WorkspacePaneTabsTargetInput<TUser>,
-    tabType: WorkspacePaneStaticTabType,
-    options?: { insertAfterIdentity?: string | null },
-  ): WorkspacePaneTabEntry[] {
-    const current = this.tabs(input)
-    const tabs = workspacePaneTabsWithStaticTab(current, tabType, options)
-    return workspacePaneTabEntryArraysEqual(current, tabs) ? current : this.replaceTabs({ ...input, tabs })
-  }
-
-  closeStaticTab(
-    input: WorkspacePaneTabsTargetInput<TUser>,
-    tabType: WorkspacePaneStaticTabType,
-  ): WorkspacePaneTabEntry[] {
-    const current = this.tabs(input)
-    const tabs = workspacePaneTabsWithoutStaticTab(current, tabType)
-    return workspacePaneTabEntryArraysEqual(current, tabs) ? current : this.replaceTabs({ ...input, tabs })
-  }
-
-  reorderTabsByIdentity(
-    input: WorkspacePaneTabsTargetInput<TUser>,
-    tabIdentities: readonly string[],
-  ): WorkspacePaneTabEntry[] {
-    const current = this.tabs(input)
-    const tabs = workspacePaneTabsWithIdentityOrder(current, tabIdentities)
-    return workspacePaneTabEntryArraysEqual(current, tabs) ? current : this.replaceTabs({ ...input, tabs })
   }
 
   tabs(input: WorkspacePaneTabsTargetInput<TUser>): WorkspacePaneTabEntry[] {

@@ -1,17 +1,10 @@
-import type {
-  WorkspacePaneRuntimeTabType,
-  WorkspacePaneStaticTabType,
-  WorkspacePaneTabEntry,
-} from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import {
   isWorkspacePaneRuntimeTabEntry,
-  workspacePaneRuntimeTabEntry,
-  workspacePaneRuntimeTabSessionId,
   workspacePaneStaticTabEntry,
   workspacePaneTabEntryFromUnknown,
   workspacePaneTabEntryIdentity,
   workspacePaneTabsInsertAfterIdentity,
-  workspacePaneTabsMoveEntryAfterIdentity,
   workspacePaneTabRequiresWorktree,
 } from '#/shared/workspace-pane.ts'
 
@@ -24,7 +17,9 @@ export function defaultWorkspacePaneTabs(): WorkspacePaneTabEntry[] {
 export function workspacePaneStaticTabsFromEntries(
   tabs: readonly WorkspacePaneTabEntry[],
 ): WorkspacePaneStaticTabType[] {
-  return normalizeWorkspacePaneTabs(tabs).flatMap((entry) => (isWorkspacePaneRuntimeTabEntry(entry) ? [] : [entry.type]))
+  return normalizeWorkspacePaneTabs(tabs).flatMap((entry) =>
+    isWorkspacePaneRuntimeTabEntry(entry) ? [] : [entry.type],
+  )
 }
 
 export function workspacePaneTabsWithStaticTab(
@@ -37,29 +32,6 @@ export function workspacePaneTabsWithStaticTab(
   if (current.some((entry) => entry.type === tab)) return normalizeWorkspacePaneTabs(current)
   return normalizeWorkspacePaneTabs(
     workspacePaneTabsInsertAfterIdentity(current, workspacePaneStaticTabEntry(tab), options?.insertAfterIdentity),
-  )
-}
-
-export function workspacePaneTabsWithRuntimeTab(
-  current: readonly WorkspacePaneTabEntry[],
-  type: WorkspacePaneRuntimeTabType,
-  sessionId: string,
-  options?: { insertAfterIdentity?: string | null },
-): WorkspacePaneTabEntry[] {
-  if (sessionId.length === 0) return normalizeWorkspacePaneTabs(current)
-  const existingIndex = current.findIndex(
-    (entry) =>
-      isWorkspacePaneRuntimeTabEntry(entry) &&
-      entry.type === type &&
-      workspacePaneRuntimeTabSessionId(entry) === sessionId,
-  )
-  if (existingIndex !== -1) {
-    return normalizeWorkspacePaneTabs(
-      workspacePaneTabsMoveEntryAfterIdentity(current, existingIndex, options?.insertAfterIdentity),
-    )
-  }
-  return normalizeWorkspacePaneTabs(
-    workspacePaneTabsInsertAfterIdentity(current, workspacePaneRuntimeTabEntry(type, sessionId), options?.insertAfterIdentity),
   )
 }
 

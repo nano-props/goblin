@@ -52,9 +52,12 @@ import type {
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
-import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
+import {
+  workspacePaneStaticTabEntry,
+  workspacePaneRuntimeTabEntry,
+  workspacePaneTabsWithRuntimeTab,
+} from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import { workspacePaneTabsWithRuntimeTab } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import {
   readWorkspacePaneTabsForTarget,
   setWorkspacePaneTabsForTargetQueryData,
@@ -732,7 +735,7 @@ beforeEach(() => {
           }),
           'terminal',
           runtime.terminalSessionId,
-          input,
+          { insertAfterIdentity: input.insertAfterIdentity },
         )
         return { ok: true as const, runtimeType: 'terminal' as const, runtime, tabs }
       }),

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
 
 const REPO_ID = '/tmp/gbl-terminal-create-command-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-terminal-create-command'
@@ -20,7 +21,7 @@ beforeEach(() => {
 
 describe('terminal create command', () => {
   test('shows the created terminal after the session is created', async () => {
-    const createTerminal = vi.fn(async () => 'term-111111111111111111111')
+    const createTerminal = vi.fn(async () => createAdmission())
     const showCreatedTerminalTab = vi.fn(() => true)
 
     await expect(
@@ -48,8 +49,12 @@ describe('terminal create command', () => {
       requestRole: 'leader' as const,
       resourceDisposition: 'created' as const,
       workspacePaneTabs: tabs,
+      runtimeProjectionApplied: true,
     }))
-    const commitCreatedTerminalTab = vi.fn(() => true)
+    const commitCreatedTerminalTab = vi.fn(() => ({
+      workspacePaneProjectionApplied: true,
+      navigationCommitted: true,
+    }))
 
     await expect(
       runCreateTerminalTabCommand({
@@ -73,7 +78,7 @@ describe('terminal create command', () => {
   })
 
   test('records opener before showing the created terminal route', async () => {
-    const createTerminal = vi.fn(async () => 'term-111111111111111111111')
+    const createTerminal = vi.fn(async () => createAdmission())
     const showCreatedTerminalTab = vi.fn((terminalSessionId: string) => {
       expect(workspacePaneTabOpener(REPO_ID, 'main', `terminal:${terminalSessionId}`)).toBe(
         'terminal:term-000000000000000000000',
@@ -106,6 +111,8 @@ describe('terminal create command', () => {
       terminalSessionId: 'term-111111111111111111111',
       requestRole: 'observer' as const,
       resourceDisposition: 'created' as const,
+      workspacePaneTabs: [],
+      runtimeProjectionApplied: true,
     }))
     const showCreatedTerminalTab = vi.fn(() => true)
 
@@ -132,6 +139,8 @@ describe('terminal create command', () => {
       terminalSessionId: 'term-111111111111111111111',
       requestRole: 'leader' as const,
       resourceDisposition: 'created' as const,
+      workspacePaneTabs: [],
+      runtimeProjectionApplied: true,
     }))
     const showCreatedTerminalTab = vi.fn(() => false)
 
@@ -160,6 +169,8 @@ describe('terminal create command', () => {
       terminalSessionId: 'term-111111111111111111111',
       requestRole: 'leader' as const,
       resourceDisposition: 'created' as const,
+      workspacePaneTabs: [],
+      runtimeProjectionApplied: true,
     }))
     const commitCreatedTerminalTab = vi.fn(() => {
       throw new Error('workspace tabs update failed')
@@ -179,7 +190,7 @@ describe('terminal create command', () => {
       }),
     ).resolves.toMatchObject({ ok: false, messageKey: 'error.terminal-create-failed' })
 
-    expect(commitCreatedTerminalTab).toHaveBeenCalledWith('term-111111111111111111111', null)
+    expect(commitCreatedTerminalTab).toHaveBeenCalledWith('term-111111111111111111111', [])
     expect(workspacePaneTabOpener(REPO_ID, 'main', 'terminal:term-111111111111111111111')).toBe(
       'terminal:term-000000000000000000000',
     )
@@ -195,6 +206,8 @@ describe('terminal create command', () => {
         terminalSessionId,
         requestRole: 'leader' as const,
         resourceDisposition,
+        workspacePaneTabs: [],
+        runtimeProjectionApplied: true,
       }))
 
       await expect(
@@ -240,7 +253,7 @@ describe('terminal create command', () => {
   })
 
   test('fast-fails before create when the base has no repo runtime id at the trigger boundary', async () => {
-    const createTerminal = vi.fn(async () => 'term-111111111111111111111')
+    const createTerminal = vi.fn(async () => createAdmission())
     const showCreatedTerminalTab = vi.fn(() => true)
 
     await expect(
@@ -260,3 +273,14 @@ describe('terminal create command', () => {
     expect(showCreatedTerminalTab).not.toHaveBeenCalled()
   })
 })
+
+function createAdmission(overrides: Partial<TerminalCreateAdmissionResult> = {}): TerminalCreateAdmissionResult {
+  return {
+    terminalSessionId: 'term-111111111111111111111',
+    requestRole: 'leader',
+    resourceDisposition: 'created',
+    workspacePaneTabs: [],
+    runtimeProjectionApplied: true,
+    ...overrides,
+  }
+}

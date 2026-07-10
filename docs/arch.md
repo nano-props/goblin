@@ -85,6 +85,9 @@ UI create paths use `workspace-pane-runtime.open`. They must not call a
 provider create and then issue a second `workspace-pane-tabs.update` to repair
 membership. Low-level provider create actions may remain available for
 provider-only use and tests, but they are not the composed UI operation.
+`workspace-pane-tabs.update` only mutates static-tab membership or user order;
+runtime-tab creation and placement belong exclusively to the application
+operation.
 
 Runtime tab types are intentionally registered statically. Adding a new
 server-owned session tab type should update the explicit extension points

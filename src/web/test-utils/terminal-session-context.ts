@@ -1,13 +1,15 @@
 import { vi } from 'vitest'
 import type { TerminalSessionContextValue } from '#/web/components/terminal/types.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneTabsWithRuntimeTab } from '#/shared/workspace-pane.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { workspacePaneTabsWithRuntimeTab } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
 type TestTerminalSessionContextValue = Omit<TerminalSessionContextValue, 'createTerminalWithAdmission'> &
   Partial<Pick<TerminalSessionContextValue, 'createTerminalWithAdmission'>>
 
 export function createTerminalWithAdmissionForContextTest(
   createTerminal: TerminalSessionContextValue['createTerminal'],
+  workspacePaneTabs: readonly WorkspacePaneTabEntry[] = [],
 ): TerminalSessionContextValue['createTerminalWithAdmission'] {
   return vi.fn(async (base, options, placement) => {
     const terminalSessionId = await createTerminal(base, options)
@@ -23,7 +25,11 @@ export function createTerminalWithAdmissionForContextTest(
       terminalSessionId,
       requestRole: 'leader' as const,
       resourceDisposition: 'created' as const,
-      workspacePaneTabs: workspacePaneTabsWithRuntimeTab(currentTabs, 'terminal', terminalSessionId, placement),
+      workspacePaneTabs:
+        workspacePaneTabs.length > 0
+          ? [...workspacePaneTabs]
+          : workspacePaneTabsWithRuntimeTab(currentTabs, 'terminal', terminalSessionId, placement),
+      runtimeProjectionApplied: true,
     }
   })
 }

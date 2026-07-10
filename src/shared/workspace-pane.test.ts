@@ -10,6 +10,7 @@ import {
   workspacePaneTabEntryFromUnknown,
   workspacePaneTabEntryIdentity,
   workspacePaneTabsInsertAfterIdentity,
+  workspacePaneTabsWithRuntimeTab,
 } from '#/shared/workspace-pane.ts'
 
 describe('workspace pane runtime tab helpers', () => {
@@ -19,15 +20,19 @@ describe('workspace pane runtime tab helpers', () => {
     expect(entry).toEqual({ type: 'terminal', runtimeSessionId: 'term-AAAAAAAAAAAAAAAAAAAAA' })
     expect(isWorkspacePaneRuntimeTabType('terminal')).toBe(true)
     expect(workspacePaneRuntimeTabSessionId(entry)).toBe('term-AAAAAAAAAAAAAAAAAAAAA')
-    expect(workspacePaneRuntimeTabIdentity('terminal', 'term-AAAAAAAAAAAAAAAAAAAAA')).toBe('terminal:term-AAAAAAAAAAAAAAAAAAAAA')
+    expect(workspacePaneRuntimeTabIdentity('terminal', 'term-AAAAAAAAAAAAAAAAAAAAA')).toBe(
+      'terminal:term-AAAAAAAAAAAAAAAAAAAAA',
+    )
     expect(workspacePaneTabEntryIdentity(entry)).toBe('terminal:term-AAAAAAAAAAAAAAAAAAAAA')
   })
 
   test('parses runtime tab entries through the shared tab parser', () => {
-    expect(workspacePaneTabEntryFromUnknown({ type: 'terminal', terminalSessionId: 'term-AAAAAAAAAAAAAAAAAAAAA' })).toBeNull()
-    expect(workspacePaneTabEntryFromUnknown({ type: 'terminal', runtimeSessionId: 'term-AAAAAAAAAAAAAAAAAAAAA' })).toEqual(
-      workspacePaneRuntimeTabEntry('terminal', 'term-AAAAAAAAAAAAAAAAAAAAA'),
-    )
+    expect(
+      workspacePaneTabEntryFromUnknown({ type: 'terminal', terminalSessionId: 'term-AAAAAAAAAAAAAAAAAAAAA' }),
+    ).toBeNull()
+    expect(
+      workspacePaneTabEntryFromUnknown({ type: 'terminal', runtimeSessionId: 'term-AAAAAAAAAAAAAAAAAAAAA' }),
+    ).toEqual(workspacePaneRuntimeTabEntry('terminal', 'term-AAAAAAAAAAAAAAAAAAAAA'))
     expect(
       workspacePaneRuntimeTabSessionId({
         type: 'terminal',
@@ -106,5 +111,37 @@ describe('workspacePaneTabsInsertAfterIdentity', () => {
     const snapshot = [...current]
     workspacePaneTabsInsertAfterIdentity(current, changes, 'terminal:term-AAAAAAAAAAAAAAAAAAAAA')
     expect(current).toEqual(snapshot)
+  })
+})
+
+describe('workspacePaneTabsWithRuntimeTab', () => {
+  const status = workspacePaneStaticTabEntry('status')
+  const history = workspacePaneStaticTabEntry('history')
+  const terminal = workspacePaneRuntimeTabEntry('terminal', 'term-AAAAAAAAAAAAAAAAAAAAA')
+
+  test('inserts a new runtime tab after the requested anchor', () => {
+    expect(
+      workspacePaneTabsWithRuntimeTab([status, history], 'terminal', 'term-AAAAAAAAAAAAAAAAAAAAA', {
+        insertAfterIdentity: workspacePaneStaticTabId('status'),
+      }),
+    ).toEqual([status, terminal, history])
+  })
+
+  test('moves an existing runtime tab after the requested anchor', () => {
+    expect(
+      workspacePaneTabsWithRuntimeTab([status, history, terminal], 'terminal', terminal.runtimeSessionId, {
+        insertAfterIdentity: workspacePaneStaticTabId('status'),
+      }),
+    ).toEqual([status, terminal, history])
+  })
+
+  test('preserves an existing runtime tab position without an anchor', () => {
+    expect(workspacePaneTabsWithRuntimeTab([status, history, terminal], 'terminal', terminal.runtimeSessionId)).toEqual(
+      [status, history, terminal],
+    )
+  })
+
+  test('ignores an empty runtime session id', () => {
+    expect(workspacePaneTabsWithRuntimeTab([status, history], 'terminal', '')).toEqual([status, history])
   })
 })

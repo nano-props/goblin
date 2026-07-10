@@ -1,14 +1,7 @@
 import type { TerminalCreateOptions, TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
-
-export type TerminalCreateAdmissionResult = {
-  terminalSessionId: string
-  requestRole: 'leader' | 'observer'
-  resourceDisposition: 'created' | 'restored' | 'reused'
-  workspacePaneTabs: WorkspacePaneTabEntry[]
-}
+import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
 
 export interface TerminalSessionCommandBridge {
   terminalWorktreeSnapshot: (terminalWorktreeKey: string) => TerminalWorktreeSnapshot

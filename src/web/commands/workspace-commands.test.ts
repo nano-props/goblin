@@ -35,11 +35,7 @@ import {
   readWorkspacePaneTabsForTarget,
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import {
-  workspacePaneStaticTabsFromEntries,
-  workspacePaneTabsWithRuntimeTab,
-} from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
+import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { TerminalCreateOptions, TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
@@ -1009,24 +1005,19 @@ describe('workspace commands', () => {
       secondCreatePending = false
       return terminalSessionId
     })
-    const createTerminalWithAdmission = vi.fn(
-      async (
-        base: TerminalSessionBase,
-        _options?: TerminalCreateOptions,
-        placement?: WorkspacePaneRuntimeTabPlacement,
-      ) => {
-        firstCreatePending = true
-        const terminalSessionId = await firstCreate.promise
-        recordCreatedTerminalSelection(base, terminalSessionId)
-        firstCreatePending = false
-        return {
-          terminalSessionId,
-          requestRole: 'leader' as const,
-          resourceDisposition: 'created' as const,
-          workspacePaneTabs: applicationTabsForCreatedTerminal(base, terminalSessionId, placement),
-        }
-      },
-    )
+    const createTerminalWithAdmission = vi.fn(async (base: TerminalSessionBase, _options?: TerminalCreateOptions) => {
+      firstCreatePending = true
+      const terminalSessionId = await firstCreate.promise
+      recordCreatedTerminalSelection(base, terminalSessionId)
+      firstCreatePending = false
+      return {
+        terminalSessionId,
+        requestRole: 'leader' as const,
+        resourceDisposition: 'created' as const,
+        workspacePaneTabs: [staticEntry('status'), terminalEntry(terminalSessionId)],
+        runtimeProjectionApplied: true,
+      }
+    })
     const showRepoBranchTerminalSession = vi.fn((_repoId: string, _branchName: string, _terminalSessionId: string) => {
       return !createPending()
     })
@@ -1055,13 +1046,14 @@ describe('workspace commands', () => {
 
     const secondCommand = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
       base,
-      createTerminal: async (createBase, _createOptions, placement) => {
+      createTerminal: async (createBase) => {
         const terminalSessionId = await createTerminal(createBase)
         return {
           terminalSessionId,
           requestRole: 'leader' as const,
           resourceDisposition: 'created' as const,
-          workspacePaneTabs: applicationTabsForCreatedTerminal(createBase, terminalSessionId, placement),
+          workspacePaneTabs: [staticEntry('status'), terminalEntry(terminalSessionId)],
+          runtimeProjectionApplied: true,
         }
       },
       openerIdentity: 'workspace-pane:files',
@@ -1838,9 +1830,6 @@ describe('workspace commands', () => {
     })
     installWorkspacePaneTabsTestBridge({
       updateWorkspaceTabs: (input) => {
-        if (input.operation.type === 'open-runtime') {
-          return [...readWorkspacePaneTabsForTarget(input), terminalEntry(input.operation.sessionId)]
-        }
         resolveCommitStarted()
         return new Promise((resolve) => {
           resolveCommit = resolve
@@ -1901,9 +1890,6 @@ describe('workspace commands', () => {
     })
     installWorkspacePaneTabsTestBridge({
       updateWorkspaceTabs: (input) => {
-        if (input.operation.type === 'open-runtime') {
-          return [...readWorkspacePaneTabsForTarget(input), terminalEntry(input.operation.sessionId)]
-        }
         resolveCommitStarted()
         return new Promise((resolve) => {
           resolveCommit = resolve
@@ -2024,9 +2010,6 @@ describe('workspace commands', () => {
     })
     installWorkspacePaneTabsTestBridge({
       updateWorkspaceTabs: (input) => {
-        if (input.operation.type === 'open-runtime') {
-          return [...readWorkspacePaneTabsForTarget(input), terminalEntry(input.operation.sessionId)]
-        }
         resolveCommitStarted()
         return new Promise((resolve) => {
           resolveCommit = resolve
@@ -2878,7 +2861,8 @@ function createSingleFlightTerminalWithProjection(resolveSessionId: () => string
       terminalSessionId,
       requestRole,
       resourceDisposition: 'created' as const,
-      workspacePaneTabs: applicationTabsForCreatedTerminal(base, terminalSessionId),
+      workspacePaneTabs: [staticEntry('status'), terminalEntry(terminalSessionId)],
+      runtimeProjectionApplied: true,
     }
   })
   return {
@@ -2887,23 +2871,6 @@ function createSingleFlightTerminalWithProjection(resolveSessionId: () => string
     createOperationCount: () => createOperationCount,
     isCreatePending: () => pending !== null,
   }
-}
-
-function applicationTabsForCreatedTerminal(
-  base: TerminalSessionBase,
-  terminalSessionId: string,
-  placement?: WorkspacePaneRuntimeTabPlacement,
-): WorkspacePaneTabEntry[] {
-  const repoRuntimeId = base.repoRuntimeId
-  const currentTabs = repoRuntimeId
-    ? readWorkspacePaneTabsForTarget({
-        repoRoot: base.repoRoot,
-        repoRuntimeId,
-        branchName: base.branch,
-        worktreePath: base.worktreePath,
-      })
-    : []
-  return workspacePaneTabsWithRuntimeTab(currentTabs, 'terminal', terminalSessionId, placement)
 }
 
 function recordCreatedTerminalSelection(base: TerminalSessionBase, terminalSessionId: string): void {

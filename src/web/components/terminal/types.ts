@@ -174,12 +174,7 @@ export interface TerminalSessionContextValue {
     base: TerminalSessionBase,
     options?: TerminalCreateOptions,
     placement?: import('#/shared/workspace-pane-runtime.ts').WorkspacePaneRuntimeTabPlacement,
-  ) => Promise<{
-    terminalSessionId: string
-    requestRole: 'leader' | 'observer'
-    resourceDisposition: 'created' | 'restored' | 'reused'
-    workspacePaneTabs: import('#/shared/workspace-pane.ts').WorkspacePaneTabEntry[]
-  }>
+  ) => Promise<import('#/web/components/terminal/terminal-create-admission.ts').TerminalCreateAdmissionResult>
   registerHost: (terminalWorktreeKey: string, host: HTMLElement) => void
   unregisterHost: (terminalWorktreeKey: string, host: HTMLElement) => void
   selectTerminal: (terminalWorktreeKey: string, terminalSessionId: string) => void

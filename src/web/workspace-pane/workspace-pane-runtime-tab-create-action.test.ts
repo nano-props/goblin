@@ -7,6 +7,7 @@ import {
   workspacePaneRuntimeTabCreateAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import { resetWorkspacePaneTabCoordinatorForTest } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
 
 const terminalCreateCommandMocks = vi.hoisted(() => ({
   runCreateTerminalTabCommand: vi.fn(async () => ({
@@ -17,6 +18,9 @@ const terminalCreateCommandMocks = vi.hoisted(() => ({
 const workspacePaneTabsCommitMocks = vi.hoisted(() => ({
   writeCanonicalWorkspacePaneTabsForTarget: vi.fn(async () => true),
 }))
+const workspacePaneTabsQueryMocks = vi.hoisted(() => ({
+  refreshWorkspacePaneTabs: vi.fn(),
+}))
 
 vi.mock('#/web/commands/terminal-create-command.ts', () => ({
   runCreateTerminalTabCommand: terminalCreateCommandMocks.runCreateTerminalTabCommand,
@@ -26,10 +30,16 @@ vi.mock('#/web/workspace-pane/workspace-pane-tabs-commit.ts', () => ({
   writeCanonicalWorkspacePaneTabsForTarget: workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsForTarget,
 }))
 
+vi.mock('#/web/workspace-pane/workspace-pane-tabs-query.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#/web/workspace-pane/workspace-pane-tabs-query.ts')>()),
+  refreshWorkspacePaneTabs: workspacePaneTabsQueryMocks.refreshWorkspacePaneTabs,
+}))
+
 beforeEach(() => {
   resetWorkspacePaneTabCoordinatorForTest()
   workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsForTarget.mockReset()
   workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsForTarget.mockResolvedValue(true)
+  workspacePaneTabsQueryMocks.refreshWorkspacePaneTabs.mockReset()
 })
 
 afterEach(() => {
@@ -47,7 +57,7 @@ describe('workspace pane runtime tab create action', () => {
       t: translate,
       terminal: {
         base: null,
-        createTerminal: vi.fn(async () => 'term-111111111111111111111'),
+        createTerminal: vi.fn(async () => createAdmission()),
         captureOpenerIdentity: vi.fn(() => null),
       },
     })
@@ -62,7 +72,7 @@ describe('workspace pane runtime tab create action', () => {
       branch: 'main',
       worktreePath: '/repo-worktree',
     }
-    const createTerminal = vi.fn(async () => 'term-111111111111111111111')
+    const createTerminal = vi.fn(async () => createAdmission())
     const showCreatedRuntimeTab = vi.fn()
     const captureOpenerIdentity = vi.fn(() => 'opener-tab')
 
@@ -114,7 +124,7 @@ describe('workspace pane runtime tab create action', () => {
 
     const createPromise = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
       base,
-      createTerminal: vi.fn(async () => 'term-111111111111111111111'),
+      createTerminal: vi.fn(async () => createAdmission()),
       openerIdentity: null,
       t: translate,
     })
@@ -150,7 +160,7 @@ describe('workspace pane runtime tab create action', () => {
         workspacePaneTabs: tabs,
         showCreatedTerminalTab,
       }),
-    ).resolves.toBe(true)
+    ).resolves.toEqual({ workspacePaneProjectionApplied: true, navigationCommitted: true })
 
     expect(workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsForTarget).toHaveBeenCalledWith({
       repoRoot: '/repo',
@@ -165,8 +175,9 @@ describe('workspace pane runtime tab create action', () => {
     ).toBeLessThan(showCreatedTerminalTab.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY)
   })
 
-  test('does not navigate when the application result has no canonical tab projection', async () => {
+  test('still navigates when a stale client projection skips the application-returned tabs', async () => {
     const showCreatedTerminalTab = vi.fn(() => true)
+    workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsForTarget.mockResolvedValueOnce(false)
 
     await expect(
       commitCreatedTerminalWorkspacePaneRuntimeTab({
@@ -177,13 +188,37 @@ describe('workspace pane runtime tab create action', () => {
           worktreePath: '/repo-worktree',
         },
         terminalSessionId: 'term-111111111111111111111',
-        workspacePaneTabs: null,
+        workspacePaneTabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
         showCreatedTerminalTab,
       }),
-    ).resolves.toBe(false)
+    ).resolves.toEqual({ workspacePaneProjectionApplied: false, navigationCommitted: true })
 
-    expect(workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsForTarget).not.toHaveBeenCalled()
-    expect(showCreatedTerminalTab).not.toHaveBeenCalled()
+    expect(workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsForTarget).toHaveBeenCalledOnce()
+    expect(showCreatedTerminalTab).toHaveBeenCalledWith('term-111111111111111111111')
+  })
+
+  test('refreshes and still navigates when applying application-returned tabs throws', async () => {
+    const showCreatedTerminalTab = vi.fn(() => true)
+    workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsForTarget.mockRejectedValueOnce(
+      new Error('query projection failed'),
+    )
+
+    await expect(
+      commitCreatedTerminalWorkspacePaneRuntimeTab({
+        base: {
+          repoRoot: '/repo',
+          repoRuntimeId: 'repo-runtime-1',
+          branch: 'main',
+          worktreePath: '/repo-worktree',
+        },
+        terminalSessionId: 'term-111111111111111111111',
+        workspacePaneTabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
+        showCreatedTerminalTab,
+      }),
+    ).resolves.toEqual({ workspacePaneProjectionApplied: false, navigationCommitted: true })
+
+    expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabs).toHaveBeenCalledWith('/repo', 'repo-runtime-1')
+    expect(showCreatedTerminalTab).toHaveBeenCalledWith('term-111111111111111111111')
   })
 
   test('marks the terminal create action busy while projection or create is pending', () => {
@@ -201,7 +236,7 @@ describe('workspace pane runtime tab create action', () => {
       t: translate,
       terminal: {
         base,
-        createTerminal: vi.fn(async () => 'term-111111111111111111111'),
+        createTerminal: vi.fn(async () => createAdmission()),
         captureOpenerIdentity: vi.fn(() => null),
       },
     })
@@ -218,7 +253,7 @@ describe('workspace pane runtime tab create action', () => {
       t: translate,
       terminal: {
         base,
-        createTerminal: vi.fn(async () => 'term-111111111111111111111'),
+        createTerminal: vi.fn(async () => createAdmission()),
         captureOpenerIdentity: vi.fn(() => null),
       },
     })
@@ -229,6 +264,16 @@ describe('workspace pane runtime tab create action', () => {
 
 function translate(key: string): string {
   return key
+}
+
+function createAdmission(): TerminalCreateAdmissionResult {
+  return {
+    terminalSessionId: 'term-111111111111111111111',
+    requestRole: 'leader',
+    resourceDisposition: 'created',
+    workspacePaneTabs: [],
+    runtimeProjectionApplied: true,
+  }
 }
 
 function runtimeTabState(input: { createPending?: boolean } = {}): WorkspacePaneRuntimeTabCreateStateByType {

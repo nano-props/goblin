@@ -10,7 +10,6 @@ import type {
   TerminalBellRealtimeEvent,
   TerminalExitEvent,
   TerminalHydrationSnapshot,
-  TerminalCreateAction,
   TerminalOutputEvent,
   TerminalSessionSummary as ServerTerminalSessionSummary,
   TerminalTitleEvent,
@@ -48,9 +47,9 @@ import type {
 } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { terminalCreateDedupeKey } from '#/web/components/terminal/terminal-create-dedupe.ts'
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
 import { workspacePaneRuntimeClient } from '#/web/workspace-pane/workspace-pane-runtime-client.ts'
+import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
 
 const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   phase: 'opening',
@@ -67,15 +66,7 @@ interface TerminalCreateQueueRequest {
   placement: WorkspacePaneRuntimeTabPlacement
 }
 
-interface TerminalCreateQueueResult {
-  terminalSessionId: string
-  resourceDisposition: TerminalCreateAction
-  workspacePaneTabs: WorkspacePaneTabEntry[]
-}
-
-export interface TerminalCreateCommandAdmissionResult extends TerminalCreateQueueResult {
-  requestRole: 'leader' | 'observer'
-}
+type TerminalCreateQueueResult = Omit<TerminalCreateAdmissionResult, 'requestRole'>
 
 interface ResolvedTerminalCreateOptions {
   startupShellCommand?: string
@@ -497,7 +488,7 @@ export class TerminalSessionProjection {
     base: TerminalSessionBase,
     options: TerminalCreateOptions = {},
     placement: WorkspacePaneRuntimeTabPlacement = {},
-  ): Promise<TerminalCreateCommandAdmissionResult> => {
+  ): Promise<TerminalCreateAdmissionResult> => {
     const admission = this.enqueueCreateRequest(base, formatTerminalWorktreeKey(base.repoRoot, base.worktreePath), {
       createOptions: options,
       dedupeKey: terminalCreateDedupeKey(options),
@@ -575,30 +566,26 @@ export class TerminalSessionProjection {
     ) {
       throw new Error('error.terminal-create-failed')
     }
-    if (this.lifecycleQueues.getCreate(terminalWorktreeKey) !== pending) {
-      await this.disposeStaleCreateResult(result.terminalSessionId, result.terminalRuntimeSessionId)
-      throw new Error('terminal create request canceled')
+    let runtimeProjectionApplied = false
+    if (this.lifecycleQueues.getCreate(terminalWorktreeKey) === pending) {
+      const projectedCreate = projectCreateResultForClient(base, result)
+      if (this.lifecycleQueues.getCreate(terminalWorktreeKey) === pending) {
+        runtimeProjectionApplied = this.reconcileServerSessions(
+          { repoRoot: base.repoRoot, repoRuntimeId: requireRepoRuntimeId(base) },
+          projectedCreate.serverSessions,
+          clientId,
+          projectedCreate.snapshotByTerminalRuntimeSessionId,
+        )
+        if (runtimeProjectionApplied) {
+          this.setPreferredSelectedTerminalSessionId(terminalWorktreeKey, result.terminalSessionId)
+        }
+      }
     }
-    const projectedCreate = projectCreateResultForClient(base, result)
-    if (this.lifecycleQueues.getCreate(terminalWorktreeKey) !== pending) {
-      await this.disposeStaleCreateResult(result.terminalSessionId, result.terminalRuntimeSessionId)
-      throw new Error('terminal create request canceled')
-    }
-    const projected = this.reconcileServerSessions(
-      { repoRoot: base.repoRoot, repoRuntimeId: requireRepoRuntimeId(base) },
-      projectedCreate.serverSessions,
-      clientId,
-      projectedCreate.snapshotByTerminalRuntimeSessionId,
-    )
-    if (!projected) {
-      await this.disposeStaleCreateResult(result.terminalSessionId, result.terminalRuntimeSessionId)
-      throw new Error('terminal create request canceled')
-    }
-    this.setPreferredSelectedTerminalSessionId(terminalWorktreeKey, result.terminalSessionId)
     return {
       terminalSessionId: result.terminalSessionId,
       resourceDisposition: result.action,
       workspacePaneTabs: openResult.tabs,
+      runtimeProjectionApplied,
     }
   }
 
@@ -735,18 +722,6 @@ export class TerminalSessionProjection {
       // shell's `Restored session: …` line print twice.
       terminalSessionProviderLog.warn('durable close failed for terminal session', { terminalRuntimeSessionId, err })
       throw err
-    }
-  }
-
-  private async disposeStaleCreateResult(terminalSessionId: string, terminalRuntimeSessionId: string): Promise<void> {
-    try {
-      await terminalClient.close({ terminalRuntimeSessionId })
-    } catch (err) {
-      terminalSessionProviderLog.warn('failed to dispose stale terminal create result', {
-        terminalSessionId,
-        terminalRuntimeSessionId,
-        err,
-      })
     }
   }
 

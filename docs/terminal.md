@@ -210,6 +210,11 @@ command-owned navigation must await the router and confirm that the requested
 route became current; navigation rejection or supersession is reported without
 rolling back committed server resources.
 
+Keep these client outcomes separate: `runtimeProjectionApplied` reports local
+terminal-session hydration, workspace-pane projection reports local canonical
+tab-cache acceptance, and navigation commit reports the exact route result.
+None of these client projection outcomes owns rollback of the server resource.
+
 The pending bit is projection state from the terminal lifecycle queue. Do not
 add client-only focus tokens, request generations, or "is the user still on
 the initiating tab" guards to decide whether a completed create may navigate.

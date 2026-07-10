@@ -1,39 +1,11 @@
 import {
-  isWorkspacePaneRuntimeTabEntry,
-  type WorkspacePaneRuntimeTabType,
   type WorkspacePaneStaticTabType,
   type WorkspacePaneTabEntry,
-  workspacePaneRuntimeTabEntry,
-  workspacePaneRuntimeTabSessionId,
   workspacePaneStaticTabEntry,
   workspacePaneTabEntryIdentity,
   workspacePaneTabsInsertAfterIdentity,
-  workspacePaneTabsMoveEntryAfterIdentity,
 } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs.ts'
-
-export function workspacePaneTabsWithRuntimeTab(
-  current: readonly WorkspacePaneTabEntry[],
-  type: WorkspacePaneRuntimeTabType,
-  sessionId: string,
-  options?: { insertAfterIdentity?: string | null },
-): WorkspacePaneTabEntry[] {
-  if (sessionId.length === 0) return [...current]
-  const existingIndex = current.findIndex(
-    (entry) =>
-      isWorkspacePaneRuntimeTabEntry(entry) &&
-      entry.type === type &&
-      workspacePaneRuntimeTabSessionId(entry) === sessionId,
-  )
-  if (existingIndex !== -1) {
-    return workspacePaneTabsMoveEntryAfterIdentity(current, existingIndex, options?.insertAfterIdentity)
-  }
-  return workspacePaneTabsInsertAfterIdentity(
-    current,
-    workspacePaneRuntimeTabEntry(type, sessionId),
-    options?.insertAfterIdentity,
-  )
-}
 
 export function workspacePaneTabsWithUpdateOperation(
   current: readonly WorkspacePaneTabEntry[],
@@ -42,10 +14,6 @@ export function workspacePaneTabsWithUpdateOperation(
   switch (operation.type) {
     case 'open-static':
       return workspacePaneTabsWithStaticTab(current, operation.tabType, {
-        insertAfterIdentity: operation.insertAfterIdentity,
-      })
-    case 'open-runtime':
-      return workspacePaneTabsWithRuntimeTab(current, operation.runtimeType, operation.sessionId, {
         insertAfterIdentity: operation.insertAfterIdentity,
       })
     case 'close-static':

@@ -20,7 +20,11 @@ import {
   WORKSPACE_PANE_TABS_REALTIME_EVENTS,
   WORKSPACE_PANE_TABS_SOCKET_ACTIONS,
 } from '#/shared/workspace-pane-tabs.ts'
-import { WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS } from '#/shared/workspace-pane-runtime.ts'
+import {
+  WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS,
+  type WorkspacePaneRuntimeOpenInput,
+  type WorkspacePaneRuntimeOpenResult,
+} from '#/shared/workspace-pane-runtime.ts'
 
 // Under method 2 the host threads `userId` (derived from the
 // access token) alongside `clientId` (per-tab routing). Tests use
@@ -162,7 +166,7 @@ function sentSocketMessages(socket: {
 async function requestWorkspacePaneTabs(
   host: ServerTerminalHost,
   socket: { send: ReturnType<typeof vi.fn>; close?: ReturnType<typeof vi.fn> },
-  action: (typeof WORKSPACE_PANE_TABS_SOCKET_ACTIONS)[keyof typeof WORKSPACE_PANE_TABS_SOCKET_ACTIONS],
+  action: string,
   input: unknown,
   requestId: string,
 ): Promise<unknown> {
@@ -187,6 +191,21 @@ async function requestWorkspacePaneTabs(
   )
   expect(response).toMatchObject({ type: 'response', ok: true, action })
   return response?.payload
+}
+
+async function requestWorkspacePaneRuntime(
+  host: ServerTerminalHost,
+  socket: { send: ReturnType<typeof vi.fn>; close?: ReturnType<typeof vi.fn> },
+  input: WorkspacePaneRuntimeOpenInput,
+  requestId: string,
+): Promise<WorkspacePaneRuntimeOpenResult> {
+  return (await requestWorkspacePaneTabs(
+    host,
+    socket,
+    WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open,
+    input,
+    requestId,
+  )) as WorkspacePaneRuntimeOpenResult
 }
 
 async function createTerminalSession(host: ServerTerminalHost, clientId: string, userId = USER_1): Promise<string> {
@@ -632,31 +651,24 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-    const created = await host.create('client_a', USER_1, {
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branch: 'feature',
-      worktreePath: '/repo-linked',
-      kind: 'additional',
-      cols: 80,
-      rows: 24,
-      clientId: 'client_a',
-    })
-    expect(created.ok).toBe(true)
-    if (!created.ok) return
-    await requestWorkspacePaneTabs(
+    const opened = await requestWorkspacePaneRuntime(
       host,
       socket,
-      WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
       {
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: 'feature',
-        worktreePath: '/repo-linked',
-        operation: { type: 'open-runtime', runtimeType: 'terminal', sessionId: created.terminalSessionId },
+        runtimeType: 'terminal',
+        request: {
+          repoRoot: REPO_ROOT,
+          repoRuntimeId: REPO_RUNTIME_ID,
+          branch: 'feature',
+          worktreePath: '/repo-linked',
+          kind: 'additional',
+          cols: 80,
+          rows: 24,
+        },
       },
       'req_open_terminal_before_exit',
     )
+    expect(opened.ok).toBe(true)
     socket.send.mockClear()
 
     mockPtys[0]?.emitExit()
@@ -692,31 +704,24 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-    const created = await host.create('client_a', USER_1, {
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branch: 'feature',
-      worktreePath: '/repo-linked',
-      kind: 'additional',
-      cols: 80,
-      rows: 24,
-      clientId: 'client_a',
-    })
-    expect(created.ok).toBe(true)
-    if (!created.ok) return
-    await requestWorkspacePaneTabs(
+    const opened = await requestWorkspacePaneRuntime(
       host,
       socket,
-      WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
       {
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: 'feature',
-        worktreePath: '/repo-linked',
-        operation: { type: 'open-runtime', runtimeType: 'terminal', sessionId: created.terminalSessionId },
+        runtimeType: 'terminal',
+        request: {
+          repoRoot: REPO_ROOT,
+          repoRuntimeId: REPO_RUNTIME_ID,
+          branch: 'feature',
+          worktreePath: '/repo-linked',
+          kind: 'additional',
+          cols: 80,
+          rows: 24,
+        },
       },
       'req_open_terminal_before_prune',
     )
+    expect(opened.ok).toBe(true)
     socket.send.mockClear()
     vi.mocked(getWorktrees).mockResolvedValueOnce([])
 

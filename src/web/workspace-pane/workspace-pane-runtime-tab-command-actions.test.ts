@@ -157,6 +157,7 @@ describe('workspace pane runtime tab command actions', () => {
       requestRole: 'observer' as const,
       resourceDisposition: 'created' as const,
       workspacePaneTabs: [],
+      runtimeProjectionApplied: true,
     }))
     const showTerminalSession = vi.fn(() => true)
     const bridge: TerminalSessionCommandBridge = {

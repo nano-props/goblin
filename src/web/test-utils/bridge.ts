@@ -34,12 +34,11 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import {
-  workspacePaneTabsWithRuntimeTab,
   workspacePaneTabsWithStaticTab,
   workspacePaneTabsWithoutStaticTab,
 } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import { workspacePaneTabEntryIdentity } from '#/shared/workspace-pane.ts'
+import { workspacePaneTabEntryIdentity, workspacePaneTabsWithRuntimeTab } from '#/shared/workspace-pane.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import type {
@@ -58,6 +57,10 @@ import type {
   WorkspacePaneTabsUpdateInput,
 } from '#/shared/workspace-pane-tabs.ts'
 import { WORKSPACE_PANE_TABS_SOCKET_ACTIONS } from '#/shared/workspace-pane-tabs.ts'
+import {
+  WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS,
+  type WorkspacePaneRuntimeOpenResult,
+} from '#/shared/workspace-pane-runtime.ts'
 import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
 import { vi } from 'vitest'
 import { installWebSocketMock } from '#/web/test-utils/websocket-mock.ts'
@@ -140,6 +143,7 @@ interface TerminalClientTestOutputs {
   'workspacePaneTabs.replace': WorkspacePaneTabEntry[]
   'workspacePaneTabs.update': WorkspacePaneTabEntry[]
   'workspacePaneTabs.list': WorkspacePaneTabsEntry[]
+  'workspacePaneRuntime.open': WorkspacePaneRuntimeOpenResult
 }
 
 function terminalHandlerNameForSocketAction(action: string): keyof TerminalClientTestOutputs | null {
@@ -164,6 +168,8 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalClien
       return 'workspacePaneTabs.update'
     case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list:
       return 'workspacePaneTabs.list'
+    case WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open:
+      return 'workspacePaneRuntime.open'
     case 'prune':
       return 'terminal.prune'
     case 'list-sessions':
@@ -221,7 +227,12 @@ export function installWorkspacePaneTabsTestBridge(
   let serverEntries: WorkspacePaneTabsEntry[] = []
   const targetKey = (input: { repoRoot: string; branchName: string; worktreePath: string | null }) =>
     workspacePaneTabsTargetIdentityKey(input)
-  const serverTabsForTarget = (input: WorkspacePaneTabsUpdateInput): WorkspacePaneTabEntry[] => {
+  const serverTabsForTarget = (input: {
+    repoRoot: string
+    repoRuntimeId: string
+    branchName: string
+    worktreePath: string | null
+  }): WorkspacePaneTabEntry[] => {
     const entry = serverEntries.find((candidate) => targetKey(candidate) === targetKey(input))
     if (entry) return [...entry.tabs]
     const tabs = readWorkspacePaneTabsForTarget(input)
@@ -340,28 +351,17 @@ export function installWorkspacePaneTabsTestBridge(
       open: async (input) => {
         const terminalSessionId = 'term-testtesttesttesttest1'
         const terminalRuntimeSessionId = 'pty_test_aaaaaaaaa'
+        const target = {
+          repoRoot: input.request.repoRoot,
+          repoRuntimeId: input.request.repoRuntimeId,
+          branchName: input.request.branch,
+          worktreePath: input.request.worktreePath,
+        }
         const tabs = replaceServerTarget(
-          {
-            repoRoot: input.request.repoRoot,
-            branchName: input.request.branch,
-            worktreePath: input.request.worktreePath,
-          },
-          workspacePaneTabsWithRuntimeTab(
-            serverTabsForTarget({
-              repoRoot: input.request.repoRoot,
-              repoRuntimeId: input.request.repoRuntimeId,
-              branchName: input.request.branch,
-              worktreePath: input.request.worktreePath,
-              operation: {
-                type: 'open-runtime',
-                runtimeType: 'terminal',
-                sessionId: terminalSessionId,
-              },
-            }),
-            'terminal',
-            terminalSessionId,
-            { insertAfterIdentity: input.insertAfterIdentity },
-          ),
+          target,
+          workspacePaneTabsWithRuntimeTab(serverTabsForTarget(target), 'terminal', terminalSessionId, {
+            insertAfterIdentity: input.insertAfterIdentity,
+          }),
         )
         return {
           ok: true,
@@ -414,10 +414,6 @@ function defaultWorkspacePaneTabsOperationResult(
   switch (input.operation.type) {
     case 'open-static':
       return workspacePaneTabsWithStaticTab(currentTabs, input.operation.tabType, {
-        insertAfterIdentity: input.operation.insertAfterIdentity,
-      })
-    case 'open-runtime':
-      return workspacePaneTabsWithRuntimeTab(currentTabs, input.operation.runtimeType, input.operation.sessionId, {
         insertAfterIdentity: input.operation.insertAfterIdentity,
       })
     case 'close-static':
@@ -587,6 +583,10 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     name: 'workspacePaneTabs.list',
     payload: unknown,
   ): TerminalClientTestOutputs['workspacePaneTabs.list']
+  function callTerminalHandler(
+    name: 'workspacePaneRuntime.open',
+    payload: unknown,
+  ): TerminalClientTestOutputs['workspacePaneRuntime.open']
   function callTerminalHandler(name: 'terminal.prune', payload: unknown): TerminalClientTestOutputs['terminal.prune']
   function callTerminalHandler(
     name: 'terminal.listSessions',
@@ -777,23 +777,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       onChanged: () => () => {},
     }),
     workspacePaneRuntime: () => ({
-      open: async (input) => {
-        const runtime = callTerminalHandler('terminal.create', input.request)
-        if (!runtime.ok) return { ok: false as const, runtimeType: 'terminal' as const, message: runtime.message }
-        const tabs = callTerminalHandler('workspacePaneTabs.update', {
-          repoRoot: input.request.repoRoot,
-          repoRuntimeId: input.request.repoRuntimeId,
-          branchName: input.request.branch,
-          worktreePath: input.request.worktreePath,
-          operation: {
-            type: 'open-runtime',
-            runtimeType: 'terminal',
-            sessionId: runtime.terminalSessionId,
-            insertAfterIdentity: input.insertAfterIdentity,
-          },
-        })
-        return { ok: true as const, runtimeType: 'terminal' as const, runtime, tabs }
-      },
+      open: async (input) => callTerminalHandler('workspacePaneRuntime.open', input),
     }),
   })
   vi.stubGlobal(

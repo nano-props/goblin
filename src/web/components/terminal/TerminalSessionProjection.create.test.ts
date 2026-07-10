@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import type { TerminalCreateResult } from '#/shared/terminal-types.ts'
 
 const mocks = vi.hoisted(() => ({
   createMock: vi.fn(),
@@ -164,7 +165,9 @@ function terminalBase() {
   }
 }
 
-function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
+type TerminalCreateSuccess = Extract<TerminalCreateResult, { ok: true }>
+
+function makeCreateResult(overrides: Partial<TerminalCreateSuccess> = {}): TerminalCreateSuccess {
   return {
     ok: true as const,
     action: 'created' as const,
@@ -186,6 +189,7 @@ function makeCreateResult(overrides: Partial<Record<string, unknown>> = {}) {
         terminalSessionId: 'term-111111111111111111111',
         repoRuntimeId: REPO_RUNTIME_ID,
         repoRoot: REPO_ROOT,
+        branch: BRANCH,
         worktreePath: WORKTREE_PATH,
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_local', status: 'connected' as const },
@@ -477,12 +481,14 @@ describe('TerminalSessionProjection create flow', () => {
       requestRole: 'leader',
       resourceDisposition: 'created',
       workspacePaneTabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
+      runtimeProjectionApplied: true,
     })
     await expect(secondCreate).resolves.toEqual({
       terminalSessionId: 'term-111111111111111111111',
       requestRole: 'observer',
       resourceDisposition: 'created',
       workspacePaneTabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
+      runtimeProjectionApplied: true,
     })
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
   })
@@ -498,6 +504,7 @@ describe('TerminalSessionProjection create flow', () => {
         requestRole: 'leader',
         resourceDisposition,
         workspacePaneTabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
+        runtimeProjectionApplied: true,
       })
       expect(projection.isKnownSession('term-111111111111111111111')).toBe(true)
     },
@@ -512,7 +519,9 @@ describe('TerminalSessionProjection create flow', () => {
         {
           terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
           terminalSessionId: 'term-111111111111111111111',
+          repoRuntimeId: REPO_RUNTIME_ID,
           repoRoot: REPO_ROOT,
+          branch: BRANCH,
           worktreePath: WORKTREE_PATH,
           cwd: WORKTREE_PATH,
           controller: { clientId: 'client_local', status: 'connected' as const },
@@ -526,7 +535,9 @@ describe('TerminalSessionProjection create flow', () => {
         {
           terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
           terminalSessionId: 'term-222222222222222222222',
+          repoRuntimeId: REPO_RUNTIME_ID,
           repoRoot: REPO_ROOT,
+          branch: BRANCH,
           worktreePath: WORKTREE_PATH,
           cwd: WORKTREE_PATH,
           controller: { clientId: 'client_local', status: 'connected' as const },
@@ -600,25 +611,32 @@ describe('TerminalSessionProjection create flow', () => {
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
   })
 
-  test('rejects and closes a create result that no longer belongs to the current repo runtime projection', async () => {
-    const createResponse = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
-    mocks.createMock.mockReturnValueOnce(createResponse.promise)
+  test.each(['created', 'reused', 'restored'] as const)(
+    'keeps a committed %s create result when the current repo runtime projection has moved on',
+    async (resourceDisposition) => {
+      const createResponse = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
+      mocks.createMock.mockReturnValueOnce(createResponse.promise)
 
-    const pending = projection.createTerminal(terminalBase())
-    await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
+      const pending = projection.createTerminalWithAdmission(terminalBase())
+      await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
 
-    projection.setRepoIndex({
-      [REPO_ROOT]: {
-        repoRuntimeId: 'repo-runtime-new',
-        branchByWorktreePath: { [WORKTREE_PATH]: BRANCH },
-      },
-    })
-    createResponse.resolve(makeCreateResult())
+      projection.setRepoIndex({
+        [REPO_ROOT]: {
+          repoRuntimeId: 'repo-runtime-new',
+          branchByWorktreePath: { [WORKTREE_PATH]: BRANCH },
+        },
+      })
+      createResponse.resolve(makeCreateResult({ action: resourceDisposition }))
 
-    await expect(pending).rejects.toThrow('terminal create request canceled')
-    expect(mocks.closeMock).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa' })
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
-  })
+      await expect(pending).resolves.toMatchObject({
+        terminalSessionId: 'term-111111111111111111111',
+        resourceDisposition,
+        runtimeProjectionApplied: false,
+      })
+      expect(mocks.closeMock).not.toHaveBeenCalled()
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    },
+  )
 
   test('creates with default startup geometry when no host geometry is available yet', async () => {
     const pending = projection.createTerminal(terminalBase())
@@ -658,7 +676,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
   })
 
-  test('destroy disposes a server create result that resolves after the queue entry is gone', async () => {
+  test('destroy does not close a server create result that resolves after the queue entry is gone', async () => {
     const { promise, resolve } = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
     mocks.createMock.mockReturnValueOnce(promise)
     const pending = projection.createTerminal(terminalBase())
@@ -669,9 +687,9 @@ describe('TerminalSessionProjection create flow', () => {
     await expectation
 
     resolve(makeCreateResult())
-    await vi.waitFor(() => {
-      expect(mocks.closeMock).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa' })
-    })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(mocks.closeMock).not.toHaveBeenCalled()
   })
 
   test('closeTerminalsForWorktree waits for an in-flight create before closing it', async () => {

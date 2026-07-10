@@ -1,13 +1,10 @@
 import PQueue from 'p-queue'
 import type { WorkspacePaneRuntimeTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import { isWorkspacePaneRuntimeTabType, isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import { isWorkspacePaneStaticTabType, workspacePaneTabsWithRuntimeTab } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsEntry, WorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs.ts'
 import { workspacePaneTabsUserScopeQueueKey } from '#/server/workspace-pane/workspace-pane-tabs-user-queue-key.ts'
 import type { WorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
-import {
-  workspacePaneTabsWithRuntimeTab,
-  workspacePaneTabsWithUpdateOperation,
-} from '#/server/workspace-pane/workspace-pane-tabs-operations.ts'
+import { workspacePaneTabsWithUpdateOperation } from '#/server/workspace-pane/workspace-pane-tabs-operations.ts'
 import {
   canonicalWorkspaceRuntimeTabsForTarget,
   projectWorkspaceRuntimeTabsFromProviderSnapshots,
@@ -336,8 +333,6 @@ export function isValidWorkspacePaneTabsOperation(value: unknown): value is Work
   const operation = value as {
     type?: unknown
     tabType?: unknown
-    runtimeType?: unknown
-    sessionId?: unknown
     tabIdentities?: unknown
     insertAfterIdentity?: unknown
   }
@@ -345,19 +340,6 @@ export function isValidWorkspacePaneTabsOperation(value: unknown): value is Work
     return (
       typeof operation.tabType === 'string' &&
       isWorkspacePaneStaticTabType(operation.tabType) &&
-      (operation.insertAfterIdentity === undefined ||
-        operation.insertAfterIdentity === null ||
-        (typeof operation.insertAfterIdentity === 'string' &&
-          operation.insertAfterIdentity.length > 0 &&
-          !operation.insertAfterIdentity.includes('\0')))
-    )
-  }
-  if (operation.type === 'open-runtime') {
-    return (
-      typeof operation.runtimeType === 'string' &&
-      isWorkspacePaneRuntimeTabType(operation.runtimeType) &&
-      typeof operation.sessionId === 'string' &&
-      operation.sessionId.length > 0 &&
       (operation.insertAfterIdentity === undefined ||
         operation.insertAfterIdentity === null ||
         (typeof operation.insertAfterIdentity === 'string' &&

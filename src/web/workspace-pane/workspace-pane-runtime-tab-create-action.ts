@@ -5,6 +5,7 @@ import {
   runCreateTerminalTabCommand,
   type TerminalCreateCommandAdmission,
   type TerminalCreateCommandResult,
+  type TerminalCreatedTabCommitResult,
 } from '#/web/commands/terminal-create-command.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import type { TerminalCreateOptions } from '#/web/components/terminal/types.ts'
@@ -14,6 +15,8 @@ import {
   type WorkspacePaneTabControllerCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { writeCanonicalWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
+import { refreshWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { gblLog } from '#/web/logger.ts'
 
 export interface WorkspacePaneRuntimeTabCreateAction {
   label: string
@@ -61,7 +64,7 @@ export interface CreateTerminalWorkspacePaneRuntimeTabActionOptions {
 export interface CommitCreatedTerminalWorkspacePaneRuntimeTabOptions {
   base: TerminalSessionBase
   terminalSessionId: string
-  workspacePaneTabs: WorkspacePaneTabEntry[] | null
+  workspacePaneTabs: WorkspacePaneTabEntry[]
   showCreatedTerminalTab?: (terminalSessionId: string) => boolean | Promise<boolean>
 }
 
@@ -116,28 +119,43 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
 
 export async function commitCreatedTerminalWorkspacePaneRuntimeTab(
   options: CommitCreatedTerminalWorkspacePaneRuntimeTabOptions,
-): Promise<boolean> {
+): Promise<TerminalCreatedTabCommitResult> {
   return await runWorkspacePaneTabCoordinatorTask(
     { repoId: options.base.repoRoot, branchName: options.base.branch, worktreePath: options.base.worktreePath },
     async () => {
-      if (!(await openCreatedTerminalWorkspacePaneRuntimeTab(options))) return false
-      return options.showCreatedTerminalTab ? await options.showCreatedTerminalTab(options.terminalSessionId) : true
+      const workspacePaneProjectionApplied = await applyCreatedTerminalWorkspacePaneRuntimeTabs(options)
+      const navigationCommitted = options.showCreatedTerminalTab
+        ? await options.showCreatedTerminalTab(options.terminalSessionId)
+        : true
+      return { workspacePaneProjectionApplied, navigationCommitted }
     },
   )
 }
 
-async function openCreatedTerminalWorkspacePaneRuntimeTab(
+async function applyCreatedTerminalWorkspacePaneRuntimeTabs(
   options: CommitCreatedTerminalWorkspacePaneRuntimeTabOptions,
 ): Promise<boolean> {
   const repoRuntimeId = options.base.repoRuntimeId
-  if (!repoRuntimeId || !options.workspacePaneTabs) return false
-  return await writeCanonicalWorkspacePaneTabsForTarget({
-    repoRoot: options.base.repoRoot,
-    repoRuntimeId,
-    branchName: options.base.branch,
-    worktreePath: options.base.worktreePath,
-    tabs: options.workspacePaneTabs,
-  })
+  if (!repoRuntimeId) return false
+  try {
+    return await writeCanonicalWorkspacePaneTabsForTarget({
+      repoRoot: options.base.repoRoot,
+      repoRuntimeId,
+      branchName: options.base.branch,
+      worktreePath: options.base.worktreePath,
+      tabs: options.workspacePaneTabs,
+    })
+  } catch (err) {
+    gblLog.warn('failed to apply application-returned workspace pane tabs', {
+      repoRoot: options.base.repoRoot,
+      repoRuntimeId,
+      branchName: options.base.branch,
+      worktreePath: options.base.worktreePath,
+      err,
+    })
+    refreshWorkspacePaneTabs(options.base.repoRoot, repoRuntimeId)
+    return false
+  }
 }
 
 function terminalRuntimeTabCreateAction(
