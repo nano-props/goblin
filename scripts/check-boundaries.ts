@@ -1,7 +1,10 @@
 #!/usr/bin/env bun
+// Architecture boundary guard. It extracts real module edges with Babel's AST
+// parser, then applies project-specific layering rules and a few legacy source
+// pattern bans that are intentionally text-based.
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
-import ts from 'typescript'
+import { parse, type ParserPlugin } from '@babel/parser'
 
 const repoRoot = path.resolve(import.meta.dirname, '..')
 const srcRoot = path.join(repoRoot, 'src')
@@ -135,53 +138,185 @@ function normalizePath(filePath: string): string {
   return filePath.slice(repoRoot.length).replaceAll(path.sep, '/')
 }
 
-export function extractImports(source: string, filePath: string): ImportReference[] {
-  const sourceFile = ts.createSourceFile(filePath, source, ts.ScriptTarget.Latest, true)
-  const values: ImportReference[] = []
+// ---------------------------------------------------------------------------
+// Source scanner
+// ---------------------------------------------------------------------------
 
-  function addImport(importPath: string | null, importedNames: readonly string[] | null): void {
-    if (importPath !== null) values.push({ importPath, importedNames })
-  }
+type BabelNode = { type: string; [key: string]: unknown }
 
-  function stringLiteralText(node: ts.Node | undefined): string | null {
-    return node && ts.isStringLiteralLike(node) ? node.text : null
-  }
+const NON_CHILD_NODE_KEYS = new Set([
+  'comments',
+  'errors',
+  'extra',
+  'innerComments',
+  'leadingComments',
+  'loc',
+  'start',
+  'end',
+  'trailingComments',
+  'tokens',
+])
 
-  function importDeclarationNames(node: ts.ImportDeclaration): readonly string[] | null {
-    const clause = node.importClause
-    if (!clause) return null
-    const names: string[] = []
-    if (clause.name) names.push('default')
-    if (!clause.namedBindings) return names
-    if (ts.isNamespaceImport(clause.namedBindings)) return null
-    for (const element of clause.namedBindings.elements) names.push((element.propertyName ?? element.name).text)
-    return names
-  }
-
-  function exportDeclarationNames(node: ts.ExportDeclaration): readonly string[] | null {
-    const clause = node.exportClause
-    if (!clause) return null
-    if (ts.isNamespaceExport(clause)) return null
-    return clause.elements.map((element) => (element.propertyName ?? element.name).text)
-  }
-
-  function visit(node: ts.Node): void {
-    if (ts.isImportDeclaration(node)) {
-      addImport(stringLiteralText(node.moduleSpecifier), importDeclarationNames(node))
-    } else if (ts.isExportDeclaration(node)) {
-      addImport(stringLiteralText(node.moduleSpecifier), exportDeclarationNames(node))
-    } else if (ts.isCallExpression(node)) {
-      if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
-        addImport(stringLiteralText(node.arguments[0]), null)
-      } else if (ts.isIdentifier(node.expression) && node.expression.text === 'require') {
-        addImport(stringLiteralText(node.arguments[0]), null)
-      }
-    }
-    ts.forEachChild(node, visit)
-  }
-  visit(sourceFile)
-  return values
+function parserPlugins(filePath: string): ParserPlugin[] {
+  return [
+    ['typescript', { dts: filePath.endsWith('.d.ts') }],
+    'jsx',
+    'importMeta',
+    'dynamicImport',
+    'exportNamespaceFrom',
+    'topLevelAwait',
+    'importAttributes',
+    'importAssertions',
+    'decorators-legacy',
+    'classProperties',
+    'classPrivateProperties',
+    'classPrivateMethods',
+    'classStaticBlock',
+    'explicitResourceManagement',
+  ]
 }
+
+function isNode(value: unknown): value is BabelNode {
+  return typeof value === 'object' && value !== null && typeof (value as { type?: unknown }).type === 'string'
+}
+
+function asNodeArray(value: unknown): BabelNode[] {
+  return Array.isArray(value) ? value.filter(isNode) : []
+}
+
+function stringLiteralValue(node: unknown): string | null {
+  if (!isNode(node)) return null
+  if (node.type !== 'StringLiteral' && node.type !== 'DirectiveLiteral') return null
+  return typeof node.value === 'string' ? node.value : null
+}
+
+function identifierName(node: unknown): string | null {
+  if (!isNode(node)) return null
+  if (node.type === 'Identifier') return typeof node.name === 'string' ? node.name : null
+  if (node.type === 'StringLiteral') return typeof node.value === 'string' ? node.value : null
+  return null
+}
+
+function traverse(node: BabelNode, visit: (node: BabelNode) => void): void {
+  visit(node)
+  for (const [key, value] of Object.entries(node)) {
+    if (NON_CHILD_NODE_KEYS.has(key)) continue
+    if (isNode(value)) {
+      traverse(value, visit)
+      continue
+    }
+    if (!Array.isArray(value)) continue
+    for (const child of value) {
+      if (isNode(child)) traverse(child, visit)
+    }
+  }
+}
+
+function parseSource(source: string, filePath: string): BabelNode {
+  try {
+    const ast = parse(source, {
+      allowAwaitOutsideFunction: true,
+      allowImportExportEverywhere: true,
+      allowReturnOutsideFunction: true,
+      attachComment: false,
+      createImportExpressions: true,
+      errorRecovery: true,
+      plugins: parserPlugins(filePath),
+      sourceFilename: filePath,
+      sourceType: 'unambiguous',
+    })
+    if (ast.errors?.length) {
+      const firstError = ast.errors[0]!
+      throw new Error(firstError.message)
+    }
+    return ast as unknown as BabelNode
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`failed to parse ${filePath}: ${message}`)
+  }
+}
+
+function importDeclarationNames(node: BabelNode): readonly string[] | null {
+  const specifiers = asNodeArray(node.specifiers)
+  if (specifiers.length === 0) return null
+
+  const names: string[] = []
+  for (const specifier of specifiers) {
+    if (specifier.type === 'ImportNamespaceSpecifier') return null
+    if (specifier.type === 'ImportDefaultSpecifier') {
+      names.push('default')
+      continue
+    }
+    if (specifier.type !== 'ImportSpecifier') return null
+    const name = identifierName(specifier.imported)
+    if (name === null) return null
+    names.push(name)
+  }
+  return names
+}
+
+function exportDeclarationNames(node: BabelNode): readonly string[] | null {
+  const specifiers = asNodeArray(node.specifiers)
+  if (specifiers.length === 0) return null
+
+  const names: string[] = []
+  for (const specifier of specifiers) {
+    if (specifier.type === 'ExportNamespaceSpecifier') return null
+    if (specifier.type === 'ExportDefaultSpecifier') {
+      names.push('default')
+      continue
+    }
+    if (specifier.type !== 'ExportSpecifier') return null
+    const name = identifierName(specifier.local)
+    if (name === null) return null
+    names.push(name)
+  }
+  return names
+}
+
+function addImport(
+  results: ImportReference[],
+  importPath: string | null,
+  importedNames: readonly string[] | null,
+): void {
+  if (importPath === null) return
+  results.push({ importPath, importedNames })
+}
+
+export function extractImports(source: string, filePath: string): ImportReference[] {
+  const ast = parseSource(source, filePath)
+  const results: ImportReference[] = []
+
+  traverse(ast, (node) => {
+    if (node.type === 'ImportDeclaration') {
+      addImport(results, stringLiteralValue(node.source), importDeclarationNames(node))
+      return
+    }
+    if (node.type === 'ExportNamedDeclaration') {
+      addImport(results, stringLiteralValue(node.source), exportDeclarationNames(node))
+      return
+    }
+    if (node.type === 'ExportAllDeclaration') {
+      addImport(results, stringLiteralValue(node.source), null)
+      return
+    }
+    if (node.type === 'ImportExpression') {
+      addImport(results, stringLiteralValue(node.source), null)
+      return
+    }
+    if (node.type !== 'CallExpression') return
+
+    const callee = node.callee
+    if (!isNode(callee) || callee.type !== 'Identifier' || callee.name !== 'require') return
+    addImport(results, stringLiteralValue(asNodeArray(node.arguments)[0]), null)
+  })
+
+  return results
+}
+
+// ---------------------------------------------------------------------------
+// Rule evaluation
+// ---------------------------------------------------------------------------
 
 function canonicalImportPath(importPath: string, relativeFilePath: string): string {
   if (importPath.startsWith('#/')) return `/src/${importPath.slice(2)}`

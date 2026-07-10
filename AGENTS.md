@@ -39,7 +39,7 @@ The project runs in Node.js strip-only mode (no `tsc` emit). Do not use these un
   - `docs/terminal.md` for terminal system design
   - `docs/terminal-roadmap.md` for terminal refactor roadmap
   - `docs/terminal-target-model.md` for terminal lifecycle and ownership target model
-- Keep the architecture guard green with `bun run check:architecture`. The enforced boundaries are:
+- Keep the architecture guard green with `bun run check:boundaries`. The enforced boundaries are:
   - `src/main/**` must not import `src/web/**` or `src/server/**`.
   - `src/web/**` must not import `src/main/**`.
   - `src/server/**` and `src/shared/**` must not import `electron`.
@@ -67,7 +67,7 @@ Known GET endpoints that must migrate to POST: _none — every client→server e
 - `src/shared/procedure-schemas.ts` — add `*_PROCEDURE_SCHEMAS.x` mirroring the old query schema; remove the matching `REPO_QUERY_SCHEMAS.x` once callers have moved.
 - `src/shared/embedded-server-ipc-routes.ts` — `method: 'GET'` → `method: 'POST'` if registered.
 - Tests — route unit, IPC bridge, store/refresh, and test-utils fixtures that build query params for the endpoint.
-- Validate with `bun run typecheck && bun run test && bun run check:architecture` before merge.
+- Validate with `bun run typecheck && bun run test && bun run check:boundaries` before merge.
 
 When reviewing PRs, reject changes that:
 
