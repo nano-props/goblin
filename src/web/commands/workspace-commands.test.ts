@@ -1079,6 +1079,7 @@ describe('workspace commands', () => {
     await expect(secondCommand).resolves.toEqual({
       ok: true,
       terminalSessionId: 'term-222222222222222222222',
+      presentationStatus: 'committed',
     })
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
       REPO_ID,

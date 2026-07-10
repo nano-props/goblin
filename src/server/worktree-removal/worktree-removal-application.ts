@@ -56,7 +56,6 @@ export class WorktreeRemovalApplication {
         afterWorktreeRemoved: async () => {
           try {
             await this.deps.workspaceTabs.finalizePhysicalWorktreeRemoval({
-              repoRoot: input.repoRoot,
               worktreePath,
               scopes: affectedScopes,
             })

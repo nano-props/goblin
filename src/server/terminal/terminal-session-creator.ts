@@ -21,8 +21,7 @@ interface TerminalSessionCreatorOptions {
     userId: string,
     input: Pick<TerminalCreateInput, 'repoRoot' | 'repoRuntimeId'>,
     terminalRuntimeSessionId: string,
-  ): TerminalCreateFailure | null
-  cleanupStaleCreate(userId: string, input: Pick<TerminalCreateInput, 'repoRoot' | 'repoRuntimeId'>): Promise<void>
+  ): Promise<TerminalCreateFailure | null>
   listSessions(userId: string, repoRoot: string, repoRuntimeId: string): Promise<TerminalSessionSummary[]>
 }
 
@@ -74,12 +73,6 @@ class TerminalSessionCreator {
           createResult.terminalRuntimeSessionId,
         )
         if (staleAfterList) return staleAfterList
-        const staleAfterSessions = await this.rejectStaleCreateIfNeeded(
-          input.userId,
-          input.request,
-          createResult.terminalRuntimeSessionId,
-        )
-        if (staleAfterSessions) return staleAfterSessions
         return {
           ok: true,
           action: createResult.action,
@@ -106,9 +99,7 @@ class TerminalSessionCreator {
     input: Pick<TerminalCreateInput, 'repoRoot' | 'repoRuntimeId'>,
     terminalRuntimeSessionId: string,
   ): Promise<TerminalCreateFailure | null> {
-    const failure = this.options.rejectStaleCreateIfNeeded(userId, input, terminalRuntimeSessionId)
-    if (!failure) return null
-    await this.options.cleanupStaleCreate(userId, input)
+    const failure = await this.options.rejectStaleCreateIfNeeded(userId, input, terminalRuntimeSessionId)
     return failure
   }
 }

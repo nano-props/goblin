@@ -195,10 +195,11 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     })
     const [openingSession] = await manager.listSessionsForUser(USER_ID, SCOPE)
     expect(openingSession).toBeDefined()
-    expect(manager.closeSessionForUser(USER_ID, openingSession!.terminalRuntimeSessionId)).toBe(true)
+    const close = manager.closeSessionForUser(USER_ID, openingSession!.terminalRuntimeSessionId)
 
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_late_spawn_123456'))
 
+    await expect(close).resolves.toBe(true)
     await expect(pending).resolves.toEqual({ ok: false, message: 'error.unavailable' })
     await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([])
     expect(supervisor.killed).toEqual(['pty_late_spawn_123456'])
@@ -210,7 +211,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const manager = createManager(supervisor, { onSessionClosed })
     const created = await createSession(manager, supervisor)
 
-    manager.closeSessionsForRepo(USER_ID, SCOPE)
+    await manager.closeSessionsForRepo(USER_ID, SCOPE)
 
     expect(onSessionClosed).toHaveBeenCalledWith(
       USER_ID,
@@ -225,7 +226,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const manager = createManager(supervisor, { onSessionClosed })
     const created = await createSession(manager, supervisor)
 
-    manager.closeSessionsForUser(USER_ID)
+    await manager.closeSessionsForUser(USER_ID)
 
     expect(onSessionClosed).toHaveBeenCalledWith(
       USER_ID,
@@ -261,7 +262,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
       expect.objectContaining({ terminalRuntimeSessionId: created.terminalRuntimeSessionId }),
     ])
 
-    expect(manager.closeSessionForUser(USER_ID, created.terminalRuntimeSessionId)).toBe(true)
+    await expect(manager.closeSessionForUser(USER_ID, created.terminalRuntimeSessionId)).resolves.toBe(true)
     expect(supervisor.killed).toEqual(['pty_initial_123456', 'pty_restart_one_123', 'pty_restart_two_123'])
   })
 
@@ -322,6 +323,109 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
 })
 
 describe('TerminalSessionManager physical worktree quiescence', () => {
+  test('keeps the session authoritative when PTY exit re-enters close before kill acknowledgement', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    let exitListener: (() => void) | null = null
+    supervisor.onExit = vi.fn((_handle, listener) => {
+      exitListener = listener
+      return { dispose: vi.fn() }
+    })
+    let acknowledgeKill!: () => void
+    const killAcknowledged = new Promise<void>((resolve) => {
+      acknowledgeKill = resolve
+    })
+    supervisor.killAndWait = vi.fn(async () => {
+      exitListener?.()
+      await killAcknowledged
+    })
+    const onSessionClosed = vi.fn()
+    const manager = createManager(supervisor, { onSessionClosed })
+    const scope = terminalSessionRuntimeScope('/repo', 'repo-runtime-test')
+    const pending = manager.ensureSession({
+      userId: USER_ID,
+      scope,
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-test',
+      branch: BRANCH_NAME,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: WORKTREE_PATH,
+      cwd: WORKTREE_PATH,
+      cols: 80,
+      rows: 24,
+      clientId: CLIENT_ID,
+    })
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_reentrant_close_123'))
+    const created = await pending
+    if (!created.ok) throw new Error(created.message)
+
+    const close = manager.closeSessionForUser(USER_ID, created.terminalRuntimeSessionId)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(onSessionClosed).not.toHaveBeenCalled()
+    await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toHaveLength(1)
+
+    acknowledgeKill()
+    await expect(close).resolves.toBe(true)
+    expect(onSessionClosed).toHaveBeenCalledOnce()
+  })
+
+  test('joins a concurrent direct close to the same acknowledged close operation', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    let acknowledgeKill!: () => void
+    const killAcknowledged = new Promise<void>((resolve) => {
+      acknowledgeKill = resolve
+    })
+    const killAndWait = vi.fn(async () => await killAcknowledged)
+    supervisor.killAndWait = killAndWait
+    const onSessionClosed = vi.fn()
+    const manager = createManager(supervisor, { onSessionClosed })
+    const repoRoot = '/repo'
+    const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
+    const pending = manager.ensureSession({
+      userId: USER_ID,
+      scope,
+      repoRoot,
+      repoRuntimeId: 'repo-runtime-test',
+      branch: BRANCH_NAME,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: WORKTREE_PATH,
+      cwd: WORKTREE_PATH,
+      cols: 80,
+      rows: 24,
+      clientId: CLIENT_ID,
+    })
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_concurrent_close_123'))
+    const created = await pending
+    if (!created.ok) throw new Error(created.message)
+
+    const quiescence = manager.closeSessionsForPhysicalWorktree(repoRoot, WORKTREE_PATH)
+    const directClose = manager.closeSessionForUser(USER_ID, created.terminalRuntimeSessionId)
+    await Promise.resolve()
+    expect(killAndWait).toHaveBeenCalledOnce()
+    expect(onSessionClosed).not.toHaveBeenCalled()
+    await expect(
+      manager.ensureSession({
+        userId: USER_ID,
+        scope,
+        repoRoot,
+        repoRuntimeId: 'repo-runtime-test',
+        branch: BRANCH_NAME,
+        terminalSessionId: TERMINAL_SESSION_ID,
+        worktreePath: WORKTREE_PATH,
+        cwd: WORKTREE_PATH,
+        cols: 80,
+        rows: 24,
+        clientId: CLIENT_ID,
+      }),
+    ).resolves.toEqual({ ok: false, message: 'error.unavailable' })
+    expect(supervisor.spawns).toEqual([])
+
+    acknowledgeKill()
+    await expect(quiescence).resolves.toEqual({ ok: true, scopes: [{ userId: USER_ID, scope }] })
+    await expect(directClose).resolves.toBe(true)
+    expect(onSessionClosed).toHaveBeenCalledOnce()
+  })
+
   test('waits for an in-flight spawn and its kill acknowledgement before reporting quiescence', async () => {
     const supervisor = createDeferredPtySupervisor()
     let acknowledgeKill!: () => void

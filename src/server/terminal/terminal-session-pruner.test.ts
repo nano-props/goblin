@@ -31,9 +31,10 @@ describe('terminal session pruner', () => {
       terminalSession('term-stalestalestalestale1', { repoRoot: REPO_ROOT, worktreePath: STALE_WORKTREE_PATH }),
       terminalSession('term-otherrepootherrepo001', { repoRoot: '/other-repo', worktreePath: '/other-repo/worktree' }),
     ]
-    const closeSession = vi.fn((terminalRuntimeSessionId: string) => {
+    const closeSession = vi.fn(async (terminalRuntimeSessionId: string) => {
       const index = sessions.findIndex((session) => session.terminalRuntimeSessionId === terminalRuntimeSessionId)
       if (index !== -1) sessions.splice(index, 1)
+      return index !== -1
     })
     const pruner = createTerminalSessionPruner({
       manager: {
@@ -60,7 +61,7 @@ describe('terminal session pruner', () => {
       terminalSession('term-remotearemotearemotea', { repoRoot: REMOTE_REPO_ROOT, worktreePath: '/srv/repo' }),
       terminalSession('term-remotebremotebremoteb', { repoRoot: REMOTE_REPO_ROOT, worktreePath: '/srv/repo/linked' }),
     ]
-    const closeSession = vi.fn()
+    const closeSession = vi.fn(async () => false)
     const assertCurrent = vi.fn()
     const pruner = createTerminalSessionPruner({
       manager: {

@@ -138,11 +138,12 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   })
   const unsubscribeRepoRuntimeClosed = onRepoRuntimeClosed((event) => {
     const scope = terminalSessionRuntimeScope(event.repoRoot, event.repoRuntimeId)
-    manager.closeSessionsForRepo(event.userId, scope)
-    broadcastRepoSessionsChanged(event.userId, event.repoRoot)
-    void workspaceTabsCoordinator
-      .closeScope({ userId: event.userId, scope })
-      .then(() => {
+    void manager
+      .closeSessionsForRepo(event.userId, scope)
+      .then(async (closed) => {
+        if (!closed) throw new Error('terminal session close failed')
+        await workspaceTabsCoordinator.closeScope({ userId: event.userId, scope })
+        broadcastRepoSessionsChanged(event.userId, event.repoRoot)
         broadcastRepoWorkspaceTabsChanged(event.userId, event.repoRoot)
       })
       .catch((err) => {
@@ -265,7 +266,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       shuttingDown = true
       unsubscribeRepoRuntimeClosed()
       coordinator.shutdown()
-      manager.closeAll()
+      manager.forceCloseAllForShutdown()
       ptySupervisor.shutdown()
     },
   })

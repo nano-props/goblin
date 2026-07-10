@@ -54,6 +54,7 @@ beforeEach(() => {
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockResolvedValue({
     ok: true,
     terminalSessionId: TERMINAL_SESSION_ID,
+    presentationStatus: 'committed',
   })
   workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsSnapshot.mockReset()
   workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsSnapshot.mockResolvedValue(true)
@@ -123,7 +124,7 @@ describe('workspace pane runtime tab create action', () => {
         showCreatedTerminalTab: vi.fn(() => true),
         t: translate,
       }),
-    ).resolves.toEqual({ ok: true, terminalSessionId: TERMINAL_SESSION_ID })
+    ).resolves.toEqual({ ok: true, terminalSessionId: TERMINAL_SESSION_ID, presentationStatus: 'committed' })
 
     expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).toHaveBeenCalledWith(
       expect.objectContaining({ base: BASE, commitCreatedTerminalTab: expect.any(Function) }),

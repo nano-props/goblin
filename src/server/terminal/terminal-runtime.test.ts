@@ -76,7 +76,9 @@ vi.mock('node-pty', () => ({
     const pty = {
       write: vi.fn(),
       resize: vi.fn(),
-      kill: vi.fn(),
+      kill: vi.fn(() => {
+        queueMicrotask(() => onExit?.())
+      }),
       emitData: (data: string) => onData?.(data),
       emitExit: () => onExit?.(),
       setProcessName: (nextProcessName: string) => {

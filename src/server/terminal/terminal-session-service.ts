@@ -28,7 +28,7 @@ import { createTerminalSessionCreator } from '#/server/terminal/terminal-session
 
 interface TerminalSessionServiceManager extends TerminalSessionEnsureManager {
   listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
-  closeSession(terminalRuntimeSessionId: string): void
+  closeSession(terminalRuntimeSessionId: string): Promise<boolean>
 }
 
 interface TerminalSessionServiceOptions {
@@ -69,9 +69,8 @@ class TerminalSessionService {
       ensureOrRestore: async (clientId, userId, input) => await this.ensureOrRestore(clientId, userId, input),
       isCurrentRepoRuntime: (userId, repoRoot, repoRuntimeId) =>
         this.isCurrentRepoRuntime(userId, repoRoot, repoRuntimeId),
-      rejectStaleCreateIfNeeded: (userId, input, terminalRuntimeSessionId) =>
-        this.rejectStaleCreateIfNeeded(userId, input, terminalRuntimeSessionId),
-      cleanupStaleCreate: async (userId, input) => await this.cleanupStaleCreate(userId, input),
+      rejectStaleCreateIfNeeded: async (userId, input, terminalRuntimeSessionId) =>
+        await this.rejectStaleCreateIfNeeded(userId, input, terminalRuntimeSessionId),
       listSessions: async (userId, repoRoot, repoRuntimeId) => await this.listSessions(userId, repoRoot, repoRuntimeId),
     })
   }
@@ -218,13 +217,14 @@ class TerminalSessionService {
     if (!this.isCurrentRepoRuntime(userId, repoRoot, repoRuntimeId)) throw new Error('error.repo-runtime-stale')
   }
 
-  private rejectStaleCreateIfNeeded(
+  private async rejectStaleCreateIfNeeded(
     userId: string,
     input: Pick<TerminalCreateInput, 'repoRoot' | 'repoRuntimeId'>,
     terminalRuntimeSessionId: string,
-  ): Extract<TerminalCreateResult, { ok: false }> | null {
+  ): Promise<Extract<TerminalCreateResult, { ok: false }> | null> {
     if (this.isCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)) return null
-    this.options.manager.closeSession(terminalRuntimeSessionId)
+    const closed = await this.options.manager.closeSession(terminalRuntimeSessionId)
+    if (closed) await this.cleanupStaleCreate(userId, input)
     return { ok: false, message: 'error.repo-runtime-stale' }
   }
 

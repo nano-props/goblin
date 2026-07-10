@@ -78,13 +78,17 @@ Runtime creation follows three responsibility layers:
    joining provider lifecycle with canonical runtime-tab membership. The
    separate `WorktreeRemovalApplication` owns physical worktree removal across
    every user and repo runtime. Its physical-target admission rejects later
-   runtime/tab writes; after repository validation it awaits provider
+   runtime/tab writes, while explicit server operation permits let mutations
+   admitted earlier finish in queue order. After repository validation it awaits provider
    quiescence, runs the Git removal past a non-cancelable commit point, then
    finalizes canonical tabs. A Git failure reconciles runtime tabs while
    preserving the worktree's static projection.
    Provider close results carry the corresponding server session projection;
    the client applies it only when it also accepts that command's canonical
    tabs revision, so an older close response cannot erase a newer open.
+   Terminal close itself is a manager-owned, idempotent promise: concurrent
+   tab close, prune, runtime cleanup, and worktree quiescence join the same PTY
+   termination acknowledgement before the session leaves authoritative state.
 3. The client command/projection owns only admission/dedupe, revision-gated
    cache projection, opener facts, cancellation, and exact route completion.
    It does not order server resources or infer session liveness from its cache.

@@ -102,7 +102,7 @@ describe('terminal session service facade', () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     let current = true
     let createdTerminalSessionId: string | null = null
-    const closeSession = vi.fn()
+    const closeSession = vi.fn(async () => true)
     const service = createService({
       sessions: () => (createdTerminalSessionId ? [terminalSession(createdTerminalSessionId)] : []),
       workspaceTabs,
@@ -152,6 +152,47 @@ describe('terminal session service facade', () => {
     ).toEqual([workspacePaneStaticTabEntry('status')])
   })
 
+  test('keeps the stale runtime projection when its session close is not acknowledged', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: RUNTIME_SCOPE,
+      branchName: BRANCH_NAME,
+      worktreePath: path.resolve(WORKTREE_PATH),
+      tabs: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-existingexisting001'),
+      ],
+    })
+    let current = true
+    const closeSession = vi.fn(async () => false)
+    const service = createService({
+      sessions: [terminalSession('term-existingexisting001')],
+      workspaceTabs,
+      closeSession,
+      isCurrentRepoRuntime: () => current,
+      ensureSession: vi.fn(async (input) => {
+        current = false
+        return terminalAttachResult(input)
+      }),
+    })
+
+    await expect(
+      service.create('client_terminal_service', USER_ID, {
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: REPO_RUNTIME_ID,
+        branch: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        kind: 'additional',
+        cols: 80,
+        rows: 24,
+      }),
+    ).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
+
+    expect(closeSession).toHaveBeenCalledOnce()
+    expect(workspaceTabs.tabsForScope({ userId: USER_ID, scope: RUNTIME_SCOPE })).not.toEqual([])
+  })
+
   test('create rejects before writing tabs when the repo runtime goes stale during live-session lookup', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({
@@ -164,7 +205,7 @@ describe('terminal session service facade', () => {
     let current = true
     let createdTerminalSessionId: string | null = null
     let sessionListCalls = 0
-    const closeSession = vi.fn()
+    const closeSession = vi.fn(async () => true)
     const service = createService({
       sessions: () => {
         sessionListCalls += 1
@@ -1019,7 +1060,7 @@ function createService(options: {
   sessions: TerminalSessionSummary[] | (() => TerminalSessionSummary[] | Promise<TerminalSessionSummary[]>)
   workspaceTabs: WorkspacePaneTabsRuntime<string>
   ensureSession?: (input: EnsureSessionInput) => Promise<TerminalAttachResult>
-  closeSession?: (terminalRuntimeSessionId: string) => void
+  closeSession?: (terminalRuntimeSessionId: string) => Promise<boolean>
   isCurrentRepoRuntime?: (userId: string, repoRoot: string, repoRuntimeId: string) => boolean
   broadcastWorkspaceTabsChanged?: (userId: string, repoRoot: string) => void
 }) {
@@ -1033,7 +1074,7 @@ function createService(options: {
     listSessionsForUser: vi.fn(
       async () => await (typeof options.sessions === 'function' ? options.sessions() : options.sessions),
     ),
-    closeSession: options.closeSession ?? vi.fn(),
+    closeSession: options.closeSession ?? vi.fn(async () => false),
   }
   const workspaceTabsCoordinator = createWorkspacePaneTabsCoordinator({
     workspaceTabs: options.workspaceTabs,

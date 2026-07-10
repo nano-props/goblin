@@ -47,8 +47,8 @@ export interface WorkspacePaneTabsScopeEntry {
   tabs: WorkspacePaneTabEntry[]
 }
 
-interface StoredWorkspacePaneTabsEntry {
-  userId: string | number
+interface StoredWorkspacePaneTabsEntry<TUser extends string | number> {
+  userId: TUser
   scope: string
   branchName: string
   worktreePath: string | null
@@ -61,7 +61,7 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
   // Authoritative in-process runtime state for workspace pane tabs.
   // Client query caches and session snapshots are projections/restore
   // inputs; they should not be treated as competing runtime owners.
-  private readonly tabsByTarget = new Map<string, StoredWorkspacePaneTabsEntry>()
+  private readonly tabsByTarget = new Map<string, StoredWorkspacePaneTabsEntry<TUser>>()
   private readonly revisionByUserScope = new Map<string, number>()
 
   replaceTabs(input: WorkspacePaneTabsReplaceInput<TUser>): WorkspacePaneTabEntry[] {
@@ -145,7 +145,7 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
       ) {
         continue
       }
-      const userId = entry.userId as TUser
+      const userId = entry.userId
       affected.set(`${String(userId)}\0${entry.scope}`, { userId, scope: entry.scope })
     }
     return Array.from(affected.values())

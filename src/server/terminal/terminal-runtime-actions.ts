@@ -160,7 +160,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         ? manager.getSessionSummaryForUser(userId, input.terminalRuntimeSessionId)
         : null
       const closed = isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId)
-        ? manager.closeSessionForUser(userId, input.terminalRuntimeSessionId)
+        ? await manager.closeSessionForUser(userId, input.terminalRuntimeSessionId)
         : false
       if (closed && session) {
         // General repo/session-list invalidation is emitted by the

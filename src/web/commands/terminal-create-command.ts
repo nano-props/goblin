@@ -11,8 +11,12 @@ import {
   terminalCreateErrorKey,
   type TerminalCreateTranslator,
 } from '#/web/components/terminal/terminal-create-feedback.ts'
+export type TerminalCreatePresentationStatus =
+  TerminalCreatedTabCommitResult['status'] | 'observer' | 'presentation-failed'
+
 export type TerminalCreateCommandResult =
-  { ok: true; terminalSessionId: string } | { ok: false; error: unknown; messageKey: string }
+  | { ok: true; terminalSessionId: string; presentationStatus: TerminalCreatePresentationStatus }
+  | { ok: false; error: unknown; messageKey: string }
 
 export type TerminalCreateCommandAdmission = TerminalCreateAdmissionResult
 
@@ -23,7 +27,6 @@ export type TerminalCreatedTabCommitResult =
   | { status: 'navigation-rejected' }
 
 const TERMINAL_CREATE_CANCELED_MESSAGE = 'terminal create request canceled'
-const WORKSPACE_PANE_NAVIGATION_REJECTED_MESSAGE = 'workspace pane navigation rejected'
 
 export async function runCreateTerminalTabCommand(input: {
   base: TerminalSessionBase
@@ -61,7 +64,9 @@ export async function runCreateTerminalTabCommand(input: {
         : await input.createTerminal(input.base, input.options, {
             insertAfterIdentity: input.insertAfterIdentity,
           })
-    if (admission.requestRole === 'observer') return { ok: true, terminalSessionId: admission.terminalSessionId }
+    if (admission.requestRole === 'observer') {
+      return { ok: true, terminalSessionId: admission.terminalSessionId, presentationStatus: 'observer' }
+    }
     return await finishCreateTerminalTabCommand(input, admission)
   } catch (error) {
     if (isTerminalCreateCanceled(error)) {
@@ -83,15 +88,16 @@ async function finishCreateTerminalTabCommand(
   admission: TerminalCreateLeaderAdmissionResult,
 ): Promise<TerminalCreateCommandResult> {
   const terminalSessionId = admission.terminalSessionId
-  const presentationStatus = (await input.commitCreatedTerminalTab(admission)).status
-  if (presentationStatus === 'navigation-rejected') {
-    return {
-      ok: false,
-      error: new Error(WORKSPACE_PANE_NAVIGATION_REJECTED_MESSAGE),
-      messageKey: 'error.terminal-create-failed',
-    }
+  try {
+    const presentationStatus = (await input.commitCreatedTerminalTab(admission)).status
+    return { ok: true, terminalSessionId, presentationStatus }
+  } catch (error) {
+    terminalLog.warn('terminal server operation succeeded but client presentation failed', {
+      terminalSessionId,
+      err: error,
+    })
+    return { ok: true, terminalSessionId, presentationStatus: 'presentation-failed' }
   }
-  return { ok: true, terminalSessionId }
 }
 
 function isTerminalCreateCanceled(error: unknown): boolean {

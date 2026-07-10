@@ -18,7 +18,7 @@ const RUNTIME_SESSION_ID = 'session_aaaaaaaaaaaaaa'
 
 function makeActions(
   options: {
-    closeSessionForUser: (userId: string, terminalRuntimeSessionId: string) => boolean
+    closeSessionForUser: (userId: string, terminalRuntimeSessionId: string) => boolean | Promise<boolean>
     getSlotScope?: (userId: string, terminalRuntimeSessionId: string) => string | undefined
     isValidTerminalClientId?: (value: unknown) => value is string
     removalAdmitted?: boolean
@@ -47,7 +47,10 @@ function makeActions(
           } as const)
         : null,
     ),
-    closeSessionForUser: vi.fn(options.closeSessionForUser),
+    closeSessionForUser: vi.fn(
+      async (userId: string, terminalRuntimeSessionId: string) =>
+        await options.closeSessionForUser(userId, terminalRuntimeSessionId),
+    ),
     // The other manager methods are unused by `close`, but the
     // `TerminalSessionManager` type is required by the deps
     // interface. Stub them with `vi.fn()` so TypeScript stays happy.

@@ -5,7 +5,7 @@ import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 
 export interface TerminalSessionPruneManager {
   listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
-  closeSession(terminalRuntimeSessionId: string): void
+  closeSession(terminalRuntimeSessionId: string): Promise<boolean>
 }
 
 export interface TerminalSessionPrunerOptions {
@@ -35,8 +35,7 @@ class TerminalSessionPruner {
     for (const session of allSessions) {
       if (path.resolve(session.repoRoot) !== path.resolve(input.repoRoot)) continue
       if (liveWorktreePaths.has(path.resolve(session.worktreePath))) continue
-      this.manager.closeSession(session.terminalRuntimeSessionId)
-      pruned += 1
+      if (await this.manager.closeSession(session.terminalRuntimeSessionId)) pruned += 1
     }
     const remaining = await this.manager
       .listSessionsForUser(input.userId, input.scope)

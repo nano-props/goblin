@@ -25,7 +25,11 @@ describe('terminal create command', () => {
         createTerminal,
         commitCreatedTerminalTab,
       }),
-    ).resolves.toEqual({ ok: true, terminalSessionId: admission.terminalSessionId })
+    ).resolves.toEqual({
+      ok: true,
+      terminalSessionId: admission.terminalSessionId,
+      presentationStatus: 'committed',
+    })
 
     expect(createTerminal).toHaveBeenCalledOnce()
     expect(commitCreatedTerminalTab).toHaveBeenCalledWith(admission)
@@ -69,7 +73,7 @@ describe('terminal create command', () => {
         createTerminal: vi.fn(async () => admission),
         commitCreatedTerminalTab,
       }),
-    ).resolves.toEqual({ ok: true, terminalSessionId: admission.terminalSessionId })
+    ).resolves.toEqual({ ok: true, terminalSessionId: admission.terminalSessionId, presentationStatus: 'observer' })
 
     expect(commitCreatedTerminalTab).not.toHaveBeenCalled()
   })
@@ -83,7 +87,7 @@ describe('terminal create command', () => {
         createTerminal: vi.fn(async () => admission),
         commitCreatedTerminalTab: vi.fn(() => ({ status: 'superseded' as const })),
       }),
-    ).resolves.toEqual({ ok: true, terminalSessionId: admission.terminalSessionId })
+    ).resolves.toEqual({ ok: true, terminalSessionId: admission.terminalSessionId, presentationStatus: 'superseded' })
   })
 
   test('keeps a server create successful when local projection is deferred to recovery', async () => {
@@ -94,7 +98,11 @@ describe('terminal create command', () => {
         createTerminal: vi.fn(async () => admission),
         commitCreatedTerminalTab: vi.fn(() => ({ status: 'projection-failed' as const })),
       }),
-    ).resolves.toEqual({ ok: true, terminalSessionId: admission.terminalSessionId })
+    ).resolves.toEqual({
+      ok: true,
+      terminalSessionId: admission.terminalSessionId,
+      presentationStatus: 'projection-failed',
+    })
   })
 
   test('reports exact-route rejection without destroying the committed server session', async () => {
@@ -104,7 +112,7 @@ describe('terminal create command', () => {
         createTerminal: vi.fn(async () => createAdmission()),
         commitCreatedTerminalTab: vi.fn(() => ({ status: 'navigation-rejected' as const })),
       }),
-    ).resolves.toMatchObject({ ok: false, messageKey: 'error.terminal-create-failed' })
+    ).resolves.toMatchObject({ ok: true, presentationStatus: 'navigation-rejected' })
   })
 
   test('reports presentation exceptions without destroying the committed server session', async () => {
@@ -118,7 +126,7 @@ describe('terminal create command', () => {
         createTerminal: vi.fn(async () => createAdmission()),
         commitCreatedTerminalTab,
       }),
-    ).resolves.toMatchObject({ ok: false, messageKey: 'error.terminal-create-failed' })
+    ).resolves.toMatchObject({ ok: true, presentationStatus: 'presentation-failed' })
 
     expect(commitCreatedTerminalTab).toHaveBeenCalledOnce()
   })

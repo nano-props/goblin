@@ -6,21 +6,40 @@ export interface PhysicalWorktreeOperationTarget {
   worktreePath: string
 }
 
+export interface PhysicalWorktreeOperationPermit {
+  readonly operationId: number
+}
+
 /** Serializes runtime mutations and removal admission by physical worktree identity. */
 export class PhysicalWorktreeOperationCoordinator {
   private readonly queues = new Map<string, PQueue>()
   private readonly removalAdmissions = new Set<string>()
+  private readonly permitKeys = new WeakMap<PhysicalWorktreeOperationPermit, string>()
+  private readonly activePermits = new WeakSet<PhysicalWorktreeOperationPermit>()
+  private nextOperationId = 1
 
   isRemovalAdmitted(target: PhysicalWorktreeOperationTarget): boolean {
     return this.removalAdmissions.has(physicalWorktreeOperationKey(target))
   }
 
-  assertWritable(target: PhysicalWorktreeOperationTarget): void {
-    if (this.isRemovalAdmitted(target)) throw new Error('error.worktree-removal-in-progress')
+  assertPermit(target: PhysicalWorktreeOperationTarget, permit: PhysicalWorktreeOperationPermit): void {
+    if (!this.activePermits.has(permit) || this.permitKeys.get(permit) !== physicalWorktreeOperationKey(target)) {
+      throw new Error('error.invalid-worktree-operation-permit')
+    }
   }
 
-  async runOperation<T>(target: PhysicalWorktreeOperationTarget, task: () => Promise<T>): Promise<T> {
-    return await this.runByKey(physicalWorktreeOperationKey(target), task)
+  async runOperation<T>(
+    target: PhysicalWorktreeOperationTarget,
+    task: (permit: PhysicalWorktreeOperationPermit) => Promise<T>,
+  ): Promise<{ admitted: true; value: T } | { admitted: false }> {
+    const key = physicalWorktreeOperationKey(target)
+    if (this.removalAdmissions.has(key)) return { admitted: false }
+    const permit = this.createPermit(key)
+    try {
+      return { admitted: true, value: await this.runByKey(key, async () => await task(permit)) }
+    } finally {
+      this.activePermits.delete(permit)
+    }
   }
 
   async runRemoval<T>(
@@ -56,6 +75,13 @@ export class PhysicalWorktreeOperationCoordinator {
       this.queues.set(key, queue)
     }
     return queue
+  }
+
+  private createPermit(key: string): PhysicalWorktreeOperationPermit {
+    const permit = { operationId: this.nextOperationId++ }
+    this.permitKeys.set(permit, key)
+    this.activePermits.add(permit)
+    return permit
   }
 }
 

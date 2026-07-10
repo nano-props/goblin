@@ -411,6 +411,39 @@ describe('workspace pane tabs coordinator', () => {
     finishRemoval.resolve(undefined)
     await removal
   })
+
+  test('lets a canonical tab write admitted before removal finish in physical queue order', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
+    const liveSessions = deferred<[]>()
+    const listSessionsForUser = vi.fn(async () => await liveSessions.promise)
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      worktreeOperations,
+      runtimeProviders: [{ type: 'terminal', listSessionsForUser }],
+    })
+
+    const update = coordinator.updateTabs({
+      userId: USER_ID,
+      repoRoot: REPO_ROOT,
+      scope: SCOPE,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      operation: { type: 'open-static', tabType: 'history' },
+      assertCurrent: () => {},
+    })
+    await vi.waitFor(() => expect(listSessionsForUser).toHaveBeenCalledOnce())
+
+    const removal = worktreeOperations.runRemoval(
+      { repoRoot: REPO_ROOT, worktreePath: WORKTREE_PATH },
+      async () => 'removed',
+    )
+    expect(worktreeOperations.isRemovalAdmitted({ repoRoot: REPO_ROOT, worktreePath: WORKTREE_PATH })).toBe(true)
+
+    liveSessions.resolve([])
+    await expect(update).resolves.toMatchObject({ revision: 1 })
+    await expect(removal).resolves.toEqual({ admitted: true, value: 'removed' })
+  })
 })
 
 function workspaceTarget() {

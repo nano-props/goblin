@@ -156,13 +156,24 @@ repair it. On failure, the session should still be present because the close did
 not complete. On success, the close path removes the session and commits the
 planned close-back navigation.
 
+The server implements every close source through one idempotent session close
+promise. The session remains in the authoritative manager until all pending
+spawns settle and PTY termination is acknowledged. Direct close, prune,
+detached-user cleanup, repo-runtime cleanup, and physical-worktree quiescence
+join that same promise; they cannot detach or broadcast the session twice. A
+termination failure leaves the session addressable in `error` state so a later
+close can retry. Only process shutdown uses an explicitly forceful disposal
+path.
+
 This distinction matters for destructive worktree operations. The client sends
 one repository-removal intent; it does not close tabs first. The server
 `WorktreeRemovalApplication` admits removal by canonical repo/worktree identity
 before the command waits in the repository write queue. The admission spans
 users and repo runtimes because the filesystem worktree is one physical
 resource. Later runtime opens and canonical tab writes for that target are
-rejected. After repository validation succeeds, the application closes and
+rejected. Operations admitted before removal carry a server-issued permit and
+finish before removal begins; a later removal cannot invalidate an earlier
+application command halfway through provider/tab composition. After repository validation succeeds, the application closes and
 awaits all authoritative provider resources. Once quiescence is confirmed, the
 Git removal crosses a non-cancelable commit point. Canonical tabs are removed
 only after Git confirms worktree removal. If Git fails, runtime tabs reconcile
@@ -234,6 +245,14 @@ materializes every live runtime session, so tab convergence and navigation are
 recoverable projection work, while closing a reused/restored session would be a
 destructive cross-client side effect. Duplicate observers must not repeat the
 tab/route commit.
+
+That success boundary is the completed server application operation, including
+canonical runtime-tab membership. If an unexpected server-side projection
+exception occurs before that boundary, the application reconciles provider
+truth and may close only a resource newly created by that incomplete command.
+Client projection or route failures occur after the server boundary and never
+roll back the resource; command results report them as presentation status, not
+as provider-create failure.
 
 A canonical workspace-pane tab response may arrive after this client has moved
 to a replacement `repoRuntimeId`. Skipping that stale local cache write does not
