@@ -24,9 +24,6 @@ export const terminalClient: ClientTerminal = {
   close(input) {
     return getTerminalClient().close(input)
   },
-  create(input) {
-    return getTerminalClient().create(input)
-  },
   pruneTerminals(repoRoot, repoRuntimeId) {
     return getTerminalClient().pruneTerminals(repoRoot, repoRuntimeId)
   },

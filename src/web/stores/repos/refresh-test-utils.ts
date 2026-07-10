@@ -67,11 +67,5 @@ export function resetRefreshTest(): void {
   ipcHandlers['repo.fetch'] = async () => ({ ok: true, message: 'ok' })
   // Tests that need repo read responses install `repo.projection`
   // directly; snapshot/status are no longer standalone read routes.
-  ipcHandlers['terminal.create'] = async (input: { kind?: string }) => ({
-    ok: true,
-    action: input?.kind === 'primary' ? 'reused' : 'created',
-    terminalSessionId: input?.kind === 'primary' ? 'term-testtesttesttesttest1' : 'term-testtesttesttesttest2',
-    sessions: [],
-  })
   ipcHandlers['terminal.prune'] = async () => ({ pruned: 0, remaining: 0 })
 }

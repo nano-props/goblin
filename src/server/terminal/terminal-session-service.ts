@@ -6,7 +6,7 @@ import {
   type TerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabsEntry, WorkspacePaneTabsUpdateInput } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneTabsSnapshot, WorkspacePaneTabsUpdateInput } from '#/shared/workspace-pane-tabs.ts'
 import { isValidTerminalClientId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import { createTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import { terminalSessionRuntimeScope, terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
@@ -128,15 +128,16 @@ class TerminalSessionService {
       worktreePath: string | null
       tabs: readonly WorkspacePaneTabEntry[]
     },
-  ): Promise<WorkspacePaneTabEntry[]> {
-    if (!isValidRepoLocator(input.repoRoot)) return []
-    if (!isValidBranch(input.branchName)) return []
-    if (input.worktreePath !== null && !isValidCwd(input.worktreePath)) return []
+  ): Promise<WorkspacePaneTabsSnapshot> {
+    if (!isValidRepoLocator(input.repoRoot)) return emptyWorkspacePaneTabsSnapshot()
+    if (!isValidBranch(input.branchName)) return emptyWorkspacePaneTabsSnapshot()
+    if (input.worktreePath !== null && !isValidCwd(input.worktreePath)) return emptyWorkspacePaneTabsSnapshot()
     const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
     const worktreePath =
       input.worktreePath === null ? null : terminalSessionWorktreePath(input.repoRoot, input.worktreePath)
     return await this.workspaceTabsCoordinator.replaceTabs({
       userId,
+      repoRoot: input.repoRoot,
       scope,
       branchName: input.branchName,
       worktreePath,
@@ -145,16 +146,17 @@ class TerminalSessionService {
     })
   }
 
-  async updateTabs(userId: string, input: WorkspacePaneTabsUpdateInput): Promise<WorkspacePaneTabEntry[]> {
-    if (!isValidRepoLocator(input.repoRoot)) return []
-    if (!isValidBranch(input.branchName)) return []
-    if (input.worktreePath !== null && !isValidCwd(input.worktreePath)) return []
-    if (!isValidWorkspacePaneTabsOperation(input.operation)) return []
+  async updateTabs(userId: string, input: WorkspacePaneTabsUpdateInput): Promise<WorkspacePaneTabsSnapshot> {
+    if (!isValidRepoLocator(input.repoRoot)) return emptyWorkspacePaneTabsSnapshot()
+    if (!isValidBranch(input.branchName)) return emptyWorkspacePaneTabsSnapshot()
+    if (input.worktreePath !== null && !isValidCwd(input.worktreePath)) return emptyWorkspacePaneTabsSnapshot()
+    if (!isValidWorkspacePaneTabsOperation(input.operation)) return emptyWorkspacePaneTabsSnapshot()
     const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
     const worktreePath =
       input.worktreePath === null ? null : terminalSessionWorktreePath(input.repoRoot, input.worktreePath)
     return await this.workspaceTabsCoordinator.updateTabs({
       userId,
+      repoRoot: input.repoRoot,
       scope,
       branchName: input.branchName,
       worktreePath,
@@ -165,11 +167,16 @@ class TerminalSessionService {
 
   async reconcileTerminalTabsForSession(userId: string, session: TerminalSessionSummary): Promise<void> {
     const scope = terminalSessionRuntimeScope(session.repoRoot, session.repoRuntimeId)
-    await this.workspaceTabsCoordinator.reconcileWorktree({ userId, scope, worktreePath: session.worktreePath })
+    await this.workspaceTabsCoordinator.reconcileWorktree({
+      userId,
+      repoRoot: session.repoRoot,
+      scope,
+      worktreePath: session.worktreePath,
+    })
   }
 
-  async listWorkspaceTabs(userId: string, repoRoot: string, repoRuntimeId: string): Promise<WorkspacePaneTabsEntry[]> {
-    if (!isValidRepoLocator(repoRoot)) return []
+  async listWorkspaceTabs(userId: string, repoRoot: string, repoRuntimeId: string): Promise<WorkspacePaneTabsSnapshot> {
+    if (!isValidRepoLocator(repoRoot)) return emptyWorkspacePaneTabsSnapshot()
     const scope = terminalSessionRuntimeScope(repoRoot, repoRuntimeId)
     return await this.workspaceTabsCoordinator.listWorkspaceTabs({
       userId,
@@ -249,4 +256,8 @@ export function terminalWorkspacePaneRuntimeTabsProvider(
       }))
     },
   }
+}
+
+function emptyWorkspacePaneTabsSnapshot(): WorkspacePaneTabsSnapshot {
+  return { revision: 0, entries: [] }
 }

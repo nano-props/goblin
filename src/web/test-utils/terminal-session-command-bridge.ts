@@ -28,10 +28,20 @@ export function createTerminalWithAdmissionForTest(
       terminalSessionId,
       requestRole: 'leader' as const,
       resourceDisposition: 'created' as const,
-      workspacePaneTabs:
-        workspacePaneTabs.length > 0
-          ? [...workspacePaneTabs]
-          : workspacePaneTabsWithRuntimeTab(currentTabs, 'terminal', terminalSessionId, placement),
+      workspacePaneTabs: {
+        revision: 1,
+        entries: [
+          {
+            repoRoot: base.repoRoot,
+            branchName: base.branch,
+            worktreePath: base.worktreePath,
+            tabs:
+              workspacePaneTabs.length > 0
+                ? [...workspacePaneTabs]
+                : workspacePaneTabsWithRuntimeTab(currentTabs, 'terminal', terminalSessionId, placement),
+          },
+        ],
+      },
       runtimeProjectionApplied: true,
     }
   })

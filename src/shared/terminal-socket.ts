@@ -2,8 +2,6 @@ import type {
   TerminalAttachInput,
   TerminalAttachResult,
   TerminalBellRealtimeEvent,
-  TerminalCreateResult,
-  TerminalCreateInput,
   TerminalIdentityEvent,
   TerminalLifecycleEvent,
   TerminalListSessionsInput,
@@ -59,7 +57,6 @@ export interface TerminalSocketRequestInputs {
   close: TerminalSessionInput
   'list-sessions': TerminalListSessionsInput
   'recover-sessions': TerminalListSessionsInput
-  create: TerminalCreateInput
   prune: TerminalPruneInput
 }
 
@@ -72,7 +69,6 @@ export interface TerminalSocketResponseOutputs {
   close: TerminalMutationResult
   'list-sessions': TerminalSessionSummary[]
   'recover-sessions': TerminalSessionsRecoveryResult
-  create: TerminalCreateResult
   prune: { pruned: number; remaining: number }
 }
 

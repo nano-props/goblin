@@ -1,6 +1,7 @@
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
+import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import {
@@ -108,7 +109,8 @@ async function openWorkspacePaneStaticTabAction(input: OpenWorkspacePaneStaticTa
       insertAfterIdentity,
     },
   })
-  if (!committed.ok || !committed.projectionApplied) return false
+  if (!committed.ok) return false
+  if (currentRepoRuntimeId(useReposStore.getState(), input.repoId) !== repo.repoRuntimeId) return false
   if (openerIdentity) {
     recordWorkspacePaneTabOpener(input.repoId, branchName, workspacePaneStaticTabId(input.type), openerIdentity)
   }

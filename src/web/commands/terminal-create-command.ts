@@ -2,23 +2,22 @@ import { terminalLog } from '#/web/logger.ts'
 import type { TerminalCreateOptions } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
-import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
+import type {
+  TerminalCreateAdmissionResult,
+  TerminalCreateLeaderAdmissionResult,
+} from '#/web/components/terminal/terminal-create-admission.ts'
 import {
   showTerminalCreateErrorToast,
   terminalCreateErrorKey,
   type TerminalCreateTranslator,
 } from '#/web/components/terminal/terminal-create-feedback.ts'
-import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import { terminalWorkspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 export type TerminalCreateCommandResult =
   { ok: true; terminalSessionId: string } | { ok: false; error: unknown; messageKey: string }
 
 export type TerminalCreateCommandAdmission = TerminalCreateAdmissionResult
 
-export interface TerminalCreatedTabCommitResult {
-  workspacePaneProjectionApplied: boolean
-  navigationCommitted: boolean
-}
+export type TerminalCreatedTabCommitResult =
+  { status: 'committed' } | { status: 'superseded' } | { status: 'navigation-rejected' }
 
 const TERMINAL_CREATE_CANCELED_MESSAGE = 'terminal create request canceled'
 const WORKSPACE_PANE_NAVIGATION_REJECTED_MESSAGE = 'workspace pane navigation rejected'
@@ -31,24 +30,12 @@ export async function runCreateTerminalTabCommand(input: {
     placement?: WorkspacePaneRuntimeTabPlacement,
   ) => Promise<TerminalCreateCommandAdmission>
   /**
-   * The tab this creation should be attributed to (used for close-back focus
-   * via the workspace pane tab opener tracker). Captured by the caller at
-   * the user-action boundary because some creation paths do async pre-work
-   * before entering the terminal view; their opener is the tab that initiated
-   * the action, not whatever tab happens to be active when the async work
-   * finishes.
+   * Applies the server projection and commits the exact route for the created
+   * session. This is required so every leader request has one explicit
+   * presentation boundary after server admission.
    */
-  openerIdentity: string | null
-  /** Opens the concrete terminal route after the server has created a session. */
-  showCreatedTerminalTab?: (terminalSessionId: string) => boolean | Promise<boolean>
-  /**
-   * Commits the workspace-pane tab/route state for the created session.
-   * Workspace-pane callers use this to run the tab insertion and exact route
-   * commit as one pane operation after terminal lifecycle admission resolves.
-   */
-  commitCreatedTerminalTab?: (
-    terminalSessionId: string,
-    workspacePaneTabs: TerminalCreateAdmissionResult['workspacePaneTabs'],
+  commitCreatedTerminalTab: (
+    admission: TerminalCreateLeaderAdmissionResult,
   ) => TerminalCreatedTabCommitResult | Promise<TerminalCreatedTabCommitResult>
   /**
    * Insertion anchor for the new terminal tab. Callers decide explicitly:
@@ -86,30 +73,15 @@ export async function runCreateTerminalTabCommand(input: {
 async function finishCreateTerminalTabCommand(
   input: {
     base: TerminalSessionBase
-    openerIdentity: string | null
-    showCreatedTerminalTab?: (terminalSessionId: string) => boolean | Promise<boolean>
-    commitCreatedTerminalTab?: (
-      terminalSessionId: string,
-      workspacePaneTabs: TerminalCreateAdmissionResult['workspacePaneTabs'],
+    commitCreatedTerminalTab: (
+      admission: TerminalCreateLeaderAdmissionResult,
     ) => TerminalCreatedTabCommitResult | Promise<TerminalCreatedTabCommitResult>
   },
-  admission: TerminalCreateAdmissionResult & { requestRole: 'leader' },
+  admission: TerminalCreateLeaderAdmissionResult,
 ): Promise<TerminalCreateCommandResult> {
   const terminalSessionId = admission.terminalSessionId
-  if (input.openerIdentity && admission.resourceDisposition === 'created') {
-    recordWorkspacePaneTabOpener(
-      input.base.repoRoot,
-      input.base.branch,
-      terminalWorkspacePaneTabProvider.identity(terminalSessionId),
-      input.openerIdentity,
-    )
-  }
-  const navigationCommitted = input.commitCreatedTerminalTab
-    ? (await input.commitCreatedTerminalTab(terminalSessionId, admission.workspacePaneTabs)).navigationCommitted
-    : input.showCreatedTerminalTab
-      ? await input.showCreatedTerminalTab(terminalSessionId)
-      : true
-  if (!navigationCommitted) {
+  const presentationStatus = (await input.commitCreatedTerminalTab(admission)).status
+  if (presentationStatus === 'navigation-rejected') {
     return {
       ok: false,
       error: new Error(WORKSPACE_PANE_NAVIGATION_REJECTED_MESSAGE),

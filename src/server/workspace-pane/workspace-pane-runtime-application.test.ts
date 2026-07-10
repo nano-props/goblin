@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { createWorkspacePaneRuntimeApplication } from '#/server/workspace-pane/workspace-pane-runtime-application.ts'
 import type { TerminalCreateResult } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
+import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 
 const request = {
   repoRoot: '/repo',
@@ -18,16 +19,17 @@ describe('WorkspacePaneRuntimeApplication', () => {
   test('returns the provider result and canonical tabs as one application outcome', async () => {
     const runtime = terminalCreateSuccess()
     const create = vi.fn(async () => runtime)
-    const ensureRuntimeTabForSession = vi.fn(async () => [
-      { type: 'status' as const, tabId: 'workspace-pane:status' as const },
-      { type: 'terminal' as const, runtimeSessionId: runtime.terminalSessionId },
+    const workspacePaneTabs = snapshot([
+      { type: 'status', tabId: 'workspace-pane:status' },
+      { type: 'terminal', runtimeSessionId: runtime.terminalSessionId },
     ])
+    const ensureRuntimeTabForSession = vi.fn(async () => workspacePaneTabs)
     const broadcastWorkspaceTabsChanged = vi.fn()
     const application = createWorkspacePaneRuntimeApplication({
-      terminal: { create },
-      workspaceTabsCoordinator: { ensureRuntimeTabForSession } as unknown as Pick<
+      terminal: { create, listSessions: async () => [], close: () => false },
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession, reconcileWorktree: vi.fn() } as unknown as Pick<
         WorkspacePaneTabsCoordinator,
-        'ensureRuntimeTabForSession'
+        'ensureRuntimeTabForSession' | 'reconcileWorktree'
       >,
       isCurrentRepoRuntime: () => true,
       broadcastWorkspaceTabsChanged,
@@ -43,6 +45,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     expect(ensureRuntimeTabForSession).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 'user-test',
+        repoRoot: '/repo',
         scope: '/repo\0repo-runtime-test',
         branchName: 'main',
         worktreePath: '/repo/worktree',
@@ -55,10 +58,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       ok: true,
       runtimeType: 'terminal',
       runtime,
-      tabs: [
-        { type: 'status', tabId: 'workspace-pane:status' },
-        { type: 'terminal', runtimeSessionId: runtime.terminalSessionId },
-      ],
+      workspacePaneTabs,
     })
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-test', '/repo')
   })
@@ -67,8 +67,12 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const ensureRuntimeTabForSession = vi.fn()
     const broadcastWorkspaceTabsChanged = vi.fn()
     const application = createWorkspacePaneRuntimeApplication({
-      terminal: { create: async () => ({ ok: false, message: 'error.terminal-create-failed' }) },
-      workspaceTabsCoordinator: { ensureRuntimeTabForSession },
+      terminal: {
+        create: async () => ({ ok: false, message: 'error.terminal-create-failed' }),
+        listSessions: async () => [],
+        close: () => false,
+      },
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession, reconcileWorktree: vi.fn() },
       isCurrentRepoRuntime: () => true,
       broadcastWorkspaceTabsChanged,
     })
@@ -82,27 +86,41 @@ describe('WorkspacePaneRuntimeApplication', () => {
     expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
   })
 
-  test('rechecks repo runtime authority at the tab commit boundary', async () => {
-    const stale = { ok: false as const, runtimeType: 'terminal' as const, message: 'error.repo-runtime-stale' }
-    const ensureRuntimeTabForSession = vi.fn(async (input: { guardBeforeWrite?: () => typeof stale | null }) => {
-      return input.guardBeforeWrite?.() ?? []
-    })
-    const broadcastWorkspaceTabsChanged = vi.fn()
-    const application = createWorkspacePaneRuntimeApplication({
-      terminal: { create: async () => terminalCreateSuccess() },
-      workspaceTabsCoordinator: { ensureRuntimeTabForSession } as unknown as Pick<
-        WorkspacePaneTabsCoordinator,
-        'ensureRuntimeTabForSession'
-      >,
-      isCurrentRepoRuntime: () => false,
-      broadcastWorkspaceTabsChanged,
-    })
+  test.each(['created', 'reused', 'restored'] as const)(
+    'rechecks repo runtime authority at the tab commit boundary for a %s terminal',
+    async (action) => {
+      const runtime = terminalCreateSuccess()
+      runtime.action = action
+      const close = vi.fn(() => true)
+      const stale = { ok: false as const, runtimeType: 'terminal' as const, message: 'error.repo-runtime-stale' }
+      const ensureRuntimeTabForSession = vi.fn(async (input: { guardBeforeWrite?: () => typeof stale | null }) => {
+        return input.guardBeforeWrite?.() ?? []
+      })
+      const broadcastWorkspaceTabsChanged = vi.fn()
+      const application = createWorkspacePaneRuntimeApplication({
+        terminal: { create: async () => runtime, listSessions: async () => [], close },
+        workspaceTabsCoordinator: { ensureRuntimeTabForSession, reconcileWorktree: vi.fn() } as unknown as Pick<
+          WorkspacePaneTabsCoordinator,
+          'ensureRuntimeTabForSession' | 'reconcileWorktree'
+        >,
+        isCurrentRepoRuntime: () => false,
+        broadcastWorkspaceTabsChanged,
+      })
 
-    await expect(application.open('client-test', 'user-test', { runtimeType: 'terminal', request })).resolves.toEqual(
-      stale,
-    )
-    expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
-  })
+      await expect(application.open('client-test', 'user-test', { runtimeType: 'terminal', request })).resolves.toEqual(
+        stale,
+      )
+      if (action === 'created') {
+        expect(close).toHaveBeenCalledOnce()
+        expect(close).toHaveBeenCalledWith('client-test', 'user-test', {
+          terminalRuntimeSessionId: runtime.terminalRuntimeSessionId,
+        })
+      } else {
+        expect(close).not.toHaveBeenCalled()
+      }
+      expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
+    },
+  )
 
   test('returns terminal sessions in the canonical workspace tab order', async () => {
     const runtime = terminalCreateSuccess()
@@ -116,10 +134,11 @@ describe('WorkspacePaneRuntimeApplication', () => {
       { type: 'terminal' as const, runtimeSessionId: second.terminalSessionId },
     ]
     const application = createWorkspacePaneRuntimeApplication({
-      terminal: { create: async () => runtime },
+      terminal: { create: async () => runtime, listSessions: async () => [], close: () => false },
       workspaceTabsCoordinator: {
-        ensureRuntimeTabForSession: async () => tabs,
-      } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession'>,
+        ensureRuntimeTabForSession: async () => snapshot(tabs),
+        reconcileWorktree: vi.fn(),
+      } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktree'>,
       isCurrentRepoRuntime: () => true,
       broadcastWorkspaceTabsChanged: () => {},
     })
@@ -132,14 +151,146 @@ describe('WorkspacePaneRuntimeApplication', () => {
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.tabs).toEqual(tabs)
+    expect(result.workspacePaneTabs).toEqual(snapshot(tabs))
     expect(result.runtime.sessions.map((session) => session.terminalSessionId)).toEqual([
       first.terminalSessionId,
       created.terminalSessionId,
       second.terminalSessionId,
     ])
   })
+
+  test('closes a terminal by durable session id and returns the canonical scope snapshot', async () => {
+    const session = terminalSession('term-111111111111111111111', 'pty_session_1_aaaaaaaaa')
+    const close = vi.fn(() => true)
+    const workspacePaneTabs = snapshot([{ type: 'status', tabId: 'workspace-pane:status' }])
+    const reconcileWorktree = vi.fn(async () => workspacePaneTabs)
+    const broadcastWorkspaceTabsChanged = vi.fn()
+    const application = createWorkspacePaneRuntimeApplication({
+      terminal: { create: async () => terminalCreateSuccess(), listSessions: async () => [session], close },
+      workspaceTabsCoordinator: {
+        ensureRuntimeTabForSession: vi.fn(),
+        reconcileWorktree,
+      } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktree'>,
+      isCurrentRepoRuntime: () => true,
+      broadcastWorkspaceTabsChanged,
+    })
+
+    await expect(
+      application.close('client-test', 'user-test', {
+        runtimeType: 'terminal',
+        sessionId: session.terminalSessionId,
+        target: {
+          repoRoot: request.repoRoot,
+          repoRuntimeId: request.repoRuntimeId,
+          branchName: request.branch,
+          worktreePath: request.worktreePath,
+        },
+      }),
+    ).resolves.toEqual({ ok: true, runtimeType: 'terminal', workspacePaneTabs })
+    expect(close).toHaveBeenCalledWith('client-test', 'user-test', {
+      terminalRuntimeSessionId: session.terminalRuntimeSessionId,
+    })
+    expect(reconcileWorktree).toHaveBeenCalledWith({
+      userId: 'user-test',
+      repoRoot: request.repoRoot,
+      scope: '/repo\0repo-runtime-test',
+      worktreePath: request.worktreePath,
+    })
+    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-test', request.repoRoot)
+  })
+
+  test('close-worktree enumerates server sessions and only closes the requested provider worktree', async () => {
+    const targetSession = terminalSession('term-111111111111111111111', 'pty_session_1_aaaaaaaaa')
+    const otherSession = {
+      ...terminalSession('term-222222222222222222222', 'pty_session_2_aaaaaaaaa'),
+      worktreePath: '/repo/other-worktree',
+    }
+    const close = vi.fn(() => true)
+    const workspacePaneTabs = snapshot([{ type: 'status', tabId: 'workspace-pane:status' }])
+    const application = createWorkspacePaneRuntimeApplication({
+      terminal: {
+        create: async () => terminalCreateSuccess(),
+        listSessions: async () => [targetSession, otherSession],
+        close,
+      },
+      workspaceTabsCoordinator: {
+        ensureRuntimeTabForSession: vi.fn(),
+        reconcileWorktree: async () => workspacePaneTabs,
+      } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktree'>,
+      isCurrentRepoRuntime: () => true,
+      broadcastWorkspaceTabsChanged: () => {},
+    })
+
+    await expect(
+      application.closeWorktree('client-test', 'user-test', {
+        runtimeType: 'terminal',
+        target: {
+          repoRoot: request.repoRoot,
+          repoRuntimeId: request.repoRuntimeId,
+          branchName: request.branch,
+          worktreePath: request.worktreePath,
+        },
+      }),
+    ).resolves.toEqual({ ok: true, runtimeType: 'terminal', workspacePaneTabs })
+    expect(close).toHaveBeenCalledTimes(1)
+    expect(close).toHaveBeenCalledWith('client-test', 'user-test', {
+      terminalRuntimeSessionId: targetSession.terminalRuntimeSessionId,
+    })
+  })
+
+  test('serializes open and close through the shared user/runtime/worktree queue', async () => {
+    const createResult = deferred<Extract<TerminalCreateResult, { ok: true }>>()
+    const session = terminalSession('term-111111111111111111111', 'pty_session_1_aaaaaaaaa')
+    const listSessions = vi.fn(async () => [session])
+    const application = createWorkspacePaneRuntimeApplication({
+      terminal: {
+        create: async () => await createResult.promise,
+        listSessions,
+        close: () => true,
+      },
+      workspaceTabsCoordinator: {
+        ensureRuntimeTabForSession: async () =>
+          snapshot([{ type: 'terminal', runtimeSessionId: session.terminalSessionId }]),
+        reconcileWorktree: async () => snapshot([]),
+      } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktree'>,
+      isCurrentRepoRuntime: () => true,
+      broadcastWorkspaceTabsChanged: () => {},
+    })
+
+    const open = application.open('client-test', 'user-test', { runtimeType: 'terminal', request })
+    const close = application.close('client-test', 'user-test', {
+      runtimeType: 'terminal',
+      sessionId: session.terminalSessionId,
+      target: {
+        repoRoot: request.repoRoot,
+        repoRuntimeId: request.repoRuntimeId,
+        branchName: request.branch,
+        worktreePath: request.worktreePath,
+      },
+    })
+    await Promise.resolve()
+    expect(listSessions).not.toHaveBeenCalled()
+
+    createResult.resolve(terminalCreateSuccess())
+    await expect(open).resolves.toMatchObject({ ok: true })
+    await expect(close).resolves.toMatchObject({ ok: true })
+    expect(listSessions).toHaveBeenCalledOnce()
+  })
 })
+
+function snapshot(tabs: WorkspacePaneTabsSnapshot['entries'][number]['tabs']): WorkspacePaneTabsSnapshot {
+  return {
+    revision: 1,
+    entries: [
+      {
+        repoRoot: request.repoRoot,
+        branchName: request.branch,
+        worktreePath: request.worktreePath,
+        tabs,
+      },
+    ],
+  }
+}
 
 function terminalCreateSuccess(): Extract<TerminalCreateResult, { ok: true }> {
   const terminalRuntimeSessionId = 'pty_session_1_aaaaaaaaa'
@@ -180,4 +331,12 @@ function terminalSession(terminalSessionId: string, terminalRuntimeSessionId: st
     cols: 100,
     rows: 30,
   }
+}
+
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise
+  })
+  return { promise, resolve }
 }

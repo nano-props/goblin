@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, test } from 'vitest'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import {
   commitWorkspacePaneTabs,
   updateWorkspacePaneTabs,
   workspacePaneTabsInteractionBlockedForTarget,
+  writeCanonicalWorkspacePaneTabsSnapshot,
 } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import {
   createRepoBranch,
@@ -14,16 +17,10 @@ import {
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import {
-  clearWorkspacePaneTabsProjectionState,
   readWorkspacePaneTabsForTarget,
-  refreshWorkspacePaneTabsQueryData,
   setWorkspacePaneTabsForTargetQueryData,
-  workspacePaneTabsQueryOptions,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
+import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 
 const REPO_ROOT = '/tmp/workspace-pane-tabs-commit-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-test'
@@ -37,70 +34,44 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.restoreAllMocks()
   resetReposStore()
   setClientBridgeForTests(null)
 })
 
 describe('commitWorkspacePaneTabs', () => {
   test('blocks target interaction while a commit is in flight', async () => {
-    let resolveServerTabs!: (tabs: WorkspacePaneTabEntry[]) => void
-    const serverTabs = new Promise<WorkspacePaneTabEntry[]>((resolve) => {
-      resolveServerTabs = resolve
-    })
-    installWorkspacePaneTabsTestBridge({
-      replaceWorkspaceTabs: async () => await serverTabs,
-    })
+    const serverTabs = Promise.withResolvers<WorkspacePaneTabEntry[]>()
+    installWorkspacePaneTabsTestBridge({ replaceWorkspaceTabs: async () => await serverTabs.promise })
 
     const commit = commitWorkspacePaneTabs({
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branchName: BRANCH_NAME,
-      worktreePath: WORKTREE_PATH,
+      ...target(),
       tabs: [workspacePaneStaticTabEntry('status')],
     })
 
     expect(workspacePaneTabsInteractionBlocked()).toBe(true)
-    resolveServerTabs([workspacePaneStaticTabEntry('status')])
-    await expect(commit).resolves.toMatchObject({ ok: true })
+    serverTabs.resolve([workspacePaneStaticTabEntry('status')])
+    await expect(commit).resolves.toMatchObject({ ok: true, projectionApplied: true })
     expect(workspacePaneTabsInteractionBlocked()).toBe(false)
   })
 
-  test('writes canonical server tabs after a successful commit', async () => {
-    let resolveServerTabs!: (tabs: WorkspacePaneTabEntry[]) => void
-    const serverTabs = new Promise<WorkspacePaneTabEntry[]>((resolve) => {
-      resolveServerTabs = resolve
-    })
+  test('writes the complete canonical server snapshot after a successful commit', async () => {
     installWorkspacePaneTabsTestBridge({
-      replaceWorkspaceTabs: async () => await serverTabs,
-    })
-
-    setWorkspacePaneTabsForTargetQueryData({
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branchName: BRANCH_NAME,
-      worktreePath: WORKTREE_PATH,
-      tabs: [workspacePaneStaticTabEntry('history')],
-    })
-
-    const commit = commitWorkspacePaneTabs({
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branchName: BRANCH_NAME,
-      worktreePath: WORKTREE_PATH,
-      tabs: [
-        workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
+      replaceWorkspaceTabs: async () => [
         workspacePaneStaticTabEntry('status'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
       ],
     })
+    seedTabs([workspacePaneStaticTabEntry('history')])
 
-    expect(readWorkspacePaneTabs()).toEqual([workspacePaneStaticTabEntry('history')])
+    await expect(
+      commitWorkspacePaneTabs({
+        ...target(),
+        tabs: [workspacePaneStaticTabEntry('status')],
+      }),
+    ).resolves.toMatchObject({ ok: true, projectionApplied: true })
 
-    resolveServerTabs([
-      workspacePaneStaticTabEntry('status'),
-      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
-    ])
-    await expect(commit).resolves.toMatchObject({ ok: true })
-    expect(readWorkspacePaneTabs()).toEqual([
+    expect(readTabs()).toEqual([
       workspacePaneStaticTabEntry('status'),
       workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
     ])
@@ -112,270 +83,51 @@ describe('commitWorkspacePaneTabs', () => {
         throw new Error('server unavailable')
       },
     })
-    setWorkspacePaneTabsForTargetQueryData({
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branchName: BRANCH_NAME,
-      worktreePath: WORKTREE_PATH,
-      tabs: [workspacePaneStaticTabEntry('status')],
-    })
+    seedTabs([workspacePaneStaticTabEntry('status')])
 
     await expect(
-      commitWorkspacePaneTabs({
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
-        tabs: [workspacePaneStaticTabEntry('history')],
-      }),
+      commitWorkspacePaneTabs({ ...target(), tabs: [workspacePaneStaticTabEntry('history')] }),
     ).resolves.toMatchObject({ ok: false })
-
-    expect(readWorkspacePaneTabs()).toEqual([workspacePaneStaticTabEntry('status')])
+    expect(readTabs()).toEqual([workspacePaneStaticTabEntry('status')])
   })
 
-  test('cancels stale in-flight list queries before writing committed tabs', async () => {
-    let resolveListTabs!: (tabs: WorkspacePaneTabsEntry[]) => void
-    const listTabs = new Promise<WorkspacePaneTabsEntry[]>((resolve) => {
-      resolveListTabs = resolve
-    })
-    installWorkspacePaneTabsTestBridge({
-      listWorkspaceTabs: async () => await listTabs,
-      replaceWorkspaceTabs: async (input) => [...input.tabs],
-    })
+  test('rejects a lower-revision canonical response', () => {
+    expect(
+      writeCanonicalWorkspacePaneTabsSnapshot(
+        REPO_ROOT,
+        REPO_RUNTIME_ID,
+        snapshot(9, [workspacePaneStaticTabEntry('history')]),
+      ),
+    ).toBe(true)
+    expect(
+      writeCanonicalWorkspacePaneTabsSnapshot(
+        REPO_ROOT,
+        REPO_RUNTIME_ID,
+        snapshot(8, [workspacePaneStaticTabEntry('status')]),
+      ),
+    ).toBe(false)
 
-    const fetch = primaryWindowQueryClient
-      .fetchQuery(workspacePaneTabsQueryOptions(REPO_ROOT, REPO_RUNTIME_ID))
-      .catch(() => null)
-
-    await expect(
-      commitWorkspacePaneTabs({
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
-        tabs: [
-          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
-          workspacePaneStaticTabEntry('status'),
-        ],
-      }),
-    ).resolves.toMatchObject({ ok: true })
-
-    resolveListTabs([
-      {
-        repoRoot: REPO_ROOT,
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
-        tabs: [workspacePaneStaticTabEntry('status')],
-      },
-    ])
-    await fetch
-
-    expect(readWorkspacePaneTabs()).toEqual([
-      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
-      workspacePaneStaticTabEntry('status'),
-    ])
-  })
-
-  test('cancels list queries that start while a commit is in flight before writing committed tabs', async () => {
-    let resolveServerTabs!: (tabs: WorkspacePaneTabEntry[]) => void
-    const serverTabs = new Promise<WorkspacePaneTabEntry[]>((resolve) => {
-      resolveServerTabs = resolve
-    })
-    let resolveListTabs!: (tabs: WorkspacePaneTabsEntry[]) => void
-    const listTabs = new Promise<WorkspacePaneTabsEntry[]>((resolve) => {
-      resolveListTabs = resolve
-    })
-    let markReplaceStarted!: () => void
-    const replaceStarted = new Promise<void>((resolve) => {
-      markReplaceStarted = resolve
-    })
-    installWorkspacePaneTabsTestBridge({
-      listWorkspaceTabs: async () => await listTabs,
-      replaceWorkspaceTabs: async () => {
-        markReplaceStarted()
-        return await serverTabs
-      },
-    })
-
-    const commit = commitWorkspacePaneTabs({
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branchName: BRANCH_NAME,
-      worktreePath: WORKTREE_PATH,
-      tabs: [
-        workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
-        workspacePaneStaticTabEntry('status'),
-      ],
-    })
-    await replaceStarted
-    const fetch = primaryWindowQueryClient
-      .fetchQuery(workspacePaneTabsQueryOptions(REPO_ROOT, REPO_RUNTIME_ID))
-      .catch(() => null)
-
-    resolveServerTabs([
-      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
-      workspacePaneStaticTabEntry('status'),
-    ])
-    await expect(commit).resolves.toMatchObject({ ok: true })
-    resolveListTabs([
-      {
-        repoRoot: REPO_ROOT,
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
-        tabs: [workspacePaneStaticTabEntry('history')],
-      },
-    ])
-    await fetch
-
-    expect(readWorkspacePaneTabs()).toEqual([
-      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
-      workspacePaneStaticTabEntry('status'),
-    ])
-  })
-
-  test('ignores a stale manual refresh that resolves after committed tabs are written', async () => {
-    let resolveListTabs!: (tabs: WorkspacePaneTabsEntry[]) => void
-    const listTabs = new Promise<WorkspacePaneTabsEntry[]>((resolve) => {
-      resolveListTabs = resolve
-    })
-    installWorkspacePaneTabsTestBridge({
-      listWorkspaceTabs: async () => await listTabs,
-      replaceWorkspaceTabs: async (input) => [...input.tabs],
-    })
-
-    const refresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, REPO_RUNTIME_ID)
-    await Promise.resolve()
-
-    await expect(
-      commitWorkspacePaneTabs({
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
-        tabs: [
-          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
-          workspacePaneStaticTabEntry('status'),
-        ],
-      }),
-    ).resolves.toMatchObject({ ok: true })
-
-    resolveListTabs([
-      {
-        repoRoot: REPO_ROOT,
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
-        tabs: [workspacePaneStaticTabEntry('history')],
-      },
-    ])
-    await refresh
-
-    expect(readWorkspacePaneTabs()).toEqual([
-      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
-      workspacePaneStaticTabEntry('status'),
-    ])
-  })
-
-  test('keeps stale refresh suppressed after projection bookkeeping is cleared and recreated', async () => {
-    let resolveOldListTabs!: (tabs: WorkspacePaneTabsEntry[]) => void
-    let resolveNewListTabs!: (tabs: WorkspacePaneTabsEntry[]) => void
-    const oldListTabs = new Promise<WorkspacePaneTabsEntry[]>((resolve) => {
-      resolveOldListTabs = resolve
-    })
-    const newListTabs = new Promise<WorkspacePaneTabsEntry[]>((resolve) => {
-      resolveNewListTabs = resolve
-    })
-    const listResponses = [oldListTabs, newListTabs]
-    installWorkspacePaneTabsTestBridge({
-      listWorkspaceTabs: async () => await listResponses.shift()!,
-      replaceWorkspaceTabs: async (input) => [...input.tabs],
-    })
-
-    const oldRefresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, REPO_RUNTIME_ID)
-    await Promise.resolve()
-    clearWorkspacePaneTabsProjectionState(REPO_ROOT, REPO_RUNTIME_ID)
-    const newRefresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, REPO_RUNTIME_ID)
-    await Promise.resolve()
-
-    resolveNewListTabs([
-      {
-        repoRoot: REPO_ROOT,
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
-        tabs: [workspacePaneStaticTabEntry('status')],
-      },
-    ])
-    await newRefresh
-
-    resolveOldListTabs([
-      {
-        repoRoot: REPO_ROOT,
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
-        tabs: [workspacePaneStaticTabEntry('history')],
-      },
-    ])
-    await oldRefresh
-
-    expect(readWorkspacePaneTabs()).toEqual([workspacePaneStaticTabEntry('status')])
+    expect(readTabs()).toEqual([workspacePaneStaticTabEntry('history')])
   })
 })
 
 describe('updateWorkspacePaneTabs', () => {
   test('does not block target interaction for open-static updates', async () => {
-    let resolveServerTabs!: (tabs: WorkspacePaneTabEntry[]) => void
-    const serverTabs = new Promise<WorkspacePaneTabEntry[]>((resolve) => {
-      resolveServerTabs = resolve
-    })
-    installWorkspacePaneTabsTestBridge({
-      updateWorkspaceTabs: async () => await serverTabs,
-    })
+    const serverTabs = Promise.withResolvers<WorkspacePaneTabEntry[]>()
+    installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs: async () => await serverTabs.promise })
 
     const update = updateWorkspacePaneTabs({
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branchName: BRANCH_NAME,
-      worktreePath: WORKTREE_PATH,
+      ...target(),
       operation: { type: 'open-static', tabType: 'history' },
     })
 
     expect(workspacePaneTabsInteractionBlocked()).toBe(false)
-    resolveServerTabs([workspacePaneStaticTabEntry('history')])
+    serverTabs.resolve([workspacePaneStaticTabEntry('history')])
     await expect(update).resolves.toMatchObject({ ok: true })
     expect(workspacePaneTabsInteractionBlocked()).toBe(false)
   })
 
-  test('sends a server operation and writes canonical server tabs', async () => {
-    installWorkspacePaneTabsTestBridge({
-      updateWorkspaceTabs: async (input) => {
-        expect(input.operation).toEqual({ type: 'open-static', tabType: 'history' })
-        return [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')]
-      },
-    })
-    setWorkspacePaneTabsForTargetQueryData({
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branchName: BRANCH_NAME,
-      worktreePath: WORKTREE_PATH,
-      tabs: [workspacePaneStaticTabEntry('status')],
-    })
-
-    await expect(
-      updateWorkspacePaneTabs({
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
-        operation: { type: 'open-static', tabType: 'history' },
-      }),
-    ).resolves.toMatchObject({ ok: true })
-
-    expect(readWorkspacePaneTabs()).toEqual([
-      workspacePaneStaticTabEntry('status'),
-      workspacePaneStaticTabEntry('history'),
-    ])
-  })
-
-  test('passes through open-static insertion hints', async () => {
+  test('passes the operation through and applies its canonical snapshot', async () => {
     installWorkspacePaneTabsTestBridge({
       updateWorkspaceTabs: async (input) => {
         expect(input.operation).toEqual({
@@ -386,116 +138,82 @@ describe('updateWorkspacePaneTabs', () => {
         return [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')]
       },
     })
-    setWorkspacePaneTabsForTargetQueryData({
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branchName: BRANCH_NAME,
-      worktreePath: WORKTREE_PATH,
-      tabs: [workspacePaneStaticTabEntry('status')],
-    })
+    seedTabs([workspacePaneStaticTabEntry('status')])
 
     await expect(
       updateWorkspacePaneTabs({
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
+        ...target(),
         operation: {
           type: 'open-static',
           tabType: 'history',
           insertAfterIdentity: 'workspace-pane:status',
         },
       }),
-    ).resolves.toMatchObject({ ok: true })
-
-    expect(readWorkspacePaneTabs()).toEqual([
-      workspacePaneStaticTabEntry('status'),
-      workspacePaneStaticTabEntry('history'),
-    ])
+    ).resolves.toMatchObject({ ok: true, projectionApplied: true })
+    expect(readTabs()).toEqual([workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')])
   })
 
-  test('returns a failure result and leaves cached tabs untouched when the server operation fails', async () => {
+  test('returns failure and preserves cache when the server operation fails', async () => {
     installWorkspacePaneTabsTestBridge({
       updateWorkspaceTabs: async () => {
         throw new Error('server unavailable')
       },
     })
-    setWorkspacePaneTabsForTargetQueryData({
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branchName: BRANCH_NAME,
-      worktreePath: WORKTREE_PATH,
-      tabs: [workspacePaneStaticTabEntry('status')],
-    })
+    seedTabs([workspacePaneStaticTabEntry('status')])
 
     await expect(
       updateWorkspacePaneTabs({
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
+        ...target(),
         operation: { type: 'open-static', tabType: 'history' },
       }),
     ).resolves.toMatchObject({ ok: false })
-
-    expect(readWorkspacePaneTabs()).toEqual([workspacePaneStaticTabEntry('status')])
+    expect(readTabs()).toEqual([workspacePaneStaticTabEntry('status')])
   })
 
-  test('does not accept server tabs after the repo runtime changes', async () => {
-    let resolveServerTabs!: (tabs: WorkspacePaneTabEntry[]) => void
-    let markUpdateStarted!: () => void
-    const updateStarted = new Promise<void>((resolve) => {
-      markUpdateStarted = resolve
-    })
-    const serverTabs = new Promise<WorkspacePaneTabEntry[]>((resolve) => {
-      resolveServerTabs = resolve
-    })
-    installWorkspacePaneTabsTestBridge({
-      updateWorkspaceTabs: async () => {
-        markUpdateStarted()
-        return await serverTabs
-      },
-    })
-    setWorkspacePaneTabsForTargetQueryData({
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branchName: BRANCH_NAME,
-      worktreePath: WORKTREE_PATH,
-      tabs: [workspacePaneStaticTabEntry('status')],
-    })
+  test('does not project a successful response after repoRuntimeId changes', async () => {
+    const serverTabs = Promise.withResolvers<WorkspacePaneTabEntry[]>()
+    installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs: async () => await serverTabs.promise })
+    seedTabs([workspacePaneStaticTabEntry('status')])
 
     const update = updateWorkspacePaneTabs({
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branchName: BRANCH_NAME,
-      worktreePath: WORKTREE_PATH,
+      ...target(),
       operation: { type: 'open-static', tabType: 'history' },
     })
-    await updateStarted
-
+    await Promise.resolve()
     seedWorkspacePaneTabsRepo(NEXT_REPO_RUNTIME_ID)
-    resolveServerTabs([workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')])
+    serverTabs.resolve([workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')])
 
     await expect(update).resolves.toMatchObject({ ok: true, projectionApplied: false })
-    expect(readWorkspacePaneTabs()).toEqual([workspacePaneStaticTabEntry('status')])
+    expect(readTabs()).toEqual([workspacePaneStaticTabEntry('status')])
   })
 })
 
-function readWorkspacePaneTabs(): WorkspacePaneTabEntry[] {
-  return readWorkspacePaneTabsForTarget({
+function target() {
+  return {
     repoRoot: REPO_ROOT,
     repoRuntimeId: REPO_RUNTIME_ID,
     branchName: BRANCH_NAME,
     worktreePath: WORKTREE_PATH,
-  })
+  }
+}
+
+function seedTabs(tabs: WorkspacePaneTabEntry[]): void {
+  setWorkspacePaneTabsForTargetQueryData({ ...target(), tabs })
+}
+
+function readTabs(): WorkspacePaneTabEntry[] {
+  return readWorkspacePaneTabsForTarget(target())
 }
 
 function workspacePaneTabsInteractionBlocked(): boolean {
-  return workspacePaneTabsInteractionBlockedForTarget({
-    repoRoot: REPO_ROOT,
-    branchName: BRANCH_NAME,
-    worktreePath: WORKTREE_PATH,
-  })
+  return workspacePaneTabsInteractionBlockedForTarget(target())
+}
+
+function snapshot(revision: number, tabs: WorkspacePaneTabEntry[]): WorkspacePaneTabsSnapshot {
+  return {
+    revision,
+    entries: [{ repoRoot: REPO_ROOT, branchName: BRANCH_NAME, worktreePath: WORKTREE_PATH, tabs }],
+  }
 }
 
 function seedWorkspacePaneTabsRepo(repoRuntimeId: string): void {

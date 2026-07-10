@@ -1,276 +1,149 @@
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
+import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
-import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
-import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
 
 const REPO_ID = '/tmp/gbl-terminal-create-command-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-terminal-create-command'
 const WORKTREE_PATH = '/tmp/gbl-terminal-create-command-worktree'
-
-beforeEach(() => {
-  resetReposStore()
-  seedRepoWithReadModelForTest({
-    id: REPO_ID,
-    name: 'terminal-create-command-repo',
-    repoRuntimeId: REPO_RUNTIME_ID,
-    branches: [createRepoBranch('main', { worktree: { path: WORKTREE_PATH } })],
-    currentBranchName: 'main',
-  })
-})
+const BASE: TerminalSessionBase = {
+  repoRoot: REPO_ID,
+  repoRuntimeId: REPO_RUNTIME_ID,
+  branch: 'main',
+  worktreePath: WORKTREE_PATH,
+}
 
 describe('terminal create command', () => {
-  test('shows the created terminal after the session is created', async () => {
-    const createTerminal = vi.fn(async () => createAdmission())
-    const showCreatedTerminalTab = vi.fn(() => true)
+  test('commits the leader admission after the server creates the session', async () => {
+    const admission = createAdmission()
+    const createTerminal = vi.fn(async () => admission)
+    const commitCreatedTerminalTab = vi.fn(() => ({ status: 'committed' as const }))
 
     await expect(
       runCreateTerminalTabCommand({
-        base: {
-          repoRoot: REPO_ID,
-          repoRuntimeId: REPO_RUNTIME_ID,
-          branch: 'main',
-          worktreePath: WORKTREE_PATH,
-        },
+        base: BASE,
         createTerminal,
-        openerIdentity: null,
-        showCreatedTerminalTab,
-      }),
-    ).resolves.toEqual({ ok: true, terminalSessionId: 'term-111111111111111111111' })
-
-    expect(createTerminal).toHaveBeenCalledTimes(1)
-    expect(showCreatedTerminalTab).toHaveBeenCalledWith('term-111111111111111111111')
-  })
-
-  test('passes runtime placement into the application operation and commits its canonical tabs', async () => {
-    const tabs = [{ type: 'terminal' as const, runtimeSessionId: 'term-111111111111111111111' }]
-    const createTerminal = vi.fn(async () => ({
-      terminalSessionId: 'term-111111111111111111111',
-      requestRole: 'leader' as const,
-      resourceDisposition: 'created' as const,
-      workspacePaneTabs: tabs,
-      runtimeProjectionApplied: true,
-    }))
-    const commitCreatedTerminalTab = vi.fn(() => ({
-      workspacePaneProjectionApplied: true,
-      navigationCommitted: true,
-    }))
-
-    await expect(
-      runCreateTerminalTabCommand({
-        base: {
-          repoRoot: REPO_ID,
-          repoRuntimeId: REPO_RUNTIME_ID,
-          branch: 'main',
-          worktreePath: WORKTREE_PATH,
-        },
-        createTerminal,
-        openerIdentity: 'workspace-pane:status',
-        insertAfterIdentity: 'workspace-pane:status',
         commitCreatedTerminalTab,
       }),
-    ).resolves.toEqual({ ok: true, terminalSessionId: 'term-111111111111111111111' })
+    ).resolves.toEqual({ ok: true, terminalSessionId: admission.terminalSessionId })
 
-    expect(createTerminal).toHaveBeenCalledWith(expect.objectContaining({ repoRoot: REPO_ID }), undefined, {
-      insertAfterIdentity: 'workspace-pane:status',
-    })
-    expect(commitCreatedTerminalTab).toHaveBeenCalledWith('term-111111111111111111111', tabs)
+    expect(createTerminal).toHaveBeenCalledOnce()
+    expect(commitCreatedTerminalTab).toHaveBeenCalledWith(admission)
   })
 
-  test('records opener before showing the created terminal route', async () => {
-    const createTerminal = vi.fn(async () => createAdmission())
-    const showCreatedTerminalTab = vi.fn((terminalSessionId: string) => {
-      expect(workspacePaneTabOpener(REPO_ID, 'main', `terminal:${terminalSessionId}`)).toBe(
-        'terminal:term-000000000000000000000',
-      )
-      return true
-    })
-
-    await expect(
-      runCreateTerminalTabCommand({
-        base: {
-          repoRoot: REPO_ID,
-          repoRuntimeId: REPO_RUNTIME_ID,
-          branch: 'main',
-          worktreePath: WORKTREE_PATH,
-        },
-        createTerminal,
-        openerIdentity: 'terminal:term-000000000000000000000',
-        showCreatedTerminalTab,
-      }),
-    ).resolves.toEqual({ ok: true, terminalSessionId: 'term-111111111111111111111' })
-
-    expect(showCreatedTerminalTab).toHaveBeenCalledWith('term-111111111111111111111')
-    expect(workspacePaneTabOpener(REPO_ID, 'main', 'terminal:term-111111111111111111111')).toBe(
-      'terminal:term-000000000000000000000',
-    )
-  })
-
-  test('does not repeat opener or navigation side effects for duplicate create joiners', async () => {
-    const createTerminal = vi.fn(async () => ({
-      terminalSessionId: 'term-111111111111111111111',
-      requestRole: 'observer' as const,
-      resourceDisposition: 'created' as const,
-      workspacePaneTabs: [],
-      runtimeProjectionApplied: true,
-    }))
-    const showCreatedTerminalTab = vi.fn(() => true)
-
-    await expect(
-      runCreateTerminalTabCommand({
-        base: {
-          repoRoot: REPO_ID,
-          repoRuntimeId: REPO_RUNTIME_ID,
-          branch: 'main',
-          worktreePath: WORKTREE_PATH,
-        },
-        createTerminal,
-        openerIdentity: 'terminal:term-000000000000000000000',
-        showCreatedTerminalTab,
-      }),
-    ).resolves.toEqual({ ok: true, terminalSessionId: 'term-111111111111111111111' })
-
-    expect(showCreatedTerminalTab).not.toHaveBeenCalled()
-    expect(workspacePaneTabOpener(REPO_ID, 'main', 'terminal:term-111111111111111111111')).toBeNull()
-  })
-
-  test('reports navigation failure without destroying the committed terminal session', async () => {
-    const createTerminal = vi.fn(async () => ({
-      terminalSessionId: 'term-111111111111111111111',
-      requestRole: 'leader' as const,
-      resourceDisposition: 'created' as const,
-      workspacePaneTabs: [],
-      runtimeProjectionApplied: true,
-    }))
-    const showCreatedTerminalTab = vi.fn(() => false)
-
-    await expect(
-      runCreateTerminalTabCommand({
-        base: {
-          repoRoot: REPO_ID,
-          repoRuntimeId: REPO_RUNTIME_ID,
-          branch: 'main',
-          worktreePath: WORKTREE_PATH,
-        },
-        createTerminal,
-        openerIdentity: 'terminal:term-000000000000000000000',
-        showCreatedTerminalTab,
-      }),
-    ).resolves.toMatchObject({ ok: false, messageKey: 'error.terminal-create-failed' })
-
-    expect(showCreatedTerminalTab).toHaveBeenCalledWith('term-111111111111111111111')
-    expect(workspacePaneTabOpener(REPO_ID, 'main', 'terminal:term-111111111111111111111')).toBe(
-      'terminal:term-000000000000000000000',
-    )
-  })
-
-  test('reports workspace commit failure without destroying the created terminal session', async () => {
-    const createTerminal = vi.fn(async () => ({
-      terminalSessionId: 'term-111111111111111111111',
-      requestRole: 'leader' as const,
-      resourceDisposition: 'created' as const,
-      workspacePaneTabs: [],
-      runtimeProjectionApplied: true,
-    }))
-    const commitCreatedTerminalTab = vi.fn(() => {
-      throw new Error('workspace tabs update failed')
-    })
-
-    await expect(
-      runCreateTerminalTabCommand({
-        base: {
-          repoRoot: REPO_ID,
-          repoRuntimeId: REPO_RUNTIME_ID,
-          branch: 'main',
-          worktreePath: WORKTREE_PATH,
-        },
-        createTerminal,
-        openerIdentity: 'terminal:term-000000000000000000000',
-        commitCreatedTerminalTab,
-      }),
-    ).resolves.toMatchObject({ ok: false, messageKey: 'error.terminal-create-failed' })
-
-    expect(commitCreatedTerminalTab).toHaveBeenCalledWith('term-111111111111111111111', [])
-    expect(workspacePaneTabOpener(REPO_ID, 'main', 'terminal:term-111111111111111111111')).toBe(
-      'terminal:term-000000000000000000000',
-    )
-  })
-
-  test.each(['reused', 'restored'] as const)(
-    'does not overwrite an existing opener when the server reports %s',
-    async (resourceDisposition) => {
-      const terminalSessionId = 'term-111111111111111111111'
-      const existingOpener = 'workspace-pane:status'
-      recordWorkspacePaneTabOpener(REPO_ID, 'main', `terminal:${terminalSessionId}`, existingOpener)
-      const createTerminal = vi.fn(async () => ({
-        terminalSessionId,
-        requestRole: 'leader' as const,
-        resourceDisposition,
-        workspacePaneTabs: [],
-        runtimeProjectionApplied: true,
-      }))
-
-      await expect(
-        runCreateTerminalTabCommand({
-          base: {
+  test('passes the captured insertion anchor to the server application operation', async () => {
+    const admission = createAdmission({
+      workspacePaneTabs: {
+        revision: 1,
+        entries: [
+          {
             repoRoot: REPO_ID,
-            repoRuntimeId: REPO_RUNTIME_ID,
-            branch: 'main',
+            branchName: 'main',
             worktreePath: WORKTREE_PATH,
+            tabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
           },
-          createTerminal,
-          openerIdentity: 'terminal:term-000000000000000000000',
-          showCreatedTerminalTab: () => true,
-        }),
-      ).resolves.toEqual({ ok: true, terminalSessionId })
+        ],
+      },
+    })
+    const createTerminal = vi.fn(async () => admission)
+    const commitCreatedTerminalTab = vi.fn(() => ({ status: 'committed' as const }))
 
-      expect(workspacePaneTabOpener(REPO_ID, 'main', `terminal:${terminalSessionId}`)).toBe(existingOpener)
-    },
-  )
+    await runCreateTerminalTabCommand({
+      base: BASE,
+      createTerminal,
+      insertAfterIdentity: 'workspace-pane:status',
+      commitCreatedTerminalTab,
+    })
 
-  test('reports provider create failure without finishing the terminal route', async () => {
+    expect(createTerminal).toHaveBeenCalledWith(BASE, undefined, { insertAfterIdentity: 'workspace-pane:status' })
+    expect(commitCreatedTerminalTab).toHaveBeenCalledWith(admission)
+  })
+
+  test('does not repeat presentation side effects for a duplicate create observer', async () => {
+    const admission = createAdmission({ requestRole: 'observer' })
+    const commitCreatedTerminalTab = vi.fn(() => ({ status: 'committed' as const }))
+
+    await expect(
+      runCreateTerminalTabCommand({
+        base: BASE,
+        createTerminal: vi.fn(async () => admission),
+        commitCreatedTerminalTab,
+      }),
+    ).resolves.toEqual({ ok: true, terminalSessionId: admission.terminalSessionId })
+
+    expect(commitCreatedTerminalTab).not.toHaveBeenCalled()
+  })
+
+  test('treats a superseded client presentation as a committed server operation', async () => {
+    const admission = createAdmission()
+
+    await expect(
+      runCreateTerminalTabCommand({
+        base: BASE,
+        createTerminal: vi.fn(async () => admission),
+        commitCreatedTerminalTab: vi.fn(() => ({ status: 'superseded' as const })),
+      }),
+    ).resolves.toEqual({ ok: true, terminalSessionId: admission.terminalSessionId })
+  })
+
+  test('reports exact-route rejection without destroying the committed server session', async () => {
+    await expect(
+      runCreateTerminalTabCommand({
+        base: BASE,
+        createTerminal: vi.fn(async () => createAdmission()),
+        commitCreatedTerminalTab: vi.fn(() => ({ status: 'navigation-rejected' as const })),
+      }),
+    ).resolves.toMatchObject({ ok: false, messageKey: 'error.terminal-create-failed' })
+  })
+
+  test('reports presentation exceptions without destroying the committed server session', async () => {
+    const commitCreatedTerminalTab = vi.fn(() => {
+      throw new Error('workspace presentation failed')
+    })
+
+    await expect(
+      runCreateTerminalTabCommand({
+        base: BASE,
+        createTerminal: vi.fn(async () => createAdmission()),
+        commitCreatedTerminalTab,
+      }),
+    ).resolves.toMatchObject({ ok: false, messageKey: 'error.terminal-create-failed' })
+
+    expect(commitCreatedTerminalTab).toHaveBeenCalledOnce()
+  })
+
+  test('reports provider create failure without running client presentation', async () => {
     const createTerminal = vi.fn(async () => {
       throw new Error('provider create failed')
     })
-    const showCreatedTerminalTab = vi.fn(() => true)
+    const commitCreatedTerminalTab = vi.fn(() => ({ status: 'committed' as const }))
 
     await expect(
       runCreateTerminalTabCommand({
-        base: {
-          repoRoot: REPO_ID,
-          repoRuntimeId: REPO_RUNTIME_ID,
-          branch: 'main',
-          worktreePath: WORKTREE_PATH,
-        },
+        base: BASE,
         createTerminal,
-        openerIdentity: null,
-        showCreatedTerminalTab,
+        commitCreatedTerminalTab,
       }),
     ).resolves.toMatchObject({ ok: false, messageKey: 'error.terminal-create-failed' })
 
-    expect(createTerminal).toHaveBeenCalledTimes(1)
-    expect(showCreatedTerminalTab).not.toHaveBeenCalled()
+    expect(createTerminal).toHaveBeenCalledOnce()
+    expect(commitCreatedTerminalTab).not.toHaveBeenCalled()
   })
 
-  test('fast-fails before create when the base has no repo runtime id at the trigger boundary', async () => {
+  test('fast-fails before server create when the trigger has no repo runtime id', async () => {
     const createTerminal = vi.fn(async () => createAdmission())
-    const showCreatedTerminalTab = vi.fn(() => true)
+    const commitCreatedTerminalTab = vi.fn(() => ({ status: 'committed' as const }))
 
     await expect(
       runCreateTerminalTabCommand({
-        base: {
-          repoRoot: REPO_ID,
-          branch: 'main',
-          worktreePath: WORKTREE_PATH,
-        },
+        base: { repoRoot: REPO_ID, branch: 'main', worktreePath: WORKTREE_PATH },
         createTerminal,
-        openerIdentity: null,
-        showCreatedTerminalTab,
+        commitCreatedTerminalTab,
       }),
     ).resolves.toMatchObject({ ok: false, messageKey: 'error.terminal-create-failed' })
 
     expect(createTerminal).not.toHaveBeenCalled()
-    expect(showCreatedTerminalTab).not.toHaveBeenCalled()
+    expect(commitCreatedTerminalTab).not.toHaveBeenCalled()
   })
 })
 
@@ -279,7 +152,7 @@ function createAdmission(overrides: Partial<TerminalCreateAdmissionResult> = {})
     terminalSessionId: 'term-111111111111111111111',
     requestRole: 'leader',
     resourceDisposition: 'created',
-    workspacePaneTabs: [],
+    workspacePaneTabs: { revision: 1, entries: [] },
     runtimeProjectionApplied: true,
     ...overrides,
   }

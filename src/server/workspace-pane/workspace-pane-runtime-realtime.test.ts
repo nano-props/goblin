@@ -26,6 +26,8 @@ describe('workspace pane runtime realtime', () => {
     }))
     const handlers = createWorkspacePaneRuntimeRealtimeHandlers({
       openRuntime,
+      closeRuntime: vi.fn(),
+      closeRuntimeWorktree: vi.fn(),
     } satisfies ServerWorkspacePaneRuntimeHost)
 
     await expect(handlers[WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open]('client_a', 'user_a', input)).resolves.toEqual({
@@ -46,6 +48,8 @@ describe('workspace pane runtime realtime', () => {
         [WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open]: async () => {
           throw new Error('runtime open failed')
         },
+        [WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close]: vi.fn(),
+        [WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.closeWorktree]: vi.fn(),
       },
       'client_a',
       'user_a',

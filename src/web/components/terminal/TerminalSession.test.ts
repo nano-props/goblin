@@ -544,7 +544,6 @@ beforeEach(() => {
         takeover: terminalCalls.takeover.mockResolvedValue(takeoverResult('pty_session_1_aaaaaaaaa')),
         close: terminalCalls.close.mockResolvedValue(true),
         notifyBell: terminalCalls.notifyBell.mockResolvedValue(true),
-        create: vi.fn(),
         pruneTerminals: vi.fn(),
         onOutput: vi.fn(),
         onBell: vi.fn(),
@@ -593,23 +592,6 @@ beforeEach(() => {
       resize: terminalCalls.resize.mockResolvedValue(true),
       takeover: terminalCalls.takeover.mockResolvedValue(takeoverResult('pty_session_1_aaaaaaaaa')),
       close: terminalCalls.close.mockResolvedValue(true),
-      create: vi.fn(async (input?: { kind?: string }) =>
-        input?.kind === 'primary'
-          ? {
-              action: 'reused' as const,
-              terminalSessionId: 'term-111111111111111111111',
-              sessions: [],
-              ...createFirstFrame('term-111111111111111111111'),
-              ok: true as const,
-            }
-          : {
-              action: 'created' as const,
-              terminalSessionId: 'term-222222222222222222222',
-              sessions: [],
-              ...createFirstFrame('term-222222222222222222222'),
-              ok: true as const,
-            },
-      ),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: vi.fn(async () => []),
       recoverSessions: vi.fn(async () => ({ sessions: [], snapshots: [] })),
@@ -626,13 +608,19 @@ beforeEach(() => {
       onSessionClosed: vi.fn(() => () => {}),
     }),
     workspacePaneTabs: () => ({
-      replace: vi.fn(async (input) => input.tabs),
-      update: vi.fn(async () => []),
-      list: vi.fn(async () => []),
+      replace: vi.fn(async () => ({ revision: 0, entries: [] })),
+      update: vi.fn(async () => ({ revision: 0, entries: [] })),
+      list: vi.fn(async () => ({ revision: 0, entries: [] })),
       onChanged: vi.fn(() => () => {}),
     }),
     workspacePaneRuntime: () => ({
       open: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
+      close: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
+      closeWorktree: vi.fn(async () => ({
+        ok: false as const,
+        runtimeType: 'terminal' as const,
+        message: 'unavailable',
+      })),
     }),
   })
 })

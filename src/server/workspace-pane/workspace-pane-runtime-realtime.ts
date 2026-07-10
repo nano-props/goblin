@@ -34,6 +34,12 @@ export function createWorkspacePaneRuntimeRealtimeHandlers(host: ServerWorkspace
     [WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open](clientId, userId, input) {
       return host.openRuntime(clientId, userId, bindRuntimeProviderClientId(input, clientId))
     },
+    [WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close](clientId, userId, input) {
+      return host.closeRuntime(clientId, userId, input)
+    },
+    [WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.closeWorktree](clientId, userId, input) {
+      return host.closeRuntimeWorktree(clientId, userId, input)
+    },
   }
 }
 
@@ -63,14 +69,19 @@ export async function handleWorkspacePaneRuntimeRealtimeRequestMessage(
 ): Promise<void> {
   let response: AppRealtimeResponseMessage
   try {
-    const payload = await handlers[message.action](clientId, userId, message.input)
+    const handler = handlers[message.action] as (
+      clientId: string,
+      userId: string,
+      input: WorkspacePaneRuntimeSocketRequestInputs[typeof message.action],
+    ) => MaybePromise<WorkspacePaneRuntimeSocketResponseOutputs[typeof message.action]>
+    const payload = await handler(clientId, userId, message.input)
     response = {
       type: 'response',
       requestId: message.requestId,
       ok: true,
       action: message.action,
       payload,
-    }
+    } as AppRealtimeResponseMessage
   } catch (error) {
     response = {
       type: 'response',
@@ -78,7 +89,7 @@ export async function handleWorkspacePaneRuntimeRealtimeRequestMessage(
       ok: false,
       action: message.action,
       error: error instanceof Error ? error.message : String(error),
-    }
+    } as AppRealtimeResponseMessage
   }
   try {
     socket.send(JSON.stringify(response))

@@ -1,8 +1,8 @@
 import type {
   TerminalAttachInput,
   TerminalAttachResult,
-  TerminalCreateResult,
   TerminalCreateInput,
+  TerminalCreateResult,
   TerminalListSessionsInput,
   TerminalPruneInput,
   TerminalMutationResult,
@@ -94,7 +94,6 @@ export interface ServerTerminalActionHost {
     userId: string,
     input: TerminalListSessionsInput,
   ): MaybePromise<TerminalSessionsRecoveryResult>
-  create(clientId: string, userId: string, input: TerminalCreateInput): MaybePromise<TerminalCreateResult>
   prune(
     clientId: string,
     userId: string,
@@ -102,4 +101,11 @@ export interface ServerTerminalActionHost {
   ): MaybePromise<{ pruned: number; remaining: number }>
 }
 
-export interface ServerTerminalHost extends ServerAppRealtimeHost, ServerTerminalActionHost {}
+/**
+ * Internal terminal runtime surface. `create` intentionally does not belong
+ * to `ServerTerminalActionHost`, so it cannot be registered as a client
+ * realtime action; workspace-pane application commands call it in-process.
+ */
+export interface ServerTerminalHost extends ServerAppRealtimeHost, ServerTerminalActionHost {
+  create(clientId: string, userId: string, input: TerminalCreateInput): MaybePromise<TerminalCreateResult>
+}

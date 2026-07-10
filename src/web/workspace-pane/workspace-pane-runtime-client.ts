@@ -9,4 +9,10 @@ export const workspacePaneRuntimeClient: ClientWorkspacePaneRuntime = {
   open(input) {
     return getWorkspacePaneRuntimeClient().open(input)
   },
+  close(input) {
+    return getWorkspacePaneRuntimeClient().close(input)
+  },
+  closeWorktree(input) {
+    return getWorkspacePaneRuntimeClient().closeWorktree(input)
+  },
 }

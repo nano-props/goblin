@@ -190,54 +190,6 @@ describe('terminal web host client', () => {
     dispose()
   })
 
-  test('includes the current attachment id when creating a terminal in web host mode', async () => {
-    const fetchMock = mockFetch()
-    const { terminalClient } = await import('#/web/terminal.ts')
-    const dispose = terminalClient.onOutput(() => {})
-    const socket = wsMock.instances[0]
-
-    const createPromise = terminalClient.create({
-      repoRoot: '/tmp/repo',
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branch: 'feature',
-      worktreePath: '/tmp/repo',
-      kind: 'primary',
-    })
-    socket?.emitOpen()
-    await Promise.resolve()
-    const request = socket?.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'create')
-    expect(request).toMatchObject({
-      type: 'request',
-      action: 'create',
-      input: {
-        repoRoot: '/tmp/repo',
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branch: 'feature',
-        worktreePath: '/tmp/repo',
-        kind: 'primary',
-      },
-    })
-    socket?.emitMessage(
-      JSON.stringify({
-        type: 'response',
-        requestId: request?.requestId,
-        ok: true,
-        action: 'create',
-        payload: {
-          ...terminalCreatePayload('term-111111111111111111111'),
-        },
-      }),
-    )
-
-    await expect(createPromise).resolves.toMatchObject({
-      ok: true,
-      action: 'created',
-    })
-    expect(fetchMock).not.toHaveBeenCalled()
-    expect(socket?.url).toMatch(/^ws:\/\//)
-    dispose()
-  })
-
   test('loads terminal session lists through websocket request-response and validates payloads', async () => {
     const fetchMock = mockFetch()
     const { terminalClient } = await import('#/web/terminal.ts')
@@ -298,11 +250,11 @@ describe('terminal web host client', () => {
         requestId: request?.requestId,
         ok: true,
         action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
-        payload: [],
+        payload: { revision: 0, entries: [] },
       }),
     )
 
-    await expect(listPromise).resolves.toEqual([])
+    await expect(listPromise).resolves.toEqual({ revision: 0, entries: [] })
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
@@ -366,72 +318,6 @@ describe('terminal web host client', () => {
 
     await expect(listPromise).resolves.toEqual([])
     expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  test('does not fall back to http when create websocket cannot open', async () => {
-    const fetchMock = mockFetch()
-    const { terminalClient } = await import('#/web/terminal.ts')
-    const dispose = terminalClient.onOutput(() => {})
-    const socket = wsMock.instances[0]
-    const createPromise = terminalClient.create({
-      repoRoot: '/tmp/repo',
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branch: 'feature',
-      worktreePath: '/tmp/repo',
-      kind: 'primary',
-    })
-
-    socket?.close()
-
-    await expect(createPromise).rejects.toThrow('App realtime socket closed before open')
-    expect(fetchMock).not.toHaveBeenCalled()
-    dispose()
-  })
-
-  test('rejects create when websocket errors before opening', async () => {
-    const fetchMock = mockFetch()
-    const { terminalClient } = await import('#/web/terminal.ts')
-    const createPromise = terminalClient.create({
-      repoRoot: '/tmp/repo',
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branch: 'feature',
-      worktreePath: '/tmp/repo',
-      kind: 'primary',
-    })
-    const socket = wsMock.instances[0]
-    if (!socket) throw new Error('missing web terminal socket')
-    const expectation = expect(createPromise).rejects.toThrow('App realtime socket error before open')
-
-    socket.emitError()
-
-    await expectation
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
-  test('times out create when websocket stays connecting', async () => {
-    vi.useFakeTimers()
-    try {
-      const fetchMock = mockFetch()
-      const { terminalClient } = await import('#/web/terminal.ts')
-      const createPromise = terminalClient.create({
-        repoRoot: '/tmp/repo',
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branch: 'feature',
-        worktreePath: '/tmp/repo',
-        kind: 'primary',
-      })
-      const socket = wsMock.instances[0]
-      if (!socket) throw new Error('missing web terminal socket')
-      const expectation = expect(createPromise).rejects.toThrow('App realtime socket open timed out')
-
-      await vi.advanceTimersByTimeAsync(10_000)
-
-      await expectation
-      expect(fetchMock).not.toHaveBeenCalled()
-      expect(socket.readyState).toBe(wsMock.CLOSED)
-    } finally {
-      vi.useRealTimers()
-    }
   })
 
   test('times out session list loading when websocket stays connecting', async () => {
@@ -648,67 +534,6 @@ describe('terminal web host client', () => {
     }
   })
 
-  test('does not fall back to http when create/list/prune websocket payloads resolve successfully', async () => {
-    const fetchMock = mockFetch()
-    const { terminalClient } = await import('#/web/terminal.ts')
-    const dispose = terminalClient.onOutput(() => {})
-    const socket = wsMock.instances[0]
-    const createPromise = terminalClient.create({
-      repoRoot: '/tmp/repo',
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branch: 'feature',
-      worktreePath: '/tmp/repo',
-      kind: 'primary',
-    })
-    socket?.emitOpen()
-    await Promise.resolve()
-    const createRequest = socket?.sent
-      .map((payload) => JSON.parse(payload))
-      .find((message) => message.action === 'create')
-    socket?.emitMessage(
-      JSON.stringify({
-        type: 'response',
-        requestId: createRequest?.requestId,
-        ok: true,
-        action: 'create',
-        payload: terminalCreatePayload('term-111111111111111111111'),
-      }),
-    )
-    await expect(createPromise).resolves.toMatchObject({ ok: true, terminalSessionId: 'term-111111111111111111111' })
-    expect(fetchMock).not.toHaveBeenCalled()
-    dispose()
-  })
-
-  test('rejects invalid create websocket payloads at the client boundary', async () => {
-    const { terminalClient } = await import('#/web/terminal.ts')
-    const dispose = terminalClient.onOutput(() => {})
-    const socket = wsMock.instances[0]
-    const createPromise = terminalClient.create({
-      repoRoot: '/tmp/repo',
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branch: 'feature',
-      worktreePath: '/tmp/repo',
-      kind: 'primary',
-    })
-    socket?.emitOpen()
-    await Promise.resolve()
-    const createRequest = socket?.sent
-      .map((payload) => JSON.parse(payload))
-      .find((message) => message.action === 'create')
-    socket?.emitMessage(
-      JSON.stringify({
-        type: 'response',
-        requestId: createRequest?.requestId,
-        ok: true,
-        action: 'create',
-        payload: { ok: true, action: 'created', terminalSessionId: 'term-111111111111111111111', sessions: [] },
-      }),
-    )
-
-    await expect(createPromise).rejects.toThrow('Invalid terminal socket response payload')
-    dispose()
-  })
-
   test('forwards terminal output, bell, title, and exit events from the web socket', async () => {
     const { terminalClient } = await import('#/web/terminal.ts')
     const { workspacePaneTabsClient } = await import('#/web/workspace-pane/workspace-pane-tabs-client.ts')
@@ -836,7 +661,10 @@ describe('terminal web host client', () => {
       worktreePath: '/tmp/repo-worktree',
       canonicalTitle: '~/Developer/goblin — npm run dev',
     })
-    expect(onExit).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_1', terminalSessionId: 'term-111111111111111111111' })
+    expect(onExit).toHaveBeenCalledWith({
+      terminalRuntimeSessionId: 'pty_1',
+      terminalSessionId: 'term-111111111111111111111',
+    })
     expect(onIdentity).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
       terminalSessionId: 'term-111111111111111111111',
@@ -1006,41 +834,6 @@ describe('terminal web host client', () => {
     disposeMessage()
   })
 
-  test('keeps a connecting terminal socket open when a one-shot request arrives after subscribers drop', async () => {
-    const { terminalClient } = await import('#/web/terminal.ts')
-    const dispose = terminalClient.onOutput(() => {})
-    expect(wsMock.instances).toHaveLength(1)
-    const socket = wsMock.instances[0]
-    if (!socket) throw new Error('missing web terminal socket')
-
-    dispose()
-    const createPromise = terminalClient.create({
-      repoRoot: '/tmp/repo',
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branch: 'feature',
-      worktreePath: '/tmp/repo',
-      kind: 'primary',
-    })
-    socket.emitOpen()
-    await Promise.resolve()
-
-    expect(socket.readyState).toBe(wsMock.OPEN)
-    const request = socket.sent.map((payload) => JSON.parse(payload)).find((message) => message.action === 'create')
-    expect(request).toMatchObject({ type: 'request', action: 'create' })
-    socket.emitMessage(
-      JSON.stringify({
-        type: 'response',
-        requestId: request?.requestId,
-        ok: true,
-        action: 'create',
-        payload: terminalCreatePayload('term-111111111111111111111'),
-      }),
-    )
-
-    await expect(createPromise).resolves.toMatchObject({ ok: true, terminalSessionId: 'term-111111111111111111111' })
-    expect(socket.readyState).toBe(wsMock.CLOSED)
-  })
-
   test('ignores stale terminal socket events after reconnect creates a newer socket', async () => {
     vi.useFakeTimers()
     const { terminalClient } = await import('#/web/terminal.ts')
@@ -1134,23 +927,3 @@ describe('terminal web host client', () => {
     resetClientLocalEventsForTests()
   })
 })
-
-function terminalCreatePayload(terminalSessionId: string) {
-  return {
-    ok: true,
-    action: 'created',
-    terminalSessionId,
-    sessions: [],
-    terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-    processName: 'zsh',
-    canonicalTitle: null,
-    phase: 'open',
-    message: null,
-    snapshot: '',
-    snapshotSeq: 0,
-    outputEra: 0,
-    controller: { clientId: 'client_a', status: 'connected' },
-    canonicalCols: 120,
-    canonicalRows: 40,
-  }
-}

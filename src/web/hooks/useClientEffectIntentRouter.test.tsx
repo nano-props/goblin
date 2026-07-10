@@ -141,7 +141,6 @@ beforeEach(() => {
         resize: vi.fn(),
         takeover: vi.fn(),
         close: vi.fn(),
-        create: vi.fn(),
         pruneTerminals: vi.fn(),
         notifyBell: vi.fn(),
         sendTestNotification: vi.fn(),

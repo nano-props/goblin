@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from '@testing-library/react'
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { stubI18n } from '#/test-utils/i18n-mock.ts'
@@ -14,6 +14,7 @@ import {
 } from '#/web/primary-window-navigation.tsx'
 import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
+import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 
 stubI18n()
 
@@ -50,7 +51,18 @@ vi.mock('#/web/commands/terminal-create-command.ts', () => ({
   runCreateTerminalTabCommand: terminalCreateCommandMocks.runCreateTerminalTabCommand,
 }))
 
+beforeEach(() => {
+  resetReposStore()
+  seedRepoWithReadModelForTest({
+    id: '/repo',
+    repoRuntimeId: 'repo-runtime-1',
+    branches: [createRepoBranch('main', { worktree: { path: '/repo-worktree' } })],
+    currentBranchName: 'main',
+  })
+})
+
 afterEach(() => {
+  resetReposStore()
   terminalSessionViewMocks.props.length = 0
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockClear()
 })
@@ -96,14 +108,30 @@ describe('workspace pane runtime tab panel', () => {
       expect.objectContaining({
         base,
         createTerminal: terminalContext.createTerminalWithAdmission,
-        openerIdentity: null,
+        commitCreatedTerminalTab: expect.any(Function),
         logMessage: 'workspace pane terminal create failed',
       }),
     )
     const commandCalls = terminalCreateCommandMocks.runCreateTerminalTabCommand.mock.calls as unknown as Array<
-      [{ showCreatedTerminalTab: (terminalSessionId: string) => boolean | Promise<boolean> }]
+      [
+        {
+          commitCreatedTerminalTab: (admission: {
+            terminalSessionId: string
+            requestRole: 'leader'
+            resourceDisposition: 'created'
+            workspacePaneTabs: { revision: number; entries: [] }
+            runtimeProjectionApplied: boolean
+          }) => Promise<unknown>
+        },
+      ]
     >
-    await commandCalls[0]?.[0].showCreatedTerminalTab('term-111111111111111111111')
+    await commandCalls[0]?.[0].commitCreatedTerminalTab({
+      terminalSessionId: 'term-111111111111111111111',
+      requestRole: 'leader',
+      resourceDisposition: 'created',
+      workspacePaneTabs: { revision: 1, entries: [] },
+      runtimeProjectionApplied: true,
+    })
     expect(navigation.showRepoBranchTerminalSession).toHaveBeenCalledWith('/repo', 'main', 'term-111111111111111111111')
   })
 })

@@ -547,7 +547,6 @@ beforeEach(() => {
         close: closeMock,
         notifyBell: vi.fn(async () => true),
         setBadge: vi.fn(async () => {}),
-        create: createTerminalMock,
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
         listSessions: async (input: { repoRoot: string }) => completeServerSessions(await listSessionsMock(input)),
         recoverSessions: async (input: { repoRoot: string }) => ({
@@ -589,7 +588,10 @@ beforeEach(() => {
       workspacePaneTabs: {
         replace: vi.fn(async (input: { tabs: unknown[] }) => input.tabs),
         update: vi.fn(async () => []),
-        list: async (input: { repoRoot: string }) => await listWorkspaceTabsMock(input),
+        list: async (input: { repoRoot: string }) => ({
+          revision: 1,
+          entries: await listWorkspaceTabsMock(input),
+        }),
         onChanged: vi.fn((cb: (repoRoot: string) => void) => {
           workspaceTabsChangedHandler = cb
           return () => {
@@ -655,7 +657,6 @@ beforeEach(() => {
         phase: 'open' as const,
       })),
       close: closeMock,
-      create: createTerminalMock,
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: async (input) => completeServerSessions(await listSessionsMock(input)),
       recoverSessions: async (input) => ({
@@ -712,9 +713,9 @@ beforeEach(() => {
       ),
     }),
     workspacePaneTabs: () => ({
-      replace: vi.fn(async (input) => input.tabs),
-      update: vi.fn(async () => []),
-      list: async (input) => await listWorkspaceTabsMock(input),
+      replace: vi.fn(async () => ({ revision: 1, entries: [] })),
+      update: vi.fn(async () => ({ revision: 1, entries: [] })),
+      list: async (input) => ({ revision: 1, entries: await listWorkspaceTabsMock(input) }),
       onChanged: vi.fn((cb: (repoRoot: string) => void) => {
         workspaceTabsChangedHandler = cb
         return () => {
@@ -737,8 +738,29 @@ beforeEach(() => {
           runtime.terminalSessionId,
           { insertAfterIdentity: input.insertAfterIdentity },
         )
-        return { ok: true as const, runtimeType: 'terminal' as const, runtime, tabs }
+        return {
+          ok: true as const,
+          runtimeType: 'terminal' as const,
+          runtime,
+          workspacePaneTabs: {
+            revision: 1,
+            entries: [
+              {
+                repoRoot: input.request.repoRoot,
+                branchName: input.request.branch,
+                worktreePath: input.request.worktreePath,
+                tabs,
+              },
+            ],
+          },
+        }
       }),
+      close: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
+      closeWorktree: vi.fn(async () => ({
+        ok: false as const,
+        runtimeType: 'terminal' as const,
+        message: 'unavailable',
+      })),
     }),
   })
 })

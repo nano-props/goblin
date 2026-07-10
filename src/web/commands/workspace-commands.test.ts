@@ -40,6 +40,7 @@ import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-proje
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { TerminalCreateOptions, TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
 import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
@@ -1014,7 +1015,7 @@ describe('workspace commands', () => {
         terminalSessionId,
         requestRole: 'leader' as const,
         resourceDisposition: 'created' as const,
-        workspacePaneTabs: [staticEntry('status'), terminalEntry(terminalSessionId)],
+        workspacePaneTabs: workspacePaneTabsSnapshot(base, [staticEntry('status'), terminalEntry(terminalSessionId)]),
         runtimeProjectionApplied: true,
       }
     })
@@ -1052,7 +1053,10 @@ describe('workspace commands', () => {
           terminalSessionId,
           requestRole: 'leader' as const,
           resourceDisposition: 'created' as const,
-          workspacePaneTabs: [staticEntry('status'), terminalEntry(terminalSessionId)],
+          workspacePaneTabs: workspacePaneTabsSnapshot(createBase, [
+            staticEntry('status'),
+            terminalEntry(terminalSessionId),
+          ]),
           runtimeProjectionApplied: true,
         }
       },
@@ -2854,17 +2858,21 @@ function createSingleFlightTerminalWithProjection(resolveSessionId: () => string
     })
     return pending
   })
-  const createTerminalWithAdmission = vi.fn(async (base: TerminalSessionBase) => {
-    const requestRole = pending ? ('observer' as const) : ('leader' as const)
-    const terminalSessionId = await createTerminal(base)
-    return {
-      terminalSessionId,
-      requestRole,
-      resourceDisposition: 'created' as const,
-      workspacePaneTabs: [staticEntry('status'), terminalEntry(terminalSessionId)],
-      runtimeProjectionApplied: true,
-    }
-  })
+  const createTerminalWithAdmission = vi.fn(
+    async (base: TerminalSessionBase): Promise<TerminalCreateAdmissionResult> => {
+      const requestRole = pending ? ('observer' as const) : ('leader' as const)
+      const terminalSessionId = await createTerminal(base)
+      const admission = {
+        terminalSessionId,
+        resourceDisposition: 'created' as const,
+        workspacePaneTabs: workspacePaneTabsSnapshot(base, [staticEntry('status'), terminalEntry(terminalSessionId)]),
+        runtimeProjectionApplied: true,
+      }
+      return requestRole === 'leader'
+        ? { ...admission, requestRole: 'leader' }
+        : { ...admission, requestRole: 'observer' }
+    },
+  )
   return {
     createTerminal,
     createTerminalWithAdmission,
@@ -2885,6 +2893,20 @@ function staticEntry(type: WorkspacePaneStaticTabType) {
 
 function terminalEntry(id: string) {
   return workspacePaneRuntimeTabEntry('terminal', id)
+}
+
+function workspacePaneTabsSnapshot(base: TerminalSessionBase, tabs: WorkspacePaneTabEntry[]) {
+  return {
+    revision: 1,
+    entries: [
+      {
+        repoRoot: base.repoRoot,
+        branchName: base.branch,
+        worktreePath: base.worktreePath,
+        tabs,
+      },
+    ],
+  }
 }
 
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {}): PrimaryWindowNavigationActions {

@@ -6,6 +6,9 @@ import type { TerminalCreateResult } from '#/shared/terminal-types.ts'
 const mocks = vi.hoisted(() => ({
   createMock: vi.fn(),
   openRuntimeMock: vi.fn(),
+  closeRuntimeMock: vi.fn(),
+  closeRuntimeWorktreeMock: vi.fn(),
+  writeWorkspaceTabsSnapshotMock: vi.fn(),
   closeMock: vi.fn(),
   listWorkspaceTabsMock: vi.fn(),
   setBadgeMock: vi.fn(),
@@ -24,7 +27,6 @@ const REPO_RUNTIME_ID = 'repo-runtime-test'
 
 vi.mock('#/web/terminal.ts', () => ({
   terminalClient: {
-    create: mocks.createMock,
     close: mocks.closeMock,
     listWorkspaceTabs: mocks.listWorkspaceTabsMock,
     setBadge: mocks.setBadgeMock,
@@ -34,7 +36,13 @@ vi.mock('#/web/terminal.ts', () => ({
 vi.mock('#/web/workspace-pane/workspace-pane-runtime-client.ts', () => ({
   workspacePaneRuntimeClient: {
     open: mocks.openRuntimeMock,
+    close: mocks.closeRuntimeMock,
+    closeWorktree: mocks.closeRuntimeWorktreeMock,
   },
+}))
+
+vi.mock('#/web/workspace-pane/workspace-pane-tabs-commit.ts', () => ({
+  writeCanonicalWorkspacePaneTabsSnapshot: mocks.writeWorkspaceTabsSnapshotMock,
 }))
 
 vi.mock('#/web/client-terminal-id.ts', () => ({
@@ -240,12 +248,36 @@ describe('TerminalSessionProjection create flow', () => {
             ok: true as const,
             runtimeType: 'terminal' as const,
             runtime,
-            tabs: [{ type: 'terminal' as const, runtimeSessionId: runtime.terminalSessionId }],
+            workspacePaneTabs: {
+              revision: 1,
+              entries: [
+                {
+                  repoRoot: REPO_ROOT,
+                  branchName: BRANCH,
+                  worktreePath: WORKTREE_PATH,
+                  tabs: [{ type: 'terminal' as const, runtimeSessionId: runtime.terminalSessionId }],
+                },
+              ],
+            },
           }
         : { ok: false as const, runtimeType: 'terminal' as const, message: runtime.message }
     })
     mocks.closeMock.mockReset()
     mocks.closeMock.mockResolvedValue(true)
+    mocks.closeRuntimeMock.mockReset()
+    mocks.closeRuntimeMock.mockResolvedValue({
+      ok: true,
+      runtimeType: 'terminal',
+      workspacePaneTabs: { revision: 2, entries: [] },
+    })
+    mocks.closeRuntimeWorktreeMock.mockReset()
+    mocks.closeRuntimeWorktreeMock.mockResolvedValue({
+      ok: true,
+      runtimeType: 'terminal',
+      workspacePaneTabs: { revision: 2, entries: [] },
+    })
+    mocks.writeWorkspaceTabsSnapshotMock.mockReset()
+    mocks.writeWorkspaceTabsSnapshotMock.mockResolvedValue(true)
     mocks.listWorkspaceTabsMock.mockReset()
     mocks.listWorkspaceTabsMock.mockResolvedValue([])
     mocks.setBadgeMock.mockReset()
@@ -480,14 +512,34 @@ describe('TerminalSessionProjection create flow', () => {
       terminalSessionId: 'term-111111111111111111111',
       requestRole: 'leader',
       resourceDisposition: 'created',
-      workspacePaneTabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
+      workspacePaneTabs: {
+        revision: 1,
+        entries: [
+          {
+            repoRoot: REPO_ROOT,
+            branchName: BRANCH,
+            worktreePath: WORKTREE_PATH,
+            tabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
+          },
+        ],
+      },
       runtimeProjectionApplied: true,
     })
     await expect(secondCreate).resolves.toEqual({
       terminalSessionId: 'term-111111111111111111111',
       requestRole: 'observer',
       resourceDisposition: 'created',
-      workspacePaneTabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
+      workspacePaneTabs: {
+        revision: 1,
+        entries: [
+          {
+            repoRoot: REPO_ROOT,
+            branchName: BRANCH,
+            worktreePath: WORKTREE_PATH,
+            tabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
+          },
+        ],
+      },
       runtimeProjectionApplied: true,
     })
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
@@ -503,10 +555,20 @@ describe('TerminalSessionProjection create flow', () => {
         terminalSessionId: 'term-111111111111111111111',
         requestRole: 'leader',
         resourceDisposition,
-        workspacePaneTabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
+        workspacePaneTabs: {
+          revision: 1,
+          entries: [
+            {
+              repoRoot: REPO_ROOT,
+              branchName: BRANCH,
+              worktreePath: WORKTREE_PATH,
+              tabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
+            },
+          ],
+        },
         runtimeProjectionApplied: true,
       })
-      expect(projection.isKnownSession('term-111111111111111111111')).toBe(true)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
     },
   )
 
@@ -692,25 +754,34 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.closeMock).not.toHaveBeenCalled()
   })
 
-  test('closeTerminalsForWorktree waits for an in-flight create before closing it', async () => {
+  test('closeTerminalsForWorktree cancels in-flight presentation while the server queues close after open', async () => {
     const { promise, resolve } = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
     mocks.createMock.mockReturnValueOnce(promise)
+    mocks.closeRuntimeWorktreeMock.mockImplementationOnce(async () => {
+      await promise
+      return {
+        ok: true as const,
+        runtimeType: 'terminal' as const,
+        workspacePaneTabs: { revision: 2, entries: [] },
+      }
+    })
     const pending = projection.createTerminal(terminalBase())
 
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
 
+    const pendingExpectation = expect(pending).rejects.toThrow('terminal create request canceled')
     const closePromise = projection.closeTerminalsForWorktree(terminalBase())
+    await pendingExpectation
     resolve(makeCreateResult())
 
-    await expect(pending).resolves.toBe('term-111111111111111111111')
     await expect(closePromise).resolves.toBe(true)
     expect((projection as any).lifecycleQueues.hasCreate(WORKTREE_KEY)).toBe(false)
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
   })
 
-  test('closeTerminalsForWorktree cancels queued distinct creates behind an in-flight create', async () => {
+  test('closeTerminalsForWorktree cancels active and queued client create presentation intents', async () => {
     const first = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
     const secondResult = makeCreateResult({
       terminalSessionId: 'term-222222222222222222222',
@@ -718,6 +789,14 @@ describe('TerminalSessionProjection create flow', () => {
     })
     mocks.createMock.mockReset()
     mocks.createMock.mockReturnValueOnce(first.promise).mockResolvedValueOnce(secondResult)
+    mocks.closeRuntimeWorktreeMock.mockImplementationOnce(async () => {
+      await first.promise
+      return {
+        ok: true as const,
+        runtimeType: 'terminal' as const,
+        workspacePaneTabs: { revision: 2, entries: [] },
+      }
+    })
 
     const firstCreate = projection.createTerminal(terminalBase(), { startupShellCommand: "bat '/repo/a.ts'\r" })
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
@@ -727,13 +806,14 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
 
+    const firstExpectation = expect(firstCreate).rejects.toThrow('terminal create request canceled')
     const secondExpectation = expect(secondCreate).rejects.toThrow('terminal create request canceled')
     const closePromise = projection.closeTerminalsForWorktree(terminalBase())
+    await firstExpectation
     await secondExpectation
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
 
     first.resolve(makeCreateResult())
-    await expect(firstCreate).resolves.toBe('term-111111111111111111111')
     await expect(closePromise).resolves.toBe(true)
     await Promise.resolve()
 

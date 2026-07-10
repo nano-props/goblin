@@ -156,7 +156,7 @@ describe('workspace pane runtime tab command actions', () => {
       terminalSessionId: 'created-session',
       requestRole: 'observer' as const,
       resourceDisposition: 'created' as const,
-      workspacePaneTabs: [],
+      workspacePaneTabs: { revision: 1, entries: [] },
       runtimeProjectionApplied: true,
     }))
     const showTerminalSession = vi.fn(() => true)

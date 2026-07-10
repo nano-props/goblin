@@ -1,5 +1,4 @@
 import {
-  normalizeTerminalCreateResult,
   normalizeTerminalSessionsRecoveryResult,
   normalizeTerminalSessionSummaryList,
 } from '#/shared/terminal-validators.ts'
@@ -7,7 +6,6 @@ import { resolveTerminalController } from '#/shared/terminal-controller.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import type {
   TerminalBellRealtimeEvent,
-  TerminalCreateInput,
   TerminalExitEvent,
   TerminalNotifyBellInput,
   TerminalOutputEvent,
@@ -62,13 +60,6 @@ export function createServerTerminalClient(options: {
     },
     close(input) {
       return options.realtime.request('close', input)
-    },
-    create(input) {
-      return options.realtime.request('create', input satisfies TerminalCreateInput).then((value) => {
-        const result = normalizeTerminalCreateResult(value)
-        if (!result) throw new Error('Terminal socket response failed: invalid terminal create response')
-        return result
-      })
     },
     pruneTerminals(repoRoot, repoRuntimeId) {
       return options.realtime.request('prune', { repoRoot, repoRuntimeId })

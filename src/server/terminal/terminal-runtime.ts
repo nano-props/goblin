@@ -164,6 +164,12 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     async openRuntime(clientId, userId, input) {
       return await workspacePaneRuntimeApplication.open(clientId, userId, input)
     },
+    async closeRuntime(clientId, userId, input) {
+      return await workspacePaneRuntimeApplication.close(clientId, userId, input)
+    },
+    async closeRuntimeWorktree(clientId, userId, input) {
+      return await workspacePaneRuntimeApplication.closeWorktree(clientId, userId, input)
+    },
   }
   const workspacePaneTabsActions = createWorkspacePaneTabsActions({
     sessionService,
@@ -211,9 +217,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     async recoverSessions(clientId, userId, input) {
       return await actions.recoverSessions(clientId, userId, input)
     },
-    async create(clientId, userId, input) {
-      return await actions.create(clientId, userId, input)
-    },
     async prune(clientId, userId, input) {
       return await actions.prune(clientId, userId, input)
     },
@@ -256,6 +259,9 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   const host: ServerTerminalHost = {
     ...appRealtimeHost,
     ...terminalActionHost,
+    async create(clientId, userId, input) {
+      return await actions.create(clientId, userId, input)
+    },
     shutdown() {
       appRealtimeHost.shutdown()
     },

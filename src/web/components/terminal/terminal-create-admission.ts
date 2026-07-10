@@ -1,5 +1,5 @@
 import type { TerminalCreateAction } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 
 /**
  * Client admission result for a server-committed terminal runtime open.
@@ -9,12 +9,19 @@ import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
  * local terminal hydration without acquiring rollback ownership over the
  * committed server resource.
  */
-interface TerminalCreateAdmissionBase {
+export interface TerminalCreateAdmissionBase {
   terminalSessionId: string
   resourceDisposition: TerminalCreateAction
-  workspacePaneTabs: WorkspacePaneTabEntry[]
+  workspacePaneTabs: WorkspacePaneTabsSnapshot
   runtimeProjectionApplied: boolean
 }
 
-export type TerminalCreateAdmissionResult = TerminalCreateAdmissionBase &
-  ({ requestRole: 'leader' } | { requestRole: 'observer' })
+export interface TerminalCreateLeaderAdmissionResult extends TerminalCreateAdmissionBase {
+  requestRole: 'leader'
+}
+
+export interface TerminalCreateObserverAdmissionResult extends TerminalCreateAdmissionBase {
+  requestRole: 'observer'
+}
+
+export type TerminalCreateAdmissionResult = TerminalCreateLeaderAdmissionResult | TerminalCreateObserverAdmissionResult

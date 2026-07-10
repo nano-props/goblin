@@ -1,5 +1,5 @@
 import * as v from 'valibot'
-import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import {
   WORKSPACE_PANE_RUNTIME_TAB_TYPES,
   WORKSPACE_PANE_STATIC_TAB_IDS,
@@ -7,7 +7,7 @@ import {
 } from '#/shared/workspace-pane.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
 
-const RepoRuntimeIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
+export const RepoRuntimeIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
 
 export const WorkspacePaneTabIdentitySchema = v.pipe(
   v.string(),
@@ -68,7 +68,12 @@ export const WorkspacePaneTabsEntrySchema = v.object({
   tabs: v.array(WorkspacePaneTabEntrySchema),
 })
 
-export function normalizeWorkspacePaneTabsEntryList(value: unknown): WorkspacePaneTabsEntry[] | null {
-  const parsed = v.safeParse(v.array(WorkspacePaneTabsEntrySchema), value)
+export const WorkspacePaneTabsSnapshotSchema = v.object({
+  revision: v.pipe(v.number(), v.integer(), v.minValue(0)),
+  entries: v.array(WorkspacePaneTabsEntrySchema),
+})
+
+export function normalizeWorkspacePaneTabsSnapshot(value: unknown): WorkspacePaneTabsSnapshot | null {
+  const parsed = v.safeParse(WorkspacePaneTabsSnapshotSchema, value)
   return parsed.success ? parsed.output : null
 }

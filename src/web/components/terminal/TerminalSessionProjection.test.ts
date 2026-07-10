@@ -13,6 +13,28 @@ import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import { terminalClient } from '#/web/terminal.ts'
 import { resetReposStore } from '#/web/test-utils/bridge.ts'
 
+const workspacePaneRuntimeMocks = vi.hoisted(() => ({
+  close: vi.fn(),
+  closeWorktree: vi.fn(),
+  writeSnapshot: vi.fn(),
+  refreshTabs: vi.fn(),
+}))
+
+vi.mock('#/web/workspace-pane/workspace-pane-runtime-client.ts', () => ({
+  workspacePaneRuntimeClient: {
+    close: workspacePaneRuntimeMocks.close,
+    closeWorktree: workspacePaneRuntimeMocks.closeWorktree,
+  },
+}))
+
+vi.mock('#/web/workspace-pane/workspace-pane-tabs-commit.ts', () => ({
+  writeCanonicalWorkspacePaneTabsSnapshot: workspacePaneRuntimeMocks.writeSnapshot,
+}))
+
+vi.mock('#/web/workspace-pane/workspace-pane-tabs-query.ts', () => ({
+  refreshWorkspacePaneTabs: workspacePaneRuntimeMocks.refreshTabs,
+}))
+
 const REPO_ROOT = '/repo'
 const REPO_RUNTIME_ID = 'repo-runtime-test'
 const WORKTREE_PATH = '/repo'
@@ -72,12 +94,27 @@ function makeServerSession(
   }
 }
 
+function successfulRuntimeCloseSnapshot() {
+  return {
+    ok: true as const,
+    runtimeType: 'terminal' as const,
+    workspacePaneTabs: { revision: 2, entries: [] },
+  }
+}
+
 describe('TerminalSessionProjection', () => {
   let projection: TerminalSessionProjection
   let selectedChanges: Array<{ terminalWorktreeKey: string; terminalSessionId: string | null }>
 
   beforeEach(() => {
     resetReposStore()
+    workspacePaneRuntimeMocks.close.mockReset()
+    workspacePaneRuntimeMocks.close.mockResolvedValue(successfulRuntimeCloseSnapshot())
+    workspacePaneRuntimeMocks.closeWorktree.mockReset()
+    workspacePaneRuntimeMocks.closeWorktree.mockResolvedValue(successfulRuntimeCloseSnapshot())
+    workspacePaneRuntimeMocks.writeSnapshot.mockReset()
+    workspacePaneRuntimeMocks.writeSnapshot.mockResolvedValue(true)
+    workspacePaneRuntimeMocks.refreshTabs.mockReset()
     selectedChanges = []
     projection = new TerminalSessionProjection((terminalWorktreeKey, terminalSessionId) =>
       selectedChanges.push({ terminalWorktreeKey, terminalSessionId }),
@@ -105,7 +142,11 @@ describe('TerminalSessionProjection', () => {
 
     const reconciled = projection.reconcileServerSessions(
       { repoRoot: REPO_ROOT, repoRuntimeId: 'repo-runtime-old' },
-      [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111', { repoRuntimeId: 'repo-runtime-old' })],
+      [
+        makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111', {
+          repoRuntimeId: 'repo-runtime-old',
+        }),
+      ],
       'client_local',
       new Map(),
     )
@@ -185,7 +226,9 @@ describe('TerminalSessionProjection', () => {
         expect(hydrateSpy).toHaveBeenCalledWith(
           expect.objectContaining({ terminalRuntimeSessionId, snapshot: 'before-index', snapshotSeq: 1, outputEra: 0 }),
         )
-        expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]?.terminalSessionId).toBe('term-111111111111111111111')
+        expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]?.terminalSessionId).toBe(
+          'term-111111111111111111111',
+        )
       } finally {
         hydrateSpy.mockRestore()
       }
@@ -418,7 +461,10 @@ describe('TerminalSessionProjection', () => {
       })
       expect(handleLifecycleSpy).toHaveBeenCalledTimes(1)
 
-      projection.handleExit({ terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa', terminalSessionId: 'term-111111111111111111111' })
+      projection.handleExit({
+        terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
+        terminalSessionId: 'term-111111111111111111111',
+      })
       expect(handleExitSpy).toHaveBeenCalledTimes(1)
     })
   })
@@ -479,8 +525,6 @@ describe('TerminalSessionProjection', () => {
       )
 
       const terminalSessionIdBefore = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      expect(projection.isKnownSession(terminalSessionIdBefore)).toBe(true)
-
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         [],
@@ -488,7 +532,6 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      expect(projection.isKnownSession(terminalSessionIdBefore)).toBe(false)
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
@@ -501,14 +544,8 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(terminalSessionId)
-      let resolveClose!: () => void
-      vi.spyOn(session, 'closeServerResourcesAndWait').mockImplementation(
-        () =>
-          new Promise<void>((resolve) => {
-            resolveClose = resolve
-          }),
-      )
+      const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
+      workspacePaneRuntimeMocks.close.mockReturnValueOnce(serverClose.promise)
 
       let settled = false
       const closePromise = projection
@@ -524,17 +561,16 @@ describe('TerminalSessionProjection', () => {
         })
       await Promise.resolve()
 
-      expect(projection.isKnownSession(terminalSessionId)).toBe(true)
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
         terminalSessionId,
       )
       expect(settled).toBe(false)
 
-      resolveClose()
+      serverClose.resolve(successfulRuntimeCloseSnapshot())
       await expect(closePromise).resolves.toBe(true)
       expect(settled).toBe(true)
-      expect(projection.isKnownSession(terminalSessionId)).toBe(false)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
     test('keeps command-closing sessions visible when server reconciliation removes them before close settles', async () => {
@@ -546,14 +582,8 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(terminalSessionId)
-      let resolveClose!: () => void
-      vi.spyOn(session, 'closeServerResourcesAndWait').mockImplementation(
-        () =>
-          new Promise<void>((resolve) => {
-            resolveClose = resolve
-          }),
-      )
+      const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
+      workspacePaneRuntimeMocks.close.mockReturnValueOnce(serverClose.promise)
 
       const closePromise = projection.closeTerminalByDescriptor(terminalSessionId, {
         repoRoot: REPO_ROOT,
@@ -563,9 +593,9 @@ describe('TerminalSessionProjection', () => {
       })
       await Promise.resolve()
 
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId)).toEqual([
-        terminalSessionId,
-      ])
+      expect(
+        projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId),
+      ).toEqual([terminalSessionId])
 
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
@@ -574,14 +604,13 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
 
-      expect(projection.isKnownSession(terminalSessionId)).toBe(true)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId)).toEqual([
-        terminalSessionId,
-      ])
+      expect(
+        projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId),
+      ).toEqual([terminalSessionId])
 
-      resolveClose()
+      serverClose.resolve(successfulRuntimeCloseSnapshot())
       await expect(closePromise).resolves.toBe(true)
-      expect(projection.isKnownSession(terminalSessionId)).toBe(false)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
     test('keeps command-closing sessions visible when a session-closed event arrives before close settles', async () => {
@@ -593,14 +622,8 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(terminalSessionId)
-      let resolveClose!: () => void
-      vi.spyOn(session, 'closeServerResourcesAndWait').mockImplementation(
-        () =>
-          new Promise<void>((resolve) => {
-            resolveClose = resolve
-          }),
-      )
+      const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
+      workspacePaneRuntimeMocks.close.mockReturnValueOnce(serverClose.promise)
 
       const closePromise = projection.closeTerminalByDescriptor(terminalSessionId, {
         repoRoot: REPO_ROOT,
@@ -615,14 +638,13 @@ describe('TerminalSessionProjection', () => {
         terminalSessionId,
       })
 
-      expect(projection.isKnownSession(terminalSessionId)).toBe(true)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((summary) => summary.terminalSessionId)).toEqual([
-        terminalSessionId,
-      ])
+      expect(
+        projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((summary) => summary.terminalSessionId),
+      ).toEqual([terminalSessionId])
 
-      resolveClose()
+      serverClose.resolve(successfulRuntimeCloseSnapshot())
       await expect(closePromise).resolves.toBe(true)
-      expect(projection.isKnownSession(terminalSessionId)).toBe(false)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
     test('durable close callback does not require a fresh repo runtime id', async () => {
@@ -665,14 +687,8 @@ describe('TerminalSessionProjection', () => {
         .sessions.find((session) => session.terminalSessionId === 'term-222222222222222222222')?.terminalSessionId
       if (!activeSessionId) throw new Error('missing term-222222222222222222222')
       projection.selectTerminal(WORKTREE_KEY, activeSessionId)
-      const session = (projection as any).sessions.get(activeSessionId)
-      let resolveClose!: () => void
-      vi.spyOn(session, 'closeServerResourcesAndWait').mockImplementation(
-        () =>
-          new Promise<void>((resolve) => {
-            resolveClose = resolve
-          }),
-      )
+      const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
+      workspacePaneRuntimeMocks.close.mockReturnValueOnce(serverClose.promise)
 
       const closePromise = projection.closeTerminalByDescriptor(activeSessionId, {
         repoRoot: REPO_ROOT,
@@ -690,7 +706,7 @@ describe('TerminalSessionProjection', () => {
       ])
       expect(closingSnapshot.selectedDescriptor?.terminalSessionId).toBe('term-222222222222222222222')
 
-      resolveClose()
+      serverClose.resolve(successfulRuntimeCloseSnapshot())
       await expect(closePromise).resolves.toBe(true)
       const closedSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
       expect(closedSnapshot.sessions.map((item) => item.terminalSessionId)).toEqual([
@@ -709,14 +725,8 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(terminalSessionId)
-      let resolveClose!: () => void
-      const closeServerResourcesAndWait = vi.spyOn(session, 'closeServerResourcesAndWait').mockImplementation(
-        () =>
-          new Promise<void>((resolve) => {
-            resolveClose = resolve
-          }),
-      )
+      const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
+      workspacePaneRuntimeMocks.close.mockReturnValueOnce(serverClose.promise)
 
       const firstClose = projection.closeTerminalByDescriptor(terminalSessionId, {
         repoRoot: REPO_ROOT,
@@ -732,13 +742,13 @@ describe('TerminalSessionProjection', () => {
       })
       await Promise.resolve()
 
-      expect(closeServerResourcesAndWait).toHaveBeenCalledTimes(1)
+      expect(workspacePaneRuntimeMocks.close).toHaveBeenCalledTimes(1)
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
 
-      resolveClose()
+      serverClose.resolve(successfulRuntimeCloseSnapshot())
       await expect(firstClose).resolves.toBe(true)
       await expect(secondClose).resolves.toBe(true)
-      expect(projection.isKnownSession(terminalSessionId)).toBe(false)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
     test('closeTerminalByDescriptor keeps the session when server resource close fails', async () => {
@@ -751,13 +761,8 @@ describe('TerminalSessionProjection', () => {
       )
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
       const session = (projection as any).sessions.get(terminalSessionId)
-      let rejectClose!: (error: Error) => void
-      vi.spyOn(session, 'closeServerResourcesAndWait').mockImplementation(
-        () =>
-          new Promise<void>((_, reject) => {
-            rejectClose = reject
-          }),
-      )
+      const serverClose = Promise.withResolvers<ReturnType<typeof successfulRuntimeCloseSnapshot>>()
+      workspacePaneRuntimeMocks.close.mockReturnValueOnce(serverClose.promise)
       const dispose = vi.spyOn(session, 'dispose')
 
       const closePromise = projection.closeTerminalByDescriptor(terminalSessionId, {
@@ -771,13 +776,40 @@ describe('TerminalSessionProjection', () => {
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
 
       const expectation = expect(closePromise).resolves.toBe(false)
-      rejectClose(new Error('close failed'))
+      serverClose.reject(new Error('close failed'))
       await expectation
 
-      expect(projection.isKnownSession(terminalSessionId)).toBe(true)
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe('term-111111111111111111111')
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
+        'term-111111111111111111111',
+      )
       expect(dispose).not.toHaveBeenCalled()
+    })
+
+    test('completes a successful server close when local snapshot projection throws', async () => {
+      projection.setRepoIndex(makeRepoIndex())
+      projection.reconcileServerSessions(
+        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
+        'client_local',
+        new Map(),
+      )
+      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
+      workspacePaneRuntimeMocks.writeSnapshot.mockImplementationOnce(() => {
+        throw new Error('local cache unavailable')
+      })
+
+      await expect(
+        projection.closeTerminalByDescriptor(terminalSessionId, {
+          repoRoot: REPO_ROOT,
+          repoRuntimeId: REPO_RUNTIME_ID,
+          branch: BRANCH,
+          worktreePath: WORKTREE_PATH,
+        }),
+      ).resolves.toBe(true)
+
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(workspacePaneRuntimeMocks.refreshTabs).toHaveBeenCalledWith(REPO_ROOT, REPO_RUNTIME_ID)
     })
 
     test('closeTerminalByDescriptor rejects a mismatched repo runtime scope', async () => {
@@ -789,8 +821,11 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(terminalSessionId)
-      const closeServerResourcesAndWait = vi.spyOn(session, 'closeServerResourcesAndWait')
+      workspacePaneRuntimeMocks.close.mockResolvedValueOnce({
+        ok: false,
+        runtimeType: 'terminal',
+        message: 'error.repo-runtime-stale',
+      })
 
       await expect(
         projection.closeTerminalByDescriptor(terminalSessionId, {
@@ -801,8 +836,7 @@ describe('TerminalSessionProjection', () => {
         }),
       ).resolves.toBe(false)
 
-      expect(closeServerResourcesAndWait).not.toHaveBeenCalled()
-      expect(projection.isKnownSession(terminalSessionId)).toBe(true)
+      expect(workspacePaneRuntimeMocks.close).toHaveBeenCalledOnce()
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
     })
 
@@ -815,8 +849,11 @@ describe('TerminalSessionProjection', () => {
         new Map(),
       )
       const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(terminalSessionId)
-      const closeServerResourcesAndWait = vi.spyOn(session, 'closeServerResourcesAndWait')
+      workspacePaneRuntimeMocks.closeWorktree.mockResolvedValueOnce({
+        ok: false,
+        runtimeType: 'terminal',
+        message: 'error.repo-runtime-stale',
+      })
 
       await expect(
         projection.closeTerminalsForWorktree({
@@ -827,8 +864,7 @@ describe('TerminalSessionProjection', () => {
         }),
       ).resolves.toBe(false)
 
-      expect(closeServerResourcesAndWait).not.toHaveBeenCalled()
-      expect(projection.isKnownSession(terminalSessionId)).toBe(true)
+      expect(workspacePaneRuntimeMocks.closeWorktree).toHaveBeenCalledOnce()
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
     })
 
@@ -842,7 +878,9 @@ describe('TerminalSessionProjection', () => {
         'client_local',
         new Map(),
       )
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe('term-111111111111111111111')
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
+        'term-111111111111111111111',
+      )
 
       // Second reconcile: term-111111111111111111111 removed, term-222222222222222222222 is controller
       projection.reconcileServerSessions(
@@ -855,7 +893,9 @@ describe('TerminalSessionProjection', () => {
         'client_local',
         new Map(),
       )
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe('term-222222222222222222222')
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
+        'term-222222222222222222222',
+      )
     })
 
     test('closing the active terminal selects the adjacent tab in the server session list', () => {
@@ -881,7 +921,9 @@ describe('TerminalSessionProjection', () => {
       projection.selectTerminal(WORKTREE_KEY, activeSessionId)
       ;(projection as any).removeSession(activeSessionId, { dispose: false, closeSession: false })
 
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe('term-111111111111111111111')
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).selectedDescriptor?.terminalSessionId).toBe(
+        'term-111111111111111111111',
+      )
     })
 
     test('invalidates cached worktree snapshot when the server session list changes', () => {
@@ -897,7 +939,10 @@ describe('TerminalSessionProjection', () => {
       )
 
       const firstSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
-      expect(firstSnapshot.sessions.map((session) => session.terminalSessionId)).toEqual(['term-111111111111111111111', 'term-222222222222222222222'])
+      expect(firstSnapshot.sessions.map((session) => session.terminalSessionId)).toEqual([
+        'term-111111111111111111111',
+        'term-222222222222222222222',
+      ])
 
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
@@ -910,7 +955,10 @@ describe('TerminalSessionProjection', () => {
       )
 
       const secondSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
-      expect(secondSnapshot.sessions.map((session) => session.terminalSessionId)).toEqual(['term-222222222222222222222', 'term-111111111111111111111'])
+      expect(secondSnapshot.sessions.map((session) => session.terminalSessionId)).toEqual([
+        'term-222222222222222222222',
+        'term-111111111111111111111',
+      ])
     })
   })
 

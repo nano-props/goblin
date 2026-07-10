@@ -35,7 +35,6 @@ const TERMINAL_SOCKET_ACTIONS = [
   'close',
   'list-sessions',
   'recover-sessions',
-  'create',
   'prune',
 ] as const satisfies TerminalSocketRequestAction[]
 const TERMINAL_CONNECTED_CONTROLLER_STATUS_VALUES = ['connected'] satisfies Exclude<TerminalControllerStatus, 'none'>[]
@@ -312,12 +311,6 @@ const TerminalClientMessageSchema = v.variant('type', [
   v.object({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
-    action: v.literal('create'),
-    input: TerminalCreateInputSchema,
-  }),
-  v.object({
-    type: v.literal('request'),
-    requestId: TerminalRequestIdSchema,
     action: v.literal('prune'),
     input: TerminalPruneInputSchema,
   }),
@@ -461,8 +454,6 @@ function normalizeTerminalSocketResponsePayload(action: TerminalSocketRequestAct
       return normalizeWithSchema(v.array(TerminalSessionSummarySchema), payload)
     case 'recover-sessions':
       return normalizeWithSchema(TerminalSessionsRecoveryResultSchema, payload)
-    case 'create':
-      return normalizeWithSchema(TerminalCreateResultSchema, payload)
     case 'prune':
       return normalizeWithSchema(TerminalPruneResultSchema, payload)
   }

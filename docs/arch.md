@@ -74,17 +74,20 @@ Runtime creation follows three responsibility layers:
 
 1. The provider domain service owns the resource lifecycle (terminal session,
    chat session, and so on) and remains usable without workspace-pane UI.
-2. `WorkspacePaneRuntimeApplication` owns the server application operation:
-   call the selected provider, commit the canonical runtime tab through the
-   workspace-pane coordinator, publish invalidation, and return both provider
-   result and tabs.
-3. The client command/projection owns admission, local canonical cache
-   projection, opener facts, and exact route completion.
+2. `WorkspacePaneRuntimeApplication` owns the server application commands for
+   open, single close, and worktree close. Commands for the same
+   user/repo-runtime/worktree share one server queue; each command joins the
+   provider lifecycle with canonical runtime-tab membership and returns a full
+   revisioned `WorkspacePaneTabsSnapshot`.
+3. The client command/projection owns only admission/dedupe, revision-gated
+   cache projection, opener facts, cancellation, and exact route completion.
+   It does not order server resources or infer session liveness from its cache.
 
 UI create paths use `workspace-pane-runtime.open`. They must not call a
 provider create and then issue a second `workspace-pane-tabs.update` to repair
-membership. Low-level provider create actions may remain available for
-provider-only use and tests, but they are not the composed UI operation.
+membership. Provider creation is an in-process server capability, not an
+externally routable terminal realtime action; only the application command can
+compose it with canonical tab membership.
 `workspace-pane-tabs.update` only mutates static-tab membership or user order;
 runtime-tab creation and placement belong exclusively to the application
 operation.
@@ -115,4 +118,5 @@ Compatibility note: old workspace tab protocol names
 of the current contract. The canonical socket actions/events are
 `workspace-pane-tabs.list`, `workspace-pane-tabs.replace`,
 `workspace-pane-tabs.update`, and `workspace-pane-tabs.changed`.
-The composed runtime-create action is `workspace-pane-runtime.open`.
+The composed runtime actions are `workspace-pane-runtime.open`,
+`workspace-pane-runtime.close`, and `workspace-pane-runtime.close-worktree`.

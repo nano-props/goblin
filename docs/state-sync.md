@@ -53,7 +53,7 @@ Notes:
 - Runtime-coherent repo actions should prefer orchestration entrypoints plus focused helper modules for projection/state transitions and sync pipelines.
 - Settings truth lives on the server; clients read it through query snapshots or specialized runtime projections.
 - Settings writes belong in `src/web/settings-actions.ts`. `src/web/settings-client.ts` is the transport boundary, not a UI mutation API. UI stores may keep local projections such as theme/i18n state, but their server write-through path should use settings actions so the settings query cache stays coherent.
-- Workspace pane tabs truth lives in the server workspace-pane runtime. React Query caches the runtime projection. Reorder may use a short-lived optimistic query update, but success must replace it with server-returned tabs and failure must rollback or invalidate.
+- Workspace pane tabs truth lives in the server workspace-pane runtime. Every list or mutation returns a complete `WorkspacePaneTabsSnapshot { revision, entries }` for the repo-runtime scope. React Query accepts a snapshot only when its server revision is at least the cached revision. Canonical reorder is intentionally not optimistic; it waits for the server snapshot instead of mixing rollback tokens into the canonical cache.
 - Runtime-coherent state may use server-published invalidation plus targeted refetch or realtime streaming. It must not use client polling as the mechanism that discovers server-owned changes.
 - For runtime correctness boundaries, prefer server-owned fast fail over client guards. A mutation that no longer matches the live runtime should be rejected by the server, not locally guessed away by the client.
 - Do not introduce client-only async tokens or focus guards to suppress late navigation after a write completes. Model the operation as a server/projection-owned pending state, reject competing user operations at their entry point, and then project the server result.
@@ -68,6 +68,12 @@ Notes:
   server application operation. Return the canonical projections together;
   do not make the client issue a provider write followed by a second membership
   write.
+- Server application commands, server snapshot revision, repo-runtime identity,
+  and client presentation coordination have different jobs. The server command
+  orders resource changes, revision orders projection responses,
+  `repoRuntimeId` scopes projection/navigation, and client coordination handles
+  only dedupe, cancellation, and route transitions. Do not replace any of these
+  with client session-liveness or cache-generation guesses.
 
 ## Restorable state
 

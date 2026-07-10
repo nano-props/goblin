@@ -1,7 +1,10 @@
-import { beforeEach, expect, test, vi } from 'vitest'
-import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
+import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import { dispatchCloseWorkspacePaneTabAction } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
+import {
+  dispatchCloseWorkspacePaneTabAction,
+  dispatchConfirmCloseTerminalWorkspacePaneTabAction,
+} from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
 import { closeWorkspacePaneTabsForWorktree } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
 import {
   resetWorkspacePaneTabCoordinatorForTest,
@@ -16,6 +19,7 @@ import {
   resetReposStore,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
+import { setTerminalSessionCommandBridgeForTest } from '#/web/test-utils/terminal-session-command-bridge.ts'
 
 const REPO_ID = '/tmp/workspace-pane-tab-close-repo'
 const BRANCH_NAME = 'feature/worktree-close'
@@ -25,7 +29,12 @@ beforeEach(() => {
   resetWorkspacePaneTabCoordinatorForTest()
   primaryWindowQueryClient.clear()
   resetReposStore()
+  setTerminalSessionCommandBridgeForTest(null)
   installWorkspacePaneTabsTestBridge()
+})
+
+afterEach(() => {
+  setTerminalSessionCommandBridgeForTest(null)
 })
 
 test('queues worktree tab close behind in-flight workspace pane tab operations', async () => {
@@ -154,6 +163,91 @@ test('awaits close-back navigation and clears the transition when navigation rej
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
       route: { kind: 'static', tab: 'files' },
+      reconciliation: { kind: 'replace-empty-pane' },
+    }),
+  ).toBe(false)
+})
+
+test('clears the close transition when the server close command rejects', async () => {
+  const terminalSessionId = 'term-111111111111111111111'
+  const repo = seedRepoWithReadModelForTest({
+    id: REPO_ID,
+    branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+    currentBranchName: BRANCH_NAME,
+    workspacePaneTabsByBranch: {
+      [BRANCH_NAME]: [
+        workspacePaneRuntimeTabEntry('terminal', terminalSessionId),
+        workspacePaneStaticTabEntry('status'),
+      ],
+    },
+  })
+  const terminalWorktreeKey = `${REPO_ID}\0${WORKTREE_PATH}`
+  setTerminalSessionCommandBridgeForTest({
+    terminalWorktreeSnapshot: () => ({
+      terminalWorktreeKey,
+      selectedDescriptor: {
+        terminalSessionId,
+        terminalWorktreeKey,
+        index: 1,
+        repoRuntimeId: repo.repoRuntimeId,
+        repoRoot: REPO_ID,
+        branch: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+      },
+      sessions: [
+        {
+          type: 'terminal',
+          terminalSessionId,
+          terminalWorktreeKey,
+          index: 1,
+          title: 'terminal 1',
+          phase: 'open',
+          selected: true,
+          hasBell: false,
+          hasRecentOutput: false,
+        },
+      ],
+      count: 1,
+      bellCount: 0,
+      outputActiveCount: 0,
+      createPending: false,
+    }),
+    createTerminal: vi.fn(async () => terminalSessionId),
+    selectTerminal: vi.fn(),
+    closeTerminalByDescriptor: vi.fn(async () => {
+      throw new Error('server close failed')
+    }),
+  })
+  const route = { kind: 'terminal' as const, terminalSessionId }
+
+  await expect(
+    dispatchConfirmCloseTerminalWorkspacePaneTabAction({
+      repoId: REPO_ID,
+      branchName: BRANCH_NAME,
+      workspacePaneRoute: route,
+      navigation: navigationWith(),
+      currentRepoId: REPO_ID,
+      currentBranchName: BRANCH_NAME,
+      currentWorkspacePaneRoute: route,
+      confirmedTerminal: {
+        terminalSessionId,
+        base: {
+          repoRoot: REPO_ID,
+          repoRuntimeId: repo.repoRuntimeId,
+          branch: BRANCH_NAME,
+          worktreePath: WORKTREE_PATH,
+        },
+      },
+    }),
+  ).resolves.toBe(false)
+
+  expect(
+    workspacePaneTabCoordinatorReconciliationDeferred({
+      repoId: REPO_ID,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      route,
       reconciliation: { kind: 'replace-empty-pane' },
     }),
   ).toBe(false)

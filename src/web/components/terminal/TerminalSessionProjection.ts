@@ -47,9 +47,16 @@ import type {
 } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { terminalCreateDedupeKey } from '#/web/components/terminal/terminal-create-dedupe.ts'
-import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
+import type {
+  WorkspacePaneRuntimeCloseResult,
+  WorkspacePaneRuntimeCloseWorktreeResult,
+  WorkspacePaneRuntimeTabPlacement,
+} from '#/shared/workspace-pane-runtime.ts'
+import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { workspacePaneRuntimeClient } from '#/web/workspace-pane/workspace-pane-runtime-client.ts'
 import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
+import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
+import { refreshWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   phase: 'opening',
@@ -73,7 +80,12 @@ interface ResolvedTerminalCreateOptions {
 }
 
 /**
- * Client-level authority for terminal session state.
+ * Client-level owner of the local terminal view projection.
+ *
+ * The server remains authoritative for session existence and lifecycle. This
+ * class materializes server results, owns client-only selection/render state,
+ * and coordinates pending presentation intents; it must not infer server
+ * liveness from its local session map.
  *
  * **Lifetime**: client-level singleton — one instance per client
  * process, created on first access via `getTerminalSessionProjection(...)`,
@@ -584,7 +596,7 @@ export class TerminalSessionProjection {
     return {
       terminalSessionId: result.terminalSessionId,
       resourceDisposition: result.action,
-      workspacePaneTabs: openResult.tabs,
+      workspacePaneTabs: openResult.workspacePaneTabs,
       runtimeProjectionApplied,
     }
   }
@@ -725,40 +737,18 @@ export class TerminalSessionProjection {
     }
   }
 
-  private async settleCreateRequestForWorktree(terminalWorktreeKey: string): Promise<void> {
-    const pending = this.lifecycleQueues.getCreate(terminalWorktreeKey)
-    if (!pending) return
-    const error = new Error('terminal create request canceled')
-    if (!pending.creating) {
-      if (this.lifecycleQueues.rejectCreatesForWorktree(terminalWorktreeKey, error, { includeActive: true })) {
-        this.notifyWorktree(terminalWorktreeKey)
-      }
-      try {
-        await pending.promise
-      } catch {
-        // A rejected create means no terminal session was created for this
-        // pending request. The release barrier can continue to close any
-        // sessions that were already present or that did get materialized.
-      }
-      return
-    }
-    if (this.lifecycleQueues.rejectCreatesForWorktree(terminalWorktreeKey, error, { includeActive: false })) {
+  private cancelCreateRequestsForWorktree(terminalWorktreeKey: string): void {
+    if (
+      this.lifecycleQueues.rejectCreatesForWorktree(
+        terminalWorktreeKey,
+        new Error('terminal create request canceled'),
+        {
+          includeActive: true,
+        },
+      )
+    ) {
       this.notifyWorktree(terminalWorktreeKey)
     }
-    try {
-      await pending.promise
-    } catch {
-      // A rejected create means no terminal session was created for this
-      // pending request. The release barrier can continue to close any
-      // sessions that were already present or that did get materialized.
-    }
-  }
-
-  private async waitForPendingClosesForWorktree(terminalWorktreeKey: string): Promise<boolean> {
-    const pendingForWorktree = this.lifecycleQueues.closesForWorktree(terminalWorktreeKey)
-    if (pendingForWorktree.length === 0) return true
-    const results = await Promise.allSettled(pendingForWorktree.map((entry) => entry.promise))
-    return results.every((result) => result.status === 'fulfilled')
   }
 
   private selectedDescriptor(terminalWorktreeKey: string): TerminalDescriptor | null {
@@ -848,36 +838,44 @@ export class TerminalSessionProjection {
 
   closeTerminalByDescriptor = async (terminalSessionId: string, base: TerminalSessionBase): Promise<boolean> => {
     if (!base.repoRuntimeId) return false
-    const session = this.sessions.get(terminalSessionId)
-    if (
-      !session ||
-      session.descriptor.repoRuntimeId !== base.repoRuntimeId ||
-      session.descriptor.terminalWorktreeKey !== formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
-    )
-      return false
-    return await this.closeTerminal(terminalSessionId)
+    return await this.closeTerminalRuntimeTab(terminalSessionId, base)
   }
 
   closeTerminalsForWorktree = async (base: TerminalSessionBase): Promise<boolean> => {
     if (!base.repoRuntimeId) return false
     const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
     const pendingCreate = this.lifecycleQueues.getCreate(terminalWorktreeKey)
-    if (pendingCreate && pendingCreate.base.repoRuntimeId !== base.repoRuntimeId) return false
-    await this.settleCreateRequestForWorktree(terminalWorktreeKey)
-    const sessionsForWorktree = this.sessionsForWorktreeList(terminalWorktreeKey)
-    const terminalSessionIds = sessionsForWorktree
-      .filter((session) => session.descriptor.repoRuntimeId === base.repoRuntimeId)
-      .map((session) => session.descriptor.terminalSessionId)
-    if (sessionsForWorktree.length > 0 && terminalSessionIds.length === 0) return false
-    // When no terminal sessions exist there is nothing to release. Skip the
-    // durable-close wait so a stale pending close (e.g. from an earlier tab
-    // that already left the worktree) cannot block worktree removal.
-    if (terminalSessionIds.length === 0) return true
-    const results = await Promise.all(
-      terminalSessionIds.map((terminalSessionId) => this.closeTerminal(terminalSessionId)),
-    )
-    const pendingClosesSettled = await this.waitForPendingClosesForWorktree(terminalWorktreeKey)
-    return results.every(Boolean) && pendingClosesSettled
+    if (pendingCreate?.base.repoRuntimeId !== undefined && pendingCreate.base.repoRuntimeId !== base.repoRuntimeId) {
+      return false
+    }
+    this.cancelCreateRequestsForWorktree(terminalWorktreeKey)
+    let result: WorkspacePaneRuntimeCloseWorktreeResult
+    try {
+      result = await workspacePaneRuntimeClient.closeWorktree({
+        runtimeType: 'terminal',
+        target: {
+          repoRoot: base.repoRoot,
+          repoRuntimeId: base.repoRuntimeId,
+          branchName: base.branch,
+          worktreePath: base.worktreePath,
+        },
+      })
+    } catch (err) {
+      terminalSessionProviderLog.warn('terminal worktree close failed', {
+        repoRoot: base.repoRoot,
+        repoRuntimeId: base.repoRuntimeId,
+        worktreePath: base.worktreePath,
+        err,
+      })
+      return false
+    }
+    if (!result.ok) return false
+    await this.applyWorkspacePaneRuntimeSnapshot(base, result.workspacePaneTabs)
+    for (const session of this.sessionsForWorktreeList(terminalWorktreeKey)) {
+      if (session.descriptor.repoRuntimeId !== base.repoRuntimeId) continue
+      this.removeSession(session.descriptor.terminalSessionId, { dispose: true, closeSession: false })
+    }
+    return true
   }
 
   attach = (descriptor: TerminalDescriptor, host: HTMLElement): void => {
@@ -905,10 +903,6 @@ export class TerminalSessionProjection {
     const next = session.snapshot()
     this.snapshotCache.set(terminalSessionId, next)
     return next
-  }
-
-  isKnownSession = (terminalSessionId: string): boolean => {
-    return this.sessions.has(terminalSessionId)
   }
 
   subscribeSnapshot = (terminalSessionId: string, listener: () => void): (() => void) => {
@@ -1076,11 +1070,9 @@ export class TerminalSessionProjection {
     return true
   }
 
-  private async closeTerminal(terminalSessionId: string): Promise<boolean> {
+  private async closeTerminalRuntimeTab(terminalSessionId: string, base: TerminalSessionBase): Promise<boolean> {
     const pending = this.closeCompletionByTerminalSessionId.get(terminalSessionId)
     if (pending) return pending
-    const session = this.sessions.get(terminalSessionId)
-    if (!session) return false
     let resolve!: (value: boolean) => void
     let reject!: (error: unknown) => void
     const promise = new Promise<boolean>((innerResolve, innerReject) => {
@@ -1094,19 +1086,58 @@ export class TerminalSessionProjection {
       }
     }
     void promise.then(cleanup, cleanup)
-    void this.runClose(terminalSessionId, session).then(resolve, reject)
+    void this.runCloseTerminalRuntimeTab(terminalSessionId, base).then(resolve, reject)
     return promise
   }
 
-  private async runClose(terminalSessionId: string, session: TerminalSession): Promise<boolean> {
+  private async runCloseTerminalRuntimeTab(terminalSessionId: string, base: TerminalSessionBase): Promise<boolean> {
+    const repoRuntimeId = requireRepoRuntimeId(base)
+    let result: WorkspacePaneRuntimeCloseResult
     try {
-      await session.closeServerResourcesAndWait()
+      result = await workspacePaneRuntimeClient.close({
+        runtimeType: 'terminal',
+        sessionId: terminalSessionId,
+        target: {
+          repoRoot: base.repoRoot,
+          repoRuntimeId,
+          branchName: base.branch,
+          worktreePath: base.worktreePath,
+        },
+      })
     } catch (err) {
       terminalSessionProviderLog.warn('terminal close failed', { terminalSessionId, err })
       return false
     }
-    if (this.sessions.get(terminalSessionId) !== session) return true
-    return this.removeSession(terminalSessionId, { dispose: true, closeSession: false })
+    if (!result.ok) return false
+    await this.applyWorkspacePaneRuntimeSnapshot(base, result.workspacePaneTabs)
+    const session = this.sessions.get(terminalSessionId)
+    if (!session) return true
+    if (
+      session.descriptor.repoRuntimeId !== base.repoRuntimeId ||
+      session.descriptor.terminalWorktreeKey !== formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
+    ) {
+      return true
+    }
+    this.removeSession(terminalSessionId, { dispose: true, closeSession: false })
+    return true
+  }
+
+  private async applyWorkspacePaneRuntimeSnapshot(
+    base: TerminalSessionBase,
+    snapshot: WorkspacePaneTabsSnapshot,
+  ): Promise<void> {
+    const repoRuntimeId = requireRepoRuntimeId(base)
+    try {
+      writeCanonicalWorkspacePaneTabsSnapshot(base.repoRoot, repoRuntimeId, snapshot)
+    } catch (err) {
+      terminalSessionProviderLog.warn('failed to apply workspace pane runtime snapshot', {
+        repoRoot: base.repoRoot,
+        repoRuntimeId,
+        worktreePath: base.worktreePath,
+        err,
+      })
+      refreshWorkspacePaneTabs(base.repoRoot, repoRuntimeId)
+    }
   }
 
   private discardLocalSessionAndDismissDetailIfLast(terminalSessionId: string, base: TerminalSessionBase): void {

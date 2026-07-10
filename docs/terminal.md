@@ -139,7 +139,11 @@ It is useful to keep three lifetimes separate:
 - **View lifetime**: client-local xterm and DOM resources for rendering a session.
 - **Tab lifetime**: user-visible workspace surface that decides which feature resources must be released before the tab is considered closed.
 
-A Workspace Pane tab is not the authoritative owner of a terminal session. The tab is a workspace-pane tab entry in the UI; the terminal server (TerminalSessionManager) and client projection (TerminalSessionProjection) own terminal resource cleanup for the session rendered by that tab. The tab close path is the orchestration boundary that waits for those owners to finish.
+A Workspace Pane tab is not the authoritative owner of a terminal session. The
+tab is a client projection of server-owned runtime membership. The terminal
+manager owns the session and `WorkspacePaneRuntimeApplication` owns the composed
+close command that joins resource cleanup with canonical tab projection. The
+client projection only applies the returned snapshot and local presentation.
 
 Closing a terminal tab is a sequential operation. The command may compute the
 close-back tab before it starts the close, but `TerminalSessionProjection` must
@@ -152,7 +156,15 @@ repair it. On failure, the session should still be present because the close did
 not complete. On success, the close path removes the session and commits the
 planned close-back navigation.
 
-This distinction matters for destructive worktree operations. Before a worktree directory is removed, the client should close every worktree-scoped Workspace Pane tab for that worktree and await each tab's close contract. For terminal tabs, that close contract delegates to the client projection's worktree release barrier: cancel pending creates that have not reached the server, wait for in-flight creates that cannot be cancelled, close materialized sessions, and wait for pending durable closes to settle. For future worktree-scoped tabs, such as a file tree or another long-lived tool surface, the same tab close contract should release that tab's resources before the worktree mutation starts.
+This distinction matters for destructive worktree operations. Before a
+worktree directory is removed, the client awaits each worktree-scoped tab close
+contract. Runtime providers submit `workspace-pane-runtime.close-worktree`;
+the server enumerates and closes authoritative resources and returns the
+revisioned canonical snapshot. The client cancels both queued and in-flight
+create presentation intents so a superseded open response cannot navigate, but
+an open request already accepted by the server still completes and is then
+ordered before close by the shared server worktree queue. The client must not
+enumerate its local session cache to decide which server resources exist.
 
 Repo routes and server-side repo write paths should not know about Workspace Pane tabs or terminal UI resources. They remain responsible for repository mutation. UI resource release belongs to the Workspace Pane tab lifecycle on the client.
 
@@ -162,13 +174,14 @@ Terminal creation has three architecture layers:
 
 - `TerminalSessionService` and its focused domain collaborators own terminal
   create/reuse/restore, PTY/session lifecycle, and terminal first-frame data.
-- `WorkspacePaneRuntimeApplication` owns the composed server operation: invoke
-  the terminal provider create, commit the canonical runtime tab, publish
-  workspace-tab invalidation, and return both results.
+- `WorkspacePaneRuntimeApplication` owns composed open/close/worktree-close
+  commands and their shared server worktree queue: invoke the provider,
+  commit canonical runtime membership, publish invalidation, and return the
+  provider result plus a revisioned full-scope snapshot.
 - `TerminalSessionProjection` and Workspace Pane commands own client admission,
-  pending/single-flight state, startup command resolution, durable close
-  draining, opener attribution, local canonical tab projection, and exact
-  route commit for the created `terminalSessionId`.
+  pending/single-flight intent, startup command resolution, durable provider
+  cleanup, opener attribution, revision-gated local projection, cancellation,
+  and exact route commit for the created `terminalSessionId`.
 
 While `TerminalSessionProjection` reports `createPending` for a
 `terminalWorktreeKey`, ordinary user-driven workspace-pane navigation for that
@@ -185,7 +198,7 @@ terminal lifecycle can see duplicate or distinct requests immediately and keep
 `workspace-pane-runtime.open`; the server application operation creates or
 restores the terminal and then commits tab membership through the generic
 workspace-pane coordinator. The response contains the terminal first frame,
-session projection, and canonical workspace tabs.
+session projection, and `WorkspacePaneTabsSnapshot { revision, entries }`.
 
 The admission-leading client command writes those returned tabs into the local
 query projection, records opener facts, and commits the exact terminal route.
@@ -211,9 +224,10 @@ route became current; navigation rejection or supersession is reported without
 rolling back committed server resources.
 
 Keep these client outcomes separate: `runtimeProjectionApplied` reports local
-terminal-session hydration, workspace-pane projection reports local canonical
-tab-cache acceptance, and navigation commit reports the exact route result.
-None of these client projection outcomes owns rollback of the server resource.
+terminal-session hydration, snapshot application reports whether the revision
+entered this client's canonical cache, and navigation commit reports the exact
+route result. None of these client projection outcomes decides whether the
+server command succeeded or owns rollback of the server resource.
 
 The pending bit is projection state from the terminal lifecycle queue. Do not
 add client-only focus tokens, request generations, or "is the user still on
@@ -226,10 +240,11 @@ The clean flow is:
 1. The user invokes create through a command/open-tab entry point.
 2. The terminal projection admits the create request and publishes
    `createPending` before async startup command resolution begins.
-3. The server application operation invokes terminal creation, commits the
-   corresponding runtime tab, and returns the server-allocated
-   `terminalSessionId` plus canonical tabs.
-4. The owning workspace-pane command applies the canonical tabs locally,
+3. The server application command invokes terminal creation, commits the
+   corresponding runtime tab in server order, and returns the server-allocated
+   `terminalSessionId` plus a revisioned full-scope snapshot.
+4. The owning workspace-pane command applies that snapshot through the single
+   revision acceptance boundary, verifies the captured `repoRuntimeId`,
    records opener facts, and navigates directly to the canonical terminal
    route for that returned session.
 

@@ -11,10 +11,9 @@ import {
   type WorkspacePaneTabsSocketAction,
 } from '#/shared/workspace-pane-tabs.ts'
 import {
-  WorkspacePaneTabEntrySchema,
-  WorkspacePaneTabsEntrySchema,
   WorkspacePaneTabsListInputSchema,
   WorkspacePaneTabsReplaceInputSchema,
+  WorkspacePaneTabsSnapshotSchema,
   WorkspacePaneTabsUpdateInputSchema,
 } from '#/shared/workspace-pane-tabs-validators.ts'
 import {
@@ -22,7 +21,11 @@ import {
   type WorkspacePaneRuntimeSocketAction,
 } from '#/shared/workspace-pane-runtime.ts'
 import {
+  normalizeWorkspacePaneRuntimeCloseResult,
+  normalizeWorkspacePaneRuntimeCloseWorktreeResult,
   normalizeWorkspacePaneRuntimeOpenResult,
+  WorkspacePaneRuntimeCloseInputSchema,
+  WorkspacePaneRuntimeCloseWorktreeInputSchema,
   WorkspacePaneRuntimeOpenInputSchema,
 } from '#/shared/workspace-pane-runtime-validators.ts'
 
@@ -36,7 +39,11 @@ const WorkspacePaneTabsSocketActionSchema = v.picklist([
   WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
   WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
 ] as const)
-const WorkspacePaneRuntimeSocketActionSchema = v.literal(WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open)
+const WorkspacePaneRuntimeSocketActionSchema = v.picklist([
+  WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open,
+  WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close,
+  WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.closeWorktree,
+] as const)
 
 const AppRealtimeNonTerminalClientMessageSchema = v.variant('type', [
   v.object({
@@ -62,6 +69,18 @@ const AppRealtimeNonTerminalClientMessageSchema = v.variant('type', [
     requestId: AppRealtimeRequestIdSchema,
     action: v.literal(WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open),
     input: WorkspacePaneRuntimeOpenInputSchema,
+  }),
+  v.object({
+    type: v.literal('request'),
+    requestId: AppRealtimeRequestIdSchema,
+    action: v.literal(WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close),
+    input: WorkspacePaneRuntimeCloseInputSchema,
+  }),
+  v.object({
+    type: v.literal('request'),
+    requestId: AppRealtimeRequestIdSchema,
+    action: v.literal(WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.closeWorktree),
+    input: WorkspacePaneRuntimeCloseWorktreeInputSchema,
   }),
   v.object({
     type: v.literal('heartbeat'),
@@ -108,10 +127,7 @@ export function normalizeAppRealtimeSocketServerMessage(value: unknown): AppReal
   if (!parsed.success) return null
   const message = parsed.output
   if (message.type !== 'response' || !message.ok) return message as AppRealtimeSocketServerMessage
-  const payload =
-    message.action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open
-      ? normalizeWorkspacePaneRuntimeOpenResult(message.payload)
-      : normalizeWorkspacePaneTabsSocketResponsePayload(message.action, message.payload)
+  const payload = normalizeAppRealtimeResponsePayload(message.action, message.payload)
   if (payload === null) {
     return {
       type: 'response',
@@ -124,16 +140,31 @@ export function normalizeAppRealtimeSocketServerMessage(value: unknown): AppReal
   return { ...message, payload } as AppRealtimeSocketServerMessage
 }
 
+function normalizeAppRealtimeResponsePayload(action: AppRealtimeRequestAction, payload: unknown): unknown | null {
+  if (isAppRealtimeWorkspacePaneTabsAction(action)) {
+    return normalizeWorkspacePaneTabsSocketResponsePayload(action, payload)
+  }
+  switch (action) {
+    case WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open:
+      return normalizeWorkspacePaneRuntimeOpenResult(payload)
+    case WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close:
+      return normalizeWorkspacePaneRuntimeCloseResult(payload)
+    case WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.closeWorktree:
+      return normalizeWorkspacePaneRuntimeCloseWorktreeResult(payload)
+    default:
+      return null
+  }
+}
+
 function normalizeWorkspacePaneTabsSocketResponsePayload(
   action: WorkspacePaneTabsSocketAction,
   payload: unknown,
 ): unknown | null {
   switch (action) {
     case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list:
-      return normalizeWithSchema(v.array(WorkspacePaneTabsEntrySchema), payload)
     case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace:
     case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update:
-      return normalizeWithSchema(v.array(WorkspacePaneTabEntrySchema), payload)
+      return normalizeWithSchema(WorkspacePaneTabsSnapshotSchema, payload)
   }
 }
 
@@ -158,7 +189,11 @@ export function isAppRealtimeWorkspacePaneTabsAction(
 export function isAppRealtimeWorkspacePaneRuntimeAction(
   action: AppRealtimeRequestAction,
 ): action is WorkspacePaneRuntimeSocketAction {
-  return action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open
+  return (
+    action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open ||
+    action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close ||
+    action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.closeWorktree
+  )
 }
 
 export function isAppRealtimeWsMessageWithinLimit(value: string): boolean {

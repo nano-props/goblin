@@ -448,7 +448,6 @@ function testBridge(): ClientBridge {
         phase: 'open' as const,
       })),
       close: vi.fn(async () => true),
-      create: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       listSessions: vi.fn(async () => []),
       recoverSessions: recoverSessionsMock,
@@ -470,9 +469,9 @@ function testBridge(): ClientBridge {
       onSessionClosed: vi.fn(() => () => {}),
     }),
     workspacePaneTabs: () => ({
-      replace: vi.fn(async (input) => input.tabs),
-      update: vi.fn(async () => []),
-      list: listWorkspaceTabsMock,
+      replace: vi.fn(async () => ({ revision: 1, entries: [] })),
+      update: vi.fn(async () => ({ revision: 1, entries: [] })),
+      list: vi.fn(async (input) => ({ revision: 1, entries: await listWorkspaceTabsMock(input) })),
       onChanged: vi.fn((cb: (repoRoot: string) => void) => {
         workspaceTabsChangedHandler = cb
         return () => {
@@ -482,6 +481,12 @@ function testBridge(): ClientBridge {
     }),
     workspacePaneRuntime: () => ({
       open: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
+      close: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
+      closeWorktree: vi.fn(async () => ({
+        ok: false as const,
+        runtimeType: 'terminal' as const,
+        message: 'unavailable',
+      })),
     }),
   }
 }

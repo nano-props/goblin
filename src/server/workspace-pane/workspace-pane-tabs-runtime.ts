@@ -13,6 +13,8 @@ import {
   workspacePaneTabsRuntimeScopePrefixKey,
   workspacePaneTabsRuntimeUserPrefixKey,
 } from '#/shared/workspace-pane-tabs-runtime-keys.ts'
+import { workspacePaneTabsUserScopeQueueKey } from '#/server/workspace-pane/workspace-pane-tabs-user-queue-key.ts'
+import { workspacePaneTabEntryArraysEqual } from '#/server/workspace-pane/workspace-pane-tabs-operations.ts'
 
 export interface WorkspacePaneTabsTargetInput<TUser extends string | number> {
   userId: TUser
@@ -58,16 +60,27 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
   // Client query caches and session snapshots are projections/restore
   // inputs; they should not be treated as competing runtime owners.
   private readonly tabsByTarget = new Map<string, StoredWorkspacePaneTabsEntry>()
+  private readonly revisionByUserScope = new Map<string, number>()
 
   replaceTabs(input: WorkspacePaneTabsReplaceInput<TUser>): WorkspacePaneTabEntry[] {
     const targetKey = this.targetKey(input)
     const tabs = normalizeWorkspacePaneTabs(input.tabs, { hasWorktree: input.worktreePath !== null })
+    const existing = this.tabsByTarget.get(targetKey)
+    if (
+      existing &&
+      existing.branchName === input.branchName &&
+      existing.worktreePath === input.worktreePath &&
+      workspacePaneTabEntryArraysEqual(existing.tabs, tabs)
+    ) {
+      return [...existing.tabs]
+    }
     this.tabsByTarget.set(targetKey, {
       scope: input.scope,
       branchName: input.branchName,
       worktreePath: input.worktreePath,
       tabs,
     })
+    this.advanceRevision(input.userId, input.scope)
     return [...tabs]
   }
 
@@ -95,17 +108,22 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
   }
 
   closeTabsForUser(userId: TUser): void {
-    const prefix = workspacePaneTabsRuntimeUserPrefixKey(userId)
-    for (const key of Array.from(this.tabsByTarget.keys())) {
-      if (key.startsWith(prefix)) this.tabsByTarget.delete(key)
-    }
+    for (const scope of this.scopesForUser(userId)) this.closeTabsForScope(userId, scope)
   }
 
   closeTabsForScope(userId: TUser, scope: string): void {
     const prefix = workspacePaneTabsRuntimeScopePrefixKey(userId, scope)
+    let changed = false
     for (const key of Array.from(this.tabsByTarget.keys())) {
-      if (key.startsWith(prefix)) this.tabsByTarget.delete(key)
+      if (!key.startsWith(prefix)) continue
+      this.tabsByTarget.delete(key)
+      changed = true
     }
+    if (changed) this.advanceRevision(userId, scope)
+  }
+
+  revision(input: WorkspacePaneTabsScopeInput<TUser>): number {
+    return this.revisionByUserScope.get(workspacePaneTabsUserScopeQueueKey(input.userId, input.scope)) ?? 0
   }
 
   scopesForUser(userId: TUser): string[] {
@@ -124,6 +142,11 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
       branchName: input.branchName,
       worktreePath: input.worktreePath,
     })
+  }
+
+  private advanceRevision(userId: TUser, scope: string): void {
+    const key = workspacePaneTabsUserScopeQueueKey(userId, scope)
+    this.revisionByUserScope.set(key, (this.revisionByUserScope.get(key) ?? 0) + 1)
   }
 }
 

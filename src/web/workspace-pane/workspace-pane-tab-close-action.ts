@@ -81,18 +81,15 @@ export async function dispatchCloseWorkspacePaneTabAction(
 async function closeWorkspacePaneTabAction(options: CloseWorkspacePaneTabActionOptions): Promise<boolean> {
   const start = beginCloseWorkspacePaneTabAction(options)
   if (start.kind === 'done') return start.result
-  if (!(await start.completion)) {
-    abortWorkspacePaneTabControllerTransition(start.transitionId)
-    return false
-  }
-  completeWorkspacePaneTabClose(start.target.repoId, start.target.branchName, start.closingIdentity)
-  if (start.wasActive) {
+  return await runWorkspacePaneCloseTransition(start.transitionId, async () => {
+    if (!(await start.completion)) return abortWorkspacePaneCloseTransition(start.transitionId)
+    completeWorkspacePaneTabClose(start.target.repoId, start.target.branchName, start.closingIdentity)
+    if (!start.wasActive) return true
     return await settleWorkspacePaneCloseBackNavigation(
       start.transitionId,
       commitWorkspacePaneControllerCloseBackTarget(start.target, start.nextTab, options.navigation),
     )
-  }
-  return true
+  })
 }
 
 export async function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
@@ -162,27 +159,25 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
           workspacePaneRoute: options.currentWorkspacePaneRoute,
         })
       : null
-  const closeContext = readWorkspacePaneRuntimeTabCloseContext()
-  if (!canConfirmWorkspacePaneRuntimeTabCloseWithContext(confirmed, closeContext)) {
-    abortWorkspacePaneTabControllerTransition(transitionId)
-    return false
-  }
-  if (!(await confirmWorkspacePaneRuntimeTabClose(confirmed, closeContext))) {
-    abortWorkspacePaneTabControllerTransition(transitionId)
-    return false
-  }
-  completeWorkspacePaneTabClose(
-    repoId,
-    confirmedBranchName,
-    targetIdentity ?? workspacePaneRuntimeTabConfirmedCloseIdentity(confirmed),
-  )
-  if (wasActive && closeTarget) {
+  return await runWorkspacePaneCloseTransition(transitionId, async () => {
+    const closeContext = readWorkspacePaneRuntimeTabCloseContext()
+    if (!canConfirmWorkspacePaneRuntimeTabCloseWithContext(confirmed, closeContext)) {
+      return abortWorkspacePaneCloseTransition(transitionId)
+    }
+    if (!(await confirmWorkspacePaneRuntimeTabClose(confirmed, closeContext))) {
+      return abortWorkspacePaneCloseTransition(transitionId)
+    }
+    completeWorkspacePaneTabClose(
+      repoId,
+      confirmedBranchName,
+      targetIdentity ?? workspacePaneRuntimeTabConfirmedCloseIdentity(confirmed),
+    )
+    if (!wasActive || !closeTarget) return true
     return await settleWorkspacePaneCloseBackNavigation(
       transitionId,
       commitWorkspacePaneControllerCloseBackTarget(closeTarget, nextTab, navigation),
     )
-  }
-  return true
+  })
 }
 
 function beginCloseWorkspacePaneTabAction(
@@ -233,7 +228,13 @@ function beginCloseWorkspacePaneTabAction(
         workspacePaneRoute: options.workspacePaneRoute,
       })
     : null
-  const close = beginWorkspacePaneTabClose(target, tab)
+  let close
+  try {
+    close = beginWorkspacePaneTabClose(target, tab)
+  } catch {
+    abortWorkspacePaneTabControllerTransition(transitionId)
+    return { kind: 'done', result: false }
+  }
   if (!close.accepted) {
     abortWorkspacePaneTabControllerTransition(transitionId)
     return { kind: 'done', result: false }
@@ -279,13 +280,24 @@ async function settleWorkspacePaneCloseBackNavigation(
   navigation: boolean | Promise<boolean>,
 ): Promise<boolean> {
   const settlesRoute = typeof navigation !== 'boolean'
+  const committed = await navigation
+  if (!committed) abortWorkspacePaneTabControllerTransition(transitionId)
+  else if (settlesRoute) completeWorkspacePaneTabControllerTransition(transitionId)
+  return committed
+}
+
+async function runWorkspacePaneCloseTransition(
+  transitionId: number | null,
+  operation: () => Promise<boolean>,
+): Promise<boolean> {
   try {
-    const committed = await navigation
-    if (!committed) abortWorkspacePaneTabControllerTransition(transitionId)
-    else if (settlesRoute) completeWorkspacePaneTabControllerTransition(transitionId)
-    return committed
+    return await operation()
   } catch {
-    abortWorkspacePaneTabControllerTransition(transitionId)
-    return false
+    return abortWorkspacePaneCloseTransition(transitionId)
   }
+}
+
+function abortWorkspacePaneCloseTransition(transitionId: number | null): false {
+  abortWorkspacePaneTabControllerTransition(transitionId)
+  return false
 }

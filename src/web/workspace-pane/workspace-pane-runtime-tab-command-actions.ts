@@ -1,7 +1,6 @@
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
-import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
@@ -9,7 +8,7 @@ import type { WorkspacePaneTabControllerCommitNavigation } from '#/web/workspace
 import { commitWorkspacePaneControllerRoute } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
-import { commitCreatedTerminalWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
+import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 
 export interface WorkspacePaneRuntimeTabCommandContext {
   terminal?: {
@@ -147,17 +146,11 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
       return firstSession ? await terminal.showTerminalSession(firstSession.terminalSessionId) : false
     })
   }
-  const result = await runCreateTerminalTabCommand({
+  const result = await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
     base,
     createTerminal: bridge.createTerminalWithAdmission,
     openerIdentity: terminal.openerIdentity,
-    commitCreatedTerminalTab: (terminalSessionId, workspacePaneTabs) =>
-      commitCreatedTerminalWorkspacePaneRuntimeTab({
-        base,
-        terminalSessionId,
-        workspacePaneTabs,
-        showCreatedTerminalTab: terminal.showTerminalSession,
-      }),
+    showCreatedTerminalTab: terminal.showTerminalSession,
     t: terminal.t,
     logMessage: 'terminal primary action create failed',
   })
@@ -169,17 +162,11 @@ async function runNewTerminalAction(context: WorkspacePaneRuntimeTabCommandConte
   if (!terminal?.base) return false
   if (!terminal.bridge) return false
   const { base, bridge } = terminal
-  const result = await runCreateTerminalTabCommand({
+  const result = await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
     base,
     createTerminal: bridge.createTerminalWithAdmission,
     openerIdentity: terminal.openerIdentity,
-    commitCreatedTerminalTab: (terminalSessionId, workspacePaneTabs) =>
-      commitCreatedTerminalWorkspacePaneRuntimeTab({
-        base,
-        terminalSessionId,
-        workspacePaneTabs,
-        showCreatedTerminalTab: terminal.showTerminalSession,
-      }),
+    showCreatedTerminalTab: terminal.showTerminalSession,
     t: terminal.t,
   })
   return result.ok

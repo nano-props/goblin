@@ -81,6 +81,27 @@ describe('workspace pane tabs runtime storage', () => {
       'term-111111111111111111111',
     ])
   })
+
+  test('advances revisions monotonically per user and scope only when canonical state changes', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+    const tabs = [workspacePaneStaticTabEntry('status')]
+
+    expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(0)
+    runtime.replaceTabs({ ...target(), tabs })
+    expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(1)
+
+    runtime.replaceTabs({ ...target(), tabs })
+    expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(1)
+
+    runtime.replaceTabs({ ...target(), userId: 'user-b', tabs })
+    expect(runtime.revision({ userId: 'user-b', scope: '/repo' })).toBe(1)
+    expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(1)
+
+    runtime.closeTabsForScope('user-a', '/repo')
+    expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(2)
+    runtime.closeTabsForScope('user-a', '/repo')
+    expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(2)
+  })
 })
 
 function target(): { userId: string; scope: string; branchName: string; worktreePath: string } {
