@@ -63,7 +63,7 @@ const appRealtimeHostStub = {
   shutdown: vi.fn(),
 } satisfies ServerAppRealtimeHost
 
-const workspacePaneWorktreeApplicationStub = {
+const worktreeRemovalApplicationStub = {
   removeWorktree: vi.fn(async () => ({ ok: false as const, message: 'unused' })),
 }
 
@@ -110,7 +110,7 @@ describe('server app body limit', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
-      workspacePaneWorktreeApplication: workspacePaneWorktreeApplicationStub,
+      worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     const oversized = 'x'.repeat(2 * 1024 * 1024)
     const response = await app.request(
@@ -135,7 +135,7 @@ describe('server app body limit', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
-      workspacePaneWorktreeApplication: workspacePaneWorktreeApplicationStub,
+      worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     // A small, well-formed body: validation will run after the body
     // limit middleware, so we expect 400 (BAD_REQUEST) — not 413.
@@ -187,7 +187,7 @@ describe('server app html static', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
-      workspacePaneWorktreeApplication: workspacePaneWorktreeApplicationStub,
+      worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
 
     const response = await app.request(new Request('http://127.0.0.1:32100/assets/missing-old-build.js'))
@@ -206,7 +206,7 @@ describe('server app html static', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
-      workspacePaneWorktreeApplication: workspacePaneWorktreeApplicationStub,
+      worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
 
     const response = await app.request(
@@ -238,7 +238,7 @@ describe('server app html static', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
-      workspacePaneWorktreeApplication: workspacePaneWorktreeApplicationStub,
+      worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     for (const path of ['/repos/abc123', '/repos/abc123/changes', '/settings', '/settings/general']) {
       const response = await app.request(new Request(`http://127.0.0.1:32100${path}`))
@@ -261,7 +261,7 @@ describe('server app html static', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
-      workspacePaneWorktreeApplication: workspacePaneWorktreeApplicationStub,
+      worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     const response = await app.request(new Request('http://127.0.0.1:32100/api/host'))
     expect(response.status).toBe(200)
@@ -279,7 +279,7 @@ describe('server app html static', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
-      workspacePaneWorktreeApplication: workspacePaneWorktreeApplicationStub,
+      worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     const response = await app.request(new Request('http://127.0.0.1:32100/api/unknown'))
     expect(response.status).toBe(404)
@@ -318,7 +318,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
-      workspacePaneWorktreeApplication: workspacePaneWorktreeApplicationStub,
+      worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     // 5 MiB body — well over the 1 MiB cap; Content-Length is set.
     const response = await app.request(
@@ -341,7 +341,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
-      workspacePaneWorktreeApplication: workspacePaneWorktreeApplicationStub,
+      worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     const response = await app.request(
       new Request('http://127.0.0.1:32100/api/settings/prefs', {
@@ -373,7 +373,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
-      workspacePaneWorktreeApplication: workspacePaneWorktreeApplicationStub,
+      worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     const form = new FormData()
     form.append('files', new File([new Uint8Array(8 * 1024 * 1024)], 'a.bin'))
@@ -403,7 +403,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
-      workspacePaneWorktreeApplication: workspacePaneWorktreeApplicationStub,
+      worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     const response = await app.request(
       new Request('http://127.0.0.1:32100/api/clipboard/files', {
@@ -431,7 +431,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
-      workspacePaneWorktreeApplication: workspacePaneWorktreeApplicationStub,
+      worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     const response = await app.request(
       new Request('http://127.0.0.1:32100/api/clipboard/files', {
@@ -454,7 +454,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
-      workspacePaneWorktreeApplication: workspacePaneWorktreeApplicationStub,
+      worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     // Two-kilobyte body to a hypothetical /api/health endpoint —
     // 1 KiB is plenty for the JSON requests health probes actually

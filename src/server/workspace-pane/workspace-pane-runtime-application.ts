@@ -1,4 +1,3 @@
-import type { ExecResult } from '#/shared/git-types.ts'
 import type {
   TerminalCreateInput,
   TerminalCreateResult,
@@ -20,20 +19,14 @@ import type {
 } from '#/shared/workspace-pane-runtime.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
-import type {
-  WorkspacePaneWorktreeOperationCoordinator,
-  WorkspacePaneWorktreeOperationTarget,
-} from '#/server/workspace-pane/workspace-pane-worktree-operation-coordinator.ts'
+import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { terminalSessionRuntimeScope, terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
 
 type MaybePromise<T> = T | Promise<T>
 
 interface WorkspacePaneRuntimeApplicationDependencies {
-  workspaceTabsCoordinator: Pick<
-    WorkspacePaneTabsCoordinator,
-    'closeWorktree' | 'ensureRuntimeTabForSession' | 'reconcileWorktree'
-  >
-  worktreeOperations: WorkspacePaneWorktreeOperationCoordinator
+  workspaceTabsCoordinator: Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktree'>
+  worktreeOperations: PhysicalWorktreeOperationCoordinator
   terminal: {
     create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCreateResult>
     close(clientId: string, userId: string, input: TerminalSessionInput): MaybePromise<boolean>
@@ -49,7 +42,8 @@ interface WorkspacePaneRuntimeApplicationDependencies {
 /**
  * Application operation joining provider lifecycle and workspace-pane
  * projection. All provider operations for one user/runtime/worktree share a
- * queue, so open, close, and removal observe one server-owned order.
+ * physical-worktree queue, so open and close observe one server-owned order
+ * and cannot cross an admitted removal.
  */
 export class WorkspacePaneRuntimeApplication {
   private readonly deps: WorkspacePaneRuntimeApplicationDependencies
@@ -65,7 +59,7 @@ export class WorkspacePaneRuntimeApplication {
   ): Promise<WorkspacePaneRuntimeOpenResult> {
     const scope = terminalSessionRuntimeScope(input.request.repoRoot, input.request.repoRuntimeId)
     const worktreePath = terminalSessionWorktreePath(input.request.repoRoot, input.request.worktreePath)
-    const operationTarget = { userId, scope, worktreePath }
+    const operationTarget = { repoRoot: input.request.repoRoot, worktreePath }
     if (this.deps.worktreeOperations.isRemovalAdmitted(operationTarget)) {
       return runtimeFailure(input.runtimeType, 'error.worktree-removal-in-progress')
     }
@@ -85,7 +79,7 @@ export class WorkspacePaneRuntimeApplication {
     const target = normalizedRuntimeTarget(input.target)
     const scope = terminalSessionRuntimeScope(target.repoRoot, target.repoRuntimeId)
     return await this.deps.worktreeOperations.runOperation(
-      { userId, scope, worktreePath: target.worktreePath },
+      { repoRoot: target.repoRoot, worktreePath: target.worktreePath },
       async () => {
         if (!this.isCurrentTarget(userId, target)) return runtimeFailure(input.runtimeType, 'error.repo-runtime-stale')
         switch (input.runtimeType) {
@@ -94,30 +88,6 @@ export class WorkspacePaneRuntimeApplication {
         }
       },
     )
-  }
-
-  async removeWorktree(
-    userId: string,
-    input: {
-      repoRoot: string
-      repoRuntimeId: string
-      worktreePath: string
-      remove(beforeRemove: () => Promise<ExecResult>): Promise<ExecResult>
-    },
-  ): Promise<ExecResult> {
-    if (!this.deps.isCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)) {
-      return { ok: false, message: 'error.repo-runtime-stale' }
-    }
-    const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
-    const worktreePath = terminalSessionWorktreePath(input.repoRoot, input.worktreePath)
-    const target = { userId, scope, worktreePath }
-    const result = await this.deps.worktreeOperations.runRemoval(target, async () => {
-      if (!this.deps.isCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)) {
-        return { ok: false, message: 'error.repo-runtime-stale' } satisfies ExecResult
-      }
-      return await input.remove(async () => await this.prepareWorktreeRemoval(input.repoRoot, target))
-    })
-    return result.admitted ? result.value : { ok: false, message: 'error.worktree-removal-in-progress' }
   }
 
   private async openTerminal(
@@ -191,10 +161,7 @@ export class WorkspacePaneRuntimeApplication {
     return { ok: true, runtimeType: 'terminal', runtime: { sessions: remainingSessions }, workspacePaneTabs }
   }
 
-  private async listTerminalSessions(
-    userId: string,
-    scope: string,
-  ): Promise<TerminalSessionSummary[]> {
+  private async listTerminalSessions(userId: string, scope: string): Promise<TerminalSessionSummary[]> {
     return await this.deps.terminalWorktree.listSessionsForUser(userId, scope)
   }
 
@@ -215,21 +182,6 @@ export class WorkspacePaneRuntimeApplication {
 
   private isCurrentTarget(userId: string, target: WorkspacePaneRuntimeCommandTarget): boolean {
     return this.deps.isCurrentRepoRuntime(userId, target.repoRoot, target.repoRuntimeId)
-  }
-
-  private async prepareWorktreeRemoval(
-    repoRoot: string,
-    target: WorkspacePaneWorktreeOperationTarget,
-  ): Promise<ExecResult> {
-    const sessions = (await this.deps.terminalWorktree.listSessionsForUser(target.userId, target.scope)).filter(
-      (session) => session.worktreePath === target.worktreePath,
-    )
-    for (const session of sessions) {
-      this.deps.terminalWorktree.closeSessionForUser(target.userId, session.terminalRuntimeSessionId)
-    }
-    await this.deps.workspaceTabsCoordinator.closeWorktree({ ...target, repoRoot })
-    this.deps.broadcastWorkspaceTabsChanged(target.userId, repoRoot)
-    return { ok: true, message: '' }
   }
 }
 

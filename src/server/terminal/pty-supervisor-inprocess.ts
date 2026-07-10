@@ -36,6 +36,32 @@ export function createInProcessPtySupervisor(): PtySupervisor {
       entries.delete(handle.ptySessionId)
       entry?.runtime.kill()
     },
+    async killAndWait(handle) {
+      const entry = entries.get(handle.ptySessionId)
+      if (!entry) return
+      await new Promise<void>((resolve, reject) => {
+        let settled = false
+        let timer: ReturnType<typeof setTimeout> | null = null
+        const finish = () => {
+          if (settled) return
+          settled = true
+          if (timer) clearTimeout(timer)
+          entries.delete(handle.ptySessionId)
+          resolve()
+        }
+        const disposable = entry.runtime.onExit(() => {
+          disposable.dispose()
+          finish()
+        })
+        timer = setTimeout(() => {
+          if (settled) return
+          settled = true
+          disposable.dispose()
+          reject(new Error('PTY close timed out'))
+        }, 2_000)
+        entry.runtime.kill()
+      })
+    },
     onData(handle, listener) {
       const entry = entries.get(handle.ptySessionId)
       if (!entry) return { dispose: () => {} }

@@ -76,14 +76,18 @@ beforeEach(() => {
 })
 
 function createTestRepoRoutes(
-  workspacePaneWorktreeApplication: Parameters<typeof createRepoRoutes>[0]['workspacePaneWorktreeApplication'] = {
+  worktreeRemovalApplication: Parameters<typeof createRepoRoutes>[0]['worktreeRemovalApplication'] = {
     async removeWorktree(_userId, input) {
-      return await input.remove(async () => ({ ok: true, message: '' }))
+      return await input.remove({
+        beforeRemove: async () => ({ ok: true, message: '' }),
+        afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+        afterRemoveFailed: async () => {},
+      })
     },
   },
 ) {
   return createRepoRoutes({
-    workspacePaneWorktreeApplication,
+    worktreeRemovalApplication,
   })
 }
 
@@ -618,15 +622,21 @@ describe('repo routes — POST body validation (action endpoints)', () => {
 
   test('remove-worktree delegates one composed command and passes cleanup into the repository mutation boundary', async () => {
     const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
-    const workspacePaneWorktreeApplication: Parameters<typeof createRepoRoutes>[0]['workspacePaneWorktreeApplication'] =
-      {
-        removeWorktree: vi.fn(async (_userId, input) => await input.remove(beforeRemove)),
-      }
+    const worktreeRemovalApplication: Parameters<typeof createRepoRoutes>[0]['worktreeRemovalApplication'] = {
+      removeWorktree: vi.fn(
+        async (_userId, input) =>
+          await input.remove({
+            beforeRemove,
+            afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+            afterRemoveFailed: async () => {},
+          }),
+      ),
+    }
     mocks.removeRepoWorktree.mockImplementationOnce(async (_cwd, _input, lifecycle) => {
       const prepared = await lifecycle.beforeRemove()
       return prepared.ok ? { ok: true, message: 'removed' } : prepared
     })
-    const app = createTestRepoRoutes(workspacePaneWorktreeApplication)
+    const app = createTestRepoRoutes(worktreeRemovalApplication)
     const response = await app.request(
       new Request('http://localhost/remove-worktree', {
         method: 'POST',
@@ -643,7 +653,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ ok: true, message: 'removed' })
-    expect(workspacePaneWorktreeApplication.removeWorktree).toHaveBeenCalledWith(
+    expect(worktreeRemovalApplication.removeWorktree).toHaveBeenCalledWith(
       'user-test',
       expect.objectContaining({
         repoRoot: '/tmp/repo',
@@ -661,7 +671,11 @@ describe('repo routes — POST body validation (action endpoints)', () => {
         forceDeleteBranch: undefined,
         alsoDeleteUpstream: undefined,
       },
-      { beforeRemove: expect.any(Function) },
+      {
+        beforeRemove: expect.any(Function),
+        afterWorktreeRemoved: expect.any(Function),
+        afterRemoveFailed: expect.any(Function),
+      },
       expect.any(AbortSignal),
     )
   })

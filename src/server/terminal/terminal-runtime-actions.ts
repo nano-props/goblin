@@ -23,6 +23,7 @@ import { isCurrentRepoRuntime as isCurrentRepoRuntimeOpen } from '#/server/modul
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
+import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 
 const MAX_TERMINAL_RECOVERY_PROJECTION_ATTEMPTS = 4
 
@@ -43,6 +44,7 @@ interface TerminalRuntimeActionDependencies {
   broker: Pick<RealtimeBroker<AppRealtimeMessage>, 'broadcastToUser'>
   sessionService: TerminalSessionServiceLike
   isValidTerminalClientId(value: unknown): value is string
+  worktreeOperations: Pick<PhysicalWorktreeOperationCoordinator, 'isRemovalAdmitted'>
 }
 
 // Manager, broker, and session service all use `userId` as the terminal
@@ -50,7 +52,7 @@ interface TerminalRuntimeActionDependencies {
 // identifier, but it must not decide session visibility or lifecycle
 // fanout.
 export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependencies) {
-  const { manager, broker, sessionService, isValidTerminalClientId } = deps
+  const { manager, broker, sessionService, isValidTerminalClientId, worktreeOperations } = deps
 
   return {
     async attach(clientId: string, userId: string, input: TerminalAttachInput): Promise<TerminalAttachResult> {
@@ -82,6 +84,12 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         return { ok: false, message: 'error.invalid-arguments' }
       }
       const session = manager.getSessionSummaryForUser(userId, terminalRuntimeSessionId)
+      if (
+        session &&
+        worktreeOperations.isRemovalAdmitted({ repoRoot: session.repoRoot, worktreePath: session.worktreePath })
+      ) {
+        return { ok: false, message: 'error.worktree-removal-in-progress' }
+      }
       const terminalClientId = input.clientId ?? clientId
       const result = await manager.restartSession(
         userId,

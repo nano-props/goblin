@@ -127,7 +127,8 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
 export async function commitCreatedTerminalWorkspacePaneRuntimeTab(
   options: CommitCreatedTerminalWorkspacePaneRuntimeTabOptions,
 ): Promise<TerminalCreatedTabCommitResult> {
-  await applyCreatedTerminalWorkspacePaneRuntimeTabs(options)
+  const projectionStatus = await applyCreatedTerminalWorkspacePaneRuntimeTabs(options)
+  if (projectionStatus !== 'accepted') return { status: projectionStatus }
   if (!terminalCreateTargetRuntimeIsCurrent(options.base)) return { status: 'superseded' }
   recordCreatedTerminalWorkspacePaneRuntimeTabOpener(options)
   const navigationCommitted = await options.showCreatedTerminalTab(options.admission.terminalSessionId)
@@ -148,15 +149,16 @@ function recordCreatedTerminalWorkspacePaneRuntimeTabOpener(
 
 async function applyCreatedTerminalWorkspacePaneRuntimeTabs(
   options: CommitCreatedTerminalWorkspacePaneRuntimeTabOptions,
-): Promise<void> {
+): Promise<'accepted' | 'superseded' | 'projection-failed'> {
   const repoRuntimeId = options.base.repoRuntimeId
-  if (!repoRuntimeId) return
+  if (!repoRuntimeId) return 'superseded'
   try {
-    await writeCanonicalWorkspacePaneTabsSnapshot(
+    const accepted = await writeCanonicalWorkspacePaneTabsSnapshot(
       options.base.repoRoot,
       repoRuntimeId,
       options.admission.workspacePaneTabs,
     )
+    return accepted ? 'accepted' : 'superseded'
   } catch (err) {
     gblLog.warn('failed to apply application-returned workspace pane tabs', {
       repoRoot: options.base.repoRoot,
@@ -166,6 +168,7 @@ async function applyCreatedTerminalWorkspacePaneRuntimeTabs(
       err,
     })
     refreshWorkspacePaneTabs(options.base.repoRoot, repoRuntimeId)
+    return 'projection-failed'
   }
 }
 

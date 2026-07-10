@@ -68,6 +68,8 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
   private inputFlushScheduled = false
   private spawnGeneration = 0
   private pendingSpawn: Promise<TerminalPtySpawnResult> | null = null
+  private readonly pendingSpawns = new Set<Promise<TerminalPtySpawnResult>>()
+  private readonly unconfirmedStaleHandles = new Map<string, PtyHandle>()
 
   constructor(supervisor: PtySupervisor, events: TerminalPtyBindingEvents<TSession>) {
     this.supervisor = supervisor
@@ -88,9 +90,11 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     const generation = this.beginSpawn()
     const spawn = this.resolveSpawn(session, generation)
     this.pendingSpawn = spawn
+    this.pendingSpawns.add(spawn)
     try {
       return await spawn
     } finally {
+      this.pendingSpawns.delete(spawn)
       if (this.pendingSpawn === spawn) this.pendingSpawn = null
     }
   }
@@ -127,6 +131,29 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
 
   dispose(session: TSession): void {
     this.disposeResources(session)
+  }
+
+  async disposeAndWait(session: TSession): Promise<void> {
+    this.inputQueue = []
+    this.inputFlushScheduled = false
+    while (this.pendingSpawns.size > 0) await Promise.all(Array.from(this.pendingSpawns))
+    const handle = this.handle
+    this.handle = null
+    try {
+      const handles = new Map(this.unconfirmedStaleHandles)
+      if (handle) handles.set(handle.ptySessionId, handle)
+      for (const pendingHandle of handles.values()) {
+        await this.supervisor.killAndWait(pendingHandle)
+        this.unconfirmedStaleHandles.delete(pendingHandle.ptySessionId)
+      }
+    } catch (error) {
+      // Keep the handle addressable so a later removal attempt can confirm
+      // termination instead of treating a timed-out kill as completed.
+      if (!this.handle) this.handle = handle
+      throw error
+    }
+    disposeRender(session.render)
+    this.disposeListeners(session.id)
   }
 
   resize(session: TSession, cols: number, rows: number): boolean {
@@ -177,7 +204,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
       return this.spawnResult(generation, resolved)
     }
     if (!this.isCurrentSpawn(session, generation)) {
-      this.killStalePtyHandle(session.id, resolved.handle)
+      await this.killStalePtyHandle(session.id, resolved.handle)
       return this.staleSpawnResult(generation)
     }
     this.bindHandle(session, generation, resolved.handle)
@@ -284,10 +311,11 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     return this.spawnResult(generation, { ok: false, message: 'error.unavailable' })
   }
 
-  private killStalePtyHandle(terminalRuntimeSessionId: string, handle: PtyHandle): void {
+  private async killStalePtyHandle(terminalRuntimeSessionId: string, handle: PtyHandle): Promise<void> {
     try {
-      this.supervisor.kill(handle)
+      await this.supervisor.killAndWait(handle)
     } catch (err) {
+      this.unconfirmedStaleHandles.set(handle.ptySessionId, handle)
       ptyLifecycleLogger.warn({ terminalRuntimeSessionId, err }, 'failed to kill stale PTY')
     }
   }
@@ -295,13 +323,16 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
   private disposeResources(session: TSession): void {
     this.disposeListeners(session.id)
     disposeRender(session.render)
-    if (this.handle) {
+    const handles = new Map(this.unconfirmedStaleHandles)
+    if (this.handle) handles.set(this.handle.ptySessionId, this.handle)
+    for (const handle of handles.values()) {
       try {
-        this.supervisor.kill(this.handle)
+        this.supervisor.kill(handle)
       } catch (err) {
         ptyLifecycleLogger.warn({ terminalRuntimeSessionId: session.id, err }, 'failed to kill PTY')
       }
     }
+    this.unconfirmedStaleHandles.clear()
     this.handle = null
     this.inputQueue = []
     this.inputFlushScheduled = false

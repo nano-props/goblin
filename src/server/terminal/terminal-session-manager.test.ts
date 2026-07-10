@@ -7,6 +7,7 @@ import {
   type PtySupervisor,
 } from '#/server/terminal/pty-supervisor.ts'
 import { TerminalSessionManager, type TerminalEventSink } from '#/server/terminal/terminal-session-manager.ts'
+import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 
 const USER_ID = 'user_terminal_session_manager'
 const CLIENT_ID = 'client_terminal_session_manager'
@@ -38,6 +39,9 @@ function createDeferredPtySupervisor(): PtySupervisor & {
     write: vi.fn(),
     resize: vi.fn(),
     kill(handle) {
+      killed.push(handle.ptySessionId)
+    },
+    async killAndWait(handle) {
       killed.push(handle.ptySessionId)
     },
     onData(handle, listener) {
@@ -314,5 +318,88 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
       canonicalCols: 120,
       canonicalRows: 40,
     })
+  })
+})
+
+describe('TerminalSessionManager physical worktree quiescence', () => {
+  test('waits for an in-flight spawn and its kill acknowledgement before reporting quiescence', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    let acknowledgeKill!: () => void
+    const killAcknowledged = new Promise<void>((resolve) => {
+      acknowledgeKill = resolve
+    })
+    supervisor.killAndWait = vi.fn(async () => await killAcknowledged)
+    const manager = createManager(supervisor)
+    const repoRoot = '/repo'
+    const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
+    const pendingCreate = manager.ensureSession({
+      userId: USER_ID,
+      scope,
+      repoRoot,
+      repoRuntimeId: 'repo-runtime-test',
+      branch: BRANCH_NAME,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: WORKTREE_PATH,
+      cwd: WORKTREE_PATH,
+      cols: 80,
+      rows: 24,
+      clientId: CLIENT_ID,
+    })
+
+    let quiesced = false
+    const quiescence = manager.closeSessionsForPhysicalWorktree(repoRoot, WORKTREE_PATH).then((result) => {
+      quiesced = true
+      return result
+    })
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_quiescence_spawn_123'))
+    await Promise.resolve()
+    expect(quiesced).toBe(false)
+
+    acknowledgeKill()
+    await expect(quiescence).resolves.toEqual({ ok: true, scopes: [{ userId: USER_ID, scope }] })
+    await expect(pendingCreate).resolves.toEqual({ ok: false, message: 'error.unavailable' })
+  })
+
+  test('keeps a timed-out PTY addressable and reports its user scope for retry', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const killAndWait = vi.fn(async (_handle: PtyHandle): Promise<void> => {
+      throw new Error('PTY close timed out')
+    })
+    supervisor.killAndWait = killAndWait
+    const manager = createManager(supervisor)
+    const repoRoot = '/repo'
+    const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
+    const pending = manager.ensureSession({
+      userId: USER_ID,
+      scope,
+      repoRoot,
+      repoRuntimeId: 'repo-runtime-test',
+      branch: BRANCH_NAME,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: WORKTREE_PATH,
+      cwd: WORKTREE_PATH,
+      cols: 80,
+      rows: 24,
+      clientId: CLIENT_ID,
+    })
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_quiescence_123456'))
+    await pending
+
+    await expect(manager.closeSessionsForPhysicalWorktree(repoRoot, WORKTREE_PATH)).resolves.toEqual({
+      ok: false,
+      scopes: [{ userId: USER_ID, scope }],
+      message: 'PTY close timed out',
+    })
+    await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([
+      expect.objectContaining({ phase: 'error', message: 'PTY close timed out' }),
+    ])
+
+    killAndWait.mockResolvedValueOnce(undefined)
+    await expect(manager.closeSessionsForPhysicalWorktree(repoRoot, WORKTREE_PATH)).resolves.toEqual({
+      ok: true,
+      scopes: [{ userId: USER_ID, scope }],
+    })
+    expect(killAndWait).toHaveBeenCalledTimes(2)
+    await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])
   })
 })

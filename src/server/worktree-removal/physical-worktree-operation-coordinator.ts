@@ -1,38 +1,33 @@
 import PQueue from 'p-queue'
-import { terminalSessionUserWorktreeKey } from '#/shared/terminal-session-keys.ts'
+import { terminalSessionScope, terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
 
-export interface WorkspacePaneWorktreeOperationTarget {
-  userId: string
-  scope: string
+export interface PhysicalWorktreeOperationTarget {
+  repoRoot: string
   worktreePath: string
 }
 
-/**
- * Owns ordering for application commands that mutate one worktree's runtime
- * resources. A removal admission is visible before the command reaches the
- * queue, so later opens and tab writes cannot slip in behind the removal.
- */
-export class WorkspacePaneWorktreeOperationCoordinator {
+/** Serializes runtime mutations and removal admission by physical worktree identity. */
+export class PhysicalWorktreeOperationCoordinator {
   private readonly queues = new Map<string, PQueue>()
   private readonly removalAdmissions = new Set<string>()
 
-  isRemovalAdmitted(target: WorkspacePaneWorktreeOperationTarget): boolean {
-    return this.removalAdmissions.has(terminalSessionUserWorktreeKey(target))
+  isRemovalAdmitted(target: PhysicalWorktreeOperationTarget): boolean {
+    return this.removalAdmissions.has(physicalWorktreeOperationKey(target))
   }
 
-  assertWritable(target: WorkspacePaneWorktreeOperationTarget): void {
+  assertWritable(target: PhysicalWorktreeOperationTarget): void {
     if (this.isRemovalAdmitted(target)) throw new Error('error.worktree-removal-in-progress')
   }
 
-  async runOperation<T>(target: WorkspacePaneWorktreeOperationTarget, task: () => Promise<T>): Promise<T> {
-    return await this.runByKey(terminalSessionUserWorktreeKey(target), task)
+  async runOperation<T>(target: PhysicalWorktreeOperationTarget, task: () => Promise<T>): Promise<T> {
+    return await this.runByKey(physicalWorktreeOperationKey(target), task)
   }
 
   async runRemoval<T>(
-    target: WorkspacePaneWorktreeOperationTarget,
+    target: PhysicalWorktreeOperationTarget,
     task: () => Promise<T>,
   ): Promise<{ admitted: true; value: T } | { admitted: false }> {
-    const key = terminalSessionUserWorktreeKey(target)
+    const key = physicalWorktreeOperationKey(target)
     if (this.removalAdmissions.has(key)) return { admitted: false }
     this.removalAdmissions.add(key)
     try {
@@ -64,6 +59,10 @@ export class WorkspacePaneWorktreeOperationCoordinator {
   }
 }
 
-export function createWorkspacePaneWorktreeOperationCoordinator(): WorkspacePaneWorktreeOperationCoordinator {
-  return new WorkspacePaneWorktreeOperationCoordinator()
+function physicalWorktreeOperationKey(target: PhysicalWorktreeOperationTarget): string {
+  return `${terminalSessionScope(target.repoRoot)}\0${terminalSessionWorktreePath(target.repoRoot, target.worktreePath)}`
+}
+
+export function createPhysicalWorktreeOperationCoordinator(): PhysicalWorktreeOperationCoordinator {
+  return new PhysicalWorktreeOperationCoordinator()
 }

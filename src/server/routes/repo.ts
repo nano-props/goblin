@@ -38,7 +38,7 @@ import {
 } from '#/server/modules/repo-runtimes.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import type { RepoLogResponse } from '#/shared/api-types.ts'
-import type { ServerWorkspacePaneWorktreeApplicationHost } from '#/server/workspace-pane/workspace-pane-worktree-application-host.ts'
+import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 
 // Soft-fail envelope returned by `jsonOr` for every repo action that
@@ -47,9 +47,7 @@ import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 // human-readable i18n key, `err.ok === false` is the branch.
 const READ_REPO_ERROR = { ok: false as const, message: 'error.failed-read-repo' }
 
-export function createRepoRoutes(options: {
-  workspacePaneWorktreeApplication: ServerWorkspacePaneWorktreeApplicationHost
-}) {
+export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWorktreeRemovalHost }) {
   const app = createRouteApp()
   async function jsonOr<T>(run: () => Promise<T>, fallback: T, label: string) {
     try {
@@ -149,9 +147,7 @@ export function createRepoRoutes(options: {
   })
   app.post('/fetch', async (c) => {
     const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fetch, c)
-    return c.json(
-      await jsonOr(() => fetchRepo(cwd, 'user', c.req.raw.signal), READ_REPO_ERROR, 'fetch'),
-    )
+    return c.json(await jsonOr(() => fetchRepo(cwd, 'user', c.req.raw.signal), READ_REPO_ERROR, 'fetch'))
   })
   app.post('/clone', async (c) => {
     const { url, parentPath, directoryName } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.clone, c)
@@ -162,24 +158,15 @@ export function createRepoRoutes(options: {
   app.post('/pull', async (c) => {
     const { cwd, branch, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pull, c)
     return c.json(
-      await jsonOr(
-        () => pullRepoBranch(cwd, branch, worktreePath, c.req.raw.signal),
-        READ_REPO_ERROR,
-        'pull',
-      ),
+      await jsonOr(() => pullRepoBranch(cwd, branch, worktreePath, c.req.raw.signal), READ_REPO_ERROR, 'pull'),
     )
   })
   app.post('/push', async (c) => {
     const { cwd, branch } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.push, c)
-    return c.json(
-      await jsonOr(() => pushRepoBranch(cwd, branch, c.req.raw.signal), READ_REPO_ERROR, 'push'),
-    )
+    return c.json(await jsonOr(() => pushRepoBranch(cwd, branch, c.req.raw.signal), READ_REPO_ERROR, 'push'))
   })
   app.post('/create-worktree', async (c) => {
-    const { cwd, worktreePath, mode, worktreeBootstrap } = await parseHttpBody(
-      REPO_PROCEDURE_SCHEMAS.createWorktree,
-      c,
-    )
+    const { cwd, worktreePath, mode, worktreeBootstrap } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.createWorktree, c)
     return c.json(
       await jsonOr(
         () =>
@@ -192,10 +179,7 @@ export function createRepoRoutes(options: {
     )
   })
   app.post('/delete-branch', async (c) => {
-    const { cwd, branch, force, alsoDeleteUpstream } = await parseHttpBody(
-      REPO_PROCEDURE_SCHEMAS.deleteBranch,
-      c,
-    )
+    const { cwd, branch, force, alsoDeleteUpstream } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.deleteBranch, c)
     return c.json(
       await jsonOr(
         () => deleteRepoBranch(cwd, branch, { force, alsoDeleteUpstream }, c.req.raw.signal),
@@ -212,15 +196,15 @@ export function createRepoRoutes(options: {
     return c.json(
       await jsonOr(
         () =>
-          options.workspacePaneWorktreeApplication.removeWorktree(userId, {
+          options.worktreeRemovalApplication.removeWorktree(userId, {
             repoRoot: cwd,
             repoRuntimeId,
             worktreePath,
-            remove: async (beforeRemove) =>
+            remove: async (lifecycle) =>
               await removeRepoWorktree(
                 cwd,
                 { branch, worktreePath, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream },
-                { beforeRemove },
+                lifecycle,
                 c.req.raw.signal,
               ),
           }),

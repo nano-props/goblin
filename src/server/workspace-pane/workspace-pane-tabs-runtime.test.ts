@@ -82,6 +82,19 @@ describe('workspace pane tabs runtime storage', () => {
     ])
   })
 
+  test('enumerates every user and runtime scope for one physical worktree', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+    const tabs = [workspacePaneStaticTabEntry('status')]
+    runtime.replaceTabs({ ...target(), scope: '/repo\0runtime-a', tabs })
+    runtime.replaceTabs({ ...target(), userId: 'user-b', scope: '/repo\0runtime-b', tabs })
+    runtime.replaceTabs({ ...target(), scope: '/other-repo\0runtime-c', tabs })
+
+    expect(runtime.physicalWorktreeScopes({ repoRoot: '/repo', worktreePath: '/repo-linked' })).toEqual([
+      { userId: 'user-a', scope: '/repo\0runtime-a' },
+      { userId: 'user-b', scope: '/repo\0runtime-b' },
+    ])
+  })
+
   test('advances revisions monotonically per user and scope only when canonical state changes', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
     const tabs = [workspacePaneStaticTabEntry('status')]

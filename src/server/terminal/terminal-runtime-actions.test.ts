@@ -21,6 +21,7 @@ function makeActions(
     closeSessionForUser: (userId: string, terminalRuntimeSessionId: string) => boolean
     getSlotScope?: (userId: string, terminalRuntimeSessionId: string) => string | undefined
     isValidTerminalClientId?: (value: unknown) => value is string
+    removalAdmitted?: boolean
     broadcasts?: ReturnType<typeof vi.fn>
   } = { closeSessionForUser: () => false },
 ) {
@@ -74,6 +75,7 @@ function makeActions(
       broker,
       sessionService,
       isValidTerminalClientId,
+      worktreeOperations: { isRemovalAdmitted: () => options.removalAdmitted ?? false },
     }),
     broadcasts,
     manager,
@@ -351,6 +353,23 @@ describe('terminal-runtime-actions clientId gate', () => {
     })
 
     expect(manager.getSessionSummaryForUser).not.toHaveBeenCalled()
+    expect(manager.restartSession).not.toHaveBeenCalled()
+  })
+
+  test('restart cannot spawn a replacement PTY while physical worktree removal is admitted', async () => {
+    const { actions, manager } = makeActions({
+      closeSessionForUser: () => false,
+      getSlotScope: () => REPO_ROOT,
+      removalAdmitted: true,
+    })
+
+    await expect(
+      actions.restart(CLIENT_ID, USER_ID, {
+        terminalRuntimeSessionId: RUNTIME_SESSION_ID,
+        cols: 80,
+        rows: 24,
+      } as never),
+    ).resolves.toEqual({ ok: false, message: 'error.worktree-removal-in-progress' })
     expect(manager.restartSession).not.toHaveBeenCalled()
   })
 })

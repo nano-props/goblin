@@ -305,6 +305,8 @@ describe('remote git helpers', () => {
 
     const result = await removeRemoteWorktree(TARGET, {
       beforeRemove: async () => ({ ok: true, message: '' }),
+      afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+      afterRemoveFailed: async () => {},
       branch: 'feature/test',
       worktreePath: '/srv/repo-feature',
       alsoDeleteBranch: true,
@@ -381,6 +383,8 @@ describe('remote git helpers', () => {
 
     const result = await removeRemoteWorktree(TARGET, {
       beforeRemove: async () => ({ ok: true, message: '' }),
+      afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+      afterRemoveFailed: async () => {},
       branch: 'feature/test',
       worktreePath: '/srv/repo-feature',
       alsoDeleteBranch: true,
@@ -405,6 +409,8 @@ describe('remote git helpers', () => {
 
     const result = await removeRemoteWorktree(TARGET, {
       beforeRemove: async () => ({ ok: true, message: '' }),
+      afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+      afterRemoveFailed: async () => {},
       branch: 'feature/test;echo bad',
       worktreePath: '/srv/repo-feature',
       alsoDeleteBranch: true,
@@ -471,6 +477,8 @@ describe('remote git helpers', () => {
 
     const result = await removeRemoteWorktree(LINKED_TARGET, {
       beforeRemove: async () => ({ ok: true, message: '' }),
+      afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+      afterRemoveFailed: async () => {},
       branch: 'feature/test',
       worktreePath: '/srv/repo-feature',
       alsoDeleteBranch: true,

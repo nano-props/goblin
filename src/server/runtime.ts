@@ -5,11 +5,11 @@ import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.
 import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
 import { WorkerBackedPtySupervisor } from '#/server/terminal/pty-supervisor-worker.ts'
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
-import type { ServerWorkspacePaneWorktreeApplicationHost } from '#/server/workspace-pane/workspace-pane-worktree-application-host.ts'
+import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 
 interface ServerRuntimeBaseOptions extends Omit<
   ServerAppOptions,
-  'appRealtimeHost' | 'workspacePaneWorktreeApplication' | 'serverHost' | 'serverPort'
+  'appRealtimeHost' | 'worktreeRemovalApplication' | 'serverHost' | 'serverPort'
 > {
   /**
    * On-disk path of the bundled PTY worker entry. When provided, the
@@ -27,10 +27,10 @@ interface ServerRuntimeBaseOptions extends Omit<
 
 export type ServerRuntimeOptions = ServerRuntimeBaseOptions &
   (
-    | { appRealtimeHost?: undefined; workspacePaneWorktreeApplication?: undefined }
+    | { appRealtimeHost?: undefined; worktreeRemovalApplication?: undefined }
     | {
         appRealtimeHost: ServerAppRealtimeHost
-        workspacePaneWorktreeApplication: ServerWorkspacePaneWorktreeApplicationHost
+        worktreeRemovalApplication: ServerWorktreeRemovalHost
       }
   )
 
@@ -43,7 +43,7 @@ export interface ServerRuntime {
 export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntime {
   const {
     appRealtimeHost: providedAppRealtimeHost,
-    workspacePaneWorktreeApplication: providedWorkspacePaneWorktreeApplication,
+    worktreeRemovalApplication: providedWorktreeRemovalApplication,
     ptyWorkerEntry,
     gCommandEntry,
     gCommandBinDir,
@@ -69,15 +69,14 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
           : undefined,
       })
   const appRealtimeHost = providedAppRealtimeHost ?? (runtime?.host as ServerAppRealtimeHost)
-  const workspacePaneWorktreeApplication =
-    providedWorkspacePaneWorktreeApplication ?? runtime?.workspacePaneRuntimeApplication
-  if (!workspacePaneWorktreeApplication) throw new Error('workspace pane worktree application is required')
+  const worktreeRemovalApplication = providedWorktreeRemovalApplication ?? runtime?.worktreeRemovalApplication
+  if (!worktreeRemovalApplication) throw new Error('worktree removal application is required')
   // `appOptions` carries `accessToken` (renamed from the pre-PR
   // `internalSecret`); it's forwarded straight to `createApp`.
   const app = createApp({
     ...appOptions,
     appRealtimeHost,
-    workspacePaneWorktreeApplication,
+    worktreeRemovalApplication,
     serverHost,
     serverPort,
   })

@@ -15,6 +15,7 @@ import {
 } from '#/shared/workspace-pane-tabs-runtime-keys.ts'
 import { workspacePaneTabsUserScopeQueueKey } from '#/server/workspace-pane/workspace-pane-tabs-user-queue-key.ts'
 import { workspacePaneTabEntryArraysEqual } from '#/server/workspace-pane/workspace-pane-tabs-operations.ts'
+import { terminalSessionScopeBelongsToRepo } from '#/server/terminal/terminal-session-scope.ts'
 
 export interface WorkspacePaneTabsTargetInput<TUser extends string | number> {
   userId: TUser
@@ -47,6 +48,7 @@ export interface WorkspacePaneTabsScopeEntry {
 }
 
 interface StoredWorkspacePaneTabsEntry {
+  userId: string | number
   scope: string
   branchName: string
   worktreePath: string | null
@@ -75,6 +77,7 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
       return [...existing.tabs]
     }
     this.tabsByTarget.set(targetKey, {
+      userId: input.userId,
       scope: input.scope,
       branchName: input.branchName,
       worktreePath: input.worktreePath,
@@ -131,6 +134,21 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
       changed = true
     }
     if (changed) this.advanceRevision(input.userId, input.scope)
+  }
+
+  physicalWorktreeScopes(input: { repoRoot: string; worktreePath: string }): Array<{ userId: TUser; scope: string }> {
+    const affected = new Map<string, { userId: TUser; scope: string }>()
+    for (const entry of this.tabsByTarget.values()) {
+      if (
+        entry.worktreePath !== input.worktreePath ||
+        !terminalSessionScopeBelongsToRepo(entry.scope, input.repoRoot)
+      ) {
+        continue
+      }
+      const userId = entry.userId as TUser
+      affected.set(`${String(userId)}\0${entry.scope}`, { userId, scope: entry.scope })
+    }
+    return Array.from(affected.values())
   }
 
   revision(input: WorkspacePaneTabsScopeInput<TUser>): number {

@@ -104,6 +104,30 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     this.ensureWorker().send({ type: 'pty-kill', ptySessionId: handle.ptySessionId })
   }
 
+  async killAndWait(handle: PtyHandle): Promise<void> {
+    if (this.shuttingDown || !this.sessions.has(handle.ptySessionId)) return
+    await new Promise<void>((resolve, reject) => {
+      const session = this.getOrCreateSession(handle.ptySessionId, 'terminal')
+      const onExit = () => {
+        clearTimeout(timeout)
+        session.listeners.exit.delete(onExit)
+        resolve()
+      }
+      const timeout = setTimeout(() => {
+        session.listeners.exit.delete(onExit)
+        reject(new Error('PTY close timed out'))
+      }, 5_000)
+      session.listeners.exit.add(onExit)
+      try {
+        this.ensureWorker().send({ type: 'pty-kill', ptySessionId: handle.ptySessionId })
+      } catch (error) {
+        clearTimeout(timeout)
+        session.listeners.exit.delete(onExit)
+        reject(error)
+      }
+    })
+  }
+
   onData(handle: PtyHandle, listener: (data: string) => void): { dispose(): void } {
     const session = this.getOrCreateSession(handle.ptySessionId, 'terminal')
     session.listeners.data.add(listener)

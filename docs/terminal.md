@@ -158,14 +158,18 @@ planned close-back navigation.
 
 This distinction matters for destructive worktree operations. The client sends
 one repository-removal intent; it does not close tabs first. The server
-application layer admits removal for the user/repo-runtime/worktree before the
-command waits in the repository write queue. Later runtime opens and canonical
-tab writes for that target are rejected. After repository validation succeeds,
-but before the Git worktree remove begins, the application closes authoritative
-provider resources, removes every canonical tab target for the worktree, and
-advances the server revision. Validation failures leave runtime resources
-untouched. The admission is released when the repository command settles, so
-recreating the same path later does not inherit a client or server tombstone.
+`WorktreeRemovalApplication` admits removal by canonical repo/worktree identity
+before the command waits in the repository write queue. The admission spans
+users and repo runtimes because the filesystem worktree is one physical
+resource. Later runtime opens and canonical tab writes for that target are
+rejected. After repository validation succeeds, the application closes and
+awaits all authoritative provider resources. Once quiescence is confirmed, the
+Git removal crosses a non-cancelable commit point. Canonical tabs are removed
+only after Git confirms worktree removal. If Git fails, runtime tabs reconcile
+against the quiesced providers while static tabs remain. Validation failures
+leave all runtime resources untouched. The admission is released when the
+repository command settles, so recreating the same path later does not inherit
+a tombstone.
 
 The repo route only delegates the composed command to the application layer;
 RepoSource and Git code remain unaware of terminal or Workspace Pane types.
@@ -190,10 +194,9 @@ Terminal creation has three architecture layers:
 
 - `TerminalSessionService` and its focused domain collaborators own terminal
   create/reuse/restore, PTY/session lifecycle, and terminal first-frame data.
-- `WorkspacePaneRuntimeApplication` owns composed open/close/worktree-removal
-  commands and their shared server worktree queue: invoke the provider,
-  commit canonical runtime membership, publish invalidation, and return the
-  provider result plus a revisioned full-scope snapshot.
+- `WorkspacePaneRuntimeApplication` owns composed runtime open/close commands;
+  `WorktreeRemovalApplication` owns physical removal, provider quiescence, Git
+  commit, and canonical-tab finalization.
 - `TerminalSessionProjection` and Workspace Pane commands own client admission,
   pending/single-flight intent, startup command resolution, durable provider
   cleanup, opener attribution, revision-gated local projection, cancellation,

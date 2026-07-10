@@ -27,6 +27,10 @@ export function terminalSessionRuntimeScope(repoRoot: string, repoRuntimeId: str
   return `${terminalSessionScope(repoRoot)}\0${repoRuntimeId}`
 }
 
+export function terminalSessionScopeBelongsToRepo(scope: string, repoRoot: string): boolean {
+  return scope.startsWith(`${terminalSessionScope(repoRoot)}\0`)
+}
+
 export function terminalSessionWorktreePath(repoRoot: string, worktreePath: string): string {
   return isRemoteRepoId(repoRoot) ? worktreePath : path.resolve(worktreePath)
 }

@@ -17,7 +17,10 @@ export type TerminalCreateCommandResult =
 export type TerminalCreateCommandAdmission = TerminalCreateAdmissionResult
 
 export type TerminalCreatedTabCommitResult =
-  { status: 'committed' } | { status: 'superseded' } | { status: 'navigation-rejected' }
+  | { status: 'committed' }
+  | { status: 'superseded' }
+  | { status: 'projection-failed' }
+  | { status: 'navigation-rejected' }
 
 const TERMINAL_CREATE_CANCELED_MESSAGE = 'terminal create request canceled'
 const WORKSPACE_PANE_NAVIGATION_REJECTED_MESSAGE = 'workspace pane navigation rejected'

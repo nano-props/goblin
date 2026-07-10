@@ -1,4 +1,5 @@
 import path from 'node:path'
+import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import { checkGitAvailable } from '#/system/git/git-exec.ts'
 import {
   deleteBranch,
@@ -127,7 +128,7 @@ export interface RepoSource {
       alsoDeleteUpstream?: boolean
     },
     signal: AbortSignal | undefined,
-    lifecycle: { beforeRemove(): Promise<ExecResult> },
+    lifecycle: RepoWorktreeRemovalLifecycle,
   ): Promise<RepoMutationResult>
   getPatch(worktreePath: string, signal?: AbortSignal): Promise<ExecResult>
   getBrowserRepoUrl(target: RepoUrlTarget, signal?: AbortSignal): Promise<string | null>
@@ -300,7 +301,12 @@ function createLocalRepoSource(repoId: string): RepoSource {
     if (!deleted.ok || !upstream) return deleted
     const slash = upstream.indexOf('/')
     if (slash <= 0) return deleted
-    const upstreamDeleted = await deleteUpstreamBranch(gitCwd, upstream.slice(0, slash), upstream.slice(slash + 1), signal)
+    const upstreamDeleted = await deleteUpstreamBranch(
+      gitCwd,
+      upstream.slice(0, slash),
+      upstream.slice(slash + 1),
+      signal,
+    )
     return upstreamDeleted.ok ? upstreamDeleted : { ...upstreamDeleted, repoChanged: true }
   }
 
@@ -449,14 +455,25 @@ function createLocalRepoSource(repoId: string): RepoSource {
       }
       const prepared = await lifecycle.beforeRemove()
       if (!prepared.ok) return prepared
-      const removed = await removeWorktree(mutationCwd, removable.target.path, signal)
-      if (!removed.ok) return removed
+      let removed: Awaited<ReturnType<typeof removeWorktree>>
+      try {
+        removed = await removeWorktree(mutationCwd, removable.target.path)
+      } catch (error) {
+        await lifecycle.afterRemoveFailed()
+        throw error
+      }
+      if (!removed.ok) {
+        await lifecycle.afterRemoveFailed()
+        return removed
+      }
+      const finalized = await lifecycle.afterWorktreeRemoved()
+      if (!finalized.ok) return withAffectedRepoIds({ ...finalized, repoChanged: true }, affectedRepoIds)
       if (!input.alsoDeleteBranch) return withAffectedRepoIds(removed, affectedRepoIds)
       return withAffectedRepoIds(
         await deleteBranchAfterValidation(
           input.branch,
           { force: input.forceDeleteBranch, alsoDeleteUpstream: input.alsoDeleteUpstream },
-          signal,
+          undefined,
           mutationCwd,
         ),
         affectedRepoIds,
@@ -566,7 +583,13 @@ async function createRemoteRepoSource(repoId: string): Promise<RepoSource> {
       return deleted.ok || deleted.repoChanged ? withAffectedRepoIds(deleted, affectedRepoIds) : deleted
     },
     async removeWorktree(input, signal, lifecycle) {
-      const result = await removeRemoteWorktree(target, { ...input, signal, beforeRemove: lifecycle.beforeRemove })
+      const result = await removeRemoteWorktree(target, {
+        ...input,
+        signal,
+        beforeRemove: lifecycle.beforeRemove,
+        afterWorktreeRemoved: lifecycle.afterWorktreeRemoved,
+        afterRemoveFailed: lifecycle.afterRemoveFailed,
+      })
       return withAffectedRepoIds(result, remoteWorktreeRepoIds(target, result.affectedWorktreePaths))
     },
     async getPatch(worktreePath, signal) {

@@ -164,7 +164,7 @@ describe('workspace pane runtime tab create action', () => {
     ).toBeLessThan(showCreatedTerminalTab.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY)
   })
 
-  test('does not treat a rejected older snapshot as server operation failure', async () => {
+  test('does not navigate when a newer server snapshot supersedes create presentation', async () => {
     workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsSnapshot.mockResolvedValueOnce(false)
     const showCreatedTerminalTab = vi.fn(() => true)
 
@@ -175,9 +175,9 @@ describe('workspace pane runtime tab create action', () => {
         openerIdentity: null,
         showCreatedTerminalTab,
       }),
-    ).resolves.toEqual({ status: 'committed' })
+    ).resolves.toEqual({ status: 'superseded' })
 
-    expect(showCreatedTerminalTab).toHaveBeenCalledWith(TERMINAL_SESSION_ID)
+    expect(showCreatedTerminalTab).not.toHaveBeenCalled()
   })
 
   test('does not navigate or record opener after the command target runtime is superseded', async () => {
@@ -198,7 +198,7 @@ describe('workspace pane runtime tab create action', () => {
     expect(useReposStore.getState().repos[REPO_ROOT]?.repoRuntimeId).toBe('repo-runtime-replacement')
   })
 
-  test('refreshes after projection failure but still routes when the operation runtime remains current', async () => {
+  test('refreshes after projection failure without routing an unprojected session', async () => {
     workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsSnapshot.mockRejectedValueOnce(
       new Error('query projection failed'),
     )
@@ -211,10 +211,10 @@ describe('workspace pane runtime tab create action', () => {
         openerIdentity: null,
         showCreatedTerminalTab,
       }),
-    ).resolves.toEqual({ status: 'committed' })
+    ).resolves.toEqual({ status: 'projection-failed' })
 
     expect(workspacePaneTabsQueryMocks.refreshWorkspacePaneTabs).toHaveBeenCalledWith(REPO_ROOT, REPO_RUNTIME_ID)
-    expect(showCreatedTerminalTab).toHaveBeenCalledWith(TERMINAL_SESSION_ID)
+    expect(showCreatedTerminalTab).not.toHaveBeenCalled()
   })
 
   test('marks the terminal create action busy while projection or create is pending', () => {

@@ -36,6 +36,7 @@ export interface PtySupervisor {
   write(handle: PtyHandle, data: string): void
   resize(handle: PtyHandle, cols: number, rows: number): void
   kill(handle: PtyHandle): void
+  killAndWait(handle: PtyHandle): Promise<void>
   onData(handle: PtyHandle, listener: (data: string) => void): { dispose(): void }
   onExit(handle: PtyHandle, listener: (code: number | null, signal: NodeJS.Signals | null) => void): { dispose(): void }
   processName(handle: PtyHandle): string

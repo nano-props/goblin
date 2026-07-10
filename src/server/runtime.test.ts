@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => ({
       isValidClientId: (_value: unknown): _value is string => true,
       shutdown: vi.fn(),
     } as unknown as ServerAppRealtimeHost,
-    workspacePaneRuntimeApplication: { removeWorktree: vi.fn() },
+    worktreeRemovalApplication: { removeWorktree: vi.fn() },
     shutdown: vi.fn(),
   })),
 }))
@@ -39,7 +39,7 @@ describe('server runtime', () => {
   test('injects the app realtime host into the server app factory', async () => {
     const { createServerRuntime } = await import('#/server/runtime.ts')
     const appRealtimeHost = { shutdown: vi.fn() } as unknown as ServerAppRealtimeHost
-    const workspacePaneWorktreeApplication = { removeWorktree: vi.fn() }
+    const worktreeRemovalApplication = { removeWorktree: vi.fn() }
 
     const runtime = createServerRuntime({
       version: '0.1.0',
@@ -48,7 +48,7 @@ describe('server runtime', () => {
       serverHost: '127.0.0.1',
       serverPort: 32100,
       appRealtimeHost,
-      workspacePaneWorktreeApplication,
+      worktreeRemovalApplication,
     })
 
     expect(runtime.appRealtimeHost).toBe(appRealtimeHost)
@@ -59,7 +59,7 @@ describe('server runtime', () => {
       serverHost: '127.0.0.1',
       serverPort: 32100,
       appRealtimeHost,
-      workspacePaneWorktreeApplication,
+      worktreeRemovalApplication,
     })
   })
 
@@ -88,8 +88,7 @@ describe('server runtime', () => {
       serverHost: '127.0.0.1',
       serverPort: 32100,
       appRealtimeHost: runtime.appRealtimeHost,
-      workspacePaneWorktreeApplication:
-        mocks.createServerTerminalRuntime.mock.results[0]?.value.workspacePaneRuntimeApplication,
+      worktreeRemovalApplication: mocks.createServerTerminalRuntime.mock.results[0]?.value.worktreeRemovalApplication,
     })
   })
 
@@ -101,7 +100,7 @@ describe('server runtime', () => {
         events.push('terminal')
       }),
     } as unknown as ServerAppRealtimeHost
-    const workspacePaneWorktreeApplication = { removeWorktree: vi.fn() }
+    const worktreeRemovalApplication = { removeWorktree: vi.fn() }
     mocks.stopBackgroundSync.mockImplementation(() => {
       events.push('background-sync')
     })
@@ -113,7 +112,7 @@ describe('server runtime', () => {
       serverHost: '127.0.0.1',
       serverPort: 32100,
       appRealtimeHost,
-      workspacePaneWorktreeApplication,
+      worktreeRemovalApplication,
     })
 
     runtime.shutdown()

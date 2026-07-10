@@ -11,7 +11,7 @@ import {
   type WorkspacePaneTabsRuntime,
 } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import { createWorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
-import { createWorkspacePaneWorktreeOperationCoordinator } from '#/server/workspace-pane/workspace-pane-worktree-operation-coordinator.ts'
+import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { TerminalAttachResult, TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
@@ -1037,7 +1037,7 @@ function createService(options: {
   }
   const workspaceTabsCoordinator = createWorkspacePaneTabsCoordinator({
     workspaceTabs: options.workspaceTabs,
-    worktreeOperations: createWorkspacePaneWorktreeOperationCoordinator(),
+    worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
     runtimeProviders: [terminalWorkspacePaneRuntimeTabsProvider(manager)],
   })
   return createTerminalSessionService({

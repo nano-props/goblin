@@ -3,7 +3,11 @@ import type { PullRequestInfo } from '#/shared/git-types.ts'
 import type { PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
 import { normalizeRemoteRepoId } from '#/shared/remote-repo.ts'
 
-const successfulRemovalLifecycle = { beforeRemove: async () => ({ ok: true as const, message: '' }) }
+const successfulRemovalLifecycle = {
+  beforeRemove: async () => ({ ok: true as const, message: '' }),
+  afterWorktreeRemoved: async () => ({ ok: true as const, message: '' }),
+  afterRemoveFailed: async () => {},
+}
 
 const mocks = vi.hoisted(() => ({
   checkGitAvailable: vi.fn(),
@@ -1290,7 +1294,7 @@ describe('repo mutation invalidation publishing', () => {
       expect(mocks.removeWorktree).toHaveBeenCalledTimes(1)
     })
 
-    expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-linked', undefined)
+    expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-linked')
     secondRemove.resolve({ ok: true, message: 'removed' })
     await expect(second).resolves.toEqual({ ok: true, message: 'removed' })
   })
@@ -1727,6 +1731,7 @@ describe('repo mutation invalidation publishing', () => {
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
     const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
     const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
+    const afterWorktreeRemoved = vi.fn(async () => ({ ok: true as const, message: '' }))
 
     const result = await removeRepoWorktree(
       '/tmp/repo',
@@ -1735,12 +1740,16 @@ describe('repo mutation invalidation publishing', () => {
         worktreePath: '/tmp/repo-worktree',
         alsoDeleteBranch: false,
       },
-      { beforeRemove },
+      { ...successfulRemovalLifecycle, beforeRemove, afterWorktreeRemoved },
     )
 
     expect(result).toEqual({ ok: true, message: 'ok' })
     expect(beforeRemove).toHaveBeenCalledOnce()
+    expect(afterWorktreeRemoved).toHaveBeenCalledOnce()
     expect(beforeRemove.mock.invocationCallOrder[0]).toBeLessThan(mocks.removeWorktree.mock.invocationCallOrder[0]!)
+    expect(mocks.removeWorktree.mock.invocationCallOrder[0]).toBeLessThan(
+      afterWorktreeRemoved.mock.invocationCallOrder[0]!,
+    )
     expect((await readRepoOperationsSnapshot('/tmp/repo')).operations).toEqual([])
     expect((await readRepoOperationsSnapshot('/tmp/repo', { includeSettled: true })).operations[0]).toMatchObject({
       kind: 'remove-worktree',
@@ -1757,6 +1766,39 @@ describe('repo mutation invalidation publishing', () => {
         query: 'repo-snapshot',
       },
     )
+  })
+
+  test('removeRepoWorktree reconciles application state when Git removal fails after commit', async () => {
+    mocks.removeWorktree.mockResolvedValueOnce({ ok: false, message: 'git remove failed' })
+    mocks.getWorktrees.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
+      {
+        path: '/tmp/repo-worktree',
+        branch: 'feature/a',
+        isBare: false,
+        isPrimary: false,
+        isDirty: false,
+        changeCount: 0,
+      },
+    ])
+    const afterRemoveFailed = vi.fn(async () => {})
+    const afterWorktreeRemoved = vi.fn(async () => ({ ok: true as const, message: '' }))
+    const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    await expect(
+      removeRepoWorktree(
+        '/tmp/repo',
+        {
+          branch: 'feature/a',
+          worktreePath: '/tmp/repo-worktree',
+          alsoDeleteBranch: false,
+        },
+        { ...successfulRemovalLifecycle, afterRemoveFailed, afterWorktreeRemoved },
+      ),
+    ).resolves.toEqual({ ok: false, message: 'git remove failed' })
+
+    expect(afterRemoveFailed).toHaveBeenCalledOnce()
+    expect(afterWorktreeRemoved).not.toHaveBeenCalled()
   })
 
   test('removeRepoWorktree publishes affected snapshot invalidations once after worktree and branch deletion success', async () => {
@@ -1823,7 +1865,7 @@ describe('repo mutation invalidation publishing', () => {
     )
 
     expect(result).toEqual({ ok: false, message: 'fatal: delete failed' })
-    expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', undefined)
+    expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree')
     expectRepoSnapshotInvalidations(
       {
         repoId: '/tmp/repo',
@@ -1863,7 +1905,7 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(result).toEqual({ ok: true, message: 'ok' })
     expect(mocks.getCurrentBranch).toHaveBeenCalledWith('/tmp/repo', { signal: undefined })
-    expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-linked', undefined)
+    expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-linked')
     expect(mocks.deleteBranch).toHaveBeenCalledWith('/tmp/repo', 'feature/a', { force: undefined, signal: undefined })
     expectRepoSnapshotInvalidations(
       {
@@ -1940,7 +1982,7 @@ describe('repo mutation invalidation publishing', () => {
         worktreePath: '/tmp/repo-worktree',
         alsoDeleteBranch: true,
       },
-      { beforeRemove },
+      { ...successfulRemovalLifecycle, beforeRemove },
     )
 
     expect(result).toEqual({ ok: false, message: 'error.cannot-remove-unpushed-worktree' })

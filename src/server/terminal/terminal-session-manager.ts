@@ -29,6 +29,7 @@ import { createEmptyTerminalRenderState, replaySnapshot } from '#/server/termina
 import { markTerminalSessionClosed, markTerminalSessionError } from '#/server/terminal/terminal-session-lifecycle.ts'
 import { TerminalPtyBinding, type TerminalPtySessionState } from '#/server/terminal/terminal-session-pty-lifecycle.ts'
 import type { PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
+import { terminalSessionScopeBelongsToRepo } from '#/server/terminal/terminal-session-scope.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
 
@@ -98,6 +99,15 @@ export interface TerminalEventSink<TUser extends string | number> {
   onIdentity?(userId: TUser, event: TerminalIdentityEvent): void
   onLifecycle?(userId: TUser, event: TerminalLifecycleEvent): void
 }
+
+export interface TerminalPhysicalWorktreeScope<TUser extends string | number> {
+  userId: TUser
+  scope: string
+}
+
+export type TerminalPhysicalWorktreeQuiescenceResult<TUser extends string | number> =
+  | { ok: true; scopes: TerminalPhysicalWorktreeScope<TUser>[] }
+  | { ok: false; scopes: TerminalPhysicalWorktreeScope<TUser>[]; message: string }
 
 export class TerminalSessionManager<TUser extends string | number> {
   private readonly sessionsByTerminalRuntimeSessionId = new Map<string, TerminalSessionView<TUser>>()
@@ -300,17 +310,20 @@ export class TerminalSessionManager<TUser extends string | number> {
   closeSession(terminalRuntimeSessionId: string, reason: TerminalSessionCloseReason = 'session'): void {
     const session = this.sessionsByTerminalRuntimeSessionId.get(terminalRuntimeSessionId)
     if (!session) return
+    const closedSession = this.detachSession(session)
+    session.ptyBinding.dispose(session)
+    this.sink.onSessionClosed?.(session.userId, closedSession, reason)
+  }
+
+  private detachSession(session: TerminalSessionView<TUser>): TerminalSessionSummary {
     session.ptyBinding.invalidateOwnership()
     if (markTerminalSessionClosed(session)) this.emitLifecycle(session)
     const closedSession = this.sessionSummary(session)
-    this.sessionsByTerminalRuntimeSessionId.delete(terminalRuntimeSessionId)
+    this.sessionsByTerminalRuntimeSessionId.delete(session.id)
     const userTerminalSessionIndex = this.formatUserTerminalSessionIndex(session.userId, session.terminalSessionId)
-    if (
-      this.terminalRuntimeSessionIdByUserTerminalSessionIndex.get(userTerminalSessionIndex) === terminalRuntimeSessionId
-    )
+    if (this.terminalRuntimeSessionIdByUserTerminalSessionIndex.get(userTerminalSessionIndex) === session.id)
       this.terminalRuntimeSessionIdByUserTerminalSessionIndex.delete(userTerminalSessionIndex)
-    session.ptyBinding.dispose(session)
-    this.sink.onSessionClosed?.(session.userId, closedSession, reason)
+    return closedSession
   }
 
   closeSessionsForUser(userId: TUser): void {
@@ -323,6 +336,34 @@ export class TerminalSessionManager<TUser extends string | number> {
     for (const session of Array.from(this.sessionsByTerminalRuntimeSessionId.values())) {
       if (session.userId === userId && session.scope === scope) this.closeSession(session.id, 'scope')
     }
+  }
+
+  async closeSessionsForPhysicalWorktree(
+    repoRoot: string,
+    worktreePath: string,
+  ): Promise<TerminalPhysicalWorktreeQuiescenceResult<TUser>> {
+    const affected = new Map<string, TerminalPhysicalWorktreeScope<TUser>>()
+    for (const session of Array.from(this.sessionsByTerminalRuntimeSessionId.values())) {
+      if (!terminalSessionScopeBelongsToRepo(session.scope, repoRoot) || session.worktreePath !== worktreePath) continue
+      const key = `${String(session.userId)}\0${session.scope}`
+      affected.set(key, { userId: session.userId, scope: session.scope })
+      try {
+        session.ptyBinding.invalidateOwnership()
+        await session.ptyBinding.disposeAndWait(session)
+      } catch (error) {
+        if (markTerminalSessionError(session, error instanceof Error ? error.message : String(error))) {
+          this.emitLifecycle(session)
+        }
+        return {
+          ok: false,
+          scopes: Array.from(affected.values()),
+          message: error instanceof Error ? error.message : String(error),
+        }
+      }
+      const closedSession = this.detachSession(session)
+      this.sink.onSessionClosed?.(session.userId, closedSession, 'scope')
+    }
+    return { ok: true, scopes: Array.from(affected.values()) }
   }
 
   handleClientPresenceChanged(userId: TUser, clientId: string, previousOnline: boolean): void {

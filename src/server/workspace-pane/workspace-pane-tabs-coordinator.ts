@@ -4,7 +4,7 @@ import { isWorkspacePaneStaticTabType, workspacePaneTabsWithRuntimeTab } from '#
 import type { WorkspacePaneTabsSnapshot, WorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs.ts'
 import { workspacePaneTabsUserScopeQueueKey } from '#/server/workspace-pane/workspace-pane-tabs-user-queue-key.ts'
 import type { WorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
-import type { WorkspacePaneWorktreeOperationCoordinator } from '#/server/workspace-pane/workspace-pane-worktree-operation-coordinator.ts'
+import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { workspacePaneTabsWithUpdateOperation } from '#/server/workspace-pane/workspace-pane-tabs-operations.ts'
 import {
   canonicalWorkspaceRuntimeTabsForTarget,
@@ -15,7 +15,14 @@ import {
 
 type WorkspacePaneTabsCoordinatorRuntime = Pick<
   WorkspacePaneTabsRuntime<string>,
-  'closeTabsForScope' | 'closeTabsForWorktree' | 'replaceTabs' | 'revision' | 'scopesForUser' | 'tabs' | 'tabsForScope'
+  | 'closeTabsForScope'
+  | 'closeTabsForWorktree'
+  | 'physicalWorktreeScopes'
+  | 'replaceTabs'
+  | 'revision'
+  | 'scopesForUser'
+  | 'tabs'
+  | 'tabsForScope'
 >
 
 export interface WorkspacePaneRuntimeTabsLiveSession {
@@ -32,13 +39,13 @@ export interface WorkspacePaneRuntimeTabsProvider {
 interface WorkspacePaneTabsCoordinatorOptions {
   runtimeProviders: readonly WorkspacePaneRuntimeTabsProvider[]
   workspaceTabs: WorkspacePaneTabsCoordinatorRuntime
-  worktreeOperations: WorkspacePaneWorktreeOperationCoordinator
+  worktreeOperations: PhysicalWorktreeOperationCoordinator
 }
 
 export class WorkspacePaneTabsCoordinator {
   private readonly runtimeProviders: readonly WorkspacePaneRuntimeTabsProvider[]
   private readonly workspaceTabs: WorkspacePaneTabsCoordinatorRuntime
-  private readonly worktreeOperations: WorkspacePaneWorktreeOperationCoordinator
+  private readonly worktreeOperations: PhysicalWorktreeOperationCoordinator
   private readonly operationQueuesByScope = new Map<string, PQueue>()
 
   constructor(options: WorkspacePaneTabsCoordinatorOptions) {
@@ -218,16 +225,39 @@ export class WorkspacePaneTabsCoordinator {
     })
   }
 
-  async closeWorktree(input: {
-    userId: string
+  physicalWorktreeScopes(input: { repoRoot: string; worktreePath: string }): Array<{ userId: string; scope: string }> {
+    return this.workspaceTabs.physicalWorktreeScopes(input)
+  }
+
+  async finalizePhysicalWorktreeRemoval(input: {
     repoRoot: string
-    scope: string
     worktreePath: string
-  }): Promise<WorkspacePaneTabsSnapshot> {
-    return await this.runWorkspaceTabsScopeOperation(input.userId, input.scope, () => {
-      this.workspaceTabs.closeTabsForWorktree(input)
-      return this.scopeSnapshot(input.userId, input.repoRoot, input.scope)
-    })
+    scopes: readonly { userId: string; scope: string }[]
+  }): Promise<void> {
+    await Promise.all(
+      input.scopes.map(async ({ userId, scope }) => {
+        await this.runWorkspaceTabsScopeOperation(userId, scope, () => {
+          this.workspaceTabs.closeTabsForWorktree({ userId, scope, worktreePath: input.worktreePath })
+        })
+      }),
+    )
+  }
+
+  async reconcilePhysicalWorktreeAfterRemovalFailure(input: {
+    repoRoot: string
+    worktreePath: string
+    scopes: readonly { userId: string; scope: string }[]
+  }): Promise<void> {
+    await Promise.all(
+      input.scopes.map(async ({ userId, scope }) => {
+        await this.reconcileWorktree({
+          userId,
+          repoRoot: input.repoRoot,
+          scope,
+          worktreePath: input.worktreePath,
+        })
+      }),
+    )
   }
 
   async closeUser(input: { userId: string }): Promise<void> {

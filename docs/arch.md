@@ -74,14 +74,14 @@ Runtime creation follows three responsibility layers:
 
 1. The provider domain service owns the resource lifecycle (terminal session,
    chat session, and so on) and remains usable without workspace-pane UI.
-2. `WorkspacePaneRuntimeApplication` owns the server application commands for
-   open, single close, and repository worktree removal. Commands for the same
-   user/repo-runtime/worktree share one server queue; each command joins the
-   provider lifecycle with canonical runtime-tab membership and returns a full
-   revisioned `WorkspacePaneTabsSnapshot`. Removal is admitted before it enters
-   the repository write queue, rejects later runtime/tab writes, and performs
-   provider plus canonical-tab cleanup after repository validation but before
-   the actual Git worktree removal.
+2. `WorkspacePaneRuntimeApplication` owns runtime open and single close,
+   joining provider lifecycle with canonical runtime-tab membership. The
+   separate `WorktreeRemovalApplication` owns physical worktree removal across
+   every user and repo runtime. Its physical-target admission rejects later
+   runtime/tab writes; after repository validation it awaits provider
+   quiescence, runs the Git removal past a non-cancelable commit point, then
+   finalizes canonical tabs. A Git failure reconciles runtime tabs while
+   preserving the worktree's static projection.
    Provider close results carry the corresponding server session projection;
    the client applies it only when it also accepts that command's canonical
    tabs revision, so an older close response cannot erase a newer open.

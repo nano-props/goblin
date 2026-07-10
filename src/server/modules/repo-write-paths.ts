@@ -1,4 +1,5 @@
 import path from 'node:path'
+import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import { publishRepoQueryInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
 import {
   beginRepoServerOperation,
@@ -6,11 +7,7 @@ import {
   settleRepoServerOperation,
   startRepoServerOperation,
 } from '#/server/modules/repo-operation-registry.ts'
-import {
-  resolveRepoSource,
-  runWithRepoSource,
-  type RepoMutationResult,
-} from '#/server/modules/repo-source.ts'
+import { resolveRepoSource, runWithRepoSource, type RepoMutationResult } from '#/server/modules/repo-source.ts'
 import {
   abortRepoWriteNetworkOperation,
   enqueueRepoWriteOperation,
@@ -279,10 +276,7 @@ export async function fetchRepo(
       canCancelUnderlying: true,
     },
     (_operation, context) => async () =>
-      await runWithRepoSource(
-        cwd,
-        async (source) => await runFetch((signal) => source.fetch(signal), context),
-      ),
+      await runWithRepoSource(cwd, async (source) => await runFetch((signal) => source.fetch(signal), context)),
   )
 }
 
@@ -298,11 +292,7 @@ export async function pullRepoBranch(
   })
 }
 
-export async function pushRepoBranch(
-  cwd: string,
-  branch: string,
-  signal?: AbortSignal,
-): Promise<ExecResult> {
+export async function pushRepoBranch(cwd: string, branch: string, signal?: AbortSignal): Promise<ExecResult> {
   const source = await resolveRepoSource(cwd)
   return await runUserNetworkMutation(cwd, signal, 'push', { branch }, async (mergedSignal) => {
     return await source.push(branch, mergedSignal)
@@ -399,7 +389,7 @@ export async function removeRepoWorktree(
     forceDeleteBranch?: boolean
     alsoDeleteUpstream?: boolean
   },
-  lifecycle: { beforeRemove(): Promise<ExecResult> },
+  lifecycle: RepoWorktreeRemovalLifecycle,
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   return await runRepoServerWriteOperation({

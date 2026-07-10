@@ -3,7 +3,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import { createWorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { createWorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
-import { createWorkspacePaneWorktreeOperationCoordinator } from '#/server/workspace-pane/workspace-pane-worktree-operation-coordinator.ts'
+import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import {
   type WorkspacePaneTabEntry,
   workspacePaneStaticTabEntry,
@@ -22,7 +22,7 @@ describe('workspace pane tabs coordinator', () => {
     const broadcastChanged = vi.fn()
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
-      worktreeOperations: createWorkspacePaneWorktreeOperationCoordinator(),
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       runtimeProviders: [
         {
           type: 'terminal',
@@ -54,7 +54,7 @@ describe('workspace pane tabs coordinator', () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
-      worktreeOperations: createWorkspacePaneWorktreeOperationCoordinator(),
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       runtimeProviders: [
         {
           type: 'terminal',
@@ -91,7 +91,7 @@ describe('workspace pane tabs coordinator', () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
-      worktreeOperations: createWorkspacePaneWorktreeOperationCoordinator(),
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       runtimeProviders: [
         {
           type: 'terminal',
@@ -137,7 +137,7 @@ describe('workspace pane tabs coordinator', () => {
     })
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
-      worktreeOperations: createWorkspacePaneWorktreeOperationCoordinator(),
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       runtimeProviders: [
         {
           type: 'terminal',
@@ -178,7 +178,7 @@ describe('workspace pane tabs coordinator', () => {
     })
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
-      worktreeOperations: createWorkspacePaneWorktreeOperationCoordinator(),
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       runtimeProviders: [
         {
           type: 'terminal',
@@ -211,7 +211,7 @@ describe('workspace pane tabs coordinator', () => {
     })
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
-      worktreeOperations: createWorkspacePaneWorktreeOperationCoordinator(),
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       runtimeProviders: [
         {
           type: 'terminal',
@@ -244,7 +244,7 @@ describe('workspace pane tabs coordinator', () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
-      worktreeOperations: createWorkspacePaneWorktreeOperationCoordinator(),
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       runtimeProviders: [
         {
           type: 'terminal',
@@ -285,7 +285,7 @@ describe('workspace pane tabs coordinator', () => {
     const listSessionsForUser = vi.fn(async () => await liveSessions.promise)
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
-      worktreeOperations: createWorkspacePaneWorktreeOperationCoordinator(),
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       runtimeProviders: [
         {
           type: 'terminal',
@@ -353,7 +353,7 @@ describe('workspace pane tabs coordinator', () => {
     const listSessionsForUser = vi.fn(async () => await liveSessions.promise)
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
-      worktreeOperations: createWorkspacePaneWorktreeOperationCoordinator(),
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       runtimeProviders: [{ type: 'terminal', listSessionsForUser }],
     })
 
@@ -376,10 +376,10 @@ describe('workspace pane tabs coordinator', () => {
 
   test('rejects canonical tab writes while worktree removal is admitted', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
-    const worktreeOperations = createWorkspacePaneWorktreeOperationCoordinator()
+    const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
     const finishRemoval = deferred<void>()
     const removal = worktreeOperations.runRemoval(
-      { userId: USER_ID, scope: SCOPE, worktreePath: WORKTREE_PATH },
+      { repoRoot: REPO_ROOT, worktreePath: WORKTREE_PATH },
       async () => await finishRemoval.promise,
     )
     const coordinator = createWorkspacePaneTabsCoordinator({ workspaceTabs, worktreeOperations, runtimeProviders: [] })
@@ -389,6 +389,18 @@ describe('workspace pane tabs coordinator', () => {
         userId: USER_ID,
         repoRoot: REPO_ROOT,
         scope: SCOPE,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        operation: { type: 'open-static', tabType: 'history' },
+        assertCurrent: () => {},
+      }),
+    ).rejects.toThrow('error.worktree-removal-in-progress')
+
+    await expect(
+      coordinator.updateTabs({
+        userId: 'other-user',
+        repoRoot: REPO_ROOT,
+        scope: `${REPO_ROOT}\0repo-runtime-other`,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         operation: { type: 'open-static', tabType: 'history' },
