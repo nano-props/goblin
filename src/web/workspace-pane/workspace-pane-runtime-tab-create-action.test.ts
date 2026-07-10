@@ -139,7 +139,7 @@ describe('workspace pane runtime tab create action', () => {
       ],
     })
     const showCreatedTerminalTab = vi.fn(() => {
-      expect(workspacePaneTabOpener(REPO_ROOT, BRANCH_NAME, `terminal:${TERMINAL_SESSION_ID}`)).toBe(
+      expect(workspacePaneTabOpener(REPO_ROOT, REPO_RUNTIME_ID, BRANCH_NAME, `terminal:${TERMINAL_SESSION_ID}`)).toBe(
         'workspace-pane:status',
       )
       return true
@@ -195,7 +195,9 @@ describe('workspace pane runtime tab create action', () => {
     ).resolves.toEqual({ status: 'superseded' })
 
     expect(showCreatedTerminalTab).not.toHaveBeenCalled()
-    expect(workspacePaneTabOpener(REPO_ROOT, BRANCH_NAME, `terminal:${TERMINAL_SESSION_ID}`)).toBeNull()
+    expect(
+      workspacePaneTabOpener(REPO_ROOT, REPO_RUNTIME_ID, BRANCH_NAME, `terminal:${TERMINAL_SESSION_ID}`),
+    ).toBeNull()
     expect(useReposStore.getState().repos[REPO_ROOT]?.repoRuntimeId).toBe('repo-runtime-replacement')
   })
 

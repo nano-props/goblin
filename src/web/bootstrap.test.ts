@@ -173,7 +173,7 @@ describe('client bootstrap', () => {
         close: async () => false,
         pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
         recoverSessions: async () => ({
-          sessions: [],
+          terminalSessions: { revision: 0, sessions: [] },
           snapshots: [],
           workspacePaneTabs: { revision: 0, entries: [] },
         }),

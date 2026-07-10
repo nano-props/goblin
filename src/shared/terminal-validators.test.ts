@@ -8,6 +8,7 @@ import {
   isValidTerminalRuntimeSessionId,
   normalizeTerminalClientMessage,
   normalizeTerminalCreateResult,
+  normalizeTerminalSessionsRecoveryResult,
   normalizeTerminalSize,
   normalizeTerminalSocketServerMessage,
   terminalUtf8ByteLength,
@@ -268,6 +269,12 @@ describe('shared terminal validators', () => {
         input: { ...closeMessage.input, sessionId: '' },
       }),
     ).toBeNull()
+    expect(
+      normalizeAppRealtimeClientMessage({
+        ...closeMessage,
+        input: { ...closeMessage.input, target: { ...target, worktreePath: null } },
+      }),
+    ).toBeNull()
   })
 
   test('rejects prune requests without a repo runtime id', () => {
@@ -317,7 +324,6 @@ describe('shared terminal validators', () => {
       ok: true,
       action: 'created',
       terminalSessionId: 'term-111111111111111111111',
-      sessions: [],
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       processName: 'zsh',
       canonicalTitle: null,
@@ -330,6 +336,7 @@ describe('shared terminal validators', () => {
       canonicalCols: 120,
       canonicalRows: 40,
     })
+    expect(normalizedCreateResult).not.toHaveProperty('sessions')
     expect(normalizedCreateResult).toMatchObject({
       ok: true,
       terminalSessionId: 'term-111111111111111111111',
@@ -344,13 +351,39 @@ describe('shared terminal validators', () => {
         ok: true,
         action: 'created',
         terminalSessionId: 'term-111111111111111111111',
-        sessions: [],
       }),
     ).toBeNull()
     expect(normalizeTerminalCreateResult({ ok: false, message: 'error.spawn-failed' })).toEqual({
       ok: false,
       message: 'error.spawn-failed',
     })
+  })
+
+  test('normalizes independently revisioned terminal and workspace-tab recovery snapshots', () => {
+    const recovery = {
+      terminalSessions: { revision: 7, sessions: [] },
+      snapshots: [],
+      workspacePaneTabs: { revision: 11, entries: [] },
+    }
+    expect(normalizeTerminalSessionsRecoveryResult(recovery)).toEqual(recovery)
+    expect(
+      normalizeTerminalSessionsRecoveryResult({
+        ...recovery,
+        terminalSessions: { revision: -1, sessions: [] },
+      }),
+    ).toBeNull()
+    expect(
+      normalizeTerminalSessionsRecoveryResult({
+        ...recovery,
+        terminalSessions: { revision: 1.5, sessions: [] },
+      }),
+    ).toBeNull()
+    expect(
+      normalizeTerminalSessionsRecoveryResult({
+        ...recovery,
+        workspacePaneTabs: { revision: -1, entries: [] },
+      }),
+    ).toBeNull()
   })
 
   test('normalizes valid terminal socket server messages', () => {
@@ -431,7 +464,6 @@ describe('shared terminal validators', () => {
         ok: true,
         action: 'created',
         terminalSessionId: 'term-111111111111111111111',
-        sessions: [],
         terminalRuntimeSessionId: 'pty_1234567890abcdef',
         processName: 'zsh',
         canonicalTitle: null,
@@ -499,37 +531,49 @@ describe('shared terminal validators', () => {
       ],
     }
 
-    for (const [index, action] of [WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close].entries()) {
+    const effects = [
+      {
+        action: 'closed' as const,
+        terminalSessionId: 'term-111111111111111111111',
+        terminalRuntimeSessionId: 'pty_1234567890abcdef',
+      },
+      {
+        action: 'already-closed' as const,
+        terminalSessionId: 'term-222222222222222222222',
+        terminalRuntimeSessionId: null,
+      },
+    ]
+    for (const [index, runtime] of effects.entries()) {
       expect(
         normalizeAppRealtimeSocketServerMessage({
           type: 'response',
           requestId: `request_runtime_close_${index}`,
           ok: true,
-          action,
-          payload: { ok: true, runtimeType: 'terminal', runtime: { sessions: [] }, workspacePaneTabs },
+          action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close,
+          payload: { ok: true, runtimeType: 'terminal', runtime, workspacePaneTabs },
         }),
       ).toMatchObject({
         type: 'response',
         ok: true,
-        action,
-        payload: { ok: true, runtimeType: 'terminal', runtime: { sessions: [] }, workspacePaneTabs },
+        action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close,
+        payload: { ok: true, runtimeType: 'terminal', runtime, workspacePaneTabs },
       })
       expect(
         normalizeAppRealtimeSocketServerMessage({
           type: 'response',
           requestId: `request_runtime_close_invalid_${index}`,
           ok: true,
-          action,
+          action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close,
           payload: {
             ok: true,
             runtimeType: 'terminal',
-            runtime: { sessions: [] },
+            runtime,
             workspacePaneTabs: { revision: 5, entries: null },
           },
         }),
       ).toMatchObject({
         ok: false,
-        action,
+        action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close,
         error: 'Invalid realtime socket response payload',
       })
     }

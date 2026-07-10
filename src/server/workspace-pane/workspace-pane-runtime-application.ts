@@ -4,11 +4,6 @@ import type {
   TerminalSessionInput,
   TerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
-import {
-  isWorkspacePaneRuntimeTabEntry,
-  type WorkspacePaneTabEntry,
-  workspacePaneRuntimeTabSessionId,
-} from '#/shared/workspace-pane.ts'
 import type {
   TerminalWorkspacePaneRuntimeOpenInput,
   WorkspacePaneRuntimeCloseInput,
@@ -104,16 +99,15 @@ export class WorkspacePaneRuntimeApplication {
     const runtime = await this.deps.terminal.create(clientId, userId, input.request)
     if (!runtime.ok) return { ok: false, runtimeType: 'terminal', message: runtime.message }
 
-    const session = runtime.sessions.find((candidate) => candidate.terminalSessionId === runtime.terminalSessionId)
     const staleFailure = runtimeFailure('terminal', 'error.repo-runtime-stale')
-    const worktreePath = session?.worktreePath ?? requestedWorktreePath
+    const worktreePath = requestedWorktreePath
     let workspacePaneTabs: WorkspacePaneTabsSnapshot | typeof staleFailure
     try {
       workspacePaneTabs = await this.deps.workspaceTabsCoordinator.ensureRuntimeTabForSession({
         userId,
         repoRoot: input.request.repoRoot,
         scope,
-        branchName: session?.branch ?? input.request.branch,
+        branchName: input.request.branch,
         worktreePath,
         runtimeType: 'terminal',
         sessionId: runtime.terminalSessionId,
@@ -144,14 +138,10 @@ export class WorkspacePaneRuntimeApplication {
     }
 
     this.deps.broadcastWorkspaceTabsChanged(userId, input.request.repoRoot)
-    const targetTabs = tabsForTarget(workspacePaneTabs, session?.branch ?? input.request.branch, worktreePath)
     return {
       ok: true,
       runtimeType: 'terminal',
-      runtime: {
-        ...runtime,
-        sessions: terminalSessionsWithWorkspaceTabOrder(runtime.sessions, worktreePath, targetTabs),
-      },
+      runtime: terminalRuntimeOpenEffect(runtime),
       workspacePaneTabs,
     }
   }
@@ -209,8 +199,16 @@ export class WorkspacePaneRuntimeApplication {
       if (!closed) return runtimeFailure('terminal', 'error.unavailable')
     }
     const workspacePaneTabs = await this.reconcileTarget(userId, target, scope)
-    const remainingSessions = await this.listTerminalSessions(userId, scope)
-    return { ok: true, runtimeType: 'terminal', runtime: { sessions: remainingSessions }, workspacePaneTabs }
+    return {
+      ok: true,
+      runtimeType: 'terminal',
+      runtime: {
+        action: session ? 'closed' : 'already-closed',
+        terminalSessionId,
+        terminalRuntimeSessionId: session?.terminalRuntimeSessionId ?? null,
+      },
+      workspacePaneTabs,
+    }
   }
 
   private async listTerminalSessions(userId: string, scope: string): Promise<TerminalSessionSummary[]> {
@@ -242,7 +240,6 @@ interface NormalizedRuntimeTarget extends WorkspacePaneRuntimeCommandTarget {
 }
 
 function normalizedRuntimeTarget(target: WorkspacePaneRuntimeCommandTarget): NormalizedRuntimeTarget {
-  if (target.worktreePath === null) throw new Error('error.invalid-arguments')
   return {
     ...target,
     worktreePath: terminalSessionWorktreePath(target.repoRoot, target.worktreePath),
@@ -257,42 +254,13 @@ function isWorkspacePaneTabsSnapshot(value: unknown): value is WorkspacePaneTabs
   return Boolean(value && typeof value === 'object' && 'revision' in value && 'entries' in value)
 }
 
-function tabsForTarget(snapshot: WorkspacePaneTabsSnapshot, branchName: string, worktreePath: string) {
-  return (
-    snapshot.entries.find((entry) => entry.branchName === branchName && entry.worktreePath === worktreePath)?.tabs ?? []
-  )
-}
-
-function terminalSessionsWithWorkspaceTabOrder(
-  sessions: readonly TerminalSessionSummary[],
-  worktreePath: string,
-  tabs: readonly WorkspacePaneTabEntry[],
-): TerminalSessionSummary[] {
-  const sessionsById = new Map(sessions.map((session) => [session.terminalSessionId, session]))
-  const usedSessionIds = new Set<string>()
-  const orderedWorktreeSessions: TerminalSessionSummary[] = []
-
-  for (const tab of tabs) {
-    if (!isWorkspacePaneRuntimeTabEntry(tab) || tab.type !== 'terminal') continue
-    const sessionId = workspacePaneRuntimeTabSessionId(tab)
-    if (usedSessionIds.has(sessionId)) continue
-    const session = sessionsById.get(sessionId)
-    if (!session || session.worktreePath !== worktreePath) continue
-    orderedWorktreeSessions.push(session)
-    usedSessionIds.add(sessionId)
+function terminalRuntimeOpenEffect(
+  runtime: Extract<TerminalCreateResult, { ok: true }>,
+): Extract<TerminalCreateResult, { ok: true }> {
+  const { sessions: _legacySessions, ...effect } = runtime as Extract<TerminalCreateResult, { ok: true }> & {
+    sessions?: unknown
   }
-
-  for (const session of sessions) {
-    if (session.worktreePath !== worktreePath || usedSessionIds.has(session.terminalSessionId)) continue
-    orderedWorktreeSessions.push(session)
-    usedSessionIds.add(session.terminalSessionId)
-  }
-
-  let orderedWorktreeIndex = 0
-  return sessions.map((session) => {
-    if (session.worktreePath !== worktreePath) return session
-    return orderedWorktreeSessions[orderedWorktreeIndex++] ?? session
-  })
+  return effect
 }
 
 export function createWorkspacePaneRuntimeApplication(

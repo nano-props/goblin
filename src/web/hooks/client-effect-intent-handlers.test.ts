@@ -20,6 +20,10 @@ import {
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
+import {
+  observedWorkspacePaneRouteCommitForTest,
+  seedInitialObservedWorkspacePaneRouteForTest,
+} from '#/web/test-utils/workspace-pane-navigation.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
@@ -37,7 +41,7 @@ afterEach(() => {
 })
 
 describe('client effect intent handlers', () => {
-  test('routes terminal bell clicks through the React Query projection read model', () => {
+  test('routes terminal bell clicks through the React Query projection read model', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [],
@@ -48,7 +52,14 @@ describe('client effect intent handlers', () => {
       currentBranch: 'feature/query',
     })
     const d = deps(REPO_ID)
-    d.navigation.showRepoBranchTerminalSession = vi.fn()
+    d.navigation.showRepoBranchTerminalSession = vi.fn(() => true)
+    seedInitialObservedWorkspacePaneRouteForTest({
+      repoId: repo.id,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName: 'feature/query',
+      worktreePath: '/tmp/bell-worktree',
+      route: { kind: 'static', tab: 'status' },
+    })
 
     handleTerminalBellClickIntent(
       {
@@ -60,7 +71,13 @@ describe('client effect intent handlers', () => {
       d,
     )
 
-    expect(d.navigation.showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/query', 'term-queryqueryqueryquery1')
+    await vi.waitFor(() => {
+      expect(d.navigation.showRepoBranchTerminalSession).toHaveBeenCalledWith(
+        REPO_ID,
+        'feature/query',
+        'term-queryqueryqueryquery1',
+      )
+    })
   })
 
   test('returns false when changes cannot be shown for a branch without a worktree', async () => {
@@ -163,7 +180,7 @@ function deps(currentRepoId: string | null, currentBranchName = 'feature/worktre
 }
 
 function navigationWithStoreActions(): PrimaryWindowNavigationActions {
-  return {
+  const navigation: PrimaryWindowNavigationActions = {
     activateRepo: vi.fn(),
     closeRepo: (repoId) => useReposStore.getState().closeRepo(repoId),
     cycleRepo: vi.fn(),
@@ -174,13 +191,15 @@ function navigationWithStoreActions(): PrimaryWindowNavigationActions {
       state.setWorkspacePaneTab(repoId, branch, tab)
       return true
     },
-    showRepoBranchTerminalSession: vi.fn(),
-    commitRepoBranchWorkspacePaneRoute: () => true,
+    showRepoBranchTerminalSession: vi.fn(() => true),
+    commitRepoBranchWorkspacePaneRoute: () => false,
     goBack: vi.fn(),
     goForward: vi.fn(),
     openSettings: vi.fn(),
     openCreateWorktree: vi.fn(),
   }
+  navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
+  return navigation
 }
 
 function serverOperation(

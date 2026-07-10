@@ -1,137 +1,119 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
-  beginWorkspacePaneTabControllerTransition,
+  beginWorkspacePaneCloseActiveTabPresentationLease,
   commitWorkspacePaneControllerCloseBackTarget,
-  commitWorkspacePaneControllerRoute,
+  commitWorkspacePaneControllerTargetRoute,
   observeWorkspacePaneTabControllerRoute,
   resetWorkspacePaneTabControllerForTest,
-  showWorkspacePaneControllerRoute,
-  workspacePaneTabControllerReconciliationDeferred,
+  WORKSPACE_PANE_CURRENT_TARGET_LEASE,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { RepoWorkspaceStaticTab, RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 
-describe('workspace pane tab controller', () => {
+const SOURCE_ROUTE = { kind: 'static' as const, tab: 'files' as const }
+const TARGET_ROUTE = { kind: 'static' as const, tab: 'status' as const }
+
+describe('workspace pane tab controller transactions', () => {
   beforeEach(() => {
     resetWorkspacePaneTabControllerForTest()
   })
 
-  test('defers stale-route reconciliation while an internal tab transition is pending', () => {
-    beginWorkspacePaneTabControllerTransition({
-      repoId: '/tmp/repo',
-      branchName: 'feature/a',
-      fromRoute: { kind: 'static', tab: 'files' },
-      toRoute: { kind: 'static', tab: 'status' },
+  test('accepted navigation stays pending until the exact route is observed', async () => {
+    const target = workspacePaneTarget()
+    observeWorkspacePaneTabControllerRoute({ ...target, route: SOURCE_ROUTE })
+    const navigation = { commitRepoBranchWorkspacePaneRoute: vi.fn(() => true) }
+    const committed = commitWorkspacePaneControllerTargetRoute(
+      target,
+      SOURCE_ROUTE,
+      TARGET_ROUTE,
+      navigation,
+      WORKSPACE_PANE_CURRENT_TARGET_LEASE,
+    )
+    let settled = false
+    void committed.then(() => {
+      settled = true
     })
 
-    expect(
-      workspacePaneTabControllerReconciliationDeferred({
-        repoId: '/tmp/repo',
-        branchName: 'feature/a',
-        route: { kind: 'static', tab: 'files' },
-        reconciliation: { kind: 'replace-empty-pane' },
-      }),
-    ).toBe(true)
+    await Promise.resolve()
+    expect(navigation.commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledOnce()
+    expect(settled).toBe(false)
+
+    observeWorkspacePaneTabControllerRoute({ ...target, route: TARGET_ROUTE })
+    await expect(committed).resolves.toBe(true)
   })
 
-  test('clears a pending transition once the observed route leaves the source route', () => {
-    beginWorkspacePaneTabControllerTransition({
-      repoId: '/tmp/repo',
-      branchName: 'feature/a',
-      fromRoute: { kind: 'static', tab: 'files' },
-      toRoute: { kind: 'static', tab: 'status' },
-    })
+  test('rejects accepted navigation when the observer reaches a different route', async () => {
+    const target = workspacePaneTarget()
+    observeWorkspacePaneTabControllerRoute({ ...target, route: SOURCE_ROUTE })
+    const committed = commitWorkspacePaneControllerTargetRoute(
+      target,
+      SOURCE_ROUTE,
+      TARGET_ROUTE,
+      { commitRepoBranchWorkspacePaneRoute: vi.fn(() => true) },
+      WORKSPACE_PANE_CURRENT_TARGET_LEASE,
+    )
 
     observeWorkspacePaneTabControllerRoute({
-      repoId: '/tmp/repo',
-      branchName: 'feature/a',
-      route: { kind: 'static', tab: 'status' },
+      ...target,
+      route: { kind: 'static', tab: 'history' },
     })
 
-    expect(
-      workspacePaneTabControllerReconciliationDeferred({
-        repoId: '/tmp/repo',
-        branchName: 'feature/a',
-        route: { kind: 'static', tab: 'files' },
-        reconciliation: { kind: 'replace-empty-pane' },
-      }),
-    ).toBe(false)
+    await expect(committed).resolves.toBe(false)
   })
 
-  test('routes tab selections through one controller dispatch surface', () => {
-    const navigation = {
-      showRepoBranchEmptyWorkspacePane: vi.fn(() => true),
-      showRepoBranchWorkspacePaneTab: vi.fn(() => true),
-      showRepoBranchTerminalSession: vi.fn(() => true),
-    }
-
-    expect(showWorkspacePaneControllerRoute('/tmp/repo', 'feature/a', { kind: 'static', tab: 'files' }, navigation)).toBe(
-      true,
+  test('rejects a pending commit when a replacement runtime is observed', async () => {
+    const target = workspacePaneTarget()
+    observeWorkspacePaneTabControllerRoute({ ...target, route: SOURCE_ROUTE })
+    const committed = commitWorkspacePaneControllerTargetRoute(
+      target,
+      SOURCE_ROUTE,
+      TARGET_ROUTE,
+      { commitRepoBranchWorkspacePaneRoute: vi.fn(() => true) },
+      WORKSPACE_PANE_CURRENT_TARGET_LEASE,
     )
-    expect(showWorkspacePaneControllerRoute('/tmp/repo', 'feature/a', null, navigation)).toBe(true)
-    expect(
-      showWorkspacePaneControllerRoute(
-        '/tmp/repo',
-        'feature/a',
-        { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
-        navigation,
-      ),
-    ).toBe(true)
 
-    expect(navigation.showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith('/tmp/repo', 'feature/a', 'files')
-    expect(navigation.showRepoBranchEmptyWorkspacePane).toHaveBeenCalledWith('/tmp/repo', 'feature/a')
-    expect(navigation.showRepoBranchTerminalSession).toHaveBeenCalledWith(
-      '/tmp/repo',
-      'feature/a',
-      'term-111111111111111111111',
-    )
+    observeWorkspacePaneTabControllerRoute({
+      ...target,
+      repoRuntimeId: 'repo-runtime-2',
+      route: SOURCE_ROUTE,
+    })
+
+    await expect(committed).resolves.toBe(false)
   })
 
-  test('commits close-back targets through the operation-owned route path', () => {
-    const navigation = {
-      showRepoBranchWorkspacePaneTab: vi.fn(() => false),
-      commitRepoBranchWorkspacePaneRoute: vi.fn(() => true),
-    }
+  test('commits a close presentation lease through observer confirmation', async () => {
+    const target = workspacePaneTarget()
+    const closingTab = staticTab('files')
+    const nextTab = staticTab('status')
+    observeWorkspacePaneTabControllerRoute({ ...target, route: SOURCE_ROUTE })
+    const lease = beginWorkspacePaneCloseActiveTabPresentationLease({
+      target,
+      closingTab,
+      nextTab,
+      workspacePaneRoute: SOURCE_ROUTE,
+    })
+    if (!lease) throw new Error('missing presentation lease')
+    const navigation = { commitRepoBranchWorkspacePaneRoute: vi.fn(() => true) }
+    const committed = commitWorkspacePaneControllerCloseBackTarget(lease, navigation)
 
-    expect(
-      commitWorkspacePaneControllerCloseBackTarget(workspacePaneTarget(), staticTab('status'), navigation),
-    ).toBe(true)
-
+    await Promise.resolve()
     expect(navigation.commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
-      '/tmp/repo',
-      'feature/a',
-      { kind: 'static', tab: 'status' },
+      target.repoId,
+      target.branchName,
+      TARGET_ROUTE,
       undefined,
     )
-    expect(navigation.showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
-  })
-
-  test('does not fall back from operation-owned commits to blockable show navigation', () => {
-    const navigation = {
-      showRepoBranchWorkspacePaneTab: vi.fn(() => true),
-      commitRepoBranchWorkspacePaneRoute: vi.fn(() => false),
-    }
-
-    expect(
-      commitWorkspacePaneControllerRoute('/tmp/repo', 'feature/a', { kind: 'static', tab: 'status' }, navigation),
-    ).toBe(false)
-
-    expect(navigation.commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
-      '/tmp/repo',
-      'feature/a',
-      { kind: 'static', tab: 'status' },
-      undefined,
-    )
-    expect(navigation.showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
+    observeWorkspacePaneTabControllerRoute({ ...target, route: TARGET_ROUTE })
+    await expect(committed).resolves.toBe(true)
   })
 })
 
 function workspacePaneTarget(): RepoWorkspaceTabModel {
   return {
-    repoId: '/tmp/repo',
+    repoId: '/repo',
     repoRuntimeId: 'repo-runtime-1',
     branchName: 'feature/a',
-    worktreePath: '/tmp/worktree-a',
+    worktreePath: '/worktree-a',
   } as RepoWorkspaceTabModel
 }
 

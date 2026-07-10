@@ -16,7 +16,7 @@ const WORKTREE_PATH = '/repo/worktree'
 const BRANCH_NAME = 'feature/worktree'
 
 describe('terminal session creator', () => {
-  test('creates a session and returns terminal sessions without mutating workspace tabs', async () => {
+  test('creates a session and returns only the target first frame', async () => {
     const sessions: TerminalSessionSummary[] = []
     const manager = {
       listSessionsForUser: vi.fn(async () => sessions),
@@ -33,7 +33,6 @@ describe('terminal session creator', () => {
       ensureOrRestore,
       isCurrentRepoRuntime: vi.fn(() => true),
       rejectStaleCreateIfNeeded: vi.fn(async () => null),
-      listSessions: vi.fn(async () => sessions),
     })
 
     const result = await creator.create({
@@ -53,46 +52,13 @@ describe('terminal session creator', () => {
         terminalSessionId: 'term-createdcreatedcreated',
       }),
     )
-    expect(result.sessions).toEqual([terminalSession('term-createdcreatedcreated')])
-  })
-
-  test('returns terminal sessions in service order', async () => {
-    const sessions: TerminalSessionSummary[] = [
-      terminalSession('term-111111111111111111111'),
-      terminalSession('term-222222222222222222222'),
-    ]
-    const manager = {
-      listSessionsForUser: vi.fn(async () => sessions),
-    }
-    const ensureOrRestore = vi.fn(async (_clientId, _userId, input) => {
-      sessions.push(terminalSession(input.terminalSessionId ?? 'term-333333333333333333333'))
-      return ensureResult(input.terminalSessionId ?? 'term-333333333333333333333')
+    expect(result).toMatchObject({
+      terminalSessionId: 'term-createdcreatedcreated',
+      terminalRuntimeSessionId: 'pty_term-createdcreatedcreated',
+      snapshotSeq: 0,
+      outputEra: 0,
     })
-    const creator = createTerminalSessionCreator({
-      createCoordinator: createTerminalSessionCreateCoordinator({
-        manager,
-        createSessionId: () => 'term-333333333333333333333',
-      }),
-      ensureOrRestore,
-      isCurrentRepoRuntime: vi.fn(() => true),
-      rejectStaleCreateIfNeeded: vi.fn(async () => null),
-      listSessions: vi.fn(async () => sessions),
-    })
-
-    const result = await creator.create({
-      clientId: CLIENT_ID,
-      terminalClientId: TERMINAL_CLIENT_ID,
-      userId: USER_ID,
-      request: createRequest(),
-    })
-
-    expect(result.ok).toBe(true)
-    if (!result.ok) return
-    expect(result.sessions.map((session) => session.terminalSessionId)).toEqual([
-      'term-111111111111111111111',
-      'term-222222222222222222222',
-      'term-333333333333333333333',
-    ])
+    expect(result).not.toHaveProperty('sessions')
   })
 
   test('rejects before ensuring when the repo runtime is already stale', async () => {
@@ -108,7 +74,6 @@ describe('terminal session creator', () => {
       ensureOrRestore,
       isCurrentRepoRuntime: vi.fn(() => false),
       rejectStaleCreateIfNeeded: vi.fn(async () => null),
-      listSessions: vi.fn(async () => []),
     })
 
     await expect(
@@ -140,7 +105,6 @@ describe('terminal session creator', () => {
       ensureOrRestore,
       isCurrentRepoRuntime: vi.fn(() => true),
       rejectStaleCreateIfNeeded,
-      listSessions: vi.fn(async () => sessions),
     })
 
     await expect(

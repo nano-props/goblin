@@ -223,19 +223,17 @@ describe('terminal session service facade', () => {
       worktreePath: path.resolve(WORKTREE_PATH),
       tabs: [workspacePaneStaticTabEntry('status')],
     })
-    let current = true
     let createdTerminalSessionId: string | null = null
-    let sessionListCalls = 0
+    let leaseChecks = 0
     const closeSession = vi.fn(async () => true)
     const service = createService({
-      sessions: () => {
-        sessionListCalls += 1
-        if (sessionListCalls === 3) current = false
-        return createdTerminalSessionId ? [terminalSession(createdTerminalSessionId)] : []
-      },
+      sessions: () => (createdTerminalSessionId ? [terminalSession(createdTerminalSessionId)] : []),
       workspaceTabs,
       closeSession,
-      isCurrentRepoRuntime: () => current,
+      isCurrentRepoRuntime: () => {
+        leaseChecks += 1
+        return leaseChecks === 1
+      },
       ensureSession: vi.fn(async (input) => {
         createdTerminalSessionId = input.terminalSessionId
         return terminalAttachResult(input)
@@ -254,6 +252,7 @@ describe('terminal session service facade', () => {
       }),
     ).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
 
+    expect(leaseChecks).toBe(2)
     expect(closeSession).toHaveBeenCalledWith('pty_session_created')
     expect(
       workspaceTabs.tabs({

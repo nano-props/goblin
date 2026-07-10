@@ -9,6 +9,7 @@ import {
   type TerminalLifecycleEvent,
   type TerminalOutputEvent,
   type TerminalSessionSummary,
+  type TerminalSessionsSnapshot,
   type TerminalTakeoverResult,
   type TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
@@ -113,6 +114,8 @@ export class TerminalSessionManager<TUser extends string | number> {
   private readonly sessionsByTerminalRuntimeSessionId = new Map<string, TerminalSessionView<TUser>>()
   private readonly terminalRuntimeSessionIdByUserTerminalSessionIndex = new Map<string, string>()
   private readonly closeOperationsByTerminalRuntimeSessionId = new Map<string, Promise<boolean>>()
+  private readonly projectionRevisionByUserScope = new Map<string, number>()
+  private readonly projectedProcessNameByTerminalRuntimeSessionId = new Map<string, string>()
   private readonly sink: TerminalEventSink<TUser>
   private readonly ptySupervisor: PtySupervisor
   private readonly sessionOrder: TerminalSessionOrderProjection<TUser>
@@ -182,6 +185,8 @@ export class TerminalSessionManager<TUser extends string | number> {
     }
     this.sessionsByTerminalRuntimeSessionId.set(id, session)
     this.terminalRuntimeSessionIdByUserTerminalSessionIndex.set(userTerminalSessionIndex, id)
+    this.projectedProcessNameByTerminalRuntimeSessionId.set(id, session.ptyBinding.processName())
+    this.advanceProjectionRevision(session.userId, session.scope)
     if (input.clientId) {
       registerTerminalClient(session, input.clientId, size.cols, size.rows)
       this.applyIdentityEffect(session, attachTerminalClient(session, input.clientId, this.sessionPresence(session)))
@@ -360,9 +365,11 @@ export class TerminalSessionManager<TUser extends string | number> {
     if (markTerminalSessionClosed(session)) this.emitLifecycle(session)
     const closedSession = this.sessionSummary(session)
     this.sessionsByTerminalRuntimeSessionId.delete(session.id)
+    this.projectedProcessNameByTerminalRuntimeSessionId.delete(session.id)
     const userTerminalSessionIndex = this.formatUserTerminalSessionIndex(session.userId, session.terminalSessionId)
     if (this.terminalRuntimeSessionIdByUserTerminalSessionIndex.get(userTerminalSessionIndex) === session.id)
       this.terminalRuntimeSessionIdByUserTerminalSessionIndex.delete(userTerminalSessionIndex)
+    this.advanceProjectionRevision(session.userId, session.scope)
     return closedSession
   }
 
@@ -382,6 +389,19 @@ export class TerminalSessionManager<TUser extends string | number> {
     )
     const results = await Promise.all(sessions.map(async (session) => await this.closeSession(session.id, 'scope')))
     return results.every(Boolean)
+  }
+
+  /**
+   * Releases the terminal projection clock after its repo-runtime epoch has
+   * been invalidated. Ordinary projection cleanup must retain the clock so a
+   * delayed response from the same epoch cannot become fresh again.
+   */
+  releaseProjectionRevisionForScope(userId: TUser, scope: string): void {
+    const hasLiveSession = Array.from(this.sessionsByTerminalRuntimeSessionId.values()).some(
+      (session) => session.userId === userId && session.scope === scope,
+    )
+    if (hasLiveSession) throw new Error('cannot release terminal projection revision with live sessions')
+    this.clearProjectionRevision(userId, scope)
   }
 
   async closeSessionsForPhysicalWorktree(
@@ -452,13 +472,20 @@ export class TerminalSessionManager<TUser extends string | number> {
     )
   }
 
+  terminalSessionsSnapshotForUser(userId: TUser, scope: string): TerminalSessionsSnapshot {
+    const sessions = Array.from(this.sessionsByTerminalRuntimeSessionId.values()).flatMap((session) =>
+      session.userId === userId && session.scope === scope ? [this.sessionSummary(session)] : [],
+    )
+    return { revision: this.projectionRevision(userId, scope), sessions }
+  }
+
   async recoverSessionsForUser(
     userId: TUser,
     scope: string,
-  ): Promise<{ sessions: TerminalSessionSummary[]; snapshots: TerminalHydrationSnapshot[] }> {
-    const sessions = await this.listSessionsForUser(userId, scope)
+  ): Promise<{ terminalSessions: TerminalSessionsSnapshot; snapshots: TerminalHydrationSnapshot[] }> {
+    const terminalSessions = this.terminalSessionsSnapshotForUser(userId, scope)
     const snapshots: TerminalHydrationSnapshot[] = []
-    for (const summary of sessions) {
+    for (const summary of terminalSessions.sessions) {
       const session = this.getSession(userId, summary.terminalRuntimeSessionId)
       if (!session) continue
       const snap = await replaySnapshot(session.render)
@@ -470,7 +497,7 @@ export class TerminalSessionManager<TUser extends string | number> {
         outputEra: snap.outputEra,
       })
     }
-    return { sessions, snapshots }
+    return { terminalSessions, snapshots }
   }
 
   getSessionSummaryForUser(userId: TUser, terminalRuntimeSessionId: string): TerminalSessionSummary | null {
@@ -650,6 +677,7 @@ export class TerminalSessionManager<TUser extends string | number> {
   }
 
   private emitIdentity(session: TerminalSessionView<TUser>): void {
+    this.advanceProjectionRevision(session.userId, session.scope)
     this.sink.onIdentity?.(session.userId, {
       terminalRuntimeSessionId: session.id,
       ...this.terminalSessionIdentity(session),
@@ -666,6 +694,7 @@ export class TerminalSessionManager<TUser extends string | number> {
   // separate paths so the type-level separation in the client
   // (`applyIdentity` vs `applyLifecycle`) cannot be circumvented.
   private emitLifecycle(session: TerminalSessionView<TUser>): void {
+    this.advanceProjectionRevision(session.userId, session.scope)
     this.sink.onLifecycle?.(session.userId, {
       terminalRuntimeSessionId: session.id,
       ...this.terminalSessionIdentity(session),
@@ -695,6 +724,7 @@ export class TerminalSessionManager<TUser extends string | number> {
   private async spawnAndAttachSession(session: TerminalSessionView<TUser>): Promise<TerminalPtyAttachResult> {
     const spawn = await session.ptyBinding.spawn(session)
     if (!spawn.result.ok) return { generation: spawn.generation, result: spawn.result }
+    this.advanceProjectionRevisionForProcessName(session, session.ptyBinding.processName())
     const attach = await this.attachResult(session)
     if (!session.ptyBinding.isCurrentSpawn(session, spawn.generation)) {
       return { generation: spawn.generation, result: { ok: false, message: 'error.unavailable' } }
@@ -706,12 +736,16 @@ export class TerminalSessionManager<TUser extends string | number> {
     return new TerminalPtyBinding<TerminalSessionView<TUser>>(this.ptySupervisor, {
       isSessionLive: (session) => this.isLiveSession(session),
       emitLifecycle: (session) => this.emitLifecycle(session),
-      emitOutput: (session, event) =>
-        this.sink.onOutput(session.userId, { ...event, ...this.terminalSessionIdentity(session) }),
+      emitOutput: (session, event) => {
+        this.advanceProjectionRevisionForProcessName(session, event.processName)
+        this.sink.onOutput(session.userId, { ...event, ...this.terminalSessionIdentity(session) })
+      },
       emitBell: (session, event) =>
         this.sink.onBell?.(session.userId, { ...event, ...this.terminalSessionPublicScope(session) }),
-      emitTitle: (session, event) =>
-        this.sink.onTitle?.(session.userId, { ...event, ...this.terminalSessionPublicScope(session) }),
+      emitTitle: (session, event) => {
+        this.advanceProjectionRevision(session.userId, session.scope)
+        this.sink.onTitle?.(session.userId, { ...event, ...this.terminalSessionPublicScope(session) })
+      },
       emitExit: (session, event) =>
         this.sink.onExit(session.userId, { ...event, ...this.terminalSessionIdentity(session) }),
       closeSession: (terminalRuntimeSessionId) => {
@@ -726,6 +760,29 @@ export class TerminalSessionManager<TUser extends string | number> {
 
   private isSessionClosing(terminalRuntimeSessionId: string): boolean {
     return this.closeOperationsByTerminalRuntimeSessionId.has(terminalRuntimeSessionId)
+  }
+
+  private projectionRevision(userId: TUser, scope: string): number {
+    return this.projectionRevisionByUserScope.get(this.projectionRevisionKey(userId, scope)) ?? 0
+  }
+
+  private advanceProjectionRevision(userId: TUser, scope: string): void {
+    const key = this.projectionRevisionKey(userId, scope)
+    this.projectionRevisionByUserScope.set(key, (this.projectionRevisionByUserScope.get(key) ?? 0) + 1)
+  }
+
+  private advanceProjectionRevisionForProcessName(session: TerminalSessionView<TUser>, processName: string): void {
+    if (this.projectedProcessNameByTerminalRuntimeSessionId.get(session.id) === processName) return
+    this.projectedProcessNameByTerminalRuntimeSessionId.set(session.id, processName)
+    this.advanceProjectionRevision(session.userId, session.scope)
+  }
+
+  private clearProjectionRevision(userId: TUser, scope: string): void {
+    this.projectionRevisionByUserScope.delete(this.projectionRevisionKey(userId, scope))
+  }
+
+  private projectionRevisionKey(userId: TUser, scope: string): string {
+    return `${String(userId)}\0${scope}`
   }
 
   private getSession(userId: TUser, terminalRuntimeSessionId: string): TerminalSessionView<TUser> | undefined {

@@ -10,9 +10,14 @@ import type { TerminalCreateLeaderAdmissionResult } from '#/web/components/termi
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import type { TerminalCreateOptions } from '#/web/components/terminal/types.ts'
 import {
-  commitWorkspacePaneControllerRoute,
+  commitWorkspacePaneControllerTargetRoute,
+  WORKSPACE_PANE_CURRENT_TARGET_LEASE,
   type WorkspacePaneTabControllerCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import {
+  runWorkspacePaneTabCoordinatorTask,
+  workspacePaneTabCoordinatorObservedRoute,
+} from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { refreshWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { gblLog } from '#/web/logger.ts'
@@ -94,21 +99,29 @@ export function workspacePaneRuntimeTabCreateAction(
 export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
   options: CreateTerminalWorkspacePaneRuntimeTabActionOptions,
 ): Promise<TerminalCreateCommandResult> {
-  return await runCreateTerminalTabCommand({
-    base: options.base,
-    createTerminal: options.createTerminal,
-    options: options.options,
-    insertAfterIdentity: options.insertAfterIdentity,
-    t: options.t,
-    logMessage: options.logMessage,
-    commitCreatedTerminalTab: async (admission) =>
-      await commitCreatedTerminalWorkspacePaneRuntimeTab({
-        base: options.base,
-        admission,
-        openerIdentity: options.openerIdentity,
-        showCreatedTerminalTab: options.showCreatedTerminalTab,
-      }),
-  })
+  const base = terminalSessionBaseWithRuntime(options.base)
+  if (!base) {
+    const error = new Error('terminal runtime target is unavailable')
+    return { ok: false, error, messageKey: 'terminal.createFailed' }
+  }
+  const target = terminalWorkspacePaneCoordinatorTarget(base)
+  return await runWorkspacePaneTabCoordinatorTask(target, async () =>
+    await runCreateTerminalTabCommand({
+      base,
+      createTerminal: options.createTerminal,
+      options: options.options,
+      insertAfterIdentity: options.insertAfterIdentity,
+      t: options.t,
+      logMessage: options.logMessage,
+      commitCreatedTerminalTab: async (admission) =>
+        await commitCreatedTerminalWorkspacePaneRuntimeTab({
+          base,
+          admission,
+          openerIdentity: options.openerIdentity,
+          showCreatedTerminalTab: options.showCreatedTerminalTab,
+        }),
+    }),
+  )
 }
 
 export function showCreatedTerminalWorkspacePaneRuntimeTab(
@@ -116,11 +129,15 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
   terminalSessionId: string,
   navigation: WorkspacePaneTabControllerCommitNavigation,
 ): boolean | Promise<boolean> {
-  return commitWorkspacePaneControllerRoute(
-    base.repoRoot,
-    base.branch,
+  const resolvedBase = terminalSessionBaseWithRuntime(base)
+  if (!resolvedBase) return false
+  const target = terminalWorkspacePaneCoordinatorTarget(resolvedBase)
+  return commitWorkspacePaneControllerTargetRoute(
+    target,
+    workspacePaneTabCoordinatorObservedRoute(target),
     { kind: 'terminal', terminalSessionId },
     navigation,
+    WORKSPACE_PANE_CURRENT_TARGET_LEASE,
   )
 }
 
@@ -139,12 +156,31 @@ function recordCreatedTerminalWorkspacePaneRuntimeTabOpener(
   options: CommitCreatedTerminalWorkspacePaneRuntimeTabOptions,
 ): void {
   if (!options.openerIdentity || options.admission.resourceDisposition !== 'created') return
+  const repoRuntimeId = options.base.repoRuntimeId
+  if (!repoRuntimeId) return
   recordWorkspacePaneTabOpener(
     options.base.repoRoot,
+    repoRuntimeId,
     options.base.branch,
     terminalWorkspacePaneTabProvider.identity(options.admission.terminalSessionId),
     options.openerIdentity,
   )
+}
+
+function terminalWorkspacePaneCoordinatorTarget(base: TerminalSessionBase & { repoRuntimeId: string }) {
+  return {
+    repoId: base.repoRoot,
+    repoRuntimeId: base.repoRuntimeId,
+    branchName: base.branch,
+    worktreePath: base.worktreePath,
+  }
+}
+
+function terminalSessionBaseWithRuntime(
+  base: TerminalSessionBase,
+): (TerminalSessionBase & { repoRuntimeId: string }) | null {
+  const repoRuntimeId = base.repoRuntimeId
+  return repoRuntimeId ? { ...base, repoRuntimeId } : null
 }
 
 async function applyCreatedTerminalWorkspacePaneRuntimeTabs(
@@ -183,7 +219,7 @@ function terminalRuntimeTabCreateAction(
   context: WorkspacePaneRuntimeTabCreateActionContext,
 ): WorkspacePaneRuntimeTabCreateAction | null {
   const terminal = context.terminal
-  const base = terminal?.base
+  const base = terminal?.base ? terminalSessionBaseWithRuntime(terminal.base) : null
   if (!terminal || !base) return null
   return {
     label: context.t('terminal.new'),

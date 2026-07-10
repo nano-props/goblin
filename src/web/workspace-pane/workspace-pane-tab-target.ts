@@ -10,6 +10,7 @@ import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/w
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 import { workspacePaneTabsInteractionBlockedForTarget } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
+import type { WorkspacePaneTabCoordinatorTarget } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 
 export type WorkspacePaneTabTargetResolution =
   | { kind: 'ready'; target: RepoWorkspaceTabModel }
@@ -29,6 +30,23 @@ export interface WorkspacePaneTabTargetOptions {
 }
 
 export const workspacePanePreferenceTargetOptions: WorkspacePaneTabTargetOptions = { workspacePaneRoute: undefined }
+
+export function workspacePaneTabCoordinatorTargetIdentityForBranch(
+  repoId: string,
+  branchName: string,
+): WorkspacePaneTabCoordinatorTarget | null {
+  const repo = useReposStore.getState().repos[repoId]
+  if (!repo) return null
+  const branchModel = readRepoBranchQueryProjection(repo)
+  const branch = branchModel?.branches.find((candidate) => candidate.name === branchName)
+  if (!branch) return null
+  return {
+    repoId,
+    repoRuntimeId: repo.repoRuntimeId,
+    branchName,
+    worktreePath: branch.worktree?.path ?? null,
+  }
+}
 
 export function workspacePaneTabTargetForBranch(
   repoId: string,

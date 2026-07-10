@@ -12,7 +12,11 @@ import {
   PrimaryWindowNavigationProvider,
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
-import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
+import { observedWorkspacePaneRouteCommitForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
+import {
+  observeWorkspacePaneTabControllerRoute,
+  resetWorkspacePaneTabControllerForTest,
+} from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 
@@ -52,6 +56,7 @@ vi.mock('#/web/commands/terminal-create-command.ts', () => ({
 }))
 
 beforeEach(() => {
+  resetWorkspacePaneTabControllerForTest()
   resetReposStore()
   seedRepoWithReadModelForTest({
     id: '/repo',
@@ -59,9 +64,17 @@ beforeEach(() => {
     branches: [createRepoBranch('main', { worktree: { path: '/repo-worktree' } })],
     currentBranchName: 'main',
   })
+  observeWorkspacePaneTabControllerRoute({
+    repoId: '/repo',
+    repoRuntimeId: 'repo-runtime-1',
+    branchName: 'main',
+    worktreePath: '/repo-worktree',
+    route: null,
+  })
 })
 
 afterEach(() => {
+  resetWorkspacePaneTabControllerForTest()
   resetReposStore()
   terminalSessionViewMocks.props.length = 0
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockClear()
@@ -172,23 +185,13 @@ function navigationWith(): PrimaryWindowNavigationActions {
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: vi.fn(() => true),
     showRepoBranchTerminalSession: vi.fn(() => true),
-    commitRepoBranchWorkspacePaneRoute: (repoId, branch, route, options) =>
-      openResolvedRepoBranchWorkspacePaneRoute(
-        {
-          openRepoBranch: navigation.showRepoBranchEmptyWorkspacePane,
-          openRepoBranchTab: navigation.showRepoBranchWorkspacePaneTab,
-          openRepoBranchTerminal: navigation.showRepoBranchTerminalSession,
-        },
-        repoId,
-        branch,
-        route,
-        options,
-      ),
+    commitRepoBranchWorkspacePaneRoute: () => false,
     goBack: vi.fn(),
     goForward: vi.fn(),
     openSettings: vi.fn(),
     openCreateWorktree: vi.fn(),
   }
+  navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
   return navigation
 }
 

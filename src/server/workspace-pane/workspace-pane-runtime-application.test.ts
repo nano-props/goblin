@@ -146,7 +146,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     const broadcastWorkspaceTabsChanged = vi.fn()
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
-      terminalWorktree: { listSessionsForUser: async () => runtime.sessions },
+      terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { create: async () => runtime, close },
       workspaceTabsCoordinator: {
         ensureRuntimeTabForSession: async (input: { guardBeforeWrite?: () => typeof stale | null }) =>
@@ -165,52 +165,13 @@ describe('WorkspacePaneRuntimeApplication', () => {
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-test', request.repoRoot)
   })
 
-  test('returns terminal sessions in the canonical workspace tab order', async () => {
-    const runtime = terminalCreateSuccess()
-    const first = terminalSession('term-333333333333333333333', 'pty_session_3_aaaaaaaaa')
-    const second = terminalSession('term-222222222222222222222', 'pty_session_2_aaaaaaaaa')
-    const created = terminalSession(runtime.terminalSessionId, runtime.terminalRuntimeSessionId)
-    runtime.sessions = [first, second, created]
-    const tabs = [
-      { type: 'terminal' as const, runtimeSessionId: first.terminalSessionId },
-      { type: 'terminal' as const, runtimeSessionId: created.terminalSessionId },
-      { type: 'terminal' as const, runtimeSessionId: second.terminalSessionId },
-    ]
-    const application = createWorkspacePaneRuntimeApplication({
-      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
-      terminalWorktree: { listSessionsForUser: async () => [] },
-      terminal: { create: async () => runtime, close: () => false },
-      workspaceTabsCoordinator: {
-        ensureRuntimeTabForSession: async () => snapshot(tabs),
-        reconcileWorktree: vi.fn(),
-      } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktree'>,
-      isCurrentRepoRuntime: () => true,
-      broadcastWorkspaceTabsChanged: () => {},
-    })
-
-    const result = await application.open('client-test', 'user-test', {
-      runtimeType: 'terminal',
-      request,
-      insertAfterIdentity: `terminal:${first.terminalSessionId}`,
-    })
-
-    expect(result.ok).toBe(true)
-    if (!result.ok) return
-    expect(result.workspacePaneTabs).toEqual(snapshot(tabs))
-    expect(result.runtime.sessions.map((session) => session.terminalSessionId)).toEqual([
-      first.terminalSessionId,
-      created.terminalSessionId,
-      second.terminalSessionId,
-    ])
-  })
-
   test('closes a terminal by durable session id and returns the canonical scope snapshot', async () => {
     const session = terminalSession('term-111111111111111111111', 'pty_session_1_aaaaaaaaa')
     const close = vi.fn(() => true)
     const workspacePaneTabs = snapshot([{ type: 'status', tabId: 'workspace-pane:status' }])
     const reconcileWorktree = vi.fn(async () => workspacePaneTabs)
     const broadcastWorkspaceTabsChanged = vi.fn()
-    const listSessions = vi.fn().mockResolvedValueOnce([session]).mockResolvedValueOnce([])
+    const listSessions = vi.fn().mockResolvedValueOnce([session])
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       terminalWorktree: { listSessionsForUser: listSessions },
@@ -234,7 +195,16 @@ describe('WorkspacePaneRuntimeApplication', () => {
           worktreePath: request.worktreePath,
         },
       }),
-    ).resolves.toEqual({ ok: true, runtimeType: 'terminal', runtime: { sessions: [] }, workspacePaneTabs })
+    ).resolves.toEqual({
+      ok: true,
+      runtimeType: 'terminal',
+      runtime: {
+        action: 'closed',
+        terminalSessionId: session.terminalSessionId,
+        terminalRuntimeSessionId: session.terminalRuntimeSessionId,
+      },
+      workspacePaneTabs,
+    })
     expect(close).toHaveBeenCalledWith('client-test', 'user-test', {
       terminalRuntimeSessionId: session.terminalRuntimeSessionId,
     })
@@ -245,6 +215,47 @@ describe('WorkspacePaneRuntimeApplication', () => {
       worktreePath: request.worktreePath,
     })
     expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-test', request.repoRoot)
+  })
+
+  test('reports an already-closed durable identity and still reconciles tabs', async () => {
+    const close = vi.fn()
+    const workspacePaneTabs = snapshot([{ type: 'status', tabId: 'workspace-pane:status' }])
+    const reconcileWorktree = vi.fn(async () => workspacePaneTabs)
+    const application = createWorkspacePaneRuntimeApplication({
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminal: { create: async () => terminalCreateSuccess(), close },
+      workspaceTabsCoordinator: {
+        ensureRuntimeTabForSession: vi.fn(),
+        reconcileWorktree,
+      } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktree'>,
+      isCurrentRepoRuntime: () => true,
+      broadcastWorkspaceTabsChanged: vi.fn(),
+    })
+
+    await expect(
+      application.close('client-test', 'user-test', {
+        runtimeType: 'terminal',
+        sessionId: 'term-closedclosedclosed001',
+        target: {
+          repoRoot: request.repoRoot,
+          repoRuntimeId: request.repoRuntimeId,
+          branchName: request.branch,
+          worktreePath: request.worktreePath,
+        },
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      runtimeType: 'terminal',
+      runtime: {
+        action: 'already-closed',
+        terminalSessionId: 'term-closedclosedclosed001',
+        terminalRuntimeSessionId: null,
+      },
+      workspacePaneTabs,
+    })
+    expect(close).not.toHaveBeenCalled()
+    expect(reconcileWorktree).toHaveBeenCalledOnce()
   })
 
   test('does not claim runtime close success or mutate tabs when provider close is unconfirmed', async () => {
@@ -314,7 +325,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     createResult.resolve(terminalCreateSuccess())
     await expect(open).resolves.toMatchObject({ ok: true })
     await expect(close).resolves.toMatchObject({ ok: true })
-    expect(listSessions).toHaveBeenCalledTimes(2)
+    expect(listSessions).toHaveBeenCalledOnce()
   })
 
   test('lets an earlier admitted open finish before a later removal that fails validation', async () => {
@@ -418,7 +429,6 @@ function terminalCreateSuccess(): Extract<TerminalCreateResult, { ok: true }> {
     controller: { clientId: 'client-test', status: 'connected' },
     canonicalCols: 100,
     canonicalRows: 30,
-    sessions: [terminalSession(terminalSessionId, terminalRuntimeSessionId)],
   }
 }
 

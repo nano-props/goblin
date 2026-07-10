@@ -59,7 +59,11 @@ function makeActions(
     writeSession: vi.fn(() => false),
     resizeSession: vi.fn(() => false),
     takeoverSession: vi.fn(),
-    recoverSessionsForUser: vi.fn(async () => ({ sessions: [], snapshots: [] })),
+    recoverSessionsForUser: vi.fn(async () => ({
+      terminalSessions: { revision: 0, sessions: [] },
+      snapshots: [],
+    })),
+    terminalSessionsSnapshotForUser: vi.fn(() => ({ revision: 0, sessions: [] })),
   } as any
   const broker = { broadcastToUser: broadcasts as unknown as (userId: string, message: unknown) => void }
   const sessionService = {
@@ -99,7 +103,6 @@ describe('terminal-runtime-actions close broadcast', () => {
       ok: true,
       action: 'created',
       terminalSessionId: 'term-111111111111111111111',
-      sessions: [],
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,
       processName: 'zsh',
       canonicalTitle: null,
@@ -268,21 +271,50 @@ describe('terminal-runtime-actions prune', () => {
 })
 
 describe('terminal-runtime-actions recovery projection', () => {
-  test('retries until sessions and canonical tabs share one stable server revision', async () => {
+  test('retries only when the terminal projection revision changes during recovery', async () => {
     clearRepoRuntimesForUser(USER_ID)
     syncCurrentRepoRuntime()
     const { actions, manager, sessionService } = makeActions()
+    manager.recoverSessionsForUser
+      .mockResolvedValueOnce({ terminalSessions: { revision: 1, sessions: [] }, snapshots: [] })
+      .mockResolvedValueOnce({ terminalSessions: { revision: 2, sessions: [] }, snapshots: [] })
+    manager.terminalSessionsSnapshotForUser
+      .mockReturnValueOnce({ revision: 2, sessions: [] })
+      .mockReturnValueOnce({ revision: 2, sessions: [] })
     sessionService.listWorkspaceTabs
-      .mockResolvedValueOnce({ revision: 1, entries: [] })
-      .mockResolvedValueOnce({ revision: 2, entries: [] })
-      .mockResolvedValueOnce({ revision: 2, entries: [] })
-      .mockResolvedValueOnce({ revision: 2, entries: [] })
+      .mockResolvedValueOnce({ revision: 8, entries: [] })
+      .mockResolvedValueOnce({ revision: 9, entries: [] })
 
     await expect(
       actions.recoverSessions(CLIENT_ID, USER_ID, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
-    ).resolves.toEqual({ sessions: [], snapshots: [], workspacePaneTabs: { revision: 2, entries: [] } })
+    ).resolves.toEqual({
+      terminalSessions: { revision: 2, sessions: [] },
+      snapshots: [],
+      workspacePaneTabs: { revision: 9, entries: [] },
+    })
 
     expect(manager.recoverSessionsForUser).toHaveBeenCalledTimes(2)
+  })
+
+  test('does not use the workspace-tabs revision as terminal freshness', async () => {
+    clearRepoRuntimesForUser(USER_ID)
+    syncCurrentRepoRuntime()
+    const { actions, manager, sessionService } = makeActions()
+    manager.recoverSessionsForUser.mockResolvedValueOnce({
+      terminalSessions: { revision: 4, sessions: [] },
+      snapshots: [],
+    })
+    manager.terminalSessionsSnapshotForUser.mockReturnValueOnce({ revision: 4, sessions: [] })
+    sessionService.listWorkspaceTabs.mockResolvedValueOnce({ revision: 27, entries: [] })
+
+    await expect(
+      actions.recoverSessions(CLIENT_ID, USER_ID, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
+    ).resolves.toEqual({
+      terminalSessions: { revision: 4, sessions: [] },
+      snapshots: [],
+      workspacePaneTabs: { revision: 27, entries: [] },
+    })
+    expect(manager.recoverSessionsForUser).toHaveBeenCalledOnce()
   })
 })
 

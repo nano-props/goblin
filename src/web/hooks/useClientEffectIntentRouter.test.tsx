@@ -18,6 +18,10 @@ import {
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import {
+  observedWorkspacePaneRouteCommitForTest,
+  seedInitialObservedWorkspacePaneRouteForTest,
+} from '#/web/test-utils/workspace-pane-navigation.ts'
+import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
@@ -29,7 +33,6 @@ import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/sha
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 
 const appDataClientMocks = vi.hoisted(() => ({
   clearRecentRepoHistory: vi.fn(async () => {}),
@@ -96,23 +99,13 @@ beforeEach(() => {
       showRepoBranchTerminalSessionSpy(repoId, branch, terminalSessionId)
       return true
     },
-    commitRepoBranchWorkspacePaneRoute: (repoId, branch, route, options) =>
-      openResolvedRepoBranchWorkspacePaneRoute(
-        {
-          openRepoBranch: navigation.showRepoBranchEmptyWorkspacePane,
-          openRepoBranchTab: navigation.showRepoBranchWorkspacePaneTab,
-          openRepoBranchTerminal: navigation.showRepoBranchTerminalSession,
-        },
-        repoId,
-        branch,
-        route,
-        options,
-      ),
+    commitRepoBranchWorkspacePaneRoute: () => false,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},
     openCreateWorktree: () => {},
   }
+  navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
   Object.defineProperty(window, 'goblinNative', {
     configurable: true,
     value: {
@@ -200,14 +193,22 @@ describe('useClientEffectIntentRouter', () => {
     const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, '/tmp/repo-feature')
 
     await renderHookHost()
+    seedInitialObservedWorkspacePaneRouteForTest({
+      repoId: repo.id,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName: 'main',
+      worktreePath: '/tmp/repo-main',
+      route: { kind: 'static', tab: 'status' },
+    })
 
     await act(async () => {
       for (const listener of intentListeners)
         listener({ type: 'terminal-bell-click', repoRoot: repo.id, terminalSessionId, terminalWorktreeKey })
-      await Promise.resolve()
     })
 
-    expect(showRepoBranchTerminalSessionSpy).toHaveBeenCalledWith(repo.id, 'feature/test', terminalSessionId)
+    await waitFor(() => {
+      expect(showRepoBranchTerminalSessionSpy).toHaveBeenCalledWith(repo.id, 'feature/test', terminalSessionId)
+    })
     expect(showRepoBranchWorkspacePaneTabSpy).not.toHaveBeenCalled()
   })
 
@@ -232,19 +233,28 @@ describe('useClientEffectIntentRouter', () => {
         return true
       },
     }
+    navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
     currentRepoId = repo.id
     const terminalSessionId = 'term-222222222222222222222'
     const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, '/tmp/repo-feature')
 
     await renderHookHost()
+    seedInitialObservedWorkspacePaneRouteForTest({
+      repoId: repo.id,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName: 'main',
+      worktreePath: '/tmp/repo-main',
+      route: { kind: 'static', tab: 'status' },
+    })
 
     await act(async () => {
       for (const listener of intentListeners)
         listener({ type: 'terminal-bell-click', repoRoot: repo.id, terminalSessionId, terminalWorktreeKey })
-      await Promise.resolve()
     })
 
-    expect(routeNavigationCalls).toEqual([{ repoId: repo.id, branch: 'feature/test', terminalSessionId }])
+    await waitFor(() => {
+      expect(routeNavigationCalls).toEqual([{ repoId: repo.id, branch: 'feature/test', terminalSessionId }])
+    })
   })
 
   test('close-repo menu action delegates to navigation close', async () => {
@@ -425,6 +435,13 @@ describe('useClientEffectIntentRouter', () => {
       },
     })
     const host = renderInJsdom(<HookHost />)
+    seedInitialObservedWorkspacePaneRouteForTest({
+      repoId: repo.id,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName: 'main',
+      worktreePath: '/tmp/repo-worktree',
+      route: { kind: 'static', tab: 'status' },
+    })
 
     await act(async () => {
       for (const listener of intentListeners) listener({ type: 'terminal-new-tab-requested' })
@@ -445,9 +462,16 @@ describe('useClientEffectIntentRouter', () => {
     showRepoBranchTerminalSessionSpy.mockClear()
     expect(
       workspacePaneTabTargetForBranch(repo.id, 'main', {
-        workspacePaneRoute: currentWorkspacePaneRoute,
+      workspacePaneRoute: currentWorkspacePaneRoute,
       })?.activeTab?.identity,
     ).toBe('terminal:term-222222222222222222222')
+    seedInitialObservedWorkspacePaneRouteForTest({
+      repoId: repo.id,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName: 'main',
+      worktreePath: '/tmp/repo-worktree',
+      route: { kind: 'terminal', terminalSessionId: 'term-222222222222222222222' },
+    })
 
     await act(async () => {
       for (const listener of intentListeners) listener({ type: 'workspace-pane-close-tab-or-window-requested' })

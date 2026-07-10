@@ -50,6 +50,10 @@ Notes:
 - Store repo data may still exist as a projection for UI orchestration, action state, warm restore, and in-place server response application. New runtime reads should prefer the query-backed projection unless they are explicitly write-side projection code.
 - `ReposStore` actions are also grouped by local, restorable, runtime-coherent, and mutation responsibilities.
 - Transport payloads may bundle multiple classes together; consumers should split them back into runtime-coherent and restorable views before use.
+- A transport payload may also bundle multiple runtime-coherent projections,
+  but each authoritative model keeps its own revision. Terminal session
+  snapshots and workspace-pane tab snapshots are applied independently; a
+  tabs revision must never gate terminal collection recovery.
 - Runtime-coherent repo actions should prefer orchestration entrypoints plus focused helper modules for projection/state transitions and sync pipelines.
 - Settings truth lives on the server; clients read it through query snapshots or specialized runtime projections.
 - Settings writes belong in `src/web/settings-actions.ts`. `src/web/settings-client.ts` is the transport boundary, not a UI mutation API. UI stores may keep local projections such as theme/i18n state, but their server write-through path should use settings actions so the settings query cache stays coherent.
@@ -68,6 +72,10 @@ Notes:
   server application operation. Return the canonical projections together;
   do not make the client issue a provider write followed by a second membership
   write.
+- Mutation responses describe the exact committed effect. Do not attach an
+  unversioned full-collection read model to a mutation response and use it to
+  replace concurrent state. Full collections belong to revisioned query or
+  recovery snapshots.
 - Server application commands, server snapshot revision, repo-runtime identity,
   and client presentation coordination have different jobs. The server command
   orders resource changes, revision orders projection responses,

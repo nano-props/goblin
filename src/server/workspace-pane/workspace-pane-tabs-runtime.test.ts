@@ -74,9 +74,11 @@ describe('workspace pane tabs runtime storage', () => {
 
     runtime.closeTabsForScope('user-a', 'scope-b')
     expect(runtime.scopesForUser('user-a')).toEqual(['/repo'])
+    expect(runtime.revision({ userId: 'user-a', scope: 'scope-b' })).toBe(2)
 
     runtime.closeTabsForUser('user-a')
     expect(runtime.tabs(target())).toEqual([workspacePaneStaticTabEntry('status')])
+    expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(2)
     expect(runtime.runtimeSessionIds({ ...worktree(), userId: 'user-b' }, 'terminal')).toEqual([
       'term-111111111111111111111',
     ])
@@ -114,6 +116,17 @@ describe('workspace pane tabs runtime storage', () => {
     expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(2)
     runtime.closeTabsForScope('user-a', '/repo')
     expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(2)
+    runtime.releaseRevisionForScope('user-a', '/repo')
+    expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(0)
+  })
+
+  test('does not release a repo-runtime epoch clock while its targets are live', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+    runtime.replaceTabs({ ...target(), tabs: [workspacePaneStaticTabEntry('status')] })
+
+    expect(() => runtime.releaseRevisionForScope('user-a', '/repo')).toThrow(
+      'cannot release workspace pane tabs revision with live targets',
+    )
   })
 
   test('closes every target for one worktree with one revision without affecting sibling worktrees', () => {

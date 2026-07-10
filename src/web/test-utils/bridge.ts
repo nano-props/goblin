@@ -305,7 +305,6 @@ export function installWorkspacePaneTabsTestBridge(
         ok: true as const,
         action: 'created' as const,
         terminalSessionId: 'term-testtesttesttesttest1',
-        sessions: [],
         terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
         snapshot: '',
         snapshotSeq: 0,
@@ -320,7 +319,7 @@ export function installWorkspacePaneTabsTestBridge(
       }),
       pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
       recoverSessions: async () => ({
-        sessions: [],
+        terminalSessions: { revision: 0, sessions: [] },
         snapshots: [],
         workspacePaneTabs: { revision: 0, entries: [] },
       }),
@@ -387,24 +386,6 @@ export function installWorkspacePaneTabsTestBridge(
             ok: true,
             action: 'created',
             terminalSessionId,
-            sessions: [
-              {
-                terminalRuntimeSessionId,
-                terminalSessionId,
-                repoRuntimeId: input.request.repoRuntimeId,
-                repoRoot: input.request.repoRoot,
-                branch: input.request.branch,
-                worktreePath: input.request.worktreePath,
-                cwd: input.request.worktreePath,
-                controller: { clientId: input.request.clientId ?? 'attachment_local', status: 'connected' },
-                processName: 'zsh',
-                canonicalTitle: null,
-                phase: 'open',
-                message: null,
-                cols: input.request.cols ?? 80,
-                rows: input.request.rows ?? 24,
-              },
-            ],
             terminalRuntimeSessionId,
             snapshot: '',
             snapshotSeq: 0,
@@ -422,6 +403,9 @@ export function installWorkspacePaneTabsTestBridge(
       },
       close: async (input) => {
         const currentTabs = serverTabsForTarget(input.target)
+        const wasOpen = currentTabs.some(
+          (tab) => tab.type === input.runtimeType && tab.runtimeSessionId === input.sessionId,
+        )
         replaceServerTarget(
           input.target,
           currentTabs.filter((tab) => tab.type !== input.runtimeType || tab.runtimeSessionId !== input.sessionId),
@@ -429,7 +413,11 @@ export function installWorkspacePaneTabsTestBridge(
         return {
           ok: true,
           runtimeType: input.runtimeType,
-          runtime: { sessions: [] },
+          runtime: {
+            action: wasOpen ? ('closed' as const) : ('already-closed' as const),
+            terminalSessionId: input.sessionId,
+            terminalRuntimeSessionId: wasOpen ? 'pty_test_aaaaaaaaa' : null,
+          },
           workspacePaneTabs: commitServerSnapshot(),
         }
       },
@@ -584,7 +572,11 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           close: () => Promise.resolve(true),
           pruneTerminals: () => Promise.resolve({ pruned: 0, remaining: 0 }),
           recoverSessions: () =>
-            Promise.resolve({ sessions: [], snapshots: [], workspacePaneTabs: { revision: 0, entries: [] } }),
+            Promise.resolve({
+              terminalSessions: { revision: 0, sessions: [] },
+              snapshots: [],
+              workspacePaneTabs: { revision: 0, entries: [] },
+            }),
           notifyBell: () => Promise.resolve(true),
           sendTestNotification: () => Promise.resolve(true),
           setBadge: () => {},
@@ -714,10 +706,21 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           const runtimeType =
             (payload as { runtimeType?: WorkspacePaneRuntimeCloseResult['runtimeType'] } | null)?.runtimeType ??
             'terminal'
-          return { ok: true, runtimeType, runtime: { sessions: [] }, workspacePaneTabs: { revision: 1, entries: [] } }
+          const terminalSessionId =
+            (payload as { sessionId?: string } | null)?.sessionId ?? 'term-testtesttesttesttest1'
+          return {
+            ok: true,
+            runtimeType,
+            runtime: { action: 'closed', terminalSessionId, terminalRuntimeSessionId: 'pty_test_aaaaaaaaa' },
+            workspacePaneTabs: { revision: 1, entries: [] },
+          }
         }
         case 'terminal.recoverSessions':
-          return { sessions: [], snapshots: [], workspacePaneTabs: { revision: 0, entries: [] } }
+          return {
+            terminalSessions: { revision: 0, sessions: [] },
+            snapshots: [],
+            workspacePaneTabs: { revision: 0, entries: [] },
+          }
       }
     }
     return handler(payload) as TerminalClientTestOutputs[keyof TerminalClientTestOutputs]

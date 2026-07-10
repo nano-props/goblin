@@ -48,9 +48,14 @@ function assignTerminalRuntimeTabCommandContext(
   context.terminal = {
     base: selectedWorkspacePaneTerminalBase(input.repoId, input.branchName, input.workspacePaneRoute),
     bridge: readTerminalSessionCommandBridge(),
-    openerIdentity: captureWorkspacePaneActiveTabIdentity(input.repoId, input.branchName, {
-      workspacePaneRoute: input.workspacePaneRoute,
-    }),
+    openerIdentity: captureWorkspacePaneActiveTabIdentity(
+      input.repoId,
+      useReposStore.getState().repos[input.repoId]?.repoRuntimeId ?? '',
+      input.branchName,
+      {
+        workspacePaneRoute: input.workspacePaneRoute,
+      },
+    ),
     showTerminalSession: (terminalSessionId) => input.showRuntimeTab('terminal', terminalSessionId),
     t: input.terminalCreateTranslator,
   }

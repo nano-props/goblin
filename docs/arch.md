@@ -83,9 +83,11 @@ Runtime creation follows three responsibility layers:
    quiescence, runs the Git removal past a non-cancelable commit point, then
    finalizes canonical tabs. A Git failure reconciles runtime tabs while
    preserving the worktree's static projection.
-   Provider close results carry the corresponding server session projection;
-   the client applies it only when it also accepts that command's canonical
-   tabs revision, so an older close response cannot erase a newer open.
+   Provider commands return the exact target lifecycle effect plus the
+   canonical tabs snapshot produced by that command. Full terminal collections
+   are query snapshots with their own terminal projection revision; clients
+   apply terminal and tabs snapshots independently, so neither model borrows
+   the other's revision as a freshness proxy.
    Terminal close itself is a manager-owned, idempotent promise: concurrent
    tab close, prune, runtime cleanup, and worktree quiescence join the same PTY
    termination acknowledgement before the session leaves authoritative state.

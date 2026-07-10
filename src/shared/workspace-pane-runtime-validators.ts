@@ -2,7 +2,6 @@ import * as v from 'valibot'
 import {
   normalizeTerminalCreateResult,
   TerminalCreateInputSchema,
-  TerminalSessionSummarySchema,
 } from '#/shared/terminal-validators.ts'
 import type { WorkspacePaneRuntimeOpenInput, WorkspacePaneRuntimeOpenResult } from '#/shared/workspace-pane-runtime.ts'
 import type {
@@ -28,7 +27,7 @@ const WorkspacePaneRuntimeCommandTargetSchema = v.object({
   repoRoot: v.string(),
   repoRuntimeId: RepoRuntimeIdSchema,
   branchName: v.string(),
-  worktreePath: v.nullable(v.string()),
+  worktreePath: v.string(),
 })
 
 export const WorkspacePaneRuntimeCloseInputSchema = v.object({
@@ -57,7 +56,11 @@ const WorkspacePaneRuntimeCloseResultSchema = v.variant('ok', [
   v.object({
     ok: v.literal(true),
     runtimeType: v.literal('terminal'),
-    runtime: v.object({ sessions: v.array(TerminalSessionSummarySchema) }),
+    runtime: v.object({
+      action: v.picklist(['closed', 'already-closed']),
+      terminalSessionId: v.pipe(v.string(), v.minLength(1)),
+      terminalRuntimeSessionId: v.nullable(v.string()),
+    }),
     workspacePaneTabs: WorkspacePaneTabsSnapshotSchema,
   }),
   v.object({

@@ -592,10 +592,10 @@ order would have been:
 These rules are derived from the symptom family and should outlive
 any individual implementation:
 
-1. **Do not use `create.sessions` as the success criterion for first
-   paint.** `create.terminalRuntimeSessionId` + `snapshot` + `snapshotSeq` +
-   `outputEra` are the authoritative created-session handshake.
-   `create.sessions` is projection data.
+1. **Do not return a full terminal collection from `create`.**
+   `create.terminalRuntimeSessionId` + `snapshot` + `snapshotSeq` +
+   `outputEra` are the authoritative target-session handshake. Full terminal
+   collections are returned only by revisioned recovery/query snapshots.
 2. **Keep `create`, `attach`, and `restart` aligned in first-frame
    semantics.** All three produce a terminal frame the user can
    immediately see; they all owe the same atomic handshake.

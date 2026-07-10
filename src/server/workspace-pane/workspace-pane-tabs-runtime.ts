@@ -125,6 +125,14 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     if (changed) this.advanceRevision(userId, scope)
   }
 
+  /** Releases a clock only after the owning repo-runtime epoch is invalid. */
+  releaseRevisionForScope(userId: TUser, scope: string): void {
+    if (this.tabsForScope({ userId, scope }).length > 0) {
+      throw new Error('cannot release workspace pane tabs revision with live targets')
+    }
+    this.revisionByUserScope.delete(workspacePaneTabsUserScopeQueueKey(userId, scope))
+  }
+
   closeTabsForWorktree(input: WorkspacePaneTabsWorktreeInput<TUser>): void {
     const prefix = workspacePaneTabsRuntimeScopePrefixKey(input.userId, input.scope)
     let changed = false

@@ -9,7 +9,7 @@ import { createTerminalWithAdmissionForTest } from '#/web/test-utils/terminal-se
 import { resetWorkspacePaneTabControllerForTest } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 
-const terminalBase: TerminalSessionBase = {
+const terminalBase: TerminalSessionBase & { repoRuntimeId: string } = {
   repoRoot: '/repo',
   repoRuntimeId: 'repo-runtime-1',
   branch: 'main',
@@ -66,7 +66,12 @@ describe('workspace pane runtime tab command actions', () => {
       markCoordinatorStarted = resolve
     })
     const coordinatorBlocker = runWorkspacePaneTabCoordinatorTask(
-      { repoId: terminalBase.repoRoot, branchName: terminalBase.branch, worktreePath: terminalBase.worktreePath },
+      {
+        repoId: terminalBase.repoRoot,
+        repoRuntimeId: terminalBase.repoRuntimeId,
+        branchName: terminalBase.branch,
+        worktreePath: terminalBase.worktreePath,
+      },
       async () => {
         markCoordinatorStarted()
         await new Promise<void>((resolve) => {

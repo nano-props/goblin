@@ -1,4 +1,4 @@
-import type { TerminalCreateInput, TerminalCreateResult, TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import type { TerminalCreateInput, TerminalCreateResult } from '#/shared/terminal-types.ts'
 import { terminalSessionRuntimeScope, terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
 import type {
   TerminalSessionEnsureInput,
@@ -22,7 +22,6 @@ interface TerminalSessionCreatorOptions {
     input: Pick<TerminalCreateInput, 'repoRoot' | 'repoRuntimeId'>,
     terminalRuntimeSessionId: string,
   ): Promise<TerminalCreateFailure | null>
-  listSessions(userId: string, repoRoot: string, repoRuntimeId: string): Promise<TerminalSessionSummary[]>
 }
 
 class TerminalSessionCreator {
@@ -62,17 +61,6 @@ class TerminalSessionCreator {
           createResult.terminalRuntimeSessionId,
         )
         if (staleAfterEnsure) return staleAfterEnsure
-        const sessions = await this.options.listSessions(
-          input.userId,
-          input.request.repoRoot,
-          input.request.repoRuntimeId,
-        )
-        const staleAfterList = await this.options.rejectStaleCreateIfNeeded(
-          input.userId,
-          input.request,
-          createResult.terminalRuntimeSessionId,
-        )
-        if (staleAfterList) return staleAfterList
         return {
           ok: true,
           action: createResult.action,
@@ -88,7 +76,6 @@ class TerminalSessionCreator {
           controller: createResult.controller,
           canonicalCols: createResult.canonicalCols,
           canonicalRows: createResult.canonicalRows,
-          sessions: sessions,
         }
       },
     )

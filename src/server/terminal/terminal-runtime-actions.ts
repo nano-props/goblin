@@ -196,17 +196,21 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       input: TerminalListSessionsInput,
     ): Promise<TerminalSessionsRecoveryResult> {
       if (!isValidTerminalClientId(clientId) || !isValidRepoLocator(input.repoRoot)) {
-        return { sessions: [], snapshots: [], workspacePaneTabs: { revision: 0, entries: [] } }
+        return {
+          terminalSessions: { revision: 0, sessions: [] },
+          snapshots: [],
+          workspacePaneTabs: { revision: 0, entries: [] },
+        }
       }
       assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
+      const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
       for (let attempt = 0; attempt < MAX_TERMINAL_RECOVERY_PROJECTION_ATTEMPTS; attempt += 1) {
-        const tabsBefore = await sessionService.listWorkspaceTabs(userId, input.repoRoot, input.repoRuntimeId)
-        const recovery = await manager.recoverSessionsForUser(
-          userId,
-          terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId),
-        )
+        const recovery = await manager.recoverSessionsForUser(userId, scope)
         const workspacePaneTabs = await sessionService.listWorkspaceTabs(userId, input.repoRoot, input.repoRuntimeId)
-        if (tabsBefore.revision === workspacePaneTabs.revision) return { ...recovery, workspacePaneTabs }
+        const terminalAfter = manager.terminalSessionsSnapshotForUser(userId, scope)
+        if (recovery.terminalSessions.revision === terminalAfter.revision) {
+          return { ...recovery, workspacePaneTabs }
+        }
       }
       throw new Error('error.terminal-recovery-unstable')
     },

@@ -1,215 +1,123 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import {
-  abortWorkspacePaneTabCoordinatorTransition,
   beginWorkspacePaneTabCoordinatorTransition,
-  completeWorkspacePaneTabCoordinatorTransition,
   observeWorkspacePaneTabCoordinatorRoute,
   resetWorkspacePaneTabCoordinatorForTest,
   runWorkspacePaneTabCoordinatorTask,
-  workspacePaneTabCoordinatorReconciliationDeferred,
+  waitForWorkspacePaneTabCoordinatorTransition,
+  workspacePaneTabCoordinatorObservedRoute,
+  workspacePaneTabCoordinatorPendingIntent,
 } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 
-describe('workspace pane tab coordinator', () => {
+const TARGET = {
+  repoId: '/repo',
+  repoRuntimeId: 'repo-runtime-1',
+  branchName: 'feature/a',
+  worktreePath: '/worktree-a',
+} as const
+const SOURCE_ROUTE = { kind: 'static' as const, tab: 'status' as const }
+const TARGET_ROUTE = { kind: 'static' as const, tab: 'files' as const }
+
+describe('workspace pane tab coordinator transactions', () => {
   beforeEach(() => {
     resetWorkspacePaneTabCoordinatorForTest()
   })
 
-  test('serializes actions for the same workspace pane target', async () => {
+  test('serializes the same complete resource target', async () => {
     const order: string[] = []
-    let releaseFirst = () => {}
-    const firstRelease = new Promise<void>((resolve) => {
-      releaseFirst = resolve
+    const release = Promise.withResolvers<void>()
+    const first = runWorkspacePaneTabCoordinatorTask(TARGET, async () => {
+      order.push('first-start')
+      await release.promise
+      order.push('first-end')
     })
-
-    const first = runWorkspacePaneTabCoordinatorTask(
-      { repoId: '/tmp/repo', branchName: 'feature/a', worktreePath: '/tmp/worktree-a' },
-      async () => {
-        order.push('first-start')
-        await firstRelease
-        order.push('first-end')
-      },
-    )
-    const second = runWorkspacePaneTabCoordinatorTask(
-      { repoId: '/tmp/repo', branchName: 'feature/a', worktreePath: '/tmp/worktree-a' },
-      () => {
-        order.push('second')
-      },
-    )
+    const second = runWorkspacePaneTabCoordinatorTask(TARGET, () => {
+      order.push('second')
+    })
 
     await Promise.resolve()
     expect(order).toEqual(['first-start'])
-    releaseFirst()
+    release.resolve()
     await Promise.all([first, second])
     expect(order).toEqual(['first-start', 'first-end', 'second'])
   })
 
-  test('does not serialize actions for different workspace pane targets', async () => {
-    const order: string[] = []
-    let releaseFirst = () => {}
-    const firstRelease = new Promise<void>((resolve) => {
-      releaseFirst = resolve
+  test.each([
+    ['runtime', { ...TARGET, repoRuntimeId: 'repo-runtime-2' }],
+    ['worktree', { ...TARGET, worktreePath: '/worktree-b' }],
+    ['branch', { ...TARGET, branchName: 'feature/b' }],
+  ] as const)('isolates a different %s resource target', async (_resource, otherTarget) => {
+    const release = Promise.withResolvers<void>()
+    let otherRan = false
+    const first = runWorkspacePaneTabCoordinatorTask(TARGET, async () => await release.promise)
+    const second = runWorkspacePaneTabCoordinatorTask(otherTarget, () => {
+      otherRan = true
     })
-
-    const first = runWorkspacePaneTabCoordinatorTask(
-      { repoId: '/tmp/repo', branchName: 'feature/a', worktreePath: '/tmp/worktree-a' },
-      async () => {
-        order.push('first-start')
-        await firstRelease
-        order.push('first-end')
-      },
-    )
-    const second = runWorkspacePaneTabCoordinatorTask(
-      { repoId: '/tmp/repo', branchName: 'feature/b', worktreePath: '/tmp/worktree-b' },
-      () => {
-        order.push('second')
-      },
-    )
 
     await second
-    expect(order).toEqual(['first-start', 'second'])
-    releaseFirst()
+    expect(otherRan).toBe(true)
+    release.resolve()
     await first
-    expect(order).toEqual(['first-start', 'second', 'first-end'])
   })
 
-  test('defers stale route reconciliation until the route leaves the transition source', () => {
-    beginWorkspacePaneTabCoordinatorTransition({
-      repoId: '/tmp/repo',
-      branchName: 'feature/a',
-      worktreePath: '/tmp/worktree-a',
-      fromRoute: { kind: 'static', tab: 'files' },
-      toRoute: { kind: 'static', tab: 'status' },
+  test('keeps observed route separate from pending intent and resolves only on exact observation', async () => {
+    observeWorkspacePaneTabCoordinatorRoute({ ...TARGET, route: SOURCE_ROUTE })
+    const transitionId = beginWorkspacePaneTabCoordinatorTransition({
+      ...TARGET,
+      fromRoute: SOURCE_ROUTE,
+      toRoute: TARGET_ROUTE,
+    })
+    const completion = waitForWorkspacePaneTabCoordinatorTransition(transitionId)
+    let settled = false
+    void completion.then(() => {
+      settled = true
     })
 
-    expect(
-      workspacePaneTabCoordinatorReconciliationDeferred({
-        repoId: '/tmp/repo',
-        branchName: 'feature/a',
-        worktreePath: '/tmp/worktree-a',
-        route: { kind: 'static', tab: 'files' },
-        reconciliation: { kind: 'replace-empty-pane' },
-      }),
-    ).toBe(true)
+    await Promise.resolve()
+    expect(settled).toBe(false)
+    expect(workspacePaneTabCoordinatorObservedRoute(TARGET)).toEqual(SOURCE_ROUTE)
+    expect(workspacePaneTabCoordinatorPendingIntent(TARGET)).toEqual({
+      fromRoute: SOURCE_ROUTE,
+      toRoute: TARGET_ROUTE,
+    })
+
+    observeWorkspacePaneTabCoordinatorRoute({ ...TARGET, route: TARGET_ROUTE })
+    await expect(completion).resolves.toBe(true)
+    expect(workspacePaneTabCoordinatorObservedRoute(TARGET)).toEqual(TARGET_ROUTE)
+    expect(workspacePaneTabCoordinatorPendingIntent(TARGET)).toBeNull()
+  })
+
+  test('rejects a transition when the observer lands on the wrong route', async () => {
+    observeWorkspacePaneTabCoordinatorRoute({ ...TARGET, route: SOURCE_ROUTE })
+    const transitionId = beginWorkspacePaneTabCoordinatorTransition({
+      ...TARGET,
+      fromRoute: SOURCE_ROUTE,
+      toRoute: TARGET_ROUTE,
+    })
+    const completion = waitForWorkspacePaneTabCoordinatorTransition(transitionId)
 
     observeWorkspacePaneTabCoordinatorRoute({
-      repoId: '/tmp/repo',
-      branchName: 'feature/a',
-      worktreePath: '/tmp/worktree-a',
-      route: { kind: 'static', tab: 'status' },
+      ...TARGET,
+      route: { kind: 'static', tab: 'history' },
     })
 
-    expect(
-      workspacePaneTabCoordinatorReconciliationDeferred({
-        repoId: '/tmp/repo',
-        branchName: 'feature/a',
-        worktreePath: '/tmp/worktree-a',
-        route: { kind: 'static', tab: 'files' },
-        reconciliation: { kind: 'replace-empty-pane' },
-      }),
-    ).toBe(false)
+    await expect(completion).resolves.toBe(false)
   })
 
-  test('clears stale route reconciliation deferral when a transition aborts', () => {
+  test.each([
+    { ...TARGET, repoRuntimeId: 'repo-runtime-2' },
+    { ...TARGET, branchName: 'feature/b', worktreePath: '/worktree-b' },
+  ])('supersedes a pending transaction when another runtime or target is observed', async (replacement) => {
+    observeWorkspacePaneTabCoordinatorRoute({ ...TARGET, route: SOURCE_ROUTE })
     const transitionId = beginWorkspacePaneTabCoordinatorTransition({
-      repoId: '/tmp/repo',
-      branchName: 'feature/a',
-      worktreePath: '/tmp/worktree-a',
-      fromRoute: { kind: 'static', tab: 'files' },
-      toRoute: { kind: 'static', tab: 'status' },
+      ...TARGET,
+      fromRoute: SOURCE_ROUTE,
+      toRoute: TARGET_ROUTE,
     })
+    const completion = waitForWorkspacePaneTabCoordinatorTransition(transitionId)
 
-    abortWorkspacePaneTabCoordinatorTransition(transitionId)
+    observeWorkspacePaneTabCoordinatorRoute({ ...replacement, route: SOURCE_ROUTE })
 
-    expect(
-      workspacePaneTabCoordinatorReconciliationDeferred({
-        repoId: '/tmp/repo',
-        branchName: 'feature/a',
-        worktreePath: '/tmp/worktree-a',
-        route: { kind: 'static', tab: 'files' },
-        reconciliation: { kind: 'replace-empty-pane' },
-      }),
-    ).toBe(false)
-  })
-
-  test('clears stale route reconciliation deferral when committed navigation settles', () => {
-    const transitionId = beginWorkspacePaneTabCoordinatorTransition({
-      repoId: '/tmp/repo',
-      repoRuntimeId: 'repo-runtime-1',
-      branchName: 'feature/a',
-      worktreePath: '/tmp/worktree-a',
-      fromRoute: { kind: 'static', tab: 'files' },
-      toRoute: { kind: 'static', tab: 'status' },
-    })
-
-    completeWorkspacePaneTabCoordinatorTransition(transitionId)
-
-    expect(
-      workspacePaneTabCoordinatorReconciliationDeferred({
-        repoId: '/tmp/repo',
-        repoRuntimeId: 'repo-runtime-1',
-        branchName: 'feature/a',
-        worktreePath: '/tmp/worktree-a',
-        route: { kind: 'static', tab: 'files' },
-        reconciliation: { kind: 'replace-empty-pane' },
-      }),
-    ).toBe(false)
-  })
-
-  test('does not let a transition from an old repo runtime defer the replacement runtime', () => {
-    beginWorkspacePaneTabCoordinatorTransition({
-      repoId: '/tmp/repo',
-      repoRuntimeId: 'repo-runtime-old',
-      branchName: 'feature/a',
-      worktreePath: '/tmp/worktree-a',
-      fromRoute: { kind: 'static', tab: 'files' },
-      toRoute: { kind: 'static', tab: 'status' },
-    })
-
-    expect(
-      workspacePaneTabCoordinatorReconciliationDeferred({
-        repoId: '/tmp/repo',
-        repoRuntimeId: 'repo-runtime-new',
-        branchName: 'feature/a',
-        worktreePath: '/tmp/worktree-a',
-        route: { kind: 'static', tab: 'files' },
-        reconciliation: { kind: 'replace-empty-pane' },
-      }),
-    ).toBe(false)
-  })
-
-  test('keeps only the latest pending transition for a workspace pane target', () => {
-    beginWorkspacePaneTabCoordinatorTransition({
-      repoId: '/tmp/repo',
-      branchName: 'feature/a',
-      worktreePath: '/tmp/worktree-a',
-      fromRoute: { kind: 'static', tab: 'files' },
-      toRoute: { kind: 'static', tab: 'status' },
-    })
-    beginWorkspacePaneTabCoordinatorTransition({
-      repoId: '/tmp/repo',
-      branchName: 'feature/a',
-      worktreePath: '/tmp/worktree-a',
-      fromRoute: { kind: 'static', tab: 'history' },
-      toRoute: { kind: 'static', tab: 'changes' },
-    })
-
-    expect(
-      workspacePaneTabCoordinatorReconciliationDeferred({
-        repoId: '/tmp/repo',
-        branchName: 'feature/a',
-        worktreePath: '/tmp/worktree-a',
-        route: { kind: 'static', tab: 'files' },
-        reconciliation: { kind: 'replace-empty-pane' },
-      }),
-    ).toBe(false)
-    expect(
-      workspacePaneTabCoordinatorReconciliationDeferred({
-        repoId: '/tmp/repo',
-        branchName: 'feature/a',
-        worktreePath: '/tmp/worktree-a',
-        route: { kind: 'static', tab: 'history' },
-        reconciliation: { kind: 'replace-empty-pane' },
-      }),
-    ).toBe(true)
+    await expect(completion).resolves.toBe(false)
   })
 })

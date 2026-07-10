@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
-import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import {
+  type WorkspacePaneTabEntry,
+  workspacePaneRuntimeTabEntry,
+  workspacePaneStaticTabEntry,
+} from '#/shared/workspace-pane.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import {
   dispatchCloseWorkspacePaneTabAction,
@@ -15,9 +19,17 @@ import {
   createRepoBranch,
   installWorkspacePaneTabsTestBridge,
   resetReposStore,
+  seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { setTerminalSessionCommandBridgeForTest } from '#/web/test-utils/terminal-session-command-bridge.ts'
+import {
+  observedWorkspacePaneRouteCommitForTest,
+  seedInitialObservedWorkspacePaneRouteForTest,
+} from '#/web/test-utils/workspace-pane-navigation.ts'
+import { observeWorkspacePaneTabControllerRoute } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 
 const REPO_ID = '/tmp/workspace-pane-tab-close-repo'
 const BRANCH_NAME = 'feature/worktree-close'
@@ -45,18 +57,17 @@ test('commits active close-back route through command-owned navigation', async (
       [BRANCH_NAME]: [workspacePaneStaticTabEntry('files'), workspacePaneStaticTabEntry('status')],
     },
   })
-  const showRepoBranchWorkspacePaneTab = vi.fn(() => false)
-  const commitRepoBranchWorkspacePaneRoute = vi.fn(() => true)
+  const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
+  const navigation = navigationWith({ showRepoBranchWorkspacePaneTab })
+  const commitRepoBranchWorkspacePaneRoute = vi.fn(navigation.commitRepoBranchWorkspacePaneRoute)
+  navigation.commitRepoBranchWorkspacePaneRoute = commitRepoBranchWorkspacePaneRoute
 
   await expect(
     dispatchCloseWorkspacePaneTabAction({
       repoId: REPO_ID,
       branchName: BRANCH_NAME,
       workspacePaneRoute: { kind: 'static', tab: 'files' },
-      navigation: navigationWith({
-        showRepoBranchWorkspacePaneTab,
-        commitRepoBranchWorkspacePaneRoute,
-      }),
+      navigation,
     }),
   ).resolves.toBe(true)
 
@@ -66,7 +77,7 @@ test('commits active close-back route through command-owned navigation', async (
     { kind: 'static', tab: 'status' },
     undefined,
   )
-  expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
+  expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, 'status')
 })
 
 test('awaits close-back navigation and clears the transition when navigation rejects', async () => {
@@ -201,8 +212,90 @@ test('clears the close transition when the server close command rejects', async 
   ).toBe(false)
 })
 
+test('does not let a late close from an old runtime navigate or clear the replacement runtime opener', async () => {
+  const repo = seedRepoWithReadModelForTest({
+    id: REPO_ID,
+    branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+    currentBranchName: BRANCH_NAME,
+    workspacePaneTabsByBranch: {
+      [BRANCH_NAME]: [workspacePaneStaticTabEntry('files'), workspacePaneStaticTabEntry('status')],
+    },
+  })
+  const serverClose = Promise.withResolvers<WorkspacePaneTabEntry[]>()
+  const updateWorkspaceTabs = vi.fn(async () => await serverClose.promise)
+  installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs })
+  expect(
+    recordWorkspacePaneTabOpener(
+      REPO_ID,
+      repo.repoRuntimeId,
+      BRANCH_NAME,
+      'workspace-pane:files',
+      'workspace-pane:status',
+    ),
+  ).toBe('recorded')
+  observeWorkspacePaneTabControllerRoute({
+    repoId: REPO_ID,
+    repoRuntimeId: repo.repoRuntimeId,
+    branchName: BRANCH_NAME,
+    worktreePath: WORKTREE_PATH,
+    route: { kind: 'static', tab: 'files' },
+  })
+  const navigation = navigationWith()
+  const close = dispatchCloseWorkspacePaneTabAction({
+    repoId: REPO_ID,
+    branchName: BRANCH_NAME,
+    workspacePaneRoute: { kind: 'static', tab: 'files' },
+    navigation,
+  })
+  await vi.waitFor(() => expect(updateWorkspaceTabs).toHaveBeenCalledOnce())
+
+  const replacementRuntimeId = 'repo-runtime-replacement'
+  const replacementRepo = { ...repo, repoRuntimeId: replacementRuntimeId }
+  useReposStore.setState((state) => ({
+    repos: {
+      ...state.repos,
+      [REPO_ID]: replacementRepo,
+    },
+  }))
+  seedRepoReadModelQueryData(replacementRepo, {
+    branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+    currentBranch: BRANCH_NAME,
+  })
+  setWorkspacePaneTabsForTargetQueryData({
+    repoRoot: REPO_ID,
+    repoRuntimeId: replacementRuntimeId,
+    branchName: BRANCH_NAME,
+    worktreePath: WORKTREE_PATH,
+    tabs: [workspacePaneStaticTabEntry('files'), workspacePaneStaticTabEntry('status')],
+  })
+  expect(
+    recordWorkspacePaneTabOpener(
+      REPO_ID,
+      replacementRuntimeId,
+      BRANCH_NAME,
+      'workspace-pane:files',
+      'workspace-pane:status',
+    ),
+  ).toBe('recorded')
+  observeWorkspacePaneTabControllerRoute({
+    repoId: REPO_ID,
+    repoRuntimeId: replacementRuntimeId,
+    branchName: BRANCH_NAME,
+    worktreePath: WORKTREE_PATH,
+    route: { kind: 'static', tab: 'files' },
+  })
+
+  serverClose.resolve([workspacePaneStaticTabEntry('status')])
+  await expect(close).resolves.toBe(true)
+  expect(navigation.commitRepoBranchWorkspacePaneRoute).not.toHaveBeenCalled()
+  expect(workspacePaneTabOpener(REPO_ID, replacementRuntimeId, BRANCH_NAME, 'workspace-pane:files')).toBe(
+    'workspace-pane:status',
+  )
+})
+
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {}): PrimaryWindowNavigationActions {
-  return {
+  seedInitialObservedWorkspacePaneRouteForTest()
+  const navigation: PrimaryWindowNavigationActions = {
     activateRepo: vi.fn(),
     closeRepo: vi.fn(),
     cycleRepo: vi.fn(),
@@ -210,11 +303,15 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
     showRepoBranchEmptyWorkspacePane: vi.fn(() => true),
     showRepoBranchWorkspacePaneTab: vi.fn(() => true),
     showRepoBranchTerminalSession: vi.fn(() => true),
-    commitRepoBranchWorkspacePaneRoute: vi.fn(() => true),
+    commitRepoBranchWorkspacePaneRoute: vi.fn(() => false),
     goBack: vi.fn(),
     goForward: vi.fn(),
     openSettings: vi.fn(),
     openCreateWorktree: vi.fn(),
     ...overrides,
   }
+  if (!overrides.commitRepoBranchWorkspacePaneRoute) {
+    navigation.commitRepoBranchWorkspacePaneRoute = vi.fn(observedWorkspacePaneRouteCommitForTest(navigation))
+  }
+  return navigation
 }

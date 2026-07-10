@@ -70,7 +70,12 @@ async function runWorkspacePaneTabsReorder(
   onReorderRejected: (() => void) | undefined,
 ): Promise<void> {
   await runWorkspacePaneTabCoordinatorTask(
-    { repoId: target.repoRoot, branchName: target.branchName, worktreePath: target.worktreePath },
+    {
+      repoId: target.repoRoot,
+      repoRuntimeId: target.repoRuntimeId,
+      branchName: target.branchName,
+      worktreePath: target.worktreePath,
+    },
     () => runWorkspacePaneTabsReorderInQueue(target, draggedTabs, queryClient, onReorderRejected),
   )
 }

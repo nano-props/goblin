@@ -189,24 +189,6 @@ function makeCreateResult(overrides: Partial<TerminalCreateSuccess> = {}): Termi
     controller: { clientId: 'client_local', status: 'connected' as const },
     canonicalCols: 101,
     canonicalRows: 31,
-    sessions: [
-      {
-        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        terminalSessionId: 'term-111111111111111111111',
-        repoRuntimeId: REPO_RUNTIME_ID,
-        repoRoot: REPO_ROOT,
-        branch: BRANCH,
-        worktreePath: WORKTREE_PATH,
-        cwd: WORKTREE_PATH,
-        controller: { clientId: 'client_local', status: 'connected' as const },
-        processName: 'zsh',
-        canonicalTitle: null,
-        phase: 'open' as const,
-        message: null,
-        cols: 101,
-        rows: 31,
-      },
-    ],
     ...overrides,
   }
 }
@@ -321,6 +303,26 @@ describe('TerminalSessionProjection create flow', () => {
       rows: 31,
       clientId: 'client_local',
     })
+  })
+
+  test('applies create as a partial effect without weakening the full snapshot revision gate', async () => {
+    projection.reconcileServerSessionsSnapshot(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      { revision: 10, sessions: [] },
+      'client_local',
+    )
+
+    await projection.createTerminal(terminalBase())
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+
+    expect(
+      projection.reconcileServerSessionsSnapshot(
+        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+        { revision: 9, sessions: [] },
+        'client_local',
+      ),
+    ).toBe(false)
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
   })
 
   test('opens terminal and workspace tab through the application operation', async () => {
@@ -521,40 +523,6 @@ describe('TerminalSessionProjection create flow', () => {
     const secondResult = makeCreateResult({
       terminalSessionId: 'term-222222222222222222222',
       terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
-      sessions: [
-        {
-          terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-          terminalSessionId: 'term-111111111111111111111',
-          repoRuntimeId: REPO_RUNTIME_ID,
-          repoRoot: REPO_ROOT,
-          branch: BRANCH,
-          worktreePath: WORKTREE_PATH,
-          cwd: WORKTREE_PATH,
-          controller: { clientId: 'client_local', status: 'connected' as const },
-          processName: 'zsh',
-          canonicalTitle: null,
-          phase: 'open' as const,
-          message: null,
-          cols: 101,
-          rows: 31,
-        },
-        {
-          terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
-          terminalSessionId: 'term-222222222222222222222',
-          repoRuntimeId: REPO_RUNTIME_ID,
-          repoRoot: REPO_ROOT,
-          branch: BRANCH,
-          worktreePath: WORKTREE_PATH,
-          cwd: WORKTREE_PATH,
-          controller: { clientId: 'client_local', status: 'connected' as const },
-          processName: 'zsh',
-          canonicalTitle: null,
-          phase: 'open' as const,
-          message: null,
-          cols: 101,
-          rows: 31,
-        },
-      ],
     })
     mocks.createMock.mockReset()
     mocks.createMock.mockReturnValueOnce(first.promise).mockResolvedValueOnce(secondResult)

@@ -15,7 +15,11 @@ describe('createServerWorkspacePaneRuntimeClient', () => {
     const request = vi.fn(async () => ({
       ok: true as const,
       runtimeType: 'terminal' as const,
-      runtime: { sessions: [] },
+      runtime: {
+        action: 'closed' as const,
+        terminalSessionId: 'term-111111111111111111111',
+        terminalRuntimeSessionId: 'pty_1234567890abcdef',
+      },
       workspacePaneTabs: { revision: 2, entries: [] },
     }))
     const client = createServerWorkspacePaneRuntimeClient(realtimeWithRequest(request))
@@ -27,6 +31,11 @@ describe('createServerWorkspacePaneRuntimeClient', () => {
     await expect(client.close(closeInput)).resolves.toMatchObject({
       ok: true,
       runtimeType: 'terminal',
+      runtime: {
+        action: 'closed',
+        terminalSessionId: 'term-111111111111111111111',
+        terminalRuntimeSessionId: 'pty_1234567890abcdef',
+      },
       workspacePaneTabs: { revision: 2, entries: [] },
     })
     expect(request).toHaveBeenNthCalledWith(1, WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close, closeInput)
@@ -38,7 +47,11 @@ describe('createServerWorkspacePaneRuntimeClient', () => {
         vi.fn(async () => ({
           ok: true,
           runtimeType: 'terminal',
-          runtime: { sessions: [] },
+          runtime: {
+            action: 'closed',
+            terminalSessionId: 'term-111111111111111111111',
+            terminalRuntimeSessionId: 'pty_1234567890abcdef',
+          },
           workspacePaneTabs: { revision: -1, entries: [] },
         })),
       ),

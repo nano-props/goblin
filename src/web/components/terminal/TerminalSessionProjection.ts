@@ -12,6 +12,7 @@ import type {
   TerminalHydrationSnapshot,
   TerminalOutputEvent,
   TerminalSessionSummary as ServerTerminalSessionSummary,
+  TerminalSessionsSnapshot,
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
 import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-index.ts'
@@ -48,6 +49,7 @@ import type {
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { terminalCreateDedupeKey } from '#/web/components/terminal/terminal-create-dedupe.ts'
 import type {
+  TerminalWorkspacePaneRuntimeCloseEffect,
   WorkspacePaneRuntimeCloseResult,
   WorkspacePaneRuntimeTabPlacement,
 } from '#/shared/workspace-pane-runtime.ts'
@@ -108,6 +110,10 @@ export class TerminalSessionProjection {
   private readonly sessions = new Map<string, TerminalSession>()
   private readonly terminalSessionIdByTerminalRuntimeSessionId = new Map<string, string>()
   private readonly terminalRuntimeSessionIdByTerminalSessionId = new Map<string, string>()
+  private readonly terminalSessionsProjectionRevisionByRepoRoot = new Map<
+    string,
+    { repoRuntimeId: string; revision: number }
+  >()
   // Client preference only: server owns session existence/control, while
   // each client chooses which terminal to present for a worktree.
   private readonly selectedTerminalSessionIdByTerminalWorktree = new Map<string, string>()
@@ -211,6 +217,7 @@ export class TerminalSessionProjection {
     this.sessions.clear()
     this.terminalSessionIdByTerminalRuntimeSessionId.clear()
     this.terminalRuntimeSessionIdByTerminalSessionId.clear()
+    this.terminalSessionsProjectionRevisionByRepoRoot.clear()
     this.selectedTerminalSessionIdByTerminalWorktree.clear()
     this.preferredSelectedTerminalSessionIdByTerminalWorktree.clear()
     this.hostByWorktree.clear()
@@ -372,6 +379,38 @@ export class TerminalSessionProjection {
     return true
   }
 
+  reconcileServerSessionsSnapshot(
+    scope: { repoRoot: string; repoRuntimeId: string },
+    snapshot: TerminalSessionsSnapshot,
+    clientId: string,
+    snapshotsByTerminalRuntimeSessionId: ReadonlyMap<string, TerminalHydrationSnapshot> = EMPTY_SERVER_SNAPSHOTS,
+  ): boolean {
+    const current = this.terminalSessionsProjectionRevisionByRepoRoot.get(scope.repoRoot)
+    if (current?.repoRuntimeId === scope.repoRuntimeId && snapshot.revision < current.revision) return false
+    if (!this.reconcileServerSessions(scope, snapshot.sessions, clientId, snapshotsByTerminalRuntimeSessionId)) return false
+    this.terminalSessionsProjectionRevisionByRepoRoot.set(scope.repoRoot, {
+      repoRuntimeId: scope.repoRuntimeId,
+      revision: snapshot.revision,
+    })
+    return true
+  }
+
+  private applyServerSessionEffect(
+    scope: { repoRoot: string; repoRuntimeId: string },
+    serverSession: ServerTerminalSessionSummary,
+    clientId: string,
+    snapshotsByTerminalRuntimeSessionId: ReadonlyMap<string, TerminalHydrationSnapshot>,
+  ): boolean {
+    if (this.repoIndex[scope.repoRoot]?.repoRuntimeId !== scope.repoRuntimeId) return false
+    const { controllerTerminalSessionIdByWorktree, touchedWorktrees, tabsChangedWorktrees } =
+      this.materializeServerSessions(scope, [serverSession], clientId, snapshotsByTerminalRuntimeSessionId, {
+        mergeIntoExisting: true,
+      })
+    this.resolveSelectedTerminalSessionIdsForTouchedWorktrees(touchedWorktrees, controllerTerminalSessionIdByWorktree)
+    for (const terminalWorktreeKey of tabsChangedWorktrees) this.notifyWorktree(terminalWorktreeKey)
+    return true
+  }
+
   // Phase 1: for each server session, ensure a local TerminalSession
   // exists, hydrate it with the latest server-side metadata, and track
   // which worktrees saw any change. Side effects: ensureSession,
@@ -381,6 +420,7 @@ export class TerminalSessionProjection {
     serverSessions: ServerTerminalSessionSummary[],
     clientId: string,
     snapshotsByTerminalRuntimeSessionId: ReadonlyMap<string, TerminalHydrationSnapshot>,
+    options: { mergeIntoExisting?: boolean } = {},
   ): {
     controllerTerminalSessionIdByWorktree: Map<string, string>
     touchedWorktrees: Set<string>
@@ -393,7 +433,14 @@ export class TerminalSessionProjection {
 
     for (const serverSession of serverSessions) {
       const terminalWorktreeKey = formatTerminalWorktreeKey(serverSession.repoRoot, serverSession.worktreePath)
-      const index = (nextIndexByWorktree.get(terminalWorktreeKey) ?? 0) + 1
+      const existingSessionIds = options.mergeIntoExisting
+        ? (this.terminalSessionIdsByTerminalWorktree.get(terminalWorktreeKey) ?? [])
+        : []
+      const existingIndex = existingSessionIds.indexOf(serverSession.terminalSessionId)
+      const index =
+        existingIndex >= 0
+          ? existingIndex + 1
+          : (nextIndexByWorktree.get(terminalWorktreeKey) ?? existingSessionIds.length) + 1
       const projected = projectServerTerminalSession({
         repoIndex: this.repoIndex,
         repoRoot: scope.repoRoot,
@@ -424,9 +471,17 @@ export class TerminalSessionProjection {
       )
     }
 
-    const tabsChangedWorktrees = this.replaceTerminalSessionIdListForTouchedWorktrees(
-      terminalSessionIdsByTouchedWorktree,
-    )
+    const nextSessionIdsByWorktree = new Map(terminalSessionIdsByTouchedWorktree)
+    if (options.mergeIntoExisting) {
+      for (const [terminalWorktreeKey, incomingSessionIds] of terminalSessionIdsByTouchedWorktree) {
+        const existingSessionIds = this.terminalSessionIdsByTerminalWorktree.get(terminalWorktreeKey) ?? []
+        nextSessionIdsByWorktree.set(terminalWorktreeKey, [
+          ...existingSessionIds,
+          ...incomingSessionIds.filter((sessionId) => !existingSessionIds.includes(sessionId)),
+        ])
+      }
+    }
+    const tabsChangedWorktrees = this.replaceTerminalSessionIdListForTouchedWorktrees(nextSessionIdsByWorktree)
     return { controllerTerminalSessionIdByWorktree, touchedWorktrees, tabsChangedWorktrees }
   }
 
@@ -587,9 +642,9 @@ export class TerminalSessionProjection {
     if (this.lifecycleQueues.getCreate(terminalWorktreeKey) === pending) {
       const projectedCreate = projectCreateResultForClient(base, result)
       if (this.lifecycleQueues.getCreate(terminalWorktreeKey) === pending) {
-        runtimeProjectionApplied = this.reconcileServerSessions(
+        runtimeProjectionApplied = this.applyServerSessionEffect(
           { repoRoot: base.repoRoot, repoRuntimeId: requireRepoRuntimeId(base) },
-          projectedCreate.serverSessions,
+          projectedCreate.serverSession,
           clientId,
           projectedCreate.snapshotByTerminalRuntimeSessionId,
         )
@@ -1063,17 +1118,31 @@ export class TerminalSessionProjection {
       return false
     }
     if (!result.ok) return false
-    const projectionAccepted = await this.applyWorkspacePaneRuntimeSnapshot(base, result.workspacePaneTabs)
-    if (projectionAccepted) {
-      this.reconcileServerSessions(
-        { repoRoot: base.repoRoot, repoRuntimeId },
-        result.runtime.sessions,
-        readOrCreateWebTerminalClientId(),
-        EMPTY_SERVER_SNAPSHOTS,
-        { evictCommandClosingSessions: true },
-      )
-    }
+    await this.applyWorkspacePaneRuntimeSnapshot(base, result.workspacePaneTabs)
+    this.applyClosedServerSessionEffect(base, result.runtime)
     return true
+  }
+
+  private applyClosedServerSessionEffect(
+    base: TerminalSessionBase,
+    effect: TerminalWorkspacePaneRuntimeCloseEffect,
+  ): void {
+    const session = this.sessions.get(effect.terminalSessionId)
+    if (!session) return
+    if (
+      session.descriptor.repoRoot !== base.repoRoot ||
+      session.descriptor.repoRuntimeId !== base.repoRuntimeId ||
+      session.descriptor.worktreePath !== base.worktreePath
+    ) {
+      return
+    }
+    if (
+      effect.terminalRuntimeSessionId !== null &&
+      session.currentTerminalRuntimeSessionId() !== effect.terminalRuntimeSessionId
+    ) {
+      return
+    }
+    this.removeSession(effect.terminalSessionId, { dispose: true, closeSession: false })
   }
 
   private async applyWorkspacePaneRuntimeSnapshot(

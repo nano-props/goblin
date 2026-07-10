@@ -15,6 +15,7 @@ import {
   type WorkspacePaneRouteReconciliation,
 } from '#/web/components/repo-workspace/workspace-pane-route-reconciliation.ts'
 import {
+  leaveWorkspacePaneTabControllerTarget,
   observeWorkspacePaneTabControllerRoute,
   showWorkspacePaneControllerRoute,
   workspacePaneTabControllerReconciliationDeferred,
@@ -135,10 +136,22 @@ function useReconcileWorkspacePaneRoute({
 }): void {
   useEffect(() => {
     if (!enabled) return
+    observeWorkspacePaneTabControllerRoute({ repoId, repoRuntimeId, branchName, worktreePath, route })
+  }, [branchName, enabled, repoId, repoRuntimeId, route, worktreePath])
+
+  useEffect(() => {
+    if (!enabled) return
+    const target = { repoId, repoRuntimeId, branchName, worktreePath }
+    return () => {
+      leaveWorkspacePaneTabControllerTarget(target)
+    }
+  }, [branchName, enabled, repoId, repoRuntimeId, worktreePath])
+
+  useEffect(() => {
+    if (!enabled) return
     let cancelled = false
     void runWorkspacePaneTabCoordinatorTask({ repoId, repoRuntimeId, branchName, worktreePath }, () => {
       if (cancelled) return
-      observeWorkspacePaneTabControllerRoute({ repoId, repoRuntimeId, branchName, worktreePath, route })
       if (!branchName) return
       if (
         workspacePaneTabControllerReconciliationDeferred({

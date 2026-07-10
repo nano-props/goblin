@@ -5,8 +5,15 @@ import type { TerminalCreateTranslator } from '#/web/components/terminal/termina
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspacePaneTabControllerCommitNavigation } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
-import { commitWorkspacePaneControllerRoute } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
-import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import {
+  commitWorkspacePaneControllerTargetRoute,
+  WORKSPACE_PANE_CURRENT_TARGET_LEASE,
+} from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import {
+  runWorkspacePaneTabCoordinatorTask,
+  workspacePaneTabCoordinatorObservedRoute,
+} from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
 import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 
@@ -69,7 +76,8 @@ async function terminalRuntimePrimaryAction({
       repoId,
       branchName,
       workspacePaneRoute,
-      showRuntimeTab: (type, sessionId) => showTerminalRuntimeTab(type, sessionId, repoId, branchName, navigation),
+      showRuntimeTab: (type, sessionId) =>
+        showTerminalRuntimeTab(type, sessionId, repoId, branchName, workspacePaneRoute, navigation),
       terminalCreateTranslator: t,
     }),
   )
@@ -95,7 +103,8 @@ function newTerminalRuntimeTabActionContext({
     repoId,
     branchName,
     workspacePaneRoute,
-    showRuntimeTab: (type, sessionId) => showTerminalRuntimeTab(type, sessionId, repoId, branchName, navigation),
+    showRuntimeTab: (type, sessionId) =>
+      showTerminalRuntimeTab(type, sessionId, repoId, branchName, workspacePaneRoute, navigation),
     terminalCreateTranslator: t,
   })
 }
@@ -119,14 +128,18 @@ function showTerminalRuntimeTab(
   sessionId: string,
   repoId: string,
   branchName: string,
+  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined,
   navigation: WorkspacePaneTabControllerCommitNavigation,
 ): boolean | Promise<boolean> {
   if (type !== 'terminal') return false
-  return commitWorkspacePaneControllerRoute(
-    repoId,
-    branchName,
+  const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute })
+  if (!target) return false
+  return commitWorkspacePaneControllerTargetRoute(
+    target,
+    workspacePaneTabCoordinatorObservedRoute(target) ?? workspacePaneRoute,
     { kind: 'terminal', terminalSessionId: sessionId },
     navigation,
+    WORKSPACE_PANE_CURRENT_TARGET_LEASE,
   )
 }
 
@@ -139,7 +152,9 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
   const worktree = bridge.terminalWorktreeSnapshot(terminalWorktreeKey)
   if (worktree.createPending) return true
   if (worktree.count > 0) {
-    return await runWorkspacePaneTabCoordinatorTask(terminalCoordinatorTarget(base), async () => {
+    const target = terminalCoordinatorTarget(base)
+    if (!target) return false
+    return await runWorkspacePaneTabCoordinatorTask(target, async () => {
       const nextWorktree = bridge.terminalWorktreeSnapshot(terminalWorktreeKey)
       if (nextWorktree.createPending) return true
       const firstSession = nextWorktree.sessions[0]
@@ -174,8 +189,16 @@ async function runNewTerminalAction(context: WorkspacePaneRuntimeTabCommandConte
 
 function terminalCoordinatorTarget(base: TerminalSessionBase): {
   repoId: string
+  repoRuntimeId: string
   branchName: string
   worktreePath: string
-} {
-  return { repoId: base.repoRoot, branchName: base.branch, worktreePath: base.worktreePath }
+} | null {
+  const repoRuntimeId = base.repoRuntimeId
+  if (!repoRuntimeId) return null
+  return {
+    repoId: base.repoRoot,
+    repoRuntimeId,
+    branchName: base.branch,
+    worktreePath: base.worktreePath,
+  }
 }

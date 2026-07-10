@@ -84,7 +84,9 @@ export function clearRepoRuntimesForUser(userId: string): void {
   if (states) {
     for (const [repoRoot, state] of states) {
       if (state.currentRepoRuntimeId) {
-        emitRepoRuntimeClosed({ userId, repoRoot, repoRuntimeId: state.currentRepoRuntimeId })
+        const repoRuntimeId = state.currentRepoRuntimeId
+        state.currentRepoRuntimeId = null
+        emitRepoRuntimeClosed({ userId, repoRoot, repoRuntimeId })
       }
     }
   }

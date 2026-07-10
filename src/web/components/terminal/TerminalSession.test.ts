@@ -594,7 +594,7 @@ beforeEach(() => {
       close: terminalCalls.close.mockResolvedValue(true),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       recoverSessions: vi.fn(async () => ({
-        sessions: [],
+        terminalSessions: { revision: 0, sessions: [] },
         snapshots: [],
         workspacePaneTabs: { revision: 0, entries: [] },
       })),

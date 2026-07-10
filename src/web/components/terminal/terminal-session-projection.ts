@@ -28,8 +28,8 @@ export interface ProjectedServerTerminalSession {
   controlsTerminal: boolean
 }
 
-export interface ProjectedCreateTerminalSessions {
-  serverSessions: ServerTerminalSessionSummary[]
+export interface ProjectedCreateTerminalSession {
+  serverSession: ServerTerminalSessionSummary
   snapshotByTerminalRuntimeSessionId: Map<string, TerminalHydrationSnapshot>
 }
 
@@ -46,17 +46,9 @@ export function projectTerminalAttachResultForClient(
 export function projectCreateResultForClient(
   base: TerminalSessionBase,
   result: Extract<TerminalCreateResult, { ok: true }>,
-): ProjectedCreateTerminalSessions {
-  const targetSession = createSessionSummaryFromCreate(base, result)
-  let sawTarget = false
-  const serverSessions = result.sessions.map((session) => {
-    if (session.terminalSessionId !== result.terminalSessionId) return session
-    sawTarget = true
-    return createSessionSummaryFromCreate(base, result, session)
-  })
-  if (!sawTarget) serverSessions.push(targetSession)
+): ProjectedCreateTerminalSession {
   return {
-    serverSessions,
+    serverSession: createSessionSummaryFromCreate(base, result),
     snapshotByTerminalRuntimeSessionId: new Map<string, TerminalHydrationSnapshot>([
       [
         result.terminalRuntimeSessionId,
@@ -122,16 +114,15 @@ export function projectServerTerminalSession(input: {
 function createSessionSummaryFromCreate(
   base: TerminalSessionBase,
   result: Extract<TerminalCreateResult, { ok: true }>,
-  serverSession?: ServerTerminalSessionSummary,
 ): ServerTerminalSessionSummary {
   return {
     terminalRuntimeSessionId: result.terminalRuntimeSessionId,
     terminalSessionId: result.terminalSessionId,
-    repoRuntimeId: serverSession?.repoRuntimeId ?? requireBaseRepoRuntimeId(base),
-    repoRoot: serverSession?.repoRoot ?? base.repoRoot,
-    branch: serverSession?.branch ?? base.branch,
-    worktreePath: serverSession?.worktreePath ?? base.worktreePath,
-    cwd: serverSession?.cwd ?? serverSession?.worktreePath ?? base.worktreePath,
+    repoRuntimeId: requireBaseRepoRuntimeId(base),
+    repoRoot: base.repoRoot,
+    branch: base.branch,
+    worktreePath: base.worktreePath,
+    cwd: base.worktreePath,
     controller: result.controller,
     processName: result.processName,
     canonicalTitle: result.canonicalTitle,

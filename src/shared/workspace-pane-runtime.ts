@@ -1,4 +1,4 @@
-import type { TerminalCreateInput, TerminalCreateResult, TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import type { TerminalCreateInput, TerminalCreateResult } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
@@ -32,6 +32,7 @@ export type WorkspacePaneRuntimeOpenInput = TerminalWorkspacePaneRuntimeOpenInpu
 export interface WorkspacePaneRuntimeCommandTarget extends WorkspacePaneTabsTarget {
   repoRoot: string
   repoRuntimeId: string
+  worktreePath: string
 }
 
 export interface WorkspacePaneRuntimeCloseInput {
@@ -55,10 +56,16 @@ export type TerminalWorkspacePaneRuntimeOpenResult =
 
 export type WorkspacePaneRuntimeOpenResult = TerminalWorkspacePaneRuntimeOpenResult
 
+export interface TerminalWorkspacePaneRuntimeCloseEffect {
+  action: 'closed' | 'already-closed'
+  terminalSessionId: string
+  terminalRuntimeSessionId: string | null
+}
+
 interface TerminalWorkspacePaneRuntimeCloseSuccess {
   ok: true
   runtimeType: 'terminal'
-  runtime: { sessions: TerminalSessionSummary[] }
+  runtime: TerminalWorkspacePaneRuntimeCloseEffect
   workspacePaneTabs: WorkspacePaneTabsSnapshot
 }
 

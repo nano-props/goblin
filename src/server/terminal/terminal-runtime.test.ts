@@ -223,7 +223,7 @@ async function createTerminalSession(host: ServerTerminalHost, clientId: string,
   })
   expect(result.ok).toBe(true)
   if (!result.ok) throw new Error(result.message)
-  return result.sessions[0]?.terminalRuntimeSessionId ?? ''
+  return result.terminalRuntimeSessionId
 }
 
 describe('server terminal runtime', () => {
@@ -245,18 +245,16 @@ describe('server terminal runtime', () => {
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.sessions).toEqual([
-      expect.objectContaining({
-        terminalSessionId: result.terminalSessionId,
-        controller: { clientId: 'client_a', status: 'connected' },
-        phase: 'opening',
-        message: null,
-        cols: 80,
-        rows: 24,
-      }),
-    ])
-    const terminalRuntimeSessionId = result.sessions[0]?.terminalRuntimeSessionId
-    if (!terminalRuntimeSessionId) throw new Error('expected session id')
+    expect(result).toMatchObject({
+      terminalSessionId: result.terminalSessionId,
+      controller: { clientId: 'client_a', status: 'connected' },
+      phase: 'opening',
+      message: null,
+      canonicalCols: 80,
+      canonicalRows: 24,
+    })
+    expect(result).not.toHaveProperty('sessions')
+    const terminalRuntimeSessionId = result.terminalRuntimeSessionId
 
     mockPtys[0]?.emitData('ready')
 
@@ -321,8 +319,7 @@ describe('server terminal runtime', () => {
     })
     expect(createResult.ok).toBe(true)
     if (!createResult.ok) return
-    const terminalRuntimeSessionId = createResult.sessions[0]?.terminalRuntimeSessionId
-    if (!terminalRuntimeSessionId) throw new Error('expected session id')
+    const terminalRuntimeSessionId = createResult.terminalRuntimeSessionId
 
     const attachResult = await host.attach('client_a', USER_1, {
       terminalRuntimeSessionId,
@@ -400,8 +397,7 @@ describe('server terminal runtime', () => {
     })
     expect(createResult.ok).toBe(true)
     if (!createResult.ok) return
-    const terminalRuntimeSessionId = createResult.sessions[0]?.terminalRuntimeSessionId
-    if (!terminalRuntimeSessionId) throw new Error('expected session id')
+    const terminalRuntimeSessionId = createResult.terminalRuntimeSessionId
 
     host.unregisterSocket('client_a', USER_1, socketA)
     const socketA2 = { send: vi.fn(), close: vi.fn() }
@@ -456,8 +452,7 @@ describe('server terminal runtime', () => {
     })
     expect(createResult.ok).toBe(true)
     if (!createResult.ok) return
-    const terminalRuntimeSessionId = createResult.sessions[0]?.terminalRuntimeSessionId
-    if (!terminalRuntimeSessionId) throw new Error('expected session id')
+    const terminalRuntimeSessionId = createResult.terminalRuntimeSessionId
     socket.send.mockClear()
 
     host.handleRealtimeMessage(
@@ -885,9 +880,16 @@ describe('server terminal runtime', () => {
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(resolveRemoteTarget).toHaveBeenCalledWith({ alias: 'prod', remotePath: '/srv/repo' })
-    expect(result.sessions).toEqual([
+    expect(result.terminalSessionId).toMatch(/^term-[A-Za-z0-9_-]{21}$/)
+    expect(result).not.toHaveProperty('sessions')
+    await expect(
+      host.listSessions('client_a', USER_1, {
+        repoRoot: 'ssh-config://prod/srv/repo',
+        repoRuntimeId: SSH_REPO_RUNTIME_ID,
+      }),
+    ).resolves.toEqual([
       expect.objectContaining({
-        terminalSessionId: expect.stringMatching(/^term-[A-Za-z0-9_-]{21}$/),
+        terminalSessionId: result.terminalSessionId,
         repoRoot: 'ssh-config://prod/srv/repo',
         worktreePath: '/srv/repo',
       }),
@@ -1423,9 +1425,39 @@ describe('server terminal runtime', () => {
     ).resolves.toMatchObject({
       ok: true,
       runtimeType: 'terminal',
+      runtime: {
+        action: 'closed',
+        terminalSessionId: opened.runtime.terminalSessionId,
+        terminalRuntimeSessionId: opened.runtime.terminalRuntimeSessionId,
+      },
       workspacePaneTabs: {
         revision: expect.any(Number),
         entries: [{ tabs: [{ type: 'status', tabId: 'workspace-pane:status' }] }],
+      },
+    })
+    await expect(
+      requestWorkspacePaneTabs(
+        host,
+        socket,
+        WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close,
+        {
+          runtimeType: 'terminal',
+          sessionId: opened.runtime.terminalSessionId,
+          target: {
+            repoRoot: REPO_ROOT,
+            repoRuntimeId: REPO_RUNTIME_ID,
+            branchName: 'feature',
+            worktreePath: '/repo-linked',
+          },
+        },
+        'req_runtime_close_again',
+      ),
+    ).resolves.toMatchObject({
+      ok: true,
+      runtime: {
+        action: 'already-closed',
+        terminalSessionId: opened.runtime.terminalSessionId,
+        terminalRuntimeSessionId: null,
       },
     })
     await expect(
@@ -1591,8 +1623,10 @@ describe('server terminal runtime', () => {
     })
     expect(userACreate.ok).toBe(true)
     if (!userACreate.ok) return
-    const userASession = userACreate.sessions[0]
-    if (!userASession) throw new Error('expected user A session')
+    const userASession = {
+      terminalRuntimeSessionId: userACreate.terminalRuntimeSessionId,
+      terminalSessionId: userACreate.terminalSessionId,
+    }
 
     expect(
       await host.listSessions('client_shared', USER_2, {
@@ -1622,8 +1656,10 @@ describe('server terminal runtime', () => {
     })
     expect(userBCreate.ok).toBe(true)
     if (!userBCreate.ok) return
-    const userBSession = userBCreate.sessions[0]
-    if (!userBSession) throw new Error('expected user B session')
+    const userBSession = {
+      terminalRuntimeSessionId: userBCreate.terminalRuntimeSessionId,
+      terminalSessionId: userBCreate.terminalSessionId,
+    }
 
     expect(userBSession.terminalSessionId).not.toBe(userASession.terminalSessionId)
     expect(userBSession.terminalRuntimeSessionId).not.toBe(userASession.terminalRuntimeSessionId)
@@ -1721,8 +1757,7 @@ describe('server terminal runtime', () => {
     })
     expect(created.ok).toBe(true)
     if (!created.ok) return
-    const terminalRuntimeSessionId = created.sessions[0]?.terminalRuntimeSessionId
-    if (!terminalRuntimeSessionId) throw new Error('expected session id')
+    const terminalRuntimeSessionId = created.terminalRuntimeSessionId
 
     host.unregisterSocket('client_a', USER_1, socketA)
 
@@ -1780,8 +1815,7 @@ describe('server terminal runtime', () => {
     })
     expect(created.ok).toBe(true)
     if (!created.ok) return
-    const terminalRuntimeSessionId = created.sessions[0]?.terminalRuntimeSessionId
-    if (!terminalRuntimeSessionId) throw new Error('expected session id')
+    const terminalRuntimeSessionId = created.terminalRuntimeSessionId
     mockPtys[0]?.emitData('ready')
 
     // A goes offline; B attaches and claims because no effective controller remains.
@@ -1878,8 +1912,7 @@ describe('server terminal runtime', () => {
     })
     expect(created.ok).toBe(true)
     if (!created.ok) return
-    const terminalRuntimeSessionId = created.sessions[0]?.terminalRuntimeSessionId
-    if (!terminalRuntimeSessionId) throw new Error('expected session id')
+    const terminalRuntimeSessionId = created.terminalRuntimeSessionId
 
     host.registerSocket('client_b', USER_1, socketB)
     const viewerAttach = await host.attach('client_a', USER_1, {

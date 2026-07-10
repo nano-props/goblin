@@ -11,6 +11,7 @@ import type {
   TerminalNotifyBellInput,
   TerminalSessionPhase,
   TerminalSessionSummary,
+  TerminalSessionsSnapshot,
   TerminalSessionsRecoveryResult,
   TerminalTestNotificationInput,
 } from '#/shared/terminal-types.ts'
@@ -118,8 +119,12 @@ const TerminalHydrationSnapshotSchema = v.object({
   snapshotSeq: v.number(),
   outputEra: v.number(),
 })
-const TerminalSessionsRecoveryResultSchema = v.object({
+export const TerminalSessionsSnapshotSchema = v.object({
+  revision: v.pipe(v.number(), v.integer(), v.minValue(0)),
   sessions: v.array(TerminalSessionSummarySchema),
+})
+const TerminalSessionsRecoveryResultSchema = v.object({
+  terminalSessions: TerminalSessionsSnapshotSchema,
   snapshots: v.array(TerminalHydrationSnapshotSchema),
   workspacePaneTabs: WorkspacePaneTabsSnapshotSchema,
 })
@@ -141,7 +146,6 @@ const TerminalCreateResultSchema = v.variant('ok', [
     ok: v.literal(true),
     action: v.picklist(['created', 'restored', 'reused']),
     terminalSessionId: v.string(),
-    sessions: v.array(TerminalSessionSummarySchema),
     ...TerminalFirstFrameSchemaEntries,
   }),
   v.object({
@@ -398,6 +402,11 @@ export function isValidTerminalTestNotificationInput(value: unknown): value is T
 
 export function normalizeTerminalSessionsRecoveryResult(value: unknown): TerminalSessionsRecoveryResult | null {
   const parsed = v.safeParse(TerminalSessionsRecoveryResultSchema, value)
+  return parsed.success ? parsed.output : null
+}
+
+export function normalizeTerminalSessionsSnapshot(value: unknown): TerminalSessionsSnapshot | null {
+  const parsed = v.safeParse(TerminalSessionsSnapshotSchema, value)
   return parsed.success ? parsed.output : null
 }
 

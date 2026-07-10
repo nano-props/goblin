@@ -71,7 +71,6 @@ class TerminalSessionService {
         this.isCurrentRepoRuntime(userId, repoRoot, repoRuntimeId),
       rejectStaleCreateIfNeeded: async (userId, input, terminalRuntimeSessionId) =>
         await this.rejectStaleCreateIfNeeded(userId, input, terminalRuntimeSessionId),
-      listSessions: async (userId, repoRoot, repoRuntimeId) => await this.listSessions(userId, repoRoot, repoRuntimeId),
     })
   }
 

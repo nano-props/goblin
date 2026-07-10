@@ -92,11 +92,18 @@ function makeServerSession(
   }
 }
 
-function successfulRuntimeCloseSnapshot(sessions: ReturnType<typeof makeServerSession>[] = []) {
+function successfulRuntimeCloseSnapshot(
+  terminalSessionId = 'term-111111111111111111111',
+  terminalRuntimeSessionId: string | null = 'pty_session_1_aaaaaaaaa',
+) {
   return {
     ok: true as const,
     runtimeType: 'terminal' as const,
-    runtime: { sessions },
+    runtime: {
+      action: terminalRuntimeSessionId === null ? ('already-closed' as const) : ('closed' as const),
+      terminalSessionId,
+      terminalRuntimeSessionId,
+    },
     workspacePaneTabs: { revision: 2, entries: [] },
   }
 }
@@ -150,6 +157,109 @@ describe('TerminalSessionProjection', () => {
 
     expect(reconciled).toBe(false)
     expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+  })
+
+  describe('versioned terminal session snapshots', () => {
+    test('rejects older snapshots without evicting the accepted projection', () => {
+      projection.setRepoIndex(makeRepoIndex())
+      expect(
+        projection.reconcileServerSessionsSnapshot(
+          { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+          {
+            revision: 2,
+            sessions: [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
+          },
+          'client_local',
+        ),
+      ).toBe(true)
+
+      expect(
+        projection.reconcileServerSessionsSnapshot(
+          { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+          { revision: 1, sessions: [] },
+          'client_local',
+        ),
+      ).toBe(false)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+    })
+
+    test('accepts equal revisions for metadata refresh and higher revisions for removal', () => {
+      projection.setRepoIndex(makeRepoIndex())
+      const scope = { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }
+      projection.reconcileServerSessionsSnapshot(
+        scope,
+        {
+          revision: 2,
+          sessions: [makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111')],
+        },
+        'client_local',
+      )
+
+      expect(
+        projection.reconcileServerSessionsSnapshot(
+          scope,
+          {
+            revision: 2,
+            sessions: [
+              makeServerSession('pty_session_a_aaaaaaaaa', 'term-111111111111111111111', {
+                processName: 'node',
+                canonicalTitle: 'build',
+              }),
+            ],
+          },
+          'client_local',
+        ),
+      ).toBe(true)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]).toMatchObject({
+        processName: 'node',
+        originalTitle: 'build',
+      })
+
+      expect(projection.reconcileServerSessionsSnapshot(scope, { revision: 3, sessions: [] }, 'client_local')).toBe(
+        true,
+      )
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    })
+
+    test('uses a fresh revision epoch for a replacement repo runtime and after destroy', () => {
+      projection.setRepoIndex(makeRepoIndex())
+      projection.reconcileServerSessionsSnapshot(
+        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+        { revision: 10, sessions: [] },
+        'client_local',
+      )
+      const replacementRuntimeId = 'repo-runtime-replacement'
+      projection.setRepoIndex({
+        [REPO_ROOT]: {
+          repoRuntimeId: replacementRuntimeId,
+          branchByWorktreePath: { [WORKTREE_PATH]: BRANCH },
+        },
+      })
+      expect(
+        projection.reconcileServerSessionsSnapshot(
+          { repoRoot: REPO_ROOT, repoRuntimeId: replacementRuntimeId },
+          {
+            revision: 1,
+            sessions: [
+              makeServerSession('pty_session_b_aaaaaaaaa', 'term-222222222222222222222', {
+                repoRuntimeId: replacementRuntimeId,
+              }),
+            ],
+          },
+          'client_local',
+        ),
+      ).toBe(true)
+
+      projection.destroy()
+      projection.setRepoIndex(makeRepoIndex())
+      expect(
+        projection.reconcileServerSessionsSnapshot(
+          { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+          { revision: 1, sessions: [] },
+          'client_local',
+        ),
+      ).toBe(true)
+    })
   })
 
   describe('event dispatch', () => {
@@ -703,12 +813,7 @@ describe('TerminalSessionProjection', () => {
       ])
       expect(closingSnapshot.selectedDescriptor?.terminalSessionId).toBe('term-222222222222222222222')
 
-      serverClose.resolve(
-        successfulRuntimeCloseSnapshot([
-          makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111'),
-          makeServerSession('pty_session_3_aaaaaaaaa', 'term-333333333333333333333'),
-        ]),
-      )
+      serverClose.resolve(successfulRuntimeCloseSnapshot(activeSessionId, 'pty_session_2_aaaaaaaaa'))
       await expect(closePromise).resolves.toBe(true)
       const closedSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
       expect(closedSnapshot.sessions.map((item) => item.terminalSessionId)).toEqual([
@@ -716,6 +821,66 @@ describe('TerminalSessionProjection', () => {
         'term-333333333333333333333',
       ])
       expect(closedSnapshot.selectedDescriptor?.terminalSessionId).toBe('term-333333333333333333333')
+    })
+
+    test('applies the exact close effect even when the workspace tabs snapshot is stale', async () => {
+      projection.setRepoIndex(makeRepoIndex())
+      projection.reconcileServerSessions(
+        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+        [
+          makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111'),
+          makeServerSession('pty_session_2_aaaaaaaaa', 'term-222222222222222222222'),
+        ],
+        'client_local',
+        new Map(),
+      )
+      workspacePaneRuntimeMocks.writeSnapshot.mockResolvedValueOnce(false)
+      workspacePaneRuntimeMocks.close.mockResolvedValueOnce(
+        successfulRuntimeCloseSnapshot(
+          'term-111111111111111111111',
+          'pty_session_1_aaaaaaaaa',
+        ),
+      )
+
+      await expect(
+        projection.closeTerminalByDescriptor('term-111111111111111111111', {
+          repoRoot: REPO_ROOT,
+          repoRuntimeId: REPO_RUNTIME_ID,
+          branch: BRANCH,
+          worktreePath: WORKTREE_PATH,
+        }),
+      ).resolves.toBe(true)
+
+      expect(
+        projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId),
+      ).toEqual(['term-222222222222222222222'])
+    })
+
+    test('does not apply a stale close effect to a newly rebound runtime session', async () => {
+      projection.setRepoIndex(makeRepoIndex())
+      projection.reconcileServerSessions(
+        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+        [makeServerSession('pty_session_new_aaaaaaaaa', 'term-111111111111111111111')],
+        'client_local',
+        new Map(),
+      )
+      workspacePaneRuntimeMocks.close.mockResolvedValueOnce(
+        successfulRuntimeCloseSnapshot(
+          'term-111111111111111111111',
+          'pty_session_old_aaaaaaaaa',
+        ),
+      )
+
+      await expect(
+        projection.closeTerminalByDescriptor('term-111111111111111111111', {
+          repoRoot: REPO_ROOT,
+          repoRuntimeId: REPO_RUNTIME_ID,
+          branch: BRANCH,
+          worktreePath: WORKTREE_PATH,
+        }),
+      ).resolves.toBe(true)
+
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
     })
 
     test('closeTerminalByDescriptor deduplicates repeated closes for the same terminal session', async () => {
@@ -810,7 +975,7 @@ describe('TerminalSessionProjection', () => {
         }),
       ).resolves.toBe(true)
 
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
       expect(workspacePaneRuntimeMocks.refreshTabs).toHaveBeenCalledWith(REPO_ROOT, REPO_RUNTIME_ID)
     })
 

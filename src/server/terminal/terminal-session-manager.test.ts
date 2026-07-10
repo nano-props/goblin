@@ -21,11 +21,13 @@ function createDeferredPtySupervisor(): PtySupervisor & {
   killed: string[]
   emitData(terminalRuntimeSessionId: string, data: string): void
   emitExit(terminalRuntimeSessionId: string): void
+  setProcessName(processName: string): void
 } {
   const spawns: Array<(result: PtySpawnResult) => void> = []
   const killed: string[] = []
   const dataListenersByPtySessionId = new Map<string, Set<(data: string) => void>>()
   const exitListenersByPtySessionId = new Map<string, Set<() => void>>()
+  let currentProcessName = 'zsh'
 
   return {
     mode: 'in-process',
@@ -63,7 +65,7 @@ function createDeferredPtySupervisor(): PtySupervisor & {
       }
     },
     processName() {
-      return 'zsh'
+      return currentProcessName
     },
     getDiagnostics() {
       return {
@@ -89,6 +91,9 @@ function createDeferredPtySupervisor(): PtySupervisor & {
     },
     emitExit(ptySessionId) {
       for (const listener of Array.from(exitListenersByPtySessionId.get(ptySessionId) ?? [])) listener()
+    },
+    setProcessName(processName) {
+      currentProcessName = processName
     },
   }
 }
@@ -505,5 +510,98 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     })
     expect(killAndWait).toHaveBeenCalledTimes(2)
     await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])
+  })
+})
+
+describe('TerminalSessionManager versioned recovery projection', () => {
+  test('advances revision for visible session fields but not ordinary output', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const manager = createManager(supervisor)
+    const scope = terminalSessionRuntimeScope('/repo', 'repo-runtime-test')
+    const pending = manager.ensureSession({
+      userId: USER_ID,
+      scope,
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-test',
+      branch: BRANCH_NAME,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: WORKTREE_PATH,
+      cwd: WORKTREE_PATH,
+      cols: 80,
+      rows: 24,
+      clientId: CLIENT_ID,
+    })
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_revision_123456'))
+    const created = await pending
+    if (!created.ok) throw new Error(created.message)
+
+    const createdSnapshot = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
+    expect(createdSnapshot.sessions).toEqual([
+      expect.objectContaining({
+        terminalSessionId: TERMINAL_SESSION_ID,
+        processName: 'zsh',
+        phase: 'opening',
+        cols: 80,
+        rows: 24,
+      }),
+    ])
+
+    supervisor.emitData('pty_revision_123456', 'first output')
+    const openedSnapshot = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
+    expect(openedSnapshot.revision).toBeGreaterThan(createdSnapshot.revision)
+    expect(openedSnapshot.sessions[0]).toMatchObject({ phase: 'open' })
+
+    supervisor.emitData('pty_revision_123456', 'ordinary output')
+    expect(manager.terminalSessionsSnapshotForUser(USER_ID, scope).revision).toBe(openedSnapshot.revision)
+
+    supervisor.setProcessName('node')
+    supervisor.emitData('pty_revision_123456', 'process changed')
+    const processSnapshot = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
+    expect(processSnapshot.revision).toBeGreaterThan(openedSnapshot.revision)
+    expect(processSnapshot.sessions[0]).toMatchObject({ processName: 'node' })
+
+    const beforeResize = processSnapshot.revision
+    expect(manager.resizeSession(USER_ID, created.terminalRuntimeSessionId, 100, 30, CLIENT_ID)).toBe(true)
+    const resizedSnapshot = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
+    expect(resizedSnapshot.revision).toBeGreaterThan(beforeResize)
+    expect(resizedSnapshot.sessions[0]).toMatchObject({ cols: 100, rows: 30 })
+
+    await expect(manager.closeSessionForUser(USER_ID, created.terminalRuntimeSessionId)).resolves.toBe(true)
+    const closedSnapshot = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
+    expect(closedSnapshot.revision).toBeGreaterThan(resizedSnapshot.revision)
+    expect(closedSnapshot.sessions).toEqual([])
+  })
+
+  test('returns hydration snapshots paired with the visible terminal collection revision', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const manager = createManager(supervisor)
+    const scope = terminalSessionRuntimeScope('/repo', 'repo-runtime-test')
+    const pending = manager.ensureSession({
+      userId: USER_ID,
+      scope,
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-test',
+      branch: BRANCH_NAME,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: WORKTREE_PATH,
+      cwd: WORKTREE_PATH,
+      cols: 80,
+      rows: 24,
+      clientId: CLIENT_ID,
+    })
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_recovery_123456'))
+    await pending
+    supervisor.emitData('pty_recovery_123456', 'recoverable output')
+
+    const recovery = await manager.recoverSessionsForUser(USER_ID, scope)
+
+    expect(recovery.terminalSessions).toEqual(manager.terminalSessionsSnapshotForUser(USER_ID, scope))
+    expect(recovery.snapshots).toEqual([
+      expect.objectContaining({
+        terminalRuntimeSessionId: recovery.terminalSessions.sessions[0]?.terminalRuntimeSessionId,
+        snapshotSeq: expect.any(Number),
+        outputEra: expect.any(Number),
+      }),
+    ])
   })
 })

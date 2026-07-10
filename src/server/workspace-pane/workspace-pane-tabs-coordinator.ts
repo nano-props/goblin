@@ -22,6 +22,7 @@ type WorkspacePaneTabsCoordinatorRuntime = Pick<
   | 'closeTabsForWorktree'
   | 'physicalWorktreeScopes'
   | 'replaceTabs'
+  | 'releaseRevisionForScope'
   | 'revision'
   | 'scopesForUser'
   | 'tabs'
@@ -230,6 +231,13 @@ export class WorkspacePaneTabsCoordinator {
   async closeScope(input: { userId: string; scope: string }): Promise<void> {
     await this.runWorkspaceTabsScopeOperation(input.userId, input.scope, () => {
       this.workspaceTabs.closeTabsForScope(input.userId, input.scope)
+    })
+  }
+
+  async closeInvalidatedScope(input: { userId: string; scope: string }): Promise<void> {
+    await this.runWorkspaceTabsScopeOperation(input.userId, input.scope, () => {
+      this.workspaceTabs.closeTabsForScope(input.userId, input.scope)
+      this.workspaceTabs.releaseRevisionForScope(input.userId, input.scope)
     })
   }
 

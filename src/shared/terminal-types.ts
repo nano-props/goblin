@@ -168,7 +168,6 @@ export type TerminalCreateResult =
       ok: true
       action: TerminalCreateAction
       terminalSessionId: string
-      sessions: TerminalSessionSummary[]
     } & TerminalFirstFrame)
   | { ok: false; message: string }
 
@@ -238,8 +237,20 @@ export interface TerminalHydrationSnapshot {
   outputEra: number
 }
 
-export interface TerminalSessionsRecoveryResult {
+/**
+ * Versioned full terminal projection for one user/repo-runtime scope.
+ *
+ * This revision belongs exclusively to the terminal projection. Workspace
+ * pane tab revisions must never be used to decide whether this collection is
+ * fresh: the two projections have independent mutation and delivery order.
+ */
+export interface TerminalSessionsSnapshot {
+  revision: number
   sessions: TerminalSessionSummary[]
+}
+
+export interface TerminalSessionsRecoveryResult {
+  terminalSessions: TerminalSessionsSnapshot
   snapshots: TerminalHydrationSnapshot[]
   workspacePaneTabs: WorkspacePaneTabsSnapshot
 }

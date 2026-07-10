@@ -18,6 +18,10 @@ import {
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
+import {
+  observedWorkspacePaneRouteCommitForTest,
+  seedInitialObservedWorkspacePaneRouteForTest,
+} from '#/web/test-utils/workspace-pane-navigation.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
@@ -85,7 +89,7 @@ describe('useKeyboard', () => {
     })
     const selectTerminal = vi.fn()
     const showRepoBranchWorkspacePaneTab = vi.fn()
-    const showRepoBranchTerminalSession = vi.fn()
+    const showRepoBranchTerminalSession = vi.fn(() => true)
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => terminalWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
@@ -95,6 +99,13 @@ describe('useKeyboard', () => {
       currentRepoId: REPO_ID,
       currentBranchName: 'feature/worktree',
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
+    })
+    seedInitialObservedWorkspacePaneRouteForTest({
+      repoId: REPO_ID,
+      repoRuntimeId: repoRuntimeIdForTest(),
+      branchName: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+      route: { kind: 'static', tab: 'status' },
     })
 
     await act(async () => {
@@ -125,6 +136,13 @@ describe('useKeyboard', () => {
       currentRepoId: REPO_ID,
       currentBranchName: 'feature/no-worktree',
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
+    })
+    seedInitialObservedWorkspacePaneRouteForTest({
+      repoId: REPO_ID,
+      repoRuntimeId: repoRuntimeIdForTest(),
+      branchName: 'feature/no-worktree',
+      worktreePath: null,
+      route: { kind: 'static', tab: 'status' },
     })
 
     await act(async () => {
@@ -199,7 +217,7 @@ describe('useKeyboard', () => {
     })
     const selectTerminal = vi.fn()
     const showRepoBranchWorkspacePaneTab = vi.fn()
-    const showRepoBranchTerminalSession = vi.fn()
+    const showRepoBranchTerminalSession = vi.fn(() => true)
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => terminalWorktreeSnapshot(),
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
@@ -209,6 +227,13 @@ describe('useKeyboard', () => {
       currentRepoId: REPO_ID,
       currentBranchName: 'feature/worktree',
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
+    })
+    seedInitialObservedWorkspacePaneRouteForTest({
+      repoId: REPO_ID,
+      repoRuntimeId: repoRuntimeIdForTest(),
+      branchName: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+      route: { kind: 'static', tab: 'status' },
     })
     const terminalHost = document.createElement('div')
     terminalHost.className = 'goblin-managed-terminal-host'
@@ -497,7 +522,7 @@ function HookHost(overrides: Partial<HookHostOptions>) {
 }
 
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {}): PrimaryWindowNavigationActions {
-  return {
+  const navigation: PrimaryWindowNavigationActions = {
     activateRepo: () => {},
     closeRepo: () => {},
     cycleRepo: () => {},
@@ -505,13 +530,17 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,
     showRepoBranchTerminalSession: () => true,
-    commitRepoBranchWorkspacePaneRoute: () => true,
+    commitRepoBranchWorkspacePaneRoute: () => false,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},
     openCreateWorktree: () => {},
     ...overrides,
   }
+  if (!overrides.commitRepoBranchWorkspacePaneRoute) {
+    navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
+  }
+  return navigation
 }
 
 function repoRuntimeIdForTest(): string {

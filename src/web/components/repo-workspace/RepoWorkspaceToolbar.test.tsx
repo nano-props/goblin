@@ -57,7 +57,10 @@ import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session
 import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type { RepoSettingsEntry } from '#/shared/repo-settings.ts'
-import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
+import {
+  observedWorkspacePaneRouteCommitForTest,
+  seedInitialObservedWorkspacePaneRouteForTest,
+} from '#/web/test-utils/workspace-pane-navigation.ts'
 
 let compactUi = false
 const runtimeExternalAppSettings = vi.hoisted(() => ({
@@ -195,7 +198,7 @@ describe('RepoWorkspaceToolbar', () => {
     })
     await flush()
 
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/no-worktree', 'status')
+    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
   })
 
   test('keeps the focus-offset leading spacer mounted for width transitions', () => {
@@ -923,11 +926,7 @@ describe('RepoWorkspaceToolbar', () => {
     })
     await flush()
 
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
-      REPO_ID,
-      'feature/worktree',
-      'term-111111111111111111111',
-    )
+    expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(mocks.createTerminal).not.toHaveBeenCalled()
     expect(mocks.selectTerminal).not.toHaveBeenCalled()
@@ -1447,6 +1446,7 @@ function workspacePaneRouteForPreferredTab(
 }
 
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
+  seedInitialObservedWorkspacePaneRouteForTest()
   const navigation: PrimaryWindowNavigationActions = {
     activateRepo: () => {},
     closeRepo: () => {},
@@ -1455,23 +1455,15 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,
     showRepoBranchTerminalSession: () => true,
-    commitRepoBranchWorkspacePaneRoute: (repoId, branch, route, options) =>
-      openResolvedRepoBranchWorkspacePaneRoute(
-        {
-          openRepoBranch: navigation.showRepoBranchEmptyWorkspacePane,
-          openRepoBranchTab: navigation.showRepoBranchWorkspacePaneTab,
-          openRepoBranchTerminal: navigation.showRepoBranchTerminalSession,
-        },
-        repoId,
-        branch,
-        route,
-        options,
-      ),
+    commitRepoBranchWorkspacePaneRoute: () => false,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},
     openCreateWorktree: () => {},
     ...overrides,
+  }
+  if (!overrides.commitRepoBranchWorkspacePaneRoute) {
+    navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
   }
   return navigation
 }

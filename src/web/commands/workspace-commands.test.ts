@@ -47,7 +47,14 @@ import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-
 import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
 import { resetWorkspacePaneTabControllerForTest } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
-import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
+import { dispatchMoveWorkspacePaneTabAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
+import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
+import { observeWorkspacePaneTabControllerRoute } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import {
+  observedWorkspacePaneRouteCommitForTest,
+  seedInitialObservedWorkspacePaneRouteForTest,
+  type WorkspacePaneNavigationObservation,
+} from '#/web/test-utils/workspace-pane-navigation.ts'
 
 const toastMocks = vi.hoisted(() => ({
   error: vi.fn(),
@@ -324,7 +331,8 @@ describe('workspace commands', () => {
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
     })
-    const navigation = navigationWith()
+    const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
+    const navigation = navigationWith({ showRepoBranchWorkspacePaneTab })
 
     await expect(
       runShowWorkspacePaneTabCommand({
@@ -335,7 +343,8 @@ describe('workspace commands', () => {
         navigation,
       }),
     ).resolves.toBe(true)
-    expect(preferredWorkspacePaneTab('feature/no-worktree')).toBe('status')
+    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
+    expect(preferredWorkspacePaneTab('feature/no-worktree')).toBe('terminal')
   })
 
   test('terminal primary action opens the terminal tab and creates the first terminal when missing', async () => {
@@ -606,7 +615,14 @@ describe('workspace commands', () => {
       staticEntry('status'),
       terminalEntry('term-222222222222222222222'),
     ])
-    expect(workspacePaneTabOpener(REPO_ID, 'feature/worktree', 'terminal:term-222222222222222222222')).toBe(
+    expect(
+      workspacePaneTabOpener(
+        REPO_ID,
+        repoRuntimeIdForTest(),
+        'feature/worktree',
+        'terminal:term-222222222222222222222',
+      ),
+    ).toBe(
       'terminal:term-111111111111111111111',
     )
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
@@ -701,7 +717,14 @@ describe('workspace commands', () => {
       terminalEntry('term-111111111111111111111'),
       terminalEntry('term-222222222222222222222'),
     ])
-    expect(workspacePaneTabOpener(REPO_ID, 'feature/worktree', 'terminal:term-222222222222222222222')).toBe(
+    expect(
+      workspacePaneTabOpener(
+        REPO_ID,
+        repoRuntimeIdForTest(),
+        'feature/worktree',
+        'terminal:term-222222222222222222222',
+      ),
+    ).toBe(
       'workspace-pane:status',
     )
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
@@ -759,7 +782,9 @@ describe('workspace commands', () => {
         navigation,
       }),
     ).toBe(true)
-    expect(workspacePaneTabOpener(REPO_ID, 'feature/worktree', 'workspace-pane:files')).toBe('workspace-pane:status')
+    expect(
+      workspacePaneTabOpener(REPO_ID, repoRuntimeIdForTest(), 'feature/worktree', 'workspace-pane:files'),
+    ).toBe('workspace-pane:status')
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenLastCalledWith(REPO_ID, 'feature/worktree', 'files')
     showRepoBranchWorkspacePaneTab.mockClear()
 
@@ -921,7 +946,7 @@ describe('workspace commands', () => {
     )
   })
 
-  test('new terminal tab command lets the terminal provider single-flight duplicate create intents', async () => {
+  test('new terminal tab command serializes duplicate create intents on the same target', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -964,14 +989,14 @@ describe('workspace commands', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(duplicateSettled).toBe(false)
-    expect(createTerminal).toHaveBeenCalledTimes(2)
+    expect(createTerminal).toHaveBeenCalledTimes(1)
     expect(createOperationCount()).toBe(1)
 
     firstCreate.resolve('term-222222222222222222222')
     await expect(firstCommand).resolves.toBe(true)
     await expect(duplicateCommand).resolves.toBe(true)
     expect(createTerminal).toHaveBeenCalledTimes(2)
-    expect(createOperationCount()).toBe(1)
+    expect(createOperationCount()).toBe(2)
     expect(showRepoBranchTerminalSession).toHaveBeenCalledOnce()
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
       REPO_ID,
@@ -981,7 +1006,7 @@ describe('workspace commands', () => {
     expect(tabsFor('feature/worktree')).toEqual([staticEntry('status'), terminalEntry('term-222222222222222222222')])
   })
 
-  test('different terminal create shapes do not let a queued create block the first create route commit', async () => {
+  test('different terminal create shapes serialize through the same target queue', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1019,14 +1044,15 @@ describe('workspace commands', () => {
     const showRepoBranchTerminalSession = vi.fn((_repoId: string, _branchName: string, _terminalSessionId: string) => {
       return !createPending()
     })
-    const commitRepoBranchWorkspacePaneRoute = vi.fn((_repoId, _branchName, route) => route?.kind === 'terminal')
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), createPending: createPending() }),
       createTerminal,
       createTerminalWithAdmission,
       selectTerminal: vi.fn(),
     })
-    const navigation = navigationWith({ showRepoBranchTerminalSession, commitRepoBranchWorkspacePaneRoute })
+    const navigation = navigationWith({ showRepoBranchTerminalSession })
+    const commitRepoBranchWorkspacePaneRoute = vi.fn(navigation.commitRepoBranchWorkspacePaneRoute)
+    navigation.commitRepoBranchWorkspacePaneRoute = commitRepoBranchWorkspacePaneRoute
     const base = {
       repoRoot: REPO_ID,
       repoRuntimeId: repoRuntimeIdForTest(),
@@ -1063,10 +1089,11 @@ describe('workspace commands', () => {
       options: { resolveStartupShellCommand: async () => "bat '/repo/a.ts'\r" },
     })
     await Promise.resolve()
-    expect(createTerminal).toHaveBeenCalledTimes(1)
+    expect(createTerminal).not.toHaveBeenCalled()
 
     firstCreate.resolve('term-111111111111111111111')
     await expect(firstCommand).resolves.toBe(true)
+    await vi.waitFor(() => expect(createTerminal).toHaveBeenCalledOnce())
     expect(commitRepoBranchWorkspacePaneRoute).toHaveBeenNthCalledWith(
       1,
       REPO_ID,
@@ -2052,8 +2079,8 @@ describe('workspace commands', () => {
     })
     await Promise.resolve()
     expect(terminalSettled).toBe(false)
-    expect(createTerminal).toHaveBeenCalledOnce()
-    expect(terminalCreateOperationRan).toBe(true)
+    expect(createTerminal).not.toHaveBeenCalled()
+    expect(terminalCreateOperationRan).toBe(false)
     expect(showRepoBranchTerminalSession).not.toHaveBeenCalled()
 
     resolveCommit([staticEntry('status')])
@@ -2256,7 +2283,7 @@ describe('workspace commands', () => {
   })
 
   test('close workspace tab command ignores the opener when closing a background (non-active) tab', async () => {
-    seedRepoWithReadModelForTest({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/worktree',
@@ -2300,6 +2327,13 @@ describe('workspace commands', () => {
       }),
     ).toBe(true)
     navigation.showRepoBranchWorkspacePaneTab(REPO_ID, 'feature/worktree', 'changes')
+    seedInitialObservedWorkspacePaneRouteForTest({
+      repoId: REPO_ID,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+      route: { kind: 'static', tab: 'changes' },
+    })
     expect(preferredWorkspacePaneTab()).toBe('changes')
     showRepoBranchWorkspacePaneTab.mockClear()
 
@@ -2394,7 +2428,7 @@ describe('workspace commands', () => {
   })
 
   test('close workspace tab command does not close a persisted active tab on a bare branch route', async () => {
-    seedRepoWithReadModelForTest({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/worktree',
@@ -2404,13 +2438,20 @@ describe('workspace commands', () => {
       },
     })
     const closeWindow = vi.fn()
+    seedInitialObservedWorkspacePaneRouteForTest({
+      repoId: REPO_ID,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+      route: null,
+    })
 
     expect(
       await runCloseWorkspacePaneTabOrWindowCommand({
         repoId: REPO_ID,
         branchName: 'feature/worktree',
         workspacePaneRoute: null,
-        navigation: navigationWith(),
+        navigation: navigationWith({}, { autoSeedInitialRoute: false }),
         closeWindow,
       }),
     ).toBe(true)
@@ -2421,7 +2462,7 @@ describe('workspace commands', () => {
   })
 
   test('close workspace tab command keeps a targeted close on a bare branch route from activating another tab', async () => {
-    seedRepoWithReadModelForTest({
+    const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
       currentBranchName: 'feature/worktree',
@@ -2434,13 +2475,23 @@ describe('workspace commands', () => {
       useReposStore.getState().setWorkspacePaneTab(repoId, branch, tab)
       return true
     })
+    seedInitialObservedWorkspacePaneRouteForTest({
+      repoId: REPO_ID,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+      route: null,
+    })
 
     expect(
       await runCloseWorkspacePaneTabCommand({
         repoId: REPO_ID,
         branchName: 'feature/worktree',
         workspacePaneRoute: null,
-        navigation: navigationWith({ showRepoBranchWorkspacePaneTab }),
+        navigation: navigationWith(
+          { showRepoBranchWorkspacePaneTab },
+          { autoSeedInitialRoute: false },
+        ),
         targetIdentity: 'workspace-pane:status',
       }),
     ).toBe(true)
@@ -2826,7 +2877,115 @@ function workspacePaneTabsSnapshot(base: TerminalSessionBase, tabs: WorkspacePan
   }
 }
 
-function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {}): PrimaryWindowNavigationActions {
+test('serializes A to B to C selection until each accepted route is observed', async () => {
+  const repo = seedRepoWithReadModelForTest({
+    id: REPO_ID,
+    branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+    currentBranchName: 'feature/worktree',
+    workspacePaneTabsByBranch: {
+      'feature/worktree': [staticEntry('status'), staticEntry('files'), staticEntry('history')],
+    },
+  })
+  const target = {
+    repoId: REPO_ID,
+    repoRuntimeId: repo.repoRuntimeId,
+    branchName: 'feature/worktree',
+    worktreePath: WORKTREE_PATH,
+  }
+  observeWorkspacePaneTabControllerRoute({ ...target, route: { kind: 'static', tab: 'status' } })
+  const observations: WorkspacePaneNavigationObservation[] = []
+  const navigation = navigationWith({}, { autoSeedInitialRoute: false })
+  navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation, {
+    observeAcceptedRoute: (observation) => observations.push(observation),
+  })
+
+  const selectFiles = dispatchSelectWorkspacePaneTabByIdentityAction({
+    repoId: REPO_ID,
+    branchName: 'feature/worktree',
+    workspacePaneRoute: { kind: 'static', tab: 'status' },
+    identity: 'workspace-pane:files',
+    navigation,
+  })
+  await vi.waitFor(() => expect(observations).toHaveLength(1))
+  const selectHistory = dispatchSelectWorkspacePaneTabByIdentityAction({
+    repoId: REPO_ID,
+    branchName: 'feature/worktree',
+    workspacePaneRoute: { kind: 'static', tab: 'status' },
+    identity: 'workspace-pane:history',
+    navigation,
+  })
+  await Promise.resolve()
+  expect(observations).toHaveLength(1)
+
+  const filesObservation = observations.shift()
+  if (!filesObservation) throw new Error('missing files route observation')
+  observeWorkspacePaneTabControllerRoute(filesObservation)
+  await expect(selectFiles).resolves.toBe(true)
+  await vi.waitFor(() => expect(observations).toHaveLength(1))
+  const historyObservation = observations.shift()
+  if (!historyObservation) throw new Error('missing history route observation')
+  observeWorkspacePaneTabControllerRoute(historyObservation)
+  await expect(selectHistory).resolves.toBe(true)
+})
+
+test('serializes open then move against the observer-confirmed opened route', async () => {
+  const repo = seedRepoWithReadModelForTest({
+    id: REPO_ID,
+    branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+    currentBranchName: 'feature/worktree',
+    workspacePaneTabsByBranch: {
+      'feature/worktree': [staticEntry('status'), staticEntry('history')],
+    },
+  })
+  const target = {
+    repoId: REPO_ID,
+    repoRuntimeId: repo.repoRuntimeId,
+    branchName: 'feature/worktree',
+    worktreePath: WORKTREE_PATH,
+  }
+  observeWorkspacePaneTabControllerRoute({ ...target, route: { kind: 'static', tab: 'status' } })
+  const observations: WorkspacePaneNavigationObservation[] = []
+  const navigation = navigationWith({}, { autoSeedInitialRoute: false })
+  navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation, {
+    observeAcceptedRoute: (observation) => observations.push(observation),
+  })
+
+  const openFiles = openWorkspacePaneTab({
+    repoId: REPO_ID,
+    branchName: 'feature/worktree',
+    worktreePath: WORKTREE_PATH,
+    type: 'files',
+    insertAfterIdentity: 'workspace-pane:status',
+    workspacePaneRoute: { kind: 'static', tab: 'status' },
+    navigation,
+  })
+  await vi.waitFor(() => expect(observations).toHaveLength(1))
+  const move = dispatchMoveWorkspacePaneTabAction({
+    repoId: REPO_ID,
+    branchName: 'feature/worktree',
+    workspacePaneRoute: { kind: 'static', tab: 'status' },
+    direction: 1,
+    navigation,
+  })
+  await Promise.resolve()
+  expect(observations).toHaveLength(1)
+
+  const filesObservation = observations.shift()
+  if (!filesObservation) throw new Error('missing opened files route observation')
+  observeWorkspacePaneTabControllerRoute(filesObservation)
+  await expect(openFiles).resolves.toBe(true)
+  await vi.waitFor(() => expect(observations).toHaveLength(1))
+  const historyObservation = observations.shift()
+  if (!historyObservation) throw new Error('missing moved history route observation')
+  observeWorkspacePaneTabControllerRoute(historyObservation)
+  await expect(move).resolves.toBe(true)
+})
+
+function navigationWith(
+  overrides: Partial<PrimaryWindowNavigationActions> = {},
+  options: { autoSeedInitialRoute?: boolean } = {},
+): PrimaryWindowNavigationActions {
+  seedInitialObservedWorkspacePaneRouteForTest(undefined, { autoSeed: options.autoSeedInitialRoute !== false })
   const navigation: PrimaryWindowNavigationActions = {
     activateRepo: (repoId) => useReposStore.setState({ restoredRepoId: repoId }),
     closeRepo: () => {},
@@ -2840,23 +2999,15 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
       return true
     },
     showRepoBranchTerminalSession: () => true,
-    commitRepoBranchWorkspacePaneRoute: (repoId, branch, route, options) =>
-      openResolvedRepoBranchWorkspacePaneRoute(
-        {
-          openRepoBranch: navigation.showRepoBranchEmptyWorkspacePane,
-          openRepoBranchTab: navigation.showRepoBranchWorkspacePaneTab,
-          openRepoBranchTerminal: navigation.showRepoBranchTerminalSession,
-        },
-        repoId,
-        branch,
-        route,
-        options,
-      ),
+    commitRepoBranchWorkspacePaneRoute: () => false,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},
     openCreateWorktree: () => {},
     ...overrides,
+  }
+  if (!overrides.commitRepoBranchWorkspacePaneRoute) {
+    navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
   }
   return navigation
 }

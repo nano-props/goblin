@@ -79,7 +79,7 @@ function seedElectronBootstrap() {
       close: vi.fn(async () => false),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       recoverSessions: vi.fn(async () => ({
-        sessions: [],
+        terminalSessions: { revision: 0, sessions: [] },
         snapshots: [],
         workspacePaneTabs: { revision: 0, entries: [] },
       })),
@@ -148,7 +148,7 @@ function seedWebBootstrap() {
       close: vi.fn(async () => false),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
       recoverSessions: vi.fn(async () => ({
-        sessions: [],
+        terminalSessions: { revision: 0, sessions: [] },
         snapshots: [],
         workspacePaneTabs: { revision: 0, entries: [] },
       })),
