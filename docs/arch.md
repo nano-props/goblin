@@ -75,10 +75,16 @@ Runtime creation follows three responsibility layers:
 1. The provider domain service owns the resource lifecycle (terminal session,
    chat session, and so on) and remains usable without workspace-pane UI.
 2. `WorkspacePaneRuntimeApplication` owns the server application commands for
-   open, single close, and worktree close. Commands for the same
+   open, single close, and repository worktree removal. Commands for the same
    user/repo-runtime/worktree share one server queue; each command joins the
    provider lifecycle with canonical runtime-tab membership and returns a full
-   revisioned `WorkspacePaneTabsSnapshot`.
+   revisioned `WorkspacePaneTabsSnapshot`. Removal is admitted before it enters
+   the repository write queue, rejects later runtime/tab writes, and performs
+   provider plus canonical-tab cleanup after repository validation but before
+   the actual Git worktree removal.
+   Provider close results carry the corresponding server session projection;
+   the client applies it only when it also accepts that command's canonical
+   tabs revision, so an older close response cannot erase a newer open.
 3. The client command/projection owns only admission/dedupe, revision-gated
    cache projection, opener facts, cancellation, and exact route completion.
    It does not order server resources or infer session liveness from its cache.
@@ -118,5 +124,7 @@ Compatibility note: old workspace tab protocol names
 of the current contract. The canonical socket actions/events are
 `workspace-pane-tabs.list`, `workspace-pane-tabs.replace`,
 `workspace-pane-tabs.update`, and `workspace-pane-tabs.changed`.
-The composed runtime actions are `workspace-pane-runtime.open`,
-`workspace-pane-runtime.close`, and `workspace-pane-runtime.close-worktree`.
+The composed runtime actions are `workspace-pane-runtime.open` and
+`workspace-pane-runtime.close`. Whole-worktree runtime cleanup is an internal
+step of the repository worktree-removal transaction, not a client-callable
+runtime action.

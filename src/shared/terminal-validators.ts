@@ -15,6 +15,7 @@ import type {
   TerminalTestNotificationInput,
 } from '#/shared/terminal-types.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
+import { WorkspacePaneTabsSnapshotSchema } from '#/shared/workspace-pane-tabs-validators.ts'
 
 const MIN_TERMINAL_COLS = 1
 const MAX_TERMINAL_COLS = 500
@@ -33,7 +34,6 @@ const TERMINAL_SOCKET_ACTIONS = [
   'resize',
   'takeover',
   'close',
-  'list-sessions',
   'recover-sessions',
   'prune',
 ] as const satisfies TerminalSocketRequestAction[]
@@ -96,7 +96,7 @@ const TerminalPruneInputSchema = v.object({
   repoRoot: v.string(),
   repoRuntimeId: RepoRuntimeIdSchema,
 })
-const TerminalSessionSummarySchema = v.object({
+export const TerminalSessionSummarySchema = v.object({
   terminalRuntimeSessionId: v.string(),
   terminalSessionId: v.string(),
   repoRuntimeId: RepoRuntimeIdSchema,
@@ -121,6 +121,7 @@ const TerminalHydrationSnapshotSchema = v.object({
 const TerminalSessionsRecoveryResultSchema = v.object({
   sessions: v.array(TerminalSessionSummarySchema),
   snapshots: v.array(TerminalHydrationSnapshotSchema),
+  workspacePaneTabs: WorkspacePaneTabsSnapshotSchema,
 })
 const TerminalFirstFrameSchemaEntries = {
   terminalRuntimeSessionId: TerminalRuntimeSessionIdSchema,
@@ -299,12 +300,6 @@ const TerminalClientMessageSchema = v.variant('type', [
   v.object({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
-    action: v.literal('list-sessions'),
-    input: TerminalListSessionsInputSchema,
-  }),
-  v.object({
-    type: v.literal('request'),
-    requestId: TerminalRequestIdSchema,
     action: v.literal('recover-sessions'),
     input: TerminalListSessionsInputSchema,
   }),
@@ -401,11 +396,6 @@ export function isValidTerminalTestNotificationInput(value: unknown): value is T
   )
 }
 
-export function normalizeTerminalSessionSummaryList(value: unknown): TerminalSessionSummary[] | null {
-  const parsed = v.safeParse(v.array(TerminalSessionSummarySchema), value)
-  return parsed.success ? parsed.output : null
-}
-
 export function normalizeTerminalSessionsRecoveryResult(value: unknown): TerminalSessionsRecoveryResult | null {
   const parsed = v.safeParse(TerminalSessionsRecoveryResultSchema, value)
   return parsed.success ? parsed.output : null
@@ -450,8 +440,6 @@ function normalizeTerminalSocketResponsePayload(action: TerminalSocketRequestAct
       return normalizeWithSchema(TerminalMutationResultSchema, payload)
     case 'takeover':
       return normalizeWithSchema(TerminalTakeoverResultSchema, payload)
-    case 'list-sessions':
-      return normalizeWithSchema(v.array(TerminalSessionSummarySchema), payload)
     case 'recover-sessions':
       return normalizeWithSchema(TerminalSessionsRecoveryResultSchema, payload)
     case 'prune':

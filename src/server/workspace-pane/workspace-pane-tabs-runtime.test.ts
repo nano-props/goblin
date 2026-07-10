@@ -102,6 +102,34 @@ describe('workspace pane tabs runtime storage', () => {
     runtime.closeTabsForScope('user-a', '/repo')
     expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(2)
   })
+
+  test('closes every target for one worktree with one revision without affecting sibling worktrees', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+    runtime.replaceTabs({ ...target(), tabs: [workspacePaneStaticTabEntry('status')] })
+    runtime.replaceTabs({
+      ...target(),
+      branchName: 'feature/renamed',
+      tabs: [workspacePaneStaticTabEntry('history')],
+    })
+    runtime.replaceTabs({
+      ...target(),
+      branchName: 'feature/other',
+      worktreePath: '/repo-other',
+      tabs: [workspacePaneStaticTabEntry('files')],
+    })
+    const revision = runtime.revision({ userId: 'user-a', scope: '/repo' })
+
+    runtime.closeTabsForWorktree(worktree())
+
+    expect(runtime.revision({ userId: 'user-a', scope: '/repo' })).toBe(revision + 1)
+    expect(runtime.tabsForScope({ userId: 'user-a', scope: '/repo' })).toEqual([
+      {
+        branchName: 'feature/other',
+        worktreePath: '/repo-other',
+        tabs: [workspacePaneStaticTabEntry('files')],
+      },
+    ])
+  })
 })
 
 function target(): { userId: string; scope: string; branchName: string; worktreePath: string } {

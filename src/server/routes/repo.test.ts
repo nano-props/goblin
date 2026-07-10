@@ -75,8 +75,16 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-function createTestRepoRoutes() {
-  return createRepoRoutes()
+function createTestRepoRoutes(
+  workspacePaneWorktreeApplication: Parameters<typeof createRepoRoutes>[0]['workspacePaneWorktreeApplication'] = {
+    async removeWorktree(_userId, input) {
+      return await input.remove(async () => ({ ok: true, message: '' }))
+    },
+  },
+) {
+  return createRepoRoutes({
+    workspacePaneWorktreeApplication,
+  })
 }
 
 describe('repo routes — POST body validation (read endpoints)', () => {
@@ -606,6 +614,56 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     )
     expect(response.status).toBe(200)
     expect(mocks.cloneRepo).toHaveBeenCalledWith('https://example.com/r.git', '/tmp', 'r', expect.any(AbortSignal))
+  })
+
+  test('remove-worktree delegates one composed command and passes cleanup into the repository mutation boundary', async () => {
+    const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
+    const workspacePaneWorktreeApplication: Parameters<typeof createRepoRoutes>[0]['workspacePaneWorktreeApplication'] =
+      {
+        removeWorktree: vi.fn(async (_userId, input) => await input.remove(beforeRemove)),
+      }
+    mocks.removeRepoWorktree.mockImplementationOnce(async (_cwd, _input, lifecycle) => {
+      const prepared = await lifecycle.beforeRemove()
+      return prepared.ok ? { ok: true, message: 'removed' } : prepared
+    })
+    const app = createTestRepoRoutes(workspacePaneWorktreeApplication)
+    const response = await app.request(
+      new Request('http://localhost/remove-worktree', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cwd: '/tmp/repo',
+          repoRuntimeId: 'repo-runtime-test',
+          branch: 'feature/remove',
+          worktreePath: '/tmp/repo-remove',
+          alsoDeleteBranch: false,
+        }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ ok: true, message: 'removed' })
+    expect(workspacePaneWorktreeApplication.removeWorktree).toHaveBeenCalledWith(
+      'user-test',
+      expect.objectContaining({
+        repoRoot: '/tmp/repo',
+        repoRuntimeId: 'repo-runtime-test',
+        worktreePath: '/tmp/repo-remove',
+      }),
+    )
+    expect(beforeRemove).toHaveBeenCalledOnce()
+    expect(mocks.removeRepoWorktree).toHaveBeenCalledWith(
+      '/tmp/repo',
+      {
+        branch: 'feature/remove',
+        worktreePath: '/tmp/repo-remove',
+        alsoDeleteBranch: false,
+        forceDeleteBranch: undefined,
+        alsoDeleteUpstream: undefined,
+      },
+      { beforeRemove: expect.any(Function) },
+      expect.any(AbortSignal),
+    )
   })
 
   test('open-url route forwards repo URL targets', async () => {

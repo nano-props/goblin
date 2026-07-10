@@ -15,7 +15,6 @@ import { resetReposStore } from '#/web/test-utils/bridge.ts'
 
 const workspacePaneRuntimeMocks = vi.hoisted(() => ({
   close: vi.fn(),
-  closeWorktree: vi.fn(),
   writeSnapshot: vi.fn(),
   refreshTabs: vi.fn(),
 }))
@@ -23,7 +22,6 @@ const workspacePaneRuntimeMocks = vi.hoisted(() => ({
 vi.mock('#/web/workspace-pane/workspace-pane-runtime-client.ts', () => ({
   workspacePaneRuntimeClient: {
     close: workspacePaneRuntimeMocks.close,
-    closeWorktree: workspacePaneRuntimeMocks.closeWorktree,
   },
 }))
 
@@ -94,10 +92,11 @@ function makeServerSession(
   }
 }
 
-function successfulRuntimeCloseSnapshot() {
+function successfulRuntimeCloseSnapshot(sessions: ReturnType<typeof makeServerSession>[] = []) {
   return {
     ok: true as const,
     runtimeType: 'terminal' as const,
+    runtime: { sessions },
     workspacePaneTabs: { revision: 2, entries: [] },
   }
 }
@@ -110,8 +109,6 @@ describe('TerminalSessionProjection', () => {
     resetReposStore()
     workspacePaneRuntimeMocks.close.mockReset()
     workspacePaneRuntimeMocks.close.mockResolvedValue(successfulRuntimeCloseSnapshot())
-    workspacePaneRuntimeMocks.closeWorktree.mockReset()
-    workspacePaneRuntimeMocks.closeWorktree.mockResolvedValue(successfulRuntimeCloseSnapshot())
     workspacePaneRuntimeMocks.writeSnapshot.mockReset()
     workspacePaneRuntimeMocks.writeSnapshot.mockResolvedValue(true)
     workspacePaneRuntimeMocks.refreshTabs.mockReset()
@@ -706,7 +703,12 @@ describe('TerminalSessionProjection', () => {
       ])
       expect(closingSnapshot.selectedDescriptor?.terminalSessionId).toBe('term-222222222222222222222')
 
-      serverClose.resolve(successfulRuntimeCloseSnapshot())
+      serverClose.resolve(
+        successfulRuntimeCloseSnapshot([
+          makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111'),
+          makeServerSession('pty_session_3_aaaaaaaaa', 'term-333333333333333333333'),
+        ]),
+      )
       await expect(closePromise).resolves.toBe(true)
       const closedSnapshot = projection.terminalWorktreeSnapshot(WORKTREE_KEY)
       expect(closedSnapshot.sessions.map((item) => item.terminalSessionId)).toEqual([
@@ -808,7 +810,7 @@ describe('TerminalSessionProjection', () => {
         }),
       ).resolves.toBe(true)
 
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
       expect(workspacePaneRuntimeMocks.refreshTabs).toHaveBeenCalledWith(REPO_ROOT, REPO_RUNTIME_ID)
     })
 
@@ -837,34 +839,6 @@ describe('TerminalSessionProjection', () => {
       ).resolves.toBe(false)
 
       expect(workspacePaneRuntimeMocks.close).toHaveBeenCalledOnce()
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
-    })
-
-    test('closeTerminalsForWorktree rejects a mismatched repo runtime scope', async () => {
-      projection.setRepoIndex(makeRepoIndex())
-      projection.reconcileServerSessions(
-        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
-        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
-        'client_local',
-        new Map(),
-      )
-      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      workspacePaneRuntimeMocks.closeWorktree.mockResolvedValueOnce({
-        ok: false,
-        runtimeType: 'terminal',
-        message: 'error.repo-runtime-stale',
-      })
-
-      await expect(
-        projection.closeTerminalsForWorktree({
-          repoRoot: REPO_ROOT,
-          repoRuntimeId: 'repo-runtime-new',
-          branch: BRANCH,
-          worktreePath: WORKTREE_PATH,
-        }),
-      ).resolves.toBe(false)
-
-      expect(workspacePaneRuntimeMocks.closeWorktree).toHaveBeenCalledOnce()
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
     })
 

@@ -13,7 +13,6 @@ export interface TerminalSessionCommandBridge {
   ) => Promise<TerminalCreateAdmissionResult>
   selectTerminal: (terminalWorktreeKey: string, terminalSessionId: string) => void
   closeTerminalByDescriptor?: (terminalSessionId: string, base: TerminalSessionBase) => Promise<boolean>
-  closeTerminalsForWorktree?: (base: TerminalSessionBase) => Promise<boolean>
 }
 
 let bridge: TerminalSessionCommandBridge | null = null

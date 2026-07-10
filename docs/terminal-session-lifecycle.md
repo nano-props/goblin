@@ -140,8 +140,8 @@ The combined symptom list across the root causes:
 - `create.sessions` is **projection / directory data**.
 
 `create.sessions` is useful for tab-strip updates, terminal count,
-session metadata projection, and reducing an immediate list-sessions
-round-trip. It is **not** a success criterion for first paint, and
+session metadata projection, and reducing an immediate recovery refresh.
+It is **not** a success criterion for first paint, and
 treating it as one introduced the false-failure toast described
 below.
 

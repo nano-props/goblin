@@ -33,8 +33,7 @@ afterEach(() => {
 describe('workspace pane runtime tab close context', () => {
   test('reads terminal close capability from the command bridge', async () => {
     const closeTerminalByDescriptor = vi.fn(async () => true)
-    const closeTerminalsForWorktree = vi.fn(async () => true)
-    setTerminalSessionCommandBridge(terminalCommandBridge({ closeTerminalByDescriptor, closeTerminalsForWorktree }))
+    setTerminalSessionCommandBridge(terminalCommandBridge({ closeTerminalByDescriptor }))
 
     const context = readWorkspacePaneRuntimeTabCloseContext()
 
@@ -49,9 +48,7 @@ describe('workspace pane runtime tab close context', () => {
     await expect(
       terminalContext?.closeTerminalByDescriptor?.('term-111111111111111111111', terminalBase),
     ).resolves.toBe(true)
-    await expect(terminalContext?.closeTerminalsForWorktree?.(terminalBase)).resolves.toBe(true)
     expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-111111111111111111111', terminalBase)
-    expect(closeTerminalsForWorktree).toHaveBeenCalledWith(terminalBase)
   })
 
   test('rejects confirmed close when terminal capability is unavailable', () => {
@@ -89,10 +86,8 @@ describe('workspace pane runtime tab close context', () => {
 
 function terminalCommandBridge({
   closeTerminalByDescriptor,
-  closeTerminalsForWorktree,
 }: {
   closeTerminalByDescriptor: TerminalSessionCommandBridge['closeTerminalByDescriptor']
-  closeTerminalsForWorktree?: TerminalSessionCommandBridge['closeTerminalsForWorktree']
 }): TerminalSessionCommandBridge {
   const createTerminal = vi.fn(async () => 'term-111111111111111111111')
   return {
@@ -109,6 +104,5 @@ function terminalCommandBridge({
     createTerminalWithAdmission: createTerminalWithAdmissionForTest(createTerminal),
     selectTerminal: vi.fn(),
     closeTerminalByDescriptor,
-    closeTerminalsForWorktree,
   }
 }

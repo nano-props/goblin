@@ -47,9 +47,6 @@ export function createTerminalRealtimeHandlers(host: ServerTerminalActionHost): 
     close(clientId, userId, input) {
       return host.close(clientId, userId, input)
     },
-    'list-sessions'(clientId, userId, input) {
-      return host.listSessions(clientId, userId, input)
-    },
     'recover-sessions'(clientId, userId, input) {
       return host.recoverSessions(clientId, userId, input)
     },

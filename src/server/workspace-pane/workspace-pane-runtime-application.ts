@@ -1,8 +1,7 @@
-import PQueue from 'p-queue'
+import type { ExecResult } from '#/shared/git-types.ts'
 import type {
   TerminalCreateInput,
   TerminalCreateResult,
-  TerminalListSessionsInput,
   TerminalSessionInput,
   TerminalSessionSummary,
 } from '#/shared/terminal-types.ts'
@@ -15,25 +14,33 @@ import type {
   TerminalWorkspacePaneRuntimeOpenInput,
   WorkspacePaneRuntimeCloseInput,
   WorkspacePaneRuntimeCloseResult,
-  WorkspacePaneRuntimeCloseWorktreeInput,
-  WorkspacePaneRuntimeCloseWorktreeResult,
   WorkspacePaneRuntimeCommandTarget,
   WorkspacePaneRuntimeOpenInput,
   WorkspacePaneRuntimeOpenResult,
 } from '#/shared/workspace-pane-runtime.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
-import { terminalSessionUserWorktreeKey } from '#/shared/terminal-session-keys.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
+import type {
+  WorkspacePaneWorktreeOperationCoordinator,
+  WorkspacePaneWorktreeOperationTarget,
+} from '#/server/workspace-pane/workspace-pane-worktree-operation-coordinator.ts'
 import { terminalSessionRuntimeScope, terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
 
 type MaybePromise<T> = T | Promise<T>
 
 interface WorkspacePaneRuntimeApplicationDependencies {
-  workspaceTabsCoordinator: Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktree'>
+  workspaceTabsCoordinator: Pick<
+    WorkspacePaneTabsCoordinator,
+    'closeWorktree' | 'ensureRuntimeTabForSession' | 'reconcileWorktree'
+  >
+  worktreeOperations: WorkspacePaneWorktreeOperationCoordinator
   terminal: {
     create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCreateResult>
-    listSessions(clientId: string, userId: string, input: TerminalListSessionsInput): Promise<TerminalSessionSummary[]>
     close(clientId: string, userId: string, input: TerminalSessionInput): MaybePromise<boolean>
+  }
+  terminalWorktree: {
+    listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
+    closeSessionForUser(userId: string, terminalRuntimeSessionId: string): boolean
   }
   isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
   broadcastWorkspaceTabsChanged(userId: string, repoRoot: string): void
@@ -42,11 +49,10 @@ interface WorkspacePaneRuntimeApplicationDependencies {
 /**
  * Application operation joining provider lifecycle and workspace-pane
  * projection. All provider operations for one user/runtime/worktree share a
- * queue, so open, close, and close-worktree observe one server-owned order.
+ * queue, so open, close, and removal observe one server-owned order.
  */
 export class WorkspacePaneRuntimeApplication {
   private readonly deps: WorkspacePaneRuntimeApplicationDependencies
-  private readonly operationQueuesByUserWorktree = new Map<string, PQueue>()
 
   constructor(deps: WorkspacePaneRuntimeApplicationDependencies) {
     this.deps = deps
@@ -59,7 +65,11 @@ export class WorkspacePaneRuntimeApplication {
   ): Promise<WorkspacePaneRuntimeOpenResult> {
     const scope = terminalSessionRuntimeScope(input.request.repoRoot, input.request.repoRuntimeId)
     const worktreePath = terminalSessionWorktreePath(input.request.repoRoot, input.request.worktreePath)
-    return await this.runWorktreeOperation({ userId, scope, worktreePath }, async () => {
+    const operationTarget = { userId, scope, worktreePath }
+    if (this.deps.worktreeOperations.isRemovalAdmitted(operationTarget)) {
+      return runtimeFailure(input.runtimeType, 'error.worktree-removal-in-progress')
+    }
+    return await this.deps.worktreeOperations.runOperation(operationTarget, async () => {
       switch (input.runtimeType) {
         case 'terminal':
           return await this.openTerminal(clientId, userId, input, scope, worktreePath)
@@ -74,29 +84,40 @@ export class WorkspacePaneRuntimeApplication {
   ): Promise<WorkspacePaneRuntimeCloseResult> {
     const target = normalizedRuntimeTarget(input.target)
     const scope = terminalSessionRuntimeScope(target.repoRoot, target.repoRuntimeId)
-    return await this.runWorktreeOperation({ userId, scope, worktreePath: target.worktreePath }, async () => {
-      if (!this.isCurrentTarget(userId, target)) return runtimeFailure(input.runtimeType, 'error.repo-runtime-stale')
-      switch (input.runtimeType) {
-        case 'terminal':
-          return await this.closeTerminal(clientId, userId, target, input.sessionId, scope)
-      }
-    })
+    return await this.deps.worktreeOperations.runOperation(
+      { userId, scope, worktreePath: target.worktreePath },
+      async () => {
+        if (!this.isCurrentTarget(userId, target)) return runtimeFailure(input.runtimeType, 'error.repo-runtime-stale')
+        switch (input.runtimeType) {
+          case 'terminal':
+            return await this.closeTerminal(clientId, userId, target, input.sessionId, scope)
+        }
+      },
+    )
   }
 
-  async closeWorktree(
-    clientId: string,
+  async removeWorktree(
     userId: string,
-    input: WorkspacePaneRuntimeCloseWorktreeInput,
-  ): Promise<WorkspacePaneRuntimeCloseWorktreeResult> {
-    const target = normalizedRuntimeTarget(input.target)
-    const scope = terminalSessionRuntimeScope(target.repoRoot, target.repoRuntimeId)
-    return await this.runWorktreeOperation({ userId, scope, worktreePath: target.worktreePath }, async () => {
-      if (!this.isCurrentTarget(userId, target)) return runtimeFailure(input.runtimeType, 'error.repo-runtime-stale')
-      switch (input.runtimeType) {
-        case 'terminal':
-          return await this.closeTerminalWorktree(clientId, userId, target, scope)
+    input: {
+      repoRoot: string
+      repoRuntimeId: string
+      worktreePath: string
+      remove(beforeRemove: () => Promise<ExecResult>): Promise<ExecResult>
+    },
+  ): Promise<ExecResult> {
+    if (!this.deps.isCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)) {
+      return { ok: false, message: 'error.repo-runtime-stale' }
+    }
+    const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
+    const worktreePath = terminalSessionWorktreePath(input.repoRoot, input.worktreePath)
+    const target = { userId, scope, worktreePath }
+    const result = await this.deps.worktreeOperations.runRemoval(target, async () => {
+      if (!this.deps.isCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)) {
+        return { ok: false, message: 'error.repo-runtime-stale' } satisfies ExecResult
       }
+      return await input.remove(async () => await this.prepareWorktreeRemoval(input.repoRoot, target))
     })
+    return result.admitted ? result.value : { ok: false, message: 'error.worktree-removal-in-progress' }
   }
 
   private async openTerminal(
@@ -155,7 +176,7 @@ export class WorkspacePaneRuntimeApplication {
     terminalSessionId: string,
     scope: string,
   ): Promise<WorkspacePaneRuntimeCloseResult> {
-    const sessions = await this.listTerminalSessions(clientId, userId, target)
+    const sessions = await this.listTerminalSessions(userId, scope)
     const session = sessions.find(
       (candidate) =>
         candidate.terminalSessionId === terminalSessionId && candidate.worktreePath === target.worktreePath,
@@ -166,36 +187,15 @@ export class WorkspacePaneRuntimeApplication {
       })
     }
     const workspacePaneTabs = await this.reconcileTarget(userId, target, scope)
-    return { ok: true, runtimeType: 'terminal', workspacePaneTabs }
-  }
-
-  private async closeTerminalWorktree(
-    clientId: string,
-    userId: string,
-    target: NormalizedRuntimeTarget,
-    scope: string,
-  ): Promise<WorkspacePaneRuntimeCloseWorktreeResult> {
-    const sessions = (await this.listTerminalSessions(clientId, userId, target)).filter(
-      (session) => session.worktreePath === target.worktreePath,
-    )
-    for (const session of sessions) {
-      await this.deps.terminal.close(clientId, userId, {
-        terminalRuntimeSessionId: session.terminalRuntimeSessionId,
-      })
-    }
-    const workspacePaneTabs = await this.reconcileTarget(userId, target, scope)
-    return { ok: true, runtimeType: 'terminal', workspacePaneTabs }
+    const remainingSessions = await this.listTerminalSessions(userId, scope)
+    return { ok: true, runtimeType: 'terminal', runtime: { sessions: remainingSessions }, workspacePaneTabs }
   }
 
   private async listTerminalSessions(
-    clientId: string,
     userId: string,
-    target: NormalizedRuntimeTarget,
+    scope: string,
   ): Promise<TerminalSessionSummary[]> {
-    return await this.deps.terminal.listSessions(clientId, userId, {
-      repoRoot: target.repoRoot,
-      repoRuntimeId: target.repoRuntimeId,
-    })
+    return await this.deps.terminalWorktree.listSessionsForUser(userId, scope)
   }
 
   private async reconcileTarget(
@@ -217,33 +217,19 @@ export class WorkspacePaneRuntimeApplication {
     return this.deps.isCurrentRepoRuntime(userId, target.repoRoot, target.repoRuntimeId)
   }
 
-  private async runWorktreeOperation<T>(
-    input: { userId: string; scope: string; worktreePath: string },
-    task: () => Promise<T>,
-  ): Promise<T> {
-    const queueKey = terminalSessionUserWorktreeKey(input)
-    const queue = this.worktreeOperationQueue(queueKey)
-    try {
-      return await queue.add(task)
-    } finally {
-      this.scheduleWorktreeOperationQueueCleanup(queueKey, queue)
+  private async prepareWorktreeRemoval(
+    repoRoot: string,
+    target: WorkspacePaneWorktreeOperationTarget,
+  ): Promise<ExecResult> {
+    const sessions = (await this.deps.terminalWorktree.listSessionsForUser(target.userId, target.scope)).filter(
+      (session) => session.worktreePath === target.worktreePath,
+    )
+    for (const session of sessions) {
+      this.deps.terminalWorktree.closeSessionForUser(target.userId, session.terminalRuntimeSessionId)
     }
-  }
-
-  private worktreeOperationQueue(queueKey: string): PQueue {
-    let queue = this.operationQueuesByUserWorktree.get(queueKey)
-    if (!queue) {
-      queue = new PQueue({ concurrency: 1 })
-      this.operationQueuesByUserWorktree.set(queueKey, queue)
-    }
-    return queue
-  }
-
-  private scheduleWorktreeOperationQueueCleanup(queueKey: string, queue: PQueue): void {
-    void queue.onIdle().then(() => {
-      if (this.operationQueuesByUserWorktree.get(queueKey) !== queue) return
-      if (queue.size === 0 && queue.pending === 0) this.operationQueuesByUserWorktree.delete(queueKey)
-    })
+    await this.deps.workspaceTabsCoordinator.closeWorktree({ ...target, repoRoot })
+    this.deps.broadcastWorkspaceTabsChanged(target.userId, repoRoot)
+    return { ok: true, message: '' }
   }
 }
 

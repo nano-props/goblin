@@ -1,8 +1,6 @@
 import type {
   WorkspacePaneRuntimeCloseInput,
   WorkspacePaneRuntimeCloseResult,
-  WorkspacePaneRuntimeCloseWorktreeInput,
-  WorkspacePaneRuntimeCloseWorktreeResult,
   WorkspacePaneRuntimeOpenInput,
   WorkspacePaneRuntimeOpenResult,
 } from '#/shared/workspace-pane-runtime.ts'
@@ -20,9 +18,4 @@ export interface ServerWorkspacePaneRuntimeHost {
     userId: string,
     input: WorkspacePaneRuntimeCloseInput,
   ): MaybePromise<WorkspacePaneRuntimeCloseResult>
-  closeRuntimeWorktree(
-    clientId: string,
-    userId: string,
-    input: WorkspacePaneRuntimeCloseWorktreeInput,
-  ): MaybePromise<WorkspacePaneRuntimeCloseWorktreeResult>
 }

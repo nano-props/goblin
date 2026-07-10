@@ -4,7 +4,11 @@ import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-import type { TerminalAttachResult, TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import type {
+  TerminalAttachResult,
+  TerminalSessionSummary,
+  TerminalSessionsRecoveryResult,
+} from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
 import type { ClientBridge } from '#/web/client-bridge-types.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
@@ -17,6 +21,7 @@ import { renderInJsdom } from '#/test-utils/render.tsx'
 import {
   readWorkspacePaneTabsForTarget,
   setWorkspacePaneTabsForTargetQueryData,
+  writeWorkspacePaneTabsSnapshotQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 
 const projectionMocks = vi.hoisted(() => ({
@@ -45,7 +50,7 @@ const recoverSessionsMock =
   vi.fn<
     (
       ...args: Array<{ repoRoot: string; repoRuntimeId: string }>
-    ) => Promise<{ sessions: TerminalSessionSummary[]; snapshots: [] }>
+    ) => Promise<TerminalSessionsRecoveryResult>
   >()
 const listWorkspaceTabsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<WorkspacePaneTabsEntry[]>>()
 
@@ -58,7 +63,11 @@ describe('AppRuntimeProjectionProvider', () => {
     projectionMocks.reconcileServerSessions.mockClear()
     projectionMocks.reconcileServerSessions.mockReturnValue(true)
     recoverSessionsMock.mockReset()
-    recoverSessionsMock.mockResolvedValue({ sessions: [], snapshots: [] })
+    recoverSessionsMock.mockResolvedValue({
+      sessions: [],
+      snapshots: [],
+      workspacePaneTabs: { revision: 0, entries: [] },
+    })
     listWorkspaceTabsMock.mockReset()
     listWorkspaceTabsMock.mockResolvedValue([])
     resetReposStore()
@@ -123,6 +132,7 @@ describe('AppRuntimeProjectionProvider', () => {
     recoverSessionsMock.mockResolvedValue({
       sessions: [completeServerSession(serverSession('term-111111111111111111111'))],
       snapshots: [],
+      workspacePaneTabs: { revision: 0, entries: [] },
     })
     const result = renderRuntimeProvider(REPO_ID)
     try {
@@ -146,6 +156,24 @@ describe('AppRuntimeProjectionProvider', () => {
         repoRuntimeId: repo.repoRuntimeId,
         phase: 'ready',
       })
+    } finally {
+      result.unmount()
+    }
+  })
+
+  test('does not apply recovered sessions paired with an older canonical tabs revision', async () => {
+    const repo = seedCurrentRepo()
+    writeWorkspacePaneTabsSnapshotQueryData(REPO_ID, repo.repoRuntimeId, { revision: 2, entries: [] })
+    recoverSessionsMock.mockResolvedValue({
+      sessions: [completeServerSession(serverSession('term-111111111111111111111'))],
+      snapshots: [],
+      workspacePaneTabs: { revision: 1, entries: [] },
+    })
+
+    const result = renderRuntimeProvider(REPO_ID)
+    try {
+      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
+      expect(projectionMocks.reconcileServerSessions).not.toHaveBeenCalled()
     } finally {
       result.unmount()
     }
@@ -223,6 +251,7 @@ describe('AppRuntimeProjectionProvider', () => {
       recoverSessionsMock.mockResolvedValue({
         sessions: [completeServerSession(serverSession('term-111111111111111111111'))],
         snapshots: [],
+        workspacePaneTabs: { revision: 0, entries: [] },
       })
       listWorkspaceTabsMock.mockResolvedValue([
         {
@@ -285,7 +314,7 @@ describe('AppRuntimeProjectionProvider', () => {
 
   test('drops a recovered terminal projection when the repo runtime changed before publish', async () => {
     const firstRepo = seedCurrentRepo()
-    const recovery = Promise.withResolvers<{ sessions: TerminalSessionSummary[]; snapshots: [] }>()
+    const recovery = Promise.withResolvers<TerminalSessionsRecoveryResult>()
     recoverSessionsMock.mockReturnValueOnce(recovery.promise)
     const result = renderRuntimeProvider(REPO_ID)
     try {
@@ -312,6 +341,7 @@ describe('AppRuntimeProjectionProvider', () => {
             }),
           ],
           snapshots: [],
+          workspacePaneTabs: { revision: 0, entries: [] },
         })
         await Promise.resolve()
       })
@@ -449,7 +479,6 @@ function testBridge(): ClientBridge {
       })),
       close: vi.fn(async () => true),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
-      listSessions: vi.fn(async () => []),
       recoverSessions: recoverSessionsMock,
       notifyBell: vi.fn(async () => true),
       sendTestNotification: vi.fn(async () => true),
@@ -482,11 +511,6 @@ function testBridge(): ClientBridge {
     workspacePaneRuntime: () => ({
       open: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
       close: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
-      closeWorktree: vi.fn(async () => ({
-        ok: false as const,
-        runtimeType: 'terminal' as const,
-        message: 'unavailable',
-      })),
     }),
   }
 }

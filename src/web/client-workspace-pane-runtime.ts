@@ -1,7 +1,6 @@
 import { WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS } from '#/shared/workspace-pane-runtime.ts'
 import {
   normalizeWorkspacePaneRuntimeCloseResult,
-  normalizeWorkspacePaneRuntimeCloseWorktreeResult,
   normalizeWorkspacePaneRuntimeOpenResult,
 } from '#/shared/workspace-pane-runtime-validators.ts'
 import type { ClientAppRealtime } from '#/web/app-realtime-client.ts'
@@ -20,13 +19,6 @@ export function createServerWorkspacePaneRuntimeClient(realtime: ClientAppRealti
       return realtime.request(WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close, input).then((value) => {
         const result = normalizeWorkspacePaneRuntimeCloseResult(value)
         if (!result) throw new Error('Workspace pane runtime socket response failed: invalid close response')
-        return result
-      })
-    },
-    closeWorktree(input) {
-      return realtime.request(WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.closeWorktree, input).then((value) => {
-        const result = normalizeWorkspacePaneRuntimeCloseWorktreeResult(value)
-        if (!result) throw new Error('Workspace pane runtime socket response failed: invalid close-worktree response')
         return result
       })
     },

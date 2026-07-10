@@ -1,3 +1,5 @@
+import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
+
 /**
  * `controllerStatus === 'connected'` while the broker reports the
  * controller client online. Disconnects and missed heartbeats make the
@@ -239,6 +241,7 @@ export interface TerminalHydrationSnapshot {
 export interface TerminalSessionsRecoveryResult {
   sessions: TerminalSessionSummary[]
   snapshots: TerminalHydrationSnapshot[]
+  workspacePaneTabs: WorkspacePaneTabsSnapshot
 }
 
 export type TerminalMutationResult = boolean

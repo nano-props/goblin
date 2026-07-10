@@ -593,8 +593,11 @@ beforeEach(() => {
       takeover: terminalCalls.takeover.mockResolvedValue(takeoverResult('pty_session_1_aaaaaaaaa')),
       close: terminalCalls.close.mockResolvedValue(true),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
-      listSessions: vi.fn(async () => []),
-      recoverSessions: vi.fn(async () => ({ sessions: [], snapshots: [] })),
+      recoverSessions: vi.fn(async () => ({
+        sessions: [],
+        snapshots: [],
+        workspacePaneTabs: { revision: 0, entries: [] },
+      })),
       notifyBell: terminalCalls.notifyBell.mockResolvedValue(true),
       sendTestNotification: vi.fn(async () => true),
       setBadge: terminalCalls.setBadge,
@@ -616,11 +619,6 @@ beforeEach(() => {
     workspacePaneRuntime: () => ({
       open: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
       close: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
-      closeWorktree: vi.fn(async () => ({
-        ok: false as const,
-        runtimeType: 'terminal' as const,
-        message: 'unavailable',
-      })),
     }),
   })
 })

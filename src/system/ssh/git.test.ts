@@ -304,6 +304,7 @@ describe('remote git helpers', () => {
     )
 
     const result = await removeRemoteWorktree(TARGET, {
+      beforeRemove: async () => ({ ok: true, message: '' }),
       branch: 'feature/test',
       worktreePath: '/srv/repo-feature',
       alsoDeleteBranch: true,
@@ -379,6 +380,7 @@ describe('remote git helpers', () => {
     )
 
     const result = await removeRemoteWorktree(TARGET, {
+      beforeRemove: async () => ({ ok: true, message: '' }),
       branch: 'feature/test',
       worktreePath: '/srv/repo-feature',
       alsoDeleteBranch: true,
@@ -402,6 +404,7 @@ describe('remote git helpers', () => {
     const run = vi.fn(async () => okRemoteResult(''))
 
     const result = await removeRemoteWorktree(TARGET, {
+      beforeRemove: async () => ({ ok: true, message: '' }),
       branch: 'feature/test;echo bad',
       worktreePath: '/srv/repo-feature',
       alsoDeleteBranch: true,
@@ -467,6 +470,7 @@ describe('remote git helpers', () => {
     )
 
     const result = await removeRemoteWorktree(LINKED_TARGET, {
+      beforeRemove: async () => ({ ok: true, message: '' }),
       branch: 'feature/test',
       worktreePath: '/srv/repo-feature',
       alsoDeleteBranch: true,

@@ -22,10 +22,8 @@ import {
 } from '#/shared/workspace-pane-runtime.ts'
 import {
   normalizeWorkspacePaneRuntimeCloseResult,
-  normalizeWorkspacePaneRuntimeCloseWorktreeResult,
   normalizeWorkspacePaneRuntimeOpenResult,
   WorkspacePaneRuntimeCloseInputSchema,
-  WorkspacePaneRuntimeCloseWorktreeInputSchema,
   WorkspacePaneRuntimeOpenInputSchema,
 } from '#/shared/workspace-pane-runtime-validators.ts'
 
@@ -42,7 +40,6 @@ const WorkspacePaneTabsSocketActionSchema = v.picklist([
 const WorkspacePaneRuntimeSocketActionSchema = v.picklist([
   WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open,
   WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close,
-  WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.closeWorktree,
 ] as const)
 
 const AppRealtimeNonTerminalClientMessageSchema = v.variant('type', [
@@ -75,12 +72,6 @@ const AppRealtimeNonTerminalClientMessageSchema = v.variant('type', [
     requestId: AppRealtimeRequestIdSchema,
     action: v.literal(WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close),
     input: WorkspacePaneRuntimeCloseInputSchema,
-  }),
-  v.object({
-    type: v.literal('request'),
-    requestId: AppRealtimeRequestIdSchema,
-    action: v.literal(WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.closeWorktree),
-    input: WorkspacePaneRuntimeCloseWorktreeInputSchema,
   }),
   v.object({
     type: v.literal('heartbeat'),
@@ -149,8 +140,6 @@ function normalizeAppRealtimeResponsePayload(action: AppRealtimeRequestAction, p
       return normalizeWorkspacePaneRuntimeOpenResult(payload)
     case WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close:
       return normalizeWorkspacePaneRuntimeCloseResult(payload)
-    case WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.closeWorktree:
-      return normalizeWorkspacePaneRuntimeCloseWorktreeResult(payload)
     default:
       return null
   }
@@ -190,9 +179,7 @@ export function isAppRealtimeWorkspacePaneRuntimeAction(
   action: AppRealtimeRequestAction,
 ): action is WorkspacePaneRuntimeSocketAction {
   return (
-    action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open ||
-    action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close ||
-    action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.closeWorktree
+    action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open || action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close
   )
 }
 

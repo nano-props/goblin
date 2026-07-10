@@ -78,8 +78,11 @@ function seedElectronBootstrap() {
       takeover: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
       close: vi.fn(async () => false),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
-      listSessions: vi.fn(async () => []),
-      recoverSessions: vi.fn(async () => ({ sessions: [], snapshots: [] })),
+      recoverSessions: vi.fn(async () => ({
+        sessions: [],
+        snapshots: [],
+        workspacePaneTabs: { revision: 0, entries: [] },
+      })),
       notifyBell: vi.fn(async () => false),
       sendTestNotification: vi.fn(async () => false),
       setBadge: () => {},
@@ -101,11 +104,6 @@ function seedElectronBootstrap() {
     workspacePaneRuntime: () => ({
       open: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
       close: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
-      closeWorktree: vi.fn(async () => ({
-        ok: false as const,
-        runtimeType: 'terminal' as const,
-        message: 'unavailable',
-      })),
     }),
     rotateAccessToken: vi.fn(async () => ({ accessToken: 'rotated-secret' })),
   })
@@ -149,8 +147,11 @@ function seedWebBootstrap() {
       takeover: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
       close: vi.fn(async () => false),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
-      listSessions: vi.fn(async () => []),
-      recoverSessions: vi.fn(async () => ({ sessions: [], snapshots: [] })),
+      recoverSessions: vi.fn(async () => ({
+        sessions: [],
+        snapshots: [],
+        workspacePaneTabs: { revision: 0, entries: [] },
+      })),
       notifyBell: vi.fn(async () => false),
       sendTestNotification: vi.fn(async () => false),
       setBadge: () => {},
@@ -172,11 +173,6 @@ function seedWebBootstrap() {
     workspacePaneRuntime: () => ({
       open: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
       close: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
-      closeWorktree: vi.fn(async () => ({
-        ok: false as const,
-        runtimeType: 'terminal' as const,
-        message: 'unavailable',
-      })),
     }),
   })
 }

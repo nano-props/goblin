@@ -37,9 +37,6 @@ export function createWorkspacePaneRuntimeRealtimeHandlers(host: ServerWorkspace
     [WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close](clientId, userId, input) {
       return host.closeRuntime(clientId, userId, input)
     },
-    [WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.closeWorktree](clientId, userId, input) {
-      return host.closeRuntimeWorktree(clientId, userId, input)
-    },
   }
 }
 

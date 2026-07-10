@@ -172,8 +172,11 @@ describe('client bootstrap', () => {
         takeover: async () => ({ ok: false as const, message: 'error.invalid-arguments' }),
         close: async () => false,
         pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
-        listSessions: async () => [],
-        recoverSessions: async () => ({ sessions: [], snapshots: [] }),
+        recoverSessions: async () => ({
+          sessions: [],
+          snapshots: [],
+          workspacePaneTabs: { revision: 0, entries: [] },
+        }),
         notifyBell: async () => false,
         sendTestNotification: async () => false,
         setBadge: () => {},
@@ -205,7 +208,6 @@ describe('client bootstrap', () => {
       workspacePaneRuntime: () => ({
         open: async () => ({ ok: false, runtimeType: 'terminal', message: 'unavailable' }),
         close: async () => ({ ok: false, runtimeType: 'terminal', message: 'unavailable' }),
-        closeWorktree: async () => ({ ok: false, runtimeType: 'terminal', message: 'unavailable' }),
       }),
     })
 

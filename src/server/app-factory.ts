@@ -22,6 +22,7 @@ import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.
 import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
 import { MAX_PASTE_BATCH_BYTES } from '#/shared/clipboard-paste.ts'
+import type { ServerWorkspacePaneWorktreeApplicationHost } from '#/server/workspace-pane/workspace-pane-worktree-application-host.ts'
 
 export interface ServerAppOptions {
   version: string
@@ -34,6 +35,7 @@ export interface ServerAppOptions {
    */
   accessToken: string
   appRealtimeHost: ServerAppRealtimeHost
+  workspacePaneWorktreeApplication: ServerWorkspacePaneWorktreeApplicationHost
   /**
    * The actual host the server is listening on. Used by the CORS
    * origin predicate to allow same-machine browsers. Defaults to
@@ -215,7 +217,10 @@ export function createApp(options: ServerAppOptions): Hono {
   // (home directory path + platform identifier).
   app.route('/api/host', createHostRoutes())
   app.route('/api/remote', createRemoteRoutes())
-  app.route('/api/repo', createRepoRoutes())
+  app.route(
+    '/api/repo',
+    createRepoRoutes({ workspacePaneWorktreeApplication: options.workspacePaneWorktreeApplication }),
+  )
   app.route('/api/repo', createRepoViewRoutes())
   app.route('/api/clipboard', createClipboardRoutes())
   app.route('/ws', createRealtimeRoutes({ accessToken: options.accessToken, appRealtimeHost: options.appRealtimeHost }))

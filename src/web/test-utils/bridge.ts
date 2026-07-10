@@ -44,7 +44,6 @@ import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspac
 import type {
   TerminalAttachResult,
   TerminalMutationResult,
-  TerminalSessionSummary,
   TerminalSessionsRecoveryResult,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
@@ -60,7 +59,6 @@ import { WORKSPACE_PANE_TABS_SOCKET_ACTIONS } from '#/shared/workspace-pane-tabs
 import {
   WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS,
   type WorkspacePaneRuntimeCloseResult,
-  type WorkspacePaneRuntimeCloseWorktreeResult,
   type WorkspacePaneRuntimeOpenResult,
 } from '#/shared/workspace-pane-runtime.ts'
 import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
@@ -138,7 +136,6 @@ interface TerminalClientTestOutputs {
   'terminal.takeover': TerminalTakeoverResult
   'terminal.close': TerminalMutationResult
   'terminal.prune': { pruned: number; remaining: number }
-  'terminal.listSessions': TerminalSessionSummary[]
   'terminal.recoverSessions': TerminalSessionsRecoveryResult
   'terminal.notifyBell': TerminalMutationResult
   'workspacePaneTabs.replace': WorkspacePaneTabsSnapshot
@@ -146,7 +143,6 @@ interface TerminalClientTestOutputs {
   'workspacePaneTabs.list': WorkspacePaneTabsSnapshot
   'workspacePaneRuntime.open': WorkspacePaneRuntimeOpenResult
   'workspacePaneRuntime.close': WorkspacePaneRuntimeCloseResult
-  'workspacePaneRuntime.closeWorktree': WorkspacePaneRuntimeCloseWorktreeResult
 }
 
 function terminalHandlerNameForSocketAction(action: string): keyof TerminalClientTestOutputs | null {
@@ -173,12 +169,8 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalClien
       return 'workspacePaneRuntime.open'
     case WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close:
       return 'workspacePaneRuntime.close'
-    case WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.closeWorktree:
-      return 'workspacePaneRuntime.closeWorktree'
     case 'prune':
       return 'terminal.prune'
-    case 'list-sessions':
-      return 'terminal.listSessions'
     case 'recover-sessions':
       return 'terminal.recoverSessions'
     default:
@@ -329,8 +321,11 @@ export function installWorkspacePaneTabsTestBridge(
         canonicalRows: 24,
       }),
       pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
-      listSessions: async () => [],
-      recoverSessions: async () => ({ sessions: [], snapshots: [] }),
+      recoverSessions: async () => ({
+        sessions: [],
+        snapshots: [],
+        workspacePaneTabs: { revision: 0, entries: [] },
+      }),
       notifyBell: async () => true,
       sendTestNotification: async () => true,
       setBadge: () => {},
@@ -436,17 +431,7 @@ export function installWorkspacePaneTabsTestBridge(
         return {
           ok: true,
           runtimeType: input.runtimeType,
-          workspacePaneTabs: commitServerSnapshot(),
-        }
-      },
-      closeWorktree: async (input) => {
-        replaceServerTarget(
-          input.target,
-          serverTabsForTarget(input.target).filter((tab) => tab.type !== input.runtimeType),
-        )
-        return {
-          ok: true,
-          runtimeType: input.runtimeType,
+          runtime: { sessions: [] },
           workspacePaneTabs: commitServerSnapshot(),
         }
       },
@@ -600,8 +585,8 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
             }),
           close: () => Promise.resolve(true),
           pruneTerminals: () => Promise.resolve({ pruned: 0, remaining: 0 }),
-          listSessions: () => Promise.resolve([]),
-          recoverSessions: () => Promise.resolve({ sessions: [], snapshots: [] }),
+          recoverSessions: () =>
+            Promise.resolve({ sessions: [], snapshots: [], workspacePaneTabs: { revision: 0, entries: [] } }),
           notifyBell: () => Promise.resolve(true),
           sendTestNotification: () => Promise.resolve(true),
           setBadge: () => {},
@@ -654,15 +639,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     name: 'workspacePaneRuntime.close',
     payload: unknown,
   ): TerminalClientTestOutputs['workspacePaneRuntime.close']
-  function callTerminalHandler(
-    name: 'workspacePaneRuntime.closeWorktree',
-    payload: unknown,
-  ): TerminalClientTestOutputs['workspacePaneRuntime.closeWorktree']
   function callTerminalHandler(name: 'terminal.prune', payload: unknown): TerminalClientTestOutputs['terminal.prune']
-  function callTerminalHandler(
-    name: 'terminal.listSessions',
-    payload: unknown,
-  ): TerminalClientTestOutputs['terminal.listSessions']
   function callTerminalHandler(
     name: 'terminal.recoverSessions',
     payload: unknown,
@@ -739,18 +716,10 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           const runtimeType =
             (payload as { runtimeType?: WorkspacePaneRuntimeCloseResult['runtimeType'] } | null)?.runtimeType ??
             'terminal'
-          return { ok: true, runtimeType, workspacePaneTabs: { revision: 1, entries: [] } }
+          return { ok: true, runtimeType, runtime: { sessions: [] }, workspacePaneTabs: { revision: 1, entries: [] } }
         }
-        case 'workspacePaneRuntime.closeWorktree': {
-          const runtimeType =
-            (payload as { runtimeType?: WorkspacePaneRuntimeCloseWorktreeResult['runtimeType'] } | null)?.runtimeType ??
-            'terminal'
-          return { ok: true, runtimeType, workspacePaneTabs: { revision: 1, entries: [] } }
-        }
-        case 'terminal.listSessions':
-          return []
         case 'terminal.recoverSessions':
-          return { sessions: [], snapshots: [] }
+          return { sessions: [], snapshots: [], workspacePaneTabs: { revision: 0, entries: [] } }
       }
     }
     return handler(payload) as TerminalClientTestOutputs[keyof TerminalClientTestOutputs]
@@ -839,7 +808,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       takeover: async (input) => callTerminalHandler('terminal.takeover', input),
       close: async (input) => callTerminalHandler('terminal.close', input),
       pruneTerminals: async (repoRoot) => callTerminalHandler('terminal.prune', { repoRoot }),
-      listSessions: async (input) => callTerminalHandler('terminal.listSessions', input),
       recoverSessions: async (input) => callTerminalHandler('terminal.recoverSessions', input),
       notifyBell: async (input) => callTerminalHandler('terminal.notifyBell', input),
       sendTestNotification: async () => true,
@@ -862,7 +830,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     workspacePaneRuntime: () => ({
       open: async (input) => callTerminalHandler('workspacePaneRuntime.open', input),
       close: async (input) => callTerminalHandler('workspacePaneRuntime.close', input),
-      closeWorktree: async (input) => callTerminalHandler('workspacePaneRuntime.closeWorktree', input),
     }),
   })
   vi.stubGlobal(

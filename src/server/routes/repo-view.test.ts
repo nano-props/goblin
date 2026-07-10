@@ -19,6 +19,10 @@ function makeAppRealtimeHost(): ServerAppRealtimeHost {
   }
 }
 
+const workspacePaneWorktreeApplication = {
+  removeWorktree: vi.fn(async () => ({ ok: false as const, message: 'unused' })),
+}
+
 describe('POST /api/repo/view', () => {
   beforeEach(() => {
     disconnectAllClientIntentSockets()
@@ -124,6 +128,7 @@ describe('POST /api/repo/view — auth integration via createApp()', () => {
       startedAt: 0,
       accessToken: 'secret',
       appRealtimeHost: makeAppRealtimeHost(),
+      workspacePaneWorktreeApplication,
     })
     const res = await app.request(
       new Request('http://127.0.0.1:32100/api/repo/view', {
@@ -146,6 +151,7 @@ describe('POST /api/repo/view — auth integration via createApp()', () => {
       startedAt: 0,
       accessToken: 'secret',
       appRealtimeHost: makeAppRealtimeHost(),
+      workspacePaneWorktreeApplication,
     })
     const res = await app.request(
       new Request('http://127.0.0.1:32100/api/repo/view', {

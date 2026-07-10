@@ -13,7 +13,6 @@ import type {
   TerminalOutputEvent,
   TerminalResizeInput,
   TerminalRestartInput,
-  TerminalSessionSummary,
   TerminalSessionInput,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
@@ -31,8 +30,6 @@ import type {
 import type {
   WorkspacePaneRuntimeCloseInput,
   WorkspacePaneRuntimeCloseResult,
-  WorkspacePaneRuntimeCloseWorktreeInput,
-  WorkspacePaneRuntimeCloseWorktreeResult,
   WorkspacePaneRuntimeOpenInput,
   WorkspacePaneRuntimeOpenResult,
 } from '#/shared/workspace-pane-runtime.ts'
@@ -46,7 +43,6 @@ export interface ClientTerminal {
   takeover: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>
   close: (input: TerminalSessionInput) => Promise<TerminalMutationResult>
   pruneTerminals: (repoRoot: string, repoRuntimeId: string) => Promise<{ pruned: number; remaining: number }>
-  listSessions: (input: TerminalListSessionsInput) => Promise<TerminalSessionSummary[]>
   recoverSessions: (input: TerminalListSessionsInput) => Promise<TerminalSessionsRecoveryResult>
   notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
   sendTestNotification: (input: TerminalTestNotificationInput) => Promise<boolean>
@@ -87,7 +83,6 @@ export interface ClientWorkspacePaneTabs {
 export interface ClientWorkspacePaneRuntime {
   open: (input: WorkspacePaneRuntimeOpenInput) => Promise<WorkspacePaneRuntimeOpenResult>
   close: (input: WorkspacePaneRuntimeCloseInput) => Promise<WorkspacePaneRuntimeCloseResult>
-  closeWorktree: (input: WorkspacePaneRuntimeCloseWorktreeInput) => Promise<WorkspacePaneRuntimeCloseWorktreeResult>
 }
 
 export interface ClientAppRealtimeLifecycle {

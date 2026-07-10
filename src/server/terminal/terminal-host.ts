@@ -84,6 +84,7 @@ export interface ServerTerminalActionHost {
   resize(clientId: string, userId: string, input: TerminalResizeInput): MaybePromise<TerminalMutationResult>
   takeover(clientId: string, userId: string, input: TerminalTakeoverInput): MaybePromise<TerminalTakeoverResult>
   close(clientId: string, userId: string, input: TerminalSessionInput): MaybePromise<TerminalMutationResult>
+  /** Internal application/test read; intentionally not exposed as a realtime action. */
   listSessions(
     clientId: string,
     userId: string,

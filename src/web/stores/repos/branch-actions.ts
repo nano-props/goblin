@@ -207,7 +207,12 @@ function waitForBranchActionIdle(
     })
 }
 
-function runBranchActionIpc(action: RepoBranchAction, repoId: string, signal?: AbortSignal): Promise<ExecResult> {
+function runBranchActionIpc(
+  action: RepoBranchAction,
+  repoId: string,
+  repoRuntimeId: string,
+  signal?: AbortSignal,
+): Promise<ExecResult> {
   switch (action.kind) {
     case 'pull':
       return pullRepoBranch(repoId, action.branch, action.worktreePath, signal)
@@ -225,6 +230,7 @@ function runBranchActionIpc(action: RepoBranchAction, repoId: string, signal?: A
     case 'removeWorktree':
       return removeRepoWorktree(
         repoId,
+        repoRuntimeId,
         {
           branch: action.branch,
           worktreePath: action.worktreePath,
@@ -331,7 +337,7 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
         }
         throwIfStale(get, id, repoRuntimeId)
         ctx.setPhase('running')
-        return runBranchActionIpc(action, id, signal)
+        return runBranchActionIpc(action, id, repoRuntimeId, signal)
       }
 
       if (network) {

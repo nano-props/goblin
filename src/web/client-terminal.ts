@@ -1,7 +1,4 @@
-import {
-  normalizeTerminalSessionsRecoveryResult,
-  normalizeTerminalSessionSummaryList,
-} from '#/shared/terminal-validators.ts'
+import { normalizeTerminalSessionsRecoveryResult } from '#/shared/terminal-validators.ts'
 import { resolveTerminalController } from '#/shared/terminal-controller.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import type {
@@ -63,13 +60,6 @@ export function createServerTerminalClient(options: {
     },
     pruneTerminals(repoRoot, repoRuntimeId) {
       return options.realtime.request('prune', { repoRoot, repoRuntimeId })
-    },
-    listSessions(input) {
-      return options.realtime.request('list-sessions', input).then((value) => {
-        const sessions = normalizeTerminalSessionSummaryList(value)
-        if (!sessions) throw new Error('Terminal socket response failed: invalid terminal sessions response')
-        return sessions
-      })
     },
     recoverSessions(input) {
       return options.realtime.request('recover-sessions', input).then((value) => {

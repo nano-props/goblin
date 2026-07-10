@@ -27,9 +27,6 @@ export const terminalClient: ClientTerminal = {
   pruneTerminals(repoRoot, repoRuntimeId) {
     return getTerminalClient().pruneTerminals(repoRoot, repoRuntimeId)
   },
-  listSessions(input) {
-    return getTerminalClient().listSessions(input)
-  },
   recoverSessions(input) {
     return getTerminalClient().recoverSessions(input)
   },

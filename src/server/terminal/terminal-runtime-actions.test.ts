@@ -55,13 +55,14 @@ function makeActions(
     writeSession: vi.fn(() => false),
     resizeSession: vi.fn(() => false),
     takeoverSession: vi.fn(),
+    recoverSessionsForUser: vi.fn(async () => ({ sessions: [], snapshots: [] })),
   } as any
   const broker = { broadcastToUser: broadcasts as unknown as (userId: string, message: unknown) => void }
   const sessionService = {
     create: vi.fn(),
     prune: vi.fn(),
     listSessions: vi.fn(),
-    listWorkspaceTabs: vi.fn(async () => []),
+    listWorkspaceTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
     replaceTabs: vi.fn(async () => []),
     updateTabs: vi.fn(async () => []),
   }
@@ -258,6 +259,25 @@ describe('terminal-runtime-actions prune', () => {
 
     expect(sessionService.prune).not.toHaveBeenCalled()
     expect(broadcasts).not.toHaveBeenCalled()
+  })
+})
+
+describe('terminal-runtime-actions recovery projection', () => {
+  test('retries until sessions and canonical tabs share one stable server revision', async () => {
+    clearRepoRuntimesForUser(USER_ID)
+    syncCurrentRepoRuntime()
+    const { actions, manager, sessionService } = makeActions()
+    sessionService.listWorkspaceTabs
+      .mockResolvedValueOnce({ revision: 1, entries: [] })
+      .mockResolvedValueOnce({ revision: 2, entries: [] })
+      .mockResolvedValueOnce({ revision: 2, entries: [] })
+      .mockResolvedValueOnce({ revision: 2, entries: [] })
+
+    await expect(
+      actions.recoverSessions(CLIENT_ID, USER_ID, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
+    ).resolves.toEqual({ sessions: [], snapshots: [], workspacePaneTabs: { revision: 2, entries: [] } })
+
+    expect(manager.recoverSessionsForUser).toHaveBeenCalledTimes(2)
   })
 })
 

@@ -121,9 +121,6 @@ export abstract class WorkspacePaneTabProvider<TType extends WorkspacePaneTabTyp
 
   abstract close(input: WorkspacePaneTabCloseInput): Promise<boolean>
 
-  closeWorktree(input: WorkspacePaneTabCloseInput): Promise<boolean> {
-    return this.close(input)
-  }
 }
 
 export abstract class WorkspacePaneStaticTabProvider<

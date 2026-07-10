@@ -156,17 +156,33 @@ repair it. On failure, the session should still be present because the close did
 not complete. On success, the close path removes the session and commits the
 planned close-back navigation.
 
-This distinction matters for destructive worktree operations. Before a
-worktree directory is removed, the client awaits each worktree-scoped tab close
-contract. Runtime providers submit `workspace-pane-runtime.close-worktree`;
-the server enumerates and closes authoritative resources and returns the
-revisioned canonical snapshot. The client cancels both queued and in-flight
-create presentation intents so a superseded open response cannot navigate, but
-an open request already accepted by the server still completes and is then
-ordered before close by the shared server worktree queue. The client must not
-enumerate its local session cache to decide which server resources exist.
+This distinction matters for destructive worktree operations. The client sends
+one repository-removal intent; it does not close tabs first. The server
+application layer admits removal for the user/repo-runtime/worktree before the
+command waits in the repository write queue. Later runtime opens and canonical
+tab writes for that target are rejected. After repository validation succeeds,
+but before the Git worktree remove begins, the application closes authoritative
+provider resources, removes every canonical tab target for the worktree, and
+advances the server revision. Validation failures leave runtime resources
+untouched. The admission is released when the repository command settles, so
+recreating the same path later does not inherit a client or server tombstone.
 
-Repo routes and server-side repo write paths should not know about Workspace Pane tabs or terminal UI resources. They remain responsible for repository mutation. UI resource release belongs to the Workspace Pane tab lifecycle on the client.
+The repo route only delegates the composed command to the application layer;
+RepoSource and Git code remain unaware of terminal or Workspace Pane types.
+Their required pre-remove lifecycle boundary guarantees that no repository
+worktree deletion can bypass application cleanup.
+
+An ordinary runtime-close response pairs the remaining server sessions with the
+canonical tabs snapshot from the same application command. Worktree removal
+performs the corresponding whole-worktree cleanup internally before Git removal;
+there is no client-callable bulk-close command. The client projects returned
+sessions only if the snapshot revision is accepted. It never enumerates local
+sessions to infer what the server closed, and a stale close response cannot
+overwrite a newer cross-window open projection.
+Realtime/reconnect recovery uses the same rule: the server retries its read
+until the session recovery and canonical tabs snapshot share a stable revision,
+and the client rejects both together when that revision is older than its
+current projection.
 
 ### Terminal create and Workspace Pane navigation
 
@@ -174,7 +190,7 @@ Terminal creation has three architecture layers:
 
 - `TerminalSessionService` and its focused domain collaborators own terminal
   create/reuse/restore, PTY/session lifecycle, and terminal first-frame data.
-- `WorkspacePaneRuntimeApplication` owns composed open/close/worktree-close
+- `WorkspacePaneRuntimeApplication` owns composed open/close/worktree-close/removal
   commands and their shared server worktree queue: invoke the provider,
   commit canonical runtime membership, publish invalidation, and return the
   provider result plus a revisioned full-scope snapshot.

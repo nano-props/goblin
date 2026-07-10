@@ -25,6 +25,7 @@ import { broadcastWorkspacePaneTabsChanged } from '#/server/workspace-pane/works
 import { createTerminalRealtimeHandlers } from '#/server/terminal/terminal-runtime-realtime.ts'
 import { createWorkspacePaneTabsRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-tabs-runtime-realtime.ts'
 import { createWorkspacePaneRuntimeApplication } from '#/server/workspace-pane/workspace-pane-runtime-application.ts'
+import { createWorkspacePaneWorktreeOperationCoordinator } from '#/server/workspace-pane/workspace-pane-worktree-operation-coordinator.ts'
 import { createWorkspacePaneRuntimeRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-runtime-realtime.ts'
 import type { ServerWorkspacePaneRuntimeHost } from '#/server/workspace-pane/workspace-pane-runtime-host.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
@@ -58,12 +59,14 @@ export interface ServerTerminalRuntimeOptions {
 
 export interface ServerTerminalRuntime {
   host: ServerTerminalHost
+  workspacePaneRuntimeApplication: ReturnType<typeof createWorkspacePaneRuntimeApplication>
   shutdown(): void
 }
 
 export function createServerTerminalRuntime(options: ServerTerminalRuntimeOptions): ServerTerminalRuntime {
   const { ptySupervisor } = options
   const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+  const worktreeOperations = createWorkspacePaneWorktreeOperationCoordinator()
   const terminalSessionOrder = {
     terminalSessionIds(input) {
       return workspaceTabs.runtimeSessionIds(input, 'terminal')
@@ -109,6 +112,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   const workspaceTabsCoordinator = createWorkspacePaneTabsCoordinator({
     workspaceTabs,
     runtimeProviders: [terminalWorkspacePaneRuntimeTabsProvider(manager)],
+    worktreeOperations,
   })
   const coordinator = createTerminalRuntimeCoordinator({
     manager,
@@ -156,7 +160,9 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   })
   const workspacePaneRuntimeApplication = createWorkspacePaneRuntimeApplication({
     workspaceTabsCoordinator,
+    worktreeOperations,
     terminal: actions,
+    terminalWorktree: manager,
     isCurrentRepoRuntime,
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
   })
@@ -166,9 +172,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     },
     async closeRuntime(clientId, userId, input) {
       return await workspacePaneRuntimeApplication.close(clientId, userId, input)
-    },
-    async closeRuntimeWorktree(clientId, userId, input) {
-      return await workspacePaneRuntimeApplication.closeWorktree(clientId, userId, input)
     },
   }
   const workspacePaneTabsActions = createWorkspacePaneTabsActions({
@@ -271,6 +274,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
 
   return {
     host,
+    workspacePaneRuntimeApplication,
     shutdown() {
       host.shutdown()
     },

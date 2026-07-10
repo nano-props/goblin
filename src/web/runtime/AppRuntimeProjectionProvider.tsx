@@ -9,6 +9,7 @@ import { useTerminalSessionProjection } from '#/web/components/terminal/use-term
 import { refreshWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
 import type { TerminalHydrationSnapshot } from '#/shared/terminal-types.ts'
+import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 
 interface AppRuntimeProjectionProviderProps {
   children: ReactNode
@@ -35,6 +36,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
         const clientId = readOrCreateWebTerminalClientId()
         const recovery = await terminalClient.recoverSessions({ repoRoot, repoRuntimeId })
         if (repoRuntimeIdForRoot(repoRoot) !== repoRuntimeId) return
+        if (!writeCanonicalWorkspacePaneTabsSnapshot(repoRoot, repoRuntimeId, recovery.workspacePaneTabs)) return
         const reconciled = terminalProjection.reconcileServerSessions(
           { repoRoot, repoRuntimeId },
           recovery.sessions,

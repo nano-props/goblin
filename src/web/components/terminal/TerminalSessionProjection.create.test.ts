@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   createMock: vi.fn(),
   openRuntimeMock: vi.fn(),
   closeRuntimeMock: vi.fn(),
-  closeRuntimeWorktreeMock: vi.fn(),
   writeWorkspaceTabsSnapshotMock: vi.fn(),
   closeMock: vi.fn(),
   listWorkspaceTabsMock: vi.fn(),
@@ -37,7 +36,6 @@ vi.mock('#/web/workspace-pane/workspace-pane-runtime-client.ts', () => ({
   workspacePaneRuntimeClient: {
     open: mocks.openRuntimeMock,
     close: mocks.closeRuntimeMock,
-    closeWorktree: mocks.closeRuntimeWorktreeMock,
   },
 }))
 
@@ -268,12 +266,7 @@ describe('TerminalSessionProjection create flow', () => {
     mocks.closeRuntimeMock.mockResolvedValue({
       ok: true,
       runtimeType: 'terminal',
-      workspacePaneTabs: { revision: 2, entries: [] },
-    })
-    mocks.closeRuntimeWorktreeMock.mockReset()
-    mocks.closeRuntimeWorktreeMock.mockResolvedValue({
-      ok: true,
-      runtimeType: 'terminal',
+      runtime: { sessions: [] },
       workspacePaneTabs: { revision: 2, entries: [] },
     })
     mocks.writeWorkspaceTabsSnapshotMock.mockReset()
@@ -401,55 +394,6 @@ describe('TerminalSessionProjection create flow', () => {
       rows: 24,
       clientId: 'client_local',
     })
-  })
-
-  test('closeTerminalsForWorktree cancels create while async startup shell command is resolving', async () => {
-    const startupCommand = Promise.withResolvers<string>()
-    const create = projection.createTerminal(terminalBase(), {
-      resolveStartupShellCommand: async () => await startupCommand.promise,
-    })
-
-    await vi.waitFor(() => {
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
-    })
-    const createExpectation = expect(create).rejects.toThrow('terminal create request canceled')
-    const closePromise = projection.closeTerminalsForWorktree(terminalBase())
-
-    await createExpectation
-    await expect(closePromise).resolves.toBe(true)
-
-    startupCommand.resolve("bat '/repo/README.md'\r")
-    await new Promise((resolve) => setTimeout(resolve, 0))
-
-    expect(mocks.createMock).not.toHaveBeenCalled()
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
-  })
-
-  test('closeTerminalsForWorktree rejects a mismatched scope without canceling pending create', async () => {
-    const startupCommand = Promise.withResolvers<string>()
-    const create = projection.createTerminal(terminalBase(), {
-      resolveStartupShellCommand: async () => await startupCommand.promise,
-    })
-
-    await vi.waitFor(() => {
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
-    })
-
-    await expect(
-      projection.closeTerminalsForWorktree({
-        ...terminalBase(),
-        repoRuntimeId: 'repo-runtime-new',
-      }),
-    ).resolves.toBe(false)
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
-
-    startupCommand.resolve("bat '/repo/README.md'\r")
-
-    await expect(create).resolves.toBe('term-111111111111111111111')
-    expect(mocks.createMock).toHaveBeenCalledTimes(1)
-    expect(mocks.closeMock).not.toHaveBeenCalled()
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
   })
 
   test('destroy cancels create while async startup shell command is resolving', async () => {
@@ -754,82 +698,6 @@ describe('TerminalSessionProjection create flow', () => {
     expect(mocks.closeMock).not.toHaveBeenCalled()
   })
 
-  test('closeTerminalsForWorktree cancels in-flight presentation while the server queues close after open', async () => {
-    const { promise, resolve } = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
-    mocks.createMock.mockReturnValueOnce(promise)
-    mocks.closeRuntimeWorktreeMock.mockImplementationOnce(async () => {
-      await promise
-      return {
-        ok: true as const,
-        runtimeType: 'terminal' as const,
-        workspacePaneTabs: { revision: 2, entries: [] },
-      }
-    })
-    const pending = projection.createTerminal(terminalBase())
-
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
-    await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
-
-    const pendingExpectation = expect(pending).rejects.toThrow('terminal create request canceled')
-    const closePromise = projection.closeTerminalsForWorktree(terminalBase())
-    await pendingExpectation
-    resolve(makeCreateResult())
-
-    await expect(closePromise).resolves.toBe(true)
-    expect((projection as any).lifecycleQueues.hasCreate(WORKTREE_KEY)).toBe(false)
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
-  })
-
-  test('closeTerminalsForWorktree cancels active and queued client create presentation intents', async () => {
-    const first = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
-    const secondResult = makeCreateResult({
-      terminalSessionId: 'term-222222222222222222222',
-      terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
-    })
-    mocks.createMock.mockReset()
-    mocks.createMock.mockReturnValueOnce(first.promise).mockResolvedValueOnce(secondResult)
-    mocks.closeRuntimeWorktreeMock.mockImplementationOnce(async () => {
-      await first.promise
-      return {
-        ok: true as const,
-        runtimeType: 'terminal' as const,
-        workspacePaneTabs: { revision: 2, entries: [] },
-      }
-    })
-
-    const firstCreate = projection.createTerminal(terminalBase(), { startupShellCommand: "bat '/repo/a.ts'\r" })
-    await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
-
-    const secondCreate = projection.createTerminal(terminalBase(), { startupShellCommand: "bat '/repo/b.ts'\r" })
-    await Promise.resolve()
-    expect(mocks.createMock).toHaveBeenCalledTimes(1)
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true)
-
-    const firstExpectation = expect(firstCreate).rejects.toThrow('terminal create request canceled')
-    const secondExpectation = expect(secondCreate).rejects.toThrow('terminal create request canceled')
-    const closePromise = projection.closeTerminalsForWorktree(terminalBase())
-    await firstExpectation
-    await secondExpectation
-    expect(mocks.createMock).toHaveBeenCalledTimes(1)
-
-    first.resolve(makeCreateResult())
-    await expect(closePromise).resolves.toBe(true)
-    await Promise.resolve()
-
-    expect(mocks.createMock).toHaveBeenCalledTimes(1)
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(false)
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
-  })
-
-  test('closeTerminalsForWorktree returns true when no terminal sessions exist', async () => {
-    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
-
-    await expect(projection.closeTerminalsForWorktree(terminalBase())).resolves.toBe(true)
-
-    expect(mocks.closeMock).not.toHaveBeenCalled()
-  })
-
   test('falls back to default startup geometry when registered host geometry is unavailable', async () => {
     mocks.estimateManagedTerminalGeometryMock.mockReturnValue(null)
 
@@ -878,27 +746,6 @@ describe('TerminalSessionProjection create flow', () => {
       rows: 24,
       clientId: 'client_local',
     })
-  })
-
-  test('canceling create during async startup resolution releases the terminal create queue', async () => {
-    const startup = Promise.withResolvers<string>()
-    const createPromise = projection
-      .createTerminal(terminalBase(), {
-        resolveStartupShellCommand: async () => await startup.promise,
-      })
-      .catch((error) => {
-        if (error instanceof Error) return error.message
-        throw error
-      })
-
-    await vi.waitFor(() => expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).createPending).toBe(true))
-
-    await expect(projection.closeTerminalsForWorktree(terminalBase())).resolves.toBe(true)
-    await expect(createPromise).resolves.toBe('terminal create request canceled')
-
-    expect(mocks.createMock).not.toHaveBeenCalled()
-    await expect(projection.createTerminal(terminalBase())).resolves.toBe('term-111111111111111111111')
-    expect(mocks.createMock).toHaveBeenCalledTimes(1)
   })
 
   test('durable close: awaits an in-flight close for the same worktree before creating', async () => {

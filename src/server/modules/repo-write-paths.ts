@@ -399,6 +399,7 @@ export async function removeRepoWorktree(
     forceDeleteBranch?: boolean
     alsoDeleteUpstream?: boolean
   },
+  lifecycle: { beforeRemove(): Promise<ExecResult> },
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   return await runRepoServerWriteOperation({
@@ -408,7 +409,10 @@ export async function removeRepoWorktree(
     signal,
     task: async () => {
       return await runWithRepoSource(cwd, async (source) => {
-        const result = await publishSnapshotInvalidationAfterMutation(cwd, await source.removeWorktree(input, signal))
+        const result = await publishSnapshotInvalidationAfterMutation(
+          cwd,
+          await source.removeWorktree(input, signal, lifecycle),
+        )
         if (!result.ok) return result
         try {
           const changed = await pruneServerRepoSettingsForRemovedWorktree({

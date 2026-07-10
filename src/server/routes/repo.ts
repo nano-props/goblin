@@ -38,6 +38,7 @@ import {
 } from '#/server/modules/repo-runtimes.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import type { RepoLogResponse } from '#/shared/api-types.ts'
+import type { ServerWorkspacePaneWorktreeApplicationHost } from '#/server/workspace-pane/workspace-pane-worktree-application-host.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 
 // Soft-fail envelope returned by `jsonOr` for every repo action that
@@ -46,7 +47,9 @@ import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 // human-readable i18n key, `err.ok === false` is the branch.
 const READ_REPO_ERROR = { ok: false as const, message: 'error.failed-read-repo' }
 
-export function createRepoRoutes() {
+export function createRepoRoutes(options: {
+  workspacePaneWorktreeApplication: ServerWorkspacePaneWorktreeApplicationHost
+}) {
   const app = createRouteApp()
   async function jsonOr<T>(run: () => Promise<T>, fallback: T, label: string) {
     try {
@@ -202,16 +205,25 @@ export function createRepoRoutes() {
     )
   })
   app.post('/remove-worktree', async (c) => {
-    const { cwd, branch, worktreePath, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream } =
+    const { cwd, repoRuntimeId, branch, worktreePath, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream } =
       await parseHttpBody(REPO_PROCEDURE_SCHEMAS.removeWorktree, c)
+    const userId = userIdFromContext(c)
+    if (!userId) throw new Error('error.unauthorized')
     return c.json(
       await jsonOr(
         () =>
-          removeRepoWorktree(
-            cwd,
-            { branch, worktreePath, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream },
-            c.req.raw.signal,
-          ),
+          options.workspacePaneWorktreeApplication.removeWorktree(userId, {
+            repoRoot: cwd,
+            repoRuntimeId,
+            worktreePath,
+            remove: async (beforeRemove) =>
+              await removeRepoWorktree(
+                cwd,
+                { branch, worktreePath, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream },
+                { beforeRemove },
+                c.req.raw.signal,
+              ),
+          }),
         READ_REPO_ERROR,
         'remove-worktree',
       ),

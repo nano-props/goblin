@@ -2,7 +2,6 @@ import { describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTerminalTabSummary } from '#/web/workspace-pane/workspace-pane-tab-summary.ts'
 import {
-  closeWorkspacePaneRuntimeTabsForWorktree,
   confirmWorkspacePaneRuntimeTabClose,
   terminalBaseForRuntimeTabCloseTarget,
   workspacePaneRuntimeTabCloseConfirmRequest,
@@ -91,18 +90,6 @@ describe('workspace pane runtime tab close actions', () => {
     expect(
       workspacePaneRuntimeTabConfirmedCloseIdentity({ type: 'terminal', sessionId: 'term-111111111111111111111', target: closeTarget }),
     ).toBe('terminal:term-111111111111111111111')
-  })
-
-  test('closes terminal worktree sessions through the runtime close registry', async () => {
-    const closeTerminalsForWorktree = vi.fn(async () => true)
-
-    await expect(
-      closeWorkspacePaneRuntimeTabsForWorktree('terminal', closeTarget, {
-        byType: { terminal: { closeTerminalsForWorktree } },
-      }),
-    ).resolves.toBe(true)
-
-    expect(closeTerminalsForWorktree).toHaveBeenCalledWith(terminalBase)
   })
 
   test('builds terminal bases from runtime close targets', () => {

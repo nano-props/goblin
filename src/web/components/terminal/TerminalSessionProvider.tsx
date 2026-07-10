@@ -81,7 +81,6 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
       createTerminalWithAdmission: projection.createTerminalWithAdmission,
       selectTerminal: projection.selectTerminal,
       closeTerminalByDescriptor: projection.closeTerminalByDescriptor,
-      closeTerminalsForWorktree: projection.closeTerminalsForWorktree,
     })
 
     return () => {

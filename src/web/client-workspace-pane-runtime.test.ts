@@ -11,11 +11,12 @@ const target = {
 }
 
 describe('createServerWorkspacePaneRuntimeClient', () => {
-  test('routes close and close-worktree through their namespaced realtime actions', async () => {
-    const request = vi.fn(async (action: string) => ({
+  test('routes close through its namespaced realtime action', async () => {
+    const request = vi.fn(async () => ({
       ok: true as const,
       runtimeType: 'terminal' as const,
-      workspacePaneTabs: { revision: action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close ? 2 : 3, entries: [] },
+      runtime: { sessions: [] },
+      workspacePaneTabs: { revision: 2, entries: [] },
     }))
     const client = createServerWorkspacePaneRuntimeClient(realtimeWithRequest(request))
     const closeInput = {
@@ -23,20 +24,12 @@ describe('createServerWorkspacePaneRuntimeClient', () => {
       sessionId: 'term-111111111111111111111',
       target,
     }
-    const closeWorktreeInput = { runtimeType: 'terminal' as const, target }
-
     await expect(client.close(closeInput)).resolves.toMatchObject({
       ok: true,
       runtimeType: 'terminal',
       workspacePaneTabs: { revision: 2, entries: [] },
     })
-    await expect(client.closeWorktree(closeWorktreeInput)).resolves.toMatchObject({
-      ok: true,
-      runtimeType: 'terminal',
-      workspacePaneTabs: { revision: 3, entries: [] },
-    })
     expect(request).toHaveBeenNthCalledWith(1, WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close, closeInput)
-    expect(request).toHaveBeenNthCalledWith(2, WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.closeWorktree, closeWorktreeInput)
   })
 
   test('rejects malformed canonical snapshots returned by runtime close', async () => {
@@ -45,6 +38,7 @@ describe('createServerWorkspacePaneRuntimeClient', () => {
         vi.fn(async () => ({
           ok: true,
           runtimeType: 'terminal',
+          runtime: { sessions: [] },
           workspacePaneTabs: { revision: -1, entries: [] },
         })),
       ),

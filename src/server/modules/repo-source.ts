@@ -126,7 +126,8 @@ export interface RepoSource {
       forceDeleteBranch?: boolean
       alsoDeleteUpstream?: boolean
     },
-    signal?: AbortSignal,
+    signal: AbortSignal | undefined,
+    lifecycle: { beforeRemove(): Promise<ExecResult> },
   ): Promise<RepoMutationResult>
   getPatch(worktreePath: string, signal?: AbortSignal): Promise<ExecResult>
   getBrowserRepoUrl(target: RepoUrlTarget, signal?: AbortSignal): Promise<string | null>
@@ -424,7 +425,7 @@ function createLocalRepoSource(repoId: string): RepoSource {
       const deleted = await deleteBranchAfterValidation(branch, options, signal)
       return deleted.ok || deleted.repoChanged ? withAffectedRepoIds(deleted, affectedRepoIds) : deleted
     },
-    async removeWorktree(input, signal) {
+    async removeWorktree(input, signal, lifecycle) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
       const worktrees = await getWorktrees(repoId, { signal })
       const affectedRepoIds = localWorktreeRepoIds(worktrees)
@@ -446,6 +447,8 @@ function createLocalRepoSource(repoId: string): RepoSource {
         )
         if (validation) return validation
       }
+      const prepared = await lifecycle.beforeRemove()
+      if (!prepared.ok) return prepared
       const removed = await removeWorktree(mutationCwd, removable.target.path, signal)
       if (!removed.ok) return removed
       if (!input.alsoDeleteBranch) return withAffectedRepoIds(removed, affectedRepoIds)
@@ -562,8 +565,8 @@ async function createRemoteRepoSource(repoId: string): Promise<RepoSource> {
       })
       return deleted.ok || deleted.repoChanged ? withAffectedRepoIds(deleted, affectedRepoIds) : deleted
     },
-    async removeWorktree(input, signal) {
-      const result = await removeRemoteWorktree(target, { ...input, signal })
+    async removeWorktree(input, signal, lifecycle) {
+      const result = await removeRemoteWorktree(target, { ...input, signal, beforeRemove: lifecycle.beforeRemove })
       return withAffectedRepoIds(result, remoteWorktreeRepoIds(target, result.affectedWorktreePaths))
     },
     async getPatch(worktreePath, signal) {

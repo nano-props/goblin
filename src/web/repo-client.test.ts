@@ -251,7 +251,7 @@ describe('repo-client', () => {
     })
 
     const { removeRepoWorktree } = await import('#/web/repo-client.ts')
-    const request = removeRepoWorktree('/tmp/repo', {
+    const request = removeRepoWorktree('/tmp/repo', 'repo-runtime-test', {
       branch: 'feature/remove',
       worktreePath: '/tmp/repo-feature-remove',
       alsoDeleteBranch: true,

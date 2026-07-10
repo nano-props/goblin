@@ -122,6 +122,17 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     if (changed) this.advanceRevision(userId, scope)
   }
 
+  closeTabsForWorktree(input: WorkspacePaneTabsWorktreeInput<TUser>): void {
+    const prefix = workspacePaneTabsRuntimeScopePrefixKey(input.userId, input.scope)
+    let changed = false
+    for (const [key, entry] of Array.from(this.tabsByTarget.entries())) {
+      if (!key.startsWith(prefix) || entry.worktreePath !== input.worktreePath) continue
+      this.tabsByTarget.delete(key)
+      changed = true
+    }
+    if (changed) this.advanceRevision(input.userId, input.scope)
+  }
+
   revision(input: WorkspacePaneTabsScopeInput<TUser>): number {
     return this.revisionByUserScope.get(workspacePaneTabsUserScopeQueueKey(input.userId, input.scope)) ?? 0
   }

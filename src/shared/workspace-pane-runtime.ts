@@ -1,4 +1,4 @@
-import type { TerminalCreateInput, TerminalCreateResult } from '#/shared/terminal-types.ts'
+import type { TerminalCreateInput, TerminalCreateResult, TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
@@ -6,7 +6,6 @@ import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-targe
 export const WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS = {
   open: 'workspace-pane-runtime.open',
   close: 'workspace-pane-runtime.close',
-  closeWorktree: 'workspace-pane-runtime.close-worktree',
 } as const
 
 export type WorkspacePaneRuntimeSocketAction =
@@ -35,19 +34,10 @@ export interface WorkspacePaneRuntimeCommandTarget extends WorkspacePaneTabsTarg
   repoRuntimeId: string
 }
 
-export interface WorkspacePaneRuntimeWorktreeCommandTarget extends WorkspacePaneRuntimeCommandTarget {
-  worktreePath: string
-}
-
 export interface WorkspacePaneRuntimeCloseInput {
   runtimeType: WorkspacePaneRuntimeTabType
   sessionId: string
   target: WorkspacePaneRuntimeCommandTarget
-}
-
-export interface WorkspacePaneRuntimeCloseWorktreeInput {
-  runtimeType: WorkspacePaneRuntimeTabType
-  target: WorkspacePaneRuntimeWorktreeCommandTarget
 }
 
 export type TerminalWorkspacePaneRuntimeOpenResult =
@@ -65,34 +55,27 @@ export type TerminalWorkspacePaneRuntimeOpenResult =
 
 export type WorkspacePaneRuntimeOpenResult = TerminalWorkspacePaneRuntimeOpenResult
 
+interface TerminalWorkspacePaneRuntimeCloseSuccess {
+  ok: true
+  runtimeType: 'terminal'
+  runtime: { sessions: TerminalSessionSummary[] }
+  workspacePaneTabs: WorkspacePaneTabsSnapshot
+}
+
 export type WorkspacePaneRuntimeCloseResult =
-  | {
-      ok: true
-      runtimeType: WorkspacePaneRuntimeTabType
-      workspacePaneTabs: WorkspacePaneTabsSnapshot
-    }
+  | TerminalWorkspacePaneRuntimeCloseSuccess
   | {
       ok: false
       runtimeType: WorkspacePaneRuntimeTabType
       message: string
     }
 
-export type WorkspacePaneRuntimeCloseWorktreeResult =
-  | {
-      ok: true
-      runtimeType: WorkspacePaneRuntimeTabType
-      workspacePaneTabs: WorkspacePaneTabsSnapshot
-    }
-  | { ok: false; runtimeType: WorkspacePaneRuntimeTabType; message: string }
-
 export interface WorkspacePaneRuntimeSocketRequestInputs {
   'workspace-pane-runtime.open': WorkspacePaneRuntimeOpenInput
   'workspace-pane-runtime.close': WorkspacePaneRuntimeCloseInput
-  'workspace-pane-runtime.close-worktree': WorkspacePaneRuntimeCloseWorktreeInput
 }
 
 export interface WorkspacePaneRuntimeSocketResponseOutputs {
   'workspace-pane-runtime.open': WorkspacePaneRuntimeOpenResult
   'workspace-pane-runtime.close': WorkspacePaneRuntimeCloseResult
-  'workspace-pane-runtime.close-worktree': WorkspacePaneRuntimeCloseWorktreeResult
 }
