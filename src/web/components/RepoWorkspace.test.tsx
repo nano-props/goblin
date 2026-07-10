@@ -332,7 +332,12 @@ describe('RepoWorkspace', () => {
       screen.getByRole('button', { name: 'terminal.new' }).click()
       await new Promise((resolve) => setTimeout(resolve, 0))
     })
-    expect(route.openRepoBranchTerminal).toHaveBeenCalledWith(REPO_ID, 'feature/a', 'term-111111111111111111111')
+    expect(route.openRepoBranchTerminal).toHaveBeenCalledWith(
+      REPO_ID,
+      'feature/a',
+      'term-111111111111111111111',
+      undefined,
+    )
 
     rerender(
       workspace(

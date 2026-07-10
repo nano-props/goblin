@@ -81,10 +81,14 @@ describe('terminal session service facade', () => {
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.tabs).toEqual([
-      workspacePaneStaticTabEntry('status'),
-      workspacePaneRuntimeTabEntry('terminal', result.terminalSessionId),
-    ])
+    expect(
+      workspaceTabs.tabs({
+        userId: USER_ID,
+        scope: terminalSessionRuntimeScope(REPO_ROOT, REPO_RUNTIME_ID),
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+      }),
+    ).toEqual([workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1'), workspacePaneStaticTabEntry('status')])
   })
 
   test('create closes the runtime session when the repo runtime goes stale after ensure', async () => {
@@ -163,41 +167,6 @@ describe('terminal session service facade', () => {
       workspaceTabs,
       closeSession,
       isCurrentRepoRuntime: () => current,
-      ensureSession: vi.fn(async (input) => {
-        createdTerminalSessionId = input.terminalSessionId
-        return terminalAttachResult(input)
-      }),
-    })
-
-    await expect(
-      service.create('client_terminal_service', USER_ID, {
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branch: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
-        kind: 'additional',
-        cols: 80,
-        rows: 24,
-      }),
-    ).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
-
-    expect(closeSession).toHaveBeenCalledWith('pty_session_created')
-    expect(workspaceTabs.tabsForScope({ userId: USER_ID, scope: RUNTIME_SCOPE })).toEqual([])
-  })
-
-  test('create clears old-scope tabs when the repo runtime goes stale after tab write', async () => {
-    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
-    let currentCheckCount = 0
-    let createdTerminalSessionId: string | null = null
-    const closeSession = vi.fn()
-    const service = createService({
-      sessions: () => (createdTerminalSessionId ? [terminalSession(createdTerminalSessionId)] : []),
-      workspaceTabs,
-      closeSession,
-      isCurrentRepoRuntime: () => {
-        currentCheckCount += 1
-        return currentCheckCount < 5
-      },
       ensureSession: vi.fn(async (input) => {
         createdTerminalSessionId = input.terminalSessionId
         return terminalAttachResult(input)

@@ -56,6 +56,12 @@ export const WorkspacePaneTabsUpdateInputSchema = v.object({
       tabType: WorkspacePaneStaticTabTypeSchema,
       insertAfterIdentity: WorkspacePaneOptionalTabIdentitySchema,
     }),
+    v.object({
+      type: v.literal('open-runtime'),
+      runtimeType: v.picklist(WORKSPACE_PANE_RUNTIME_TAB_TYPES),
+      sessionId: v.pipe(v.string(), v.minLength(1)),
+      insertAfterIdentity: WorkspacePaneOptionalTabIdentitySchema,
+    }),
     v.object({ type: v.literal('close-static'), tabType: WorkspacePaneStaticTabTypeSchema }),
     v.object({ type: v.literal('reorder'), tabIdentities: v.array(WorkspacePaneTabIdentitySchema) }),
   ]),

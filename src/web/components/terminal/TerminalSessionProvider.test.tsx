@@ -329,10 +329,6 @@ function completeServerSessions(sessions: TestTerminalSessionSummary[]): Termina
   return sessions.map(completeServerSession)
 }
 
-function workspaceTabsWithTerminal(terminalSessionId: string) {
-  return [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)]
-}
-
 function tabsFor(repoRoot: string, branchName: string): WorkspacePaneTabEntry[] {
   const repo = useReposStore.getState().repos[repoRoot]
   const target = repo
@@ -422,7 +418,6 @@ beforeEach(() => {
         ok: true,
         action: 'reused',
         terminalSessionId,
-        tabs: workspaceTabsWithTerminal(terminalSessionId),
         sessions: completeServerSessions(serverSessions),
         terminalRuntimeSessionId: reused?.terminalRuntimeSessionId ?? 'term-111111111111111111111',
         snapshot: '',
@@ -468,7 +463,6 @@ beforeEach(() => {
       ok: true,
       action: 'created',
       terminalSessionId,
-      tabs: workspaceTabsWithTerminal(terminalSessionId),
       sessions: completeServerSessions(serverSessions),
       terminalRuntimeSessionId: terminalSessionId,
       snapshot: '',
@@ -1591,7 +1585,6 @@ describe('TerminalSessionProvider', () => {
       ok: true as const,
       action: 'created' as const,
       terminalSessionId: 'term-111111111111111111111',
-      tabs: [],
       sessions: [],
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       snapshot: '',

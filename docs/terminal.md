@@ -158,13 +158,31 @@ Repo routes and server-side repo write paths should not know about Workspace Pan
 
 ### Terminal create and Workspace Pane navigation
 
-Terminal creation is a serial operation at the workspace-pane target boundary.
+Terminal creation has two separate operation boundaries:
+
+- `TerminalSessionProjection` owns create admission, pending state,
+  same-request single-flight, startup command resolution, PTY/session creation,
+  and durable close draining.
+- Workspace Pane commands own opener attribution, runtime-tab insertion, and
+  exact route commit for the created `terminalSessionId`.
+
 While `TerminalSessionProjection` reports `createPending` for a
-`terminalWorktreeKey`, user-driven workspace-pane tab interaction for that
+`terminalWorktreeKey`, ordinary user-driven workspace-pane navigation for that
 repo/branch/worktree should fast-fail at the operation entry point:
 tab switching, terminal selection, tab closing, shortcuts, history restore,
 notification jumps, and static-tab opens should not enqueue competing
-navigation.
+navigation. A command-owned route commit is different: it is the committed
+result of the command that already created or joined the terminal session, so it
+must not be rejected just because another terminal create is pending.
+
+Workspace-pane terminal create commands should call terminal create before
+entering the workspace-pane tab coordinator. This lets terminal lifecycle see
+duplicate or distinct create requests immediately and keeps `createPending`
+owned by the projection. After create resolves, the owning command enters the
+workspace-pane target coordinator once to insert the runtime tab through the
+workspace-pane tabs API, record opener facts, and commit the exact terminal
+route returned by create. Duplicate observers that did not own the create must
+not repeat the tab/route commit.
 
 The pending bit is projection state from the terminal lifecycle queue. Do not
 add client-only focus tokens, request generations, or "is the user still on
@@ -175,18 +193,21 @@ completion order part of the product model.
 The clean flow is:
 
 1. The user invokes create through a command/open-tab entry point.
-2. The entry point rejects immediately if the target projection is already
-   pending.
+2. The terminal projection admits the create request and publishes
+   `createPending` before async startup command resolution begins.
 3. The terminal projection/server create path owns session creation and
    returns the server-allocated `terminalSessionId`.
-4. The caller navigates directly to the canonical terminal route for that
-   returned session.
+4. The owning workspace-pane command records opener facts, updates workspace
+   tabs with an `open-runtime` operation, and navigates directly to the
+   canonical terminal route for that returned session.
 
 If a create flow needs async preparation before the PTY can be launched, such
 as resolving a file viewer command for "open file in terminal", that preparation
 must be part of the projection-owned create request. Use a create option that is
 resolved inside the terminal create queue after `createPending` is visible; do
 not `await` the preparation in a component and only then call create.
+Terminal create options describe the session being launched; they must not
+carry workspace-pane scheduling callbacks.
 
 Route reconciliation remains a boundary concern: stale or unrenderable explicit
 pane URLs should fast-fail to the bare branch route. Do not replace

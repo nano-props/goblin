@@ -15,10 +15,6 @@ import type {
   TerminalTestNotificationInput,
 } from '#/shared/terminal-types.ts'
 import { OPAQUE_ID_RE } from '#/shared/opaque-id.ts'
-import {
-  WorkspacePaneOptionalTabIdentitySchema,
-  WorkspacePaneTabEntrySchema,
-} from '#/shared/workspace-pane-tabs-validators.ts'
 
 const MIN_TERMINAL_COLS = 1
 const MAX_TERMINAL_COLS = 500
@@ -96,7 +92,6 @@ const TerminalCreateInputSchema = v.object({
   cols: v.optional(TerminalColsSchema),
   rows: v.optional(TerminalRowsSchema),
   clientId: TerminalOptionalClientIdSchema,
-  insertAfterIdentity: WorkspacePaneOptionalTabIdentitySchema,
 })
 const TerminalPruneInputSchema = v.object({
   repoRoot: v.string(),
@@ -146,7 +141,6 @@ const TerminalCreateResultSchema = v.variant('ok', [
     ok: v.literal(true),
     action: v.picklist(['created', 'restored', 'reused']),
     terminalSessionId: v.string(),
-    tabs: v.array(WorkspacePaneTabEntrySchema),
     sessions: v.array(TerminalSessionSummarySchema),
     ...TerminalFirstFrameSchemaEntries,
   }),

@@ -14,7 +14,6 @@ import type {
   TerminalSessionSummary as ServerTerminalSessionSummary,
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-index.ts'
 import {
   projectCreateResultForClient,
@@ -70,13 +69,7 @@ export interface TerminalCreateCommandAdmissionResult {
 
 interface ResolvedTerminalCreateOptions {
   startupShellCommand?: string
-  insertAfterIdentity?: string | null
 }
-
-type TerminalWorkspaceTabsChangedHandler = (
-  base: TerminalSessionBase,
-  tabs: readonly WorkspacePaneTabEntry[],
-) => boolean | Promise<boolean>
 
 /**
  * Client-level authority for terminal session state.
@@ -99,7 +92,6 @@ type TerminalWorkspaceTabsChangedHandler = (
  */
 export class TerminalSessionProjection {
   private readonly onSelectedWorktreeChange: (terminalWorktreeKey: string, terminalSessionId: string | null) => void
-  private readonly onWorkspaceTabsChanged: TerminalWorkspaceTabsChangedHandler
   private repoIndex: TerminalRepoIndex = {}
   private readonly sessions = new Map<string, TerminalSession>()
   private readonly terminalSessionIdByTerminalRuntimeSessionId = new Map<string, string>()
@@ -164,12 +156,8 @@ export class TerminalSessionProjection {
     this.notifyWorktree(terminalWorktreeKey),
   )
 
-  constructor(
-    onSelectedWorktreeChange: (terminalWorktreeKey: string, terminalSessionId: string | null) => void = () => {},
-    onWorkspaceTabsChanged: TerminalWorkspaceTabsChangedHandler = () => true,
-  ) {
+  constructor(onSelectedWorktreeChange: (terminalWorktreeKey: string, terminalSessionId: string | null) => void = () => {}) {
     this.onSelectedWorktreeChange = onSelectedWorktreeChange
-    this.onWorkspaceTabsChanged = onWorkspaceTabsChanged
   }
 
   setRepoIndex(repoIndex: TerminalRepoIndex): void {
@@ -539,7 +527,6 @@ export class TerminalSessionProjection {
       worktreePath: base.worktreePath,
       kind: createKind,
       ...(createOptions.startupShellCommand ? { startupShellCommand: createOptions.startupShellCommand } : {}),
-      ...(createOptions.insertAfterIdentity ? { insertAfterIdentity: createOptions.insertAfterIdentity } : {}),
       cols: geometry.cols,
       rows: geometry.rows,
       clientId,
@@ -560,17 +547,6 @@ export class TerminalSessionProjection {
       throw new Error('terminal create request canceled')
     }
     const projectedCreate = projectCreateResultForClient(base, result)
-    let workspaceTabsAccepted = false
-    try {
-      workspaceTabsAccepted = await this.onWorkspaceTabsChanged(base, result.tabs)
-    } catch (error) {
-      await this.disposeStaleCreateResult(result.terminalSessionId, result.terminalRuntimeSessionId)
-      throw error
-    }
-    if (!workspaceTabsAccepted) {
-      await this.disposeStaleCreateResult(result.terminalSessionId, result.terminalRuntimeSessionId)
-      throw new Error('terminal create request canceled')
-    }
     if (this.lifecycleQueues.getCreate(terminalWorktreeKey) !== pending) {
       await this.disposeStaleCreateResult(result.terminalSessionId, result.terminalRuntimeSessionId)
       throw new Error('terminal create request canceled')
@@ -637,8 +613,7 @@ export class TerminalSessionProjection {
     // bail and observe the same pending promise.
     pending.flushing = true
     try {
-      const coordinateCreate = pending.options.createOptions.coordinateCreate ?? runTerminalCreateOperationDirectly
-      pending.resolve(await coordinateCreate(async () => await this.flushCreateRequestNow(terminalWorktreeKey, pending)))
+      pending.resolve(await this.flushCreateRequestNow(terminalWorktreeKey, pending))
     } catch (error) {
       pending.reject(error)
     } finally {
@@ -1309,7 +1284,6 @@ async function resolveTerminalCreateOptions(options: TerminalCreateOptions): Pro
     : options.startupShellCommand
   return {
     ...(startupShellCommand ? { startupShellCommand } : {}),
-    ...(options.insertAfterIdentity ? { insertAfterIdentity: options.insertAfterIdentity } : {}),
   }
 }
 
@@ -1352,13 +1326,8 @@ function stringArraysEqual(a: readonly string[], b: readonly string[]): boolean 
   return a.length === b.length && b.every((value, index) => a[index] === value)
 }
 
-async function runTerminalCreateOperationDirectly<T>(operation: () => Promise<T>): Promise<T> {
-  return await operation()
-}
-
 export interface TerminalSessionProjectionDeps {
   onSelectedWorktreeChange: (terminalWorktreeKey: string, terminalSessionId: string | null) => void
-  onWorkspaceTabsChanged?: TerminalWorkspaceTabsChangedHandler
 }
 
 let projectionInstance: TerminalSessionProjection | null = null
@@ -1377,7 +1346,7 @@ let projectionInstance: TerminalSessionProjection | null = null
  */
 export function getTerminalSessionProjection(deps: TerminalSessionProjectionDeps): TerminalSessionProjection {
   if (!projectionInstance) {
-    projectionInstance = new TerminalSessionProjection(deps.onSelectedWorktreeChange, deps.onWorkspaceTabsChanged)
+    projectionInstance = new TerminalSessionProjection(deps.onSelectedWorktreeChange)
   }
   return projectionInstance
 }

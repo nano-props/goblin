@@ -34,7 +34,7 @@ export function useWorkspacePaneRuntimeTabCreateAction({
   showCreatedRuntimeTab,
   t,
 }: UseWorkspacePaneRuntimeTabCreateActionInput): WorkspacePaneRuntimeTabCreateAction | null {
-  const { createTerminal } = useTerminalSessionContext()
+  const { createTerminal, createTerminalWithOwnership } = useTerminalSessionContext()
   const terminalBase = useMemo<TerminalSessionBase | null>(
     () =>
       branchName && worktreePath
@@ -67,13 +67,14 @@ export function useWorkspacePaneRuntimeTabCreateAction({
         t,
         terminal: {
           base: terminalBase,
-          createTerminal,
+          createTerminal: createTerminalWithOwnership ?? createTerminal,
           captureOpenerIdentity,
         },
       }),
     [
       captureOpenerIdentity,
       createTerminal,
+      createTerminalWithOwnership,
       initialRuntimeProjectionHydrating,
       repoRoot,
       runtimeTabStateByType,

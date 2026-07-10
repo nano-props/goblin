@@ -51,6 +51,7 @@ import {
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
@@ -1043,16 +1044,26 @@ describe('RepoWorkspaceContent', () => {
       await Promise.resolve()
     })
 
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/filetree-open', 'term-111111111111111111111')
+    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
+      REPO_ID,
+      'feature/filetree-open',
+      'term-111111111111111111111',
+    )
     expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
     expect(createTerminal).toHaveBeenCalledWith(
       { repoRoot: REPO_ID, repoRuntimeId: repo.repoRuntimeId, branch: branchName, worktreePath },
       {
         resolveStartupShellCommand: expect.any(Function),
-        insertAfterIdentity: 'workspace-pane:files',
-        coordinateCreate: expect.any(Function),
       },
     )
+    expect(
+      readWorkspacePaneTabsForTarget({
+        repoRoot: REPO_ID,
+        repoRuntimeId: repo.repoRuntimeId,
+        branchName,
+        worktreePath,
+      }),
+    ).toEqual([staticEntry('files'), terminalEntry('term-111111111111111111111'), staticEntry('status')])
     expect(resolvedStartupShellCommand).toBe(
       "bat --paging=never --style=plain '/tmp/filetree-open-worktree/README.md'\r",
     )

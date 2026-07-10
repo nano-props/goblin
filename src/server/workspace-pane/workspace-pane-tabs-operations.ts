@@ -44,6 +44,10 @@ export function workspacePaneTabsWithUpdateOperation(
       return workspacePaneTabsWithStaticTab(current, operation.tabType, {
         insertAfterIdentity: operation.insertAfterIdentity,
       })
+    case 'open-runtime':
+      return workspacePaneTabsWithRuntimeTab(current, operation.runtimeType, operation.sessionId, {
+        insertAfterIdentity: operation.insertAfterIdentity,
+      })
     case 'close-static':
       return workspacePaneTabsWithoutStaticTab(current, operation.tabType)
     case 'reorder':

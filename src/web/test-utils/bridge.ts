@@ -36,6 +36,7 @@ import {
   setRepoProjectionQueryData,
 } from '#/web/repo-data-query.ts'
 import {
+  workspacePaneTabsWithRuntimeTab,
   workspacePaneTabsWithStaticTab,
   workspacePaneTabsWithoutStaticTab,
 } from '#/web/workspace-pane/workspace-pane-tabs.ts'
@@ -216,6 +217,7 @@ export function installWorkspacePaneTabsTestBridge(
     listWorkspaceTabs?: (
       input: WorkspacePaneTabsListInput,
     ) => WorkspacePaneTabsEntry[] | Promise<WorkspacePaneTabsEntry[]>
+    onEffectIntent?: ClientBridge['onEffectIntent']
   } = {},
 ): void {
   let serverEntries: WorkspacePaneTabsEntry[] = []
@@ -262,7 +264,7 @@ export function installWorkspacePaneTabsTestBridge(
     },
     abortIpc: async () => false,
     onIpcEvent: () => () => {},
-    onEffectIntent: () => () => {},
+    onEffectIntent: options.onEffectIntent ?? (() => () => {}),
     pathForFile: () => '',
     saveClipboardFiles: async () => [],
     host: () => null,
@@ -290,7 +292,6 @@ export function installWorkspacePaneTabsTestBridge(
         ok: true as const,
         action: 'created' as const,
         terminalSessionId: 'term-testtesttesttesttest1',
-        tabs: [],
         sessions: [],
         terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
         snapshot: '',
@@ -347,6 +348,10 @@ function defaultWorkspacePaneTabsOperationResult(
   switch (input.operation.type) {
     case 'open-static':
       return workspacePaneTabsWithStaticTab(currentTabs, input.operation.tabType, {
+        insertAfterIdentity: input.operation.insertAfterIdentity,
+      })
+    case 'open-runtime':
+      return workspacePaneTabsWithRuntimeTab(currentTabs, input.operation.runtimeType, input.operation.sessionId, {
         insertAfterIdentity: input.operation.insertAfterIdentity,
       })
     case 'close-static':
@@ -582,7 +587,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
             ok: true,
             action: terminalKind === 'primary' ? 'reused' : 'created',
             terminalSessionId: terminalKind === 'primary' ? 'term-testtesttesttesttest1' : 'term-testtesttesttesttest2',
-            tabs: [],
             sessions: [],
             terminalRuntimeSessionId,
             snapshot: '',

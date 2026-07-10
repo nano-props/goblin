@@ -701,7 +701,7 @@ describe('terminal web host client', () => {
         requestId: createRequest?.requestId,
         ok: true,
         action: 'create',
-        payload: { ok: true, action: 'created', terminalSessionId: 'term-111111111111111111111', tabs: [], sessions: [] },
+        payload: { ok: true, action: 'created', terminalSessionId: 'term-111111111111111111111', sessions: [] },
       }),
     )
 
@@ -1140,7 +1140,6 @@ function terminalCreatePayload(terminalSessionId: string) {
     ok: true,
     action: 'created',
     terminalSessionId,
-    tabs: [],
     sessions: [],
     terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
     processName: 'zsh',

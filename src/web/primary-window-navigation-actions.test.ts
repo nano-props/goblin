@@ -220,6 +220,41 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(navigation.openRepoBranchTerminal).not.toHaveBeenCalled()
   })
 
+  test('allows command-owned workspace pane route commits while terminal creation is pending', () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: BRANCH_NAME,
+      preferredWorkspacePaneTab: 'status',
+    })
+    setTerminalSessionCommandBridge({
+      terminalWorktreeSnapshot: () => createPendingWorktreeSnapshot(),
+      createTerminal: vi.fn(async () => 'term-111111111111111111111'),
+      selectTerminal: vi.fn(),
+    })
+    const navigation = routeNavigation()
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: REPO_ID,
+      order: [REPO_ID],
+      closeRepo: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    const accepted = actions.commitRepoBranchWorkspacePaneRoute?.(REPO_ID, BRANCH_NAME, {
+      kind: 'terminal',
+      terminalSessionId: 'term-111111111111111111111',
+    })
+
+    expect(accepted).toBe(true)
+    expect(navigation.openRepoBranchTerminal).toHaveBeenCalledWith(
+      REPO_ID,
+      BRANCH_NAME,
+      'term-111111111111111111111',
+      undefined,
+    )
+    expect(preferredWorkspacePaneTab()).toBe('terminal')
+  })
+
   test('blocks workspace history restore before mutating history while terminal creation is pending', () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,

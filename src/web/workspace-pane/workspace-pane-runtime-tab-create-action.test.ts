@@ -7,9 +7,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import {
   resetWorkspacePaneTabCoordinatorForTest,
-  runWorkspacePaneTabCoordinatorTask,
 } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
-import type { TerminalCreateOptions } from '#/web/components/terminal/types.ts'
 
 const terminalCreateCommandMocks = vi.hoisted(() => ({
   runCreateTerminalTabCommand: vi.fn(async () => ({ ok: true as const, terminalSessionId: 'term-111111111111111111111' })),
@@ -95,21 +93,13 @@ describe('workspace pane runtime tab create action', () => {
     expect(showCreatedRuntimeTab).toHaveBeenCalledWith('terminal', 'term-111111111111111111111')
   })
 
-  test('passes a workspace-pane coordinator hook to the terminal create command', async () => {
+  test('delegates create immediately and provides a workspace-pane commit callback', async () => {
     const base: TerminalSessionBase = {
       repoRoot: '/repo',
       repoRuntimeId: 'repo-runtime-1',
       branch: 'main',
       worktreePath: '/repo-worktree',
     }
-    let releaseBlocker!: () => void
-    const blocker = runWorkspacePaneTabCoordinatorTask(
-      { repoId: base.repoRoot, branchName: base.branch, worktreePath: base.worktreePath },
-      async () =>
-        await new Promise<void>((resolve) => {
-          releaseBlocker = resolve
-        }),
-    )
 
     const createPromise = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
       base,
@@ -119,77 +109,14 @@ describe('workspace pane runtime tab create action', () => {
     })
     await Promise.resolve()
 
-    expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).toHaveBeenCalledOnce()
-    const commandCalls = terminalCreateCommandMocks.runCreateTerminalTabCommand.mock.calls as unknown as Array<[
-      { options?: TerminalCreateOptions },
-    ]>
-    const commandInput = commandCalls[0]?.[0]
-    let coordinatedTaskRan = false
-    const coordinatedTask = commandInput?.options?.coordinateCreate?.(async () => {
-      coordinatedTaskRan = true
-      return 'coordinated'
-    })
-    await Promise.resolve()
-
-    expect(coordinatedTaskRan).toBe(false)
-
-    releaseBlocker()
-    await blocker
     await expect(createPromise).resolves.toEqual({ ok: true, terminalSessionId: 'term-111111111111111111111' })
-    await expect(coordinatedTask).resolves.toBe('coordinated')
-    expect(coordinatedTaskRan).toBe(true)
-  })
-
-  test('passes a lazy composed create coordinator without invoking it at dispatch time', async () => {
-    const base: TerminalSessionBase = {
-      repoRoot: '/repo',
-      repoRuntimeId: 'repo-runtime-1',
-      branch: 'main',
-      worktreePath: '/repo-worktree',
-    }
-    let releaseBlocker!: () => void
-    const blocker = runWorkspacePaneTabCoordinatorTask(
-      { repoId: base.repoRoot, branchName: base.branch, worktreePath: base.worktreePath },
-      async () =>
-        await new Promise<void>((resolve) => {
-          releaseBlocker = resolve
-        }),
+    expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).toHaveBeenCalledOnce()
+    expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        base,
+        commitCreatedTerminalTab: expect.any(Function),
+      }),
     )
-    const existingCoordinateCreateMock = vi.fn()
-    const existingCoordinateCreate = async <T,>(task: () => Promise<T>): Promise<T> => {
-      existingCoordinateCreateMock(task)
-      return await task()
-    }
-
-    await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
-      base,
-      createTerminal: vi.fn(async () => 'term-111111111111111111111'),
-      openerIdentity: null,
-      options: { coordinateCreate: existingCoordinateCreate },
-      t: translate,
-    })
-
-    const commandCalls = terminalCreateCommandMocks.runCreateTerminalTabCommand.mock.calls as unknown as Array<[
-      { options?: TerminalCreateOptions },
-    ]>
-    const commandInput = commandCalls[0]?.[0]
-    let coordinatedTaskRan = false
-    const coordinatedTask = commandInput?.options?.coordinateCreate?.(async () => {
-      coordinatedTaskRan = true
-      return 'coordinated'
-    })
-    await Promise.resolve()
-
-    // This test mocks the command layer, so it verifies only the helper wiring:
-    // dispatch passes a lazy composed hook; real create/finish flows invoke it.
-    expect(existingCoordinateCreateMock).not.toHaveBeenCalled()
-    expect(coordinatedTaskRan).toBe(false)
-
-    releaseBlocker()
-    await blocker
-    await expect(coordinatedTask).resolves.toBe('coordinated')
-    expect(existingCoordinateCreateMock).toHaveBeenCalledOnce()
-    expect(coordinatedTaskRan).toBe(true)
   })
 
   test('marks the terminal create action busy while projection or create is pending', () => {
@@ -213,6 +140,8 @@ describe('workspace pane runtime tab create action', () => {
     })
     expect(pendingAction?.busy).toBe(true)
     expect(pendingAction?.blocksTabInteraction).toBe(true)
+    pendingAction?.onCreate()
+    expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).not.toHaveBeenCalled()
 
     const hydratingAction = workspacePaneRuntimeTabCreateAction('terminal', {
       repoRoot: '/repo',

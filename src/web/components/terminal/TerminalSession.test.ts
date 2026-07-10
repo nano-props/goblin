@@ -598,7 +598,6 @@ beforeEach(() => {
           ? {
               action: 'reused' as const,
               terminalSessionId: 'term-111111111111111111111',
-              tabs: [],
               sessions: [],
               ...createFirstFrame('term-111111111111111111111'),
               ok: true as const,
@@ -606,7 +605,6 @@ beforeEach(() => {
           : {
               action: 'created' as const,
               terminalSessionId: 'term-222222222222222222222',
-              tabs: [],
               sessions: [],
               ...createFirstFrame('term-222222222222222222222'),
               ok: true as const,

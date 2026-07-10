@@ -104,26 +104,4 @@ describe('terminal session worktree snapshot helper', () => {
     expect(session.snapshotSpy).toHaveBeenCalledTimes(1)
   })
 
-  test('projects closing terminal session ids when present', () => {
-    const descriptor = makeDescriptor('term-111111111111111111111', 1)
-    const session = makeSession(descriptor, {
-      phase: 'open',
-      message: null,
-      processName: 'bash',
-    })
-    const snapshot = buildTerminalWorktreeSnapshot({
-      terminalWorktreeKey: descriptor.terminalWorktreeKey,
-      selectedDescriptor: null,
-      createPending: false,
-      closingSessionIds: [descriptor.terminalSessionId],
-      sessions: [session],
-      selectedTerminalSessionId: null,
-      getCachedSnapshot: () => null,
-      cacheSnapshot: () => {},
-      hasBell: () => false,
-      hasRecentOutput: () => false,
-    })
-
-    expect(snapshot.closingSessionIds).toEqual([descriptor.terminalSessionId])
-  })
 })

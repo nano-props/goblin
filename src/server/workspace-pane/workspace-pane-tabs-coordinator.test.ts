@@ -148,6 +148,48 @@ describe('workspace pane tabs coordinator', () => {
     ])
   })
 
+  test('opens a live runtime tab with an insertion anchor when updating workspace tabs', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: SCOPE,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+    })
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      runtimeProviders: [
+        {
+          type: 'terminal',
+          listSessionsForUser: vi.fn(async () => [
+            { sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+          ]),
+        },
+      ],
+    })
+
+    await expect(
+      coordinator.updateTabs({
+        userId: USER_ID,
+        scope: SCOPE,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        operation: {
+          type: 'open-runtime',
+          runtimeType: 'terminal',
+          sessionId: 'term-livelivelivelivelive1',
+          insertAfterIdentity: 'workspace-pane:status',
+        },
+        assertCurrent: () => {},
+      }),
+    ).resolves.toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
+      workspacePaneStaticTabEntry('history'),
+    ])
+  })
+
   test('does not mutate workspace tabs when update canonicalization fails', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     workspaceTabs.replaceTabs({

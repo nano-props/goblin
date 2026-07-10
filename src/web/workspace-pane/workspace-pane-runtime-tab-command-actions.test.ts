@@ -143,8 +143,12 @@ describe('workspace pane runtime tab command actions', () => {
     expect(createTerminal).not.toHaveBeenCalled()
   })
 
-  test('new terminal action leaves pending create admission to the terminal provider', async () => {
+  test('new terminal action joins a pending duplicate create through terminal ownership', async () => {
     const createTerminal = vi.fn(async () => 'created-session')
+    const createTerminalWithOwnership = vi.fn(async () => ({
+      terminalSessionId: 'created-session',
+      ownsCreate: false,
+    }))
     const showTerminalSession = vi.fn(() => true)
     const bridge: TerminalSessionCommandBridge = {
       terminalWorktreeSnapshot: () => ({
@@ -157,6 +161,7 @@ describe('workspace pane runtime tab command actions', () => {
         createPending: true,
       }),
       createTerminal,
+      createTerminalWithOwnership,
       selectTerminal: vi.fn(),
     }
 
@@ -171,11 +176,9 @@ describe('workspace pane runtime tab command actions', () => {
       }),
     ).resolves.toBe(true)
 
-    expect(showTerminalSession).toHaveBeenCalledWith('created-session')
-    expect(createTerminal).toHaveBeenCalledWith(
-      terminalBase,
-      expect.objectContaining({ coordinateCreate: expect.any(Function) }),
-    )
+    expect(showTerminalSession).not.toHaveBeenCalled()
+    expect(createTerminalWithOwnership).toHaveBeenCalledWith(terminalBase, undefined)
+    expect(createTerminal).not.toHaveBeenCalled()
   })
 
   test('primary terminal action rejects when no bridge is available', async () => {

@@ -171,7 +171,7 @@ function FiletreeTab({
 }) {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()
-  const { createTerminal } = useTerminalSessionContext()
+  const { createTerminal, createTerminalWithOwnership } = useTerminalSessionContext()
   const openTrashFileConfirm = useFiletreeActionDialogsStore((s) => s.openTrashFileConfirm)
   const interactionScopeKey = useMemo(() => filetreeInteractionScopeKey(repoId, worktreePath), [repoId, worktreePath])
   const selectedKeyList = useFiletreeInteractionStore(
@@ -248,16 +248,16 @@ function FiletreeTab({
         const base = { repoRoot: repoId, repoRuntimeId, branch: branchName, worktreePath }
         await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
           base,
-          createTerminal,
+          createTerminal: createTerminalWithOwnership ?? createTerminal,
           openerIdentity,
           showCreatedTerminalTab: (terminalSessionId) =>
             showCreatedTerminalWorkspacePaneRuntimeTab(base, terminalSessionId, navigation),
+          insertAfterIdentity: openerIdentity,
           options: {
             resolveStartupShellCommand: async () => {
               const viewerResult = await getRepositoryFileViewer(repoId, worktreePath)
               return fileReadCommand(viewerResult, absoluteFilePathForTerminal(worktreePath, node.path))
             },
-            insertAfterIdentity: openerIdentity,
           },
           t,
           logMessage: 'filetree open file terminal create failed',
@@ -270,6 +270,7 @@ function FiletreeTab({
       beginOpeningFile,
       branchName,
       createTerminal,
+      createTerminalWithOwnership,
       endOpeningFile,
       openingFileKeyPrefix,
       navigation,

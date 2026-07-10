@@ -38,6 +38,12 @@ export async function runCreateTerminalTabCommand(input: {
   /** Opens the concrete terminal route after the server has created a session. */
   showCreatedTerminalTab?: (terminalSessionId: string) => boolean | Promise<boolean>
   /**
+   * Commits the workspace-pane tab/route state for the created session.
+   * Workspace-pane callers use this to run the tab insertion and exact route
+   * commit as one pane operation after terminal lifecycle admission resolves.
+   */
+  commitCreatedTerminalTab?: (terminalSessionId: string) => boolean | Promise<boolean>
+  /**
    * Insertion anchor for the new terminal tab. Callers decide explicitly:
    * supply the captured opener's identity when the terminal is opened from
    * inside a specific tab (per Chrome-style opener rules), or omit for
@@ -53,8 +59,7 @@ export async function runCreateTerminalTabCommand(input: {
   try {
     const admission = terminalCreateCommandAdmission(await input.createTerminal(input.base, input.options))
     if (!admission.ownsCreate) return { ok: true, terminalSessionId: admission.terminalSessionId }
-    const runAfterCreate = input.options?.coordinateCreate ?? runTerminalCreateCommandStepDirectly
-    return await runAfterCreate(async () => finishCreateTerminalTabCommand(input, admission.terminalSessionId))
+    return await finishCreateTerminalTabCommand(input, admission.terminalSessionId)
   } catch (error) {
     if (isTerminalCreateCanceled(error)) {
       return { ok: false, error, messageKey: 'error.terminal-create-failed' }
@@ -77,6 +82,7 @@ async function finishCreateTerminalTabCommand(
     base: TerminalSessionBase
     openerIdentity: string | null
     showCreatedTerminalTab?: (terminalSessionId: string) => boolean | Promise<boolean>
+    commitCreatedTerminalTab?: (terminalSessionId: string) => boolean | Promise<boolean>
   },
   terminalSessionId: string,
 ): Promise<TerminalCreateCommandResult> {
@@ -88,7 +94,11 @@ async function finishCreateTerminalTabCommand(
       input.openerIdentity,
     )
   }
-  const navigationAccepted = input.showCreatedTerminalTab ? await input.showCreatedTerminalTab(terminalSessionId) : true
+  const navigationAccepted = input.commitCreatedTerminalTab
+    ? await input.commitCreatedTerminalTab(terminalSessionId)
+    : input.showCreatedTerminalTab
+      ? await input.showCreatedTerminalTab(terminalSessionId)
+      : true
   if (!navigationAccepted) {
     return {
       ok: false,
@@ -97,10 +107,6 @@ async function finishCreateTerminalTabCommand(
     }
   }
   return { ok: true, terminalSessionId }
-}
-
-async function runTerminalCreateCommandStepDirectly<T>(operation: () => Promise<T>): Promise<T> {
-  return await operation()
 }
 
 function isTerminalCreateCanceled(error: unknown): boolean {

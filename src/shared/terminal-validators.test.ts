@@ -250,39 +250,37 @@ describe('shared terminal validators', () => {
   })
 
   test('normalizes terminal create results with required first-frame payloads', () => {
-    expect(
-      normalizeTerminalCreateResult({
-        ok: true,
-        action: 'created',
-        terminalSessionId: 'term-111111111111111111111',
-        tabs: [],
-        sessions: [],
-        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
-        processName: 'zsh',
-        canonicalTitle: null,
-        phase: 'open',
-        message: null,
-        snapshot: 'first frame',
-        snapshotSeq: 1,
-        outputEra: 0,
-        controller: { clientId: 'client_a', status: 'connected' },
-        canonicalCols: 120,
-        canonicalRows: 40,
-      }),
-    ).toMatchObject({
+    const normalizedCreateResult = normalizeTerminalCreateResult({
+      ok: true,
+      action: 'created',
+      terminalSessionId: 'term-111111111111111111111',
+      sessions: [],
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      processName: 'zsh',
+      canonicalTitle: null,
+      phase: 'open',
+      message: null,
+      snapshot: 'first frame',
+      snapshotSeq: 1,
+      outputEra: 0,
+      controller: { clientId: 'client_a', status: 'connected' },
+      canonicalCols: 120,
+      canonicalRows: 40,
+    })
+    expect(normalizedCreateResult).toMatchObject({
       ok: true,
       terminalSessionId: 'term-111111111111111111111',
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
       snapshotSeq: 1,
       outputEra: 0,
     })
+    expect(normalizedCreateResult).not.toHaveProperty('tabs')
 
     expect(
       normalizeTerminalCreateResult({
         ok: true,
         action: 'created',
         terminalSessionId: 'term-111111111111111111111',
-        tabs: [],
         sessions: [],
       }),
     ).toBeNull()
@@ -414,7 +412,6 @@ describe('shared terminal validators', () => {
           ok: true,
           action: 'created',
           terminalSessionId: 'term-111111111111111111111',
-          tabs: [],
           sessions: [],
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
           processName: 'zsh',

@@ -6,10 +6,10 @@ import type { TerminalCreateTranslator } from '#/web/components/terminal/termina
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspacePaneTabControllerNavigation } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
-import { showWorkspacePaneControllerRoute } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { commitWorkspacePaneControllerRoute } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
-import { withWorkspacePaneTerminalCreateCoordination } from '#/web/workspace-pane/workspace-pane-terminal-create-coordination.ts'
+import { commitCreatedTerminalWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 
 export interface WorkspacePaneRuntimeTabCommandContext {
   terminal?: {
@@ -123,33 +123,35 @@ function showTerminalRuntimeTab(
   navigation: WorkspacePaneTabControllerNavigation,
 ): boolean {
   if (type !== 'terminal') return false
-  return showWorkspacePaneControllerRoute(repoId, branchName, { kind: 'terminal', terminalSessionId: sessionId }, navigation)
+  return commitWorkspacePaneControllerRoute(repoId, branchName, { kind: 'terminal', terminalSessionId: sessionId }, navigation)
 }
 
 async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandContext): Promise<boolean> {
   const terminal = context.terminal
   if (!terminal?.base) return false
   if (!terminal.bridge) return false
-  const terminalWorktreeKey = formatTerminalWorktreeKey(terminal.base.repoRoot, terminal.base.worktreePath)
-  const worktree = terminal.bridge.terminalWorktreeSnapshot(terminalWorktreeKey)
+  const { base, bridge } = terminal
+  const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
+  const worktree = bridge.terminalWorktreeSnapshot(terminalWorktreeKey)
   if (worktree.createPending) return true
   if (worktree.count > 0) {
-    return await runWorkspacePaneTabCoordinatorTask(
-      { repoId: terminal.base.repoRoot, branchName: terminal.base.branch, worktreePath: terminal.base.worktreePath },
-      async () => {
-        const currentWorktree = terminal.bridge?.terminalWorktreeSnapshot(terminalWorktreeKey)
-        if (!currentWorktree || currentWorktree.createPending) return true
-        const firstSession = currentWorktree.sessions[0]
-        return firstSession ? await terminal.showTerminalSession(firstSession.terminalSessionId) : false
-      },
-    )
+    return await runWorkspacePaneTabCoordinatorTask(terminalCoordinatorTarget(base), async () => {
+      const nextWorktree = bridge.terminalWorktreeSnapshot(terminalWorktreeKey)
+      if (nextWorktree.createPending) return true
+      const firstSession = nextWorktree.sessions[0]
+      return firstSession ? await terminal.showTerminalSession(firstSession.terminalSessionId) : false
+    })
   }
   const result = await runCreateTerminalTabCommand({
-    base: terminal.base,
-    createTerminal: terminal.bridge.createTerminalWithOwnership ?? terminal.bridge.createTerminal,
-    options: withWorkspacePaneTerminalCreateCoordination(terminal.base),
+    base,
+    createTerminal: bridge.createTerminalWithOwnership ?? bridge.createTerminal,
     openerIdentity: terminal.openerIdentity,
-    showCreatedTerminalTab: terminal.showTerminalSession,
+    commitCreatedTerminalTab: (terminalSessionId) =>
+      commitCreatedTerminalWorkspacePaneRuntimeTab({
+        base,
+        terminalSessionId,
+        showCreatedTerminalTab: terminal.showTerminalSession,
+      }),
     t: terminal.t,
     logMessage: 'terminal primary action create failed',
   })
@@ -160,13 +162,26 @@ async function runNewTerminalAction(context: WorkspacePaneRuntimeTabCommandConte
   const terminal = context.terminal
   if (!terminal?.base) return false
   if (!terminal.bridge) return false
+  const { base, bridge } = terminal
   const result = await runCreateTerminalTabCommand({
-    base: terminal.base,
-    createTerminal: terminal.bridge.createTerminalWithOwnership ?? terminal.bridge.createTerminal,
-    options: withWorkspacePaneTerminalCreateCoordination(terminal.base),
+    base,
+    createTerminal: bridge.createTerminalWithOwnership ?? bridge.createTerminal,
     openerIdentity: terminal.openerIdentity,
-    showCreatedTerminalTab: terminal.showTerminalSession,
+    commitCreatedTerminalTab: (terminalSessionId) =>
+      commitCreatedTerminalWorkspacePaneRuntimeTab({
+        base,
+        terminalSessionId,
+        showCreatedTerminalTab: terminal.showTerminalSession,
+      }),
     t: terminal.t,
   })
   return result.ok
+}
+
+function terminalCoordinatorTarget(base: TerminalSessionBase): {
+  repoId: string
+  branchName: string
+  worktreePath: string
+} {
+  return { repoId: base.repoRoot, branchName: base.branch, worktreePath: base.worktreePath }
 }

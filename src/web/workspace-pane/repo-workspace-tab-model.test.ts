@@ -200,7 +200,6 @@ describe('repo workspace pane tab model', () => {
     expect(model.runtimeTabStateByType.terminal).toEqual({
       type: 'terminal',
       createPending: false,
-      closingSessionIds: [],
       projectionPhase: 'pending',
       projectionErrorMessage: undefined,
       selectedSessionId: null,

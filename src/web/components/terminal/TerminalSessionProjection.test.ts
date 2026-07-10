@@ -566,7 +566,6 @@ describe('TerminalSessionProjection', () => {
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId)).toEqual([
         terminalSessionId,
       ])
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).closingSessionIds ?? []).toEqual([])
 
       projection.reconcileServerSessions(
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
@@ -579,12 +578,10 @@ describe('TerminalSessionProjection', () => {
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions.map((session) => session.terminalSessionId)).toEqual([
         terminalSessionId,
       ])
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).closingSessionIds ?? []).toEqual([])
 
       resolveClose()
       await expect(closePromise).resolves.toBe(true)
       expect(projection.isKnownSession(terminalSessionId)).toBe(false)
-      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).closingSessionIds ?? []).toEqual([])
     })
 
     test('keeps command-closing sessions visible when a session-closed event arrives before close settles', async () => {

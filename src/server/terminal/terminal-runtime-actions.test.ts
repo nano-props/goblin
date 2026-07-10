@@ -94,7 +94,6 @@ describe('terminal-runtime-actions close broadcast', () => {
       ok: true,
       action: 'created',
       terminalSessionId: 'term-111111111111111111111',
-      tabs: [],
       sessions: [],
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,
       processName: 'zsh',

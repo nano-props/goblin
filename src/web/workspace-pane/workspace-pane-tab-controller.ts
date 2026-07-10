@@ -18,7 +18,10 @@ export type WorkspacePaneTabControllerRoute = RepoBranchWorkspacePaneRoute | nul
 export type WorkspacePaneTabControllerNavigation = Partial<
   Pick<
     PrimaryWindowNavigationActions,
-    'showRepoBranchEmptyWorkspacePane' | 'showRepoBranchWorkspacePaneTab' | 'showRepoBranchTerminalSession'
+    | 'showRepoBranchEmptyWorkspacePane'
+    | 'showRepoBranchWorkspacePaneTab'
+    | 'showRepoBranchTerminalSession'
+    | 'commitRepoBranchWorkspacePaneRoute'
   >
 >
 
@@ -139,4 +142,17 @@ export function showWorkspacePaneControllerRoute(
       : navigation.showRepoBranchTerminalSession(repoId, branchName, route.terminalSessionId)
   }
   return false
+}
+
+export function commitWorkspacePaneControllerRoute(
+  repoId: string,
+  branchName: string,
+  route: WorkspacePaneTabControllerRoute,
+  navigation: WorkspacePaneTabControllerNavigation,
+  options?: { replace?: boolean },
+): boolean {
+  if (navigation.commitRepoBranchWorkspacePaneRoute) {
+    return navigation.commitRepoBranchWorkspacePaneRoute(repoId, branchName, route, options)
+  }
+  return showWorkspacePaneControllerRoute(repoId, branchName, route, navigation, options)
 }

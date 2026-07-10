@@ -99,6 +99,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   const commandValue = useMemo<TerminalSessionContextValue>(
     () => ({
       createTerminal: projection.createTerminal,
+      createTerminalWithOwnership: projection.createTerminalWithOwnership,
       registerHost: projection.registerHost,
       unregisterHost: projection.unregisterHost,
       selectTerminal: projection.selectTerminal,

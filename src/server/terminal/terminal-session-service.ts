@@ -68,7 +68,6 @@ class TerminalSessionService {
     this.workspaceTabsCoordinator = options.workspaceTabsCoordinator
     this.creator = createTerminalSessionCreator({
       createCoordinator: this.createCoordinator,
-      workspaceTabsCoordinator: this.workspaceTabsCoordinator,
       ensureOrRestore: async (clientId, userId, input) => await this.ensureOrRestore(clientId, userId, input),
       isCurrentRepoRuntime: (userId, repoRoot, repoRuntimeId) =>
         this.isCurrentRepoRuntime(userId, repoRoot, repoRuntimeId),

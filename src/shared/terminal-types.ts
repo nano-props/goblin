@@ -1,5 +1,3 @@
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-
 /**
  * `controllerStatus === 'connected'` while the broker reports the
  * controller client online. Disconnects and missed heartbeats make the
@@ -61,12 +59,6 @@ export interface TerminalCreateInput {
   cols?: number
   rows?: number
   clientId?: string
-  /**
-   * Optional workspace pane tab identity to anchor the new terminal tab after.
-   * When omitted or null, the new tab appends to the end of the strip.
-   * See `docs/workspace-tab-opener.md`.
-   */
-  insertAfterIdentity?: string | null
 }
 
 export interface TerminalRestartInput {
@@ -174,7 +166,6 @@ export type TerminalCreateResult =
       ok: true
       action: TerminalCreateAction
       terminalSessionId: string
-      tabs: WorkspacePaneTabEntry[]
       sessions: TerminalSessionSummary[]
     } & TerminalFirstFrame)
   | { ok: false; message: string }

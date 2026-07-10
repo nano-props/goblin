@@ -1,26 +1,18 @@
 import path from 'node:path'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import type { TerminalCreateInput, TerminalCreateResult, TerminalSessionSummary } from '#/shared/terminal-types.ts'
-import {
-  isWorkspacePaneRuntimeTabEntry,
-  type WorkspacePaneTabEntry,
-  workspacePaneRuntimeTabSessionId,
-} from '#/shared/workspace-pane.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import type {
   TerminalSessionEnsureInput,
   TerminalSessionEnsureResult,
 } from '#/server/terminal/terminal-session-ensurer.ts'
 import type { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
-import type { createWorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 
 type TerminalSessionCreateCoordinator = ReturnType<typeof createTerminalSessionCreateCoordinator>
-type WorkspacePaneTabsCoordinator = ReturnType<typeof createWorkspacePaneTabsCoordinator>
 type TerminalCreateFailure = Extract<TerminalCreateResult, { ok: false }>
 
 interface TerminalSessionCreatorOptions {
   createCoordinator: TerminalSessionCreateCoordinator
-  workspaceTabsCoordinator: WorkspacePaneTabsCoordinator
   ensureOrRestore(
     clientId: string,
     userId: string,
@@ -84,41 +76,16 @@ class TerminalSessionCreator {
           createResult.terminalRuntimeSessionId,
         )
         if (staleAfterList) return staleAfterList
-        const createdSession = sessions.find((session) => session.terminalSessionId === createResult.terminalSessionId)
-        const tabsResult = createdSession
-          ? await this.options.workspaceTabsCoordinator.ensureRuntimeTabForSession({
-              userId: input.userId,
-              scope: sessionScope,
-              branchName: input.request.branch,
-              worktreePath: createdSession.worktreePath,
-              runtimeType: 'terminal',
-              sessionId: createResult.terminalSessionId,
-              insertAfterIdentity: input.request.insertAfterIdentity ?? null,
-              guardBeforeWrite: () =>
-                this.options.rejectStaleCreateIfNeeded(
-                  input.userId,
-                  input.request,
-                  createResult.terminalRuntimeSessionId,
-                ),
-            })
-          : []
-        if (isTerminalCreateFailure(tabsResult)) {
-          await this.options.cleanupStaleCreate(input.userId, input.request)
-          return tabsResult
-        }
-        const tabs = tabsResult
-        const staleAfterTabs = await this.rejectStaleCreateIfNeeded(
+        const staleAfterSessions = await this.rejectStaleCreateIfNeeded(
           input.userId,
           input.request,
           createResult.terminalRuntimeSessionId,
         )
-        if (staleAfterTabs) return staleAfterTabs
-        const responseSessions = terminalSessionsWithWorkspaceTabOrder(sessions, createdSession?.worktreePath, tabs)
+        if (staleAfterSessions) return staleAfterSessions
         return {
           ok: true,
           action: createResult.action,
           terminalSessionId: createResult.terminalSessionId,
-          tabs,
           terminalRuntimeSessionId: createResult.terminalRuntimeSessionId,
           processName: createResult.processName,
           canonicalTitle: createResult.canonicalTitle,
@@ -130,7 +97,7 @@ class TerminalSessionCreator {
           controller: createResult.controller,
           canonicalCols: createResult.canonicalCols,
           canonicalRows: createResult.canonicalRows,
-          sessions: responseSessions,
+          sessions: sessions,
         }
       },
     )
@@ -152,46 +119,6 @@ export function createTerminalSessionCreator(options: TerminalSessionCreatorOpti
   return new TerminalSessionCreator(options)
 }
 
-function isTerminalCreateFailure(
-  result: WorkspacePaneTabEntry[] | TerminalCreateFailure,
-): result is TerminalCreateFailure {
-  return !Array.isArray(result)
-}
-
 function terminalWorktreePath(repoRoot: string, worktreePath: string): string {
   return isRemoteRepoId(repoRoot) ? worktreePath : path.resolve(worktreePath)
-}
-
-function terminalSessionsWithWorkspaceTabOrder(
-  sessions: readonly TerminalSessionSummary[],
-  worktreePath: string | null | undefined,
-  tabs: readonly WorkspacePaneTabEntry[],
-): TerminalSessionSummary[] {
-  if (!worktreePath) return [...sessions]
-
-  const sessionsById = new Map(sessions.map((session) => [session.terminalSessionId, session]))
-  const usedSessionIds = new Set<string>()
-  const orderedWorktreeSessions: TerminalSessionSummary[] = []
-
-  for (const tab of tabs) {
-    if (!isWorkspacePaneRuntimeTabEntry(tab) || tab.type !== 'terminal') continue
-    const sessionId = workspacePaneRuntimeTabSessionId(tab)
-    if (usedSessionIds.has(sessionId)) continue
-    const session = sessionsById.get(sessionId)
-    if (!session || session.worktreePath !== worktreePath) continue
-    orderedWorktreeSessions.push(session)
-    usedSessionIds.add(sessionId)
-  }
-
-  for (const session of sessions) {
-    if (session.worktreePath !== worktreePath || usedSessionIds.has(session.terminalSessionId)) continue
-    orderedWorktreeSessions.push(session)
-    usedSessionIds.add(session.terminalSessionId)
-  }
-
-  let orderedWorktreeIndex = 0
-  return sessions.map((session) => {
-    if (session.worktreePath !== worktreePath) return session
-    return orderedWorktreeSessions[orderedWorktreeIndex++] ?? session
-  })
 }

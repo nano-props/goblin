@@ -41,9 +41,6 @@ function reconcileTerminalWorkspacePaneRoute(
   if (model.tabEntriesProjectionPhase === 'failed') return { kind: 'unverified' }
   if (model.runtimeTabStateByType.terminal.projectionPhase === 'pending') return { kind: 'pending' }
   if (model.runtimeTabStateByType.terminal.projectionPhase === 'failed') return { kind: 'unverified' }
-  if (model.runtimeTabStateByType.terminal.closingSessionIds.includes(route.terminalSessionId)) {
-    return { kind: 'pending' }
-  }
   if (
     model.tabs.some(
       (tab) => tab.kind === 'runtime' && tab.runtimeType === 'terminal' && tab.sessionId === route.terminalSessionId,

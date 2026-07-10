@@ -1,4 +1,8 @@
-import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import type {
+  WorkspacePaneRuntimeTabType,
+  WorkspacePaneStaticTabType,
+  WorkspacePaneTabEntry,
+} from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 export const WORKSPACE_PANE_TABS_SOCKET_ACTIONS = {
@@ -45,6 +49,12 @@ export type WorkspacePaneTabsUpdateOperation =
   | {
       type: 'open-static'
       tabType: WorkspacePaneStaticTabType
+      insertAfterIdentity?: string | null
+    }
+  | {
+      type: 'open-runtime'
+      runtimeType: WorkspacePaneRuntimeTabType
+      sessionId: string
       insertAfterIdentity?: string | null
     }
   | { type: 'close-static'; tabType: WorkspacePaneStaticTabType }

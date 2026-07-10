@@ -134,21 +134,6 @@ export interface TerminalCreateOptions {
    * workspace-pane navigation can race the eventual create result.
    */
   resolveStartupShellCommand?: () => Promise<string>
-  /**
-   * Optional workspace pane tab identity to anchor the new terminal tab after.
-   * When omitted or null, the new tab appends to the end of the strip.
-   * See `docs/workspace-tab-opener.md`.
-   *
-   * Create dedupe intentionally ignores this field — two creates anchored at
-   * different positions are still the same session shape.
-   */
-  insertAfterIdentity?: string | null
-  /**
-   * Optional caller scheduling policy for the create side effects. Terminal
-   * still owns admission/lifecycle; callers use this to serialize the actual
-   * create work with adjacent UI/domain mutations when needed.
-   */
-  coordinateCreate?: <T>(task: () => Promise<T>) => Promise<T>
 }
 
 export interface TerminalRepoSnapshot {
@@ -177,7 +162,6 @@ export interface TerminalWorktreeSnapshot {
   terminalWorktreeKey: string
   selectedDescriptor: TerminalDescriptor | null
   sessions: TerminalSessionSummary[]
-  closingSessionIds?: string[]
   count: number
   bellCount: number
   outputActiveCount: number
@@ -186,6 +170,10 @@ export interface TerminalWorktreeSnapshot {
 
 export interface TerminalSessionContextValue {
   createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
+  createTerminalWithOwnership?: (
+    base: TerminalSessionBase,
+    options?: TerminalCreateOptions,
+  ) => Promise<{ terminalSessionId: string; ownsCreate: boolean }>
   registerHost: (terminalWorktreeKey: string, host: HTMLElement) => void
   unregisterHost: (terminalWorktreeKey: string, host: HTMLElement) => void
   selectTerminal: (terminalWorktreeKey: string, terminalSessionId: string) => void

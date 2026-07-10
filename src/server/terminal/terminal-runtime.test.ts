@@ -618,7 +618,19 @@ describe('server terminal runtime', () => {
     })
     expect(created.ok).toBe(true)
     if (!created.ok) return
-    expect(created.tabs).toContainEqual({ type: 'terminal', runtimeSessionId: created.terminalSessionId })
+    await requestWorkspacePaneTabs(
+      host,
+      socket,
+      WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
+      {
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: REPO_RUNTIME_ID,
+        branchName: 'feature',
+        worktreePath: '/repo-linked',
+        operation: { type: 'open-runtime', runtimeType: 'terminal', sessionId: created.terminalSessionId },
+      },
+      'req_open_terminal_before_exit',
+    )
     socket.send.mockClear()
 
     mockPtys[0]?.emitExit()
@@ -666,6 +678,19 @@ describe('server terminal runtime', () => {
     })
     expect(created.ok).toBe(true)
     if (!created.ok) return
+    await requestWorkspacePaneTabs(
+      host,
+      socket,
+      WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
+      {
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: REPO_RUNTIME_ID,
+        branchName: 'feature',
+        worktreePath: '/repo-linked',
+        operation: { type: 'open-runtime', runtimeType: 'terminal', sessionId: created.terminalSessionId },
+      },
+      'req_open_terminal_before_prune',
+    )
     socket.send.mockClear()
     vi.mocked(getWorktrees).mockResolvedValueOnce([])
 
@@ -887,8 +912,8 @@ describe('server terminal runtime', () => {
       ),
     ).resolves.toEqual([
       { type: 'status', tabId: 'workspace-pane:status' },
-      { type: 'terminal', runtimeSessionId: first.terminalSessionId },
       { type: 'history', tabId: 'workspace-pane:history' },
+      { type: 'terminal', runtimeSessionId: first.terminalSessionId },
     ])
     socket.send.mockClear()
 
