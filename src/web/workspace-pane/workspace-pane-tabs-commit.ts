@@ -31,6 +31,8 @@ export type WorkspacePaneTabsMutationOperation = 'commit' | 'update' | 'reorder'
 
 export interface WorkspacePaneTabsMutationSuccess {
   ok: true
+  /** Whether this client runtime accepted the canonical server result into its query projection. */
+  projectionApplied: boolean
 }
 
 export interface WorkspacePaneTabsMutationFailure {
@@ -179,7 +181,7 @@ async function commitWorkspacePaneTabsNow(
       worktreePath: input.worktreePath,
       tabs: serverTabs,
     })
-    return accepted ? { ok: true } : canceledWorkspacePaneTabsMutation('commit', input)
+    return { ok: true, projectionApplied: accepted }
   } catch (err) {
     return reportWorkspacePaneTabsFailure({
       operation: 'commit',
@@ -204,7 +206,7 @@ async function updateWorkspacePaneTabsNow(
       worktreePath: input.worktreePath,
       tabs: serverTabs,
     })
-    return accepted ? { ok: true } : canceledWorkspacePaneTabsMutation('update', input)
+    return { ok: true, projectionApplied: accepted }
   } catch (err) {
     return reportWorkspacePaneTabsFailure({
       operation: 'update',
@@ -260,21 +262,4 @@ function workspacePaneTabsProjectionScopeAccepted(
   input: Pick<CommitWorkspacePaneTabsInput, 'repoRoot' | 'repoRuntimeId'>,
 ): boolean {
   return currentRepoRuntimeId(useReposStore.getState(), input.repoRoot) === input.repoRuntimeId
-}
-
-function canceledWorkspacePaneTabsMutation(
-  operation: WorkspacePaneTabsMutationOperation,
-  input: Pick<CommitWorkspacePaneTabsInput, 'repoRoot' | 'branchName' | 'worktreePath'>,
-): WorkspacePaneTabsMutationFailure {
-  const error = new Error('error.repo-runtime-stale')
-  return {
-    ok: false,
-    operation,
-    repoRoot: input.repoRoot,
-    branchName: input.branchName,
-    worktreePath: input.worktreePath,
-    message: error.message,
-    error,
-    canceled: true,
-  }
 }

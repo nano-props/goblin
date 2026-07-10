@@ -4,8 +4,8 @@ import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
 import { runCreateTerminalTabCommand } from '#/web/commands/terminal-create-command.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
-import type { WorkspacePaneTabControllerNavigation } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { WorkspacePaneTabControllerCommitNavigation } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { commitWorkspacePaneControllerRoute } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
@@ -24,8 +24,8 @@ export interface WorkspacePaneRuntimeTabCommandContext {
 export interface WorkspacePaneTerminalRuntimeCommandOptions {
   repoId: string | null
   branchName: string | null
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
-  navigation: WorkspacePaneTabControllerNavigation
+  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
+  navigation: WorkspacePaneTabControllerCommitNavigation
   t?: TerminalCreateTranslator
 }
 
@@ -120,10 +120,15 @@ function showTerminalRuntimeTab(
   sessionId: string,
   repoId: string,
   branchName: string,
-  navigation: WorkspacePaneTabControllerNavigation,
-): boolean {
+  navigation: WorkspacePaneTabControllerCommitNavigation,
+): boolean | Promise<boolean> {
   if (type !== 'terminal') return false
-  return commitWorkspacePaneControllerRoute(repoId, branchName, { kind: 'terminal', terminalSessionId: sessionId }, navigation)
+  return commitWorkspacePaneControllerRoute(
+    repoId,
+    branchName,
+    { kind: 'terminal', terminalSessionId: sessionId },
+    navigation,
+  )
 }
 
 async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandContext): Promise<boolean> {
@@ -144,12 +149,13 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
   }
   const result = await runCreateTerminalTabCommand({
     base,
-    createTerminal: bridge.createTerminalWithOwnership ?? bridge.createTerminal,
+    createTerminal: bridge.createTerminalWithAdmission,
     openerIdentity: terminal.openerIdentity,
-    commitCreatedTerminalTab: (terminalSessionId) =>
+    commitCreatedTerminalTab: (terminalSessionId, workspacePaneTabs) =>
       commitCreatedTerminalWorkspacePaneRuntimeTab({
         base,
         terminalSessionId,
+        workspacePaneTabs,
         showCreatedTerminalTab: terminal.showTerminalSession,
       }),
     t: terminal.t,
@@ -165,12 +171,13 @@ async function runNewTerminalAction(context: WorkspacePaneRuntimeTabCommandConte
   const { base, bridge } = terminal
   const result = await runCreateTerminalTabCommand({
     base,
-    createTerminal: bridge.createTerminalWithOwnership ?? bridge.createTerminal,
+    createTerminal: bridge.createTerminalWithAdmission,
     openerIdentity: terminal.openerIdentity,
-    commitCreatedTerminalTab: (terminalSessionId) =>
+    commitCreatedTerminalTab: (terminalSessionId, workspacePaneTabs) =>
       commitCreatedTerminalWorkspacePaneRuntimeTab({
         base,
         terminalSessionId,
+        workspacePaneTabs,
         showCreatedTerminalTab: terminal.showTerminalSession,
       }),
     t: terminal.t,

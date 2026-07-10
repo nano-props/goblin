@@ -22,9 +22,7 @@ import {
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import {
-  setTerminalSessionCommandBridge,
-} from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'

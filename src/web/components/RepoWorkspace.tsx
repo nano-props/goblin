@@ -16,13 +16,13 @@ import { BranchActionSurfaceContext } from '#/web/components/repo-workspace/bran
 import { useRepoProjectionReadModel } from '#/web/repo-data-query.ts'
 import { repoBranchReadModelFromSnapshot } from '#/web/repo-branch-read-model.ts'
 import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { useWorkspacePaneRouteController } from '#/web/components/repo-workspace/workspace-pane-route-controller.ts'
 import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 
 export type RepoWorkspacePaneRouteContext =
-  | { kind: 'routed'; route: RepoBranchWorkspacePaneRoute | null }
+  | { kind: 'routed'; route: ParsedRepoBranchWorkspacePaneRoute | null }
   | { kind: 'inactive' }
 
 interface Props {

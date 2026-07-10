@@ -631,6 +631,9 @@ beforeEach(() => {
       list: vi.fn(async () => []),
       onChanged: vi.fn(() => () => {}),
     }),
+    workspacePaneRuntime: () => ({
+      open: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
+    }),
   })
 })
 

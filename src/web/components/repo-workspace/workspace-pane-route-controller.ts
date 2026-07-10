@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRouteTarget, RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
 import {
   useWorkspaceNavigationHistory,
   type WorkspaceNavigationRouteContext,
@@ -26,7 +26,7 @@ export interface WorkspacePaneRouteControllerInput {
   repoId: string
   branchName: string | null
   worktreePath: string | null
-  route: RepoBranchWorkspacePaneRoute | null
+  route: ParsedRepoBranchWorkspacePaneRouteTarget
   model: RepoWorkspaceTabModel
 }
 
@@ -51,6 +51,7 @@ export function useWorkspacePaneRouteController({
   const historyReconciliation = workspacePaneRouteControllerHistoryReconciliation({
     enabled,
     repoId,
+    repoRuntimeId: model.repoRuntimeId,
     branchName,
     worktreePath,
     route,
@@ -77,6 +78,7 @@ export function useWorkspacePaneRouteController({
   useReconcileWorkspacePaneRoute({
     enabled,
     repoId,
+    repoRuntimeId: model.repoRuntimeId,
     branchName,
     worktreePath,
     route,
@@ -90,15 +92,17 @@ export function useWorkspacePaneRouteController({
 function workspacePaneRouteControllerHistoryReconciliation(input: {
   enabled: boolean
   repoId: string
+  repoRuntimeId: string
   branchName: string | null
   worktreePath: string | null
-  route: RepoBranchWorkspacePaneRoute | null
+  route: ParsedRepoBranchWorkspacePaneRouteTarget
   reconciliation: WorkspacePaneRouteReconciliation
 }): WorkspacePaneRouteReconciliation {
   if (!input.enabled) return input.reconciliation
   if (
     workspacePaneTabControllerReconciliationDeferred({
       repoId: input.repoId,
+      repoRuntimeId: input.repoRuntimeId,
       branchName: input.branchName,
       worktreePath: input.worktreePath,
       route: input.route,
@@ -113,6 +117,7 @@ function workspacePaneRouteControllerHistoryReconciliation(input: {
 function useReconcileWorkspacePaneRoute({
   enabled,
   repoId,
+  repoRuntimeId,
   branchName,
   worktreePath,
   route,
@@ -121,20 +126,30 @@ function useReconcileWorkspacePaneRoute({
 }: {
   enabled: boolean
   repoId: string
+  repoRuntimeId: string
   branchName: string | null
   worktreePath: string | null
-  route: RepoBranchWorkspacePaneRoute | null
+  route: ParsedRepoBranchWorkspacePaneRouteTarget
   reconciliation: WorkspacePaneRouteReconciliation
   navigation: PrimaryWindowNavigationActions
 }): void {
   useEffect(() => {
     if (!enabled) return
     let cancelled = false
-    void runWorkspacePaneTabCoordinatorTask({ repoId, branchName, worktreePath }, () => {
+    void runWorkspacePaneTabCoordinatorTask({ repoId, repoRuntimeId, branchName, worktreePath }, () => {
       if (cancelled) return
-      observeWorkspacePaneTabControllerRoute({ repoId, branchName, worktreePath, route })
+      observeWorkspacePaneTabControllerRoute({ repoId, repoRuntimeId, branchName, worktreePath, route })
       if (!branchName) return
-      if (workspacePaneTabControllerReconciliationDeferred({ repoId, branchName, worktreePath, route, reconciliation })) {
+      if (
+        workspacePaneTabControllerReconciliationDeferred({
+          repoId,
+          repoRuntimeId,
+          branchName,
+          worktreePath,
+          route,
+          reconciliation,
+        })
+      ) {
         return
       }
       applyWorkspacePaneRouteReconciliation({ repoId, branchName, reconciliation, navigation })
@@ -142,7 +157,7 @@ function useReconcileWorkspacePaneRoute({
     return () => {
       cancelled = true
     }
-  }, [branchName, enabled, navigation, reconciliation, repoId, route, worktreePath])
+  }, [branchName, enabled, navigation, reconciliation, repoId, repoRuntimeId, route, worktreePath])
 }
 
 function useWorkspacePaneNavigationHistory({
@@ -157,17 +172,18 @@ function useWorkspacePaneNavigationHistory({
   repoId: string
   branchName: string | null
   worktreePath: string | null
-  route: RepoBranchWorkspacePaneRoute | null
+  route: ParsedRepoBranchWorkspacePaneRouteTarget
   reconciliation: WorkspacePaneRouteReconciliation
 }): void {
   const historyRoute = workspacePaneRouteHistoryResolution(route ?? null, reconciliation)
+  const replaceCurrentRoute = workspacePaneValidRouteTarget(route)
   const replaceCurrentRouteContext =
     branchName && reconciliation.kind === 'replace-empty-pane'
       ? workspacePaneHistoryRouteContext({
           repoId,
           branchName,
           worktreePath,
-          route: route ?? null,
+          route: replaceCurrentRoute,
         })
       : null
   useWorkspaceNavigationHistory({
@@ -180,6 +196,13 @@ function useWorkspacePaneNavigationHistory({
   })
 }
 
+function workspacePaneValidRouteTarget(
+  route: ParsedRepoBranchWorkspacePaneRouteTarget,
+): RepoBranchWorkspacePaneRouteTarget {
+  if (route?.kind === 'invalid-static') return null
+  return route
+}
+
 function workspacePaneHistoryRouteContext({
   repoId,
   branchName,
@@ -189,7 +212,7 @@ function workspacePaneHistoryRouteContext({
   repoId: string
   branchName: string
   worktreePath: string | null
-  route: RepoBranchWorkspacePaneRoute | null
+  route: RepoBranchWorkspacePaneRouteTarget
 }): WorkspaceNavigationRouteContext {
   return {
     kind: 'branch',
@@ -229,7 +252,7 @@ function useSyncRoutedWorkspacePaneSelection({
   repoId: string
   branchName: string | null
   worktreePath: string | null
-  route: RepoBranchWorkspacePaneRoute | null
+  route: ParsedRepoBranchWorkspacePaneRouteTarget
   reconciliation: WorkspacePaneRouteReconciliation
 }): void {
   const setWorkspacePaneTab = useReposStore((s) => s.setWorkspacePaneTab)

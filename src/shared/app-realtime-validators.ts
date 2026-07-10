@@ -4,10 +4,7 @@ import type {
   AppRealtimeRequestAction,
   AppRealtimeSocketServerMessage,
 } from '#/shared/app-realtime-socket.ts'
-import {
-  normalizeTerminalClientMessage,
-  normalizeTerminalSocketServerMessage,
-} from '#/shared/terminal-validators.ts'
+import { normalizeTerminalClientMessage, normalizeTerminalSocketServerMessage } from '#/shared/terminal-validators.ts'
 import {
   WORKSPACE_PANE_TABS_REALTIME_EVENTS,
   WORKSPACE_PANE_TABS_SOCKET_ACTIONS,
@@ -20,6 +17,14 @@ import {
   WorkspacePaneTabsReplaceInputSchema,
   WorkspacePaneTabsUpdateInputSchema,
 } from '#/shared/workspace-pane-tabs-validators.ts'
+import {
+  WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS,
+  type WorkspacePaneRuntimeSocketAction,
+} from '#/shared/workspace-pane-runtime.ts'
+import {
+  normalizeWorkspacePaneRuntimeOpenResult,
+  WorkspacePaneRuntimeOpenInputSchema,
+} from '#/shared/workspace-pane-runtime-validators.ts'
 
 const APP_REALTIME_REQUEST_ID_RE = /^[A-Za-z0-9_-]{1,128}$/
 const APP_REALTIME_INVALID_RESPONSE_PAYLOAD_ERROR = 'Invalid realtime socket response payload'
@@ -31,8 +36,9 @@ const WorkspacePaneTabsSocketActionSchema = v.picklist([
   WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
   WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
 ] as const)
+const WorkspacePaneRuntimeSocketActionSchema = v.literal(WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open)
 
-const AppRealtimeWorkspacePaneTabsClientMessageSchema = v.variant('type', [
+const AppRealtimeNonTerminalClientMessageSchema = v.variant('type', [
   v.object({
     type: v.literal('request'),
     requestId: AppRealtimeRequestIdSchema,
@@ -52,6 +58,12 @@ const AppRealtimeWorkspacePaneTabsClientMessageSchema = v.variant('type', [
     input: WorkspacePaneTabsUpdateInputSchema,
   }),
   v.object({
+    type: v.literal('request'),
+    requestId: AppRealtimeRequestIdSchema,
+    action: v.literal(WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open),
+    input: WorkspacePaneRuntimeOpenInputSchema,
+  }),
+  v.object({
     type: v.literal('heartbeat'),
   }),
   v.object({
@@ -66,14 +78,14 @@ const AppRealtimeNonTerminalServerMessageSchema = v.variant('type', [
     type: v.literal('response'),
     requestId: AppRealtimeRequestIdSchema,
     ok: v.literal(true),
-    action: WorkspacePaneTabsSocketActionSchema,
+    action: v.union([WorkspacePaneTabsSocketActionSchema, WorkspacePaneRuntimeSocketActionSchema]),
     payload: v.unknown(),
   }),
   v.object({
     type: v.literal('response'),
     requestId: AppRealtimeRequestIdSchema,
     ok: v.literal(false),
-    action: WorkspacePaneTabsSocketActionSchema,
+    action: v.union([WorkspacePaneTabsSocketActionSchema, WorkspacePaneRuntimeSocketActionSchema]),
     error: v.string(),
   }),
   v.object({
@@ -85,7 +97,7 @@ const AppRealtimeNonTerminalServerMessageSchema = v.variant('type', [
 export function normalizeAppRealtimeClientMessage(value: unknown): AppRealtimeClientMessage | null {
   const terminal = normalizeTerminalClientMessage(value)
   if (terminal) return terminal
-  const parsed = v.safeParse(AppRealtimeWorkspacePaneTabsClientMessageSchema, value)
+  const parsed = v.safeParse(AppRealtimeNonTerminalClientMessageSchema, value)
   return parsed.success ? (parsed.output as AppRealtimeClientMessage) : null
 }
 
@@ -96,7 +108,10 @@ export function normalizeAppRealtimeSocketServerMessage(value: unknown): AppReal
   if (!parsed.success) return null
   const message = parsed.output
   if (message.type !== 'response' || !message.ok) return message as AppRealtimeSocketServerMessage
-  const payload = normalizeWorkspacePaneTabsSocketResponsePayload(message.action, message.payload)
+  const payload =
+    message.action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open
+      ? normalizeWorkspacePaneRuntimeOpenResult(message.payload)
+      : normalizeWorkspacePaneTabsSocketResponsePayload(message.action, message.payload)
   if (payload === null) {
     return {
       type: 'response',
@@ -138,6 +153,12 @@ export function isAppRealtimeWorkspacePaneTabsAction(
     action === WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace ||
     action === WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update
   )
+}
+
+export function isAppRealtimeWorkspacePaneRuntimeAction(
+  action: AppRealtimeRequestAction,
+): action is WorkspacePaneRuntimeSocketAction {
+  return action === WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open
 }
 
 export function isAppRealtimeWsMessageWithinLimit(value: string): boolean {

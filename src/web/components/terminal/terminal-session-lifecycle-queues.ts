@@ -11,19 +11,19 @@
  * Close requests are deduped by terminalRuntimeSessionId and are awaited by later creates
  * for the same worktree so a fresh create cannot race an orphan close.
  */
-export interface TerminalCreateQueueEntry<TBase, TOptions> {
+export interface TerminalCreateQueueEntry<TBase, TOptions, TResult = string> {
   base: TBase
   options: TOptions
-  promise: Promise<string>
-  resolve: (terminalSessionId: string) => void
+  promise: Promise<TResult>
+  resolve: (result: TResult) => void
   reject: (error: unknown) => void
   flushing: boolean
   creating: boolean
 }
 
-export interface TerminalCreateQueueAdmission {
-  promise: Promise<string>
-  ownsCreate: boolean
+export interface TerminalCreateQueueAdmission<TResult = string> {
+  promise: Promise<TResult>
+  ownsAdmission: boolean
 }
 
 export interface PendingTerminalClose {
@@ -34,8 +34,8 @@ export interface PendingTerminalClose {
   reject: (error: unknown) => void
 }
 
-export class TerminalSessionLifecycleQueues<TBase, TOptions> {
-  private readonly createEntriesByWorktree = new Map<string, TerminalCreateQueueEntry<TBase, TOptions>[]>()
+export class TerminalSessionLifecycleQueues<TBase, TOptions, TResult = string> {
+  private readonly createEntriesByWorktree = new Map<string, TerminalCreateQueueEntry<TBase, TOptions, TResult>[]>()
   private readonly pendingCloseByTerminalRuntimeSessionId = new Map<string, PendingTerminalClose>()
 
   enqueueCreate(input: {
@@ -44,13 +44,13 @@ export class TerminalSessionLifecycleQueues<TBase, TOptions> {
     options: TOptions
     isSameRequest: (existing: TOptions, next: TOptions) => boolean
     flush: (terminalWorktreeKey: string) => void
-  }): TerminalCreateQueueAdmission {
+  }): TerminalCreateQueueAdmission<TResult> {
     const queue = this.createQueue(input.terminalWorktreeKey)
     const existing = queue.find((entry) => input.isSameRequest(entry.options, input.options))
-    if (existing) return { promise: existing.promise, ownsCreate: false }
-    let resolve!: (terminalSessionId: string) => void
+    if (existing) return { promise: existing.promise, ownsAdmission: false }
+    let resolve!: (result: TResult) => void
     let reject!: (error: unknown) => void
-    const promise = new Promise<string>((innerResolve, innerReject) => {
+    const promise = new Promise<TResult>((innerResolve, innerReject) => {
       resolve = innerResolve
       reject = innerReject
     })
@@ -65,10 +65,10 @@ export class TerminalSessionLifecycleQueues<TBase, TOptions> {
       creating: false,
     })
     if (wasEmpty) input.flush(input.terminalWorktreeKey)
-    return { promise, ownsCreate: true }
+    return { promise, ownsAdmission: true }
   }
 
-  getCreate(terminalWorktreeKey: string): TerminalCreateQueueEntry<TBase, TOptions> | undefined {
+  getCreate(terminalWorktreeKey: string): TerminalCreateQueueEntry<TBase, TOptions, TResult> | undefined {
     return this.createEntriesByWorktree.get(terminalWorktreeKey)?.[0]
   }
 
@@ -76,7 +76,7 @@ export class TerminalSessionLifecycleQueues<TBase, TOptions> {
     return (this.createEntriesByWorktree.get(terminalWorktreeKey)?.length ?? 0) > 0
   }
 
-  deleteCreate(terminalWorktreeKey: string, expected?: TerminalCreateQueueEntry<TBase, TOptions>): boolean {
+  deleteCreate(terminalWorktreeKey: string, expected?: TerminalCreateQueueEntry<TBase, TOptions, TResult>): boolean {
     const queue = this.createEntriesByWorktree.get(terminalWorktreeKey)
     if (!queue || queue.length === 0) return false
     if (!expected) {
@@ -90,11 +90,7 @@ export class TerminalSessionLifecycleQueues<TBase, TOptions> {
     return index === 0
   }
 
-  rejectCreatesForWorktree(
-    terminalWorktreeKey: string,
-    error: unknown,
-    options: { includeActive: boolean },
-  ): boolean {
+  rejectCreatesForWorktree(terminalWorktreeKey: string, error: unknown, options: { includeActive: boolean }): boolean {
     const queue = this.createEntriesByWorktree.get(terminalWorktreeKey)
     if (!queue || queue.length === 0) return false
     const start = options.includeActive ? 0 : 1
@@ -145,10 +141,10 @@ export class TerminalSessionLifecycleQueues<TBase, TOptions> {
     this.pendingCloseByTerminalRuntimeSessionId.clear()
   }
 
-  private createQueue(terminalWorktreeKey: string): TerminalCreateQueueEntry<TBase, TOptions>[] {
+  private createQueue(terminalWorktreeKey: string): TerminalCreateQueueEntry<TBase, TOptions, TResult>[] {
     const queue = this.createEntriesByWorktree.get(terminalWorktreeKey)
     if (queue) return queue
-    const next: TerminalCreateQueueEntry<TBase, TOptions>[] = []
+    const next: TerminalCreateQueueEntry<TBase, TOptions, TResult>[] = []
     this.createEntriesByWorktree.set(terminalWorktreeKey, next)
     return next
   }

@@ -63,6 +63,11 @@ Notes:
 - Cache identity must match runtime identity. If reopen can mint a new runtime for the same stable path, cache keys and mutation preconditions need a runtime dimension too.
 - Do not layer a client freshness check on top of a server-owned runtime id when the server can already validate the mutation from that id alone. That is not extra safety; it is a second authority and a new failure mode.
 - After a successful server mutation, prefer invalidation from server push over client-issued "confirming" fetches. If the server already owns the durable state transition, the client should re-project from the broadcast instead of trying to restage the transition locally.
+- When one user action creates a server-owned resource and must also establish
+  another server-owned projection of that resource, compose those writes in a
+  server application operation. Return the canonical projections together;
+  do not make the client issue a provider write followed by a second membership
+  write.
 
 ## Restorable state
 
@@ -125,9 +130,18 @@ The normal shape is:
 const plan = resolveOperationPlan(currentRoute, currentProjection)
 if (!plan.ok) return false
 const result = await performServerOrRuntimeWrite(plan.write)
-if (!result.ok) return false
-return commitPlannedNavigation(plan.route)
+if (!result.serverCommitted) return false
+applyCanonicalProjectionWhenCurrent(result.canonicalProjection)
+return await commitPlannedNavigation(plan.route)
 ```
+
+Keep server commit, local projection application, and route completion as
+separate outcomes. A server response that belongs to an old client runtime may
+be skipped by the local cache without reclassifying the server write as failed.
+After the server commit point, route failure is recoverable UI state and must
+not trigger destructive compensation against a long-lived runtime resource.
+Operation-owned navigation must settle against the requested route; merely
+scheduling `router.navigate(...)` is not completion.
 
 If a runtime write has a visible transitional lifecycle, project that lifecycle
 through the owning runtime model without contradicting the current business

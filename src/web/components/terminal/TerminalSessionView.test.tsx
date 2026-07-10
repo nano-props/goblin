@@ -4,6 +4,7 @@ import { act } from '@testing-library/react'
 import type { ComponentProps } from 'react'
 import { describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { TerminalSessionView as TerminalSessionViewComponent } from '#/web/components/terminal/TerminalSessionView.tsx'
 import {
   TerminalSessionContext,
@@ -129,7 +130,7 @@ async function renderTerminalSession() {
       phase: 'open' as const,
     },
   }
-  const context: TerminalSessionContextValue = {
+  const context: TerminalSessionContextValue = terminalSessionContextForTest({
     createTerminal: async () => 'term-111111111111111111111',
     registerHost: vi.fn(),
     unregisterHost: vi.fn(),
@@ -148,7 +149,7 @@ async function renderTerminalSession() {
     writeInput,
     takeover: vi.fn(),
     focusTerminal: vi.fn(),
-  }
+  })
   const readContext: TerminalSessionReadContextValue = {
     terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
     subscribeTerminalWorktree: () => () => {},
@@ -289,7 +290,7 @@ describe('TerminalSessionView', () => {
       },
     }
     const attach = vi.fn()
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -308,7 +309,7 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-    }
+    })
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
       subscribeTerminalWorktree: () => () => {},
@@ -404,7 +405,7 @@ describe('TerminalSessionView', () => {
     const attach = vi.fn()
     const detach = vi.fn()
     const worktreeListeners = new Set<() => void>()
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -423,7 +424,7 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-    }
+    })
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
       subscribeTerminalWorktree: (_terminalWorktreeKey, listener) => {
@@ -528,7 +529,7 @@ describe('TerminalSessionView', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -547,7 +548,7 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover,
       focusTerminal: vi.fn(),
-    }
+    })
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
@@ -599,7 +600,7 @@ describe('TerminalSessionView', () => {
       createPending: false,
     }
     const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: vi.fn(async () => 'term-222222222222222222222'),
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -618,7 +619,7 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-    }
+    })
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
@@ -684,7 +685,7 @@ describe('TerminalSessionView', () => {
       createPending: false,
     }
     const snapshot = { phase: 'opening' as const, message: null, processName: 'zsh' }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -703,7 +704,7 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-    }
+    })
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
@@ -745,7 +746,7 @@ describe('TerminalSessionView', () => {
       count: 0,
       createPending: false,
     }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: vi.fn(),
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -764,7 +765,7 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-    }
+    })
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
@@ -845,7 +846,7 @@ describe('TerminalSessionView', () => {
       },
     }
     const focusTerminal = vi.fn()
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -864,7 +865,7 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal,
-    }
+    })
     let activeSnapshot: TerminalSnapshot = openingSnapshot
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -959,7 +960,7 @@ describe('TerminalSessionView', () => {
       },
     }
     const focusTerminal = vi.fn()
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -978,7 +979,7 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal,
-    }
+    })
     let activeSnapshot: TerminalSnapshot = openingSnapshot
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
@@ -1079,7 +1080,7 @@ describe('TerminalSessionView', () => {
         phase: 'error' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -1098,7 +1099,7 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover,
       focusTerminal: vi.fn(),
-    }
+    })
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
@@ -1201,7 +1202,7 @@ describe('TerminalSessionView', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -1220,7 +1221,7 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-    }
+    })
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
@@ -1326,7 +1327,7 @@ describe('TerminalSessionView', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -1345,7 +1346,7 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-    }
+    })
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
@@ -1468,7 +1469,7 @@ describe('TerminalSessionView', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -1487,7 +1488,7 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-    }
+    })
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
@@ -1584,7 +1585,7 @@ describe('TerminalSessionView', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -1603,7 +1604,7 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-    }
+    })
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
@@ -1653,7 +1654,11 @@ describe('TerminalSessionView', () => {
       // both of which `shellEscapePath` wraps in single quotes — if
       // the escape regresses to plain concat this catches it.
       expect(writeInput).toHaveBeenCalledTimes(1)
-      expect(writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/resolved/weird name & space.png'", 'paste')
+      expect(writeInput).toHaveBeenCalledWith(
+        'term-111111111111111111111',
+        "'/resolved/weird name & space.png'",
+        'paste',
+      )
       expect(shellClient.saveClipboardFiles).not.toHaveBeenCalled()
     } finally {
       unmount()
@@ -1712,7 +1717,7 @@ describe('TerminalSessionView', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -1731,7 +1736,7 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-    }
+    })
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
@@ -1933,7 +1938,11 @@ describe('TerminalSessionView', () => {
         new File([new Uint8Array([1])], 'c.png'),
       ])
 
-      expect(rendered.writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'/abs/a.png' '/tmp/b.png'", 'paste')
+      expect(rendered.writeInput).toHaveBeenCalledWith(
+        'term-111111111111111111111',
+        "'/abs/a.png' '/tmp/b.png'",
+        'paste',
+      )
       expect(vi.mocked(toast.error)).toHaveBeenCalledWith('terminal.paste-file-partial')
       expect(vi.mocked(toast.error)).not.toHaveBeenCalledWith('terminal.paste-file-failed')
     } finally {
@@ -1996,7 +2005,7 @@ describe('TerminalSessionView', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -2015,7 +2024,7 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-    }
+    })
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(terminalWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
@@ -2164,7 +2173,7 @@ describe('TerminalSessionView', () => {
         phase: 'open' as const,
       },
     }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal: async () => 'term-111111111111111111111',
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -2183,7 +2192,7 @@ describe('TerminalSessionView', () => {
       writeInput,
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-    }
+    })
     let activeWorktreeSnapshot = worktreeSnapshotA
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(activeWorktreeSnapshot),
@@ -2287,7 +2296,7 @@ describe('TerminalSessionView', () => {
       createPending: false,
     }
     const emptySnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
-    const context: TerminalSessionContextValue = {
+    const context: TerminalSessionContextValue = terminalSessionContextForTest({
       createTerminal,
       registerHost: vi.fn(),
       unregisterHost: vi.fn(),
@@ -2306,7 +2315,7 @@ describe('TerminalSessionView', () => {
       writeInput: vi.fn(),
       takeover: vi.fn(),
       focusTerminal: vi.fn(),
-    }
+    })
     const readContext: TerminalSessionReadContextValue = {
       terminalWorktreeSnapshot: () => completeWorktreeSnapshot(emptyWorktreeSnapshot),
       subscribeTerminalWorktree: () => () => {},
@@ -2436,7 +2445,11 @@ describe('TerminalSessionView', () => {
       const event = await dispatchPasteWithText(rendered.sessionRoot, 'C:\\Users\\me\\bar.png', [file])
 
       expect(event.defaultPrevented).toBe(true)
-      expect(rendered.writeInput).toHaveBeenCalledWith('term-111111111111111111111', "'C:\\Users\\me\\bar.png'", 'paste')
+      expect(rendered.writeInput).toHaveBeenCalledWith(
+        'term-111111111111111111111',
+        "'C:\\Users\\me\\bar.png'",
+        'paste',
+      )
     } finally {
       await rendered.cleanup()
     }

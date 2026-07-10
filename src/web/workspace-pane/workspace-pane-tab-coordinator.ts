@@ -1,11 +1,13 @@
 import PQueue from 'p-queue'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRouteTarget, RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { WorkspacePaneRouteReconciliation } from '#/web/components/repo-workspace/workspace-pane-route-reconciliation.ts'
 
-export type WorkspacePaneTabCoordinatorRoute = RepoBranchWorkspacePaneRoute | null
+export type WorkspacePaneTabCoordinatorRoute = RepoBranchWorkspacePaneRouteTarget
+export type WorkspacePaneTabCoordinatorObservedRoute = ParsedRepoBranchWorkspacePaneRouteTarget
 
 export interface WorkspacePaneTabCoordinatorTarget {
   repoId: string
+  repoRuntimeId?: string
   branchName: string | null
   worktreePath?: string | null
 }
@@ -13,6 +15,7 @@ export interface WorkspacePaneTabCoordinatorTarget {
 type WorkspacePaneTabTransition = {
   id: number
   repoId: string
+  repoRuntimeId: string | null
   branchName: string
   worktreePath: string | null
   fromRoute: WorkspacePaneTabCoordinatorRoute
@@ -28,18 +31,20 @@ type WorkspacePaneTabCoordinatorEvent =
   | {
       type: 'begin-transition'
       repoId: string
+      repoRuntimeId: string | null
       branchName: string
       worktreePath: string | null
       fromRoute: WorkspacePaneTabCoordinatorRoute
       toRoute: WorkspacePaneTabCoordinatorRoute
     }
-  | { type: 'abort-transition'; transitionId: number }
+  | { type: 'end-transition'; transitionId: number }
   | {
       type: 'observe-route'
       repoId: string
+      repoRuntimeId: string | null
       branchName: string
       worktreePath: string | null
-      route: WorkspacePaneTabCoordinatorRoute
+      route: WorkspacePaneTabCoordinatorObservedRoute
     }
 
 let state: WorkspacePaneTabCoordinatorState = { nextTransitionId: 1, transitions: [] }
@@ -47,6 +52,7 @@ const queuesByTarget = new Map<string, PQueue>()
 
 export function beginWorkspacePaneTabCoordinatorTransition(input: {
   repoId: string
+  repoRuntimeId?: string
   branchName: string
   worktreePath?: string | null
   fromRoute: WorkspacePaneTabCoordinatorRoute
@@ -55,6 +61,7 @@ export function beginWorkspacePaneTabCoordinatorTransition(input: {
   const nextState = reduceWorkspacePaneTabCoordinator(state, {
     type: 'begin-transition',
     repoId: input.repoId,
+    repoRuntimeId: input.repoRuntimeId ?? null,
     branchName: input.branchName,
     worktreePath: input.worktreePath ?? null,
     fromRoute: input.fromRoute,
@@ -67,19 +74,26 @@ export function beginWorkspacePaneTabCoordinatorTransition(input: {
 
 export function abortWorkspacePaneTabCoordinatorTransition(transitionId: number | null | undefined): void {
   if (!transitionId) return
-  state = reduceWorkspacePaneTabCoordinator(state, { type: 'abort-transition', transitionId })
+  state = reduceWorkspacePaneTabCoordinator(state, { type: 'end-transition', transitionId })
+}
+
+export function completeWorkspacePaneTabCoordinatorTransition(transitionId: number | null | undefined): void {
+  if (!transitionId) return
+  state = reduceWorkspacePaneTabCoordinator(state, { type: 'end-transition', transitionId })
 }
 
 export function observeWorkspacePaneTabCoordinatorRoute(input: {
   repoId: string
+  repoRuntimeId?: string
   branchName: string | null
   worktreePath?: string | null
-  route: WorkspacePaneTabCoordinatorRoute
+  route: WorkspacePaneTabCoordinatorObservedRoute
 }): void {
   if (!input.branchName) return
   state = reduceWorkspacePaneTabCoordinator(state, {
     type: 'observe-route',
     repoId: input.repoId,
+    repoRuntimeId: input.repoRuntimeId ?? null,
     branchName: input.branchName,
     worktreePath: input.worktreePath ?? null,
     route: input.route,
@@ -88,9 +102,10 @@ export function observeWorkspacePaneTabCoordinatorRoute(input: {
 
 export function workspacePaneTabCoordinatorReconciliationDeferred(input: {
   repoId: string
+  repoRuntimeId?: string
   branchName: string | null
   worktreePath?: string | null
-  route: WorkspacePaneTabCoordinatorRoute
+  route: WorkspacePaneTabCoordinatorObservedRoute
   reconciliation: WorkspacePaneRouteReconciliation
 }): boolean {
   if (!input.branchName) return false
@@ -98,9 +113,10 @@ export function workspacePaneTabCoordinatorReconciliationDeferred(input: {
   return state.transitions.some(
     (transition) =>
       transition.repoId === input.repoId &&
+      transition.repoRuntimeId === (input.repoRuntimeId ?? null) &&
       transition.branchName === input.branchName &&
       transition.worktreePath === (input.worktreePath ?? null) &&
-      workspacePaneCoordinatorRoutesEqual(transition.fromRoute, input.route),
+      workspacePaneCoordinatorRoutesEqual(input.route, transition.fromRoute),
   )
 }
 
@@ -155,12 +171,14 @@ function reduceWorkspacePaneTabCoordinator(
         ...current.transitions.filter(
           (transition) =>
             transition.repoId !== event.repoId ||
+            transition.repoRuntimeId !== event.repoRuntimeId ||
             transition.branchName !== event.branchName ||
             transition.worktreePath !== event.worktreePath,
         ),
         {
           id: current.nextTransitionId,
           repoId: event.repoId,
+          repoRuntimeId: event.repoRuntimeId,
           branchName: event.branchName,
           worktreePath: event.worktreePath,
           fromRoute: event.fromRoute,
@@ -169,7 +187,7 @@ function reduceWorkspacePaneTabCoordinator(
       ],
     }
   }
-  if (event.type === 'abort-transition') {
+  if (event.type === 'end-transition') {
     return {
       ...current,
       transitions: current.transitions.filter((transition) => transition.id !== event.transitionId),
@@ -180,6 +198,7 @@ function reduceWorkspacePaneTabCoordinator(
     transitions: current.transitions.filter((transition) => {
       if (
         transition.repoId !== event.repoId ||
+        transition.repoRuntimeId !== event.repoRuntimeId ||
         transition.branchName !== event.branchName ||
         transition.worktreePath !== event.worktreePath
       ) {
@@ -192,14 +211,14 @@ function reduceWorkspacePaneTabCoordinator(
 
 function workspacePaneTabTransitionRemainsPendingAfterRouteObservation(
   transition: WorkspacePaneTabTransition,
-  route: WorkspacePaneTabCoordinatorRoute,
+  route: WorkspacePaneTabCoordinatorObservedRoute,
 ): boolean {
   if (workspacePaneCoordinatorRoutesEqual(route, transition.toRoute)) return false
   return workspacePaneCoordinatorRoutesEqual(route, transition.fromRoute)
 }
 
 function workspacePaneCoordinatorRoutesEqual(
-  a: WorkspacePaneTabCoordinatorRoute,
+  a: WorkspacePaneTabCoordinatorObservedRoute,
   b: WorkspacePaneTabCoordinatorRoute,
 ): boolean {
   if (a === null || b === null) return a === b

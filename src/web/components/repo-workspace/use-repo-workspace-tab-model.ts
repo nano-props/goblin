@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { RepoWorkspaceRepo, CurrentRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import {
   createRepoWorkspaceTabModel,
   repoWorkspaceTabModelBlocksTabInteraction,
@@ -20,7 +20,7 @@ import { useSyncWorkspacePaneRuntimeTabProviderSelection } from '#/web/workspace
 export function useRepoWorkspaceTabModel(
   repo: Pick<RepoWorkspaceRepo, 'id' | 'repoRuntimeId' | 'ui'>,
   detail: CurrentRepoWorkspacePresentation,
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined,
+  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined,
 ) {
   const input = useRepoWorkspaceTabModelInput(repo, detail, workspacePaneRoute)
   const model = useMemo(() => createRepoWorkspaceTabModel(input), [input])
@@ -35,7 +35,7 @@ export function useRepoWorkspaceTabModel(
 export function useRepoWorkspaceTabModelInput(
   repo: Pick<RepoWorkspaceRepo, 'id' | 'repoRuntimeId' | 'ui'>,
   detail: CurrentRepoWorkspacePresentation,
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined,
+  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined,
 ): RepoWorkspaceTabModelInput {
   const { branch } = detail
   const branchName = branch?.name ?? null

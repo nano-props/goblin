@@ -31,6 +31,7 @@ const navigation: PrimaryWindowNavigationActions = {
   showRepoBranchEmptyWorkspacePane: () => true,
   showRepoBranchWorkspacePaneTab: vi.fn(),
   showRepoBranchTerminalSession: vi.fn(),
+  commitRepoBranchWorkspacePaneRoute: vi.fn(() => true),
   goBack: vi.fn(),
   goForward: vi.fn(),
   openSettings: vi.fn(),

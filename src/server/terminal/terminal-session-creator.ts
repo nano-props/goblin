@@ -1,7 +1,5 @@
-import path from 'node:path'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import type { TerminalCreateInput, TerminalCreateResult, TerminalSessionSummary } from '#/shared/terminal-types.ts'
-import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
+import { terminalSessionRuntimeScope, terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
 import type {
   TerminalSessionEnsureInput,
   TerminalSessionEnsureResult,
@@ -42,7 +40,7 @@ class TerminalSessionCreator {
     request: TerminalCreateInput
   }): Promise<TerminalCreateResult> {
     const sessionScope = terminalSessionRuntimeScope(input.request.repoRoot, input.request.repoRuntimeId)
-    const scopedWorktreePath = terminalWorktreePath(input.request.repoRoot, input.request.worktreePath)
+    const scopedWorktreePath = terminalSessionWorktreePath(input.request.repoRoot, input.request.worktreePath)
     return await this.options.createCoordinator.runInWorktreeQueue(
       { userId: input.userId, scope: sessionScope, worktreePath: scopedWorktreePath },
       async () => {
@@ -117,8 +115,4 @@ class TerminalSessionCreator {
 
 export function createTerminalSessionCreator(options: TerminalSessionCreatorOptions): TerminalSessionCreator {
   return new TerminalSessionCreator(options)
-}
-
-function terminalWorktreePath(repoRoot: string, worktreePath: string): string {
-  return isRemoteRepoId(repoRoot) ? worktreePath : path.resolve(worktreePath)
 }

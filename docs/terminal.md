@@ -158,13 +158,17 @@ Repo routes and server-side repo write paths should not know about Workspace Pan
 
 ### Terminal create and Workspace Pane navigation
 
-Terminal creation has two separate operation boundaries:
+Terminal creation has three architecture layers:
 
-- `TerminalSessionProjection` owns create admission, pending state,
-  same-request single-flight, startup command resolution, PTY/session creation,
-  and durable close draining.
-- Workspace Pane commands own opener attribution, runtime-tab insertion, and
-  exact route commit for the created `terminalSessionId`.
+- `TerminalSessionService` and its focused domain collaborators own terminal
+  create/reuse/restore, PTY/session lifecycle, and terminal first-frame data.
+- `WorkspacePaneRuntimeApplication` owns the composed server operation: invoke
+  the terminal provider create, commit the canonical runtime tab, publish
+  workspace-tab invalidation, and return both results.
+- `TerminalSessionProjection` and Workspace Pane commands own client admission,
+  pending/single-flight state, startup command resolution, durable close
+  draining, opener attribution, local canonical tab projection, and exact
+  route commit for the created `terminalSessionId`.
 
 While `TerminalSessionProjection` reports `createPending` for a
 `terminalWorktreeKey`, ordinary user-driven workspace-pane navigation for that
@@ -175,14 +179,36 @@ navigation. A command-owned route commit is different: it is the committed
 result of the command that already created or joined the terminal session, so it
 must not be rejected just because another terminal create is pending.
 
-Workspace-pane terminal create commands should call terminal create before
-entering the workspace-pane tab coordinator. This lets terminal lifecycle see
-duplicate or distinct create requests immediately and keeps `createPending`
-owned by the projection. After create resolves, the owning command enters the
-workspace-pane target coordinator once to insert the runtime tab through the
-workspace-pane tabs API, record opener facts, and commit the exact terminal
-route returned by create. Duplicate observers that did not own the create must
-not repeat the tab/route commit.
+Workspace-pane terminal create commands enter the terminal projection first so
+terminal lifecycle can see duplicate or distinct requests immediately and keep
+`createPending` projection-owned. The projection sends the accepted request to
+`workspace-pane-runtime.open`; the server application operation creates or
+restores the terminal and then commits tab membership through the generic
+workspace-pane coordinator. The response contains the terminal first frame,
+session projection, and canonical workspace tabs.
+
+The admission-leading client command writes those returned tabs into the local
+query projection, records opener facts, and commits the exact terminal route.
+It does not send a second `workspace-pane-tabs.update`. Duplicate admission
+observers must not repeat local tab/route commit.
+
+This is an ordered application operation, not a distributed transaction that
+can safely roll back through the client. The create result must preserve
+both the client admission role (`leader` or `observer`) and the server resource
+disposition (`created`, `reused`, or `restored`); admission leadership is not
+resource ownership. Once the server has accepted create, a later tab/cache or
+route failure must not close the session. The workspace-pane server projection
+materializes every live runtime session, so tab convergence and navigation are
+recoverable projection work, while closing a reused/restored session would be a
+destructive cross-client side effect. Duplicate observers must not repeat the
+tab/route commit.
+
+A canonical workspace-pane tab response may arrive after this client has moved
+to a replacement `repoRuntimeId`. Skipping that stale local cache write does not
+turn the already-successful server mutation into a failure. Likewise,
+command-owned navigation must await the router and confirm that the requested
+route became current; navigation rejection or supersession is reported without
+rolling back committed server resources.
 
 The pending bit is projection state from the terminal lifecycle queue. Do not
 add client-only focus tokens, request generations, or "is the user still on
@@ -195,11 +221,12 @@ The clean flow is:
 1. The user invokes create through a command/open-tab entry point.
 2. The terminal projection admits the create request and publishes
    `createPending` before async startup command resolution begins.
-3. The terminal projection/server create path owns session creation and
-   returns the server-allocated `terminalSessionId`.
-4. The owning workspace-pane command records opener facts, updates workspace
-   tabs with an `open-runtime` operation, and navigates directly to the
-   canonical terminal route for that returned session.
+3. The server application operation invokes terminal creation, commits the
+   corresponding runtime tab, and returns the server-allocated
+   `terminalSessionId` plus canonical tabs.
+4. The owning workspace-pane command applies the canonical tabs locally,
+   records opener facts, and navigates directly to the canonical terminal
+   route for that returned session.
 
 If a create flow needs async preparation before the PTY can be launched, such
 as resolving a file viewer command for "open file in terminal", that preparation
@@ -217,6 +244,12 @@ the empty pane (`workspacePaneTab: null`) rather than inventing a tab hit.
 The tab model must apply the same rule before reconciliation effects run:
 generic preferred-tab fallback is only for persisted preferences, never for an
 explicit URL route.
+
+Keep URL parsing routes and command commit targets distinct. A parsed route may
+represent URL-only states such as `invalid-static`; a command-owned commit may
+only target a valid workspace-pane route (`static`, `terminal`) or the empty
+route (`null`). Command commit APIs must require the commit boundary and must
+not silently fall back to ordinary blockable show/select navigation.
 
 URL-backed terminal routes are requested selection, not projection state. A
 route such as `/terminal/{sessionId}` may ask the tab model to render that

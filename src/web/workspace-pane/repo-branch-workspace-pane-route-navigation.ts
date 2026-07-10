@@ -1,4 +1,4 @@
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 
 export interface RepoBranchWorkspacePaneRouteNavigation {
@@ -21,7 +21,7 @@ export function openResolvedRepoBranchWorkspacePaneRoute(
   routeNavigation: RepoBranchWorkspacePaneRouteNavigation,
   repoId: string,
   branchName: string,
-  route: RepoBranchWorkspacePaneRoute | null,
+  route: RepoBranchWorkspacePaneRouteTarget,
   options?: { replace?: boolean },
 ): boolean {
   if (!route) {

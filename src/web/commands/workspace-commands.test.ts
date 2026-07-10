@@ -13,7 +13,7 @@ import {
 } from '#/web/commands/workspace-commands.ts'
 import { closeWorkspacePaneTabsForWorktree } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
 import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import {
   createRepoBranch,
   installWorkspacePaneTabsTestBridge,
@@ -35,7 +35,11 @@ import {
   readWorkspacePaneTabsForTarget,
   setWorkspacePaneTabsForTargetQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import {
+  workspacePaneStaticTabsFromEntries,
+  workspacePaneTabsWithRuntimeTab,
+} from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { TerminalCreateOptions, TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
@@ -546,7 +550,9 @@ describe('workspace commands', () => {
       'feature/worktree',
       'term-222222222222222222222',
     )
-    expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[WORKTREE_KEY]).toBe('term-222222222222222222222')
+    expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[WORKTREE_KEY]).toBe(
+      'term-222222222222222222222',
+    )
     // Cmd+T / File → New Terminal Tab is a generic entry — no insertion
     // anchor is passed, so the new terminal appends to the end of the strip.
     expect(createTerminal).toHaveBeenCalledWith(
@@ -606,7 +612,9 @@ describe('workspace commands', () => {
       staticEntry('status'),
       terminalEntry('term-222222222222222222222'),
     ])
-    expect(workspacePaneTabOpener(REPO_ID, 'feature/worktree', 'terminal:term-222222222222222222222')).toBe('terminal:term-111111111111111111111')
+    expect(workspacePaneTabOpener(REPO_ID, 'feature/worktree', 'terminal:term-222222222222222222222')).toBe(
+      'terminal:term-111111111111111111111',
+    )
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
       REPO_ID,
       'feature/worktree',
@@ -630,7 +638,11 @@ describe('workspace commands', () => {
       branch: 'feature/worktree',
       worktreePath: WORKTREE_PATH,
     })
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'term-111111111111111111111')
+    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
+      REPO_ID,
+      'feature/worktree',
+      'term-111111111111111111111',
+    )
     expect(showRepoBranchEmptyWorkspacePane).not.toHaveBeenCalled()
   })
 
@@ -641,7 +653,11 @@ describe('workspace commands', () => {
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
-        'feature/worktree': [staticEntry('status'), staticEntry('history'), terminalEntry('term-111111111111111111111')],
+        'feature/worktree': [
+          staticEntry('status'),
+          staticEntry('history'),
+          terminalEntry('term-111111111111111111111'),
+        ],
       },
     })
     let visibleSessionIds = ['term-111111111111111111111']
@@ -691,7 +707,9 @@ describe('workspace commands', () => {
       terminalEntry('term-111111111111111111111'),
       terminalEntry('term-222222222222222222222'),
     ])
-    expect(workspacePaneTabOpener(REPO_ID, 'feature/worktree', 'terminal:term-222222222222222222222')).toBe('workspace-pane:status')
+    expect(workspacePaneTabOpener(REPO_ID, 'feature/worktree', 'terminal:term-222222222222222222222')).toBe(
+      'workspace-pane:status',
+    )
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
       REPO_ID,
       'feature/worktree',
@@ -899,7 +917,9 @@ describe('workspace commands', () => {
       terminalEntry('term-222222222222222222222'),
     ])
     expect(preferredWorkspacePaneTab('feature/worktree')).toBe('status')
-    expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[WORKTREE_KEY]).toBe('term-222222222222222222222')
+    expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[WORKTREE_KEY]).toBe(
+      'term-222222222222222222222',
+    )
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
       REPO_ID,
       'feature/worktree',
@@ -918,13 +938,13 @@ describe('workspace commands', () => {
       },
     })
     const firstCreate = Promise.withResolvers<string>()
-    const { createTerminal, createTerminalWithOwnership, createOperationCount, isCreatePending } =
+    const { createTerminal, createTerminalWithAdmission, createOperationCount, isCreatePending } =
       createSingleFlightTerminalWithProjection(async () => await firstCreate.promise)
     const showRepoBranchTerminalSession = vi.fn(() => true)
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), createPending: isCreatePending() }),
       createTerminal,
-      createTerminalWithOwnership,
+      createTerminalWithAdmission,
       selectTerminal: vi.fn(),
     })
     const navigation = navigationWith({ showRepoBranchTerminalSession })
@@ -989,13 +1009,24 @@ describe('workspace commands', () => {
       secondCreatePending = false
       return terminalSessionId
     })
-    const createTerminalWithOwnership = vi.fn(async (base: TerminalSessionBase) => {
-      firstCreatePending = true
-      const terminalSessionId = await firstCreate.promise
-      recordCreatedTerminalSelection(base, terminalSessionId)
-      firstCreatePending = false
-      return { terminalSessionId, ownsCreate: true }
-    })
+    const createTerminalWithAdmission = vi.fn(
+      async (
+        base: TerminalSessionBase,
+        _options?: TerminalCreateOptions,
+        placement?: WorkspacePaneRuntimeTabPlacement,
+      ) => {
+        firstCreatePending = true
+        const terminalSessionId = await firstCreate.promise
+        recordCreatedTerminalSelection(base, terminalSessionId)
+        firstCreatePending = false
+        return {
+          terminalSessionId,
+          requestRole: 'leader' as const,
+          resourceDisposition: 'created' as const,
+          workspacePaneTabs: applicationTabsForCreatedTerminal(base, terminalSessionId, placement),
+        }
+      },
+    )
     const showRepoBranchTerminalSession = vi.fn((_repoId: string, _branchName: string, _terminalSessionId: string) => {
       return !createPending()
     })
@@ -1003,7 +1034,7 @@ describe('workspace commands', () => {
     setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: () => ({ ...emptyWorktreeSnapshot(), createPending: createPending() }),
       createTerminal,
-      createTerminalWithOwnership,
+      createTerminalWithAdmission,
       selectTerminal: vi.fn(),
     })
     const navigation = navigationWith({ showRepoBranchTerminalSession, commitRepoBranchWorkspacePaneRoute })
@@ -1020,11 +1051,19 @@ describe('workspace commands', () => {
       branchName: 'feature/worktree',
       navigation,
     })
-    await vi.waitFor(() => expect(createTerminalWithOwnership).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(createTerminalWithAdmission).toHaveBeenCalledTimes(1))
 
     const secondCommand = dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
       base,
-      createTerminal,
+      createTerminal: async (createBase, _createOptions, placement) => {
+        const terminalSessionId = await createTerminal(createBase)
+        return {
+          terminalSessionId,
+          requestRole: 'leader' as const,
+          resourceDisposition: 'created' as const,
+          workspacePaneTabs: applicationTabsForCreatedTerminal(createBase, terminalSessionId, placement),
+        }
+      },
       openerIdentity: 'workspace-pane:files',
       showCreatedTerminalTab: (terminalSessionId) =>
         showRepoBranchTerminalSession(REPO_ID, 'feature/worktree', terminalSessionId),
@@ -1356,7 +1395,11 @@ describe('workspace commands', () => {
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
-        'feature/worktree': [staticEntry('status'), terminalEntry('term-111111111111111111111'), staticEntry('history')],
+        'feature/worktree': [
+          staticEntry('status'),
+          terminalEntry('term-111111111111111111111'),
+          staticEntry('history'),
+        ],
       },
     })
     const closeTerminalByDescriptor = vi.fn(async () => true)
@@ -1418,7 +1461,11 @@ describe('workspace commands', () => {
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
-        'feature/worktree': [staticEntry('status'), terminalEntry('term-111111111111111111111'), staticEntry('history')],
+        'feature/worktree': [
+          staticEntry('status'),
+          terminalEntry('term-111111111111111111111'),
+          staticEntry('history'),
+        ],
       },
     })
     const otherRepo = seedRepoWithReadModelForTest({
@@ -1556,7 +1603,11 @@ describe('workspace commands', () => {
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
-        'feature/worktree': [staticEntry('status'), terminalEntry('term-111111111111111111111'), terminalEntry('term-222222222222222222222')],
+        'feature/worktree': [
+          staticEntry('status'),
+          terminalEntry('term-111111111111111111111'),
+          terminalEntry('term-222222222222222222222'),
+        ],
       },
     })
     useReposStore.getState().setSelectedTerminal(WORKTREE_KEY, 'term-111111111111111111111')
@@ -1629,7 +1680,11 @@ describe('workspace commands', () => {
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
-        'feature/worktree': [staticEntry('status'), terminalEntry('term-111111111111111111111'), terminalEntry('term-222222222222222222222')],
+        'feature/worktree': [
+          staticEntry('status'),
+          terminalEntry('term-111111111111111111111'),
+          terminalEntry('term-222222222222222222222'),
+        ],
       },
     })
     useReposStore.getState().setSelectedTerminal(WORKTREE_KEY, 'term-222222222222222222222')
@@ -2069,7 +2124,11 @@ describe('workspace commands', () => {
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'changes',
       workspacePaneTabsByBranch: {
-        'feature/worktree': [staticEntry('status'), terminalEntry('term-111111111111111111111'), staticEntry('changes')],
+        'feature/worktree': [
+          staticEntry('status'),
+          terminalEntry('term-111111111111111111111'),
+          staticEntry('changes'),
+        ],
       },
     })
     const closeWindow = vi.fn()
@@ -2111,7 +2170,11 @@ describe('workspace commands', () => {
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
-        'feature/worktree': [staticEntry('status'), terminalEntry('term-111111111111111111111'), staticEntry('changes')],
+        'feature/worktree': [
+          staticEntry('status'),
+          terminalEntry('term-111111111111111111111'),
+          staticEntry('changes'),
+        ],
       },
     })
     const closeWindow = vi.fn()
@@ -2584,7 +2647,11 @@ describe('workspace commands', () => {
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
-        'feature/worktree': [staticEntry('status'), terminalEntry('term-111111111111111111111'), staticEntry('changes')],
+        'feature/worktree': [
+          staticEntry('status'),
+          terminalEntry('term-111111111111111111111'),
+          staticEntry('changes'),
+        ],
       },
     })
     const selectTerminal = vi.fn()
@@ -2619,7 +2686,11 @@ describe('workspace commands', () => {
       }),
     ).resolves.toBe(true)
 
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'term-111111111111111111111')
+    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
+      REPO_ID,
+      'feature/worktree',
+      'term-111111111111111111111',
+    )
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'changes')
     expect(selectTerminal).not.toHaveBeenCalled()
   })
@@ -2665,7 +2736,11 @@ describe('workspace commands', () => {
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'status',
       workspacePaneTabsByBranch: {
-        'feature/worktree': [staticEntry('status'), terminalEntry('term-111111111111111111111'), staticEntry('changes')],
+        'feature/worktree': [
+          staticEntry('status'),
+          terminalEntry('term-111111111111111111111'),
+          staticEntry('changes'),
+        ],
       },
     })
     const selectTerminal = vi.fn()
@@ -2701,7 +2776,11 @@ describe('workspace commands', () => {
       }),
     ).resolves.toBe(true)
 
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'term-111111111111111111111')
+    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
+      REPO_ID,
+      'feature/worktree',
+      'term-111111111111111111111',
+    )
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'changes')
     expect(selectTerminal).not.toHaveBeenCalled()
   })
@@ -2792,16 +2871,39 @@ function createSingleFlightTerminalWithProjection(resolveSessionId: () => string
     })
     return pending
   })
-  const createTerminalWithOwnership = vi.fn(async (base: TerminalSessionBase) => {
-    const ownsCreate = !pending
-    return { terminalSessionId: await createTerminal(base), ownsCreate }
+  const createTerminalWithAdmission = vi.fn(async (base: TerminalSessionBase) => {
+    const requestRole = pending ? ('observer' as const) : ('leader' as const)
+    const terminalSessionId = await createTerminal(base)
+    return {
+      terminalSessionId,
+      requestRole,
+      resourceDisposition: 'created' as const,
+      workspacePaneTabs: applicationTabsForCreatedTerminal(base, terminalSessionId),
+    }
   })
   return {
     createTerminal,
-    createTerminalWithOwnership,
+    createTerminalWithAdmission,
     createOperationCount: () => createOperationCount,
     isCreatePending: () => pending !== null,
   }
+}
+
+function applicationTabsForCreatedTerminal(
+  base: TerminalSessionBase,
+  terminalSessionId: string,
+  placement?: WorkspacePaneRuntimeTabPlacement,
+): WorkspacePaneTabEntry[] {
+  const repoRuntimeId = base.repoRuntimeId
+  const currentTabs = repoRuntimeId
+    ? readWorkspacePaneTabsForTarget({
+        repoRoot: base.repoRoot,
+        repoRuntimeId,
+        branchName: base.branch,
+        worktreePath: base.worktreePath,
+      })
+    : []
+  return workspacePaneTabsWithRuntimeTab(currentTabs, 'terminal', terminalSessionId, placement)
 }
 
 function recordCreatedTerminalSelection(base: TerminalSessionBase, terminalSessionId: string): void {
@@ -2832,14 +2934,7 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
       return true
     },
     showRepoBranchTerminalSession: () => true,
-    goBack: () => {},
-    goForward: () => {},
-    openSettings: () => {},
-    openCreateWorktree: () => {},
-    ...overrides,
-  }
-  if (!overrides.commitRepoBranchWorkspacePaneRoute) {
-    navigation.commitRepoBranchWorkspacePaneRoute = (repoId, branch, route, options) =>
+    commitRepoBranchWorkspacePaneRoute: (repoId, branch, route, options) =>
       openResolvedRepoBranchWorkspacePaneRoute(
         {
           openRepoBranch: navigation.showRepoBranchEmptyWorkspacePane,
@@ -2850,7 +2945,12 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
         branch,
         route,
         options,
-      )
+      ),
+    goBack: () => {},
+    goForward: () => {},
+    openSettings: () => {},
+    openCreateWorktree: () => {},
+    ...overrides,
   }
   return navigation
 }

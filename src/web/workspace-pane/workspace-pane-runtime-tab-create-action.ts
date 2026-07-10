@@ -1,5 +1,6 @@
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneRuntimeTabType } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import {
   runCreateTerminalTabCommand,
   type TerminalCreateCommandAdmission,
@@ -10,9 +11,9 @@ import type { TerminalCreateOptions } from '#/web/components/terminal/types.ts'
 import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 import {
   commitWorkspacePaneControllerRoute,
-  type WorkspacePaneTabControllerNavigation,
+  type WorkspacePaneTabControllerCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
-import { updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
+import { writeCanonicalWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 
 export interface WorkspacePaneRuntimeTabCreateAction {
   label: string
@@ -37,6 +38,7 @@ export interface WorkspacePaneTerminalCreateActionContext {
   createTerminal: (
     base: TerminalSessionBase,
     options?: TerminalCreateOptions,
+    placement?: import('#/shared/workspace-pane-runtime.ts').WorkspacePaneRuntimeTabPlacement,
   ) => Promise<TerminalCreateCommandAdmission>
   captureOpenerIdentity: () => string | null
 }
@@ -46,6 +48,7 @@ export interface CreateTerminalWorkspacePaneRuntimeTabActionOptions {
   createTerminal: (
     base: TerminalSessionBase,
     options?: TerminalCreateOptions,
+    placement?: import('#/shared/workspace-pane-runtime.ts').WorkspacePaneRuntimeTabPlacement,
   ) => Promise<TerminalCreateCommandAdmission>
   openerIdentity: string | null
   showCreatedTerminalTab?: (terminalSessionId: string) => boolean | Promise<boolean>
@@ -58,8 +61,8 @@ export interface CreateTerminalWorkspacePaneRuntimeTabActionOptions {
 export interface CommitCreatedTerminalWorkspacePaneRuntimeTabOptions {
   base: TerminalSessionBase
   terminalSessionId: string
+  workspacePaneTabs: WorkspacePaneTabEntry[] | null
   showCreatedTerminalTab?: (terminalSessionId: string) => boolean | Promise<boolean>
-  insertAfterIdentity?: string | null
 }
 
 interface WorkspacePaneRuntimeTabCreateActionResolver {
@@ -87,12 +90,13 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
 ): Promise<TerminalCreateCommandResult> {
   return await runCreateTerminalTabCommand({
     ...options,
-    commitCreatedTerminalTab: async (terminalSessionId) =>
+    insertAfterIdentity: options.insertAfterIdentity,
+    commitCreatedTerminalTab: async (terminalSessionId, workspacePaneTabs) =>
       await commitCreatedTerminalWorkspacePaneRuntimeTab({
         base: options.base,
         terminalSessionId,
+        workspacePaneTabs,
         showCreatedTerminalTab: options.showCreatedTerminalTab,
-        insertAfterIdentity: options.insertAfterIdentity,
       }),
   })
 }
@@ -100,8 +104,8 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
 export function showCreatedTerminalWorkspacePaneRuntimeTab(
   base: TerminalSessionBase,
   terminalSessionId: string,
-  navigation: WorkspacePaneTabControllerNavigation,
-): boolean {
+  navigation: WorkspacePaneTabControllerCommitNavigation,
+): boolean | Promise<boolean> {
   return commitWorkspacePaneControllerRoute(
     base.repoRoot,
     base.branch,
@@ -126,20 +130,14 @@ async function openCreatedTerminalWorkspacePaneRuntimeTab(
   options: CommitCreatedTerminalWorkspacePaneRuntimeTabOptions,
 ): Promise<boolean> {
   const repoRuntimeId = options.base.repoRuntimeId
-  if (!repoRuntimeId) return false
-  const result = await updateWorkspacePaneTabs({
+  if (!repoRuntimeId || !options.workspacePaneTabs) return false
+  return await writeCanonicalWorkspacePaneTabsForTarget({
     repoRoot: options.base.repoRoot,
     repoRuntimeId,
     branchName: options.base.branch,
     worktreePath: options.base.worktreePath,
-    operation: {
-      type: 'open-runtime',
-      runtimeType: 'terminal',
-      sessionId: options.terminalSessionId,
-      insertAfterIdentity: options.insertAfterIdentity,
-    },
+    tabs: options.workspacePaneTabs,
   })
-  return result.ok
 }
 
 function terminalRuntimeTabCreateAction(

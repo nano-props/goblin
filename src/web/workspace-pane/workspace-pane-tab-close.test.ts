@@ -6,9 +6,16 @@ import { closeWorkspacePaneTabsForWorktree } from '#/web/workspace-pane/workspac
 import {
   resetWorkspacePaneTabCoordinatorForTest,
   runWorkspacePaneTabCoordinatorTask,
+  workspacePaneTabCoordinatorReconciliationDeferred,
 } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { createRepoBranch, installWorkspacePaneTabsTestBridge, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import {
+  createRepoBranch,
+  installWorkspacePaneTabsTestBridge,
+  resetReposStore,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/bridge.ts'
 
 const REPO_ID = '/tmp/workspace-pane-tab-close-repo'
 const BRANCH_NAME = 'feature/worktree-close'
@@ -105,6 +112,53 @@ test('commits active close-back route through command-owned navigation', async (
   expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
 })
 
+test('awaits close-back navigation and clears the transition when navigation rejects', async () => {
+  seedRepoWithReadModelForTest({
+    id: REPO_ID,
+    branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+    currentBranchName: BRANCH_NAME,
+    preferredWorkspacePaneTab: 'files',
+    workspacePaneTabsByBranch: {
+      [BRANCH_NAME]: [workspacePaneStaticTabEntry('files'), workspacePaneStaticTabEntry('status')],
+    },
+  })
+  const routeCommit = Promise.withResolvers<boolean>()
+  const commitRepoBranchWorkspacePaneRoute = vi.fn(() => routeCommit.promise)
+  const close = dispatchCloseWorkspacePaneTabAction({
+    repoId: REPO_ID,
+    branchName: BRANCH_NAME,
+    workspacePaneRoute: { kind: 'static', tab: 'files' },
+    navigation: navigationWith({ commitRepoBranchWorkspacePaneRoute }),
+  })
+
+  await vi.waitFor(() => expect(commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledOnce())
+  const repoRuntimeId = useReposStore.getState().repos[REPO_ID]?.repoRuntimeId
+  expect(repoRuntimeId).toBeTruthy()
+  expect(
+    workspacePaneTabCoordinatorReconciliationDeferred({
+      repoId: REPO_ID,
+      repoRuntimeId,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      route: { kind: 'static', tab: 'files' },
+      reconciliation: { kind: 'replace-empty-pane' },
+    }),
+  ).toBe(true)
+
+  routeCommit.reject(new Error('navigation failed'))
+  await expect(close).resolves.toBe(false)
+  expect(
+    workspacePaneTabCoordinatorReconciliationDeferred({
+      repoId: REPO_ID,
+      repoRuntimeId,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      route: { kind: 'static', tab: 'files' },
+      reconciliation: { kind: 'replace-empty-pane' },
+    }),
+  ).toBe(false)
+})
+
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {}): PrimaryWindowNavigationActions {
   return {
     activateRepo: vi.fn(),
@@ -114,6 +168,7 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
     showRepoBranchEmptyWorkspacePane: vi.fn(() => true),
     showRepoBranchWorkspacePaneTab: vi.fn(() => true),
     showRepoBranchTerminalSession: vi.fn(() => true),
+    commitRepoBranchWorkspacePaneRoute: vi.fn(() => true),
     goBack: vi.fn(),
     goForward: vi.fn(),
     openSettings: vi.fn(),

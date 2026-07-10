@@ -55,7 +55,7 @@ export async function restoreServerWorkspacePaneTabsFromSession(
   // workspace-tab commits, so an abort that lands here can only stop boot from
   // advancing; it cannot unsend a mutation already accepted by the server.
   if (options.signal?.aborted) return { status: 'cancelled', ...details() }
-  const failedCommits = results.filter((result) => !result.ok)
+  const failedCommits = results.filter((result) => !result.ok || !result.projectionApplied)
   const restoreDetails = {
     unresolvedRepos,
     unresolvedTargets,

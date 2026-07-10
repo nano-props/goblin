@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from 'vitest'
 import {
   abortWorkspacePaneTabCoordinatorTransition,
   beginWorkspacePaneTabCoordinatorTransition,
+  completeWorkspacePaneTabCoordinatorTransition,
   observeWorkspacePaneTabCoordinatorRoute,
   resetWorkspacePaneTabCoordinatorForTest,
   runWorkspacePaneTabCoordinatorTask,
@@ -122,6 +123,52 @@ describe('workspace pane tab coordinator', () => {
     expect(
       workspacePaneTabCoordinatorReconciliationDeferred({
         repoId: '/tmp/repo',
+        branchName: 'feature/a',
+        worktreePath: '/tmp/worktree-a',
+        route: { kind: 'static', tab: 'files' },
+        reconciliation: { kind: 'replace-empty-pane' },
+      }),
+    ).toBe(false)
+  })
+
+  test('clears stale route reconciliation deferral when committed navigation settles', () => {
+    const transitionId = beginWorkspacePaneTabCoordinatorTransition({
+      repoId: '/tmp/repo',
+      repoRuntimeId: 'repo-runtime-1',
+      branchName: 'feature/a',
+      worktreePath: '/tmp/worktree-a',
+      fromRoute: { kind: 'static', tab: 'files' },
+      toRoute: { kind: 'static', tab: 'status' },
+    })
+
+    completeWorkspacePaneTabCoordinatorTransition(transitionId)
+
+    expect(
+      workspacePaneTabCoordinatorReconciliationDeferred({
+        repoId: '/tmp/repo',
+        repoRuntimeId: 'repo-runtime-1',
+        branchName: 'feature/a',
+        worktreePath: '/tmp/worktree-a',
+        route: { kind: 'static', tab: 'files' },
+        reconciliation: { kind: 'replace-empty-pane' },
+      }),
+    ).toBe(false)
+  })
+
+  test('does not let a transition from an old repo runtime defer the replacement runtime', () => {
+    beginWorkspacePaneTabCoordinatorTransition({
+      repoId: '/tmp/repo',
+      repoRuntimeId: 'repo-runtime-old',
+      branchName: 'feature/a',
+      worktreePath: '/tmp/worktree-a',
+      fromRoute: { kind: 'static', tab: 'files' },
+      toRoute: { kind: 'static', tab: 'status' },
+    })
+
+    expect(
+      workspacePaneTabCoordinatorReconciliationDeferred({
+        repoId: '/tmp/repo',
+        repoRuntimeId: 'repo-runtime-new',
         branchName: 'feature/a',
         worktreePath: '/tmp/worktree-a',
         route: { kind: 'static', tab: 'files' },

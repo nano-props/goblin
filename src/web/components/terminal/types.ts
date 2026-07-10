@@ -170,10 +170,16 @@ export interface TerminalWorktreeSnapshot {
 
 export interface TerminalSessionContextValue {
   createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
-  createTerminalWithOwnership?: (
+  createTerminalWithAdmission: (
     base: TerminalSessionBase,
     options?: TerminalCreateOptions,
-  ) => Promise<{ terminalSessionId: string; ownsCreate: boolean }>
+    placement?: import('#/shared/workspace-pane-runtime.ts').WorkspacePaneRuntimeTabPlacement,
+  ) => Promise<{
+    terminalSessionId: string
+    requestRole: 'leader' | 'observer'
+    resourceDisposition: 'created' | 'restored' | 'reused'
+    workspacePaneTabs: import('#/shared/workspace-pane.ts').WorkspacePaneTabEntry[]
+  }>
   registerHost: (terminalWorktreeKey: string, host: HTMLElement) => void
   unregisterHost: (terminalWorktreeKey: string, host: HTMLElement) => void
   selectTerminal: (terminalWorktreeKey: string, terminalSessionId: string) => void

@@ -17,9 +17,9 @@ import {
   dispatchTerminalRuntimePrimaryAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
 import { resolveWorkspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
-type WorkspacePaneCommandRoute = RepoBranchWorkspacePaneRoute | null | undefined
+type WorkspacePaneCommandRoute = ParsedRepoBranchWorkspacePaneRoute | null | undefined
 
 interface ShowWorkspacePaneTabCommandOptions {
   repoId: string | null
@@ -61,7 +61,7 @@ interface CloseWorkspacePaneTabCommandOptions extends WorkspacePaneTabCommandTar
 interface ConfirmCloseTerminalWorkspacePaneTabCommandOptions extends WorkspacePaneTabCommandTargetOptions {
   currentRepoId: string | null
   currentBranchName: string | null
-  currentWorkspacePaneRoute: RepoBranchWorkspacePaneRoute | null
+  currentWorkspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null
   confirmedTerminal: ConfirmedTerminalWorkspacePaneTabClose
 }
 

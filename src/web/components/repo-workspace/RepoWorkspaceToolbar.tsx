@@ -28,10 +28,7 @@ import { useIsInitialTerminalProjectionHydrating } from '#/web/stores/terminal-p
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import { showCreatedTerminalWorkspacePaneRuntimeTab } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import {
-  workspacePaneRuntimeTabProvider,
-  workspacePaneStaticTabProvider,
-} from '#/web/workspace-pane/tab-providers.ts'
+import { workspacePaneRuntimeTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import { useWorkspacePaneTabDragPreview } from '#/web/components/workspace-pane/workspace-pane-tab-drag-preview.ts'
 import {
   WorkspaceToolbar,
@@ -47,13 +44,13 @@ import { orderWorkspacePaneItemsByTabEntries } from '#/web/workspace-pane/worksp
 import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import { useWorkspacePaneRuntimeTabCreateAction } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-create-action.ts'
 import { useWorkspacePaneRuntimeTabActionContext } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-action-context.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 interface Props {
   repo: RepoWorkspaceRepo
   detail: CurrentRepoWorkspacePresentation
   workspacePaneId: string
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
   workspacePaneTabModel: RepoWorkspaceTabModel
   trafficLightOffset?: boolean
   branchActions?: BranchActions
@@ -105,8 +102,15 @@ export function RepoWorkspaceToolbar({
     },
     [branchName, navigation, repo.id, repo.repoRuntimeId, worktreePath],
   )
+  const showWorkspacePaneRuntimeTab = useCallback(
+    (type: WorkspacePaneRuntimeTabType, sessionId: string) => {
+      if (!branchName || type !== 'terminal') return false
+      return navigation.showRepoBranchTerminalSession(repo.id, branchName, sessionId)
+    },
+    [branchName, navigation, repo.id],
+  )
   const workspacePaneRuntimeTabActionContext = useWorkspacePaneRuntimeTabActionContext({
-    showRuntimeTab: showCreatedWorkspacePaneRuntimeTab,
+    showRuntimeTab: showWorkspacePaneRuntimeTab,
   })
   const workspacePaneCreateAction = useWorkspacePaneRuntimeTabCreateAction({
     repoRoot: repo.id,

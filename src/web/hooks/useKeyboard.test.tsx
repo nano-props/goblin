@@ -20,10 +20,8 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import {
-  setTerminalSessionCommandBridge,
-  type TerminalSessionCommandBridge,
-} from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import type { TerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
@@ -507,6 +505,7 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,
     showRepoBranchTerminalSession: () => true,
+    commitRepoBranchWorkspacePaneRoute: () => true,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},

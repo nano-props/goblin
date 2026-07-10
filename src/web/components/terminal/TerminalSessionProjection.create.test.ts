@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   createMock: vi.fn(),
+  openRuntimeMock: vi.fn(),
   closeMock: vi.fn(),
   listWorkspaceTabsMock: vi.fn(),
   setBadgeMock: vi.fn(),
@@ -26,6 +27,12 @@ vi.mock('#/web/terminal.ts', () => ({
     close: mocks.closeMock,
     listWorkspaceTabs: mocks.listWorkspaceTabsMock,
     setBadge: mocks.setBadgeMock,
+  },
+}))
+
+vi.mock('#/web/workspace-pane/workspace-pane-runtime-client.ts', () => ({
+  workspacePaneRuntimeClient: {
+    open: mocks.openRuntimeMock,
   },
 }))
 
@@ -221,6 +228,18 @@ describe('TerminalSessionProjection create flow', () => {
   beforeEach(() => {
     mocks.createMock.mockReset()
     mocks.createMock.mockResolvedValue(makeCreateResult())
+    mocks.openRuntimeMock.mockReset()
+    mocks.openRuntimeMock.mockImplementation(async (input: { runtimeType: 'terminal'; request: unknown }) => {
+      const runtime = await mocks.createMock(input.request)
+      return runtime.ok
+        ? {
+            ok: true as const,
+            runtimeType: 'terminal' as const,
+            runtime,
+            tabs: [{ type: 'terminal' as const, runtimeSessionId: runtime.terminalSessionId }],
+          }
+        : { ok: false as const, runtimeType: 'terminal' as const, message: runtime.message }
+    })
     mocks.closeMock.mockReset()
     mocks.closeMock.mockResolvedValue(true)
     mocks.listWorkspaceTabsMock.mockReset()
@@ -272,6 +291,31 @@ describe('TerminalSessionProjection create flow', () => {
       cols: 101,
       rows: 31,
       clientId: 'client_local',
+    })
+  })
+
+  test('opens terminal and workspace tab through the application operation', async () => {
+    await projection.createTerminalWithAdmission(
+      terminalBase(),
+      {},
+      {
+        insertAfterIdentity: 'workspace-pane:status',
+      },
+    )
+
+    expect(mocks.openRuntimeMock).toHaveBeenCalledWith({
+      runtimeType: 'terminal',
+      request: {
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: REPO_RUNTIME_ID,
+        branch: BRANCH,
+        worktreePath: WORKTREE_PATH,
+        kind: 'primary',
+        cols: 80,
+        rows: 24,
+        clientId: 'client_local',
+      },
+      insertAfterIdentity: 'workspace-pane:status',
     })
   })
 
@@ -422,21 +466,42 @@ describe('TerminalSessionProjection create flow', () => {
     const base = terminalBase()
     const options = { startupShellCommand: "bat '/repo/a.ts'\r" }
 
-    const firstCreate = projection.createTerminalWithOwnership(base, options)
+    const firstCreate = projection.createTerminalWithAdmission(base, options)
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
-    const secondCreate = projection.createTerminalWithOwnership(base, { ...options })
+    const secondCreate = projection.createTerminalWithAdmission(base, { ...options })
 
     first.resolve(makeCreateResult())
-    await expect(firstCreate).resolves.toEqual({
+    const firstResult = await firstCreate
+    expect(firstResult).toEqual({
       terminalSessionId: 'term-111111111111111111111',
-      ownsCreate: true,
+      requestRole: 'leader',
+      resourceDisposition: 'created',
+      workspacePaneTabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
     })
     await expect(secondCreate).resolves.toEqual({
       terminalSessionId: 'term-111111111111111111111',
-      ownsCreate: false,
+      requestRole: 'observer',
+      resourceDisposition: 'created',
+      workspacePaneTabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
     })
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
   })
+
+  test.each(['created', 'reused', 'restored'] as const)(
+    'preserves the server resource disposition for a %s terminal admission',
+    async (resourceDisposition) => {
+      mocks.createMock.mockResolvedValueOnce(makeCreateResult({ action: resourceDisposition }))
+      const admission = await projection.createTerminalWithAdmission(terminalBase())
+
+      expect(admission).toEqual({
+        terminalSessionId: 'term-111111111111111111111',
+        requestRole: 'leader',
+        resourceDisposition,
+        workspacePaneTabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
+      })
+      expect(projection.isKnownSession('term-111111111111111111111')).toBe(true)
+    },
+  )
 
   test('queues a different startup shell command behind an in-flight create for the same worktree', async () => {
     const first = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
@@ -867,7 +932,9 @@ describe('TerminalSessionProjection create flow', () => {
     await expect(closePromise).rejects.toThrow('terminal session projection destroyed')
     expect((projection as any).lifecycleQueues.hasCloses()).toBe(false)
     resolveClose(true)
-    await vi.waitFor(() => expect(mocks.closeMock).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'term-stalestalestalestale1' }))
+    await vi.waitFor(() =>
+      expect(mocks.closeMock).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'term-stalestalestalestale1' }),
+    )
   })
 
   test('durable close: handleSessionClosed drops the matching local session', async () => {

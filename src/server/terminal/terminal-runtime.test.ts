@@ -8,11 +8,7 @@
 // protocol types in `shared/terminal-types.ts`.
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import {
-  clearRepoRuntimesForUser,
-  closeRepoRuntime,
-  openRepoRuntime,
-} from '#/server/modules/repo-runtimes.ts'
+import { clearRepoRuntimesForUser, closeRepoRuntime, openRepoRuntime } from '#/server/modules/repo-runtimes.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
@@ -24,6 +20,7 @@ import {
   WORKSPACE_PANE_TABS_REALTIME_EVENTS,
   WORKSPACE_PANE_TABS_SOCKET_ACTIONS,
 } from '#/shared/workspace-pane-tabs.ts'
+import { WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS } from '#/shared/workspace-pane-runtime.ts'
 
 // Under method 2 the host threads `userId` (derived from the
 // access token) alongside `clientId` (per-tab routing). Tests use
@@ -181,8 +178,9 @@ async function requestWorkspacePaneTabs(
     }),
   )
   await vi.waitFor(() => {
-    expect(sentSocketMessages(socket).some((message) => message.type === 'response' && message.requestId === requestId))
-      .toBe(true)
+    expect(
+      sentSocketMessages(socket).some((message) => message.type === 'response' && message.requestId === requestId),
+    ).toBe(true)
   })
   const response = sentSocketMessages(socket).find(
     (message) => message.type === 'response' && message.requestId === requestId,
@@ -775,11 +773,11 @@ describe('server terminal runtime', () => {
         socket,
         WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
         {
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: 'feature',
-        worktreePath: '/repo-linked',
-        tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
+          repoRoot: REPO_ROOT,
+          repoRuntimeId: REPO_RUNTIME_ID,
+          branchName: 'feature',
+          worktreePath: '/repo-linked',
+          tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
         },
         'req_replace_workspace_tabs',
       ),
@@ -1329,6 +1327,79 @@ describe('server terminal runtime', () => {
         canonicalRows: 24,
       },
     })
+
+    host.unregisterSocket('client_a', USER_1, socket)
+    shutdown()
+  })
+
+  test('runtime-open returns terminal and canonical tabs before flushing provider realtime', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_a', USER_1, socket)
+    mockDataToEmitOnRegistration = 'during-runtime-open'
+
+    host.handleRealtimeMessage(
+      'client_a',
+      USER_1,
+      socket,
+      JSON.stringify({
+        type: 'request',
+        requestId: 'req_runtime_open',
+        action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open,
+        input: {
+          runtimeType: 'terminal',
+          insertAfterIdentity: 'workspace-pane:status',
+          request: {
+            repoRoot: REPO_ROOT,
+            repoRuntimeId: REPO_RUNTIME_ID,
+            branch: 'feature',
+            worktreePath: '/repo-linked',
+            kind: 'primary',
+            cols: 80,
+            rows: 24,
+            clientId: 'forged_client',
+          },
+        },
+      }),
+    )
+
+    await vi.waitFor(() => {
+      expect(
+        sentSocketMessages(socket).some(
+          (message) => message.type === 'response' && message.requestId === 'req_runtime_open',
+        ),
+      ).toBe(true)
+    })
+
+    const messages = sentSocketMessages(socket)
+    const responseIndex = messages.findIndex(
+      (message) => message.type === 'response' && message.requestId === 'req_runtime_open',
+    )
+    expect(messages[responseIndex]).toMatchObject({
+      type: 'response',
+      ok: true,
+      action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open,
+      payload: {
+        ok: true,
+        runtimeType: 'terminal',
+        runtime: {
+          ok: true,
+          action: 'created',
+          snapshot: expect.stringContaining('during-runtime-open'),
+          snapshotSeq: 1,
+          controller: { clientId: 'client_a', status: 'connected' },
+        },
+        tabs: [
+          { type: 'status', tabId: 'workspace-pane:status' },
+          { type: 'terminal', runtimeSessionId: expect.any(String) },
+        ],
+      },
+    })
+    expect(messages.filter((message) => message.type === 'output')).toHaveLength(0)
+    const firstRealtimeIndex = messages.findIndex(
+      (message) => message.type === 'sessions-changed' || message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
+    )
+    expect(firstRealtimeIndex).toBeGreaterThan(responseIndex)
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()

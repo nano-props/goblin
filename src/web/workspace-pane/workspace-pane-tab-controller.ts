@@ -1,4 +1,4 @@
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRouteTarget, RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import {
   isRepoWorkspaceRuntimeTab,
@@ -9,25 +9,36 @@ import type { WorkspacePaneRouteReconciliation } from '#/web/components/repo-wor
 import {
   abortWorkspacePaneTabCoordinatorTransition,
   beginWorkspacePaneTabCoordinatorTransition,
+  completeWorkspacePaneTabCoordinatorTransition,
   observeWorkspacePaneTabCoordinatorRoute,
   resetWorkspacePaneTabCoordinatorForTest,
   workspacePaneTabCoordinatorReconciliationDeferred,
 } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 
-export type WorkspacePaneTabControllerRoute = RepoBranchWorkspacePaneRoute | null
-export type WorkspacePaneTabControllerNavigation = Partial<
+export type WorkspacePaneTabControllerRoute = RepoBranchWorkspacePaneRouteTarget
+export type WorkspacePaneTabControllerObservedRoute = ParsedRepoBranchWorkspacePaneRouteTarget
+export type WorkspacePaneTabControllerShowNavigation = Pick<
+  PrimaryWindowNavigationActions,
+  'showRepoBranchEmptyWorkspacePane' | 'showRepoBranchWorkspacePaneTab' | 'showRepoBranchTerminalSession'
+>
+export type WorkspacePaneTabControllerCommitNavigation = Pick<
+  PrimaryWindowNavigationActions,
+  'commitRepoBranchWorkspacePaneRoute'
+>
+export type WorkspacePaneTabControllerNavigation = WorkspacePaneTabControllerShowNavigation &
+  WorkspacePaneTabControllerCommitNavigation
+type WorkspacePaneTabControllerOptionalShowNavigation = Partial<
   Pick<
     PrimaryWindowNavigationActions,
-    | 'showRepoBranchEmptyWorkspacePane'
-    | 'showRepoBranchWorkspacePaneTab'
-    | 'showRepoBranchTerminalSession'
-    | 'commitRepoBranchWorkspacePaneRoute'
+    'showRepoBranchEmptyWorkspacePane' | 'showRepoBranchWorkspacePaneTab' | 'showRepoBranchTerminalSession'
   >
 >
+type MaybePromise<T> = T | Promise<T>
 
 export function beginWorkspacePaneTabControllerTransition(input: {
   repoId: string
+  repoRuntimeId?: string
   branchName: string
   worktreePath?: string | null
   fromRoute: WorkspacePaneTabControllerRoute
@@ -40,11 +51,16 @@ export function abortWorkspacePaneTabControllerTransition(transitionId: number |
   abortWorkspacePaneTabCoordinatorTransition(transitionId)
 }
 
+export function completeWorkspacePaneTabControllerTransition(transitionId: number | null | undefined): void {
+  completeWorkspacePaneTabCoordinatorTransition(transitionId)
+}
+
 export function observeWorkspacePaneTabControllerRoute(input: {
   repoId: string
+  repoRuntimeId?: string
   branchName: string | null
   worktreePath?: string | null
-  route: WorkspacePaneTabControllerRoute
+  route: WorkspacePaneTabControllerObservedRoute
 }): void {
   observeWorkspacePaneTabCoordinatorRoute(input)
 }
@@ -55,9 +71,10 @@ export function resetWorkspacePaneTabControllerForTest(): void {
 
 export function workspacePaneTabControllerReconciliationDeferred(input: {
   repoId: string
+  repoRuntimeId?: string
   branchName: string | null
   worktreePath?: string | null
-  route: WorkspacePaneTabControllerRoute
+  route: WorkspacePaneTabControllerObservedRoute
   reconciliation: WorkspacePaneRouteReconciliation
 }): boolean {
   return workspacePaneTabCoordinatorReconciliationDeferred(input)
@@ -76,16 +93,19 @@ export function beginWorkspacePaneCloseActiveTabTransition(input: {
   target: RepoWorkspaceTabModel
   closingTab: RepoWorkspaceTab
   nextTab: RepoWorkspaceTab | null
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRouteTarget | undefined
 }): number | null {
   const branchName = input.target.branchName
   if (!branchName) return null
-  const fromRoute = input.workspacePaneRoute ?? workspacePaneControllerRouteForTab(input.closingTab)
+  const fromRoute =
+    workspacePaneTabControllerRouteFromParsed(input.workspacePaneRoute) ??
+    workspacePaneControllerRouteForTab(input.closingTab)
   if (!fromRoute) return null
   const toRoute = input.nextTab ? workspacePaneControllerRouteForTab(input.nextTab) : null
   if (toRoute === undefined) return null
   return beginWorkspacePaneTabControllerTransition({
     repoId: input.target.repoId,
+    repoRuntimeId: input.target.repoRuntimeId,
     branchName,
     worktreePath: input.target.worktreePath,
     fromRoute,
@@ -93,10 +113,17 @@ export function beginWorkspacePaneCloseActiveTabTransition(input: {
   })
 }
 
+function workspacePaneTabControllerRouteFromParsed(
+  route: ParsedRepoBranchWorkspacePaneRouteTarget | undefined,
+): WorkspacePaneTabControllerRoute | undefined {
+  if (route === undefined || route?.kind === 'invalid-static') return undefined
+  return route
+}
+
 export function selectWorkspacePaneControllerTab(
   target: RepoWorkspaceTabModel,
   tab: RepoWorkspaceTab,
-  navigation: WorkspacePaneTabControllerNavigation,
+  navigation: WorkspacePaneTabControllerShowNavigation,
 ): boolean {
   const branchName = target.branchName
   if (!branchName) return false
@@ -108,8 +135,8 @@ export function selectWorkspacePaneControllerTab(
 export function commitWorkspacePaneControllerCloseBackTarget(
   target: RepoWorkspaceTabModel,
   nextTab: RepoWorkspaceTab | null,
-  navigation: WorkspacePaneTabControllerNavigation,
-): boolean {
+  navigation: WorkspacePaneTabControllerCommitNavigation,
+): MaybePromise<boolean> {
   const branchName = target.branchName
   if (!branchName) return false
   const route = nextTab ? workspacePaneControllerRouteForTab(nextTab) : null
@@ -121,7 +148,7 @@ export function showWorkspacePaneControllerRoute(
   repoId: string,
   branchName: string,
   route: WorkspacePaneTabControllerRoute,
-  navigation: WorkspacePaneTabControllerNavigation,
+  navigation: WorkspacePaneTabControllerOptionalShowNavigation,
   options?: { replace?: boolean },
 ): boolean {
   return openResolvedRepoBranchWorkspacePaneRoute(
@@ -141,8 +168,8 @@ export function commitWorkspacePaneControllerRoute(
   repoId: string,
   branchName: string,
   route: WorkspacePaneTabControllerRoute,
-  navigation: WorkspacePaneTabControllerNavigation,
+  navigation: WorkspacePaneTabControllerCommitNavigation,
   options?: { replace?: boolean },
-): boolean {
-  return navigation.commitRepoBranchWorkspacePaneRoute?.(repoId, branchName, route, options) ?? false
+): MaybePromise<boolean> {
+  return navigation.commitRepoBranchWorkspacePaneRoute(repoId, branchName, route, options)
 }

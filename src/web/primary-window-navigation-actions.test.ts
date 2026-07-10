@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/repos/types.ts'
@@ -190,7 +190,9 @@ describe('createPrimaryWindowNavigationActions', () => {
 
     expect(navigation.openRepoBranchTerminal).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, 'term-111111111111111111111')
     expect(preferredWorkspacePaneTab()).toBe('terminal')
-    expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[WORKTREE_KEY]).toBe('term-111111111111111111111')
+    expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[WORKTREE_KEY]).toBe(
+      'term-111111111111111111111',
+    )
   })
 
   test('blocks workspace pane route navigation while terminal creation is pending', () => {
@@ -240,18 +242,45 @@ describe('createPrimaryWindowNavigationActions', () => {
       routeNavigation: navigation,
     })
 
-    const accepted = actions.commitRepoBranchWorkspacePaneRoute?.(REPO_ID, BRANCH_NAME, {
+    const accepted = actions.commitRepoBranchWorkspacePaneRoute(REPO_ID, BRANCH_NAME, {
       kind: 'terminal',
       terminalSessionId: 'term-111111111111111111111',
     })
 
     expect(accepted).toBe(true)
-    expect(navigation.openRepoBranchTerminal).toHaveBeenCalledWith(
-      REPO_ID,
-      BRANCH_NAME,
-      'term-111111111111111111111',
-    )
+    expect(navigation.openRepoBranchTerminal).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, 'term-111111111111111111111')
     expect(preferredWorkspacePaneTab()).toBe('terminal')
+  })
+
+  test('commits route supplements only after operation-owned navigation settles successfully', async () => {
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
+      currentBranchName: BRANCH_NAME,
+      preferredWorkspacePaneTab: 'status',
+      workspacePaneTabsByBranch: {
+        [BRANCH_NAME]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+      },
+    })
+    const routeCommit = Promise.withResolvers<boolean>()
+    const navigation = routeNavigation()
+    navigation.commitRepoBranchWorkspacePaneRoute = vi.fn(() => routeCommit.promise)
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: REPO_ID,
+      order: [REPO_ID],
+      closeRepo: vi.fn(),
+      routeNavigation: navigation,
+    })
+
+    const committed = actions.commitRepoBranchWorkspacePaneRoute(REPO_ID, BRANCH_NAME, {
+      kind: 'static',
+      tab: 'history',
+    })
+    expect(preferredWorkspacePaneTab()).toBe('status')
+
+    routeCommit.resolve(true)
+    await expect(committed).resolves.toBe(true)
+    expect(preferredWorkspacePaneTab()).toBe('history')
   })
 
   test('blocks workspace history restore before mutating history while terminal creation is pending', () => {

@@ -11,7 +11,7 @@ import {
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import type { WorkspacePaneBranchTabType, WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { dispatchOpenWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 export interface BranchActionItem {
   id: BranchActionItemId
   label: string
@@ -46,7 +46,7 @@ export function useBranchActionItems(
   repo: BranchActionRepo,
   branch: RepoBranchState,
   branchActions: BranchActions,
-  options: { workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined },
+  options: { workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined },
 ): BranchActionSurface {
   const t = useT()
   const navigation = usePrimaryWindowNavigation()

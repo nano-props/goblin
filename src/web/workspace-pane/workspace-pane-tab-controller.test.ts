@@ -109,12 +109,19 @@ describe('workspace pane tab controller', () => {
   test('does not fall back from operation-owned commits to blockable show navigation', () => {
     const navigation = {
       showRepoBranchWorkspacePaneTab: vi.fn(() => true),
+      commitRepoBranchWorkspacePaneRoute: vi.fn(() => false),
     }
 
     expect(
       commitWorkspacePaneControllerRoute('/tmp/repo', 'feature/a', { kind: 'static', tab: 'status' }, navigation),
     ).toBe(false)
 
+    expect(navigation.commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
+      '/tmp/repo',
+      'feature/a',
+      { kind: 'static', tab: 'status' },
+      undefined,
+    )
     expect(navigation.showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
   })
 })

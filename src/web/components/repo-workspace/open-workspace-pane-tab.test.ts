@@ -18,7 +18,7 @@ import {
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
@@ -448,10 +448,7 @@ describe('openWorkspacePaneTab', () => {
       branchName: 'feature/a',
       worktreePath: WORKTREE_PATH,
       type: 'changes',
-      navigation: {
-        ...navigationWithStoreActions(),
-        showRepoBranchWorkspacePaneTab,
-      },
+      navigation: navigationWithStoreActions(showRepoBranchWorkspacePaneTab),
     })
     await commitStarted
 
@@ -510,10 +507,7 @@ describe('openWorkspacePaneTab', () => {
       branchName: 'feature/a',
       worktreePath: WORKTREE_PATH,
       type: 'changes',
-      navigation: {
-        ...navigationWithStoreActions(),
-        showRepoBranchWorkspacePaneTab,
-      },
+      navigation: navigationWithStoreActions(showRepoBranchWorkspacePaneTab),
     })
     await commitStarted
 
@@ -669,17 +663,23 @@ function openerScopeKey(repoRoot: string, branchName: string, worktreePath: stri
   return tabOpenerScopeKey({ repoRoot, branchName, worktreePath })
 }
 
-function navigationWithStoreActions(): Pick<
+function navigationWithStoreActions(
+  showRepoBranchWorkspacePaneTab: PrimaryWindowNavigationActions['showRepoBranchWorkspacePaneTab'] = (
+    repoId,
+    branch,
+    tab,
+  ) => {
+    const state = useReposStore.getState()
+    useReposStore.setState({ restoredRepoId: repoId })
+    state.setWorkspacePaneTab(repoId, branch, tab)
+    return true
+  },
+): Pick<
   PrimaryWindowNavigationActions,
   'showRepoBranchWorkspacePaneTab' | 'commitRepoBranchWorkspacePaneRoute'
 > {
   const navigation: Pick<PrimaryWindowNavigationActions, 'showRepoBranchWorkspacePaneTab'> = {
-    showRepoBranchWorkspacePaneTab: (repoId, branch, tab) => {
-      const state = useReposStore.getState()
-      useReposStore.setState({ restoredRepoId: repoId })
-      state.setWorkspacePaneTab(repoId, branch, tab)
-      return true
-    },
+    showRepoBranchWorkspacePaneTab,
   }
   return {
     ...navigation,

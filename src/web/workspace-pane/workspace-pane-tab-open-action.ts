@@ -1,11 +1,11 @@
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
 import {
   commitWorkspacePaneControllerRoute,
-  type WorkspacePaneTabControllerNavigation,
+  type WorkspacePaneTabControllerCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -24,18 +24,18 @@ export interface OpenWorkspacePaneStaticTabActionOptions {
   branchName: string
   worktreePath: string | null | undefined
   type: WorkspacePaneStaticTabType
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
   insertAfterIdentity?: string | null
-  navigation: WorkspacePaneTabControllerNavigation
+  navigation: WorkspacePaneTabControllerCommitNavigation
 }
 
 export interface ShowWorkspacePaneStaticTabActionOptions {
   repoId: string | null
   branchName: string | null
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
   type: WorkspacePaneStaticTabType
   insertAfterIdentity?: string | null
-  navigation: WorkspacePaneTabControllerNavigation
+  navigation: WorkspacePaneTabControllerCommitNavigation
 }
 
 export async function dispatchShowWorkspacePaneStaticTabAction({
@@ -108,13 +108,17 @@ async function openWorkspacePaneStaticTabAction(input: OpenWorkspacePaneStaticTa
       insertAfterIdentity,
     },
   })
-  if (!committed.ok) return false
+  if (!committed.ok || !committed.projectionApplied) return false
   if (openerIdentity) {
     recordWorkspacePaneTabOpener(input.repoId, branchName, workspacePaneStaticTabId(input.type), openerIdentity)
   }
-  if (!commitWorkspacePaneStaticTab(input)) return false
+  if (!(await commitWorkspacePaneStaticTab(input))) return false
   if (provider.refreshOnOpen) {
-    requestVisibleRepoProjectionRefresh({ get: useReposStore.getState, set: useReposStore.setState }, input.repoId, branchName)
+    requestVisibleRepoProjectionRefresh(
+      { get: useReposStore.getState, set: useReposStore.setState },
+      input.repoId,
+      branchName,
+    )
   }
   return true
 }
@@ -123,8 +127,8 @@ function commitWorkspacePaneStaticTab(input: {
   repoId: string
   branchName: string
   type: WorkspacePaneStaticTabType
-  navigation: WorkspacePaneTabControllerNavigation
-}): boolean {
+  navigation: WorkspacePaneTabControllerCommitNavigation
+}): boolean | Promise<boolean> {
   return commitWorkspacePaneControllerRoute(
     input.repoId,
     input.branchName,

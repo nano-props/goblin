@@ -5,6 +5,7 @@ import {
   runWorkspacePaneRuntimeNewAction,
   runWorkspacePaneRuntimePrimaryAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
+import { createTerminalWithAdmissionForTest } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import { resetWorkspacePaneTabControllerForTest } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 
@@ -28,13 +29,17 @@ describe('workspace pane runtime tab command actions', () => {
       terminalWorktreeSnapshot: () => ({
         terminalWorktreeKey: '/repo\0/repo-worktree',
         selectedDescriptor: null,
-        sessions: [terminalSession('term-111111111111111111111', true), terminalSession('term-222222222222222222222', false)],
+        sessions: [
+          terminalSession('term-111111111111111111111', true),
+          terminalSession('term-222222222222222222222', false),
+        ],
         count: 2,
         bellCount: 0,
         outputActiveCount: 0,
         createPending: false,
       }),
       createTerminal,
+      createTerminalWithAdmission: createTerminalWithAdmissionForTest(createTerminal),
       selectTerminal,
     }
 
@@ -86,6 +91,7 @@ describe('workspace pane runtime tab command actions', () => {
         createPending: false,
       }),
       createTerminal,
+      createTerminalWithAdmission: createTerminalWithAdmissionForTest(createTerminal),
       selectTerminal,
     }
 
@@ -125,6 +131,7 @@ describe('workspace pane runtime tab command actions', () => {
         createPending: true,
       }),
       createTerminal,
+      createTerminalWithAdmission: createTerminalWithAdmissionForTest(createTerminal),
       selectTerminal: vi.fn(),
     }
 
@@ -145,9 +152,11 @@ describe('workspace pane runtime tab command actions', () => {
 
   test('new terminal action joins a pending duplicate create through terminal ownership', async () => {
     const createTerminal = vi.fn(async () => 'created-session')
-    const createTerminalWithOwnership = vi.fn(async () => ({
+    const createTerminalWithAdmission = vi.fn(async () => ({
       terminalSessionId: 'created-session',
-      ownsCreate: false,
+      requestRole: 'observer' as const,
+      resourceDisposition: 'created' as const,
+      workspacePaneTabs: [],
     }))
     const showTerminalSession = vi.fn(() => true)
     const bridge: TerminalSessionCommandBridge = {
@@ -161,7 +170,7 @@ describe('workspace pane runtime tab command actions', () => {
         createPending: true,
       }),
       createTerminal,
-      createTerminalWithOwnership,
+      createTerminalWithAdmission,
       selectTerminal: vi.fn(),
     }
 
@@ -177,7 +186,7 @@ describe('workspace pane runtime tab command actions', () => {
     ).resolves.toBe(true)
 
     expect(showTerminalSession).not.toHaveBeenCalled()
-    expect(createTerminalWithOwnership).toHaveBeenCalledWith(terminalBase, undefined)
+    expect(createTerminalWithAdmission).toHaveBeenCalledWith(terminalBase, undefined)
     expect(createTerminal).not.toHaveBeenCalled()
   })
 

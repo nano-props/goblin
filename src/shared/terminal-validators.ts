@@ -82,7 +82,7 @@ const TerminalListSessionsInputSchema = v.object({
   repoRoot: v.string(),
   repoRuntimeId: RepoRuntimeIdSchema,
 })
-const TerminalCreateInputSchema = v.object({
+export const TerminalCreateInputSchema = v.object({
   repoRoot: v.string(),
   repoRuntimeId: RepoRuntimeIdSchema,
   branch: v.string(),

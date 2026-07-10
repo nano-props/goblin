@@ -1,4 +1,8 @@
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type {
+  ParsedRepoBranchWorkspacePaneRoute,
+  ParsedRepoBranchWorkspacePaneRouteTarget,
+  RepoBranchWorkspacePaneRouteTarget,
+} from '#/web/App.tsx'
 import { WORKSPACE_PANE_RUNTIME_TAB_TYPES } from '#/shared/workspace-pane.ts'
 import type { RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 
@@ -6,10 +10,10 @@ export type WorkspacePaneRouteReconciliation =
   { kind: 'none' } | { kind: 'pending' } | { kind: 'unverified' } | { kind: 'replace-empty-pane' }
 
 export type WorkspacePaneRouteHistoryResolution =
-  { kind: 'defer' } | { kind: 'record'; route: RepoBranchWorkspacePaneRoute | null }
+  { kind: 'defer' } | { kind: 'record'; route: RepoBranchWorkspacePaneRouteTarget }
 
 export function reconcileWorkspacePaneRoute(
-  route: RepoBranchWorkspacePaneRoute | null,
+  route: ParsedRepoBranchWorkspacePaneRouteTarget,
   model: RepoWorkspaceTabModel,
 ): WorkspacePaneRouteReconciliation {
   if (!route || !model.branchName) return { kind: 'none' }
@@ -24,7 +28,7 @@ function workspacePaneRouteReconciliationBlocked(model: RepoWorkspaceTabModel): 
 }
 
 function reconcileStaticWorkspacePaneRoute(
-  route: Extract<RepoBranchWorkspacePaneRoute, { kind: 'static' }>,
+  route: Extract<ParsedRepoBranchWorkspacePaneRoute, { kind: 'static' }>,
   model: RepoWorkspaceTabModel,
 ): WorkspacePaneRouteReconciliation {
   if (model.tabEntriesProjectionPhase === 'pending') return { kind: 'pending' }
@@ -34,7 +38,7 @@ function reconcileStaticWorkspacePaneRoute(
 }
 
 function reconcileTerminalWorkspacePaneRoute(
-  route: Extract<RepoBranchWorkspacePaneRoute, { kind: 'terminal' }>,
+  route: Extract<ParsedRepoBranchWorkspacePaneRoute, { kind: 'terminal' }>,
   model: RepoWorkspaceTabModel,
 ): WorkspacePaneRouteReconciliation {
   if (model.tabEntriesProjectionPhase === 'pending') return { kind: 'pending' }
@@ -52,7 +56,7 @@ function reconcileTerminalWorkspacePaneRoute(
 }
 
 function reconcileInvalidWorkspacePaneRoute(
-  route: Extract<RepoBranchWorkspacePaneRoute, { kind: 'invalid-static' }>,
+  route: Extract<ParsedRepoBranchWorkspacePaneRoute, { kind: 'invalid-static' }>,
   model: RepoWorkspaceTabModel,
 ): WorkspacePaneRouteReconciliation {
   if (model.tabEntriesProjectionPhase === 'pending') return { kind: 'pending' }
@@ -61,11 +65,12 @@ function reconcileInvalidWorkspacePaneRoute(
 }
 
 export function workspacePaneRouteHistoryResolution(
-  route: RepoBranchWorkspacePaneRoute | null,
+  route: ParsedRepoBranchWorkspacePaneRouteTarget,
   reconciliation: WorkspacePaneRouteReconciliation,
 ): WorkspacePaneRouteHistoryResolution {
   if (reconciliation.kind === 'pending' || reconciliation.kind === 'unverified') return { kind: 'defer' }
   if (reconciliation.kind === 'replace-empty-pane') return { kind: 'record', route: null }
+  if (route?.kind === 'invalid-static') return { kind: 'record', route: null }
   return { kind: 'record', route }
 }
 

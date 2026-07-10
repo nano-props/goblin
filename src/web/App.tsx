@@ -29,13 +29,25 @@ interface AppProps {
 export type RepoRouteView =
   | { kind: 'empty'; repoId: string }
   | { kind: 'dashboard'; repoId: string }
-  | { kind: 'branch'; repoId: string; branchName: string; workspacePaneRoute: RepoBranchWorkspacePaneRoute | null }
+  | {
+      kind: 'branch'
+      repoId: string
+      branchName: string
+      workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null
+    }
   | { kind: 'newWorktree'; repoId: string }
 
 export type RepoBranchWorkspacePaneRoute =
   | { kind: 'static'; tab: WorkspacePaneStaticTabType }
-  | { kind: 'invalid-static'; tabKey: string }
   | { kind: 'terminal'; terminalSessionId: string }
+
+export type RepoBranchWorkspacePaneRouteTarget = RepoBranchWorkspacePaneRoute | null
+
+export type ParsedRepoBranchWorkspacePaneRoute =
+  | RepoBranchWorkspacePaneRoute
+  | { kind: 'invalid-static'; tabKey: string }
+
+export type ParsedRepoBranchWorkspacePaneRouteTarget = ParsedRepoBranchWorkspacePaneRoute | null
 
 export function App({
   routeSettingsPage = null,

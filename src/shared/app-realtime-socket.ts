@@ -11,16 +11,21 @@ import type {
   WorkspacePaneTabsSocketRequestInputs,
   WorkspacePaneTabsSocketResponseOutputs,
 } from '#/shared/workspace-pane-tabs.ts'
+import type {
+  WorkspacePaneRuntimeSocketRequestInputs,
+  WorkspacePaneRuntimeSocketResponseOutputs,
+} from '#/shared/workspace-pane-runtime.ts'
 
 export type AppRealtimeMessage = TerminalRealtimeMessage | WorkspacePaneTabsRealtimeMessage
 
 export interface AppRealtimeRequestInputs
-  extends TerminalSocketRequestInputs,
-    WorkspacePaneTabsSocketRequestInputs {}
+  extends TerminalSocketRequestInputs, WorkspacePaneTabsSocketRequestInputs, WorkspacePaneRuntimeSocketRequestInputs {}
 
 export interface AppRealtimeResponseOutputs
-  extends TerminalSocketResponseOutputs,
-    WorkspacePaneTabsSocketResponseOutputs {}
+  extends
+    TerminalSocketResponseOutputs,
+    WorkspacePaneTabsSocketResponseOutputs,
+    WorkspacePaneRuntimeSocketResponseOutputs {}
 
 export type AppRealtimeRequestAction = keyof AppRealtimeRequestInputs
 
@@ -34,6 +39,14 @@ export type AppRealtimeRequestMessage =
         input: WorkspacePaneTabsSocketRequestInputs[TAction]
       }
     }[keyof WorkspacePaneTabsSocketRequestInputs]
+  | {
+      [TAction in keyof WorkspacePaneRuntimeSocketRequestInputs]: {
+        type: 'request'
+        requestId: string
+        action: TAction
+        input: WorkspacePaneRuntimeSocketRequestInputs[TAction]
+      }
+    }[keyof WorkspacePaneRuntimeSocketRequestInputs]
 
 export type AppRealtimeResponseMessage =
   | TerminalSocketResponseMessage
@@ -47,6 +60,15 @@ export type AppRealtimeResponseMessage =
       }
     }[keyof WorkspacePaneTabsSocketRequestInputs]
   | {
+      [TAction in keyof WorkspacePaneRuntimeSocketRequestInputs]: {
+        type: 'response'
+        requestId: string
+        ok: true
+        action: TAction
+        payload: WorkspacePaneRuntimeSocketResponseOutputs[TAction]
+      }
+    }[keyof WorkspacePaneRuntimeSocketRequestInputs]
+  | {
       [TAction in keyof WorkspacePaneTabsSocketRequestInputs]: {
         type: 'response'
         requestId: string
@@ -55,13 +77,20 @@ export type AppRealtimeResponseMessage =
         error: string
       }
     }[keyof WorkspacePaneTabsSocketRequestInputs]
+  | {
+      [TAction in keyof WorkspacePaneRuntimeSocketRequestInputs]: {
+        type: 'response'
+        requestId: string
+        ok: false
+        action: TAction
+        error: string
+      }
+    }[keyof WorkspacePaneRuntimeSocketRequestInputs]
 
 export type AppRealtimeHealthPongMessage = { type: 'pong'; requestId: string }
 
 export type AppRealtimeSocketServerMessage =
-  | AppRealtimeMessage
-  | AppRealtimeResponseMessage
-  | AppRealtimeHealthPongMessage
+  AppRealtimeMessage | AppRealtimeResponseMessage | AppRealtimeHealthPongMessage
 
 /**
  * Heartbeat envelope. Sent client→server while the realtime socket is open.
@@ -75,7 +104,4 @@ export interface AppRealtimeHeartbeatMessage {
 export type AppRealtimeHealthPingMessage = { type: 'ping'; requestId: string }
 
 export type AppRealtimeClientMessage =
-  | TerminalClientMessage
-  | AppRealtimeRequestMessage
-  | AppRealtimeHeartbeatMessage
-  | AppRealtimeHealthPingMessage
+  TerminalClientMessage | AppRealtimeRequestMessage | AppRealtimeHeartbeatMessage | AppRealtimeHealthPingMessage

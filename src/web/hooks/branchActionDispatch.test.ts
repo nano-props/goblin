@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { dispatchRemoveWorktree } from '#/web/hooks/branchActionDispatch.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import {
   createBranchSnapshot,

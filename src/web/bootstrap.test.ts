@@ -229,6 +229,9 @@ describe('client bootstrap', () => {
         list: async () => [],
         onChanged: () => () => {},
       }),
+      workspacePaneRuntime: () => ({
+        open: async () => ({ ok: false, runtimeType: 'terminal', message: 'unavailable' }),
+      }),
     })
 
     const { getInitialBootstrap } = await import('#/web/bootstrap.ts')

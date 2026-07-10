@@ -1,18 +1,23 @@
 import type { TerminalCreateOptions, TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
 
-export interface TerminalCreateOwnershipResult {
+export type TerminalCreateAdmissionResult = {
   terminalSessionId: string
-  ownsCreate: boolean
+  requestRole: 'leader' | 'observer'
+  resourceDisposition: 'created' | 'restored' | 'reused'
+  workspacePaneTabs: WorkspacePaneTabEntry[]
 }
 
 export interface TerminalSessionCommandBridge {
   terminalWorktreeSnapshot: (terminalWorktreeKey: string) => TerminalWorktreeSnapshot
   createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
-  createTerminalWithOwnership?: (
+  createTerminalWithAdmission: (
     base: TerminalSessionBase,
     options?: TerminalCreateOptions,
-  ) => Promise<TerminalCreateOwnershipResult>
+    placement?: WorkspacePaneRuntimeTabPlacement,
+  ) => Promise<TerminalCreateAdmissionResult>
   selectTerminal: (terminalWorktreeKey: string, terminalSessionId: string) => void
   closeTerminalByDescriptor?: (terminalSessionId: string, base: TerminalSessionBase) => Promise<boolean>
   closeTerminalsForWorktree?: (base: TerminalSessionBase) => Promise<boolean>

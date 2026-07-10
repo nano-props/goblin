@@ -42,7 +42,7 @@ import { returnToFromHref, usePrimaryWindowRouteNavigation } from '#/web/primary
 import { useWorkspaceNavigationHistory } from '#/web/workspace-navigation-history.ts'
 import type { WorkspaceNavigationRouteContext } from '#/web/workspace-navigation-history.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 
 const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapState>({
@@ -220,7 +220,7 @@ interface RepoRouteContext {
   kind: 'empty' | 'dashboard' | 'branch' | 'newWorktree'
   repoSlug: string
   branchName?: string
-  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
+  workspacePaneRoute?: ParsedRepoBranchWorkspacePaneRoute | null
 }
 
 export function repoRouteContextFromMatches(
@@ -252,7 +252,7 @@ export function repoRouteContextFromMatches(
 
 function workspacePaneRouteFromMatches(
   matches: Array<{ routeId: string; params: Record<string, string> }>,
-): RepoBranchWorkspacePaneRoute | null {
+): ParsedRepoBranchWorkspacePaneRoute | null {
   const terminalMatch = [...matches].reverse().find((match) => typeof match.params.terminalSessionId === 'string')
   const terminalSessionId = terminalMatch?.params.terminalSessionId
   if (terminalSessionId) return { kind: 'terminal', terminalSessionId }
@@ -269,7 +269,7 @@ interface PrimaryWindowOverlaysProps {
   navigation: PrimaryWindowNavigationActions
   hydratedRouteRepoId: string | null
   currentBranchName: string | null
-  currentWorkspacePaneRoute: RepoBranchWorkspacePaneRoute | null
+  currentWorkspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null
 }
 
 function PrimaryWindowOverlays({
@@ -339,7 +339,7 @@ function AuthenticatedWorkspaceSideEffects({
   routedRepoId: string | null
   hydratedRouteRepoId: string | null
   currentBranchName: string | null
-  currentWorkspacePaneRoute: RepoBranchWorkspacePaneRoute | null
+  currentWorkspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null
   routeContext: WorkspaceNavigationRouteContext | null
   navigation: PrimaryWindowNavigationActions
   closeAllOverlays: () => void
@@ -395,7 +395,7 @@ function VisibleRepoProjectionRefreshEffect({
 }: {
   hydratedRouteRepoId: string | null
   currentBranchName: string | null
-  currentWorkspacePaneRoute: RepoBranchWorkspacePaneRoute | null
+  currentWorkspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null
 }) {
   useVisibleRepoProjectionRefresh({
     hydratedRouteRepoId,

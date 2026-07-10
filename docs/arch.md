@@ -51,9 +51,12 @@ The ownership split is:
 - `src/shared/workspace-pane-tabs.ts` and
   `src/shared/workspace-pane-tabs-validators.ts` own the workspace tab socket
   action/event names and their validation.
+- `src/shared/workspace-pane-runtime.ts` owns the application protocol for
+  opening a provider runtime and its canonical tab as one server result.
 - `src/server/workspace-pane/*` owns server-side tab runtime state,
-  canonicalization, read/write actions, realtime invalidation, and
-  runtime-session materialization/pruning.
+  canonicalization, read/write actions, realtime invalidation,
+  runtime-session materialization/pruning, and the cross-provider runtime-open
+  application operation.
 - `src/web/workspace-pane/*` owns client query/cache projection and mutation
   orchestration for server-owned tab state.
 - `src/web/workspace-pane/tab-providers.ts` owns per-tab-type
@@ -67,6 +70,22 @@ architecture itself. Future session tabs such as chat should add a runtime
 type, provider, projection, panel, create action, and close/action adapters
 without changing the generic tab strip contract.
 
+Runtime creation follows three responsibility layers:
+
+1. The provider domain service owns the resource lifecycle (terminal session,
+   chat session, and so on) and remains usable without workspace-pane UI.
+2. `WorkspacePaneRuntimeApplication` owns the server application operation:
+   call the selected provider, commit the canonical runtime tab through the
+   workspace-pane coordinator, publish invalidation, and return both provider
+   result and tabs.
+3. The client command/projection owns admission, local canonical cache
+   projection, opener facts, and exact route completion.
+
+UI create paths use `workspace-pane-runtime.open`. They must not call a
+provider create and then issue a second `workspace-pane-tabs.update` to repair
+membership. Low-level provider create actions may remain available for
+provider-only use and tests, but they are not the composed UI operation.
+
 Runtime tab types are intentionally registered statically. Adding a new
 server-owned session tab type should update the explicit extension points
 instead of adding fallback logic in `WorkspacePaneTabStrip` or local client
@@ -78,6 +97,9 @@ mirrors:
   `WorkspacePaneRuntimeTabsProvider`.
 - `src/server/<feature>/*`: own the feature lifecycle and expose live runtime
   sessions to the workspace-pane provider.
+- `src/shared/workspace-pane-runtime.ts` and
+  `src/server/workspace-pane/workspace-pane-runtime-application.ts`: add the
+  provider request/result variant and application adapter.
 - `src/web/workspace-pane/workspace-pane-runtime-tab-*.ts*`: add provider
   projection, target key, create, command, close, and panel entries for the
   new type.
@@ -90,3 +112,4 @@ Compatibility note: old workspace tab protocol names
 of the current contract. The canonical socket actions/events are
 `workspace-pane-tabs.list`, `workspace-pane-tabs.replace`,
 `workspace-pane-tabs.update`, and `workspace-pane-tabs.changed`.
+The composed runtime-create action is `workspace-pane-runtime.open`.

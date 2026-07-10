@@ -1,4 +1,4 @@
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import {
@@ -10,6 +10,7 @@ import {
 import {
   abortWorkspacePaneTabControllerTransition,
   beginWorkspacePaneCloseActiveTabTransition,
+  completeWorkspacePaneTabControllerTransition,
   commitWorkspacePaneControllerCloseBackTarget,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { beginWorkspacePaneTabClose } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
@@ -21,7 +22,10 @@ import {
   workspacePaneRuntimeTabConfirmedCloseIdentity,
   type ConfirmedWorkspacePaneRuntimeTabClose,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
-import { workspacePaneTabTargetBlocksInteraction, workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import {
+  workspacePaneTabTargetBlocksInteraction,
+  workspacePaneTabTargetForBranch,
+} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { clearWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { useTerminalActionDialogsStore } from '#/web/stores/repos/terminal-action-dialogs.ts'
 import {
@@ -34,7 +38,7 @@ import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspa
 export interface CloseWorkspacePaneTabActionOptions {
   repoId: string | null
   branchName: string | null
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
   navigation: PrimaryWindowNavigationActions
   targetIdentity?: string
   skipTerminalCloseConfirm?: boolean
@@ -49,7 +53,7 @@ export interface ConfirmedTerminalWorkspacePaneTabClose {
 export interface ConfirmCloseTerminalWorkspacePaneTabActionOptions extends CloseWorkspacePaneTabActionOptions {
   currentRepoId: string | null
   currentBranchName: string | null
-  currentWorkspacePaneRoute: RepoBranchWorkspacePaneRoute | null
+  currentWorkspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null
   confirmedTerminal: ConfirmedTerminalWorkspacePaneTabClose
 }
 
@@ -65,11 +69,12 @@ type CloseWorkspacePaneTabActionStart =
       completion: Promise<boolean>
     }
 
-export async function dispatchCloseWorkspacePaneTabAction(options: CloseWorkspacePaneTabActionOptions): Promise<boolean> {
+export async function dispatchCloseWorkspacePaneTabAction(
+  options: CloseWorkspacePaneTabActionOptions,
+): Promise<boolean> {
   if (!options.repoId || !options.branchName) return await closeWorkspacePaneTabAction(options)
-  return await runWorkspacePaneTabCoordinatorTask(
-    { repoId: options.repoId, branchName: options.branchName },
-    () => closeWorkspacePaneTabAction(options),
+  return await runWorkspacePaneTabCoordinatorTask({ repoId: options.repoId, branchName: options.branchName }, () =>
+    closeWorkspacePaneTabAction(options),
   )
 }
 
@@ -82,9 +87,10 @@ async function closeWorkspacePaneTabAction(options: CloseWorkspacePaneTabActionO
   }
   completeWorkspacePaneTabClose(start.target.repoId, start.target.branchName, start.closingIdentity)
   if (start.wasActive) {
-    const shown = commitWorkspacePaneControllerCloseBackTarget(start.target, start.nextTab, options.navigation)
-    if (!shown) abortWorkspacePaneTabControllerTransition(start.transitionId)
-    return shown
+    return await settleWorkspacePaneCloseBackNavigation(
+      start.transitionId,
+      commitWorkspacePaneControllerCloseBackTarget(start.target, start.nextTab, options.navigation),
+    )
   }
   return true
 }
@@ -140,9 +146,13 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
   // Close the original runtime tab, but only drive close-back navigation when
   // the current routed pane is still showing that same tab.
   const openerIdentity =
-    wasActive && closeTarget && tab ? workspacePaneTabOpener(closeTarget.repoId, confirmedBranchName, tab.identity) : null
+    wasActive && closeTarget && tab
+      ? workspacePaneTabOpener(closeTarget.repoId, confirmedBranchName, tab.identity)
+      : null
   const nextTab =
-    wasActive && closeTarget && tab ? nextRepoWorkspaceTabAfterClose(closeTarget.tabs, tab.identity, openerIdentity) : null
+    wasActive && closeTarget && tab
+      ? nextRepoWorkspaceTabAfterClose(closeTarget.tabs, tab.identity, openerIdentity)
+      : null
   const transitionId =
     wasActive && closeTarget && tab
       ? beginWorkspacePaneCloseActiveTabTransition({
@@ -161,16 +171,23 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
     abortWorkspacePaneTabControllerTransition(transitionId)
     return false
   }
-  completeWorkspacePaneTabClose(repoId, confirmedBranchName, targetIdentity ?? workspacePaneRuntimeTabConfirmedCloseIdentity(confirmed))
+  completeWorkspacePaneTabClose(
+    repoId,
+    confirmedBranchName,
+    targetIdentity ?? workspacePaneRuntimeTabConfirmedCloseIdentity(confirmed),
+  )
   if (wasActive && closeTarget) {
-    const shown = commitWorkspacePaneControllerCloseBackTarget(closeTarget, nextTab, navigation)
-    if (!shown) abortWorkspacePaneTabControllerTransition(transitionId)
-    return shown
+    return await settleWorkspacePaneCloseBackNavigation(
+      transitionId,
+      commitWorkspacePaneControllerCloseBackTarget(closeTarget, nextTab, navigation),
+    )
   }
   return true
 }
 
-function beginCloseWorkspacePaneTabAction(options: CloseWorkspacePaneTabActionOptions): CloseWorkspacePaneTabActionStart {
+function beginCloseWorkspacePaneTabAction(
+  options: CloseWorkspacePaneTabActionOptions,
+): CloseWorkspacePaneTabActionStart {
   const { repoId, targetIdentity } = options
   const skipRuntimeCloseConfirm = options.skipRuntimeCloseConfirm ?? options.skipTerminalCloseConfirm ?? false
   const target =
@@ -235,7 +252,7 @@ function beginCloseWorkspacePaneTabAction(options: CloseWorkspacePaneTabActionOp
 function openWorkspacePaneRuntimeCloseConfirm(
   repoId: string,
   request: WorkspacePaneRuntimeTabCloseConfirmRequest | null,
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined,
+  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined,
 ): boolean {
   if (!request) return false
   const terminalBase = request.type === 'terminal' ? terminalBaseForRuntimeTabCloseTarget(request.target) : null
@@ -255,4 +272,20 @@ function openWorkspacePaneRuntimeCloseConfirm(
 
 function completeWorkspacePaneTabClose(repoId: string | null, branchName: string | null, identity: string): void {
   if (repoId && branchName) clearWorkspacePaneTabOpener(repoId, branchName, identity)
+}
+
+async function settleWorkspacePaneCloseBackNavigation(
+  transitionId: number | null,
+  navigation: boolean | Promise<boolean>,
+): Promise<boolean> {
+  const settlesRoute = typeof navigation !== 'boolean'
+  try {
+    const committed = await navigation
+    if (!committed) abortWorkspacePaneTabControllerTransition(transitionId)
+    else if (settlesRoute) completeWorkspacePaneTabControllerTransition(transitionId)
+    return committed
+  } catch {
+    abortWorkspacePaneTabControllerTransition(transitionId)
+    return false
+  }
 }

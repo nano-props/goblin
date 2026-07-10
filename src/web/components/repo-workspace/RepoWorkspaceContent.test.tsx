@@ -47,6 +47,7 @@ import {
   workspacePaneTabTargetForBranch,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import {
   PrimaryWindowNavigationProvider,
   type PrimaryWindowNavigationActions,
@@ -94,7 +95,9 @@ function RepoWorkspaceContentInner(props: RepoWorkspaceContentHarnessProps) {
   return <RepoWorkspaceContent {...contentProps} workspacePaneTabModel={workspacePaneTabModel} />
 }
 
-function useHarnessWorkspacePaneRoute(props: RepoWorkspaceContentHarnessProps): RepoBranchWorkspacePaneRoute | null | undefined {
+function useHarnessWorkspacePaneRoute(
+  props: RepoWorkspaceContentHarnessProps,
+): RepoBranchWorkspacePaneRoute | null | undefined {
   if (props.workspacePaneRouteMode === 'bare-branch') return undefined
   const branch = props.detail.branch
   const preferredTab = preferredWorkspacePaneTabForTarget(
@@ -121,7 +124,9 @@ function useHarnessWorkspacePaneRoute(props: RepoWorkspaceContentHarnessProps): 
   return workspacePaneRouteForStaticPreferredTab(preferredTab)
 }
 
-function workspacePaneRouteForStaticPreferredTab(tab: WorkspacePaneTabType | null): RepoBranchWorkspacePaneRoute | null {
+function workspacePaneRouteForStaticPreferredTab(
+  tab: WorkspacePaneTabType | null,
+): RepoBranchWorkspacePaneRoute | null {
   return isWorkspacePaneStaticTabType(tab) ? { kind: 'static', tab } : null
 }
 
@@ -409,7 +414,9 @@ describe('RepoWorkspaceContent', () => {
       await Promise.resolve()
     })
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/status-links', 'files')
-    expect(workspacePaneTabOpener(REPO_ID, 'feature/status-links', 'workspace-pane:files')).toBe('workspace-pane:status')
+    expect(workspacePaneTabOpener(REPO_ID, 'feature/status-links', 'workspace-pane:files')).toBe(
+      'workspace-pane:status',
+    )
 
     showRepoBranchWorkspacePaneTab.mockClear()
 
@@ -428,7 +435,7 @@ describe('RepoWorkspaceContent', () => {
 
   test('opens changes from the status row', async () => {
     const worktreePath = '/tmp/status-links-worktree'
-    const showRepoBranchWorkspacePaneTab = vi.fn()
+    const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branchSnapshots: [
@@ -929,7 +936,11 @@ describe('RepoWorkspaceContent', () => {
       currentBranchName: 'feature/terminal-reordered',
       preferredWorkspacePaneTab: 'terminal',
       workspacePaneTabsByBranch: {
-        'feature/terminal-reordered': [terminalEntry('term-222222222222222222222'), staticEntry('status'), terminalEntry('term-111111111111111111111')],
+        'feature/terminal-reordered': [
+          terminalEntry('term-222222222222222222222'),
+          staticEntry('status'),
+          terminalEntry('term-111111111111111111111'),
+        ],
       },
     })
     useTerminalProjectionHydrationStore.getState().markProjectionReady(REPO_ID, repo.repoRuntimeId)
@@ -994,8 +1005,8 @@ describe('RepoWorkspaceContent', () => {
       return 'term-111111111111111111111'
     })
     const writeInput = vi.fn()
-    const showRepoBranchWorkspacePaneTab = vi.fn()
-    const showRepoBranchTerminalSession = vi.fn()
+    const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
+    const showRepoBranchTerminalSession = vi.fn(() => true)
     let resolveViewer!: (value: { viewer: 'bat'; shell: 'posix' }) => void
     filetreeClientMocks.getRepositoryFileViewer.mockImplementationOnce(
       () =>
@@ -1256,7 +1267,7 @@ const emptyTerminalReadContext: TerminalSessionReadContextValue = {
 }
 
 function terminalCommandContextWith(overrides: Partial<TerminalSessionContextValue> = {}): TerminalSessionContextValue {
-  return {
+  return terminalSessionContextForTest({
     createTerminal: vi.fn(async () => 'term-111111111111111111111'),
     registerHost: vi.fn(),
     unregisterHost: vi.fn(),
@@ -1276,7 +1287,7 @@ function terminalCommandContextWith(overrides: Partial<TerminalSessionContextVal
     takeover: vi.fn(async () => true),
     focusTerminal: vi.fn(),
     ...overrides,
-  }
+  })
 }
 
 async function flushAsyncWork() {
@@ -1302,14 +1313,7 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,
     showRepoBranchTerminalSession: () => true,
-    goBack: () => {},
-    goForward: () => {},
-    openSettings: () => {},
-    openCreateWorktree: () => {},
-    ...overrides,
-  }
-  if (!overrides.commitRepoBranchWorkspacePaneRoute) {
-    navigation.commitRepoBranchWorkspacePaneRoute = (repoId, branch, route, options) =>
+    commitRepoBranchWorkspacePaneRoute: (repoId, branch, route, options) =>
       openResolvedRepoBranchWorkspacePaneRoute(
         {
           openRepoBranch: navigation.showRepoBranchEmptyWorkspacePane,
@@ -1320,7 +1324,12 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
         branch,
         route,
         options,
-      )
+      ),
+    goBack: () => {},
+    goForward: () => {},
+    openSettings: () => {},
+    openCreateWorktree: () => {},
+    ...overrides,
   }
   return navigation
 }

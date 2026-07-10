@@ -115,6 +115,9 @@ function seedElectronBootstrap() {
       list: vi.fn(async () => []),
       onChanged: () => () => {},
     }),
+    workspacePaneRuntime: () => ({
+      open: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
+    }),
     rotateAccessToken: vi.fn(async () => ({ accessToken: 'rotated-secret' })),
   })
 }
@@ -193,6 +196,9 @@ function seedWebBootstrap() {
       update: vi.fn(async () => []),
       list: vi.fn(async () => []),
       onChanged: () => () => {},
+    }),
+    workspacePaneRuntime: () => ({
+      open: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
     }),
   })
 }

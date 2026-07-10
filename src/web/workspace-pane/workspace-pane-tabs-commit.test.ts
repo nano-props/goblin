@@ -87,12 +87,18 @@ describe('commitWorkspacePaneTabs', () => {
       repoRuntimeId: REPO_RUNTIME_ID,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
-      tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'), workspacePaneStaticTabEntry('status')],
+      tabs: [
+        workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
+        workspacePaneStaticTabEntry('status'),
+      ],
     })
 
     expect(readWorkspacePaneTabs()).toEqual([workspacePaneStaticTabEntry('history')])
 
-    resolveServerTabs([workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111')])
+    resolveServerTabs([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
+    ])
     await expect(commit).resolves.toMatchObject({ ok: true })
     expect(readWorkspacePaneTabs()).toEqual([
       workspacePaneStaticTabEntry('status'),
@@ -147,7 +153,10 @@ describe('commitWorkspacePaneTabs', () => {
         repoRuntimeId: REPO_RUNTIME_ID,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
-        tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'), workspacePaneStaticTabEntry('status')],
+        tabs: [
+          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
+          workspacePaneStaticTabEntry('status'),
+        ],
       }),
     ).resolves.toMatchObject({ ok: true })
 
@@ -193,14 +202,20 @@ describe('commitWorkspacePaneTabs', () => {
       repoRuntimeId: REPO_RUNTIME_ID,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
-      tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'), workspacePaneStaticTabEntry('status')],
+      tabs: [
+        workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
+        workspacePaneStaticTabEntry('status'),
+      ],
     })
     await replaceStarted
     const fetch = primaryWindowQueryClient
       .fetchQuery(workspacePaneTabsQueryOptions(REPO_ROOT, REPO_RUNTIME_ID))
       .catch(() => null)
 
-    resolveServerTabs([workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'), workspacePaneStaticTabEntry('status')])
+    resolveServerTabs([
+      workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
+      workspacePaneStaticTabEntry('status'),
+    ])
     await expect(commit).resolves.toMatchObject({ ok: true })
     resolveListTabs([
       {
@@ -237,7 +252,10 @@ describe('commitWorkspacePaneTabs', () => {
         repoRuntimeId: REPO_RUNTIME_ID,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
-        tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'), workspacePaneStaticTabEntry('status')],
+        tabs: [
+          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
+          workspacePaneStaticTabEntry('status'),
+        ],
       }),
     ).resolves.toMatchObject({ ok: true })
 
@@ -458,7 +476,7 @@ describe('updateWorkspacePaneTabs', () => {
     seedWorkspacePaneTabsRepo(NEXT_REPO_RUNTIME_ID)
     resolveServerTabs([workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')])
 
-    await expect(update).resolves.toMatchObject({ ok: false, canceled: true })
+    await expect(update).resolves.toMatchObject({ ok: true, projectionApplied: false })
     expect(readWorkspacePaneTabs()).toEqual([workspacePaneStaticTabEntry('status')])
   })
 })

@@ -145,6 +145,6 @@ function closeStaticTabWithCommit(worktreePath: string | null) {
       worktreePath,
       operation: { type: 'close-static', tabType: type },
     })
-    return result.ok
+    return result.ok && result.projectionApplied
   }
 }

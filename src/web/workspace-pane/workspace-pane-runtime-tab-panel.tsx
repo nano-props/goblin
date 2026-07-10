@@ -69,13 +69,13 @@ function TerminalWorkspacePaneRuntimeTabPanel({
   runtimeState,
 }: WorkspacePaneRuntimeTabPanelProps) {
   const t = useT()
-  const { createTerminal, createTerminalWithOwnership } = useTerminalSessionContext()
+  const { createTerminalWithAdmission } = useTerminalSessionContext()
   const navigation = usePrimaryWindowNavigation()
   const createTerminalForSlot = useCallback(
     async (base: TerminalSessionBase) => {
       await dispatchCreateTerminalWorkspacePaneRuntimeTabAction({
         base,
-        createTerminal: createTerminalWithOwnership ?? createTerminal,
+        createTerminal: createTerminalWithAdmission,
         openerIdentity: null,
         showCreatedTerminalTab: (terminalSessionId) =>
           showCreatedTerminalWorkspacePaneRuntimeTab(base, terminalSessionId, navigation),
@@ -83,7 +83,7 @@ function TerminalWorkspacePaneRuntimeTabPanel({
         logMessage: 'workspace pane terminal create failed',
       })
     },
-    [createTerminal, createTerminalWithOwnership, navigation, t],
+    [createTerminalWithAdmission, navigation, t],
   )
 
   if (!target.branchName || !target.worktreePath) return null

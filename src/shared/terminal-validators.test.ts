@@ -21,6 +21,7 @@ import {
   normalizeAppRealtimeClientMessage,
   normalizeAppRealtimeSocketServerMessage,
 } from '#/shared/app-realtime-validators.ts'
+import { WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS } from '#/shared/workspace-pane-runtime.ts'
 
 describe('shared terminal validators', () => {
   test('normalizes terminal sizes within supported bounds', () => {
@@ -207,6 +208,42 @@ describe('shared terminal validators', () => {
     ).toBeNull()
   })
 
+  test('normalizes runtime-open application requests with provider validation', () => {
+    const message = {
+      type: 'request',
+      requestId: 'request_runtime_open',
+      action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open,
+      input: {
+        runtimeType: 'terminal',
+        request: {
+          repoRoot: '/repo',
+          repoRuntimeId: 'repo-runtime-test',
+          branch: 'main',
+          worktreePath: '/repo/worktree',
+          kind: 'primary',
+          cols: 100,
+          rows: 30,
+          clientId: 'client_a',
+        },
+        insertAfterIdentity: 'workspace-pane:status',
+      },
+    }
+
+    expect(normalizeAppRealtimeClientMessage(message)).toEqual(message)
+    expect(
+      normalizeAppRealtimeClientMessage({
+        ...message,
+        input: { ...message.input, insertAfterIdentity: 'bad\0identity' },
+      }),
+    ).toBeNull()
+    expect(
+      normalizeAppRealtimeClientMessage({
+        ...message,
+        input: { ...message.input, request: { ...message.input.request, cols: 0 } },
+      }),
+    ).toBeNull()
+  })
+
   test('rejects prune requests without a repo runtime id', () => {
     expect(
       normalizeTerminalClientMessage({
@@ -343,6 +380,59 @@ describe('shared terminal validators', () => {
       ok: true,
       action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
       payload: [],
+    })
+  })
+
+  test('normalizes runtime-open application responses as one provider-and-tabs outcome', () => {
+    const payload = {
+      ok: true,
+      runtimeType: 'terminal',
+      runtime: {
+        ok: true,
+        action: 'created',
+        terminalSessionId: 'term-111111111111111111111',
+        sessions: [],
+        terminalRuntimeSessionId: 'pty_1234567890abcdef',
+        processName: 'zsh',
+        canonicalTitle: null,
+        phase: 'open',
+        message: null,
+        snapshot: 'prompt',
+        snapshotSeq: 1,
+        outputEra: 0,
+        controller: { clientId: 'client_a', status: 'connected' },
+        canonicalCols: 120,
+        canonicalRows: 40,
+      },
+      tabs: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
+    }
+
+    expect(
+      normalizeAppRealtimeSocketServerMessage({
+        type: 'response',
+        requestId: 'request_runtime_open',
+        ok: true,
+        action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open,
+        payload,
+      }),
+    ).toMatchObject({
+      type: 'response',
+      ok: true,
+      action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open,
+      payload,
+    })
+    expect(
+      normalizeAppRealtimeSocketServerMessage({
+        type: 'response',
+        requestId: 'request_runtime_open_invalid',
+        ok: true,
+        action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open,
+        payload: { ...payload, runtime: { ...payload.runtime, outputEra: undefined } },
+      }),
+    ).toMatchObject({
+      ok: false,
+      action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open,
+      error: 'Invalid realtime socket response payload',
     })
   })
 

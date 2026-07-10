@@ -6,9 +6,9 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { WorkspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
 import { captureWorkspacePaneActiveTabIdentity } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { resolveWorkspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
-type WorkspacePaneCommandRoute = RepoBranchWorkspacePaneRoute | null | undefined
+type WorkspacePaneCommandRoute = ParsedRepoBranchWorkspacePaneRoute | null | undefined
 
 export interface WorkspacePaneRuntimeTabCommandContextInput {
   repoId: string

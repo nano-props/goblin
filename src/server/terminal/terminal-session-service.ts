@@ -1,6 +1,4 @@
-import path from 'node:path'
 import { isValidBranch, isValidCwd, isValidRepoLocator } from '#/shared/input-validation.ts'
-import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import {
   type TerminalCreateAction,
   type TerminalCreateResult,
@@ -11,7 +9,7 @@ import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsEntry, WorkspacePaneTabsUpdateInput } from '#/shared/workspace-pane-tabs.ts'
 import { isValidTerminalClientId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import { createTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
-import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
+import { terminalSessionRuntimeScope, terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
 import {
   isValidWorkspacePaneTabsOperation,
   type WorkspacePaneTabsCoordinator,
@@ -74,8 +72,7 @@ class TerminalSessionService {
       rejectStaleCreateIfNeeded: (userId, input, terminalRuntimeSessionId) =>
         this.rejectStaleCreateIfNeeded(userId, input, terminalRuntimeSessionId),
       cleanupStaleCreate: async (userId, input) => await this.cleanupStaleCreate(userId, input),
-      listSessions: async (userId, repoRoot, repoRuntimeId) =>
-        await this.listSessions(userId, repoRoot, repoRuntimeId),
+      listSessions: async (userId, repoRoot, repoRuntimeId) => await this.listSessions(userId, repoRoot, repoRuntimeId),
     })
   }
 
@@ -97,7 +94,7 @@ class TerminalSessionService {
     if (!isValidTerminalSize(cols, rows)) return { ok: false, message: 'error.invalid-arguments' }
 
     const sessionScope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
-    const scopedWorktreePath = terminalWorktreePath(input.repoRoot, input.worktreePath)
+    const scopedWorktreePath = terminalSessionWorktreePath(input.repoRoot, input.worktreePath)
     const existingSessions = await this.options.manager.listSessionsForUser(userId, sessionScope)
     const existingSession = existingSessions.find(
       (session) => session.terminalSessionId === terminalSessionId && session.worktreePath === scopedWorktreePath,
@@ -136,7 +133,8 @@ class TerminalSessionService {
     if (!isValidBranch(input.branchName)) return []
     if (input.worktreePath !== null && !isValidCwd(input.worktreePath)) return []
     const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
-    const worktreePath = input.worktreePath === null ? null : terminalWorktreePath(input.repoRoot, input.worktreePath)
+    const worktreePath =
+      input.worktreePath === null ? null : terminalSessionWorktreePath(input.repoRoot, input.worktreePath)
     return await this.workspaceTabsCoordinator.replaceTabs({
       userId,
       scope,
@@ -153,7 +151,8 @@ class TerminalSessionService {
     if (input.worktreePath !== null && !isValidCwd(input.worktreePath)) return []
     if (!isValidWorkspacePaneTabsOperation(input.operation)) return []
     const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
-    const worktreePath = input.worktreePath === null ? null : terminalWorktreePath(input.repoRoot, input.worktreePath)
+    const worktreePath =
+      input.worktreePath === null ? null : terminalSessionWorktreePath(input.repoRoot, input.worktreePath)
     return await this.workspaceTabsCoordinator.updateTabs({
       userId,
       scope,
@@ -235,10 +234,6 @@ class TerminalSessionService {
 
 export function createTerminalSessionService(options: TerminalSessionServiceOptions): TerminalSessionService {
   return new TerminalSessionService(options)
-}
-
-function terminalWorktreePath(repoRoot: string, worktreePath: string): string {
-  return isRemoteRepoId(repoRoot) ? worktreePath : path.resolve(worktreePath)
 }
 
 export function terminalWorkspacePaneRuntimeTabsProvider(

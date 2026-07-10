@@ -34,7 +34,7 @@ import { getClientBridge } from '#/web/client-bridge.ts'
 import { translate } from '#/web/stores/i18n.ts'
 import { toast } from 'sonner'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { getRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 
@@ -46,7 +46,7 @@ interface Options {
   navigation: PrimaryWindowNavigationActions
   currentRepoId: string | null
   currentBranchName?: string | null
-  currentWorkspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
+  currentWorkspacePaneRoute?: ParsedRepoBranchWorkspacePaneRoute | null
   onShowHelp: () => void
   /** Returns true when workspace shortcuts should not affect the repo view. */
   isWorkspaceShortcutSuppressed: () => boolean

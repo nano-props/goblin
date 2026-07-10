@@ -305,7 +305,12 @@ describe('AppRuntimeProjectionProvider', () => {
 
       await act(async () => {
         recovery.resolve({
-          sessions: [completeServerSession({ ...serverSession('term-111111111111111111111'), repoRuntimeId: firstRepo.repoRuntimeId })],
+          sessions: [
+            completeServerSession({
+              ...serverSession('term-111111111111111111111'),
+              repoRuntimeId: firstRepo.repoRuntimeId,
+            }),
+          ],
           snapshots: [],
         })
         await Promise.resolve()
@@ -474,6 +479,9 @@ function testBridge(): ClientBridge {
           if (workspaceTabsChangedHandler === cb) workspaceTabsChangedHandler = null
         }
       }),
+    }),
+    workspacePaneRuntime: () => ({
+      open: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
     }),
   }
 }

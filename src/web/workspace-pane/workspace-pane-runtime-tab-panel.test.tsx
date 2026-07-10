@@ -5,6 +5,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { stubI18n } from '#/test-utils/i18n-mock.ts'
+import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { TerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionContextValue } from '#/web/components/terminal/types.ts'
 import {
@@ -32,7 +33,10 @@ const terminalSessionViewMocks = vi.hoisted(() => ({
 }))
 
 const terminalCreateCommandMocks = vi.hoisted(() => ({
-  runCreateTerminalTabCommand: vi.fn(async () => ({ ok: true as const, terminalSessionId: 'term-111111111111111111111' })),
+  runCreateTerminalTabCommand: vi.fn(async () => ({
+    ok: true as const,
+    terminalSessionId: 'term-111111111111111111111',
+  })),
 }))
 
 vi.mock('#/web/components/terminal/TerminalSessionView.tsx', () => ({
@@ -72,8 +76,9 @@ describe('workspace pane runtime tab panel', () => {
 
   test('delegates terminal empty-slot create to the terminal create command', async () => {
     const createTerminal = vi.fn(async () => 'term-111111111111111111111')
+    const terminalContext = terminalCommandContextWith({ createTerminal })
     const { navigation } = renderPanel({
-      terminalContext: terminalCommandContextWith({ createTerminal }),
+      terminalContext,
     })
 
     const base: TerminalSessionBase = {
@@ -90,7 +95,7 @@ describe('workspace pane runtime tab panel', () => {
     expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).toHaveBeenCalledWith(
       expect.objectContaining({
         base,
-        createTerminal,
+        createTerminal: terminalContext.createTerminalWithAdmission,
         openerIdentity: null,
         logMessage: 'workspace pane terminal create failed',
       }),
@@ -137,30 +142,30 @@ function navigationWith(): PrimaryWindowNavigationActions {
     cycleRepo: vi.fn(),
     selectRepoBranch: vi.fn(),
     showRepoBranchEmptyWorkspacePane: () => true,
-    showRepoBranchWorkspacePaneTab: vi.fn(),
-    showRepoBranchTerminalSession: vi.fn(),
+    showRepoBranchWorkspacePaneTab: vi.fn(() => true),
+    showRepoBranchTerminalSession: vi.fn(() => true),
+    commitRepoBranchWorkspacePaneRoute: (repoId, branch, route, options) =>
+      openResolvedRepoBranchWorkspacePaneRoute(
+        {
+          openRepoBranch: navigation.showRepoBranchEmptyWorkspacePane,
+          openRepoBranchTab: navigation.showRepoBranchWorkspacePaneTab,
+          openRepoBranchTerminal: navigation.showRepoBranchTerminalSession,
+        },
+        repoId,
+        branch,
+        route,
+        options,
+      ),
     goBack: vi.fn(),
     goForward: vi.fn(),
     openSettings: vi.fn(),
     openCreateWorktree: vi.fn(),
   }
-  navigation.commitRepoBranchWorkspacePaneRoute = (repoId, branch, route, options) =>
-    openResolvedRepoBranchWorkspacePaneRoute(
-      {
-        openRepoBranch: navigation.showRepoBranchEmptyWorkspacePane,
-        openRepoBranchTab: navigation.showRepoBranchWorkspacePaneTab,
-        openRepoBranchTerminal: navigation.showRepoBranchTerminalSession,
-      },
-      repoId,
-      branch,
-      route,
-      options,
-    )
   return navigation
 }
 
 function terminalCommandContextWith(overrides: Partial<TerminalSessionContextValue> = {}): TerminalSessionContextValue {
-  return {
+  return terminalSessionContextForTest({
     createTerminal: vi.fn(async () => 'term-111111111111111111111'),
     registerHost: vi.fn(),
     unregisterHost: vi.fn(),
@@ -180,5 +185,5 @@ function terminalCommandContextWith(overrides: Partial<TerminalSessionContextVal
     takeover: vi.fn(async () => true),
     focusTerminal: vi.fn(),
     ...overrides,
-  }
+  })
 }

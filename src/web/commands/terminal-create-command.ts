@@ -1,6 +1,8 @@
 import { terminalLog } from '#/web/logger.ts'
 import type { TerminalCreateOptions } from '#/web/components/terminal/types.ts'
-import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { TerminalCreateAction, TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
 import {
   showTerminalCreateErrorToast,
   terminalCreateErrorKey,
@@ -15,16 +17,20 @@ export type TerminalCreateCommandAdmission =
   | string
   | {
       terminalSessionId: string
-      ownsCreate: boolean
+      requestRole: 'leader' | 'observer'
+      resourceDisposition: TerminalCreateAction
+      workspacePaneTabs?: WorkspacePaneTabEntry[]
     }
 
 const TERMINAL_CREATE_CANCELED_MESSAGE = 'terminal create request canceled'
+const WORKSPACE_PANE_NAVIGATION_REJECTED_MESSAGE = 'workspace pane navigation rejected'
 
 export async function runCreateTerminalTabCommand(input: {
   base: TerminalSessionBase
   createTerminal: (
     base: TerminalSessionBase,
     options?: TerminalCreateOptions,
+    placement?: WorkspacePaneRuntimeTabPlacement,
   ) => Promise<TerminalCreateCommandAdmission>
   /**
    * The tab this creation should be attributed to (used for close-back focus
@@ -42,7 +48,10 @@ export async function runCreateTerminalTabCommand(input: {
    * Workspace-pane callers use this to run the tab insertion and exact route
    * commit as one pane operation after terminal lifecycle admission resolves.
    */
-  commitCreatedTerminalTab?: (terminalSessionId: string) => boolean | Promise<boolean>
+  commitCreatedTerminalTab?: (
+    terminalSessionId: string,
+    workspacePaneTabs: WorkspacePaneTabEntry[] | null,
+  ) => boolean | Promise<boolean>
   /**
    * Insertion anchor for the new terminal tab. Callers decide explicitly:
    * supply the captured opener's identity when the terminal is opened from
@@ -50,6 +59,7 @@ export async function runCreateTerminalTabCommand(input: {
    * generic entries (+ button, Cmd+T, Terminal menu) that should append.
    */
   options?: TerminalCreateOptions
+  insertAfterIdentity?: string | null
   t?: TerminalCreateTranslator
   logMessage?: string
 }): Promise<TerminalCreateCommandResult> {
@@ -57,9 +67,15 @@ export async function runCreateTerminalTabCommand(input: {
     return { ok: false, error: new Error('repo runtime unavailable'), messageKey: 'error.terminal-create-failed' }
   }
   try {
-    const admission = terminalCreateCommandAdmission(await input.createTerminal(input.base, input.options))
-    if (!admission.ownsCreate) return { ok: true, terminalSessionId: admission.terminalSessionId }
-    return await finishCreateTerminalTabCommand(input, admission.terminalSessionId)
+    const admission = terminalCreateCommandAdmission(
+      input.insertAfterIdentity === undefined
+        ? await input.createTerminal(input.base, input.options)
+        : await input.createTerminal(input.base, input.options, {
+            insertAfterIdentity: input.insertAfterIdentity,
+          }),
+    )
+    if (admission.requestRole === 'observer') return { ok: true, terminalSessionId: admission.terminalSessionId }
+    return await finishCreateTerminalTabCommand(input, admission)
   } catch (error) {
     if (isTerminalCreateCanceled(error)) {
       return { ok: false, error, messageKey: 'error.terminal-create-failed' }
@@ -70,11 +86,22 @@ export async function runCreateTerminalTabCommand(input: {
   }
 }
 
-function terminalCreateCommandAdmission(admission: TerminalCreateCommandAdmission): {
-  terminalSessionId: string
-  ownsCreate: boolean
-} {
-  return typeof admission === 'string' ? { terminalSessionId: admission, ownsCreate: true } : admission
+function terminalCreateCommandAdmission(admission: TerminalCreateCommandAdmission):
+  | {
+      terminalSessionId: string
+      requestRole: 'leader'
+      resourceDisposition: TerminalCreateAction
+      workspacePaneTabs: WorkspacePaneTabEntry[] | null
+    }
+  | {
+      terminalSessionId: string
+      requestRole: 'observer'
+      resourceDisposition: TerminalCreateAction
+      workspacePaneTabs: WorkspacePaneTabEntry[] | null
+    } {
+  return typeof admission === 'string'
+    ? { terminalSessionId: admission, requestRole: 'leader', resourceDisposition: 'created', workspacePaneTabs: null }
+    : { ...admission, workspacePaneTabs: admission.workspacePaneTabs ?? null }
 }
 
 async function finishCreateTerminalTabCommand(
@@ -82,11 +109,20 @@ async function finishCreateTerminalTabCommand(
     base: TerminalSessionBase
     openerIdentity: string | null
     showCreatedTerminalTab?: (terminalSessionId: string) => boolean | Promise<boolean>
-    commitCreatedTerminalTab?: (terminalSessionId: string) => boolean | Promise<boolean>
+    commitCreatedTerminalTab?: (
+      terminalSessionId: string,
+      workspacePaneTabs: WorkspacePaneTabEntry[] | null,
+    ) => boolean | Promise<boolean>
   },
-  terminalSessionId: string,
+  admission: {
+    terminalSessionId: string
+    requestRole: 'leader'
+    resourceDisposition: TerminalCreateAction
+    workspacePaneTabs: WorkspacePaneTabEntry[] | null
+  },
 ): Promise<TerminalCreateCommandResult> {
-  if (input.openerIdentity) {
+  const terminalSessionId = admission.terminalSessionId
+  if (input.openerIdentity && admission.resourceDisposition === 'created') {
     recordWorkspacePaneTabOpener(
       input.base.repoRoot,
       input.base.branch,
@@ -95,14 +131,14 @@ async function finishCreateTerminalTabCommand(
     )
   }
   const navigationAccepted = input.commitCreatedTerminalTab
-    ? await input.commitCreatedTerminalTab(terminalSessionId)
+    ? await input.commitCreatedTerminalTab(terminalSessionId, admission.workspacePaneTabs)
     : input.showCreatedTerminalTab
       ? await input.showCreatedTerminalTab(terminalSessionId)
       : true
   if (!navigationAccepted) {
     return {
       ok: false,
-      error: new Error('workspace pane navigation rejected'),
+      error: new Error(WORKSPACE_PANE_NAVIGATION_REJECTED_MESSAGE),
       messageKey: 'error.terminal-create-failed',
     }
   }

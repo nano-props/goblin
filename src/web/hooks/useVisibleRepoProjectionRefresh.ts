@@ -18,7 +18,7 @@ import {
 import { useWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/use-workspace-pane-runtime-tab-target-projection.ts'
 import { createRepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { useRepoProjectionReadModel } from '#/web/repo-data-query.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 export { isRepoVisibleProjectionRefreshable }
 
@@ -62,7 +62,7 @@ export function useVisibleRepoProjectionRefresh({
 }: {
   hydratedRouteRepoId?: string | null
   currentBranchName?: string | null
-  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
+  workspacePaneRoute?: ParsedRepoBranchWorkspacePaneRoute | null
 } = {}) {
   const currentRepoShell = useStoreWithEqualityFn(
     useReposStore,

@@ -3,7 +3,7 @@ import {
   repoWorkspaceTabModelBlocksTabInteraction,
   type RepoWorkspaceTabModel,
 } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -25,7 +25,7 @@ export interface WorkspacePaneTabTargetOptions {
    * workspace-pane preference. `null` is an explicit bare branch route and
    * therefore has no active pane tab.
    */
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
 }
 
 export const workspacePanePreferenceTargetOptions: WorkspacePaneTabTargetOptions = { workspacePaneRoute: undefined }

@@ -1,6 +1,6 @@
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/repos/types.ts'
 import {
@@ -13,6 +13,8 @@ import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/r
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
+
+type MaybePromise<T> = T | Promise<T>
 
 export interface PrimaryWindowNavigationActions {
   activateRepo: (repoId: string) => void
@@ -32,12 +34,12 @@ export interface PrimaryWindowNavigationActions {
     terminalSessionId: string,
     options?: { replace?: boolean },
   ) => boolean
-  commitRepoBranchWorkspacePaneRoute?: (
+  commitRepoBranchWorkspacePaneRoute: (
     repoId: string,
     branch: string,
-    route: RepoBranchWorkspacePaneRoute | null,
+    route: RepoBranchWorkspacePaneRouteTarget,
     options?: { replace?: boolean },
-  ) => boolean
+  ) => MaybePromise<boolean>
   goBack: (repoId: string) => void
   goForward: (repoId: string) => void
   openSettings: (page: SettingsPage) => void
@@ -155,17 +157,32 @@ function commitRepoBranchWorkspacePaneRoute(
   routeNavigation: PrimaryWindowRouteNavigation,
   repoId: string,
   branchName: string,
-  route: RepoBranchWorkspacePaneRoute | null,
+  route: RepoBranchWorkspacePaneRouteTarget,
   options?: { replace?: boolean },
+): MaybePromise<boolean> {
+  const committed = routeNavigation.commitRepoBranchWorkspacePaneRoute
+    ? routeNavigation.commitRepoBranchWorkspacePaneRoute(repoId, branchName, route, options)
+    : openResolvedRepoBranchWorkspacePaneRoute(routeNavigation, repoId, branchName, route, options)
+  if (typeof committed === 'boolean') {
+    return finishCommittedWorkspacePaneRoute(committed, repoId, branchName, route)
+  }
+  return committed.then((accepted) => finishCommittedWorkspacePaneRoute(accepted, repoId, branchName, route))
+}
+
+function finishCommittedWorkspacePaneRoute(
+  accepted: boolean,
+  repoId: string,
+  branchName: string,
+  route: RepoBranchWorkspacePaneRouteTarget,
 ): boolean {
-  if (!openResolvedRepoBranchWorkspacePaneRoute(routeNavigation, repoId, branchName, route, options)) return false
+  if (!accepted) return false
   const rememberedRoute = rememberedWorkspacePaneRoute(route)
   if (!rememberedRoute) return false
   rememberWorkspacePaneRouteSelection(repoId, branchName, rememberedRoute)
   return true
 }
 
-function rememberedWorkspacePaneRoute(route: RepoBranchWorkspacePaneRoute | null): WorkspacePaneRememberedRoute | null {
+function rememberedWorkspacePaneRoute(route: RepoBranchWorkspacePaneRouteTarget): WorkspacePaneRememberedRoute | null {
   if (route === null) return { kind: 'empty' }
   if (route.kind === 'static') return { kind: 'static', tab: route.tab }
   if (route.kind === 'terminal') return { kind: 'terminal', terminalSessionId: route.terminalSessionId }

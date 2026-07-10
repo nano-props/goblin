@@ -1,24 +1,35 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import {
+  commitCreatedTerminalWorkspacePaneRuntimeTab,
   dispatchCreateTerminalWorkspacePaneRuntimeTabAction,
   type WorkspacePaneRuntimeTabCreateStateByType,
   workspacePaneRuntimeTabCreateAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
-import {
-  resetWorkspacePaneTabCoordinatorForTest,
-} from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import { resetWorkspacePaneTabCoordinatorForTest } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 
 const terminalCreateCommandMocks = vi.hoisted(() => ({
-  runCreateTerminalTabCommand: vi.fn(async () => ({ ok: true as const, terminalSessionId: 'term-111111111111111111111' })),
+  runCreateTerminalTabCommand: vi.fn(async () => ({
+    ok: true as const,
+    terminalSessionId: 'term-111111111111111111111',
+  })),
+}))
+const workspacePaneTabsCommitMocks = vi.hoisted(() => ({
+  writeCanonicalWorkspacePaneTabsForTarget: vi.fn(async () => true),
 }))
 
 vi.mock('#/web/commands/terminal-create-command.ts', () => ({
   runCreateTerminalTabCommand: terminalCreateCommandMocks.runCreateTerminalTabCommand,
 }))
 
+vi.mock('#/web/workspace-pane/workspace-pane-tabs-commit.ts', () => ({
+  writeCanonicalWorkspacePaneTabsForTarget: workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsForTarget,
+}))
+
 beforeEach(() => {
   resetWorkspacePaneTabCoordinatorForTest()
+  workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsForTarget.mockReset()
+  workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsForTarget.mockResolvedValue(true)
 })
 
 afterEach(() => {
@@ -117,6 +128,62 @@ describe('workspace pane runtime tab create action', () => {
         commitCreatedTerminalTab: expect.any(Function),
       }),
     )
+  })
+
+  test('projects application-returned tabs locally before showing the created runtime', async () => {
+    const base: TerminalSessionBase = {
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-1',
+      branch: 'main',
+      worktreePath: '/repo-worktree',
+    }
+    const tabs = [
+      { type: 'status' as const, tabId: 'workspace-pane:status' as const },
+      { type: 'terminal' as const, runtimeSessionId: 'term-111111111111111111111' },
+    ]
+    const showCreatedTerminalTab = vi.fn(() => true)
+
+    await expect(
+      commitCreatedTerminalWorkspacePaneRuntimeTab({
+        base,
+        terminalSessionId: 'term-111111111111111111111',
+        workspacePaneTabs: tabs,
+        showCreatedTerminalTab,
+      }),
+    ).resolves.toBe(true)
+
+    expect(workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsForTarget).toHaveBeenCalledWith({
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-1',
+      branchName: 'main',
+      worktreePath: '/repo-worktree',
+      tabs,
+    })
+    expect(showCreatedTerminalTab).toHaveBeenCalledWith('term-111111111111111111111')
+    expect(
+      workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsForTarget.mock.invocationCallOrder[0],
+    ).toBeLessThan(showCreatedTerminalTab.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY)
+  })
+
+  test('does not navigate when the application result has no canonical tab projection', async () => {
+    const showCreatedTerminalTab = vi.fn(() => true)
+
+    await expect(
+      commitCreatedTerminalWorkspacePaneRuntimeTab({
+        base: {
+          repoRoot: '/repo',
+          repoRuntimeId: 'repo-runtime-1',
+          branch: 'main',
+          worktreePath: '/repo-worktree',
+        },
+        terminalSessionId: 'term-111111111111111111111',
+        workspacePaneTabs: null,
+        showCreatedTerminalTab,
+      }),
+    ).resolves.toBe(false)
+
+    expect(workspacePaneTabsCommitMocks.writeCanonicalWorkspacePaneTabsForTarget).not.toHaveBeenCalled()
+    expect(showCreatedTerminalTab).not.toHaveBeenCalled()
   })
 
   test('marks the terminal create action busy while projection or create is pending', () => {

@@ -1,4 +1,4 @@
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { adjacentRepoWorkspaceTab, isRepoWorkspaceRuntimeTab } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import {
@@ -18,7 +18,7 @@ import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspa
 export interface SelectWorkspacePaneTabByIndexActionOptions {
   repoId: string | null
   branchName: string | null
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
   tabIndex: number
   navigation: PrimaryWindowNavigationActions
 }
@@ -26,7 +26,7 @@ export interface SelectWorkspacePaneTabByIndexActionOptions {
 export interface MoveWorkspacePaneTabActionOptions {
   repoId: string | null
   branchName: string | null
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
   direction: 1 | -1
   navigation: PrimaryWindowNavigationActions
 }
@@ -34,7 +34,7 @@ export interface MoveWorkspacePaneTabActionOptions {
 export interface SelectWorkspacePaneTabByIdentityActionOptions {
   repoId: string | null
   branchName: string | null
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
   identity: string
   navigation: PrimaryWindowNavigationActions
   runtimeActionContext?: WorkspacePaneRuntimeTabActionContext

@@ -54,6 +54,7 @@ import type {
 import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneTabsWithRuntimeTab } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import {
   readWorkspacePaneTabsForTarget,
   setWorkspacePaneTabsForTargetQueryData,
@@ -718,6 +719,24 @@ beforeEach(() => {
         }
       }),
     }),
+    workspacePaneRuntime: () => ({
+      open: vi.fn(async (input) => {
+        const runtime = await createTerminalMock(input.request)
+        if (!runtime.ok) return { ok: false as const, runtimeType: 'terminal' as const, message: runtime.message }
+        const tabs = workspacePaneTabsWithRuntimeTab(
+          readWorkspacePaneTabsForTarget({
+            repoRoot: input.request.repoRoot,
+            repoRuntimeId: input.request.repoRuntimeId,
+            branchName: input.request.branch,
+            worktreePath: input.request.worktreePath,
+          }),
+          'terminal',
+          runtime.terminalSessionId,
+          input,
+        )
+        return { ok: true as const, runtimeType: 'terminal' as const, runtime, tabs }
+      }),
+    }),
   })
 })
 
@@ -770,7 +789,10 @@ describe('TerminalSessionProvider', () => {
       ])
 
       await act(async () => {
-        exitHandler?.({ terminalRuntimeSessionId: 'term-222222222222222222222', terminalSessionId: 'term-222222222222222222222' })
+        exitHandler?.({
+          terminalRuntimeSessionId: 'term-222222222222222222222',
+          terminalSessionId: 'term-222222222222222222222',
+        })
       })
 
       expect(closeMock).not.toHaveBeenCalled()
@@ -785,7 +807,10 @@ describe('TerminalSessionProvider', () => {
       // at read time (covered by `workspace-pane-tabs.ts` and
       // `workspace-pane-tab.test.ts`).
       await act(async () => {
-        exitHandler?.({ terminalRuntimeSessionId: 'term-111111111111111111111', terminalSessionId: 'term-111111111111111111111' })
+        exitHandler?.({
+          terminalRuntimeSessionId: 'term-111111111111111111111',
+          terminalSessionId: 'term-111111111111111111111',
+        })
       })
 
       expect(closeMock).not.toHaveBeenCalled()
@@ -982,8 +1007,12 @@ describe('TerminalSessionProvider', () => {
         await getContext().createTerminal(base)
       })
 
-      const first = mockSessions.find((session) => session.descriptor.terminalSessionId === 'term-111111111111111111111')
-      const second = mockSessions.find((session) => session.descriptor.terminalSessionId === 'term-222222222222222222222')
+      const first = mockSessions.find(
+        (session) => session.descriptor.terminalSessionId === 'term-111111111111111111111',
+      )
+      const second = mockSessions.find(
+        (session) => session.descriptor.terminalSessionId === 'term-222222222222222222222',
+      )
       if (!first || !second) throw new Error('missing terminal mock sessions')
 
       await act(async () => {
@@ -1158,7 +1187,9 @@ describe('TerminalSessionProvider', () => {
       expect(getProbe().summaries).toEqual([
         expect.objectContaining({ terminalSessionId: 'term-111111111111111111111', title: 'zsh', phase: 'open' }),
       ])
-      const hydrated = mockSessions.find((session) => session.descriptor.terminalSessionId === 'term-111111111111111111111')
+      const hydrated = mockSessions.find(
+        (session) => session.descriptor.terminalSessionId === 'term-111111111111111111111',
+      )
       expect(hydrated?.hydrate).toHaveBeenCalledWith(
         expect.objectContaining({
           terminalRuntimeSessionId: 'server_session_1',
@@ -1412,7 +1443,10 @@ describe('TerminalSessionProvider', () => {
       })
 
       expect(createdKey).toBe('term-333333333333333333333')
-      expect(getProbe().summaries.map((session) => session.terminalSessionId)).toEqual(['term-222222222222222222222', 'term-333333333333333333333'])
+      expect(getProbe().summaries.map((session) => session.terminalSessionId)).toEqual([
+        'term-222222222222222222222',
+        'term-333333333333333333333',
+      ])
     } finally {
       await unmount()
     }
@@ -1563,10 +1597,16 @@ describe('TerminalSessionProvider', () => {
       await act(async () => {
         await getContext().createTerminal(base)
       })
-      expect(getProbe()).toMatchObject({ count: 2, terminalIds: ['term-111111111111111111111', 'term-222222222222222222222'] })
+      expect(getProbe()).toMatchObject({
+        count: 2,
+        terminalIds: ['term-111111111111111111111', 'term-222222222222222222222'],
+      })
 
       await act(async () => {
-        exitHandler?.({ terminalRuntimeSessionId: 'term-222222222222222222222', terminalSessionId: 'term-222222222222222222222' })
+        exitHandler?.({
+          terminalRuntimeSessionId: 'term-222222222222222222222',
+          terminalSessionId: 'term-222222222222222222222',
+        })
       })
       expect(getProbe()).toMatchObject({ count: 1, terminalIds: ['term-111111111111111111111'] })
     } finally {

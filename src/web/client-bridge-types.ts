@@ -31,6 +31,7 @@ import type {
   WorkspacePaneTabsReplaceInput,
   WorkspacePaneTabsUpdateInput,
 } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneRuntimeOpenInput, WorkspacePaneRuntimeOpenResult } from '#/shared/workspace-pane-runtime.ts'
 import type { TerminalIdentityRealtimeEvent, TerminalLifecycleRealtimeEvent } from '#/web/components/terminal/types.ts'
 
 export interface ClientTerminal {
@@ -78,6 +79,10 @@ export interface ClientWorkspacePaneTabs {
   replace: (input: WorkspacePaneTabsReplaceInput) => Promise<WorkspacePaneTabEntry[]>
   update: (input: WorkspacePaneTabsUpdateInput) => Promise<WorkspacePaneTabEntry[]>
   onChanged: (cb: (repoRoot: string) => void) => () => void
+}
+
+export interface ClientWorkspacePaneRuntime {
+  open: (input: WorkspacePaneRuntimeOpenInput) => Promise<WorkspacePaneRuntimeOpenResult>
 }
 
 export interface ClientAppRealtimeLifecycle {
@@ -128,4 +133,5 @@ export interface ClientBridge {
   appRealtime(): ClientAppRealtimeLifecycle
   terminal(): ClientTerminal
   workspacePaneTabs(): ClientWorkspacePaneTabs
+  workspacePaneRuntime(): ClientWorkspacePaneRuntime
 }

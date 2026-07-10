@@ -175,6 +175,7 @@ function navigationWithStoreActions(): PrimaryWindowNavigationActions {
       return true
     },
     showRepoBranchTerminalSession: vi.fn(),
+    commitRepoBranchWorkspacePaneRoute: () => true,
     goBack: vi.fn(),
     goForward: vi.fn(),
     openSettings: vi.fn(),

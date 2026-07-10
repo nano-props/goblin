@@ -24,6 +24,9 @@ import { createWorkspacePaneTabsActions } from '#/server/workspace-pane/workspac
 import { broadcastWorkspacePaneTabsChanged } from '#/server/workspace-pane/workspace-pane-tabs-realtime.ts'
 import { createTerminalRealtimeHandlers } from '#/server/terminal/terminal-runtime-realtime.ts'
 import { createWorkspacePaneTabsRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-tabs-runtime-realtime.ts'
+import { createWorkspacePaneRuntimeApplication } from '#/server/workspace-pane/workspace-pane-runtime-application.ts'
+import { createWorkspacePaneRuntimeRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-runtime-realtime.ts'
+import type { ServerWorkspacePaneRuntimeHost } from '#/server/workspace-pane/workspace-pane-runtime-host.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { isValidTerminalClientId, isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import {
@@ -151,6 +154,17 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     sessionService,
     isValidTerminalClientId,
   })
+  const workspacePaneRuntimeApplication = createWorkspacePaneRuntimeApplication({
+    workspaceTabsCoordinator,
+    terminal: actions,
+    isCurrentRepoRuntime,
+    broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
+  })
+  const workspacePaneRuntimeHost: ServerWorkspacePaneRuntimeHost = {
+    async openRuntime(clientId, userId, input) {
+      return await workspacePaneRuntimeApplication.open(clientId, userId, input)
+    },
+  }
   const workspacePaneTabsActions = createWorkspacePaneTabsActions({
     sessionService,
     isValidClientId: isValidTerminalClientId,
@@ -207,6 +221,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
 
   const realtimeHandlers = createTerminalRealtimeHandlers(terminalActionHost)
   const workspacePaneTabsRealtimeHandlers = createWorkspacePaneTabsRealtimeHandlers(workspacePaneTabsHost)
+  const workspacePaneRuntimeRealtimeHandlers = createWorkspacePaneRuntimeRealtimeHandlers(workspacePaneRuntimeHost)
   const appRealtimeHost = createAppRealtimeHost({
     broker,
     isValidClientId: isValidTerminalClientId,
@@ -227,6 +242,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     },
     terminalHandlers: realtimeHandlers,
     workspacePaneTabsHandlers: workspacePaneTabsRealtimeHandlers,
+    workspacePaneRuntimeHandlers: workspacePaneRuntimeRealtimeHandlers,
     onShutdown() {
       if (shuttingDown) return
       shuttingDown = true
@@ -262,7 +278,11 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     broadcastWorkspacePaneTabsChanged(broker, userId, repoRoot)
   }
 
-  function handleSessionClosed(userId: string, session: TerminalSessionSummary, reason: TerminalSessionCloseReason): void {
+  function handleSessionClosed(
+    userId: string,
+    session: TerminalSessionSummary,
+    reason: TerminalSessionCloseReason,
+  ): void {
     if (reason !== 'session') return
     broadcastRepoSessionsChanged(userId, session.repoRoot)
     void sessionService
