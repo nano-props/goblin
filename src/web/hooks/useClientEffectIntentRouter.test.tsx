@@ -27,10 +27,6 @@ import {
 } from '#/web/components/terminal/terminal-session-command-bridge.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
-import {
-  readWorkspacePaneTabsForTarget,
-  setWorkspacePaneTabsForTargetQueryData,
-} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
@@ -396,19 +392,6 @@ describe('useClientEffectIntentRouter', () => {
     useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'term-111111111111111111111')
     const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
       const terminalSessionId = 'term-222222222222222222222'
-      const currentTabs = readWorkspacePaneTabsForTarget({
-        repoRoot: base.repoRoot,
-        repoRuntimeId: base.repoRuntimeId!,
-        branchName: base.branch,
-        worktreePath: base.worktreePath,
-      })
-      setWorkspacePaneTabsForTargetQueryData({
-        repoRoot: base.repoRoot,
-        repoRuntimeId: base.repoRuntimeId!,
-        branchName: base.branch,
-        worktreePath: base.worktreePath,
-        tabs: [...currentTabs, workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
-      })
       visibleSessionIds = [...visibleSessionIds, terminalSessionId]
       useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, terminalSessionId)
       return terminalSessionId

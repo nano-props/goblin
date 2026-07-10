@@ -11,6 +11,7 @@ import {
   workspacePaneTabEntryFromUnknown,
   workspacePaneTabEntryIdentity,
   workspacePaneTabsInsertAfterIdentity,
+  workspacePaneTabsMoveEntryAfterIdentity,
   workspacePaneTabRequiresWorktree,
 } from '#/shared/workspace-pane.ts'
 
@@ -46,15 +47,16 @@ export function workspacePaneTabsWithRuntimeTab(
   options?: { insertAfterIdentity?: string | null },
 ): WorkspacePaneTabEntry[] {
   if (sessionId.length === 0) return normalizeWorkspacePaneTabs(current)
-  if (
-    current.some(
-      (entry) =>
-        isWorkspacePaneRuntimeTabEntry(entry) &&
-        entry.type === type &&
-        workspacePaneRuntimeTabSessionId(entry) === sessionId,
+  const existingIndex = current.findIndex(
+    (entry) =>
+      isWorkspacePaneRuntimeTabEntry(entry) &&
+      entry.type === type &&
+      workspacePaneRuntimeTabSessionId(entry) === sessionId,
+  )
+  if (existingIndex !== -1) {
+    return normalizeWorkspacePaneTabs(
+      workspacePaneTabsMoveEntryAfterIdentity(current, existingIndex, options?.insertAfterIdentity),
     )
-  ) {
-    return normalizeWorkspacePaneTabs(current)
   }
   return normalizeWorkspacePaneTabs(
     workspacePaneTabsInsertAfterIdentity(current, workspacePaneRuntimeTabEntry(type, sessionId), options?.insertAfterIdentity),

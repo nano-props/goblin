@@ -5,6 +5,7 @@ import {
   orderWorkspacePaneItemsByTabEntries,
   workspacePaneTabsWithoutStaticTab,
   workspacePaneTabsWithDraggedOrder,
+  workspacePaneTabsWithRuntimeTab,
 } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
 describe('orderWorkspacePaneItemsByTabEntries', () => {
@@ -42,6 +43,32 @@ describe('workspacePaneTabsWithDraggedOrder', () => {
 describe('workspacePaneTabsWithoutStaticTab', () => {
   test('allows closing the final tab', () => {
     expect(workspacePaneTabsWithoutStaticTab([staticEntry('status')], 'status')).toEqual([])
+  })
+})
+
+describe('workspacePaneTabsWithRuntimeTab', () => {
+  test('moves an existing runtime tab after an insertion anchor', () => {
+    const status = staticEntry('status')
+    const history = staticEntry('history')
+    const terminal = terminalEntry('term-222222222222222222222')
+
+    expect(
+      workspacePaneTabsWithRuntimeTab([status, history, terminal], 'terminal', 'term-222222222222222222222', {
+        insertAfterIdentity: 'workspace-pane:status',
+      }),
+    ).toEqual([status, terminal, history])
+  })
+
+  test('preserves an existing runtime tab order without an insertion anchor', () => {
+    const status = staticEntry('status')
+    const history = staticEntry('history')
+    const terminal = terminalEntry('term-222222222222222222222')
+
+    expect(workspacePaneTabsWithRuntimeTab([status, history, terminal], 'terminal', 'term-222222222222222222222')).toEqual([
+      status,
+      history,
+      terminal,
+    ])
   })
 })
 

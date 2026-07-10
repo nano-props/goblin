@@ -51,12 +51,18 @@ export type WorkspacePaneTabsUpdateOperation =
       tabType: WorkspacePaneStaticTabType
       insertAfterIdentity?: string | null
     }
-  | {
-      type: 'open-runtime'
-      runtimeType: WorkspacePaneRuntimeTabType
-      sessionId: string
-      insertAfterIdentity?: string | null
-    }
+	  | {
+	      type: 'open-runtime'
+	      runtimeType: WorkspacePaneRuntimeTabType
+	      sessionId: string
+	      /**
+	       * When provided, this operation owns the runtime tab placement.
+	       * If recovery/list-time materialization already inserted the same
+	       * runtime tab, the update may move it after this anchor instead of
+	       * preserving the recovery append position.
+	       */
+	      insertAfterIdentity?: string | null
+	    }
   | { type: 'close-static'; tabType: WorkspacePaneStaticTabType }
   | { type: 'reorder'; tabIdentities: string[] }
 

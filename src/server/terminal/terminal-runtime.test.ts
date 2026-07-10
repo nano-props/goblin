@@ -255,6 +255,34 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
+  test('create broadcasts terminal sessions without invalidating workspace pane tabs', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_a', USER_1, socket)
+
+    const result = await host.create('client_a', USER_1, {
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: REPO_RUNTIME_ID,
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'additional',
+      cols: 80,
+      rows: 24,
+      clientId: 'client_a',
+    })
+
+    expect(result.ok).toBe(true)
+    expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toEqual([
+      { type: 'sessions-changed', repoRoot: REPO_ROOT },
+    ])
+    expect(
+      sentSocketMessages(socket).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+    ).toBe(false)
+
+    host.unregisterSocket('client_a', USER_1, socket)
+    shutdown()
+  })
+
   test('a second attachment can attach as viewer without stealing controller control', async () => {
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }

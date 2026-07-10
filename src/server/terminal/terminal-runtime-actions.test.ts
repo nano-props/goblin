@@ -3,7 +3,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import { clearRepoRuntimesForUser, openRepoRuntime } from '#/server/modules/repo-runtimes.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
-import { WORKSPACE_PANE_TABS_REALTIME_EVENTS } from '#/shared/workspace-pane-tabs.ts'
 
 const CLIENT_ID = 'client_terminal_actions'
 // Identity is userId-keyed under method 2: the runtime derives
@@ -86,7 +85,7 @@ function syncCurrentRepoRuntime(): void {
 }
 
 describe('terminal-runtime-actions close broadcast', () => {
-  test('emits workspace tab invalidation after a successful create', async () => {
+  test('does not emit workspace tab invalidation after a successful create', async () => {
     clearRepoRuntimesForUser(USER_ID)
     syncCurrentRepoRuntime()
     const { actions, broadcasts, sessionService } = makeActions()
@@ -118,10 +117,7 @@ describe('terminal-runtime-actions close broadcast', () => {
       }),
     ).resolves.toMatchObject({ ok: true })
 
-    expect(broadcasts).toHaveBeenCalledWith(USER_ID, {
-      type: WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
-      repoRoot: '/repo',
-    })
+    expect(broadcasts).not.toHaveBeenCalled()
   })
 
   test('does not emit workspace tab invalidation after a failed create', async () => {

@@ -161,6 +161,22 @@ export function workspacePaneTabsInsertAfterIdentity<TEntry extends WorkspacePan
   return [...current.slice(0, insertAfterIndex + 1), entry, ...current.slice(insertAfterIndex + 1)]
 }
 
+export function workspacePaneTabsMoveEntryAfterIdentity<TEntry extends WorkspacePaneTabEntry>(
+  current: readonly TEntry[],
+  entryIndex: number,
+  insertAfterIdentity?: string | null,
+): TEntry[] {
+  if (!insertAfterIdentity) return [...current]
+  const entry = current[entryIndex]
+  if (!entry) return [...current]
+  if (workspacePaneTabEntryIdentity(entry) === insertAfterIdentity) return [...current]
+  const withoutEntry = [...current.slice(0, entryIndex), ...current.slice(entryIndex + 1)]
+  if (!withoutEntry.some((candidate) => workspacePaneTabEntryIdentity(candidate) === insertAfterIdentity)) {
+    return [...current]
+  }
+  return workspacePaneTabsInsertAfterIdentity(withoutEntry, entry, insertAfterIdentity)
+}
+
 export function workspacePaneStaticTabId(type: WorkspacePaneStaticTabType): WorkspacePaneStaticTabId {
   return WORKSPACE_PANE_STATIC_TAB_IDS[type]
 }

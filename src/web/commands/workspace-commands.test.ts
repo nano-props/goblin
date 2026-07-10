@@ -463,22 +463,9 @@ describe('workspace commands', () => {
       workspacePaneTabsByBranch: { 'feature/worktree': [staticEntry('status'), staticEntry('changes')] },
     })
     let visibleSessionIds: string[] = []
-    const createTerminal = vi.fn(async () => {
+    const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
       const terminalSessionId = 'term-111111111111111111111'
-      const currentTabs = readWorkspacePaneTabsForTarget({
-        repoRoot: REPO_ID,
-        repoRuntimeId: useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
-        branchName: 'feature/worktree',
-        worktreePath: WORKTREE_PATH,
-      })
-      setWorkspacePaneTabsForTargetQueryData({
-        repoRoot: REPO_ID,
-        repoRuntimeId: useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
-        branchName: 'feature/worktree',
-        worktreePath: WORKTREE_PATH,
-        tabs: [...currentTabs, terminalEntry(terminalSessionId)],
-      })
-      useReposStore.getState().setSelectedTerminal(WORKTREE_KEY, terminalSessionId)
+      recordCreatedTerminalSelection(base, terminalSessionId)
       visibleSessionIds = [...visibleSessionIds, terminalSessionId]
       return terminalSessionId
     })
@@ -586,21 +573,8 @@ describe('workspace commands', () => {
     useReposStore.getState().setSelectedTerminal(WORKTREE_KEY, 'term-111111111111111111111')
     const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
       const terminalSessionId = 'term-222222222222222222222'
-      const currentTabs = readWorkspacePaneTabsForTarget({
-        repoRoot: base.repoRoot,
-        repoRuntimeId: base.repoRuntimeId!,
-        branchName: base.branch,
-        worktreePath: base.worktreePath,
-      })
-      setWorkspacePaneTabsForTargetQueryData({
-        repoRoot: base.repoRoot,
-        repoRuntimeId: base.repoRuntimeId!,
-        branchName: base.branch,
-        worktreePath: base.worktreePath,
-        tabs: [...currentTabs, terminalEntry(terminalSessionId)],
-      })
       visibleSessionIds = [...visibleSessionIds, terminalSessionId]
-      useReposStore.getState().setSelectedTerminal(WORKTREE_KEY, terminalSessionId)
+      recordCreatedTerminalSelection(base, terminalSessionId)
       return terminalSessionId
     })
     const closeTerminalByDescriptor = vi.fn((terminalSessionId: string) => {
@@ -674,21 +648,8 @@ describe('workspace commands', () => {
     const closeEvents: string[] = []
     const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
       const terminalSessionId = 'term-222222222222222222222'
-      const currentTabs = readWorkspacePaneTabsForTarget({
-        repoRoot: base.repoRoot,
-        repoRuntimeId: base.repoRuntimeId!,
-        branchName: base.branch,
-        worktreePath: base.worktreePath,
-      })
-      setWorkspacePaneTabsForTargetQueryData({
-        repoRoot: base.repoRoot,
-        repoRuntimeId: base.repoRuntimeId!,
-        branchName: base.branch,
-        worktreePath: base.worktreePath,
-        tabs: [...currentTabs, terminalEntry(terminalSessionId)],
-      })
       visibleSessionIds = [...visibleSessionIds, terminalSessionId]
-      useReposStore.getState().setSelectedTerminal(WORKTREE_KEY, terminalSessionId)
+      recordCreatedTerminalSelection(base, terminalSessionId)
       return terminalSessionId
     })
     const closeTerminalByDescriptor = vi.fn((terminalSessionId: string) => {
@@ -1023,14 +984,14 @@ describe('workspace commands', () => {
     const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
       secondCreatePending = true
       const terminalSessionId = await secondCreate.promise
-      recordCreatedTerminalInProjection(base, terminalSessionId)
+      recordCreatedTerminalSelection(base, terminalSessionId)
       secondCreatePending = false
       return terminalSessionId
     })
     const createTerminalWithOwnership = vi.fn(async (base: TerminalSessionBase) => {
       firstCreatePending = true
       const terminalSessionId = await firstCreate.promise
-      recordCreatedTerminalInProjection(base, terminalSessionId)
+      recordCreatedTerminalSelection(base, terminalSessionId)
       firstCreatePending = false
       return { terminalSessionId, ownsCreate: true }
     })
@@ -2193,20 +2154,7 @@ describe('workspace commands', () => {
     let visibleSessionIds: string[] = []
     const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
       const terminalSessionId = 'term-111111111111111111111'
-      const currentTabs = readWorkspacePaneTabsForTarget({
-        repoRoot: base.repoRoot,
-        repoRuntimeId: base.repoRuntimeId!,
-        branchName: base.branch,
-        worktreePath: base.worktreePath,
-      })
-      setWorkspacePaneTabsForTargetQueryData({
-        repoRoot: base.repoRoot,
-        repoRuntimeId: base.repoRuntimeId!,
-        branchName: base.branch,
-        worktreePath: base.worktreePath,
-        tabs: [...currentTabs, terminalEntry(terminalSessionId)],
-      })
-      useReposStore.getState().setSelectedTerminal(WORKTREE_KEY, terminalSessionId)
+      recordCreatedTerminalSelection(base, terminalSessionId)
       visibleSessionIds = [...visibleSessionIds, terminalSessionId]
       return terminalSessionId
     })
@@ -2271,20 +2219,7 @@ describe('workspace commands', () => {
     let visibleSessionIds: string[] = []
     const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
       const terminalSessionId = 'term-111111111111111111111'
-      const currentTabs = readWorkspacePaneTabsForTarget({
-        repoRoot: base.repoRoot,
-        repoRuntimeId: base.repoRuntimeId!,
-        branchName: base.branch,
-        worktreePath: base.worktreePath,
-      })
-      setWorkspacePaneTabsForTargetQueryData({
-        repoRoot: base.repoRoot,
-        repoRuntimeId: base.repoRuntimeId!,
-        branchName: base.branch,
-        worktreePath: base.worktreePath,
-        tabs: [...currentTabs, terminalEntry(terminalSessionId)],
-      })
-      useReposStore.getState().setSelectedTerminal(WORKTREE_KEY, terminalSessionId)
+      recordCreatedTerminalSelection(base, terminalSessionId)
       visibleSessionIds = [...visibleSessionIds, terminalSessionId]
       return terminalSessionId
     })
@@ -2836,7 +2771,7 @@ function repoRuntimeIdForTest(repoId = REPO_ID): string {
 function createTerminalWithProjection(resolveSessionId: () => string | Promise<string>) {
   return vi.fn(async (base: TerminalSessionBase) => {
     const terminalSessionId = await resolveSessionId()
-    recordCreatedTerminalInProjection(base, terminalSessionId)
+    recordCreatedTerminalSelection(base, terminalSessionId)
     return terminalSessionId
   })
 }
@@ -2849,7 +2784,7 @@ function createSingleFlightTerminalWithProjection(resolveSessionId: () => string
     pending = (async () => {
       createOperationCount += 1
       const terminalSessionId = await resolveSessionId()
-      recordCreatedTerminalInProjection(base, terminalSessionId)
+      recordCreatedTerminalSelection(base, terminalSessionId)
       return terminalSessionId
     })().finally(() => {
       pending = null
@@ -2868,20 +2803,7 @@ function createSingleFlightTerminalWithProjection(resolveSessionId: () => string
   }
 }
 
-function recordCreatedTerminalInProjection(base: TerminalSessionBase, terminalSessionId: string): void {
-  const currentTabs = readWorkspacePaneTabsForTarget({
-    repoRoot: base.repoRoot,
-    repoRuntimeId: base.repoRuntimeId!,
-    branchName: base.branch,
-    worktreePath: base.worktreePath,
-  })
-  setWorkspacePaneTabsForTargetQueryData({
-    repoRoot: base.repoRoot,
-    repoRuntimeId: base.repoRuntimeId!,
-    branchName: base.branch,
-    worktreePath: base.worktreePath,
-    tabs: [...currentTabs, terminalEntry(terminalSessionId)],
-  })
+function recordCreatedTerminalSelection(base: TerminalSessionBase, terminalSessionId: string): void {
   useReposStore
     .getState()
     .setSelectedTerminal(formatTerminalWorktreeKey(base.repoRoot, base.worktreePath), terminalSessionId)

@@ -70,6 +70,46 @@ describe('workspace pane tabs runtime', () => {
     ])
   })
 
+  test('ensureRuntimeTab with insertAfterIdentity moves an existing runtime tab after the anchor', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+    runtime.replaceTabs({
+      ...target(),
+      tabs: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneStaticTabEntry('history'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-222222222222222222222'),
+      ],
+    })
+
+    expect(
+      runtime.ensureRuntimeTab(target(), 'terminal', 'term-222222222222222222222', {
+        insertAfterIdentity: 'workspace-pane:status',
+      }),
+    ).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-222222222222222222222'),
+      workspacePaneStaticTabEntry('history'),
+    ])
+  })
+
+  test('ensureRuntimeTab without insertAfterIdentity preserves an existing runtime tab order', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+    runtime.replaceTabs({
+      ...target(),
+      tabs: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneStaticTabEntry('history'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-222222222222222222222'),
+      ],
+    })
+
+    expect(runtime.ensureRuntimeTab(target(), 'terminal', 'term-222222222222222222222')).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('history'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-222222222222222222222'),
+    ])
+  })
+
   test('ensureRuntimeTab with insertAfterIdentity falls back to append when anchor is missing', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
     runtime.replaceTabs({

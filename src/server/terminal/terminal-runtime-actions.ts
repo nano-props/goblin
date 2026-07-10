@@ -20,7 +20,6 @@ import { isValidTerminalRuntimeSessionId, isValidTerminalSize } from '#/shared/t
 import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import { isCurrentRepoRuntime as isCurrentRepoRuntimeOpen } from '#/server/modules/repo-runtimes.ts'
-import { broadcastWorkspacePaneTabsChanged } from '#/server/workspace-pane/workspace-pane-tabs-realtime.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 
@@ -103,9 +102,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       if (!isCurrentRepoRuntimeOpen(userId, input.repoRoot, input.repoRuntimeId)) {
         return { ok: false, message: 'error.repo-runtime-stale' }
       }
-      const result = await sessionService.create(clientId, userId, input)
-      if (result.ok) broadcastRepoWorkspaceTabsChanged(userId, input.repoRoot)
-      return result
+      return await sessionService.create(clientId, userId, input)
     },
 
     async prune(
@@ -209,10 +206,6 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
 
   function broadcastRepoSessionsChanged(userId: string, repoRoot: string): void {
     broker.broadcastToUser(userId, { type: 'sessions-changed', repoRoot })
-  }
-
-  function broadcastRepoWorkspaceTabsChanged(userId: string, repoRoot: string): void {
-    broadcastWorkspacePaneTabsChanged(broker, userId, repoRoot)
   }
 
   function assertCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): void {
