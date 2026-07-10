@@ -648,6 +648,7 @@ export async function removeRemoteWorktree(
   },
 ): Promise<RemoteWorktreeMutationResult> {
   if (!isSafeBranchName(input.branch)) return { ok: false, message: 'error.invalid-arguments' }
+  if (!isValidRemotePath(input.worktreePath)) return { ok: false, message: 'error.invalid-path' }
   const run: RemoteGitRunner = input.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const listResult = await run({ type: 'gitWorktreeList', path: target.remotePath }, target, { signal: input.signal })
   if (input.signal?.aborted) return { ok: false, message: 'cancelled' }
@@ -683,9 +684,7 @@ export async function removeRemoteWorktree(
     const validation = validateBranchDeletionPolicy({
       branch: input.branch,
       currentBranch,
-      isCheckedOutElsewhere: worktrees.some(
-        (worktree) => worktree.branch === input.branch && worktree.path !== resolved.path,
-      ),
+      isCheckedOutElsewhere: worktrees.some((worktree) => worktree.branch === input.branch && worktree !== resolved),
       force: shouldForceDeleteBranch,
       mergedToCurrent: mergeFacts.mergedToCurrent,
       mergedToUpstream: mergeFacts.mergedToUpstream,
@@ -725,7 +724,9 @@ export async function removeRemoteWorktree(
     { timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS },
   )
   const localDeleteResult = remoteExecResult(deleteResult)
-  if (!localDeleteResult.ok) return withAffectedWorktreePaths(localDeleteResult, affectedWorktreePaths)
+  if (!localDeleteResult.ok) {
+    return withAffectedWorktreePaths({ ...localDeleteResult, repoChanged: true }, affectedWorktreePaths)
+  }
   const upstreamDeleteResult = await deleteRemoteUpstreamBranch(target, mutationPath, upstream, {
     signal: undefined,
     run,
@@ -907,9 +908,15 @@ function resolveRemoteRemovableWorktree(
   worktreePath: string,
   mainWorktreePath: string,
 ): WorktreeInfo | ExecResult {
-  const target = worktrees.find((worktree) => worktree.path === worktreePath && worktree.branch === branch)
+  const resolvedPath = path.posix.resolve(worktreePath)
+  const target = worktrees.find(
+    (worktree) => path.posix.resolve(worktree.path) === resolvedPath && worktree.branch === branch,
+  )
   if (!target) return { ok: false, message: 'error.worktree-not-found-for-branch' }
-  if (target.isPrimary || (!!mainWorktreePath && target.path === mainWorktreePath)) {
+  if (
+    target.isPrimary ||
+    (!!mainWorktreePath && path.posix.resolve(target.path) === path.posix.resolve(mainWorktreePath))
+  ) {
     return { ok: false, message: 'error.cannot-remove-main-worktree' }
   }
   return target

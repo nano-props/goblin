@@ -1799,6 +1799,41 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(afterRemoveFailed).toHaveBeenCalledOnce()
     expect(afterWorktreeRemoved).not.toHaveBeenCalled()
+    expect(mocks.pruneServerRepoSettingsForRemovedWorktree).not.toHaveBeenCalled()
+  })
+
+  test('removeRepoWorktree prunes settings when application finalization fails after removal', async () => {
+    mocks.getWorktrees.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
+      {
+        path: '/tmp/repo-worktree',
+        branch: 'feature/a',
+        isBare: false,
+        isPrimary: false,
+        isDirty: false,
+        changeCount: 0,
+      },
+    ])
+    const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await removeRepoWorktree(
+      '/tmp/repo',
+      {
+        branch: 'feature/a',
+        worktreePath: '/tmp/repo-worktree',
+        alsoDeleteBranch: false,
+      },
+      {
+        ...successfulRemovalLifecycle,
+        afterWorktreeRemoved: async () => ({ ok: false, message: 'tabs finalize failed' }),
+      },
+    )
+
+    expect(result).toEqual({ ok: false, message: 'tabs finalize failed', repoChanged: true })
+    expect(mocks.pruneServerRepoSettingsForRemovedWorktree).toHaveBeenCalledWith({
+      repoId: '/tmp/repo',
+      worktreePath: '/tmp/repo-worktree',
+    })
   })
 
   test('removeRepoWorktree publishes affected snapshot invalidations once after worktree and branch deletion success', async () => {
@@ -1864,8 +1899,12 @@ describe('repo mutation invalidation publishing', () => {
       successfulRemovalLifecycle,
     )
 
-    expect(result).toEqual({ ok: false, message: 'fatal: delete failed' })
+    expect(result).toEqual({ ok: false, message: 'fatal: delete failed', repoChanged: true })
     expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree')
+    expect(mocks.pruneServerRepoSettingsForRemovedWorktree).toHaveBeenCalledWith({
+      repoId: '/tmp/repo',
+      worktreePath: '/tmp/repo-worktree',
+    })
     expectRepoSnapshotInvalidations(
       {
         repoId: '/tmp/repo',
@@ -1956,6 +1995,36 @@ describe('repo mutation invalidation publishing', () => {
       worktreePath: '/tmp/repo-worktree',
     })
     expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['settings-snapshot'])
+  })
+
+  test('removeRepoWorktree reports settings failure after removing the worktree', async () => {
+    mocks.getWorktrees.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
+      {
+        path: '/tmp/repo-worktree',
+        branch: 'feature/a',
+        isBare: false,
+        isPrimary: false,
+        isDirty: false,
+        changeCount: 0,
+      },
+    ])
+    mocks.pruneServerRepoSettingsForRemovedWorktree.mockRejectedValueOnce(new Error('settings write failed'))
+    const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await removeRepoWorktree(
+      '/tmp/repo',
+      {
+        branch: 'feature/a',
+        worktreePath: '/tmp/repo-worktree',
+        alsoDeleteBranch: false,
+      },
+      successfulRemovalLifecycle,
+    )
+
+    expect(result).toEqual({ ok: false, message: 'error.settings-write-title', repoChanged: true })
+    expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree')
+    expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
   })
 
   test('removeRepoWorktree refuses before removing when branch deletion would fail', async () => {

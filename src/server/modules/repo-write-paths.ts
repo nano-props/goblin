@@ -1,5 +1,6 @@
 import path from 'node:path'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
+import { serverLogger } from '#/server/logger.ts'
 import { publishRepoQueryInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
 import {
   beginRepoServerOperation,
@@ -38,6 +39,7 @@ type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
 const MAX_CLONE_URL_LENGTH = 4096
 const MAX_CLONE_DIR_NAME_LENGTH = 255
+const repoWriteLogger = serverLogger.child({ module: 'repo-write-paths' })
 const CLONE_URL_SCHEME_RE = /^(?:https?|ssh|git|file):\/\/\S+$/i
 const SCP_LIKE_CLONE_URL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+:[^\s]+$/
 
@@ -100,7 +102,7 @@ function publishRepoSnapshotInvalidation(cwd: string): void {
 
 async function publishSnapshotInvalidationAfterMutation(cwd: string, result: RepoMutationResult): Promise<ExecResult> {
   const affectedRepoIds = result.affectedRepoIds ?? []
-  if (!result.ok && affectedRepoIds.length === 0) return execResultOnly(result)
+  if (!result.ok && !result.repoChanged && affectedRepoIds.length === 0) return execResultOnly(result)
   publishRepoSnapshotInvalidations(cwd, affectedRepoIds)
   return execResultOnly(result)
 }
@@ -399,21 +401,26 @@ export async function removeRepoWorktree(
     signal,
     task: async () => {
       return await runWithRepoSource(cwd, async (source) => {
-        const result = await publishSnapshotInvalidationAfterMutation(
-          cwd,
-          await source.removeWorktree(input, signal, lifecycle),
-        )
-        if (!result.ok) return result
+        const mutation = await source.removeWorktree(input, signal, lifecycle)
+        const result = await publishSnapshotInvalidationAfterMutation(cwd, mutation)
+        if (!mutation.ok && !mutation.repoChanged) return result
         try {
           const changed = await pruneServerRepoSettingsForRemovedWorktree({
             repoId: cwd,
             worktreePath: input.worktreePath,
           })
           if (changed) publishSettingsInvalidation(['settings-snapshot'])
-          return result
-        } catch {
+        } catch (error) {
+          if (!result.ok) {
+            repoWriteLogger.warn(
+              { error, repoId: cwd, worktreePath: input.worktreePath },
+              'failed to prune settings after worktree removal',
+            )
+            return result
+          }
           return { ...result, ok: false, message: 'error.settings-write-title', repoChanged: true }
         }
+        return result
       })
     },
   })

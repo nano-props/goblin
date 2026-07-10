@@ -469,15 +469,13 @@ function createLocalRepoSource(repoId: string): RepoSource {
       const finalized = await lifecycle.afterWorktreeRemoved()
       if (!finalized.ok) return withAffectedRepoIds({ ...finalized, repoChanged: true }, affectedRepoIds)
       if (!input.alsoDeleteBranch) return withAffectedRepoIds(removed, affectedRepoIds)
-      return withAffectedRepoIds(
-        await deleteBranchAfterValidation(
-          input.branch,
-          { force: input.forceDeleteBranch, alsoDeleteUpstream: input.alsoDeleteUpstream },
-          undefined,
-          mutationCwd,
-        ),
-        affectedRepoIds,
+      const deleted = await deleteBranchAfterValidation(
+        input.branch,
+        { force: input.forceDeleteBranch, alsoDeleteUpstream: input.alsoDeleteUpstream },
+        undefined,
+        mutationCwd,
       )
+      return withAffectedRepoIds(deleted.ok ? deleted : { ...deleted, repoChanged: true }, affectedRepoIds)
     },
     async getPatch(worktreePath, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
