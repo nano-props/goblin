@@ -98,8 +98,19 @@ describe('terminal session service facade', () => {
     ])
   })
 
-  test('create closes the runtime session when the repo runtime goes stale after ensure', async () => {
+  test('create closes its runtime session without clearing the stale runtime projection', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    const existingTabs = [
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-existingexisting001'),
+    ]
+    workspaceTabs.replaceTabs({
+      userId: USER_ID,
+      scope: RUNTIME_SCOPE,
+      branchName: BRANCH_NAME,
+      worktreePath: path.resolve(WORKTREE_PATH),
+      tabs: existingTabs,
+    })
     let current = true
     let createdTerminalSessionId: string | null = null
     const closeSession = vi.fn(async () => true)
@@ -149,7 +160,7 @@ describe('terminal session service facade', () => {
         branchName: BRANCH_NAME,
         worktreePath: path.resolve(WORKTREE_PATH),
       }),
-    ).toEqual([workspacePaneStaticTabEntry('status')])
+    ).toEqual(existingTabs)
   })
 
   test('keeps the stale runtime projection when its session close is not acknowledged', async () => {
@@ -190,7 +201,17 @@ describe('terminal session service facade', () => {
     ).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
 
     expect(closeSession).toHaveBeenCalledOnce()
-    expect(workspaceTabs.tabsForScope({ userId: USER_ID, scope: RUNTIME_SCOPE })).not.toEqual([])
+    expect(
+      workspaceTabs.tabs({
+        userId: USER_ID,
+        scope: RUNTIME_SCOPE,
+        branchName: BRANCH_NAME,
+        worktreePath: path.resolve(WORKTREE_PATH),
+      }),
+    ).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-existingexisting001'),
+    ])
   })
 
   test('create rejects before writing tabs when the repo runtime goes stale during live-session lookup', async () => {
@@ -234,7 +255,14 @@ describe('terminal session service facade', () => {
     ).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
 
     expect(closeSession).toHaveBeenCalledWith('pty_session_created')
-    expect(workspaceTabs.tabsForScope({ userId: USER_ID, scope: RUNTIME_SCOPE })).toEqual([])
+    expect(
+      workspaceTabs.tabs({
+        userId: USER_ID,
+        scope: RUNTIME_SCOPE,
+        branchName: BRANCH_NAME,
+        worktreePath: path.resolve(WORKTREE_PATH),
+      }),
+    ).toEqual([workspacePaneStaticTabEntry('status')])
   })
 
   test('ensureOrRestore reports created reused and restored from matching session state', async () => {

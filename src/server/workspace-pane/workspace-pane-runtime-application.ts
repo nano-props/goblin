@@ -125,11 +125,21 @@ export class WorkspacePaneRuntimeApplication {
             : staleFailure,
       })
     } catch (error) {
-      await this.recoverIncompleteTerminalOpen(clientId, userId, input, runtime, scope, worktreePath, error)
-      return runtimeFailure('terminal', error instanceof Error ? error.message : String(error))
+      const recovery = await this.recoverIncompleteTerminalOpen(clientId, userId, input, runtime, scope, worktreePath)
+      workspacePaneRuntimeApplicationLogger.error(
+        { error, ...recovery, userId, repoRoot: input.request.repoRoot, worktreePath },
+        'terminal open application command failed',
+      )
+      return runtimeFailure('terminal', 'error.unavailable')
     }
     if (!isWorkspacePaneTabsSnapshot(workspacePaneTabs)) {
-      await this.recoverIncompleteTerminalOpen(clientId, userId, input, runtime, scope, worktreePath, null)
+      const recovery = await this.recoverIncompleteTerminalOpen(clientId, userId, input, runtime, scope, worktreePath)
+      if (recovery.closeError || recovery.reconcileError) {
+        workspacePaneRuntimeApplicationLogger.error(
+          { ...recovery, userId, repoRoot: input.request.repoRoot, worktreePath },
+          'failed to recover rejected terminal open application command',
+        )
+      }
       return workspacePaneTabs
     }
 
@@ -153,8 +163,7 @@ export class WorkspacePaneRuntimeApplication {
     runtime: Extract<TerminalCreateResult, { ok: true }>,
     scope: string,
     worktreePath: string,
-    error: unknown,
-  ): Promise<void> {
+  ): Promise<{ closeError: unknown; reconcileError: unknown }> {
     let closeError: unknown = null
     if (runtime.action === 'created') {
       try {
@@ -178,18 +187,7 @@ export class WorkspacePaneRuntimeApplication {
       reconcileError = caught
     }
     this.deps.broadcastWorkspaceTabsChanged(userId, input.request.repoRoot)
-    if (reconcileError) {
-      workspacePaneRuntimeApplicationLogger.error(
-        { error, closeError, reconcileError, userId, repoRoot: input.request.repoRoot, worktreePath },
-        'failed to recover terminal open application command',
-      )
-    }
-    if (closeError) {
-      workspacePaneRuntimeApplicationLogger.error(
-        { error, closeError, userId, repoRoot: input.request.repoRoot, worktreePath },
-        'failed to close terminal after application projection failure',
-      )
-    }
+    return { closeError, reconcileError }
   }
 
   private async closeTerminal(

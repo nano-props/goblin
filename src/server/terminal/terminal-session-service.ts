@@ -223,19 +223,8 @@ class TerminalSessionService {
     terminalRuntimeSessionId: string,
   ): Promise<Extract<TerminalCreateResult, { ok: false }> | null> {
     if (this.isCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)) return null
-    const closed = await this.options.manager.closeSession(terminalRuntimeSessionId)
-    if (closed) await this.cleanupStaleCreate(userId, input)
+    await this.options.manager.closeSession(terminalRuntimeSessionId)
     return { ok: false, message: 'error.repo-runtime-stale' }
-  }
-
-  private async cleanupStaleCreate(
-    userId: string,
-    input: Pick<TerminalCreateInput, 'repoRoot' | 'repoRuntimeId'>,
-  ): Promise<void> {
-    await this.workspaceTabsCoordinator.closeScope({
-      userId,
-      scope: terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId),
-    })
   }
 }
 

@@ -376,7 +376,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     await expect(application.open('client-test', 'user-test', { runtimeType: 'terminal', request })).resolves.toEqual({
       ok: false,
       runtimeType: 'terminal',
-      message: 'projection failed',
+      message: 'error.unavailable',
     })
     expect(close).toHaveBeenCalledWith('client-test', 'user-test', {
       terminalRuntimeSessionId: runtime.terminalRuntimeSessionId,

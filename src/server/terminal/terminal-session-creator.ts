@@ -56,7 +56,7 @@ class TerminalSessionCreator {
             }),
         )
         if (!createResult.ok) return { ok: false, message: createResult.message }
-        const staleAfterEnsure = await this.rejectStaleCreateIfNeeded(
+        const staleAfterEnsure = await this.options.rejectStaleCreateIfNeeded(
           input.userId,
           input.request,
           createResult.terminalRuntimeSessionId,
@@ -67,7 +67,7 @@ class TerminalSessionCreator {
           input.request.repoRoot,
           input.request.repoRuntimeId,
         )
-        const staleAfterList = await this.rejectStaleCreateIfNeeded(
+        const staleAfterList = await this.options.rejectStaleCreateIfNeeded(
           input.userId,
           input.request,
           createResult.terminalRuntimeSessionId,
@@ -92,15 +92,6 @@ class TerminalSessionCreator {
         }
       },
     )
-  }
-
-  private async rejectStaleCreateIfNeeded(
-    userId: string,
-    input: Pick<TerminalCreateInput, 'repoRoot' | 'repoRuntimeId'>,
-    terminalRuntimeSessionId: string,
-  ): Promise<TerminalCreateFailure | null> {
-    const failure = await this.options.rejectStaleCreateIfNeeded(userId, input, terminalRuntimeSessionId)
-    return failure
   }
 }
 
