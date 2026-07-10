@@ -23,6 +23,7 @@ import { defineConfig } from 'vitest/config'
 
 const alias = {
   '#': path.resolve(import.meta.dirname, 'src'),
+  '#scripts': path.resolve(import.meta.dirname, 'scripts'),
 }
 
 const sharedTestOptions = {

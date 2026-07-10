@@ -60,7 +60,7 @@ function runTypeScript(project: (typeof PROJECTS)[number], index: number): Promi
   })
 }
 
-await runPreflightCheck('scripts/check-architecture.ts', 'architecture boundary check')
+await runPreflightCheck('scripts/check-boundaries.ts', 'architecture boundary check')
 await runPreflightCheck('scripts/check-no-html-injection.ts', 'no-html-injection check')
 
 for (const [index, project] of PROJECTS.entries()) {

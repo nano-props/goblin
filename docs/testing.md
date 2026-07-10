@@ -267,7 +267,7 @@ Every PR must leave these green:
 
 - `bun run typecheck`
 - `bun run test`
-- `bun run check` (which runs `check:architecture` and
+- `bun run check` (which runs `check:boundaries` and
   `check:no-html-injection`)
 
 If a verification step is legitimately slow, the fix is to extract a
