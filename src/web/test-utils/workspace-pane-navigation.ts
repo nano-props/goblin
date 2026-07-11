@@ -1,7 +1,6 @@
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
-import { observeWorkspacePaneTabControllerRoute } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import {
   workspacePanePreferenceTargetOptions,
   workspacePaneTabTargetForBranch,
@@ -17,12 +16,13 @@ export interface WorkspacePaneNavigationObservation {
   route: ParsedRepoBranchWorkspacePaneRoute | null
 }
 
+export function observeWorkspacePaneRouteForTest(_observation: WorkspacePaneNavigationObservation): void {}
+
 export function seedInitialObservedWorkspacePaneRouteForTest(
   observation?: WorkspacePaneNavigationObservation,
   options: { autoSeed?: boolean } = {},
 ): boolean {
   if (observation) {
-    observeWorkspacePaneTabControllerRoute(observation)
     return true
   }
   if (options.autoSeed === false) return false
@@ -41,13 +41,7 @@ export function seedInitialObservedWorkspacePaneRouteForTest(
       : activeTab?.kind === 'runtime' && activeTab.runtimeType === 'terminal'
         ? { kind: 'terminal', terminalSessionId: activeTab.sessionId }
         : null
-  observeWorkspacePaneTabControllerRoute({
-    repoId: target.repoId,
-    repoRuntimeId: target.repoRuntimeId,
-    branchName: target.branchName,
-    worktreePath: target.worktreePath,
-    route,
-  })
+  void route
   return true
 }
 
@@ -61,7 +55,7 @@ export function observedWorkspacePaneRouteCommitForTest(
     commitRoute?: PrimaryWindowNavigationActions['commitRepoBranchWorkspacePaneRoute']
   } = {},
 ): PrimaryWindowNavigationActions['commitRepoBranchWorkspacePaneRoute'] {
-  const observeAcceptedRoute = options.observeAcceptedRoute ?? observeWorkspacePaneTabControllerRoute
+  const observeAcceptedRoute = options.observeAcceptedRoute ?? (() => {})
   const observeCommittedRoute = (
     repoId: string,
     branchName: string,

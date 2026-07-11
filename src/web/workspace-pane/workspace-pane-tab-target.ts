@@ -10,7 +10,7 @@ import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/w
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 import { workspacePaneTabsInteractionBlockedForTarget } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
-import type { WorkspacePaneTabCoordinatorTarget } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import type { WorkspacePaneActionTarget } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
 export type WorkspacePaneTabTargetResolution =
   | { kind: 'ready'; target: RepoWorkspaceTabModel }
@@ -31,7 +31,7 @@ export interface WorkspacePaneTabTargetOptions {
 
 export const workspacePanePreferenceTargetOptions: WorkspacePaneTabTargetOptions = { workspacePaneRoute: undefined }
 
-export interface WorkspacePaneDestinationTargetLease extends WorkspacePaneTabCoordinatorTarget {
+export interface WorkspacePaneDestinationTargetLease extends WorkspacePaneActionTarget {
   branchName: string
   worktreePath: string | null
 }

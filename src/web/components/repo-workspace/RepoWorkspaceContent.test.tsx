@@ -39,7 +39,7 @@ import {
 } from '#/shared/workspace-pane.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { observedWorkspacePaneRouteCommitForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
-import { observeWorkspacePaneTabControllerRoute } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
@@ -408,7 +408,7 @@ describe('RepoWorkspaceContent', () => {
     )
 
     expect(pathButton).not.toBeNull()
-    observeWorkspacePaneTabControllerRoute({
+    observeWorkspacePaneRouteForTest({
       repoId: REPO_ID,
       repoRuntimeId: repo.repoRuntimeId,
       branchName: 'feature/status-links',
@@ -426,7 +426,7 @@ describe('RepoWorkspaceContent', () => {
     )
 
     showRepoBranchWorkspacePaneTab.mockClear()
-    observeWorkspacePaneTabControllerRoute({
+    observeWorkspacePaneRouteForTest({
       repoId: REPO_ID,
       repoRuntimeId: repo.repoRuntimeId,
       branchName: 'feature/status-links',
@@ -488,7 +488,7 @@ describe('RepoWorkspaceContent', () => {
     )
 
     expect(changesButton).not.toBeNull()
-    observeWorkspacePaneTabControllerRoute({
+    observeWorkspacePaneRouteForTest({
       repoId: REPO_ID,
       repoRuntimeId: repo.repoRuntimeId,
       branchName: 'feature/status-links',
@@ -1081,7 +1081,7 @@ describe('RepoWorkspaceContent', () => {
     )
 
     const row = await screen.findByRole('treeitem', { name: 'README.md' })
-    observeWorkspacePaneTabControllerRoute({
+    observeWorkspacePaneRouteForTest({
       repoId: REPO_ID,
       repoRuntimeId: repo.repoRuntimeId,
       branchName,

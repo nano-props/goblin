@@ -11,10 +11,7 @@ import {
   workspacePaneTabTargetBlocksInteraction,
   workspacePaneTabTargetForBranch,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import {
-  runWorkspacePaneTabCoordinatorTask,
-  workspacePaneTabCoordinatorObservedRoute,
-} from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { beginPrimaryWindowPresentation, type PrimaryWindowPresentationToken } from '#/web/primary-window-presentation.ts'
 
 export interface SelectWorkspacePaneTabByIndexActionOptions {
@@ -57,7 +54,7 @@ export async function dispatchSelectWorkspacePaneTabByIndexAction(
   const coordinatorTarget = workspacePaneTabActionCoordinatorTarget(options)
   if (!coordinatorTarget) return false
   const presentationToken = beginPrimaryWindowPresentation()
-  return await runWorkspacePaneTabCoordinatorTask(coordinatorTarget, () =>
+  return await runWorkspacePaneAction(coordinatorTarget, () =>
     selectWorkspacePaneTabByIndexAction(options, coordinatorTarget, presentationToken),
   )
 }
@@ -70,7 +67,7 @@ async function selectWorkspacePaneTabByIndexAction({
   navigation,
 }: SelectWorkspacePaneTabByIndexActionOptions, coordinatorTarget: RepoWorkspaceTabModel, presentationToken: PrimaryWindowPresentationToken): Promise<boolean> {
   if (!repoId || !branchName || tabIndex < 1) return false
-  const sourceRoute = workspacePaneRoute ?? workspacePaneTabCoordinatorObservedRoute(coordinatorTarget)
+  const sourceRoute = workspacePaneRoute
   const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute: sourceRoute })
   const tab = target?.tabs[tabIndex - 1]
   if (!target || !tab) return false
@@ -86,7 +83,7 @@ export async function dispatchSelectWorkspacePaneTabByIdentityAction(
   const coordinatorTarget = workspacePaneTabActionCoordinatorTarget(options)
   if (!coordinatorTarget) return false
   const presentationToken = beginPrimaryWindowPresentation()
-  return await runWorkspacePaneTabCoordinatorTask(coordinatorTarget, () =>
+  return await runWorkspacePaneAction(coordinatorTarget, () =>
     selectWorkspacePaneTabByIdentityAction(options, coordinatorTarget, presentationToken),
   )
 }
@@ -101,7 +98,7 @@ async function selectWorkspacePaneTabByIdentityAction({
   reselect,
 }: SelectWorkspacePaneTabByIdentityActionOptions, coordinatorTarget: RepoWorkspaceTabModel, presentationToken: PrimaryWindowPresentationToken): Promise<boolean> {
   if (!repoId || !branchName) return false
-  const sourceRoute = workspacePaneRoute ?? workspacePaneTabCoordinatorObservedRoute(coordinatorTarget)
+  const sourceRoute = workspacePaneRoute
   const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute: sourceRoute })
   const tab = target?.tabs.find((candidate) => candidate.identity === identity) ?? null
   if (!target || !tab) return false
@@ -137,7 +134,7 @@ export async function dispatchMoveWorkspacePaneTabAction(options: MoveWorkspaceP
     options.direction,
   )?.identity
   if (!targetIdentity) return false
-  return await runWorkspacePaneTabCoordinatorTask(coordinatorTarget, () =>
+  return await runWorkspacePaneAction(coordinatorTarget, () =>
     moveWorkspacePaneTabAction(options, coordinatorTarget, presentationToken, targetIdentity),
   )
 }
@@ -146,15 +143,12 @@ async function moveWorkspacePaneTabAction({
   repoId,
   branchName,
   workspacePaneRoute,
-  direction,
   navigation,
 }: MoveWorkspacePaneTabActionOptions, coordinatorTarget: RepoWorkspaceTabModel, presentationToken: PrimaryWindowPresentationToken, targetIdentity: string): Promise<boolean> {
   if (!repoId || !branchName) return false
-  const sourceRoute = workspacePaneRoute ?? workspacePaneTabCoordinatorObservedRoute(coordinatorTarget)
+  const sourceRoute = workspacePaneRoute
   const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute: sourceRoute })
-  const tab = target?.activeTab
-    ? adjacentRepoWorkspaceTab(target.tabs, target.activeTab.identity, direction)
-    : (target?.tabs.find((candidate) => candidate.identity === targetIdentity) ?? null)
+  const tab = target?.tabs.find((candidate) => candidate.identity === targetIdentity) ?? null
   if (!target || !tab) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
   return await selectWorkspacePaneControllerTab(target, tab, sourceRoute, navigation, presentationToken)

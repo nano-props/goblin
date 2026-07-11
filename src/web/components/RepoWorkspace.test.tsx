@@ -40,7 +40,7 @@ import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspa
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
-import { resetWorkspacePaneTabControllerForTest } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
 import {
   recordWorkspacePaneTabOpener,
@@ -114,7 +114,7 @@ const navigation: PrimaryWindowNavigationActions = {
 }
 
 beforeEach(() => {
-  resetWorkspacePaneTabControllerForTest()
+  resetWorkspacePaneActionQueueForTest()
   primaryWindowQueryClient.clear()
   resetReposStore()
   installWorkspacePaneTabsTestBridge()

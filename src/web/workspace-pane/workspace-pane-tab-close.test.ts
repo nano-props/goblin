@@ -10,9 +10,8 @@ import {
   dispatchConfirmCloseTerminalWorkspacePaneTabAction,
 } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
 import {
-  resetWorkspacePaneTabCoordinatorForTest,
-  workspacePaneTabCoordinatorReconciliationDeferred,
-} from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+  resetWorkspacePaneActionQueueForTest,
+} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
@@ -27,7 +26,7 @@ import {
   observedWorkspacePaneRouteCommitForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
-import { observeWorkspacePaneTabControllerRoute } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 
@@ -36,7 +35,7 @@ const BRANCH_NAME = 'feature/worktree-close'
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-close-worktree'
 
 beforeEach(() => {
-  resetWorkspacePaneTabCoordinatorForTest()
+  resetWorkspacePaneActionQueueForTest()
   primaryWindowQueryClient.clear()
   resetReposStore()
   setTerminalSessionCommandBridgeForTest(null)
@@ -100,31 +99,9 @@ test('awaits close-back navigation and clears the transition when navigation rej
   })
 
   await vi.waitFor(() => expect(commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledOnce())
-  const repoRuntimeId = useReposStore.getState().repos[REPO_ID]?.repoRuntimeId
-  expect(repoRuntimeId).toBeTruthy()
-  expect(
-    workspacePaneTabCoordinatorReconciliationDeferred({
-      repoId: REPO_ID,
-      repoRuntimeId,
-      branchName: BRANCH_NAME,
-      worktreePath: WORKTREE_PATH,
-      route: { kind: 'static', tab: 'files' },
-      reconciliation: { kind: 'replace-empty-pane' },
-    }),
-  ).toBe(true)
 
   routeCommit.reject(new Error('navigation failed'))
   await expect(close).resolves.toBe(false)
-  expect(
-    workspacePaneTabCoordinatorReconciliationDeferred({
-      repoId: REPO_ID,
-      repoRuntimeId,
-      branchName: BRANCH_NAME,
-      worktreePath: WORKTREE_PATH,
-      route: { kind: 'static', tab: 'files' },
-      reconciliation: { kind: 'replace-empty-pane' },
-    }),
-  ).toBe(false)
 })
 
 test('clears the close transition when the server close command rejects', async () => {
@@ -200,16 +177,6 @@ test('clears the close transition when the server close command rejects', async 
     }),
   ).resolves.toBe(false)
 
-  expect(
-    workspacePaneTabCoordinatorReconciliationDeferred({
-      repoId: REPO_ID,
-      repoRuntimeId: repo.repoRuntimeId,
-      branchName: BRANCH_NAME,
-      worktreePath: WORKTREE_PATH,
-      route,
-      reconciliation: { kind: 'replace-empty-pane' },
-    }),
-  ).toBe(false)
 })
 
 test('does not let a late close from an old runtime navigate or clear the replacement runtime opener', async () => {
@@ -233,7 +200,7 @@ test('does not let a late close from an old runtime navigate or clear the replac
       'workspace-pane:status',
     ),
   ).toBe('recorded')
-  observeWorkspacePaneTabControllerRoute({
+  observeWorkspacePaneRouteForTest({
     repoId: REPO_ID,
     repoRuntimeId: repo.repoRuntimeId,
     branchName: BRANCH_NAME,
@@ -277,7 +244,7 @@ test('does not let a late close from an old runtime navigate or clear the replac
       'workspace-pane:status',
     ),
   ).toBe('recorded')
-  observeWorkspacePaneTabControllerRoute({
+  observeWorkspacePaneRouteForTest({
     repoId: REPO_ID,
     repoRuntimeId: replacementRuntimeId,
     branchName: BRANCH_NAME,

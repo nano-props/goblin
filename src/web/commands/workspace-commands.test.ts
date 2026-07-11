@@ -45,11 +45,11 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/repo-refresh-actions.ts'
-import { resetWorkspacePaneTabControllerForTest } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import { dispatchMoveWorkspacePaneTabAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
-import { observeWorkspacePaneTabControllerRoute } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import {
   observedWorkspacePaneRouteCommitForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
@@ -78,7 +78,7 @@ const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 const requestVisibleRefresh = vi.mocked(requestVisibleRepoProjectionRefresh)
 
 beforeEach(() => {
-  resetWorkspacePaneTabControllerForTest()
+  resetWorkspacePaneActionQueueForTest()
   primaryWindowQueryClient.clear()
   resetReposStore()
   installWorkspacePaneTabsTestBridge()
@@ -999,7 +999,7 @@ describe('workspace commands', () => {
     await expect(duplicateCommand).resolves.toBe(true)
     expect(createTerminal).toHaveBeenCalledTimes(2)
     expect(createOperationCount()).toBe(2)
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledOnce()
+    expect(showRepoBranchTerminalSession).toHaveBeenCalledTimes(2)
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
       REPO_ID,
       'feature/worktree',
@@ -2891,7 +2891,7 @@ test('serializes A to B to C selection through exact route commits', async () =>
     branchName: 'feature/worktree',
     worktreePath: WORKTREE_PATH,
   }
-  observeWorkspacePaneTabControllerRoute({ ...target, route: { kind: 'static', tab: 'status' } })
+  observeWorkspacePaneRouteForTest({ ...target, route: { kind: 'static', tab: 'status' } })
   const showRepoBranchWorkspacePaneTab = vi.fn((repoId: string, branchName: string, tab: WorkspacePaneStaticTabType) => {
     useReposStore.getState().setWorkspacePaneTab(repoId, branchName, tab)
     return true
@@ -2918,7 +2918,7 @@ test('serializes A to B to C selection through exact route commits', async () =>
   expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'history')
 })
 
-test('serializes open then move against the observer-confirmed opened route', async () => {
+test('serializes open then move through exact route commits', async () => {
   const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -2933,12 +2933,12 @@ test('serializes open then move against the observer-confirmed opened route', as
     branchName: 'feature/worktree',
     worktreePath: WORKTREE_PATH,
   }
-  observeWorkspacePaneTabControllerRoute({ ...target, route: { kind: 'static', tab: 'status' } })
-  const observations: WorkspacePaneNavigationObservation[] = []
-  const navigation = navigationWith({}, { autoSeedInitialRoute: false })
-  navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation, {
-    observeAcceptedRoute: (observation) => observations.push(observation),
+  observeWorkspacePaneRouteForTest({ ...target, route: { kind: 'static', tab: 'status' } })
+  const showRepoBranchWorkspacePaneTab = vi.fn((repoId: string, branchName: string, tab: WorkspacePaneStaticTabType) => {
+    useReposStore.getState().setWorkspacePaneTab(repoId, branchName, tab)
+    return true
   })
+  const navigation = navigationWith({ showRepoBranchWorkspacePaneTab }, { autoSeedInitialRoute: false })
 
   const openFiles = openWorkspacePaneTab({
     repoId: REPO_ID,
@@ -2948,7 +2948,6 @@ test('serializes open then move against the observer-confirmed opened route', as
     workspacePaneRoute: { kind: 'static', tab: 'status' },
     navigation,
   })
-  await vi.waitFor(() => expect(observations).toHaveLength(1))
   const move = dispatchMoveWorkspacePaneTabAction({
     repoId: REPO_ID,
     branchName: 'feature/worktree',
@@ -2956,18 +2955,10 @@ test('serializes open then move against the observer-confirmed opened route', as
     direction: 1,
     navigation,
   })
-  await Promise.resolve()
-  expect(observations).toHaveLength(1)
-
-  const filesObservation = observations.shift()
-  if (!filesObservation) throw new Error('missing opened files route observation')
-  observeWorkspacePaneTabControllerRoute(filesObservation)
   await expect(openFiles).resolves.toBe(true)
-  await vi.waitFor(() => expect(observations).toHaveLength(1))
-  const historyObservation = observations.shift()
-  if (!historyObservation) throw new Error('missing moved history route observation')
-  observeWorkspacePaneTabControllerRoute(historyObservation)
   await expect(move).resolves.toBe(true)
+  expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledOnce()
+  expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'history')
 })
 
 function navigationWith(

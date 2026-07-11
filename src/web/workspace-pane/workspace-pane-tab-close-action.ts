@@ -8,7 +8,6 @@ import {
   type RepoWorkspaceTabModel,
 } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import {
-  abortWorkspacePaneTabControllerTransition,
   beginWorkspacePaneCloseActiveTabPresentationLease,
   commitWorkspacePaneControllerCloseBackTarget,
   workspacePaneTabControllerTargetIsCurrent,
@@ -34,10 +33,8 @@ import {
   readWorkspacePaneRuntimeTabCloseContext,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-context.ts'
 import type { WorkspacePaneRuntimeTabCloseConfirmRequest } from '#/web/workspace-pane/workspace-pane-runtime-tab-close-actions.ts'
-import {
-  runWorkspacePaneTabCoordinatorTask,
-  workspacePaneTabCoordinatorObservedRoute,
-} from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { finishWorkspacePaneRouteIntent } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
   beginPrimaryWindowPresentation,
   primaryWindowPresentationIsCurrent,
@@ -88,11 +85,11 @@ export async function dispatchCloseWorkspacePaneTabAction(
   })
   if (!coordinatorTarget) return false
   const presentationToken = beginPrimaryWindowPresentation()
-  return await runWorkspacePaneTabCoordinatorTask(coordinatorTarget, () =>
+  return await runWorkspacePaneAction(coordinatorTarget, () =>
     closeWorkspacePaneTabAction({
       ...options,
       presentationToken,
-      workspacePaneRoute: workspacePaneTabCoordinatorObservedRoute(coordinatorTarget) ?? options.workspacePaneRoute,
+      workspacePaneRoute: options.workspacePaneRoute,
     }),
   )
 }
@@ -101,13 +98,10 @@ async function closeWorkspacePaneTabAction(options: CloseWorkspacePaneTabActionO
   const start = beginCloseWorkspacePaneTabAction(options)
   if (start.kind === 'done') return start.result
   return await runWorkspacePaneCloseTransition(start.presentationLease, async () => {
-    if (!(await start.completion)) return abortWorkspacePaneCloseTransition(start.presentationLease)
+    if (!(await start.completion)) return false
     completeWorkspacePaneTabClose(start.target, start.closingIdentity)
     if (!start.wasActive) return true
-    if (!workspacePaneTabControllerTargetIsCurrent(start.target)) {
-      abortWorkspacePaneTabControllerTransition(start.presentationLease?.transitionId)
-      return true
-    }
+    if (!workspacePaneTabControllerTargetIsCurrent(start.target)) return true
     if (!start.presentationLease) return false
     const presented = await commitWorkspacePaneControllerCloseBackTarget(start.presentationLease, options.navigation)
     return presented || !primaryWindowPresentationIsCurrent(start.presentationLease.presentationToken)
@@ -122,7 +116,7 @@ export async function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
   const queueBranchName = options.branchName ?? options.confirmedTerminal.base.branch
   if (!queueRepoId || !queueRepoRuntimeId || !queueBranchName) return false
   const presentationToken = beginPrimaryWindowPresentation()
-  return await runWorkspacePaneTabCoordinatorTask(
+  return await runWorkspacePaneAction(
     {
       repoId: queueRepoId,
       repoRuntimeId: queueRepoRuntimeId,
@@ -192,10 +186,10 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
   return await runWorkspacePaneCloseTransition(presentationLease, async () => {
     const closeContext = readWorkspacePaneRuntimeTabCloseContext()
     if (!canConfirmWorkspacePaneRuntimeTabCloseWithContext(confirmed, closeContext)) {
-      return abortWorkspacePaneCloseTransition(presentationLease)
+      return false
     }
     if (!(await confirmWorkspacePaneRuntimeTabClose(confirmed, closeContext))) {
-      return abortWorkspacePaneCloseTransition(presentationLease)
+      return false
     }
     if (closeTarget) {
       completeWorkspacePaneTabClose(
@@ -204,10 +198,7 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
       )
     }
     if (!wasActive || !closeTarget) return true
-    if (!workspacePaneTabControllerTargetIsCurrent(closeTarget)) {
-      abortWorkspacePaneTabControllerTransition(presentationLease?.transitionId)
-      return true
-    }
+    if (!workspacePaneTabControllerTargetIsCurrent(closeTarget)) return true
     if (!presentationLease) return false
     const presented = await commitWorkspacePaneControllerCloseBackTarget(presentationLease, navigation)
     return presented || !primaryWindowPresentationIsCurrent(presentationLease.presentationToken)
@@ -269,11 +260,11 @@ function beginCloseWorkspacePaneTabAction(
   try {
     close = beginWorkspacePaneTabClose(target, tab)
   } catch {
-    abortWorkspacePaneTabControllerTransition(presentationLease?.transitionId)
+    finishWorkspacePaneRouteIntent(presentationLease?.routeIntentId)
     return { kind: 'done', result: false }
   }
   if (!close.accepted) {
-    abortWorkspacePaneTabControllerTransition(presentationLease?.transitionId)
+    finishWorkspacePaneRouteIntent(presentationLease?.routeIntentId)
     return { kind: 'done', result: false }
   }
   return {
@@ -320,11 +311,8 @@ async function runWorkspacePaneCloseTransition(
   try {
     return await operation()
   } catch {
-    return abortWorkspacePaneCloseTransition(presentationLease)
+    return false
+  } finally {
+    finishWorkspacePaneRouteIntent(presentationLease?.routeIntentId)
   }
-}
-
-function abortWorkspacePaneCloseTransition(presentationLease: WorkspacePaneControllerPresentationLease | null): false {
-  abortWorkspacePaneTabControllerTransition(presentationLease?.transitionId)
-  return false
 }

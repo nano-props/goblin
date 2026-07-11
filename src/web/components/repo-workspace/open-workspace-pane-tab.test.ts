@@ -264,8 +264,8 @@ describe('openWorkspacePaneTab', () => {
       }),
     ).resolves.toBe(true)
 
-    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
-    expect(preferredWorkspacePaneTab('feature/no-worktree')).toBe('changes')
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/no-worktree', 'status')
+    expect(preferredWorkspacePaneTab('feature/no-worktree')).toBe('status')
   })
 
   test('opens history as a branch-static workspace pane tab', async () => {

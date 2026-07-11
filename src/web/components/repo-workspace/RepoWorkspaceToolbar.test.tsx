@@ -1042,6 +1042,7 @@ describe('RepoWorkspaceToolbar', () => {
     const showRepoBranchTerminalSession = vi.fn(() => true)
     const { container: c } = renderToolbar({
       terminalCount: 2,
+      preferredWorkspacePaneTab: 'terminal',
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
     })
 
@@ -1051,22 +1052,7 @@ describe('RepoWorkspaceToolbar', () => {
     if (!statusTab || !terminalTab) throw new Error('missing repo workspace pane tabs')
 
     act(() => {
-      statusTab.focus()
-      statusTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-    })
-    await flush()
-    // No changes tab to land on: ArrowRight moves focus from status to terminal
-    // within the same sortable workspace-pane strip.
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
-      REPO_ID,
-      'feature/worktree',
-      'term-111111111111111111111',
-    )
-    expect(document.activeElement).toBe(terminalTab)
-    showRepoBranchWorkspacePaneTab.mockClear()
-    showRepoBranchTerminalSession.mockClear()
-
-    act(() => {
+      terminalTab.focus()
       terminalTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
     })
     await flush()

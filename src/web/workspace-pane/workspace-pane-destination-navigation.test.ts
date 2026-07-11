@@ -7,7 +7,7 @@ import {
   type WorkspacePaneDestinationNavigation,
 } from '#/web/workspace-pane/workspace-pane-destination-navigation.ts'
 import { resolveWorkspacePaneDestinationTargetLease } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { resetWorkspacePaneTabControllerForTest } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
@@ -34,7 +34,7 @@ const DESTINATION_ROUTE = { kind: 'static' as const, tab: 'status' as const }
 beforeEach(() => {
   primaryWindowQueryClient.clear()
   resetReposStore()
-  resetWorkspacePaneTabControllerForTest()
+  resetWorkspacePaneActionQueueForTest()
   resetWorkspacePaneDestinationPresentationForTest()
 })
 
