@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import type { ParsedRepoBranchWorkspacePaneRouteTarget, RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
 import {
   useWorkspaceNavigationHistory,
@@ -18,7 +18,10 @@ import {
   commitWorkspacePaneControllerRoute,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
-import { workspacePaneRouteIntentPending } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import {
+  subscribeWorkspacePaneRouteIntents,
+  workspacePaneRouteIntentPending,
+} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { workspacePaneRouteKey } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 
 export interface WorkspacePaneRouteControllerInput {
@@ -48,12 +51,16 @@ export function useWorkspacePaneRouteController({
     () => (enabled ? reconcileWorkspacePaneRoute(route, model) : { kind: 'none' as const }),
     [enabled, route, model],
   )
-  const routeIntentPending =
-    route?.kind !== 'invalid-static' &&
-    workspacePaneRouteIntentPending(
-      { repoId, repoRuntimeId: model.repoRuntimeId, branchName, worktreePath },
-      workspacePaneRouteKey(route),
-    )
+  const routeIntentPending = useSyncExternalStore(
+    subscribeWorkspacePaneRouteIntents,
+    () =>
+      route?.kind !== 'invalid-static' &&
+      workspacePaneRouteIntentPending(
+        { repoId, repoRuntimeId: model.repoRuntimeId, branchName, worktreePath },
+        workspacePaneRouteKey(route),
+      ),
+    () => false,
+  )
   const effectiveReconciliation =
     routeIntentPending && reconciliation.kind === 'replace-empty-pane'
       ? ({ kind: 'pending' } as const)

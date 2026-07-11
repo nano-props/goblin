@@ -59,12 +59,8 @@ function repoRuntimeState(userId: string, repoRoot: string): RepoRuntimeState {
 export function openRepoRuntime(userId: string, repoRoot: string): string {
   if (!repoRoot) throw new Error('repo runtime open requires repoRoot')
   const state = repoRuntimeState(userId, repoRoot)
-  const previousRepoRuntimeId = state.currentRepoRuntimeId
-  const repoRuntimeId = createOpaqueId('repo-runtime')
-  state.remoteAttemptController?.abort()
-  state.currentRepoRuntimeId = repoRuntimeId
-  state.remoteLifecycle = { kind: 'idle', attemptId: 0 }
-  state.remoteAttemptController = null
+  const previousRepoRuntimeId = stopRepoRuntimeEpoch(state)
+  const repoRuntimeId = startRepoRuntimeEpoch(state)
   if (previousRepoRuntimeId) emitRepoRuntimeClosed({ userId, repoRoot, repoRuntimeId: previousRepoRuntimeId })
   return repoRuntimeId
 }
@@ -73,18 +69,14 @@ export function getOrOpenRepoRuntime(userId: string, repoRoot: string): string {
   if (!repoRoot) throw new Error('repo runtime open requires repoRoot')
   const state = repoRuntimeState(userId, repoRoot)
   if (state.currentRepoRuntimeId) return state.currentRepoRuntimeId
-  const repoRuntimeId = createOpaqueId('repo-runtime')
-  state.currentRepoRuntimeId = repoRuntimeId
-  return repoRuntimeId
+  return startRepoRuntimeEpoch(state)
 }
 
 export function closeRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean {
   const state = repoRuntimesByUser.get(userId)?.get(repoRoot)
   if (!state) return false
   if (state.currentRepoRuntimeId !== repoRuntimeId) return false
-  state.remoteAttemptController?.abort()
-  state.currentRepoRuntimeId = null
-  state.remoteAttemptController = null
+  stopRepoRuntimeEpoch(state)
   emitRepoRuntimeClosed({ userId, repoRoot, repoRuntimeId })
   return true
 }
@@ -185,14 +177,29 @@ export function clearRepoRuntimesForUser(userId: string): void {
   const states = repoRuntimesByUser.get(userId)
   if (states) {
     for (const [repoRoot, state] of states) {
-      if (state.currentRepoRuntimeId) {
-        const repoRuntimeId = state.currentRepoRuntimeId
-        state.currentRepoRuntimeId = null
-        emitRepoRuntimeClosed({ userId, repoRoot, repoRuntimeId })
-      }
+      const repoRuntimeId = stopRepoRuntimeEpoch(state)
+      if (repoRuntimeId) emitRepoRuntimeClosed({ userId, repoRoot, repoRuntimeId })
     }
   }
   repoRuntimesByUser.delete(userId)
+}
+
+function startRepoRuntimeEpoch(state: RepoRuntimeState): string {
+  if (state.currentRepoRuntimeId || state.remoteAttemptController) {
+    throw new Error('repo runtime epoch must stop before it starts')
+  }
+  const repoRuntimeId = createOpaqueId('repo-runtime')
+  state.currentRepoRuntimeId = repoRuntimeId
+  state.remoteLifecycle = { kind: 'idle', attemptId: 0 }
+  return repoRuntimeId
+}
+
+function stopRepoRuntimeEpoch(state: RepoRuntimeState): string | null {
+  const repoRuntimeId = state.currentRepoRuntimeId
+  state.remoteAttemptController?.abort()
+  state.remoteAttemptController = null
+  state.currentRepoRuntimeId = null
+  return repoRuntimeId
 }
 
 export function onRepoRuntimeClosed(listener: (event: RepoRuntimeClosedEvent) => void): () => void {

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from 'vitest'
 import {
   clearRepoRuntimesForUser,
   closeRepoRuntime,
+  getOrOpenRepoRuntime,
   listRepoRuntimes,
   openRepoRuntime,
   runRepoRemoteLifecycle,
@@ -67,6 +68,48 @@ describe('repo runtime remote lifecycle', () => {
     expect(listRepoRuntimes(userId)).toEqual([{
       repoRoot, repoRuntimeId: reopened, remoteLifecycle: { kind: 'idle', attemptId: 0 },
     }])
+  })
+
+  test('bulk user cleanup aborts the attempt and settles it as stale runtime', async () => {
+    const runtimeId = openRepoRuntime(userId, repoRoot)
+    let signal!: AbortSignal
+    const transitions: string[] = []
+    const work = runRepoRemoteLifecycle(
+      userId,
+      repoRoot,
+      runtimeId,
+      (nextSignal) => {
+        signal = nextSignal
+        return new Promise((_resolve, reject) => {
+          nextSignal.addEventListener(
+            'abort',
+            () => reject(new DOMException('aborted', 'AbortError')),
+            { once: true },
+          )
+        })
+      },
+      (lifecycle) => transitions.push(`${lifecycle.kind}:${lifecycle.attemptId}`),
+    )
+
+    clearRepoRuntimesForUser(userId)
+
+    expect(signal.aborted).toBe(true)
+    await expect(work).resolves.toEqual({ kind: 'stale-runtime' })
+    expect(transitions).toEqual(['connecting:1'])
+    expect(listRepoRuntimes(userId)).toEqual([])
+  })
+
+  test('get-or-open starts a fresh lifecycle epoch after close', async () => {
+    const runtimeId = openRepoRuntime(userId, repoRoot)
+    await runRepoRemoteLifecycle(userId, repoRoot, runtimeId, async () => ready)
+    expect(closeRepoRuntime(userId, repoRoot, runtimeId)).toBe(true)
+
+    const reopened = getOrOpenRepoRuntime(userId, repoRoot)
+
+    expect(reopened).not.toBe(runtimeId)
+    expect(listRepoRuntimes(userId)).toEqual([
+      { repoRoot, repoRuntimeId: reopened, remoteLifecycle: { kind: 'idle', attemptId: 0 } },
+    ])
   })
 
   test('normalizes an aborted predecessor rejection to a superseded result', async () => {

@@ -9,6 +9,7 @@ export interface WorkspacePaneActionTarget {
 
 const queuesByTarget = new Map<string, PQueue>()
 const pendingRouteIntents = new Map<number, { targetKey: string; fromRouteKey: string }>()
+const routeIntentSubscribers = new Set<() => void>()
 let nextRouteIntentId = 1
 
 export async function runWorkspacePaneAction<T>(
@@ -32,8 +33,10 @@ export function workspacePaneActionTargetKey(target: WorkspacePaneActionTarget):
 
 export function resetWorkspacePaneActionQueueForTest(): void {
   queuesByTarget.clear()
+  const hadPendingRouteIntents = pendingRouteIntents.size > 0
   pendingRouteIntents.clear()
   nextRouteIntentId = 1
+  if (hadPendingRouteIntents) notifyWorkspacePaneRouteIntentSubscribers()
 }
 
 export function workspacePaneActionQueueStatsForTest(): { targetQueues: number; pendingRouteIntents: number } {
@@ -45,11 +48,17 @@ export function beginWorkspacePaneRouteIntent(target: WorkspacePaneActionTarget,
   if (!targetKey) return null
   const intentId = nextRouteIntentId++
   pendingRouteIntents.set(intentId, { targetKey, fromRouteKey })
+  notifyWorkspacePaneRouteIntentSubscribers()
   return intentId
 }
 
 export function finishWorkspacePaneRouteIntent(intentId: number | null | undefined): void {
-  if (intentId) pendingRouteIntents.delete(intentId)
+  if (intentId && pendingRouteIntents.delete(intentId)) notifyWorkspacePaneRouteIntentSubscribers()
+}
+
+export function subscribeWorkspacePaneRouteIntents(onStoreChange: () => void): () => void {
+  routeIntentSubscribers.add(onStoreChange)
+  return () => routeIntentSubscribers.delete(onStoreChange)
 }
 
 export function workspacePaneRouteIntentPending(
@@ -77,4 +86,8 @@ function scheduleWorkspacePaneActionQueueCleanup(queueKey: string, queue: PQueue
     if (queuesByTarget.get(queueKey) !== queue) return
     if (queue.size === 0 && queue.pending === 0) queuesByTarget.delete(queueKey)
   })
+}
+
+function notifyWorkspacePaneRouteIntentSubscribers(): void {
+  for (const subscriber of routeIntentSubscribers) subscriber()
 }

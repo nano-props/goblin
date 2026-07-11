@@ -1047,6 +1047,55 @@ describe('RepoWorkspace', () => {
     expect(route.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, branchName, 'status', presentationOptions())
   })
 
+  test('reconciles a closed active tab after close-back navigation rejects', async () => {
+    const branchName = 'feature/close-route-rejected'
+    const worktreePath = '/tmp/close-route-rejected-worktree'
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
+      currentBranchName: branchName,
+      preferredWorkspacePaneTab: 'files',
+      workspacePaneTabsByBranch: {
+        [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
+      },
+    })
+    const route = routeNavigation()
+    vi.mocked(route.openRepoBranchTab).mockImplementation(() => {
+      throw new Error('navigation rejected')
+    })
+    const actions = navigationWithStore(route)
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={actions}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName={branchName}
+                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'files' } }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+    vi.mocked(route.openRepoBranch).mockClear()
+
+    await expect(
+      runCloseWorkspacePaneTabCommand({
+        repoId: REPO_ID,
+        branchName,
+        workspacePaneRoute: { kind: 'static', tab: 'files' },
+        navigation: actions,
+      }),
+    ).resolves.toBe(false)
+
+    await waitFor(() => {
+      expect(route.openRepoBranch).toHaveBeenCalledWith(REPO_ID, branchName, presentationOptions({ replace: true }))
+    })
+  })
+
   test('replaces an unrenderable static route with the bare branch route', async () => {
     const branchName = 'feature/no-worktree'
     seedRepoWithReadModelForTest({
