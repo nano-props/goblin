@@ -20,7 +20,7 @@ interface RuntimeCoherentRepoProjectionStoreActions extends Pick<
 > {}
 
 interface PrimaryWindowNavigationStoreActions
-  extends Pick<ReposStore, 'closeRepo' | 'goBackInWorkspaceNavigation' | 'goForwardInWorkspaceNavigation'> {}
+  extends Pick<ReposStore, 'closeRepo' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'> {}
 
 interface RepoPickerStoreActions extends Pick<ReposStore, 'ensureWorkspaceOpen'> {}
 
@@ -77,13 +77,12 @@ export function runtimeCoherentRepoProjectionStoreActionsFromStore(
 }
 
 export function primaryWindowNavigationStoreActionsFromStore(
-  state: Pick<ReposStore, 'closeRepo'> &
-    Partial<Pick<ReposStore, 'goBackInWorkspaceNavigation' | 'goForwardInWorkspaceNavigation'>>,
+  state: Pick<ReposStore, 'closeRepo' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'>,
 ): PrimaryWindowNavigationStoreActions {
   return {
     closeRepo: state.closeRepo,
-    goBackInWorkspaceNavigation: state.goBackInWorkspaceNavigation ?? (() => null),
-    goForwardInWorkspaceNavigation: state.goForwardInWorkspaceNavigation ?? (() => null),
+    peekWorkspaceNavigation: state.peekWorkspaceNavigation,
+    commitWorkspaceNavigation: state.commitWorkspaceNavigation,
   }
 }
 

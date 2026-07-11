@@ -56,7 +56,9 @@ describe('WorkspaceNavigationControls', () => {
     expect(forwardButton().disabled).toBe(true)
 
     act(() => {
-      useReposStore.getState().goBackInWorkspaceNavigation(REPO_ID)
+      const store = useReposStore.getState()
+      const traversal = store.peekWorkspaceNavigation(REPO_ID, 'back')
+      if (traversal) store.commitWorkspaceNavigation(traversal)
     })
 
     expect(backButton().disabled).toBe(true)
@@ -80,7 +82,9 @@ describe('WorkspaceNavigationControls', () => {
     expect(goBack).toHaveBeenCalledWith(REPO_ID)
 
     act(() => {
-      useReposStore.getState().goBackInWorkspaceNavigation(REPO_ID)
+      const store = useReposStore.getState()
+      const traversal = store.peekWorkspaceNavigation(REPO_ID, 'back')
+      if (traversal) store.commitWorkspaceNavigation(traversal)
     })
 
     await user.click(forwardButton())

@@ -26,7 +26,7 @@ export function usePrimaryWindowNavigation(): PrimaryWindowNavigationActions {
   if (context) return context
 
   const order = useReposStore((s) => s.order)
-  const { closeRepo, goBackInWorkspaceNavigation, goForwardInWorkspaceNavigation } = useReposStore(
+  const { closeRepo, peekWorkspaceNavigation, commitWorkspaceNavigation } = useReposStore(
     useShallow(primaryWindowNavigationStoreActionsFromStore),
   )
   const routeNavigation = usePrimaryWindowRouteNavigation()
@@ -36,14 +36,14 @@ export function usePrimaryWindowNavigation(): PrimaryWindowNavigationActions {
         currentRepoId: null,
         order,
         closeRepo,
-        goBackInWorkspaceNavigation,
-        goForwardInWorkspaceNavigation,
+        peekWorkspaceNavigation,
+        commitWorkspaceNavigation,
         routeNavigation,
       }),
     [
       closeRepo,
-      goBackInWorkspaceNavigation,
-      goForwardInWorkspaceNavigation,
+      peekWorkspaceNavigation,
+      commitWorkspaceNavigation,
       order,
       routeNavigation,
     ],

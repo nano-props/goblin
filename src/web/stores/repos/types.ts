@@ -174,6 +174,13 @@ export interface WorkspaceNavigationHistoryRepoState {
   forwardStack: WorkspaceNavigationHistoryEntry[]
 }
 
+export interface WorkspaceNavigationHistoryTraversal {
+  repoId: string
+  direction: 'back' | 'forward'
+  current: WorkspaceNavigationHistoryEntry
+  target: WorkspaceNavigationHistoryEntry
+}
+
 export interface SessionWorkspacePaneRestoreState {
   workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>
   preferredWorkspacePaneTabByTargetByRepo: Record<string, Record<string, WorkspacePaneSessionTabType | null>>
@@ -226,8 +233,11 @@ interface LocalWorkspaceActions {
     entry: WorkspaceNavigationHistoryEntry,
     options?: { replace?: boolean; browserHistoryTraversal?: 'back' | 'forward' },
   ) => void
-  goBackInWorkspaceNavigation: (repoId: string) => WorkspaceNavigationHistoryEntry | null
-  goForwardInWorkspaceNavigation: (repoId: string) => WorkspaceNavigationHistoryEntry | null
+  peekWorkspaceNavigation: (
+    repoId: string,
+    direction: 'back' | 'forward',
+  ) => WorkspaceNavigationHistoryTraversal | null
+  commitWorkspaceNavigation: (traversal: WorkspaceNavigationHistoryTraversal) => boolean
 }
 
 interface RestorableWorkspaceActions {

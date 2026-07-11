@@ -6,7 +6,11 @@ import {
   normalizeWorkspaceSessionLayoutState,
 } from '#/shared/workspace-layout.ts'
 import type { BranchViewMode, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
-import type { WorkspaceNavigationHistoryEntry, WorkspaceNavigationHistoryRepoState } from '#/web/stores/repos/types.ts'
+import type {
+  WorkspaceNavigationHistoryEntry,
+  WorkspaceNavigationHistoryRepoState,
+  WorkspaceNavigationHistoryTraversal,
+} from '#/web/stores/repos/types.ts'
 import {
   workspaceNavigationHistoryEntryCanReplaceCurrent,
   workspaceNavigationHistoryEntryEqual,
@@ -33,7 +37,7 @@ type RestorableWorkspaceActions = Pick<
 type RuntimeWorkspacePreferenceActions = Pick<ReposStore, 'setBranchViewMode' | 'setWorkspacePaneTab'>
 type WorkspaceNavigationHistoryActions = Pick<
   ReposStore,
-  'recordWorkspaceNavigation' | 'goBackInWorkspaceNavigation' | 'goForwardInWorkspaceNavigation'
+  'recordWorkspaceNavigation' | 'peekWorkspaceNavigation' | 'commitWorkspaceNavigation'
 >
 
 const MAX_WORKSPACE_NAVIGATION_HISTORY_ENTRIES = 50
@@ -234,58 +238,56 @@ function createWorkspaceNavigationHistoryActions(set: ReposSet, get: ReposGet): 
       })
     },
 
-    goBackInWorkspaceNavigation(repoId) {
+    peekWorkspaceNavigation(repoId, direction) {
       const history = navigationHistoryForRepo(get().navigationHistoryByRepo[repoId])
-      const target = history.backStack.at(-1) ?? null
+      const target = direction === 'back' ? (history.backStack.at(-1) ?? null) : (history.forwardStack[0] ?? null)
       if (!target || !history.current) return null
+      return { repoId, direction, current: history.current, target }
+    },
 
+    commitWorkspaceNavigation(traversal) {
+      let committed = false
       set((s) => {
-        const currentRepoHistory = navigationHistoryForRepo(s.navigationHistoryByRepo[repoId])
-        const nextTarget = currentRepoHistory.backStack.at(-1) ?? null
-        if (!nextTarget || !currentRepoHistory.current) return s
+        const currentRepoHistory = navigationHistoryForRepo(s.navigationHistoryByRepo[traversal.repoId])
+        const nextTarget =
+          traversal.direction === 'back'
+            ? (currentRepoHistory.backStack.at(-1) ?? null)
+            : (currentRepoHistory.forwardStack[0] ?? null)
+        if (
+          !nextTarget ||
+          !workspaceNavigationHistoryEntryEqual(currentRepoHistory.current, traversal.current) ||
+          !workspaceNavigationHistoryEntryEqual(nextTarget, traversal.target)
+        )
+          return s
+        committed = true
+        const nextHistory = commitWorkspaceNavigationTraversal(currentRepoHistory, traversal)
         return {
           navigationHistoryByRepo: {
             ...s.navigationHistoryByRepo,
-            [repoId]: {
-              current: nextTarget,
-              backStack: currentRepoHistory.backStack.slice(0, -1),
-              forwardStack: [currentRepoHistory.current, ...currentRepoHistory.forwardStack].slice(
-                0,
-                MAX_WORKSPACE_NAVIGATION_HISTORY_ENTRIES,
-              ),
-            },
+            [traversal.repoId]: nextHistory,
           },
         }
       })
-
-      return target
+      return committed
     },
+  }
+}
 
-    goForwardInWorkspaceNavigation(repoId) {
-      const history = navigationHistoryForRepo(get().navigationHistoryByRepo[repoId])
-      const target = history.forwardStack[0] ?? null
-      if (!target || !history.current) return null
-
-      set((s) => {
-        const currentRepoHistory = navigationHistoryForRepo(s.navigationHistoryByRepo[repoId])
-        const nextTarget = currentRepoHistory.forwardStack[0] ?? null
-        if (!nextTarget || !currentRepoHistory.current) return s
-        return {
-          navigationHistoryByRepo: {
-            ...s.navigationHistoryByRepo,
-            [repoId]: {
-              current: nextTarget,
-              backStack: [...currentRepoHistory.backStack, currentRepoHistory.current].slice(
-                -MAX_WORKSPACE_NAVIGATION_HISTORY_ENTRIES,
-              ),
-              forwardStack: currentRepoHistory.forwardStack.slice(1),
-            },
-          },
-        }
-      })
-
-      return target
-    },
+function commitWorkspaceNavigationTraversal(
+  history: WorkspaceNavigationHistoryRepoState,
+  traversal: WorkspaceNavigationHistoryTraversal,
+): WorkspaceNavigationHistoryRepoState {
+  if (traversal.direction === 'back') {
+    return {
+      current: traversal.target,
+      backStack: history.backStack.slice(0, -1),
+      forwardStack: [traversal.current, ...history.forwardStack].slice(0, MAX_WORKSPACE_NAVIGATION_HISTORY_ENTRIES),
+    }
+  }
+  return {
+    current: traversal.target,
+    backStack: [...history.backStack, traversal.current].slice(-MAX_WORKSPACE_NAVIGATION_HISTORY_ENTRIES),
+    forwardStack: history.forwardStack.slice(1),
   }
 }
 

@@ -218,6 +218,7 @@ describe('workspace pane destination navigation', () => {
 })
 
 function primaryNavigationActions() {
+  const store = useReposStore.getState()
   const routeNavigation = {
     openHome: vi.fn(),
     openRepoDashboard: vi.fn(),
@@ -234,6 +235,8 @@ function primaryNavigationActions() {
       currentRepoId: REPO_ID,
       order: [REPO_ID],
       closeRepo: vi.fn(),
+      peekWorkspaceNavigation: store.peekWorkspaceNavigation,
+      commitWorkspaceNavigation: store.commitWorkspaceNavigation,
       routeNavigation: routeNavigation as unknown as PrimaryWindowRouteNavigation,
     }),
   }

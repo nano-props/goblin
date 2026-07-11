@@ -20,12 +20,12 @@ describe('workspace navigation history', () => {
     expect(history().backStack).toEqual([entry('dashboard'), entry('branch', 'feature/a')])
     expect(history().forwardStack).toEqual([])
 
-    expect(useReposStore.getState().goBackInWorkspaceNavigation(REPO_ID)).toEqual(entry('branch', 'feature/a'))
+    expect(traverse('back')).toEqual(entry('branch', 'feature/a'))
     expect(history().current).toEqual(entry('branch', 'feature/a'))
     expect(history().backStack).toEqual([entry('dashboard')])
     expect(history().forwardStack).toEqual([entry('branch', 'feature/b')])
 
-    expect(useReposStore.getState().goForwardInWorkspaceNavigation(REPO_ID)).toEqual(entry('branch', 'feature/b'))
+    expect(traverse('forward')).toEqual(entry('branch', 'feature/b'))
     expect(history().current).toEqual(entry('branch', 'feature/b'))
     expect(history().backStack).toEqual([entry('dashboard'), entry('branch', 'feature/a')])
     expect(history().forwardStack).toEqual([])
@@ -36,13 +36,27 @@ describe('workspace navigation history', () => {
     store.recordWorkspaceNavigation(entry('dashboard'))
     store.recordWorkspaceNavigation(entry('branch', 'feature/a'))
     store.recordWorkspaceNavigation(entry('branch', 'feature/b'))
-    store.goBackInWorkspaceNavigation(REPO_ID)
+    traverse('back')
 
     useReposStore.getState().recordWorkspaceNavigation(entry('newWorktree'))
 
     expect(history().current).toEqual(entry('newWorktree'))
     expect(history().backStack).toEqual([entry('dashboard'), entry('branch', 'feature/a')])
     expect(history().forwardStack).toEqual([])
+  })
+
+  test('rejects a stale traversal lease after history changes', () => {
+    const store = useReposStore.getState()
+    store.recordWorkspaceNavigation(entry('dashboard'))
+    store.recordWorkspaceNavigation(entry('branch', 'feature/a'))
+    const traversal = store.peekWorkspaceNavigation(REPO_ID, 'back')
+    expect(traversal).not.toBeNull()
+
+    store.recordWorkspaceNavigation(entry('branch', 'feature/b'))
+
+    expect(store.commitWorkspaceNavigation(traversal!)).toBe(false)
+    expect(history().current).toEqual(entry('branch', 'feature/b'))
+    expect(history().backStack).toEqual([entry('dashboard'), entry('branch', 'feature/a')])
   })
 
   test('does not duplicate the current entry', () => {
@@ -141,7 +155,7 @@ describe('workspace navigation history', () => {
     store.recordWorkspaceNavigation(dashboard)
     store.recordWorkspaceNavigation(status)
     store.recordWorkspaceNavigation(terminal)
-    store.goBackInWorkspaceNavigation(REPO_ID)
+    traverse('back')
     store.recordWorkspaceNavigation(terminal, { browserHistoryTraversal: 'back' })
 
     expect(history().current).toEqual(terminal)
@@ -175,7 +189,7 @@ describe('workspace navigation history', () => {
     store.recordWorkspaceNavigation(dashboard)
     store.recordWorkspaceNavigation(staleTerminal)
     store.recordWorkspaceNavigation(status)
-    store.goBackInWorkspaceNavigation(REPO_ID)
+    traverse('back')
     store.recordWorkspaceNavigation(status, { replace: true })
 
     expect(history().current).toEqual(status)
@@ -195,6 +209,13 @@ describe('workspace navigation history', () => {
 
 function history() {
   return useReposStore.getState().navigationHistoryByRepo[REPO_ID]!
+}
+
+function traverse(direction: 'back' | 'forward'): WorkspaceNavigationHistoryEntry | null {
+  const store = useReposStore.getState()
+  const traversal = store.peekWorkspaceNavigation(REPO_ID, direction)
+  if (!traversal) return null
+  return store.commitWorkspaceNavigation(traversal) ? traversal.target : null
 }
 
 function entry(kind: 'dashboard' | 'newWorktree'): WorkspaceNavigationHistoryEntry

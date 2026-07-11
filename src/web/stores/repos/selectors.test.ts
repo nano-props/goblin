@@ -104,11 +104,13 @@ describe('repo selectors', () => {
     expect(
       primaryWindowNavigationStoreActionsFromStore({
         closeRepo: fnA,
+        peekWorkspaceNavigation: fnA as never,
+        commitWorkspaceNavigation: fnA as never,
       }),
     ).toEqual({
       closeRepo: fnA,
-      goBackInWorkspaceNavigation: expect.any(Function),
-      goForwardInWorkspaceNavigation: expect.any(Function),
+      peekWorkspaceNavigation: fnA,
+      commitWorkspaceNavigation: fnA,
     })
     expect(
       repoPickerStoreActionsFromStore({

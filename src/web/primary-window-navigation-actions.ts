@@ -2,7 +2,7 @@ import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
-import type { WorkspaceNavigationHistoryEntry } from '#/web/stores/repos/types.ts'
+import type { WorkspaceNavigationHistoryTraversal } from '#/web/stores/repos/types.ts'
 import {
   restoreWorkspaceNavigationEntry,
   workspaceNavigationHistoryRestoreBlocked,
@@ -61,8 +61,11 @@ interface CreatePrimaryWindowNavigationActionsOptions {
   currentRepoId: string | null
   order: string[]
   closeRepo: (repoId: string) => void
-  goBackInWorkspaceNavigation?: (repoId: string) => WorkspaceNavigationHistoryEntry | null
-  goForwardInWorkspaceNavigation?: (repoId: string) => WorkspaceNavigationHistoryEntry | null
+  peekWorkspaceNavigation: (
+    repoId: string,
+    direction: 'back' | 'forward',
+  ) => WorkspaceNavigationHistoryTraversal | null
+  commitWorkspaceNavigation: (traversal: WorkspaceNavigationHistoryTraversal) => boolean
   routeNavigation: PrimaryWindowRouteNavigation
 }
 
@@ -70,28 +73,31 @@ export function createPrimaryWindowNavigationActions({
   currentRepoId,
   order,
   closeRepo,
-  goBackInWorkspaceNavigation,
-  goForwardInWorkspaceNavigation,
+  peekWorkspaceNavigation,
+  commitWorkspaceNavigation,
   routeNavigation,
 }: CreatePrimaryWindowNavigationActionsOptions): PrimaryWindowNavigationActions {
   return {
     activateRepo(repoId) {
       const presentationToken = beginPrimaryWindowPresentation()
-      routeNavigation.openRepoDashboard(repoId, { presentationToken })
+      restoreRepoPresentationOrOpenDashboard(repoId, routeNavigation, presentationToken, { onBlocked: 'stay' })
     },
     closeRepo(repoId) {
       const nextRepoId = repoId === currentRepoId ? nextNavigationRepoIdAfterClose(order, repoId) : null
       const presentationToken = repoId === currentRepoId ? beginPrimaryWindowPresentation() : null
       closeRepo(repoId)
       if (repoId !== currentRepoId) return
-      if (nextRepoId) routeNavigation.openRepoDashboard(nextRepoId, { presentationToken: presentationToken! })
+      if (nextRepoId)
+        restoreRepoPresentationOrOpenDashboard(nextRepoId, routeNavigation, presentationToken!, {
+          onBlocked: 'dashboard',
+        })
       else routeNavigation.openHome({ presentationToken: presentationToken! })
     },
     cycleRepo(direction) {
       const repoId = nextNavigationRepoId(order, currentRepoId, direction)
       if (repoId) {
         const presentationToken = beginPrimaryWindowPresentation()
-        routeNavigation.openRepoDashboard(repoId, { presentationToken })
+        restoreRepoPresentationOrOpenDashboard(repoId, routeNavigation, presentationToken, { onBlocked: 'stay' })
       }
     },
     selectRepoBranch(repoId, branch, options) {
@@ -143,14 +149,18 @@ export function createPrimaryWindowNavigationActions({
     goBack(repoId) {
       if (workspaceNavigationHistoryRestoreBlocked(repoId, 'back')) return
       const presentationToken = beginPrimaryWindowPresentation()
-      const target = goBackInWorkspaceNavigation?.(repoId) ?? null
-      if (target) restoreWorkspaceNavigationEntry(target, routeNavigation, { presentationToken })
+      const traversal = peekWorkspaceNavigation(repoId, 'back')
+      if (!traversal) return
+      const result = restoreWorkspaceNavigationEntry(traversal.target, routeNavigation, { presentationToken })
+      if (result.kind === 'accepted') commitWorkspaceNavigation(traversal)
     },
     goForward(repoId) {
       if (workspaceNavigationHistoryRestoreBlocked(repoId, 'forward')) return
       const presentationToken = beginPrimaryWindowPresentation()
-      const target = goForwardInWorkspaceNavigation?.(repoId) ?? null
-      if (target) restoreWorkspaceNavigationEntry(target, routeNavigation, { presentationToken })
+      const traversal = peekWorkspaceNavigation(repoId, 'forward')
+      if (!traversal) return
+      const result = restoreWorkspaceNavigationEntry(traversal.target, routeNavigation, { presentationToken })
+      if (result.kind === 'accepted') commitWorkspaceNavigation(traversal)
     },
     openSettings(page) {
       const presentationToken = beginPrimaryWindowPresentation()
@@ -203,6 +213,21 @@ function commitRepoBranchWorkspacePaneRoute(
   return routeNavigation.commitRepoBranchWorkspacePaneRoute
     ? routeNavigation.commitRepoBranchWorkspacePaneRoute(repoId, branchName, route, routeOptions)
     : openResolvedRepoBranchWorkspacePaneRoute(routeNavigation, repoId, branchName, route, routeOptions)
+}
+
+function restoreRepoPresentationOrOpenDashboard(
+  repoId: string,
+  routeNavigation: PrimaryWindowRouteNavigation,
+  presentationToken: PrimaryWindowPresentationToken,
+  options: { onBlocked: 'stay' | 'dashboard' },
+): void {
+  const entry = useReposStore.getState().navigationHistoryByRepo[repoId]?.current ?? null
+  // Creating a worktree is a transient workflow, not a repo workspace to resume.
+  if (entry && entry.route.kind !== 'newWorktree') {
+    const result = restoreWorkspaceNavigationEntry(entry, routeNavigation, { presentationToken })
+    if (result.kind === 'accepted' || (result.kind === 'blocked' && options.onBlocked === 'stay')) return
+  }
+  routeNavigation.openRepoDashboard(repoId, { presentationToken })
 }
 
 function nextNavigationRepoIdAfterClose(order: string[], closingRepoId: string): string | null {
