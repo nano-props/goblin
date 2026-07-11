@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   beginWorkspacePaneTabCoordinatorTransition,
   observeWorkspacePaneTabCoordinatorRoute,
@@ -7,6 +7,7 @@ import {
   waitForWorkspacePaneTabCoordinatorTransition,
   workspacePaneTabCoordinatorObservedRoute,
   workspacePaneTabCoordinatorPendingIntent,
+  workspacePaneTabCoordinatorStatsForTest,
 } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 
 const TARGET = {
@@ -40,6 +41,7 @@ describe('workspace pane tab coordinator transactions', () => {
     release.resolve()
     await Promise.all([first, second])
     expect(order).toEqual(['first-start', 'first-end', 'second'])
+    await vi.waitFor(() => expect(workspacePaneTabCoordinatorStatsForTest().targetQueues).toBe(0))
   })
 
   test.each([
@@ -85,6 +87,10 @@ describe('workspace pane tab coordinator transactions', () => {
     await expect(completion).resolves.toBe(true)
     expect(workspacePaneTabCoordinatorObservedRoute(TARGET)).toEqual(TARGET_ROUTE)
     expect(workspacePaneTabCoordinatorPendingIntent(TARGET)).toBeNull()
+    expect(workspacePaneTabCoordinatorStatsForTest()).toMatchObject({
+      transitions: 0,
+      transitionCompletions: 0,
+    })
   })
 
   test('rejects a transition when the observer lands on the wrong route', async () => {

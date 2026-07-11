@@ -3,6 +3,7 @@ import {
   abortRepoWriteNetworkOperation,
   enqueueRepoWriteOperation,
   listRepoWriteOperationsForRepo,
+  repoWriteOperationCoordinatorStatsForTests,
   resetRepoWriteOperationCoordinatorForTests,
 } from '#/server/modules/repo-write-operation-coordinator.ts'
 
@@ -54,6 +55,10 @@ describe('repo write operation coordinator', () => {
         error: { message: 'boom' },
       },
     ])
+    expect(repoWriteOperationCoordinatorStatsForTests()).toMatchObject({
+      queuedOperations: 0,
+      runningOperations: 0,
+    })
   })
 
   test('keeps settled write operations globally bounded', async () => {

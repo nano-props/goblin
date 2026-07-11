@@ -245,6 +245,20 @@ export function resetWorkspacePaneTabCoordinatorForTest(): void {
   transitionCompletionById.clear()
 }
 
+export function workspacePaneTabCoordinatorStatsForTest(): {
+  transitions: number
+  transitionCompletions: number
+  targetQueues: number
+  observedRoutes: number
+} {
+  return {
+    transitions: state.transitions.length,
+    transitionCompletions: transitionCompletionById.size,
+    targetQueues: queuesByTarget.size,
+    observedRoutes: observedRoutesByTarget.size,
+  }
+}
+
 export async function runWorkspacePaneTabCoordinatorTask<T>(
   target: WorkspacePaneTabCoordinatorTarget,
   task: () => Promise<T> | T,

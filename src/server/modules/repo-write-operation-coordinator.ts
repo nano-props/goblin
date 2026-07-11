@@ -468,3 +468,20 @@ export function resetRepoWriteOperationCoordinatorForTests(): void {
   repoRuntimeCloseSubscription = null
   nextWriteOperationId = 1
 }
+
+export function repoWriteOperationCoordinatorStatsForTests(): {
+  boundaryRuntimes: number
+  registeredBoundaries: number
+  registeredRepoIds: number
+  queuedOperations: number
+  runningOperations: number
+} {
+  const runtimes = [...repoWriteOperationRuntimesByBoundary.values()]
+  return {
+    boundaryRuntimes: runtimes.length,
+    registeredBoundaries: repoWriteOperationRepoIdsByBoundary.size,
+    registeredRepoIds: repoWriteOperationBoundaryByRepoId.size,
+    queuedOperations: runtimes.reduce((total, runtime) => total + runtime.queue.size, 0),
+    runningOperations: runtimes.reduce((total, runtime) => total + runtime.queue.pending, 0),
+  }
+}
