@@ -7,7 +7,7 @@
 // manager, broker, and session service stays in lockstep with the shared
 // protocol types in `shared/terminal-types.ts`.
 
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { acquireRepoRuntime, clearRepoRuntimesForUser, releaseRepoRuntime } from '#/server/modules/repo-runtimes.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
@@ -195,6 +195,7 @@ const createTerminalApplications = new WeakMap<
   ServerTerminalHost,
   ServerWorkspacePaneRuntimeHost
 >()
+const activeRuntimeShutdowns = new Set<() => void>()
 
 function buildRuntime(): RuntimeHandle {
   const runtime = createServerTerminalRuntime({
@@ -205,9 +206,14 @@ function buildRuntime(): RuntimeHandle {
   USER_2_REPO_RUNTIME_ID = acquireRepoRuntime(USER_2, REPO_ROOT, 'client_b')
   acquireRepoRuntime(USER_2, 'ssh-config://prod/srv/repo', 'client_b')
   createTerminalApplications.set(runtime.host, runtime.workspacePaneRuntimeHost)
+  const shutdown = () => {
+    if (!activeRuntimeShutdowns.delete(shutdown)) return
+    runtime.shutdown()
+  }
+  activeRuntimeShutdowns.add(shutdown)
   return {
     host: runtime.host,
-    shutdown: () => runtime.shutdown(),
+    shutdown,
     isClientOnline: (clientId: string) => runtime.host.isClientOnline(USER_1, clientId),
   }
 }
@@ -219,6 +225,10 @@ beforeEach(() => {
   vi.clearAllMocks()
   clearRepoRuntimesForUser(USER_1)
   clearRepoRuntimesForUser(USER_2)
+})
+
+afterEach(() => {
+  for (const shutdown of Array.from(activeRuntimeShutdowns)) shutdown()
 })
 
 function createDeferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
@@ -2305,6 +2315,7 @@ describe('server terminal runtime', () => {
       const { host } = handle
       shutdownFn = handle.shutdown
       const socket = { send: vi.fn(), close: vi.fn() }
+      acquireRepoRuntime(USER_1, REPO_ROOT, 'client_recovered')
       host.registerSocket('client_recovered', USER_1, socket)
       await createTerminalSession(host, 'client_recovered')
 
@@ -2338,6 +2349,7 @@ describe('server terminal runtime', () => {
       const { host } = handle
       shutdownFn = handle.shutdown
       const socket = { send: vi.fn(), close: vi.fn() }
+      acquireRepoRuntime(USER_1, REPO_ROOT, 'client_half_open')
       host.registerSocket('client_half_open', USER_1, socket)
       await createTerminalSession(host, 'client_half_open')
 
@@ -2349,6 +2361,7 @@ describe('server terminal runtime', () => {
       await vi.runOnlyPendingTimersAsync()
 
       expect(host.getDiagnostics().terminal.liveSessionCount).toBe(0)
+      REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_half_open')
       await expect(
         host.listSessions('client_half_open', USER_1, { repoRoot: '/repo', repoRuntimeId: REPO_RUNTIME_ID }),
       ).resolves.toEqual([])
@@ -2367,6 +2380,7 @@ describe('server terminal runtime', () => {
       const { host } = handle
       shutdownFn = handle.shutdown
       const socket = { send: vi.fn(), close: vi.fn() }
+      acquireRepoRuntime(USER_1, REPO_ROOT, 'client_late_drain')
       host.registerSocket('client_late_drain', USER_1, socket)
       await createTerminalSession(host, 'client_late_drain')
 
@@ -2379,6 +2393,7 @@ describe('server terminal runtime', () => {
       await vi.runOnlyPendingTimersAsync()
 
       expect(host.getDiagnostics().terminal.liveSessionCount).toBe(0)
+      REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_late_drain')
       await expect(
         host.listSessions('client_late_drain', USER_1, { repoRoot: '/repo', repoRuntimeId: REPO_RUNTIME_ID }),
       ).resolves.toEqual([])
@@ -2414,6 +2429,9 @@ describe('server terminal runtime', () => {
       const handle = buildRuntime()
       shutdownFn = handle.shutdown
       expect(acquireRepoRuntime(USER_1, REPO_ROOT, 'client_expiring')).toBe(REPO_RUNTIME_ID)
+      acquireRepoRuntime(USER_1, REPO_ROOT, 'client_survivor')
+      const survivorSocket = { send: vi.fn(), close: vi.fn() }
+      handle.host.registerSocket('client_survivor', USER_1, survivorSocket)
       const socket = { send: vi.fn(), close: vi.fn() }
       handle.host.registerSocket('client_expiring', USER_1, socket)
       handle.host.unregisterSocket('client_expiring', USER_1, socket)
@@ -2424,7 +2442,87 @@ describe('server terminal runtime', () => {
         released: false,
         runtimeClosed: false,
       })
-      expect(releaseRepoRuntime(USER_1, REPO_ROOT, REPO_RUNTIME_ID, 'client_a')).toEqual({
+      expect(releaseRepoRuntime(USER_1, REPO_ROOT, REPO_RUNTIME_ID, 'client_survivor')).toEqual({
+        released: true,
+        runtimeClosed: true,
+      })
+    } finally {
+      vi.useRealTimers()
+      shutdownFn?.()
+    }
+  })
+
+  test('runtime: a repo membership that never establishes realtime presence expires', async () => {
+    vi.useFakeTimers()
+    let shutdownFn: (() => void) | undefined
+    try {
+      const handle = buildRuntime()
+      shutdownFn = handle.shutdown
+      const runtimeId = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_never_online')
+
+      await vi.advanceTimersByTimeAsync(DETACHED_TTL_MS + 1)
+
+      expect(releaseRepoRuntime(USER_1, REPO_ROOT, runtimeId, 'client_never_online')).toEqual({
+        released: false,
+        runtimeClosed: false,
+      })
+    } finally {
+      vi.useRealTimers()
+      shutdownFn?.()
+    }
+  })
+
+  test('runtime: first realtime presence cancels the orphan membership expiry', async () => {
+    vi.useFakeTimers()
+    let shutdownFn: (() => void) | undefined
+    try {
+      const handle = buildRuntime()
+      shutdownFn = handle.shutdown
+      const runtimeId = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_claimed_before_expiry')
+      const socket = { send: vi.fn(), close: vi.fn() }
+      handle.host.registerSocket('client_claimed_before_expiry', USER_1, socket)
+
+      for (let elapsed = 0; elapsed < DETACHED_TTL_MS + 1; elapsed += HEARTBEAT_INTERVAL_MS) {
+        handle.host.handleRealtimeMessage(
+          'client_claimed_before_expiry',
+          USER_1,
+          socket,
+          JSON.stringify({ type: 'heartbeat' }),
+        )
+        await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS)
+      }
+
+      expect(releaseRepoRuntime(USER_1, REPO_ROOT, runtimeId, 'client_claimed_before_expiry')).toEqual({
+        released: true,
+        runtimeClosed: true,
+      })
+    } finally {
+      vi.useRealTimers()
+      shutdownFn?.()
+    }
+  })
+
+  test('runtime: an already-online client acquires membership without an orphan timer', async () => {
+    vi.useFakeTimers()
+    let shutdownFn: (() => void) | undefined
+    try {
+      const handle = buildRuntime()
+      shutdownFn = handle.shutdown
+      const socket = { send: vi.fn(), close: vi.fn() }
+      handle.host.registerSocket('client_online_before_acquire', USER_1, socket)
+      const runtimeId = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_online_before_acquire')
+
+      for (let elapsed = 0; elapsed < DETACHED_TTL_MS + 1; elapsed += HEARTBEAT_INTERVAL_MS) {
+        handle.host.handleRealtimeMessage(
+          'client_online_before_acquire',
+          USER_1,
+          socket,
+          JSON.stringify({ type: 'heartbeat' }),
+        )
+        await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS)
+      }
+
+      expect(releaseRepoRuntime(USER_1, REPO_ROOT, runtimeId, 'client_online_before_acquire')).toEqual({
         released: true,
         runtimeClosed: true,
       })
@@ -2445,12 +2543,14 @@ describe('server terminal runtime', () => {
       handle.host.registerSocket('client_renewed', USER_1, socket)
       handle.host.unregisterSocket('client_renewed', USER_1, socket)
       expect(acquireRepoRuntime(USER_1, REPO_ROOT, 'client_renewed')).toBe(REPO_RUNTIME_ID)
+      const reconnectedSocket = { send: vi.fn(), close: vi.fn() }
+      handle.host.registerSocket('client_renewed', USER_1, reconnectedSocket)
 
       await vi.advanceTimersByTimeAsync(DETACHED_TTL_MS + 1)
 
       expect(releaseRepoRuntime(USER_1, REPO_ROOT, REPO_RUNTIME_ID, 'client_renewed')).toEqual({
         released: true,
-        runtimeClosed: false,
+        runtimeClosed: true,
       })
     } finally {
       vi.useRealTimers()

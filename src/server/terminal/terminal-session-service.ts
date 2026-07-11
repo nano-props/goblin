@@ -258,16 +258,22 @@ export function createTerminalSessionService(options: TerminalSessionServiceOpti
 }
 
 export function terminalWorkspacePaneRuntimeTabsProvider(
-  manager: Pick<TerminalSessionServiceManager, 'listSessionsForUser'>,
+  manager: Pick<TerminalSessionServiceManager, 'terminalSessionsSnapshotForUser'>,
+  captureSnapshot: (userId: string, scope: string) => Promise<TerminalSessionsSnapshot> = async (userId, scope) =>
+    manager.terminalSessionsSnapshotForUser(userId, scope),
 ): WorkspacePaneRuntimeTabsProvider {
   return {
     type: 'terminal',
-    async listSessionsForUser(userId, scope) {
-      return (await manager.listSessionsForUser(userId, scope)).map((session) => ({
-        sessionId: session.terminalSessionId,
-        branch: session.branch,
-        worktreePath: session.worktreePath,
-      }))
+    async captureSnapshotForUser(userId, scope) {
+      const snapshot = await captureSnapshot(userId, scope)
+      return {
+        revision: snapshot.revision,
+        liveSessions: snapshot.sessions.map((session) => ({
+          sessionId: session.terminalSessionId,
+          branch: session.branch,
+          worktreePath: session.worktreePath,
+        })),
+      }
     },
   }
 }

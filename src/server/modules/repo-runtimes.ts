@@ -21,6 +21,11 @@ export interface RepoRuntimeClosedEvent {
   repoRuntimeId: string
 }
 
+export interface RepoRuntimeMembershipAcquiredEvent {
+  userId: string
+  clientId: string
+}
+
 export interface RepoRuntimeEntry {
   repoRoot: string
   repoRuntimeId: string
@@ -48,6 +53,7 @@ export type RepoRemoteLifecycleRunResult =
 
 const repoRuntimesByUser = new Map<string, Map<string, RepoRuntimeState>>()
 const repoRuntimeClosedListeners = new Set<(event: RepoRuntimeClosedEvent) => void>()
+const repoRuntimeMembershipAcquiredListeners = new Set<(event: RepoRuntimeMembershipAcquiredEvent) => void>()
 const repoRuntimeLogger = serverLogger.child({ tag: 'repo-runtime' })
 
 function repoRuntimeStateByUser(userId: string): Map<string, RepoRuntimeState> {
@@ -75,6 +81,12 @@ function repoRuntimeState(userId: string, repoRoot: string): RepoRuntimeState {
 }
 
 export function acquireRepoRuntime(userId: string, repoRoot: string, clientId: string): string {
+  const repoRuntimeId = acquireRepoRuntimeMembership(userId, repoRoot, clientId)
+  emitRepoRuntimeMembershipAcquired({ userId, clientId })
+  return repoRuntimeId
+}
+
+function acquireRepoRuntimeMembership(userId: string, repoRoot: string, clientId: string): string {
   if (!repoRoot) throw new Error('repo runtime open requires repoRoot')
   if (!clientId) throw new Error('repo runtime acquire requires clientId')
   const state = repoRuntimeState(userId, repoRoot)
@@ -175,7 +187,8 @@ export function replaceRepoRuntimeMembershipsForClient(
       closed.push({ userId, repoRoot, repoRuntimeId })
     }
   }
-  for (const repoRoot of desired) acquireRepoRuntime(userId, repoRoot, clientId)
+  for (const repoRoot of desired) acquireRepoRuntimeMembership(userId, repoRoot, clientId)
+  if (desired.size > 0) emitRepoRuntimeMembershipAcquired({ userId, clientId })
   for (const event of closed) emitRepoRuntimeClosed(event)
   // The runtime query is user-scoped, so return its complete canonical
   // snapshot rather than only this window's declaration.
@@ -354,12 +367,31 @@ export function onRepoRuntimeClosed(listener: (event: RepoRuntimeClosedEvent) =>
   }
 }
 
+export function onRepoRuntimeMembershipAcquired(
+  listener: (event: RepoRuntimeMembershipAcquiredEvent) => void,
+): () => void {
+  repoRuntimeMembershipAcquiredListeners.add(listener)
+  return () => {
+    repoRuntimeMembershipAcquiredListeners.delete(listener)
+  }
+}
+
 function emitRepoRuntimeClosed(event: RepoRuntimeClosedEvent): void {
   for (const listener of repoRuntimeClosedListeners) {
     try {
       listener(event)
     } catch (err) {
       repoRuntimeLogger.warn({ err, repoRoot: event.repoRoot }, 'repo runtime close listener failed')
+    }
+  }
+}
+
+function emitRepoRuntimeMembershipAcquired(event: RepoRuntimeMembershipAcquiredEvent): void {
+  for (const listener of repoRuntimeMembershipAcquiredListeners) {
+    try {
+      listener(event)
+    } catch (err) {
+      repoRuntimeLogger.warn({ err, userId: event.userId, clientId: event.clientId }, 'membership acquire listener failed')
     }
   }
 }

@@ -1,7 +1,10 @@
 // @vitest-environment node
 
 import { describe, expect, test, vi } from 'vitest'
-import { createWorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
+import {
+  createWorkspacePaneTabsCoordinator as createProductionWorkspacePaneTabsCoordinator,
+  type WorkspacePaneRuntimeTabsLiveSession,
+} from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { createWorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import {
@@ -22,6 +25,29 @@ const REPO_ROOT = '/repo'
 const SCOPE = 'repo-runtime-scope'
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/repo/worktree'
+
+type ProductionCoordinatorOptions = Parameters<typeof createProductionWorkspacePaneTabsCoordinator>[0]
+type TestRuntimeProvider = ProductionCoordinatorOptions['runtimeProviders'][number] | {
+  type: 'terminal'
+  listSessionsForUser(userId: string, scope: string): Promise<WorkspacePaneRuntimeTabsLiveSession[]>
+}
+
+function createWorkspacePaneTabsCoordinator(
+  options: Omit<ProductionCoordinatorOptions, 'runtimeProviders'> & { runtimeProviders: readonly TestRuntimeProvider[] },
+) {
+  return createProductionWorkspacePaneTabsCoordinator({
+    ...options,
+    runtimeProviders: options.runtimeProviders.map((provider) => {
+      if ('captureSnapshotForUser' in provider) return provider
+      return {
+        type: provider.type,
+        async captureSnapshotForUser(userId: string, scope: string) {
+          return { revision: 0, liveSessions: await provider.listSessionsForUser(userId, scope) }
+        },
+      }
+    }),
+  })
+}
 
 describe('workspace pane tabs coordinator', () => {
   test('materializes live runtime sessions when listing workspace tabs', async () => {
@@ -202,6 +228,217 @@ describe('workspace pane tabs coordinator', () => {
     })).resolves.toEqual(snapshot(3, [
       workspacePaneStaticTabEntry('status'), terminal, workspacePaneStaticTabEntry('files'), workspacePaneStaticTabEntry('history'),
     ]))
+  })
+
+  test('inserts a new runtime tab after a projected-only opener', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    replaceTestWorkspaceTabs(workspaceTabs, {
+      ...workspaceTarget(),
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+    })
+    const opener = workspacePaneRuntimeTabEntry('terminal', 'term-openeropeneropenerope1')
+    const created = workspacePaneRuntimeTabEntry('terminal', 'term-createdcreatedcreatedcr1')
+    const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
+    const capability = testPhysicalWorktreeCapability(WORKTREE_PATH, {
+      userId: USER_ID,
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: SCOPE,
+    })
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      worktreeOperations,
+      physicalWorktrees: testPhysicalWorktrees,
+      runtimeProviders: [{ type: 'terminal', listSessionsForUser: vi.fn(async () => [
+        { sessionId: 'term-openeropeneropenerope1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+        { sessionId: 'term-createdcreatedcreatedcr1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+      ]) }],
+    })
+
+    const result = await worktreeOperations.runOperation(capability, async (permit) =>
+      await coordinator.ensureRuntimeTabForSession({
+        ...workspaceTarget(),
+        repoRoot: REPO_ROOT,
+        runtimeType: 'terminal',
+        sessionId: 'term-createdcreatedcreatedcr1',
+        insertAfterIdentity: workspacePaneTabEntryIdentity(opener),
+        permit,
+        physicalWorktreeCapability: capability,
+      }),
+    )
+
+    expect(result).toEqual({ admitted: true, value: snapshot(2, [
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('history'),
+      opener,
+      created,
+    ]) })
+  })
+
+  test('returns a scope-wide canonical snapshot after a target mutation', async () => {
+    const otherBranch = 'feature/other'
+    const otherWorktree = '/repo/other-worktree'
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    replaceTestWorkspaceTabs(workspaceTabs, {
+      ...workspaceTarget(),
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    replaceTestWorkspaceTabs(workspaceTabs, {
+      userId: USER_ID,
+      scope: SCOPE,
+      branchName: otherBranch,
+      worktreePath: otherWorktree,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
+    const capability = testPhysicalWorktreeCapability(WORKTREE_PATH, {
+      userId: USER_ID,
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: SCOPE,
+    })
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      worktreeOperations,
+      physicalWorktrees: testPhysicalWorktrees,
+      runtimeProviders: [{ type: 'terminal', listSessionsForUser: vi.fn(async () => [
+        { sessionId: 'term-createdcreatedcreatedcr1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+        { sessionId: 'term-otherotherotherotherot1', branch: otherBranch, worktreePath: otherWorktree },
+      ]) }],
+    })
+
+    const result = await worktreeOperations.runOperation(capability, async (permit) =>
+      await coordinator.ensureRuntimeTabForSession({
+        ...workspaceTarget(),
+        repoRoot: REPO_ROOT,
+        runtimeType: 'terminal',
+        sessionId: 'term-createdcreatedcreatedcr1',
+        permit,
+        physicalWorktreeCapability: capability,
+      }),
+    )
+
+    expect(result).toEqual({
+      admitted: true,
+      value: {
+        revision: 3,
+        entries: [
+          {
+            repoRoot: REPO_ROOT,
+            branchName: BRANCH_NAME,
+            worktreePath: WORKTREE_PATH,
+            tabs: [
+              workspacePaneStaticTabEntry('status'),
+              workspacePaneRuntimeTabEntry('terminal', 'term-createdcreatedcreatedcr1'),
+            ],
+          },
+          {
+            repoRoot: REPO_ROOT,
+            branchName: otherBranch,
+            worktreePath: otherWorktree,
+            tabs: [
+              workspacePaneStaticTabEntry('status'),
+              workspacePaneRuntimeTabEntry('terminal', 'term-otherotherotherotherot1'),
+            ],
+          },
+        ],
+      },
+    })
+  })
+
+  test('advances canonical revision when provider membership changes without a layout write', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    replaceTestWorkspaceTabs(workspaceTabs, {
+      ...workspaceTarget(),
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    let providerRevision = 1
+    let liveSessions = [
+      { sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+    ]
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
+      runtimeProviders: [{
+        type: 'terminal',
+        captureSnapshotForUser: vi.fn(async () => ({ revision: providerRevision, liveSessions })),
+      }],
+    })
+
+    const withTerminal = await coordinator.listWorkspaceTabs({
+      userId: USER_ID, repoRoot: REPO_ROOT, scope: SCOPE, assertCurrent: () => {},
+    })
+    providerRevision = 2
+    liveSessions = []
+    const afterClose = await coordinator.listWorkspaceTabs({
+      userId: USER_ID, repoRoot: REPO_ROOT, scope: SCOPE, assertCurrent: () => {},
+    })
+
+    expect(withTerminal).toEqual(snapshot(1, [
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
+    ]))
+    expect(afterClose).toEqual(snapshot(2, [workspacePaneStaticTabEntry('status')]))
+
+    providerRevision = 1
+    liveSessions = [
+      { sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+    ]
+    await expect(coordinator.listWorkspaceTabs({
+      userId: USER_ID, repoRoot: REPO_ROOT, scope: SCOPE, assertCurrent: () => {},
+    })).rejects.toThrow('error.workspace-tabs-provider-snapshot-stale')
+  })
+
+  test('reconciling one worktree returns provider membership for the full scope', async () => {
+    const otherBranch = 'feature/reconcile-other'
+    const otherWorktree = '/repo/reconcile-other'
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    replaceTestWorkspaceTabs(workspaceTabs, {
+      ...workspaceTarget(), tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    replaceTestWorkspaceTabs(workspaceTabs, {
+      userId: USER_ID,
+      scope: SCOPE,
+      branchName: otherBranch,
+      worktreePath: otherWorktree,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    })
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
+      runtimeProviders: [{ type: 'terminal', listSessionsForUser: vi.fn(async () => [
+        { sessionId: 'term-currentcurrentcurrentcu1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+        { sessionId: 'term-otherotherotherotherot1', branch: otherBranch, worktreePath: otherWorktree },
+      ]) }],
+    })
+
+    const result = await coordinator.reconcileWorktree({
+      userId: USER_ID,
+      repoRoot: REPO_ROOT,
+      scope: SCOPE,
+      worktreePath: WORKTREE_PATH,
+    })
+
+    expect(result.entries).toEqual([
+      {
+        repoRoot: REPO_ROOT,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        tabs: [
+          workspacePaneStaticTabEntry('status'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-currentcurrentcurrentcu1'),
+        ],
+      },
+      {
+        repoRoot: REPO_ROOT,
+        branchName: otherBranch,
+        worktreePath: otherWorktree,
+        tabs: [
+          workspacePaneStaticTabEntry('status'),
+          workspacePaneRuntimeTabEntry('terminal', 'term-otherotherotherotherot1'),
+        ],
+      },
+    ])
   })
 
   test('does not mutate workspace tabs when update canonicalization fails', async () => {

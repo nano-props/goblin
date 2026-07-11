@@ -196,6 +196,9 @@ export type RepoRuntimeMembershipRecoveryResult =
   | { kind: 'superseded' }
 
 type SettledRepoRuntimeMembershipRecovery = Extract<RepoRuntimeMembershipRecoveryResult, { kind: 'settled' }>
+type ReconciledRepoRuntimeMembershipRecovery = RepoRuntimeMembershipRecoveryResult & {
+  remoteEnsureTargets?: Array<{ repoRoot: string; repoRuntimeId: string }>
+}
 
 /**
  * Re-declares this window's complete repo membership after realtime recovery,
@@ -206,15 +209,27 @@ export async function reconcileOpenRepoRuntimeMemberships(
   set: ReposSet,
   get: ReposGet,
 ): Promise<RepoRuntimeMembershipRecoveryResult> {
-  return await runExclusiveRepoRuntimeMembershipCommand(
+  const recovery = await runExclusiveRepoRuntimeMembershipCommand(
     async () => await reconcileOpenRepoRuntimeMembershipsNow(set, get),
   )
+  if (recovery.kind === 'superseded') return recovery
+  void Promise.all(
+    (recovery.remoteEnsureTargets ?? []).map(async (target) => {
+      await runRemoteRepoConnection(set, get, target.repoRoot, {
+        repoRuntimeId: target.repoRuntimeId,
+        mode: 'ensure',
+      })
+    }),
+  ).catch((err) => {
+    reposLog.warn('failed to ensure remote lifecycle after runtime membership recovery', { err })
+  })
+  return { kind: 'settled', targets: recovery.targets, changedTargets: recovery.changedTargets }
 }
 
 async function reconcileOpenRepoRuntimeMembershipsNow(
   set: ReposSet,
   get: ReposGet,
-): Promise<RepoRuntimeMembershipRecoveryResult> {
+): Promise<ReconciledRepoRuntimeMembershipRecovery> {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const capturedRecovery = await reconcileCapturedRepoRuntimeMemberships(set, get)
     const currentRoots = Object.keys(get().repos)
@@ -223,6 +238,7 @@ async function reconcileOpenRepoRuntimeMembershipsNow(
         kind: 'settled',
         targets: capturedRecovery.targets,
         changedTargets: capturedRecovery.changedTargets,
+        remoteEnsureTargets: capturedRecovery.remoteEnsureTargets,
       }
     }
   }
@@ -232,7 +248,10 @@ async function reconcileOpenRepoRuntimeMembershipsNow(
 async function reconcileCapturedRepoRuntimeMemberships(
   set: ReposSet,
   get: ReposGet,
-): Promise<SettledRepoRuntimeMembershipRecovery & { declaredRepoRoots: string[] }> {
+): Promise<SettledRepoRuntimeMembershipRecovery & {
+  declaredRepoRoots: string[]
+  remoteEnsureTargets: Array<{ repoRoot: string; repoRuntimeId: string }>
+}> {
   const captured = Object.values(get().repos).map((repo) => ({
     repoRoot: repo.id,
     repoRuntimeId: repo.repoRuntimeId,
@@ -269,17 +288,6 @@ async function reconcileCapturedRepoRuntimeMemberships(
   await replaceRepoRuntimeCache({ runtimes: response.runtimes })
   acceptRemoteLifecycleSnapshot(set, get, { runtimes: response.runtimes })
 
-  await Promise.all(
-    changedTargets
-      .filter((target) =>
-        isRemoteRepoId(target.repoRoot) &&
-        ['idle', 'connecting'].includes(runtimeByRoot.get(target.repoRoot)?.remoteLifecycle?.kind ?? '')
-      )
-      .map(async (target) => {
-        await runRemoteRepoConnection(set, get, target.repoRoot, { mode: 'ensure' })
-      }),
-  )
-
   return {
     kind: 'settled',
     targets: captured.flatMap(({ repoRoot }) => {
@@ -288,6 +296,19 @@ async function reconcileCapturedRepoRuntimeMemberships(
     }),
     changedTargets,
     declaredRepoRoots: captured.map((entry) => entry.repoRoot),
+    remoteEnsureTargets: captured.flatMap(({ repoRoot }) => {
+      const runtime = runtimeByRoot.get(repoRoot)
+      const currentRepoRuntimeId = get().repos[repoRoot]?.repoRuntimeId
+      if (
+        !runtime ||
+        !isRemoteRepoId(repoRoot) ||
+        currentRepoRuntimeId !== runtime.repoRuntimeId ||
+        !['idle', 'connecting'].includes(runtime.remoteLifecycle?.kind ?? '')
+      ) {
+        return []
+      }
+      return [{ repoRoot, repoRuntimeId: runtime.repoRuntimeId }]
+    }),
   }
 }
 

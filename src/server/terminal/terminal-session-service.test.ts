@@ -1122,7 +1122,10 @@ function createService(options: {
   const workspaceTabsCoordinator = createWorkspacePaneTabsCoordinator({
     workspaceTabs: options.workspaceTabs,
     worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
-    runtimeProviders: [terminalWorkspacePaneRuntimeTabsProvider(manager)],
+    runtimeProviders: [terminalWorkspacePaneRuntimeTabsProvider(manager, async () => ({
+      revision: 7,
+      sessions: await (typeof options.sessions === 'function' ? options.sessions() : options.sessions),
+    }))],
     physicalWorktrees: testPhysicalWorktrees,
   })
   return createTerminalSessionService({

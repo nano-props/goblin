@@ -22,6 +22,7 @@ describe('workspace pane runtime tabs projection', () => {
       entries,
       providerSnapshots: [{
         type: 'terminal',
+        revision: 0,
         liveSessions: [{ sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH }],
       }],
     })).toEqual([{

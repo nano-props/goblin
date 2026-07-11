@@ -66,12 +66,15 @@ Realtime recovery:
    authority; repo runtime code does not poll or infer browser lifecycle.
 2. When the last socket for a `clientId` disappears, the server captures the
    client's current membership generations and starts a grace timer.
-3. Reconnect cancels the timer. Expiry releases only the captured generations,
+3. An HTTP acquire made before the first realtime connection starts the same
+   grace timer immediately. First online presence claims the membership and
+   cancels this orphan-admission lease.
+4. Reconnect cancels the timer. Expiry releases only the captured generations,
    so a later HTTP acquire cannot be removed by an old disconnect timer.
-4. After reconnect, the window submits its complete current repo set through
+5. After reconnect, the window submits its complete current repo set through
    one batch reconcile command. The server replaces only that client's
    memberships and returns canonical runtime ids.
-5. The client commits changed runtime ids atomically, resets transient
+6. The client commits changed runtime ids atomically, resets transient
    epoch-owned state, and only then recovers remote lifecycle, terminals and
    workspace tabs with the new scopes.
 

@@ -32,6 +32,7 @@ export interface WorkspacePaneRuntimeTabsProjectionSession {
 
 export interface WorkspacePaneRuntimeTabsProviderSnapshot {
   type: WorkspacePaneRuntimeTabType
+  revision: number
   liveSessions: readonly WorkspacePaneRuntimeTabsProviderSnapshotSession[]
 }
 

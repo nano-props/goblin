@@ -32,6 +32,13 @@ beforeEach(() => {
 })
 
 describe('workspace pane tabs revisioned query cache', () => {
+  test('accepts an identical same-revision snapshot as current', () => {
+    const queryClient = new QueryClient()
+    const current = snapshot(4, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])])
+    expect(writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, REPO_RUNTIME_ID, current, queryClient)).toBe(true)
+    expect(writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, REPO_RUNTIME_ID, current, queryClient)).toBe(true)
+  })
+
   test('normalizes the complete snapshot and keeps no-worktree targets static-only', () => {
     const queryClient = new QueryClient()
     const accepted = writeWorkspacePaneTabsSnapshotQueryData(

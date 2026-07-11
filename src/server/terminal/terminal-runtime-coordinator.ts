@@ -3,6 +3,7 @@ import { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import {
   captureRepoRuntimeMembershipLease,
   expireRepoRuntimeMembershipLease,
+  onRepoRuntimeMembershipAcquired,
 } from '#/server/modules/repo-runtimes.ts'
 import type { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
@@ -42,12 +43,7 @@ export function createTerminalRuntimeCoordinator(
         detachedUsers.cancel(event.userId)
         detachedClients.cancel(clientKey)
       } else {
-        const lease = captureRepoRuntimeMembershipLease(event.userId, event.clientId)
-        detachedClients.schedule(
-          clientKey,
-          () => broker.isClientOnline(event.userId, event.clientId),
-          () => expireRepoRuntimeMembershipLease(lease),
-        )
+        scheduleRepoRuntimeMembershipExpiry(event.userId, event.clientId)
       }
       manager.handleClientPresenceChanged(event.userId, event.clientId, event.previousOnline)
     },
@@ -65,6 +61,14 @@ export function createTerminalRuntimeCoordinator(
       }
     },
   })
+  const unsubscribeMembershipAcquired = onRepoRuntimeMembershipAcquired(({ userId, clientId }) => {
+    const clientKey = repoRuntimeClientLeaseKey(userId, clientId)
+    if (broker.isClientOnline(userId, clientId)) {
+      detachedClients.cancel(clientKey)
+      return
+    }
+    scheduleRepoRuntimeMembershipExpiry(userId, clientId)
+  })
 
   return {
     broker,
@@ -73,6 +77,7 @@ export function createTerminalRuntimeCoordinator(
       // and schedule detached-user timers. Stop those timers after the broker
       // drain so runtime shutdown cannot leave a 24h cleanup timeout behind.
       broker.disconnectAll()
+      unsubscribeMembershipAcquired()
       detachedUsers.shutdown()
       detachedClients.shutdown()
     },
@@ -81,6 +86,15 @@ export function createTerminalRuntimeCoordinator(
   async function closeDetachedUserRuntime(userId: string): Promise<void> {
     if (!(await manager.closeSessionsForUser(userId))) return
     await workspaceTabsCoordinator.closeUser({ userId })
+  }
+
+  function scheduleRepoRuntimeMembershipExpiry(userId: string, clientId: string): void {
+    const lease = captureRepoRuntimeMembershipLease(userId, clientId)
+    detachedClients.schedule(
+      repoRuntimeClientLeaseKey(userId, clientId),
+      () => broker.isClientOnline(userId, clientId),
+      () => expireRepoRuntimeMembershipLease(lease),
+    )
   }
 }
 
