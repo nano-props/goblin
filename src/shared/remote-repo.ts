@@ -190,6 +190,13 @@ export type RemoteRepoConnectionLifecycle =
   | { kind: 'ready'; target: RemoteRepoTarget }
   | { kind: 'failed'; reason: RemoteRepoFailureReason; target?: RemoteRepoTarget }
 
+/** Authoritative lifecycle owned by one server repo-runtime generation. */
+export type RemoteRepoRuntimeLifecycle =
+  | { kind: 'idle'; attemptId: number }
+  | { kind: 'connecting'; attemptId: number }
+  | { kind: 'ready'; attemptId: number; target: RemoteRepoTarget }
+  | { kind: 'failed'; attemptId: number; reason: RemoteRepoFailureReason; target?: RemoteRepoTarget }
+
 /** Narrow a lifecycle to its concrete target, if any. */
 export function remoteRepoConnectionTarget(
   lifecycle: RemoteRepoConnectionLifecycle | null | undefined,

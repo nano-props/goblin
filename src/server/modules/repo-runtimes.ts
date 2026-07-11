@@ -1,8 +1,14 @@
 import { createOpaqueId } from '#/shared/opaque-id.ts'
 import { serverLogger } from '#/server/logger.ts'
+import type {
+  RemoteRepoConnectionResult,
+  RemoteRepoRuntimeLifecycle,
+} from '#/shared/remote-repo.ts'
 
 interface RepoRuntimeState {
   currentRepoRuntimeId: string | null
+  remoteLifecycle: RemoteRepoRuntimeLifecycle
+  remoteAttemptController: AbortController | null
 }
 
 export interface RepoRuntimeClosedEvent {
@@ -32,7 +38,11 @@ function repoRuntimeState(userId: string, repoRoot: string): RepoRuntimeState {
   const byRepo = repoRuntimeStateByUser(userId)
   const existing = byRepo.get(repoRoot)
   if (existing) return existing
-  const created: RepoRuntimeState = { currentRepoRuntimeId: null }
+  const created: RepoRuntimeState = {
+    currentRepoRuntimeId: null,
+    remoteLifecycle: { kind: 'idle', attemptId: 0 },
+    remoteAttemptController: null,
+  }
   byRepo.set(repoRoot, created)
   return created
 }
@@ -42,7 +52,10 @@ export function openRepoRuntime(userId: string, repoRoot: string): string {
   const state = repoRuntimeState(userId, repoRoot)
   const previousRepoRuntimeId = state.currentRepoRuntimeId
   const repoRuntimeId = createOpaqueId('repo-runtime')
+  state.remoteAttemptController?.abort()
   state.currentRepoRuntimeId = repoRuntimeId
+  state.remoteLifecycle = { kind: 'idle', attemptId: 0 }
+  state.remoteAttemptController = null
   if (previousRepoRuntimeId) emitRepoRuntimeClosed({ userId, repoRoot, repoRuntimeId: previousRepoRuntimeId })
   return repoRuntimeId
 }
@@ -60,7 +73,9 @@ export function closeRepoRuntime(userId: string, repoRoot: string, repoRuntimeId
   const state = repoRuntimesByUser.get(userId)?.get(repoRoot)
   if (!state) return false
   if (state.currentRepoRuntimeId !== repoRuntimeId) return false
+  state.remoteAttemptController?.abort()
   state.currentRepoRuntimeId = null
+  state.remoteAttemptController = null
   emitRepoRuntimeClosed({ userId, repoRoot, repoRuntimeId })
   return true
 }
@@ -77,6 +92,71 @@ export function listRepoRuntimes(userId: string): RepoRuntimeEntry[] {
 
 export function isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean {
   return repoRuntimesByUser.get(userId)?.get(repoRoot)?.currentRepoRuntimeId === repoRuntimeId
+}
+
+export class StaleRepoRuntimeError extends Error {
+  constructor() {
+    super('stale repo runtime')
+    this.name = 'StaleRepoRuntimeError'
+  }
+}
+
+export function getRepoRemoteLifecycle(
+  userId: string,
+  repoRoot: string,
+  repoRuntimeId: string,
+): RemoteRepoRuntimeLifecycle {
+  const state = repoRuntimesByUser.get(userId)?.get(repoRoot)
+  if (!state || state.currentRepoRuntimeId !== repoRuntimeId) throw new StaleRepoRuntimeError()
+  return state.remoteLifecycle
+}
+
+export async function runRepoRemoteLifecycle(
+  userId: string,
+  repoRoot: string,
+  repoRuntimeId: string,
+  resolve: (signal: AbortSignal) => Promise<RemoteRepoConnectionResult>,
+): Promise<RemoteRepoRuntimeLifecycle> {
+  const state = repoRuntimesByUser.get(userId)?.get(repoRoot)
+  if (!state || state.currentRepoRuntimeId !== repoRuntimeId) throw new StaleRepoRuntimeError()
+
+  state.remoteAttemptController?.abort()
+  const controller = new AbortController()
+  const attemptId = state.remoteLifecycle.attemptId + 1
+  state.remoteAttemptController = controller
+  state.remoteLifecycle = { kind: 'connecting', attemptId }
+
+  try {
+    const result = await resolve(controller.signal)
+    if (
+      state.currentRepoRuntimeId !== repoRuntimeId ||
+      state.remoteAttemptController !== controller ||
+      state.remoteLifecycle.attemptId !== attemptId
+    ) {
+      throw new StaleRepoRuntimeError()
+    }
+    state.remoteLifecycle =
+      result.kind === 'ready'
+        ? { kind: 'ready', attemptId, target: result.lifecycle.target }
+        : {
+            kind: 'failed',
+            attemptId,
+            reason: result.lifecycle.reason,
+            ...(result.lifecycle.target ? { target: result.lifecycle.target } : {}),
+          }
+    return state.remoteLifecycle
+  } catch (error) {
+    if (
+      state.currentRepoRuntimeId !== repoRuntimeId ||
+      state.remoteAttemptController !== controller ||
+      state.remoteLifecycle.attemptId !== attemptId
+    ) {
+      throw new StaleRepoRuntimeError()
+    }
+    throw error
+  } finally {
+    if (state.remoteAttemptController === controller) state.remoteAttemptController = null
+  }
 }
 
 export function clearRepoRuntimesForUser(userId: string): void {
