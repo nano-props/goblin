@@ -138,6 +138,32 @@ describe('app menu actions', () => {
     expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, { type: 'open-repo-requested' })
   })
 
+  test('ignores close commands when no window exists', async () => {
+    const { buildAppMenu } = await import('#/main/menu.ts')
+    buildAppMenu()
+
+    clickMenuItem('menu.file', 'menu.file.close-workspace-tab-or-window')
+    clickMenuItem('menu.file', 'menu.file.close-tab')
+    await Promise.resolve()
+
+    expect(mocks.activatePrimaryWindow).not.toHaveBeenCalled()
+    expect(mocks.sendClientEffectIntent).not.toHaveBeenCalled()
+  })
+
+  test('sends close workspace tab or window to an existing window', async () => {
+    mocks.getPrimaryWindow.mockReturnValue(mocks.win)
+    const { buildAppMenu } = await import('#/main/menu.ts')
+    buildAppMenu()
+
+    clickMenuItem('menu.file', 'menu.file.close-workspace-tab-or-window')
+    await Promise.resolve()
+
+    expect(mocks.activatePrimaryWindow).not.toHaveBeenCalled()
+    expect(mocks.sendClientEffectIntent).toHaveBeenCalledWith(mocks.win, {
+      type: 'workspace-pane-close-tab-or-window-requested',
+    })
+  })
+
   test('sends the path dialog action from the file menu', async () => {
     mocks.getPrimaryWindow.mockReturnValue(mocks.win)
     const { buildAppMenu } = await import('#/main/menu.ts')
