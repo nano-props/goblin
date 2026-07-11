@@ -1284,8 +1284,8 @@ function navigationWithStore(
     currentRepoId: REPO_ID,
     order: [REPO_ID],
     closeRepo: store.closeRepo,
-    goBackInWorkspaceNavigation: store.goBackInWorkspaceNavigation,
-    goForwardInWorkspaceNavigation: store.goForwardInWorkspaceNavigation,
+    peekWorkspaceNavigation: store.peekWorkspaceNavigation,
+    commitWorkspaceNavigation: store.commitWorkspaceNavigation,
     routeNavigation: routeNavigationOverrides,
   })
   const commitRoute = navigation.commitRepoBranchWorkspacePaneRoute

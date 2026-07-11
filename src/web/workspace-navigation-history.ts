@@ -222,41 +222,50 @@ export function restoreWorkspaceNavigationEntry(
   entry: WorkspaceNavigationHistoryEntry,
   routeNavigation: PrimaryWindowRouteNavigation,
   options?: { presentationToken?: PrimaryWindowPresentationToken },
-): boolean {
-  if (workspaceNavigationEntryBlocksWorkspacePaneInteraction(entry)) return false
+): WorkspaceNavigationRestoreResult {
+  if (workspaceNavigationEntryBlocksWorkspacePaneInteraction(entry)) return { kind: 'blocked' }
   switch (entry.route.kind) {
     case 'empty':
       routeNavigation.openRepoRoot(entry.repoId, options)
-      return true
+      return { kind: 'accepted' }
     case 'dashboard':
       routeNavigation.openRepoDashboard(entry.repoId, options)
-      return true
+      return { kind: 'accepted' }
     case 'newWorktree':
       routeNavigation.openRepoNewWorktree(entry.repoId, { ...options, returnTo: entry.route.returnTo })
-      return true
+      return { kind: 'accepted' }
     case 'branch':
       if (entry.route.workspacePaneTab === 'terminal' && entry.route.terminalSessionId) {
-        return routeNavigation.openRepoBranchTerminal(
+        const accepted = routeNavigation.openRepoBranchTerminal(
           entry.repoId,
           entry.route.branchName,
           entry.route.terminalSessionId,
           options,
         )
+        return accepted ? { kind: 'accepted' } : { kind: 'unavailable' }
       }
       if (!entry.route.workspacePaneTab) {
-        return routeNavigation.openRepoBranch(entry.repoId, entry.route.branchName, options)
+        const accepted = routeNavigation.openRepoBranch(entry.repoId, entry.route.branchName, options)
+        return accepted ? { kind: 'accepted' } : { kind: 'unavailable' }
       }
       if (!isWorkspacePaneStaticTabType(entry.route.workspacePaneTab)) {
-        return routeNavigation.openRepoBranch(entry.repoId, entry.route.branchName, options)
+        const accepted = routeNavigation.openRepoBranch(entry.repoId, entry.route.branchName, options)
+        return accepted ? { kind: 'accepted' } : { kind: 'unavailable' }
       }
-      return routeNavigation.openRepoBranchTab(
+      const accepted = routeNavigation.openRepoBranchTab(
         entry.repoId,
         entry.route.branchName,
         entry.route.workspacePaneTab,
         options,
       )
+      return accepted ? { kind: 'accepted' } : { kind: 'unavailable' }
   }
 }
+
+export type WorkspaceNavigationRestoreResult =
+  | { kind: 'accepted' }
+  | { kind: 'blocked' }
+  | { kind: 'unavailable' }
 
 export function workspaceNavigationHistoryRestoreBlocked(repoId: string, direction: 'back' | 'forward'): boolean {
   const history = useReposStore.getState().navigationHistoryByRepo[repoId]
