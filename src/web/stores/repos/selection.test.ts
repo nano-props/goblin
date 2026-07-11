@@ -27,7 +27,7 @@ import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspa
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
-const REPO_ID = '/tmp/gbl-selection-test-repo'
+const REPO_ID = '/tmp/goblin-selection-test-repo'
 const ipcHandlers: Record<string, (input: any) => unknown> = {}
 
 function seedRepo(options: {

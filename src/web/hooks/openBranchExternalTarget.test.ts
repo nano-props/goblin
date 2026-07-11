@@ -17,7 +17,7 @@ vi.mock('#/web/repo-client.ts', () => ({
   openRepoUrl: mocks.openRepoUrl,
 }))
 
-const REPO_ID = '/tmp/gbl-open-upstream-test'
+const REPO_ID = '/tmp/goblin-open-upstream-test'
 
 beforeEach(() => {
   resetReposStore()

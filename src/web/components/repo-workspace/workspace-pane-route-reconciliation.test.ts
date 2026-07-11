@@ -7,9 +7,9 @@ import {
   workspacePaneRouteHistoryResolution,
 } from '#/web/components/repo-workspace/workspace-pane-route-reconciliation.ts'
 
-const REPO_ID = '/tmp/gbl-route-reconciliation-repo'
+const REPO_ID = '/tmp/goblin-route-reconciliation-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-test'
-const WORKTREE_PATH = '/tmp/gbl-route-reconciliation-worktree'
+const WORKTREE_PATH = '/tmp/goblin-route-reconciliation-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
 describe('workspace pane route reconciliation', () => {

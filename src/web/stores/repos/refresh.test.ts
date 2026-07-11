@@ -869,7 +869,7 @@ describe('projection refresh request ordering', () => {
   test('status projection refresh records data-load loading, success, and stale error state', async () => {
     const repoRuntimeId = seedRepo([branch('feature/a')])
     let resolveStatus!: (value: WorktreeStatus[]) => void
-    const status: WorktreeStatus[] = [{ path: '/tmp/gbl-test-repo', branch: 'feature/a', isMain: true, entries: [] }]
+    const status: WorktreeStatus[] = [{ path: '/tmp/goblin-test-repo', branch: 'feature/a', isMain: true, entries: [] }]
     ipcHandlers['repo.projection'] = () =>
       new Promise((resolve) => {
         resolveStatus = (status) =>

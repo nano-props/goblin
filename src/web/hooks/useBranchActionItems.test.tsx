@@ -122,7 +122,7 @@ describe('useBranchActionItems', () => {
 
     expect(mocks.dispatchShowWorkspacePaneStaticTabAction).toHaveBeenCalledWith(
       expect.objectContaining({
-        repoId: '/tmp/gbl-action-items',
+        repoId: '/tmp/goblin-action-items',
         branchName: 'feature/action-order',
         type: 'history',
         insertAfterIdentity: null,
@@ -167,7 +167,7 @@ function allVisibleCapabilities(): BranchActionCapabilities {
 
 function repo(): BranchActionRepo {
   return {
-    id: '/tmp/gbl-action-items',
+    id: '/tmp/goblin-action-items',
     repoRuntimeId: 'repo-runtime-test',
     branchModel: {
       currentBranch: 'main',
@@ -198,6 +198,6 @@ function branch(): RepoBranchState {
     lastCommitDate: '',
     lastCommitAuthor: '',
     tracking: 'origin/feature/action-order',
-    worktree: { path: '/tmp/gbl-action-items-worktree' },
+    worktree: { path: '/tmp/goblin-action-items-worktree' },
   }
 }

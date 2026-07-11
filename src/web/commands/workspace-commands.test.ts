@@ -71,9 +71,9 @@ vi.mock('sonner', () => ({
   },
 }))
 
-const REPO_ID = '/tmp/gbl-workspace-command-repo'
-const OTHER_REPO_ID = '/tmp/gbl-workspace-command-other-repo'
-const WORKTREE_PATH = '/tmp/gbl-workspace-command-worktree'
+const REPO_ID = '/tmp/goblin-workspace-command-repo'
+const OTHER_REPO_ID = '/tmp/goblin-workspace-command-other-repo'
+const WORKTREE_PATH = '/tmp/goblin-workspace-command-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 const requestVisibleRefresh = vi.mocked(requestVisibleRepoProjectionRefresh)
 
@@ -1338,7 +1338,7 @@ describe('workspace commands', () => {
   })
 
   test('close workspace tab command confirms against the original terminal when selection changes', async () => {
-    const otherWorktreePath = '/tmp/gbl-workspace-command-other-worktree'
+    const otherWorktreePath = '/tmp/goblin-workspace-command-other-worktree'
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [
@@ -1498,7 +1498,7 @@ describe('workspace commands', () => {
     const otherRepo = seedRepoWithReadModelForTest({
       id: OTHER_REPO_ID,
       branches: [
-        createRepoBranch('feature/worktree', { worktree: { path: '/tmp/gbl-workspace-command-other-worktree' } }),
+        createRepoBranch('feature/worktree', { worktree: { path: '/tmp/goblin-workspace-command-other-worktree' } }),
       ],
       currentBranchName: 'feature/worktree',
       preferredWorkspacePaneTab: 'terminal',

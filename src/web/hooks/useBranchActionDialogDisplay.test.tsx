@@ -34,8 +34,8 @@ import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import type { RepoServerOperationState } from '#/shared/api-types.ts'
 
-const REPO_ID = '/tmp/gbl-dialog-display-test'
-const OTHER_REPO_ID = '/tmp/gbl-dialog-display-test-other'
+const REPO_ID = '/tmp/goblin-dialog-display-test'
+const OTHER_REPO_ID = '/tmp/goblin-dialog-display-test-other'
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()

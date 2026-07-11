@@ -319,9 +319,9 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
   return { TerminalSession }
 })
 
-const REPO_ID = '/tmp/gbl-terminal-provider-repo'
+const REPO_ID = '/tmp/goblin-terminal-provider-repo'
 const BRANCH_NAME = 'feature/worktree'
-const WORKTREE_PATH = '/tmp/gbl-terminal-provider-worktree'
+const WORKTREE_PATH = '/tmp/goblin-terminal-provider-worktree'
 
 function terminalExitEvent(terminalSessionId: string): TerminalExitEvent {
   return {
@@ -934,7 +934,7 @@ describe('TerminalSessionProvider', () => {
         ['term-222222222222222222222', true, false],
       ])
       expect(notifyBell).toHaveBeenCalledWith({
-        title: 'gbl-terminal-provider-repo',
+        title: 'goblin-terminal-provider-repo',
         body: 'feature/worktree\n~/Developer/goblin — npm run dev',
         terminalSessionId: 'term-111111111111111111111',
         terminalWorktreeKey,
@@ -1005,7 +1005,7 @@ describe('TerminalSessionProvider', () => {
         ['term-222222222222222222222', true, false],
       ])
       expect(notifyBell).toHaveBeenCalledWith({
-        title: 'gbl-terminal-provider-repo',
+        title: 'goblin-terminal-provider-repo',
         body: 'feature/worktree\nzsh',
         terminalSessionId: 'term-111111111111111111111',
         terminalWorktreeKey,
@@ -1052,7 +1052,7 @@ describe('TerminalSessionProvider', () => {
         ['term-111111111111111111111', true],
       ])
       expect(notifyBell).toHaveBeenCalledWith({
-        title: 'gbl-terminal-provider-repo',
+        title: 'goblin-terminal-provider-repo',
         body: 'feature/worktree\nbuild running',
         terminalSessionId: 'term-111111111111111111111',
         terminalWorktreeKey,
@@ -1227,7 +1227,7 @@ describe('TerminalSessionProvider', () => {
       })
 
       expect(notifyBell).toHaveBeenLastCalledWith({
-        title: 'gbl-terminal-provider-repo',
+        title: 'goblin-terminal-provider-repo',
         body: 'feature/renamed\n~/Developer/goblin — npm run dev',
         terminalSessionId: 'term-111111111111111111111',
         terminalWorktreeKey,

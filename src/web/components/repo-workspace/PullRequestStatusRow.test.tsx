@@ -37,7 +37,7 @@ vi.mock('#/web/hooks/openBranchExternalTarget.ts', () => ({
 
 const openExternalMock = vi.mocked(openBranchExternalTarget)
 
-const REPO_ID = '/tmp/gbl-pr-row-test-repo'
+const REPO_ID = '/tmp/goblin-pr-row-test-repo'
 const BRANCH_NAME = 'feature/pr'
 
 beforeEach(() => {

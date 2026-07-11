@@ -1,7 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsSnapshot, WorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs.ts'
-import { gblLog } from '#/web/logger.ts'
+import { goblinLog } from '#/web/logger.ts'
 import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { writeWorkspacePaneTabsSnapshotQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
@@ -118,7 +118,7 @@ export function reportWorkspacePaneTabsFailure(input: {
       : typeof input.error === 'string'
         ? input.error
         : 'workspace pane tabs operation failed'
-  gblLog.warn(`workspace pane tabs ${input.operation} failed`, {
+  goblinLog.warn(`workspace pane tabs ${input.operation} failed`, {
     repoRoot: input.repoRoot,
     branchName: input.branchName,
     worktreePath: input.worktreePath,

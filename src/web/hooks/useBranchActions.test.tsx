@@ -45,7 +45,7 @@ vi.mock('#/web/app-shell-client.ts', () => ({
   openExternalUrl: mocks.openExternalUrl,
 }))
 
-const REPO_ID = '/tmp/gbl-use-branch-actions-test-repo'
+const REPO_ID = '/tmp/goblin-use-branch-actions-test-repo'
 
 describe('useBranchActions', () => {
   beforeEach(() => {

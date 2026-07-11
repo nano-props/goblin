@@ -23,7 +23,7 @@ describe('ssh config resolution', () => {
   beforeEach(() => {
     vi.resetModules()
     execaMock.mockReset()
-    tmpHome = mkdtempSync(path.join(os.tmpdir(), 'gbl-ssh-config-test-'))
+    tmpHome = mkdtempSync(path.join(os.tmpdir(), 'goblin-ssh-config-test-'))
     process.env.HOME = tmpHome
     mkdirSync(path.join(tmpHome, '.ssh'), { recursive: true })
   })

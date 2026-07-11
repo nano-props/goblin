@@ -65,7 +65,7 @@ export const ja: Record<DictKey, string> = {
   'menu.view.toggle-full-screen': 'フルスクリーンを切り替え',
   'menu.view.toggle-dev-tools': '開発者ツールを切替',
 
-  // ---- Menu — Window (gbl-specific) --------------------------------------
+  // ---- Menu — Window (goblin-specific) --------------------------------------
   'menu.window.next-repo': '次のリポジトリ',
   'menu.window.prev-repo': '前のリポジトリ',
   'menu.window.reset-window': 'ウィンドウをリセット',

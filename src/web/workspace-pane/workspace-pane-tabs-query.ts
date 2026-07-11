@@ -9,7 +9,7 @@ import {
 } from '#/shared/workspace-pane-tabs-target.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { defaultWorkspacePaneTabs, normalizeWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import { gblLog } from '#/web/logger.ts'
+import { goblinLog } from '#/web/logger.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
 
 export type WorkspacePaneTabsQueryData = WorkspacePaneTabsSnapshot
@@ -137,7 +137,7 @@ export function refreshWorkspacePaneTabs(
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
   void refreshWorkspacePaneTabsQueryData(repoRoot, repoRuntimeId, queryClient).catch((err) => {
-    gblLog.warn('workspace pane tabs refresh failed', { repoRoot, repoRuntimeId, err })
+    goblinLog.warn('workspace pane tabs refresh failed', { repoRoot, repoRuntimeId, err })
   })
 }
 

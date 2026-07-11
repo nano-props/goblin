@@ -31,7 +31,7 @@ export const log: ConsolaInstance = createConsola({
 
 // Add a new `xxxLog` here as modules are migrated off raw `console.*`.
 export const terminalLog = log.withTag('terminal')
-export const gblLog = log.withTag('gbl')
+export const goblinLog = log.withTag('goblin')
 export const settingsLog = log.withTag('settings')
 export const externalOpenLog = log.withTag('external-open')
 export const bootstrapLog = log.withTag('bootstrap')

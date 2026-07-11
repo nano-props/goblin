@@ -16,7 +16,7 @@ import {
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import type { RepoOperationsSnapshot, RepoServerOperationState } from '#/shared/api-types.ts'
 
-const REPO_ID = '/tmp/gbl-repo-activity-model'
+const REPO_ID = '/tmp/goblin-repo-activity-model'
 
 describe('repo activity model', () => {
   test('marks the primary refresh control busy from user server fetch operations', () => {

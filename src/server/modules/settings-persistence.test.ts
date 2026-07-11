@@ -16,7 +16,7 @@ afterEach(() => {
 })
 
 test('continues processing queued settings writes after a write failure', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-settings-persistence-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-settings-persistence-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
   const writeFileAtomic = vi

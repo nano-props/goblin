@@ -109,7 +109,7 @@ vi.mock('#/web/components/ConfirmDialog.tsx', () => ({
   },
 }))
 
-const REPO_ID = '/tmp/gbl-dialog-host-test'
+const REPO_ID = '/tmp/goblin-dialog-host-test'
 
 function setupRepo() {
   const worktreePath = '/tmp/dialog-host-worktree'
@@ -196,7 +196,7 @@ describe('BranchActionDialogHost', () => {
   test('regression: closeStaleDialogs clears any open dialog whose repo does not match the new active workspace', () => {
     // Repo A active, open removeConfirm for A/feature/x.
     const { repo: repoA, branch: branchA } = setupRepo()
-    const repoBId = '/tmp/gbl-other-repo'
+    const repoBId = '/tmp/goblin-other-repo'
     // Add repoB to the store alongside repoA via seedRepoWithReadModelForTest +
     // setState merge (seedRepoWithReadModelForTest alone would overwrite `repos`).
     seedRepoWithReadModelForTest({ id: repoBId, branches: [createRepoBranch('main')] })
@@ -337,7 +337,7 @@ describe('BranchActionDialogHost', () => {
     // `(currentRepoId, currentBranchName)`.
     const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
     const repoA = setupRepo().repo
-    const repoBId = '/tmp/gbl-other-repo'
+    const repoBId = '/tmp/goblin-other-repo'
     seedRepoWithReadModelForTest({ id: repoBId, branches: [createRepoBranch('main')] })
     act(() => {
       useReposStore.setState((state) => ({

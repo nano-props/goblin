@@ -68,7 +68,7 @@ export const en = {
   'menu.view.toggle-full-screen': 'Toggle Full Screen',
   'menu.view.toggle-dev-tools': 'Toggle Developer Tools',
 
-  // ---- Menu — Window (gbl-specific) ---------------------------------------
+  // ---- Menu — Window (goblin-specific) ---------------------------------------
   'menu.window.next-repo': 'Next Repository',
   'menu.window.prev-repo': 'Previous Repository',
   'menu.window.reset-window': 'Reset Window',

@@ -28,8 +28,8 @@ vi.mock('#/web/workspace-pane/workspace-pane-tab-open-action.ts', () => ({
   dispatchShowWorkspacePaneStaticTabAction: mocks.dispatchShowWorkspacePaneStaticTabAction,
 }))
 
-const REPO_ID = '/tmp/gbl-branch-view-test-repo'
-const WORKTREE_PATH = '/tmp/gbl-branch-view-test-worktree'
+const REPO_ID = '/tmp/goblin-branch-view-test-repo'
+const WORKTREE_PATH = '/tmp/goblin-branch-view-test-worktree'
 
 const navigation: PrimaryWindowNavigationActions = {
   activateRepo: vi.fn(),
