@@ -1,25 +1,54 @@
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { EventEmitter } from 'node:events'
 import { createServer } from 'node:net'
+import { PassThrough } from 'node:stream'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
-// embedded-server-lifecycle.ts imports `app` from `electron` at module load. In a
-// plain Node test environment, importing the `electron` package triggers a
-// download of the Electron binary, which dominates this test's runtime. The
-// functions exercised here (parseServerPort, reserveEmbeddedServerPort) do not
-// touch `app`, so a minimal stub is enough to keep the import cheap.
+const mocks = vi.hoisted(() => ({
+  appExit: vi.fn(),
+  showErrorBox: vi.fn(),
+  spawn: vi.fn(),
+}))
+
+// The lifecycle runs inside Electron, but these tests exercise its process
+// boundary under plain Node. Keep the Electron surface observable and small:
+// app exit and the fatal dialog are the product outcomes asserted below.
 vi.mock('electron', () => ({
   app: {
     getAppPath: () => '/tmp',
     isPackaged: false,
     getPath: () => '/tmp',
+    exit: mocks.appExit,
   },
+  dialog: { showErrorBox: mocks.showErrorBox },
 }))
 
-const { DEFAULT_EMBEDDED_SERVER_PORT, parseServerPort, reserveEmbeddedServerPort } =
-  await import('#/main/embedded-server-lifecycle.ts')
+vi.mock('node:child_process', () => ({ spawn: mocks.spawn }))
+
+vi.mock('#/shared/access-token-file.ts', () => ({
+  readOrCreateAccessToken: vi.fn(async () => 'test-token'),
+}))
+
+const {
+  DEFAULT_EMBEDDED_SERVER_PORT,
+  getEmbeddedServerRuntime,
+  parseServerPort,
+  reserveEmbeddedServerPort,
+  startEmbeddedServer,
+  stopEmbeddedServer,
+} = await import('#/main/embedded-server-lifecycle.ts')
 
 const openServers: Array<ReturnType<typeof createServer>> = []
 
+beforeEach(() => {
+  vi.clearAllMocks()
+  vi.stubEnv('GOBLIN_ENABLE_EMBEDDED_SERVER', '1')
+})
+
 afterEach(async () => {
+  await stopEmbeddedServer('app-quit')
+  vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
   await Promise.all(
     openServers.splice(0).map(
       (server) =>
@@ -29,6 +58,30 @@ afterEach(async () => {
     ),
   )
 })
+
+function createServerChild() {
+  const child = new EventEmitter() as EventEmitter & {
+    pid: number
+    stdout: PassThrough
+    stderr: PassThrough
+    kill: ReturnType<typeof vi.fn>
+    emitExit(code: number | null, signal: NodeJS.Signals | null): void
+  }
+  let exited = false
+  child.pid = 4242
+  child.stdout = new PassThrough()
+  child.stderr = new PassThrough()
+  child.emitExit = (code, signal) => {
+    if (exited) return
+    exited = true
+    child.emit('exit', code, signal)
+  }
+  child.kill = vi.fn((signal: NodeJS.Signals = 'SIGTERM') => {
+    queueMicrotask(() => child.emitExit(null, signal))
+    return true
+  })
+  return child
+}
 
 async function reserveTestPort(): Promise<number> {
   const server = createServer()
@@ -67,5 +120,83 @@ describe('embedded server port selection', () => {
 
     expect(port).not.toBe(preferredPort)
     expect(port).toBeGreaterThan(0)
+  })
+})
+
+describe('embedded server process lifecycle', () => {
+  test('fails the native host when a ready server exits unexpectedly', async () => {
+    const child = createServerChild()
+    mocks.spawn.mockReturnValue(child)
+    mockFetch(() => ({ ok: true }))
+    await startEmbeddedServer()
+
+    child.stderr.write('Error: test server failure\n')
+    child.emitExit(1, null)
+
+    expect(getEmbeddedServerRuntime()).toBeNull()
+    expect(mocks.showErrorBox).toHaveBeenCalledWith('Goblin server stopped', expect.stringContaining('exit code 1'))
+    expect(mocks.showErrorBox).toHaveBeenCalledWith(
+      'Goblin server stopped',
+      expect.stringContaining('Error: test server failure'),
+    )
+    expect(mocks.appExit).toHaveBeenCalledWith(1)
+  })
+
+  test('does not fail the native host when the server is stopped intentionally', async () => {
+    const child = createServerChild()
+    mocks.spawn.mockReturnValue(child)
+    mockFetch(() => ({ ok: true }))
+    await startEmbeddedServer()
+
+    await stopEmbeddedServer('app-quit')
+
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM')
+    expect(mocks.showErrorBox).not.toHaveBeenCalled()
+    expect(mocks.appExit).not.toHaveBeenCalled()
+  })
+
+  test('reports startup failure without entering the ready-server fatal boundary', async () => {
+    const child = createServerChild()
+    mocks.spawn.mockReturnValue(child)
+    mockFetch(() => ({ ok: false }))
+    const starting = startEmbeddedServer()
+    await vi.waitFor(() => expect(mocks.spawn).toHaveBeenCalledTimes(1))
+
+    child.stderr.write('Error: startup failed\n')
+    child.emitExit(1, null)
+
+    await expect(starting).rejects.toThrow('Embedded server exited before becoming ready (exit code 1)')
+    expect(mocks.showErrorBox).not.toHaveBeenCalled()
+    expect(mocks.appExit).not.toHaveBeenCalled()
+  })
+
+  test('fails startup without entering the fatal boundary when the process cannot spawn', async () => {
+    const child = createServerChild()
+    mocks.spawn.mockReturnValue(child)
+    mockFetch(() => ({ ok: false }))
+    const starting = startEmbeddedServer()
+    await vi.waitFor(() => expect(mocks.spawn).toHaveBeenCalledTimes(1))
+
+    child.emit('error', new Error('spawn unavailable'))
+
+    await expect(starting).rejects.toThrow('spawn unavailable')
+    expect(getEmbeddedServerRuntime()).toBeNull()
+    expect(mocks.showErrorBox).not.toHaveBeenCalled()
+    expect(mocks.appExit).not.toHaveBeenCalled()
+  })
+
+  test('cancels an in-flight start when an intentional stop wins the race', async () => {
+    const child = createServerChild()
+    mocks.spawn.mockReturnValue(child)
+    mockFetch(() => ({ ok: false }))
+    const starting = startEmbeddedServer()
+    await vi.waitFor(() => expect(mocks.spawn).toHaveBeenCalledTimes(1))
+
+    await stopEmbeddedServer('app-quit')
+
+    await expect(starting).resolves.toBeNull()
+    expect(getEmbeddedServerRuntime()).toBeNull()
+    expect(mocks.showErrorBox).not.toHaveBeenCalled()
+    expect(mocks.appExit).not.toHaveBeenCalled()
   })
 })

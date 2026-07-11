@@ -742,6 +742,12 @@ export const en = {
   'help.row.this-help': 'This help',
   'help.row.dismiss': 'Dismiss overlay / leave focused non-text control',
 
+  // ---- Embedded server -----------------------------------------------------
+  'embedded-server.fatal-exit.title': 'Goblin server stopped',
+  'embedded-server.fatal-exit.body': 'The embedded server stopped unexpectedly ({exitDetail}). Restart Goblin.',
+  'embedded-server.fatal-exit.body-with-detail':
+    'The embedded server stopped unexpectedly ({exitDetail}). Restart Goblin.\n\nLast server error:\n{stderr}',
+
   // ---- Generic dialog -----------------------------------------------------
   'dialog.cancel': 'Cancel',
   'dialog.close': 'Close (Esc)',

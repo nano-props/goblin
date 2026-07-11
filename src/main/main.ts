@@ -96,7 +96,7 @@ async function finalizeNativeHostExit(): Promise<void> {
     }
     const windowStateFlushed = await flushWindowState()
     if (!windowStateFlushed) windowStateNodeLog.error('final flush failed before quit')
-    await stopEmbeddedServer()
+    await stopEmbeddedServer('app-quit')
   } finally {
     unregisterAppShortcuts()
     app.exit(0)
