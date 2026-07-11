@@ -727,6 +727,13 @@ export const ko: Record<DictKey, string> = {
   'help.row.this-help': '이 도움말',
   'help.row.dismiss': '오버레이 닫기 / 포커스된 비텍스트 컨트롤 나가기',
 
+  // ---- Embedded server -----------------------------------------------------
+  'embedded-server.fatal-exit.title': 'Goblin 서버가 중지됨',
+  'embedded-server.fatal-exit.body':
+    '내장 서버가 예기치 않게 중지되었습니다 ({exitDetail}). Goblin 을(를) 다시 시작하세요.',
+  'embedded-server.fatal-exit.body-with-detail':
+    '내장 서버가 예기치 않게 중지되었습니다 ({exitDetail}). Goblin 을(를) 다시 시작하세요.\n\n마지막 서버 오류:\n{stderr}',
+
   // ---- Generic dialog ----------------------------------------------------
   'dialog.cancel': '취소',
   'dialog.close': '닫기 (Esc)',

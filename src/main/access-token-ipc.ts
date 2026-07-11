@@ -60,7 +60,7 @@ async function doRotate(): Promise<{ accessToken: string }> {
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
   }
-  await stopEmbeddedServer()
+  await stopEmbeddedServer('access-token-rotation')
   await startEmbeddedServer()
   // After the server is back up, read the freshly written file so
   // the value we return is the one the running server is using.

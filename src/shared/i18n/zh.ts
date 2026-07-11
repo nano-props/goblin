@@ -707,6 +707,12 @@ export const zh: Record<DictKey, string> = {
   'help.row.this-help': '当前帮助',
   'help.row.dismiss': '关闭弹层 / 退出当前非文本控件',
 
+  // ---- Embedded server -----------------------------------------------------
+  'embedded-server.fatal-exit.title': 'Goblin 服务器已停止',
+  'embedded-server.fatal-exit.body': '嵌入式服务器意外停止 ({exitDetail})。请重新启动 Goblin。',
+  'embedded-server.fatal-exit.body-with-detail':
+    '嵌入式服务器意外停止 ({exitDetail})。请重新启动 Goblin。\n\n最后一次服务器错误：\n{stderr}',
+
   // ---- Generic dialog ----------------------------------------------------
   'dialog.cancel': '取消',
   'dialog.close': '关闭 (Esc)',

@@ -735,6 +735,13 @@ export const ja: Record<DictKey, string> = {
   'help.row.this-help': 'このヘルプ',
   'help.row.dismiss': 'オーバーレイを閉じる / フォーカス中の非テキストコントロールを抜ける',
 
+  // ---- Embedded server -----------------------------------------------------
+  'embedded-server.fatal-exit.title': 'Goblin サーバーが停止しました',
+  'embedded-server.fatal-exit.body':
+    '組み込みサーバーが予期せず停止しました ({exitDetail})。Goblin を再起動してください。',
+  'embedded-server.fatal-exit.body-with-detail':
+    '組み込みサーバーが予期せず停止しました ({exitDetail})。Goblin を再起動してください。\n\nサーバーエラー:\n{stderr}',
+
   // ---- Generic dialog ----------------------------------------------------
   'dialog.cancel': 'キャンセル',
   'dialog.close': '閉じる (Esc)',
