@@ -4,7 +4,7 @@ import { runExclusiveOperation, runLatestOperation } from '#/web/stores/repos/op
 import { repoOperation, repoOperationBusy } from '#/web/stores/repos/repo-operation-scheduler.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { resetReposStore, seedRepoShellForTest } from '#/web/test-utils/bridge.ts'
-const REPO_ID = '/tmp/gbl-operation-runner-test-repo'
+const REPO_ID = '/tmp/goblin-operation-runner-test-repo'
 
 beforeEach(() => {
   resetReposStore()

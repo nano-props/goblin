@@ -8,7 +8,7 @@ import {
   seedRepoWithReadModelForTest,
   type IpcTestHandler,
 } from '#/web/test-utils/bridge.ts'
-export const REPO_ID = '/tmp/gbl-test-repo'
+export const REPO_ID = '/tmp/goblin-test-repo'
 export const ipcHandlers: Record<string, IpcTestHandler> = {}
 export const pullRequest = createPullRequest
 

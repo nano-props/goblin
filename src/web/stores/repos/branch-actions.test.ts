@@ -22,7 +22,7 @@ import type { BranchViewMode } from '#/web/stores/repos/types.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { repoProjection } from '#/web/stores/repos/refresh-test-utils.ts'
-const REPO_ID = '/tmp/gbl-branch-actions-test-repo'
+const REPO_ID = '/tmp/goblin-branch-actions-test-repo'
 const refreshStoreAccess = { get: useReposStore.getState, set: useReposStore.setState }
 
 function branchBrowserRemoteProvider(
@@ -83,7 +83,7 @@ function createWorktreeAction(): Extract<RepoBranchAction, { kind: 'createWorktr
   return {
     kind: 'createWorktree',
     input: {
-      worktreePath: '/tmp/gbl-branch-actions-test-worktree',
+      worktreePath: '/tmp/goblin-branch-actions-test-worktree',
       mode: { kind: 'newBranch', newBranch: 'feature/new', baseRef: 'feature/a' },
     },
     worktreeBootstrap: { kind: 'skip' },
@@ -95,7 +95,7 @@ function installSuccessfulCreateWorktreeBridge(options?: { onSnapshot?: () => vo
     branches: [
       createBranchSnapshot('feature/a'),
       createBranchSnapshot('feature/b'),
-      createBranchSnapshot('feature/new', { worktree: { path: '/tmp/gbl-branch-actions-test-worktree' } }),
+      createBranchSnapshot('feature/new', { worktree: { path: '/tmp/goblin-branch-actions-test-worktree' } }),
     ],
     current: 'feature/a',
   }
@@ -111,9 +111,9 @@ function installSuccessfulCreateWorktreeBridge(options?: { onSnapshot?: () => vo
 function installSuccessfulCreateWorktreeBridgeWithExistingWorktree(options?: { onSnapshot?: () => void }) {
   const snapshot = {
     branches: [
-      createBranchSnapshot('feature/a', { worktree: { path: '/tmp/gbl-branch-actions-test-repo' } }),
+      createBranchSnapshot('feature/a', { worktree: { path: '/tmp/goblin-branch-actions-test-repo' } }),
       createBranchSnapshot('feature/b'),
-      createBranchSnapshot('feature/new', { worktree: { path: '/tmp/gbl-branch-actions-test-worktree' } }),
+      createBranchSnapshot('feature/new', { worktree: { path: '/tmp/goblin-branch-actions-test-worktree' } }),
     ],
     current: 'feature/a',
   }
@@ -128,7 +128,7 @@ function installSuccessfulCreateWorktreeBridgeWithExistingWorktree(options?: { o
 
 describe('branch action capabilities', () => {
   test('gates remote-only actions when a repo transitions to local-only', () => {
-    const branch = createRepoBranch('feature/local', { worktree: { path: '/tmp/gbl-branch-actions-test-worktree' } })
+    const branch = createRepoBranch('feature/local', { worktree: { path: '/tmp/goblin-branch-actions-test-worktree' } })
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [branch],
@@ -184,7 +184,7 @@ describe('branch action capabilities', () => {
   })
 
   test('allows removing the current branch when it belongs to a linked worktree', () => {
-    const worktreePath = '/tmp/gbl-current-linked-worktree'
+    const worktreePath = '/tmp/goblin-current-linked-worktree'
     const branch = createRepoBranch('feature/current-linked', { worktree: { path: worktreePath } })
     const repo = seedRepoWithReadModelForTest({
       id: worktreePath,
@@ -595,7 +595,7 @@ describe('runBranchAction', () => {
       {
         kind: 'removeWorktree',
         branch: 'feature/a',
-        worktreePath: '/tmp/gbl-branch-actions-test-worktree',
+        worktreePath: '/tmp/goblin-branch-actions-test-worktree',
         alsoDeleteBranch: false,
       },
       'repo.removeWorktree',
@@ -717,7 +717,7 @@ describe('runBranchAction', () => {
       action: {
         kind: 'createWorktree',
         branch: 'feature/new',
-        worktreePath: '/tmp/gbl-branch-actions-test-worktree',
+        worktreePath: '/tmp/goblin-branch-actions-test-worktree',
       },
     })
   })
@@ -823,7 +823,7 @@ describe('runBranchAction', () => {
         repoProjection({
           branches: [
             createBranchSnapshot('feature/a'),
-            createBranchSnapshot('feature/new', { worktree: { path: '/tmp/gbl-branch-actions-test-worktree' } }),
+            createBranchSnapshot('feature/new', { worktree: { path: '/tmp/goblin-branch-actions-test-worktree' } }),
           ],
           current: 'feature/a',
         }),

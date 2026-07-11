@@ -14,7 +14,7 @@ afterEach(() => {
 })
 
 test('returns the default window state when window-state.json is missing', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-window-state-test-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-window-state-test-'))
   vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
   const windowState = await import('#/main/window-state.ts')
 
@@ -24,7 +24,7 @@ test('returns the default window state when window-state.json is missing', async
 })
 
 test('persists window bounds to window-state.json', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-window-state-test-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-window-state-test-'))
   vi.doMock('electron', () => ({ app: { getPath: () => tmp! } }))
   const windowState = await import('#/main/window-state.ts')
 

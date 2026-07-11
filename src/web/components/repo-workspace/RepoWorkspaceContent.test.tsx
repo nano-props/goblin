@@ -74,7 +74,7 @@ vi.mock('#/web/filetree-client.ts', () => ({
   getRepositoryTree: filetreeClientMocks.getRepositoryTree,
   getRepositoryFileViewer: filetreeClientMocks.getRepositoryFileViewer,
 }))
-const REPO_ID = '/tmp/gbl-repo-workspace-content-repo'
+const REPO_ID = '/tmp/goblin-repo-workspace-content-repo'
 
 type RepoWorkspaceContentHarnessProps = Omit<ComponentProps<typeof RepoWorkspaceContent>, 'workspacePaneTabModel'> & {
   workspacePaneRouteMode?: 'preference-route' | 'bare-branch'

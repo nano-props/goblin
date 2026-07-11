@@ -21,7 +21,7 @@ afterEach(async () => {
 })
 
 test('initializes user-settings.json with defaults when no persisted settings exist', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
@@ -52,7 +52,7 @@ test('initializes user-settings.json with defaults when no persisted settings ex
 })
 
 test('persists updates and notifies subscribers from the server settings store', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
@@ -128,7 +128,7 @@ test('persists updates and notifies subscribers from the server settings store',
 })
 
 test('quarantines corrupt settings JSON before rebuilding defaults', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
   await writeFile(path.join(tmp, 'user-settings.json'), '{bad json', 'utf-8')
@@ -144,7 +144,7 @@ test('quarantines corrupt settings JSON before rebuilding defaults', async () =>
 })
 
 test('serializes concurrent settings mutations without dropping updates', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
@@ -165,7 +165,7 @@ test('serializes concurrent settings mutations without dropping updates', async 
 })
 
 test('updates repo-level worktree bootstrap trust by repo id', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
@@ -196,7 +196,7 @@ test('updates repo-level worktree bootstrap trust by repo id', async () => {
 })
 
 test('clears repo-level worktree bootstrap trust without dropping other repo settings', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
@@ -230,7 +230,7 @@ test('clears repo-level worktree bootstrap trust without dropping other repo set
 })
 
 test('clears empty repo settings entry when removing only worktree bootstrap trust', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
@@ -247,7 +247,7 @@ test('clears empty repo settings entry when removing only worktree bootstrap tru
 })
 
 test('normalizes target-scoped workspace pane tab preferences in server sessions', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
@@ -299,7 +299,7 @@ test('normalizes target-scoped workspace pane tab preferences in server sessions
 })
 
 test('normalizes workspace pane tab list in server sessions', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
@@ -357,7 +357,7 @@ test('normalizes workspace pane tab list in server sessions', async () => {
 })
 
 test('normalizes file tree view state in server sessions', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
@@ -413,7 +413,7 @@ test('normalizes file tree view state in server sessions', async () => {
 })
 
 test('records the most recent workspace external app per (repo, worktree)', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
@@ -466,7 +466,7 @@ test('records the most recent workspace external app per (repo, worktree)', asyn
 })
 
 test('overwrites an existing workspace external app recent on the same worktree key', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
@@ -496,7 +496,7 @@ test('overwrites an existing workspace external app recent on the same worktree 
 })
 
 test('skips the file rewrite when the workspace external app recent is already current', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
@@ -525,7 +525,7 @@ test('skips the file rewrite when the workspace external app recent is already c
 })
 
 test('rejects invalid workspace external app recent input without touching disk', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
@@ -564,7 +564,7 @@ function worktreeTargetKey(repoRoot: string, branchName: string, worktreePath: s
 }
 
 test('normalizer drops malformed workspace external app recent entries on load', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
@@ -610,7 +610,7 @@ test('normalizer drops malformed workspace external app recent entries on load',
 })
 
 test('setServerRepoWorkspaceExternalAppRecent silently drops unknown item ids without overwriting valid entries', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
@@ -643,7 +643,7 @@ test('setServerRepoWorkspaceExternalAppRecent silently drops unknown item ids wi
 })
 
 test('prunes removed-worktree settings without dropping repo-level trust', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 
@@ -689,7 +689,7 @@ test('prunes removed-worktree settings without dropping repo-level trust', async
 })
 
 test('prunes empty repo settings entries after removed-worktree cleanup', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-server-settings-'))
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
 

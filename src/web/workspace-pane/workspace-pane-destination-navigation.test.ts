@@ -26,9 +26,9 @@ import {
   registerPrimaryWindowNavigation,
 } from '#/web/primary-window-presentation.ts'
 
-const REPO_ID = '/tmp/gbl-destination-navigation-repo'
-const CURRENT_WORKTREE = '/tmp/gbl-destination-current-worktree'
-const DESTINATION_WORKTREE = '/tmp/gbl-destination-target-worktree'
+const REPO_ID = '/tmp/goblin-destination-navigation-repo'
+const CURRENT_WORKTREE = '/tmp/goblin-destination-current-worktree'
+const DESTINATION_WORKTREE = '/tmp/goblin-destination-target-worktree'
 const DESTINATION_ROUTE = { kind: 'static' as const, tab: 'status' as const }
 
 beforeEach(() => {
@@ -100,7 +100,7 @@ describe('workspace pane destination navigation', () => {
     seedRepoReadModelQueryData(repo, {
       branches: [
         createRepoBranch('feature/current', { worktree: { path: CURRENT_WORKTREE } }),
-        createRepoBranch('feature/destination', { worktree: { path: '/tmp/gbl-replaced-worktree' } }),
+        createRepoBranch('feature/destination', { worktree: { path: '/tmp/goblin-replaced-worktree' } }),
       ],
       currentBranch: 'feature/current',
     })

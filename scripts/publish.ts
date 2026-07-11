@@ -92,7 +92,7 @@ async function findAll(pattern: string, what: string, expected: number): Promise
 // single platform build, so the stash isn't strictly needed; keeping
 // the pattern means chaining multiple platforms later (CI matrix)
 // won't require restructuring.
-const stash = mkdtempSync(path.join(os.tmpdir(), 'gbl-publish-'))
+const stash = mkdtempSync(path.join(os.tmpdir(), 'goblin-publish-'))
 
 try {
   const isMac = process.platform === 'darwin'

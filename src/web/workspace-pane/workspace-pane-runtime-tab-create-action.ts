@@ -19,7 +19,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { refreshWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { gblLog } from '#/web/logger.ts'
+import { goblinLog } from '#/web/logger.ts'
 import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { recordWorkspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
@@ -194,7 +194,7 @@ async function applyCreatedTerminalWorkspacePaneRuntimeTabs(
     )
     return accepted ? 'accepted' : 'superseded'
   } catch (err) {
-    gblLog.warn('failed to apply application-returned workspace pane tabs', {
+    goblinLog.warn('failed to apply application-returned workspace pane tabs', {
       repoRoot: options.base.repoRoot,
       repoRuntimeId,
       branchName: options.base.branch,

@@ -113,8 +113,8 @@ vi.mock('sonner', () => ({
   },
 }))
 
-const REPO_ID = '/tmp/gbl-repo-workspace-toolbar-repo'
-const WORKTREE_PATH = '/tmp/gbl-repo-workspace-toolbar-worktree'
+const REPO_ID = '/tmp/goblin-repo-workspace-toolbar-repo'
+const WORKTREE_PATH = '/tmp/goblin-repo-workspace-toolbar-worktree'
 compactUi = false
 
 function defaultRuntimeExternalAppSettings() {
@@ -434,7 +434,7 @@ describe('RepoWorkspaceToolbar', () => {
   })
 
   test('reloads the scoped recent external app when the worktree path changes', async () => {
-    const nextWorktreePath = '/tmp/gbl-repo-workspace-toolbar-worktree-next'
+    const nextWorktreePath = '/tmp/goblin-repo-workspace-toolbar-worktree-next'
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],

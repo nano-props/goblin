@@ -13,7 +13,7 @@ afterEach(() => {
 
 describe('git', () => {
   test('times out promptly when git ignores SIGTERM', async () => {
-    tmp = mkdtempSync(path.join(os.tmpdir(), 'gbl-helper-test-'))
+    tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-helper-test-'))
     const bin = path.join(tmp, 'bin')
     mkdirSync(bin)
     const fakeGit = path.join(bin, 'git')

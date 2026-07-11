@@ -32,9 +32,9 @@ vi.mock('#/web/components/terminal/use-terminal-session-projection.ts', () => ({
   useTerminalSessionProjection: () => projectionMocks,
 }))
 
-const REPO_ID = '/tmp/gbl-runtime-provider-repo'
+const REPO_ID = '/tmp/goblin-runtime-provider-repo'
 const BRANCH_NAME = 'feature/worktree'
-const WORKTREE_PATH = '/tmp/gbl-runtime-provider-worktree'
+const WORKTREE_PATH = '/tmp/goblin-runtime-provider-worktree'
 
 type TestTerminalSessionSummary = Omit<
   TerminalSessionSummary,
@@ -480,8 +480,8 @@ function seedCurrentRepo() {
 function seedSecondRepo() {
   const current = useReposStore.getState()
   const secondRepo = seedRepoWithReadModelForTest({
-    id: '/tmp/gbl-runtime-provider-repo-2',
-    branches: [createRepoBranch('feature/other', { worktree: { path: '/tmp/gbl-runtime-provider-worktree-2' } })],
+    id: '/tmp/goblin-runtime-provider-repo-2',
+    branches: [createRepoBranch('feature/other', { worktree: { path: '/tmp/goblin-runtime-provider-worktree-2' } })],
     currentBranchName: 'feature/other',
     preferredWorkspacePaneTab: 'terminal',
     repoRuntimeId: 'repo-runtime-second',

@@ -346,7 +346,7 @@ describe('repo session hydration', () => {
     let active = 0
     let maxActive = 0
     const resolvers: Array<() => void> = []
-    const repos = Array.from({ length: 6 }, (_, index) => `/tmp/gbl-lifecycle-limit-${index}`)
+    const repos = Array.from({ length: 6 }, (_, index) => `/tmp/goblin-lifecycle-limit-${index}`)
     installGoblin({
       probe: async (path: string) => {
         active += 1
