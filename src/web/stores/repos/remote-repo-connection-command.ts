@@ -1,16 +1,11 @@
-import {
-  isRemoteRepoId,
-  type RemoteRepoFailureReason,
-  type RemoteRepoLifecycleCommandResult,
-  type RemoteRepoTarget,
-} from '#/shared/remote-repo.ts'
+import { isRemoteRepoId, type RemoteRepoFailureReason, type RemoteRepoLifecycleCommandResult, type RemoteRepoTarget } from '#/shared/remote-repo.ts'
 import { resolveRemoteRepoConnection } from '#/web/remote-client.ts'
-import { addResolvedRepo, addUnavailableRepo } from '#/web/stores/repos/repo-session-write-paths.ts'
+import { acceptRemoteLifecycleProjection } from '#/web/stores/repos/remote-lifecycle-projection.ts'
 import { requestRepoProjectionReadModelRefresh } from '#/web/stores/repos/refresh.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 
 interface RemoteRepoConnectionOutcome {
-  kind: 'ready' | 'failed'
+  kind: 'ready' | 'failed' | 'superseded' | 'stale-runtime'
   reason?: RemoteRepoFailureReason
   repoId: string
   name: string
@@ -18,6 +13,7 @@ interface RemoteRepoConnectionOutcome {
 }
 
 function commandOutcome(result: RemoteRepoLifecycleCommandResult): RemoteRepoConnectionOutcome {
+  if (result.kind !== 'settled') return { kind: result.kind, repoId: result.repoId, name: result.repoId }
   const lifecycle = result.lifecycle
   if (lifecycle.kind === 'ready') {
     return { kind: 'ready', repoId: result.repoId, name: result.name, target: lifecycle.target }
@@ -55,18 +51,16 @@ export async function runRemoteRepoConnection(
 
   const result = await resolveRemoteRepoConnection({ repoId, repoRuntimeId }, options.signal)
   const outcome = commandOutcome(result)
-  const current = get().repos[repoId]
-  if (!current || current.repoRuntimeId !== repoRuntimeId) return outcome
-
-  set((state) => {
-    if (outcome.kind === 'ready' && outcome.target) {
-      const next = addResolvedRepo(state, { id: outcome.repoId, name: outcome.name, target: outcome.target }, repoRuntimeId)
-      return next.changed ? { ...state, repos: next.repos, order: next.order } : state
+  if (result.kind === 'settled') {
+    const accepted = acceptRemoteLifecycleProjection(
+      set,
+      get,
+      { repoRoot: repoId, repoRuntimeId, remoteLifecycle: result.lifecycle },
+      { name: result.name },
+    )
+    if (accepted && result.lifecycle.kind === 'ready') {
+      void requestRepoProjectionReadModelRefresh({ get, set }, repoId, { repoRuntimeId })
     }
-    return addUnavailableRepo(state, outcome.repoId, outcome.reason ?? 'unknown', repoRuntimeId, outcome.target)
-  })
-  if (outcome.kind === 'ready') {
-    void requestRepoProjectionReadModelRefresh({ get, set }, repoId, { repoRuntimeId })
   }
   return outcome
 }

@@ -78,6 +78,8 @@ export interface RepoRemoteState {
    * instead of inferring target state from other remote fields.
    */
   lifecycle: RemoteRepoConnectionLifecycle | null
+  /** Highest server-owned remote attempt accepted into this window projection. */
+  lifecycleAttemptId: number | null
   remotes?: string[]
   remoteDetails?: GitRemoteInfo[]
   hasRemotes?: boolean

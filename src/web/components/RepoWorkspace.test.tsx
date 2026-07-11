@@ -864,7 +864,7 @@ describe('RepoWorkspace', () => {
           nextBranch,
         ) => {
           useReposStore.getState().setWorkspacePaneTab(repoId, nextBranch, null)
-          setTimeout(() => setRoute(null), 0)
+          setRoute(null)
           return true
         }
         const showRepoBranchWorkspacePaneTab: PrimaryWindowNavigationActions['showRepoBranchWorkspacePaneTab'] = (
@@ -873,7 +873,7 @@ describe('RepoWorkspace', () => {
           tab,
         ) => {
           useReposStore.getState().setWorkspacePaneTab(repoId, nextBranch, tab)
-          setTimeout(() => setRoute({ kind: 'static', tab }), 0)
+          setRoute({ kind: 'static', tab })
           return true
         }
         seedInitialObservedWorkspacePaneRouteForTest()

@@ -11,7 +11,6 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
-import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 
 beforeEach(() => {
   resetReposStore()
@@ -33,28 +32,6 @@ describe('repo projection read-model effects', () => {
       loadedAt,
     }
   }
-
-  test('projects the server-owned remote lifecycle for every accepted scope', () => {
-    const id = 'ssh-config://example/repo'
-    const repo = seedRepoShellForTest({ id, repoRuntimeId: 'repo-runtime-test-2' })
-    const target = normalizeRemoteTarget({
-      alias: 'example', host: 'example.test', user: 'developer', port: 22, remotePath: '/repo',
-    })!
-    const apply = (remoteLifecycle: NonNullable<RepoRuntimeProjection['remoteLifecycle']>) => {
-      acceptRepoProjectionReadModel(useReposStore.setState, useReposStore.getState, {
-        repoRoot: id,
-        repoRuntimeId: repo.repoRuntimeId,
-        projection: { ...acceptedProjection('feature/a', 'summary'), remoteLifecycle },
-      }, { scope: 'query-cache' })
-    }
-
-    apply({ kind: 'connecting', attemptId: 1 })
-    expect(useReposStore.getState().repos[id]?.remote.lifecycle).toEqual({ kind: 'connecting' })
-    apply({ kind: 'ready', attemptId: 1, target })
-    expect(useReposStore.getState().repos[id]?.remote.lifecycle).toEqual({ kind: 'ready', target })
-    apply({ kind: 'failed', attemptId: 2, reason: 'timeout', target })
-    expect(useReposStore.getState().repos[id]?.remote.lifecycle).toEqual({ kind: 'failed', reason: 'timeout', target })
-  })
 
   test('snapshot success persists snapshot cache without triggering pull request summary backfill', () => {
     installGoblinTestBridge({})

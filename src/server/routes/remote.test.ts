@@ -47,10 +47,55 @@ describe('remote lifecycle route', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({ repoId, name: 'repo', lifecycle: { kind: 'ready', attemptId: 1 } })
+    expect(await response.json()).toMatchObject({
+      kind: 'settled', repoId, name: 'repo', lifecycle: { kind: 'ready', attemptId: 1 },
+    })
     expect(mocks.publishInvalidation).toHaveBeenCalledTimes(2)
     expect(mocks.publishInvalidation).toHaveBeenNthCalledWith(1, 'user-test', {
-      repoId, query: 'repo-runtime',
+      repoId, query: 'remote-lifecycle',
     })
+  })
+
+  test('returns superseded instead of 500 when a newer attempt replaces the request', async () => {
+    const repoId = 'ssh-config://example/repo'
+    const repoRuntimeId = openRepoRuntime('user-test', repoId)
+    let releaseFirst!: (value: never) => void
+    mocks.resolveConnection
+      .mockImplementationOnce(() => new Promise((resolve) => { releaseFirst = resolve }))
+      .mockResolvedValueOnce({
+        kind: 'failed', repoId, name: 'repo', lifecycle: { kind: 'failed', reason: 'unreachable' },
+      })
+    const request = () => createRemoteRoutes().request(new Request('http://localhost/lifecycle', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ repoId, repoRuntimeId }),
+    }))
+
+    const first = request()
+    await vi.waitFor(() => expect(mocks.resolveConnection).toHaveBeenCalledTimes(1))
+    const second = await request()
+    releaseFirst(undefined as never)
+
+    expect(second.status).toBe(200)
+    expect(await second.json()).toMatchObject({ kind: 'settled' })
+    const firstResponse = await first
+    expect(firstResponse.status).toBe(200)
+    expect(await firstResponse.json()).toMatchObject({ kind: 'superseded', repoId })
+  })
+
+  test('returns stale-runtime instead of 500 for a closed generation', async () => {
+    const repoId = 'ssh-config://example/repo'
+    const staleRuntimeId = openRepoRuntime('user-test', repoId)
+    openRepoRuntime('user-test', repoId)
+    const response = await createRemoteRoutes().request(new Request('http://localhost/lifecycle', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ repoId, repoRuntimeId: staleRuntimeId }),
+    }))
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ kind: 'stale-runtime', repoId })
+    expect(mocks.resolveConnection).not.toHaveBeenCalled()
+    expect(mocks.publishInvalidation).not.toHaveBeenCalled()
   })
 })

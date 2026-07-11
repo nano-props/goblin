@@ -35,7 +35,6 @@ import {
   getOrOpenRepoRuntime,
   listRepoRuntimes,
   openRepoRuntime,
-  getRepoRemoteLifecycle,
 } from '#/server/modules/repo-runtimes.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import type { RepoLogResponse } from '#/shared/api-types.ts'
@@ -136,17 +135,10 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
     return c.json(result)
   })
   app.post('/projection', async (c) => {
-    const userId = userIdFromContext(c)
-    if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
-    const { cwd, repoRuntimeId, branch, mode } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.projection, c)
+    const { cwd, branch, mode } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.projection, c)
     return c.json(
       await readJsonOrThrow(
-        async () => {
-          const projection = await readRepoProjection(cwd, { branch, mode: mode ?? 'full', signal: c.req.raw.signal })
-          return repoRuntimeId
-            ? { ...projection, remoteLifecycle: getRepoRemoteLifecycle(userId, cwd, repoRuntimeId) }
-            : projection
-        },
+        () => readRepoProjection(cwd, { branch, mode: mode ?? 'full', signal: c.req.raw.signal }),
         'projection',
       ),
     )

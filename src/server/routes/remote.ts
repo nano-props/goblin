@@ -28,15 +28,26 @@ export function createRemoteRoutes() {
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
     const { repoId, repoRuntimeId } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.remoteLifecycle, c)
     let resultName = repoId
-    const command = runRepoRemoteLifecycle(userId, repoId, repoRuntimeId, async (attemptSignal) => {
-      const result = await resolveServerRemoteRepoConnection({ repoId }, attemptSignal)
-      resultName = result.name
-      return result
-    })
-    publishUserRepoQueryInvalidation(userId, { repoId, query: 'repo-runtime' })
-    const lifecycle = await command
-    publishUserRepoQueryInvalidation(userId, { repoId, query: 'repo-runtime' })
-    return c.json({ repoId, name: resultName, lifecycle } satisfies RemoteRepoLifecycleCommandResult)
+    const result = await runRepoRemoteLifecycle(
+      userId,
+      repoId,
+      repoRuntimeId,
+      async (attemptSignal) => {
+        const resolved = await resolveServerRemoteRepoConnection({ repoId }, attemptSignal)
+        resultName = resolved.name
+        return resolved
+      },
+      () => publishUserRepoQueryInvalidation(userId, { repoId, query: 'remote-lifecycle' }),
+    )
+    if (result.kind !== 'settled') {
+      return c.json({ kind: result.kind, repoId } satisfies RemoteRepoLifecycleCommandResult)
+    }
+    return c.json({
+      kind: 'settled',
+      repoId,
+      name: resultName,
+      lifecycle: result.lifecycle,
+    } satisfies RemoteRepoLifecycleCommandResult)
   })
   app.post('/path-suggestions', async (c) => {
     const { alias, remotePath, prefix } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.pathSuggestions, c)

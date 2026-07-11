@@ -4,6 +4,8 @@ import { invalidateRepoDataQueries, invalidateRepoRuntimeProjectionQueries } fro
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import { requestRepoRuntimeProjectionRefresh, type RepoRefreshStoreAccess } from '#/web/stores/repos/refresh.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
+import { refreshRepoRuntimes } from '#/web/repo-runtime-query.ts'
+import { acceptRemoteLifecycleSnapshot } from '#/web/stores/repos/remote-lifecycle-projection.ts'
 
 export interface RepoVisibleProjectionRefreshState {
   id: string
@@ -53,7 +55,12 @@ export async function handleRepoInvalidationRefresh(
 ): Promise<void> {
   const repoId = event.repoId
   const repo = store.get().repos[repoId]
-  if (!repo || repo.repoRuntimeId !== repoRuntimeId || isRepoUnavailable(repo)) return
+  if (!repo || repo.repoRuntimeId !== repoRuntimeId) return
+  if (event.query === 'remote-lifecycle') {
+    acceptRemoteLifecycleSnapshot(store.set, store.get, await refreshRepoRuntimes())
+    return
+  }
+  if (isRepoUnavailable(repo)) return
   if (event.query === 'repo-runtime') {
     invalidateRepoRuntimeProjectionQueries(repoId, repoRuntimeId)
     return

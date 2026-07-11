@@ -118,6 +118,7 @@ function createRepo(input: {
     projection: { source: 'fresh', savedAt: null },
     remote: {
       lifecycle: null,
+      lifecycleAttemptId: null,
       remotes: [],
       remoteDetails: [],
       hasRemotes: input.remote.hasRemotes,

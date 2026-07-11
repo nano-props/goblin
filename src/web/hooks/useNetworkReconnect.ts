@@ -3,6 +3,13 @@ import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-command.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
+import { goblinLog } from '#/web/logger.ts'
+
+function reconnectRemoteRepo(set: ReposSet, get: ReposGet, repoId: string): void {
+  void runRemoteRepoConnection(set, get, repoId).catch((error) => {
+    goblinLog.warn('remote reconnect command failed', { repoId, error })
+  })
+}
 
 /**
  * Re-probe remote repos when the browser reports we are back
@@ -48,7 +55,7 @@ export function useNetworkReconnect(): void {
         // kills the stale in-flight run and starts over with the
         // now-working network.
         if (lifecycle?.kind === 'ready') continue
-        void runRemoteRepoConnection(set, get, repo.id)
+        reconnectRemoteRepo(set, get, repo.id)
       }
     }
     window.addEventListener('online', onOnline)

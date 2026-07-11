@@ -27,9 +27,10 @@ export function emptyRepo(id: string, name: string, repoRuntimeId: string): Repo
       savedAt: null,
     },
     remote: {
-      // Local repos never have a remote lifecycle. Remote repos set this
-      // through addResolvedRepo / addUnavailableRepo / insertPlaceholderRepo.
+      // Local repos never have a remote lifecycle. Remote shells remain null
+      // until a server runtime projection is accepted.
       lifecycle: null,
+      lifecycleAttemptId: null,
       remotes: [],
       remoteDetails: [],
       hasRemotes: false,

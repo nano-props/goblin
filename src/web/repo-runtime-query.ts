@@ -31,8 +31,9 @@ export async function updateRepoRuntimeCache(
   await queryClient.cancelQueries({ queryKey: repoRuntimesQueryKey(), exact: true })
   queryClient.setQueryData<RepoRuntimesSnapshot>(repoRuntimesQueryKey(), (current) => {
     const existing = current?.runtimes ?? []
+    const previous = existing.find((item) => item.repoRoot === entry.repoRoot)
     const runtimes = existing.filter((item) => item.repoRoot !== entry.repoRoot)
-    runtimes.push(entry)
+    runtimes.push({ ...previous, ...entry })
     return { runtimes }
   })
 }

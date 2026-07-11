@@ -159,7 +159,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
               // Hydration keeps the restored repo id in sync with the accepted server projection. The
               // command adapter updates the local projection; we then
               // re-derive the restored repo id after each settlement.
-              if (outcome) {
+              if (outcome && outcome.kind !== 'superseded' && outcome.kind !== 'stale-runtime') {
                 set((s) => {
                   const { repos, order } = s
                   const nextRestoredRepoId = restoredRepoIdAfterWorkspaceHydration(

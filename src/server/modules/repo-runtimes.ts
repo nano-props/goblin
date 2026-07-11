@@ -4,6 +4,7 @@ import type {
   RemoteRepoConnectionResult,
   RemoteRepoRuntimeLifecycle,
 } from '#/shared/remote-repo.ts'
+import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 
 interface RepoRuntimeState {
   currentRepoRuntimeId: string | null
@@ -20,7 +21,15 @@ export interface RepoRuntimeClosedEvent {
 export interface RepoRuntimeEntry {
   repoRoot: string
   repoRuntimeId: string
+  remoteLifecycle: RemoteRepoRuntimeLifecycle | null
 }
+
+type TerminalRemoteLifecycle = Extract<RemoteRepoRuntimeLifecycle, { kind: 'ready' | 'failed' }>
+
+export type RepoRemoteLifecycleRunResult =
+  | { kind: 'settled'; lifecycle: TerminalRemoteLifecycle }
+  | { kind: 'superseded' }
+  | { kind: 'stale-runtime' }
 
 const repoRuntimesByUser = new Map<string, Map<string, RepoRuntimeState>>()
 const repoRuntimeClosedListeners = new Set<(event: RepoRuntimeClosedEvent) => void>()
@@ -85,7 +94,13 @@ export function listRepoRuntimes(userId: string): RepoRuntimeEntry[] {
   if (!states) return []
   const runtimes: RepoRuntimeEntry[] = []
   for (const [repoRoot, state] of states) {
-    if (state.currentRepoRuntimeId) runtimes.push({ repoRoot, repoRuntimeId: state.currentRepoRuntimeId })
+    if (state.currentRepoRuntimeId) {
+      runtimes.push({
+        repoRoot,
+        repoRuntimeId: state.currentRepoRuntimeId,
+        remoteLifecycle: isRemoteRepoId(repoRoot) ? state.remoteLifecycle : null,
+      })
+    }
   }
   return runtimes
 }
@@ -94,37 +109,22 @@ export function isCurrentRepoRuntime(userId: string, repoRoot: string, repoRunti
   return repoRuntimesByUser.get(userId)?.get(repoRoot)?.currentRepoRuntimeId === repoRuntimeId
 }
 
-export class StaleRepoRuntimeError extends Error {
-  constructor() {
-    super('stale repo runtime')
-    this.name = 'StaleRepoRuntimeError'
-  }
-}
-
-export function getRepoRemoteLifecycle(
-  userId: string,
-  repoRoot: string,
-  repoRuntimeId: string,
-): RemoteRepoRuntimeLifecycle {
-  const state = repoRuntimesByUser.get(userId)?.get(repoRoot)
-  if (!state || state.currentRepoRuntimeId !== repoRuntimeId) throw new StaleRepoRuntimeError()
-  return state.remoteLifecycle
-}
-
 export async function runRepoRemoteLifecycle(
   userId: string,
   repoRoot: string,
   repoRuntimeId: string,
   resolve: (signal: AbortSignal) => Promise<RemoteRepoConnectionResult>,
-): Promise<RemoteRepoRuntimeLifecycle> {
+  onTransition: (lifecycle: RemoteRepoRuntimeLifecycle) => void = () => {},
+): Promise<RepoRemoteLifecycleRunResult> {
   const state = repoRuntimesByUser.get(userId)?.get(repoRoot)
-  if (!state || state.currentRepoRuntimeId !== repoRuntimeId) throw new StaleRepoRuntimeError()
+  if (!state || state.currentRepoRuntimeId !== repoRuntimeId) return { kind: 'stale-runtime' }
 
   state.remoteAttemptController?.abort()
   const controller = new AbortController()
   const attemptId = state.remoteLifecycle.attemptId + 1
   state.remoteAttemptController = controller
   state.remoteLifecycle = { kind: 'connecting', attemptId }
+  notifyRemoteLifecycleTransition(onTransition, state.remoteLifecycle, repoRoot)
 
   try {
     const result = await resolve(controller.signal)
@@ -133,7 +133,7 @@ export async function runRepoRemoteLifecycle(
       state.remoteAttemptController !== controller ||
       state.remoteLifecycle.attemptId !== attemptId
     ) {
-      throw new StaleRepoRuntimeError()
+      return supersededRemoteLifecycleResult(state, repoRuntimeId)
     }
     state.remoteLifecycle =
       result.kind === 'ready'
@@ -144,19 +144,40 @@ export async function runRepoRemoteLifecycle(
             reason: result.lifecycle.reason,
             ...(result.lifecycle.target ? { target: result.lifecycle.target } : {}),
           }
-    return state.remoteLifecycle
+    notifyRemoteLifecycleTransition(onTransition, state.remoteLifecycle, repoRoot)
+    return { kind: 'settled', lifecycle: state.remoteLifecycle }
   } catch (error) {
     if (
       state.currentRepoRuntimeId !== repoRuntimeId ||
       state.remoteAttemptController !== controller ||
       state.remoteLifecycle.attemptId !== attemptId
     ) {
-      throw new StaleRepoRuntimeError()
+      return supersededRemoteLifecycleResult(state, repoRuntimeId)
     }
     state.remoteLifecycle = { kind: 'failed', attemptId, reason: 'unknown' }
-    return state.remoteLifecycle
+    notifyRemoteLifecycleTransition(onTransition, state.remoteLifecycle, repoRoot)
+    return { kind: 'settled', lifecycle: state.remoteLifecycle }
   } finally {
     if (state.remoteAttemptController === controller) state.remoteAttemptController = null
+  }
+}
+
+function supersededRemoteLifecycleResult(
+  state: RepoRuntimeState,
+  repoRuntimeId: string,
+): RepoRemoteLifecycleRunResult {
+  return state.currentRepoRuntimeId === repoRuntimeId ? { kind: 'superseded' } : { kind: 'stale-runtime' }
+}
+
+function notifyRemoteLifecycleTransition(
+  listener: (lifecycle: RemoteRepoRuntimeLifecycle) => void,
+  lifecycle: RemoteRepoRuntimeLifecycle,
+  repoRoot: string,
+): void {
+  try {
+    listener(lifecycle)
+  } catch (err) {
+    repoRuntimeLogger.warn({ err, repoRoot, attemptId: lifecycle.attemptId }, 'remote lifecycle transition listener failed')
   }
 }
 

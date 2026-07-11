@@ -12,6 +12,7 @@ The server owns:
 - the current `repoRuntimeId` for a `(userId, repoRoot)` runtime scope
 - stale runtime rejection
 - terminal/session cleanup when a repo runtime closes
+- the remote lifecycle and monotonic attempt generation for that runtime
 
 The client window owns:
 
@@ -80,6 +81,14 @@ Good candidates for React Query ownership:
 - pull request reads
 - file tree reads
 - workspace pane tabs reads
+- the user-scoped runtime snapshot used to project remote lifecycle state
+
+Remote lifecycle transitions publish a dedicated `remote-lifecycle`
+invalidation. Clients refresh the lightweight runtime snapshot and accept only
+entries matching a window-local repo shell and `repoRuntimeId`; the snapshot
+never adds, removes, orders, or activates repos for a window. Command responses
+and snapshot refreshes share one attempt-gated projector, so transport order
+cannot make an older attempt overwrite a newer lifecycle.
 
 Keep in window-local state:
 

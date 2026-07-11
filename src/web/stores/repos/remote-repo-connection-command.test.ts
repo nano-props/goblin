@@ -32,18 +32,19 @@ describe('remote lifecycle command client', () => {
     expect(useReposStore.getState().repos[repoId]?.remote.lifecycle).toEqual({
       kind: 'failed', reason: 'unreachable',
     })
-    release({ repoId, name: 'repo', lifecycle: { kind: 'ready', attemptId: 1, target } })
+    release({ kind: 'settled', repoId, name: 'repo', lifecycle: { kind: 'ready', attemptId: 1, target } })
     await pending
   })
 
-  test('applies the canonical terminal and refreshes the shared projection', async () => {
+  test('applies the canonical terminal through the runtime projection acceptor', async () => {
     vi.mocked(resolveRemoteRepoConnection).mockResolvedValue({
-      repoId, name: 'repo', lifecycle: { kind: 'ready', attemptId: 3, target },
+      kind: 'settled', repoId, name: 'repo', lifecycle: { kind: 'ready', attemptId: 3, target },
     })
     await expect(runRemoteRepoConnection(useReposStore.setState, useReposStore.getState, repoId)).resolves.toMatchObject({
       kind: 'ready', target,
     })
     expect(useReposStore.getState().repos[repoId]?.remote.lifecycle).toEqual({ kind: 'ready', target })
+    expect(useReposStore.getState().repos[repoId]?.remote.lifecycleAttemptId).toBe(3)
     expect(requestRepoProjectionReadModelRefresh).toHaveBeenCalledWith(
       expect.anything(), repoId, { repoRuntimeId: runtimeId },
     )
@@ -56,8 +57,18 @@ describe('remote lifecycle command client', () => {
     useReposStore.setState((state) => ({
       repos: { ...state.repos, [repoId]: { ...state.repos[repoId]!, repoRuntimeId: 'repo-runtime-test-2' } },
     }))
-    release({ repoId, name: 'repo', lifecycle: { kind: 'ready', attemptId: 1, target } })
+    release({ kind: 'settled', repoId, name: 'repo', lifecycle: { kind: 'ready', attemptId: 1, target } })
     await pending
+    expect(useReposStore.getState().repos[repoId]?.remote.lifecycle).toEqual({
+      kind: 'failed', reason: 'unreachable',
+    })
+  })
+
+  test('does not write lifecycle state for a superseded command', async () => {
+    vi.mocked(resolveRemoteRepoConnection).mockResolvedValue({ kind: 'superseded', repoId })
+    await expect(runRemoteRepoConnection(useReposStore.setState, useReposStore.getState, repoId)).resolves.toMatchObject({
+      kind: 'superseded',
+    })
     expect(useReposStore.getState().repos[repoId]?.remote.lifecycle).toEqual({
       kind: 'failed', reason: 'unreachable',
     })

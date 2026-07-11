@@ -25,7 +25,6 @@ import { clearWorkspacePaneTabsProjectionState } from '#/web/workspace-pane/work
 import { reposLog } from '#/web/logger.ts'
 import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-command.ts'
 import {
-  markRemoteLifecycleConnecting,
   markRemoteLifecycleFailed,
   markRemoteLifecycleReady,
 } from '#/web/stores/repos/availability.ts'
@@ -411,7 +410,8 @@ export function insertPlaceholderRepo(
       // remote placeholder we mark `connecting` so deriveConnectivity
       // can show the spinner until addResolvedRepo /
       // addUnavailableRepo replaces it.
-      if (entry.kind === 'remote') markRemoteLifecycleConnecting(repo)
+      // A remote shell with no accepted server lifecycle renders as pending;
+      // only the runtime projection may publish `connecting`.
       // 'refreshing' so the cached branches render with a stale indicator
       // (dataLoadInitialLoading would hide them).
       const cached = s.repoSnapshotCache[entry.id]
@@ -453,6 +453,9 @@ export function createRuntimeRepoSessionActions(
         }
         const outcome = await runRemoteRepoConnection(set, get, entry.id)
         if (!outcome) return { ok: false, message: 'error.not-git-repo' }
+        if (outcome.kind === 'superseded' || outcome.kind === 'stale-runtime') {
+          return { ok: false, message: 'error.failed-read-repo' }
+        }
         if (outcome.kind === 'ready' && outcome.target) {
           const recentEntry = remoteRepoSessionEntry(outcome.target)
           return { ok: true, id: outcome.repoId, postOpenEffects: recordRecentRepoPostOpen(recentEntry) }
@@ -514,6 +517,7 @@ export function createRuntimeRepoSessionActions(
       if (!isRemoteRepoId(id)) return null
       const outcome = await runRemoteRepoConnection(set, get, id)
       if (!outcome) return null
+      if (outcome.kind === 'superseded' || outcome.kind === 'stale-runtime') return null
       if (outcome.kind === 'ready') return { ok: true }
       return { ok: false, reason: outcome.reason ?? 'unknown' }
     },

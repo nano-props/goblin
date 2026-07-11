@@ -110,6 +110,7 @@ export interface RuntimeRecentReposState {
 export interface RepoRuntimeEntry {
   repoRoot: string
   repoRuntimeId: string
+  remoteLifecycle?: RemoteRepoRuntimeLifecycle | null
 }
 
 export interface RepoRuntimesSnapshot {
@@ -309,8 +310,6 @@ export interface RepoRuntimeProjection {
     pullRequestMode: PullRequestFetchMode
   }
   loadedAt: number
-  /** Present on runtime-aware reads; omitted only by legacy/test projections. */
-  remoteLifecycle?: RemoteRepoRuntimeLifecycle
 }
 
 export type { RemoteRepoTarget } from '#/shared/remote-repo.ts'

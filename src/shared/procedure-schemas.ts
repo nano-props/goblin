@@ -143,7 +143,6 @@ export const REPO_PROCEDURE_SCHEMAS = {
   }),
   projection: v.object({
     cwd: v.string(),
-    repoRuntimeId: v.optional(v.pipe(v.string(), v.regex(OPAQUE_ID_RE))),
     branch: v.optional(v.string()),
     mode: v.optional(v.picklist(['summary', 'full'])),
   }),
