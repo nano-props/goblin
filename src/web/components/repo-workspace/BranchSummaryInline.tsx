@@ -29,6 +29,7 @@ interface BranchSummaryInlineProps {
   selected?: boolean
   leadingTerminalBellCount?: number
   leadingTerminalOutputActive?: boolean
+  worktreeIconDirty?: boolean
   className?: string
 }
 
@@ -185,12 +186,14 @@ export function BranchSummaryInline({
   selected = false,
   leadingTerminalBellCount = 0,
   leadingTerminalOutputActive = false,
+  worktreeIconDirty,
   className,
 }: BranchSummaryInlineProps) {
   const t = useT()
   const lang = useI18nStore((s) => s.lang)
   const state = computeBranchSummaryState(branch, repo, lang)
   const { hasWorktree, worktreeDirty } = state
+  const iconDirty = worktreeIconDirty ?? worktreeDirty
   const showLeadingTerminalBell = leadingTerminalBellCount > 0
   const showLeadingTerminalOutputActive = leadingTerminalOutputActive && !showLeadingTerminalBell
   const title = buildBranchSummaryTitle(state, branch, t, leadingTerminalBellCount, showLeadingTerminalOutputActive)
@@ -198,7 +201,7 @@ export function BranchSummaryInline({
   // state on the glyph itself. Compact callers may deliberately pass
   // terminal bell/output state into this same slot; see BranchRow for
   // that priority decision.
-  const iconAriaLabel = hasWorktree ? (worktreeDirty ? t('branches.dirty') : t('branches.worktree')) : undefined
+  const iconAriaLabel = hasWorktree ? (iconDirty ? t('branches.dirty') : t('branches.worktree')) : undefined
 
   return (
     <div title={title} className={cn('flex min-w-0 items-center gap-1.5', className)}>
@@ -213,7 +216,7 @@ export function BranchSummaryInline({
       ) : (
         <BranchSummaryIcon
           hasWorktree={hasWorktree}
-          worktreeDirty={worktreeDirty}
+          worktreeDirty={iconDirty}
           selected={selected}
           ariaLabel={iconAriaLabel}
         />

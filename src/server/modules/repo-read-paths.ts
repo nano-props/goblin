@@ -220,12 +220,6 @@ export async function readRepoProjection(
   const branch = typeof options.branch === 'string' && options.branch.length > 0 ? options.branch : null
   const mode: PullRequestFetchMode = options.mode === 'summary' ? 'summary' : 'full'
   const includePullRequests = !!branch || mode === 'summary'
-  // Define one lifecycle boundary for the whole projection. `git worktree
-  // add` registers its worktree before checkout finishes, so status is not an
-  // authoritative read for that target while the captured operation is
-  // running. The same operation snapshot is returned with the projected data
-  // so consumers never receive contradictory lifecycle and status facts.
-  const operations = await readRepoOperationsSnapshot(cwd, { signal: options.signal })
   const result = await readRepoBulk(
     cwd,
     includePullRequests ? ['snapshot', 'status', 'pullRequests'] : ['snapshot', 'status'],
@@ -236,54 +230,14 @@ export async function readRepoProjection(
       timeoutMs: options.timeoutMs,
     },
   )
-  const stableResult = projectRepoBulkReadForOperations(result, operations.operations)
   return {
-    ...stableResult,
-    operations,
+    ...result,
+    operations: await readRepoOperationsSnapshot(cwd, { signal: options.signal }),
     requested: {
       branch,
       pullRequestMode: mode,
     },
     loadedAt: Date.now(),
-  }
-}
-
-function projectRepoBulkReadForOperations(
-  result: RepoBulkReadResult,
-  operations: readonly RepoServerOperationState[],
-): RepoBulkReadResult {
-  const creatingPaths = new Set<string>()
-  const creatingBranches = new Set<string>()
-  for (const operation of operations) {
-    if (operation.kind !== 'create-worktree') continue
-    if (operation.startedAt === null) continue
-    if (operation.phase !== 'running' && operation.phase !== 'cancelling') continue
-    const worktreePath = operation.target?.worktreePath
-    const branch = operation.target?.branch
-    if (worktreePath) creatingPaths.add(worktreePath)
-    if (branch) creatingBranches.add(branch)
-  }
-  if (creatingPaths.size === 0 && creatingBranches.size === 0) return result
-  return {
-    ...result,
-    snapshot: result.snapshot
-      ? {
-          ...result.snapshot,
-          branches: result.snapshot.branches.map((branch) => {
-            if (
-              !branch.worktree ||
-              (!creatingBranches.has(branch.name) && !creatingPaths.has(branch.worktree.path))
-            ) {
-              return branch
-            }
-            const { summary: _summary, ...worktree } = branch.worktree
-            return { ...branch, worktree }
-          }),
-        }
-      : null,
-    status: result.status.filter(
-      (worktree) => !creatingPaths.has(worktree.path) && !creatingBranches.has(worktree.branch ?? ''),
-    ),
   }
 }
 

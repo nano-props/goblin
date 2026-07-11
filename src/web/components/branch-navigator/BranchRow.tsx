@@ -64,6 +64,10 @@ export function BranchRow({
   const leadingTerminalOutputActive = compact && terminalBellCount <= 0 && showTerminalOutputActive
   const actionTerminalBellCount = compact ? 0 : terminalBellCount
   const actionTerminalOutputActive = !compact && terminalBellCount <= 0 && showTerminalOutputActive
+  const worktreeOperationTargetsRow =
+    repo.branchAction.phase !== 'idle' &&
+    repo.branchAction.target === branch.name &&
+    (repo.branchAction.reason === 'branch:createWorktree' || repo.branchAction.reason === 'branch:removeWorktree')
 
   return (
     <li
@@ -84,6 +88,7 @@ export function BranchRow({
           selected={isSelected}
           leadingTerminalBellCount={leadingTerminalBellCount}
           leadingTerminalOutputActive={leadingTerminalOutputActive}
+          worktreeIconDirty={worktreeOperationTargetsRow ? false : undefined}
         />
       </div>
       <BranchRowActionSlot

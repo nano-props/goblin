@@ -88,7 +88,9 @@ describe('BranchRow', () => {
       </ul>,
     )
 
-    expect(container.querySelector('[data-testid="branch-summary-icon"][aria-label="有改动"]')).not.toBeNull()
+    const icon = container.querySelector('[data-testid="branch-summary-icon"][aria-label="有改动"]')
+    expect(icon).not.toBeNull()
+    expect(icon?.querySelector('svg')?.className.baseVal).toContain('text-attention')
   })
 
   test('keeps the generic dirty label even when exact counts are unavailable', () => {
@@ -98,6 +100,85 @@ describe('BranchRow', () => {
       branch: 'feature/a',
       isMain: false,
       isDirty: true,
+    }
+    const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
+
+    const { container } = renderInJsdom(
+      <ul>
+        <BranchRow
+          repo={repo}
+          branch={branch}
+          selected={null}
+          onSelectBranch={vi.fn()}
+          onOpenBranchStatus={vi.fn()}
+          selectedRef={createRef<HTMLLIElement>()}
+        />
+      </ul>,
+    )
+
+    expect(container.querySelector('[data-testid="branch-summary-icon"][aria-label="有改动"]')).not.toBeNull()
+  })
+
+  test.each(['branch:createWorktree', 'branch:removeWorktree'] as const)(
+    'shows the worktree icon as clean while %s targets the row',
+    (reason) => {
+      const repo = branchRowRepo()
+      repo.branchModel.worktreesByPath['/tmp/worktree-a'] = {
+        path: '/tmp/worktree-a',
+        branch: 'feature/a',
+        isMain: false,
+        isDirty: true,
+        changeCount: 7,
+      }
+      repo.branchAction = {
+        operationId: 1,
+        phase: 'running',
+        reason,
+        target: 'feature/a',
+        startedAt: 1,
+        settledAt: null,
+        error: null,
+      }
+      const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
+
+      const { container } = renderInJsdom(
+        <ul>
+          <BranchRow
+            repo={repo}
+            branch={branch}
+            selected={null}
+            onSelectBranch={vi.fn()}
+            onOpenBranchStatus={vi.fn()}
+            selectedRef={createRef<HTMLLIElement>()}
+          />
+        </ul>,
+      )
+
+      const icon = container.querySelector('[data-testid="branch-summary-icon"][aria-label="工作树"]')
+      expect(icon).not.toBeNull()
+      expect(icon?.querySelector('svg')?.className.baseVal).toContain('text-brand-text')
+      expect(icon?.querySelector('svg')?.className.baseVal).not.toContain('text-attention')
+      expect(container.querySelector('[data-testid="branch-summary-icon"][aria-label="有改动"]')).toBeNull()
+    },
+  )
+
+  test('keeps the dirty worktree icon when a worktree operation targets another row', () => {
+    const repo = branchRowRepo()
+    repo.branchModel.worktreesByPath['/tmp/worktree-a'] = {
+      path: '/tmp/worktree-a',
+      branch: 'feature/a',
+      isMain: false,
+      isDirty: true,
+      changeCount: 7,
+    }
+    repo.branchAction = {
+      operationId: 1,
+      phase: 'running',
+      reason: 'branch:createWorktree',
+      target: 'feature/b',
+      startedAt: 1,
+      settledAt: null,
+      error: null,
     }
     const branch = createRepoBranch('feature/a', { worktree: { path: '/tmp/worktree-a' } })
 
