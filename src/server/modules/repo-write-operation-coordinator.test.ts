@@ -34,6 +34,102 @@ afterEach(() => {
 })
 
 describe('repo write operation coordinator', () => {
+  test('does not block an unrelated repo behind slow boundary resolution', async () => {
+    const slowBoundary = Promise.withResolvers<string>()
+    mocks.resolveRepoWriteBoundaryKey.mockImplementation(async (repoId: string) => {
+      if (repoId === '/tmp/repo-slow') return await slowBoundary.promise
+      return repoId
+    })
+    const slowWork = enqueueRepoWriteOperation(
+      '/tmp/repo-slow',
+      undefined,
+      { repoId: '/tmp/repo-slow', kind: 'fetch', source: 'background' },
+      (operation) => async () => {
+        operation.start()
+        operation.settle({ ok: true })
+        return { ok: true, message: 'slow' }
+      },
+    )
+
+    await expect(
+      enqueueRepoWriteOperation(
+        '/tmp/repo-fast',
+        undefined,
+        { repoId: '/tmp/repo-fast', kind: 'fetch', source: 'background' },
+        (operation) => async () => {
+          operation.start()
+          operation.settle({ ok: true })
+          return { ok: true, message: 'fast' }
+        },
+      ),
+    ).resolves.toEqual({ ok: true, message: 'fast' })
+
+    slowBoundary.resolve('/tmp/repo-slow')
+    await expect(slowWork).resolves.toEqual({ ok: true, message: 'slow' })
+  })
+
+  test('does not register an operation when boundary resolution is aborted', async () => {
+    const caller = new AbortController()
+    mocks.resolveRepoWriteBoundaryKey.mockImplementation(
+      async (_repoId: string, signal?: AbortSignal) =>
+        await new Promise<string>((_resolve, reject) => {
+          signal?.addEventListener('abort', () => reject(new Error('cancelled')), { once: true })
+        }),
+    )
+
+    const work = enqueueRepoWriteOperation(
+      '/tmp/repo',
+      caller.signal,
+      { repoId: '/tmp/repo', kind: 'fetch', source: 'background' },
+      () => async () => ({ ok: true, message: 'unexpected' }),
+    )
+    caller.abort()
+
+    await expect(work).resolves.toEqual({ ok: false, message: 'cancelled' })
+    expect(repoWriteOperationCoordinatorStatsForTests()).toEqual({
+      boundaryRuntimes: 0,
+      registeredBoundaries: 0,
+      registeredRepoIds: 0,
+      queuedOperations: 0,
+      runningOperations: 0,
+    })
+  })
+
+  test('serializes aliases that concurrently resolve to one physical boundary', async () => {
+    mocks.resolveRepoWriteBoundaryKey.mockResolvedValue('/tmp/repo/.git')
+    const releaseFirst = Promise.withResolvers<void>()
+    const order: string[] = []
+    const first = enqueueRepoWriteOperation(
+      '/tmp/repo',
+      undefined,
+      { repoId: '/tmp/repo', kind: 'fetch', source: 'background' },
+      (operation) => async () => {
+        operation.start()
+        order.push('first-start')
+        await releaseFirst.promise
+        order.push('first-end')
+        operation.settle({ ok: true })
+        return { ok: true, message: 'first' }
+      },
+    )
+    const second = enqueueRepoWriteOperation(
+      '/tmp/repo-linked',
+      undefined,
+      { repoId: '/tmp/repo-linked', kind: 'fetch', source: 'background' },
+      (operation) => async () => {
+        operation.start()
+        order.push('second')
+        operation.settle({ ok: true })
+        return { ok: true, message: 'second' }
+      },
+    )
+
+    await vi.waitFor(() => expect(order).toEqual(['first-start']))
+    releaseFirst.resolve()
+    await Promise.all([first, second])
+    expect(order).toEqual(['first-start', 'first-end', 'second'])
+  })
+
   test('settles operations when the queued task throws', async () => {
     await expect(
       enqueueRepoWriteOperation(
