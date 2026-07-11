@@ -49,6 +49,7 @@ interface AppMenuState {
 }
 
 type AppMenuCommandContext = Record<string, never>
+type MissingWindowPolicy = 'activate' | 'ignore'
 
 const APPEARANCE_MENU_OPTIONS = [
   { pref: 'auto', labelKey: 'settings.appearance.auto' },
@@ -64,13 +65,15 @@ const LANGUAGE_MENU_OPTIONS = [
   { pref: 'ja', labelKey: 'settings.lang.ja' },
 ] as const
 
-function send(intent: ClientEffectIntent): void {
-  void sendClientIntent(intent)
+function send(intent: ClientEffectIntent, missingWindow: MissingWindowPolicy = 'activate'): void {
+  void sendClientIntent(intent, missingWindow)
 }
 
-async function sendClientIntent(intent: ClientEffectIntent): Promise<void> {
+async function sendClientIntent(intent: ClientEffectIntent, missingWindow: MissingWindowPolicy): Promise<void> {
   try {
-    const win = getPrimaryWindow() ?? focusedRegisteredSurface()?.window ?? (await activatePrimaryWindow())
+    const existingWindow = getPrimaryWindow() ?? focusedRegisteredSurface()?.window
+    if (!existingWindow && missingWindow === 'ignore') return
+    const win = existingWindow ?? (await activatePrimaryWindow())
     sendClientEffectIntent(win, intent)
   } catch (err) {
     menuNodeLog.warn({ err }, 'failed to send client intent')
@@ -145,8 +148,11 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
       createClientCommandMenuItem(state, 'file-open-remote-repo'),
       { label: t('menu.file.open-recent'), submenu: createRecentReposMenu(state.recentRepos) },
       separator(),
-      createClientCommandMenuItem(state, 'file-close-workspace-tab-or-window'),
-      createClientCommandMenuItem(state, 'file-close-tab'),
+      // Repeated close accelerators can arrive after the last window has
+      // closed. Close commands are scoped to an existing surface and must
+      // never recreate one just to deliver the intent.
+      createClientCommandMenuItem(state, 'file-close-workspace-tab-or-window', { missingWindow: 'ignore' }),
+      createClientCommandMenuItem(state, 'file-close-tab', { missingWindow: 'ignore' }),
       { label: t('menu.file.close-window'), click: () => focusedRegisteredSurface()?.window.close() },
       separator(),
       { label: t('menu.file.open-in-browser'), click: () => void openWebVersionFromMenu() },
@@ -305,7 +311,7 @@ function createClientCommandMenuItem(
   // `beforeIntent` runs a main-side side effect before the client
   // intent is dispatched — for actions like Reset Window that need to
   // touch the Electron window itself, not just the client state.
-  options?: { beforeIntent?: () => void },
+  options?: { beforeIntent?: () => void; missingWindow?: MissingWindowPolicy },
 ): MenuItemConstructorOptions {
   const command = clientMenuCommandById(id)
   const context = menuCommandContext(state)
@@ -317,7 +323,7 @@ function createClientCommandMenuItem(
     ...(resolvedEnabled !== undefined ? { enabled: resolvedEnabled } : {}),
     click: () => {
       options?.beforeIntent?.()
-      send(resolveClientMenuCommandIntent(command, context))
+      send(resolveClientMenuCommandIntent(command, context), options?.missingWindow)
     },
   }
 }
