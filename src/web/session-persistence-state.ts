@@ -1,5 +1,6 @@
 import {
   isWorkspacePaneStaticTabType,
+  isWorkspacePaneRuntimeTabEntry,
   isWorkspacePaneSessionTabType,
   type WorkspacePaneSessionTabType,
   type WorkspacePaneTabEntry,
@@ -70,7 +71,10 @@ export function persistedWorkspacePaneTabsByTargetByRepoForSession(
     for (const [targetKey, tabs] of Object.entries(workspacePaneTabsByTargetByRepo[id] ?? {})) {
       const target = workspacePaneTabsTargetKeyBelongsToRepo(targetKey, id, repo)
       if (!target) continue
-      byTarget[targetKey] = normalizeWorkspacePaneTabs(tabs, { hasWorktree: target.kind === 'worktree' })
+      byTarget[targetKey] = normalizeWorkspacePaneTabs(
+        tabs.filter((tab) => !isWorkspacePaneRuntimeTabEntry(tab)),
+        { hasWorktree: target.kind === 'worktree' },
+      )
     }
     if (Object.keys(byTarget).length > 0) byRepo[id] = byTarget
   }

@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { queryOptions, useQuery, type QueryClient } from '@tanstack/react-query'
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import { isWorkspacePaneRuntimeTabEntry, type WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsEntry, WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import {
   type WorkspacePaneTabsTarget,
@@ -159,9 +159,10 @@ export function workspacePaneTabsByTargetFromQueryData(
 ): Record<string, WorkspacePaneTabEntry[]> {
   const byTarget: Record<string, WorkspacePaneTabEntry[]> = {}
   for (const entry of data.entries) {
-    byTarget[workspacePaneTabsTargetIdentityKey(entry)] = normalizeWorkspacePaneTabs(entry.tabs, {
-      hasWorktree: entry.worktreePath !== null,
-    })
+    byTarget[workspacePaneTabsTargetIdentityKey(entry)] = normalizeWorkspacePaneTabs(
+      entry.tabs.filter((tab) => !isWorkspacePaneRuntimeTabEntry(tab)),
+      { hasWorktree: entry.worktreePath !== null },
+    )
   }
   return byTarget
 }

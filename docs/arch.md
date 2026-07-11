@@ -54,9 +54,9 @@ The ownership split is:
 - `src/shared/workspace-pane-runtime.ts` owns the application protocol for
   opening a provider runtime and its canonical tab as one server result.
 - `src/server/workspace-pane/*` owns server-side tab runtime state,
-  canonicalization, read/write actions, realtime invalidation,
-  runtime-session materialization/pruning, and the cross-provider runtime-open
-  application operation.
+  layout-intent writes, pure live-session projection, realtime invalidation,
+  and the cross-provider runtime-open application operation. Provider snapshots
+  are the sole live-membership authority; list never writes derived membership.
 - `src/web/workspace-pane/*` owns client query/cache projection and mutation
   orchestration for server-owned tab state.
 - `src/web/workspace-pane/tab-providers.ts` owns per-tab-type

@@ -208,7 +208,6 @@ class TerminalSessionService {
       repoRoot,
       scope,
       assertCurrent: () => this.assertCurrentRepoRuntime(userId, repoRoot, repoRuntimeId),
-      broadcastChanged: () => this.options.broadcastWorkspaceTabsChanged(userId, repoRoot),
     })
   }
 

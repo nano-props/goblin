@@ -177,7 +177,10 @@ describe('workspace pane tabs revisioned query cache', () => {
     expect(
       workspacePaneTabsByTargetFromQueryData(
         snapshot(1, [
-          entry('feature/current', '/tmp/worktree', [workspacePaneStaticTabEntry('status')]),
+          entry('feature/current', '/tmp/worktree', [
+            workspacePaneStaticTabEntry('status'),
+            workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
+          ]),
           entry('feature/current', null, [workspacePaneStaticTabEntry('history')]),
         ]),
       ),
