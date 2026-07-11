@@ -202,6 +202,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
       }),
     )
     return () => {
+      membershipRecoveryGeneration += 1
       offSessionsChanged()
       offRecovered()
       offWorkspaceTabsChanged()

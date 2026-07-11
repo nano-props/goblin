@@ -482,6 +482,37 @@ describe('AppRuntimeProjectionProvider', () => {
     })
   })
 
+  test('invalidates a pending membership recovery when the provider unmounts', async () => {
+    const repo = seedCurrentRepo()
+    const membershipRecovery = Promise.withResolvers<{
+      kind: 'settled'
+      targets: Array<{ repoRoot: string; repoRuntimeId: string }>
+      changedTargets: []
+    }>()
+    projectionMocks.reconcileOpenRepoRuntimeMemberships.mockReturnValueOnce(membershipRecovery.promise)
+    const result = renderRuntimeProvider(REPO_ID)
+    await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
+    recoverSessionsMock.mockClear()
+    listWorkspaceTabsMock.mockClear()
+
+    await act(async () => {
+      recoveredHandler?.('client_sharedterminal')
+    })
+    await vi.waitFor(() => expect(projectionMocks.reconcileOpenRepoRuntimeMemberships).toHaveBeenCalledOnce())
+    result.unmount()
+
+    membershipRecovery.resolve({
+      kind: 'settled',
+      targets: [{ repoRoot: REPO_ID, repoRuntimeId: repo.repoRuntimeId }],
+      changedTargets: [],
+    })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(recoverSessionsMock).not.toHaveBeenCalled()
+    expect(listWorkspaceTabsMock).not.toHaveBeenCalled()
+  })
+
   test('failed focus projection refresh does not replace an already ready hydrate', async () => {
     const repo = seedCurrentRepo()
     useTerminalProjectionHydrationStore.setState({ refreshCooldownMs: 0 })
