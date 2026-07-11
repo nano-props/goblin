@@ -2,6 +2,7 @@
 
 import { describe, expect, test } from 'vitest'
 import {
+  projectCanonicalWorkspacePaneTabs,
   projectWorkspaceRuntimeTabsForWorktree,
   workspaceTabsWithoutStaleRuntimeEntries,
 } from '#/server/workspace-pane/workspace-pane-runtime-tabs-projection.ts'
@@ -11,6 +12,24 @@ const WORKTREE_PATH = '/repo/worktree'
 const BRANCH_NAME = 'feature/worktree'
 
 describe('workspace pane runtime tabs projection', () => {
+  test('projects a full scope without mutating layout input', () => {
+    const entries = [{
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    }]
+    expect(projectCanonicalWorkspacePaneTabs({
+      entries,
+      providerSnapshots: [{
+        type: 'terminal',
+        liveSessions: [{ sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH }],
+      }],
+    })).toEqual([{
+      ...entries[0],
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')],
+    }])
+    expect(entries[0]!.tabs).toEqual([workspacePaneStaticTabEntry('status')])
+  })
   test('prunes stale runtime tabs and materializes missing live runtime tabs', () => {
     expect(
       projectWorkspaceRuntimeTabsForWorktree({

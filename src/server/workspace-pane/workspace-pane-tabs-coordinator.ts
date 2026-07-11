@@ -16,6 +16,7 @@ import type {
 import { workspacePaneTabsWithUpdateOperation } from '#/server/workspace-pane/workspace-pane-tabs-operations.ts'
 import {
   canonicalWorkspaceRuntimeTabsForTarget,
+  projectCanonicalWorkspacePaneTabs,
   projectWorkspaceRuntimeTabsFromProviderSnapshots,
   type WorkspacePaneRuntimeTabsProviderSnapshot,
   workspaceRuntimeTabWorktreePaths,
@@ -248,12 +249,11 @@ export class WorkspacePaneTabsCoordinator {
     assertCurrent: () => void
     broadcastChanged: () => void
   }): Promise<WorkspacePaneTabsSnapshot> {
-    return await this.runWorkspaceTabsScopeOperation(input.userId, input.scope, async () => {
-      const revisionBeforeReconcile = this.workspaceTabs.revision(input)
-      await this.reconcileWorkspaceTabsProjectionBoundary(input)
-      if (this.workspaceTabs.revision(input) !== revisionBeforeReconcile) input.broadcastChanged()
-      return this.scopeSnapshot(input.userId, input.repoRoot, input.scope)
-    })
+    const revisionBeforeReconcile = this.workspaceTabs.revision(input)
+    await this.reconcileWorkspaceTabsProjectionBoundary(input)
+    const snapshot = await this.snapshot(input)
+    if (snapshot.revision !== revisionBeforeReconcile) input.broadcastChanged()
+    return snapshot
   }
 
   async snapshot(input: { userId: string; repoRoot: string; scope: string }): Promise<WorkspacePaneTabsSnapshot> {
@@ -394,38 +394,41 @@ export class WorkspacePaneTabsCoordinator {
     input.assertCurrent()
     const scopeEntries = this.workspaceTabs.tabsForScope({ userId: input.userId, scope: input.scope })
     const worktreePaths = workspaceRuntimeTabWorktreePaths({ entries: scopeEntries, providerSnapshots })
-    const replacementGroups = worktreePaths.map((worktreePath) =>
-      projectWorkspaceRuntimeTabsFromProviderSnapshots({
-        entries: scopeEntries.filter((entry) => entry.worktreePath === worktreePath),
-        providerSnapshots,
-        worktreePath,
-      }),
-    )
-    const replacements = replacementGroups.flat()
-    const physicalIdentityByWorktreePath = new Map(
-      await Promise.all(
-        worktreePaths.map(async (worktreePath) => [
-          worktreePath,
-          (await this.capturePhysicalWorktree(input, worktreePath)).identity,
-        ] as const),
-      ),
-    )
     // Read-side canonicalization boundary: runtime tabs are a projection of
     // server-owned live sessions. Listing tabs self-heals missing runtime
     // entries so reload/restore always returns a coherent tab strip.
-    input.assertCurrent()
-    for (const replacement of replacements) {
-      const physicalIdentity = replacement.worktreePath
-        ? (physicalIdentityByWorktreePath.get(replacement.worktreePath) ?? null)
-        : null
-      this.workspaceTabs.replaceTabs({
-        userId: input.userId,
-        scope: input.scope,
-        branchName: replacement.branchName,
-        worktreePath: replacement.worktreePath,
-        physicalWorktreeIdentity: physicalIdentity,
-        tabs: replacement.tabs,
+    for (const worktreePath of worktreePaths) {
+      const capability = await this.capturePhysicalWorktree(input, worktreePath)
+      const result = await this.worktreeOperations.runOperation(capability, async (permit) => {
+        await this.runWorkspaceTabsScopeOperation(input.userId, input.scope, () => {
+          input.assertCurrent()
+          this.worktreeOperations.assertPermit(capability, permit)
+          const currentEntries = this.workspaceTabs
+            .tabsForScope({ userId: input.userId, scope: input.scope })
+            .filter((entry) => entry.worktreePath === worktreePath)
+          const replacements = projectWorkspaceRuntimeTabsFromProviderSnapshots({
+            entries: currentEntries,
+            providerSnapshots,
+            worktreePath,
+          })
+          for (const replacement of replacements) {
+            this.workspaceTabs.replaceTabs({
+              userId: input.userId,
+              scope: input.scope,
+              branchName: replacement.branchName,
+              worktreePath: replacement.worktreePath,
+              physicalWorktreeIdentity: capability.identity,
+              tabs: replacement.tabs,
+            })
+          }
+        })
       })
+      if (!result.admitted) throw new Error('error.worktree-removal-in-progress')
+    }
+    const canonical = this.workspaceTabs.tabsForScope({ userId: input.userId, scope: input.scope })
+    const shadowProjection = projectCanonicalWorkspacePaneTabs({ entries: canonical, providerSnapshots })
+    if (JSON.stringify(canonical) !== JSON.stringify(shadowProjection)) {
+      throw new Error('workspace pane tabs projection shadow mismatch')
     }
   }
 

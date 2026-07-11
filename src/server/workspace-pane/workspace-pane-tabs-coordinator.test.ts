@@ -337,20 +337,21 @@ describe('workspace pane tabs coordinator', () => {
     await expect(list).resolves.toEqual(
       snapshot(2, [
         workspacePaneStaticTabEntry('status'),
+        workspacePaneStaticTabEntry('history'),
         workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
       ]),
     )
     await expect(update).resolves.toEqual(
-      snapshot(3, [
+      snapshot(2, [
         workspacePaneStaticTabEntry('status'),
-        workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
         workspacePaneStaticTabEntry('history'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
       ]),
     )
     expect(workspaceTabs.tabs(workspaceTarget())).toEqual([
       workspacePaneStaticTabEntry('status'),
-      workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
       workspacePaneStaticTabEntry('history'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
     ])
   })
 
@@ -427,6 +428,39 @@ describe('workspace pane tabs coordinator', () => {
         assertCurrent: () => {},
       }),
     ).rejects.toThrow('error.worktree-removal-in-progress')
+
+    finishRemoval.resolve(undefined)
+    await removal
+  })
+
+  test('does not rematerialize a provider session while physical removal is admitted', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
+    const finishRemoval = deferred<void>()
+    const removal = worktreeOperations.runRemoval(
+      testPhysicalWorktreeCapability(WORKTREE_PATH),
+      async () => await finishRemoval.promise,
+    )
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      worktreeOperations,
+      physicalWorktrees: testPhysicalWorktrees,
+      runtimeProviders: [{
+        type: 'terminal',
+        listSessionsForUser: vi.fn(async () => [
+          { sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+        ]),
+      }],
+    })
+
+    await expect(coordinator.listWorkspaceTabs({
+      userId: USER_ID,
+      repoRoot: REPO_ROOT,
+      scope: SCOPE,
+      assertCurrent: () => {},
+      broadcastChanged: vi.fn(),
+    })).rejects.toThrow('error.worktree-removal-in-progress')
+    expect(workspaceTabs.tabsForScope({ userId: USER_ID, scope: SCOPE })).toEqual([])
 
     finishRemoval.resolve(undefined)
     await removal
