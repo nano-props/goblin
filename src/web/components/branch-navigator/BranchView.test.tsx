@@ -106,7 +106,6 @@ describe('BranchView', () => {
         repoId: REPO_ID,
         branchName: 'feature/destination',
         type: 'status',
-        insertAfterIdentity: null,
       }),
     )
   })

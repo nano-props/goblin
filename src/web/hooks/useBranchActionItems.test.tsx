@@ -111,7 +111,7 @@ describe('useBranchActionItems', () => {
     expect(actionIds).not.toContain('files')
   })
 
-  test('opens tab actions as generic append entries', async () => {
+  test('opens tab actions through destination navigation', async () => {
     let actions: ReturnType<typeof useBranchActionItems> | null = null
 
     await renderHookHost((nextActions) => {
@@ -125,7 +125,6 @@ describe('useBranchActionItems', () => {
         repoId: '/tmp/goblin-action-items',
         branchName: 'feature/action-order',
         type: 'history',
-        insertAfterIdentity: null,
       }),
     )
   })

@@ -713,8 +713,8 @@ describe('projection refresh request ordering', () => {
       changeCount: 2,
     })
     expect(worktreesByPath?.['/tmp/worktree-missing']).toMatchObject({
-      isDirty: true,
-      changeCount: 3,
+      isDirty: false,
+      changeCount: 0,
     })
   })
 
@@ -837,7 +837,7 @@ describe('projection refresh request ordering', () => {
     })
   })
 
-  test('repo read-model projection refresh stores worktree state in the branch read model', async () => {
+  test('repo read-model projection refresh does not use snapshot dirty summary without status', async () => {
     const repoRuntimeId = seedRepo([branch('feature/a')])
     ipcHandlers['repo.projection'] = async () =>
       repoProjection({
@@ -861,8 +861,8 @@ describe('projection refresh request ordering', () => {
     const projection = repo ? readRepoBranchQueryProjection(repo) : null
     expect(projection?.branches[0]?.worktree).toEqual({ path: '/tmp/worktree-a' })
     expect(projection?.worktreesByPath['/tmp/worktree-a']).toMatchObject({
-      isDirty: true,
-      changeCount: 3,
+      isDirty: false,
+      changeCount: 0,
     })
   })
 
