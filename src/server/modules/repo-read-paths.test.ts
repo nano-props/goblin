@@ -200,6 +200,146 @@ describe('readRepoProjection', () => {
     expect(getPullRequests).not.toHaveBeenCalled()
   })
 
+  test('omits transient dirty state while git is still creating a worktree', async () => {
+    const snapshot: RepoSnapshot = {
+      branches: [
+        {
+          name: 'feature/new',
+          isCurrent: false,
+          ahead: 0,
+          behind: 0,
+          lastCommitHash: '0000000000000000000000000000000000000000',
+          lastCommitShortHash: '0000000',
+          lastCommitMessage: 'Initial commit',
+          lastCommitDate: '2026-01-01T00:00:00.000Z',
+          lastCommitAuthor: 'Example Author',
+          worktree: {
+            path: '/tmp/worktree-new',
+            isPrimary: false,
+            summary: { dirty: true, changeCount: 12 },
+          },
+        },
+      ],
+      current: 'main',
+    }
+    const status: WorktreeStatus[] = [
+      {
+        path: '/tmp/worktree-new',
+        branch: 'feature/new',
+        isMain: false,
+        entries: [{ x: 'D', y: ' ', path: 'not-checked-out-yet.ts' }],
+      },
+    ]
+    const creatingOperation = {
+      id: 'repo-write-op-1',
+      repoId: '/tmp/repo',
+      repoRuntimeId: null,
+      kind: 'create-worktree',
+      phase: 'running',
+      source: 'user',
+      target: { branch: 'feature/new', worktreePath: '/tmp/base/../worktree-new' },
+      queuedAt: 1,
+      startedAt: 2,
+      deadlineAt: null,
+      settledAt: null,
+      error: null,
+      cancellation: {
+        underlyingRequested: false,
+        reason: null,
+        requestedAt: null,
+        waitCancelledCount: 0,
+        lastWaitCancelledAt: null,
+        lastWaitCancellationReason: null,
+      },
+      canCancelUnderlying: true,
+    } satisfies import('#/shared/api-types.ts').RepoServerOperationState
+    mocks.listRepoWriteOperationsForRepo.mockResolvedValue([creatingOperation])
+    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
+      task(
+        asRepoSource(
+          makeSource({
+            getSnapshot: () => Promise.resolve(snapshot),
+            getStatus: () => Promise.resolve(status),
+          }),
+        ),
+      ),
+    )
+    const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
+
+    const result = await readRepoProjection('/tmp/repo')
+
+    expect(result.snapshot?.branches[0]?.worktree).toEqual({
+      path: '/tmp/worktree-new',
+      isPrimary: false,
+    })
+    expect(result.status).toEqual([])
+  })
+
+  test.each(['queued', 'done'] as const)('keeps worktree status when create operation is %s', async (phase) => {
+    const snapshot: RepoSnapshot = {
+      branches: [
+        {
+          name: 'feature/new',
+          isCurrent: false,
+          ahead: 0,
+          behind: 0,
+          lastCommitHash: '0000000000000000000000000000000000000000',
+          lastCommitShortHash: '0000000',
+          lastCommitMessage: 'Initial commit',
+          lastCommitDate: '2026-01-01T00:00:00.000Z',
+          lastCommitAuthor: 'Example Author',
+          worktree: {
+            path: '/tmp/worktree-new',
+            isPrimary: false,
+            summary: { dirty: true, changeCount: 1 },
+          },
+        },
+      ],
+      current: 'main',
+    }
+    const status: WorktreeStatus[] = [
+      {
+        path: '/tmp/worktree-new',
+        branch: 'feature/new',
+        isMain: false,
+        entries: [{ x: 'M', y: ' ', path: 'tracked-change.ts' }],
+      },
+    ]
+    const operation = {
+      id: 'repo-write-op-1',
+      repoId: '/tmp/repo',
+      repoRuntimeId: null,
+      kind: 'create-worktree',
+      phase,
+      source: 'user',
+      target: { branch: 'feature/new', worktreePath: '/tmp/worktree-new' },
+      queuedAt: 1,
+      startedAt: phase === 'queued' ? null : 2,
+      deadlineAt: null,
+      settledAt: phase === 'done' ? 3 : null,
+      error: null,
+      cancellation: {
+        underlyingRequested: false,
+        reason: null,
+        requestedAt: null,
+        waitCancelledCount: 0,
+        lastWaitCancelledAt: null,
+        lastWaitCancellationReason: null,
+      },
+      canCancelUnderlying: true,
+    } satisfies import('#/shared/api-types.ts').RepoServerOperationState
+    mocks.listRepoWriteOperationsForRepo.mockResolvedValue([operation])
+    mocks.runWithRepoSource.mockImplementation((_cwd: string, task: SourceTask) =>
+      task(asRepoSource(makeSource({ getSnapshot: () => Promise.resolve(snapshot), getStatus: () => Promise.resolve(status) }))),
+    )
+    const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
+
+    const result = await readRepoProjection('/tmp/repo')
+
+    expect(result.snapshot).toEqual(snapshot)
+    expect(result.status).toEqual(status)
+  })
+
   test('reads all pull request summaries when the dashboard projection asks for summary mode', async () => {
     const pullRequests: PullRequestEntry[] = [
       {
