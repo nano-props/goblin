@@ -68,12 +68,12 @@ export async function getRepoRemoteBranches(cwd: string, signal?: AbortSignal): 
 export async function getRepoProjection(
   cwd: string,
   branch?: string | null,
-  options?: { mode?: PullRequestFetchMode },
+  options?: { mode?: PullRequestFetchMode; repoRuntimeId?: string },
   signal?: AbortSignal,
 ): Promise<RepoRuntimeProjection> {
   return await postServerJson(
     '/api/repo/projection',
-    { cwd, branch: branch || undefined, mode: options?.mode },
+    { cwd, repoRuntimeId: options?.repoRuntimeId, branch: branch || undefined, mode: options?.mode },
     { signal },
   )
 }

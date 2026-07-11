@@ -4,6 +4,7 @@ import {
   InvalidationSocketLimitError,
   MAX_INVALIDATION_SOCKETS,
   publishRepoQueryInvalidation,
+  publishUserRepoQueryInvalidation,
   registerInvalidationSocket,
   unregisterInvalidationSocket,
 } from '#/server/modules/invalidation-broker.ts'
@@ -42,5 +43,17 @@ describe('invalidation broker', () => {
     unregisterInvalidationSocket(sockets[0]!)
     // The freed slot is available again.
     expect(() => registerInvalidationSocket({ send: vi.fn(), close: vi.fn() })).not.toThrow()
+  })
+
+  test('fans user-scoped invalidations only to sockets for that identity', () => {
+    const first = { send: vi.fn(), close: vi.fn() }
+    const second = { send: vi.fn(), close: vi.fn() }
+    registerInvalidationSocket(first, 'user_a')
+    registerInvalidationSocket(second, 'user_b')
+
+    publishUserRepoQueryInvalidation('user_a', { repoId: 'repo_1', query: 'repo-runtime' })
+
+    expect(first.send).toHaveBeenCalledOnce()
+    expect(second.send).not.toHaveBeenCalled()
   })
 })

@@ -197,6 +197,12 @@ export type RemoteRepoRuntimeLifecycle =
   | { kind: 'ready'; attemptId: number; target: RemoteRepoTarget }
   | { kind: 'failed'; attemptId: number; reason: RemoteRepoFailureReason; target?: RemoteRepoTarget }
 
+export interface RemoteRepoLifecycleCommandResult {
+  repoId: string
+  name: string
+  lifecycle: RemoteRepoRuntimeLifecycle
+}
+
 /** Narrow a lifecycle to its concrete target, if any. */
 export function remoteRepoConnectionTarget(
   lifecycle: RemoteRepoConnectionLifecycle | null | undefined,

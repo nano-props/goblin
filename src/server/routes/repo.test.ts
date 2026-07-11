@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { testPhysicalWorktreeCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
+import { clearRepoRuntimesForUser, openRepoRuntime } from '#/server/modules/repo-runtimes.ts'
 
 const mocks = vi.hoisted(() => ({
   probeRepo: vi.fn(),
@@ -74,6 +75,7 @@ vi.mock('#/server/common/identity.ts', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  clearRepoRuntimesForUser('user-test')
 })
 
 function createTestRepoRoutes(
@@ -278,6 +280,28 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       signal: expect.any(AbortSignal),
     })
     expect(await response.json()).toMatchObject({ requested: { branch: 'feature/a', pullRequestMode: 'full' } })
+  })
+
+  test('adds the authoritative remote lifecycle to a runtime-aware projection', async () => {
+    mocks.readRepoProjection.mockResolvedValue({
+      snapshot: null,
+      status: [],
+      pullRequests: null,
+      operations: { operations: [], loadedAt: 123 },
+      requested: { branch: null, pullRequestMode: 'full' },
+      loadedAt: 123,
+    })
+    const repoRuntimeId = openRepoRuntime('user-test', '/tmp/repo')
+    const response = await createTestRepoRoutes().request(
+      new Request('http://localhost/projection', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ remoteLifecycle: { kind: 'idle', attemptId: 0 } })
   })
 
   test('returns repo operation state snapshots', async () => {

@@ -69,4 +69,14 @@ describe('repo runtime remote lifecycle', () => {
     await runRepoRemoteLifecycle(userId, repoRoot, runtimeId, async () => ready)
     await expect(first).rejects.toBeInstanceOf(StaleRepoRuntimeError)
   })
+
+  test('settles a current unexpected failure instead of orphaning connecting', async () => {
+    const runtimeId = openRepoRuntime(userId, repoRoot)
+    await expect(
+      runRepoRemoteLifecycle(userId, repoRoot, runtimeId, async () => { throw new Error('transport failed') }),
+    ).resolves.toEqual({ kind: 'failed', attemptId: 1, reason: 'unknown' })
+    expect(getRepoRemoteLifecycle(userId, repoRoot, runtimeId)).toEqual({
+      kind: 'failed', attemptId: 1, reason: 'unknown',
+    })
+  })
 })

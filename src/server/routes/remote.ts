@@ -9,6 +9,10 @@ import {
 } from '#/server/modules/remote.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { REMOTE_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
+import { userIdFromContext } from '#/server/common/identity.ts'
+import { runRepoRemoteLifecycle } from '#/server/modules/repo-runtimes.ts'
+import { publishUserRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
+import type { RemoteRepoLifecycleCommandResult } from '#/shared/remote-repo.ts'
 
 export function createRemoteRoutes() {
   const app = createRouteApp()
@@ -22,8 +26,19 @@ export function createRemoteRoutes() {
   // a converged `ready`/`failed` lifecycle result. NEVER
   // returns `connecting` — that's a client projection.
   app.post('/lifecycle', async (c) => {
-    const { repoId } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.remoteLifecycle, c)
-    return c.json(await resolveServerRemoteRepoConnection({ repoId }, c.req.raw.signal))
+    const userId = userIdFromContext(c)
+    if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
+    const { repoId, repoRuntimeId } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.remoteLifecycle, c)
+    let resultName = repoId
+    const command = runRepoRemoteLifecycle(userId, repoId, repoRuntimeId, async (attemptSignal) => {
+      const result = await resolveServerRemoteRepoConnection({ repoId }, attemptSignal)
+      resultName = result.name
+      return result
+    })
+    publishUserRepoQueryInvalidation(userId, { repoId, query: 'repo-runtime' })
+    const lifecycle = await command
+    publishUserRepoQueryInvalidation(userId, { repoId, query: 'repo-runtime' })
+    return c.json({ repoId, name: resultName, lifecycle } satisfies RemoteRepoLifecycleCommandResult)
   })
   app.post('/path-suggestions', async (c) => {
     const { alias, remotePath, prefix } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.pathSuggestions, c)

@@ -30,6 +30,7 @@ import type {
   RemotePathSuggestionsInput,
   RepoSessionEntry,
   RemoteRepoTarget,
+  RemoteRepoRuntimeLifecycle,
   ResolvedRemoteTarget,
   SshConfigHostsResult,
 } from '#/shared/remote-repo.ts'
@@ -308,6 +309,8 @@ export interface RepoRuntimeProjection {
     pullRequestMode: PullRequestFetchMode
   }
   loadedAt: number
+  /** Present on runtime-aware reads; omitted only by legacy/test projections. */
+  remoteLifecycle?: RemoteRepoRuntimeLifecycle
 }
 
 export type { RemoteRepoTarget } from '#/shared/remote-repo.ts'

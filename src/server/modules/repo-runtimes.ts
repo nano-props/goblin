@@ -153,7 +153,8 @@ export async function runRepoRemoteLifecycle(
     ) {
       throw new StaleRepoRuntimeError()
     }
-    throw error
+    state.remoteLifecycle = { kind: 'failed', attemptId, reason: 'unknown' }
+    return state.remoteLifecycle
   } finally {
     if (state.remoteAttemptController === controller) state.remoteAttemptController = null
   }

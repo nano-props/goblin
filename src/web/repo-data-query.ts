@@ -287,7 +287,7 @@ async function fetchRepoProjectionReadModel(
   queryClient: QueryClient,
 ): Promise<RepoRuntimeProjection> {
   const startedVersion = markRepoProjectionFetchStarted(repoRoot, repoRuntimeId, branch, mode, queryClient)
-  const projection = await getRepoProjection(repoRoot, branch, { mode }, signal)
+  const projection = await getRepoProjection(repoRoot, branch, { mode, repoRuntimeId }, signal)
   signal.throwIfAborted()
   if (startedVersion < getRepoRuntimeProjectionInvalidationVersion(repoRoot, repoRuntimeId, queryClient)) {
     throw new StaleRepoRuntimeReadError()

@@ -143,6 +143,7 @@ export const REPO_PROCEDURE_SCHEMAS = {
   }),
   projection: v.object({
     cwd: v.string(),
+    repoRuntimeId: v.optional(v.pipe(v.string(), v.regex(OPAQUE_ID_RE))),
     branch: v.optional(v.string()),
     mode: v.optional(v.picklist(['summary', 'full'])),
   }),
@@ -159,7 +160,10 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
   // probes the remote repo, classifies the failure, and returns
   // a converged `RemoteRepoConnectionResult`. NEVER returns
   // 'connecting' — that's a client projection.
-  remoteLifecycle: v.object({ repoId: v.string() }),
+  remoteLifecycle: v.object({
+    repoId: v.string(),
+    repoRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
+  }),
   pathSuggestions: RemotePathSuggestionsInputSchema,
   testRepo: v.object({ target: RemoteTargetSchema }),
   openEditor: v.object({ repoId: v.string(), worktreePath: v.string(), app: EditorAppSchema }),

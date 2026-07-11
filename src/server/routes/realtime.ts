@@ -67,11 +67,13 @@ export function createRealtimeRoutes({ accessToken, appRealtimeHost }: RealtimeR
 
   app.get(
     '/invalidation',
-    upgradeWebSocket(() => {
+    upgradeWebSocket((c) => {
+      const userId = userIdFromContext(c)
       return {
         onOpen(_event, ws) {
           try {
-            registerInvalidationSocket(ws)
+            if (!userId) throw new Error('invalidation owner missing')
+            registerInvalidationSocket(ws, userId)
           } catch (err) {
             if (err instanceof InvalidationSocketLimitError) {
               try {
