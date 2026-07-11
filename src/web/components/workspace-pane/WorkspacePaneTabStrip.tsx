@@ -1054,14 +1054,14 @@ function WorkspacePaneTabChrome({
   const attentionLabel = isRuntimeWorkspacePaneTabItem(item) && item.attention ? runtimeAttentionLabel(item, t) : null
   const accessibleLabel = item.label || item.tooltip
   const ariaLabel = attentionLabel ? `${accessibleLabel} — ${attentionLabel}` : accessibleLabel
-  const closeProps =
-    isPendingWorkspacePaneTabItem(item) || interactionDisabled
-      ? ({ closeButton: false } as const)
-      : ({
-          closeLabel: item.closeLabel,
-          closeVisible: isActive && !compact,
-          onClose: (e: React.MouseEvent<HTMLButtonElement>) => onClose(e, item.identity),
-        } as const)
+  const closeProps = isPendingWorkspacePaneTabItem(item)
+    ? ({ closeButton: 'placeholder' } as const)
+    : ({
+        closeLabel: item.closeLabel,
+        closeVisible: isActive && !compact,
+        closeDisabled: interactionDisabled,
+        onClose: (e: React.MouseEvent<HTMLButtonElement>) => onClose(e, item.identity),
+      } as const)
   const collectionAria =
     index !== undefined && total !== undefined
       ? {

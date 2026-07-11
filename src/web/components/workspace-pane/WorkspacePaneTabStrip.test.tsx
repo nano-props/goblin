@@ -212,6 +212,7 @@ describe('WorkspacePaneTabStrip', () => {
       <TestWorkspacePaneTabStrip
         terminalWorktreeKey="/repo\0/repo/worktree"
         workspacePaneId="workspace"
+        panelActive
         newTerminalBusy
         newTerminalBlocksTabInteraction
         sessions={[
@@ -227,16 +228,48 @@ describe('WorkspacePaneTabStrip', () => {
     )
 
     const inactiveTab = document.body.querySelector<HTMLButtonElement>('#workspace-workspace-pane-tab-1')
+    const activeClose = document.body.querySelector<HTMLButtonElement>('button[aria-label="close term-1"]')
+    const inactiveClose = document.body.querySelector<HTMLButtonElement>('button[aria-label="close term-2"]')
     expect(inactiveTab).not.toBeNull()
     expect(inactiveTab?.disabled).toBe(true)
-    expect(document.body.querySelector('button[aria-label="close term-2"]')).toBeNull()
+    expect(activeClose).not.toBeNull()
+    expect(activeClose?.disabled).toBe(true)
+    expect(activeClose?.className).toContain('opacity-100')
+    expect(inactiveClose).not.toBeNull()
+    expect(inactiveClose?.disabled).toBe(true)
+    expect(inactiveClose?.className).toContain('opacity-0')
+    expect(inactiveClose?.className).not.toContain('group-hover:opacity-100')
 
     act(() => {
       inactiveTab?.click()
+      activeClose?.click()
+      inactiveClose?.click()
     })
 
     expect(onSelect).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
+  })
+
+  test('reserves close-action space for a pending terminal tab', () => {
+    render(
+      <TestWorkspacePaneTabStrip
+        terminalWorktreeKey="/repo\0/repo/worktree"
+        workspacePaneId="workspace"
+        pendingTerminal
+        newTerminalBusy
+        newTerminalBlocksTabInteraction
+        sessions={[session({ terminalSessionId: 'term-111111111111111111111', selected: true, title: 'term-1' })]}
+        onNew={() => {}}
+        onSelect={() => {}}
+        onScrollToBottom={() => {}}
+        onClose={() => {}}
+        onReorder={() => {}}
+      />,
+    )
+
+    const pendingTab = document.body.querySelector('[data-workspace-pane-pending-tab="terminal"]')
+    expect(pendingTab?.querySelector('[data-toolbar-tab-close-placeholder]')).not.toBeNull()
+    expect(pendingTab?.querySelector('button[aria-label^="close "]')).toBeNull()
   })
 
   test('blocks compact popover tab switching while terminal creation is pending', async () => {
