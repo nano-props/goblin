@@ -11,7 +11,7 @@ import {
 } from '#/web/primary-window-presentation.ts'
 import {
   resolveWorkspacePaneDestinationTargetLease,
-  workspacePaneDestinationTargetLeaseIsCurrent,
+  workspacePaneTargetLeaseIsCurrent,
   type WorkspacePaneDestinationTargetLease,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
@@ -35,7 +35,7 @@ export function beginWorkspacePaneDestinationPresentation(
 export function workspacePaneDestinationPresentationIsCurrent(
   presentation: WorkspacePaneDestinationPresentation,
 ): boolean {
-  return primaryWindowPresentationIsCurrent(presentation.token) && workspacePaneDestinationTargetLeaseIsCurrent(presentation.lease)
+  return primaryWindowPresentationIsCurrent(presentation.token) && workspacePaneTargetLeaseIsCurrent(presentation.lease)
 }
 
 export function resetWorkspacePaneDestinationPresentationForTest(): void {

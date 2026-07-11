@@ -29,7 +29,7 @@ beforeEach(() => {
   // store; `resetLifecycleTest` covers that.
   resetLifecycleTest()
   vi.mocked(runRemoteRepoConnection).mockClear()
-  vi.mocked(runRemoteRepoConnection).mockResolvedValue({ kind: 'superseded', repoId: 'remote', name: 'remote' })
+  vi.mocked(runRemoteRepoConnection).mockResolvedValue({ kind: 'superseded', repoId: 'remote' })
 })
 
 function fireOnline(): void {
@@ -226,15 +226,16 @@ describe('useNetworkReconnect', () => {
 
   test('owns transport failures from the fire-and-forget online event', async () => {
     const target = remoteTargetFixture()
-    const error = new Error('offline')
     const warn = vi.spyOn(goblinLog, 'warn').mockImplementation(() => undefined)
-    vi.mocked(runRemoteRepoConnection).mockRejectedValueOnce(error)
+    vi.mocked(runRemoteRepoConnection).mockResolvedValueOnce({
+      kind: 'transport-failed', repoId: target.id, reason: 'unknown',
+    })
     seedRepo(target.id, { kind: 'failed', reason: 'unreachable' })
     mountHook()
 
     fireOnline()
     for (let i = 0; i < 10; i += 1) await Promise.resolve()
 
-    expect(warn).toHaveBeenCalledWith('remote reconnect command failed', { repoId: target.id, error })
+    expect(warn).toHaveBeenCalledWith('remote reconnect command failed', { repoId: target.id, reason: 'unknown' })
   })
 })

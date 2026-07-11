@@ -4,16 +4,16 @@ import { acceptRemoteLifecycleProjection } from '#/web/stores/repos/remote-lifec
 import { requestRepoProjectionReadModelRefresh } from '#/web/stores/repos/refresh.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 
-interface RemoteRepoConnectionOutcome {
-  kind: 'ready' | 'failed' | 'superseded' | 'stale-runtime'
-  reason?: RemoteRepoFailureReason
-  repoId: string
-  name: string
-  target?: RemoteRepoTarget
-}
+export type RemoteRepoConnectionOutcome =
+  | { kind: 'ready'; repoId: string; name: string; target: RemoteRepoTarget }
+  | { kind: 'failed'; repoId: string; name: string; reason: RemoteRepoFailureReason; target?: RemoteRepoTarget }
+  | { kind: 'superseded'; repoId: string }
+  | { kind: 'stale-runtime'; repoId: string }
+  | { kind: 'cancelled'; repoId: string }
+  | { kind: 'transport-failed'; repoId: string; reason: 'unknown' }
 
 function commandOutcome(result: RemoteRepoLifecycleCommandResult): RemoteRepoConnectionOutcome {
-  if (result.kind !== 'settled') return { kind: result.kind, repoId: result.repoId, name: result.repoId }
+  if (result.kind !== 'settled') return { kind: result.kind, repoId: result.repoId }
   const lifecycle = result.lifecycle
   if (lifecycle.kind === 'ready') {
     return { kind: 'ready', repoId: result.repoId, name: result.name, target: lifecycle.target }
@@ -49,7 +49,13 @@ export async function runRemoteRepoConnection(
   const repoRuntimeId = options.repoRuntimeId ?? get().repos[repoId]?.repoRuntimeId
   if (!repoRuntimeId) return null
 
-  const result = await resolveRemoteRepoConnection({ repoId, repoRuntimeId }, options.signal)
+  let result: RemoteRepoLifecycleCommandResult
+  try {
+    result = await resolveRemoteRepoConnection({ repoId, repoRuntimeId }, options.signal)
+  } catch (error) {
+    if (options.signal?.aborted || isAbortError(error)) return { kind: 'cancelled', repoId }
+    return { kind: 'transport-failed', repoId, reason: 'unknown' }
+  }
   const outcome = commandOutcome(result)
   if (result.kind === 'settled') {
     const accepted = acceptRemoteLifecycleProjection(
@@ -63,4 +69,8 @@ export async function runRemoteRepoConnection(
     }
   }
   return outcome
+}
+
+function isAbortError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError'
 }

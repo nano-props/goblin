@@ -74,11 +74,21 @@ describe('remote lifecycle command client', () => {
     })
   })
 
-  test('does not synthesize a local failed state when waiting for the command aborts', async () => {
+  test('normalizes command abort without synthesizing local lifecycle state', async () => {
     vi.mocked(resolveRemoteRepoConnection).mockRejectedValue(new DOMException('aborted', 'AbortError'))
     await expect(
       runRemoteRepoConnection(useReposStore.setState, useReposStore.getState, repoId),
-    ).rejects.toMatchObject({ name: 'AbortError' })
+    ).resolves.toEqual({ kind: 'cancelled', repoId })
+    expect(useReposStore.getState().repos[repoId]?.remote.lifecycle).toEqual({
+      kind: 'failed', reason: 'unreachable',
+    })
+  })
+
+  test('normalizes transport failure without synthesizing local lifecycle state', async () => {
+    vi.mocked(resolveRemoteRepoConnection).mockRejectedValue(new Error('offline'))
+    await expect(
+      runRemoteRepoConnection(useReposStore.setState, useReposStore.getState, repoId),
+    ).resolves.toEqual({ kind: 'transport-failed', repoId, reason: 'unknown' })
     expect(useReposStore.getState().repos[repoId]?.remote.lifecycle).toEqual({
       kind: 'failed', reason: 'unreachable',
     })

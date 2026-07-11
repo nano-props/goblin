@@ -155,7 +155,11 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
               }
               // Remote entries submit the server-owned lifecycle command.
               const outcome = await runRemoteRepoConnection(set, get, entry.id, { signal })
-              if (signal?.aborted) return
+              if (signal?.aborted || outcome?.kind === 'cancelled') return
+              if (outcome?.kind === 'transport-failed') {
+                markOpenEntryFailed(entry)
+                return
+              }
               // Hydration keeps the restored repo id in sync with the accepted server projection. The
               // command adapter updates the local projection; we then
               // re-derive the restored repo id after each settlement.

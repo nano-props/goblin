@@ -228,6 +228,39 @@ describe('repo lifecycle', () => {
     expect(calls.recent).toEqual([remoteRepoSessionEntry(target!)])
   })
 
+  test('ensureWorkspaceOpen returns a failure when the remote command transport fails', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'example', host: 'example.com', user: 'developer', port: 22, remotePath: '/srv/repo',
+    })
+    expect(target).not.toBeNull()
+    installGoblin({
+      'remote.lifecycle': () => {
+        throw new Error('offline')
+      },
+    })
+
+    await expect(
+      useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(target!)),
+    ).resolves.toEqual({ ok: false, message: 'error.failed-read-repo' })
+  })
+
+  test('retryRemoteRepoConnection returns a failure when the command transport fails', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'example', host: 'example.com', user: 'developer', port: 22, remotePath: '/srv/repo',
+    })
+    expect(target).not.toBeNull()
+    installGoblin({
+      'remote.lifecycle': () => {
+        throw new Error('offline')
+      },
+    })
+    await useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(target!))
+
+    await expect(useReposStore.getState().retryRemoteRepoConnection(target!.id)).resolves.toEqual({
+      ok: false, reason: 'unknown',
+    })
+  })
+
   test('ensureWorkspaceOpen uses the canonical remote name instead of a stale cached name', async () => {
     const target = normalizeRemoteTarget({
       alias: 'example',

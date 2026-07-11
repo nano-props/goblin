@@ -36,6 +36,8 @@ export interface WorkspacePaneDestinationTargetLease extends WorkspacePaneAction
   worktreePath: string | null
 }
 
+export type WorkspacePaneTargetLease = WorkspacePaneActionTarget & { branchName: string }
+
 export type WorkspacePaneDestinationTargetResolution =
   | { kind: 'ready'; lease: WorkspacePaneDestinationTargetLease }
   | { kind: 'missing' }
@@ -69,7 +71,7 @@ export function resolveWorkspacePaneDestinationTargetLease(
   return resolution.kind === 'ready' ? resolution.lease : null
 }
 
-export function workspacePaneDestinationTargetLeaseIsCurrent(lease: WorkspacePaneDestinationTargetLease): boolean {
+export function workspacePaneTargetLeaseIsCurrent(lease: WorkspacePaneTargetLease): boolean {
   const current = resolveWorkspacePaneDestinationTargetLease(lease.repoId, lease.branchName)
   return (
     current !== null &&

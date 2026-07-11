@@ -453,10 +453,15 @@ export function createRuntimeRepoSessionActions(
         }
         const outcome = await runRemoteRepoConnection(set, get, entry.id)
         if (!outcome) return { ok: false, message: 'error.not-git-repo' }
-        if (outcome.kind === 'superseded' || outcome.kind === 'stale-runtime') {
+        if (
+          outcome.kind === 'superseded' ||
+          outcome.kind === 'stale-runtime' ||
+          outcome.kind === 'cancelled' ||
+          outcome.kind === 'transport-failed'
+        ) {
           return { ok: false, message: 'error.failed-read-repo' }
         }
-        if (outcome.kind === 'ready' && outcome.target) {
+        if (outcome.kind === 'ready') {
           const recentEntry = remoteRepoSessionEntry(outcome.target)
           return { ok: true, id: outcome.repoId, postOpenEffects: recordRecentRepoPostOpen(recentEntry) }
         }
@@ -517,7 +522,8 @@ export function createRuntimeRepoSessionActions(
       if (!isRemoteRepoId(id)) return null
       const outcome = await runRemoteRepoConnection(set, get, id)
       if (!outcome) return null
-      if (outcome.kind === 'superseded' || outcome.kind === 'stale-runtime') return null
+      if (outcome.kind === 'superseded' || outcome.kind === 'stale-runtime' || outcome.kind === 'cancelled') return null
+      if (outcome.kind === 'transport-failed') return { ok: false, reason: outcome.reason }
       if (outcome.kind === 'ready') return { ok: true }
       return { ok: false, reason: outcome.reason ?? 'unknown' }
     },

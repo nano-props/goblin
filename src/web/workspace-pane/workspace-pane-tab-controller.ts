@@ -1,7 +1,5 @@
 import type { ParsedRepoBranchWorkspacePaneRouteTarget, RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
   isRepoWorkspaceRuntimeTab,
   type RepoWorkspaceTab,
@@ -13,6 +11,7 @@ import {
 } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import { commitWorkspacePaneRouteSupplement } from '#/web/workspace-pane/workspace-pane-route-supplement.ts'
+import { workspacePaneTargetLeaseIsCurrent } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
   beginPrimaryWindowPresentation,
   primaryWindowPresentationIsCurrent,
@@ -30,7 +29,6 @@ export type WorkspacePaneTabControllerCommitNavigation = Pick<
   'commitRepoBranchWorkspacePaneRoute'
 >
 type WorkspacePaneTabControllerOptionalShowNavigation = Partial<WorkspacePaneTabControllerShowNavigation>
-type MaybePromise<T> = T | Promise<T>
 
 export function workspacePaneControllerRouteForTab(tab: RepoWorkspaceTab): WorkspacePaneTabControllerRoute | undefined {
   if (isRepoWorkspaceRuntimeTab(tab)) {
@@ -130,14 +128,18 @@ export function showWorkspacePaneControllerRoute(
   )
 }
 
-export function commitWorkspacePaneControllerRoute(
+export async function commitWorkspacePaneControllerRoute(
   repoId: string,
   branchName: string,
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneTabControllerCommitNavigation,
   options?: { replace?: boolean; presentationToken?: PrimaryWindowPresentationToken; onCommit?: () => void },
-): MaybePromise<boolean> {
-  return navigation.commitRepoBranchWorkspacePaneRoute(repoId, branchName, route, options)
+): Promise<boolean> {
+  try {
+    return await navigation.commitRepoBranchWorkspacePaneRoute(repoId, branchName, route, options)
+  } catch {
+    return false
+  }
 }
 
 export async function commitWorkspacePaneCurrentTargetRoute(
@@ -180,7 +182,7 @@ export async function commitWorkspacePaneExactTargetRoute(
 }
 
 export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneActionTarget): boolean {
-  return currentRepoRuntimeId(useReposStore.getState(), target.repoId) === target.repoRuntimeId
+  return target.branchName !== null && workspacePaneTargetLeaseIsCurrent({ ...target, branchName: target.branchName })
 }
 
 function workspacePaneTabControllerRouteFromParsed(

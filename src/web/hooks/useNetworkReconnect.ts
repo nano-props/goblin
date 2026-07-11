@@ -6,8 +6,10 @@ import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import { goblinLog } from '#/web/logger.ts'
 
 function reconnectRemoteRepo(set: ReposSet, get: ReposGet, repoId: string): void {
-  void runRemoteRepoConnection(set, get, repoId).catch((error) => {
-    goblinLog.warn('remote reconnect command failed', { repoId, error })
+  void runRemoteRepoConnection(set, get, repoId).then((outcome) => {
+    if (outcome?.kind === 'transport-failed') {
+      goblinLog.warn('remote reconnect command failed', { repoId, reason: outcome.reason })
+    }
   })
 }
 

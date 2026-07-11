@@ -9,7 +9,12 @@ import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/sha
 import type { RepoWorkspaceStaticTab, RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import {
+  createRepoBranch,
+  resetReposStore,
+  seedRepoReadModelQueryData,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/bridge.ts'
 
 const SOURCE_ROUTE = { kind: 'static' as const, tab: 'files' as const }
 const TARGET_ROUTE = { kind: 'static' as const, tab: 'status' as const }
@@ -53,6 +58,41 @@ describe('workspace pane tab controller transactions', () => {
       repos: { ...state.repos, '/repo': { ...state.repos['/repo']!, repoRuntimeId: 'repo-runtime-2' } },
     }))
     commit.resolve(true)
+    await expect(completion).resolves.toBe(false)
+  })
+
+  test('normalizes a navigation rejection to false', async () => {
+    await expect(
+      commitWorkspacePaneExactTargetRoute(workspacePaneTarget(), SOURCE_ROUTE, TARGET_ROUTE, {
+        commitRepoBranchWorkspacePaneRoute: vi.fn(async () => {
+          throw new Error('router failed')
+        }),
+      }),
+    ).resolves.toBe(false)
+  })
+
+  test('rejects completion when the target worktree changes while navigation settles', async () => {
+    const commit = Promise.withResolvers<boolean>()
+    const navigation: WorkspacePaneTabControllerCommitNavigation = {
+      commitRepoBranchWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
+        options?.onCommit?.()
+        return commit.promise
+      }),
+    }
+    const completion = commitWorkspacePaneExactTargetRoute(
+      workspacePaneTarget(),
+      SOURCE_ROUTE,
+      TARGET_ROUTE,
+      navigation,
+    )
+    const repo = useReposStore.getState().repos['/repo']!
+    seedRepoReadModelQueryData(repo, {
+      branches: [createRepoBranch('feature/a', { worktree: { path: '/worktree-b' } })],
+      currentBranch: 'feature/a',
+      status: [],
+    })
+    commit.resolve(true)
+
     await expect(completion).resolves.toBe(false)
   })
 
