@@ -69,7 +69,7 @@ export function useBranchActionItems(
       repoId: repo.id,
       branchName: branch.name,
       type,
-      insertAfterIdentity: null,
+      workspacePaneRoute: options.workspacePaneRoute,
       navigation,
     })
   }

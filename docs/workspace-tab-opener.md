@@ -10,6 +10,8 @@ The strip splits based on **how** the action was triggered:
 - **From a generic entry** (`+` button, branch navigator, command palette "Show …", empty-state CTA) → new tab **appends to the end**. Opener is still recorded — it's the tab active at click time — but the new tab does not displace anything.
 
 The opener is captured at click time and does not change afterwards.
+Existing tabs' opener records never participate in a later tab's placement.
+They are close-back facts, not sibling-group or insertion-chain metadata.
 Runtime create commands should capture the opener at the user-action boundary,
 then record the new tab's opener as soon as the server/projection has minted
 the child tab identity and before routing to the child tab. The route should
