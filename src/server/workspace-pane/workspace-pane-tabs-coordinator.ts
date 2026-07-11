@@ -54,13 +54,13 @@ interface CanonicalWorkspaceTabsRevisionState {
   revision: number
 }
 
-function mutateCanonicalWorkspaceRuntimeTabs(input: {
+function mutateCanonicalWorkspaceTabLayout(input: {
   branchName: string
   worktreePath: string | null
   layoutTabs: readonly WorkspacePaneTabEntry[]
   providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
   mutate: (currentTabs: WorkspacePaneTabEntry[]) => WorkspacePaneTabEntry[]
-}): { layoutTabs: WorkspacePaneTabEntry[]; canonicalTabs: WorkspacePaneTabEntry[] } {
+}): WorkspacePaneTabEntry[] {
   const currentTabs = canonicalWorkspaceRuntimeTabsForTarget({
     entry: {
       branchName: input.branchName,
@@ -69,14 +69,7 @@ function mutateCanonicalWorkspaceRuntimeTabs(input: {
     },
     providerSnapshots: input.providerSnapshots,
   })
-  const layoutTabs = input.mutate(currentTabs)
-  return {
-    layoutTabs,
-    canonicalTabs: canonicalWorkspaceRuntimeTabsForTarget({
-      entry: { branchName: input.branchName, worktreePath: input.worktreePath, tabs: layoutTabs },
-      providerSnapshots: input.providerSnapshots,
-    }),
-  }
+  return input.mutate(currentTabs)
 }
 
 interface WorkspacePaneTabsCoordinatorOptions {
@@ -127,7 +120,7 @@ export class WorkspacePaneTabsCoordinator {
       const failure = input.guardBeforeWrite?.() ?? null
       if (failure) return failure
       this.worktreeOperations.assertPermit(physicalCapability, input.permit)
-      const mutation = mutateCanonicalWorkspaceRuntimeTabs({
+      const layoutTabs = mutateCanonicalWorkspaceTabLayout({
         branchName: input.branchName,
         worktreePath: input.worktreePath,
         layoutTabs: this.workspaceTabs.tabs(target),
@@ -142,7 +135,7 @@ export class WorkspacePaneTabsCoordinator {
       this.workspaceTabs.replaceTabs({
         ...target,
         physicalWorktreeIdentity: physicalCapability.identity,
-        tabs: mutation.layoutTabs,
+        tabs: layoutTabs,
       })
       return this.projectedScopeSnapshot(input.userId, input.repoRoot, input.scope, providerSnapshots)
     })
@@ -201,7 +194,7 @@ export class WorkspacePaneTabsCoordinator {
         }
         const providerSnapshots = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
         input.assertCurrent()
-        const mutation = mutateCanonicalWorkspaceRuntimeTabs({
+        const layoutTabs = mutateCanonicalWorkspaceTabLayout({
           branchName: input.branchName,
           worktreePath: input.worktreePath,
           layoutTabs: this.workspaceTabs.tabs(target),
@@ -212,7 +205,7 @@ export class WorkspacePaneTabsCoordinator {
         this.workspaceTabs.replaceTabs({
           ...target,
           physicalWorktreeIdentity: physicalCapability?.identity ?? null,
-          tabs: mutation.layoutTabs,
+          tabs: layoutTabs,
         })
         return this.projectedScopeSnapshot(input.userId, input.repoRoot, input.scope, providerSnapshots)
       })
