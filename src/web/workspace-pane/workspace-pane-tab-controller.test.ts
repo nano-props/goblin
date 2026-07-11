@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   beginWorkspacePaneCloseActiveTabPresentationLease,
   commitWorkspacePaneControllerCloseBackTarget,
+  commitWorkspacePaneExactTargetRoute,
   commitWorkspacePaneCurrentTargetRoute,
   observeWorkspacePaneTabControllerRoute,
   resetWorkspacePaneTabControllerForTest,
@@ -57,6 +58,38 @@ describe('workspace pane tab controller transactions', () => {
     observeWorkspacePaneTabControllerRoute({ ...target, route: TARGET_ROUTE })
     await expect(committed).resolves.toBe(true)
     expect(setWorkspacePaneTab).toHaveBeenCalledWith('/repo', 'feature/a', 'status')
+  })
+
+  test('commits an exact target route without feature route observation', async () => {
+    const target = workspacePaneTarget()
+    const setWorkspacePaneTab = vi.spyOn(useReposStore.getState(), 'setWorkspacePaneTab')
+
+    await expect(
+      commitWorkspacePaneExactTargetRoute(target, SOURCE_ROUTE, TARGET_ROUTE, committingNavigation()),
+    ).resolves.toBe(true)
+
+    expect(setWorkspacePaneTab).toHaveBeenCalledWith('/repo', 'feature/a', 'status')
+  })
+
+  test('rejects exact target route completion after its runtime is replaced', async () => {
+    const target = workspacePaneTarget()
+    const commit = Promise.withResolvers<boolean>()
+    const navigation: WorkspacePaneTabControllerCommitNavigation = {
+      commitRepoBranchWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
+        options?.onCommit?.()
+        return commit.promise
+      }),
+    }
+    const completion = commitWorkspacePaneExactTargetRoute(target, SOURCE_ROUTE, TARGET_ROUTE, navigation)
+    useReposStore.setState((state) => ({
+      repos: {
+        ...state.repos,
+        '/repo': { ...state.repos['/repo']!, repoRuntimeId: 'repo-runtime-2' },
+      },
+    }))
+    commit.resolve(true)
+
+    await expect(completion).resolves.toBe(false)
   })
 
   test('rejects accepted navigation when the observer reaches a different route', async () => {

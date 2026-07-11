@@ -25,6 +25,8 @@ import {
   primaryWindowPresentationIsCurrent,
   type PrimaryWindowPresentationToken,
 } from '#/web/primary-window-presentation.ts'
+import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
 
 export type WorkspacePaneTabControllerRoute = RepoBranchWorkspacePaneRouteTarget
 export type WorkspacePaneTabControllerObservedRoute = ParsedRepoBranchWorkspacePaneRouteTarget
@@ -160,7 +162,41 @@ export async function selectWorkspacePaneControllerTab(
   if (!branchName) return false
   const route = workspacePaneControllerRouteForTab(tab)
   if (route === undefined) return false
-  return await commitWorkspacePaneCurrentTargetRoute(target, fromRoute, route, navigation, undefined, presentationToken)
+  if (fromRoute === undefined) {
+    return await commitWorkspacePaneCurrentTargetRoute(target, fromRoute, route, navigation, undefined, presentationToken)
+  }
+  return await commitWorkspacePaneExactTargetRoute(target, fromRoute, route, navigation, undefined, presentationToken)
+}
+
+export async function commitWorkspacePaneExactTargetRoute(
+  target: WorkspacePaneTabCoordinatorTarget,
+  fromRoute: WorkspacePaneTabControllerObservedRoute | undefined,
+  route: WorkspacePaneTabControllerRoute,
+  navigation: WorkspacePaneTabControllerCommitNavigation,
+  options?: { replace?: boolean },
+  presentationToken: PrimaryWindowPresentationToken = beginPrimaryWindowPresentation(),
+): Promise<boolean> {
+  if (!primaryWindowPresentationIsCurrent(presentationToken)) return false
+  const branchName = target.branchName
+  if (!branchName) return false
+  if (currentRepoRuntimeId(useReposStore.getState(), target.repoId) !== target.repoRuntimeId) return false
+  const sourceRoute = workspacePaneTabControllerRouteFromParsed(fromRoute)
+  if (sourceRoute === undefined) return false
+  if (workspacePaneTabControllerRoutesEqual(sourceRoute, route)) return true
+
+  let supplementCommitted = false
+  const committed = await commitWorkspacePaneControllerRoute(target.repoId, branchName, route, navigation, {
+    ...options,
+    presentationToken,
+    onCommit: () => {
+      supplementCommitted = commitWorkspacePaneRouteSupplement({ ...target, branchName }, route)
+    },
+  })
+  if (!committed || !supplementCommitted) return false
+  return (
+    primaryWindowPresentationIsCurrent(presentationToken) &&
+    currentRepoRuntimeId(useReposStore.getState(), target.repoId) === target.repoRuntimeId
+  )
 }
 
 export function commitWorkspacePaneControllerCloseBackTarget(

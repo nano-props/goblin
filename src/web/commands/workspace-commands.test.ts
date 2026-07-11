@@ -2876,7 +2876,7 @@ function workspacePaneTabsSnapshot(base: TerminalSessionBase, tabs: WorkspacePan
   }
 }
 
-test('serializes A to B to C selection until each accepted route is observed', async () => {
+test('serializes A to B to C selection through exact route commits', async () => {
   const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -2892,11 +2892,11 @@ test('serializes A to B to C selection until each accepted route is observed', a
     worktreePath: WORKTREE_PATH,
   }
   observeWorkspacePaneTabControllerRoute({ ...target, route: { kind: 'static', tab: 'status' } })
-  const observations: WorkspacePaneNavigationObservation[] = []
-  const navigation = navigationWith({}, { autoSeedInitialRoute: false })
-  navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation, {
-    observeAcceptedRoute: (observation) => observations.push(observation),
+  const showRepoBranchWorkspacePaneTab = vi.fn((repoId: string, branchName: string, tab: WorkspacePaneStaticTabType) => {
+    useReposStore.getState().setWorkspacePaneTab(repoId, branchName, tab)
+    return true
   })
+  const navigation = navigationWith({ showRepoBranchWorkspacePaneTab }, { autoSeedInitialRoute: false })
 
   const selectFiles = dispatchSelectWorkspacePaneTabByIdentityAction({
     repoId: REPO_ID,
@@ -2905,7 +2905,6 @@ test('serializes A to B to C selection until each accepted route is observed', a
     identity: 'workspace-pane:files',
     navigation,
   })
-  await vi.waitFor(() => expect(observations).toHaveLength(1))
   const selectHistory = dispatchSelectWorkspacePaneTabByIdentityAction({
     repoId: REPO_ID,
     branchName: 'feature/worktree',
@@ -2913,18 +2912,10 @@ test('serializes A to B to C selection until each accepted route is observed', a
     identity: 'workspace-pane:history',
     navigation,
   })
-  await Promise.resolve()
-  expect(observations).toHaveLength(1)
-
-  const filesObservation = observations.shift()
-  if (!filesObservation) throw new Error('missing files route observation')
-  observeWorkspacePaneTabControllerRoute(filesObservation)
   await expect(selectFiles).resolves.toBe(false)
-  await vi.waitFor(() => expect(observations).toHaveLength(1))
-  const historyObservation = observations.shift()
-  if (!historyObservation) throw new Error('missing history route observation')
-  observeWorkspacePaneTabControllerRoute(historyObservation)
   await expect(selectHistory).resolves.toBe(true)
+  expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(1, REPO_ID, 'feature/worktree', 'files')
+  expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'history')
 })
 
 test('serializes open then move against the observer-confirmed opened route', async () => {
