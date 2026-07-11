@@ -628,9 +628,7 @@ describe('workspace commands', () => {
         'feature/worktree',
         'terminal:term-222222222222222222222',
       ),
-    ).toBe(
-      'terminal:term-111111111111111111111',
-    )
+    ).toBe('terminal:term-111111111111111111111')
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
       REPO_ID,
       'feature/worktree',
@@ -730,9 +728,7 @@ describe('workspace commands', () => {
         'feature/worktree',
         'terminal:term-222222222222222222222',
       ),
-    ).toBe(
-      'workspace-pane:status',
-    )
+    ).toBe('workspace-pane:status')
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
       REPO_ID,
       'feature/worktree',
@@ -788,9 +784,9 @@ describe('workspace commands', () => {
         navigation,
       }),
     ).toBe(true)
-    expect(
-      workspacePaneTabOpener(REPO_ID, repoRuntimeIdForTest(), 'feature/worktree', 'workspace-pane:files'),
-    ).toBe('workspace-pane:status')
+    expect(workspacePaneTabOpener(REPO_ID, repoRuntimeIdForTest(), 'feature/worktree', 'workspace-pane:files')).toBe(
+      'workspace-pane:status',
+    )
     expect(showRepoBranchWorkspacePaneTab).toHaveBeenLastCalledWith(REPO_ID, 'feature/worktree', 'files')
     showRepoBranchWorkspacePaneTab.mockClear()
 
@@ -2494,10 +2490,7 @@ describe('workspace commands', () => {
         repoId: REPO_ID,
         branchName: 'feature/worktree',
         workspacePaneRoute: null,
-        navigation: navigationWith(
-          { showRepoBranchWorkspacePaneTab },
-          { autoSeedInitialRoute: false },
-        ),
+        navigation: navigationWith({ showRepoBranchWorkspacePaneTab }, { autoSeedInitialRoute: false }),
         targetIdentity: 'workspace-pane:status',
       }),
     ).toBe(true)
@@ -2961,7 +2954,6 @@ test('serializes open then move against the observer-confirmed opened route', as
     branchName: 'feature/worktree',
     worktreePath: WORKTREE_PATH,
     type: 'files',
-    insertAfterIdentity: 'workspace-pane:status',
     workspacePaneRoute: { kind: 'static', tab: 'status' },
     navigation,
   })

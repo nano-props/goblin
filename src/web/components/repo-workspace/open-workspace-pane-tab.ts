@@ -12,7 +12,6 @@ export async function openWorkspacePaneTab(input: {
   worktreePath: string | null | undefined
   type: WorkspacePaneStaticTabType
   workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
-  insertAfterIdentity?: string | null
   navigation: WorkspacePaneTabControllerCommitNavigation
 }): Promise<boolean> {
   return await dispatchOpenWorkspacePaneStaticTabAction(input satisfies OpenWorkspacePaneStaticTabActionOptions)

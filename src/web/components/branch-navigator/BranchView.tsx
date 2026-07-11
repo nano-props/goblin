@@ -51,7 +51,7 @@ export function BranchView({ repoId, onSelectBranch, currentBranchName, onAfterS
       repoId,
       branchName,
       type: 'status',
-      insertAfterIdentity: null,
+      workspacePaneRoute: undefined,
       navigation,
     })
     onAfterOpenStatus?.(branchName)

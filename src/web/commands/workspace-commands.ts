@@ -112,7 +112,7 @@ async function showWorkspacePaneTabCommand({
       repoId,
       branchName,
       type: provider.type,
-      insertAfterIdentity: null,
+      workspacePaneRoute,
       navigation,
     })
     return workspacePaneActionOutcomeHandled(outcome)
