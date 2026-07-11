@@ -44,7 +44,7 @@ import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
+import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/repo-refresh-actions.ts'
 import { resetWorkspacePaneTabControllerForTest } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import { dispatchMoveWorkspacePaneTabAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
@@ -60,8 +60,8 @@ const toastMocks = vi.hoisted(() => ({
   error: vi.fn(),
 }))
 
-vi.mock('#/web/stores/repos/refresh-coordinator.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#/web/stores/repos/refresh-coordinator.ts')>()
+vi.mock('#/web/stores/repos/repo-refresh-actions.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#/web/stores/repos/repo-refresh-actions.ts')>()
   return { ...actual, requestVisibleRepoProjectionRefresh: vi.fn() }
 })
 

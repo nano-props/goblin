@@ -30,7 +30,7 @@ import {
 } from '#/web/stores/repos/branch-action-scheduler.ts'
 import type { RepoEventAction, RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import type { ExecResult } from '#/web/types.ts'
-import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
+import { requestRepoProjectionReadModelRefresh } from '#/web/stores/repos/refresh.ts'
 import {
   createRepoWorktree,
   deleteRepoBranch,
@@ -307,10 +307,7 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
         if (!shouldRefreshBranchActionProjection(result, options)) return
         const repo = get().repos[id]
         if (repo?.repoRuntimeId !== repoRuntimeId) return
-        await runRepoRefreshIntent(
-          { get, set },
-          { kind: 'projection-read-model-refresh-requested', reason: 'branch-action', id, repoRuntimeId },
-        )
+        await requestRepoProjectionReadModelRefresh({ get, set }, id, { repoRuntimeId })
       }
       const handleResult = async (result: ExecResult, ctx: RepoOperationContext) => {
         const ownsFetchDataLoad = ownsNetworkFetchDataLoad(ctx)

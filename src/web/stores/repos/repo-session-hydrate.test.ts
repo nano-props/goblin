@@ -409,7 +409,7 @@ describe('repo session hydration', () => {
 
     // The lifecycle union owns the failure signal. The `availability`
     // mirror field is kept for refresh pipeline guards
-    // (refresh.ts / refresh-coordinator.ts), but is not authoritative;
+    // (refresh.ts / repo-refresh-actions.ts), but is not authoritative;
     // this assertion pins the union shape, not the mirror.
     expect(useReposStore.getState().repos[target!.id]).toMatchObject({
       id: target!.id,

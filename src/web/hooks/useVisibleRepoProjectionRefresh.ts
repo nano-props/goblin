@@ -3,9 +3,9 @@ import { useStoreWithEqualityFn } from 'zustand/traditional'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import {
   isRepoVisibleProjectionRefreshable,
-  runRepoRefreshIntent,
+  requestVisibleRepoRuntimeProjectionRefresh,
   type RepoVisibleProjectionRefreshState,
-} from '#/web/stores/repos/refresh-coordinator.ts'
+} from '#/web/stores/repos/repo-refresh-actions.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
@@ -168,34 +168,25 @@ export function useVisibleRepoProjectionRefresh({
     [branchName, currentRepoShell, preferredWorkspacePaneTab, renderedWorkspacePaneTab],
   )
   const lastRequestedVisibleProjectionKey = useRef<string | null>(null)
-  const lastRequestedBranchName = useRef<string | null>(null)
 
   useEffect(() => {
     if (!currentRepoRefreshState) {
       lastRequestedVisibleProjectionKey.current = null
-      lastRequestedBranchName.current = null
       return
     }
     const nextVisibleProjectionKey = visibleProjectionRefreshKey(currentRepoRefreshState)
     if (!nextVisibleProjectionKey) {
       lastRequestedVisibleProjectionKey.current = null
-      lastRequestedBranchName.current = null
       return
     }
     if (nextVisibleProjectionKey === lastRequestedVisibleProjectionKey.current) return
     if (!isRepoVisibleProjectionRefreshable(currentRepoRefreshState)) return
-    const previousBranchName = lastRequestedBranchName.current
     lastRequestedVisibleProjectionKey.current = nextVisibleProjectionKey
-    lastRequestedBranchName.current = currentRepoRefreshState.branchName
-    void runRepoRefreshIntent({ get: useReposStore.getState, set: useReposStore.setState }, {
-      kind: 'visible-runtime-projection-requested',
-      reason:
-        previousBranchName !== null && previousBranchName !== currentRepoRefreshState.branchName
-          ? 'visible-projection-branch-changed'
-          : 'visible-projection-view-opened',
-      id: currentRepoRefreshState.id,
-      repoRuntimeId: currentRepoRefreshState.repoRuntimeId,
-      branchName: currentRepoRefreshState.branchName,
-    })
+    void requestVisibleRepoRuntimeProjectionRefresh(
+      { get: useReposStore.getState, set: useReposStore.setState },
+      currentRepoRefreshState.id,
+      currentRepoRefreshState.repoRuntimeId,
+      currentRepoRefreshState.branchName,
+    )
   }, [currentRepoRefreshState])
 }

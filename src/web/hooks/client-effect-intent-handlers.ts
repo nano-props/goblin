@@ -1,7 +1,7 @@
 import { toast } from 'sonner'
 import { isShortcutBlockingLayerOpen } from '#/web/lib/layers.ts'
 import { isTerminalFocused } from '#/web/terminal-focus.ts'
-import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
+import { runManualRepoSync } from '#/web/stores/repos/refresh.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
@@ -197,9 +197,7 @@ export async function handleWorkspaceClientIntent(
       deps.navigation.cycleRepo(plan.direction)
       return true
     case 'refresh-repo':
-      await runRepoRefreshIntent({ get: useReposStore.getState, set: useReposStore.setState }, {
-        kind: 'manual-refresh-requested',
-        id: plan.repoId,
+      await runManualRepoSync({ get: useReposStore.getState, set: useReposStore.setState }, plan.repoId, {
         repoRuntimeId: plan.repoRuntimeId,
       })
       return true

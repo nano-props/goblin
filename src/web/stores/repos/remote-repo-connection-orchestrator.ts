@@ -41,7 +41,7 @@ import {
 } from '#/web/stores/repos/repo-session-write-paths.ts'
 import { markRemoteLifecycleConnecting } from '#/web/stores/repos/availability.ts'
 import { runLatestOperation } from '#/web/stores/repos/operation-runner.ts'
-import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
+import { requestRepoProjectionReadModelRefresh } from '#/web/stores/repos/refresh.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import { resolveRemoteRepoConnection } from '#/web/remote-client.ts'
 
@@ -139,10 +139,7 @@ export async function runRemoteRepoConnection(
         })
         const pending = refreshHolder.value
         if (pending) {
-          void runRepoRefreshIntent({ get, set }, {
-            kind: 'projection-read-model-refresh-requested',
-            reason: 'initial-load',
-            id: pending.id,
+          void requestRepoProjectionReadModelRefresh({ get, set }, pending.id, {
             repoRuntimeId: pending.repoRuntimeId,
           })
         }

@@ -5,7 +5,7 @@ import {
   seedRepoProjectionQueryFromCacheEntry,
 } from '#/web/stores/repos/persistence.ts'
 import { disposeRepoOperationScheduler } from '#/web/stores/repos/repo-operation-scheduler.ts'
-import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
+import { requestRepoProjectionReadModelRefresh } from '#/web/stores/repos/refresh.ts'
 import {
   abortRepoOperation,
   closeRepoRuntime,
@@ -426,12 +426,7 @@ export function insertPlaceholderRepo(
 export function refreshInitialRepoState(set: ReposSet, get: ReposGet, refresh: InitialRepoRefresh) {
   const repo = get().repos[refresh.id]
   if (!repo || repo.repoRuntimeId !== refresh.repoRuntimeId) return
-  void runRepoRefreshIntent({ get, set }, {
-    kind: 'projection-read-model-refresh-requested',
-    reason: 'initial-load',
-    id: refresh.id,
-    repoRuntimeId: refresh.repoRuntimeId,
-  })
+  void requestRepoProjectionReadModelRefresh({ get, set }, refresh.id, { repoRuntimeId: refresh.repoRuntimeId })
 }
 
 export function createRuntimeRepoSessionActions(

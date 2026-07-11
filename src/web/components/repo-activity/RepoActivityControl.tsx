@@ -6,7 +6,7 @@ import type { RepoEvent, RepoState } from '#/web/stores/repos/types.ts'
 import { useI18nStore, useT } from '#/web/stores/i18n.ts'
 import { Tip } from '#/web/components/Tip.tsx'
 import { AsyncButton } from '#/web/components/AsyncButton.tsx'
-import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
+import { runManualRepoSync } from '#/web/stores/repos/refresh.ts'
 import type {
   RepoActivity,
   RepoActivityProjectionRepo,
@@ -161,11 +161,7 @@ function RepoRefreshButton({ repo, manualSyncBusy }: { repo: RepoActivityControl
     // Fire-and-forget so AsyncButton's internal pending state does not fight
     // the external manualSyncBusy prop. The visual loading state is owned by
     // the operation, not the click promise.
-    void runRepoRefreshIntent({ get: useReposStore.getState, set: useReposStore.setState }, {
-      kind: 'manual-refresh-requested',
-      id: repo.id,
-      repoRuntimeId,
-    })
+    void runManualRepoSync({ get: useReposStore.getState, set: useReposStore.setState }, repo.id, { repoRuntimeId })
   }
 
   const fetchTooltipKey = repo.remote.hasRemotes === false ? 'action.fetch-local-title' : 'action.fetch-title'

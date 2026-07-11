@@ -27,7 +27,7 @@ import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-p
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
-import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
+import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/repo-refresh-actions.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import {
   observedWorkspacePaneRouteCommitForTest,
@@ -35,8 +35,8 @@ import {
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
 
-vi.mock('#/web/stores/repos/refresh-coordinator.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#/web/stores/repos/refresh-coordinator.ts')>()
+vi.mock('#/web/stores/repos/repo-refresh-actions.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#/web/stores/repos/repo-refresh-actions.ts')>()
   return { ...actual, requestVisibleRepoProjectionRefresh: vi.fn() }
 })
 

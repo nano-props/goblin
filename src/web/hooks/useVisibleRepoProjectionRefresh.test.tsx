@@ -19,17 +19,17 @@ import type { TerminalSessionReadContextValue, TerminalWorktreeSnapshot } from '
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
-import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
+import { requestVisibleRepoRuntimeProjectionRefresh } from '#/web/stores/repos/repo-refresh-actions.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 import type { BranchSnapshotInfo, WorktreeStatus } from '#/web/types.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
-vi.mock('#/web/stores/repos/refresh-coordinator.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#/web/stores/repos/refresh-coordinator.ts')>()
-  return { ...actual, runRepoRefreshIntent: vi.fn(async () => {}) }
+vi.mock('#/web/stores/repos/repo-refresh-actions.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#/web/stores/repos/repo-refresh-actions.ts')>()
+  return { ...actual, requestVisibleRepoRuntimeProjectionRefresh: vi.fn(async () => {}) }
 })
 
-const refreshIntent = vi.mocked(runRepoRefreshIntent)
+const refreshIntent = vi.mocked(requestVisibleRepoRuntimeProjectionRefresh)
 const emptyTerminalWorktreeSnapshots = new Map<string, TerminalWorktreeSnapshot>()
 const emptyTerminalSnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
 const emptyTerminalWorktreeSnapshot = (terminalWorktreeKey: string): TerminalWorktreeSnapshot => {
@@ -134,12 +134,9 @@ function setVisibleStatusPhase(repoId: string, phase: 'idle' | 'loading' | 'refr
 function expectVisibleProjectionRefresh(repoId: string, repoRuntimeId: string, branchName: string): void {
   expect(refreshIntent).toHaveBeenCalledWith(
     expect.objectContaining({ get: useReposStore.getState, set: useReposStore.setState }),
-    expect.objectContaining({
-      kind: 'visible-runtime-projection-requested',
-      id: repoId,
-      repoRuntimeId,
-      branchName,
-    }),
+    repoId,
+    repoRuntimeId,
+    branchName,
   )
 }
 
