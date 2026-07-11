@@ -6,6 +6,12 @@ import { persistRepoSnapshotCacheEntry } from '#/web/stores/repos/persistence.ts
 import { applyRepoSnapshotShellState } from '#/web/stores/repos/refresh-state.ts'
 import { finishDataLoadError, finishDataLoadSuccess } from '#/web/stores/repos/repo-data-load-state.ts'
 import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
+import { isRemoteRepoId } from '#/shared/remote-repo.ts'
+import {
+  markRemoteLifecycleConnecting,
+  markRemoteLifecycleFailed,
+  markRemoteLifecycleReady,
+} from '#/web/stores/repos/availability.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 
 interface AcceptedRepoProjectionReadModel {
@@ -93,6 +99,14 @@ export function acceptRepoProjectionReadModel(
     options.settleVisibleStatus ?? (options.scope === 'visible-status' || acceptCoreReadModel)
   const repoBefore = get().repos[repoRoot]
   if (!repoBefore || repoBefore.repoRuntimeId !== repoRuntimeId) return
+  if (isRemoteRepoId(repoRoot) && projection.remoteLifecycle) {
+    updateIfFresh(set, repoRoot, repoRuntimeId, (repo) => {
+      const lifecycle = projection.remoteLifecycle!
+      if (lifecycle.kind === 'connecting') markRemoteLifecycleConnecting(repo)
+      else if (lifecycle.kind === 'ready') markRemoteLifecycleReady(repo, lifecycle.target)
+      else if (lifecycle.kind === 'failed') markRemoteLifecycleFailed(repo, lifecycle.reason, lifecycle.target)
+    })
+  }
   if (settleVisibleStatus) {
     updateIfFresh(set, repoRoot, repoRuntimeId, (repo) => {
       if (projection.snapshot) finishDataLoadSuccess(repo.dataLoads.visibleStatus, projection.loadedAt)

@@ -4,7 +4,7 @@ import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 import type {
   RemoteDiagnosticsResult,
   RemotePathSuggestionsInput,
-  RemoteRepoConnectionResult,
+  RemoteRepoLifecycleCommandResult,
   RemoteRepoTarget,
   SshConfigHostsResult,
 } from '#/shared/remote-repo.ts'
@@ -24,18 +24,14 @@ export async function resolveRemoteRepositoryTarget(
 }
 
 /**
- * Single-server-call remote-repo lifecycle boundary (see
- * docs/.../plan §5). The server composes resolveTarget +
- * probe + classification and returns a converged
- * `RemoteRepoConnectionResult` (ready or failed, never
- * connecting). The orchestrator's task is a thin
- * delegation to this function.
+ * Submit one command to the server-owned repo-runtime lifecycle and return
+ * its accepted terminal projection.
  */
 export async function resolveRemoteRepoConnection(
-  input: { repoId: string },
+  input: { repoId: string; repoRuntimeId: string },
   signal?: AbortSignal,
-): Promise<RemoteRepoConnectionResult> {
-  return await postServerJson<typeof input, RemoteRepoConnectionResult>('/api/remote/lifecycle', input, { signal })
+): Promise<RemoteRepoLifecycleCommandResult> {
+  return await postServerJson<typeof input, RemoteRepoLifecycleCommandResult>('/api/remote/lifecycle', input, { signal })
 }
 
 export async function getRemoteSshHosts(): Promise<SshConfigHostsResult> {

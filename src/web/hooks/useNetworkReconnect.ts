@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
-import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-orchestrator.ts'
+import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-command.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 
@@ -11,10 +11,10 @@ import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
  * Per docs/goblin-remote-repo-refactor-plan.md §1 and §6, "网络
  * 变动导致 tab 一直转圈" is a root symptom of an unowned
  * `connecting` state. The `useNetworkReconnect` hook re-enters
- * the orchestrator for *all* remote repos on a connectivity
+ * the server command for *all* remote repos on a connectivity
  * change — both `failed` and `connecting` repos get a fresh
  * probe. Re-probing a `connecting` repo is safe: the
- * orchestrator's latest-wins semantics abort the in-flight run
+ * server attempt's latest-wins semantics abort the in-flight run
  * (which may be stuck against a dead network connection) and
  * start a new one with fresh signal state. Without this, a
  * `connecting` probe that started before the network came back
@@ -44,7 +44,7 @@ export function useNetworkReconnect(): void {
         const lifecycle = repo.remote.lifecycle
         // `ready` is the success terminus — no re-probe needed.
         // `failed` and `connecting` repos both get a fresh probe.
-        // For `connecting`, the orchestrator's latest-wins abort
+        // For `connecting`, the server runtime's latest-wins abort
         // kills the stale in-flight run and starts over with the
         // now-working network.
         if (lifecycle?.kind === 'ready') continue

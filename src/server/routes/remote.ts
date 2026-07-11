@@ -21,10 +21,8 @@ export function createRemoteRoutes() {
     const { alias, remotePath } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.resolveTarget, c)
     return c.json(await resolveServerRemoteTarget({ alias, remotePath }, c.req.raw.signal))
   })
-  // Unified lifecycle boundary (docs/.../plan §5). The client
-  // calls this from the orchestrator's task; the server returns
-  // a converged `ready`/`failed` lifecycle result. NEVER
-  // returns `connecting` — that's a client projection.
+  // Server-owned lifecycle command. RepoRuntime publishes connecting
+  // immediately and returns the accepted terminal projection.
   app.post('/lifecycle', async (c) => {
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)

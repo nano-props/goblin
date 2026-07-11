@@ -10,7 +10,7 @@ import {
   refreshInitialRepoState,
   type RuntimeOpenResolvedRepo,
 } from '#/web/stores/repos/repo-session-write-paths.ts'
-import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-orchestrator.ts'
+import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-command.ts'
 import { restoredRepoIdAfterWorkspaceHydration } from '#/web/open-workspace-state.ts'
 import { isRemoteRepoId, localRepoSessionEntry, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { restoreSessionWorkspacePaneStateInRepos } from '#/web/stores/repos/workspace-pane-session-restore.ts'
@@ -44,7 +44,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       //     entries keep their remote id and are opened directly.
       //   2. Settle the restored repos. Local entries promote the
       //     canonical placeholder to a resolved repo and kick off initial
-      //     refresh. Remote entries go through the unified orchestrator.
+      //     refresh. Remote entries submit the server lifecycle command.
       //
       // workspaceMembershipReady means restored entries have produced
       // placeholders (or settled as absent). The per-repo body keeps showing
@@ -153,12 +153,11 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
                 if (!signal?.aborted && !isAbortError(err)) markOpenEntryFailed(entry)
                 return
               }
-              // Remote entries go through the unified orchestrator. It owns:
-              // connecting → server boundary → ready/failed → initial refresh.
+              // Remote entries submit the server-owned lifecycle command.
               const outcome = await runRemoteRepoConnection(set, get, entry.id, { signal })
               if (signal?.aborted) return
-              // Hydration must keep the restored repo id in sync with the orchestrator's writes. The
-              // orchestrator updates the store directly; we just
+              // Hydration keeps the restored repo id in sync with the accepted server projection. The
+              // command adapter updates the local projection; we then
               // re-derive the restored repo id after each settlement.
               if (outcome) {
                 set((s) => {

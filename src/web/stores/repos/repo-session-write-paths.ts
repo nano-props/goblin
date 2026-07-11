@@ -23,7 +23,7 @@ import {
 } from '#/web/repo-runtime-query.ts'
 import { clearWorkspacePaneTabsProjectionState } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { reposLog } from '#/web/logger.ts'
-import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-orchestrator.ts'
+import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-command.ts'
 import {
   markRemoteLifecycleConnecting,
   markRemoteLifecycleFailed,
@@ -436,16 +436,10 @@ export function createRuntimeRepoSessionActions(
   return {
     async ensureWorkspaceOpen(pathOrEntry: string | RepoSessionEntry): Promise<OpenRepoResult> {
       const entry = sessionEntryFromInput(pathOrEntry)
-      // Remote entries go through the unified orchestrator. It
-      // owns the connecting → ready/failed transition and the
-      // initial refresh kickoff, so this caller only has to
-      // translate the outcome into the OpenRepoResult contract.
+      // Remote entries submit one server-owned lifecycle command; this caller
+      // only translates its canonical outcome into OpenRepoResult.
       if (isRemoteRepoId(entry.id)) {
-        // Per docs/.../plan §6.3 the orchestrator expects the repo
-        // shell to exist already. Pre-insert the placeholder so
-        // the orchestrator's "set connecting" lands on a real
-        // store entry; the orchestrator will fill in target +
-        // trigger refresh on settle.
+        // Pre-insert the window-local shell before applying the server result.
         if (!get().repos[entry.id]) {
           const repoRuntimeId = await openRepoRuntimeWithCache(entry.id)
           set((s) => {
@@ -466,7 +460,7 @@ export function createRuntimeRepoSessionActions(
         return { ok: false, message: outcome.reason ?? 'error.failed-read-repo' }
       }
       // Local repos use the direct runtime-open path — there's no remote
-      // lifecycle to converge and no orchestrator concern.
+      // lifecycle command to converge.
       const resolved = await openLocalRepoRuntimeForInput(entry)
       if (!resolved.repo || !resolved.repoRuntimeId)
         return { ok: false, message: resolved.reason ?? 'error.not-git-repo' }

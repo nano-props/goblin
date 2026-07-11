@@ -230,16 +230,11 @@ export function isRemoteRepoConnectionTerminal(
 /**
  * Server-side converged result for a remote-repo lifecycle run.
  *
- * This is the wire contract for the unified server boundary
- * (see docs/goblin-remote-repo-refactor-plan.md §5.2). The server
- * returns ONLY the converged terminals — `ready` or `failed`.
- * `connecting` is a client-side projection; the client
- * writes it before the server call lands and replaces it with
- * the converged result after.
+ * This is the terminal output of the server resolver. RepoRuntime owns the
+ * surrounding `connecting -> ready|failed` lifecycle and attempt generation.
  *
  * `lifecycle.target` is the same `RemoteRepoTarget` the
- * client will land on `RepoRemoteState.lifecycle.target` after
- * the orchestrator's settle. The `target?` in the failed
+ * runtime publishes in its canonical lifecycle. The `target?` in the failed
  * variant retains the last-known target so the UI keeps
  * showing the remote locator on a failed repository.
  */

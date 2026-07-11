@@ -70,8 +70,11 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
       return { ok: true }
     },
   }
-  handlers['remote.lifecycle'] = async ({ repoId }: { repoId: string }) => {
-    return resolveServerRemoteRepoConnection({ repoId }, undefined, deps)
+  handlers['remote.lifecycle'] = async ({ repoId }: { repoId: string; repoRuntimeId: string }) => {
+    const result = await resolveServerRemoteRepoConnection({ repoId }, undefined, deps)
+    return result.kind === 'ready'
+      ? { repoId: result.repoId, name: result.name, lifecycle: { ...result.lifecycle, attemptId: 1 } }
+      : { repoId: result.repoId, name: result.name, lifecycle: { ...result.lifecycle, attemptId: 1 } }
   }
   installGoblinTestBridge(handlers)
   return calls

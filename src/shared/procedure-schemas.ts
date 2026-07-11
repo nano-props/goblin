@@ -155,11 +155,8 @@ export const REPO_PROCEDURE_SCHEMAS = {
 
 export const REMOTE_PROCEDURE_SCHEMAS = {
   resolveTarget: RemoteConnectionInputSchema,
-  // Unified lifecycle boundary (docs/.../plan §5): body is the
-  // repo id. The server parses the id, resolves the SSH target,
-  // probes the remote repo, classifies the failure, and returns
-  // a converged `RemoteRepoConnectionResult`. NEVER returns
-  // 'connecting' — that's a client projection.
+  // Starts a server-owned attempt for one repo-runtime generation and
+  // returns its accepted terminal lifecycle projection.
   remoteLifecycle: v.object({
     repoId: v.string(),
     repoRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),

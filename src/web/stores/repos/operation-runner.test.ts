@@ -283,7 +283,7 @@ describe('runLatestOperation active-task cancellation', () => {
       get: useReposStore.getState,
       id: REPO_ID,
       repoRuntimeId: 'repo-runtime-test',
-      lane: 'lifecycle',
+      lane: 'write',
       operationKey: 'remoteLifecycle',
       priority: 1,
       targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
@@ -306,7 +306,7 @@ describe('runLatestOperation active-task cancellation', () => {
       get: useReposStore.getState,
       id: REPO_ID,
       repoRuntimeId: 'repo-runtime-test',
-      lane: 'lifecycle',
+      lane: 'write',
       operationKey: 'remoteLifecycle',
       priority: 1,
       targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
@@ -343,7 +343,7 @@ describe('runLatestOperation active-task cancellation', () => {
       get: useReposStore.getState,
       id: REPO_ID,
       repoRuntimeId: 'repo-runtime-test',
-      lane: 'lifecycle',
+      lane: 'write',
       operationKey: 'remoteLifecycle',
       priority: 1,
       targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
@@ -360,7 +360,7 @@ describe('runLatestOperation active-task cancellation', () => {
       get: useReposStore.getState,
       id: REPO_ID,
       repoRuntimeId: 'repo-runtime-test',
-      lane: 'lifecycle',
+      lane: 'write',
       operationKey: 'remoteLifecycle',
       priority: 1,
       targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
@@ -384,7 +384,7 @@ describe('runLatestOperation active-task cancellation', () => {
 
   test('active-cancel does not affect tasks with a different replaceKey', async () => {
     // The `read` lane's default-key tasks (no `operationKey`)
-    // must not be aborted by a `lifecycle` submission. The lane
+    // must not be aborted by a `write` submission. The lane
     // index is keyed by `replaceKey`, so unrelated tasks are
     // insulated.
     const reads: string[] = []
@@ -432,7 +432,7 @@ describe('runLatestOperation active-task cancellation', () => {
     await read2
   })
 
-  test('stale run does not overwrite the new run on the lifecycle union', async () => {
+  test('stale run does not overwrite the new run on the latest-wins target', async () => {
     // End-to-end check that supersede preserves the new run's
     // result, even when the old run's task body resolved with
     // a sentinel value via the abort listener. The
@@ -445,7 +445,7 @@ describe('runLatestOperation active-task cancellation', () => {
       get: useReposStore.getState,
       id: REPO_ID,
       repoRuntimeId: 'repo-runtime-test',
-      lane: 'lifecycle',
+      lane: 'write',
       operationKey: 'remoteLifecycle',
       priority: 1,
       targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
@@ -466,7 +466,7 @@ describe('runLatestOperation active-task cancellation', () => {
       get: useReposStore.getState,
       id: REPO_ID,
       repoRuntimeId: 'repo-runtime-test',
-      lane: 'lifecycle',
+      lane: 'write',
       operationKey: 'remoteLifecycle',
       priority: 1,
       targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
@@ -540,7 +540,7 @@ describe('runLatestOperation active-task cancellation', () => {
       get: useReposStore.getState,
       id: REPO_ID,
       repoRuntimeId: 'repo-runtime-test',
-      lane: 'lifecycle',
+      lane: 'write',
       operationKey: 'remoteLifecycle',
       priority: 1,
       targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
@@ -558,7 +558,7 @@ describe('runLatestOperation active-task cancellation', () => {
       get: useReposStore.getState,
       id: REPO_ID,
       repoRuntimeId: 'repo-runtime-test',
-      lane: 'lifecycle',
+      lane: 'write',
       operationKey: 'remoteLifecycle',
       priority: 1,
       targets: [{ key: 'remoteLifecycle', reason: 'manual-refresh' }],
