@@ -246,6 +246,23 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     await expect(close('client-b')).resolves.toEqual({ ok: true, released: true, runtimeClosed: true })
   })
 
+  test.each([
+    ['/runtime-open', { repoRoot: '/tmp/invalid-client', clientId: '' }],
+    ['/runtime-open', { repoRoot: '/tmp/invalid-client', clientId: 'x'.repeat(129) }],
+    ['/runtime-close', { repoRoot: '/tmp/invalid-client', repoRuntimeId: 'repo-runtime-test', clientId: '' }],
+    ['/runtime-close', { repoRoot: '/tmp/invalid-client', repoRuntimeId: 'repo-runtime-test', clientId: 'x'.repeat(129) }],
+    ['/runtime-reconcile', { repoRoots: ['/tmp/invalid-client'], clientId: '' }],
+    ['/runtime-reconcile', { repoRoots: ['/tmp/invalid-client'], clientId: 'x'.repeat(129) }],
+  ])('returns 400 when %s receives an invalid clientId', async (path, body) => {
+    const response = await createTestRepoRoutes().request(new Request(`http://localhost${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }))
+
+    expect(response.status).toBe(400)
+  })
+
   test('reconciles a client window membership declaration in one request', async () => {
     const app = createTestRepoRoutes()
     const post = async (path: string, body: object) =>
