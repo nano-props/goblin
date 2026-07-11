@@ -8,9 +8,11 @@ import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 
 interface RepoRuntimeState {
   currentRepoRuntimeId: string | null
-  members: Set<string>
+  members: Map<string, number>
+  nextMembershipGeneration: number
   remoteLifecycle: RemoteRepoRuntimeLifecycle
   remoteAttemptController: AbortController | null
+  remoteAttemptPromise: Promise<RepoRemoteLifecycleRunResult> | null
 }
 
 export interface RepoRuntimeClosedEvent {
@@ -23,6 +25,18 @@ export interface RepoRuntimeEntry {
   repoRoot: string
   repoRuntimeId: string
   remoteLifecycle: RemoteRepoRuntimeLifecycle | null
+}
+
+export interface RepoRuntimeMembershipLeaseEntry {
+  repoRoot: string
+  repoRuntimeId: string
+  generation: number
+}
+
+export interface RepoRuntimeMembershipLease {
+  userId: string
+  clientId: string
+  entries: RepoRuntimeMembershipLeaseEntry[]
 }
 
 type TerminalRemoteLifecycle = Extract<RemoteRepoRuntimeLifecycle, { kind: 'ready' | 'failed' }>
@@ -50,9 +64,11 @@ function repoRuntimeState(userId: string, repoRoot: string): RepoRuntimeState {
   if (existing) return existing
   const created: RepoRuntimeState = {
     currentRepoRuntimeId: null,
-    members: new Set(),
+    members: new Map(),
+    nextMembershipGeneration: 0,
     remoteLifecycle: { kind: 'idle', attemptId: 0 },
     remoteAttemptController: null,
+    remoteAttemptPromise: null,
   }
   byRepo.set(repoRoot, created)
   return created
@@ -63,7 +79,8 @@ export function acquireRepoRuntime(userId: string, repoRoot: string, clientId: s
   if (!clientId) throw new Error('repo runtime acquire requires clientId')
   const state = repoRuntimeState(userId, repoRoot)
   const repoRuntimeId = state.currentRepoRuntimeId ?? startRepoRuntimeEpoch(state)
-  state.members.add(clientId)
+  state.nextMembershipGeneration += 1
+  state.members.set(clientId, state.nextMembershipGeneration)
   return repoRuntimeId
 }
 
@@ -79,6 +96,46 @@ export function releaseRepoRuntime(userId: string, repoRoot: string, repoRuntime
   stopRepoRuntimeEpoch(state)
   emitRepoRuntimeClosed({ userId, repoRoot, repoRuntimeId })
   return { released: true, runtimeClosed: true }
+}
+
+/** Snapshot the membership generations whose liveness was owned by one client. */
+export function captureRepoRuntimeMembershipLease(userId: string, clientId: string): RepoRuntimeMembershipLease {
+  const entries: RepoRuntimeMembershipLeaseEntry[] = []
+  for (const [repoRoot, state] of repoRuntimesByUser.get(userId) ?? []) {
+    const generation = state.members.get(clientId)
+    if (generation === undefined || !state.currentRepoRuntimeId) continue
+    entries.push({ repoRoot, repoRuntimeId: state.currentRepoRuntimeId, generation })
+  }
+  return { userId, clientId, entries }
+}
+
+/**
+ * Expires only the membership generations captured when presence was lost.
+ * A later HTTP acquire renews its generation and cannot be removed by an old
+ * disconnect timer, even if the realtime channel is still recovering.
+ */
+export function expireRepoRuntimeMembershipLease(lease: RepoRuntimeMembershipLease): RepoRuntimeClosedEvent[] {
+  const states = repoRuntimesByUser.get(lease.userId)
+  if (!states) return []
+  const closed: RepoRuntimeClosedEvent[] = []
+  for (const entry of lease.entries) {
+    const state = states.get(entry.repoRoot)
+    if (
+      !state ||
+      state.currentRepoRuntimeId !== entry.repoRuntimeId ||
+      state.members.get(lease.clientId) !== entry.generation
+    ) {
+      continue
+    }
+    state.members.delete(lease.clientId)
+    if (state.members.size > 0) continue
+    const repoRuntimeId = stopRepoRuntimeEpoch(state)
+    if (!repoRuntimeId) continue
+    const event = { userId: lease.userId, repoRoot: entry.repoRoot, repoRuntimeId }
+    closed.push(event)
+    emitRepoRuntimeClosed(event)
+  }
+  return closed
 }
 
 export function listRepoRuntimes(userId: string): RepoRuntimeEntry[] {
@@ -97,6 +154,34 @@ export function listRepoRuntimes(userId: string): RepoRuntimeEntry[] {
   return runtimes
 }
 
+/**
+ * Reconciles one window's complete membership declaration in a single
+ * synchronous server transaction. Other clients' memberships are untouched.
+ */
+export function replaceRepoRuntimeMembershipsForClient(
+  userId: string,
+  clientId: string,
+  repoRoots: readonly string[],
+): RepoRuntimeEntry[] {
+  const desired = new Set(repoRoots)
+  const states = repoRuntimesByUser.get(userId)
+  const closed: RepoRuntimeClosedEvent[] = []
+  if (states) {
+    for (const [repoRoot, state] of states) {
+      if (desired.has(repoRoot)) continue
+      const repoRuntimeId = state.currentRepoRuntimeId
+      if (!repoRuntimeId || !state.members.delete(clientId) || state.members.size > 0) continue
+      stopRepoRuntimeEpoch(state)
+      closed.push({ userId, repoRoot, repoRuntimeId })
+    }
+  }
+  for (const repoRoot of desired) acquireRepoRuntime(userId, repoRoot, clientId)
+  for (const event of closed) emitRepoRuntimeClosed(event)
+  // The runtime query is user-scoped, so return its complete canonical
+  // snapshot rather than only this window's declaration.
+  return listRepoRuntimes(userId)
+}
+
 export function isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean {
   return repoRuntimesByUser.get(userId)?.get(repoRoot)?.currentRepoRuntimeId === repoRuntimeId
 }
@@ -107,9 +192,18 @@ export async function runRepoRemoteLifecycle(
   repoRuntimeId: string,
   resolve: (signal: AbortSignal) => Promise<RemoteRepoConnectionResult>,
   onTransition: (lifecycle: RemoteRepoRuntimeLifecycle) => void = () => {},
+  mode: 'restart' | 'ensure' = 'restart',
 ): Promise<RepoRemoteLifecycleRunResult> {
   const state = repoRuntimesByUser.get(userId)?.get(repoRoot)
   if (!state || state.currentRepoRuntimeId !== repoRuntimeId) return { kind: 'stale-runtime' }
+
+  if (mode === 'ensure') {
+    const joined = await joinRepoRemoteLifecycleAttempt(state, repoRuntimeId)
+    if (joined) return joined
+    if (state.remoteLifecycle.kind === 'ready' || state.remoteLifecycle.kind === 'failed') {
+      return { kind: 'settled', lifecycle: state.remoteLifecycle }
+    }
+  }
 
   state.remoteAttemptController?.abort()
   const controller = new AbortController()
@@ -118,6 +212,53 @@ export async function runRepoRemoteLifecycle(
   state.remoteLifecycle = { kind: 'connecting', attemptId }
   notifyRemoteLifecycleTransition(onTransition, state.remoteLifecycle, repoRoot)
 
+  const attemptPromise = settleRepoRemoteLifecycleAttempt(
+    state,
+    repoRoot,
+    repoRuntimeId,
+    controller,
+    attemptId,
+    resolve,
+    onTransition,
+  )
+  state.remoteAttemptPromise = attemptPromise
+  try {
+    return await attemptPromise
+  } finally {
+    if (state.remoteAttemptPromise === attemptPromise) state.remoteAttemptPromise = null
+  }
+}
+
+async function joinRepoRemoteLifecycleAttempt(
+  state: RepoRuntimeState,
+  repoRuntimeId: string,
+): Promise<RepoRemoteLifecycleRunResult | null> {
+  while (state.currentRepoRuntimeId === repoRuntimeId && state.remoteLifecycle.kind === 'connecting') {
+    const attempt = state.remoteAttemptPromise
+    if (!attempt) return null
+    const result = await attempt
+    if (
+      result.kind === 'superseded' &&
+      state.currentRepoRuntimeId === repoRuntimeId &&
+      state.remoteLifecycle.kind === 'connecting'
+    ) {
+      continue
+    }
+    return result
+  }
+  if (state.currentRepoRuntimeId !== repoRuntimeId) return { kind: 'stale-runtime' }
+  return null
+}
+
+async function settleRepoRemoteLifecycleAttempt(
+  state: RepoRuntimeState,
+  repoRoot: string,
+  repoRuntimeId: string,
+  controller: AbortController,
+  attemptId: number,
+  resolve: (signal: AbortSignal) => Promise<RemoteRepoConnectionResult>,
+  onTransition: (lifecycle: RemoteRepoRuntimeLifecycle) => void,
+): Promise<RepoRemoteLifecycleRunResult> {
   try {
     const result = await resolve(controller.signal)
     if (
@@ -185,12 +326,13 @@ export function clearRepoRuntimesForUser(userId: string): void {
 }
 
 function startRepoRuntimeEpoch(state: RepoRuntimeState): string {
-  if (state.currentRepoRuntimeId || state.remoteAttemptController) {
+  if (state.currentRepoRuntimeId || state.remoteAttemptController || state.remoteAttemptPromise) {
     throw new Error('repo runtime epoch must stop before it starts')
   }
   const repoRuntimeId = createOpaqueId('repo-runtime')
   state.currentRepoRuntimeId = repoRuntimeId
   state.members.clear()
+  state.nextMembershipGeneration = 0
   state.remoteLifecycle = { kind: 'idle', attemptId: 0 }
   return repoRuntimeId
 }
@@ -199,6 +341,7 @@ function stopRepoRuntimeEpoch(state: RepoRuntimeState): string | null {
   const repoRuntimeId = state.currentRepoRuntimeId
   state.remoteAttemptController?.abort()
   state.remoteAttemptController = null
+  state.remoteAttemptPromise = null
   state.currentRepoRuntimeId = null
   state.members.clear()
   return repoRuntimeId

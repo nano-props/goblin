@@ -30,7 +30,12 @@ import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
 import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
-import { acquireRepoRuntime, listRepoRuntimes, releaseRepoRuntime } from '#/server/modules/repo-runtimes.ts'
+import {
+  acquireRepoRuntime,
+  listRepoRuntimes,
+  releaseRepoRuntime,
+  replaceRepoRuntimeMembershipsForClient,
+} from '#/server/modules/repo-runtimes.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import type { RepoLogResponse } from '#/shared/api-types.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
@@ -272,6 +277,12 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
     await parseHttpBody(REPO_PROCEDURE_SCHEMAS.runtimeList, c)
     return c.json({ runtimes: listRepoRuntimes(userId) })
+  })
+  app.post('/runtime-reconcile', async (c) => {
+    const userId = userIdFromContext(c)
+    if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
+    const { clientId, repoRoots } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.runtimeReconcile, c)
+    return c.json({ runtimes: replaceRepoRuntimeMembershipsForClient(userId, clientId, repoRoots) })
   })
   app.post('/runtime-close', async (c) => {
     const userId = userIdFromContext(c)

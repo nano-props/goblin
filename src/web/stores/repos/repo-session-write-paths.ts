@@ -13,6 +13,7 @@ import {
   openRepoRuntimeForInput,
   openRepoRuntime,
   probeRepo,
+  reconcileRepoRuntimeMemberships,
 } from '#/web/repo-client.ts'
 import { resolveRemoteRepositoryTarget } from '#/web/remote-client.ts'
 import { recordRecentRepo } from '#/web/settings-actions.ts'
@@ -20,11 +21,15 @@ import {
   invalidateRepoRuntimes,
   removeRepoRuntimeFromCache,
   refreshRepoRuntimes,
+  replaceRepoRuntimeCache,
   updateRepoRuntimeCache,
 } from '#/web/repo-runtime-query.ts'
 import { clearWorkspacePaneTabsProjectionState } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { reposLog } from '#/web/logger.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-command.ts'
+import { acceptRemoteLifecycleSnapshot } from '#/web/stores/repos/remote-lifecycle-projection.ts'
+import { emptyRepoOperations } from '#/web/stores/repos/operations.ts'
 import {
   markRemoteLifecycleFailed,
   markRemoteLifecycleReady,
@@ -70,6 +75,8 @@ export interface RuntimeOpenResolvedRepo {
 }
 
 const repoRuntimeMembershipQueues = new Map<string, PQueue>()
+const activeRepoRuntimeMembershipCommands = new Set<Promise<unknown>>()
+let repoRuntimeMembershipExclusiveTail: Promise<void> = Promise.resolve()
 
 export interface InitialRepoRefresh {
   id: string
@@ -122,9 +129,16 @@ export async function resolveRepoPath(
   }
 }
 
-export async function openLocalRepoRuntimeForInput(input: string | RepoSessionEntry): Promise<RuntimeOpenResolvedRepo> {
+export async function openLocalRepoRuntimeForInput(
+  input: string | RepoSessionEntry,
+  onOpened?: (opened: RuntimeOpenResolvedRepo) => void | Promise<void>,
+): Promise<RuntimeOpenResolvedRepo> {
   const entry = sessionEntryFromInput(input)
-  return await runRepoRuntimeMembershipCommand(entry.id, async () => await openLocalRepoRuntimeForEntry(entry))
+  return await runRepoRuntimeMembershipCommand(entry.id, async () => {
+    const opened = await openLocalRepoRuntimeForEntry(entry)
+    await onOpened?.(opened)
+    return opened
+  })
 }
 
 async function openLocalRepoRuntimeForEntry(entry: RepoSessionEntry): Promise<RuntimeOpenResolvedRepo> {
@@ -146,10 +160,14 @@ async function openLocalRepoRuntimeForEntry(entry: RepoSessionEntry): Promise<Ru
   }
 }
 
-export async function openRepoRuntimeWithCache(repoRoot: string): Promise<string> {
+export async function openRepoRuntimeWithCache(
+  repoRoot: string,
+  onOpened?: (repoRuntimeId: string) => void | Promise<void>,
+): Promise<string> {
   return await runRepoRuntimeMembershipCommand(repoRoot, async () => {
     const repoRuntimeId = await openRepoRuntime(repoRoot)
     await updateRepoRuntimeCache({ repoRoot, repoRuntimeId })
+    await onOpened?.(repoRuntimeId)
     return repoRuntimeId
   })
 }
@@ -169,21 +187,174 @@ export async function closeRepoRuntimeWithCache(repoRoot: string, repoRuntimeId:
   })
 }
 
+export type RepoRuntimeMembershipRecoveryResult =
+  | {
+      kind: 'settled'
+      targets: Array<{ repoRoot: string; repoRuntimeId: string }>
+      changedTargets: Array<{ repoRoot: string; previousRepoRuntimeId: string; repoRuntimeId: string }>
+    }
+  | { kind: 'superseded' }
+
+type SettledRepoRuntimeMembershipRecovery = Extract<RepoRuntimeMembershipRecoveryResult, { kind: 'settled' }>
+
+/**
+ * Re-declares this window's complete repo membership after realtime recovery,
+ * then atomically advances every still-current local shell to the server's
+ * canonical runtime epoch.
+ */
+export async function reconcileOpenRepoRuntimeMemberships(
+  set: ReposSet,
+  get: ReposGet,
+): Promise<RepoRuntimeMembershipRecoveryResult> {
+  return await runExclusiveRepoRuntimeMembershipCommand(
+    async () => await reconcileOpenRepoRuntimeMembershipsNow(set, get),
+  )
+}
+
+async function reconcileOpenRepoRuntimeMembershipsNow(
+  set: ReposSet,
+  get: ReposGet,
+): Promise<RepoRuntimeMembershipRecoveryResult> {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const capturedRecovery = await reconcileCapturedRepoRuntimeMemberships(set, get)
+    const currentRoots = Object.keys(get().repos)
+    if (sameRepoRootSet(currentRoots, capturedRecovery.declaredRepoRoots)) {
+      return {
+        kind: 'settled',
+        targets: capturedRecovery.targets,
+        changedTargets: capturedRecovery.changedTargets,
+      }
+    }
+  }
+  return { kind: 'superseded' }
+}
+
+async function reconcileCapturedRepoRuntimeMemberships(
+  set: ReposSet,
+  get: ReposGet,
+): Promise<SettledRepoRuntimeMembershipRecovery & { declaredRepoRoots: string[] }> {
+  const captured = Object.values(get().repos).map((repo) => ({
+    repoRoot: repo.id,
+    repoRuntimeId: repo.repoRuntimeId,
+  }))
+  const response = await reconcileRepoRuntimeMemberships(captured.map((entry) => entry.repoRoot))
+  const runtimeByRoot = new Map(response.runtimes.map((entry) => [entry.repoRoot, entry]))
+  const changedTargets: SettledRepoRuntimeMembershipRecovery['changedTargets'] = []
+
+  set((state) => {
+    let repos = state.repos
+    for (const previous of captured) {
+      const current = repos[previous.repoRoot]
+      const runtime = runtimeByRoot.get(previous.repoRoot)
+      if (!current || current.repoRuntimeId !== previous.repoRuntimeId || !runtime) continue
+      if (runtime.repoRuntimeId === previous.repoRuntimeId) continue
+      if (repos === state.repos) repos = { ...state.repos }
+      repos[previous.repoRoot] = repoShellForNewRuntimeEpoch(current, runtime.repoRuntimeId)
+      changedTargets.push({
+        repoRoot: previous.repoRoot,
+        previousRepoRuntimeId: previous.repoRuntimeId,
+        repoRuntimeId: runtime.repoRuntimeId,
+      })
+    }
+    return repos === state.repos ? state : { ...state, repos }
+  })
+
+  for (const changed of changedTargets) {
+    disposeRepoOperationScheduler(changed.repoRoot)
+    clearWorkspacePaneTabsProjectionState(changed.repoRoot, changed.previousRepoRuntimeId)
+    primaryWindowQueryClient.removeQueries({
+      queryKey: ['repo-data', changed.repoRoot, changed.previousRepoRuntimeId],
+    })
+  }
+  await replaceRepoRuntimeCache({ runtimes: response.runtimes })
+  acceptRemoteLifecycleSnapshot(set, get, { runtimes: response.runtimes })
+
+  await Promise.all(
+    changedTargets
+      .filter((target) =>
+        isRemoteRepoId(target.repoRoot) &&
+        ['idle', 'connecting'].includes(runtimeByRoot.get(target.repoRoot)?.remoteLifecycle?.kind ?? '')
+      )
+      .map(async (target) => {
+        await runRemoteRepoConnection(set, get, target.repoRoot, { mode: 'ensure' })
+      }),
+  )
+
+  return {
+    kind: 'settled',
+    targets: captured.flatMap(({ repoRoot }) => {
+      const repoRuntimeId = get().repos[repoRoot]?.repoRuntimeId
+      return repoRuntimeId ? [{ repoRoot, repoRuntimeId }] : []
+    }),
+    changedTargets,
+    declaredRepoRoots: captured.map((entry) => entry.repoRoot),
+  }
+}
+
+function sameRepoRootSet(left: readonly string[], right: readonly string[]): boolean {
+  if (left.length !== right.length) return false
+  const rightSet = new Set(right)
+  return left.every((repoRoot) => rightSet.has(repoRoot))
+}
+
+function repoShellForNewRuntimeEpoch(repo: RepoState, repoRuntimeId: string): RepoState {
+  return {
+    ...repo,
+    repoRuntimeId,
+    dataLoads: {
+      repoReadModel: { phase: 'idle', loadedAt: repo.dataLoads.repoReadModel.loadedAt, error: null, stale: true },
+      visibleStatus: { phase: 'idle', loadedAt: repo.dataLoads.visibleStatus.loadedAt, error: null, stale: true },
+      fetch: { phase: 'idle', loadedAt: null, error: null, stale: false },
+    },
+    operations: emptyRepoOperations(),
+    remote: {
+      ...repo.remote,
+      lifecycle: null,
+      lifecycleAttemptId: null,
+      fetchFailed: false,
+      fetchError: null,
+    },
+    events: [],
+  }
+}
+
 async function runRepoRuntimeMembershipCommand<T>(repoKey: string, command: () => Promise<T>): Promise<T> {
+  const precedingExclusive = repoRuntimeMembershipExclusiveTail
   let queue = repoRuntimeMembershipQueues.get(repoKey)
   if (!queue) {
     queue = new PQueue({ concurrency: 1 })
     repoRuntimeMembershipQueues.set(repoKey, queue)
   }
-  try {
+  const work = (async () => {
+    await precedingExclusive
     return await queue.add(command)
+  })()
+  activeRepoRuntimeMembershipCommands.add(work)
+  try {
+    return await work
   } finally {
+    activeRepoRuntimeMembershipCommands.delete(work)
     void queue.onIdle().then(() => {
       if (repoRuntimeMembershipQueues.get(repoKey) === queue && queue.size === 0 && queue.pending === 0) {
         repoRuntimeMembershipQueues.delete(repoKey)
       }
     })
   }
+}
+
+async function runExclusiveRepoRuntimeMembershipCommand<T>(command: () => Promise<T>): Promise<T> {
+  const precedingExclusive = repoRuntimeMembershipExclusiveTail
+  const precedingShared = Array.from(activeRepoRuntimeMembershipCommands)
+  const work = (async () => {
+    await precedingExclusive
+    await Promise.allSettled(precedingShared)
+    return await command()
+  })()
+  repoRuntimeMembershipExclusiveTail = work.then(
+    () => undefined,
+    () => undefined,
+  )
+  return await work
 }
 
 function orderedInsert(order: string[], id: string, rankById?: ReadonlyMap<string, number>): string[] {
@@ -469,14 +640,15 @@ export function createRuntimeRepoSessionActions(
       if (isRemoteRepoId(entry.id)) {
         // Pre-insert the window-local shell before applying the server result.
         if (!get().repos[entry.id]) {
-          const repoRuntimeId = await openRepoRuntimeWithCache(entry.id)
-          set((s) => {
-            const result = insertPlaceholderRepo(
-              { repos: s.repos, repoSnapshotCache: s.repoSnapshotCache, order: s.order },
-              entry,
-              repoRuntimeId,
-            )
-            return { ...s, repos: result.repos, order: result.order }
+          await openRepoRuntimeWithCache(entry.id, (repoRuntimeId) => {
+            set((s) => {
+              const result = insertPlaceholderRepo(
+                { repos: s.repos, repoSnapshotCache: s.repoSnapshotCache, order: s.order },
+                entry,
+                repoRuntimeId,
+              )
+              return { ...s, repos: result.repos, order: result.order }
+            })
           })
         }
         const outcome = await runRemoteRepoConnection(set, get, entry.id)
@@ -497,25 +669,22 @@ export function createRuntimeRepoSessionActions(
       }
       // Local repos use the direct runtime-open path — there's no remote
       // lifecycle command to converge.
-      const resolved = await openLocalRepoRuntimeForInput(entry)
+      let initialRefresh: InitialRepoRefresh | null = null
+      const resolved = await openLocalRepoRuntimeForInput(entry, (opened) => {
+        if (!opened.repo || !opened.repoRuntimeId) return
+        const repo = opened.repo
+        const repoRuntimeId = opened.repoRuntimeId
+        set((s) => {
+          const { repos, order, changed } = addResolvedRepo(s, repo, repoRuntimeId)
+          if (changed) initialRefresh = { id: repo.id, repoRuntimeId: repos[repo.id]!.repoRuntimeId }
+          return changed ? { repos, order } : s
+        })
+      })
       if (!resolved.repo || !resolved.repoRuntimeId)
         return { ok: false, message: resolved.reason ?? 'error.not-git-repo' }
       const repo = resolved.repo
       const { id } = repo
-      const repoRuntimeId = resolved.repoRuntimeId
-      let initialRefresh: InitialRepoRefresh | null = null
       const recentEntry = repo.target ? remoteRepoSessionEntry(repo.target) : { kind: 'local' as const, id }
-
-      set((s) => {
-        const { repos, order, changed } = addResolvedRepo(s, repo, repoRuntimeId)
-        // Only kick off an initial refresh when the resolved probe
-        // actually changed the store (new repo, or existing placeholder
-        // got a new target). A matching target is a no-op set and the
-        // cached data is already coherent — re-running the snapshot/
-        // status pipeline would just duplicate the in-flight work.
-        if (changed) initialRefresh = { id, repoRuntimeId: repos[id]!.repoRuntimeId }
-        return changed ? { repos, order } : s
-      })
 
       if (initialRefresh) refreshInitialRepoState(set, get, initialRefresh)
       return { ok: true, id, postOpenEffects: recordRecentRepoPostOpen(recentEntry) }

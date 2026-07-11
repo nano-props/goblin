@@ -949,6 +949,28 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         if (runtimeClosed) state.currentRepoRuntimeId = null
         return { ok: true as const, released, runtimeClosed }
       }
+      const reconcileRepoRuntimeMemberships = (payload: unknown) => {
+        const clientId = typeof payload === 'object' && payload && 'clientId' in payload ? payload.clientId : null
+        const repoRoots = typeof payload === 'object' && payload && 'repoRoots' in payload ? payload.repoRoots : null
+        if (typeof clientId !== 'string' || !Array.isArray(repoRoots) || !repoRoots.every((root) => typeof root === 'string')) {
+          throw new Error('runtime-reconcile requires clientId and repoRoots')
+        }
+        const desired = new Set(repoRoots)
+        for (const [repoRoot, state] of repoRuntimeState) {
+          if (desired.has(repoRoot)) continue
+          state.members.delete(clientId)
+          if (state.members.size === 0) state.currentRepoRuntimeId = null
+        }
+        return {
+          runtimes: repoRoots.map((repoRoot) => {
+            const state = repoRuntimeState.get(repoRoot) ?? { currentRepoRuntimeId: null, members: new Set<string>() }
+            state.currentRepoRuntimeId ??= createOpaqueId('repo-runtime')
+            state.members.add(clientId)
+            repoRuntimeState.set(repoRoot, state)
+            return { repoRoot, repoRuntimeId: state.currentRepoRuntimeId }
+          }),
+        }
+      }
       const listRepoRuntime = () => ({
         runtimes: Array.from(repoRuntimeState.entries()).flatMap(([repoRoot, state]) =>
           state.currentRepoRuntimeId ? [{ repoRoot, repoRuntimeId: state.currentRepoRuntimeId }] : [],
@@ -996,6 +1018,11 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         }
         if (url.pathname === '/api/repo/runtime-list') {
           return handlers['repo.runtimeList'] ? call('repo.runtimeList', body) : listRepoRuntime()
+        }
+        if (url.pathname === '/api/repo/runtime-reconcile') {
+          return handlers['repo.runtimeReconcile']
+            ? call('repo.runtimeReconcile', body)
+            : reconcileRepoRuntimeMemberships(body)
         }
         if (url.pathname === '/api/repo/runtime-close') {
           return handlers['repo.runtimeClose'] ? call('repo.runtimeClose', body) : closeRepoRuntime(body)

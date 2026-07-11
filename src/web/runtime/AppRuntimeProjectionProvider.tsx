@@ -14,6 +14,7 @@ import {
   type RuntimeProjectionScope,
   type RuntimeProjectionScopeRegistry,
 } from '#/web/runtime/runtime-projection-scope.ts'
+import { reconcileOpenRepoRuntimeMemberships } from '#/web/stores/repos/repo-session-write-paths.ts'
 
 interface AppRuntimeProjectionProviderProps {
   children: ReactNode
@@ -165,13 +166,33 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
         )
       }),
     )
+    let membershipRecoveryGeneration = 0
     const offRecovered = scopeRegistry.track(
       appRealtimeClient.onRecovered(() => {
-        for (const target of currentRepoRuntimes()) {
-          const scope = scopeRegistry.scopeFor(target)
-          recoverTerminalSessionsFromServer(scope)
-          refreshWorkspacePaneTabsForScope(scope)
-        }
+        const generation = ++membershipRecoveryGeneration
+        void reconcileOpenRepoRuntimeMemberships(useReposStore.setState, useReposStore.getState)
+          .then((recovery) => {
+            if (generation !== membershipRecoveryGeneration) return
+            if (recovery.kind === 'superseded') return
+            scopeRegistry.disposeScopes()
+            for (const target of recovery.targets) {
+              if (repoRuntimeIdForRoot(target.repoRoot) !== target.repoRuntimeId) continue
+              const scope = scopeRegistry.scopeFor(target)
+              scope.commit(() => {
+                useTerminalProjectionHydrationStore
+                  .getState()
+                  .beginProjectionHydration(target.repoRoot, target.repoRuntimeId)
+              })
+              recoverTerminalSessionsFromServer(scope)
+              refreshWorkspacePaneTabsForScope(scope)
+            }
+          })
+          .catch((error) => {
+            if (generation !== membershipRecoveryGeneration) return
+            appRuntimeProjectionLog.warn('failed to reconcile repo runtime memberships after realtime recovery', {
+              error,
+            })
+          })
       }),
     )
     const offWorkspaceTabsChanged = scopeRegistry.track(
@@ -205,13 +226,6 @@ function currentScopeForRepo(
 
 function repoRuntimeIdForRoot(repoRoot: string): string | null {
   return useReposStore.getState().repos[repoRoot]?.repoRuntimeId ?? null
-}
-
-function currentRepoRuntimes(): Array<{ repoRoot: string; repoRuntimeId: string }> {
-  return Object.values(useReposStore.getState().repos).map((repo) => ({
-    repoRoot: repo.id,
-    repoRuntimeId: repo.repoRuntimeId,
-  }))
 }
 
 function terminalHydrationSnapshotMap(

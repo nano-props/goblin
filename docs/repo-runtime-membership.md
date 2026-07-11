@@ -14,6 +14,8 @@ The server owns:
 - terminal/session cleanup when a repo runtime closes
 - the remote lifecycle and monotonic attempt generation for that runtime
 - the idempotent client-membership set that keeps the shared epoch alive
+- presence-backed membership expiry after a client remains disconnected for
+  the configured grace period
 
 The client window owns:
 
@@ -58,6 +60,21 @@ Restore:
 3. After boot, session persistence records window-local membership for the
    next launch; it is not live runtime truth.
 
+Realtime recovery:
+
+1. WebSocket heartbeat and socket counts are the only online-presence
+   authority; repo runtime code does not poll or infer browser lifecycle.
+2. When the last socket for a `clientId` disappears, the server captures the
+   client's current membership generations and starts a grace timer.
+3. Reconnect cancels the timer. Expiry releases only the captured generations,
+   so a later HTTP acquire cannot be removed by an old disconnect timer.
+4. After reconnect, the window submits its complete current repo set through
+   one batch reconcile command. The server replaces only that client's
+   memberships and returns canonical runtime ids.
+5. The client commits changed runtime ids atomically, resets transient
+   epoch-owned state, and only then recovers remote lifecycle, terminals and
+   workspace tabs with the new scopes.
+
 ## Rules
 
 - Do not add a global server-owned open repo list unless the product model
@@ -69,6 +86,9 @@ Restore:
   server-owned `repoRuntimeId` when the operation targets runtime state.
 - Client cache keys for runtime-scoped resources should include
   `repoRuntimeId` where stale runtime separation matters.
+- Do not use `beforeunload`, periodic scans, or a second client-side presence
+  model for correctness. Page lifecycle notification may be an optimization,
+  never the ownership boundary.
 
 ## React Query Implication
 

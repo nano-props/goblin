@@ -6,6 +6,7 @@ import type {
   RepoRuntimeProjection,
   RepoRuntimesSnapshot,
   RepoRuntimeOpenResult,
+  RepoRuntimeMembershipReconcileResult,
   RepoLogResponse,
 } from '#/shared/api-types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
@@ -221,6 +222,13 @@ export async function openRepoRuntimeForInput(repoInput: string): Promise<RepoRu
   return await postServerJson<{ repoInput: string; clientId: string }, RepoRuntimeOpenResult>('/api/repo/runtime-open', {
     repoInput,
     clientId: readOrCreateWebTerminalClientId(),
+  })
+}
+
+export async function reconcileRepoRuntimeMemberships(repoRoots: string[]): Promise<RepoRuntimeMembershipReconcileResult> {
+  return await postServerJson('/api/repo/runtime-reconcile', {
+    clientId: readOrCreateWebTerminalClientId(),
+    repoRoots,
   })
 }
 

@@ -38,6 +38,14 @@ export async function updateRepoRuntimeCache(
   })
 }
 
+export async function replaceRepoRuntimeCache(
+  snapshot: RepoRuntimesSnapshot,
+  queryClient: QueryClient = primaryWindowQueryClient,
+): Promise<void> {
+  await queryClient.cancelQueries({ queryKey: repoRuntimesQueryKey(), exact: true })
+  queryClient.setQueryData(repoRuntimesQueryKey(), snapshot)
+}
+
 export async function removeRepoRuntimeFromCache(
   entry: RepoRuntimeEntry,
   queryClient: QueryClient = primaryWindowQueryClient,

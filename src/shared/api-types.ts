@@ -117,6 +117,10 @@ export interface RepoRuntimesSnapshot {
   runtimes: RepoRuntimeEntry[]
 }
 
+export interface RepoRuntimeMembershipReconcileResult {
+  runtimes: RepoRuntimeEntry[]
+}
+
 export interface RepoSettingsState {
   repoSettings: RepoSettingsEntry[]
 }
@@ -343,6 +347,7 @@ export interface AppIpcHandlers {
   repo: {
     probe: (input: { cwd: string }) => Promise<ProbeResult>
     runtimeOpen: (input: ({ repoRoot: string } | { repoInput: string }) & { clientId: string }) => Promise<RepoRuntimeOpenResponse>
+    runtimeReconcile: (input: { clientId: string; repoRoots: string[] }) => Promise<RepoRuntimeMembershipReconcileResult>
     runtimeList: () => Promise<RepoRuntimesSnapshot>
     runtimeClose: (input: { repoRoot: string; repoRuntimeId: string; clientId: string }) => Promise<{
       ok: boolean

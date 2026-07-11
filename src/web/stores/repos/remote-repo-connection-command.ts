@@ -43,7 +43,7 @@ export async function runRemoteRepoConnection(
   set: ReposSet,
   get: ReposGet,
   repoId: string,
-  options: { repoRuntimeId?: string; signal?: AbortSignal } = {},
+  options: { repoRuntimeId?: string; signal?: AbortSignal; mode?: 'restart' | 'ensure' } = {},
 ): Promise<RemoteRepoConnectionOutcome | null> {
   if (!isRemoteRepoId(repoId)) return null
   const repoRuntimeId = options.repoRuntimeId ?? get().repos[repoId]?.repoRuntimeId
@@ -51,7 +51,7 @@ export async function runRemoteRepoConnection(
 
   let result: RemoteRepoLifecycleCommandResult
   try {
-    result = await resolveRemoteRepoConnection({ repoId, repoRuntimeId }, options.signal)
+    result = await resolveRemoteRepoConnection({ repoId, repoRuntimeId, mode: options.mode }, options.signal)
   } catch (error) {
     if (options.signal?.aborted || isAbortError(error)) return { kind: 'cancelled', repoId }
     return { kind: 'transport-failed', repoId, reason: 'unknown' }

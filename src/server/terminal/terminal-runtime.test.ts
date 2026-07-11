@@ -1797,6 +1797,7 @@ describe('server terminal runtime', () => {
 
     const socket2 = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_b', USER_1, socket2)
+    REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_b')
     await expect(
       requestWorkspacePaneTabs(
         host,
@@ -2400,6 +2401,57 @@ describe('server terminal runtime', () => {
 
       vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
       expect(handle.isClientOnline('client_silent')).toBe(false)
+    } finally {
+      vi.useRealTimers()
+      shutdownFn?.()
+    }
+  })
+
+  test('runtime: detached client expiry releases its repo memberships without closing sibling epochs', async () => {
+    vi.useFakeTimers()
+    let shutdownFn: (() => void) | undefined
+    try {
+      const handle = buildRuntime()
+      shutdownFn = handle.shutdown
+      expect(acquireRepoRuntime(USER_1, REPO_ROOT, 'client_expiring')).toBe(REPO_RUNTIME_ID)
+      const socket = { send: vi.fn(), close: vi.fn() }
+      handle.host.registerSocket('client_expiring', USER_1, socket)
+      handle.host.unregisterSocket('client_expiring', USER_1, socket)
+
+      await vi.advanceTimersByTimeAsync(DETACHED_TTL_MS + 1)
+
+      expect(releaseRepoRuntime(USER_1, REPO_ROOT, REPO_RUNTIME_ID, 'client_expiring')).toEqual({
+        released: false,
+        runtimeClosed: false,
+      })
+      expect(releaseRepoRuntime(USER_1, REPO_ROOT, REPO_RUNTIME_ID, 'client_a')).toEqual({
+        released: true,
+        runtimeClosed: true,
+      })
+    } finally {
+      vi.useRealTimers()
+      shutdownFn?.()
+    }
+  })
+
+  test('runtime: a membership renewed after disconnect survives the stale expiry timer', async () => {
+    vi.useFakeTimers()
+    let shutdownFn: (() => void) | undefined
+    try {
+      const handle = buildRuntime()
+      shutdownFn = handle.shutdown
+      expect(acquireRepoRuntime(USER_1, REPO_ROOT, 'client_renewed')).toBe(REPO_RUNTIME_ID)
+      const socket = { send: vi.fn(), close: vi.fn() }
+      handle.host.registerSocket('client_renewed', USER_1, socket)
+      handle.host.unregisterSocket('client_renewed', USER_1, socket)
+      expect(acquireRepoRuntime(USER_1, REPO_ROOT, 'client_renewed')).toBe(REPO_RUNTIME_ID)
+
+      await vi.advanceTimersByTimeAsync(DETACHED_TTL_MS + 1)
+
+      expect(releaseRepoRuntime(USER_1, REPO_ROOT, REPO_RUNTIME_ID, 'client_renewed')).toEqual({
+        released: true,
+        runtimeClosed: false,
+      })
     } finally {
       vi.useRealTimers()
       shutdownFn?.()

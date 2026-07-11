@@ -115,6 +115,10 @@ export const REPO_PROCEDURE_SCHEMAS = {
   openInFinder: v.object({ path: v.string() }),
   backgroundSyncRepos: v.object({ repoIds: StringArray }),
   runtimeOpen: RepoRuntimeOpenSchema,
+  runtimeReconcile: v.object({
+    clientId: v.string(),
+    repoRoots: v.pipe(v.array(v.string()), v.maxLength(100)),
+  }),
   runtimeList: EmptyBodySchema,
   runtimeClose: RepoRuntimeCloseSchema,
   abort: CwdInput,
@@ -163,6 +167,7 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
   remoteLifecycle: v.object({
     repoId: v.string(),
     repoRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
+    mode: v.optional(v.picklist(['restart', 'ensure'])),
   }),
   pathSuggestions: RemotePathSuggestionsInputSchema,
   testRepo: v.object({ target: RemoteTargetSchema }),

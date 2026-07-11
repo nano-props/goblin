@@ -26,7 +26,7 @@ export function createRemoteRoutes() {
   app.post('/lifecycle', async (c) => {
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
-    const { repoId, repoRuntimeId } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.remoteLifecycle, c)
+    const { repoId, repoRuntimeId, mode } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.remoteLifecycle, c)
     let resultName = repoId
     const result = await runRepoRemoteLifecycle(
       userId,
@@ -38,6 +38,7 @@ export function createRemoteRoutes() {
         return resolved
       },
       () => publishUserRepoQueryInvalidation(userId, { repoId, query: 'remote-lifecycle' }),
+      mode,
     )
     if (result.kind !== 'settled') {
       return c.json({ kind: result.kind, repoId } satisfies RemoteRepoLifecycleCommandResult)

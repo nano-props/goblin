@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   acquireRepoRuntime,
   clearRepoRuntimesForUser,
@@ -43,6 +43,49 @@ describe('repo runtime remote lifecycle', () => {
     releaseFirst(ready)
     await expect(first).resolves.toEqual({ kind: 'superseded' })
     expect(listRepoRuntimes(userId)[0]?.remoteLifecycle).toMatchObject({ kind: 'ready', attemptId: 2 })
+  })
+
+  test('ensure joins an existing connecting lifecycle without restarting it', async () => {
+    const runtimeId = acquireRepoRuntime(userId, repoRoot, clientId)
+    let firstSignal!: AbortSignal
+    let releaseFirst!: (value: RemoteRepoConnectionResult) => void
+    const first = runRepoRemoteLifecycle(userId, repoRoot, runtimeId, (signal) => {
+      firstSignal = signal
+      return new Promise((resolve) => { releaseFirst = resolve })
+    })
+    const resolver = vi.fn(async () => ready)
+
+    const ensured = runRepoRemoteLifecycle(userId, repoRoot, runtimeId, resolver, () => {}, 'ensure')
+    expect(resolver).not.toHaveBeenCalled()
+    expect(firstSignal.aborted).toBe(false)
+    releaseFirst(ready)
+    await expect(first).resolves.toMatchObject({ kind: 'settled', lifecycle: { attemptId: 1 } })
+    await expect(ensured).resolves.toMatchObject({ kind: 'settled', lifecycle: { attemptId: 1 } })
+  })
+
+  test('ensure follows a replacement attempt until the current lifecycle settles', async () => {
+    const runtimeId = acquireRepoRuntime(userId, repoRoot, clientId)
+    const first = Promise.withResolvers<RemoteRepoConnectionResult>()
+    const second = Promise.withResolvers<RemoteRepoConnectionResult>()
+    let firstSignal!: AbortSignal
+    const firstRun = runRepoRemoteLifecycle(userId, repoRoot, runtimeId, (signal) => {
+      firstSignal = signal
+      return first.promise
+    })
+    const ensured = runRepoRemoteLifecycle(userId, repoRoot, runtimeId, async () => ready, () => {}, 'ensure')
+    const restarted = runRepoRemoteLifecycle(userId, repoRoot, runtimeId, () => second.promise)
+    expect(firstSignal.aborted).toBe(true)
+    first.resolve(ready)
+    await expect(firstRun).resolves.toEqual({ kind: 'superseded' })
+
+    let ensureSettled = false
+    void ensured.finally(() => { ensureSettled = true })
+    await Promise.resolve()
+    expect(ensureSettled).toBe(false)
+
+    second.resolve(ready)
+    await expect(restarted).resolves.toMatchObject({ kind: 'settled', lifecycle: { attemptId: 2 } })
+    await expect(ensured).resolves.toMatchObject({ kind: 'settled', lifecycle: { attemptId: 2 } })
   })
 
   test('publishes lifecycle through the user-scoped runtime snapshot', async () => {

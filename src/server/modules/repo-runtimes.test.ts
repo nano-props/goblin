@@ -1,10 +1,14 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   acquireRepoRuntime,
+  captureRepoRuntimeMembershipLease,
   clearRepoRuntimesForUser,
+  expireRepoRuntimeMembershipLease,
   isCurrentRepoRuntime,
+  listRepoRuntimes,
   onRepoRuntimeClosed,
   releaseRepoRuntime,
+  replaceRepoRuntimeMembershipsForClient,
 } from '#/server/modules/repo-runtimes.ts'
 
 const USER_ID = 'user_repo_runtime'
@@ -45,5 +49,71 @@ describe('repo runtimes', () => {
     expect(acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')).toBe(runtimeId)
     expect(releaseRepoRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toEqual({ released: true, runtimeClosed: true })
     expect(releaseRepoRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toEqual({ released: false, runtimeClosed: false })
+  })
+
+  test('expires only memberships captured when a client went offline', () => {
+    const runtimeId = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
+    acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-b')
+    const lease = captureRepoRuntimeMembershipLease(USER_ID, 'client-a')
+
+    expect(expireRepoRuntimeMembershipLease(lease)).toEqual([])
+    expect(isCurrentRepoRuntime(USER_ID, REPO_ROOT, runtimeId)).toBe(true)
+    expect(releaseRepoRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toEqual({
+      released: false,
+      runtimeClosed: false,
+    })
+    expect(releaseRepoRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-b')).toEqual({
+      released: true,
+      runtimeClosed: true,
+    })
+  })
+
+  test('does not let an old disconnect lease remove a renewed membership', () => {
+    const runtimeId = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
+    const staleLease = captureRepoRuntimeMembershipLease(USER_ID, 'client-a')
+    expect(acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')).toBe(runtimeId)
+
+    expect(expireRepoRuntimeMembershipLease(staleLease)).toEqual([])
+    expect(releaseRepoRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toEqual({
+      released: true,
+      runtimeClosed: true,
+    })
+  })
+
+  test('atomically replaces one client membership set without changing sibling clients', () => {
+    const firstRuntimeId = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
+    acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-b')
+    const secondRoot = '/repo-runtimes/second'
+
+    const reconciled = replaceRepoRuntimeMembershipsForClient(USER_ID, 'client-a', [secondRoot])
+
+    expect(reconciled).toContainEqual(
+      expect.objectContaining({ repoRoot: secondRoot, repoRuntimeId: expect.stringMatching(/^repo-runtime-/) }),
+    )
+    expect(isCurrentRepoRuntime(USER_ID, REPO_ROOT, firstRuntimeId)).toBe(true)
+    expect(releaseRepoRuntime(USER_ID, REPO_ROOT, firstRuntimeId, 'client-a')).toEqual({
+      released: false,
+      runtimeClosed: false,
+    })
+    expect(releaseRepoRuntime(USER_ID, REPO_ROOT, firstRuntimeId, 'client-b')).toEqual({
+      released: true,
+      runtimeClosed: true,
+    })
+  })
+
+  test('publishes close events only after the replacement snapshot is complete', () => {
+    const oldRoot = '/repo-runtimes/old'
+    const newRoot = '/repo-runtimes/new'
+    acquireRepoRuntime(USER_ID, oldRoot, 'client-a')
+    const observedSnapshots: string[][] = []
+    const unsubscribe = onRepoRuntimeClosed(() => {
+      observedSnapshots.push(listRepoRuntimes(USER_ID).map((entry) => entry.repoRoot))
+    })
+    try {
+      replaceRepoRuntimeMembershipsForClient(USER_ID, 'client-a', [newRoot])
+      expect(observedSnapshots).toEqual([[newRoot]])
+    } finally {
+      unsubscribe()
+    }
   })
 })

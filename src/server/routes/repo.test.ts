@@ -246,6 +246,39 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     await expect(close('client-b')).resolves.toEqual({ ok: true, released: true, runtimeClosed: true })
   })
 
+  test('reconciles a client window membership declaration in one request', async () => {
+    const app = createTestRepoRoutes()
+    const post = async (path: string, body: object) =>
+      await app.request(new Request(`http://localhost${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      }))
+    const old = (await (await post('/runtime-open', {
+      repoRoot: '/tmp/reconcile-old', clientId: 'client-a',
+    })).json()) as { repoRuntimeId: string }
+    await post('/runtime-open', { repoRoot: '/tmp/reconcile-old', clientId: 'client-b' })
+
+    const response = await post('/runtime-reconcile', {
+      clientId: 'client-a', repoRoots: ['/tmp/reconcile-new'],
+    })
+
+    expect(response.status).toBe(200)
+    const reconciled = await response.json() as {
+      runtimes: Array<{ repoRoot: string; repoRuntimeId: string }>
+    }
+    expect(reconciled.runtimes).toContainEqual(expect.objectContaining({
+      repoRoot: '/tmp/reconcile-new',
+      repoRuntimeId: expect.stringMatching(/^repo-runtime-/),
+    }))
+    const listed = await (await post('/runtime-list', {})).json() as {
+      runtimes: Array<{ repoRoot: string; repoRuntimeId: string }>
+    }
+    expect(listed.runtimes).toContainEqual(expect.objectContaining({
+      repoRoot: '/tmp/reconcile-old', repoRuntimeId: old.repoRuntimeId,
+    }))
+  })
+
   test('passes worktree bootstrap preview requests through to the module layer', async () => {
     mocks.getRepoWorktreeBootstrapPreview.mockResolvedValueOnce({
       ok: true,

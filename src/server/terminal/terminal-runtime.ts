@@ -57,6 +57,10 @@ import {
 // timer here; it has been removed — controller effectiveness now derives from
 // broker presence.)
 const TERMINAL_DETACHED_TTL_MS = 24 * 60 * 60 * 1000
+// A window's repo membership survives the same long disconnect window as its
+// terminals, but remains a separate policy input so the two lifecycles are not
+// structurally coupled if product retention changes later.
+const REPO_RUNTIME_MEMBERSHIP_TTL_MS = 24 * 60 * 60 * 1000
 const terminalRuntimeLogger = serverLogger.child({ module: 'terminal-runtime' })
 
 export interface ServerTerminalRuntimeOptions {
@@ -129,6 +133,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     manager,
     workspaceTabsCoordinator,
     detachedTtlMs: TERMINAL_DETACHED_TTL_MS,
+    repoMembershipTtlMs: REPO_RUNTIME_MEMBERSHIP_TTL_MS,
   })
   broker = coordinator.broker
   sessionService = createTerminalSessionService({
