@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { createWorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
+import { testPhysicalWorktreeIdentity } from '#/server/test-utils/physical-worktree-identity.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 describe('workspace pane tabs runtime storage', () => {
@@ -39,7 +40,12 @@ describe('workspace pane tabs runtime storage', () => {
 
   test('removes runtime and worktree-only tabs from no-worktree targets', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
-    const noWorktree = { ...target(), branchName: 'feature/no-worktree', worktreePath: null }
+    const noWorktree = {
+      ...target(),
+      branchName: 'feature/no-worktree',
+      worktreePath: null,
+      physicalWorktreeIdentity: null,
+    }
 
     runtime.replaceTabs({
       ...noWorktree,
@@ -91,7 +97,7 @@ describe('workspace pane tabs runtime storage', () => {
     runtime.replaceTabs({ ...target(), userId: 'user-b', scope: '/repo\0runtime-b', tabs })
     runtime.replaceTabs({ ...target(), scope: '/other-repo\0runtime-c', tabs })
 
-    expect(runtime.physicalWorktreeScopes({ repoRoot: '/repo', worktreePath: '/repo-linked' })).toEqual([
+    expect(runtime.physicalWorktreeScopes(testPhysicalWorktreeIdentity('/repo-linked'))).toEqual([
       { userId: 'user-a', scope: '/repo\0runtime-a' },
       { userId: 'user-b', scope: '/repo\0runtime-b' },
       { userId: 'user-a', scope: '/other-repo\0runtime-c' },
@@ -142,6 +148,7 @@ describe('workspace pane tabs runtime storage', () => {
       ...target(),
       branchName: 'feature/other',
       worktreePath: '/repo-other',
+      physicalWorktreeIdentity: testPhysicalWorktreeIdentity('/repo-other'),
       tabs: [workspacePaneStaticTabEntry('files')],
     })
     const revision = runtime.revision({ userId: 'user-a', scope: '/repo' })
@@ -159,19 +166,21 @@ describe('workspace pane tabs runtime storage', () => {
   })
 })
 
-function target(): { userId: string; scope: string; branchName: string; worktreePath: string } {
+function target() {
   return {
     userId: 'user-a',
     scope: '/repo',
     branchName: 'feature/worktree',
     worktreePath: '/repo-linked',
+    physicalWorktreeIdentity: testPhysicalWorktreeIdentity('/repo-linked'),
   }
 }
 
-function worktree(): { userId: string; scope: string; worktreePath: string } {
+function worktree() {
   return {
     userId: 'user-a',
     scope: '/repo',
     worktreePath: '/repo-linked',
+    identity: testPhysicalWorktreeIdentity('/repo-linked'),
   }
 }

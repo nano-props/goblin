@@ -11,6 +11,11 @@ export interface RemoteRepoTarget extends RemoteRepoRef {
   host: string
   user: string
   port: number
+  /** Server-captured effective SSH configuration; omitted on client-originated targets. */
+  sshConnection?: {
+    readonly destination: string
+    readonly options: readonly string[]
+  }
 }
 
 export type LocalRepoSessionEntry = { kind: 'local'; id: string }

@@ -645,6 +645,7 @@ export async function removeRemoteWorktree(
     beforeRemove: () => Promise<ExecResult>
     afterWorktreeRemoved: () => Promise<ExecResult>
     afterRemoveFailed: () => Promise<void>
+    validateBeforeRemove?: () => Promise<ExecResult>
   },
 ): Promise<RemoteWorktreeMutationResult> {
   if (!isSafeBranchName(input.branch)) return { ok: false, message: 'error.invalid-arguments' }
@@ -695,11 +696,21 @@ export async function removeRemoteWorktree(
 
   const prepared = await input.beforeRemove()
   if (!prepared.ok) return prepared
+  const exact = await input.validateBeforeRemove?.()
+  if (exact && !exact.ok) {
+    await input.afterRemoveFailed()
+    return exact
+  }
+  if (input.signal?.aborted) {
+    await input.afterRemoveFailed()
+    return { ok: false, message: 'cancelled' }
+  }
 
   let removeResult: RemoteCommandResult
   try {
     removeResult = await run({ type: 'gitWorktreeRemove', path: mutationPath, worktreePath: resolved.path }, target, {
       timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS,
+      signal: input.signal,
     })
   } catch (error) {
     await input.afterRemoveFailed()
@@ -716,19 +727,19 @@ export async function removeRemoteWorktree(
   if (!input.alsoDeleteBranch) return withAffectedWorktreePaths(remoteExecResult(removeResult), affectedWorktreePaths)
 
   const upstream = input.alsoDeleteUpstream
-    ? await getRemoteUpstreamParts(target, input.branch, { run, path: mutationPath })
+      ? await getRemoteUpstreamParts(target, input.branch, { signal: input.signal, run, path: mutationPath })
     : null
   const deleteResult = await run(
     { type: 'gitBranchDelete', path: mutationPath, branch: input.branch, force: shouldForceDeleteBranch },
     target,
-    { timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS },
+    { timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS, signal: input.signal },
   )
   const localDeleteResult = remoteExecResult(deleteResult)
   if (!localDeleteResult.ok) {
     return withAffectedWorktreePaths({ ...localDeleteResult, repoChanged: true }, affectedWorktreePaths)
   }
   const upstreamDeleteResult = await deleteRemoteUpstreamBranch(target, mutationPath, upstream, {
-    signal: undefined,
+    signal: input.signal,
     run,
   })
   return withAffectedWorktreePaths(upstreamDeleteResult ?? localDeleteResult, affectedWorktreePaths)

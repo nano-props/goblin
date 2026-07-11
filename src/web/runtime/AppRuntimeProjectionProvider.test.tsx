@@ -526,6 +526,7 @@ function testBridge(): ClientBridge {
       takeover: vi.fn(async () => ({
         ok: true as const,
         terminalRuntimeSessionId: 'term-111111111111111111111',
+        terminalRuntimeGeneration: 1,
         role: 'controller' as const,
         controllerStatus: 'connected' as const,
         controller: { clientId: 'client_local', status: 'connected' as const },
@@ -575,6 +576,7 @@ function attachResult(): TerminalAttachResult {
   return {
     ok: true,
     terminalRuntimeSessionId: 'unused',
+        terminalRuntimeGeneration: 1,
     snapshot: '',
     snapshotSeq: 0,
     outputEra: 0,
@@ -591,6 +593,7 @@ function attachResult(): TerminalAttachResult {
 function serverSession(terminalSessionId: string): TestTerminalSessionSummary {
   return {
     terminalRuntimeSessionId: `runtime-${terminalSessionId}`,
+        terminalRuntimeGeneration: 1,
     terminalSessionId,
     processName: 'zsh',
     canonicalTitle: null,

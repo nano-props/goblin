@@ -19,6 +19,7 @@ describe('createServerWorkspacePaneRuntimeClient', () => {
         action: 'closed' as const,
         terminalSessionId: 'term-111111111111111111111',
         terminalRuntimeSessionId: 'pty_1234567890abcdef',
+        terminalRuntimeGeneration: 1,
       },
       workspacePaneTabs: { revision: 2, entries: [] },
     }))
@@ -35,6 +36,7 @@ describe('createServerWorkspacePaneRuntimeClient', () => {
         action: 'closed',
         terminalSessionId: 'term-111111111111111111111',
         terminalRuntimeSessionId: 'pty_1234567890abcdef',
+        terminalRuntimeGeneration: 1,
       },
       workspacePaneTabs: { revision: 2, entries: [] },
     })
@@ -51,6 +53,7 @@ describe('createServerWorkspacePaneRuntimeClient', () => {
             action: 'closed',
             terminalSessionId: 'term-111111111111111111111',
             terminalRuntimeSessionId: 'pty_1234567890abcdef',
+            terminalRuntimeGeneration: 1,
           },
           workspacePaneTabs: { revision: -1, entries: [] },
         })),

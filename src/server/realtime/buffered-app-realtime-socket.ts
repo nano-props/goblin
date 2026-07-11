@@ -3,6 +3,7 @@ import type { RealtimeSocket } from '#/server/realtime/realtime-broker.ts'
 
 export interface AppRealtimeOutputFlushBoundary {
   terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: number
   outputEra: number
   seq: number
 }
@@ -12,7 +13,7 @@ export type AppRealtimeOutputFlushBoundaryContext =
   | readonly AppRealtimeOutputFlushBoundary[]
 
 export class BufferedAppRealtimeSocket extends BufferedRealtimeSocket<AppRealtimeOutputFlushBoundaryContext> {
-  private readonly flushBoundaryByTerminalRuntimeSessionId = new Map<string, AppRealtimeOutputFlushBoundary>()
+  private readonly flushBoundaryByRuntimeBinding = new Map<string, AppRealtimeOutputFlushBoundary>()
 
   constructor(socket: RealtimeSocket, onDeactivate?: () => void) {
     super(socket, onDeactivate)
@@ -30,36 +31,43 @@ export class BufferedAppRealtimeSocket extends BufferedRealtimeSocket<AppRealtim
   protected override shouldDropBufferedSend(payload: string): boolean {
     const event = parseTerminalOutputEvent(payload)
     if (!event) return false
-    const boundary = this.flushBoundaryByTerminalRuntimeSessionId.get(event.terminalRuntimeSessionId)
+    const boundary = this.flushBoundaryByRuntimeBinding.get(runtimeBindingKey(event))
     if (!boundary) return false
     if (event.outputEra !== boundary.outputEra) return event.outputEra < boundary.outputEra
     return event.seq <= boundary.seq
   }
 
   protected override onBufferCleared(): void {
-    this.flushBoundaryByTerminalRuntimeSessionId.clear()
+    this.flushBoundaryByRuntimeBinding.clear()
   }
 
   private recordFlushBoundary(boundary: AppRealtimeOutputFlushBoundary): void {
-    const current = this.flushBoundaryByTerminalRuntimeSessionId.get(boundary.terminalRuntimeSessionId)
+    const key = runtimeBindingKey(boundary)
+    const current = this.flushBoundaryByRuntimeBinding.get(key)
     if (!current || isCheckpointAfter(boundary, current)) {
-      this.flushBoundaryByTerminalRuntimeSessionId.set(boundary.terminalRuntimeSessionId, normalizeBoundary(boundary))
+      this.flushBoundaryByRuntimeBinding.set(key, normalizeBoundary(boundary))
     }
   }
 }
 
 function parseTerminalOutputEvent(
   payload: string,
-): { terminalRuntimeSessionId: string; outputEra: number; seq: number } | null {
+): { terminalRuntimeSessionId: string; terminalRuntimeGeneration: number; outputEra: number; seq: number } | null {
   try {
     const parsed = JSON.parse(payload) as unknown
     if (!parsed || typeof parsed !== 'object' || !('type' in parsed)) return null
     if ((parsed as { type?: unknown }).type !== 'output') return null
     const event = (parsed as { event?: unknown }).event
     if (!event || typeof event !== 'object') return null
-    const maybeEvent = event as { terminalRuntimeSessionId?: unknown; outputEra?: unknown; seq?: unknown }
+    const maybeEvent = event as {
+      terminalRuntimeSessionId?: unknown
+      terminalRuntimeGeneration?: unknown
+      outputEra?: unknown
+      seq?: unknown
+    }
     if (
       typeof maybeEvent.terminalRuntimeSessionId !== 'string' ||
+      !Number.isSafeInteger(maybeEvent.terminalRuntimeGeneration) ||
       typeof maybeEvent.outputEra !== 'number' ||
       typeof maybeEvent.seq !== 'number'
     ) {
@@ -67,6 +75,7 @@ function parseTerminalOutputEvent(
     }
     return {
       terminalRuntimeSessionId: maybeEvent.terminalRuntimeSessionId,
+      terminalRuntimeGeneration: maybeEvent.terminalRuntimeGeneration as number,
       outputEra: maybeEvent.outputEra,
       seq: maybeEvent.seq,
     }
@@ -78,9 +87,17 @@ function parseTerminalOutputEvent(
 function normalizeBoundary(boundary: AppRealtimeOutputFlushBoundary): AppRealtimeOutputFlushBoundary {
   return {
     terminalRuntimeSessionId: boundary.terminalRuntimeSessionId,
+    terminalRuntimeGeneration: boundary.terminalRuntimeGeneration,
     outputEra: normalizeOutputNumber(boundary.outputEra),
     seq: normalizeOutputNumber(boundary.seq),
   }
+}
+
+function runtimeBindingKey(binding: {
+  terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: number
+}): string {
+  return `${binding.terminalRuntimeSessionId}:${binding.terminalRuntimeGeneration}`
 }
 
 function isCheckpointAfter(next: AppRealtimeOutputFlushBoundary, current: AppRealtimeOutputFlushBoundary): boolean {

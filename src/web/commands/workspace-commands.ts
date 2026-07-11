@@ -12,14 +12,12 @@ import {
 } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import type { TerminalCreateTranslator } from '#/web/components/terminal/terminal-create-feedback.ts'
 import { isWorkspacePaneStaticTabProvider, workspacePaneTabProvider } from '#/web/workspace-pane/tab-providers.ts'
+import { workspacePaneActionOutcomeHandled } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import {
   dispatchNewTerminalRuntimeTabAction,
   dispatchTerminalRuntimePrimaryAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
-import {
-  resolveWorkspacePaneDestinationTarget,
-  resolveWorkspacePaneTabTargetForBranch,
-} from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import { resolveWorkspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 type WorkspacePaneCommandRoute = ParsedRepoBranchWorkspacePaneRoute | null | undefined
@@ -110,15 +108,14 @@ async function showWorkspacePaneTabCommand({
   if (!repoId || !branchName) return false
   const provider = workspacePaneTabProvider(tab)
   if (isWorkspacePaneStaticTabProvider(provider)) {
-    const destination = resolveWorkspacePaneDestinationTarget(repoId, branchName)
-    if (destination.kind === 'no-worktree') return provider.canOpen({ hasWorktree: false })
-    return await dispatchShowWorkspacePaneStaticTabAction({
+    const outcome = await dispatchShowWorkspacePaneStaticTabAction({
       repoId,
       branchName,
       type: provider.type,
       insertAfterIdentity: null,
       navigation,
     })
+    return workspacePaneActionOutcomeHandled(outcome)
   }
   if (tab === 'terminal')
     return await runTerminalPrimaryActionCommand({ repoId, branchName, workspacePaneRoute, navigation })

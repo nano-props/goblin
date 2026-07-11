@@ -1,68 +1,115 @@
 import PQueue from 'p-queue'
 import {
-  physicalWorktreeIdentity,
   physicalWorktreeIdentityKey,
+  type PhysicalWorktreeIdentity,
 } from '#/server/worktree-removal/physical-worktree-identity.ts'
+import {
+  physicalWorktreeCapabilityLease,
+  type PhysicalWorktreeCapability,
+} from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
-export interface PhysicalWorktreeOperationTarget {
-  repoRoot: string
-  worktreePath: string
-}
+export type PhysicalWorktreeAdmissionTarget = PhysicalWorktreeCapability | PhysicalWorktreeIdentity
 
 export interface PhysicalWorktreeOperationPermit {
   readonly operationId: number
+}
+
+export interface PhysicalWorktreeOperationContext {
+  readonly signal: AbortSignal
 }
 
 /** Serializes runtime mutations and removal admission by physical worktree identity. */
 export class PhysicalWorktreeOperationCoordinator {
   private readonly queues = new Map<string, PQueue>()
   private readonly removalAdmissions = new Set<string>()
-  private readonly permitKeys = new WeakMap<PhysicalWorktreeOperationPermit, string>()
+  private readonly permitContexts = new WeakMap<
+    PhysicalWorktreeOperationPermit,
+    { capability: PhysicalWorktreeCapability; key: string; context: PhysicalWorktreeOperationContext }
+  >()
   private readonly activePermits = new WeakSet<PhysicalWorktreeOperationPermit>()
   private nextOperationId = 1
 
-  isRemovalAdmitted(target: PhysicalWorktreeOperationTarget): boolean {
+  isRemovalAdmitted(target: PhysicalWorktreeAdmissionTarget): boolean {
     return this.removalAdmissions.has(physicalWorktreeOperationKey(target))
   }
 
-  assertPermit(target: PhysicalWorktreeOperationTarget, permit: PhysicalWorktreeOperationPermit): void {
-    if (!this.activePermits.has(permit) || this.permitKeys.get(permit) !== physicalWorktreeOperationKey(target)) {
+  assertPermit(
+    capability: PhysicalWorktreeCapability,
+    permit: PhysicalWorktreeOperationPermit,
+  ): PhysicalWorktreeOperationContext {
+    const entry = this.permitContexts.get(permit)
+    if (!this.activePermits.has(permit) || entry?.capability !== capability) {
       throw new Error('error.invalid-worktree-operation-permit')
     }
+    return entry.context
   }
 
   async runOperation<T>(
-    target: PhysicalWorktreeOperationTarget,
-    task: (permit: PhysicalWorktreeOperationPermit) => Promise<T>,
+    capability: PhysicalWorktreeCapability,
+    task: (permit: PhysicalWorktreeOperationPermit, context: PhysicalWorktreeOperationContext) => Promise<T>,
+    externalSignal?: AbortSignal,
   ): Promise<{ admitted: true; value: T } | { admitted: false }> {
-    const key = physicalWorktreeOperationKey(target)
+    const lease = physicalWorktreeCapabilityLease(capability)
+    const signal = combinedSignal(lease.runtimeSignal, externalSignal)
+    signal.throwIfAborted()
+    const key = physicalWorktreeOperationKey(capability)
     if (this.removalAdmissions.has(key)) return { admitted: false }
-    const permit = this.createPermit(key)
+    const context = Object.freeze({ signal })
+    const permit = this.createPermit(capability, key, context)
     try {
-      return { admitted: true, value: await this.runByKey(key, async () => await task(permit)) }
+      return {
+        admitted: true,
+        value: await this.runByKey(
+          key,
+          async () => {
+            await lease.validateExecution(signal)
+            signal.throwIfAborted()
+            return await task(permit, context)
+          },
+          signal,
+        ),
+      }
     } finally {
       this.activePermits.delete(permit)
     }
   }
 
   async runRemoval<T>(
-    target: PhysicalWorktreeOperationTarget,
-    task: () => Promise<T>,
+    capability: PhysicalWorktreeCapability,
+    task: (context: PhysicalWorktreeOperationContext, permit: PhysicalWorktreeOperationPermit) => Promise<T>,
+    externalSignal?: AbortSignal,
   ): Promise<{ admitted: true; value: T } | { admitted: false }> {
-    const key = physicalWorktreeOperationKey(target)
+    const lease = physicalWorktreeCapabilityLease(capability)
+    const signal = combinedSignal(lease.runtimeSignal, externalSignal)
+    signal.throwIfAborted()
+    const key = physicalWorktreeOperationKey(capability)
     if (this.removalAdmissions.has(key)) return { admitted: false }
     this.removalAdmissions.add(key)
+    const context = Object.freeze({ signal })
+    const permit = this.createPermit(capability, key, context)
     try {
-      return { admitted: true, value: await this.runByKey(key, task) }
+      return {
+        admitted: true,
+        value: await this.runByKey(
+          key,
+          async () => {
+            await lease.validateExecution(signal)
+            signal.throwIfAborted()
+            return await task(context, permit)
+          },
+          signal,
+        ),
+      }
     } finally {
+      this.activePermits.delete(permit)
       this.removalAdmissions.delete(key)
     }
   }
 
-  private async runByKey<T>(key: string, task: () => Promise<T>): Promise<T> {
+  private async runByKey<T>(key: string, task: () => Promise<T>, signal: AbortSignal): Promise<T> {
     const queue = this.queue(key)
     try {
-      return await queue.add(task)
+      return await queue.add(task, { signal })
     } finally {
       void queue.onIdle().then(() => {
         if (this.queues.get(key) !== queue) return
@@ -80,16 +127,24 @@ export class PhysicalWorktreeOperationCoordinator {
     return queue
   }
 
-  private createPermit(key: string): PhysicalWorktreeOperationPermit {
+  private createPermit(
+    capability: PhysicalWorktreeCapability,
+    key: string,
+    context: PhysicalWorktreeOperationContext,
+  ): PhysicalWorktreeOperationPermit {
     const permit = { operationId: this.nextOperationId++ }
-    this.permitKeys.set(permit, key)
+    this.permitContexts.set(permit, { capability, key, context })
     this.activePermits.add(permit)
     return permit
   }
 }
 
-function physicalWorktreeOperationKey(target: PhysicalWorktreeOperationTarget): string {
-  return physicalWorktreeIdentityKey(physicalWorktreeIdentity(target))
+function combinedSignal(runtimeSignal: AbortSignal, externalSignal: AbortSignal | undefined): AbortSignal {
+  return externalSignal ? AbortSignal.any([runtimeSignal, externalSignal]) : runtimeSignal
+}
+
+function physicalWorktreeOperationKey(target: PhysicalWorktreeAdmissionTarget): string {
+  return physicalWorktreeIdentityKey('identity' in target ? target.identity : target)
 }
 
 export function createPhysicalWorktreeOperationCoordinator(): PhysicalWorktreeOperationCoordinator {

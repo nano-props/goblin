@@ -59,6 +59,7 @@ describe('terminal web host client', () => {
         payload: {
           ok: true,
           terminalRuntimeSessionId: 'pty_1234567890123456',
+        terminalRuntimeGeneration: 1,
           snapshot: '',
           snapshotSeq: 0,
           outputEra: 0,
@@ -100,6 +101,7 @@ describe('terminal web host client', () => {
         payload: {
           ok: true,
           terminalRuntimeSessionId: 'pty_1234567890123456',
+        terminalRuntimeGeneration: 1,
           snapshot: '',
           snapshotSeq: 0,
           outputEra: 0,
@@ -135,6 +137,7 @@ describe('terminal web host client', () => {
         type: 'identity',
         event: {
           terminalRuntimeSessionId: 'pty_1',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           controller: { clientId: 'client_sharedterminal', status: 'connected' },
           canonicalCols: 100,
@@ -146,6 +149,7 @@ describe('terminal web host client', () => {
     expect(socket.url).toContain('clientId=client_sharedterminal')
     expect(onIdentity).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
+        terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       role: 'controller',
       controllerStatus: 'connected',
@@ -428,6 +432,7 @@ describe('terminal web host client', () => {
         type: 'title',
         event: {
           terminalRuntimeSessionId: 'pty_1',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           repoRoot: '/tmp/repo',
           worktreePath: '/tmp/repo-worktree',
@@ -440,6 +445,7 @@ describe('terminal web host client', () => {
         type: 'output',
         event: {
           terminalRuntimeSessionId: 'pty_1',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           data: 'hello',
           seq: 1,
@@ -453,6 +459,7 @@ describe('terminal web host client', () => {
         type: 'bell',
         event: {
           terminalRuntimeSessionId: 'pty_1',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           repoRoot: '/tmp/repo',
           worktreePath: '/tmp/repo-worktree',
@@ -464,7 +471,13 @@ describe('terminal web host client', () => {
     socket.emitMessage(
       JSON.stringify({
         type: 'exit',
-        event: { terminalRuntimeSessionId: 'pty_1', terminalSessionId: 'term-111111111111111111111' },
+        event: {
+          terminalRuntimeSessionId: 'pty_1',
+          terminalRuntimeGeneration: 1,
+          terminalSessionId: 'term-111111111111111111111',
+          repoRoot: '/tmp/repo',
+          repoRuntimeId: 'repo-runtime-1',
+        },
       }),
     )
     socket.emitMessage(
@@ -472,7 +485,10 @@ describe('terminal web host client', () => {
         type: 'identity',
         event: {
           terminalRuntimeSessionId: 'pty_1',
-          terminalSessionId: 'term-111111111111111111111',
+      terminalRuntimeGeneration: 1,
+      terminalSessionId: 'term-111111111111111111111',
+      repoRoot: '/tmp/repo',
+      repoRuntimeId: 'repo-runtime-1',
           controller: null,
           canonicalCols: 100,
           canonicalRows: 30,
@@ -484,6 +500,7 @@ describe('terminal web host client', () => {
         type: 'lifecycle',
         event: {
           terminalRuntimeSessionId: 'pty_1',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           phase: 'open',
           message: null,
@@ -506,6 +523,7 @@ describe('terminal web host client', () => {
 
     expect(onOutput).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
+        terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       data: 'hello',
       seq: 1,
@@ -514,6 +532,7 @@ describe('terminal web host client', () => {
     })
     expect(onBell).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
+        terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       repoRoot: '/tmp/repo',
       worktreePath: '/tmp/repo-worktree',
@@ -522,6 +541,7 @@ describe('terminal web host client', () => {
     })
     expect(onTitle).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
+        terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       repoRoot: '/tmp/repo',
       worktreePath: '/tmp/repo-worktree',
@@ -529,10 +549,14 @@ describe('terminal web host client', () => {
     })
     expect(onExit).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
+        terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
+      repoRoot: '/tmp/repo',
+      repoRuntimeId: 'repo-runtime-1',
     })
     expect(onIdentity).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
+        terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       role: 'unowned',
       controllerStatus: 'none',
@@ -541,6 +565,7 @@ describe('terminal web host client', () => {
     })
     expect(onLifecycle).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'pty_1',
+        terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       phase: 'open',
       message: null,
@@ -686,6 +711,7 @@ describe('terminal web host client', () => {
         type: 'output',
         event: {
           terminalRuntimeSessionId: 'pty_1',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           data: 'hello',
           seq: 1,
@@ -719,6 +745,7 @@ describe('terminal web host client', () => {
         type: 'output',
         event: {
           terminalRuntimeSessionId: 'term_old',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-oldoldoldoldoldoldold',
           data: 'stale',
           seq: 1,
@@ -732,6 +759,7 @@ describe('terminal web host client', () => {
         type: 'output',
         event: {
           terminalRuntimeSessionId: 'term_new',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-newnewnewnewnewnewnew',
           data: 'fresh',
           seq: 2,
@@ -744,6 +772,7 @@ describe('terminal web host client', () => {
     expect(onOutput).toHaveBeenCalledTimes(1)
     expect(onOutput).toHaveBeenCalledWith({
       terminalRuntimeSessionId: 'term_new',
+        terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-newnewnewnewnewnewnew',
       data: 'fresh',
       seq: 2,

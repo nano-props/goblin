@@ -117,6 +117,7 @@ function terminalSession(
 ): TerminalSessionSummary {
   return {
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
+        terminalRuntimeGeneration: 1,
     terminalSessionId,
     repoRuntimeId: 'repo-runtime-test',
     repoRoot: overrides.repoRoot ?? REPO_ROOT,

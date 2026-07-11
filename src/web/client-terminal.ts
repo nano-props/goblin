@@ -31,6 +31,7 @@ export function createServerTerminalClient(options: {
   const sessionClosedSubscribers = new Set<
     (event: {
       terminalRuntimeSessionId: string
+      terminalRuntimeGeneration: number
       terminalSessionId: string
       repoRoot: string
       worktreePath: string
@@ -190,6 +191,7 @@ export function createServerTerminalClient(options: {
         for (const subscriber of sessionClosedSubscribers)
           subscriber({
             terminalRuntimeSessionId: message.terminalRuntimeSessionId,
+            terminalRuntimeGeneration: message.terminalRuntimeGeneration,
             terminalSessionId: message.terminalSessionId,
             repoRoot: message.repoRoot,
             worktreePath: message.worktreePath,
@@ -198,6 +200,7 @@ export function createServerTerminalClient(options: {
       case 'identity': {
         const identityEvent = {
           terminalRuntimeSessionId: message.event.terminalRuntimeSessionId,
+          terminalRuntimeGeneration: message.event.terminalRuntimeGeneration,
           terminalSessionId: message.event.terminalSessionId,
           ...resolveTerminalController(message.event.controller, currentClientId),
           canonicalCols: message.event.canonicalCols,

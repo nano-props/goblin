@@ -24,7 +24,7 @@ import {
   openRepoUrl,
   pullRepoBranch,
   pushRepoBranch,
-  removeRepoWorktree,
+  removeCapturedRepoWorktree,
 } from '#/server/modules/repo-write-paths.ts'
 import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
 import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
@@ -39,6 +39,8 @@ import {
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import type { RepoLogResponse } from '#/shared/api-types.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
+import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
+import type { PhysicalWorktreeCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 
 // Soft-fail envelope returned by `jsonOr` for every repo action that
@@ -200,12 +202,18 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
             repoRoot: cwd,
             repoRuntimeId,
             worktreePath,
-            remove: async (lifecycle) =>
-              await removeRepoWorktree(
+            signal: c.req.raw.signal,
+            remove: async (
+              physicalWorktreeCapability: PhysicalWorktreeCapability,
+              lifecycle: RepoWorktreeRemovalLifecycle,
+              signal: AbortSignal,
+            ) =>
+              await removeCapturedRepoWorktree(
                 cwd,
                 { branch, worktreePath, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream },
                 lifecycle,
-                c.req.raw.signal,
+                physicalWorktreeCapability,
+                signal,
               ),
           }),
         READ_REPO_ERROR,

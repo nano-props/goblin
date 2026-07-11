@@ -64,6 +64,7 @@ describe('terminal realtime broker', () => {
         type: 'output',
         event: {
           terminalRuntimeSessionId: 's_1',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           data: 'covered',
           outputEra: 0,
@@ -77,6 +78,7 @@ describe('terminal realtime broker', () => {
         type: 'output',
         event: {
           terminalRuntimeSessionId: 's_1',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           data: 'after',
           outputEra: 0,
@@ -90,6 +92,7 @@ describe('terminal realtime broker', () => {
         type: 'output',
         event: {
           terminalRuntimeSessionId: 's_2',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-222222222222222222222',
           data: 'other-session',
           outputEra: 0,
@@ -99,7 +102,12 @@ describe('terminal realtime broker', () => {
       }),
     )
 
-    bufferedSocket.resume({ terminalRuntimeSessionId: 's_1', outputEra: 0, seq: 1 })
+    bufferedSocket.resume({
+      terminalRuntimeSessionId: 's_1',
+      terminalRuntimeGeneration: 1,
+      outputEra: 0,
+      seq: 1,
+    })
 
     expect(rawSocket.send).toHaveBeenCalledTimes(2)
     const messages = rawSocket.send.mock.calls.map(([payload]) => JSON.parse(String(payload)))
@@ -117,6 +125,7 @@ describe('terminal realtime broker', () => {
       type: 'output',
       event: {
         terminalRuntimeSessionId: 's_1',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         data: 'hi',
         outputEra: 0,
@@ -133,6 +142,7 @@ describe('terminal realtime broker', () => {
       type: 'output',
       event: {
         terminalRuntimeSessionId: 's_1',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         data: 'hi',
         seq: 1,
@@ -153,6 +163,7 @@ describe('terminal realtime broker', () => {
       type: 'output',
       event: {
         terminalRuntimeSessionId: 's_1',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         data: 'a',
         outputEra: 0,
@@ -176,6 +187,7 @@ describe('terminal realtime broker', () => {
       type: 'output',
       event: {
         terminalRuntimeSessionId: 's_1',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         data: 'a',
         outputEra: 0,
@@ -200,6 +212,7 @@ describe('terminal realtime broker', () => {
       type: 'output',
       event: {
         terminalRuntimeSessionId: 's_1',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         data: 'a',
         outputEra: 0,

@@ -54,6 +54,7 @@ export function projectCreateResultForClient(
         result.terminalRuntimeSessionId,
         {
           terminalRuntimeSessionId: result.terminalRuntimeSessionId,
+          terminalRuntimeGeneration: result.terminalRuntimeGeneration,
           snapshot: result.snapshot,
           snapshotSeq: result.snapshotSeq,
           outputEra: result.outputEra,
@@ -95,6 +96,7 @@ export function projectServerTerminalSession(input: {
     terminalWorktreeKey: terminalWorktree,
     hydrateInput: {
       terminalRuntimeSessionId: input.serverSession.terminalRuntimeSessionId,
+      terminalRuntimeGeneration: input.serverSession.terminalRuntimeGeneration,
       processName: input.serverSession.processName,
       canonicalTitle: input.serverSession.canonicalTitle,
       phase: input.serverSession.phase,
@@ -117,6 +119,7 @@ function createSessionSummaryFromCreate(
 ): ServerTerminalSessionSummary {
   return {
     terminalRuntimeSessionId: result.terminalRuntimeSessionId,
+    terminalRuntimeGeneration: result.terminalRuntimeGeneration,
     terminalSessionId: result.terminalSessionId,
     repoRuntimeId: requireBaseRepoRuntimeId(base),
     repoRoot: base.repoRoot,

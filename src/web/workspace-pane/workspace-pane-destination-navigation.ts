@@ -1,5 +1,14 @@
 import type { RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
+import { terminalWorkspacePaneTabProvider, workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
+import type { WorkspacePaneActionOutcome } from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
+import { commitWorkspacePaneRouteSupplement } from '#/web/workspace-pane/workspace-pane-route-supplement.ts'
+import {
+  beginPrimaryWindowPresentation,
+  primaryWindowPresentationIsCurrent,
+  resetPrimaryWindowPresentationForTest,
+  type PrimaryWindowPresentationToken,
+} from '#/web/primary-window-presentation.ts'
 import {
   resolveWorkspacePaneDestinationTargetLease,
   workspacePaneDestinationTargetLeaseIsCurrent,
@@ -12,17 +21,42 @@ export type WorkspacePaneDestinationNavigation = Pick<
   'commitRepoBranchWorkspacePaneRoute'
 >
 
+export interface WorkspacePaneDestinationPresentation {
+  token: PrimaryWindowPresentationToken
+  lease: WorkspacePaneDestinationTargetLease
+}
+
+export function beginWorkspacePaneDestinationPresentation(
+  lease: WorkspacePaneDestinationTargetLease,
+): WorkspacePaneDestinationPresentation {
+  return { token: beginPrimaryWindowPresentation(), lease }
+}
+
+export function workspacePaneDestinationPresentationIsCurrent(
+  presentation: WorkspacePaneDestinationPresentation,
+): boolean {
+  return primaryWindowPresentationIsCurrent(presentation.token) && workspacePaneDestinationTargetLeaseIsCurrent(presentation.lease)
+}
+
+export function resetWorkspacePaneDestinationPresentationForTest(): void {
+  resetPrimaryWindowPresentationForTest()
+}
+
 export async function dispatchWorkspacePaneDestinationRoute(input: {
   repoId: string
   branchName: string
   route: RepoBranchWorkspacePaneRouteTarget
   navigation: WorkspacePaneDestinationNavigation
   options?: { replace?: boolean }
-}): Promise<boolean> {
+}): Promise<WorkspacePaneActionOutcome> {
   const lease = resolveWorkspacePaneDestinationTargetLease(input.repoId, input.branchName)
-  if (!lease) return false
+  if (!lease) return { kind: 'target-missing' }
+  if (!workspacePaneDestinationRouteSupported(lease, input.route)) {
+    return { kind: 'unsupported', reason: 'worktree-required' }
+  }
+  const presentation = beginWorkspacePaneDestinationPresentation(lease)
   return await runWorkspacePaneTabCoordinatorTask(lease, () =>
-    commitWorkspacePaneDestinationRoute(lease, input.route, input.navigation, input.options),
+    commitWorkspacePaneDestinationRoute(presentation, input.route, input.navigation, input.options),
   )
 }
 
@@ -34,15 +68,39 @@ export async function dispatchWorkspacePaneDestinationRoute(input: {
  * reopened repo runtime or a branch whose worktree identity changed meanwhile.
  */
 export async function commitWorkspacePaneDestinationRoute(
-  lease: WorkspacePaneDestinationTargetLease,
+  presentation: WorkspacePaneDestinationPresentation,
   route: RepoBranchWorkspacePaneRouteTarget,
   navigation: WorkspacePaneDestinationNavigation,
   options?: { replace?: boolean },
-): Promise<boolean> {
-  if (!workspacePaneDestinationTargetLeaseIsCurrent(lease)) return false
+): Promise<WorkspacePaneActionOutcome> {
+  if (!workspacePaneDestinationPresentationIsCurrent(presentation)) return { kind: 'superseded' }
+  const { lease } = presentation
+  let accepted = false
+  let supplementCommitted = false
   try {
-    return await navigation.commitRepoBranchWorkspacePaneRoute(lease.repoId, lease.branchName, route, options)
+    accepted = await navigation.commitRepoBranchWorkspacePaneRoute(lease.repoId, lease.branchName, route, {
+      ...options,
+      presentationToken: presentation.token,
+      onCommit: () => {
+        supplementCommitted = commitWorkspacePaneRouteSupplement(lease, route)
+      },
+    })
   } catch {
-    return false
+    return { kind: 'navigation-rejected' }
   }
+  if (!accepted) return { kind: 'navigation-rejected' }
+  if (!workspacePaneDestinationPresentationIsCurrent(presentation)) return { kind: 'superseded' }
+  if (!supplementCommitted) return { kind: 'superseded' }
+  return { kind: 'completed', changed: true, presentation: 'router-settled' }
+}
+
+function workspacePaneDestinationRouteSupported(
+  lease: WorkspacePaneDestinationTargetLease,
+  route: RepoBranchWorkspacePaneRouteTarget,
+): boolean {
+  if (route === null) return true
+  const availability = { hasWorktree: lease.worktreePath !== null }
+  return route.kind === 'static'
+    ? workspacePaneStaticTabProvider(route.tab).canOpen(availability)
+    : terminalWorkspacePaneTabProvider.canOpen(availability)
 }

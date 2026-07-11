@@ -1,8 +1,10 @@
+import { createHash } from 'node:crypto'
 import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { execa } from 'execa'
 import SSHConfig, { LineType, type Line, type Section } from '#/system/ssh/vendor/ssh-config/index.ts'
+import { buildCanonicalSshConnectionSnapshot } from '#/system/ssh/commands.ts'
 import {
   normalizeRemoteRepoRef,
   normalizeRemoteTarget,
@@ -56,6 +58,14 @@ export async function resolveRemoteTarget(
   input: RemoteConnectionInput,
   signal?: AbortSignal,
 ): Promise<ResolvedRemoteTarget> {
+  const resolved = await resolveRemoteTargetWithConfigFingerprint(input, signal)
+  return { target: resolved.target }
+}
+
+export async function resolveRemoteTargetWithConfigFingerprint(
+  input: RemoteConnectionInput,
+  signal?: AbortSignal,
+): Promise<ResolvedRemoteTarget & { configFingerprint: string }> {
   const alias = input.alias.trim()
   if (!isConcreteAlias(alias)) throw new Error('Invalid SSH config host alias')
   const configState = await listSshConfigHosts()
@@ -63,13 +73,20 @@ export async function resolveRemoteTarget(
     throw new Error('error.ssh-config-changed')
   }
   const effective = await resolveEffectiveConfig(alias, signal)
-  return toResolvedTarget({
+  const resolved = toResolvedTarget({
     alias,
     host: effective.hostname ?? alias,
     user: effective.user ?? os.userInfo().username,
     port: effective.port ?? 22,
     remotePath: input.remotePath,
   })
+  return {
+    target: Object.freeze({
+      ...resolved.target,
+      sshConnection: buildCanonicalSshConnectionSnapshot(resolved.target, effective.normalized),
+    }),
+    configFingerprint: effective.fingerprint,
+  }
 }
 
 export async function resolveTrackedRemoteTarget(
@@ -85,6 +102,8 @@ interface EffectiveSshConfig {
   hostname?: string
   user?: string
   port?: number
+  fingerprint: string
+  normalized: string
 }
 
 async function resolveEffectiveConfig(alias: string, signal?: AbortSignal): Promise<EffectiveSshConfig> {
@@ -94,7 +113,11 @@ async function resolveEffectiveConfig(alias: string, signal?: AbortSignal): Prom
     forceKillAfterDelay: 500,
     maxBuffer: 1024 * 1024,
   })
-  const parsed: EffectiveSshConfig = {}
+  const normalized = normalizedEffectiveConfig(stdout)
+  const parsed: EffectiveSshConfig = {
+    fingerprint: createHash('sha256').update(normalized).digest('hex'),
+    normalized,
+  }
   for (const rawLine of stdout.split(/\r?\n/)) {
     const line = rawLine.trim()
     if (!line) continue
@@ -108,6 +131,14 @@ async function resolveEffectiveConfig(alias: string, signal?: AbortSignal): Prom
     }
   }
   return parsed
+}
+
+function normalizedEffectiveConfig(output: string): string {
+  return output
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join('\n')
 }
 
 function toResolvedTarget(input: {

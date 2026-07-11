@@ -5,6 +5,7 @@ import type {
   TerminalSessionEnsureResult,
 } from '#/server/terminal/terminal-session-ensurer.ts'
 import type { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
+import type { PhysicalWorktreeCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
 type TerminalSessionCreateCoordinator = ReturnType<typeof createTerminalSessionCreateCoordinator>
 type TerminalCreateFailure = Extract<TerminalCreateResult, { ok: false }>
@@ -15,6 +16,8 @@ interface TerminalSessionCreatorOptions {
     clientId: string,
     userId: string,
     input: TerminalSessionEnsureInput,
+    physicalWorktreeCapability: PhysicalWorktreeCapability,
+    signal: AbortSignal,
   ): Promise<TerminalSessionEnsureResult>
   isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
   rejectStaleCreateIfNeeded(
@@ -36,12 +39,16 @@ class TerminalSessionCreator {
     terminalClientId: string
     userId: string
     request: TerminalCreateInput
+    physicalWorktreeCapability: PhysicalWorktreeCapability
+    signal: AbortSignal
   }): Promise<TerminalCreateResult> {
+    const signal = input.signal
     const sessionScope = terminalSessionRuntimeScope(input.request.repoRoot, input.request.repoRuntimeId)
     const scopedWorktreePath = terminalSessionWorktreePath(input.request.repoRoot, input.request.worktreePath)
     return await this.options.createCoordinator.runInWorktreeQueue(
       { userId: input.userId, scope: sessionScope, worktreePath: scopedWorktreePath },
       async () => {
+        if (signal.aborted) return { ok: false, message: 'error.repo-runtime-stale' }
         if (!this.options.isCurrentRepoRuntime(input.userId, input.request.repoRoot, input.request.repoRuntimeId)) {
           return { ok: false, message: 'error.repo-runtime-stale' }
         }
@@ -52,7 +59,7 @@ class TerminalSessionCreator {
               ...input.request,
               clientId: input.terminalClientId,
               terminalSessionId,
-            }),
+            }, input.physicalWorktreeCapability, signal),
         )
         if (!createResult.ok) return { ok: false, message: createResult.message }
         const staleAfterEnsure = await this.options.rejectStaleCreateIfNeeded(
@@ -65,7 +72,9 @@ class TerminalSessionCreator {
           ok: true,
           action: createResult.action,
           terminalSessionId: createResult.terminalSessionId,
+          terminalSessionsRevision: createResult.terminalSessionsRevision,
           terminalRuntimeSessionId: createResult.terminalRuntimeSessionId,
+          terminalRuntimeGeneration: createResult.terminalRuntimeGeneration,
           processName: createResult.processName,
           canonicalTitle: createResult.canonicalTitle,
           phase: createResult.phase,

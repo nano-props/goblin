@@ -1294,7 +1294,7 @@ describe('repo mutation invalidation publishing', () => {
       expect(mocks.removeWorktree).toHaveBeenCalledTimes(1)
     })
 
-    expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-linked')
+    expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-linked', undefined)
     secondRemove.resolve({ ok: true, message: 'removed' })
     await expect(second).resolves.toEqual({ ok: true, message: 'removed' })
   })
@@ -1900,7 +1900,7 @@ describe('repo mutation invalidation publishing', () => {
     )
 
     expect(result).toEqual({ ok: false, message: 'fatal: delete failed', repoChanged: true })
-    expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree')
+    expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', undefined)
     expect(mocks.pruneServerRepoSettingsForRemovedWorktree).toHaveBeenCalledWith({
       repoId: '/tmp/repo',
       worktreePath: '/tmp/repo-worktree',
@@ -1944,7 +1944,7 @@ describe('repo mutation invalidation publishing', () => {
 
     expect(result).toEqual({ ok: true, message: 'ok' })
     expect(mocks.getCurrentBranch).toHaveBeenCalledWith('/tmp/repo', { signal: undefined })
-    expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-linked')
+    expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-linked', undefined)
     expect(mocks.deleteBranch).toHaveBeenCalledWith('/tmp/repo', 'feature/a', { force: undefined, signal: undefined })
     expectRepoSnapshotInvalidations(
       {
@@ -2023,7 +2023,7 @@ describe('repo mutation invalidation publishing', () => {
     )
 
     expect(result).toEqual({ ok: false, message: 'error.settings-write-title', repoChanged: true })
-    expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree')
+    expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', undefined)
     expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
   })
 

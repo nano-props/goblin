@@ -66,6 +66,7 @@ export interface ClientTerminal {
   onSessionClosed: (
     cb: (event: {
       terminalRuntimeSessionId: string
+      terminalRuntimeGeneration: number
       terminalSessionId: string
       repoRoot: string
       worktreePath: string

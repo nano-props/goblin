@@ -15,9 +15,9 @@ import {
   type WorkspacePaneRouteReconciliation,
 } from '#/web/components/repo-workspace/workspace-pane-route-reconciliation.ts'
 import {
+  commitWorkspacePaneControllerRoute,
   leaveWorkspacePaneTabControllerTarget,
   observeWorkspacePaneTabControllerRoute,
-  showWorkspacePaneControllerRoute,
   workspacePaneTabControllerReconciliationDeferred,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
@@ -250,7 +250,7 @@ function applyWorkspacePaneRouteReconciliation({
   if (reconciliation.kind === 'none' || reconciliation.kind === 'pending' || reconciliation.kind === 'unverified') {
     return
   }
-  showWorkspacePaneControllerRoute(repoId, branchName, null, navigation, { replace: true })
+  void commitWorkspacePaneControllerRoute(repoId, branchName, null, navigation, { replace: true })
 }
 
 function useSyncRoutedWorkspacePaneSelection({

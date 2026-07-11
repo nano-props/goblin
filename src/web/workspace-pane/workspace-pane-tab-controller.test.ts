@@ -5,22 +5,40 @@ import {
   commitWorkspacePaneCurrentTargetRoute,
   observeWorkspacePaneTabControllerRoute,
   resetWorkspacePaneTabControllerForTest,
+  type WorkspacePaneTabControllerCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { RepoWorkspaceStaticTab, RepoWorkspaceTabModel } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
+import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { useReposStore } from '#/web/stores/repos/store.ts'
+import {
+  createRepoBranch,
+  resetReposStore,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/bridge.ts'
 
 const SOURCE_ROUTE = { kind: 'static' as const, tab: 'files' as const }
 const TARGET_ROUTE = { kind: 'static' as const, tab: 'status' as const }
 
 describe('workspace pane tab controller transactions', () => {
   beforeEach(() => {
+    primaryWindowQueryClient.clear()
+    resetReposStore()
     resetWorkspacePaneTabControllerForTest()
+    seedRepoWithReadModelForTest({
+      id: '/repo',
+      repoRuntimeId: 'repo-runtime-1',
+      branches: [createRepoBranch('feature/a', { worktree: { path: '/worktree-a' } })],
+      currentBranchName: 'feature/a',
+      preferredWorkspacePaneTab: 'files',
+    })
   })
 
   test('accepted navigation stays pending until the exact route is observed', async () => {
     const target = workspacePaneTarget()
+    const setWorkspacePaneTab = vi.spyOn(useReposStore.getState(), 'setWorkspacePaneTab')
     observeWorkspacePaneTabControllerRoute({ ...target, route: SOURCE_ROUTE })
-    const navigation = { commitRepoBranchWorkspacePaneRoute: vi.fn(() => true) }
+    const navigation = committingNavigation()
     const committed = commitWorkspacePaneCurrentTargetRoute(
       target,
       SOURCE_ROUTE,
@@ -38,6 +56,7 @@ describe('workspace pane tab controller transactions', () => {
 
     observeWorkspacePaneTabControllerRoute({ ...target, route: TARGET_ROUTE })
     await expect(committed).resolves.toBe(true)
+    expect(setWorkspacePaneTab).toHaveBeenCalledWith('/repo', 'feature/a', 'status')
   })
 
   test('rejects accepted navigation when the observer reaches a different route', async () => {
@@ -47,7 +66,7 @@ describe('workspace pane tab controller transactions', () => {
       target,
       SOURCE_ROUTE,
       TARGET_ROUTE,
-      { commitRepoBranchWorkspacePaneRoute: vi.fn(() => true) },
+      committingNavigation(),
     )
 
     observeWorkspacePaneTabControllerRoute({
@@ -65,7 +84,7 @@ describe('workspace pane tab controller transactions', () => {
       target,
       SOURCE_ROUTE,
       TARGET_ROUTE,
-      { commitRepoBranchWorkspacePaneRoute: vi.fn(() => true) },
+      committingNavigation(),
     )
 
     observeWorkspacePaneTabControllerRoute({
@@ -79,6 +98,7 @@ describe('workspace pane tab controller transactions', () => {
 
   test('commits a close presentation lease through observer confirmation', async () => {
     const target = workspacePaneTarget()
+    const setWorkspacePaneTab = vi.spyOn(useReposStore.getState(), 'setWorkspacePaneTab')
     const closingTab = staticTab('files')
     const nextTab = staticTab('status')
     observeWorkspacePaneTabControllerRoute({ ...target, route: SOURCE_ROUTE })
@@ -89,7 +109,7 @@ describe('workspace pane tab controller transactions', () => {
       workspacePaneRoute: SOURCE_ROUTE,
     })
     if (!lease) throw new Error('missing presentation lease')
-    const navigation = { commitRepoBranchWorkspacePaneRoute: vi.fn(() => true) }
+    const navigation = committingNavigation()
     const committed = commitWorkspacePaneControllerCloseBackTarget(lease, navigation)
 
     await Promise.resolve()
@@ -97,10 +117,11 @@ describe('workspace pane tab controller transactions', () => {
       target.repoId,
       target.branchName,
       TARGET_ROUTE,
-      undefined,
+      expect.objectContaining({ presentationToken: expect.any(Object) }),
     )
     observeWorkspacePaneTabControllerRoute({ ...target, route: TARGET_ROUTE })
     await expect(committed).resolves.toBe(true)
+    expect(setWorkspacePaneTab).toHaveBeenCalledWith('/repo', 'feature/a', 'status')
   })
 })
 
@@ -111,6 +132,15 @@ function workspacePaneTarget(): RepoWorkspaceTabModel {
     branchName: 'feature/a',
     worktreePath: '/worktree-a',
   } as RepoWorkspaceTabModel
+}
+
+function committingNavigation(): WorkspacePaneTabControllerCommitNavigation {
+  return {
+    commitRepoBranchWorkspacePaneRoute: vi.fn((_repoId, _branchName, _route, options) => {
+      options?.onCommit?.()
+      return true
+    }),
+  }
 }
 
 function staticTab(type: WorkspacePaneStaticTabType): RepoWorkspaceStaticTab {

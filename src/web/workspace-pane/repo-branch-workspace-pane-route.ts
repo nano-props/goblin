@@ -1,5 +1,6 @@
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
+import type { PrimaryWindowPresentationToken } from '#/web/primary-window-presentation.ts'
 import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import { createRepoWorkspaceTabModel, isRepoWorkspaceRuntimeTab } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
@@ -76,7 +77,7 @@ export function openRepoBranchWorkspacePaneRoute(
   >,
   repoId: string,
   branchName: string,
-  options?: { replace?: boolean },
+  options?: { replace?: boolean; presentationToken?: PrimaryWindowPresentationToken; onCommit?: () => void },
 ): boolean {
   const resolution = resolveRepoBranchWorkspacePaneRoute(repoId, branchName)
   if (resolution.kind === 'missing' || resolution.kind === 'unavailable') return false

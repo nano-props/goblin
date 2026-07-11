@@ -10,6 +10,9 @@ export type TerminalControllerStatus = 'connected' | 'none'
 export type TerminalClientRole = 'controller' | 'viewer' | 'unowned'
 export type TerminalSessionPhase = 'opening' | 'restarting' | 'open' | 'error' | 'closed'
 
+/** Monotonic PTY binding generation owned by the server runtime session. */
+export type TerminalRuntimeGeneration = number
+
 export interface TerminalResolvedController {
   role: TerminalClientRole
   controllerStatus: TerminalControllerStatus
@@ -99,6 +102,7 @@ export type TerminalTakeoverResult =
   | {
       ok: true
       terminalRuntimeSessionId: string
+      terminalRuntimeGeneration: TerminalRuntimeGeneration
       role: 'controller' | 'viewer' | 'unowned'
       controllerStatus: 'connected' | 'none'
       controller: TerminalController | null
@@ -128,6 +132,7 @@ export type TerminalAttachResult =
   | {
       ok: true
       terminalRuntimeSessionId: string
+      terminalRuntimeGeneration: TerminalRuntimeGeneration
       processName: string
       canonicalTitle: string | null
       phase: TerminalSessionPhase
@@ -151,6 +156,7 @@ export type TerminalCreateAction = 'created' | 'restored' | 'reused'
  */
 export interface TerminalFirstFrame {
   terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: TerminalRuntimeGeneration
   processName: string
   canonicalTitle: string | null
   phase: TerminalSessionPhase
@@ -168,6 +174,8 @@ export type TerminalCreateResult =
       ok: true
       action: TerminalCreateAction
       terminalSessionId: string
+      /** Exact terminal projection revision sampled with this first frame. */
+      terminalSessionsRevision: number
     } & TerminalFirstFrame)
   | { ok: false; message: string }
 
@@ -215,6 +223,7 @@ export interface TerminalPruneInput {
 
 export interface TerminalSessionSummary {
   terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
   repoRuntimeId: string
   repoRoot: string
@@ -232,6 +241,7 @@ export interface TerminalSessionSummary {
 
 export interface TerminalHydrationSnapshot {
   terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: TerminalRuntimeGeneration
   snapshot: string
   snapshotSeq: number
   outputEra: number
@@ -272,6 +282,7 @@ export type TerminalMutationResult = boolean
 // pattern caused.
 export interface TerminalOutputEvent {
   terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
   data: string
   outputEra: number
@@ -283,6 +294,7 @@ export interface TerminalOutputEvent {
 // intentionally not part of terminal summaries or any persisted unread model.
 export interface TerminalBellRealtimeEvent {
   terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
   repoRoot: string
   worktreePath: string
@@ -292,6 +304,7 @@ export interface TerminalBellRealtimeEvent {
 
 export interface TerminalTitleEvent {
   terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
   repoRoot: string
   worktreePath: string
@@ -300,7 +313,10 @@ export interface TerminalTitleEvent {
 
 export interface TerminalExitEvent {
   terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
+  repoRoot: string
+  repoRuntimeId: string
 }
 
 /**
@@ -318,6 +334,7 @@ export interface TerminalExitEvent {
  */
 export interface TerminalIdentityEvent {
   terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
   controller: TerminalController | null
   canonicalCols: number
@@ -334,6 +351,7 @@ export interface TerminalIdentityEvent {
  */
 export interface TerminalLifecycleEvent {
   terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: TerminalRuntimeGeneration
   terminalSessionId: string
   phase: TerminalSessionPhase
   message: string | null

@@ -1,9 +1,7 @@
-import { isValidBranch, isValidCwd, isValidRepoLocator } from '#/shared/input-validation.ts'
+import { isValidRepoLocator } from '#/shared/input-validation.ts'
 import type {
   TerminalAttachInput,
   TerminalAttachResult,
-  TerminalCreateResult,
-  TerminalCreateInput,
   TerminalListSessionsInput,
   TerminalPruneInput,
   TerminalMutationResult,
@@ -28,7 +26,6 @@ import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-rem
 const MAX_TERMINAL_RECOVERY_PROJECTION_ATTEMPTS = 4
 
 interface TerminalSessionServiceLike {
-  create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCreateResult>
   prune(
     clientId: string,
     userId: string,
@@ -44,7 +41,7 @@ interface TerminalRuntimeActionDependencies {
   broker: Pick<RealtimeBroker<AppRealtimeMessage>, 'broadcastToUser'>
   sessionService: TerminalSessionServiceLike
   isValidTerminalClientId(value: unknown): value is string
-  worktreeOperations: Pick<PhysicalWorktreeOperationCoordinator, 'isRemovalAdmitted'>
+  worktreeOperations: Pick<PhysicalWorktreeOperationCoordinator, 'runOperation'>
 }
 
 // Manager, broker, and session service all use `userId` as the terminal
@@ -84,37 +81,23 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         return { ok: false, message: 'error.invalid-arguments' }
       }
       const session = manager.getSessionSummaryForUser(userId, terminalRuntimeSessionId)
-      if (
-        session &&
-        worktreeOperations.isRemovalAdmitted({ repoRoot: session.repoRoot, worktreePath: session.worktreePath })
-      ) {
-        return { ok: false, message: 'error.worktree-removal-in-progress' }
-      }
+      const physicalWorktreeCapability = manager.getPhysicalWorktreeCapabilityForUser(userId, terminalRuntimeSessionId)
+      if (!physicalWorktreeCapability) return { ok: false, message: 'error.invalid-worktree-capability' }
       const terminalClientId = input.clientId ?? clientId
-      const result = await manager.restartSession(
-        userId,
-        terminalRuntimeSessionId,
-        input.cols,
-        input.rows,
-        terminalClientId,
+      const operation = await worktreeOperations.runOperation(physicalWorktreeCapability, async (_permit, context) =>
+        await manager.restartSession(
+          userId,
+          terminalRuntimeSessionId,
+          input.cols,
+          input.rows,
+          terminalClientId,
+          context.signal,
+        ),
       )
+      if (!operation.admitted) return { ok: false, message: 'error.worktree-removal-in-progress' }
+      const result = operation.value
       if (session) broadcastRepoSessionsChanged(userId, session.repoRoot)
       return result
-    },
-
-    async create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCreateResult> {
-      if (
-        !isValidTerminalClientId(clientId) ||
-        !isValidRepoLocator(input?.repoRoot) ||
-        !isValidBranch(input?.branch) ||
-        !isValidCwd(input?.worktreePath)
-      ) {
-        return { ok: false, message: 'error.invalid-arguments' }
-      }
-      if (!isCurrentRepoRuntimeOpen(userId, input.repoRoot, input.repoRuntimeId)) {
-        return { ok: false, message: 'error.repo-runtime-stale' }
-      }
-      return await sessionService.create(clientId, userId, input)
     },
 
     async prune(
@@ -170,6 +153,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         broker.broadcastToUser(userId, {
           type: 'session-closed',
           terminalRuntimeSessionId: input.terminalRuntimeSessionId,
+          terminalRuntimeGeneration: session.terminalRuntimeGeneration,
           terminalSessionId: session.terminalSessionId,
           repoRoot: session.repoRoot,
           worktreePath: session.worktreePath,

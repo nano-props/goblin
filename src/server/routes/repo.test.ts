@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { testPhysicalWorktreeCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -14,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   createRepoWorktree: vi.fn(),
   getRepoWorktreeBootstrapPreview: vi.fn(),
   deleteRepoBranch: vi.fn(),
-  removeRepoWorktree: vi.fn(),
+  removeCapturedRepoWorktree: vi.fn(),
   openRepoTerminal: vi.fn(),
   openRepoUrl: vi.fn(),
   openRepoEditor: vi.fn(),
@@ -56,7 +57,7 @@ vi.mock('#/server/modules/repo-write-paths.ts', () => ({
   pushRepoBranch: mocks.pushRepoBranch,
   createRepoWorktree: mocks.createRepoWorktree,
   deleteRepoBranch: mocks.deleteRepoBranch,
-  removeRepoWorktree: mocks.removeRepoWorktree,
+  removeCapturedRepoWorktree: mocks.removeCapturedRepoWorktree,
   fetchRepo: mocks.fetchRepo,
   abortRepoOperation: mocks.abortRepoOperation,
   openRepoTerminal: mocks.openRepoTerminal,
@@ -78,11 +79,15 @@ beforeEach(() => {
 function createTestRepoRoutes(
   worktreeRemovalApplication: Parameters<typeof createRepoRoutes>[0]['worktreeRemovalApplication'] = {
     async removeWorktree(_userId, input) {
-      return await input.remove({
-        beforeRemove: async () => ({ ok: true, message: '' }),
-        afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
-        afterRemoveFailed: async () => {},
-      })
+      return await input.remove(
+        testPhysicalWorktreeCapability('/repo/worktree'),
+        {
+          beforeRemove: async () => ({ ok: true, message: '' }),
+          afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+          afterRemoveFailed: async () => {},
+        },
+        new AbortController().signal,
+      )
     },
   },
 ) {
@@ -625,14 +630,18 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     const worktreeRemovalApplication: Parameters<typeof createRepoRoutes>[0]['worktreeRemovalApplication'] = {
       removeWorktree: vi.fn(
         async (_userId, input) =>
-          await input.remove({
-            beforeRemove,
-            afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
-            afterRemoveFailed: async () => {},
-          }),
+          await input.remove(
+            testPhysicalWorktreeCapability('/tmp/repo-remove'),
+            {
+              beforeRemove,
+              afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+              afterRemoveFailed: async () => {},
+            },
+            new AbortController().signal,
+          ),
       ),
     }
-    mocks.removeRepoWorktree.mockImplementationOnce(async (_cwd, _input, lifecycle) => {
+    mocks.removeCapturedRepoWorktree.mockImplementationOnce(async (_cwd, _input, lifecycle) => {
       const prepared = await lifecycle.beforeRemove()
       return prepared.ok ? { ok: true, message: 'removed' } : prepared
     })
@@ -662,7 +671,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       }),
     )
     expect(beforeRemove).toHaveBeenCalledOnce()
-    expect(mocks.removeRepoWorktree).toHaveBeenCalledWith(
+    expect(mocks.removeCapturedRepoWorktree).toHaveBeenCalledWith(
       '/tmp/repo',
       {
         branch: 'feature/remove',
@@ -676,6 +685,12 @@ describe('repo routes — POST body validation (action endpoints)', () => {
         afterWorktreeRemoved: expect.any(Function),
         afterRemoveFailed: expect.any(Function),
       },
+      expect.objectContaining({
+        identity: expect.objectContaining({
+          kind: 'local',
+          endpoint: '/tmp/repo-remove',
+        }),
+      }),
       expect.any(AbortSignal),
     )
   })

@@ -6,6 +6,7 @@ import { createTerminalSessionCreator } from '#/server/terminal/terminal-session
 import { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
 import type { TerminalCreateInput, TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import type { TerminalSessionEnsureResult } from '#/server/terminal/terminal-session-ensurer.ts'
+import { testPhysicalWorktreeCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 
 const USER_ID = 'user_terminal_creator'
 const CLIENT_ID = 'client_terminal_creator'
@@ -16,8 +17,9 @@ const WORKTREE_PATH = '/repo/worktree'
 const BRANCH_NAME = 'feature/worktree'
 
 describe('terminal session creator', () => {
-  test('creates a session and returns only the target first frame', async () => {
+  test('keeps the manager first-frame revision when takeover advances current revision during stale validation', async () => {
     const sessions: TerminalSessionSummary[] = []
+    let currentRevision = 7
     const manager = {
       listSessionsForUser: vi.fn(async () => sessions),
     }
@@ -32,7 +34,10 @@ describe('terminal session creator', () => {
       }),
       ensureOrRestore,
       isCurrentRepoRuntime: vi.fn(() => true),
-      rejectStaleCreateIfNeeded: vi.fn(async () => null),
+      rejectStaleCreateIfNeeded: vi.fn(async () => {
+        currentRevision = 8
+        return null
+      }),
     })
 
     const result = await creator.create({
@@ -40,6 +45,8 @@ describe('terminal session creator', () => {
       terminalClientId: TERMINAL_CLIENT_ID,
       userId: USER_ID,
       request: createRequest(),
+      physicalWorktreeCapability: testPhysicalWorktreeCapability(WORKTREE_PATH),
+      signal: new AbortController().signal,
     })
 
     expect(result.ok).toBe(true)
@@ -51,13 +58,18 @@ describe('terminal session creator', () => {
         clientId: TERMINAL_CLIENT_ID,
         terminalSessionId: 'term-createdcreatedcreated',
       }),
+      testPhysicalWorktreeCapability(WORKTREE_PATH),
+      expect.any(AbortSignal),
     )
     expect(result).toMatchObject({
       terminalSessionId: 'term-createdcreatedcreated',
+      terminalSessionsRevision: 7,
       terminalRuntimeSessionId: 'pty_term-createdcreatedcreated',
+        terminalRuntimeGeneration: 1,
       snapshotSeq: 0,
       outputEra: 0,
     })
+    expect(currentRevision).toBe(8)
     expect(result).not.toHaveProperty('sessions')
   })
 
@@ -82,6 +94,8 @@ describe('terminal session creator', () => {
         terminalClientId: TERMINAL_CLIENT_ID,
         userId: USER_ID,
         request: createRequest(),
+        physicalWorktreeCapability: testPhysicalWorktreeCapability(WORKTREE_PATH),
+        signal: new AbortController().signal,
       }),
     ).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
     expect(ensureOrRestore).not.toHaveBeenCalled()
@@ -113,6 +127,8 @@ describe('terminal session creator', () => {
         terminalClientId: TERMINAL_CLIENT_ID,
         userId: USER_ID,
         request: createRequest(),
+        physicalWorktreeCapability: testPhysicalWorktreeCapability(WORKTREE_PATH),
+        signal: new AbortController().signal,
       }),
     ).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
     expect(rejectStaleCreateIfNeeded).toHaveBeenCalledTimes(1)
@@ -135,6 +151,7 @@ function createRequest(overrides: Partial<TerminalCreateInput> = {}): TerminalCr
 function terminalSession(terminalSessionId: string): TerminalSessionSummary {
   return {
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
+        terminalRuntimeGeneration: 1,
     terminalSessionId,
     repoRuntimeId: REPO_RUNTIME_ID,
     repoRoot: path.resolve(REPO_ROOT),
@@ -154,7 +171,9 @@ function terminalSession(terminalSessionId: string): TerminalSessionSummary {
 function ensureResult(terminalSessionId: string): Extract<TerminalSessionEnsureResult, { ok: true }> {
   return {
     ok: true,
+    terminalSessionsRevision: 7,
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
+        terminalRuntimeGeneration: 1,
     terminalSessionId,
     action: 'created',
     processName: 'zsh',

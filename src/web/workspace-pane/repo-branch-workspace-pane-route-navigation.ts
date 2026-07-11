@@ -1,19 +1,24 @@
 import type { RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
+import type { PrimaryWindowPresentationToken } from '#/web/primary-window-presentation.ts'
 import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 
 export interface RepoBranchWorkspacePaneRouteNavigation {
-  openRepoBranch: (repoId: string, branchName: string, options?: { replace?: boolean }) => boolean
+  openRepoBranch: (
+    repoId: string,
+    branchName: string,
+    options?: { replace?: boolean; presentationToken?: PrimaryWindowPresentationToken; onCommit?: () => void },
+  ) => boolean
   openRepoBranchTab: (
     repoId: string,
     branchName: string,
     tab: WorkspacePaneStaticTabType,
-    options?: { replace?: boolean },
+    options?: { replace?: boolean; presentationToken?: PrimaryWindowPresentationToken; onCommit?: () => void },
   ) => boolean
   openRepoBranchTerminal: (
     repoId: string,
     branchName: string,
     terminalSessionId: string,
-    options?: { replace?: boolean },
+    options?: { replace?: boolean; presentationToken?: PrimaryWindowPresentationToken; onCommit?: () => void },
   ) => boolean
 }
 
@@ -22,7 +27,7 @@ export function openResolvedRepoBranchWorkspacePaneRoute(
   repoId: string,
   branchName: string,
   route: RepoBranchWorkspacePaneRouteTarget,
-  options?: { replace?: boolean },
+  options?: { replace?: boolean; presentationToken?: PrimaryWindowPresentationToken; onCommit?: () => void },
 ): boolean {
   if (!route) {
     return options === undefined

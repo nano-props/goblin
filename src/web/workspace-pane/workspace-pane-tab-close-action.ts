@@ -38,6 +38,11 @@ import {
   runWorkspacePaneTabCoordinatorTask,
   workspacePaneTabCoordinatorObservedRoute,
 } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import {
+  beginPrimaryWindowPresentation,
+  primaryWindowPresentationIsCurrent,
+  type PrimaryWindowPresentationToken,
+} from '#/web/primary-window-presentation.ts'
 
 export interface CloseWorkspacePaneTabActionOptions {
   repoId: string | null
@@ -47,6 +52,7 @@ export interface CloseWorkspacePaneTabActionOptions {
   targetIdentity?: string
   skipTerminalCloseConfirm?: boolean
   skipRuntimeCloseConfirm?: boolean
+  presentationToken?: PrimaryWindowPresentationToken
 }
 
 export interface ConfirmedTerminalWorkspacePaneTabClose {
@@ -81,9 +87,11 @@ export async function dispatchCloseWorkspacePaneTabAction(
     workspacePaneRoute: options.workspacePaneRoute,
   })
   if (!coordinatorTarget) return false
+  const presentationToken = beginPrimaryWindowPresentation()
   return await runWorkspacePaneTabCoordinatorTask(coordinatorTarget, () =>
     closeWorkspacePaneTabAction({
       ...options,
+      presentationToken,
       workspacePaneRoute: workspacePaneTabCoordinatorObservedRoute(coordinatorTarget) ?? options.workspacePaneRoute,
     }),
   )
@@ -101,7 +109,8 @@ async function closeWorkspacePaneTabAction(options: CloseWorkspacePaneTabActionO
       return true
     }
     if (!start.presentationLease) return false
-    return await commitWorkspacePaneControllerCloseBackTarget(start.presentationLease, options.navigation)
+    const presented = await commitWorkspacePaneControllerCloseBackTarget(start.presentationLease, options.navigation)
+    return presented || !primaryWindowPresentationIsCurrent(start.presentationLease.presentationToken)
   })
 }
 
@@ -112,6 +121,7 @@ export async function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
   const queueRepoRuntimeId = options.confirmedTerminal.base.repoRuntimeId
   const queueBranchName = options.branchName ?? options.confirmedTerminal.base.branch
   if (!queueRepoId || !queueRepoRuntimeId || !queueBranchName) return false
+  const presentationToken = beginPrimaryWindowPresentation()
   return await runWorkspacePaneTabCoordinatorTask(
     {
       repoId: queueRepoId,
@@ -119,7 +129,7 @@ export async function dispatchConfirmCloseTerminalWorkspacePaneTabAction(
       branchName: queueBranchName,
       worktreePath: options.confirmedTerminal.base.worktreePath,
     },
-    () => confirmCloseTerminalWorkspacePaneTabAction(options),
+    () => confirmCloseTerminalWorkspacePaneTabAction({ ...options, presentationToken }),
   )
 }
 
@@ -176,6 +186,7 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
           closingTab: tab,
           nextTab,
           workspacePaneRoute: options.currentWorkspacePaneRoute,
+          presentationToken: options.presentationToken,
         })
       : null
   return await runWorkspacePaneCloseTransition(presentationLease, async () => {
@@ -198,7 +209,8 @@ async function confirmCloseTerminalWorkspacePaneTabAction(
       return true
     }
     if (!presentationLease) return false
-    return await commitWorkspacePaneControllerCloseBackTarget(presentationLease, navigation)
+    const presented = await commitWorkspacePaneControllerCloseBackTarget(presentationLease, navigation)
+    return presented || !primaryWindowPresentationIsCurrent(presentationLease.presentationToken)
   })
 }
 
@@ -250,6 +262,7 @@ function beginCloseWorkspacePaneTabAction(
         closingTab: tab,
         nextTab,
         workspacePaneRoute: options.workspacePaneRoute,
+        presentationToken: options.presentationToken,
       })
     : null
   let close

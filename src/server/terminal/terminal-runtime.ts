@@ -25,7 +25,9 @@ import { broadcastWorkspacePaneTabsChanged } from '#/server/workspace-pane/works
 import { createTerminalRealtimeHandlers } from '#/server/terminal/terminal-runtime-realtime.ts'
 import { createWorkspacePaneTabsRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-tabs-runtime-realtime.ts'
 import { createWorkspacePaneRuntimeApplication } from '#/server/workspace-pane/workspace-pane-runtime-application.ts'
-import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
+import {
+  createPhysicalWorktreeOperationCoordinator,
+} from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { createWorkspacePaneRuntimeRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-runtime-realtime.ts'
 import type { ServerWorkspacePaneRuntimeHost } from '#/server/workspace-pane/workspace-pane-runtime-host.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
@@ -43,6 +45,10 @@ import { isCurrentRepoRuntime, onRepoRuntimeClosed } from '#/server/modules/repo
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { createAppRealtimeHost } from '#/server/realtime/app-realtime-runtime.ts'
 import { createWorktreeRemovalApplication } from '#/server/worktree-removal/worktree-removal-application.ts'
+import { createPhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import {
+  createTerminalSessionCreateProvider,
+} from '#/server/terminal/terminal-session-create-provider.ts'
 
 // Intentionally long TTL: we want terminals to survive as long as possible in
 // the background so users can leave builds or long-running tasks unattended.
@@ -60,6 +66,7 @@ export interface ServerTerminalRuntimeOptions {
 
 export interface ServerTerminalRuntime {
   host: ServerTerminalHost
+  workspacePaneRuntimeHost: ServerWorkspacePaneRuntimeHost
   workspacePaneRuntimeApplication: ReturnType<typeof createWorkspacePaneRuntimeApplication>
   worktreeRemovalApplication: ReturnType<typeof createWorktreeRemovalApplication>
   shutdown(): void
@@ -69,6 +76,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   const { ptySupervisor } = options
   const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
   const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
+  const physicalWorktrees = createPhysicalWorktreeIdentityResolver()
   const terminalSessionOrder = {
     terminalSessionIds(input) {
       return workspaceTabs.runtimeSessionIds(input, 'terminal')
@@ -115,6 +123,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     workspaceTabs,
     runtimeProviders: [terminalWorkspacePaneRuntimeTabsProvider(manager)],
     worktreeOperations,
+    physicalWorktrees,
   })
   const coordinator = createTerminalRuntimeCoordinator({
     manager,
@@ -163,16 +172,19 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     isValidTerminalClientId,
     worktreeOperations,
   })
+  const terminalCreateProvider = createTerminalSessionCreateProvider({ sessionService, worktreeOperations })
   const workspacePaneRuntimeApplication = createWorkspacePaneRuntimeApplication({
     workspaceTabsCoordinator,
     worktreeOperations,
-    terminal: actions,
+    physicalWorktrees,
+    terminal: { ...terminalCreateProvider, close: actions.close },
     terminalWorktree: manager,
     isCurrentRepoRuntime,
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
   })
   const worktreeRemovalApplication = createWorktreeRemovalApplication({
     worktreeOperations,
+    physicalWorktrees,
     terminalWorktree: manager,
     workspaceTabs: workspaceTabsCoordinator,
     isCurrentRepoRuntime,
@@ -266,6 +278,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       if (shuttingDown) return
       shuttingDown = true
       unsubscribeRepoRuntimeClosed()
+      physicalWorktrees.dispose()
       coordinator.shutdown()
       manager.forceCloseAllForShutdown()
       ptySupervisor.shutdown()
@@ -275,9 +288,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   const host: ServerTerminalHost = {
     ...appRealtimeHost,
     ...terminalActionHost,
-    async create(clientId, userId, input) {
-      return await actions.create(clientId, userId, input)
-    },
     shutdown() {
       appRealtimeHost.shutdown()
     },
@@ -287,6 +297,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
 
   return {
     host,
+    workspacePaneRuntimeHost,
     workspacePaneRuntimeApplication,
     worktreeRemovalApplication,
     shutdown() {

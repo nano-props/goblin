@@ -9,7 +9,11 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
-import { type WorkspacePaneStaticTabType, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import {
+  type WorkspacePaneStaticTabType,
+  type WorkspacePaneTabEntry,
+  workspacePaneStaticTabEntry,
+} from '#/shared/workspace-pane.ts'
 import { tabOpenerScopeKey } from '#/web/stores/repos/tab-opener.ts'
 import {
   preferredWorkspacePaneTabForTarget,
@@ -25,6 +29,7 @@ import {
   observedWorkspacePaneRouteCommitForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
+import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
 
 vi.mock('#/web/stores/repos/refresh-coordinator.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('#/web/stores/repos/refresh-coordinator.ts')>()
@@ -623,6 +628,27 @@ describe('openWorkspacePaneTab', () => {
     ).resolves.toEqual([true, true])
 
     expect(openTabsFor('feature/worktree')).toEqual(['status', 'changes', 'history'])
+  })
+
+  test('refreshes a committed open even when a newer presentation supersedes its route', async () => {
+    seedWorktreeRepo('status')
+    const mutation = Promise.withResolvers<WorkspacePaneTabEntry[]>()
+    installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs: async () => await mutation.promise })
+
+    const opened = openWorkspacePaneTab({
+      workspacePaneRoute: undefined,
+      repoId: REPO_ID,
+      branchName: 'feature/worktree',
+      worktreePath: WORKTREE_PATH,
+      type: 'changes',
+      navigation: navigationWithStoreActions(),
+    })
+    await Promise.resolve()
+    beginPrimaryWindowPresentation()
+    mutation.resolve([workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('changes')])
+
+    await expect(opened).resolves.toBe(true)
+    expectVisibleRefreshRequested('feature/worktree')
   })
 })
 

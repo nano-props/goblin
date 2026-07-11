@@ -29,7 +29,9 @@ const SSH_CONTROL_DIR = path.join(os.homedir(), '.goblin', 'ssh')
 const SSH_CONTROL_PERSIST_SEC = 600
 
 function controlPathFor(target: RemoteRepoTarget): string {
-  const key = `${target.alias}|${target.host}|${target.port}|${target.user}`
+  const key = target.sshConnection
+    ? JSON.stringify([target.sshConnection.destination, ...target.sshConnection.options])
+    : JSON.stringify([target.alias, target.host, target.port, target.user])
   const hash = createHash('sha256').update(key).digest('hex').slice(0, 16)
   return path.join(SSH_CONTROL_DIR, hash)
 }
@@ -60,6 +62,7 @@ export type RemoteCommandKind =
   | { type: 'listDirectories'; path: string; limit?: number }
   | { type: 'gitTreeWalk'; path: string; prefix?: string }
   | { type: 'revParseTopLevel'; path: string }
+  | { type: 'resolvePhysicalWorktreeIdentity'; path: string }
   | { type: 'gitSnapshot'; path: string }
   | { type: 'gitPatch'; path: string }
   | { type: 'gitWorktreeList'; path: string }
@@ -110,6 +113,54 @@ export interface RemoteCommandInvocation {
   script: string
 }
 
+const SNAPSHOT_MANAGED_SSH_OPTIONS = new Set([
+  'connecttimeout',
+  'controlmaster',
+  'controlpath',
+  'controlpersist',
+  'host',
+  'hostname',
+  'port',
+  'requesttty',
+  'stricthostkeychecking',
+  'user',
+])
+
+/** Converts one `ssh -G` result into argv-safe options that never consult config again. */
+export function buildCanonicalSshConnectionSnapshot(
+  target: Pick<RemoteRepoTarget, 'alias' | 'host' | 'user' | 'port'>,
+  effectiveConfig: string,
+): NonNullable<RemoteRepoTarget['sshConnection']> {
+  const options = effectiveConfig
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .flatMap((line) => {
+      const firstSpace = line.search(/\s/u)
+      const key = (firstSpace === -1 ? line : line.slice(0, firstSpace)).toLowerCase()
+      if (SNAPSHOT_MANAGED_SSH_OPTIONS.has(key)) return []
+      const value = firstSpace === -1 ? '' : line.slice(firstSpace + 1).trim()
+      return value ? [`${key}=${value}`] : []
+    })
+  return Object.freeze({
+    // Keep the original argv host so OpenSSH's %n token retains alias semantics.
+    // HostName below still fixes %h and the actual network destination.
+    destination: target.alias,
+    options: Object.freeze([
+      `hostname=${target.host}`,
+      `user=${target.user}`,
+      `port=${target.port}`,
+      ...options,
+    ]),
+  })
+}
+
+function capturedConnectionArgs(target: RemoteRepoTarget): string[] {
+  if (!target.sshConnection) return []
+  const nullConfig = process.platform === 'win32' ? 'NUL' : '/dev/null'
+  return ['-F', nullConfig, ...target.sshConnection.options.flatMap((option) => ['-o', option])]
+}
+
 export type RemoteCommandRunner = (
   command: RemoteCommandKind,
   target: RemoteRepoTarget,
@@ -121,24 +172,7 @@ export function buildRemoteCommandInvocation(
   command: RemoteCommandKind,
 ): RemoteCommandInvocation {
   const script = scriptForCommand(command)
-  const args = [
-    '-T',
-    '-o',
-    'RequestTTY=no',
-    '-o',
-    'StrictHostKeyChecking=yes',
-    '-o',
-    `ConnectTimeout=${SSH_CONNECT_TIMEOUT_SEC}`,
-    '-o',
-    `ControlPath=${controlPathFor(target)}`,
-    '-o',
-    `ControlMaster=auto`,
-    '-o',
-    `ControlPersist=${SSH_CONTROL_PERSIST_SEC}`,
-  ]
-  const destination = target.alias
-  args.push('--', destination, `sh -lc ${shellQuote(script)}`)
-  return { command: findExecutableOnPath('ssh') ?? 'ssh', args, script }
+  return buildCanonicalSshInvocation(target, script, ['-T', '-o', 'RequestTTY=no'])
 }
 
 export function buildRemoteTerminalInvocation(
@@ -154,8 +188,17 @@ export function buildRemoteTerminalInvocation(
   const script = startupShellCommand
     ? `cd ${shellQuote(remotePath)} && exec "\${SHELL:-/bin/sh}" -ilc ${shellQuote(`${startupShellCommand}\nexec "\${SHELL:-/bin/sh}" -l`)}`
     : `cd ${shellQuote(remotePath)} && exec "\${SHELL:-/bin/sh}" -l`
+  return buildCanonicalSshInvocation(target, script, ['-tt'])
+}
+
+function buildCanonicalSshInvocation(
+  target: RemoteRepoTarget,
+  script: string,
+  ttyArgs: readonly string[],
+): RemoteCommandInvocation {
   const args = [
-    '-tt',
+    ...capturedConnectionArgs(target),
+    ...ttyArgs,
     '-o',
     'StrictHostKeyChecking=yes',
     '-o',
@@ -167,7 +210,7 @@ export function buildRemoteTerminalInvocation(
     '-o',
     `ControlPersist=${SSH_CONTROL_PERSIST_SEC}`,
   ]
-  const destination = target.alias
+  const destination = target.sshConnection?.destination ?? target.alias
   args.push('--', destination, `sh -lc ${shellQuote(script)}`)
   return { command: findExecutableOnPath('ssh') ?? 'ssh', args, script }
 }
@@ -231,6 +274,8 @@ function scriptForCommand(command: RemoteCommandKind): string {
     }
     case 'revParseTopLevel':
       return `git -C ${shellQuote(command.path)} rev-parse --show-toplevel`
+    case 'resolvePhysicalWorktreeIdentity':
+      return remotePhysicalWorktreeIdentityScript(command.path)
     case 'gitSnapshot': {
       const repo = shellQuote(command.path)
       const branchFormat = [
@@ -500,6 +545,61 @@ function scriptForCommand(command: RemoteCommandKind): string {
   }
   const exhaustive: never = command
   return exhaustive
+}
+
+function remotePhysicalWorktreeIdentityScript(worktreePath: string): string {
+  return [
+    'umask 077',
+    'uid=$(id -u) || exit 1',
+    'if [ -n "${XDG_RUNTIME_DIR:-}" ] && [ -d "$XDG_RUNTIME_DIR" ]; then',
+    '  runtime_dir=$XDG_RUNTIME_DIR',
+    'else',
+    '  runtime_dir="/tmp/goblin-runtime-$uid"',
+    '  [ ! -L "$runtime_dir" ] || exit 1',
+    '  mkdir -p -- "$runtime_dir" || exit 1',
+    'fi',
+    'owner=$(stat -c %u "$runtime_dir" 2>/dev/null || stat -f %u "$runtime_dir" 2>/dev/null) || exit 1',
+    '[ "$owner" = "$uid" ] || exit 1',
+    'chmod 700 -- "$runtime_dir" || exit 1',
+    'state_dir="$runtime_dir/goblin"',
+    'identity_file="$state_dir/execution-namespace-id"',
+    'mkdir -p -- "$state_dir"',
+    'if [ ! -s "$identity_file" ]; then',
+    '  tmp="$identity_file.tmp.$$"',
+    "  token=$(od -An -N16 -tx1 /dev/urandom 2>/dev/null | tr -d ' \\n')",
+    '  case "$token" in (*[!0-9a-f]*) rm -f -- "$tmp"; exit 1;; esac',
+    '  [ "${#token}" -eq 32 ] || { rm -f -- "$tmp"; exit 1; }',
+    '  printf \'%s\\n\' "$token" > "$tmp"',
+    '  chmod 600 -- "$tmp"',
+    '  ln -- "$tmp" "$identity_file" 2>/dev/null || true',
+    '  rm -f -- "$tmp"',
+    'fi',
+    'runtime_token=$(cat -- "$identity_file")',
+    'case "$runtime_token" in (*[!0-9a-f]*) exit 1;; esac',
+    '[ "${#runtime_token}" -eq 32 ] || exit 1',
+    'machine_fact=',
+    'for machine_id_file in /etc/machine-id /var/lib/dbus/machine-id; do',
+    '  [ -r "$machine_id_file" ] || continue',
+    '  machine_fact=$(tr -cd "A-Za-z0-9._:-" < "$machine_id_file" | head -c 128)',
+    '  [ -n "$machine_fact" ] && break',
+    'done',
+    'if [ -z "$machine_fact" ]; then',
+    '  machine_fact=$(uname -n 2>/dev/null | tr -cd "A-Za-z0-9._:-" | head -c 128)',
+    'fi',
+    '[ -n "$machine_fact" ] || exit 1',
+    'root_namespace_fact=$(readlink /proc/self/ns/mnt 2>/dev/null | tr -cd "A-Za-z0-9._:-" | head -c 128)',
+    'if [ -z "$root_namespace_fact" ]; then',
+    '  root_namespace_fact=$(stat -c "%d:%i" / 2>/dev/null || stat -f "%d:%i" / 2>/dev/null)',
+    '  root_namespace_fact=$(printf "%s" "$root_namespace_fact" | tr -cd "A-Za-z0-9._:-" | head -c 128)',
+    'fi',
+    '[ -n "$root_namespace_fact" ] || exit 1',
+    `canonical=$(cd -- ${shellQuote(worktreePath)} && pwd -P) || exit 1`,
+    'endpoint_stat=$(stat -c "%d %i" "$canonical" 2>/dev/null || stat -f "%d %i" "$canonical" 2>/dev/null) || exit 1',
+    'set -- $endpoint_stat',
+    '[ "$#" -eq 2 ] || exit 1',
+    'case "$1:$2" in (*[!0-9:]*) exit 1;; esac',
+    "printf '%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0' \"$runtime_token\" \"$machine_fact\" \"$root_namespace_fact\" \"$canonical\" \"$1\" \"$2\"",
+  ].join('\n')
 }
 
 function remoteTrashFileScript(worktreePath: string, filePath: string): string {

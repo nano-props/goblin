@@ -1,0 +1,34 @@
+import { describe, expect, test } from 'vitest'
+import { buildRemoteCommandInvocation } from '#/system/ssh/commands.ts'
+import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+
+const target: RemoteRepoTarget = {
+  id: 'ssh://example/repo',
+  alias: 'example',
+  host: 'example.invalid',
+  user: 'developer',
+  port: 22,
+  remotePath: '/srv/repo',
+  displayName: 'example',
+}
+
+describe('remote physical worktree identity command', () => {
+  test('publishes a user-scoped namespace atomically and canonicalizes the worktree', () => {
+    const invocation = buildRemoteCommandInvocation(target, {
+      type: 'resolvePhysicalWorktreeIdentity',
+      path: '/srv/worktrees/feature',
+    })
+
+    expect(invocation.script).toContain('execution-namespace-id')
+    expect(invocation.script).toContain('umask 077')
+    expect(invocation.script).toContain('XDG_RUNTIME_DIR')
+    expect(invocation.script).toContain('/tmp/goblin-runtime-$uid')
+    expect(invocation.script).toContain('/etc/machine-id')
+    expect(invocation.script).toContain('/proc/self/ns/mnt')
+    expect(invocation.script).toContain('ln -- "$tmp" "$identity_file"')
+    expect(invocation.script).toContain('pwd -P')
+    expect(invocation.script).toContain("printf '%s\\0%s\\0%s\\0%s\\0%s\\0%s\\0'")
+    expect(invocation.script).not.toContain('$HOME')
+    expect(invocation.script).not.toContain('example.invalid')
+  })
+})

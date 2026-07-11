@@ -324,7 +324,9 @@ describe('shared terminal validators', () => {
       ok: true,
       action: 'created',
       terminalSessionId: 'term-111111111111111111111',
+      terminalSessionsRevision: 11,
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
       processName: 'zsh',
       canonicalTitle: null,
       phase: 'open',
@@ -340,7 +342,9 @@ describe('shared terminal validators', () => {
     expect(normalizedCreateResult).toMatchObject({
       ok: true,
       terminalSessionId: 'term-111111111111111111111',
+      terminalSessionsRevision: 11,
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
       snapshotSeq: 1,
       outputEra: 0,
     })
@@ -351,6 +355,7 @@ describe('shared terminal validators', () => {
         ok: true,
         action: 'created',
         terminalSessionId: 'term-111111111111111111111',
+        terminalSessionsRevision: 11,
       }),
     ).toBeNull()
     expect(normalizeTerminalCreateResult({ ok: false, message: 'error.spawn-failed' })).toEqual({
@@ -392,6 +397,7 @@ describe('shared terminal validators', () => {
         type: 'output',
         event: {
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           data: 'hi',
           seq: 1,
@@ -403,6 +409,7 @@ describe('shared terminal validators', () => {
       type: 'output',
       event: {
         terminalRuntimeSessionId: 'pty_1234567890abcdef',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         data: 'hi',
         seq: 1,
@@ -464,7 +471,9 @@ describe('shared terminal validators', () => {
         ok: true,
         action: 'created',
         terminalSessionId: 'term-111111111111111111111',
+        terminalSessionsRevision: 11,
         terminalRuntimeSessionId: 'pty_1234567890abcdef',
+        terminalRuntimeGeneration: 1,
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',
@@ -536,11 +545,13 @@ describe('shared terminal validators', () => {
         action: 'closed' as const,
         terminalSessionId: 'term-111111111111111111111',
         terminalRuntimeSessionId: 'pty_1234567890abcdef',
+        terminalRuntimeGeneration: 1,
       },
       {
         action: 'already-closed' as const,
         terminalSessionId: 'term-222222222222222222222',
         terminalRuntimeSessionId: null,
+        terminalRuntimeGeneration: null,
       },
     ]
     for (const [index, runtime] of effects.entries()) {
@@ -583,12 +594,60 @@ describe('shared terminal validators', () => {
     expect(
       normalizeAppRealtimeSocketServerMessage({
         type: 'response',
+        requestId: 'req_takeover',
+        ok: true,
+        action: 'takeover',
+        payload: {
+          ok: true,
+          terminalRuntimeSessionId: 'pty_1234567890abcdef',
+          terminalRuntimeGeneration: 3,
+          role: 'controller',
+          controllerStatus: 'connected',
+          controller: { clientId: 'client_a', status: 'connected' },
+          canonicalCols: 120,
+          canonicalRows: 40,
+          phase: 'open',
+        },
+      }),
+    ).toMatchObject({
+      type: 'response',
+      action: 'takeover',
+      payload: { ok: true, terminalRuntimeGeneration: 3 },
+    })
+
+    expect(
+      normalizeAppRealtimeSocketServerMessage({
+        type: 'response',
+        requestId: 'req_takeover_missing_generation',
+        ok: true,
+        action: 'takeover',
+        payload: {
+          ok: true,
+          terminalRuntimeSessionId: 'pty_1234567890abcdef',
+          role: 'controller',
+          controllerStatus: 'connected',
+          controller: { clientId: 'client_a', status: 'connected' },
+          canonicalCols: 120,
+          canonicalRows: 40,
+          phase: 'open',
+        },
+      }),
+    ).toMatchObject({
+      ok: false,
+      action: 'takeover',
+      error: 'Invalid terminal socket response payload',
+    })
+
+    expect(
+      normalizeAppRealtimeSocketServerMessage({
+        type: 'response',
         requestId: 'req_1',
         ok: true,
         action: 'attach',
         payload: {
           ok: true,
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
+        terminalRuntimeGeneration: 1,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'open',
@@ -616,6 +675,7 @@ describe('shared terminal validators', () => {
         payload: {
           ok: true,
           terminalRuntimeSessionId: 'pty_1234567890abcdef',
+        terminalRuntimeGeneration: 1,
           processName: 'zsh',
           canonicalTitle: null,
           phase: 'open',
@@ -651,6 +711,7 @@ describe('shared terminal validators', () => {
       normalizeTerminalSocketServerMessage({
         type: 'session-closed',
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         repoRoot: '/repo',
         worktreePath: '/repo/worktree',
@@ -658,6 +719,7 @@ describe('shared terminal validators', () => {
     ).toEqual({
       type: 'session-closed',
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       repoRoot: '/repo',
       worktreePath: '/repo/worktree',
@@ -681,5 +743,36 @@ describe('shared terminal validators', () => {
         repoRoot: '/repo',
       }),
     ).toBeNull()
+  })
+})
+
+describe('terminal runtime generation validation', () => {
+  test('requires a non-negative safe integer on realtime bindings', async () => {
+    const { normalizeTerminalRealtimeMessage } = await import('#/shared/terminal-validators.ts')
+    const message = {
+      type: 'exit' as const,
+      event: {
+        terminalRuntimeSessionId: 'pty_generation_validation',
+        terminalSessionId: 'term-generation-validation',
+        terminalRuntimeGeneration: 0,
+        repoRoot: '/repo',
+        repoRuntimeId: 'repo-runtime-validation',
+      },
+    }
+    expect(normalizeTerminalRealtimeMessage(message)).toEqual(message)
+    expect(
+      normalizeTerminalRealtimeMessage({ ...message, event: { ...message.event, repoRoot: undefined } }),
+    ).toBeNull()
+    expect(
+      normalizeTerminalRealtimeMessage({ ...message, event: { ...message.event, repoRuntimeId: undefined } }),
+    ).toBeNull()
+    for (const terminalRuntimeGeneration of [-1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(
+        normalizeTerminalRealtimeMessage({
+          ...message,
+          event: { ...message.event, terminalRuntimeGeneration },
+        }),
+      ).toBeNull()
+    }
   })
 })

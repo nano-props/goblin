@@ -60,6 +60,9 @@ const WorkspacePaneRuntimeCloseResultSchema = v.variant('ok', [
       action: v.picklist(['closed', 'already-closed']),
       terminalSessionId: v.pipe(v.string(), v.minLength(1)),
       terminalRuntimeSessionId: v.nullable(v.string()),
+      terminalRuntimeGeneration: v.nullable(
+        v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(Number.MAX_SAFE_INTEGER)),
+      ),
     }),
     workspacePaneTabs: WorkspacePaneTabsSnapshotSchema,
   }),

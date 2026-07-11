@@ -4,6 +4,7 @@ import {
   type TerminalCreateResult,
   type TerminalCreateInput,
   type TerminalSessionSummary,
+  type TerminalSessionsSnapshot,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsSnapshot, WorkspacePaneTabsUpdateInput } from '#/shared/workspace-pane-tabs.ts'
@@ -25,9 +26,11 @@ import {
 } from '#/server/terminal/terminal-session-ensurer.ts'
 import { createTerminalSessionPruner } from '#/server/terminal/terminal-session-pruner.ts'
 import { createTerminalSessionCreator } from '#/server/terminal/terminal-session-creator.ts'
+import type { PhysicalWorktreeCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
 interface TerminalSessionServiceManager extends TerminalSessionEnsureManager {
   listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
+  terminalSessionsSnapshotForUser(userId: string, scope: string): TerminalSessionsSnapshot
   closeSession(terminalRuntimeSessionId: string): Promise<boolean>
 }
 
@@ -66,7 +69,8 @@ class TerminalSessionService {
     this.workspaceTabsCoordinator = options.workspaceTabsCoordinator
     this.creator = createTerminalSessionCreator({
       createCoordinator: this.createCoordinator,
-      ensureOrRestore: async (clientId, userId, input) => await this.ensureOrRestore(clientId, userId, input),
+      ensureOrRestore: async (clientId, userId, input, physicalWorktreeCapability, signal) =>
+        await this.ensureOrRestore(clientId, userId, input, physicalWorktreeCapability, signal),
       isCurrentRepoRuntime: (userId, repoRoot, repoRuntimeId) =>
         this.isCurrentRepoRuntime(userId, repoRoot, repoRuntimeId),
       rejectStaleCreateIfNeeded: async (userId, input, terminalRuntimeSessionId) =>
@@ -78,6 +82,8 @@ class TerminalSessionService {
     clientId: string,
     userId: string,
     input: TerminalSessionEnsureInput,
+    physicalWorktreeCapability: PhysicalWorktreeCapability,
+    signal: AbortSignal,
   ): Promise<TerminalSessionEnsureResult> {
     if (!this.options.isValidClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidRepoLocator(input.repoRoot)) return { ok: false, message: 'error.invalid-arguments' }
@@ -103,10 +109,24 @@ class TerminalSessionService {
         : 'reused'
       : 'created'
 
-    return await this.ensurer.ensure(userId, input, { terminalSessionId, cols, rows, scopedWorktreePath, action })
+    return await this.ensurer.ensure(userId, input, {
+      terminalSessionId,
+      cols,
+      rows,
+      scopedWorktreePath,
+      physicalWorktreeCapability,
+      action,
+      signal,
+    })
   }
 
-  async create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCreateResult> {
+  async createAdmitted(
+    clientId: string,
+    userId: string,
+    input: TerminalCreateInput,
+    physicalWorktreeCapability: PhysicalWorktreeCapability,
+    signal: AbortSignal,
+  ): Promise<TerminalCreateResult> {
     if (!this.options.isValidClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidRepoLocator(input.repoRoot)) return { ok: false, message: 'error.invalid-arguments' }
     if (!isValidBranch(input.branch)) return { ok: false, message: 'error.invalid-arguments' }
@@ -114,7 +134,14 @@ class TerminalSessionService {
     const terminalClientId = input.clientId ?? clientId
     if (!isValidTerminalClientId(terminalClientId)) return { ok: false, message: 'error.invalid-arguments' }
 
-    return await this.creator.create({ clientId, terminalClientId, userId, request: input })
+    return await this.creator.create({
+      clientId,
+      terminalClientId,
+      userId,
+      request: input,
+      physicalWorktreeCapability,
+      signal,
+    })
   }
 
   async replaceTabs(

@@ -53,6 +53,8 @@ import {
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 
 const REPO_ID = '/tmp/repo-workspace-container-repo'
+const presentationOptions = (options: { replace?: boolean } = {}) =>
+  expect.objectContaining({ ...options, presentationToken: expect.any(Object) })
 
 const emptyWorktreeSnapshot: TerminalWorktreeSnapshot = {
   terminalWorktreeKey: '',
@@ -344,7 +346,12 @@ describe('RepoWorkspace', () => {
       screen.getByRole('button', { name: 'terminal.new' }).click()
       await new Promise((resolve) => setTimeout(resolve, 0))
     })
-    expect(route.openRepoBranchTerminal).toHaveBeenCalledWith(REPO_ID, 'feature/a', 'term-111111111111111111111')
+    expect(route.openRepoBranchTerminal).toHaveBeenCalledWith(
+      REPO_ID,
+      'feature/a',
+      'term-111111111111111111111',
+      presentationOptions(),
+    )
 
     rerender(
       workspace(
@@ -362,7 +369,7 @@ describe('RepoWorkspace', () => {
       testNavigation.goBack(REPO_ID)
     })
 
-    expect(route.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, 'feature/a', 'status')
+    expect(route.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, 'feature/a', 'status', presentationOptions())
   })
 
   test('replaces a stale terminal route with the bare branch route', async () => {
@@ -420,7 +427,7 @@ describe('RepoWorkspace', () => {
 
     expect(container.textContent).toContain('workspace-pane-tabs.empty')
     await waitFor(() => {
-      expect(route.openRepoBranch).toHaveBeenCalledWith(REPO_ID, branchName, { replace: true })
+      expect(route.openRepoBranch).toHaveBeenCalledWith(REPO_ID, branchName, presentationOptions({ replace: true }))
       expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
       expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]).toEqual({
         current: expectedCurrentEntry,
@@ -578,7 +585,7 @@ describe('RepoWorkspace', () => {
     )
 
     await waitFor(() => {
-      expect(route.openRepoBranch).toHaveBeenCalledWith(REPO_ID, branchName, { replace: true })
+      expect(route.openRepoBranch).toHaveBeenCalledWith(REPO_ID, branchName, presentationOptions({ replace: true }))
       expect(route.openRepoBranchTerminal).not.toHaveBeenCalled()
       expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]).toEqual({
         current: {
@@ -956,7 +963,6 @@ describe('RepoWorkspace', () => {
     const branchName = 'feature/close-route-race'
     const worktreePath = '/tmp/close-route-race-worktree'
     const route = routeNavigation()
-    vi.mocked(route.openRepoBranchTab).mockReturnValue(true)
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
@@ -1038,7 +1044,7 @@ describe('RepoWorkspace', () => {
     resolveCommit([workspacePaneStaticTabEntry('status')])
 
     await expect(closePromise).resolves.toBe(true)
-    expect(route.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, branchName, 'status')
+    expect(route.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, branchName, 'status', presentationOptions())
   })
 
   test('replaces an unrenderable static route with the bare branch route', async () => {
@@ -1072,7 +1078,7 @@ describe('RepoWorkspace', () => {
 
     expect(container.textContent).toContain('workspace-pane-tabs.empty')
     await waitFor(() => {
-      expect(route.openRepoBranch).toHaveBeenCalledWith(REPO_ID, branchName, { replace: true })
+      expect(route.openRepoBranch).toHaveBeenCalledWith(REPO_ID, branchName, presentationOptions({ replace: true }))
       expect(route.openRepoBranchTab).not.toHaveBeenCalled()
       expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]).toEqual({
         current: {
@@ -1121,7 +1127,7 @@ describe('RepoWorkspace', () => {
     )
 
     await waitFor(() => {
-      expect(route.openRepoBranch).toHaveBeenCalledWith(REPO_ID, branchName, { replace: true })
+      expect(route.openRepoBranch).toHaveBeenCalledWith(REPO_ID, branchName, presentationOptions({ replace: true }))
       expect(route.openRepoBranchTab).not.toHaveBeenCalled()
       expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]).toEqual({
         current: {
@@ -1282,7 +1288,8 @@ function navigationWithStore(
     goForwardInWorkspaceNavigation: store.goForwardInWorkspaceNavigation,
     routeNavigation: routeNavigationOverrides,
   })
-  navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
+  const commitRoute = navigation.commitRepoBranchWorkspacePaneRoute
+  navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation, { commitRoute })
   return navigation
 }
 
@@ -1294,9 +1301,18 @@ function routeNavigation(): PrimaryWindowRouteNavigation {
     closeSettings: vi.fn(),
     openRepoRoot: vi.fn(),
     openRepoDashboard: vi.fn(),
-    openRepoBranch: vi.fn(),
-    openRepoBranchTab: vi.fn(),
-    openRepoBranchTerminal: vi.fn(),
+    openRepoBranch: vi.fn((_repoId, _branchName, options) => {
+      options?.onCommit?.()
+      return true
+    }),
+    openRepoBranchTab: vi.fn((_repoId, _branchName, _tab, options) => {
+      options?.onCommit?.()
+      return true
+    }),
+    openRepoBranchTerminal: vi.fn((_repoId, _branchName, _sessionId, options) => {
+      options?.onCommit?.()
+      return true
+    }),
     openRepoNewWorktree: vi.fn(),
     cancelRepoNewWorktree: vi.fn(),
   }

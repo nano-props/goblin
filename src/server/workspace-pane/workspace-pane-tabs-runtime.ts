@@ -16,9 +16,8 @@ import {
 import { workspacePaneTabsUserScopeQueueKey } from '#/server/workspace-pane/workspace-pane-tabs-user-queue-key.ts'
 import { workspacePaneTabEntryArraysEqual } from '#/server/workspace-pane/workspace-pane-tabs-operations.ts'
 import {
-  physicalWorktreeIdentity,
-  physicalWorktreeIdentityFromRuntimeScope,
   physicalWorktreeIdentityKey,
+  type PhysicalWorktreeIdentity,
 } from '#/server/worktree-removal/physical-worktree-identity.ts'
 
 export interface WorkspacePaneTabsTargetInput<TUser extends string | number> {
@@ -32,6 +31,7 @@ export interface WorkspacePaneTabsReplaceInput<
   TUser extends string | number,
 > extends WorkspacePaneTabsTargetInput<TUser> {
   tabs: readonly WorkspacePaneTabEntry[]
+  physicalWorktreeIdentity: PhysicalWorktreeIdentity | null
 }
 
 export interface WorkspacePaneTabsWorktreeInput<TUser extends string | number> {
@@ -70,11 +70,14 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
   private readonly revisionByUserScope = new Map<string, number>()
 
   replaceTabs(input: WorkspacePaneTabsReplaceInput<TUser>): WorkspacePaneTabEntry[] {
+    if (input.worktreePath !== null && input.physicalWorktreeIdentity === null) {
+      throw new Error('error.invalid-worktree-identity')
+    }
     const targetKey = this.targetKey(input)
     const tabs = normalizeWorkspacePaneTabs(input.tabs, { hasWorktree: input.worktreePath !== null })
     const physicalWorktreeKey = input.worktreePath === null
       ? null
-      : physicalWorktreeIdentityKey(physicalWorktreeIdentityFromRuntimeScope(input.scope, input.worktreePath))
+      : physicalWorktreeIdentityKey(input.physicalWorktreeIdentity!)
     const existing = this.tabsByTarget.get(targetKey)
     if (
       existing &&
@@ -143,11 +146,9 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     this.revisionByUserScope.delete(workspacePaneTabsUserScopeQueueKey(userId, scope))
   }
 
-  closeTabsForWorktree(input: WorkspacePaneTabsWorktreeInput<TUser>): void {
+  closeTabsForWorktree(input: WorkspacePaneTabsWorktreeInput<TUser> & { identity: PhysicalWorktreeIdentity }): void {
     const prefix = workspacePaneTabsRuntimeScopePrefixKey(input.userId, input.scope)
-    const targetKey = physicalWorktreeIdentityKey(
-      physicalWorktreeIdentityFromRuntimeScope(input.scope, input.worktreePath),
-    )
+    const targetKey = physicalWorktreeIdentityKey(input.identity)
     let changed = false
     for (const [key, entry] of Array.from(this.tabsByTarget.entries())) {
       if (!key.startsWith(prefix) || entry.physicalWorktreeKey !== targetKey) continue
@@ -157,8 +158,8 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
     if (changed) this.advanceRevision(input.userId, input.scope)
   }
 
-  physicalWorktreeScopes(input: { repoRoot: string; worktreePath: string }): Array<{ userId: TUser; scope: string }> {
-    const targetKey = physicalWorktreeIdentityKey(physicalWorktreeIdentity(input))
+  physicalWorktreeScopes(identity: PhysicalWorktreeIdentity): Array<{ userId: TUser; scope: string }> {
+    const targetKey = physicalWorktreeIdentityKey(identity)
     const affected = new Map<string, { userId: TUser; scope: string }>()
     for (const entry of this.tabsByTarget.values()) {
       if (entry.physicalWorktreeKey !== targetKey) continue

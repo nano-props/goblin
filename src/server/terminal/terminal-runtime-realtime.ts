@@ -132,6 +132,7 @@ function outputFlushBoundaryFromResponse(
   if (message.action === 'recover-sessions') {
     return message.payload.snapshots.map((snapshot) => ({
       terminalRuntimeSessionId: snapshot.terminalRuntimeSessionId,
+      terminalRuntimeGeneration: snapshot.terminalRuntimeGeneration,
       outputEra: snapshot.outputEra,
       seq: snapshot.snapshotSeq,
     }))
@@ -141,6 +142,7 @@ function outputFlushBoundaryFromResponse(
   if (!payload.ok) return null
   return {
     terminalRuntimeSessionId: payload.terminalRuntimeSessionId,
+    terminalRuntimeGeneration: payload.terminalRuntimeGeneration,
     outputEra: payload.outputEra,
     seq: payload.snapshotSeq,
   }

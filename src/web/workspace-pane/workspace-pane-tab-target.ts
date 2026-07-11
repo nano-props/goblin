@@ -33,13 +33,12 @@ export const workspacePanePreferenceTargetOptions: WorkspacePaneTabTargetOptions
 
 export interface WorkspacePaneDestinationTargetLease extends WorkspacePaneTabCoordinatorTarget {
   branchName: string
-  worktreePath: string
+  worktreePath: string | null
 }
 
 export type WorkspacePaneDestinationTargetResolution =
   | { kind: 'ready'; lease: WorkspacePaneDestinationTargetLease }
   | { kind: 'missing' }
-  | { kind: 'no-worktree' }
 
 export function resolveWorkspacePaneDestinationTarget(
   repoId: string,
@@ -50,8 +49,7 @@ export function resolveWorkspacePaneDestinationTarget(
   const branchModel = readRepoBranchQueryProjection(repo)
   const branch = branchModel?.branches.find((candidate) => candidate.name === branchName)
   if (!branch) return { kind: 'missing' }
-  const worktreePath = branch.worktree?.path
-  if (!worktreePath) return { kind: 'no-worktree' }
+  const worktreePath = branch.worktree?.path ?? null
   return {
     kind: 'ready',
     lease: {

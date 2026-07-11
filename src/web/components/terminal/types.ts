@@ -53,6 +53,7 @@ export interface TerminalClientSnapshot extends TerminalControllerViewModel {
  */
 export interface TerminalIdentityViewModel extends TerminalControllerViewModel {
   terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: number
   canonicalCols: number
   canonicalRows: number
 }
@@ -76,6 +77,7 @@ export interface TerminalIdentityRealtimeEvent extends TerminalIdentityViewModel
  */
 export interface TerminalLifecycleViewModel {
   terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: number
   phase: TerminalSessionPhase
   message: string | null
   takeoverPending: boolean

@@ -75,7 +75,7 @@ test('commits active close-back route through command-owned navigation', async (
     REPO_ID,
     BRANCH_NAME,
     { kind: 'static', tab: 'status' },
-    undefined,
+    expect.objectContaining({ presentationToken: expect.any(Object) }),
   )
   expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, BRANCH_NAME, 'status')
 })

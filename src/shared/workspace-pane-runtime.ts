@@ -60,6 +60,7 @@ export interface TerminalWorkspacePaneRuntimeCloseEffect {
   action: 'closed' | 'already-closed'
   terminalSessionId: string
   terminalRuntimeSessionId: string | null
+  terminalRuntimeGeneration: number | null
 }
 
 interface TerminalWorkspacePaneRuntimeCloseSuccess {

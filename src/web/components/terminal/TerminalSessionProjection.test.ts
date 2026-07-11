@@ -64,6 +64,7 @@ function makeServerSession(
   terminalRuntimeSessionId: string,
   terminalSessionId: string,
   overrides: Partial<{
+    terminalRuntimeGeneration: number
     controller: { clientId: string; status: 'connected' }
     processName: string
     canonicalTitle: string | null
@@ -76,6 +77,7 @@ function makeServerSession(
 ): TerminalSessionSummary {
   return {
     terminalRuntimeSessionId,
+    terminalRuntimeGeneration: overrides.terminalRuntimeGeneration ?? 1,
     terminalSessionId,
     repoRuntimeId: overrides.repoRuntimeId ?? REPO_RUNTIME_ID,
     repoRoot: REPO_ROOT,
@@ -103,6 +105,7 @@ function successfulRuntimeCloseSnapshot(
       action: terminalRuntimeSessionId === null ? ('already-closed' as const) : ('closed' as const),
       terminalSessionId,
       terminalRuntimeSessionId,
+      terminalRuntimeGeneration: terminalRuntimeSessionId === null ? null : 1,
     },
     workspacePaneTabs: { revision: 2, entries: [] },
   }
@@ -221,6 +224,74 @@ describe('TerminalSessionProjection', () => {
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
+    test('keeps an active exit terminal across repeated same-revision snapshots until authoritative absence', () => {
+      projection.setRepoIndex(makeRepoIndex())
+      const scope = { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }
+      const terminalSessionId = 'term-111111111111111111111'
+      const terminalRuntimeSessionId = 'pty_active_exit_aaaaaaaaa'
+      const snapshot = {
+        revision: 10,
+        sessions: [makeServerSession(terminalRuntimeSessionId, terminalSessionId)],
+      }
+      projection.reconcileServerSessionsSnapshot(scope, snapshot, 'client_local')
+
+      projection.handleExit({
+        terminalRuntimeSessionId,
+        terminalRuntimeGeneration: 1,
+        terminalSessionId,
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: REPO_RUNTIME_ID,
+      })
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+
+      expect(projection.reconcileServerSessionsSnapshot(scope, snapshot, 'client_local')).toBe(true)
+      expect(projection.reconcileServerSessionsSnapshot(scope, snapshot, 'client_local')).toBe(true)
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+      expect((projection as any).futureExitOrphans.size()).toBe(1)
+
+      projection.reconcileServerSessionsSnapshot(scope, { revision: 11, sessions: [] }, 'client_local')
+      expect((projection as any).futureExitOrphans.size()).toBe(0)
+    })
+
+    test('does not let an older exact exit tombstone block a newer runtime generation', () => {
+      projection.setRepoIndex(makeRepoIndex())
+      const scope = { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }
+      const terminalSessionId = 'term-111111111111111111111'
+      const terminalRuntimeSessionId = 'pty_generation_exit_aaaaaa'
+      projection.reconcileServerSessionsSnapshot(
+        scope,
+        {
+          revision: 10,
+          sessions: [makeServerSession(terminalRuntimeSessionId, terminalSessionId)],
+        },
+        'client_local',
+      )
+      projection.handleExit({
+        terminalRuntimeSessionId,
+        terminalRuntimeGeneration: 1,
+        terminalSessionId,
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: REPO_RUNTIME_ID,
+      })
+
+      projection.reconcileServerSessionsSnapshot(
+        scope,
+        {
+          revision: 11,
+          sessions: [
+            makeServerSession(terminalRuntimeSessionId, terminalSessionId, { terminalRuntimeGeneration: 2 }),
+          ],
+        },
+        'client_local',
+      )
+
+      expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+      expect((projection as any).sessions.get(terminalSessionId).currentRuntimeBinding()).toEqual({
+        terminalRuntimeSessionId,
+        terminalRuntimeGeneration: 2,
+      })
+    })
+
     test('uses a fresh revision epoch for a replacement repo runtime and after destroy', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessionsSnapshot(
@@ -279,6 +350,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleOutput({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-unroutedunroutedroute',
         data: 'hello',
         seq: 1,
@@ -289,6 +361,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleOutput({
         terminalRuntimeSessionId: 'pty_session_b_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-unroutedunroutedroute',
         data: 'hello',
         seq: 1,
@@ -306,6 +379,7 @@ describe('TerminalSessionProjection', () => {
       try {
         projection.handleOutput({
           terminalRuntimeSessionId,
+    terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           data: 'before-index',
           seq: 1,
@@ -325,13 +399,20 @@ describe('TerminalSessionProjection', () => {
           new Map([
             [
               terminalRuntimeSessionId,
-              { terminalRuntimeSessionId, snapshot: 'before-index', snapshotSeq: 1, outputEra: 0 },
+              {
+                terminalRuntimeSessionId,
+                terminalRuntimeGeneration: 1,
+                snapshot: 'before-index',
+                snapshotSeq: 1,
+                outputEra: 0,
+              },
             ],
           ]),
         )
 
         expect(hydrateSpy).toHaveBeenCalledWith(
           expect.objectContaining({ terminalRuntimeSessionId, snapshot: 'before-index', snapshotSeq: 1, outputEra: 0 }),
+          'snapshot',
         )
         expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]?.terminalSessionId).toBe(
           'term-111111111111111111111',
@@ -358,6 +439,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleOutput({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-unroutedunroutedroute',
         data: '',
         seq: 1,
@@ -367,6 +449,7 @@ describe('TerminalSessionProjection', () => {
       vi.advanceTimersByTime(5000)
       projection.handleOutput({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-unroutedunroutedroute',
         data: '',
         seq: 2,
@@ -393,6 +476,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleOutput({
         terminalRuntimeSessionId: 'pty_session_old_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         data: 'stale output',
         seq: 1,
@@ -419,6 +503,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleServerTitle({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-unroutedunroutedroute',
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
@@ -429,6 +514,7 @@ describe('TerminalSessionProjection', () => {
       handleServerTitleSpy.mockClear()
       projection.handleServerTitle({
         terminalRuntimeSessionId: 'pty_session_b_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-unroutedunroutedroute',
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
@@ -458,6 +544,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleServerTitle({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
@@ -481,6 +568,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleServerTitle({
         terminalRuntimeSessionId: 'pty_session_old_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
@@ -504,14 +592,20 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleExit({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-unroutedunroutedroute',
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: REPO_RUNTIME_ID,
       })
       expect(handleExitSpy).toHaveBeenCalledTimes(1)
 
       handleExitSpy.mockClear()
       projection.handleExit({
         terminalRuntimeSessionId: 'pty_session_b_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-unroutedunroutedroute',
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: REPO_RUNTIME_ID,
       })
       expect(handleExitSpy).not.toHaveBeenCalled()
     })
@@ -541,6 +635,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleOutput({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         data: 'hello',
         seq: 1,
@@ -551,6 +646,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleIdentity({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         role: 'controller',
         controllerStatus: 'connected',
@@ -561,6 +657,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleLifecycle({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         phase: 'open',
         message: null,
@@ -570,7 +667,10 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleExit({
         terminalRuntimeSessionId: 'pty_session_a_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: REPO_RUNTIME_ID,
       })
       expect(handleExitSpy).toHaveBeenCalledTimes(1)
     })
@@ -742,6 +842,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleSessionClosed({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId,
       })
 
@@ -765,12 +866,14 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleSessionClosed({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
       })
 
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
       projection.handleSessionClosed({
         terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
       })
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
@@ -788,6 +891,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleSessionClosed({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
       })
 
@@ -798,6 +902,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.handleServerBell({
         terminalRuntimeSessionId: 'pty_session_2_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
@@ -807,6 +912,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleSessionClosed({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
       })
       projection.reconcileServerSessions(
@@ -823,6 +929,7 @@ describe('TerminalSessionProjection', () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.handleServerBell({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
@@ -832,6 +939,7 @@ describe('TerminalSessionProjection', () => {
 
       projection.handleSessionClosed({
         terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
       })
       projection.reconcileServerSessions(
@@ -1387,5 +1495,423 @@ describe('TerminalSessionProjection', () => {
         { descriptor: TerminalDescriptor } | undefined
       expect(stored?.descriptor.terminalSessionId).toBe('term-111111111111111111111')
     })
+  })
+})
+
+describe('TerminalSessionProjection runtime binding activation races', () => {
+  test('does not delete a durable session when the retiring generation exits during restart', () => {
+    const localProjection = new TerminalSessionProjection()
+    localProjection.setRepoIndex(makeRepoIndex())
+    localProjection.reconcileServerSessions(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      [
+        makeServerSession('pty_generation_race_aaaa', 'term-111111111111111111111', {
+          terminalRuntimeGeneration: 1,
+        }),
+      ],
+      'client_local',
+      new Map(),
+    )
+    const session = (localProjection as any).sessions.get('term-111111111111111111111')
+    session.restart()
+
+    localProjection.handleExit({
+      terminalRuntimeSessionId: 'pty_generation_race_aaaa',
+      terminalRuntimeGeneration: 1,
+      terminalSessionId: 'term-111111111111111111111',
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: REPO_RUNTIME_ID,
+    })
+
+    expect(localProjection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+    localProjection.destroy()
+  })
+
+  test('consumes an exact future bell once when reconciliation activates its generation', () => {
+    const localProjection = new TerminalSessionProjection()
+    localProjection.setRepoIndex(makeRepoIndex())
+    localProjection.handleServerBell({
+      terminalRuntimeSessionId: 'pty_future_bell_aaaaaaaa',
+      terminalRuntimeGeneration: 2,
+      terminalSessionId: 'term-111111111111111111111',
+      repoRoot: REPO_ROOT,
+      worktreePath: WORKTREE_PATH,
+      processName: 'zsh',
+      canonicalTitle: null,
+    })
+
+    localProjection.reconcileServerSessions(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      [
+        makeServerSession('pty_future_bell_aaaaaaaa', 'term-111111111111111111111', {
+          terminalRuntimeGeneration: 2,
+        }),
+      ],
+      'client_local',
+      new Map(),
+    )
+
+    expect(localProjection.terminalWorktreeSnapshot(WORKTREE_KEY).bellCount).toBe(1)
+    expect((localProjection as any).pendingServerBellByRuntimeBindingKey.size).toBe(0)
+    localProjection.destroy()
+  })
+
+  test('refuses to activate a future generation that exited before reconciliation', () => {
+    const localProjection = new TerminalSessionProjection()
+    localProjection.setRepoIndex(makeRepoIndex())
+    localProjection.handleExit({
+      terminalRuntimeSessionId: 'pty_future_exit_aaaaaaaa',
+      terminalRuntimeGeneration: 2,
+      terminalSessionId: 'term-111111111111111111111',
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: REPO_RUNTIME_ID,
+    })
+
+    localProjection.reconcileServerSessions(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      [
+        makeServerSession('pty_future_exit_aaaaaaaa', 'term-111111111111111111111', {
+          terminalRuntimeGeneration: 2,
+        }),
+      ],
+      'client_local',
+      new Map(),
+    )
+
+    expect(localProjection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    localProjection.destroy()
+  })
+
+  test('ledgers a future-generation exit rejected by an active session until exact snapshot activation', () => {
+    const localProjection = new TerminalSessionProjection()
+    localProjection.setRepoIndex(makeRepoIndex())
+    const terminalSessionId = 'term-111111111111111111111'
+    const terminalRuntimeSessionId = 'pty_active_future_aaaaaaaa'
+    localProjection.reconcileServerSessions(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      [makeServerSession(terminalRuntimeSessionId, terminalSessionId, { terminalRuntimeGeneration: 1 })],
+      'client_local',
+      new Map(),
+    )
+
+    localProjection.handleExit({
+      terminalRuntimeSessionId,
+      terminalRuntimeGeneration: 2,
+      terminalSessionId,
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: REPO_RUNTIME_ID,
+    })
+    localProjection.reconcileServerSessions(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      [makeServerSession(terminalRuntimeSessionId, terminalSessionId, { terminalRuntimeGeneration: 2 })],
+      'client_local',
+      new Map(),
+    )
+
+    expect(localProjection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    localProjection.destroy()
+  })
+
+  test('ledgers a future-generation exit rejected by an error session until exact snapshot activation', () => {
+    const localProjection = new TerminalSessionProjection()
+    localProjection.setRepoIndex(makeRepoIndex())
+    const terminalSessionId = 'term-111111111111111111111'
+    const terminalRuntimeSessionId = 'pty_error_future_aaaaaaaaa'
+    localProjection.reconcileServerSessions(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      [makeServerSession(terminalRuntimeSessionId, terminalSessionId, { terminalRuntimeGeneration: 1 })],
+      'client_local',
+      new Map(),
+    )
+    const session = (localProjection as any).sessions.get(terminalSessionId)
+    session.runtime.failRuntime('error.restart-failed')
+
+    localProjection.handleExit({
+      terminalRuntimeSessionId,
+      terminalRuntimeGeneration: 2,
+      terminalSessionId,
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: REPO_RUNTIME_ID,
+    })
+    localProjection.reconcileServerSessions(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      [makeServerSession(terminalRuntimeSessionId, terminalSessionId, { terminalRuntimeGeneration: 2 })],
+      'client_local',
+      new Map(),
+    )
+
+    expect(localProjection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    localProjection.destroy()
+  })
+})
+
+describe('TerminalSessionProjection direct runtime activation barrier', () => {
+  test('consumes the exact future bell on direct authoritative activation', () => {
+    const localProjection = new TerminalSessionProjection()
+    localProjection.setRepoIndex(makeRepoIndex())
+    localProjection.reconcileServerSessions(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      [
+        makeServerSession('pty_direct_activation_aaaa', 'term-111111111111111111111', {
+          terminalRuntimeGeneration: 1,
+        }),
+      ],
+      'client_local',
+      new Map(),
+    )
+    const session = (localProjection as any).sessions.get('term-111111111111111111111')
+    const bellBase = {
+      terminalRuntimeSessionId: 'pty_direct_activation_aaaa',
+      terminalSessionId: 'term-111111111111111111111',
+      repoRoot: REPO_ROOT,
+      worktreePath: WORKTREE_PATH,
+      processName: 'zsh',
+      canonicalTitle: null,
+    }
+    localProjection.handleServerBell({ ...bellBase, terminalRuntimeGeneration: 2 })
+    expect(localProjection.terminalWorktreeSnapshot(WORKTREE_KEY).bellCount).toBe(0)
+
+    session.hydrate({
+      terminalRuntimeSessionId: 'pty_direct_activation_aaaa',
+      terminalRuntimeGeneration: 2,
+      phase: 'open',
+      message: null,
+      processName: 'zsh',
+      canonicalTitle: null,
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalCols: 80,
+      canonicalRows: 24,
+      snapshot: '',
+      snapshotSeq: 0,
+      outputEra: 0,
+    })
+
+    expect(localProjection.terminalWorktreeSnapshot(WORKTREE_KEY).bellCount).toBe(1)
+    expect((localProjection as any).pendingServerBellByRuntimeBindingKey.size).toBe(0)
+    localProjection.destroy()
+  })
+})
+
+describe('TerminalSessionProjection new runtime lineage exit barrier', () => {
+  const terminalSessionId = 'term-111111111111111111111'
+  const lineageA = 'pty_lineage_a_aaaaaaaa'
+  const lineageB = 'pty_lineage_b_aaaaaaaa'
+  const lineageC = 'pty_lineage_c_aaaaaaaa'
+  const exitFor = (terminalRuntimeSessionId: string) => ({
+    terminalRuntimeSessionId,
+    terminalRuntimeGeneration: 0,
+    terminalSessionId,
+    repoRoot: REPO_ROOT,
+    repoRuntimeId: REPO_RUNTIME_ID,
+  })
+
+  function transitioningProjection(): { projection: TerminalSessionProjection; session: any } {
+    const projection = new TerminalSessionProjection()
+    projection.setRepoIndex(makeRepoIndex())
+    projection.reconcileServerSessions(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      [makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 1 })],
+      'client_local',
+      new Map(),
+    )
+    const session = (projection as any).sessions.get(terminalSessionId)
+    session.restart()
+    return { projection, session }
+  }
+
+  test('blocks direct activation when the replacement lineage exited before its first frame', () => {
+    const { projection, session } = transitioningProjection()
+    projection.handleExit(exitFor(lineageB))
+
+    session.hydrate({
+      terminalRuntimeSessionId: lineageB,
+      terminalRuntimeGeneration: 0,
+      phase: 'open',
+      message: null,
+      processName: 'zsh',
+      canonicalTitle: null,
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalCols: 80,
+      canonicalRows: 24,
+      snapshot: '',
+      snapshotSeq: 0,
+      outputEra: 0,
+    })
+
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    projection.destroy()
+  })
+
+  test('does not let a delayed partial create effect regress or replace a newer active binding', () => {
+    const projection = new TerminalSessionProjection()
+    projection.setRepoIndex(makeRepoIndex())
+    projection.reconcileServerSessions(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      [makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 2 })],
+      'client_local',
+      new Map(),
+    )
+
+    ;(projection as any).applyServerSessionEffect(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      1,
+      makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 1 }),
+      'client_local',
+      new Map(),
+    )
+    ;(projection as any).applyServerSessionEffect(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      1,
+      makeServerSession(lineageB, terminalSessionId, { terminalRuntimeGeneration: 0 }),
+      'client_local',
+      new Map(),
+    )
+
+    const session = (projection as any).sessions.get(terminalSessionId)
+    expect(session.currentRuntimeBinding()).toEqual({
+      terminalRuntimeSessionId: lineageA,
+      terminalRuntimeGeneration: 2,
+    })
+    projection.destroy()
+  })
+
+  test('blocks reconciliation activation of an exited replacement lineage', () => {
+    const { projection } = transitioningProjection()
+    projection.handleExit(exitFor(lineageB))
+
+    projection.reconcileServerSessions(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      [makeServerSession(lineageB, terminalSessionId, { terminalRuntimeGeneration: 0 })],
+      'client_local',
+      new Map(),
+    )
+
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    projection.destroy()
+  })
+
+  test('keeps unrelated lineage exits when exact activation commits lineage C', () => {
+    const { projection, session } = transitioningProjection()
+    projection.handleExit(exitFor(lineageB))
+
+    session.hydrate({
+      terminalRuntimeSessionId: lineageC,
+      terminalRuntimeGeneration: 0,
+      phase: 'open',
+      message: null,
+      processName: 'zsh',
+      canonicalTitle: null,
+      role: 'controller',
+      controllerStatus: 'connected',
+      canonicalCols: 80,
+      canonicalRows: 24,
+      snapshot: '',
+      snapshotSeq: 0,
+      outputEra: 0,
+    })
+
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+    expect((projection as any).futureExitOrphans.blocksActivation(exitFor(lineageB))).toBe(true)
+    projection.destroy()
+  })
+
+  test('blocks a different-lineage activation when its exit arrived while lineage A was active', () => {
+    const projection = new TerminalSessionProjection()
+    projection.setRepoIndex(makeRepoIndex())
+    projection.reconcileServerSessions(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      [makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 1 })],
+      'client_local',
+      new Map(),
+    )
+    projection.handleExit(exitFor(lineageB))
+
+    projection.reconcileServerSessions(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      [makeServerSession(lineageB, terminalSessionId, { terminalRuntimeGeneration: 0 })],
+      'client_local',
+      new Map(),
+    )
+
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    projection.destroy()
+  })
+
+  test('preserves a generation 3 exit across generation 2 activation', () => {
+    const { projection } = transitioningProjection()
+    projection.handleExit({ ...exitFor(lineageA), terminalRuntimeGeneration: 3 })
+
+    projection.reconcileServerSessions(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      [makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 2 })],
+      'client_local',
+      new Map(),
+    )
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(1)
+
+    projection.reconcileServerSessions(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      [makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 3 })],
+      'client_local',
+      new Map(),
+    )
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    projection.destroy()
+  })
+
+  test('authoritative binding changes retire the older durable generation tombstone', () => {
+    const { projection } = transitioningProjection()
+    projection.handleExit({ ...exitFor(lineageA), terminalRuntimeGeneration: 3 })
+    projection.handleExit({ ...exitFor(lineageA), terminalRuntimeGeneration: 2 })
+
+    projection.reconcileServerSessions(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      [makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 2 })],
+      'client_local',
+      new Map(),
+    )
+    expect((projection as any).futureExitOrphans.size()).toBe(2)
+
+    projection.reconcileServerSessions(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      [makeServerSession(lineageA, terminalSessionId, { terminalRuntimeGeneration: 3 })],
+      'client_local',
+      new Map(),
+    )
+    expect((projection as any).futureExitOrphans.size()).toBe(1)
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    projection.destroy()
+  })
+
+  test('keeps an orphan exit when an unrelated repo epoch is replaced', () => {
+    const projection = new TerminalSessionProjection()
+    const otherRepoRoot = '/repo-other'
+    projection.setRepoIndex({
+      ...makeRepoIndex(),
+      [otherRepoRoot]: {
+        repoRuntimeId: 'repo-runtime-other-1',
+        branchByWorktreePath: { [otherRepoRoot]: 'main' },
+      },
+    })
+    projection.handleExit(exitFor(lineageB))
+
+    projection.setRepoIndex({
+      ...makeRepoIndex(),
+      [otherRepoRoot]: {
+        repoRuntimeId: 'repo-runtime-other-2',
+        branchByWorktreePath: { [otherRepoRoot]: 'main' },
+      },
+    })
+    projection.reconcileServerSessions(
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      [makeServerSession(lineageB, terminalSessionId, { terminalRuntimeGeneration: 0 })],
+      'client_local',
+      new Map(),
+    )
+
+    expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
+    projection.destroy()
   })
 })

@@ -1,5 +1,9 @@
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
-import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import {
+  workspacePaneStaticTabId,
+  workspacePaneTabEntryIdentity,
+  type WorkspacePaneStaticTabType,
+} from '#/shared/workspace-pane.ts'
 import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
 import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -8,25 +12,37 @@ import {
   commitWorkspacePaneCurrentTargetRoute,
   type WorkspacePaneTabControllerCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
-import { commitWorkspacePaneDestinationRoute } from '#/web/workspace-pane/workspace-pane-destination-navigation.ts'
+import {
+  beginWorkspacePaneDestinationPresentation,
+  commitWorkspacePaneDestinationRoute,
+  workspacePaneDestinationPresentationIsCurrent,
+  type WorkspacePaneDestinationPresentation,
+} from '#/web/workspace-pane/workspace-pane-destination-navigation.ts'
+import {
+  workspacePaneActionOutcomeSucceeded,
+  type WorkspacePaneActionOutcome,
+} from '#/web/workspace-pane/workspace-pane-action-outcome.ts'
 import { updateWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   captureWorkspacePaneActiveTabIdentity,
   recordWorkspacePaneTabOpener,
+  workspacePaneTabOpener,
 } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import {
   resolveWorkspacePaneTabTargetForBranch,
   resolveWorkspacePaneDestinationTarget,
-  resolveWorkspacePaneDestinationTargetLease,
-  workspacePaneDestinationTargetLeaseIsCurrent,
-  type WorkspacePaneDestinationTargetLease,
   workspacePaneTabInteractionBlockedForBranch,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
   runWorkspacePaneTabCoordinatorTask,
   workspacePaneTabCoordinatorObservedRoute,
 } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import {
+  beginPrimaryWindowPresentation,
+  primaryWindowPresentationIsCurrent,
+  type PrimaryWindowPresentationToken,
+} from '#/web/primary-window-presentation.ts'
 
 export interface OpenWorkspacePaneStaticTabActionOptions {
   repoId: string
@@ -57,12 +73,16 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
   type,
   insertAfterIdentity,
   navigation,
-}: ShowWorkspacePaneStaticTabActionOptions): Promise<boolean> {
-  if (!repoId || !branchName) return false
+}: ShowWorkspacePaneStaticTabActionOptions): Promise<WorkspacePaneActionOutcome> {
+  if (!repoId || !branchName) return { kind: 'target-missing' }
   const resolution = resolveWorkspacePaneDestinationTarget(repoId, branchName)
-  if (resolution.kind === 'no-worktree') return false
-  if (resolution.kind !== 'ready') return false
+  if (resolution.kind !== 'ready') return { kind: 'target-missing' }
   const lease = resolution.lease
+  const provider = workspacePaneStaticTabProvider(type)
+  if (!provider.canOpen({ hasWorktree: lease.worktreePath !== null })) {
+    return { kind: 'unsupported', reason: 'worktree-required' }
+  }
+  const presentation = beginWorkspacePaneDestinationPresentation(lease)
   const input: ResolvedOpenWorkspacePaneStaticTabActionOptions = {
     repoId,
     repoRuntimeId: lease.repoRuntimeId,
@@ -76,7 +96,7 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
   return await runWorkspacePaneTabCoordinatorTask(lease, () =>
     openWorkspacePaneStaticTabAction(input, {
       kind: 'destination',
-      lease,
+      presentation,
       sourceRoute: workspacePaneTabCoordinatorObservedRoute(lease),
     }),
   )
@@ -92,7 +112,8 @@ export async function dispatchOpenWorkspacePaneStaticTabAction(
     repoRuntimeId,
     worktreePath: input.worktreePath ?? null,
   }
-  return await runWorkspacePaneTabCoordinatorTask(
+  const presentationToken = beginPrimaryWindowPresentation()
+  const outcome = await runWorkspacePaneTabCoordinatorTask(
     {
       repoId: input.repoId,
       repoRuntimeId,
@@ -102,6 +123,7 @@ export async function dispatchOpenWorkspacePaneStaticTabAction(
     () =>
       openWorkspacePaneStaticTabAction(resolvedInput, {
         kind: 'current',
+        presentationToken,
         sourceRoute:
           workspacePaneTabCoordinatorObservedRoute({
             repoId: input.repoId,
@@ -111,35 +133,46 @@ export async function dispatchOpenWorkspacePaneStaticTabAction(
           }) ?? input.workspacePaneRoute,
       }),
   )
+  return workspacePaneActionOutcomeSucceeded(outcome)
 }
 
 type WorkspacePaneStaticTabRouteTransaction =
   | {
       kind: 'current'
+      presentationToken: PrimaryWindowPresentationToken
       sourceRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
     }
   | {
       kind: 'destination'
-      lease: WorkspacePaneDestinationTargetLease
+      presentation: WorkspacePaneDestinationPresentation
       sourceRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
     }
 
 async function openWorkspacePaneStaticTabAction(
   input: ResolvedOpenWorkspacePaneStaticTabActionOptions,
   transaction: WorkspacePaneStaticTabRouteTransaction,
-): Promise<boolean> {
+): Promise<WorkspacePaneActionOutcome> {
   const provider = workspacePaneStaticTabProvider(input.type)
-  if (!provider.canOpen({ hasWorktree: !!input.worktreePath })) return false
+  if (!provider.canOpen({ hasWorktree: !!input.worktreePath })) {
+    return { kind: 'unsupported', reason: 'worktree-required' }
+  }
+  if (transaction.kind === 'destination' && !workspacePaneDestinationPresentationIsCurrent(transaction.presentation)) {
+    return { kind: 'superseded' }
+  }
+  if (transaction.kind === 'current' && !primaryWindowPresentationIsCurrent(transaction.presentationToken)) {
+    return { kind: 'superseded' }
+  }
   if (
     transaction.kind === 'current' &&
     workspacePaneTabInteractionBlockedForBranch(input.repoId, input.branchName, {
       workspacePaneRoute: input.workspacePaneRoute,
     })
   )
-    return false
+    return { kind: 'blocked' }
   const state = useReposStore.getState()
   const repo = state.repos[input.repoId]
-  if (!repo || repo.repoRuntimeId !== input.repoRuntimeId) return false
+  if (!repo) return { kind: 'target-missing' }
+  if (repo.repoRuntimeId !== input.repoRuntimeId) return { kind: 'superseded' }
   const branchName = input.branchName
   const coordinatorTarget = {
     repoId: input.repoId,
@@ -156,14 +189,25 @@ async function openWorkspacePaneStaticTabAction(
   }
   // Chrome-tab-style opener tracking: reopening/refocusing an already-open
   // static tab shouldn't overwrite its opener.
-  const alreadyOpen = readWorkspacePaneTabsForTarget(target).some((entry) => entry.type === input.type)
+  const currentTabs = readWorkspacePaneTabsForTarget(target)
+  const alreadyOpen = currentTabs.some((entry) => entry.type === input.type)
   const openerIdentity = !alreadyOpen
     ? captureWorkspacePaneActiveTabIdentity(input.repoId, input.repoRuntimeId, branchName, {
         workspacePaneRoute: sourceRoute,
       })
     : null
   // Default anchor is the captured opener; callers may pass null to force append.
-  const insertAfterIdentity = input.insertAfterIdentity === undefined ? openerIdentity : input.insertAfterIdentity
+  let invocationOrderedInsertAfterIdentity = openerIdentity
+  if (openerIdentity) {
+    for (const entry of currentTabs) {
+      const identity = workspacePaneTabEntryIdentity(entry)
+      if (workspacePaneTabOpener(input.repoId, input.repoRuntimeId, branchName, identity) === openerIdentity) {
+        invocationOrderedInsertAfterIdentity = identity
+      }
+    }
+  }
+  const insertAfterIdentity =
+    input.insertAfterIdentity === undefined ? invocationOrderedInsertAfterIdentity : input.insertAfterIdentity
   const committed = await updateWorkspacePaneTabs({
     ...target,
     operation: {
@@ -172,10 +216,15 @@ async function openWorkspacePaneStaticTabAction(
       insertAfterIdentity,
     },
   })
-  if (!committed.ok) return false
-  if (currentRepoRuntimeId(useReposStore.getState(), input.repoId) !== input.repoRuntimeId) return false
-  if (transaction.kind === 'destination' && !workspacePaneDestinationTargetLeaseIsCurrent(transaction.lease)) {
-    return false
+  if (!committed.ok) return { kind: 'mutation-failed' }
+  const liveTarget = resolveWorkspacePaneDestinationTarget(input.repoId, branchName)
+  if (
+    currentRepoRuntimeId(useReposStore.getState(), input.repoId) !== input.repoRuntimeId ||
+    liveTarget.kind !== 'ready' ||
+    liveTarget.lease.repoRuntimeId !== input.repoRuntimeId ||
+    liveTarget.lease.worktreePath !== input.worktreePath
+  ) {
+    return { kind: 'superseded' }
   }
   if (openerIdentity) {
     recordWorkspacePaneTabOpener(
@@ -186,7 +235,6 @@ async function openWorkspacePaneStaticTabAction(
       openerIdentity,
     )
   }
-  if (!(await commitWorkspacePaneStaticTab(input, sourceRoute, transaction))) return false
   if (provider.refreshOnOpen) {
     requestVisibleRepoProjectionRefresh(
       { get: useReposStore.getState, set: useReposStore.setState },
@@ -194,22 +242,32 @@ async function openWorkspacePaneStaticTabAction(
       branchName,
     )
   }
-  return true
+  if (transaction.kind === 'current' && !primaryWindowPresentationIsCurrent(transaction.presentationToken)) {
+    return { kind: 'completed', changed: !alreadyOpen, presentation: 'superseded' }
+  }
+  if (transaction.kind === 'destination' && !workspacePaneDestinationPresentationIsCurrent(transaction.presentation)) {
+    return { kind: 'completed', changed: !alreadyOpen, presentation: 'superseded' }
+  }
+  const navigationOutcome = await commitWorkspacePaneStaticTab(input, sourceRoute, transaction)
+  if (!workspacePaneActionOutcomeSucceeded(navigationOutcome)) return navigationOutcome
+  return navigationOutcome.kind === 'completed'
+    ? { ...navigationOutcome, changed: !alreadyOpen }
+    : navigationOutcome
 }
 
-function commitWorkspacePaneStaticTab(input: {
+async function commitWorkspacePaneStaticTab(input: {
   repoId: string
   repoRuntimeId: string
   branchName: string
   worktreePath: string | null
   type: WorkspacePaneStaticTabType
   navigation: WorkspacePaneTabControllerCommitNavigation
-}, sourceRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined, transaction: WorkspacePaneStaticTabRouteTransaction): Promise<boolean> {
+}, sourceRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined, transaction: WorkspacePaneStaticTabRouteTransaction): Promise<WorkspacePaneActionOutcome> {
   const route = { kind: 'static' as const, tab: input.type }
   if (transaction.kind === 'destination') {
-    return commitWorkspacePaneDestinationRoute(transaction.lease, route, input.navigation)
+    return commitWorkspacePaneDestinationRoute(transaction.presentation, route, input.navigation)
   }
-  return commitWorkspacePaneCurrentTargetRoute(
+  const committed = await commitWorkspacePaneCurrentTargetRoute(
     {
       repoId: input.repoId,
       repoRuntimeId: input.repoRuntimeId,
@@ -219,5 +277,13 @@ function commitWorkspacePaneStaticTab(input: {
     sourceRoute,
     route,
     input.navigation,
+    undefined,
+    transaction.presentationToken,
   )
+  if (!committed && !primaryWindowPresentationIsCurrent(transaction.presentationToken)) {
+    return { kind: 'completed', changed: true, presentation: 'superseded' }
+  }
+  return committed
+    ? { kind: 'completed', changed: true, presentation: 'observed' }
+    : { kind: 'navigation-rejected' }
 }

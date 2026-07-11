@@ -58,10 +58,37 @@ export function observedWorkspacePaneRouteCommitForTest(
   >,
   options: {
     observeAcceptedRoute?: (observation: WorkspacePaneNavigationObservation) => void
+    commitRoute?: PrimaryWindowNavigationActions['commitRepoBranchWorkspacePaneRoute']
   } = {},
 ): PrimaryWindowNavigationActions['commitRepoBranchWorkspacePaneRoute'] {
   const observeAcceptedRoute = options.observeAcceptedRoute ?? observeWorkspacePaneTabControllerRoute
+  const observeCommittedRoute = (
+    repoId: string,
+    branchName: string,
+    route: ParsedRepoBranchWorkspacePaneRoute | null,
+  ): void => {
+    const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute: route })
+    if (!target?.branchName) return
+    observeAcceptedRoute({
+      repoId: target.repoId,
+      repoRuntimeId: target.repoRuntimeId,
+      branchName: target.branchName,
+      worktreePath: target.worktreePath,
+      route,
+    })
+  }
+  if (options.commitRoute) {
+    return (repoId, branchName, route, commitOptions) =>
+      options.commitRoute!(repoId, branchName, route, {
+        ...commitOptions,
+        onCommit: () => {
+          commitOptions?.onCommit?.()
+          observeCommittedRoute(repoId, branchName, route)
+        },
+      })
+  }
   return (repoId, branchName, route, commitOptions) => {
+    const routeOptions = commitOptions?.replace === undefined ? undefined : { replace: commitOptions.replace }
     const accepted = openResolvedRepoBranchWorkspacePaneRoute(
       {
         openRepoBranch: navigation.showRepoBranchEmptyWorkspacePane,
@@ -71,20 +98,12 @@ export function observedWorkspacePaneRouteCommitForTest(
       repoId,
       branchName,
       route,
-      commitOptions,
+      routeOptions,
     )
     const observeIfAccepted = (didAccept: boolean): boolean => {
       if (!didAccept) return false
-      const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute: route })
-      if (target?.branchName) {
-        observeAcceptedRoute({
-          repoId: target.repoId,
-          repoRuntimeId: target.repoRuntimeId,
-          branchName: target.branchName,
-          worktreePath: target.worktreePath,
-          route,
-        })
-      }
+      commitOptions?.onCommit?.()
+      observeCommittedRoute(repoId, branchName, route)
       return true
     }
     return observeIfAccepted(accepted)

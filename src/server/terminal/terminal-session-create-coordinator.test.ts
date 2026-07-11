@@ -145,6 +145,7 @@ describe('terminal session create coordinator', () => {
 function terminalSession(terminalSessionId: string): TerminalSessionSummary {
   return {
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
+        terminalRuntimeGeneration: 1,
     terminalSessionId,
     repoRuntimeId: 'repo-runtime-test',
     repoRoot: '/repo',

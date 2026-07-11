@@ -1,40 +1,70 @@
 import { describe, expect, test } from 'vitest'
-import { normalizeRemoteRepoId } from '#/shared/remote-repo.ts'
+import path from 'node:path'
 import {
-  physicalWorktreeIdentity,
   physicalWorktreeIdentityKey,
+  type PhysicalWorktreeIdentity,
 } from '#/server/worktree-removal/physical-worktree-identity.ts'
+import {
+  parseRemotePhysicalWorktreeEndpointMarker,
+  parseRemotePhysicalWorktreeIdentity,
+} from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
 describe('physical worktree identity', () => {
-  test('collapses primary and linked local repository entries onto the worktree endpoint', () => {
-    const primary = physicalWorktreeIdentity({ repoRoot: '/repo', worktreePath: '/repo-linked' })
-    const linked = physicalWorktreeIdentity({ repoRoot: '/repo-linked', worktreePath: '/repo-linked' })
+  test('resolved local entries reached through different repo roots share a canonical path key', () => {
+    const worktreePath = path.resolve('/worktrees/feature')
+    const left: PhysicalWorktreeIdentity = {
+      kind: 'local',
+      executionNamespaceId: 'local',
+      endpoint: worktreePath,
+    }
+    const right: PhysicalWorktreeIdentity = { ...left }
 
-    expect(physicalWorktreeIdentityKey(primary)).toBe(physicalWorktreeIdentityKey(linked))
+    expect(left).toEqual({ kind: 'local', executionNamespaceId: 'local', endpoint: worktreePath })
+    expect(physicalWorktreeIdentityKey(left)).toBe(physicalWorktreeIdentityKey(right))
   })
 
-  test('collapses remote repository entries for one SSH alias and endpoint', () => {
-    const primaryRepo = normalizeRemoteRepoId({ alias: 'build-host', remotePath: '/srv/repo' })
-    const linkedRepo = normalizeRemoteRepoId({ alias: 'build-host', remotePath: '/srv/repo-linked' })
+  test('resolved remote aliases merge when namespace and canonical path match', () => {
+    const left: PhysicalWorktreeIdentity = {
+      kind: 'remote',
+      executionNamespaceId: '0123456789abcdef0123456789abcdef',
+      endpoint: '/srv/worktrees/feature',
+    }
+    const right: PhysicalWorktreeIdentity = { ...left }
 
-    expect(
-      physicalWorktreeIdentityKey(
-        physicalWorktreeIdentity({ repoRoot: primaryRepo, worktreePath: '/srv/repo-linked' }),
-      ),
-    ).toBe(
-      physicalWorktreeIdentityKey(
-        physicalWorktreeIdentity({ repoRoot: linkedRepo, worktreePath: '/srv/repo-linked' }),
-      ),
+    expect(physicalWorktreeIdentityKey(left)).toBe(physicalWorktreeIdentityKey(right))
+  })
+
+  test('remote protocol parses the non-sensitive namespace and canonical path', () => {
+    const output = remoteOutput('machine-a')
+    expect(parseRemotePhysicalWorktreeIdentity(output)).toEqual({
+      kind: 'remote',
+      executionNamespaceId: expect.stringMatching(/^[a-f0-9]{32}$/u),
+      endpoint: '/srv/worktrees/feature',
+    })
+    expect(parseRemotePhysicalWorktreeEndpointMarker(output)).toEqual({ deviceId: '10', inode: '20' })
+  })
+
+  test('different machine facts cannot collide even if a runtime token is repeated', () => {
+    const left = parseRemotePhysicalWorktreeIdentity(remoteOutput('machine-a'))
+    const right = parseRemotePhysicalWorktreeIdentity(remoteOutput('machine-b'))
+
+    expect(physicalWorktreeIdentityKey(left)).not.toBe(physicalWorktreeIdentityKey(right))
+  })
+
+  test('remote protocol rejects malformed or ambiguous output', () => {
+    expect(() => parseRemotePhysicalWorktreeIdentity('short\0machine-a\0mnt-a\0/srv/worktrees/feature\0')).toThrow(
+      'error.invalid-worktree-identity',
     )
-  })
-
-  test('keeps different SSH aliases and different endpoints independent', () => {
-    const hostA = normalizeRemoteRepoId({ alias: 'host-a', remotePath: '/srv/repo' })
-    const hostB = normalizeRemoteRepoId({ alias: 'host-b', remotePath: '/srv/repo' })
-    const key = (repoRoot: string, worktreePath: string) =>
-      physicalWorktreeIdentityKey(physicalWorktreeIdentity({ repoRoot, worktreePath }))
-
-    expect(key(hostA, '/srv/repo-linked')).not.toBe(key(hostB, '/srv/repo-linked'))
-    expect(key(hostA, '/srv/repo-linked')).not.toBe(key(hostA, '/srv/repo-other'))
+    expect(() =>
+      parseRemotePhysicalWorktreeIdentity(
+        '0123456789abcdef0123456789abcdef\0machine-a\0mnt-a\0/srv/worktrees/feature\0extra\0',
+      ),
+    ).toThrow('error.invalid-worktree-identity')
   })
 })
+
+function remoteOutput(machineFact: string): string {
+  const deviceId = '10'
+  const inode = '20'
+  return `0123456789abcdef0123456789abcdef\0${machineFact}\0mnt-a\0/srv/worktrees/feature\0${deviceId}\0${inode}\0`
+}

@@ -19,6 +19,12 @@ import {
   type WorkspacePaneTabCoordinatorTarget,
 } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
+import { commitWorkspacePaneRouteSupplement } from '#/web/workspace-pane/workspace-pane-route-supplement.ts'
+import {
+  beginPrimaryWindowPresentation,
+  primaryWindowPresentationIsCurrent,
+  type PrimaryWindowPresentationToken,
+} from '#/web/primary-window-presentation.ts'
 
 export type WorkspacePaneTabControllerRoute = RepoBranchWorkspacePaneRouteTarget
 export type WorkspacePaneTabControllerObservedRoute = ParsedRepoBranchWorkspacePaneRouteTarget
@@ -94,6 +100,7 @@ export function workspacePaneControllerRouteForTab(tab: RepoWorkspaceTab): Works
 }
 
 export interface WorkspacePaneControllerPresentationLease {
+  presentationToken: PrimaryWindowPresentationToken
   transitionId: number
   target: WorkspacePaneTabCoordinatorTarget
   fromRoute: WorkspacePaneTabControllerRoute
@@ -105,6 +112,7 @@ export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
   closingTab: RepoWorkspaceTab
   nextTab: RepoWorkspaceTab | null
   workspacePaneRoute: ParsedRepoBranchWorkspacePaneRouteTarget | undefined
+  presentationToken?: PrimaryWindowPresentationToken
 }): WorkspacePaneControllerPresentationLease | null {
   const branchName = input.target.branchName
   if (!branchName) return null
@@ -125,7 +133,13 @@ export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
     fromRoute,
     toRoute,
   })
-  return { transitionId, target, fromRoute, toRoute }
+  return {
+    presentationToken: input.presentationToken ?? beginPrimaryWindowPresentation(),
+    transitionId,
+    target,
+    fromRoute,
+    toRoute,
+  }
 }
 
 function workspacePaneTabControllerRouteFromParsed(
@@ -140,12 +154,13 @@ export async function selectWorkspacePaneControllerTab(
   tab: RepoWorkspaceTab,
   fromRoute: WorkspacePaneTabControllerObservedRoute | undefined,
   navigation: WorkspacePaneTabControllerCommitNavigation,
+  presentationToken: PrimaryWindowPresentationToken = beginPrimaryWindowPresentation(),
 ): Promise<boolean> {
   const branchName = target.branchName
   if (!branchName) return false
   const route = workspacePaneControllerRouteForTab(tab)
   if (route === undefined) return false
-  return await commitWorkspacePaneCurrentTargetRoute(target, fromRoute, route, navigation)
+  return await commitWorkspacePaneCurrentTargetRoute(target, fromRoute, route, navigation, undefined, presentationToken)
 }
 
 export function commitWorkspacePaneControllerCloseBackTarget(
@@ -180,7 +195,11 @@ export function commitWorkspacePaneControllerRoute(
   branchName: string,
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneTabControllerCommitNavigation,
-  options?: { replace?: boolean },
+  options?: {
+    replace?: boolean
+    presentationToken?: PrimaryWindowPresentationToken
+    onCommit?: () => void
+  },
 ): MaybePromise<boolean> {
   return navigation.commitRepoBranchWorkspacePaneRoute(repoId, branchName, route, options)
 }
@@ -191,7 +210,9 @@ export async function commitWorkspacePaneCurrentTargetRoute(
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneTabControllerCommitNavigation,
   options?: { replace?: boolean },
+  presentationToken: PrimaryWindowPresentationToken = beginPrimaryWindowPresentation(),
 ): Promise<boolean> {
+  if (!primaryWindowPresentationIsCurrent(presentationToken)) return false
   const branchName = target.branchName
   if (!branchName) return false
   const observedRoute = workspacePaneTabCoordinatorObservedRoute(target) ?? fromRoute
@@ -213,6 +234,7 @@ export async function commitWorkspacePaneCurrentTargetRoute(
   const sourceRoute = workspacePaneTabControllerRouteFromParsed(observedRoute)
   if (sourceRoute === undefined) return false
   const lease: WorkspacePaneControllerPresentationLease = {
+    presentationToken,
     transitionId: beginWorkspacePaneTabControllerTransition({
       ...target,
       branchName,
@@ -234,6 +256,7 @@ export async function commitWorkspacePaneControllerPresentationLease(
   const branchName = lease.target.branchName
   const observedRoute = workspacePaneTabCoordinatorObservedRoute(lease.target)
   const validLease =
+    primaryWindowPresentationIsCurrent(lease.presentationToken) &&
     !!branchName &&
     observedRoute !== undefined &&
     workspacePaneTabControllerRoutesEqual(observedRoute, lease.fromRoute) &&
@@ -243,13 +266,23 @@ export async function commitWorkspacePaneControllerPresentationLease(
     return false
   }
   let accepted = false
+  let supplementCommitted = false
   try {
     accepted = await commitWorkspacePaneControllerRoute(
       lease.target.repoId,
       branchName,
       lease.toRoute,
       navigation,
-      options,
+      {
+        ...options,
+        presentationToken: lease.presentationToken,
+        onCommit: () => {
+          supplementCommitted = commitWorkspacePaneRouteSupplement(
+            { ...lease.target, branchName },
+            lease.toRoute,
+          )
+        },
+      },
     )
   } catch {
     abortWorkspacePaneTabControllerTransition(lease.transitionId)
@@ -259,7 +292,22 @@ export async function commitWorkspacePaneControllerPresentationLease(
     abortWorkspacePaneTabControllerTransition(lease.transitionId)
     return false
   }
-  return await waitForWorkspacePaneTabCoordinatorTransition(lease.transitionId)
+  if (
+    !primaryWindowPresentationIsCurrent(lease.presentationToken) ||
+    !workspacePaneTabCoordinatorTargetIsCurrent(lease.target)
+  ) {
+    abortWorkspacePaneTabControllerTransition(lease.transitionId)
+    return false
+  }
+  const presented = await waitForWorkspacePaneTabCoordinatorTransition(lease.transitionId)
+  if (!presented) return false
+  if (
+    !primaryWindowPresentationIsCurrent(lease.presentationToken) ||
+    !workspacePaneTabCoordinatorTargetIsCurrent(lease.target)
+  ) {
+    return false
+  }
+  return supplementCommitted
 }
 
 export function workspacePaneTabControllerTargetIsCurrent(target: WorkspacePaneTabCoordinatorTarget): boolean {

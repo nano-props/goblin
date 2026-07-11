@@ -331,8 +331,9 @@ describe('workspace commands', () => {
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
     })
-    const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
-    const navigation = navigationWith({ showRepoBranchWorkspacePaneTab })
+    const navigation = navigationWith()
+    const commitRepoBranchWorkspacePaneRoute = vi.fn(navigation.commitRepoBranchWorkspacePaneRoute)
+    navigation.commitRepoBranchWorkspacePaneRoute = commitRepoBranchWorkspacePaneRoute
 
     await expect(
       runShowWorkspacePaneTabCommand({
@@ -343,8 +344,13 @@ describe('workspace commands', () => {
         navigation,
       }),
     ).resolves.toBe(true)
-    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
-    expect(preferredWorkspacePaneTab('feature/no-worktree')).toBe('terminal')
+    expect(commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
+      REPO_ID,
+      'feature/no-worktree',
+      { kind: 'static', tab: 'status' },
+      expect.objectContaining({ presentationToken: expect.any(Object) }),
+    )
+    expect(preferredWorkspacePaneTab('feature/no-worktree')).toBe('status')
   })
 
   test('terminal primary action opens the terminal tab and creates the first terminal when missing', async () => {
@@ -935,7 +941,7 @@ describe('workspace commands', () => {
       terminalEntry('term-111111111111111111111'),
       terminalEntry('term-222222222222222222222'),
     ])
-    expect(preferredWorkspacePaneTab('feature/worktree')).toBe('status')
+    expect(preferredWorkspacePaneTab('feature/worktree')).toBe('terminal')
     expect(useReposStore.getState().selectedTerminalSessionIdByTerminalWorktree[WORKTREE_KEY]).toBe(
       'term-222222222222222222222',
     )
@@ -1099,7 +1105,7 @@ describe('workspace commands', () => {
       REPO_ID,
       'feature/worktree',
       { kind: 'terminal', terminalSessionId: 'term-111111111111111111111' },
-      undefined,
+      expect.objectContaining({ presentationToken: expect.any(Object) }),
     )
 
     secondCreate.resolve('term-222222222222222222222')
@@ -1838,8 +1844,8 @@ describe('workspace commands', () => {
     await expect(showPromise).resolves.toBe(true)
     expect(openTabsFor('feature/worktree')).toEqual(['status', 'files'])
     expect(preferredWorkspacePaneTab('feature/worktree')).toBe('status')
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(1, REPO_ID, 'feature/worktree', 'files')
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'status')
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledOnce()
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'status')
   })
 
   test('select workspace pane tab command queues behind an in-flight static close on the same target', async () => {
@@ -1898,8 +1904,8 @@ describe('workspace commands', () => {
 
     await expect(closePromise).resolves.toBe(true)
     await expect(selectPromise).resolves.toBe(true)
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(1, REPO_ID, 'feature/worktree', 'files')
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'status')
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledOnce()
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'status')
   })
 
   test('tab strip select action queues behind an in-flight static close on the same target', async () => {
@@ -1958,8 +1964,8 @@ describe('workspace commands', () => {
 
     await expect(closePromise).resolves.toBe(true)
     await expect(selectPromise).resolves.toBe(true)
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(1, REPO_ID, 'feature/worktree', 'files')
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'status')
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledOnce()
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'status')
   })
 
   test('move workspace pane tab command queues behind an in-flight static close on the same target', async () => {
@@ -2018,8 +2024,8 @@ describe('workspace commands', () => {
 
     await expect(closePromise).resolves.toBe(true)
     await expect(movePromise).resolves.toBe(true)
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(1, REPO_ID, 'feature/worktree', 'files')
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'status')
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledOnce()
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'status')
   })
 
   test('new terminal command queues behind an in-flight static close on the same target', async () => {
@@ -2920,7 +2926,7 @@ test('serializes A to B to C selection until each accepted route is observed', a
   const filesObservation = observations.shift()
   if (!filesObservation) throw new Error('missing files route observation')
   observeWorkspacePaneTabControllerRoute(filesObservation)
-  await expect(selectFiles).resolves.toBe(true)
+  await expect(selectFiles).resolves.toBe(false)
   await vi.waitFor(() => expect(observations).toHaveLength(1))
   const historyObservation = observations.shift()
   if (!historyObservation) throw new Error('missing history route observation')

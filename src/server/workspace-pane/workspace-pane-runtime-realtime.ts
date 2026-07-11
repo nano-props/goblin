@@ -104,6 +104,7 @@ function outputFlushBoundaryFromResponse(
   if (!payload.ok || payload.runtimeType !== 'terminal') return null
   return {
     terminalRuntimeSessionId: payload.runtime.terminalRuntimeSessionId,
+    terminalRuntimeGeneration: payload.runtime.terminalRuntimeGeneration,
     outputEra: payload.runtime.outputEra,
     seq: payload.runtime.snapshotSeq,
   }

@@ -1,13 +1,18 @@
 import { describe, expect, test, vi } from 'vitest'
-import type { TerminalAttachResult } from '#/shared/terminal-types.ts'
+import type { TerminalSessionEnsureAttachResult } from '#/server/terminal/terminal-session-ensurer.ts'
 import {
   createPtyHandle,
   type PtyHandle,
   type PtySpawnResult,
   type PtySupervisor,
 } from '#/server/terminal/pty-supervisor.ts'
-import { TerminalSessionManager, type TerminalEventSink } from '#/server/terminal/terminal-session-manager.ts'
+import {
+  TerminalSessionManager,
+  type TerminalEnsureSessionInput,
+  type TerminalEventSink,
+} from '#/server/terminal/terminal-session-manager.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
+import { testPhysicalWorktreeCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 
 const USER_ID = 'user_terminal_session_manager'
 const CLIENT_ID = 'client_terminal_session_manager'
@@ -120,8 +125,8 @@ function ptySpawnSuccess(id: string): { ok: true; handle: PtyHandle; processName
 async function createSession(
   manager: TerminalSessionManager<string>,
   supervisor: ReturnType<typeof createDeferredPtySupervisor>,
-): Promise<Extract<TerminalAttachResult, { ok: true }>> {
-  const pending = manager.ensureSession({
+): Promise<Extract<TerminalSessionEnsureAttachResult, { ok: true }>> {
+  const pending = ensureSession(manager, {
     userId: USER_ID,
     scope: SCOPE,
     repoRoot: SCOPE,
@@ -141,12 +146,22 @@ async function createSession(
   return result
 }
 
+function ensureSession(
+  manager: TerminalSessionManager<string>,
+  input: Omit<TerminalEnsureSessionInput<string>, 'physicalWorktreeCapability'>,
+): Promise<TerminalSessionEnsureAttachResult> {
+  return manager['ensureSession']({
+    ...input,
+    physicalWorktreeCapability: testPhysicalWorktreeCapability(input.worktreePath),
+  })
+}
+
 describe('TerminalSessionManager PTY spawn ownership', () => {
   test('waits for an in-flight create spawn before reusing the same terminalSessionId', async () => {
     const supervisor = createDeferredPtySupervisor()
     const manager = createManager(supervisor)
 
-    const first = manager.ensureSession({
+    const first = ensureSession(manager, {
       userId: USER_ID,
       scope: SCOPE,
       repoRoot: SCOPE,
@@ -159,7 +174,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
       rows: 24,
       clientId: CLIENT_ID,
     })
-    const second = manager.ensureSession({
+    const second = ensureSession(manager, {
       userId: USER_ID,
       scope: SCOPE,
       repoRoot: SCOPE,
@@ -185,7 +200,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     const supervisor = createDeferredPtySupervisor()
     const manager = createManager(supervisor)
 
-    const pending = manager.ensureSession({
+    const pending = ensureSession(manager, {
       userId: USER_ID,
       scope: SCOPE,
       repoRoot: SCOPE,
@@ -285,6 +300,7 @@ describe('TerminalSessionManager PTY spawn ownership', () => {
     await expect(manager.listSessionsForUser(USER_ID, SCOPE)).resolves.toEqual([
       expect.objectContaining({
         terminalRuntimeSessionId: created.terminalRuntimeSessionId,
+        terminalRuntimeGeneration: 3,
         phase: 'error',
         message: 'new restart failed',
       }),
@@ -338,7 +354,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const onSessionClosed = vi.fn()
     const manager = createManager(supervisor, { onSessionClosed })
     const scope = terminalSessionRuntimeScope('/repo', 'repo-runtime-test')
-    const pending = manager.ensureSession({
+    const pending = ensureSession(manager, {
       userId: USER_ID,
       scope,
       repoRoot: '/repo',
@@ -378,7 +394,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const manager = createManager(supervisor, { onSessionClosed })
     const repoRoot = '/repo'
     const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
-    const pending = manager.ensureSession({
+    const pending = ensureSession(manager, {
       userId: USER_ID,
       scope,
       repoRoot,
@@ -395,13 +411,13 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const created = await pending
     if (!created.ok) throw new Error(created.message)
 
-    const quiescence = manager.closeSessionsForPhysicalWorktree(repoRoot, WORKTREE_PATH)
+    const quiescence = manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeCapability(WORKTREE_PATH))
     const directClose = manager.closeSessionForUser(USER_ID, created.terminalRuntimeSessionId)
     await Promise.resolve()
     expect(killAndWait).toHaveBeenCalledOnce()
     expect(onSessionClosed).not.toHaveBeenCalled()
     await expect(
-      manager.ensureSession({
+      ensureSession(manager, {
         userId: USER_ID,
         scope,
         repoRoot,
@@ -430,7 +446,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const linkedRepoRoot = '/repo-linked'
     const physicalWorktreePath = '/repo-linked/worktree'
     const scope = terminalSessionRuntimeScope(linkedRepoRoot, 'repo-runtime-linked')
-    const pending = manager.ensureSession({
+    const pending = ensureSession(manager, {
       userId: USER_ID,
       scope,
       repoRoot: linkedRepoRoot,
@@ -447,7 +463,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const created = await pending
     if (!created.ok) throw new Error(created.message)
 
-    await expect(manager.closeSessionsForPhysicalWorktree('/repo-primary', physicalWorktreePath)).resolves.toEqual({
+    await expect(manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeCapability(physicalWorktreePath))).resolves.toEqual({
       ok: true,
       scopes: [{ userId: USER_ID, scope }],
     })
@@ -464,7 +480,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const manager = createManager(supervisor)
     const repoRoot = '/repo'
     const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
-    const pendingCreate = manager.ensureSession({
+    const pendingCreate = ensureSession(manager, {
       userId: USER_ID,
       scope,
       repoRoot,
@@ -479,7 +495,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     })
 
     let quiesced = false
-    const quiescence = manager.closeSessionsForPhysicalWorktree(repoRoot, WORKTREE_PATH).then((result) => {
+    const quiescence = manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeCapability(WORKTREE_PATH)).then((result) => {
       quiesced = true
       return result
     })
@@ -501,7 +517,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const manager = createManager(supervisor)
     const repoRoot = '/repo'
     const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
-    const pending = manager.ensureSession({
+    const pending = ensureSession(manager, {
       userId: USER_ID,
       scope,
       repoRoot,
@@ -517,7 +533,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_quiescence_123456'))
     await pending
 
-    await expect(manager.closeSessionsForPhysicalWorktree(repoRoot, WORKTREE_PATH)).resolves.toEqual({
+    await expect(manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeCapability(WORKTREE_PATH))).resolves.toEqual({
       ok: false,
       scopes: [{ userId: USER_ID, scope }],
       message: 'PTY close timed out',
@@ -527,7 +543,91 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     ])
 
     killAndWait.mockResolvedValueOnce(undefined)
-    await expect(manager.closeSessionsForPhysicalWorktree(repoRoot, WORKTREE_PATH)).resolves.toEqual({
+    await expect(manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeCapability(WORKTREE_PATH))).resolves.toEqual({
+      ok: true,
+      scopes: [{ userId: USER_ID, scope }],
+    })
+    expect(killAndWait).toHaveBeenCalledTimes(2)
+    await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])
+  })
+
+  test('returns stale on abort while quiescence waits for late spawn retirement', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const killAcknowledged = Promise.withResolvers<void>()
+    const killAndWait = vi.fn(async () => await killAcknowledged.promise)
+    supervisor.killAndWait = killAndWait
+    const manager = createManager(supervisor)
+    const repoRoot = '/repo'
+    const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
+    const controller = new AbortController()
+    const pendingCreate = ensureSession(manager, {
+      userId: USER_ID,
+      scope,
+      repoRoot,
+      repoRuntimeId: 'repo-runtime-test',
+      branch: BRANCH_NAME,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: WORKTREE_PATH,
+      cwd: WORKTREE_PATH,
+      cols: 80,
+      rows: 24,
+      clientId: CLIENT_ID,
+      signal: controller.signal,
+    })
+
+    controller.abort()
+    await expect(pendingCreate).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
+
+    let quiesced = false
+    const quiescence = manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeCapability(WORKTREE_PATH)).then((value) => {
+      quiesced = true
+      return value
+    })
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_late_abort_123456'))
+    await vi.waitFor(() => expect(killAndWait).toHaveBeenCalledOnce())
+    expect(quiesced).toBe(false)
+
+    killAcknowledged.resolve()
+    await expect(quiescence).resolves.toEqual({ ok: true, scopes: [{ userId: USER_ID, scope }] })
+    await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([])
+  })
+
+  test('retains a late-spawn owner after the first retirement failure and retries cleanup', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const killAndWait = vi.fn(async () => {})
+    killAndWait.mockRejectedValueOnce(new Error('PTY close timed out'))
+    supervisor.killAndWait = killAndWait
+    const manager = createManager(supervisor)
+    const repoRoot = '/repo'
+    const scope = terminalSessionRuntimeScope(repoRoot, 'repo-runtime-test')
+    const controller = new AbortController()
+    const pendingCreate = ensureSession(manager, {
+      userId: USER_ID,
+      scope,
+      repoRoot,
+      repoRuntimeId: 'repo-runtime-test',
+      branch: BRANCH_NAME,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: WORKTREE_PATH,
+      cwd: WORKTREE_PATH,
+      cols: 80,
+      rows: 24,
+      clientId: CLIENT_ID,
+      signal: controller.signal,
+    })
+
+    controller.abort()
+    await expect(pendingCreate).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_late_retry_123456'))
+    await vi.waitFor(async () => {
+      await expect(manager.listSessionsForUser(USER_ID, scope)).resolves.toEqual([
+        expect.objectContaining({ phase: 'error', message: 'PTY close timed out' }),
+      ])
+    })
+    expect(killAndWait).toHaveBeenCalledOnce()
+    await Promise.resolve()
+
+    await expect(manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeCapability(WORKTREE_PATH))).resolves.toEqual({
       ok: true,
       scopes: [{ userId: USER_ID, scope }],
     })
@@ -541,7 +641,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     supervisor.killAndWait = vi.fn(async () => await termination.promise)
     const manager = createManager(supervisor)
     const scope = terminalSessionRuntimeScope('/repo', 'repo-runtime-test')
-    const pending = manager.ensureSession({
+    const pending = ensureSession(manager, {
       userId: USER_ID,
       scope,
       repoRoot: '/repo',
@@ -582,7 +682,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     supervisor.killAndWait = killAndWait
     const manager = createManager(supervisor)
     const scope = terminalSessionRuntimeScope('/repo', 'repo-runtime-test')
-    const pending = manager.ensureSession({
+    const pending = ensureSession(manager, {
       userId: USER_ID,
       scope,
       repoRoot: '/repo',
@@ -621,11 +721,42 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
 })
 
 describe('TerminalSessionManager versioned recovery projection', () => {
+  test('advances revision when a new binding keeps the default process name', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    supervisor.processName = vi.fn(() => 'terminal')
+    const manager = createManager(supervisor)
+    const scope = terminalSessionRuntimeScope('/repo', 'repo-runtime-test')
+    const pending = ensureSession(manager, {
+      userId: USER_ID,
+      scope,
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-test',
+      branch: BRANCH_NAME,
+      terminalSessionId: TERMINAL_SESSION_ID,
+      worktreePath: WORKTREE_PATH,
+      cwd: WORKTREE_PATH,
+      cols: 80,
+      rows: 24,
+      clientId: CLIENT_ID,
+    })
+    const beforeBinding = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
+    expect(beforeBinding.sessions[0]).toMatchObject({ terminalRuntimeGeneration: 0, processName: 'terminal' })
+
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_default_process_123'))
+    const created = await pending
+    if (!created.ok) throw new Error(created.message)
+    const afterBinding = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
+
+    expect(afterBinding.revision).toBeGreaterThan(beforeBinding.revision)
+    expect(created.terminalSessionsRevision).toBe(afterBinding.revision)
+    expect(afterBinding.sessions[0]).toMatchObject({ terminalRuntimeGeneration: 1, processName: 'terminal' })
+  })
+
   test('advances revision for visible session fields but not ordinary output', async () => {
     const supervisor = createDeferredPtySupervisor()
     const manager = createManager(supervisor)
     const scope = terminalSessionRuntimeScope('/repo', 'repo-runtime-test')
-    const pending = manager.ensureSession({
+    const pending = ensureSession(manager, {
       userId: USER_ID,
       scope,
       repoRoot: '/repo',
@@ -643,6 +774,7 @@ describe('TerminalSessionManager versioned recovery projection', () => {
     if (!created.ok) throw new Error(created.message)
 
     const createdSnapshot = manager.terminalSessionsSnapshotForUser(USER_ID, scope)
+    expect(created.terminalSessionsRevision).toBe(createdSnapshot.revision)
     expect(createdSnapshot.sessions).toEqual([
       expect.objectContaining({
         terminalSessionId: TERMINAL_SESSION_ID,
@@ -683,7 +815,7 @@ describe('TerminalSessionManager versioned recovery projection', () => {
     const supervisor = createDeferredPtySupervisor()
     const manager = createManager(supervisor)
     const scope = terminalSessionRuntimeScope('/repo', 'repo-runtime-test')
-    const pending = manager.ensureSession({
+    const pending = ensureSession(manager, {
       userId: USER_ID,
       scope,
       repoRoot: '/repo',
@@ -706,9 +838,37 @@ describe('TerminalSessionManager versioned recovery projection', () => {
     expect(recovery.snapshots).toEqual([
       expect.objectContaining({
         terminalRuntimeSessionId: recovery.terminalSessions.sessions[0]?.terminalRuntimeSessionId,
+        terminalRuntimeGeneration: 1,
         snapshotSeq: expect.any(Number),
         outputEra: expect.any(Number),
       }),
     ])
+  })
+})
+
+describe('TerminalSessionManager runtime binding generations', () => {
+  test('publishes the PTY binding generation on first frames and realtime events', async () => {
+    const supervisor = createDeferredPtySupervisor()
+    const onOutput = vi.fn()
+    const manager = createManager(supervisor, { onOutput })
+    const created = await createSession(manager, supervisor)
+    expect(created.terminalRuntimeGeneration).toBe(1)
+
+    supervisor.emitData('pty_initial_123456', 'first')
+    expect(onOutput).toHaveBeenLastCalledWith(
+      USER_ID,
+      expect.objectContaining({ terminalRuntimeGeneration: 1 }),
+    )
+
+    const restart = manager.restartSession(USER_ID, created.terminalRuntimeSessionId, 100, 30, CLIENT_ID)
+    await vi.waitFor(() => expect(supervisor.spawns).toHaveLength(1))
+    supervisor.spawns.shift()?.(ptySpawnSuccess('pty_generation_two_123'))
+    await expect(restart).resolves.toMatchObject({ ok: true, terminalRuntimeGeneration: 2 })
+
+    supervisor.emitData('pty_generation_two_123', 'second')
+    expect(onOutput).toHaveBeenLastCalledWith(
+      USER_ID,
+      expect.objectContaining({ terminalRuntimeGeneration: 2 }),
+    )
   })
 })

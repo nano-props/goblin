@@ -57,11 +57,14 @@ vi.mock('#/web/components/terminal/terminal-geometry.ts', () => ({
 vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
   class MockTerminalSession {
     descriptor: any
+    private readonly notify: () => void
     private terminalRuntimeSessionId: string | null = null
+    private terminalRuntimeGeneration: number | null = null
     private snapshotState: any = { phase: 'opening', message: null, processName: 'terminal', canonicalTitle: null }
 
-    constructor(descriptor: any) {
+    constructor(descriptor: any, notify: () => void) {
       this.descriptor = descriptor
+      this.notify = notify
     }
 
     updateDescriptor(descriptor: any): void {
@@ -101,11 +104,45 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
     currentTerminalRuntimeSessionId(): string | null {
       return this.terminalRuntimeSessionId
     }
+    currentRuntimeBinding() {
+      return this.terminalRuntimeSessionId && this.terminalRuntimeGeneration !== null
+        ? {
+            terminalRuntimeSessionId: this.terminalRuntimeSessionId,
+            terminalRuntimeGeneration: this.terminalRuntimeGeneration,
+          }
+        : null
+    }
+    addressableRuntimeBinding() {
+      return this.currentRuntimeBinding()
+    }
+    pendingAuthoritativeRuntimeBinding() {
+      return null
+    }
+    commitPendingAuthoritativeHydration(): boolean {
+      return false
+    }
+    classifyRuntimeBinding(binding: { terminalRuntimeSessionId: string; terminalRuntimeGeneration: number }) {
+      const current = this.currentRuntimeBinding()
+      if (!current) return 'future'
+      if (
+        current.terminalRuntimeSessionId === binding.terminalRuntimeSessionId &&
+        current.terminalRuntimeGeneration === binding.terminalRuntimeGeneration
+      ) return 'active'
+      if (
+        current.terminalRuntimeSessionId === binding.terminalRuntimeSessionId &&
+        binding.terminalRuntimeGeneration > current.terminalRuntimeGeneration
+      ) return 'future'
+      return 'foreign'
+    }
+    isVisible(): boolean {
+      return false
+    }
     snapshot() {
       return this.snapshotState
     }
     hydrate(input: any): void {
       this.terminalRuntimeSessionId = input.terminalRuntimeSessionId
+      this.terminalRuntimeGeneration = input.terminalRuntimeGeneration
       this.snapshotState = {
         phase: 'open',
         message: null,
@@ -120,6 +157,7 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
           canonicalRows: input.canonicalRows,
         },
       }
+      this.notify()
     }
   }
 
@@ -178,7 +216,9 @@ function makeCreateResult(overrides: Partial<TerminalCreateSuccess> = {}): Termi
     ok: true as const,
     action: 'created' as const,
     terminalSessionId: 'term-111111111111111111111',
+    terminalSessionsRevision: 11,
     terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
     processName: 'zsh',
     canonicalTitle: null,
     phase: 'open' as const,
@@ -305,7 +345,7 @@ describe('TerminalSessionProjection create flow', () => {
     })
   })
 
-  test('applies create as a partial effect without weakening the full snapshot revision gate', async () => {
+  test('advances the projection revision with create so a late same-base snapshot cannot evict it', async () => {
     projection.reconcileServerSessionsSnapshot(
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
       { revision: 10, sessions: [] },
@@ -318,7 +358,7 @@ describe('TerminalSessionProjection create flow', () => {
     expect(
       projection.reconcileServerSessionsSnapshot(
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
-        { revision: 9, sessions: [] },
+        { revision: 10, sessions: [] },
         'client_local',
       ),
     ).toBe(false)
@@ -518,7 +558,7 @@ describe('TerminalSessionProjection create flow', () => {
     },
   )
 
-  test('queues a different startup shell command behind an in-flight create for the same worktree', async () => {
+  test('keeps admission-time geometry for a different command queued behind an in-flight create', async () => {
     const first = Promise.withResolvers<ReturnType<typeof makeCreateResult>>()
     const secondResult = makeCreateResult({
       terminalSessionId: 'term-222222222222222222222',
@@ -531,6 +571,8 @@ describe('TerminalSessionProjection create flow', () => {
     await vi.waitFor(() => expect(mocks.createMock).toHaveBeenCalledTimes(1))
 
     const secondCreate = projection.createTerminal(terminalBase(), { startupShellCommand: "bat '/repo/b.ts'\r" })
+    // The second queue entry captures default geometry now. The first result
+    // later materializes a 101x31 attachment, but must not rewrite this fact.
     await Promise.resolve()
     expect(mocks.createMock).toHaveBeenCalledTimes(1)
 
@@ -864,6 +906,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
     })
 
@@ -882,6 +925,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
     })
 
@@ -897,6 +941,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_missing_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
     })
 
@@ -907,6 +952,7 @@ describe('TerminalSessionProjection create flow', () => {
     for (let index = 0; index < 100; index += 1) {
       projection.handleServerBell({
         terminalRuntimeSessionId: `pty_session_${index}_aaaaaaaaa`,
+        terminalRuntimeGeneration: 1,
         terminalSessionId: `term-${String(index).padStart(21, '0')}`,
         repoRoot: REPO_ROOT,
         worktreePath: WORKTREE_PATH,
@@ -931,6 +977,7 @@ describe('TerminalSessionProjection create flow', () => {
   test('clears pending server bell when an unknown session is closed', () => {
     projection.handleServerBell({
       terminalRuntimeSessionId: 'pty_session_unknown_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-unknownunknownunknown',
       repoRoot: REPO_ROOT,
       worktreePath: WORKTREE_PATH,
@@ -946,11 +993,13 @@ describe('TerminalSessionProjection create flow', () => {
       expect.objectContaining({
         terminalSessionId: 'term-unknownunknownunknown',
         terminalRuntimeSessionId: 'pty_session_unknown_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
       }),
     )
 
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_unknown_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-unknownunknownunknown',
     })
 
@@ -958,6 +1007,7 @@ describe('TerminalSessionProjection create flow', () => {
       expect.objectContaining({
         terminalSessionId: 'term-unknownunknownunknown',
         terminalRuntimeSessionId: 'pty_session_unknown_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
       }),
     )
   })
@@ -965,6 +1015,7 @@ describe('TerminalSessionProjection create flow', () => {
   test('keeps a pending server bell when a stale runtime close arrives', () => {
     projection.handleServerBell({
       terminalRuntimeSessionId: 'pty_session_current_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-unknownunknownunknown',
       repoRoot: REPO_ROOT,
       worktreePath: WORKTREE_PATH,
@@ -974,6 +1025,7 @@ describe('TerminalSessionProjection create flow', () => {
 
     projection.handleSessionClosed({
       terminalRuntimeSessionId: 'pty_session_stale_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-unknownunknownunknown',
     })
 
@@ -1060,7 +1112,11 @@ describe('TerminalSessionProjection create flow', () => {
     try {
       expect(projection.repoBellCount(REPO_ROOT)).toBe(1)
 
-      projection.handleSessionClosed({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa', terminalSessionId })
+      projection.handleSessionClosed({
+        terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+        terminalSessionId,
+      })
 
       expect(projection.repoBellCount(REPO_ROOT)).toBe(0)
       expect(listener).toHaveBeenCalledTimes(1)

@@ -293,6 +293,7 @@ export function installWorkspacePaneTabsTestBridge(
       takeover: async () => ({
         ok: true as const,
         terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         role: 'controller' as const,
         controllerStatus: 'connected' as const,
         controller: { clientId: 'attachment_local', status: 'connected' as const },
@@ -305,7 +306,9 @@ export function installWorkspacePaneTabsTestBridge(
         ok: true as const,
         action: 'created' as const,
         terminalSessionId: 'term-testtesttesttesttest1',
+        terminalSessionsRevision: 1,
         terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         snapshot: '',
         snapshotSeq: 0,
         outputEra: 0,
@@ -386,7 +389,9 @@ export function installWorkspacePaneTabsTestBridge(
             ok: true,
             action: 'created',
             terminalSessionId,
+            terminalSessionsRevision: 1,
             terminalRuntimeSessionId,
+    terminalRuntimeGeneration: 1,
             snapshot: '',
             snapshotSeq: 0,
             outputEra: 0,
@@ -417,6 +422,7 @@ export function installWorkspacePaneTabsTestBridge(
             action: wasOpen ? ('closed' as const) : ('already-closed' as const),
             terminalSessionId: input.sessionId,
             terminalRuntimeSessionId: wasOpen ? 'pty_test_aaaaaaaaa' : null,
+            terminalRuntimeGeneration: wasOpen ? 1 : null,
           },
           workspacePaneTabs: commitServerSnapshot(),
         }
@@ -567,7 +573,13 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
             Promise.resolve({
               ok: true as const,
               terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
+              terminalRuntimeGeneration: 1,
+              role: 'controller' as const,
+              controllerStatus: 'connected' as const,
               controller: { clientId: 'attachment_local', status: 'connected' as const },
+              canonicalCols: 80,
+              canonicalRows: 24,
+              phase: 'open' as const,
             }),
           close: () => Promise.resolve(true),
           pruneTerminals: () => Promise.resolve({ pruned: 0, remaining: 0 }),
@@ -661,6 +673,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return {
             ok: true as const,
             terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
             role: 'controller' as const,
             controllerStatus: 'connected' as const,
             controller: { clientId: 'attachment_local', status: 'connected' as const },
@@ -711,7 +724,12 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return {
             ok: true,
             runtimeType,
-            runtime: { action: 'closed', terminalSessionId, terminalRuntimeSessionId: 'pty_test_aaaaaaaaa' },
+            runtime: {
+              action: 'closed',
+              terminalSessionId,
+              terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
+              terminalRuntimeGeneration: 1,
+            },
             workspacePaneTabs: { revision: 1, entries: [] },
           }
         }

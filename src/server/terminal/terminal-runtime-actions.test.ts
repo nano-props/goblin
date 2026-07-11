@@ -3,6 +3,9 @@
 import { describe, expect, test, vi } from 'vitest'
 import { clearRepoRuntimesForUser, openRepoRuntime } from '#/server/modules/repo-runtimes.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
+import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
+import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
+import { testPhysicalWorktreeCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 
 const CLIENT_ID = 'client_terminal_actions'
 // Identity is userId-keyed under method 2: the runtime derives
@@ -21,16 +24,21 @@ function makeActions(
     closeSessionForUser: (userId: string, terminalRuntimeSessionId: string) => boolean | Promise<boolean>
     getSlotScope?: (userId: string, terminalRuntimeSessionId: string) => string | undefined
     isValidTerminalClientId?: (value: unknown) => value is string
-    removalAdmitted?: boolean
+    physicalWorktreeCapability?: ReturnType<typeof testPhysicalWorktreeCapability>
+    worktreeOperations?: ReturnType<typeof createPhysicalWorktreeOperationCoordinator>
     broadcasts?: ReturnType<typeof vi.fn>
   } = { closeSessionForUser: () => false },
 ) {
   const broadcasts = options.broadcasts ?? vi.fn()
+  const physicalWorktreeCapability =
+    options.physicalWorktreeCapability ?? testPhysicalWorktreeCapability(REPO_ROOT)
+  const worktreeOperations = options.worktreeOperations ?? createPhysicalWorktreeOperationCoordinator()
   const manager = {
     getSessionSummaryForUser: vi.fn((userId: string, terminalRuntimeSessionId: string) =>
       options.getSlotScope?.(userId, terminalRuntimeSessionId)
-        ? ({
+          ? ({
             terminalRuntimeSessionId,
+            terminalRuntimeGeneration: 1,
             terminalSessionId: 'term-111111111111111111111',
             repoRuntimeId: REPO_RUNTIME_ID,
             repoRoot: options.getSlotScope(userId, terminalRuntimeSessionId),
@@ -51,6 +59,7 @@ function makeActions(
       async (userId: string, terminalRuntimeSessionId: string) =>
         await options.closeSessionForUser(userId, terminalRuntimeSessionId),
     ),
+    getPhysicalWorktreeCapabilityForUser: vi.fn(() => physicalWorktreeCapability),
     // The other manager methods are unused by `close`, but the
     // `TerminalSessionManager` type is required by the deps
     // interface. Stub them with `vi.fn()` so TypeScript stays happy.
@@ -67,7 +76,7 @@ function makeActions(
   } as any
   const broker = { broadcastToUser: broadcasts as unknown as (userId: string, message: unknown) => void }
   const sessionService = {
-    create: vi.fn(),
+    createAdmitted: vi.fn(),
     prune: vi.fn(),
     listSessions: vi.fn(),
     listWorkspaceTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
@@ -82,11 +91,12 @@ function makeActions(
       broker,
       sessionService,
       isValidTerminalClientId,
-      worktreeOperations: { isRemovalAdmitted: () => options.removalAdmitted ?? false },
+      worktreeOperations,
     }),
     broadcasts,
     manager,
     sessionService,
+    worktreeOperations,
   }
 }
 
@@ -98,12 +108,14 @@ describe('terminal-runtime-actions close broadcast', () => {
   test('does not emit workspace tab invalidation after a successful create', async () => {
     clearRepoRuntimesForUser(USER_ID)
     syncCurrentRepoRuntime()
-    const { actions, broadcasts, sessionService } = makeActions()
-    sessionService.create.mockResolvedValue({
+    const { broadcasts, sessionService } = makeActions()
+    sessionService.createAdmitted.mockResolvedValue({
       ok: true,
       action: 'created',
       terminalSessionId: 'term-111111111111111111111',
+      terminalSessionsRevision: 1,
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,
+        terminalRuntimeGeneration: 1,
       processName: 'zsh',
       canonicalTitle: null,
       phase: 'open',
@@ -116,15 +128,24 @@ describe('terminal-runtime-actions close broadcast', () => {
       canonicalRows: 24,
     })
 
+    const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
+    const provider = createTerminalSessionCreateProvider({ sessionService, worktreeOperations })
+    const physicalWorktreeCapability = testPhysicalWorktreeCapability('/repo', {
+      userId: USER_ID,
+      repoRoot: '/repo',
+      repoRuntimeId: REPO_RUNTIME_ID,
+    })
     await expect(
-      actions.create(CLIENT_ID, USER_ID, {
+      worktreeOperations.runOperation(physicalWorktreeCapability, async (permit) =>
+        await provider.createAdmitted(CLIENT_ID, USER_ID, {
         repoRoot: '/repo',
         repoRuntimeId: REPO_RUNTIME_ID,
         branch: 'feature/worktree',
         worktreePath: '/repo',
         kind: 'additional',
-      }),
-    ).resolves.toMatchObject({ ok: true })
+        }, { physicalWorktreeCapability, permit }),
+      ),
+    ).resolves.toMatchObject({ admitted: true, value: { ok: true } })
 
     expect(broadcasts).not.toHaveBeenCalled()
   })
@@ -132,37 +153,62 @@ describe('terminal-runtime-actions close broadcast', () => {
   test('does not emit workspace tab invalidation after a failed create', async () => {
     clearRepoRuntimesForUser(USER_ID)
     syncCurrentRepoRuntime()
-    const { actions, broadcasts, sessionService } = makeActions()
-    sessionService.create.mockResolvedValue({ ok: false, message: 'error.invalid-arguments' })
+    const { broadcasts, sessionService } = makeActions()
+    sessionService.createAdmitted.mockResolvedValue({ ok: false, message: 'error.invalid-arguments' })
 
+    const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
+    const provider = createTerminalSessionCreateProvider({ sessionService, worktreeOperations })
+    const physicalWorktreeCapability = testPhysicalWorktreeCapability('/repo', {
+      userId: USER_ID,
+      repoRoot: '/repo',
+      repoRuntimeId: REPO_RUNTIME_ID,
+    })
     await expect(
-      actions.create(CLIENT_ID, USER_ID, {
+      worktreeOperations.runOperation(physicalWorktreeCapability, async (permit) =>
+        await provider.createAdmitted(CLIENT_ID, USER_ID, {
         repoRoot: '/repo',
         repoRuntimeId: REPO_RUNTIME_ID,
         branch: 'feature/worktree',
         worktreePath: '/repo',
         kind: 'additional',
-      }),
-    ).resolves.toEqual({ ok: false, message: 'error.invalid-arguments' })
+        }, { physicalWorktreeCapability, permit }),
+      ),
+    ).resolves.toEqual({
+      admitted: true,
+      value: { ok: false, message: 'error.invalid-arguments' },
+    })
 
     expect(broadcasts).not.toHaveBeenCalled()
   })
 
-  test('rejects invalid create input before checking repo runtime freshness', async () => {
+  test('does not emit workspace tab invalidation when admitted create validation fails', async () => {
     clearRepoRuntimesForUser(USER_ID)
-    const { actions, broadcasts, sessionService } = makeActions()
+    const { broadcasts, sessionService } = makeActions()
+    sessionService.createAdmitted.mockResolvedValue({ ok: false, message: 'error.invalid-arguments' })
 
+    const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
+    const provider = createTerminalSessionCreateProvider({ sessionService, worktreeOperations })
+    const physicalWorktreeCapability = testPhysicalWorktreeCapability('/repo', {
+      userId: USER_ID,
+      repoRoot: '',
+      repoRuntimeId: 'repo-runtime-stale',
+    })
     await expect(
-      actions.create(CLIENT_ID, USER_ID, {
+      worktreeOperations.runOperation(physicalWorktreeCapability, async (permit) =>
+        await provider.createAdmitted(CLIENT_ID, USER_ID, {
         repoRoot: '',
         repoRuntimeId: 'repo-runtime-stale',
         branch: 'feature/worktree',
         worktreePath: '/repo',
         kind: 'additional',
-      }),
-    ).resolves.toEqual({ ok: false, message: 'error.invalid-arguments' })
+        }, { physicalWorktreeCapability, permit }),
+      ),
+    ).resolves.toEqual({
+      admitted: true,
+      value: { ok: false, message: 'error.invalid-arguments' },
+    })
 
-    expect(sessionService.create).not.toHaveBeenCalled()
+    expect(sessionService.createAdmitted).toHaveBeenCalledOnce()
     expect(broadcasts).not.toHaveBeenCalled()
   })
 
@@ -184,6 +230,7 @@ describe('terminal-runtime-actions close broadcast', () => {
     expect(broadcasts).toHaveBeenCalledWith(USER_ID, {
       type: 'session-closed',
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,
+        terminalRuntimeGeneration: 1,
       terminalSessionId: 'term-111111111111111111111',
       repoRoot: '/repo',
       worktreePath: '/repo',
@@ -352,7 +399,14 @@ describe('terminal-runtime-actions clientId gate', () => {
     expect(manager.writeSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 'x', CLIENT_ID)
     expect(manager.resizeSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 80, 24, CLIENT_ID)
     expect(manager.takeoverSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 80, 24, CLIENT_ID)
-    expect(manager.restartSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 80, 24, CLIENT_ID)
+    expect(manager.restartSession).toHaveBeenCalledWith(
+      USER_ID,
+      RUNTIME_SESSION_ID,
+      80,
+      24,
+      CLIENT_ID,
+      expect.any(AbortSignal),
+    )
     expect(manager.attachSession).toHaveBeenCalledWith(USER_ID, RUNTIME_SESSION_ID, 80, 24, CLIENT_ID)
   })
 
@@ -392,11 +446,21 @@ describe('terminal-runtime-actions clientId gate', () => {
   })
 
   test('restart cannot spawn a replacement PTY while physical worktree removal is admitted', async () => {
+    const physicalWorktreeCapability = testPhysicalWorktreeCapability(REPO_ROOT)
+    const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
     const { actions, manager } = makeActions({
       closeSessionForUser: () => false,
       getSlotScope: () => REPO_ROOT,
-      removalAdmitted: true,
+      physicalWorktreeCapability,
+      worktreeOperations,
     })
+    const releaseRemoval = Promise.withResolvers<void>()
+    const removalStarted = Promise.withResolvers<void>()
+    const removal = worktreeOperations.runRemoval(physicalWorktreeCapability, async () => {
+      removalStarted.resolve()
+      await releaseRemoval.promise
+    })
+    await removalStarted.promise
 
     await expect(
       actions.restart(CLIENT_ID, USER_ID, {
@@ -406,5 +470,35 @@ describe('terminal-runtime-actions clientId gate', () => {
       } as never),
     ).resolves.toEqual({ ok: false, message: 'error.worktree-removal-in-progress' })
     expect(manager.restartSession).not.toHaveBeenCalled()
+    releaseRemoval.resolve()
+    await removal
+  })
+
+  test('removal waits for an admitted restart operation to settle', async () => {
+    const physicalWorktreeCapability = testPhysicalWorktreeCapability(REPO_ROOT)
+    const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
+    const { actions, manager } = makeActions({
+      closeSessionForUser: () => false,
+      getSlotScope: () => REPO_ROOT,
+      physicalWorktreeCapability,
+      worktreeOperations,
+    })
+    const restartResult = Promise.withResolvers<{ ok: false; message: string }>()
+    manager.restartSession.mockImplementation(async () => await restartResult.promise)
+    const restart = actions.restart(CLIENT_ID, USER_ID, {
+      terminalRuntimeSessionId: RUNTIME_SESSION_ID,
+      cols: 80,
+      rows: 24,
+    } as never)
+    await vi.waitFor(() => expect(manager.restartSession).toHaveBeenCalledOnce())
+    const removalTask = vi.fn(async () => undefined)
+    const removal = worktreeOperations.runRemoval(physicalWorktreeCapability, removalTask)
+    await Promise.resolve()
+    expect(removalTask).not.toHaveBeenCalled()
+
+    restartResult.resolve({ ok: false, message: 'restart stopped' })
+    await expect(restart).resolves.toEqual({ ok: false, message: 'restart stopped' })
+    await expect(removal).resolves.toEqual({ admitted: true, value: undefined })
+    expect(removalTask).toHaveBeenCalledOnce()
   })
 })

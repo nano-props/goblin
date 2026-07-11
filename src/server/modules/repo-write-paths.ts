@@ -8,7 +8,13 @@ import {
   settleRepoServerOperation,
   startRepoServerOperation,
 } from '#/server/modules/repo-operation-registry.ts'
-import { resolveRepoSource, runWithRepoSource, type RepoMutationResult } from '#/server/modules/repo-source.ts'
+import {
+  resolveRepoSource,
+  runWithCapturedRepoSource,
+  runWithRepoSource,
+  type RepoMutationResult,
+} from '#/server/modules/repo-source.ts'
+import type { PhysicalWorktreeCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import {
   abortRepoWriteNetworkOperation,
   enqueueRepoWriteOperation,
@@ -394,13 +400,49 @@ export async function removeRepoWorktree(
   lifecycle: RepoWorktreeRemovalLifecycle,
   signal?: AbortSignal,
 ): Promise<ExecResult> {
+  return await removeRepoWorktreeWithBinding(cwd, input, lifecycle, signal, null)
+}
+
+export async function removeCapturedRepoWorktree(
+  cwd: string,
+  input: {
+    branch: string
+    worktreePath: string
+    alsoDeleteBranch: boolean
+    forceDeleteBranch?: boolean
+    alsoDeleteUpstream?: boolean
+  },
+  lifecycle: RepoWorktreeRemovalLifecycle,
+  physicalWorktreeCapability: PhysicalWorktreeCapability,
+  signal?: AbortSignal,
+): Promise<ExecResult> {
+  return await removeRepoWorktreeWithBinding(cwd, input, lifecycle, signal, physicalWorktreeCapability)
+}
+
+async function removeRepoWorktreeWithBinding(
+  cwd: string,
+  input: {
+    branch: string
+    worktreePath: string
+    alsoDeleteBranch: boolean
+    forceDeleteBranch?: boolean
+    alsoDeleteUpstream?: boolean
+  },
+  lifecycle: RepoWorktreeRemovalLifecycle,
+  signal: AbortSignal | undefined,
+  physicalWorktreeCapability: PhysicalWorktreeCapability | null,
+): Promise<ExecResult> {
   return await runRepoServerWriteOperation({
     repoId: cwd,
     kind: 'remove-worktree',
     target: { branch: input.branch, worktreePath: input.worktreePath },
     signal,
     task: async () => {
-      return await runWithRepoSource(cwd, async (source) => {
+      const runWithSource = physicalWorktreeCapability
+        ? async <T>(task: Parameters<typeof runWithRepoSource<T>>[1]) =>
+            await runWithCapturedRepoSource(cwd, physicalWorktreeCapability, task)
+        : async <T>(task: Parameters<typeof runWithRepoSource<T>>[1]) => await runWithRepoSource(cwd, task)
+      return await runWithSource(async (source) => {
         const mutation = await source.removeWorktree(input, signal, lifecycle)
         const result = await publishSnapshotInvalidationAfterMutation(cwd, mutation)
         if (!mutation.ok && !mutation.repoChanged) return result

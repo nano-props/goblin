@@ -25,6 +25,24 @@ import type { PtyHandle, PtySupervisor } from '#/server/terminal/pty-supervisor.
 const ptyLifecycleLogger = serverLogger.child({ module: 'terminal-session-pty-lifecycle' })
 
 type TerminalPtySpawnOutcome = { ok: true } | { ok: false; message: string }
+type PtySupervisorSpawnResult = Awaited<ReturnType<PtySupervisor['spawn']>>
+
+interface PendingSpawnOwnership {
+  completion: Promise<void>
+  failed: boolean
+  failure: unknown
+  releaseConsumer(): void
+}
+
+interface AbortablePtySpawn {
+  result: Promise<PtySupervisorSpawnResult>
+  ownership: Promise<void>
+}
+
+interface RetiringPtyOwnership {
+  handle: PtyHandle
+  attempt: Promise<void> | null
+}
 
 export interface TerminalPtySpawnResult {
   generation: number
@@ -44,6 +62,7 @@ export interface TerminalPtySessionState<TUser extends string | number = string 
   render: TerminalRenderState
   phase: TerminalSessionPhase
   message: string | null
+  terminalRuntimeGeneration: number
 }
 
 export interface TerminalPtyBindingEvents<TSession extends TerminalPtySessionState> {
@@ -55,7 +74,10 @@ export interface TerminalPtyBindingEvents<TSession extends TerminalPtySessionSta
     event: Omit<TerminalBellRealtimeEvent, 'terminalSessionId' | 'repoRoot' | 'worktreePath'>,
   ): void
   emitTitle(session: TSession, event: Omit<TerminalTitleEvent, 'terminalSessionId' | 'repoRoot' | 'worktreePath'>): void
-  emitExit(session: TSession, event: Omit<TerminalExitEvent, 'terminalSessionId'>): void
+  emitExit(
+    session: TSession,
+    event: Omit<TerminalExitEvent, 'terminalSessionId' | 'repoRoot' | 'repoRuntimeId'>,
+  ): void
   closeSession(terminalRuntimeSessionId: string): void
 }
 
@@ -68,11 +90,11 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
   private inputFlushScheduled = false
   private spawnGeneration = 0
   private pendingSpawn: Promise<TerminalPtySpawnResult> | null = null
-  private readonly pendingSpawns = new Set<Promise<TerminalPtySpawnResult>>()
+  private readonly pendingSpawns = new Set<PendingSpawnOwnership>()
   // Every handle whose exit has not yet been confirmed remains owned here.
   // Reset/restart may detach it from the active binding, but only a successful
   // supervisor `killAndWait` can release the retirement obligation.
-  private readonly retiringHandles = new Map<string, PtyHandle>()
+  private readonly retiringHandles = new Map<string, RetiringPtyOwnership>()
 
   constructor(supervisor: PtySupervisor, events: TerminalPtyBindingEvents<TSession>) {
     this.supervisor = supervisor
@@ -87,11 +109,15 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     return this.handle ? this.supervisor.processName(this.handle) : 'terminal'
   }
 
-  async spawn(session: TSession): Promise<TerminalPtySpawnResult> {
+  generation(): number {
+    return this.spawnGeneration
+  }
+
+  async spawn(session: TSession, signal?: AbortSignal): Promise<TerminalPtySpawnResult> {
     // This pending promise covers only PTY spawn/bind ownership. The
     // manager builds attach first-frame results after a successful bind.
     const generation = this.beginSpawn()
-    const spawn = this.resolveSpawn(session, generation)
+    const spawn = this.resolveSpawn(session, generation, signal)
     return await this.trackPendingSpawn(spawn)
   }
 
@@ -100,22 +126,51 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     cols: number,
     rows: number,
     phase: 'opening' | 'restarting' = 'restarting',
+    signal?: AbortSignal,
   ): Promise<TerminalPtySpawnResult> {
     const generation = this.beginSpawn()
     const olderSpawns = Array.from(this.pendingSpawns)
-    const spawn = this.resolveReplacement(session, generation, olderSpawns, cols, rows, phase)
+    const spawn = this.resolveReplacement(session, generation, olderSpawns, cols, rows, phase, signal)
     return await this.trackPendingSpawn(spawn)
   }
 
   private async trackPendingSpawn(spawn: Promise<TerminalPtySpawnResult>): Promise<TerminalPtySpawnResult> {
     this.pendingSpawn = spawn
-    this.pendingSpawns.add(spawn)
     try {
       return await spawn
     } finally {
-      this.pendingSpawns.delete(spawn)
       if (this.pendingSpawn === spawn) this.pendingSpawn = null
     }
+  }
+
+  private trackSpawnOwnership(ownership: Promise<void>): PendingSpawnOwnership {
+    const consumer = Promise.withResolvers<void>()
+    const pending: PendingSpawnOwnership = {
+      completion: Promise.resolve(),
+      failed: false,
+      failure: undefined,
+      releaseConsumer: () => consumer.resolve(),
+    }
+    pending.completion = Promise.all([
+      ownership.catch((error: unknown) => {
+        pending.failed = true
+        pending.failure = error
+      }),
+      consumer.promise,
+    ]).then(() => {
+      if (!pending.failed) this.pendingSpawns.delete(pending)
+    })
+    this.pendingSpawns.add(pending)
+    return pending
+  }
+
+  private async drainPendingSpawns(
+    pendingSpawns: readonly PendingSpawnOwnership[] = Array.from(this.pendingSpawns),
+  ): Promise<void> {
+    await Promise.all(pendingSpawns.map(async (pending) => await pending.completion))
+    for (const pending of pendingSpawns) this.pendingSpawns.delete(pending)
+    const failed = pendingSpawns.find((pending) => pending.failed)
+    if (failed) throw failed.failure
   }
 
   async waitForPendingSpawn(session: TSession): Promise<{ ok: false; message: string } | null> {
@@ -136,14 +191,15 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
   private async resolveReplacement(
     session: TSession,
     generation: number,
-    olderSpawns: readonly Promise<TerminalPtySpawnResult>[],
+    olderSpawns: readonly PendingSpawnOwnership[],
     cols: number,
     rows: number,
     phase: 'opening' | 'restarting' = 'opening',
+    signal?: AbortSignal,
   ): Promise<TerminalPtySpawnResult> {
     this.beginRetirement(session)
     try {
-      await Promise.all(olderSpawns)
+      await this.drainPendingSpawns(olderSpawns)
       await this.drainRetiringHandles()
     } catch (error) {
       if (!this.isCurrentSpawn(session, generation)) return this.staleSpawnResult(generation)
@@ -153,13 +209,14 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
       })
     }
     if (!this.isCurrentSpawn(session, generation)) return this.staleSpawnResult(generation)
+    session.terminalRuntimeGeneration = generation
     session.cols = cols
     session.rows = rows
     const phaseChanged =
       phase === 'restarting' ? markTerminalSessionRestarting(session) : markTerminalSessionOpening(session)
     resetRender(session.render, cols, rows)
     if (phaseChanged) this.events.emitLifecycle(session)
-    return await this.resolveSpawn(session, generation)
+    return await this.resolveSpawn(session, generation, signal)
   }
 
   invalidateOwnership(): void {
@@ -171,7 +228,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
   }
 
   async disposeAndWait(session: TSession): Promise<void> {
-    while (this.pendingSpawns.size > 0) await Promise.all(Array.from(this.pendingSpawns))
+    while (this.pendingSpawns.size > 0) await this.drainPendingSpawns()
     this.beginRetirement(session)
     await this.drainRetiringHandles()
     disposeRender(session.render)
@@ -199,13 +256,17 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     return true
   }
 
-  private async resolveSpawn(session: TSession, generation: number): Promise<TerminalPtySpawnResult> {
+  private async resolveSpawn(
+    session: TSession,
+    generation: number,
+    signal?: AbortSignal,
+  ): Promise<TerminalPtySpawnResult> {
     // Failure handling stays with the caller:
     // - create failures remove the just-created session from manager maps;
     // - restart failures keep the session addressable for a later retry.
-    let resolved: { ok: true; handle: PtyHandle; processName: string } | { ok: false; message: string }
+    let spawn: AbortablePtySpawn
     try {
-      resolved = await this.supervisor.spawn({
+      spawn = abortablePtySpawn(this.supervisor, {
         command: session.command,
         args: session.args,
         startupShellCommand: session.startupShellCommand,
@@ -213,27 +274,42 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
         cols: session.cols,
         rows: session.rows,
         env: session.env,
-      })
+      }, signal, async (handle) => await this.killStalePtyHandle(handle))
     } catch (err) {
       const message = err instanceof Error ? err.message : 'error.unknown'
       return this.isCurrentSpawn(session, generation)
         ? this.spawnResult(generation, { ok: false, message })
         : this.staleSpawnResult(generation)
     }
-    if (!resolved.ok) {
-      if (!this.isCurrentSpawn(session, generation)) return this.staleSpawnResult(generation)
-      return this.spawnResult(generation, resolved)
+    const ownership = this.trackSpawnOwnership(spawn.ownership)
+    try {
+      let resolved: PtySupervisorSpawnResult
+      try {
+        resolved = await spawn.result
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'error.unknown'
+        return this.isCurrentSpawn(session, generation)
+          ? this.spawnResult(generation, { ok: false, message })
+          : this.staleSpawnResult(generation)
+      }
+      if (!resolved.ok) {
+        if (!this.isCurrentSpawn(session, generation)) return this.staleSpawnResult(generation)
+        return this.spawnResult(generation, resolved)
+      }
+      if (!this.isCurrentSpawn(session, generation)) {
+        await this.killStalePtyHandle(resolved.handle)
+        return this.staleSpawnResult(generation)
+      }
+      this.bindHandle(session, generation, resolved.handle)
+      return this.spawnResult(generation, { ok: true })
+    } finally {
+      ownership.releaseConsumer()
     }
-    if (!this.isCurrentSpawn(session, generation)) {
-      await this.killStalePtyHandle(session.id, resolved.handle)
-      return this.staleSpawnResult(generation)
-    }
-    this.bindHandle(session, generation, resolved.handle)
-    return this.spawnResult(generation, { ok: true })
   }
 
   private bindHandle(session: TSession, generation: number, handle: PtyHandle): void {
     this.handle = handle
+    session.terminalRuntimeGeneration = generation
     let lastBroadcastTitle: string | null = session.render.title
     let lastProcessName: string = this.supervisor.processName(handle)
     this.disposables.push(
@@ -268,6 +344,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
             lastBroadcastTitle = null
             this.events.emitTitle(session, {
               terminalRuntimeSessionId: session.id,
+            terminalRuntimeGeneration: generation,
               canonicalTitle: null,
             })
           }
@@ -281,6 +358,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
               lastBroadcastTitle = eventCanonicalTitle
               this.events.emitTitle(session, {
                 terminalRuntimeSessionId: session.id,
+            terminalRuntimeGeneration: generation,
                 canonicalTitle: eventCanonicalTitle,
               })
             }
@@ -288,12 +366,14 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
           }
           this.events.emitBell(session, {
             terminalRuntimeSessionId: session.id,
+            terminalRuntimeGeneration: generation,
             processName: processNameAfterData,
             canonicalTitle: eventCanonicalTitle,
           })
         }
         this.events.emitOutput(session, {
           terminalRuntimeSessionId: session.id,
+          terminalRuntimeGeneration: generation,
           data,
           outputEra: output.outputEra,
           seq: output.seq,
@@ -305,7 +385,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
       this.supervisor.onExit(handle, () => {
         if (!this.isCurrentBinding(session, generation, handle)) return
         this.handle = null
-        this.events.emitExit(session, { terminalRuntimeSessionId: session.id })
+        this.events.emitExit(session, { terminalRuntimeSessionId: session.id, terminalRuntimeGeneration: generation })
         this.events.closeSession(session.id)
       }),
     )
@@ -332,21 +412,17 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     return this.spawnResult(generation, { ok: false, message: 'error.unavailable' })
   }
 
-  private async killStalePtyHandle(terminalRuntimeSessionId: string, handle: PtyHandle): Promise<void> {
-    try {
-      await this.supervisor.killAndWait(handle)
-    } catch (err) {
-      this.retiringHandles.set(handle.ptySessionId, handle)
-      ptyLifecycleLogger.warn({ terminalRuntimeSessionId, err }, 'failed to kill stale PTY')
-    }
+  private async killStalePtyHandle(handle: PtyHandle): Promise<void> {
+    await this.drainRetiringHandle(this.retainRetiringHandle(handle))
   }
 
   private disposeResources(session: TSession): void {
     this.beginRetirement(session)
     disposeRender(session.render)
-    for (const handle of this.retiringHandles.values()) {
+    for (const retiring of this.retiringHandles.values()) {
+      if (retiring.attempt) continue
       try {
-        this.supervisor.kill(handle)
+        this.supervisor.kill(retiring.handle)
       } catch (err) {
         ptyLifecycleLogger.warn({ terminalRuntimeSessionId: session.id, err }, 'failed to kill PTY')
       }
@@ -355,16 +431,50 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
 
   private beginRetirement(session: TSession): void {
     this.disposeListeners(session.id)
-    if (this.handle) this.retiringHandles.set(this.handle.ptySessionId, this.handle)
+    if (this.handle) this.retainRetiringHandle(this.handle)
     this.handle = null
     this.inputQueue = []
     this.inputFlushScheduled = false
   }
 
   private async drainRetiringHandles(): Promise<void> {
-    for (const handle of Array.from(this.retiringHandles.values())) {
-      await this.supervisor.killAndWait(handle)
-      this.retiringHandles.delete(handle.ptySessionId)
+    for (const retiring of Array.from(this.retiringHandles.values())) {
+      await this.drainRetiringHandle(retiring)
+    }
+  }
+
+  private retainRetiringHandle(handle: PtyHandle): RetiringPtyOwnership {
+    const existing = this.retiringHandles.get(handle.ptySessionId)
+    if (existing) return existing
+    const retiring = { handle, attempt: null }
+    this.retiringHandles.set(handle.ptySessionId, retiring)
+    return retiring
+  }
+
+  private async drainRetiringHandle(retiring: RetiringPtyOwnership): Promise<void> {
+    if (this.retiringHandles.get(retiring.handle.ptySessionId) !== retiring) return
+    let attempt = retiring.attempt
+    if (!attempt) {
+      const deferred = Promise.withResolvers<void>()
+      attempt = deferred.promise
+      retiring.attempt = attempt
+      try {
+        void this.supervisor.killAndWait(retiring.handle).then(deferred.resolve, deferred.reject)
+      } catch (error) {
+        deferred.reject(error)
+      }
+    }
+    try {
+      await attempt
+    } catch (error) {
+      if (retiring.attempt === attempt) retiring.attempt = null
+      throw error
+    }
+    if (
+      this.retiringHandles.get(retiring.handle.ptySessionId) === retiring &&
+      retiring.attempt === attempt
+    ) {
+      this.retiringHandles.delete(retiring.handle.ptySessionId)
     }
   }
 
@@ -396,4 +506,57 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
       ptyLifecycleLogger.warn({ terminalRuntimeSessionId: session.id, err, bytes: batch.length }, 'failed to write PTY')
     }
   }
+}
+
+function abortablePtySpawn(
+  supervisor: PtySupervisor,
+  input: Parameters<PtySupervisor['spawn']>[0],
+  signal: AbortSignal | undefined,
+  retireLateHandle: (handle: PtyHandle) => Promise<void>,
+): AbortablePtySpawn {
+  if (signal?.aborted) {
+    return {
+      result: Promise.resolve({ ok: false, message: 'error.repo-runtime-stale' }),
+      ownership: Promise.resolve(),
+    }
+  }
+  const spawn = supervisor.spawn(input)
+  if (!signal) {
+    return {
+      result: spawn,
+      ownership: spawn.then(
+        () => undefined,
+        () => undefined,
+      ),
+    }
+  }
+  const result = Promise.withResolvers<PtySupervisorSpawnResult>()
+  let settled = false
+  let abandoned = false
+  const aborted = () => {
+    if (settled) return
+    abandoned = true
+    settled = true
+    result.resolve({ ok: false, message: 'error.repo-runtime-stale' })
+  }
+  signal.addEventListener('abort', aborted, { once: true })
+  const ownership = spawn.then(
+    async (spawnResult) => {
+      signal.removeEventListener('abort', aborted)
+      if (abandoned) {
+        if (spawnResult.ok) await retireLateHandle(spawnResult.handle)
+        return
+      }
+      if (settled) return
+      settled = true
+      result.resolve(spawnResult)
+    },
+    (error: unknown) => {
+      signal.removeEventListener('abort', aborted)
+      if (settled) return
+      settled = true
+      result.resolve({ ok: false, message: error instanceof Error ? error.message : 'error.unknown' })
+    },
+  )
+  return { result: result.promise, ownership }
 }

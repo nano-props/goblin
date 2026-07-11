@@ -5,6 +5,12 @@ import { createWorkspacePaneTabsCoordinator } from '#/server/workspace-pane/work
 import { createWorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import {
+  replaceTestWorkspaceTabs,
+  testPhysicalWorktreeCapability,
+  testPhysicalWorktreeIdentity,
+  testPhysicalWorktrees,
+} from '#/server/test-utils/physical-worktree-identity.ts'
+import {
   type WorkspacePaneTabEntry,
   workspacePaneStaticTabEntry,
   workspacePaneRuntimeTabEntry,
@@ -23,6 +29,7 @@ describe('workspace pane tabs coordinator', () => {
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
       runtimeProviders: [
         {
           type: 'terminal',
@@ -55,6 +62,7 @@ describe('workspace pane tabs coordinator', () => {
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
       runtimeProviders: [
         {
           type: 'terminal',
@@ -92,6 +100,7 @@ describe('workspace pane tabs coordinator', () => {
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
       runtimeProviders: [
         {
           type: 'terminal',
@@ -128,7 +137,7 @@ describe('workspace pane tabs coordinator', () => {
 
   test('materializes missing live runtime sessions when updating workspace tabs', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
-    workspaceTabs.replaceTabs({
+    replaceTestWorkspaceTabs(workspaceTabs, {
       userId: USER_ID,
       scope: SCOPE,
       branchName: BRANCH_NAME,
@@ -138,6 +147,7 @@ describe('workspace pane tabs coordinator', () => {
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
       runtimeProviders: [
         {
           type: 'terminal',
@@ -169,7 +179,7 @@ describe('workspace pane tabs coordinator', () => {
 
   test('does not mutate workspace tabs when update canonicalization fails', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
-    workspaceTabs.replaceTabs({
+    replaceTestWorkspaceTabs(workspaceTabs, {
       userId: USER_ID,
       scope: SCOPE,
       branchName: BRANCH_NAME,
@@ -179,6 +189,7 @@ describe('workspace pane tabs coordinator', () => {
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
       runtimeProviders: [
         {
           type: 'terminal',
@@ -205,13 +216,14 @@ describe('workspace pane tabs coordinator', () => {
 
   test('does not mutate workspace tabs when update becomes stale before commit', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
-    workspaceTabs.replaceTabs({
+    replaceTestWorkspaceTabs(workspaceTabs, {
       ...workspaceTarget(),
       tabs: [workspacePaneStaticTabEntry('status')],
     })
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
       runtimeProviders: [
         {
           type: 'terminal',
@@ -245,6 +257,7 @@ describe('workspace pane tabs coordinator', () => {
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
       runtimeProviders: [
         {
           type: 'terminal',
@@ -274,7 +287,7 @@ describe('workspace pane tabs coordinator', () => {
 
   test('serializes list canonicalization with scope updates', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
-    workspaceTabs.replaceTabs({
+    replaceTestWorkspaceTabs(workspaceTabs, {
       ...workspaceTarget(),
       tabs: [
         workspacePaneStaticTabEntry('status'),
@@ -286,6 +299,7 @@ describe('workspace pane tabs coordinator', () => {
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
       runtimeProviders: [
         {
           type: 'terminal',
@@ -342,7 +356,7 @@ describe('workspace pane tabs coordinator', () => {
 
   test('serializes scope close after pending reconciliation', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
-    workspaceTabs.replaceTabs({
+    replaceTestWorkspaceTabs(workspaceTabs, {
       ...workspaceTarget(),
       tabs: [
         workspacePaneStaticTabEntry('status'),
@@ -354,6 +368,7 @@ describe('workspace pane tabs coordinator', () => {
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
       runtimeProviders: [{ type: 'terminal', listSessionsForUser }],
     })
 
@@ -379,10 +394,15 @@ describe('workspace pane tabs coordinator', () => {
     const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
     const finishRemoval = deferred<void>()
     const removal = worktreeOperations.runRemoval(
-      { repoRoot: REPO_ROOT, worktreePath: WORKTREE_PATH },
+      testPhysicalWorktreeCapability(WORKTREE_PATH),
       async () => await finishRemoval.promise,
     )
-    const coordinator = createWorkspacePaneTabsCoordinator({ workspaceTabs, worktreeOperations, runtimeProviders: [] })
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      worktreeOperations,
+      physicalWorktrees: testPhysicalWorktrees,
+      runtimeProviders: [],
+    })
 
     await expect(
       coordinator.updateTabs({
@@ -415,11 +435,14 @@ describe('workspace pane tabs coordinator', () => {
   test('lets a canonical tab write admitted before removal finish in physical queue order', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
+    const physicalCapability = testPhysicalWorktreeCapability(WORKTREE_PATH)
+    const capturePhysicalWorktree = vi.fn(async () => physicalCapability)
     const liveSessions = deferred<[]>()
     const listSessionsForUser = vi.fn(async () => await liveSessions.promise)
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
       worktreeOperations,
+      physicalWorktrees: { capture: capturePhysicalWorktree },
       runtimeProviders: [{ type: 'terminal', listSessionsForUser }],
     })
 
@@ -434,14 +457,12 @@ describe('workspace pane tabs coordinator', () => {
     })
     await vi.waitFor(() => expect(listSessionsForUser).toHaveBeenCalledOnce())
 
-    const removal = worktreeOperations.runRemoval(
-      { repoRoot: REPO_ROOT, worktreePath: WORKTREE_PATH },
-      async () => 'removed',
-    )
-    expect(worktreeOperations.isRemovalAdmitted({ repoRoot: REPO_ROOT, worktreePath: WORKTREE_PATH })).toBe(true)
+    const removal = worktreeOperations.runRemoval(physicalCapability, async () => 'removed')
+    expect(worktreeOperations.isRemovalAdmitted(testPhysicalWorktreeIdentity(WORKTREE_PATH))).toBe(true)
 
     liveSessions.resolve([])
     await expect(update).resolves.toMatchObject({ revision: 1 })
+    expect(capturePhysicalWorktree).toHaveBeenCalledOnce()
     await expect(removal).resolves.toEqual({ admitted: true, value: 'removed' })
   })
 })

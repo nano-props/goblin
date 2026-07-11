@@ -173,6 +173,7 @@ export class TerminalSessionState {
     changed =
       this.applyIdentity({
         terminalRuntimeSessionId: '', // The runtime stamps the actual terminalRuntimeSessionId itself; the first-frame path carries it via `currentTerminalRuntimeSessionId` set by the caller.
+        terminalRuntimeGeneration: 0,
         role: input.role,
         controllerStatus: input.controllerStatus,
         canonicalCols: input.canonicalCols,
@@ -181,6 +182,7 @@ export class TerminalSessionState {
     changed =
       this.applyLifecycle({
         terminalRuntimeSessionId: '',
+        terminalRuntimeGeneration: 0,
         phase: input.phase ?? 'open',
         message: input.message ?? null,
         takeoverPending: false,
