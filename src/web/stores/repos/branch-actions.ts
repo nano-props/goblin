@@ -185,6 +185,15 @@ function shouldSkipBranchActionRefresh(result: ExecResult, options?: RunBranchAc
   return false
 }
 
+function shouldRefreshBranchActionProjection(result: ExecResult, options?: RunBranchActionOptions): boolean {
+  if (shouldSkipBranchActionRefresh(result, options)) return false
+  return result.ok || result.repoChanged || options?.refreshOnError !== false
+}
+
+function requiresProjectionRefreshBeforeCompletion(action: RepoBranchAction, result: ExecResult): boolean {
+  return result.ok && (action.kind === 'createWorktree' || action.kind === 'removeWorktree')
+}
+
 function waitForBranchActionIdle(
   id: string,
   keys: Parameters<typeof waitForRepoOperationsIdle>[1],
@@ -294,22 +303,22 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
       })
       const ownsNetworkFetchDataLoad = (ctx: Pick<RepoOperationContext, 'ownsTarget'>) =>
         network && ctx.ownsTarget('fetch')
+      const refreshAfterBranchAction = async (result: ExecResult): Promise<void> => {
+        if (!shouldRefreshBranchActionProjection(result, options)) return
+        const repo = get().repos[id]
+        if (repo?.repoRuntimeId !== repoRuntimeId) return
+        await runRepoRefreshIntent(
+          { get, set },
+          { kind: 'projection-read-model-refresh-requested', reason: 'branch-action', id, repoRuntimeId },
+        )
+      }
       const handleResult = async (result: ExecResult, ctx: RepoOperationContext) => {
         const ownsFetchDataLoad = ownsNetworkFetchDataLoad(ctx)
         settleNetworkFetchDataLoadState(set, id, repoRuntimeId, ownsFetchDataLoad, result)
         if (!shouldSuppressBranchActionResultMessage(result, options)) {
           get().setLastResult(id, result, repoRuntimeId, { action: branchActionEventAction(action) })
         }
-        if (shouldSkipBranchActionRefresh(result, options)) return
-        if (result.ok || result.repoChanged || options?.refreshOnError !== false) {
-          const repo = get().repos[id]
-          if (repo?.repoRuntimeId === repoRuntimeId) {
-            await runRepoRefreshIntent(
-              { get, set },
-              { kind: 'projection-read-model-refresh-requested', reason: 'branch-action', id, repoRuntimeId },
-            )
-          }
-        }
+        if (!requiresProjectionRefreshBeforeCompletion(action, result)) await refreshAfterBranchAction(result)
         if (result.ok && ownsFetchDataLoad) get().clearFetchFailed(id, repoRuntimeId)
       }
       const handleError = (message: string, ctx: RepoOperationContext) => {
@@ -332,12 +341,16 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
           }
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err)
-          if (message === BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE) return { ok: false, message }
+          if (message === BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE) return branchActionErrorResult(message)
           throw err
         }
         throwIfStale(get, id, repoRuntimeId)
         ctx.setPhase('running')
         return runBranchActionIpc(action, id, repoRuntimeId, signal)
+      }
+
+      const completionBarrier = async (result: ExecResult) => {
+        if (requiresProjectionRefreshBeforeCompletion(action, result)) await refreshAfterBranchAction(result)
       }
 
       if (network) {
@@ -351,6 +364,7 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
           priority: 100,
           targets: [branchActionTarget(action), { key: 'fetch', reason: networkFetchReason(action) }],
           task: runActionTask,
+          completionBarrier,
           queuedTimeoutMs: options?.waitTimeoutMs ?? BRANCH_ACTION_WAIT_TIMEOUT_MS,
           queuedTimeoutMessage: BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE,
           errorFromResult: branchActionErrorFromResult,
@@ -369,8 +383,9 @@ export function createBranchActions(set: ReposSet, get: ReposGet) {
         lane: 'write',
         priority: 100,
         targets: [branchActionTarget(action)],
-        busyResult: { ok: false, message: 'cancelled' },
+        busyResult: branchActionErrorResult('cancelled'),
         task: runActionTask,
+        completionBarrier,
         errorFromResult: branchActionErrorFromResult,
         errorResult: branchActionErrorResult,
         onResult: handleResult,

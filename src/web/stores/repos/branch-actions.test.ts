@@ -679,6 +679,70 @@ describe('runBranchAction', () => {
     expect(repoOperation(REPO_ID, 'branchAction').target).toBeNull()
   })
 
+  test.each([
+    [
+      'createWorktree',
+      createWorktreeAction(),
+      'repo.createWorktree',
+      'feature/new',
+      repoProjection({
+        branches: [
+          createBranchSnapshot('feature/a'),
+          createBranchSnapshot('feature/new', { worktree: { path: '/tmp/goblin-branch-actions-test-worktree' } }),
+        ],
+        current: 'feature/a',
+      }),
+    ],
+    [
+      'removeWorktree',
+      {
+        kind: 'removeWorktree',
+        branch: 'feature/a',
+        worktreePath: '/tmp/goblin-branch-actions-test-worktree',
+        alsoDeleteBranch: false,
+      },
+      'repo.removeWorktree',
+      'feature/a',
+      repoProjection({ branches: [createBranchSnapshot('feature/a')], current: 'feature/a' }),
+    ],
+  ] satisfies Array<[string, RepoBranchAction, string, string, ReturnType<typeof repoProjection>]>)(
+    'keeps %s busy until the follow-up projection refresh completes',
+    async (_label, action, ipcPath, target, projection) => {
+      let resolveProjection!: () => void
+      installGoblinTestBridge({
+        [ipcPath]: async () => ({ ok: true, message: 'ok' }),
+        'repo.projection': () =>
+          new Promise((resolve) => {
+            resolveProjection = () => resolve(projection)
+          }),
+      })
+
+      const work = useReposStore.getState().runBranchAction(REPO_ID, action)
+      await flushAsyncWork()
+
+      expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction).toMatchObject({
+        phase: 'running',
+        target,
+      })
+      expect(repoOperation(REPO_ID, 'branchAction')).toMatchObject({
+        phase: 'running',
+        target,
+      })
+
+      resolveProjection()
+      await work
+
+      expect(useReposStore.getState().repos[REPO_ID]?.operations.branchAction).toMatchObject({
+        phase: 'idle',
+        target: null,
+      })
+      expect(repoOperation(REPO_ID, 'branchAction')).toMatchObject({
+        phase: 'idle',
+        target: null,
+      })
+    },
+  )
+
   test('submitBranchAction starts create worktree without waiting for completion', async () => {
     let release!: () => void
     installGoblinTestBridge({

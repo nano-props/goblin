@@ -73,6 +73,44 @@ describe('runLatestOperation', () => {
 })
 
 describe('runExclusiveOperation', () => {
+  test('stays running until the result completion barrier settles', async () => {
+    let releaseBarrier!: () => void
+    const events: string[] = []
+    const work = runExclusiveOperation({
+      set: useReposStore.setState,
+      get: useReposStore.getState,
+      id: REPO_ID,
+      repoRuntimeId: 'repo-runtime-test',
+      lane: 'write',
+      priority: 1,
+      targets: [{ key: 'branchAction', reason: 'branch:createWorktree', target: 'feature/new' }],
+      task: async () => {
+        events.push('task')
+        return 'ok'
+      },
+      completionBarrier: (result) =>
+        new Promise<void>((resolve) => {
+          events.push(`barrier:${result}`)
+          releaseBarrier = resolve
+        }),
+      onResult: () => {
+        events.push('result')
+      },
+    })
+
+    await vi.waitFor(() => expect(events).toEqual(['task', 'barrier:ok']))
+    expect(repoOperation(REPO_ID, 'branchAction')).toMatchObject({
+      phase: 'running',
+      target: 'feature/new',
+    })
+
+    releaseBarrier()
+    await expect(work).resolves.toBe('ok')
+
+    expect(events).toEqual(['task', 'barrier:ok', 'result'])
+    expect(repoOperation(REPO_ID, 'branchAction')).toMatchObject({ phase: 'idle', target: null })
+  })
+
   test('marks and settles all targets together', async () => {
     let release!: () => void
     const work = runExclusiveOperation({
