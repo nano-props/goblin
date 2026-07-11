@@ -40,6 +40,25 @@ describe('workspace pane tab controller transactions', () => {
     expect(setWorkspacePaneTab).toHaveBeenCalledWith('/repo', 'feature/a', 'status')
   })
 
+  test('passes the observed route as a compare-and-set precondition', async () => {
+    const commitRepoBranchWorkspacePaneRoute = vi.fn(() => false)
+
+    await expect(
+      commitWorkspacePaneExactTargetRoute(
+        workspacePaneTarget(),
+        SOURCE_ROUTE,
+        TARGET_ROUTE,
+        { commitRepoBranchWorkspacePaneRoute },
+      ),
+    ).resolves.toBe(false)
+    expect(commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
+      '/repo',
+      'feature/a',
+      TARGET_ROUTE,
+      expect.objectContaining({ expectedCurrentRoute: SOURCE_ROUTE }),
+    )
+  })
+
   test('rejects exact target completion after its runtime is replaced', async () => {
     const commit = Promise.withResolvers<boolean>()
     const navigation: WorkspacePaneTabControllerCommitNavigation = {

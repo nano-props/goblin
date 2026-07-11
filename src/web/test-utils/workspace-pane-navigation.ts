@@ -82,6 +82,14 @@ export function observedWorkspacePaneRouteCommitForTest(
       })
   }
   return (repoId, branchName, route, commitOptions) => {
+    if (
+      commitOptions?.expectedCurrentRoute !== undefined &&
+      workspacePaneRoutesEqual(commitOptions.expectedCurrentRoute, route)
+    ) {
+      commitOptions.onCommit?.()
+      observeCommittedRoute(repoId, branchName, route)
+      return true
+    }
     const routeOptions = commitOptions?.replace === undefined ? undefined : { replace: commitOptions.replace }
     const accepted = openResolvedRepoBranchWorkspacePaneRoute(
       {
@@ -102,4 +110,15 @@ export function observedWorkspacePaneRouteCommitForTest(
     }
     return observeIfAccepted(accepted)
   }
+}
+
+function workspacePaneRoutesEqual(
+  a: ParsedRepoBranchWorkspacePaneRoute | null,
+  b: ParsedRepoBranchWorkspacePaneRoute | null,
+): boolean {
+  if (a === null || b === null) return a === b
+  if (a.kind !== b.kind) return false
+  if (a.kind === 'static') return b.kind === 'static' && a.tab === b.tab
+  if (a.kind === 'terminal') return b.kind === 'terminal' && a.terminalSessionId === b.terminalSessionId
+  return b.kind === 'invalid-static' && a.tabKey === b.tabKey
 }

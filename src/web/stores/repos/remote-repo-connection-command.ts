@@ -56,7 +56,6 @@ export async function runRemoteRepoConnection(
     if (options.signal?.aborted || isAbortError(error)) return { kind: 'cancelled', repoId }
     return { kind: 'transport-failed', repoId, reason: 'unknown' }
   }
-  const outcome = commandOutcome(result)
   if (result.kind === 'settled') {
     const accepted = acceptRemoteLifecycleProjection(
       set,
@@ -64,11 +63,12 @@ export async function runRemoteRepoConnection(
       { repoRoot: repoId, repoRuntimeId, remoteLifecycle: result.lifecycle },
       { name: result.name },
     )
-    if (accepted && result.lifecycle.kind === 'ready') {
+    if (!accepted) return { kind: 'stale-runtime', repoId }
+    if (result.lifecycle.kind === 'ready') {
       void requestRepoProjectionReadModelRefresh({ get, set }, repoId, { repoRuntimeId })
     }
   }
-  return outcome
+  return commandOutcome(result)
 }
 
 function isAbortError(error: unknown): boolean {

@@ -60,7 +60,18 @@ describe('repo runtime remote lifecycle', () => {
     expect(firstSignal.aborted).toBe(false)
     releaseFirst(ready)
     await expect(first).resolves.toMatchObject({ kind: 'settled', lifecycle: { attemptId: 1 } })
-    await expect(ensured).resolves.toMatchObject({ kind: 'settled', lifecycle: { attemptId: 1 } })
+    await expect(ensured).resolves.toMatchObject({ kind: 'settled', name: 'repo', lifecycle: { attemptId: 1 } })
+  })
+
+  test('ensure reuses the complete settled projection without resolving again', async () => {
+    const runtimeId = acquireRepoRuntime(userId, repoRoot, clientId)
+    await runRepoRemoteLifecycle(userId, repoRoot, runtimeId, async () => ready)
+    const resolver = vi.fn(async () => ready)
+
+    await expect(
+      runRepoRemoteLifecycle(userId, repoRoot, runtimeId, resolver, () => {}, 'ensure'),
+    ).resolves.toMatchObject({ kind: 'settled', name: 'repo', lifecycle: { kind: 'ready', attemptId: 1 } })
+    expect(resolver).not.toHaveBeenCalled()
   })
 
   test('ensure follows a replacement attempt until the current lifecycle settles', async () => {
@@ -170,7 +181,11 @@ describe('repo runtime remote lifecycle', () => {
     const runtimeId = acquireRepoRuntime(userId, repoRoot, clientId)
     await expect(
       runRepoRemoteLifecycle(userId, repoRoot, runtimeId, async () => { throw new Error('transport failed') }),
-    ).resolves.toEqual({ kind: 'settled', lifecycle: { kind: 'failed', attemptId: 1, reason: 'unknown' } })
+    ).resolves.toEqual({
+      kind: 'settled',
+      name: repoRoot,
+      lifecycle: { kind: 'failed', attemptId: 1, reason: 'unknown' },
+    })
     expect(listRepoRuntimes(userId)[0]?.remoteLifecycle).toEqual({
       kind: 'failed', attemptId: 1, reason: 'unknown',
     })

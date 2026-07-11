@@ -27,6 +27,7 @@ import {
   type WorkspacePaneRuntimeOpenInput,
   type WorkspacePaneRuntimeOpenResult,
 } from '#/shared/workspace-pane-runtime.ts'
+import { advanceTimersAndFlush, useFakeTimers } from '#/test-utils/timers.ts'
 
 // Under method 2 the host threads `userId` (derived from the
 // access token) alongside `clientId` (per-tab routing). Tests use
@@ -1785,7 +1786,7 @@ describe('server terminal runtime', () => {
   })
 
   test('cleans up detached user sessions after the detached TTL elapses', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
@@ -1801,7 +1802,7 @@ describe('server terminal runtime', () => {
     expect(mockPtys).toHaveLength(1)
 
     host.unregisterSocket('client_a', USER_1, socket)
-    await vi.advanceTimersByTimeAsync(DETACHED_TTL_MS + 1)
+    await advanceTimersAndFlush(DETACHED_TTL_MS + 1)
     await vi.runOnlyPendingTimersAsync()
     await Promise.resolve()
 
@@ -1992,7 +1993,7 @@ describe('server terminal runtime', () => {
     // detached TTL fires (after 24h), which is far longer than the
     // test. The relevant invariant is that an offline viewer
     // doesn't disturb the controller.
-    vi.useFakeTimers()
+    useFakeTimers()
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
@@ -2083,7 +2084,7 @@ describe('server terminal runtime', () => {
   })
 
   test('shutdown does not leave detached-user timers after closing registered sockets', () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     try {
       const { host, shutdown } = buildRuntime()
       const socket = { send: vi.fn(), close: vi.fn() }
@@ -2195,7 +2196,7 @@ describe('server terminal runtime', () => {
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
 
-    vi.useFakeTimers()
+    useFakeTimers()
     try {
       vi.setSystemTime(TEST_NOW)
 
@@ -2230,7 +2231,7 @@ describe('server terminal runtime', () => {
   })
 
   test('runtime health ping refreshes broker presence before the next heartbeat scan', () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
       vi.setSystemTime(TEST_NOW)
@@ -2258,7 +2259,7 @@ describe('server terminal runtime', () => {
   })
 
   test('runtime: controller projection recovers when a long-idle client reconnects', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
       vi.setSystemTime(TEST_NOW)
@@ -2307,7 +2308,7 @@ describe('server terminal runtime', () => {
   })
 
   test('runtime: recovered heartbeat cancels detached cleanup after a heartbeat timeout', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
       vi.setSystemTime(TEST_NOW)
@@ -2327,7 +2328,7 @@ describe('server terminal runtime', () => {
       expect(handle.isClientOnline('client_recovered')).toBe(true)
 
       for (let elapsed = 0; elapsed < DETACHED_TTL_MS + 1; elapsed += HEARTBEAT_INTERVAL_MS) {
-        await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS)
+        await advanceTimersAndFlush(HEARTBEAT_INTERVAL_MS)
         host.handleRealtimeMessage('client_recovered', USER_1, reconnectedSocket, JSON.stringify({ type: 'heartbeat' }))
       }
       await vi.runOnlyPendingTimersAsync()
@@ -2341,7 +2342,7 @@ describe('server terminal runtime', () => {
   })
 
   test('runtime: detached TTL cleans up when heartbeat timeout leaves only half-open sockets', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
       vi.setSystemTime(TEST_NOW)
@@ -2357,7 +2358,7 @@ describe('server terminal runtime', () => {
       expect(host.getDiagnostics().terminal.registeredSockets).toBe(0)
       expect(handle.isClientOnline('client_half_open')).toBe(false)
 
-      await vi.advanceTimersByTimeAsync(DETACHED_TTL_MS + 1)
+      await advanceTimersAndFlush(DETACHED_TTL_MS + 1)
       await vi.runOnlyPendingTimersAsync()
 
       expect(host.getDiagnostics().terminal.liveSessionCount).toBe(0)
@@ -2372,7 +2373,7 @@ describe('server terminal runtime', () => {
   })
 
   test('runtime: late socket drain does not extend detached TTL after heartbeat timeout', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
       vi.setSystemTime(TEST_NOW)
@@ -2387,9 +2388,9 @@ describe('server terminal runtime', () => {
       vi.advanceTimersByTime(HEARTBEAT_SILENCE_MS)
       expect(handle.isClientOnline('client_late_drain')).toBe(false)
 
-      await vi.advanceTimersByTimeAsync(DETACHED_TTL_MS - 1_000)
+      await advanceTimersAndFlush(DETACHED_TTL_MS - 1_000)
       host.unregisterSocket('client_late_drain', USER_1, socket)
-      await vi.advanceTimersByTimeAsync(1_001)
+      await advanceTimersAndFlush(1_001)
       await vi.runOnlyPendingTimersAsync()
 
       expect(host.getDiagnostics().terminal.liveSessionCount).toBe(0)
@@ -2404,7 +2405,7 @@ describe('server terminal runtime', () => {
   })
 
   test('runtime: a silent client (no heartbeats) is marked offline past the deadline', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
       vi.setSystemTime(TEST_NOW)
@@ -2423,7 +2424,7 @@ describe('server terminal runtime', () => {
   })
 
   test('runtime: detached client expiry releases its repo memberships without closing sibling epochs', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
       const handle = buildRuntime()
@@ -2436,7 +2437,7 @@ describe('server terminal runtime', () => {
       handle.host.registerSocket('client_expiring', USER_1, socket)
       handle.host.unregisterSocket('client_expiring', USER_1, socket)
 
-      await vi.advanceTimersByTimeAsync(DETACHED_TTL_MS + 1)
+      await advanceTimersAndFlush(DETACHED_TTL_MS + 1)
 
       expect(releaseRepoRuntime(USER_1, REPO_ROOT, REPO_RUNTIME_ID, 'client_expiring')).toEqual({
         released: false,
@@ -2453,14 +2454,14 @@ describe('server terminal runtime', () => {
   })
 
   test('runtime: a repo membership that never establishes realtime presence expires', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
       const handle = buildRuntime()
       shutdownFn = handle.shutdown
       const runtimeId = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_never_online')
 
-      await vi.advanceTimersByTimeAsync(DETACHED_TTL_MS + 1)
+      await advanceTimersAndFlush(DETACHED_TTL_MS + 1)
 
       expect(releaseRepoRuntime(USER_1, REPO_ROOT, runtimeId, 'client_never_online')).toEqual({
         released: false,
@@ -2473,7 +2474,7 @@ describe('server terminal runtime', () => {
   })
 
   test('runtime: first realtime presence cancels the orphan membership expiry', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
       const handle = buildRuntime()
@@ -2489,7 +2490,7 @@ describe('server terminal runtime', () => {
           socket,
           JSON.stringify({ type: 'heartbeat' }),
         )
-        await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS)
+        await advanceTimersAndFlush(HEARTBEAT_INTERVAL_MS)
       }
 
       expect(releaseRepoRuntime(USER_1, REPO_ROOT, runtimeId, 'client_claimed_before_expiry')).toEqual({
@@ -2503,7 +2504,7 @@ describe('server terminal runtime', () => {
   })
 
   test('runtime: an already-online client acquires membership without an orphan timer', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
       const handle = buildRuntime()
@@ -2519,7 +2520,7 @@ describe('server terminal runtime', () => {
           socket,
           JSON.stringify({ type: 'heartbeat' }),
         )
-        await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS)
+        await advanceTimersAndFlush(HEARTBEAT_INTERVAL_MS)
       }
 
       expect(releaseRepoRuntime(USER_1, REPO_ROOT, runtimeId, 'client_online_before_acquire')).toEqual({
@@ -2533,7 +2534,7 @@ describe('server terminal runtime', () => {
   })
 
   test('runtime: a membership renewed after disconnect survives the stale expiry timer', async () => {
-    vi.useFakeTimers()
+    useFakeTimers()
     let shutdownFn: (() => void) | undefined
     try {
       const handle = buildRuntime()
@@ -2546,7 +2547,7 @@ describe('server terminal runtime', () => {
       const reconnectedSocket = { send: vi.fn(), close: vi.fn() }
       handle.host.registerSocket('client_renewed', USER_1, reconnectedSocket)
 
-      await vi.advanceTimersByTimeAsync(DETACHED_TTL_MS + 1)
+      await advanceTimersAndFlush(DETACHED_TTL_MS + 1)
 
       expect(releaseRepoRuntime(USER_1, REPO_ROOT, REPO_RUNTIME_ID, 'client_renewed')).toEqual({
         released: true,

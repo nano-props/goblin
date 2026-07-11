@@ -44,6 +44,7 @@
 
 import { afterEach } from 'vitest'
 import { cleanup, render, type RenderOptions, type RenderResult } from '@testing-library/react'
+export { flushMicrotasks } from './microtasks.ts'
 
 afterEach(() => {
   cleanup()
@@ -70,16 +71,5 @@ export function renderInJsdom(
         await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
       }
     },
-  }
-}
-
-/**
- * Drain `ticks` microtask rounds. Prefer this over an inline
- * `for (let i = 0; i < 5; i++) await Promise.resolve()` so the count is
- * visible and reviewable.
- */
-export async function flushMicrotasks(ticks = 3): Promise<void> {
-  for (let i = 0; i < ticks; i += 1) {
-    await Promise.resolve()
   }
 }

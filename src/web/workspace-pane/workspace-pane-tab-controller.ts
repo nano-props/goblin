@@ -133,7 +133,12 @@ export async function commitWorkspacePaneControllerRoute(
   branchName: string,
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneTabControllerCommitNavigation,
-  options?: { replace?: boolean; presentationToken?: PrimaryWindowPresentationToken; onCommit?: () => void },
+  options?: {
+    replace?: boolean
+    presentationToken?: PrimaryWindowPresentationToken
+    onCommit?: () => void
+    expectedCurrentRoute?: WorkspacePaneTabControllerRoute
+  },
 ): Promise<boolean> {
   try {
     return await navigation.commitRepoBranchWorkspacePaneRoute(repoId, branchName, route, options)
@@ -167,12 +172,11 @@ export async function commitWorkspacePaneExactTargetRoute(
   if (!workspacePaneTabControllerTargetIsCurrent(target)) return false
   const sourceRoute = workspacePaneTabControllerRouteFromParsed(fromRoute)
   if (fromRoute !== undefined && sourceRoute === undefined) return false
-  if (sourceRoute !== undefined && workspacePaneTabControllerRoutesEqual(sourceRoute, route)) return true
-
   let supplementCommitted = false
   const committed = await commitWorkspacePaneControllerRoute(target.repoId, branchName, route, navigation, {
     ...options,
     presentationToken,
+    expectedCurrentRoute: sourceRoute,
     onCommit: () => {
       supplementCommitted = commitWorkspacePaneRouteSupplement({ ...target, branchName }, route)
     },
@@ -190,15 +194,4 @@ function workspacePaneTabControllerRouteFromParsed(
 ): WorkspacePaneTabControllerRoute | undefined {
   if (route === undefined || route?.kind === 'invalid-static') return undefined
   return route
-}
-
-function workspacePaneTabControllerRoutesEqual(
-  a: WorkspacePaneTabControllerObservedRoute,
-  b: WorkspacePaneTabControllerObservedRoute,
-): boolean {
-  if (a === null || b === null) return a === b
-  if (a.kind !== b.kind) return false
-  if (a.kind === 'static') return b.kind === 'static' && a.tab === b.tab
-  if (a.kind === 'terminal') return b.kind === 'terminal' && a.terminalSessionId === b.terminalSessionId
-  return b.kind === 'invalid-static' && a.tabKey === b.tabKey
 }

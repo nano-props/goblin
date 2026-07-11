@@ -33,7 +33,7 @@ describe('remote lifecycle command client', () => {
       kind: 'failed', reason: 'unreachable',
     })
     release({ kind: 'settled', repoId, name: 'repo', lifecycle: { kind: 'ready', attemptId: 1, target } })
-    await pending
+    await expect(pending).resolves.toMatchObject({ kind: 'ready', repoId })
   })
 
   test('applies the canonical terminal through the runtime projection acceptor', async () => {
@@ -58,7 +58,7 @@ describe('remote lifecycle command client', () => {
       repos: { ...state.repos, [repoId]: { ...state.repos[repoId]!, repoRuntimeId: 'repo-runtime-test-2' } },
     }))
     release({ kind: 'settled', repoId, name: 'repo', lifecycle: { kind: 'ready', attemptId: 1, target } })
-    await pending
+    await expect(pending).resolves.toEqual({ kind: 'stale-runtime', repoId })
     expect(useReposStore.getState().repos[repoId]?.remote.lifecycle).toEqual({
       kind: 'failed', reason: 'unreachable',
     })

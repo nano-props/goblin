@@ -25,6 +25,7 @@ export interface PrimaryWindowPresentationNavigationOptions {
   replace?: boolean
   presentationToken?: PrimaryWindowPresentationToken
   onCommit?: () => void
+  expectedCurrentRoute?: RepoBranchWorkspacePaneRouteTarget
 }
 
 export interface PrimaryWindowNavigationActions {
@@ -209,7 +210,12 @@ function commitRepoBranchWorkspacePaneRoute(
 ): MaybePromise<boolean> {
   const token = options?.presentationToken ?? beginPrimaryWindowPresentation()
   if (!primaryWindowPresentationIsCurrent(token)) return false
-  const routeOptions = { replace: options?.replace, presentationToken: token, onCommit: options?.onCommit }
+  const routeOptions = {
+    replace: options?.replace,
+    presentationToken: token,
+    onCommit: options?.onCommit,
+    expectedCurrentRoute: options?.expectedCurrentRoute,
+  }
   return routeNavigation.commitRepoBranchWorkspacePaneRoute
     ? routeNavigation.commitRepoBranchWorkspacePaneRoute(repoId, branchName, route, routeOptions)
     : openResolvedRepoBranchWorkspacePaneRoute(routeNavigation, repoId, branchName, route, routeOptions)

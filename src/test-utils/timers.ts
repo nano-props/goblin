@@ -12,29 +12,33 @@
 //     debounce / reconnect code paths.
 
 import { afterEach, vi } from 'vitest'
-import { flushMicrotasks } from './render.tsx'
+import { flushMicrotasks } from './microtasks.ts'
 
 const FAKE_TIMER_OPTIONS: Parameters<typeof vi.useFakeTimers>[0] = {
-  toFake: ['setTimeout', 'setInterval', 'requestAnimationFrame', 'cancelAnimationFrame', 'Date', 'performance'],
+  toFake: [
+    'setTimeout',
+    'clearTimeout',
+    'setInterval',
+    'clearInterval',
+    'requestAnimationFrame',
+    'cancelAnimationFrame',
+    'Date',
+    'performance',
+  ],
 }
 
-let registered = false
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 /**
  * Enable fake timers with the project's standard `toFake` list and
- * register an `afterEach` to restore real timers. Idempotent: a second
- * call inside the same worker is a no-op for the afterEach registration.
+ * The module-level `afterEach` restores real timers after every test.
  *
  * Returns the `vi` namespace so callers can chain timer operations.
  */
 export function useFakeTimers(): typeof vi {
   vi.useFakeTimers(FAKE_TIMER_OPTIONS)
-  if (!registered) {
-    afterEach(() => {
-      vi.useRealTimers()
-    })
-    registered = true
-  }
   return vi
 }
 

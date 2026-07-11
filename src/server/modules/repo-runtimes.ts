@@ -11,6 +11,7 @@ interface RepoRuntimeState {
   members: Map<string, number>
   nextMembershipGeneration: number
   remoteLifecycle: RemoteRepoRuntimeLifecycle
+  remoteName: string | null
   remoteAttemptController: AbortController | null
   remoteAttemptPromise: Promise<RepoRemoteLifecycleRunResult> | null
 }
@@ -47,7 +48,7 @@ export interface RepoRuntimeMembershipLease {
 type TerminalRemoteLifecycle = Extract<RemoteRepoRuntimeLifecycle, { kind: 'ready' | 'failed' }>
 
 export type RepoRemoteLifecycleRunResult =
-  | { kind: 'settled'; lifecycle: TerminalRemoteLifecycle }
+  | { kind: 'settled'; name: string; lifecycle: TerminalRemoteLifecycle }
   | { kind: 'superseded' }
   | { kind: 'stale-runtime' }
 
@@ -73,6 +74,7 @@ function repoRuntimeState(userId: string, repoRoot: string): RepoRuntimeState {
     members: new Map(),
     nextMembershipGeneration: 0,
     remoteLifecycle: { kind: 'idle', attemptId: 0 },
+    remoteName: null,
     remoteAttemptController: null,
     remoteAttemptPromise: null,
   }
@@ -214,7 +216,7 @@ export async function runRepoRemoteLifecycle(
     const joined = await joinRepoRemoteLifecycleAttempt(state, repoRuntimeId)
     if (joined) return joined
     if (state.remoteLifecycle.kind === 'ready' || state.remoteLifecycle.kind === 'failed') {
-      return { kind: 'settled', lifecycle: state.remoteLifecycle }
+      return settledRepoRemoteLifecycleResult(state, repoRoot)
     }
   }
 
@@ -290,8 +292,9 @@ async function settleRepoRemoteLifecycleAttempt(
             reason: result.lifecycle.reason,
             ...(result.lifecycle.target ? { target: result.lifecycle.target } : {}),
           }
+    state.remoteName = result.name
     notifyRemoteLifecycleTransition(onTransition, state.remoteLifecycle, repoRoot)
-    return { kind: 'settled', lifecycle: state.remoteLifecycle }
+    return settledRepoRemoteLifecycleResult(state, repoRoot)
   } catch (error) {
     if (
       state.currentRepoRuntimeId !== repoRuntimeId ||
@@ -301,11 +304,23 @@ async function settleRepoRemoteLifecycleAttempt(
       return supersededRemoteLifecycleResult(state, repoRuntimeId)
     }
     state.remoteLifecycle = { kind: 'failed', attemptId, reason: 'unknown' }
+    state.remoteName = repoRoot
     notifyRemoteLifecycleTransition(onTransition, state.remoteLifecycle, repoRoot)
-    return { kind: 'settled', lifecycle: state.remoteLifecycle }
+    return settledRepoRemoteLifecycleResult(state, repoRoot)
   } finally {
     if (state.remoteAttemptController === controller) state.remoteAttemptController = null
   }
+}
+
+function settledRepoRemoteLifecycleResult(
+  state: RepoRuntimeState,
+  repoRoot: string,
+): Extract<RepoRemoteLifecycleRunResult, { kind: 'settled' }> {
+  if (state.remoteLifecycle.kind !== 'ready' && state.remoteLifecycle.kind !== 'failed') {
+    throw new Error('repo remote lifecycle must be terminal before it settles')
+  }
+  if (state.remoteName === null) throw new Error(`repo remote lifecycle name is missing for ${repoRoot}`)
+  return { kind: 'settled', name: state.remoteName, lifecycle: state.remoteLifecycle }
 }
 
 function supersededRemoteLifecycleResult(
@@ -347,6 +362,7 @@ function startRepoRuntimeEpoch(state: RepoRuntimeState): string {
   state.members.clear()
   state.nextMembershipGeneration = 0
   state.remoteLifecycle = { kind: 'idle', attemptId: 0 }
+  state.remoteName = null
   return repoRuntimeId
 }
 
