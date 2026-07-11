@@ -16,13 +16,13 @@ import type { PrimaryWindowNavigationActions } from '#/web/primary-window-naviga
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { clientEffectIntentStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 interface ClientEffectIntentRouterOptions {
   navigation: PrimaryWindowNavigationActions
   currentRepoId: string | null
   currentBranchName?: string | null
-  currentWorkspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
+  currentWorkspacePaneRoute?: ParsedRepoBranchWorkspacePaneRoute | null
   closeAllOverlays: () => void
   openRepoPathDialog: () => void
   openCloneRepo: () => void

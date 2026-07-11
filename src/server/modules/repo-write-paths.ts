@@ -1,4 +1,6 @@
 import path from 'node:path'
+import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
+import { serverLogger } from '#/server/logger.ts'
 import { publishRepoQueryInvalidation, publishSettingsInvalidation } from '#/server/modules/invalidation-broker.ts'
 import {
   beginRepoServerOperation,
@@ -8,9 +10,11 @@ import {
 } from '#/server/modules/repo-operation-registry.ts'
 import {
   resolveRepoSource,
+  runWithCapturedRepoSource,
   runWithRepoSource,
   type RepoMutationResult,
 } from '#/server/modules/repo-source.ts'
+import type { PhysicalWorktreeCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import {
   abortRepoWriteNetworkOperation,
   enqueueRepoWriteOperation,
@@ -41,6 +45,7 @@ type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
 const MAX_CLONE_URL_LENGTH = 4096
 const MAX_CLONE_DIR_NAME_LENGTH = 255
+const repoWriteLogger = serverLogger.child({ module: 'repo-write-paths' })
 const CLONE_URL_SCHEME_RE = /^(?:https?|ssh|git|file):\/\/\S+$/i
 const SCP_LIKE_CLONE_URL_RE = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+:[^\s]+$/
 
@@ -103,7 +108,7 @@ function publishRepoSnapshotInvalidation(cwd: string): void {
 
 async function publishSnapshotInvalidationAfterMutation(cwd: string, result: RepoMutationResult): Promise<ExecResult> {
   const affectedRepoIds = result.affectedRepoIds ?? []
-  if (!result.ok && affectedRepoIds.length === 0) return execResultOnly(result)
+  if (!result.ok && !result.repoChanged && affectedRepoIds.length === 0) return execResultOnly(result)
   publishRepoSnapshotInvalidations(cwd, affectedRepoIds)
   return execResultOnly(result)
 }
@@ -279,10 +284,7 @@ export async function fetchRepo(
       canCancelUnderlying: true,
     },
     (_operation, context) => async () =>
-      await runWithRepoSource(
-        cwd,
-        async (source) => await runFetch((signal) => source.fetch(signal), context),
-      ),
+      await runWithRepoSource(cwd, async (source) => await runFetch((signal) => source.fetch(signal), context)),
   )
 }
 
@@ -298,11 +300,7 @@ export async function pullRepoBranch(
   })
 }
 
-export async function pushRepoBranch(
-  cwd: string,
-  branch: string,
-  signal?: AbortSignal,
-): Promise<ExecResult> {
+export async function pushRepoBranch(cwd: string, branch: string, signal?: AbortSignal): Promise<ExecResult> {
   const source = await resolveRepoSource(cwd)
   return await runUserNetworkMutation(cwd, signal, 'push', { branch }, async (mergedSignal) => {
     return await source.push(branch, mergedSignal)
@@ -399,7 +397,40 @@ export async function removeRepoWorktree(
     forceDeleteBranch?: boolean
     alsoDeleteUpstream?: boolean
   },
+  lifecycle: RepoWorktreeRemovalLifecycle,
   signal?: AbortSignal,
+): Promise<ExecResult> {
+  return await removeRepoWorktreeWithBinding(cwd, input, lifecycle, signal, null)
+}
+
+export async function removeCapturedRepoWorktree(
+  cwd: string,
+  input: {
+    branch: string
+    worktreePath: string
+    alsoDeleteBranch: boolean
+    forceDeleteBranch?: boolean
+    alsoDeleteUpstream?: boolean
+  },
+  lifecycle: RepoWorktreeRemovalLifecycle,
+  physicalWorktreeCapability: PhysicalWorktreeCapability,
+  signal?: AbortSignal,
+): Promise<ExecResult> {
+  return await removeRepoWorktreeWithBinding(cwd, input, lifecycle, signal, physicalWorktreeCapability)
+}
+
+async function removeRepoWorktreeWithBinding(
+  cwd: string,
+  input: {
+    branch: string
+    worktreePath: string
+    alsoDeleteBranch: boolean
+    forceDeleteBranch?: boolean
+    alsoDeleteUpstream?: boolean
+  },
+  lifecycle: RepoWorktreeRemovalLifecycle,
+  signal: AbortSignal | undefined,
+  physicalWorktreeCapability: PhysicalWorktreeCapability | null,
 ): Promise<ExecResult> {
   return await runRepoServerWriteOperation({
     repoId: cwd,
@@ -407,19 +438,31 @@ export async function removeRepoWorktree(
     target: { branch: input.branch, worktreePath: input.worktreePath },
     signal,
     task: async () => {
-      return await runWithRepoSource(cwd, async (source) => {
-        const result = await publishSnapshotInvalidationAfterMutation(cwd, await source.removeWorktree(input, signal))
-        if (!result.ok) return result
+      const runWithSource = physicalWorktreeCapability
+        ? async <T>(task: Parameters<typeof runWithRepoSource<T>>[1]) =>
+            await runWithCapturedRepoSource(cwd, physicalWorktreeCapability, task)
+        : async <T>(task: Parameters<typeof runWithRepoSource<T>>[1]) => await runWithRepoSource(cwd, task)
+      return await runWithSource(async (source) => {
+        const mutation = await source.removeWorktree(input, signal, lifecycle)
+        const result = await publishSnapshotInvalidationAfterMutation(cwd, mutation)
+        if (!mutation.ok && !mutation.repoChanged) return result
         try {
           const changed = await pruneServerRepoSettingsForRemovedWorktree({
             repoId: cwd,
             worktreePath: input.worktreePath,
           })
           if (changed) publishSettingsInvalidation(['settings-snapshot'])
-          return result
-        } catch {
+        } catch (error) {
+          if (!result.ok) {
+            repoWriteLogger.warn(
+              { error, repoId: cwd, worktreePath: input.worktreePath },
+              'failed to prune settings after worktree removal',
+            )
+            return result
+          }
           return { ...result, ok: false, message: 'error.settings-write-title', repoChanged: true }
         }
+        return result
       })
     },
   })

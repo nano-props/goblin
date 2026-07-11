@@ -12,7 +12,11 @@ import os from 'node:os'
 import path from 'node:path'
 import { execa } from 'execa'
 import { afterEach, describe, expect, test } from 'vitest'
-import { buildRemoteCommandInvocation, buildRemoteTerminalInvocation } from '#/system/ssh/commands.ts'
+import {
+  buildCanonicalSshConnectionSnapshot,
+  buildRemoteCommandInvocation,
+  buildRemoteTerminalInvocation,
+} from '#/system/ssh/commands.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 
 const originalPath = process.env.PATH
@@ -69,6 +73,41 @@ describe('remote ssh command builders', () => {
     const invocation = buildRemoteTerminalInvocation(target(), '/srv/repo', { cols: 80, rows: 24 })
 
     expect(invocation.command).toBe('ssh')
+  })
+
+  test('binds ControlPath to the complete captured SSH connection snapshot', () => {
+    const withConnection = (effectiveConfig: string): RemoteRepoTarget => {
+      const remote = target()
+      return { ...remote, sshConnection: buildCanonicalSshConnectionSnapshot(remote, effectiveConfig) }
+    }
+    const controlPath = (remote: RemoteRepoTarget): string | undefined =>
+      buildRemoteCommandInvocation(remote, { type: 'printHome' }).args.find((arg) => arg.startsWith('ControlPath='))
+    const base = ['hostname example.test', 'user deploy', 'port 22', 'proxycommand route-a %n %h'].join('\n')
+    const changedProxy = ['hostname example.test', 'user deploy', 'port 22', 'proxycommand route-b %n %h'].join('\n')
+    const changedIdentity = [base, 'identityfile /keys/deploy-b'].join('\n')
+    const changedHostKey = [base, 'hostkeyalias deploy-b', 'userknownhostsfile /known-hosts/b'].join('\n')
+
+    expect(controlPath(withConnection(base))).toBe(controlPath(withConnection(base)))
+    expect(controlPath(withConnection(changedProxy))).not.toBe(controlPath(withConnection(base)))
+    expect(controlPath(withConnection(changedIdentity))).not.toBe(controlPath(withConnection(base)))
+    expect(controlPath(withConnection(changedHostKey))).not.toBe(controlPath(withConnection(base)))
+  })
+
+  test('replays the alias as %n while captured HostName fixes %h for commands and terminals', () => {
+    const remote = { ...target(), host: 'edge.example.test' }
+    const sshConnection = buildCanonicalSshConnectionSnapshot(
+      remote,
+      ['hostname edge.example.test', 'user deploy', 'port 22', 'proxycommand route --alias %n --host %h'].join('\n'),
+    )
+    const captured = { ...remote, sshConnection }
+    const command = buildRemoteCommandInvocation(captured, { type: 'printHome' })
+    const terminal = buildRemoteTerminalInvocation(captured, '/srv/repo', { cols: 80, rows: 24 })
+
+    for (const invocation of [command, terminal]) {
+      expect(invocation.args).toEqual(expect.arrayContaining(['-F', expect.any(String), '-o', 'hostname=edge.example.test']))
+      expect(invocation.args).toContain('proxycommand=route --alias %n --host %h')
+      expect(invocation.args.at(-2)).toBe('prod')
+    }
   })
 
   test('remote terminal startup shell command runs before returning to an interactive shell', () => {

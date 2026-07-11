@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { useRouter } from '@tanstack/react-router'
+import type { HistoryState } from '@tanstack/history'
 import { useStoreWithEqualityFn } from 'zustand/traditional'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -10,6 +11,10 @@ import { isWorkspacePaneStaticTabType, type WorkspacePaneTabType } from '#/share
 import { workspaceNavigationHistoryEntryEqual } from '#/web/stores/repos/navigation-history-entry.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { workspacePaneRouteNavigationBlockedForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
+import {
+  observePrimaryWindowHistoryNavigation,
+  type PrimaryWindowPresentationToken,
+} from '#/web/primary-window-presentation.ts'
 
 export type WorkspaceNavigationRouteContext =
   | { kind: 'empty'; repoId: string }
@@ -34,11 +39,11 @@ type WorkspaceNavigationBrowserHistoryAction =
   { href: string; type: 'BACK' | 'FORWARD' | 'PUSH' | 'REPLACE' } | { href: string; type: 'GO'; index: number }
 
 interface WorkspaceNavigationRouterHistory {
-  state: { location: { href: string } }
+  state: { location: { href: string; state: HistoryState } }
   history: {
     subscribe: (
       cb: (event: {
-        location: { href: string }
+        location: { href: string; state: HistoryState }
         action: { type: 'BACK' | 'FORWARD' | 'PUSH' | 'REPLACE' } | { type: 'GO'; index: number }
       }) => void,
     ) => () => void
@@ -61,16 +66,6 @@ export function useWorkspaceNavigationHistory({
   const router = useRouter({ warn: false }) as WorkspaceNavigationRouterHistory | null
   const routeHref = router?.state.location.href ?? currentBrowserLocationHref()
   const recordWorkspaceNavigation = useReposStore((s) => s.recordWorkspaceNavigation)
-
-  useEffect(() => {
-    if (!router) return
-    return router.history.subscribe(({ location, action }) => {
-      browserHistoryAction =
-        action.type === 'GO'
-          ? { href: location.href, type: 'GO', index: action.index }
-          : { href: location.href, type: action.type }
-    })
-  }, [router])
 
   useEffect(() => {
     if (!entry) return
@@ -99,6 +94,21 @@ export function useWorkspaceNavigationHistory({
     )
     clearBrowserHistoryAction(routeHref)
   }, [entry, recordWorkspaceNavigation, replaceCurrent, replaceCurrentEntry, routeHref])
+}
+
+/** One primary-window subscription owns both presentation arbitration and browser traversal metadata. */
+export function usePrimaryWindowHistoryPresentationObserver(): void {
+  const router = useRouter({ warn: false }) as WorkspaceNavigationRouterHistory | null
+  useEffect(() => {
+    if (!router) return
+    return router.history.subscribe(({ location, action }) => {
+      observePrimaryWindowHistoryNavigation({ href: location.href, state: location.state, action })
+      browserHistoryAction =
+        action.type === 'GO'
+          ? { href: location.href, type: 'GO', index: action.index }
+          : { href: location.href, type: action.type }
+    })
+  }, [router])
 }
 
 function useWorkspaceNavigationHistoryEntry(
@@ -211,32 +221,39 @@ function workspaceNavigationHistoryRouteSnapshotEqual(
 export function restoreWorkspaceNavigationEntry(
   entry: WorkspaceNavigationHistoryEntry,
   routeNavigation: PrimaryWindowRouteNavigation,
+  options?: { presentationToken?: PrimaryWindowPresentationToken },
 ): boolean {
   if (workspaceNavigationEntryBlocksWorkspacePaneInteraction(entry)) return false
   switch (entry.route.kind) {
     case 'empty':
-      routeNavigation.openRepoRoot(entry.repoId)
+      routeNavigation.openRepoRoot(entry.repoId, options)
       return true
     case 'dashboard':
-      routeNavigation.openRepoDashboard(entry.repoId)
+      routeNavigation.openRepoDashboard(entry.repoId, options)
       return true
     case 'newWorktree':
-      routeNavigation.openRepoNewWorktree(entry.repoId, { returnTo: entry.route.returnTo })
+      routeNavigation.openRepoNewWorktree(entry.repoId, { ...options, returnTo: entry.route.returnTo })
       return true
     case 'branch':
       if (entry.route.workspacePaneTab === 'terminal' && entry.route.terminalSessionId) {
-        return routeNavigation.openRepoBranchTerminal(entry.repoId, entry.route.branchName, entry.route.terminalSessionId)
+        return routeNavigation.openRepoBranchTerminal(
+          entry.repoId,
+          entry.route.branchName,
+          entry.route.terminalSessionId,
+          options,
+        )
       }
       if (!entry.route.workspacePaneTab) {
-        return routeNavigation.openRepoBranch(entry.repoId, entry.route.branchName)
+        return routeNavigation.openRepoBranch(entry.repoId, entry.route.branchName, options)
       }
       if (!isWorkspacePaneStaticTabType(entry.route.workspacePaneTab)) {
-        return routeNavigation.openRepoBranch(entry.repoId, entry.route.branchName)
+        return routeNavigation.openRepoBranch(entry.repoId, entry.route.branchName, options)
       }
       return routeNavigation.openRepoBranchTab(
         entry.repoId,
         entry.route.branchName,
         entry.route.workspacePaneTab,
+        options,
       )
   }
 }

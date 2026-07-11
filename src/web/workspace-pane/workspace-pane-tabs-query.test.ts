@@ -1,75 +1,156 @@
 import { QueryClient } from '@tanstack/react-query'
-import { afterEach, describe, expect, test } from 'vitest'
-import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
-import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+import type { WorkspacePaneTabsEntry, WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
+import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import {
   readWorkspacePaneTabsForTarget,
   refreshWorkspacePaneTabsQueryData,
-  setWorkspacePaneTabsForTargetQueryData,
   workspacePaneTabsByTargetFromQueryData,
   workspacePaneTabsQueryKey,
   workspacePaneTabsQueryOptions,
-  workspacePaneTabsTargetVersion,
+  writeWorkspacePaneTabsSnapshotQueryData,
   type WorkspacePaneTabsQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import { installWorkspacePaneTabsTestBridge } from '#/web/test-utils/bridge.ts'
-import { setClientBridgeForTests } from '#/web/client-bridge.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
+import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
+
+vi.mock('#/web/workspace-pane/workspace-pane-tabs-client.ts', () => ({
+  workspacePaneTabsClient: {
+    list: vi.fn(),
+    replace: vi.fn(),
+    update: vi.fn(),
+    onChanged: vi.fn(() => () => {}),
+  },
+}))
 
 const REPO_ROOT = '/tmp/workspace-pane-tabs-query-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-test'
 
-afterEach(() => {
-  setClientBridgeForTests(null)
+beforeEach(() => {
+  vi.mocked(workspacePaneTabsClient.list).mockReset()
 })
 
-describe('workspace pane tabs query cache', () => {
-  test('keeps no-worktree branch cache entries static-only', () => {
+describe('workspace pane tabs revisioned query cache', () => {
+  test('normalizes the complete snapshot and keeps no-worktree targets static-only', () => {
     const queryClient = new QueryClient()
-
-    setWorkspacePaneTabsForTargetQueryData(
-      {
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: 'feature/no-worktree',
-        worktreePath: null,
-        tabs: [
+    const accepted = writeWorkspacePaneTabsSnapshotQueryData(
+      REPO_ROOT,
+      REPO_RUNTIME_ID,
+      snapshot(4, [
+        entry('feature/no-worktree', null, [
           workspacePaneStaticTabEntry('status'),
           workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1'),
           workspacePaneStaticTabEntry('files'),
-        ],
-      },
+        ]),
+      ]),
+      queryClient,
+    )
+
+    expect(accepted).toBe(true)
+    expect(readTabs(queryClient, 'feature/no-worktree', null)).toEqual([workspacePaneStaticTabEntry('status')])
+    expect(
+      queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, REPO_RUNTIME_ID)),
+    ).toEqual(snapshot(4, [entry('feature/no-worktree', null, [workspacePaneStaticTabEntry('status')])]))
+  })
+
+  test('rejects an older full snapshot without losing newer changes on another target', () => {
+    const queryClient = new QueryClient()
+    writeWorkspacePaneTabsSnapshotQueryData(
+      REPO_ROOT,
+      REPO_RUNTIME_ID,
+      snapshot(8, [
+        entry('feature/a', null, [workspacePaneStaticTabEntry('history')]),
+        entry('feature/b', null, [workspacePaneStaticTabEntry('status')]),
+      ]),
       queryClient,
     )
 
     expect(
-      readWorkspacePaneTabsForTarget(
-        {
-          repoRoot: REPO_ROOT,
-          repoRuntimeId: REPO_RUNTIME_ID,
-          branchName: 'feature/no-worktree',
-          worktreePath: null,
-        },
+      writeWorkspacePaneTabsSnapshotQueryData(
+        REPO_ROOT,
+        REPO_RUNTIME_ID,
+        snapshot(7, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])]),
         queryClient,
       ),
-    ).toEqual([workspacePaneStaticTabEntry('status')])
-    expect(
-      queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, REPO_RUNTIME_ID)),
-    ).toEqual([entry('feature/no-worktree', null, [workspacePaneStaticTabEntry('status')])])
+    ).toBe(false)
+
+    expect(readTabs(queryClient, 'feature/a', null)).toEqual([workspacePaneStaticTabEntry('history')])
+    expect(readTabs(queryClient, 'feature/b', null)).toEqual([workspacePaneStaticTabEntry('status')])
   })
 
-  test('dedupes polluted branch cache entries on write', () => {
+  test('accepts an equal revision as the canonical complete snapshot', () => {
     const queryClient = new QueryClient()
-    queryClient.setQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, REPO_RUNTIME_ID), [
-      entry('feature/duplicate', '/tmp/worktree', [workspacePaneStaticTabEntry('status')]),
-      entry('feature/duplicate', '/tmp/worktree', [workspacePaneStaticTabEntry('history')]),
-    ])
+    writeWorkspacePaneTabsSnapshotQueryData(
+      REPO_ROOT,
+      REPO_RUNTIME_ID,
+      snapshot(3, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])]),
+      queryClient,
+    )
+
+    expect(
+      writeWorkspacePaneTabsSnapshotQueryData(
+        REPO_ROOT,
+        REPO_RUNTIME_ID,
+        snapshot(3, [entry('feature/a', null, [workspacePaneStaticTabEntry('history')])]),
+        queryClient,
+      ),
+    ).toBe(true)
+    expect(readTabs(queryClient, 'feature/a', null)).toEqual([workspacePaneStaticTabEntry('history')])
+  })
+
+  test('manual refresh uses server revisions when responses resolve out of order', async () => {
+    const queryClient = new QueryClient()
+    const requests: Array<ReturnType<typeof Promise.withResolvers<WorkspacePaneTabsSnapshot>>> = []
+    vi.mocked(workspacePaneTabsClient.list).mockImplementation(async () => {
+      const request = Promise.withResolvers<WorkspacePaneTabsSnapshot>()
+      requests.push(request)
+      return await request.promise
+    })
+
+    const olderRequest = refreshWorkspacePaneTabsQueryData(REPO_ROOT, REPO_RUNTIME_ID, queryClient)
+    await vi.waitFor(() => expect(requests).toHaveLength(1))
+    const newerRequest = refreshWorkspacePaneTabsQueryData(REPO_ROOT, REPO_RUNTIME_ID, queryClient)
+    await vi.waitFor(() => expect(requests).toHaveLength(2))
+
+    requests[1]!.resolve(snapshot(12, [entry('feature/a', null, [workspacePaneStaticTabEntry('history')])]))
+    await newerRequest
+    requests[0]!.resolve(snapshot(11, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])]))
+    await olderRequest
+
+    expect(readTabs(queryClient, 'feature/a', null)).toEqual([workspacePaneStaticTabEntry('history')])
+  })
+
+  test('query structural sharing rejects a lower-revision fetch result', async () => {
+    const queryClient = new QueryClient()
+    writeWorkspacePaneTabsSnapshotQueryData(
+      REPO_ROOT,
+      REPO_RUNTIME_ID,
+      snapshot(20, [entry('feature/a', null, [workspacePaneStaticTabEntry('history')])]),
+      queryClient,
+    )
+    vi.mocked(workspacePaneTabsClient.list).mockResolvedValue(
+      snapshot(19, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])]),
+    )
+    await queryClient.invalidateQueries({
+      queryKey: workspacePaneTabsQueryKey(REPO_ROOT, REPO_RUNTIME_ID),
+      exact: true,
+    })
+
+    await queryClient.fetchQuery(workspacePaneTabsQueryOptions(REPO_ROOT, REPO_RUNTIME_ID))
+
+    expect(readTabs(queryClient, 'feature/a', null)).toEqual([workspacePaneStaticTabEntry('history')])
+  })
+
+  test('test target seeds preserve the cached server revision', () => {
+    const queryClient = new QueryClient()
+    writeWorkspacePaneTabsSnapshotQueryData(REPO_ROOT, REPO_RUNTIME_ID, snapshot(5, []), queryClient)
 
     setWorkspacePaneTabsForTargetQueryData(
       {
         repoRoot: REPO_ROOT,
         repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: 'feature/new',
+        branchName: 'feature/a',
         worktreePath: null,
         tabs: [workspacePaneStaticTabEntry('status')],
       },
@@ -78,56 +159,7 @@ describe('workspace pane tabs query cache', () => {
 
     expect(
       queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, REPO_RUNTIME_ID)),
-    ).toEqual([
-      entry('feature/duplicate', '/tmp/worktree', [workspacePaneStaticTabEntry('history')]),
-      entry('feature/new', null, [workspacePaneStaticTabEntry('status')]),
-    ])
-  })
-
-  test('reads and retargets worktree entries by worktree identity', () => {
-    const queryClient = new QueryClient()
-    setWorkspacePaneTabsForTargetQueryData(
-      {
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: 'feature/old',
-        worktreePath: '/tmp/worktree',
-        tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'), workspacePaneStaticTabEntry('status')],
-      },
-      queryClient,
-    )
-
-    expect(
-      readWorkspacePaneTabsForTarget(
-        {
-          repoRoot: REPO_ROOT,
-          repoRuntimeId: REPO_RUNTIME_ID,
-          branchName: 'feature/new',
-          worktreePath: '/tmp/worktree',
-        },
-        queryClient,
-      ),
-    ).toEqual([workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'), workspacePaneStaticTabEntry('status')])
-
-    setWorkspacePaneTabsForTargetQueryData(
-      {
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: 'feature/new',
-        worktreePath: '/tmp/worktree',
-        tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'), workspacePaneStaticTabEntry('history')],
-      },
-      queryClient,
-    )
-
-    expect(
-      queryClient.getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(REPO_ROOT, REPO_RUNTIME_ID)),
-    ).toEqual([
-      entry('feature/new', '/tmp/worktree', [
-        workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
-        workspacePaneStaticTabEntry('history'),
-      ]),
-    ])
+    ).toEqual(snapshot(5, [entry('feature/a', null, [workspacePaneStaticTabEntry('status')])]))
   })
 
   test('persists worktree and branch-only entries under separate target identities', () => {
@@ -143,106 +175,29 @@ describe('workspace pane tabs query cache', () => {
     })
 
     expect(
-      workspacePaneTabsByTargetFromQueryData([
-        entry('feature/current', '/tmp/worktree', [
-          workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'),
-          workspacePaneStaticTabEntry('status'),
+      workspacePaneTabsByTargetFromQueryData(
+        snapshot(1, [
+          entry('feature/current', '/tmp/worktree', [workspacePaneStaticTabEntry('status')]),
+          entry('feature/current', null, [workspacePaneStaticTabEntry('history')]),
         ]),
-        entry('feature/current', null, [workspacePaneStaticTabEntry('history')]),
-      ]),
+      ),
     ).toEqual({
-      [worktreeTargetKey]: [workspacePaneRuntimeTabEntry('terminal', 'term-111111111111111111111'), workspacePaneStaticTabEntry('status')],
+      [worktreeTargetKey]: [workspacePaneStaticTabEntry('status')],
       [branchTargetKey]: [workspacePaneStaticTabEntry('history')],
     })
   })
-
-  test('manual refresh keeps the latest request when an older request resolves first', async () => {
-    const queryClient = new QueryClient()
-    const requests = installDeferredWorkspacePaneTabsList()
-
-    const olderRefresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, REPO_RUNTIME_ID, queryClient)
-    await Promise.resolve()
-    const newerRefresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, REPO_RUNTIME_ID, queryClient)
-    await Promise.resolve()
-
-    requests[0]!.resolve([entry('feature/a', null, [workspacePaneStaticTabEntry('status')])])
-    await olderRefresh
-    expect(queryClient.getQueryData(workspacePaneTabsQueryKey(REPO_ROOT, REPO_RUNTIME_ID))).toBeUndefined()
-
-    requests[1]!.resolve([entry('feature/a', null, [workspacePaneStaticTabEntry('history')])])
-    await newerRefresh
-
-    expect(
-      readWorkspacePaneTabsForTarget(
-        {
-          repoRoot: REPO_ROOT,
-          repoRuntimeId: REPO_RUNTIME_ID,
-          branchName: 'feature/a',
-          worktreePath: null,
-        },
-        queryClient,
-      ),
-    ).toEqual([workspacePaneStaticTabEntry('history')])
-  })
-
-  test('manual refresh keeps the latest request when an older request resolves last', async () => {
-    const queryClient = new QueryClient()
-    const requests = installDeferredWorkspacePaneTabsList()
-
-    const olderRefresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, REPO_RUNTIME_ID, queryClient)
-    await Promise.resolve()
-    const newerRefresh = refreshWorkspacePaneTabsQueryData(REPO_ROOT, REPO_RUNTIME_ID, queryClient)
-    await Promise.resolve()
-
-    requests[1]!.resolve([entry('feature/a', null, [workspacePaneStaticTabEntry('history')])])
-    await newerRefresh
-
-    requests[0]!.resolve([entry('feature/a', null, [workspacePaneStaticTabEntry('status')])])
-    await olderRefresh
-
-    expect(
-      readWorkspacePaneTabsForTarget(
-        {
-          repoRoot: REPO_ROOT,
-          repoRuntimeId: REPO_RUNTIME_ID,
-          branchName: 'feature/a',
-          worktreePath: null,
-        },
-        queryClient,
-      ),
-    ).toEqual([workspacePaneStaticTabEntry('history')])
-  })
-
-  test('query success updates target version bookkeeping for accepted data', async () => {
-    const queryClient = new QueryClient()
-    const target = {
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branchName: 'feature/a',
-      worktreePath: null,
-    }
-    setWorkspacePaneTabsForTargetQueryData(
-      {
-        ...target,
-        tabs: [workspacePaneStaticTabEntry('status')],
-      },
-      queryClient,
-    )
-    const versionBeforeQuerySuccess = workspacePaneTabsTargetVersion(target)
-    await queryClient.invalidateQueries({
-      queryKey: workspacePaneTabsQueryKey(REPO_ROOT, REPO_RUNTIME_ID),
-      exact: true,
-    })
-    installWorkspacePaneTabsTestBridge({
-      listWorkspaceTabs: async () => [entry('feature/a', null, [workspacePaneStaticTabEntry('history')])],
-    })
-
-    await queryClient.fetchQuery(workspacePaneTabsQueryOptions(REPO_ROOT, REPO_RUNTIME_ID))
-
-    expect(workspacePaneTabsTargetVersion(target)).toBeGreaterThan(versionBeforeQuerySuccess)
-    expect(readWorkspacePaneTabsForTarget(target, queryClient)).toEqual([workspacePaneStaticTabEntry('history')])
-  })
 })
+
+function readTabs(queryClient: QueryClient, branchName: string, worktreePath: string | null) {
+  return readWorkspacePaneTabsForTarget(
+    { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branchName, worktreePath },
+    queryClient,
+  )
+}
+
+function snapshot(revision: number, entries: WorkspacePaneTabsEntry[]): WorkspacePaneTabsSnapshot {
+  return { revision, entries }
+}
 
 function entry(
   branchName: string,
@@ -250,17 +205,4 @@ function entry(
   tabs: WorkspacePaneTabsEntry['tabs'],
 ): WorkspacePaneTabsEntry {
   return { repoRoot: REPO_ROOT, branchName, worktreePath, tabs }
-}
-
-function installDeferredWorkspacePaneTabsList(): Array<{
-  resolve: (entries: WorkspacePaneTabsEntry[]) => void
-}> {
-  const requests: Array<{ resolve: (entries: WorkspacePaneTabsEntry[]) => void }> = []
-  installWorkspacePaneTabsTestBridge({
-    listWorkspaceTabs: async () =>
-      await new Promise<WorkspacePaneTabsEntry[]>((resolve) => {
-        requests.push({ resolve })
-      }),
-  })
-  return requests
 }

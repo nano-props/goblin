@@ -3,6 +3,12 @@ import type { PullRequestInfo } from '#/shared/git-types.ts'
 import type { PullRequestEntry, RepoSnapshot } from '#/shared/api-types.ts'
 import { normalizeRemoteRepoId } from '#/shared/remote-repo.ts'
 
+const successfulRemovalLifecycle = {
+  beforeRemove: async () => ({ ok: true as const, message: '' }),
+  afterWorktreeRemoved: async () => ({ ok: true as const, message: '' }),
+  afterRemoveFailed: async () => {},
+}
+
 const mocks = vi.hoisted(() => ({
   checkGitAvailable: vi.fn(),
   createWorktree: vi.fn(),
@@ -1188,11 +1194,15 @@ describe('repo mutation invalidation publishing', () => {
       target: { branch: 'feature/a' },
     })
 
-    const second = removeRepoWorktree('/tmp/repo', {
-      branch: 'feature/b',
-      worktreePath: '/tmp/repo-worktree',
-      alsoDeleteBranch: false,
-    })
+    const second = removeRepoWorktree(
+      '/tmp/repo',
+      {
+        branch: 'feature/b',
+        worktreePath: '/tmp/repo-worktree',
+        alsoDeleteBranch: false,
+      },
+      successfulRemovalLifecycle,
+    )
     await Promise.resolve()
     await Promise.resolve()
 
@@ -1255,11 +1265,15 @@ describe('repo mutation invalidation publishing', () => {
       ],
     })
 
-    const second = removeRepoWorktree('/tmp/repo-linked', {
-      branch: 'feature/b',
-      worktreePath: '/tmp/repo-linked',
-      alsoDeleteBranch: false,
-    })
+    const second = removeRepoWorktree(
+      '/tmp/repo-linked',
+      {
+        branch: 'feature/b',
+        worktreePath: '/tmp/repo-linked',
+        alsoDeleteBranch: false,
+      },
+      successfulRemovalLifecycle,
+    )
     await Promise.resolve()
     await Promise.resolve()
 
@@ -1716,14 +1730,26 @@ describe('repo mutation invalidation publishing', () => {
     ])
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
     const { readRepoOperationsSnapshot } = await import('#/server/modules/repo-read-paths.ts')
+    const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
+    const afterWorktreeRemoved = vi.fn(async () => ({ ok: true as const, message: '' }))
 
-    const result = await removeRepoWorktree('/tmp/repo', {
-      branch: 'feature/a',
-      worktreePath: '/tmp/repo-worktree',
-      alsoDeleteBranch: false,
-    })
+    const result = await removeRepoWorktree(
+      '/tmp/repo',
+      {
+        branch: 'feature/a',
+        worktreePath: '/tmp/repo-worktree',
+        alsoDeleteBranch: false,
+      },
+      { ...successfulRemovalLifecycle, beforeRemove, afterWorktreeRemoved },
+    )
 
     expect(result).toEqual({ ok: true, message: 'ok' })
+    expect(beforeRemove).toHaveBeenCalledOnce()
+    expect(afterWorktreeRemoved).toHaveBeenCalledOnce()
+    expect(beforeRemove.mock.invocationCallOrder[0]).toBeLessThan(mocks.removeWorktree.mock.invocationCallOrder[0]!)
+    expect(mocks.removeWorktree.mock.invocationCallOrder[0]).toBeLessThan(
+      afterWorktreeRemoved.mock.invocationCallOrder[0]!,
+    )
     expect((await readRepoOperationsSnapshot('/tmp/repo')).operations).toEqual([])
     expect((await readRepoOperationsSnapshot('/tmp/repo', { includeSettled: true })).operations[0]).toMatchObject({
       kind: 'remove-worktree',
@@ -1742,6 +1768,74 @@ describe('repo mutation invalidation publishing', () => {
     )
   })
 
+  test('removeRepoWorktree reconciles application state when Git removal fails after commit', async () => {
+    mocks.removeWorktree.mockResolvedValueOnce({ ok: false, message: 'git remove failed' })
+    mocks.getWorktrees.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
+      {
+        path: '/tmp/repo-worktree',
+        branch: 'feature/a',
+        isBare: false,
+        isPrimary: false,
+        isDirty: false,
+        changeCount: 0,
+      },
+    ])
+    const afterRemoveFailed = vi.fn(async () => {})
+    const afterWorktreeRemoved = vi.fn(async () => ({ ok: true as const, message: '' }))
+    const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    await expect(
+      removeRepoWorktree(
+        '/tmp/repo',
+        {
+          branch: 'feature/a',
+          worktreePath: '/tmp/repo-worktree',
+          alsoDeleteBranch: false,
+        },
+        { ...successfulRemovalLifecycle, afterRemoveFailed, afterWorktreeRemoved },
+      ),
+    ).resolves.toEqual({ ok: false, message: 'git remove failed' })
+
+    expect(afterRemoveFailed).toHaveBeenCalledOnce()
+    expect(afterWorktreeRemoved).not.toHaveBeenCalled()
+    expect(mocks.pruneServerRepoSettingsForRemovedWorktree).not.toHaveBeenCalled()
+  })
+
+  test('removeRepoWorktree prunes settings when application finalization fails after removal', async () => {
+    mocks.getWorktrees.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
+      {
+        path: '/tmp/repo-worktree',
+        branch: 'feature/a',
+        isBare: false,
+        isPrimary: false,
+        isDirty: false,
+        changeCount: 0,
+      },
+    ])
+    const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await removeRepoWorktree(
+      '/tmp/repo',
+      {
+        branch: 'feature/a',
+        worktreePath: '/tmp/repo-worktree',
+        alsoDeleteBranch: false,
+      },
+      {
+        ...successfulRemovalLifecycle,
+        afterWorktreeRemoved: async () => ({ ok: false, message: 'tabs finalize failed' }),
+      },
+    )
+
+    expect(result).toEqual({ ok: false, message: 'tabs finalize failed', repoChanged: true })
+    expect(mocks.pruneServerRepoSettingsForRemovedWorktree).toHaveBeenCalledWith({
+      repoId: '/tmp/repo',
+      worktreePath: '/tmp/repo-worktree',
+    })
+  })
+
   test('removeRepoWorktree publishes affected snapshot invalidations once after worktree and branch deletion success', async () => {
     mocks.getWorktrees.mockResolvedValueOnce([
       { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
@@ -1756,11 +1850,15 @@ describe('repo mutation invalidation publishing', () => {
     ])
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await removeRepoWorktree('/tmp/repo', {
-      branch: 'feature/a',
-      worktreePath: '/tmp/repo-worktree',
-      alsoDeleteBranch: true,
-    })
+    const result = await removeRepoWorktree(
+      '/tmp/repo',
+      {
+        branch: 'feature/a',
+        worktreePath: '/tmp/repo-worktree',
+        alsoDeleteBranch: true,
+      },
+      successfulRemovalLifecycle,
+    )
 
     expect(result).toEqual({ ok: true, message: 'ok' })
     expectRepoSnapshotInvalidations(
@@ -1791,14 +1889,22 @@ describe('repo mutation invalidation publishing', () => {
     mocks.deleteBranch.mockResolvedValueOnce({ ok: false, message: 'fatal: delete failed' })
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await removeRepoWorktree('/tmp/repo', {
-      branch: 'feature/a',
-      worktreePath: '/tmp/repo-worktree',
-      alsoDeleteBranch: true,
-    })
+    const result = await removeRepoWorktree(
+      '/tmp/repo',
+      {
+        branch: 'feature/a',
+        worktreePath: '/tmp/repo-worktree',
+        alsoDeleteBranch: true,
+      },
+      successfulRemovalLifecycle,
+    )
 
-    expect(result).toEqual({ ok: false, message: 'fatal: delete failed' })
+    expect(result).toEqual({ ok: false, message: 'fatal: delete failed', repoChanged: true })
     expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', undefined)
+    expect(mocks.pruneServerRepoSettingsForRemovedWorktree).toHaveBeenCalledWith({
+      repoId: '/tmp/repo',
+      worktreePath: '/tmp/repo-worktree',
+    })
     expectRepoSnapshotInvalidations(
       {
         repoId: '/tmp/repo',
@@ -1826,11 +1932,15 @@ describe('repo mutation invalidation publishing', () => {
     mocks.getWorktrees.mockResolvedValueOnce(worktrees).mockResolvedValueOnce(worktrees)
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await removeRepoWorktree('/tmp/repo-linked', {
-      branch: 'feature/a',
-      worktreePath: '/tmp/repo-linked',
-      alsoDeleteBranch: true,
-    })
+    const result = await removeRepoWorktree(
+      '/tmp/repo-linked',
+      {
+        branch: 'feature/a',
+        worktreePath: '/tmp/repo-linked',
+        alsoDeleteBranch: true,
+      },
+      successfulRemovalLifecycle,
+    )
 
     expect(result).toEqual({ ok: true, message: 'ok' })
     expect(mocks.getCurrentBranch).toHaveBeenCalledWith('/tmp/repo', { signal: undefined })
@@ -1869,11 +1979,15 @@ describe('repo mutation invalidation publishing', () => {
     mocks.pruneServerRepoSettingsForRemovedWorktree.mockResolvedValueOnce(true)
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await removeRepoWorktree('/tmp/repo', {
-      branch: 'feature/a',
-      worktreePath: '/tmp/repo-worktree',
-      alsoDeleteBranch: false,
-    })
+    const result = await removeRepoWorktree(
+      '/tmp/repo',
+      {
+        branch: 'feature/a',
+        worktreePath: '/tmp/repo-worktree',
+        alsoDeleteBranch: false,
+      },
+      successfulRemovalLifecycle,
+    )
 
     expect(result).toEqual({ ok: true, message: 'ok' })
     expect(mocks.pruneServerRepoSettingsForRemovedWorktree).toHaveBeenCalledWith({
@@ -1881,6 +1995,36 @@ describe('repo mutation invalidation publishing', () => {
       worktreePath: '/tmp/repo-worktree',
     })
     expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['settings-snapshot'])
+  })
+
+  test('removeRepoWorktree reports settings failure after removing the worktree', async () => {
+    mocks.getWorktrees.mockResolvedValueOnce([
+      { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true, isDirty: false },
+      {
+        path: '/tmp/repo-worktree',
+        branch: 'feature/a',
+        isBare: false,
+        isPrimary: false,
+        isDirty: false,
+        changeCount: 0,
+      },
+    ])
+    mocks.pruneServerRepoSettingsForRemovedWorktree.mockRejectedValueOnce(new Error('settings write failed'))
+    const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+
+    const result = await removeRepoWorktree(
+      '/tmp/repo',
+      {
+        branch: 'feature/a',
+        worktreePath: '/tmp/repo-worktree',
+        alsoDeleteBranch: false,
+      },
+      successfulRemovalLifecycle,
+    )
+
+    expect(result).toEqual({ ok: false, message: 'error.settings-write-title', repoChanged: true })
+    expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', undefined)
+    expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
   })
 
   test('removeRepoWorktree refuses before removing when branch deletion would fail', async () => {
@@ -1898,14 +2042,20 @@ describe('repo mutation invalidation publishing', () => {
     mocks.isAncestor.mockResolvedValueOnce(false)
     mocks.getUpstream.mockResolvedValueOnce(null)
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
+    const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
 
-    const result = await removeRepoWorktree('/tmp/repo', {
-      branch: 'feature/a',
-      worktreePath: '/tmp/repo-worktree',
-      alsoDeleteBranch: true,
-    })
+    const result = await removeRepoWorktree(
+      '/tmp/repo',
+      {
+        branch: 'feature/a',
+        worktreePath: '/tmp/repo-worktree',
+        alsoDeleteBranch: true,
+      },
+      { ...successfulRemovalLifecycle, beforeRemove },
+    )
 
     expect(result).toEqual({ ok: false, message: 'error.cannot-remove-unpushed-worktree' })
+    expect(beforeRemove).not.toHaveBeenCalled()
     expect(mocks.removeWorktree).not.toHaveBeenCalled()
     expect(mocks.deleteBranch).not.toHaveBeenCalled()
     expectNoRepoSnapshotInvalidations()
@@ -1925,11 +2075,15 @@ describe('repo mutation invalidation publishing', () => {
     ])
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await removeRepoWorktree('/tmp/repo', {
-      branch: 'feature/a',
-      worktreePath: '/tmp/repo-worktree',
-      alsoDeleteBranch: false,
-    })
+    const result = await removeRepoWorktree(
+      '/tmp/repo',
+      {
+        branch: 'feature/a',
+        worktreePath: '/tmp/repo-worktree',
+        alsoDeleteBranch: false,
+      },
+      successfulRemovalLifecycle,
+    )
 
     expect(result).toEqual({ ok: false, message: 'error.cannot-remove-locked-worktree' })
     expect(mocks.removeWorktree).not.toHaveBeenCalled()
@@ -1942,11 +2096,15 @@ describe('repo mutation invalidation publishing', () => {
     ])
     const { removeRepoWorktree } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await removeRepoWorktree('/tmp/repo', {
-      branch: 'feature/a',
-      worktreePath: '/tmp/repo-worktree',
-      alsoDeleteBranch: false,
-    })
+    const result = await removeRepoWorktree(
+      '/tmp/repo',
+      {
+        branch: 'feature/a',
+        worktreePath: '/tmp/repo-worktree',
+        alsoDeleteBranch: false,
+      },
+      successfulRemovalLifecycle,
+    )
 
     expect(result).toEqual({ ok: false, message: 'error.cannot-remove-dirty-worktree' })
     expect(mocks.removeWorktree).not.toHaveBeenCalled()

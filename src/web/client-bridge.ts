@@ -1,10 +1,7 @@
 import type { ClientNativeCapability } from '#/shared/bootstrap.ts'
 import type { IpcEvent, IpcRequest } from '#/shared/api-types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
-import type {
-  ClientHostBridge,
-  ClientBridge,
-} from '#/web/client-bridge-types.ts'
+import type { ClientHostBridge, ClientBridge } from '#/web/client-bridge-types.ts'
 import { readNativeBridge } from '#/web/native-bridge.ts'
 import { createHttpClipboardBackend } from '#/web/clipboard/http-backend.ts'
 import { normalizeClientServerClientId, readWebBootstrap } from '#/web/client-bootstrap-bridge.ts'
@@ -12,8 +9,14 @@ import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import { createClientAppRealtime, type AppRealtimeServerConfig } from '#/web/app-realtime-client.ts'
 import { createServerTerminalClient } from '#/web/client-terminal.ts'
 import { createServerWorkspacePaneTabsClient } from '#/web/client-workspace-pane-tabs.ts'
+import { createServerWorkspacePaneRuntimeClient } from '#/web/client-workspace-pane-runtime.ts'
 import { createTerminalNotificationProvider } from '#/web/terminal-notification-provider.ts'
-import type { ClientAppRealtimeLifecycle, ClientTerminal, ClientWorkspacePaneTabs } from '#/web/client-bridge-types.ts'
+import type {
+  ClientAppRealtimeLifecycle,
+  ClientTerminal,
+  ClientWorkspacePaneRuntime,
+  ClientWorkspacePaneTabs,
+} from '#/web/client-bridge-types.ts'
 
 /**
  * Compute the client's capability set from the live `goblinNative`
@@ -88,6 +91,7 @@ interface ClientServerRealtimeClients {
   appRealtime: ClientAppRealtimeLifecycle
   terminal: ClientTerminal
   workspacePaneTabs: ClientWorkspacePaneTabs
+  workspacePaneRuntime: ClientWorkspacePaneRuntime
 }
 
 // The app realtime client is *expensive*: it owns the shared WebSocket,
@@ -113,6 +117,7 @@ function getOrCreateRealtimeClients(): ClientServerRealtimeClients {
       },
     }),
     workspacePaneTabs: createServerWorkspacePaneTabsClient(appRealtime),
+    workspacePaneRuntime: createServerWorkspacePaneRuntimeClient(appRealtime),
   }
   return memoizedRealtimeClients
 }
@@ -224,6 +229,9 @@ function createClientBridge(): ClientBridge {
     },
     workspacePaneTabs() {
       return realtimeClients.workspacePaneTabs
+    },
+    workspacePaneRuntime() {
+      return realtimeClients.workspacePaneRuntime
     },
   }
 }

@@ -22,6 +22,7 @@ import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.
 import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
 import { MAX_PASTE_BATCH_BYTES } from '#/shared/clipboard-paste.ts'
+import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 
 export interface ServerAppOptions {
   version: string
@@ -34,6 +35,7 @@ export interface ServerAppOptions {
    */
   accessToken: string
   appRealtimeHost: ServerAppRealtimeHost
+  worktreeRemovalApplication: ServerWorktreeRemovalHost
   /**
    * The actual host the server is listening on. Used by the CORS
    * origin predicate to allow same-machine browsers. Defaults to
@@ -123,7 +125,11 @@ export function createApp(options: ServerAppOptions): Hono {
   // by a gateway / reverse proxy when the server is bound to a LAN address.
   app.route(
     '/api',
-    createHealthRoutes({ version: options.version, startedAt: options.startedAt, appRealtimeHost: options.appRealtimeHost }),
+    createHealthRoutes({
+      version: options.version,
+      startedAt: options.startedAt,
+      appRealtimeHost: options.appRealtimeHost,
+    }),
   )
   // Login / logout / whoami. `whoami` is gated by the same middleware
   // the data routes use, but `login` and `logout` are intentionally
@@ -215,7 +221,7 @@ export function createApp(options: ServerAppOptions): Hono {
   // (home directory path + platform identifier).
   app.route('/api/host', createHostRoutes())
   app.route('/api/remote', createRemoteRoutes())
-  app.route('/api/repo', createRepoRoutes())
+  app.route('/api/repo', createRepoRoutes({ worktreeRemovalApplication: options.worktreeRemovalApplication }))
   app.route('/api/repo', createRepoViewRoutes())
   app.route('/api/clipboard', createClipboardRoutes())
   app.route('/ws', createRealtimeRoutes({ accessToken: options.accessToken, appRealtimeHost: options.appRealtimeHost }))

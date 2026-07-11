@@ -2,8 +2,6 @@ import type {
   TerminalAttachInput,
   TerminalAttachResult,
   TerminalBellRealtimeEvent,
-  TerminalCreateResult,
-  TerminalCreateInput,
   TerminalIdentityEvent,
   TerminalLifecycleEvent,
   TerminalListSessionsInput,
@@ -13,7 +11,6 @@ import type {
   TerminalResizeInput,
   TerminalRestartInput,
   TerminalSessionInput,
-  TerminalSessionSummary,
   TerminalSessionsRecoveryResult,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
@@ -45,6 +42,7 @@ export type TerminalRealtimeMessage =
   | {
       type: 'session-closed'
       terminalRuntimeSessionId: string
+      terminalRuntimeGeneration: number
       terminalSessionId: string
       repoRoot: string
       worktreePath: string
@@ -57,9 +55,7 @@ export interface TerminalSocketRequestInputs {
   resize: TerminalResizeInput
   takeover: TerminalTakeoverInput
   close: TerminalSessionInput
-  'list-sessions': TerminalListSessionsInput
   'recover-sessions': TerminalListSessionsInput
-  create: TerminalCreateInput
   prune: TerminalPruneInput
 }
 
@@ -70,9 +66,7 @@ export interface TerminalSocketResponseOutputs {
   resize: TerminalMutationResult
   takeover: TerminalTakeoverResult
   close: TerminalMutationResult
-  'list-sessions': TerminalSessionSummary[]
   'recover-sessions': TerminalSessionsRecoveryResult
-  create: TerminalCreateResult
   prune: { pruned: number; remaining: number }
 }
 

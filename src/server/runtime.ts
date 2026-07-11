@@ -5,9 +5,12 @@ import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.
 import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
 import { WorkerBackedPtySupervisor } from '#/server/terminal/pty-supervisor-worker.ts'
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
+import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 
-export interface ServerRuntimeOptions extends Omit<ServerAppOptions, 'appRealtimeHost' | 'serverHost' | 'serverPort'> {
-  appRealtimeHost?: ServerAppRealtimeHost
+interface ServerRuntimeBaseOptions extends Omit<
+  ServerAppOptions,
+  'appRealtimeHost' | 'worktreeRemovalApplication' | 'serverHost' | 'serverPort'
+> {
   /**
    * On-disk path of the bundled PTY worker entry. When provided, the
    * runtime uses a dedicated subprocess for node-pty work, so a PTY
@@ -22,6 +25,15 @@ export interface ServerRuntimeOptions extends Omit<ServerAppOptions, 'appRealtim
   serverPort: number
 }
 
+export type ServerRuntimeOptions = ServerRuntimeBaseOptions &
+  (
+    | { appRealtimeHost?: undefined; worktreeRemovalApplication?: undefined }
+    | {
+        appRealtimeHost: ServerAppRealtimeHost
+        worktreeRemovalApplication: ServerWorktreeRemovalHost
+      }
+  )
+
 export interface ServerRuntime {
   app: Hono
   appRealtimeHost: ServerAppRealtimeHost
@@ -31,6 +43,7 @@ export interface ServerRuntime {
 export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntime {
   const {
     appRealtimeHost: providedAppRealtimeHost,
+    worktreeRemovalApplication: providedWorktreeRemovalApplication,
     ptyWorkerEntry,
     gCommandEntry,
     gCommandBinDir,
@@ -56,9 +69,17 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
           : undefined,
       })
   const appRealtimeHost = providedAppRealtimeHost ?? (runtime?.host as ServerAppRealtimeHost)
+  const worktreeRemovalApplication = providedWorktreeRemovalApplication ?? runtime?.worktreeRemovalApplication
+  if (!worktreeRemovalApplication) throw new Error('worktree removal application is required')
   // `appOptions` carries `accessToken` (renamed from the pre-PR
   // `internalSecret`); it's forwarded straight to `createApp`.
-  const app = createApp({ ...appOptions, appRealtimeHost, serverHost, serverPort })
+  const app = createApp({
+    ...appOptions,
+    appRealtimeHost,
+    worktreeRemovalApplication,
+    serverHost,
+    serverPort,
+  })
   let stopped = false
   return {
     app,

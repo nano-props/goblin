@@ -3,6 +3,7 @@ import type { RealtimeBroker, RealtimeSocket } from '#/server/realtime/realtime-
 import type { ServerAppRealtimeDiagnostics, ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
 import { serverLogger } from '#/server/logger.ts'
 import {
+  isAppRealtimeWorkspacePaneRuntimeAction,
   isAppRealtimeWorkspacePaneTabsAction,
   normalizeAppRealtimeClientMessage,
 } from '#/shared/app-realtime-validators.ts'
@@ -26,6 +27,15 @@ import {
   handleWorkspacePaneTabsRealtimeRequestMessage,
   type WorkspacePaneTabsRealtimeRequestMessage,
 } from '#/server/workspace-pane/workspace-pane-tabs-runtime-realtime.ts'
+import {
+  handleWorkspacePaneRuntimeRealtimeRequestMessage,
+  type WorkspacePaneRuntimeRealtimeRequestMessage,
+} from '#/server/workspace-pane/workspace-pane-runtime-realtime.ts'
+import type {
+  WorkspacePaneRuntimeSocketAction,
+  WorkspacePaneRuntimeSocketRequestInputs,
+  WorkspacePaneRuntimeSocketResponseOutputs,
+} from '#/shared/workspace-pane-runtime.ts'
 
 type MaybePromise<T> = T | Promise<T>
 
@@ -48,6 +58,13 @@ export interface AppRealtimeRuntimeOptions {
       userId: string,
       input: WorkspacePaneTabsSocketRequestInputs[TAction],
     ) => MaybePromise<WorkspacePaneTabsSocketResponseOutputs[TAction]>
+  }
+  workspacePaneRuntimeHandlers: {
+    [TAction in WorkspacePaneRuntimeSocketAction]: (
+      clientId: string,
+      userId: string,
+      input: WorkspacePaneRuntimeSocketRequestInputs[TAction],
+    ) => MaybePromise<WorkspacePaneRuntimeSocketResponseOutputs[TAction]>
   }
   onShutdown(): void
 }
@@ -116,6 +133,21 @@ export function createAppRealtimeHost(options: AppRealtimeRuntimeOptions): Serve
       }
       const rawSocket = socket as RealtimeSocket
       const bufferedSocket = bufferedSocketByRawSocket.get(rawSocket)
+      if (isAppRealtimeWorkspacePaneRuntimeAction(message.action)) {
+        // Runtime open responses may carry an authoritative provider frame
+        // (terminal currently does). Keep provider realtime behind that frame;
+        // the handler resumes with the matching flush boundary.
+        bufferedSocket?.pause()
+        void handleWorkspacePaneRuntimeRealtimeRequestMessage(
+          options.workspacePaneRuntimeHandlers,
+          clientId,
+          userId,
+          rawSocket,
+          message as WorkspacePaneRuntimeRealtimeRequestMessage,
+          bufferedSocket,
+        )
+        return
+      }
       if (isAppRealtimeWorkspacePaneTabsAction(message.action)) {
         void handleWorkspacePaneTabsRealtimeRequestMessage(
           options.workspacePaneTabsHandlers,

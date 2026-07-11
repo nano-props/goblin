@@ -16,11 +16,11 @@ import type { RealtimeSocket } from '#/server/realtime/realtime-broker.ts'
 type MaybePromise<T> = T | Promise<T>
 
 // Action → handler table. The handler receives the union-shaped input
-// and the WS request's `clientId`/`userId`. `clientId` is folded
-// into the input for actions that need it (e.g. `create` needs the
-// `clientId` it didn't ask the client to provide); `userId` is
-// threaded through to the host unchanged. See `identity.ts` for
-// the routing-vs-identity distinction.
+// and the WS request's `clientId`/`userId`. `clientId` is folded into
+// actions that attach a terminal controller; `userId` is threaded through to
+// the host unchanged. Runtime tab creation intentionally lives on the
+// workspace-pane application command surface. See `identity.ts` for the
+// routing-vs-identity distinction.
 export function createTerminalRealtimeHandlers(host: ServerTerminalActionHost): {
   [TAction in TerminalSocketRequestAction]: (
     clientId: string,
@@ -47,14 +47,8 @@ export function createTerminalRealtimeHandlers(host: ServerTerminalActionHost): 
     close(clientId, userId, input) {
       return host.close(clientId, userId, input)
     },
-    'list-sessions'(clientId, userId, input) {
-      return host.listSessions(clientId, userId, input)
-    },
     'recover-sessions'(clientId, userId, input) {
       return host.recoverSessions(clientId, userId, input)
-    },
-    create(clientId, userId, input) {
-      return host.create(clientId, userId, { ...input, clientId })
     },
     prune(clientId, userId, input) {
       return host.prune(clientId, userId, input)
@@ -121,36 +115,34 @@ function sendRealtimeResponse(socket: RealtimeSocket, message: TerminalSocketRes
 // during the request can race ahead of the authoritative response and
 // split the client's transition across two sources.
 //
-// `attach`, `restart`, and `create` all return snapshot hydration
+// `attach` and `restart` both return snapshot hydration
 // data that the client applies as one boundary.
 // `takeover` does not return a fresh snapshot, but its response is still
 // the authoritative identity/geometry handshake for the new controller;
 // the same socket must not observe the identity event before that
 // response settles.
 export function shouldPauseRealtimeRequest(action: TerminalSocketRequestAction): boolean {
-  return (
-    action === 'attach' ||
-    action === 'restart' ||
-    action === 'create' ||
-    action === 'takeover' ||
-    action === 'recover-sessions'
-  )
+  return action === 'attach' || action === 'restart' || action === 'takeover' || action === 'recover-sessions'
 }
 
-function outputFlushBoundaryFromResponse(message: TerminalSocketResponseMessage): AppRealtimeOutputFlushBoundaryContext | null {
+function outputFlushBoundaryFromResponse(
+  message: TerminalSocketResponseMessage,
+): AppRealtimeOutputFlushBoundaryContext | null {
   if (!message.ok) return null
   if (message.action === 'recover-sessions') {
     return message.payload.snapshots.map((snapshot) => ({
       terminalRuntimeSessionId: snapshot.terminalRuntimeSessionId,
+      terminalRuntimeGeneration: snapshot.terminalRuntimeGeneration,
       outputEra: snapshot.outputEra,
       seq: snapshot.snapshotSeq,
     }))
   }
-  if (message.action !== 'attach' && message.action !== 'restart' && message.action !== 'create') return null
+  if (message.action !== 'attach' && message.action !== 'restart') return null
   const payload = message.payload
   if (!payload.ok) return null
   return {
     terminalRuntimeSessionId: payload.terminalRuntimeSessionId,
+    terminalRuntimeGeneration: payload.terminalRuntimeGeneration,
     outputEra: payload.outputEra,
     seq: payload.snapshotSeq,
   }

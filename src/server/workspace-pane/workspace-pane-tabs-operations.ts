@@ -1,39 +1,11 @@
 import {
-  isWorkspacePaneRuntimeTabEntry,
-  type WorkspacePaneRuntimeTabType,
   type WorkspacePaneStaticTabType,
   type WorkspacePaneTabEntry,
-  workspacePaneRuntimeTabEntry,
-  workspacePaneRuntimeTabSessionId,
   workspacePaneStaticTabEntry,
   workspacePaneTabEntryIdentity,
   workspacePaneTabsInsertAfterIdentity,
 } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs.ts'
-
-export function workspacePaneTabsWithRuntimeTab(
-  current: readonly WorkspacePaneTabEntry[],
-  type: WorkspacePaneRuntimeTabType,
-  sessionId: string,
-  options?: { insertAfterIdentity?: string | null },
-): WorkspacePaneTabEntry[] {
-  if (sessionId.length === 0) return [...current]
-  if (
-    current.some(
-      (entry) =>
-        isWorkspacePaneRuntimeTabEntry(entry) &&
-        entry.type === type &&
-        workspacePaneRuntimeTabSessionId(entry) === sessionId,
-    )
-  ) {
-    return [...current]
-  }
-  return workspacePaneTabsInsertAfterIdentity(
-    current,
-    workspacePaneRuntimeTabEntry(type, sessionId),
-    options?.insertAfterIdentity,
-  )
-}
 
 export function workspacePaneTabsWithUpdateOperation(
   current: readonly WorkspacePaneTabEntry[],

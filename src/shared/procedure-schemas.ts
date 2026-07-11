@@ -98,6 +98,7 @@ export const REPO_PROCEDURE_SCHEMAS = {
   }),
   removeWorktree: v.object({
     cwd: v.string(),
+    repoRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
     branch: v.string(),
     worktreePath: v.string(),
     alsoDeleteBranch: v.boolean(),

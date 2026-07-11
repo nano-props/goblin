@@ -1,8 +1,13 @@
 // @vitest-environment node
 
 import path from 'node:path'
+import { testPhysicalWorktreeCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { createTerminalSessionEnsurer } from '#/server/terminal/terminal-session-ensurer.ts'
+import {
+  createTerminalSessionEnsurer,
+  type TerminalSessionEnsureContext,
+} from '#/server/terminal/terminal-session-ensurer.ts'
+import { issueTestPhysicalWorktreeCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
@@ -31,6 +36,7 @@ vi.mock('#/system/ssh/config.ts', () => ({
       displayName: 'prod:repo',
     },
   })),
+  resolveRemoteTargetWithConfigFingerprint: vi.fn(),
 }))
 
 const USER_ID = 'user_terminal_ensurer'
@@ -40,6 +46,39 @@ const WORKTREE_PATH = '/repo/worktree'
 const BRANCH_NAME = 'feature/worktree'
 const REMOTE_REPO_ROOT = 'ssh-config://prod/srv/repo'
 const REMOTE_WORKTREE_PATH = '/srv/repo'
+
+function ensureContext(context: Omit<TerminalSessionEnsureContext, 'signal'>): TerminalSessionEnsureContext {
+  return { ...context, signal: new AbortController().signal }
+}
+
+function remotePhysicalWorktreeCapability() {
+  return issueTestPhysicalWorktreeCapability({
+    identity: {
+      kind: 'remote',
+      executionNamespaceId: '0123456789abcdef0123456789abcdef',
+      endpoint: REMOTE_WORKTREE_PATH,
+    },
+    userId: USER_ID,
+    repoRoot: REMOTE_REPO_ROOT,
+    repoRuntimeId: REPO_RUNTIME_ID,
+    worktreePath: REMOTE_WORKTREE_PATH,
+    execution: {
+      kind: 'remote',
+      canonicalWorktreePath: REMOTE_WORKTREE_PATH,
+      configFingerprint: 'ensurer-test-config',
+      endpointMarker: { deviceId: '10', inode: '20' },
+      target: {
+        id: REMOTE_REPO_ROOT,
+        alias: 'prod',
+        host: 'example.test',
+        user: 'deploy',
+        port: 22,
+        remotePath: REMOTE_WORKTREE_PATH,
+        displayName: 'prod:repo',
+      },
+    },
+  })
+}
 
 describe('terminal session ensurer', () => {
   beforeEach(() => {
@@ -68,6 +107,14 @@ describe('terminal session ensurer', () => {
       broadcastSessionsChanged,
     })
 
+    const context = ensureContext({
+      terminalSessionId: 'term-locallocallocallocal1',
+      cols: 100,
+      rows: 40,
+      scopedWorktreePath: path.resolve(WORKTREE_PATH),
+      physicalWorktreeCapability: testPhysicalWorktreeCapability(WORKTREE_PATH),
+      action: 'created',
+    })
     const result = await ensurer.ensure(
       USER_ID,
       {
@@ -78,28 +125,19 @@ describe('terminal session ensurer', () => {
         startupShellCommand: 'echo ready',
         clientId: 'client_terminal_ensurer',
       },
-      {
-        terminalSessionId: 'term-locallocallocallocal1',
-        cols: 100,
-        rows: 40,
-        scopedWorktreePath: path.resolve(WORKTREE_PATH),
-        action: 'created',
-      },
+      context,
     )
 
     expect(result).toMatchObject({
       ok: true,
+      terminalSessionsRevision: 7,
       action: 'created',
       terminalSessionId: 'term-locallocallocallocal1',
       canonicalCols: 100,
       canonicalRows: 40,
     })
-    expect(getWorktrees).toHaveBeenCalledWith(REPO_ROOT, { includeStatus: false })
-    expect(resolveKnownWorktree).toHaveBeenCalledWith(
-      [{ path: WORKTREE_PATH, branch: BRANCH_NAME, isBare: false, isPrimary: false }],
-      WORKTREE_PATH,
-      BRANCH_NAME,
-    )
+    expect(getWorktrees).not.toHaveBeenCalled()
+    expect(resolveKnownWorktree).not.toHaveBeenCalled()
     expect(ensureSession).toHaveBeenCalledWith({
       userId: USER_ID,
       scope: terminalSessionRuntimeScope(REPO_ROOT, REPO_RUNTIME_ID),
@@ -108,48 +146,16 @@ describe('terminal session ensurer', () => {
       branch: BRANCH_NAME,
       terminalSessionId: 'term-locallocallocallocal1',
       worktreePath: path.resolve(WORKTREE_PATH),
+      physicalWorktreeCapability: testPhysicalWorktreeCapability(WORKTREE_PATH),
       cwd: path.resolve(WORKTREE_PATH),
       cols: 100,
       rows: 40,
       clientId: 'client_terminal_ensurer',
       startupShellCommand: 'echo ready',
       env: undefined,
+      signal: context.signal,
     })
     expect(broadcastSessionsChanged).toHaveBeenCalledWith(USER_ID, REPO_ROOT)
-  })
-
-  test('returns the worktree resolution failure without ensuring a session', async () => {
-    vi.mocked(resolveKnownWorktree).mockReturnValueOnce({
-      ok: false,
-      message: 'error.worktree-not-found-for-branch',
-    })
-    const ensureSession = vi.fn(async (input) => attachResult(input.terminalSessionId, input.cols, input.rows))
-    const broadcastSessionsChanged = vi.fn()
-    const ensurer = createTerminalSessionEnsurer({
-      manager: { ensureSession },
-      broadcastSessionsChanged,
-    })
-
-    await expect(
-      ensurer.ensure(
-        USER_ID,
-        {
-          repoRoot: REPO_ROOT,
-          repoRuntimeId: REPO_RUNTIME_ID,
-          branch: BRANCH_NAME,
-          worktreePath: WORKTREE_PATH,
-        },
-        {
-          terminalSessionId: 'term-locallocallocallocal1',
-          cols: 80,
-          rows: 24,
-          scopedWorktreePath: path.resolve(WORKTREE_PATH),
-          action: 'created',
-        },
-      ),
-    ).resolves.toEqual({ ok: false, message: 'error.worktree-not-found-for-branch' })
-    expect(ensureSession).not.toHaveBeenCalled()
-    expect(broadcastSessionsChanged).not.toHaveBeenCalled()
   })
 
   test('ensures remote terminal sessions through an SSH invocation', async () => {
@@ -169,13 +175,14 @@ describe('terminal session ensurer', () => {
         worktreePath: REMOTE_WORKTREE_PATH,
         startupShellCommand: 'pwd',
       },
-      {
+      ensureContext({
         terminalSessionId: 'term-remoteremoteremote001',
         cols: 120,
         rows: 32,
         scopedWorktreePath: REMOTE_WORKTREE_PATH,
+        physicalWorktreeCapability: remotePhysicalWorktreeCapability(),
         action: 'reused',
-      },
+      }),
     )
 
     expect(result).toMatchObject({
@@ -185,7 +192,7 @@ describe('terminal session ensurer', () => {
       canonicalCols: 120,
       canonicalRows: 32,
     })
-    expect(resolveRemoteTarget).toHaveBeenCalledWith({ alias: 'prod', remotePath: REMOTE_WORKTREE_PATH })
+    expect(resolveRemoteTarget).not.toHaveBeenCalled()
     expect(ensureSession).toHaveBeenCalledTimes(1)
     const input = ensureSession.mock.calls[0]?.[0]
     expect(input).toEqual(
@@ -197,20 +204,22 @@ describe('terminal session ensurer', () => {
         branch: BRANCH_NAME,
         terminalSessionId: 'term-remoteremoteremote001',
         worktreePath: REMOTE_WORKTREE_PATH,
+        physicalWorktreeCapability: remotePhysicalWorktreeCapability(),
         cwd: process.cwd(),
         cols: 120,
         rows: 32,
       }),
     )
     expect(input?.command).toBeTruthy()
-    expect(input?.args).toEqual(expect.arrayContaining(['-tt', '--', 'prod']))
+    expect(input?.args).toEqual(expect.arrayContaining(['-F', '/dev/null', '-tt', 'hostname=example.test']))
+    expect(input?.args?.at(-2)).toBe('prod')
     expect(input?.args?.at(-1)).toContain(REMOTE_WORKTREE_PATH)
     expect(input?.args?.at(-1)).toContain('pwd')
     expect(input?.startupShellCommand).toBeUndefined()
     expect(broadcastSessionsChanged).toHaveBeenCalledWith(USER_ID, REMOTE_REPO_ROOT)
   })
 
-  test('returns remote config errors without ensuring a session', async () => {
+  test('uses the captured remote target after SSH config changes', async () => {
     vi.mocked(resolveRemoteTarget).mockRejectedValueOnce(new Error('error.ssh-config-changed'))
     const ensureSession = vi.fn(async (input) => attachResult(input.terminalSessionId, input.cols, input.rows))
     const broadcastSessionsChanged = vi.fn()
@@ -228,17 +237,18 @@ describe('terminal session ensurer', () => {
           branch: BRANCH_NAME,
           worktreePath: REMOTE_WORKTREE_PATH,
         },
-        {
+        ensureContext({
           terminalSessionId: 'term-remoteremoteremote001',
           cols: 80,
           rows: 24,
           scopedWorktreePath: REMOTE_WORKTREE_PATH,
+          physicalWorktreeCapability: remotePhysicalWorktreeCapability(),
           action: 'created',
-        },
+        }),
       ),
-    ).resolves.toEqual({ ok: false, message: 'error.ssh-config-changed' })
-    expect(ensureSession).not.toHaveBeenCalled()
-    expect(broadcastSessionsChanged).not.toHaveBeenCalled()
+    ).resolves.toMatchObject({ ok: true })
+    expect(resolveRemoteTarget).not.toHaveBeenCalled()
+    expect(ensureSession).toHaveBeenCalledOnce()
   })
 })
 
@@ -246,10 +256,12 @@ function attachResult(
   terminalSessionId: string,
   cols: number,
   rows: number,
-): Extract<TerminalAttachResult, { ok: true }> {
+): Extract<TerminalAttachResult, { ok: true }> & { terminalSessionsRevision: number } {
   return {
     ok: true,
+    terminalSessionsRevision: 7,
     terminalRuntimeSessionId: `pty_${terminalSessionId}`,
+        terminalRuntimeGeneration: 1,
     snapshot: '',
     snapshotSeq: 0,
    outputEra: 0,

@@ -6,14 +6,46 @@ import {
   type PtySupervisor,
 } from '#/server/terminal/pty-supervisor.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
+import { StickyCompletion } from '#/server/terminal/sticky-completion.ts'
 
 interface PtyEntry {
   runtime: TerminalPtyRuntime
+  exitCompletion: StickyCompletion
+  exitDisposable: { dispose(): void } | null
+  killRequested: boolean
+  killOperation: Promise<void> | null
 }
 
 export function createInProcessPtySupervisor(): PtySupervisor {
   const entries = new Map<string, PtyEntry>()
   let shuttingDown = false
+
+  const requestKill = (entry: PtyEntry): void => {
+    if (entry.killRequested) return
+    entry.killRequested = true
+    try {
+      entry.runtime.kill()
+    } catch (error) {
+      entry.killRequested = false
+      throw error
+    }
+  }
+
+  const sharedKillOperation = (entry: PtyEntry): Promise<void> => {
+    if (entry.exitCompletion.completed) return Promise.resolve()
+    if (entry.killOperation) return entry.killOperation
+    try {
+      requestKill(entry)
+    } catch (error) {
+      return Promise.reject(error)
+    }
+    const operation = entry.exitCompletion.wait(2_000, 'PTY close timed out').finally(() => {
+      if (!entry.exitCompletion.completed) entry.killRequested = false
+      if (entry.killOperation === operation) entry.killOperation = null
+    })
+    entry.killOperation = operation
+    return operation
+  }
 
   return {
     mode: 'in-process',
@@ -21,8 +53,31 @@ export function createInProcessPtySupervisor(): PtySupervisor {
       const result = spawnTerminalPtyRuntime(input)
       if (!result.ok) return { ok: false, message: result.message }
       const handle = createPtyHandle(createPtySessionId())
-      const entry: PtyEntry = { runtime: result.runtime }
+      const entry: PtyEntry = {
+        runtime: result.runtime,
+        exitCompletion: new StickyCompletion(),
+        exitDisposable: null,
+        killRequested: false,
+        killOperation: null,
+      }
       entries.set(handle.ptySessionId, entry)
+      try {
+        const exitDisposable = entry.runtime.onExit(() => {
+          if (entry.exitCompletion.completed) return
+          entry.exitDisposable?.dispose()
+          entry.exitDisposable = null
+          if (entries.get(handle.ptySessionId) === entry) entries.delete(handle.ptySessionId)
+          entry.exitCompletion.complete()
+        })
+        if (entry.exitCompletion.completed) exitDisposable.dispose()
+        else entry.exitDisposable = exitDisposable
+      } catch (error) {
+        entries.delete(handle.ptySessionId)
+        try {
+          entry.runtime.kill()
+        } catch {}
+        return { ok: false, message: error instanceof Error ? error.message : String(error) }
+      }
       return { ok: true, handle, processName: entry.runtime.processName() || 'terminal' }
     },
     write(handle, data) {
@@ -33,8 +88,12 @@ export function createInProcessPtySupervisor(): PtySupervisor {
     },
     kill(handle) {
       const entry = entries.get(handle.ptySessionId)
-      entries.delete(handle.ptySessionId)
-      entry?.runtime.kill()
+      if (entry) requestKill(entry)
+    },
+    async killAndWait(handle) {
+      const entry = entries.get(handle.ptySessionId)
+      if (!entry) return
+      await sharedKillOperation(entry)
     },
     onData(handle, listener) {
       const entry = entries.get(handle.ptySessionId)
@@ -45,14 +104,23 @@ export function createInProcessPtySupervisor(): PtySupervisor {
     },
     onExit(handle, listener) {
       const entry = entries.get(handle.ptySessionId)
-      if (!entry) return { dispose: () => {} }
+      let disposed = false
+      if (!entry) {
+        queueMicrotask(() => {
+          if (!disposed) listener(null, null)
+        })
+        return {
+          dispose: () => {
+            disposed = true
+          },
+        }
+      }
       // node-pty's onExit only signals "exited" without (code, signal).
       // The supervisor contract carries both; we pass nulls because the
       // worker is the source of truth for exit metadata and the in-process
       // variant cannot recover it after the fact.
-      return entry.runtime.onExit(() => {
-        entries.delete(handle.ptySessionId)
-        listener(null, null)
+      return entry.exitCompletion.subscribe(() => {
+        if (!disposed) listener(null, null)
       })
     },
     processName(handle) {

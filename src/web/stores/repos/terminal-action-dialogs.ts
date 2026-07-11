@@ -1,11 +1,11 @@
 import { create } from 'zustand'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 export interface TerminalCloseConfirmPayload {
   readonly repoId: string
   readonly targetIdentity: string
-  readonly workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
+  readonly workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
   readonly terminalSessionId: string
   readonly terminalBase: TerminalSessionBase
   readonly processName: string

@@ -53,6 +53,7 @@ export interface TerminalClientSnapshot extends TerminalControllerViewModel {
  */
 export interface TerminalIdentityViewModel extends TerminalControllerViewModel {
   terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: number
   canonicalCols: number
   canonicalRows: number
 }
@@ -76,6 +77,7 @@ export interface TerminalIdentityRealtimeEvent extends TerminalIdentityViewModel
  */
 export interface TerminalLifecycleViewModel {
   terminalRuntimeSessionId: string
+  terminalRuntimeGeneration: number
   phase: TerminalSessionPhase
   message: string | null
   takeoverPending: boolean
@@ -134,15 +136,6 @@ export interface TerminalCreateOptions {
    * workspace-pane navigation can race the eventual create result.
    */
   resolveStartupShellCommand?: () => Promise<string>
-  /**
-   * Optional workspace pane tab identity to anchor the new terminal tab after.
-   * When omitted or null, the new tab appends to the end of the strip.
-   * See `docs/workspace-tab-opener.md`.
-   *
-   * Create dedupe intentionally ignores this field — two creates anchored at
-   * different positions are still the same session shape.
-   */
-  insertAfterIdentity?: string | null
 }
 
 export interface TerminalRepoSnapshot {
@@ -171,7 +164,6 @@ export interface TerminalWorktreeSnapshot {
   terminalWorktreeKey: string
   selectedDescriptor: TerminalDescriptor | null
   sessions: TerminalSessionSummary[]
-  closingSessionIds?: string[]
   count: number
   bellCount: number
   outputActiveCount: number
@@ -180,6 +172,11 @@ export interface TerminalWorktreeSnapshot {
 
 export interface TerminalSessionContextValue {
   createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
+  createTerminalWithAdmission: (
+    base: TerminalSessionBase,
+    options?: TerminalCreateOptions,
+    placement?: import('#/shared/workspace-pane-runtime.ts').WorkspacePaneRuntimeTabPlacement,
+  ) => Promise<import('#/web/components/terminal/terminal-create-admission.ts').TerminalCreateAdmissionResult>
   registerHost: (terminalWorktreeKey: string, host: HTMLElement) => void
   unregisterHost: (terminalWorktreeKey: string, host: HTMLElement) => void
   selectTerminal: (terminalWorktreeKey: string, terminalSessionId: string) => void

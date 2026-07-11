@@ -24,7 +24,7 @@ import {
   openRepoUrl,
   pullRepoBranch,
   pushRepoBranch,
-  removeRepoWorktree,
+  removeCapturedRepoWorktree,
 } from '#/server/modules/repo-write-paths.ts'
 import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
 import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
@@ -38,6 +38,9 @@ import {
 } from '#/server/modules/repo-runtimes.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import type { RepoLogResponse } from '#/shared/api-types.ts'
+import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
+import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
+import type { PhysicalWorktreeCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 
 // Soft-fail envelope returned by `jsonOr` for every repo action that
@@ -46,7 +49,7 @@ import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 // human-readable i18n key, `err.ok === false` is the branch.
 const READ_REPO_ERROR = { ok: false as const, message: 'error.failed-read-repo' }
 
-export function createRepoRoutes() {
+export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWorktreeRemovalHost }) {
   const app = createRouteApp()
   async function jsonOr<T>(run: () => Promise<T>, fallback: T, label: string) {
     try {
@@ -146,9 +149,7 @@ export function createRepoRoutes() {
   })
   app.post('/fetch', async (c) => {
     const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fetch, c)
-    return c.json(
-      await jsonOr(() => fetchRepo(cwd, 'user', c.req.raw.signal), READ_REPO_ERROR, 'fetch'),
-    )
+    return c.json(await jsonOr(() => fetchRepo(cwd, 'user', c.req.raw.signal), READ_REPO_ERROR, 'fetch'))
   })
   app.post('/clone', async (c) => {
     const { url, parentPath, directoryName } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.clone, c)
@@ -159,24 +160,15 @@ export function createRepoRoutes() {
   app.post('/pull', async (c) => {
     const { cwd, branch, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pull, c)
     return c.json(
-      await jsonOr(
-        () => pullRepoBranch(cwd, branch, worktreePath, c.req.raw.signal),
-        READ_REPO_ERROR,
-        'pull',
-      ),
+      await jsonOr(() => pullRepoBranch(cwd, branch, worktreePath, c.req.raw.signal), READ_REPO_ERROR, 'pull'),
     )
   })
   app.post('/push', async (c) => {
     const { cwd, branch } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.push, c)
-    return c.json(
-      await jsonOr(() => pushRepoBranch(cwd, branch, c.req.raw.signal), READ_REPO_ERROR, 'push'),
-    )
+    return c.json(await jsonOr(() => pushRepoBranch(cwd, branch, c.req.raw.signal), READ_REPO_ERROR, 'push'))
   })
   app.post('/create-worktree', async (c) => {
-    const { cwd, worktreePath, mode, worktreeBootstrap } = await parseHttpBody(
-      REPO_PROCEDURE_SCHEMAS.createWorktree,
-      c,
-    )
+    const { cwd, worktreePath, mode, worktreeBootstrap } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.createWorktree, c)
     return c.json(
       await jsonOr(
         () =>
@@ -189,10 +181,7 @@ export function createRepoRoutes() {
     )
   })
   app.post('/delete-branch', async (c) => {
-    const { cwd, branch, force, alsoDeleteUpstream } = await parseHttpBody(
-      REPO_PROCEDURE_SCHEMAS.deleteBranch,
-      c,
-    )
+    const { cwd, branch, force, alsoDeleteUpstream } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.deleteBranch, c)
     return c.json(
       await jsonOr(
         () => deleteRepoBranch(cwd, branch, { force, alsoDeleteUpstream }, c.req.raw.signal),
@@ -202,16 +191,31 @@ export function createRepoRoutes() {
     )
   })
   app.post('/remove-worktree', async (c) => {
-    const { cwd, branch, worktreePath, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream } =
+    const { cwd, repoRuntimeId, branch, worktreePath, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream } =
       await parseHttpBody(REPO_PROCEDURE_SCHEMAS.removeWorktree, c)
+    const userId = userIdFromContext(c)
+    if (!userId) throw new Error('error.unauthorized')
     return c.json(
       await jsonOr(
         () =>
-          removeRepoWorktree(
-            cwd,
-            { branch, worktreePath, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream },
-            c.req.raw.signal,
-          ),
+          options.worktreeRemovalApplication.removeWorktree(userId, {
+            repoRoot: cwd,
+            repoRuntimeId,
+            worktreePath,
+            signal: c.req.raw.signal,
+            remove: async (
+              physicalWorktreeCapability: PhysicalWorktreeCapability,
+              lifecycle: RepoWorktreeRemovalLifecycle,
+              signal: AbortSignal,
+            ) =>
+              await removeCapturedRepoWorktree(
+                cwd,
+                { branch, worktreePath, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream },
+                lifecycle,
+                physicalWorktreeCapability,
+                signal,
+              ),
+          }),
         READ_REPO_ERROR,
         'remove-worktree',
       ),

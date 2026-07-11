@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act } from '@testing-library/react'
+import { act, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
@@ -10,23 +10,29 @@ import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
-import { createBranchSnapshot, createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
+import {
+  createBranchSnapshot,
+  createRepoBranch,
+  installWorkspacePaneTabsTestBridge,
+  resetReposStore,
+  seedRepoWithReadModelForTest,
+} from '#/web/test-utils/bridge.ts'
+import {
+  observedWorkspacePaneRouteCommitForTest,
+  seedInitialObservedWorkspacePaneRouteForTest,
+} from '#/web/test-utils/workspace-pane-navigation.ts'
 import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import {
-  setTerminalSessionCommandBridge,
-} from '#/web/components/terminal/terminal-session-command-bridge.ts'
+import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
-import {
-  readWorkspacePaneTabsForTarget,
-  setWorkspacePaneTabsForTargetQueryData,
-} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
+import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
 const appDataClientMocks = vi.hoisted(() => ({
   clearRecentRepoHistory: vi.fn(async () => {}),
@@ -93,11 +99,13 @@ beforeEach(() => {
       showRepoBranchTerminalSessionSpy(repoId, branch, terminalSessionId)
       return true
     },
+    commitRepoBranchWorkspacePaneRoute: () => false,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},
     openCreateWorktree: () => {},
   }
+  navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
   Object.defineProperty(window, 'goblinNative', {
     configurable: true,
     value: {
@@ -126,7 +134,6 @@ beforeEach(() => {
         resize: vi.fn(),
         takeover: vi.fn(),
         close: vi.fn(),
-        create: vi.fn(),
         pruneTerminals: vi.fn(),
         notifyBell: vi.fn(),
         sendTestNotification: vi.fn(),
@@ -186,14 +193,22 @@ describe('useClientEffectIntentRouter', () => {
     const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, '/tmp/repo-feature')
 
     await renderHookHost()
+    seedInitialObservedWorkspacePaneRouteForTest({
+      repoId: repo.id,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName: 'main',
+      worktreePath: '/tmp/repo-main',
+      route: { kind: 'static', tab: 'status' },
+    })
 
     await act(async () => {
       for (const listener of intentListeners)
         listener({ type: 'terminal-bell-click', repoRoot: repo.id, terminalSessionId, terminalWorktreeKey })
-      await Promise.resolve()
     })
 
-    expect(showRepoBranchTerminalSessionSpy).toHaveBeenCalledWith(repo.id, 'feature/test', terminalSessionId)
+    await waitFor(() => {
+      expect(showRepoBranchTerminalSessionSpy).toHaveBeenCalledWith(repo.id, 'feature/test', terminalSessionId)
+    })
     expect(showRepoBranchWorkspacePaneTabSpy).not.toHaveBeenCalled()
   })
 
@@ -218,19 +233,28 @@ describe('useClientEffectIntentRouter', () => {
         return true
       },
     }
+    navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
     currentRepoId = repo.id
     const terminalSessionId = 'term-222222222222222222222'
     const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, '/tmp/repo-feature')
 
     await renderHookHost()
+    seedInitialObservedWorkspacePaneRouteForTest({
+      repoId: repo.id,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName: 'main',
+      worktreePath: '/tmp/repo-main',
+      route: { kind: 'static', tab: 'status' },
+    })
 
     await act(async () => {
       for (const listener of intentListeners)
         listener({ type: 'terminal-bell-click', repoRoot: repo.id, terminalSessionId, terminalWorktreeKey })
-      await Promise.resolve()
     })
 
-    expect(routeNavigationCalls).toEqual([{ repoId: repo.id, branch: 'feature/test', terminalSessionId }])
+    await waitFor(() => {
+      expect(routeNavigationCalls).toEqual([{ repoId: repo.id, branch: 'feature/test', terminalSessionId }])
+    })
   })
 
   test('close-repo menu action delegates to navigation close', async () => {
@@ -382,24 +406,12 @@ describe('useClientEffectIntentRouter', () => {
     currentRepoId = repo.id
     currentBranchName = 'main'
     currentWorkspacePaneRoute = { kind: 'static', tab: 'status' }
+    useTerminalProjectionHydrationStore.getState().markProjectionReady(repo.id, repo.repoRuntimeId)
     const terminalWorktreeKey = formatTerminalWorktreeKey(repo.id, '/tmp/repo-worktree')
     let visibleSessionIds = ['term-111111111111111111111']
     useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, 'term-111111111111111111111')
     const createTerminal = vi.fn(async (base: TerminalSessionBase) => {
       const terminalSessionId = 'term-222222222222222222222'
-      const currentTabs = readWorkspacePaneTabsForTarget({
-        repoRoot: base.repoRoot,
-        repoRuntimeId: base.repoRuntimeId!,
-        branchName: base.branch,
-        worktreePath: base.worktreePath,
-      })
-      setWorkspacePaneTabsForTargetQueryData({
-        repoRoot: base.repoRoot,
-        repoRuntimeId: base.repoRuntimeId!,
-        branchName: base.branch,
-        worktreePath: base.worktreePath,
-        tabs: [...currentTabs, workspacePaneRuntimeTabEntry('terminal', terminalSessionId)],
-      })
       visibleSessionIds = [...visibleSessionIds, terminalSessionId]
       useReposStore.getState().setSelectedTerminal(terminalWorktreeKey, terminalSessionId)
       return terminalSessionId
@@ -414,7 +426,22 @@ describe('useClientEffectIntentRouter', () => {
       selectTerminal: vi.fn(),
       closeTerminalByDescriptor,
     })
+    installWorkspacePaneTabsTestBridge({
+      onEffectIntent: (cb) => {
+        intentListeners.add(cb)
+        return () => {
+          intentListeners.delete(cb)
+        }
+      },
+    })
     const host = renderInJsdom(<HookHost />)
+    seedInitialObservedWorkspacePaneRouteForTest({
+      repoId: repo.id,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName: 'main',
+      worktreePath: '/tmp/repo-worktree',
+      route: { kind: 'static', tab: 'status' },
+    })
 
     await act(async () => {
       for (const listener of intentListeners) listener({ type: 'terminal-new-tab-requested' })
@@ -422,12 +449,29 @@ describe('useClientEffectIntentRouter', () => {
       await Promise.resolve()
     })
 
-    expect(showRepoBranchTerminalSessionSpy).toHaveBeenCalledWith(repo.id, 'main', 'term-222222222222222222222')
+    await waitFor(() => {
+      expect(showRepoBranchTerminalSessionSpy).toHaveBeenCalledWith(repo.id, 'main', 'term-222222222222222222222')
+    })
 
     currentWorkspacePaneRoute = { kind: 'terminal', terminalSessionId: 'term-222222222222222222222' }
-    host.rerender(<HookHost />)
+    await act(async () => {
+      host.rerender(<HookHost />)
+      await Promise.resolve()
+    })
     showRepoBranchWorkspacePaneTabSpy.mockClear()
     showRepoBranchTerminalSessionSpy.mockClear()
+    expect(
+      workspacePaneTabTargetForBranch(repo.id, 'main', {
+      workspacePaneRoute: currentWorkspacePaneRoute,
+      })?.activeTab?.identity,
+    ).toBe('terminal:term-222222222222222222222')
+    seedInitialObservedWorkspacePaneRouteForTest({
+      repoId: repo.id,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName: 'main',
+      worktreePath: '/tmp/repo-worktree',
+      route: { kind: 'terminal', terminalSessionId: 'term-222222222222222222222' },
+    })
 
     await act(async () => {
       for (const listener of intentListeners) listener({ type: 'workspace-pane-close-tab-or-window-requested' })
@@ -435,11 +479,13 @@ describe('useClientEffectIntentRouter', () => {
       await Promise.resolve()
     })
 
-    expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-222222222222222222222', {
-      repoRoot: repo.id,
-      repoRuntimeId: repo.repoRuntimeId,
-      branch: 'main',
-      worktreePath: '/tmp/repo-worktree',
+    await waitFor(() => {
+      expect(closeTerminalByDescriptor).toHaveBeenCalledWith('term-222222222222222222222', {
+        repoRoot: repo.id,
+        repoRuntimeId: repo.repoRuntimeId,
+        branch: 'main',
+        worktreePath: '/tmp/repo-worktree',
+      })
     })
     expect(showRepoBranchWorkspacePaneTabSpy).toHaveBeenCalledWith(repo.id, 'main', 'status')
     expect(showRepoBranchTerminalSessionSpy).not.toHaveBeenCalled()

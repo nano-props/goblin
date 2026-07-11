@@ -139,21 +139,133 @@ It is useful to keep three lifetimes separate:
 - **View lifetime**: client-local xterm and DOM resources for rendering a session.
 - **Tab lifetime**: user-visible workspace surface that decides which feature resources must be released before the tab is considered closed.
 
-A Workspace Pane tab is not the authoritative owner of a terminal session. The tab is a workspace-pane tab entry in the UI; the terminal server (TerminalSessionManager) and client projection (TerminalSessionProjection) own terminal resource cleanup for the session rendered by that tab. The tab close path is the orchestration boundary that waits for those owners to finish.
+A Workspace Pane tab is not the authoritative owner of a terminal session. The
+tab is a client projection of server-owned runtime membership. The terminal
+manager owns the session and `WorkspacePaneRuntimeApplication` owns the composed
+close command that joins resource cleanup with canonical tab projection. The
+client projection only applies the returned snapshot and local presentation.
 
-This distinction matters for destructive worktree operations. Before a worktree directory is removed, the client should close every worktree-scoped Workspace Pane tab for that worktree and await each tab's close contract. For terminal tabs, that close contract delegates to the client projection's worktree release barrier: cancel pending creates that have not reached the server, wait for in-flight creates that cannot be cancelled, close materialized sessions, and wait for pending durable closes to settle. For future worktree-scoped tabs, such as a file tree or another long-lived tool surface, the same tab close contract should release that tab's resources before the worktree mutation starts.
+Closing a terminal tab is a sequential operation. The command may compute the
+close-back tab before it starts the close, but `TerminalSessionProjection` must
+keep the terminal session visible until the server/runtime close succeeds. Do
+not optimistically hide the session from the tab strip, clear selected terminal
+state, or expose a compensating `closingSessionIds` state for normal tab close.
+Those patterns make the UI render a state that is neither the old tab nor the
+planned close-back tab, and then force route reconciliation or render logic to
+repair it. On failure, the session should still be present because the close did
+not complete. On success, the close path removes the session and commits the
+planned close-back navigation.
 
-Repo routes and server-side repo write paths should not know about Workspace Pane tabs or terminal UI resources. They remain responsible for repository mutation. UI resource release belongs to the Workspace Pane tab lifecycle on the client.
+The server implements every close source through one idempotent session close
+promise. The session remains in the authoritative manager until all pending
+spawns settle and PTY termination is acknowledged. Direct close, prune,
+detached-user cleanup, repo-runtime cleanup, and physical-worktree quiescence
+join that same promise; they cannot detach or broadcast the session twice. A
+termination failure leaves the session addressable in `error` state so a later
+close can retry. Only process shutdown uses an explicitly forceful disposal
+path.
+
+This distinction matters for destructive worktree operations. The client sends
+one repository-removal intent; it does not close tabs first. The server
+`WorktreeRemovalApplication` admits removal by canonical repo/worktree identity
+before the command waits in the repository write queue. The admission spans
+users and repo runtimes because the filesystem worktree is one physical
+resource. Later runtime opens and canonical tab writes for that target are
+rejected. Operations admitted before removal carry a server-issued permit and
+finish before removal begins; a later removal cannot invalidate an earlier
+application command halfway through provider/tab composition. After repository validation succeeds, the application closes and
+awaits all authoritative provider resources. Once quiescence is confirmed, the
+Git removal crosses a non-cancelable commit point. Canonical tabs are removed
+only after Git confirms worktree removal. If Git fails, runtime tabs reconcile
+against the quiesced providers while static tabs remain. Validation failures
+leave all runtime resources untouched. The admission is released when the
+repository command settles, so recreating the same path later does not inherit
+a tombstone.
+
+The repo route only delegates the composed command to the application layer;
+RepoSource and Git code remain unaware of terminal or Workspace Pane types.
+Their required pre-remove lifecycle boundary guarantees that no repository
+worktree deletion can bypass application cleanup.
+
+An ordinary runtime-close response pairs the remaining server sessions with the
+canonical tabs snapshot from the same application command. Worktree removal
+performs the corresponding whole-worktree cleanup internally before Git removal;
+there is no client-callable bulk-close command. The client projects returned
+sessions only if the snapshot revision is accepted. It never enumerates local
+sessions to infer what the server closed, and a stale close response cannot
+overwrite a newer cross-window open projection.
+Realtime/reconnect recovery uses the same rule: the server retries its read
+until the session recovery and canonical tabs snapshot share a stable revision,
+and the client rejects both together when that revision is older than its
+current projection.
 
 ### Terminal create and Workspace Pane navigation
 
-Terminal creation is a serial operation at the workspace-pane target boundary.
+Terminal creation has three architecture layers:
+
+- `TerminalSessionService` and its focused domain collaborators own terminal
+  create/reuse/restore, PTY/session lifecycle, and terminal first-frame data.
+- `WorkspacePaneRuntimeApplication` owns composed runtime open/close commands;
+  `WorktreeRemovalApplication` owns physical removal, provider quiescence, Git
+  commit, and canonical-tab finalization.
+- `TerminalSessionProjection` and Workspace Pane commands own client admission,
+  pending/single-flight intent, startup command resolution, durable provider
+  cleanup, opener attribution, revision-gated local projection, cancellation,
+  and exact route commit for the created `terminalSessionId`.
+
 While `TerminalSessionProjection` reports `createPending` for a
-`terminalWorktreeKey`, user-driven workspace-pane tab interaction for that
+`terminalWorktreeKey`, ordinary user-driven workspace-pane navigation for that
 repo/branch/worktree should fast-fail at the operation entry point:
 tab switching, terminal selection, tab closing, shortcuts, history restore,
 notification jumps, and static-tab opens should not enqueue competing
-navigation.
+navigation. A command-owned route commit is different: it is the committed
+result of the command that already created or joined the terminal session, so it
+must not be rejected just because another terminal create is pending.
+
+Workspace-pane terminal create commands enter the terminal projection first so
+terminal lifecycle can see duplicate or distinct requests immediately and keep
+`createPending` projection-owned. The projection sends the accepted request to
+`workspace-pane-runtime.open`; the server application operation creates or
+restores the terminal and then commits tab membership through the generic
+workspace-pane coordinator. The response contains the terminal first frame,
+session projection, and `WorkspacePaneTabsSnapshot { revision, entries }`.
+
+The admission-leading client command writes those returned tabs into the local
+query projection, records opener facts, and commits the exact terminal route.
+It does not send a second `workspace-pane-tabs.update`. Duplicate admission
+observers must not repeat local tab/route commit.
+
+This is an ordered application operation, not a distributed transaction that
+can safely roll back through the client. The create result must preserve
+both the client admission role (`leader` or `observer`) and the server resource
+disposition (`created`, `reused`, or `restored`); admission leadership is not
+resource ownership. Once the server has accepted create, a later tab/cache or
+route failure must not close the session. The workspace-pane server projection
+materializes every live runtime session, so tab convergence and navigation are
+recoverable projection work, while closing a reused/restored session would be a
+destructive cross-client side effect. Duplicate observers must not repeat the
+tab/route commit.
+
+That success boundary is the completed server application operation, including
+canonical runtime-tab membership. If an unexpected server-side projection
+exception occurs before that boundary, the application reconciles provider
+truth and may close only a resource newly created by that incomplete command.
+Client projection or route failures occur after the server boundary and never
+roll back the resource; command results report them as presentation status, not
+as provider-create failure.
+
+A canonical workspace-pane tab response may arrive after this client has moved
+to a replacement `repoRuntimeId`. Skipping that stale local cache write does not
+turn the already-successful server mutation into a failure. Likewise,
+command-owned navigation must await the router and confirm that the requested
+route became current; navigation rejection or supersession is reported without
+rolling back committed server resources.
+
+Keep these client outcomes separate: `runtimeProjectionApplied` reports local
+terminal-session hydration, snapshot application reports whether the revision
+entered this client's canonical cache, and navigation commit reports the exact
+route result. None of these client projection outcomes decides whether the
+server command succeeded or owns rollback of the server resource.
 
 The pending bit is projection state from the terminal lifecycle queue. Do not
 add client-only focus tokens, request generations, or "is the user still on
@@ -164,18 +276,23 @@ completion order part of the product model.
 The clean flow is:
 
 1. The user invokes create through a command/open-tab entry point.
-2. The entry point rejects immediately if the target projection is already
-   pending.
-3. The terminal projection/server create path owns session creation and
-   returns the server-allocated `terminalSessionId`.
-4. The caller navigates directly to the canonical terminal route for that
-   returned session.
+2. The terminal projection admits the create request and publishes
+   `createPending` before async startup command resolution begins.
+3. The server application command invokes terminal creation, commits the
+   corresponding runtime tab in server order, and returns the server-allocated
+   `terminalSessionId` plus a revisioned full-scope snapshot.
+4. The owning workspace-pane command applies that snapshot through the single
+   revision acceptance boundary, verifies the captured `repoRuntimeId`,
+   records opener facts, and navigates directly to the canonical terminal
+   route for that returned session.
 
 If a create flow needs async preparation before the PTY can be launched, such
 as resolving a file viewer command for "open file in terminal", that preparation
 must be part of the projection-owned create request. Use a create option that is
 resolved inside the terminal create queue after `createPending` is visible; do
 not `await` the preparation in a component and only then call create.
+Terminal create options describe the session being launched; they must not
+carry workspace-pane scheduling callbacks.
 
 Route reconciliation remains a boundary concern: stale or unrenderable explicit
 pane URLs should fast-fail to the bare branch route. Do not replace
@@ -185,6 +302,12 @@ the empty pane (`workspacePaneTab: null`) rather than inventing a tab hit.
 The tab model must apply the same rule before reconciliation effects run:
 generic preferred-tab fallback is only for persisted preferences, never for an
 explicit URL route.
+
+Keep URL parsing routes and command commit targets distinct. A parsed route may
+represent URL-only states such as `invalid-static`; a command-owned commit may
+only target a valid workspace-pane route (`static`, `terminal`) or the empty
+route (`null`). Command commit APIs must require the commit boundary and must
+not silently fall back to ordinary blockable show/select navigation.
 
 URL-backed terminal routes are requested selection, not projection state. A
 route such as `/terminal/{sessionId}` may ask the tab model to render that

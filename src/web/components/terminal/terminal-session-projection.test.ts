@@ -29,6 +29,7 @@ describe('terminal session projection helpers', () => {
       index: 2,
       serverSession: {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-222222222222222222222',
         repoRuntimeId: REPO_RUNTIME_ID,
         repoRoot: REPO_ROOT,
@@ -45,6 +46,7 @@ describe('terminal session projection helpers', () => {
       },
       serverSnapshot: {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         snapshot: 'server-snap',
         snapshotSeq: 9,
       outputEra: 0,
@@ -64,6 +66,7 @@ describe('terminal session projection helpers', () => {
       terminalWorktreeKey: `${REPO_ROOT}\0${WORKTREE_PATH}`,
       hydrateInput: {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         processName: 'zsh',
         canonicalTitle: 'shell',
         phase: 'open',
@@ -89,6 +92,7 @@ describe('terminal session projection helpers', () => {
       index: 1,
       serverSession: {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         repoRuntimeId: REPO_RUNTIME_ID,
         repoRoot: REPO_ROOT,
@@ -121,6 +125,7 @@ describe('terminal session projection helpers', () => {
       index: 1,
       serverSession: {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         repoRuntimeId: REPO_RUNTIME_ID,
         repoRoot: REPO_ROOT,
@@ -154,6 +159,7 @@ describe('terminal session projection helpers', () => {
       index: 1,
       serverSession: {
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         repoRuntimeId: REPO_RUNTIME_ID,
         repoRoot: REPO_ROOT,
@@ -178,6 +184,7 @@ describe('terminal session projection helpers', () => {
       {
         ok: true,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         snapshot: '',
         snapshotSeq: 0,
         outputEra: 0,
@@ -196,16 +203,16 @@ describe('terminal session projection helpers', () => {
     expect(projected.controllerStatus).toBe('connected')
   })
 
-  test('materializes create projection from first-frame payload when sessions list lags', () => {
+  test('materializes create projection from the first-frame payload', () => {
     const projected = projectCreateResultForClient(
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branch: 'main', worktreePath: WORKTREE_PATH },
       {
         ok: true,
         action: 'created',
         terminalSessionId: 'term-111111111111111111111',
-        tabs: [],
-        sessions: [],
+        terminalSessionsRevision: 1,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         processName: 'zsh',
         canonicalTitle: null,
         phase: 'open',
@@ -219,59 +226,42 @@ describe('terminal session projection helpers', () => {
       },
     )
 
-    expect(projected.serverSessions).toEqual([
-      {
-        terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
-        terminalSessionId: 'term-111111111111111111111',
-        repoRuntimeId: REPO_RUNTIME_ID,
-        repoRoot: REPO_ROOT,
-        branch: 'main',
-        worktreePath: WORKTREE_PATH,
-        cwd: WORKTREE_PATH,
-        controller: { clientId: 'client_a', status: 'connected' },
-        processName: 'zsh',
-        canonicalTitle: null,
-        phase: 'open',
-        message: null,
-        cols: 120,
-        rows: 40,
-      },
-    ])
+    expect(projected.serverSession).toEqual({
+      terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
+      terminalSessionId: 'term-111111111111111111111',
+      repoRuntimeId: REPO_RUNTIME_ID,
+      repoRoot: REPO_ROOT,
+      branch: 'main',
+      worktreePath: WORKTREE_PATH,
+      cwd: WORKTREE_PATH,
+      controller: { clientId: 'client_a', status: 'connected' },
+      processName: 'zsh',
+      canonicalTitle: null,
+      phase: 'open',
+      message: null,
+      cols: 120,
+      rows: 40,
+    })
     expect(projected.snapshotByTerminalRuntimeSessionId.get('pty_session_123_aaaaaaaaa')).toEqual({
       terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
       snapshot: 'first-frame',
       snapshotSeq: 3,
     outputEra: 0,
     })
   })
 
-  test('uses authoritative create first-frame metadata when sessions projection already includes the target', () => {
-    const existingSession = {
-      terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
-      terminalSessionId: 'term-111111111111111111111',
-      repoRuntimeId: REPO_RUNTIME_ID,
-      repoRoot: '/server/repo',
-      branch: 'server/main',
-      worktreePath: '/server/repo/worktree',
-      cwd: '/server/repo/worktree/subdir',
-      controller: { clientId: 'client_a', status: 'connected' as const },
-      processName: 'old-shell',
-      canonicalTitle: 'old title',
-      phase: 'opening' as const,
-      message: 'old message',
-      cols: 80,
-      rows: 24,
-    }
-
+  test('uses authoritative create first-frame metadata for the projected session', () => {
     const projected = projectCreateResultForClient(
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branch: 'main', worktreePath: WORKTREE_PATH },
       {
         ok: true,
         action: 'created',
         terminalSessionId: 'term-111111111111111111111',
-        tabs: [],
-        sessions: [existingSession],
+        terminalSessionsRevision: 1,
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         processName: 'new-shell',
         canonicalTitle: 'new title',
         phase: 'open',
@@ -285,48 +275,34 @@ describe('terminal session projection helpers', () => {
       },
     )
 
-    expect(projected.serverSessions).toEqual([
-      {
-        ...existingSession,
+    expect(projected.serverSession).toEqual(
+      expect.objectContaining({
         terminalRuntimeSessionId: 'pty_session_123_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
+        repoRoot: REPO_ROOT,
+        branch: 'main',
+        worktreePath: WORKTREE_PATH,
         processName: 'new-shell',
         canonicalTitle: 'new title',
         phase: 'open',
         message: null,
         cols: 120,
         rows: 40,
-      },
-    ])
+      }),
+    )
   })
 
-  test('replaces stale create projection entry for the same terminal session id', () => {
-    const staleSession = {
-      terminalRuntimeSessionId: 'pty_session_old_aaaaaaaaa',
-      terminalSessionId: 'term-111111111111111111111',
-      repoRuntimeId: REPO_RUNTIME_ID,
-      repoRoot: REPO_ROOT,
-      branch: 'main',
-      worktreePath: WORKTREE_PATH,
-      cwd: WORKTREE_PATH,
-      controller: { clientId: 'client_old', status: 'connected' as const },
-      processName: 'old-shell',
-      canonicalTitle: null,
-      phase: 'open' as const,
-      message: null,
-      cols: 80,
-      rows: 24,
-    }
-
+  test('projects restored create metadata for the durable terminal session id', () => {
     const projected = projectCreateResultForClient(
       { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID, branch: 'main', worktreePath: WORKTREE_PATH },
       {
         ok: true,
         action: 'restored',
         terminalSessionId: 'term-111111111111111111111',
-        tabs: [],
-        sessions: [staleSession],
+        terminalSessionsRevision: 1,
         terminalRuntimeSessionId: 'pty_session_new_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         processName: 'zsh',
         canonicalTitle: 'new-shell',
         phase: 'open',
@@ -340,15 +316,16 @@ describe('terminal session projection helpers', () => {
       },
     )
 
-    expect(projected.serverSessions).toEqual([
+    expect(projected.serverSession).toEqual(
       expect.objectContaining({
         terminalRuntimeSessionId: 'pty_session_new_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         processName: 'zsh',
         canonicalTitle: 'new-shell',
         cols: 120,
         rows: 40,
       }),
-    ])
+    )
   })
 })

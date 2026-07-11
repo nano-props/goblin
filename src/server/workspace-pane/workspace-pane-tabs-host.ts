@@ -1,8 +1,7 @@
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type {
-  WorkspacePaneTabsEntry,
   WorkspacePaneTabsListInput,
   WorkspacePaneTabsReplaceInput,
+  WorkspacePaneTabsSnapshot,
   WorkspacePaneTabsUpdateInput,
 } from '#/shared/workspace-pane-tabs.ts'
 
@@ -13,15 +12,15 @@ export interface ServerWorkspacePaneTabsHost {
     clientId: string,
     userId: string,
     input: WorkspacePaneTabsListInput,
-  ): MaybePromise<WorkspacePaneTabsEntry[]>
+  ): MaybePromise<WorkspacePaneTabsSnapshot>
   replaceTabs(
     clientId: string,
     userId: string,
     input: WorkspacePaneTabsReplaceInput,
-  ): MaybePromise<WorkspacePaneTabEntry[]>
+  ): MaybePromise<WorkspacePaneTabsSnapshot>
   updateTabs(
     clientId: string,
     userId: string,
     input: WorkspacePaneTabsUpdateInput,
-  ): MaybePromise<WorkspacePaneTabEntry[]>
+  ): MaybePromise<WorkspacePaneTabsSnapshot>
 }

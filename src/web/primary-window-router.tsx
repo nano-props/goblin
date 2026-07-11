@@ -15,7 +15,10 @@ import type { SettingsPage } from '#/shared/settings-pages.ts'
 import { branchNameFromSlug, repoIdFromSlug, repoSlugFromId } from '#/web/repo-route-slugs.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { ReposStore } from '#/web/stores/repos/types.ts'
-import { usePrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
+import {
+  usePrimaryWindowRouteActions,
+  type PrimaryWindowRouteNavigation,
+} from '#/web/primary-window-route-navigation.ts'
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import { openRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route.ts'
 
@@ -185,32 +188,41 @@ export function repoRouteViewFromChildRoute(
 }
 
 function useRepoRouteNavigation() {
-  const routeNavigation = usePrimaryWindowRouteNavigation()
+  const routeActions = usePrimaryWindowRouteActions()
+  return primaryWindowRouterCallbacks(routeActions)
+}
+
+export function primaryWindowRouterCallbacks(routeActions: PrimaryWindowRouteNavigation) {
   return {
     onRouteSettingsPageChange: (page: SettingsPage | null) => {
-      if (page) routeNavigation.openSettings(page)
+      if (page) routeActions.openSettings(page)
     },
-    onOpenRepoRoot: (repoId: string) => routeNavigation.openRepoRoot(repoId),
-    onOpenRepoDashboard: (repoId: string) => routeNavigation.openRepoDashboard(repoId),
+    onOpenRepoRoot: (repoId: string) => routeActions.openRepoRoot(repoId),
+    onOpenRepoDashboard: (repoId: string) => routeActions.openRepoDashboard(repoId),
     onOpenRepoBranch: (repoId: string, branchName: string) =>
-      openRepoBranchWorkspacePaneRoute(routeNavigation, repoId, branchName),
-    onOpenRepoNewWorktree: (repoId: string) => routeNavigation.openRepoNewWorktree(repoId),
-    onCancelRepoNewWorktree: (repoId: string) => routeNavigation.cancelRepoNewWorktree(repoId),
+      openRepoBranchWorkspacePaneRoute(routeActions, repoId, branchName),
+    onOpenRepoNewWorktree: (repoId: string) => routeActions.openRepoNewWorktree(repoId),
+    onCancelRepoNewWorktree: (repoId: string) => routeActions.cancelRepoNewWorktree(repoId),
     onReplaceRepoBranch: (repoId: string, branchName: string) =>
-      openRepoBranchWorkspacePaneRoute(routeNavigation, repoId, branchName, { replace: true }),
+      openRepoBranchWorkspacePaneRoute(routeActions, repoId, branchName, { replace: true }),
   }
+}
+
+export function applyPrimaryWindowSettingsRouteChange(
+  routeActions: Pick<PrimaryWindowRouteNavigation, 'openSettings' | 'closeSettings'>,
+  nextPage: SettingsPage | null,
+): void {
+  if (nextPage) routeActions.openSettings(nextPage)
+  else routeActions.closeSettings()
 }
 
 function SettingsRoute() {
   const { page } = settingsRoute.useParams()
-  const routeNavigation = usePrimaryWindowRouteNavigation()
+  const routeActions = usePrimaryWindowRouteActions()
   return (
     <App
       routeSettingsPage={page as SettingsPage}
-      onRouteSettingsPageChange={(nextPage) => {
-        if (nextPage) routeNavigation.openSettings(nextPage)
-        else routeNavigation.closeSettings()
-      }}
+      onRouteSettingsPageChange={(nextPage) => applyPrimaryWindowSettingsRouteChange(routeActions, nextPage)}
     />
   )
 }

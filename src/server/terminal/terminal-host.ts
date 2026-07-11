@@ -1,8 +1,6 @@
 import type {
   TerminalAttachInput,
   TerminalAttachResult,
-  TerminalCreateResult,
-  TerminalCreateInput,
   TerminalListSessionsInput,
   TerminalPruneInput,
   TerminalMutationResult,
@@ -84,6 +82,7 @@ export interface ServerTerminalActionHost {
   resize(clientId: string, userId: string, input: TerminalResizeInput): MaybePromise<TerminalMutationResult>
   takeover(clientId: string, userId: string, input: TerminalTakeoverInput): MaybePromise<TerminalTakeoverResult>
   close(clientId: string, userId: string, input: TerminalSessionInput): MaybePromise<TerminalMutationResult>
+  /** Internal application/test read; intentionally not exposed as a realtime action. */
   listSessions(
     clientId: string,
     userId: string,
@@ -94,7 +93,6 @@ export interface ServerTerminalActionHost {
     userId: string,
     input: TerminalListSessionsInput,
   ): MaybePromise<TerminalSessionsRecoveryResult>
-  create(clientId: string, userId: string, input: TerminalCreateInput): MaybePromise<TerminalCreateResult>
   prune(
     clientId: string,
     userId: string,

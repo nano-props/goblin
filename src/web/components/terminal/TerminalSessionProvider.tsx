@@ -66,12 +66,9 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     const offLifecycle = terminalClient.onLifecycle((event) => {
       projection.handleLifecycle(event)
     })
-    // Per-session close broadcast. When the server confirms a close,
-    // drop the matching local entry immediately so a sibling window
-    // (or a stale local entry from a lost close in the current
-    // window) doesn't reattach to the orphan. The originating window
-    // already disposed the local entry, so the handler is a no-op
-    // there — the broadcast is multi-window safe by construction.
+    // Per-session close broadcast. Sibling windows drop matching local
+    // entries immediately. A window that owns an in-flight command close
+    // keeps its projection visible until that close command settles.
     const offSessionClosed = terminalClient.onSessionClosed((event) => {
       projection.handleSessionClosed(event)
       const repoRuntimeId = useReposStore.getState().repos[event.repoRoot]?.repoRuntimeId
@@ -81,9 +78,9 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
     const disposeCommandBridge = setTerminalSessionCommandBridge({
       terminalWorktreeSnapshot: projection.terminalWorktreeSnapshot,
       createTerminal: projection.createTerminal,
+      createTerminalWithAdmission: projection.createTerminalWithAdmission,
       selectTerminal: projection.selectTerminal,
       closeTerminalByDescriptor: projection.closeTerminalByDescriptor,
-      closeTerminalsForWorktree: projection.closeTerminalsForWorktree,
     })
 
     return () => {
@@ -101,6 +98,7 @@ export function TerminalSessionProvider({ children }: TerminalSessionProviderPro
   const commandValue = useMemo<TerminalSessionContextValue>(
     () => ({
       createTerminal: projection.createTerminal,
+      createTerminalWithAdmission: projection.createTerminalWithAdmission,
       registerHost: projection.registerHost,
       unregisterHost: projection.unregisterHost,
       selectTerminal: projection.selectTerminal,

@@ -3,11 +3,9 @@ import type { IpcEvent, IpcRequest, SettingsPage } from '#/shared/api-types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type {
-  TerminalCreateResult,
   TerminalAttachInput,
   TerminalAttachResult,
   TerminalBellRealtimeEvent,
-  TerminalCreateInput,
   TerminalExitEvent,
   TerminalListSessionsInput,
   TerminalMutationResult,
@@ -15,7 +13,6 @@ import type {
   TerminalOutputEvent,
   TerminalResizeInput,
   TerminalRestartInput,
-  TerminalSessionSummary,
   TerminalSessionInput,
   TerminalTakeoverInput,
   TerminalTakeoverResult,
@@ -24,13 +21,18 @@ import type {
   TerminalWriteInput,
   TerminalSessionsRecoveryResult,
 } from '#/shared/terminal-types.ts'
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type {
-  WorkspacePaneTabsEntry,
   WorkspacePaneTabsListInput,
   WorkspacePaneTabsReplaceInput,
+  WorkspacePaneTabsSnapshot,
   WorkspacePaneTabsUpdateInput,
 } from '#/shared/workspace-pane-tabs.ts'
+import type {
+  WorkspacePaneRuntimeCloseInput,
+  WorkspacePaneRuntimeCloseResult,
+  WorkspacePaneRuntimeOpenInput,
+  WorkspacePaneRuntimeOpenResult,
+} from '#/shared/workspace-pane-runtime.ts'
 import type { TerminalIdentityRealtimeEvent, TerminalLifecycleRealtimeEvent } from '#/web/components/terminal/types.ts'
 
 export interface ClientTerminal {
@@ -40,9 +42,7 @@ export interface ClientTerminal {
   resize: (input: TerminalResizeInput) => Promise<TerminalMutationResult>
   takeover: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>
   close: (input: TerminalSessionInput) => Promise<TerminalMutationResult>
-  create: (input: TerminalCreateInput) => Promise<TerminalCreateResult>
   pruneTerminals: (repoRoot: string, repoRuntimeId: string) => Promise<{ pruned: number; remaining: number }>
-  listSessions: (input: TerminalListSessionsInput) => Promise<TerminalSessionSummary[]>
   recoverSessions: (input: TerminalListSessionsInput) => Promise<TerminalSessionsRecoveryResult>
   notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
   sendTestNotification: (input: TerminalTestNotificationInput) => Promise<boolean>
@@ -66,6 +66,7 @@ export interface ClientTerminal {
   onSessionClosed: (
     cb: (event: {
       terminalRuntimeSessionId: string
+      terminalRuntimeGeneration: number
       terminalSessionId: string
       repoRoot: string
       worktreePath: string
@@ -74,10 +75,15 @@ export interface ClientTerminal {
 }
 
 export interface ClientWorkspacePaneTabs {
-  list: (input: WorkspacePaneTabsListInput) => Promise<WorkspacePaneTabsEntry[]>
-  replace: (input: WorkspacePaneTabsReplaceInput) => Promise<WorkspacePaneTabEntry[]>
-  update: (input: WorkspacePaneTabsUpdateInput) => Promise<WorkspacePaneTabEntry[]>
+  list: (input: WorkspacePaneTabsListInput) => Promise<WorkspacePaneTabsSnapshot>
+  replace: (input: WorkspacePaneTabsReplaceInput) => Promise<WorkspacePaneTabsSnapshot>
+  update: (input: WorkspacePaneTabsUpdateInput) => Promise<WorkspacePaneTabsSnapshot>
   onChanged: (cb: (repoRoot: string) => void) => () => void
+}
+
+export interface ClientWorkspacePaneRuntime {
+  open: (input: WorkspacePaneRuntimeOpenInput) => Promise<WorkspacePaneRuntimeOpenResult>
+  close: (input: WorkspacePaneRuntimeCloseInput) => Promise<WorkspacePaneRuntimeCloseResult>
 }
 
 export interface ClientAppRealtimeLifecycle {
@@ -128,4 +134,5 @@ export interface ClientBridge {
   appRealtime(): ClientAppRealtimeLifecycle
   terminal(): ClientTerminal
   workspacePaneTabs(): ClientWorkspacePaneTabs
+  workspacePaneRuntime(): ClientWorkspacePaneRuntime
 }

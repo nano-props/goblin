@@ -58,6 +58,19 @@ export interface WorkspacePaneTabsEntry extends WorkspacePaneTabsTarget {
   tabs: WorkspacePaneTabEntry[]
 }
 
+/**
+ * Full canonical projection for one server workspace-tab scope.
+ *
+ * `revision` is allocated by the server and advances whenever any target in
+ * the scope changes. Returning the full scope lets clients reject an older
+ * response without losing changes to a different target that committed in
+ * between two requests.
+ */
+export interface WorkspacePaneTabsSnapshot {
+  revision: number
+  entries: WorkspacePaneTabsEntry[]
+}
+
 export interface WorkspacePaneTabsSocketRequestInputs {
   'workspace-pane-tabs.list': WorkspacePaneTabsListInput
   'workspace-pane-tabs.replace': WorkspacePaneTabsReplaceInput
@@ -65,7 +78,7 @@ export interface WorkspacePaneTabsSocketRequestInputs {
 }
 
 export interface WorkspacePaneTabsSocketResponseOutputs {
-  'workspace-pane-tabs.list': WorkspacePaneTabsEntry[]
-  'workspace-pane-tabs.replace': WorkspacePaneTabEntry[]
-  'workspace-pane-tabs.update': WorkspacePaneTabEntry[]
+  'workspace-pane-tabs.list': WorkspacePaneTabsSnapshot
+  'workspace-pane-tabs.replace': WorkspacePaneTabsSnapshot
+  'workspace-pane-tabs.update': WorkspacePaneTabsSnapshot
 }

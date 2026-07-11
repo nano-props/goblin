@@ -3,13 +3,14 @@ import {
   repoWorkspaceTabModelBlocksTabInteraction,
   type RepoWorkspaceTabModel,
 } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { readWorkspacePaneTabsProjectionForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { readWorkspacePaneRuntimeTabTargetProjection } from '#/web/workspace-pane/workspace-pane-runtime-tab-target-projection.ts'
 import { workspacePaneTabsInteractionBlockedForTarget } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
+import type { WorkspacePaneTabCoordinatorTarget } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 
 export type WorkspacePaneTabTargetResolution =
   | { kind: 'ready'; target: RepoWorkspaceTabModel }
@@ -25,10 +26,57 @@ export interface WorkspacePaneTabTargetOptions {
    * workspace-pane preference. `null` is an explicit bare branch route and
    * therefore has no active pane tab.
    */
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
 }
 
 export const workspacePanePreferenceTargetOptions: WorkspacePaneTabTargetOptions = { workspacePaneRoute: undefined }
+
+export interface WorkspacePaneDestinationTargetLease extends WorkspacePaneTabCoordinatorTarget {
+  branchName: string
+  worktreePath: string | null
+}
+
+export type WorkspacePaneDestinationTargetResolution =
+  | { kind: 'ready'; lease: WorkspacePaneDestinationTargetLease }
+  | { kind: 'missing' }
+
+export function resolveWorkspacePaneDestinationTarget(
+  repoId: string,
+  branchName: string,
+): WorkspacePaneDestinationTargetResolution {
+  const repo = useReposStore.getState().repos[repoId]
+  if (!repo) return { kind: 'missing' }
+  const branchModel = readRepoBranchQueryProjection(repo)
+  const branch = branchModel?.branches.find((candidate) => candidate.name === branchName)
+  if (!branch) return { kind: 'missing' }
+  const worktreePath = branch.worktree?.path ?? null
+  return {
+    kind: 'ready',
+    lease: {
+      repoId,
+      repoRuntimeId: repo.repoRuntimeId,
+      branchName,
+      worktreePath,
+    },
+  }
+}
+
+export function resolveWorkspacePaneDestinationTargetLease(
+  repoId: string,
+  branchName: string,
+): WorkspacePaneDestinationTargetLease | null {
+  const resolution = resolveWorkspacePaneDestinationTarget(repoId, branchName)
+  return resolution.kind === 'ready' ? resolution.lease : null
+}
+
+export function workspacePaneDestinationTargetLeaseIsCurrent(lease: WorkspacePaneDestinationTargetLease): boolean {
+  const current = resolveWorkspacePaneDestinationTargetLease(lease.repoId, lease.branchName)
+  return (
+    current !== null &&
+    current.repoRuntimeId === lease.repoRuntimeId &&
+    current.worktreePath === lease.worktreePath
+  )
+}
 
 export function workspacePaneTabTargetForBranch(
   repoId: string,

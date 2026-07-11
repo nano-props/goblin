@@ -1,7 +1,47 @@
 import { describe, expect, test } from 'vitest'
-import { returnToFromHref, routeReturnSearch } from '#/web/primary-window-route-navigation.ts'
+import {
+  returnToFromHref,
+  routeReturnSearch,
+  settlePrimaryWindowRouteCommit,
+} from '#/web/primary-window-route-navigation.ts'
 
 describe('primary window route navigation helpers', () => {
+  test('accepts an operation route only after navigation lands on the requested href', async () => {
+    let currentHref = '/repo/example/branch/main'
+
+    await expect(
+      settlePrimaryWindowRouteCommit({
+        targetHref: '/repo/example/branch/main/tab/status',
+        navigate: async () => {
+          currentHref = '/repo/example/branch/main/tab/status'
+        },
+        currentHref: () => currentHref,
+      }),
+    ).resolves.toBe(true)
+  })
+
+  test('rejects an operation route when navigation is superseded', async () => {
+    await expect(
+      settlePrimaryWindowRouteCommit({
+        targetHref: '/repo/example/branch/main/tab/status',
+        navigate: async () => {},
+        currentHref: () => '/repo/example/branch/main/tab/history',
+      }),
+    ).resolves.toBe(false)
+  })
+
+  test('rejects an operation route when navigation throws', async () => {
+    await expect(
+      settlePrimaryWindowRouteCommit({
+        targetHref: '/repo/example/branch/main/tab/status',
+        navigate: async () => {
+          throw new Error('navigation failed')
+        },
+        currentHref: () => '/repo/example/branch/main',
+      }),
+    ).resolves.toBe(false)
+  })
+
   test('records a route return target when opening a different route', () => {
     expect(routeReturnSearch('/repo/repo-slug/branch/branch-slug', '/repo/repo-slug/worktree/new')).toEqual({
       returnTo: '/repo/repo-slug/branch/branch-slug',

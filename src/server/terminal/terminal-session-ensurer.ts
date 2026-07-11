@@ -1,9 +1,5 @@
-import path from 'node:path'
-import { getWorktrees } from '#/system/git/worktrees.ts'
-import { resolveKnownWorktree } from '#/shared/worktree-guards.ts'
-import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import { buildRemoteTerminalInvocation } from '#/system/ssh/commands.ts'
-import { isRemoteRepoId, parseRemoteRepoId } from '#/shared/remote-repo.ts'
+import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import {
   type TerminalAttachResult,
   type TerminalCreateAction,
@@ -15,6 +11,10 @@ import {
   buildGoblinTerminalCommandEnvironment,
   type GoblinTerminalCommandRuntime,
 } from '#/server/terminal/g-command.ts'
+import {
+  physicalWorktreeCapabilityExecution,
+  type PhysicalWorktreeCapability,
+} from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
 export interface TerminalSessionEnsureInput {
   repoRoot: string
@@ -31,7 +31,9 @@ export interface TerminalSessionEnsureInput {
 export type TerminalSessionEnsureResult =
   | {
       ok: true
+      terminalSessionsRevision: number
       terminalRuntimeSessionId: string
+      terminalRuntimeGeneration: number
       terminalSessionId: string
       action: TerminalCreateAction
       processName: string
@@ -47,6 +49,10 @@ export type TerminalSessionEnsureResult =
     }
   | { ok: false; message: string }
 
+export type TerminalSessionEnsureAttachResult =
+  | (Extract<TerminalAttachResult, { ok: true }> & { terminalSessionsRevision: number })
+  | Extract<TerminalAttachResult, { ok: false }>
+
 export interface TerminalSessionEnsureManagerInput {
   userId: string
   scope: string
@@ -55,6 +61,7 @@ export interface TerminalSessionEnsureManagerInput {
   branch: string
   terminalSessionId: string
   worktreePath: string
+  physicalWorktreeCapability: PhysicalWorktreeCapability
   cwd: string
   cols: number
   rows: number
@@ -63,10 +70,11 @@ export interface TerminalSessionEnsureManagerInput {
   args?: string[]
   startupShellCommand?: string
   env?: Record<string, string>
+  signal?: AbortSignal
 }
 
 export interface TerminalSessionEnsureManager {
-  ensureSession(input: TerminalSessionEnsureManagerInput): Promise<TerminalAttachResult>
+  ensureSession(input: TerminalSessionEnsureManagerInput): Promise<TerminalSessionEnsureAttachResult>
 }
 
 export interface TerminalSessionEnsurerOptions {
@@ -80,7 +88,9 @@ export interface TerminalSessionEnsureContext {
   cols: number
   rows: number
   scopedWorktreePath: string
+  physicalWorktreeCapability: PhysicalWorktreeCapability
   action: TerminalCreateAction
+  signal: AbortSignal
 }
 
 class TerminalSessionEnsurer {
@@ -104,17 +114,11 @@ class TerminalSessionEnsurer {
     input: TerminalSessionEnsureInput,
     context: TerminalSessionEnsureContext,
   ): Promise<TerminalSessionEnsureResult> {
-    const ref = parseRemoteRepoId(input.repoRoot)
-    if (!ref) return { ok: false, message: 'error.ssh-config-changed' }
-    let resolved
-    try {
-      resolved = await resolveRemoteTarget(ref)
-    } catch (error) {
-      return { ok: false, message: error instanceof Error ? error.message : 'error.ssh-config-changed' }
-    }
+    const execution = physicalWorktreeCapabilityExecution(context.physicalWorktreeCapability)
+    if (execution.kind !== 'remote') return { ok: false, message: 'error.invalid-worktree-capability' }
     const invocation = buildRemoteTerminalInvocation(
-      resolved.target,
-      input.worktreePath,
+      execution.target,
+      execution.canonicalWorktreePath,
       {
         cols: context.cols,
         rows: context.rows,
@@ -129,12 +133,14 @@ class TerminalSessionEnsurer {
       branch: input.branch,
       terminalSessionId: context.terminalSessionId,
       worktreePath: context.scopedWorktreePath,
+      physicalWorktreeCapability: context.physicalWorktreeCapability,
       cwd: process.cwd(),
       cols: context.cols,
       rows: context.rows,
       clientId: input.clientId,
       command: invocation.command,
       args: invocation.args,
+      signal: context.signal,
     })
     if (!result.ok) return { ok: false, message: result.message }
     this.options.broadcastSessionsChanged(userId, input.repoRoot)
@@ -146,12 +152,10 @@ class TerminalSessionEnsurer {
     input: TerminalSessionEnsureInput,
     context: TerminalSessionEnsureContext,
   ): Promise<TerminalSessionEnsureResult> {
-    const worktrees = await getWorktrees(input.repoRoot, { includeStatus: false })
-    const resolved = resolveKnownWorktree(worktrees, input.worktreePath, input.branch)
-    if (!resolved.ok) return { ok: false, message: resolved.message }
-
-    const repoRoot = path.resolve(input.repoRoot)
-    const worktreePath = path.resolve(resolved.path)
+    const execution = physicalWorktreeCapabilityExecution(context.physicalWorktreeCapability)
+    if (execution.kind !== 'local') return { ok: false, message: 'error.invalid-worktree-capability' }
+    const repoRoot = input.repoRoot
+    const worktreePath = execution.canonicalWorktreePath
     const env = this.options.gCommand
       ? (buildGoblinTerminalCommandEnvironment({
           ...this.options.gCommand,
@@ -167,12 +171,14 @@ class TerminalSessionEnsurer {
       branch: input.branch,
       terminalSessionId: context.terminalSessionId,
       worktreePath: worktreePath,
+      physicalWorktreeCapability: context.physicalWorktreeCapability,
       cwd: worktreePath,
       cols: context.cols,
       rows: context.rows,
       clientId: input.clientId,
       startupShellCommand: input.startupShellCommand,
       env,
+      signal: context.signal,
     })
     if (!result.ok) return { ok: false, message: result.message }
     this.options.broadcastSessionsChanged(userId, input.repoRoot)
@@ -187,11 +193,13 @@ export function createTerminalSessionEnsurer(options: TerminalSessionEnsurerOpti
 function toEnsureResult(
   terminalSessionId: string,
   action: TerminalCreateAction,
-  snapshotResult: Extract<TerminalAttachResult, { ok: true }>,
+  snapshotResult: Extract<TerminalSessionEnsureAttachResult, { ok: true }>,
 ): TerminalSessionEnsureResult {
   return {
     ok: true,
+    terminalSessionsRevision: snapshotResult.terminalSessionsRevision,
     terminalRuntimeSessionId: snapshotResult.terminalRuntimeSessionId,
+    terminalRuntimeGeneration: snapshotResult.terminalRuntimeGeneration,
     terminalSessionId,
     action,
     processName: snapshotResult.processName,

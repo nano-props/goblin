@@ -2,26 +2,13 @@ import { useCallback, useMemo } from 'react'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabEntryIdentity } from '#/shared/workspace-pane.ts'
-import { workspacePaneTabsEntryMatchesTarget } from '#/shared/workspace-pane-tabs-target.ts'
-import type { WorkspacePaneTabsQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import {
-  cancelWorkspacePaneTabs,
-  readWorkspacePaneTabsForTarget,
-  restoreWorkspacePaneTabsTargetQueryData,
-  setWorkspacePaneTabsForTargetQueryData,
-  workspacePaneTabsQueryKey,
-  workspacePaneTabsTargetVersion,
-  workspacePaneTabsTargetWriteVersion,
-} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
   reportWorkspacePaneTabsFailure,
   updateWorkspacePaneTabsOnServer,
-  writeCanonicalWorkspacePaneTabsForTarget,
+  writeCanonicalWorkspacePaneTabsSnapshot,
 } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
-import {
-  workspacePaneTabEntryListIdentity,
-  workspacePaneTabsWithDraggedOrder,
-} from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import { workspacePaneTabEntryListIdentity } from '#/web/workspace-pane/workspace-pane-tabs.ts'
+import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
 
 export interface WorkspacePaneTabsReorderMutationInput {
   repoRoot: string
@@ -82,34 +69,35 @@ async function runWorkspacePaneTabsReorder(
   queryClient: QueryClient,
   onReorderRejected: (() => void) | undefined,
 ): Promise<void> {
-  const currentTabs = readWorkspacePaneTabsForTarget(target, queryClient)
-  const nextTabs = workspacePaneTabsWithDraggedOrder(currentTabs, draggedTabs)
-  if (workspacePaneTabEntryListIdentity(nextTabs) === workspacePaneTabEntryListIdentity(currentTabs)) return
-  const cancelListQueries = cancelWorkspacePaneTabs(target.repoRoot, target.repoRuntimeId, queryClient)
-  const previousTargetEntry = queryClient
-    .getQueryData<WorkspacePaneTabsQueryData>(workspacePaneTabsQueryKey(target.repoRoot, target.repoRuntimeId))
-    ?.find((entry) => workspacePaneTabsEntryMatchesTarget(entry, target))
-  setWorkspacePaneTabsForTargetQueryData({ ...target, tabs: nextTabs }, queryClient)
-  const optimisticTargetVersion = workspacePaneTabsTargetVersion(target)
-  const optimisticTargetWriteVersion = workspacePaneTabsTargetWriteVersion(target)
+  await runWorkspacePaneTabCoordinatorTask(
+    {
+      repoId: target.repoRoot,
+      repoRuntimeId: target.repoRuntimeId,
+      branchName: target.branchName,
+      worktreePath: target.worktreePath,
+    },
+    () => runWorkspacePaneTabsReorderInQueue(target, draggedTabs, queryClient, onReorderRejected),
+  )
+}
+
+async function runWorkspacePaneTabsReorderInQueue(
+  target: {
+    repoRoot: string
+    repoRuntimeId: string
+    branchName: string
+    worktreePath: string | null
+  },
+  draggedTabs: readonly WorkspacePaneTabEntry[],
+  queryClient: QueryClient,
+  onReorderRejected: (() => void) | undefined,
+): Promise<void> {
   try {
-    await cancelListQueries
-    const serverTabs = await updateWorkspacePaneTabsOnServer({
+    const snapshot = await updateWorkspacePaneTabsOnServer({
       ...target,
       operation: { type: 'reorder', tabIdentities: draggedTabs.map(workspacePaneTabEntryIdentity) },
     })
-    if (workspacePaneTabsTargetWriteVersion(target) !== optimisticTargetWriteVersion) return
-    const accepted = await writeCanonicalWorkspacePaneTabsForTarget({ ...target, tabs: serverTabs }, queryClient)
-    if (!accepted) return
+    writeCanonicalWorkspacePaneTabsSnapshot(target.repoRoot, target.repoRuntimeId, snapshot, queryClient)
   } catch (err) {
-    restoreWorkspacePaneTabsTargetQueryData(
-      {
-        ...target,
-        previousTargetEntry,
-        expectedTargetVersion: optimisticTargetVersion,
-      },
-      queryClient,
-    )
     reportWorkspacePaneTabsFailure({
       operation: 'reorder',
       repoRoot: target.repoRoot,

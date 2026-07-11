@@ -63,6 +63,9 @@ function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
     workspacePaneTabs: (() => {
       throw new Error('unused workspace pane tabs client')
     }) as never,
+    workspacePaneRuntime: (() => {
+      throw new Error('unused workspace pane runtime client')
+    }) as never,
     ...overrides,
   }
 }
@@ -248,7 +251,7 @@ describe('repo-client', () => {
     })
 
     const { removeRepoWorktree } = await import('#/web/repo-client.ts')
-    const request = removeRepoWorktree('/tmp/repo', {
+    const request = removeRepoWorktree('/tmp/repo', 'repo-runtime-test', {
       branch: 'feature/remove',
       worktreePath: '/tmp/repo-feature-remove',
       alsoDeleteBranch: true,

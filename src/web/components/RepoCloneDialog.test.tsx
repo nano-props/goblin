@@ -130,6 +130,7 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
     showRepoBranchEmptyWorkspacePane: () => true,
     showRepoBranchWorkspacePaneTab: () => true,
     showRepoBranchTerminalSession: () => true,
+    commitRepoBranchWorkspacePaneRoute: () => true,
     goBack: () => {},
     goForward: () => {},
     openSettings: () => {},

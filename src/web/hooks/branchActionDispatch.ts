@@ -30,7 +30,6 @@ import {
 import type { BranchActionRepo } from '#/web/hooks/branch-action-state.ts'
 import type { ExecResult } from '#/web/types.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { closeWorkspacePaneTabsForWorktree } from '#/web/workspace-pane/workspace-pane-tab-close.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 
 interface BranchActionDispatchContext {
@@ -97,21 +96,6 @@ export async function dispatchRemoveWorktree({
 }): Promise<ExecResult | null> {
   const actionRepo = repoForBranchActionDispatch(repo)
   if (!actionRepo) return recordRepoDataUnavailable(repo)
-  const preflightFailure = removeWorktreePreflightFailure(actionRepo, target)
-  if (preflightFailure) {
-    recordRemoveWorktreeResult(actionRepo, target, alsoDeleteBranch, preflightFailure)
-    return preflightFailure
-  }
-  const tabsClosed = await closeWorkspacePaneTabsForWorktree({
-    repoId: actionRepo.id,
-    branchName: target.branch,
-    worktreePath: target.path,
-  })
-  if (!tabsClosed) {
-    const result = { ok: false as const, message: 'error.workspace-tab-close-failed' }
-    recordRemoveWorktreeResult(actionRepo, target, alsoDeleteBranch, result)
-    return result
-  }
   return await dispatchRepoBranchAction(
     actionRepo.id,
     actionRepo.repoRuntimeId,
@@ -139,34 +123,6 @@ export async function dispatchRemoveWorktree({
       },
     },
   )
-}
-
-function removeWorktreePreflightFailure(
-  repo: BranchActionRepo,
-  target: RemoveWorktreeDialogPayload,
-): ExecResult | null {
-  const worktree = repo.branchModel.worktreesByPath[target.path]
-  if (!worktree) return null
-  if (worktree.isMain) return { ok: false, message: 'error.cannot-remove-main-worktree' }
-  if (worktree.isLocked === true) return { ok: false, message: 'error.cannot-remove-locked-worktree' }
-  if (worktree.isDirty === true) return { ok: false, message: 'error.cannot-remove-dirty-worktree' }
-  return null
-}
-
-function recordRemoveWorktreeResult(
-  repo: BranchActionRepo,
-  target: RemoveWorktreeDialogPayload,
-  alsoDeleteBranch: boolean,
-  result: ExecResult,
-): void {
-  useReposStore.getState().setLastResult(repo.id, result, repo.repoRuntimeId, {
-    action: {
-      kind: 'removeWorktree',
-      branch: target.branch,
-      worktreePath: target.path,
-      alsoDeleteBranch,
-    },
-  })
 }
 
 /**

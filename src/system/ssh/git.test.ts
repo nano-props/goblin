@@ -304,6 +304,9 @@ describe('remote git helpers', () => {
     )
 
     const result = await removeRemoteWorktree(TARGET, {
+      beforeRemove: async () => ({ ok: true, message: '' }),
+      afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+      afterRemoveFailed: async () => {},
       branch: 'feature/test',
       worktreePath: '/srv/repo-feature',
       alsoDeleteBranch: true,
@@ -325,6 +328,91 @@ describe('remote git helpers', () => {
       TARGET,
       { signal: undefined, timeoutMs: 180_000 },
     )
+  })
+
+  test('removeRemoteWorktree resolves equivalent absolute worktree paths', async () => {
+    const run = vi.fn(async (command: { type: string }) => {
+      switch (command.type) {
+        case 'gitWorktreeList':
+          return okRemoteResult(
+            [
+              'worktree /srv/repo',
+              'HEAD f00ba4',
+              'branch refs/heads/main',
+              '',
+              'worktree /srv/repo-feature',
+              'HEAD ba5eba1',
+              'branch refs/heads/feature/test',
+            ].join('\n'),
+          )
+        case 'gitStatus':
+          return okRemoteResult('')
+        case 'gitWorktreeRemove':
+          return okRemoteResult('Removed worktree')
+        default:
+          return okRemoteResult('')
+      }
+    })
+
+    const result = await removeRemoteWorktree(TARGET, {
+      beforeRemove: async () => ({ ok: true, message: '' }),
+      afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+      afterRemoveFailed: async () => {},
+      branch: 'feature/test',
+      worktreePath: '/srv/./repo-feature/',
+      alsoDeleteBranch: false,
+      run: run as any,
+    })
+
+    expect(result).toEqual({
+      ok: true,
+      message: 'Removed worktree',
+      affectedWorktreePaths: ['/srv/repo', '/srv/repo-feature'],
+    })
+    expect(run).toHaveBeenCalledWith(
+      { type: 'gitWorktreeRemove', path: '/srv/repo', worktreePath: '/srv/repo-feature' },
+      TARGET,
+      { timeoutMs: 180_000 },
+    )
+  })
+
+  test('removeRemoteWorktree rejects relative worktree paths before running remote commands', async () => {
+    const run = vi.fn(async () => okRemoteResult(''))
+
+    const result = await removeRemoteWorktree(TARGET, {
+      beforeRemove: async () => ({ ok: true, message: '' }),
+      afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+      afterRemoveFailed: async () => {},
+      branch: 'feature/test',
+      worktreePath: 'repo-feature',
+      alsoDeleteBranch: false,
+      run: run as any,
+    })
+
+    expect(result).toEqual({ ok: false, message: 'error.invalid-path' })
+    expect(run).not.toHaveBeenCalled()
+  })
+
+  test('removeRemoteWorktree rejects an equivalent path to the primary worktree', async () => {
+    const run = vi.fn(async (command: { type: string }) => {
+      if (command.type === 'gitWorktreeList') {
+        return okRemoteResult('worktree /srv/repo\nHEAD f00ba4\nbranch refs/heads/main\n')
+      }
+      return okRemoteResult('')
+    })
+
+    const result = await removeRemoteWorktree(TARGET, {
+      beforeRemove: async () => ({ ok: true, message: '' }),
+      afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+      afterRemoveFailed: async () => {},
+      branch: 'main',
+      worktreePath: '/srv/./repo/',
+      alsoDeleteBranch: false,
+      run: run as any,
+    })
+
+    expect(result).toEqual({ ok: false, message: 'error.cannot-remove-main-worktree' })
+    expect(run).toHaveBeenCalledTimes(1)
   })
 
   test('removeRemoteWorktree deletes the configured upstream after worktree and branch deletion', async () => {
@@ -379,6 +467,9 @@ describe('remote git helpers', () => {
     )
 
     const result = await removeRemoteWorktree(TARGET, {
+      beforeRemove: async () => ({ ok: true, message: '' }),
+      afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+      afterRemoveFailed: async () => {},
       branch: 'feature/test',
       worktreePath: '/srv/repo-feature',
       alsoDeleteBranch: true,
@@ -402,6 +493,9 @@ describe('remote git helpers', () => {
     const run = vi.fn(async () => okRemoteResult(''))
 
     const result = await removeRemoteWorktree(TARGET, {
+      beforeRemove: async () => ({ ok: true, message: '' }),
+      afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+      afterRemoveFailed: async () => {},
       branch: 'feature/test;echo bad',
       worktreePath: '/srv/repo-feature',
       alsoDeleteBranch: true,
@@ -467,6 +561,9 @@ describe('remote git helpers', () => {
     )
 
     const result = await removeRemoteWorktree(LINKED_TARGET, {
+      beforeRemove: async () => ({ ok: true, message: '' }),
+      afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+      afterRemoveFailed: async () => {},
       branch: 'feature/test',
       worktreePath: '/srv/repo-feature',
       alsoDeleteBranch: true,

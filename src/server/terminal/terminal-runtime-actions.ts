@@ -1,9 +1,7 @@
-import { isValidBranch, isValidCwd, isValidRepoLocator } from '#/shared/input-validation.ts'
+import { isValidRepoLocator } from '#/shared/input-validation.ts'
 import type {
   TerminalAttachInput,
   TerminalAttachResult,
-  TerminalCreateResult,
-  TerminalCreateInput,
   TerminalListSessionsInput,
   TerminalPruneInput,
   TerminalMutationResult,
@@ -20,12 +18,14 @@ import { isValidTerminalRuntimeSessionId, isValidTerminalSize } from '#/shared/t
 import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import { isValidTerminalWriteData, type TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import { isCurrentRepoRuntime as isCurrentRepoRuntimeOpen } from '#/server/modules/repo-runtimes.ts'
-import { broadcastWorkspacePaneTabsChanged } from '#/server/workspace-pane/workspace-pane-tabs-realtime.ts'
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
+import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
+import type { PhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
+
+const MAX_TERMINAL_RECOVERY_PROJECTION_ATTEMPTS = 4
 
 interface TerminalSessionServiceLike {
-  create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCreateResult>
   prune(
     clientId: string,
     userId: string,
@@ -33,6 +33,7 @@ interface TerminalSessionServiceLike {
     repoRuntimeId: string,
   ): Promise<{ pruned: number; remaining: number }>
   listSessions(userId: string, repoRoot: string, repoRuntimeId: string): Promise<TerminalSessionSummary[]>
+  listWorkspaceTabs(userId: string, repoRoot: string, repoRuntimeId: string): Promise<WorkspacePaneTabsSnapshot>
 }
 
 interface TerminalRuntimeActionDependencies {
@@ -40,6 +41,7 @@ interface TerminalRuntimeActionDependencies {
   broker: Pick<RealtimeBroker<AppRealtimeMessage>, 'broadcastToUser'>
   sessionService: TerminalSessionServiceLike
   isValidTerminalClientId(value: unknown): value is string
+  worktreeOperations: Pick<PhysicalWorktreeOperationCoordinator, 'runOperation'>
 }
 
 // Manager, broker, and session service all use `userId` as the terminal
@@ -47,7 +49,7 @@ interface TerminalRuntimeActionDependencies {
 // identifier, but it must not decide session visibility or lifecycle
 // fanout.
 export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependencies) {
-  const { manager, broker, sessionService, isValidTerminalClientId } = deps
+  const { manager, broker, sessionService, isValidTerminalClientId, worktreeOperations } = deps
 
   return {
     async attach(clientId: string, userId: string, input: TerminalAttachInput): Promise<TerminalAttachResult> {
@@ -79,32 +81,22 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         return { ok: false, message: 'error.invalid-arguments' }
       }
       const session = manager.getSessionSummaryForUser(userId, terminalRuntimeSessionId)
+      const physicalWorktreeCapability = manager.getPhysicalWorktreeCapabilityForUser(userId, terminalRuntimeSessionId)
+      if (!physicalWorktreeCapability) return { ok: false, message: 'error.invalid-worktree-capability' }
       const terminalClientId = input.clientId ?? clientId
-      const result = await manager.restartSession(
-        userId,
-        terminalRuntimeSessionId,
-        input.cols,
-        input.rows,
-        terminalClientId,
+      const operation = await worktreeOperations.runOperation(physicalWorktreeCapability, async (_permit, context) =>
+        await manager.restartSession(
+          userId,
+          terminalRuntimeSessionId,
+          input.cols,
+          input.rows,
+          terminalClientId,
+          context.signal,
+        ),
       )
+      if (!operation.admitted) return { ok: false, message: 'error.worktree-removal-in-progress' }
+      const result = operation.value
       if (session) broadcastRepoSessionsChanged(userId, session.repoRoot)
-      return result
-    },
-
-    async create(clientId: string, userId: string, input: TerminalCreateInput): Promise<TerminalCreateResult> {
-      if (
-        !isValidTerminalClientId(clientId) ||
-        !isValidRepoLocator(input?.repoRoot) ||
-        !isValidBranch(input?.branch) ||
-        !isValidCwd(input?.worktreePath)
-      ) {
-        return { ok: false, message: 'error.invalid-arguments' }
-      }
-      if (!isCurrentRepoRuntimeOpen(userId, input.repoRoot, input.repoRuntimeId)) {
-        return { ok: false, message: 'error.repo-runtime-stale' }
-      }
-      const result = await sessionService.create(clientId, userId, input)
-      if (result.ok) broadcastRepoWorkspaceTabsChanged(userId, input.repoRoot)
       return result
     },
 
@@ -151,7 +143,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         ? manager.getSessionSummaryForUser(userId, input.terminalRuntimeSessionId)
         : null
       const closed = isValidTerminalRuntimeSessionId(input?.terminalRuntimeSessionId)
-        ? manager.closeSessionForUser(userId, input.terminalRuntimeSessionId)
+        ? await manager.closeSessionForUser(userId, input.terminalRuntimeSessionId)
         : false
       if (closed && session) {
         // General repo/session-list invalidation is emitted by the
@@ -161,6 +153,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         broker.broadcastToUser(userId, {
           type: 'session-closed',
           terminalRuntimeSessionId: input.terminalRuntimeSessionId,
+          terminalRuntimeGeneration: session.terminalRuntimeGeneration,
           terminalSessionId: session.terminalSessionId,
           repoRoot: session.repoRoot,
           worktreePath: session.worktreePath,
@@ -181,6 +174,31 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       return manager.takeoverSession(userId, input.terminalRuntimeSessionId, input.cols, input.rows, terminalClientId)
     },
 
+    async recoverSessions(
+      clientId: string,
+      userId: string,
+      input: TerminalListSessionsInput,
+    ): Promise<TerminalSessionsRecoveryResult> {
+      if (!isValidTerminalClientId(clientId) || !isValidRepoLocator(input.repoRoot)) {
+        return {
+          terminalSessions: { revision: 0, sessions: [] },
+          snapshots: [],
+          workspacePaneTabs: { revision: 0, entries: [] },
+        }
+      }
+      assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
+      const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
+      for (let attempt = 0; attempt < MAX_TERMINAL_RECOVERY_PROJECTION_ATTEMPTS; attempt += 1) {
+        const recovery = await manager.recoverSessionsForUser(userId, scope)
+        const workspacePaneTabs = await sessionService.listWorkspaceTabs(userId, input.repoRoot, input.repoRuntimeId)
+        const terminalAfter = manager.terminalSessionsSnapshotForUser(userId, scope)
+        if (recovery.terminalSessions.revision === terminalAfter.revision) {
+          return { ...recovery, workspacePaneTabs }
+        }
+      }
+      throw new Error('error.terminal-recovery-unstable')
+    },
+
     async listSessions(
       clientId: string,
       userId: string,
@@ -191,28 +209,10 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
       assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
       return await sessionService.listSessions(userId, input.repoRoot, input.repoRuntimeId)
     },
-
-    async recoverSessions(
-      clientId: string,
-      userId: string,
-      input: TerminalListSessionsInput,
-    ): Promise<TerminalSessionsRecoveryResult> {
-      if (!isValidTerminalClientId(clientId)) return { sessions: [], snapshots: [] }
-      if (!isValidRepoLocator(input.repoRoot)) return { sessions: [], snapshots: [] }
-      assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
-      return await manager.recoverSessionsForUser(
-        userId,
-        terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId),
-      )
-    },
   }
 
   function broadcastRepoSessionsChanged(userId: string, repoRoot: string): void {
     broker.broadcastToUser(userId, { type: 'sessions-changed', repoRoot })
-  }
-
-  function broadcastRepoWorkspaceTabsChanged(userId: string, repoRoot: string): void {
-    broadcastWorkspacePaneTabsChanged(broker, userId, repoRoot)
   }
 
   function assertCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): void {

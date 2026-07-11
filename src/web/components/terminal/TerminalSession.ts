@@ -24,7 +24,13 @@ import {
   projectTerminalAttachResultForClient,
   type TerminalAttachResultWithController,
 } from '#/web/components/terminal/terminal-session-projection.ts'
-import { TerminalSessionRuntime } from '#/web/components/terminal/terminal-session-runtime.ts'
+import {
+  TerminalSessionRuntime,
+  type TerminalAuthoritativeHydrationSource,
+  type TerminalRuntimeAttemptToken,
+  type TerminalRuntimeBinding,
+  type TerminalRuntimeBindingClassification,
+} from '#/web/components/terminal/terminal-session-runtime.ts'
 import { TerminalSessionView } from '#/web/components/terminal/terminal-session-view.ts'
 import {
   isExternalCommandInput,
@@ -94,6 +100,7 @@ export class TerminalSession {
     snapshotSeq: 0,
     outputEra: 0,
   }
+  private stagedHydrationInput: TerminalSessionHydrationInput | null = null
   private renderedOutputCheckpoint: RenderedOutputCheckpoint | null = null
   private disposed = false
 
@@ -357,6 +364,18 @@ export class TerminalSession {
     return this.runtime.currentTerminalRuntimeSessionId()
   }
 
+  currentRuntimeBinding(): TerminalRuntimeBinding | null {
+    return this.runtime.currentRuntimeBinding()
+  }
+
+  addressableRuntimeBinding(): TerminalRuntimeBinding | null {
+    return this.runtime.addressableRuntimeBinding()
+  }
+
+  classifyRuntimeBinding(binding: TerminalRuntimeBinding): TerminalRuntimeBindingClassification {
+    return this.runtime.classifyRuntimeBinding(binding)
+  }
+
   /**
    * Lazy accessor for the per-session AuthorityGate. The gate is
    * the single source of truth for write-side promotion: xterm
@@ -393,15 +412,14 @@ export class TerminalSession {
     return this.authorityGate
   }
 
-  hydrate(input: TerminalSessionHydrationInput): void {
+  hydrate(
+    input: TerminalSessionHydrationInput,
+    source: TerminalAuthoritativeHydrationSource = 'snapshot',
+  ): void {
     const previousTerminalRuntimeSessionId = this.runtime.currentTerminalRuntimeSessionId()
-    this.hydratedSnapshot = {
-      snapshot: input.snapshot,
-      snapshotSeq: input.snapshotSeq,
-      outputEra: input.outputEra,
-    }
-    const changed = this.runtime.hydrateRepoSession({
+    const hydration = this.runtime.hydrateRepoSession({
       terminalRuntimeSessionId: input.terminalRuntimeSessionId,
+      terminalRuntimeGeneration: input.terminalRuntimeGeneration,
       phase: input.phase,
       message: input.message,
       processName: input.processName,
@@ -410,7 +428,29 @@ export class TerminalSession {
       controllerStatus: input.controllerStatus,
       canonicalCols: input.canonicalCols,
       canonicalRows: input.canonicalRows,
-    })
+    }, source)
+    if (hydration.disposition === 'staged') {
+      if (hydration.candidateAccepted) this.stagedHydrationInput = input
+      if (hydration.activationPending) this.notify('metadata')
+      return
+    }
+    if (hydration.disposition === 'ignored') return
+    this.stagedHydrationInput = null
+    this.applyHydrationInput(input, hydration.changed, previousTerminalRuntimeSessionId)
+  }
+
+  private applyHydrationInput(
+    input: TerminalSessionHydrationInput,
+    changed: boolean,
+    previousTerminalRuntimeSessionId: string | null,
+    forceSnapshot = false,
+    notifyChange = true,
+  ): void {
+    this.hydratedSnapshot = {
+      snapshot: input.snapshot,
+      snapshotSeq: input.snapshotSeq,
+      outputEra: input.outputEra,
+    }
     this.syncExternalCommandGate(
       input.terminalRuntimeSessionId,
       terminalSnapshotHasOutput(input.snapshot, input.snapshotSeq),
@@ -420,9 +460,38 @@ export class TerminalSession {
     if (changed && input.phase === 'open' && input.role === 'unowned' && this.view.isConnected()) {
       this.start()
     }
-    if (this.shouldApplyHydratedSnapshotToActiveView(previousTerminalRuntimeSessionId))
+    if (
+      forceSnapshot
+        ? this.view.currentTerminal() !== null && input.snapshot.length > 0
+        : this.shouldApplyHydratedSnapshotToActiveView(previousTerminalRuntimeSessionId)
+    )
       this.applyHydratedSnapshotToActiveView()
-    if (changed) this.notify('metadata')
+    if (changed && notifyChange) this.notify('metadata')
+  }
+
+  pendingAuthoritativeRuntimeBinding(): TerminalRuntimeBinding | null {
+    return this.runtime.pendingAuthoritativeRuntimeBinding()
+  }
+
+  commitPendingAuthoritativeHydration(binding: TerminalRuntimeBinding): boolean {
+    const input = this.stagedHydrationInput
+    if (
+      !input ||
+      input.terminalRuntimeSessionId !== binding.terminalRuntimeSessionId ||
+      input.terminalRuntimeGeneration !== binding.terminalRuntimeGeneration
+    ) {
+      return false
+    }
+    const committed = this.runtime.commitPendingAuthoritativeHydration(binding)
+    if (!committed.accepted) return false
+    this.stagedHydrationInput = null
+    this.applyHydrationInput(input, committed.changed, null, true, false)
+    return true
+  }
+
+  private applySettledStagedHydration(_changed: boolean): void {
+    if (!this.stagedHydrationInput) return
+    this.notify('metadata')
   }
 
   handleOutput(event: TerminalOutputEvent): void {
@@ -577,33 +646,47 @@ export class TerminalSession {
   private start(): void {
     if (this.disposed || this.view.currentTerminal() || !this.view.isConnected()) return
     const epoch = (this.startEpoch += 1)
-    if (this.runtime.phase() !== 'restarting' && this.runtime.startAttaching()) this.notify('metadata')
-    void this.startAsync(epoch)
+    let attempt: TerminalRuntimeAttemptToken | null
+    if (this.runtime.phase() === 'restarting') {
+      attempt = this.runtime.currentAttemptToken()
+    } else {
+      const started = this.runtime.startAttaching()
+      attempt = started.attempt
+      if (started.changed) this.notify('metadata')
+    }
+    if (!attempt) return
+    void this.startAsync(epoch, attempt)
   }
 
-  private async startAsync(epoch: number): Promise<void> {
+  private async startAsync(epoch: number, attempt: TerminalRuntimeAttemptToken): Promise<void> {
     let preloadReplayGeneration: number | null = null
     try {
-      const opened = await this.openPhase(epoch)
+      const opened = await this.openPhase(epoch, attempt)
       const { term } = opened
       preloadReplayGeneration = opened.preloadReplayGeneration
-      const result = await this.ipcPhase(epoch, term)
+      const result = await this.ipcPhase(epoch, attempt, term)
       if (result.phase === 'error') {
         // The attach failed. Drop the replay window the preload
         // started so the boundary and captured events don't leak
         // into the next start.
         if (preloadReplayGeneration !== null) this.runtime.drainReplay(preloadReplayGeneration)
-        const changed = this.runtime.applyAttachResult(result, { cols: term.cols, rows: term.rows })
+        const committed = this.runtime.commitAttachResult(attempt, result, { cols: term.cols, rows: term.rows })
+        if (!committed.accepted) throw new StartCancelledError()
+        if (committed.resolution === 'staged') {
+          this.applySettledStagedHydration(committed.changed)
+          throw new StartCancelledError()
+        }
+        this.stagedHydrationInput = null
         // Sync the gate so writes/resizes that race the next identity
         // event use the correct role. The first-frame payload is
         // authoritative for the new terminalRuntimeSessionId, so a successful
         // attach always lands here before any keystroke.
         this.authority().setRole(result.role)
         this.destroyActiveView()
-        if (changed) this.notify('metadata')
+        if (committed.changed) this.notify('metadata')
         return
       }
-      const metadataChanged = await this.replayPhase(epoch, term, result)
+      const metadataChanged = await this.replayPhase(epoch, attempt, term, result)
       this.finalizePhase(epoch, term, metadataChanged)
     } catch (err) {
       if (err instanceof StartCancelledError) {
@@ -614,14 +697,22 @@ export class TerminalSession {
         if (preloadReplayGeneration !== null) this.runtime.drainReplay(preloadReplayGeneration)
         return
       }
-      this.closeRestartBaseSession()
       if (!this.isCurrentStartEpoch(epoch)) return
+      const failed = this.runtime.failStartAttempt(attempt, err instanceof Error ? err.message : String(err))
+      if (!failed.accepted) return
+      if (failed.resolution === 'staged') {
+        this.applySettledStagedHydration(failed.changed)
+        return
+      }
       this.destroyActiveView()
-      if (this.runtime.failRuntime(err instanceof Error ? err.message : String(err))) this.notify('metadata')
+      if (failed.changed) this.notify('metadata')
     }
   }
 
-  private async openPhase(epoch: number): Promise<{ term: XTermTerminal; preloadReplayGeneration: number | null }> {
+  private async openPhase(
+    epoch: number,
+    attempt: TerminalRuntimeAttemptToken,
+  ): Promise<{ term: XTermTerminal; preloadReplayGeneration: number | null }> {
     let preloadReplayGeneration: number | null = null
     if (this.disposed || this.startEpoch !== epoch || this.view.currentTerminal()) throw new StartCancelledError()
     try {
@@ -651,8 +742,12 @@ export class TerminalSession {
           // tear its transient state down. Tear down only if our starting epoch
           // is still current.
           if (this.isCurrentStartEpoch(epoch)) {
-            this.destroyActiveView()
-            if (this.runtime.failAttachAttempt('error.terminal-host-not-measurable')) this.notify('metadata')
+            const failed = this.runtime.failStartAttempt(attempt, 'error.terminal-host-not-measurable')
+            if (failed.resolution === 'staged') this.applySettledStagedHydration(failed.changed)
+            else {
+              this.destroyActiveView()
+              if (failed.accepted && failed.changed) this.notify('metadata')
+            }
           }
           throw new StartCancelledError()
         }
@@ -685,14 +780,19 @@ export class TerminalSession {
     }
   }
 
-  private async ipcPhase(epoch: number, term: XTermTerminal): Promise<TerminalAttachResultWithController> {
-    const restart = this.runtime.consumeRestartFlag()
+  private async ipcPhase(
+    epoch: number,
+    attempt: TerminalRuntimeAttemptToken,
+    term: XTermTerminal,
+  ): Promise<TerminalAttachResultWithController> {
+    const restart = attempt.operation === 'restart'
     const terminalRuntimeSessionId = restart
       ? this.runtime.restartingTerminalRuntimeSessionId()
       : this.runtime.currentTerminalRuntimeSessionId()
     if (!terminalRuntimeSessionId) {
       this.destroyActiveView()
-      if (this.runtime.failAttachAttempt('error.invalid-arguments')) this.notify('metadata')
+      const failed = this.runtime.failStartAttempt(attempt, 'error.invalid-arguments')
+      if (failed.accepted && failed.changed) this.notify('metadata')
       throw new StartCancelledError()
     }
     const result = restart
@@ -702,52 +802,34 @@ export class TerminalSession {
       if (this.disposed) {
         if (result.ok) void this.requestDurableClose(result.terminalRuntimeSessionId).catch(() => {})
         else this.closeRestartBaseSession()
-      } else {
-        this.absorbDetachedIpcResult(result, { cols: term.cols, rows: term.rows }, { restart })
       }
       throw new StartCancelledError()
     }
-    this.runtime.settleStartAttempt()
     if (!result.ok) {
-      this.destroyActiveView()
-      const changed = restart
-        ? this.runtime.failRestartAttempt(result.message)
-        : this.runtime.failAttachAttempt(result.message)
-      if (changed) this.notify('metadata')
+      const failed = this.runtime.failStartAttempt(attempt, result.message)
+      if (failed.resolution === 'staged') this.applySettledStagedHydration(failed.changed)
+      else {
+        this.destroyActiveView()
+        if (failed.accepted && failed.changed) this.notify('metadata')
+      }
       throw new StartCancelledError()
     }
     return this.withLocalController(result)
   }
 
-  private absorbDetachedIpcResult(
-    result: TerminalAttachResult,
-    fallbackSize: { cols: number; rows: number },
-    options: { restart: boolean },
-  ): void {
-    this.runtime.settleStartAttempt()
-    if (!result.ok) {
-      const changed = options.restart
-        ? this.runtime.failRestartAttempt(result.message)
-        : this.runtime.failAttachAttempt(result.message)
-      if (changed) this.notify('metadata')
-      return
-    }
-    const projected = this.withLocalController(result)
-    const changed = this.runtime.applyAttachResult(projected, fallbackSize)
-    this.syncExternalCommandGate(
-      projected.terminalRuntimeSessionId,
-      terminalSnapshotHasOutput(projected.snapshot, projected.snapshotSeq),
-    )
-    this.authority().setRole(projected.role)
-    if (changed) this.notify('metadata')
-  }
-
   private async replayPhase(
     epoch: number,
+    attempt: TerminalRuntimeAttemptToken,
     term: XTermTerminal,
     result: TerminalAttachResultWithController,
   ): Promise<boolean> {
-    const changed = this.runtime.applyAttachResult(result, { cols: term.cols, rows: term.rows })
+    const committed = this.runtime.commitAttachResult(attempt, result, { cols: term.cols, rows: term.rows })
+    if (!committed.accepted) throw new StartCancelledError()
+    if (committed.resolution === 'staged') {
+      this.applySettledStagedHydration(committed.changed)
+      throw new StartCancelledError()
+    }
+    this.stagedHydrationInput = null
     this.syncExternalCommandGate(
       result.terminalRuntimeSessionId,
       terminalSnapshotHasOutput(result.snapshot, result.snapshotSeq),
@@ -772,7 +854,7 @@ export class TerminalSession {
       seq: result.snapshotSeq,
     })
     this.assertCurrentStart(epoch, term)
-    return changed
+    return committed.changed
   }
 
   private finalizePhase(epoch: number, term: XTermTerminal, metadataChanged: boolean): void {

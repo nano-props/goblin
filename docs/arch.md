@@ -51,9 +51,12 @@ The ownership split is:
 - `src/shared/workspace-pane-tabs.ts` and
   `src/shared/workspace-pane-tabs-validators.ts` own the workspace tab socket
   action/event names and their validation.
+- `src/shared/workspace-pane-runtime.ts` owns the application protocol for
+  opening a provider runtime and its canonical tab as one server result.
 - `src/server/workspace-pane/*` owns server-side tab runtime state,
-  canonicalization, read/write actions, realtime invalidation, and
-  runtime-session materialization/pruning.
+  canonicalization, read/write actions, realtime invalidation,
+  runtime-session materialization/pruning, and the cross-provider runtime-open
+  application operation.
 - `src/web/workspace-pane/*` owns client query/cache projection and mutation
   orchestration for server-owned tab state.
 - `src/web/workspace-pane/tab-providers.ts` owns per-tab-type
@@ -67,6 +70,40 @@ architecture itself. Future session tabs such as chat should add a runtime
 type, provider, projection, panel, create action, and close/action adapters
 without changing the generic tab strip contract.
 
+Runtime creation follows three responsibility layers:
+
+1. The provider domain service owns the resource lifecycle (terminal session,
+   chat session, and so on) and remains usable without workspace-pane UI.
+2. `WorkspacePaneRuntimeApplication` owns runtime open and single close,
+   joining provider lifecycle with canonical runtime-tab membership. The
+   separate `WorktreeRemovalApplication` owns physical worktree removal across
+   every user and repo runtime. Its physical-target admission rejects later
+   runtime/tab writes, while explicit server operation permits let mutations
+   admitted earlier finish in queue order. After repository validation it awaits provider
+   quiescence, runs the Git removal past a non-cancelable commit point, then
+   finalizes canonical tabs. A Git failure reconciles runtime tabs while
+   preserving the worktree's static projection.
+   Provider commands return the exact target lifecycle effect plus the
+   canonical tabs snapshot produced by that command. Full terminal collections
+   are query snapshots with their own terminal projection revision; clients
+   apply terminal and tabs snapshots independently, so neither model borrows
+   the other's revision as a freshness proxy.
+   Terminal close itself is a manager-owned, idempotent promise: concurrent
+   tab close, prune, runtime cleanup, and worktree quiescence join the same PTY
+   termination acknowledgement before the session leaves authoritative state.
+3. The client command/projection owns only admission/dedupe, revision-gated
+   cache projection, opener facts, cancellation, and exact route completion.
+   It does not order server resources or infer session liveness from its cache.
+
+UI create paths use `workspace-pane-runtime.open`. They must not call a
+provider create and then issue a second `workspace-pane-tabs.update` to repair
+membership. Provider creation is an in-process server capability, not an
+externally routable terminal realtime action; only the application command can
+compose it with canonical tab membership.
+`workspace-pane-tabs.update` only mutates static-tab membership or user order;
+runtime-tab creation and placement belong exclusively to the application
+operation.
+
 Runtime tab types are intentionally registered statically. Adding a new
 server-owned session tab type should update the explicit extension points
 instead of adding fallback logic in `WorkspacePaneTabStrip` or local client
@@ -78,15 +115,22 @@ mirrors:
   `WorkspacePaneRuntimeTabsProvider`.
 - `src/server/<feature>/*`: own the feature lifecycle and expose live runtime
   sessions to the workspace-pane provider.
+- `src/shared/workspace-pane-runtime.ts` and
+  `src/server/workspace-pane/workspace-pane-runtime-application.ts`: add the
+  provider request/result variant and application adapter.
 - `src/web/workspace-pane/workspace-pane-runtime-tab-*.ts*`: add provider
   projection, target key, create, command, close, and panel entries for the
   new type.
 - `src/web/workspace-pane/tab-providers.ts`: add labels, icons,
   pending/attention state, close policy, and renderability for the new type.
 
-Compatibility note: old workspace tab protocol names
+Protocol contract: old workspace tab protocol names
 (`list-workspace-tabs`, `replace-tabs`, `update-tabs`,
 `workspace-tabs-changed`) and old terminal-specific tab entries are not part
 of the current contract. The canonical socket actions/events are
 `workspace-pane-tabs.list`, `workspace-pane-tabs.replace`,
 `workspace-pane-tabs.update`, and `workspace-pane-tabs.changed`.
+The composed runtime actions are `workspace-pane-runtime.open` and
+`workspace-pane-runtime.close`. Whole-worktree runtime cleanup is an internal
+step of the repository worktree-removal transaction, not a client-callable
+runtime action.

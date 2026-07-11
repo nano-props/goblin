@@ -2,14 +2,10 @@
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { dispatchRemoveWorktree } from '#/web/hooks/branchActionDispatch.ts'
-import { setTerminalSessionCommandBridge } from '#/web/components/terminal/terminal-session-command-bridge.ts'
-import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import {
-  createBranchSnapshot,
   createRepoBranch,
   repoPresentationFromQueryForTest,
   resetReposStore,
-  seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -18,7 +14,6 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 
 const REPO_ID = '/tmp/gbl-branch-action-dispatch-repo'
 const WORKTREE_PATH = '/tmp/gbl-branch-action-dispatch-worktree'
-const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
 
 beforeEach(() => {
   primaryWindowQueryClient.clear()
@@ -26,13 +21,12 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  setTerminalSessionCommandBridge(null)
   primaryWindowQueryClient.clear()
   resetReposStore()
 })
 
 describe('branch action dispatch', () => {
-  test('remove worktree waits for workspace tab resources before dispatching repo action', async () => {
+  test('remove worktree submits one server application command without client-side resource cleanup', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -45,38 +39,19 @@ describe('branch action dispatch', () => {
         ],
       },
     })
-    const calls: string[] = []
-    const runBranchAction = vi.fn(async () => {
-      calls.push('runBranchAction')
-      return { ok: true, message: 'ok' }
-    })
+    const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     useReposStore.setState({ runBranchAction })
-    let resolveClose!: (value: boolean) => void
-    const closeTerminalsForWorktree = vi.fn(
-      () =>
-        new Promise<boolean>((resolve) => {
-          calls.push('closeTerminal')
-          resolveClose = resolve
-        }),
-    )
-    installTerminalBridge({ closeTerminalsForWorktree })
 
-    const pending = dispatchRemoveWorktree({
-      repo: repoPresentationFromQueryForTest(repo),
-      target: { branch: 'feature/worktree', path: WORKTREE_PATH },
-      alsoDeleteBranch: false,
-      forceDeleteBranch: false,
-      alsoDeleteUpstream: false,
-    })
-    await Promise.resolve()
+    await expect(
+      dispatchRemoveWorktree({
+        repo: repoPresentationFromQueryForTest(repo),
+        target: { branch: 'feature/worktree', path: WORKTREE_PATH },
+        alsoDeleteBranch: false,
+        forceDeleteBranch: false,
+        alsoDeleteUpstream: false,
+      }),
+    ).resolves.toEqual({ ok: true, message: 'ok' })
 
-    expect(calls).toEqual(['closeTerminal'])
-    expect(runBranchAction).not.toHaveBeenCalled()
-
-    resolveClose(true)
-    await expect(pending).resolves.toEqual({ ok: true, message: 'ok' })
-
-    expect(calls).toEqual(['closeTerminal', 'runBranchAction'])
     expect(runBranchAction).toHaveBeenCalledWith(
       REPO_ID,
       {
@@ -94,46 +69,6 @@ describe('branch action dispatch', () => {
     )
   })
 
-  test('remove worktree stops when workspace tab resources fail to close', async () => {
-    const repo = seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabsByBranch: {
-        'feature/worktree': [
-          workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
-        ],
-      },
-    })
-    const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
-    useReposStore.setState({ runBranchAction })
-    installTerminalBridge({ closeTerminalsForWorktree: vi.fn(async () => false) })
-
-    await expect(
-      dispatchRemoveWorktree({
-        repo: repoPresentationFromQueryForTest(repo),
-        target: { branch: 'feature/worktree', path: WORKTREE_PATH },
-        alsoDeleteBranch: true,
-        forceDeleteBranch: false,
-        alsoDeleteUpstream: true,
-      }),
-    ).resolves.toEqual({ ok: false, message: 'error.workspace-tab-close-failed' })
-
-    expect(runBranchAction).not.toHaveBeenCalled()
-    expect(useReposStore.getState().repos[REPO_ID]?.events.at(-1)).toMatchObject({
-      kind: 'result',
-      result: { ok: false, message: 'error.workspace-tab-close-failed' },
-      action: {
-        kind: 'removeWorktree',
-        branch: 'feature/worktree',
-        worktreePath: WORKTREE_PATH,
-        alsoDeleteBranch: true,
-      },
-    })
-  })
-
   test('remove worktree proceeds when no workspace tabs are open', async () => {
     const repo = seedRepoWithReadModelForTest({
       id: REPO_ID,
@@ -144,8 +79,6 @@ describe('branch action dispatch', () => {
     })
     const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
     useReposStore.setState({ runBranchAction })
-    const closeTerminalsForWorktree = vi.fn(async () => true)
-    installTerminalBridge({ terminalWorktreeSnapshot: () => emptyWorktreeSnapshot(), closeTerminalsForWorktree })
 
     await expect(
       dispatchRemoveWorktree({
@@ -160,198 +93,4 @@ describe('branch action dispatch', () => {
     expect(runBranchAction).toHaveBeenCalled()
   })
 
-  test('remove worktree does not close workspace tabs when local preflight already knows it is dirty', async () => {
-    const repo = seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabsByBranch: {
-        'feature/worktree': [
-          workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
-        ],
-      },
-    })
-    seedRepoReadModelQueryData(repo, {
-      branches: [
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: WORKTREE_PATH, summary: { dirty: true, changeCount: 1 } },
-        }),
-      ],
-      currentBranch: 'feature/worktree',
-    })
-    const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
-    const closeTerminalsForWorktree = vi.fn(async () => true)
-    useReposStore.setState({ runBranchAction })
-    installTerminalBridge({ closeTerminalsForWorktree })
-
-    await expect(
-      dispatchRemoveWorktree({
-        repo: repoPresentationFromQueryForTest(repo),
-        target: { branch: 'feature/worktree', path: WORKTREE_PATH },
-        alsoDeleteBranch: false,
-        forceDeleteBranch: false,
-        alsoDeleteUpstream: false,
-      }),
-    ).resolves.toEqual({ ok: false, message: 'error.cannot-remove-dirty-worktree' })
-
-    expect(closeTerminalsForWorktree).not.toHaveBeenCalled()
-    expect(runBranchAction).not.toHaveBeenCalled()
-  })
-
-  test('remove worktree preflight reads worktree metadata from the React Query projection', async () => {
-    const repo = seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree')],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabsByBranch: {
-        'feature/worktree': [
-          workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
-        ],
-      },
-    })
-    seedRepoReadModelQueryData(repo, {
-      branches: [
-        createBranchSnapshot('main', {
-          isCurrent: true,
-          worktree: { path: REPO_ID, isPrimary: true, summary: { dirty: false, changeCount: 0 } },
-        }),
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: WORKTREE_PATH, summary: { dirty: true, changeCount: 2 } },
-        }),
-      ],
-      currentBranch: 'main',
-    })
-    const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
-    const closeTerminalsForWorktree = vi.fn(async () => true)
-    useReposStore.setState({ runBranchAction })
-    installTerminalBridge({ closeTerminalsForWorktree })
-
-    await expect(
-      dispatchRemoveWorktree({
-        repo: repoPresentationFromQueryForTest(repo),
-        target: { branch: 'feature/worktree', path: WORKTREE_PATH },
-        alsoDeleteBranch: false,
-        forceDeleteBranch: false,
-        alsoDeleteUpstream: false,
-      }),
-    ).resolves.toEqual({ ok: false, message: 'error.cannot-remove-dirty-worktree' })
-
-    expect(closeTerminalsForWorktree).not.toHaveBeenCalled()
-    expect(runBranchAction).not.toHaveBeenCalled()
-  })
-
-  test('remove worktree preflight derives snapshot worktree state from status projection', async () => {
-    const repo = seedRepoWithReadModelForTest({
-      id: REPO_ID,
-      branches: [createRepoBranch('feature/worktree')],
-      currentBranchName: 'feature/worktree',
-      preferredWorkspacePaneTab: 'terminal',
-      workspacePaneTabsByBranch: {
-        'feature/worktree': [
-          workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
-        ],
-      },
-    })
-    seedRepoReadModelQueryData(repo, {
-      branches: [
-        createBranchSnapshot('main', {
-          isCurrent: true,
-          worktree: { path: REPO_ID, isPrimary: true, summary: { dirty: false, changeCount: 0 } },
-        }),
-        createBranchSnapshot('feature/worktree', {
-          worktree: { path: WORKTREE_PATH, summary: { dirty: false, changeCount: 0 } },
-        }),
-      ],
-      currentBranch: 'main',
-      status: [
-        {
-          path: WORKTREE_PATH,
-          branch: 'feature/worktree',
-          isMain: false,
-          entries: [{ x: 'M', y: ' ', path: 'query-status-dirty.ts' }],
-        },
-      ],
-    })
-    const runBranchAction = vi.fn(async () => ({ ok: true, message: 'ok' }))
-    const closeTerminalsForWorktree = vi.fn(async () => true)
-    useReposStore.setState({ runBranchAction })
-    installTerminalBridge({ closeTerminalsForWorktree })
-
-    await expect(
-      dispatchRemoveWorktree({
-        repo: repoPresentationFromQueryForTest(repo),
-        target: { branch: 'feature/worktree', path: WORKTREE_PATH },
-        alsoDeleteBranch: false,
-        forceDeleteBranch: false,
-        alsoDeleteUpstream: false,
-      }),
-    ).resolves.toEqual({ ok: false, message: 'error.cannot-remove-dirty-worktree' })
-
-    expect(closeTerminalsForWorktree).not.toHaveBeenCalled()
-    expect(runBranchAction).not.toHaveBeenCalled()
-  })
 })
-
-function installTerminalBridge(options: {
-  terminalWorktreeSnapshot?: () => TerminalWorktreeSnapshot
-  closeTerminalsForWorktree: () => Promise<boolean>
-}): void {
-  setTerminalSessionCommandBridge({
-    terminalWorktreeSnapshot: options.terminalWorktreeSnapshot ?? (() => worktreeSnapshotWithTerminal()),
-    createTerminal: vi.fn(async () => 'term-222222222222222222222'),
-    selectTerminal: vi.fn(),
-    closeTerminalByDescriptor: vi.fn(async () => true),
-    closeTerminalsForWorktree: options.closeTerminalsForWorktree,
-  })
-}
-
-function emptyWorktreeSnapshot(): TerminalWorktreeSnapshot {
-  return {
-    terminalWorktreeKey: WORKTREE_KEY,
-    selectedDescriptor: null,
-    sessions: [],
-    count: 0,
-    bellCount: 0,
-    outputActiveCount: 0,
-    createPending: false,
-  }
-}
-
-function worktreeSnapshotWithTerminal(): TerminalWorktreeSnapshot {
-  return {
-    terminalWorktreeKey: WORKTREE_KEY,
-    selectedDescriptor: {
-      terminalSessionId: 'term-111111111111111111111',
-      terminalWorktreeKey: WORKTREE_KEY,
-      index: 1,
-      repoRoot: REPO_ID,
-
-      repoRuntimeId: 'repo-runtime-test',
-
-      branch: 'feature/worktree',
-      worktreePath: WORKTREE_PATH,
-    },
-    sessions: [
-      {
-        type: 'terminal',
-        terminalSessionId: 'term-111111111111111111111',
-        terminalWorktreeKey: WORKTREE_KEY,
-        index: 1,
-        title: 'terminal 1',
-        phase: 'open',
-        selected: true,
-        hasBell: false,
-        hasRecentOutput: false,
-      },
-    ],
-    count: 1,
-    bellCount: 0,
-    outputActiveCount: 0,
-    createPending: false,
-  }
-}

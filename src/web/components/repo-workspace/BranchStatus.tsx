@@ -41,7 +41,7 @@ import { openUpstreamBranchExternalTarget } from '#/web/hooks/openBranchExternal
 import type { CurrentRepoWorkspace } from '#/web/components/repo-workspace/model.ts'
 import { CommitHashLink } from '#/web/components/repo-workspace/repo-link-actions.tsx'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
-import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
+import { dispatchOpenWorkspacePaneStaticTabAction } from '#/web/workspace-pane/workspace-pane-tab-open-action.ts'
 interface Props {
   detail: CurrentRepoWorkspace
 }
@@ -169,7 +169,7 @@ export function BranchStatus({ detail }: Props) {
       throttle(
         () => {
           if (!branchName || !worktreePathRaw) return
-          void openWorkspacePaneTab({
+          void dispatchOpenWorkspacePaneStaticTabAction({
             repoId: detail.repoId,
             branchName,
             worktreePath: worktreePathRaw,
@@ -188,7 +188,7 @@ export function BranchStatus({ detail }: Props) {
       throttle(
         () => {
           if (!branchName || !worktreePathRaw) return
-          void openWorkspacePaneTab({
+          void dispatchOpenWorkspacePaneStaticTabAction({
             repoId: detail.repoId,
             branchName,
             worktreePath: worktreePathRaw,
@@ -208,7 +208,7 @@ export function BranchStatus({ detail }: Props) {
       throttle(
         () => {
           if (!branchName) return
-          void openWorkspacePaneTab({
+          void dispatchOpenWorkspacePaneStaticTabAction({
             repoId: detail.repoId,
             branchName,
             worktreePath: worktreePathRaw,

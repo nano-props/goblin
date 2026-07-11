@@ -21,6 +21,7 @@ function successResult(terminalRuntimeSessionId: string, clientId = 'client_loca
   return {
     ok: true,
     terminalRuntimeSessionId,
+    terminalRuntimeGeneration: 1,
     role: 'controller',
     controllerStatus: 'connected',
     controller: { clientId, status: 'connected' },

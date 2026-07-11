@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { testPhysicalWorktreeCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -14,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   createRepoWorktree: vi.fn(),
   getRepoWorktreeBootstrapPreview: vi.fn(),
   deleteRepoBranch: vi.fn(),
-  removeRepoWorktree: vi.fn(),
+  removeCapturedRepoWorktree: vi.fn(),
   openRepoTerminal: vi.fn(),
   openRepoUrl: vi.fn(),
   openRepoEditor: vi.fn(),
@@ -56,7 +57,7 @@ vi.mock('#/server/modules/repo-write-paths.ts', () => ({
   pushRepoBranch: mocks.pushRepoBranch,
   createRepoWorktree: mocks.createRepoWorktree,
   deleteRepoBranch: mocks.deleteRepoBranch,
-  removeRepoWorktree: mocks.removeRepoWorktree,
+  removeCapturedRepoWorktree: mocks.removeCapturedRepoWorktree,
   fetchRepo: mocks.fetchRepo,
   abortRepoOperation: mocks.abortRepoOperation,
   openRepoTerminal: mocks.openRepoTerminal,
@@ -75,8 +76,24 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-function createTestRepoRoutes() {
-  return createRepoRoutes()
+function createTestRepoRoutes(
+  worktreeRemovalApplication: Parameters<typeof createRepoRoutes>[0]['worktreeRemovalApplication'] = {
+    async removeWorktree(_userId, input) {
+      return await input.remove(
+        testPhysicalWorktreeCapability('/repo/worktree'),
+        {
+          beforeRemove: async () => ({ ok: true, message: '' }),
+          afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+          afterRemoveFailed: async () => {},
+        },
+        new AbortController().signal,
+      )
+    },
+  },
+) {
+  return createRepoRoutes({
+    worktreeRemovalApplication,
+  })
 }
 
 describe('repo routes — POST body validation (read endpoints)', () => {
@@ -606,6 +623,76 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     )
     expect(response.status).toBe(200)
     expect(mocks.cloneRepo).toHaveBeenCalledWith('https://example.com/r.git', '/tmp', 'r', expect.any(AbortSignal))
+  })
+
+  test('remove-worktree delegates one composed command and passes cleanup into the repository mutation boundary', async () => {
+    const beforeRemove = vi.fn(async () => ({ ok: true as const, message: '' }))
+    const worktreeRemovalApplication: Parameters<typeof createRepoRoutes>[0]['worktreeRemovalApplication'] = {
+      removeWorktree: vi.fn(
+        async (_userId, input) =>
+          await input.remove(
+            testPhysicalWorktreeCapability('/tmp/repo-remove'),
+            {
+              beforeRemove,
+              afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
+              afterRemoveFailed: async () => {},
+            },
+            new AbortController().signal,
+          ),
+      ),
+    }
+    mocks.removeCapturedRepoWorktree.mockImplementationOnce(async (_cwd, _input, lifecycle) => {
+      const prepared = await lifecycle.beforeRemove()
+      return prepared.ok ? { ok: true, message: 'removed' } : prepared
+    })
+    const app = createTestRepoRoutes(worktreeRemovalApplication)
+    const response = await app.request(
+      new Request('http://localhost/remove-worktree', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          cwd: '/tmp/repo',
+          repoRuntimeId: 'repo-runtime-test',
+          branch: 'feature/remove',
+          worktreePath: '/tmp/repo-remove',
+          alsoDeleteBranch: false,
+        }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ ok: true, message: 'removed' })
+    expect(worktreeRemovalApplication.removeWorktree).toHaveBeenCalledWith(
+      'user-test',
+      expect.objectContaining({
+        repoRoot: '/tmp/repo',
+        repoRuntimeId: 'repo-runtime-test',
+        worktreePath: '/tmp/repo-remove',
+      }),
+    )
+    expect(beforeRemove).toHaveBeenCalledOnce()
+    expect(mocks.removeCapturedRepoWorktree).toHaveBeenCalledWith(
+      '/tmp/repo',
+      {
+        branch: 'feature/remove',
+        worktreePath: '/tmp/repo-remove',
+        alsoDeleteBranch: false,
+        forceDeleteBranch: undefined,
+        alsoDeleteUpstream: undefined,
+      },
+      {
+        beforeRemove: expect.any(Function),
+        afterWorktreeRemoved: expect.any(Function),
+        afterRemoveFailed: expect.any(Function),
+      },
+      expect.objectContaining({
+        identity: expect.objectContaining({
+          kind: 'local',
+          endpoint: '/tmp/repo-remove',
+        }),
+      }),
+      expect.any(AbortSignal),
+    )
   })
 
   test('open-url route forwards repo URL targets', async () => {

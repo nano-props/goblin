@@ -1,11 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, test, vi } from 'vitest'
-import {
-  clearRepoRuntimesForUser,
-  isCurrentRepoRuntime,
-  openRepoRuntime,
-} from '#/server/modules/repo-runtimes.ts'
+import { clearRepoRuntimesForUser, isCurrentRepoRuntime, openRepoRuntime } from '#/server/modules/repo-runtimes.ts'
 import { createWorkspacePaneTabsActions } from '#/server/workspace-pane/workspace-pane-tabs-actions.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
@@ -25,17 +21,26 @@ function makeActions(
   } = {},
 ) {
   const broadcasts = options.broadcasts ?? vi.fn()
-  const sessionService = {
-    listWorkspaceTabs: vi.fn(async () => [
+  const listedSnapshot = {
+    revision: 1,
+    entries: [
       {
         repoRoot: REPO_ROOT,
         branchName: 'feature/worktree',
         worktreePath: '/repo',
         tabs: [workspacePaneStaticTabEntry('status')],
       },
-    ]),
-    replaceTabs: vi.fn(async (userId, input) => input.tabs),
-    updateTabs: vi.fn(async () => [workspacePaneStaticTabEntry('history')]),
+    ],
+  }
+  const replacedSnapshot = { revision: 2, entries: listedSnapshot.entries }
+  const updatedSnapshot = {
+    revision: 3,
+    entries: [{ ...listedSnapshot.entries[0], tabs: [workspacePaneStaticTabEntry('history')] }],
+  }
+  const sessionService = {
+    listWorkspaceTabs: vi.fn(async () => listedSnapshot),
+    replaceTabs: vi.fn(async () => replacedSnapshot),
+    updateTabs: vi.fn(async () => updatedSnapshot),
   }
   const isValidClientId = options.isValidClientId ?? ((value: unknown): value is string => value === CLIENT_ID)
 
@@ -62,14 +67,17 @@ describe('workspace-pane-tabs-actions', () => {
         repoRoot: REPO_ROOT,
         repoRuntimeId: REPO_RUNTIME_ID,
       }),
-    ).resolves.toEqual([
-      {
-        repoRoot: REPO_ROOT,
-        branchName: 'feature/worktree',
-        worktreePath: '/repo',
-        tabs: [workspacePaneStaticTabEntry('status')],
-      },
-    ])
+    ).resolves.toEqual({
+      revision: 1,
+      entries: [
+        {
+          repoRoot: REPO_ROOT,
+          branchName: 'feature/worktree',
+          worktreePath: '/repo',
+          tabs: [workspacePaneStaticTabEntry('status')],
+        },
+      ],
+    })
 
     expect(sessionService.listWorkspaceTabs).toHaveBeenCalledWith(USER_ID, REPO_ROOT, REPO_RUNTIME_ID)
   })
@@ -87,7 +95,7 @@ describe('workspace-pane-tabs-actions', () => {
         worktreePath: '/repo',
         tabs: [workspacePaneStaticTabEntry('status')],
       }),
-    ).resolves.toEqual([workspacePaneStaticTabEntry('status')])
+    ).resolves.toMatchObject({ revision: 2 })
 
     expect(broadcasts).toHaveBeenCalledTimes(1)
     expect(broadcasts).toHaveBeenCalledWith(USER_ID, REPO_ROOT)
@@ -106,7 +114,7 @@ describe('workspace-pane-tabs-actions', () => {
         worktreePath: '/repo',
         operation: { type: 'open-static', tabType: 'status' },
       }),
-    ).resolves.toEqual([workspacePaneStaticTabEntry('history')])
+    ).resolves.toMatchObject({ revision: 3 })
 
     expect(broadcasts).toHaveBeenCalledTimes(1)
     expect(broadcasts).toHaveBeenCalledWith(USER_ID, REPO_ROOT)
@@ -125,7 +133,7 @@ describe('workspace-pane-tabs-actions', () => {
         worktreePath: '/repo',
         tabs: [workspacePaneStaticTabEntry('status')],
       }),
-    ).resolves.toEqual([])
+    ).resolves.toEqual({ revision: 0, entries: [] })
 
     expect(sessionService.replaceTabs).not.toHaveBeenCalled()
     expect(broadcasts).not.toHaveBeenCalled()
@@ -160,7 +168,7 @@ describe('workspace-pane-tabs-actions', () => {
         repoRoot: REPO_ROOT,
         repoRuntimeId: REPO_RUNTIME_ID,
       }),
-    ).resolves.toEqual([])
+    ).resolves.toEqual({ revision: 0, entries: [] })
 
     expect(sessionService.listWorkspaceTabs).not.toHaveBeenCalled()
     expect(broadcasts).not.toHaveBeenCalled()

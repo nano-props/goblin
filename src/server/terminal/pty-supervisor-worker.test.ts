@@ -339,6 +339,38 @@ describe('WorkerBackedPtySupervisor', () => {
     ])
   })
 
+  test('killAndWait resolves only after the worker confirms PTY exit', async () => {
+    const supervisor = buildSupervisor(worker)
+    const spawn = supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
+    const request = worker.sent[0] as { type: string; requestId: string }
+    worker.emit('message', {
+      type: 'pty-spawn-result',
+      requestId: request.requestId,
+      ok: true,
+      ptySessionId: 'pty_abc',
+      processName: 'zsh',
+    } satisfies PtyWorkerMessage)
+    const result = await spawn
+    if (!result.ok) throw new Error(result.message)
+
+    let settled = false
+    const closing = supervisor.killAndWait(result.handle).then(() => {
+      settled = true
+    })
+    await Promise.resolve()
+    expect(settled).toBe(false)
+    expect(worker.sent.at(-1)).toEqual({ type: 'pty-kill', ptySessionId: 'pty_abc' })
+
+    worker.emit('message', {
+      type: 'pty-exit',
+      ptySessionId: 'pty_abc',
+      code: 0,
+      signal: null,
+    } satisfies PtyWorkerMessage)
+    await closing
+    expect(settled).toBe(true)
+  })
+
   test('pty-data from the worker fans out to all subscribed data listeners', () => {
     const supervisor = buildSupervisor(worker)
     void supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })

@@ -13,6 +13,7 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import * as workspacePaneTabsCommit from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 
 const REPO_ID = '/tmp/workspace-pane-session-tabs-restore-repo'
 const WORKTREE_PATH = '/tmp/workspace-pane-session-tabs-restore-worktree'
@@ -22,6 +23,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.restoreAllMocks()
   resetReposStore()
   setClientBridgeForTests(null)
 })
@@ -81,7 +83,10 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
       repoRuntimeId: useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
       branchName: 'feature/no-worktree',
       worktreePath: null,
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1')],
+      tabs: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1'),
+      ],
     })
     expect(readTabsFor('feature/no-worktree', null)).toEqual([workspacePaneStaticTabEntry('status')])
   })
@@ -127,6 +132,22 @@ describe('restoreServerWorkspacePaneTabsFromSession', () => {
     ).resolves.toMatchObject({ status: 'failed', failedCommits: [expect.objectContaining({ ok: false })] })
 
     expect(readTabsFor('feature/worktree', WORKTREE_PATH)).toEqual([workspacePaneStaticTabEntry('status')])
+  })
+
+  test('does not treat an older unprojected server response as a restore failure', async () => {
+    seedRepo()
+    vi.spyOn(workspacePaneTabsCommit, 'commitWorkspacePaneTabs').mockResolvedValue({
+      ok: true,
+      projectionApplied: false,
+    })
+
+    await expect(
+      restoreServerWorkspacePaneTabsFromSession({
+        [REPO_ID]: {
+          [worktreeTargetKey()]: [workspacePaneStaticTabEntry('history')],
+        },
+      }),
+    ).resolves.toMatchObject({ status: 'restored', failedCommits: [] })
   })
 
   test('fails restore when a persisted repo is not loaded', async () => {

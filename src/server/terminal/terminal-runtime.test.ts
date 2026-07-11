@@ -8,22 +8,25 @@
 // protocol types in `shared/terminal-types.ts`.
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import {
-  clearRepoRuntimesForUser,
-  closeRepoRuntime,
-  openRepoRuntime,
-} from '#/server/modules/repo-runtimes.ts'
+import { clearRepoRuntimesForUser, closeRepoRuntime, openRepoRuntime } from '#/server/modules/repo-runtimes.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
 import { HEARTBEAT_DEADLINE_MS, HEARTBEAT_INTERVAL_MS } from '#/server/terminal/terminal-realtime-broker.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
+import type { ServerWorkspacePaneRuntimeHost } from '#/server/workspace-pane/workspace-pane-runtime-host.ts'
+import type { TerminalCreateInput, TerminalCreateResult } from '#/shared/terminal-types.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import {
   WORKSPACE_PANE_TABS_REALTIME_EVENTS,
   WORKSPACE_PANE_TABS_SOCKET_ACTIONS,
 } from '#/shared/workspace-pane-tabs.ts'
+import {
+  WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS,
+  type WorkspacePaneRuntimeOpenInput,
+  type WorkspacePaneRuntimeOpenResult,
+} from '#/shared/workspace-pane-runtime.ts'
 
 // Under method 2 the host threads `userId` (derived from the
 // access token) alongside `clientId` (per-tab routing). Tests use
@@ -55,7 +58,71 @@ vi.mock('#/system/ssh/config.ts', () => ({
       displayName: 'prod:repo',
     },
   })),
+  resolveRemoteTargetWithConfigFingerprint: vi.fn(async () => ({
+    target: {
+      id: 'ssh-config://prod/srv/repo',
+      alias: 'prod',
+      host: 'example.test',
+      user: 'deploy',
+      port: 22,
+      remotePath: '/srv/repo',
+      displayName: 'prod:repo',
+    },
+    configFingerprint: 'terminal-runtime-test-config-fingerprint',
+  })),
 }))
+
+vi.mock('#/server/worktree-removal/physical-worktree-identity-resolver.ts', async (importOriginal) => {
+  const original = await importOriginal<typeof import('#/server/worktree-removal/physical-worktree-identity-resolver.ts')>()
+  class RuntimeTestPhysicalWorktreeResolver extends original.PhysicalWorktreeIdentityResolver {
+    issue(input: { userId: string; repoRoot: string; repoRuntimeId: string; worktreePath: string }) {
+      const remote = input.repoRoot.startsWith('ssh-config://')
+      return this.issueCapability({
+        ...input,
+        identity: remote
+          ? {
+              kind: 'remote',
+              executionNamespaceId: '0123456789abcdef0123456789abcdef',
+              endpoint: input.worktreePath,
+            }
+          : { kind: 'local', executionNamespaceId: 'local', endpoint: input.worktreePath },
+        execution: remote
+          ? {
+              kind: 'remote',
+              canonicalWorktreePath: input.worktreePath,
+              configFingerprint: 'terminal-runtime-test-config-fingerprint',
+              endpointMarker: { deviceId: '10', inode: '20' },
+              target: {
+                id: input.repoRoot,
+                alias: 'prod',
+                host: 'example.test',
+                user: 'deploy',
+                port: 22,
+                remotePath: '/srv/repo',
+                displayName: 'prod:repo',
+              },
+            }
+          : {
+              kind: 'local',
+              canonicalWorktreePath: input.worktreePath,
+              endpointMarker: { deviceId: 'test-device', inode: 'test-inode' },
+            },
+        runtimeSignal: new AbortController().signal,
+        validateExecution: async () => undefined,
+      })
+    }
+  }
+  const resolver = new RuntimeTestPhysicalWorktreeResolver({ onRepoRuntimeClosed: () => () => undefined })
+  return {
+    ...original,
+    createPhysicalWorktreeIdentityResolver: () => ({
+      capture: vi.fn(async (input: { userId: string; repoRoot: string; repoRuntimeId: string; worktreePath: string }) =>
+        resolver.issue(input),
+      ),
+      dispose: vi.fn(),
+    }),
+  }
+})
 
 const mockPtys: Array<{
   write: ReturnType<typeof vi.fn>
@@ -75,7 +142,9 @@ vi.mock('node-pty', () => ({
     const pty = {
       write: vi.fn(),
       resize: vi.fn(),
-      kill: vi.fn(),
+      kill: vi.fn(() => {
+        queueMicrotask(() => onExit?.())
+      }),
       emitData: (data: string) => onData?.(data),
       emitExit: () => onExit?.(),
       setProcessName: (nextProcessName: string) => {
@@ -122,12 +191,20 @@ interface RuntimeHandle {
   isClientOnline: (clientId: string) => boolean
 }
 
+const createTerminalApplications = new WeakMap<
+  ServerTerminalHost,
+  ServerWorkspacePaneRuntimeHost
+>()
+
 function buildRuntime(): RuntimeHandle {
-  const runtime = createServerTerminalRuntime({ ptySupervisor: createInProcessPtySupervisor() })
+  const runtime = createServerTerminalRuntime({
+    ptySupervisor: createInProcessPtySupervisor(),
+  })
   REPO_RUNTIME_ID = openRepoRuntime(USER_1, REPO_ROOT)
   SSH_REPO_RUNTIME_ID = openRepoRuntime(USER_1, 'ssh-config://prod/srv/repo')
   USER_2_REPO_RUNTIME_ID = openRepoRuntime(USER_2, REPO_ROOT)
   openRepoRuntime(USER_2, 'ssh-config://prod/srv/repo')
+  createTerminalApplications.set(runtime.host, runtime.workspacePaneRuntimeHost)
   return {
     host: runtime.host,
     shutdown: () => runtime.shutdown(),
@@ -165,7 +242,7 @@ function sentSocketMessages(socket: {
 async function requestWorkspacePaneTabs(
   host: ServerTerminalHost,
   socket: { send: ReturnType<typeof vi.fn>; close?: ReturnType<typeof vi.fn> },
-  action: (typeof WORKSPACE_PANE_TABS_SOCKET_ACTIONS)[keyof typeof WORKSPACE_PANE_TABS_SOCKET_ACTIONS],
+  action: string,
   input: unknown,
   requestId: string,
 ): Promise<unknown> {
@@ -181,8 +258,9 @@ async function requestWorkspacePaneTabs(
     }),
   )
   await vi.waitFor(() => {
-    expect(sentSocketMessages(socket).some((message) => message.type === 'response' && message.requestId === requestId))
-      .toBe(true)
+    expect(
+      sentSocketMessages(socket).some((message) => message.type === 'response' && message.requestId === requestId),
+    ).toBe(true)
   })
   const response = sentSocketMessages(socket).find(
     (message) => message.type === 'response' && message.requestId === requestId,
@@ -191,8 +269,23 @@ async function requestWorkspacePaneTabs(
   return response?.payload
 }
 
+async function requestWorkspacePaneRuntime(
+  host: ServerTerminalHost,
+  socket: { send: ReturnType<typeof vi.fn>; close?: ReturnType<typeof vi.fn> },
+  input: WorkspacePaneRuntimeOpenInput,
+  requestId: string,
+): Promise<WorkspacePaneRuntimeOpenResult> {
+  return (await requestWorkspacePaneTabs(
+    host,
+    socket,
+    WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open,
+    input,
+    requestId,
+  )) as WorkspacePaneRuntimeOpenResult
+}
+
 async function createTerminalSession(host: ServerTerminalHost, clientId: string, userId = USER_1): Promise<string> {
-  const result = await host.create(clientId, userId, {
+  const result = await createAdmittedTerminal(host, clientId, userId, {
     repoRoot: REPO_ROOT,
     repoRuntimeId: REPO_RUNTIME_ID,
     branch: 'feature',
@@ -204,7 +297,22 @@ async function createTerminalSession(host: ServerTerminalHost, clientId: string,
   })
   expect(result.ok).toBe(true)
   if (!result.ok) throw new Error(result.message)
-  return result.sessions[0]?.terminalRuntimeSessionId ?? ''
+  return result.terminalRuntimeSessionId
+}
+
+async function createAdmittedTerminal(
+  host: ServerTerminalHost,
+  clientId: string,
+  userId: string,
+  input: TerminalCreateInput,
+): Promise<TerminalCreateResult> {
+  const application = createTerminalApplications.get(host)
+  if (!application) throw new Error('missing workspace pane runtime application')
+  const result = await application.openRuntime(clientId, userId, {
+    runtimeType: 'terminal',
+    request: input.clientId ? input : { ...input, clientId },
+  })
+  return result.ok ? result.runtime : { ok: false, message: result.message }
 }
 
 describe('server terminal runtime', () => {
@@ -213,7 +321,7 @@ describe('server terminal runtime', () => {
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
 
-    const result = await host.create('client_a', USER_1, {
+    const result = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
@@ -226,18 +334,16 @@ describe('server terminal runtime', () => {
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.sessions).toEqual([
-      expect.objectContaining({
-        terminalSessionId: result.terminalSessionId,
-        controller: { clientId: 'client_a', status: 'connected' },
-        phase: 'opening',
-        message: null,
-        cols: 80,
-        rows: 24,
-      }),
-    ])
-    const terminalRuntimeSessionId = result.sessions[0]?.terminalRuntimeSessionId
-    if (!terminalRuntimeSessionId) throw new Error('expected session id')
+    expect(result).toMatchObject({
+      terminalSessionId: result.terminalSessionId,
+      controller: { clientId: 'client_a', status: 'connected' },
+      phase: 'opening',
+      message: null,
+      canonicalCols: 80,
+      canonicalRows: 24,
+    })
+    expect(result).not.toHaveProperty('sessions')
+    const terminalRuntimeSessionId = result.terminalRuntimeSessionId
 
     mockPtys[0]?.emitData('ready')
 
@@ -255,6 +361,34 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
+  test('application create broadcasts terminal sessions and workspace pane tabs', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_a', USER_1, socket)
+
+    const result = await createAdmittedTerminal(host, 'client_a', USER_1, {
+      repoRoot: REPO_ROOT,
+      repoRuntimeId: REPO_RUNTIME_ID,
+      branch: 'feature',
+      worktreePath: '/repo-linked',
+      kind: 'additional',
+      cols: 80,
+      rows: 24,
+      clientId: 'client_a',
+    })
+
+    expect(result.ok).toBe(true)
+    expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toEqual([
+      { type: 'sessions-changed', repoRoot: REPO_ROOT },
+    ])
+    expect(
+      sentSocketMessages(socket).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
+    ).toBe(true)
+
+    host.unregisterSocket('client_a', USER_1, socket)
+    shutdown()
+  })
+
   test('a second attachment can attach as viewer without stealing controller control', async () => {
     const { host, shutdown } = buildRuntime()
     const socketA = { send: vi.fn(), close: vi.fn() }
@@ -262,7 +396,7 @@ describe('server terminal runtime', () => {
     host.registerSocket('client_a', USER_1, socketA)
     host.registerSocket('client_b', USER_1, socketB)
 
-    const createResult = await host.create('client_a', USER_1, {
+    const createResult = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
@@ -274,8 +408,7 @@ describe('server terminal runtime', () => {
     })
     expect(createResult.ok).toBe(true)
     if (!createResult.ok) return
-    const terminalRuntimeSessionId = createResult.sessions[0]?.terminalRuntimeSessionId
-    if (!terminalRuntimeSessionId) throw new Error('expected session id')
+    const terminalRuntimeSessionId = createResult.terminalRuntimeSessionId
 
     const attachResult = await host.attach('client_a', USER_1, {
       terminalRuntimeSessionId,
@@ -341,7 +474,7 @@ describe('server terminal runtime', () => {
     const socketA = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socketA)
 
-    const createResult = await host.create('client_a', USER_1, {
+    const createResult = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
@@ -353,8 +486,7 @@ describe('server terminal runtime', () => {
     })
     expect(createResult.ok).toBe(true)
     if (!createResult.ok) return
-    const terminalRuntimeSessionId = createResult.sessions[0]?.terminalRuntimeSessionId
-    if (!terminalRuntimeSessionId) throw new Error('expected session id')
+    const terminalRuntimeSessionId = createResult.terminalRuntimeSessionId
 
     host.unregisterSocket('client_a', USER_1, socketA)
     const socketA2 = { send: vi.fn(), close: vi.fn() }
@@ -397,7 +529,7 @@ describe('server terminal runtime', () => {
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
 
-    const createResult = await host.create('client_a', USER_1, {
+    const createResult = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
@@ -409,8 +541,7 @@ describe('server terminal runtime', () => {
     })
     expect(createResult.ok).toBe(true)
     if (!createResult.ok) return
-    const terminalRuntimeSessionId = createResult.sessions[0]?.terminalRuntimeSessionId
-    if (!terminalRuntimeSessionId) throw new Error('expected session id')
+    const terminalRuntimeSessionId = createResult.terminalRuntimeSessionId
     socket.send.mockClear()
 
     host.handleRealtimeMessage(
@@ -555,7 +686,12 @@ describe('server terminal runtime', () => {
       .find((message) => message.type === 'exit')
     expect(exitMessage).toMatchObject({
       type: 'exit',
-      event: { terminalRuntimeSessionId, terminalSessionId: expect.any(String) },
+      event: {
+        terminalRuntimeSessionId,
+        terminalSessionId: expect.any(String),
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: REPO_RUNTIME_ID,
+      },
     })
     expect(host.getDiagnostics().terminal.pty.state).toBe('idle')
 
@@ -606,19 +742,24 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-    const created = await host.create('client_a', USER_1, {
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branch: 'feature',
-      worktreePath: '/repo-linked',
-      kind: 'additional',
-      cols: 80,
-      rows: 24,
-      clientId: 'client_a',
-    })
-    expect(created.ok).toBe(true)
-    if (!created.ok) return
-    expect(created.tabs).toContainEqual({ type: 'terminal', runtimeSessionId: created.terminalSessionId })
+    const opened = await requestWorkspacePaneRuntime(
+      host,
+      socket,
+      {
+        runtimeType: 'terminal',
+        request: {
+          repoRoot: REPO_ROOT,
+          repoRuntimeId: REPO_RUNTIME_ID,
+          branch: 'feature',
+          worktreePath: '/repo-linked',
+          kind: 'additional',
+          cols: 80,
+          rows: 24,
+        },
+      },
+      'req_open_terminal_before_exit',
+    )
+    expect(opened.ok).toBe(true)
     socket.send.mockClear()
 
     mockPtys[0]?.emitExit()
@@ -637,14 +778,16 @@ describe('server terminal runtime', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         'req_list_after_exit',
       ),
-    ).resolves.toEqual([
-      {
-        repoRoot: REPO_ROOT,
-        branchName: 'feature',
-        worktreePath: '/repo-linked',
-        tabs: [expect.objectContaining({ type: 'status' })],
-      },
-    ])
+    ).resolves.toMatchObject({
+      entries: [
+        {
+          repoRoot: REPO_ROOT,
+          branchName: 'feature',
+          worktreePath: '/repo-linked',
+          tabs: [expect.objectContaining({ type: 'status' })],
+        },
+      ],
+    })
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
@@ -654,18 +797,24 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-    const created = await host.create('client_a', USER_1, {
-      repoRoot: REPO_ROOT,
-      repoRuntimeId: REPO_RUNTIME_ID,
-      branch: 'feature',
-      worktreePath: '/repo-linked',
-      kind: 'additional',
-      cols: 80,
-      rows: 24,
-      clientId: 'client_a',
-    })
-    expect(created.ok).toBe(true)
-    if (!created.ok) return
+    const opened = await requestWorkspacePaneRuntime(
+      host,
+      socket,
+      {
+        runtimeType: 'terminal',
+        request: {
+          repoRoot: REPO_ROOT,
+          repoRuntimeId: REPO_RUNTIME_ID,
+          branch: 'feature',
+          worktreePath: '/repo-linked',
+          kind: 'additional',
+          cols: 80,
+          rows: 24,
+        },
+      },
+      'req_open_terminal_before_prune',
+    )
+    expect(opened.ok).toBe(true)
     socket.send.mockClear()
     vi.mocked(getWorktrees).mockResolvedValueOnce([])
 
@@ -687,14 +836,16 @@ describe('server terminal runtime', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         'req_list_after_prune',
       ),
-    ).resolves.toEqual([
-      {
-        repoRoot: REPO_ROOT,
-        branchName: 'feature',
-        worktreePath: '/repo-linked',
-        tabs: [expect.objectContaining({ type: 'status' })],
-      },
-    ])
+    ).resolves.toMatchObject({
+      entries: [
+        {
+          repoRoot: REPO_ROOT,
+          branchName: 'feature',
+          worktreePath: '/repo-linked',
+          tabs: [expect.objectContaining({ type: 'status' })],
+        },
+      ],
+    })
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
@@ -704,7 +855,7 @@ describe('server terminal runtime', () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-    const created = await host.create('client_a', USER_1, {
+    const created = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
@@ -722,18 +873,24 @@ describe('server terminal runtime', () => {
         socket,
         WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace,
         {
-        repoRoot: REPO_ROOT,
-        repoRuntimeId: REPO_RUNTIME_ID,
-        branchName: 'feature',
-        worktreePath: '/repo-linked',
-        tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
+          repoRoot: REPO_ROOT,
+          repoRuntimeId: REPO_RUNTIME_ID,
+          branchName: 'feature',
+          worktreePath: '/repo-linked',
+          tabs: [{ type: 'status', tabId: 'workspace-pane:status' }],
         },
         'req_replace_workspace_tabs',
       ),
-    ).resolves.toEqual([
-      { type: 'status', tabId: 'workspace-pane:status' },
-      { type: 'terminal', runtimeSessionId: created.terminalSessionId },
-    ])
+    ).resolves.toMatchObject({
+      entries: [
+        {
+          tabs: [
+            { type: 'status', tabId: 'workspace-pane:status' },
+            { type: 'terminal', runtimeSessionId: created.terminalSessionId },
+          ],
+        },
+      ],
+    })
     await vi.waitFor(() => {
       expect(
         sentSocketMessages(socket).some((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
@@ -766,17 +923,20 @@ describe('server terminal runtime', () => {
       type: 'response',
       ok: true,
       action: WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
-      payload: [
-        {
-          repoRoot: REPO_ROOT,
-          branchName: 'feature',
-          worktreePath: '/repo-linked',
-          tabs: [
-            { type: 'status', tabId: 'workspace-pane:status' },
-            { type: 'terminal', runtimeSessionId: created.terminalSessionId },
-          ],
-        },
-      ],
+      payload: {
+        revision: expect.any(Number),
+        entries: [
+          {
+            repoRoot: REPO_ROOT,
+            branchName: 'feature',
+            worktreePath: '/repo-linked',
+            tabs: [
+              { type: 'status', tabId: 'workspace-pane:status' },
+              { type: 'terminal', runtimeSessionId: created.terminalSessionId },
+            ],
+          },
+        ],
+      },
     })
 
     host.unregisterSocket('client_a', USER_1, socket)
@@ -801,7 +961,7 @@ describe('server terminal runtime', () => {
 
   test('returns created terminal sessions for SSH remote repositories', async () => {
     const { host, shutdown } = buildRuntime()
-    const result = await host.create('client_a', USER_1, {
+    const result = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: 'ssh-config://prod/srv/repo',
       repoRuntimeId: SSH_REPO_RUNTIME_ID,
       branch: 'feature',
@@ -813,10 +973,17 @@ describe('server terminal runtime', () => {
 
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(resolveRemoteTarget).toHaveBeenCalledWith({ alias: 'prod', remotePath: '/srv/repo' })
-    expect(result.sessions).toEqual([
+    expect(resolveRemoteTarget).not.toHaveBeenCalled()
+    expect(result.terminalSessionId).toMatch(/^term-[A-Za-z0-9_-]{21}$/)
+    expect(result).not.toHaveProperty('sessions')
+    await expect(
+      host.listSessions('client_a', USER_1, {
+        repoRoot: 'ssh-config://prod/srv/repo',
+        repoRuntimeId: SSH_REPO_RUNTIME_ID,
+      }),
+    ).resolves.toEqual([
       expect.objectContaining({
-        terminalSessionId: expect.stringMatching(/^term-[A-Za-z0-9_-]{21}$/),
+        terminalSessionId: result.terminalSessionId,
         repoRoot: 'ssh-config://prod/srv/repo',
         worktreePath: '/srv/repo',
       }),
@@ -827,7 +994,7 @@ describe('server terminal runtime', () => {
 
   test('reuses the existing terminal when reopening the same repo root', async () => {
     const { host, shutdown } = buildRuntime()
-    const first = await host.create('client_a', USER_1, {
+    const first = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
@@ -839,7 +1006,7 @@ describe('server terminal runtime', () => {
     expect(first.ok).toBe(true)
     if (!first.ok) return
     expect(first.action).toBe('created')
-    const second = await host.create('client_a', USER_1, {
+    const second = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
@@ -858,7 +1025,7 @@ describe('server terminal runtime', () => {
 
   test('repo runtime close makes old terminal sessions and workspace tabs unreachable to the reopened runtime', async () => {
     const { host, shutdown } = buildRuntime()
-    const first = await host.create('client_a', USER_1, {
+    const first = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
@@ -885,11 +1052,17 @@ describe('server terminal runtime', () => {
         },
         'req_update_before_repo_close',
       ),
-    ).resolves.toEqual([
-      { type: 'status', tabId: 'workspace-pane:status' },
-      { type: 'terminal', runtimeSessionId: first.terminalSessionId },
-      { type: 'history', tabId: 'workspace-pane:history' },
-    ])
+    ).resolves.toMatchObject({
+      entries: [
+        {
+          tabs: [
+            { type: 'status', tabId: 'workspace-pane:status' },
+            { type: 'terminal', runtimeSessionId: first.terminalSessionId },
+            { type: 'history', tabId: 'workspace-pane:history' },
+          ],
+        },
+      ],
+    })
     socket.send.mockClear()
 
     expect(closeRepoRuntime(USER_1, REPO_ROOT, REPO_RUNTIME_ID)).toBe(true)
@@ -912,9 +1085,9 @@ describe('server terminal runtime', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: nextRepoRuntimeId },
         'req_list_after_repo_reopen',
       ),
-    ).resolves.toEqual([])
+    ).resolves.toMatchObject({ entries: [] })
 
-    const second = await host.create('client_a', USER_1, {
+    const second = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: nextRepoRuntimeId,
       branch: 'feature',
@@ -933,15 +1106,9 @@ describe('server terminal runtime', () => {
   })
 
   test('serializes concurrent primary creates for the same worktree', async () => {
-    const worktrees: WorktreeInfo[] = [{ path: '/repo-linked', branch: 'feature', isBare: false, isPrimary: false }]
-    const firstWorktrees = createDeferred<WorktreeInfo[]>()
-    const secondWorktrees = createDeferred<WorktreeInfo[]>()
-    vi.mocked(getWorktrees)
-      .mockImplementationOnce(async () => await firstWorktrees.promise)
-      .mockImplementationOnce(async () => await secondWorktrees.promise)
     const { host, shutdown } = buildRuntime()
 
-    const first = host.create('client_a', USER_1, {
+    const first = createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
@@ -950,7 +1117,7 @@ describe('server terminal runtime', () => {
       cols: 80,
       rows: 24,
     })
-    const second = host.create('client_b', USER_1, {
+    const second = createAdmittedTerminal(host, 'client_b', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
@@ -960,18 +1127,11 @@ describe('server terminal runtime', () => {
       rows: 24,
     })
 
-    await vi.waitFor(() => expect(getWorktrees).toHaveBeenCalledTimes(1))
-    await flushPromiseQueue()
-    expect(getWorktrees).toHaveBeenCalledTimes(1)
-
-    firstWorktrees.resolve(worktrees)
     const firstResult = await first
     expect(firstResult.ok).toBe(true)
     if (!firstResult.ok) return
     expect(firstResult.action).toBe('created')
 
-    await vi.waitFor(() => expect(getWorktrees).toHaveBeenCalledTimes(2))
-    secondWorktrees.resolve(worktrees)
     const secondResult = await second
     expect(secondResult.ok).toBe(true)
     if (!secondResult.ok) return
@@ -989,7 +1149,7 @@ describe('server terminal runtime', () => {
     const browserSocket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_browser', USER_1, browserSocket)
 
-    const first = await host.create('client_browser', USER_1, {
+    const first = await createAdmittedTerminal(host, 'client_browser', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
@@ -1008,7 +1168,7 @@ describe('server terminal runtime', () => {
     const electronSocket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_electron', USER_1, electronSocket)
 
-    const reopened = await host.create('client_electron', USER_1, {
+    const reopened = await createAdmittedTerminal(host, 'client_electron', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
@@ -1054,7 +1214,7 @@ describe('server terminal runtime', () => {
     host.registerSocket('client_a', USER_1, socket)
     socket.send.mockClear()
 
-    const failed = await host.create('client_a', USER_1, {
+    const failed = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
@@ -1083,7 +1243,7 @@ describe('server terminal runtime', () => {
     expect(exitBroadcasts).toEqual([])
 
     // Retry with a working spawn must succeed as a brand-new create.
-    const retried = await host.create('client_a', USER_1, {
+    const retried = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
@@ -1222,70 +1382,11 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('realtime create returns snapshot hydration fields in its response payload', async () => {
+  test('runtime-open returns terminal and canonical tabs before flushing provider realtime', async () => {
     const { host, shutdown } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socket)
-
-    host.handleRealtimeMessage(
-      'client_1',
-      USER_1,
-      socket,
-      JSON.stringify({
-        type: 'request',
-        requestId: 'req_create',
-        action: 'create',
-        input: {
-          repoRoot: REPO_ROOT,
-          repoRuntimeId: REPO_RUNTIME_ID,
-          branch: 'feature',
-          worktreePath: '/repo-linked',
-          kind: 'primary',
-          cols: 80,
-          rows: 24,
-        },
-      }),
-    )
-
-    await vi.waitFor(() => {
-      expect(
-        socket.send.mock.calls.some(([payload]) => {
-          const message = JSON.parse(String(payload))
-          return message.type === 'response' && message.requestId === 'req_create'
-        }),
-      ).toBe(true)
-    })
-
-    const response = socket.send.mock.calls
-      .map(([payload]) => JSON.parse(String(payload)))
-      .find((message) => message.type === 'response' && message.requestId === 'req_create')
-    expect(response).toMatchObject({
-      type: 'response',
-      requestId: 'req_create',
-      ok: true,
-      action: 'create',
-      payload: {
-        ok: true,
-        action: 'created',
-        terminalRuntimeSessionId: expect.any(String),
-        processName: 'zsh',
-        snapshot: expect.any(String),
-        snapshotSeq: expect.any(Number),
-        outputEra: 0,
-        canonicalCols: 80,
-        canonicalRows: 24,
-      },
-    })
-
-    host.unregisterSocket('client_a', USER_1, socket)
-    shutdown()
-  })
-
-  test('drops buffered output covered by the create response snapshot', async () => {
-    const { host, shutdown } = buildRuntime()
-    const socket = { send: vi.fn(), close: vi.fn() }
-    host.registerSocket('client_a', USER_1, socket)
-    mockDataToEmitOnRegistration = 'during-create'
+    mockDataToEmitOnRegistration = 'during-runtime-open'
 
     host.handleRealtimeMessage(
       'client_a',
@@ -1293,45 +1394,156 @@ describe('server terminal runtime', () => {
       socket,
       JSON.stringify({
         type: 'request',
-        requestId: 'req_create_buffered_output',
-        action: 'create',
+        requestId: 'req_runtime_open',
+        action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open,
         input: {
-          repoRoot: REPO_ROOT,
-          repoRuntimeId: REPO_RUNTIME_ID,
-          branch: 'feature',
-          worktreePath: '/repo-linked',
-          kind: 'primary',
-          cols: 80,
-          rows: 24,
+          runtimeType: 'terminal',
+          insertAfterIdentity: 'workspace-pane:status',
+          request: {
+            repoRoot: REPO_ROOT,
+            repoRuntimeId: REPO_RUNTIME_ID,
+            branch: 'feature',
+            worktreePath: '/repo-linked',
+            kind: 'primary',
+            cols: 80,
+            rows: 24,
+            clientId: 'forged_client',
+          },
         },
       }),
     )
 
     await vi.waitFor(() => {
-      const messages = sentSocketMessages(socket)
-      expect(messages.some((message) => message.type === 'response')).toBe(true)
+      expect(
+        sentSocketMessages(socket).some(
+          (message) => message.type === 'response' && message.requestId === 'req_runtime_open',
+        ),
+      ).toBe(true)
     })
 
     const messages = sentSocketMessages(socket)
     const responseIndex = messages.findIndex(
-      (message) => message.type === 'response' && message.requestId === 'req_create_buffered_output',
+      (message) => message.type === 'response' && message.requestId === 'req_runtime_open',
     )
-    expect(responseIndex).toBeGreaterThanOrEqual(0)
-
-    const response = messages[responseIndex]
-    expect(response).toMatchObject({
+    expect(messages[responseIndex]).toMatchObject({
       type: 'response',
-      requestId: 'req_create_buffered_output',
       ok: true,
-      action: 'create',
+      action: WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open,
       payload: {
         ok: true,
-        snapshot: expect.stringContaining('during-create'),
-        snapshotSeq: 1,
-        outputEra: 0,
+        runtimeType: 'terminal',
+        runtime: {
+          ok: true,
+          action: 'created',
+          snapshot: expect.stringContaining('during-runtime-open'),
+          snapshotSeq: 1,
+          controller: { clientId: 'client_a', status: 'connected' },
+        },
+        workspacePaneTabs: {
+          revision: expect.any(Number),
+          entries: [
+            {
+              tabs: [
+                { type: 'status', tabId: 'workspace-pane:status' },
+                { type: 'terminal', runtimeSessionId: expect.any(String) },
+              ],
+            },
+          ],
+        },
       },
     })
-    expect(messages.some((message) => message.type === 'output')).toBe(false)
+    expect(messages.filter((message) => message.type === 'output')).toHaveLength(0)
+    const firstRealtimeIndex = messages.findIndex(
+      (message) => message.type === 'sessions-changed' || message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
+    )
+    expect(firstRealtimeIndex).toBeGreaterThan(responseIndex)
+
+    host.unregisterSocket('client_a', USER_1, socket)
+    shutdown()
+  })
+
+  test('runtime-close resolves durable terminal identity on the server and returns a canonical snapshot', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socket = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_a', USER_1, socket)
+    const opened = await requestWorkspacePaneRuntime(
+      host,
+      socket,
+      {
+        runtimeType: 'terminal',
+        request: {
+          repoRoot: REPO_ROOT,
+          repoRuntimeId: REPO_RUNTIME_ID,
+          branch: 'feature',
+          worktreePath: '/repo-linked',
+          kind: 'additional',
+          cols: 80,
+          rows: 24,
+        },
+      },
+      'req_runtime_open_before_close',
+    )
+    expect(opened.ok).toBe(true)
+    if (!opened.ok) return
+
+    await expect(
+      requestWorkspacePaneTabs(
+        host,
+        socket,
+        WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close,
+        {
+          runtimeType: 'terminal',
+          sessionId: opened.runtime.terminalSessionId,
+          target: {
+            repoRoot: REPO_ROOT,
+            repoRuntimeId: REPO_RUNTIME_ID,
+            branchName: 'feature',
+            worktreePath: '/repo-linked',
+          },
+        },
+        'req_runtime_close',
+      ),
+    ).resolves.toMatchObject({
+      ok: true,
+      runtimeType: 'terminal',
+      runtime: {
+        action: 'closed',
+        terminalSessionId: opened.runtime.terminalSessionId,
+        terminalRuntimeSessionId: opened.runtime.terminalRuntimeSessionId,
+      },
+      workspacePaneTabs: {
+        revision: expect.any(Number),
+        entries: [{ tabs: [{ type: 'status', tabId: 'workspace-pane:status' }] }],
+      },
+    })
+    await expect(
+      requestWorkspacePaneTabs(
+        host,
+        socket,
+        WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close,
+        {
+          runtimeType: 'terminal',
+          sessionId: opened.runtime.terminalSessionId,
+          target: {
+            repoRoot: REPO_ROOT,
+            repoRuntimeId: REPO_RUNTIME_ID,
+            branchName: 'feature',
+            worktreePath: '/repo-linked',
+          },
+        },
+        'req_runtime_close_again',
+      ),
+    ).resolves.toMatchObject({
+      ok: true,
+      runtime: {
+        action: 'already-closed',
+        terminalSessionId: opened.runtime.terminalSessionId,
+        terminalRuntimeSessionId: null,
+      },
+    })
+    await expect(
+      host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID }),
+    ).resolves.toEqual([])
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
@@ -1339,7 +1551,7 @@ describe('server terminal runtime', () => {
 
   test('rejects terminal IPC calls from untrusted senders', async () => {
     const { host, shutdown } = buildRuntime()
-    const result = await host.create('client_with_$pecial!chars' as never, USER_1, {
+    const result = await createAdmittedTerminal(host, 'client_with_$pecial!chars' as never, USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
@@ -1370,6 +1582,7 @@ describe('server terminal runtime', () => {
     expect(result).toEqual({
       ok: true,
       terminalRuntimeSessionId,
+      terminalRuntimeGeneration: 1,
       role: 'controller',
       controllerStatus: 'connected',
       controller: { clientId: 'client_b', status: 'connected' },
@@ -1480,7 +1693,7 @@ describe('server terminal runtime', () => {
     host.registerSocket('client_shared_attachment_a', USER_1, userASocket)
     host.registerSocket('client_shared_attachment_b', USER_2, userBSocket)
 
-    const userACreate = await host.create('client_shared', USER_1, {
+    const userACreate = await createAdmittedTerminal(host, 'client_shared', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
@@ -1492,8 +1705,11 @@ describe('server terminal runtime', () => {
     })
     expect(userACreate.ok).toBe(true)
     if (!userACreate.ok) return
-    const userASession = userACreate.sessions[0]
-    if (!userASession) throw new Error('expected user A session')
+    const userASession = {
+      terminalRuntimeSessionId: userACreate.terminalRuntimeSessionId,
+        terminalRuntimeGeneration: 1,
+      terminalSessionId: userACreate.terminalSessionId,
+    }
 
     expect(
       await host.listSessions('client_shared', USER_2, {
@@ -1511,7 +1727,7 @@ describe('server terminal runtime', () => {
       }),
     ).toBe(false)
 
-    const userBCreate = await host.create('client_shared', USER_2, {
+    const userBCreate = await createAdmittedTerminal(host, 'client_shared', USER_2, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: USER_2_REPO_RUNTIME_ID,
       branch: 'feature',
@@ -1523,8 +1739,11 @@ describe('server terminal runtime', () => {
     })
     expect(userBCreate.ok).toBe(true)
     if (!userBCreate.ok) return
-    const userBSession = userBCreate.sessions[0]
-    if (!userBSession) throw new Error('expected user B session')
+    const userBSession = {
+      terminalRuntimeSessionId: userBCreate.terminalRuntimeSessionId,
+        terminalRuntimeGeneration: 1,
+      terminalSessionId: userBCreate.terminalSessionId,
+    }
 
     expect(userBSession.terminalSessionId).not.toBe(userASession.terminalSessionId)
     expect(userBSession.terminalRuntimeSessionId).not.toBe(userASession.terminalRuntimeSessionId)
@@ -1533,6 +1752,7 @@ describe('server terminal runtime', () => {
     ).toEqual([
       expect.objectContaining({
         terminalRuntimeSessionId: userASession.terminalRuntimeSessionId,
+        terminalRuntimeGeneration: 1,
         terminalSessionId: userASession.terminalSessionId,
       }),
     ])
@@ -1544,6 +1764,7 @@ describe('server terminal runtime', () => {
     ).toEqual([
       expect.objectContaining({
         terminalRuntimeSessionId: userBSession.terminalRuntimeSessionId,
+        terminalRuntimeGeneration: 1,
         terminalSessionId: userBSession.terminalSessionId,
       }),
     ])
@@ -1584,7 +1805,7 @@ describe('server terminal runtime', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         'req_list_after_detached_ttl',
       ),
-    ).resolves.toEqual([])
+    ).resolves.toMatchObject({ entries: [] })
 
     const recreatedSessionId = await createTerminalSession(host, 'client_1')
     const replacementAttach = await host.attach('client_a', USER_1, {
@@ -1610,7 +1831,7 @@ describe('server terminal runtime', () => {
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socketA)
-    const created = await host.create('client_a', USER_1, {
+    const created = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
@@ -1622,8 +1843,7 @@ describe('server terminal runtime', () => {
     })
     expect(created.ok).toBe(true)
     if (!created.ok) return
-    const terminalRuntimeSessionId = created.sessions[0]?.terminalRuntimeSessionId
-    if (!terminalRuntimeSessionId) throw new Error('expected session id')
+    const terminalRuntimeSessionId = created.terminalRuntimeSessionId
 
     host.unregisterSocket('client_a', USER_1, socketA)
 
@@ -1669,7 +1889,7 @@ describe('server terminal runtime', () => {
     const socketB = { send: vi.fn(), close: vi.fn() }
     const socketAReconnect = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socketA)
-    const created = await host.create('client_a', USER_1, {
+    const created = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
@@ -1681,8 +1901,7 @@ describe('server terminal runtime', () => {
     })
     expect(created.ok).toBe(true)
     if (!created.ok) return
-    const terminalRuntimeSessionId = created.sessions[0]?.terminalRuntimeSessionId
-    if (!terminalRuntimeSessionId) throw new Error('expected session id')
+    const terminalRuntimeSessionId = created.terminalRuntimeSessionId
     mockPtys[0]?.emitData('ready')
 
     // A goes offline; B attaches and claims because no effective controller remains.
@@ -1767,7 +1986,7 @@ describe('server terminal runtime', () => {
     const socketA = { send: vi.fn(), close: vi.fn() }
     const socketB = { send: vi.fn(), close: vi.fn() }
     host.registerSocket('client_a', USER_1, socketA)
-    const created = await host.create('client_a', USER_1, {
+    const created = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,
       repoRuntimeId: REPO_RUNTIME_ID,
       branch: 'feature',
@@ -1779,8 +1998,7 @@ describe('server terminal runtime', () => {
     })
     expect(created.ok).toBe(true)
     if (!created.ok) return
-    const terminalRuntimeSessionId = created.sessions[0]?.terminalRuntimeSessionId
-    if (!terminalRuntimeSessionId) throw new Error('expected session id')
+    const terminalRuntimeSessionId = created.terminalRuntimeSessionId
 
     host.registerSocket('client_b', USER_1, socketB)
     const viewerAttach = await host.attach('client_a', USER_1, {

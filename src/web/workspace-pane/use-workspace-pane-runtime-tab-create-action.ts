@@ -9,7 +9,7 @@ import {
   type WorkspacePaneRuntimeTabCreateStateByType,
   workspacePaneRuntimeTabCreateAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 
 export interface UseWorkspacePaneRuntimeTabCreateActionInput {
   repoRoot: string
@@ -18,7 +18,7 @@ export interface UseWorkspacePaneRuntimeTabCreateActionInput {
   worktreePath: string | null
   runtimeTabStateByType: WorkspacePaneRuntimeTabCreateStateByType
   initialRuntimeProjectionHydrating: boolean
-  workspacePaneRoute: RepoBranchWorkspacePaneRoute | null | undefined
+  workspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null | undefined
   showCreatedRuntimeTab: (type: WorkspacePaneRuntimeTabType, sessionId: string) => boolean | Promise<boolean>
   t: TerminalCreateTranslator
 }
@@ -34,7 +34,7 @@ export function useWorkspacePaneRuntimeTabCreateAction({
   showCreatedRuntimeTab,
   t,
 }: UseWorkspacePaneRuntimeTabCreateActionInput): WorkspacePaneRuntimeTabCreateAction | null {
-  const { createTerminal } = useTerminalSessionContext()
+  const { createTerminalWithAdmission } = useTerminalSessionContext()
   const terminalBase = useMemo<TerminalSessionBase | null>(
     () =>
       branchName && worktreePath
@@ -50,11 +50,11 @@ export function useWorkspacePaneRuntimeTabCreateAction({
   const captureOpenerIdentity = useCallback(
     () =>
       branchName
-        ? captureWorkspacePaneActiveTabIdentity(repoRoot, branchName, {
+        ? captureWorkspacePaneActiveTabIdentity(repoRoot, repoRuntimeId, branchName, {
             workspacePaneRoute,
           })
         : null,
-    [branchName, repoRoot, workspacePaneRoute],
+    [branchName, repoRoot, repoRuntimeId, workspacePaneRoute],
   )
 
   return useMemo(
@@ -67,13 +67,13 @@ export function useWorkspacePaneRuntimeTabCreateAction({
         t,
         terminal: {
           base: terminalBase,
-          createTerminal,
+          createTerminal: createTerminalWithAdmission,
           captureOpenerIdentity,
         },
       }),
     [
       captureOpenerIdentity,
-      createTerminal,
+      createTerminalWithAdmission,
       initialRuntimeProjectionHydrating,
       repoRoot,
       runtimeTabStateByType,

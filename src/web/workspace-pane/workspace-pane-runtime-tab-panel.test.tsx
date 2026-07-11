@@ -1,17 +1,24 @@
 // @vitest-environment jsdom
 
 import { act } from '@testing-library/react'
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { stubI18n } from '#/test-utils/i18n-mock.ts'
+import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { TerminalSessionContext } from '#/web/components/terminal/terminal-session-context.ts'
 import type { TerminalSessionContextValue } from '#/web/components/terminal/types.ts'
 import {
   PrimaryWindowNavigationProvider,
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
+import { observedWorkspacePaneRouteCommitForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
+import {
+  observeWorkspacePaneTabControllerRoute,
+  resetWorkspacePaneTabControllerForTest,
+} from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
+import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 
 stubI18n()
 
@@ -31,7 +38,10 @@ const terminalSessionViewMocks = vi.hoisted(() => ({
 }))
 
 const terminalCreateCommandMocks = vi.hoisted(() => ({
-  runCreateTerminalTabCommand: vi.fn(async () => ({ ok: true as const, terminalSessionId: 'term-111111111111111111111' })),
+  runCreateTerminalTabCommand: vi.fn(async () => ({
+    ok: true as const,
+    terminalSessionId: 'term-111111111111111111111',
+  })),
 }))
 
 vi.mock('#/web/components/terminal/TerminalSessionView.tsx', () => ({
@@ -45,7 +55,27 @@ vi.mock('#/web/commands/terminal-create-command.ts', () => ({
   runCreateTerminalTabCommand: terminalCreateCommandMocks.runCreateTerminalTabCommand,
 }))
 
+beforeEach(() => {
+  resetWorkspacePaneTabControllerForTest()
+  resetReposStore()
+  seedRepoWithReadModelForTest({
+    id: '/repo',
+    repoRuntimeId: 'repo-runtime-1',
+    branches: [createRepoBranch('main', { worktree: { path: '/repo-worktree' } })],
+    currentBranchName: 'main',
+  })
+  observeWorkspacePaneTabControllerRoute({
+    repoId: '/repo',
+    repoRuntimeId: 'repo-runtime-1',
+    branchName: 'main',
+    worktreePath: '/repo-worktree',
+    route: null,
+  })
+})
+
 afterEach(() => {
+  resetWorkspacePaneTabControllerForTest()
+  resetReposStore()
   terminalSessionViewMocks.props.length = 0
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockClear()
 })
@@ -71,8 +101,9 @@ describe('workspace pane runtime tab panel', () => {
 
   test('delegates terminal empty-slot create to the terminal create command', async () => {
     const createTerminal = vi.fn(async () => 'term-111111111111111111111')
+    const terminalContext = terminalCommandContextWith({ createTerminal })
     const { navigation } = renderPanel({
-      terminalContext: terminalCommandContextWith({ createTerminal }),
+      terminalContext,
     })
 
     const base: TerminalSessionBase = {
@@ -89,15 +120,31 @@ describe('workspace pane runtime tab panel', () => {
     expect(terminalCreateCommandMocks.runCreateTerminalTabCommand).toHaveBeenCalledWith(
       expect.objectContaining({
         base,
-        createTerminal,
-        openerIdentity: null,
+        createTerminal: terminalContext.createTerminalWithAdmission,
+        commitCreatedTerminalTab: expect.any(Function),
         logMessage: 'workspace pane terminal create failed',
       }),
     )
     const commandCalls = terminalCreateCommandMocks.runCreateTerminalTabCommand.mock.calls as unknown as Array<
-      [{ showCreatedTerminalTab: (terminalSessionId: string) => boolean | Promise<boolean> }]
+      [
+        {
+          commitCreatedTerminalTab: (admission: {
+            terminalSessionId: string
+            requestRole: 'leader'
+            resourceDisposition: 'created'
+            workspacePaneTabs: { revision: number; entries: [] }
+            runtimeProjectionApplied: boolean
+          }) => Promise<unknown>
+        },
+      ]
     >
-    await commandCalls[0]?.[0].showCreatedTerminalTab('term-111111111111111111111')
+    await commandCalls[0]?.[0].commitCreatedTerminalTab({
+      terminalSessionId: 'term-111111111111111111111',
+      requestRole: 'leader',
+      resourceDisposition: 'created',
+      workspacePaneTabs: { revision: 1, entries: [] },
+      runtimeProjectionApplied: true,
+    })
     expect(navigation.showRepoBranchTerminalSession).toHaveBeenCalledWith('/repo', 'main', 'term-111111111111111111111')
   })
 })
@@ -130,23 +177,26 @@ function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = 
 }
 
 function navigationWith(): PrimaryWindowNavigationActions {
-  return {
+  const navigation: PrimaryWindowNavigationActions = {
     activateRepo: vi.fn(),
     closeRepo: vi.fn(),
     cycleRepo: vi.fn(),
     selectRepoBranch: vi.fn(),
     showRepoBranchEmptyWorkspacePane: () => true,
-    showRepoBranchWorkspacePaneTab: vi.fn(),
-    showRepoBranchTerminalSession: vi.fn(),
+    showRepoBranchWorkspacePaneTab: vi.fn(() => true),
+    showRepoBranchTerminalSession: vi.fn(() => true),
+    commitRepoBranchWorkspacePaneRoute: () => false,
     goBack: vi.fn(),
     goForward: vi.fn(),
     openSettings: vi.fn(),
     openCreateWorktree: vi.fn(),
   }
+  navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
+  return navigation
 }
 
 function terminalCommandContextWith(overrides: Partial<TerminalSessionContextValue> = {}): TerminalSessionContextValue {
-  return {
+  return terminalSessionContextForTest({
     createTerminal: vi.fn(async () => 'term-111111111111111111111'),
     registerHost: vi.fn(),
     unregisterHost: vi.fn(),
@@ -166,5 +216,5 @@ function terminalCommandContextWith(overrides: Partial<TerminalSessionContextVal
     takeover: vi.fn(async () => true),
     focusTerminal: vi.fn(),
     ...overrides,
-  }
+  })
 }

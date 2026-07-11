@@ -63,10 +63,9 @@ export function canCloseWorkspacePaneRuntimeTabWithContext(
 
 function assignTerminalRuntimeTabCloseContext(context: WorkspacePaneRuntimeTabCloseContext): void {
   const bridge = readTerminalSessionCommandBridge()
-  if (!bridge?.closeTerminalByDescriptor && !bridge?.closeTerminalsForWorktree) return
+  if (!bridge?.closeTerminalByDescriptor) return
   context.byType.terminal = {
     closeTerminalByDescriptor: bridge.closeTerminalByDescriptor,
-    closeTerminalsForWorktree: bridge.closeTerminalsForWorktree,
   } satisfies TerminalWorkspacePaneRuntimeTabCloseContext
 }
 

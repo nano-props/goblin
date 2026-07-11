@@ -39,7 +39,6 @@ export interface WorkspacePaneRuntimeTabCloseContext {
 
 export interface TerminalWorkspacePaneRuntimeTabCloseContext {
   closeTerminalByDescriptor?: (terminalSessionId: string, base: TerminalSessionBase) => Promise<boolean>
-  closeTerminalsForWorktree?: (base: TerminalSessionBase) => Promise<boolean>
 }
 
 interface WorkspacePaneRuntimeTabCloseActions {
@@ -48,10 +47,6 @@ interface WorkspacePaneRuntimeTabCloseActions {
   ) => WorkspacePaneRuntimeTabCloseConfirmRequest | null
   confirmClose: (
     confirmed: ConfirmedWorkspacePaneRuntimeTabClose,
-    context: WorkspacePaneRuntimeTabCloseContext,
-  ) => Promise<boolean>
-  closeWorktree: (
-    target: WorkspacePaneRuntimeTabCloseTarget,
     context: WorkspacePaneRuntimeTabCloseContext,
   ) => Promise<boolean>
   confirmedBranchName: (confirmed: ConfirmedWorkspacePaneRuntimeTabClose) => string | null
@@ -64,7 +59,6 @@ const WORKSPACE_PANE_RUNTIME_TAB_CLOSE_ACTIONS_BY_TYPE: Record<
   terminal: {
     closeConfirmRequest: terminalCloseConfirmRequest,
     confirmClose: confirmTerminalClose,
-    closeWorktree: closeTerminalWorktree,
     confirmedBranchName: terminalConfirmedBranchName,
   },
 }
@@ -86,14 +80,6 @@ export function workspacePaneRuntimeTabConfirmedCloseBranchName(
   confirmed: ConfirmedWorkspacePaneRuntimeTabClose,
 ): string | null {
   return WORKSPACE_PANE_RUNTIME_TAB_CLOSE_ACTIONS_BY_TYPE[confirmed.type].confirmedBranchName(confirmed)
-}
-
-export async function closeWorkspacePaneRuntimeTabsForWorktree(
-  type: WorkspacePaneRuntimeTabType,
-  target: WorkspacePaneRuntimeTabCloseTarget,
-  context: WorkspacePaneRuntimeTabCloseContext,
-): Promise<boolean> {
-  return await WORKSPACE_PANE_RUNTIME_TAB_CLOSE_ACTIONS_BY_TYPE[type].closeWorktree(target, context)
 }
 
 export function workspacePaneRuntimeTabConfirmedCloseIdentity(
@@ -128,17 +114,6 @@ async function confirmTerminalClose(
   const closeTerminalByDescriptor = terminalRuntimeTabCloseContext(context)?.closeTerminalByDescriptor
   if (!closeTerminalByDescriptor) return false
   return await closeTerminalByDescriptor(confirmed.sessionId, terminalBase)
-}
-
-async function closeTerminalWorktree(
-  target: WorkspacePaneRuntimeTabCloseTarget,
-  context: WorkspacePaneRuntimeTabCloseContext,
-): Promise<boolean> {
-  const terminalBase = terminalBaseForRuntimeTabCloseTarget(target)
-  if (!terminalBase) return true
-  const closeTerminalsForWorktree = terminalRuntimeTabCloseContext(context)?.closeTerminalsForWorktree
-  if (!closeTerminalsForWorktree) return true
-  return await closeTerminalsForWorktree(terminalBase)
 }
 
 function terminalConfirmedBranchName(confirmed: ConfirmedWorkspacePaneRuntimeTabClose): string | null {

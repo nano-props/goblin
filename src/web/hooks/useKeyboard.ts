@@ -34,7 +34,7 @@ import { getClientBridge } from '#/web/client-bridge.ts'
 import { translate } from '#/web/stores/i18n.ts'
 import { toast } from 'sonner'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { getRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
 
@@ -46,7 +46,7 @@ interface Options {
   navigation: PrimaryWindowNavigationActions
   currentRepoId: string | null
   currentBranchName?: string | null
-  currentWorkspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
+  currentWorkspacePaneRoute?: ParsedRepoBranchWorkspacePaneRoute | null
   onShowHelp: () => void
   /** Returns true when workspace shortcuts should not affect the repo view. */
   isWorkspaceShortcutSuppressed: () => boolean
@@ -227,16 +227,14 @@ export function useKeyboard({
         }
         const tabIndex = !e.shiftKey ? digitShortcutIndex(e) : null
         if (tabIndex !== null) {
-          if (
-            runSelectWorkspacePaneTabByIndexCommand({
-              repoId,
-              branchName: currentBranchNameRef.current,
-              workspacePaneRoute: currentWorkspacePaneRouteRef.current,
-              tabIndex,
-              navigation,
-            })
-          )
-            e.preventDefault()
+          e.preventDefault()
+          void runSelectWorkspacePaneTabByIndexCommand({
+            repoId,
+            branchName: currentBranchNameRef.current,
+            workspacePaneRoute: currentWorkspacePaneRouteRef.current,
+            tabIndex,
+            navigation,
+          })
           return
         }
       }
@@ -291,17 +289,14 @@ export function useKeyboard({
         case 'next-workspace-pane-tab':
         case 'prev-workspace-pane-tab': {
           if (overlayOpen || !repo || !currentBranchNameRef.current) break
-          if (
-            runMoveWorkspacePaneTabCommand({
-              repoId: repo.id,
-              branchName: currentBranchNameRef.current,
-              workspacePaneRoute: currentWorkspacePaneRouteRef.current,
-              direction: action === 'next-workspace-pane-tab' ? 1 : -1,
-              navigation,
-            })
-          ) {
-            e.preventDefault()
-          }
+          e.preventDefault()
+          void runMoveWorkspacePaneTabCommand({
+            repoId: repo.id,
+            branchName: currentBranchNameRef.current,
+            workspacePaneRoute: currentWorkspacePaneRouteRef.current,
+            direction: action === 'next-workspace-pane-tab' ? 1 : -1,
+            navigation,
+          })
           break
         }
       }

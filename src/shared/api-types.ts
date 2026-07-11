@@ -364,6 +364,7 @@ export interface AppIpcHandlers {
     }) => Promise<ExecResult>
     removeWorktree: (input: {
       cwd: string
+      repoRuntimeId: string
       branch: string
       worktreePath: string
       alsoDeleteBranch: boolean

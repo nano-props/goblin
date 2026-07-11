@@ -8,7 +8,7 @@ import {
 } from '#/web/test-utils/bridge.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-import { setWorkspacePaneTabsForTargetQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 import {
   resolveWorkspacePaneTabTargetForBranch,
   workspacePanePreferenceTargetOptions,
@@ -123,11 +123,17 @@ describe('workspace pane tab target read model', () => {
       currentBranch: 'feature/query',
     })
 
-    recordWorkspacePaneTabOpener(REPO_ID, 'feature/query', 'workspace-pane:changes', 'workspace-pane:status')
+    recordWorkspacePaneTabOpener(
+      REPO_ID,
+      repo.repoRuntimeId,
+      'feature/query',
+      'workspace-pane:changes',
+      'workspace-pane:status',
+    )
 
     expect(
       useReposStore.getState().tabOpenerIdentityByScope[
-        tabOpenerScopeKey({ repoRoot: REPO_ID, branchName: 'feature/query', worktreePath: null })
+        `${tabOpenerScopeKey({ repoRoot: REPO_ID, branchName: 'feature/query', worktreePath: null })}\0${repo.repoRuntimeId}`
       ]?.[
         'workspace-pane:changes'
       ],
@@ -142,14 +148,22 @@ describe('workspace pane tab target read model', () => {
     })
 
     expect(
-      recordWorkspacePaneTabOpener(REPO_ID, 'feature/old', 'workspace-pane:changes', 'workspace-pane:status'),
+      recordWorkspacePaneTabOpener(
+        REPO_ID,
+        repo.repoRuntimeId,
+        'feature/old',
+        'workspace-pane:changes',
+        'workspace-pane:status',
+      ),
     ).toBe('recorded')
     seedRepoReadModelQueryData(repo, {
       branches: [createRepoBranch('feature/new', { worktree: { path: WORKTREE_PATH } })],
       currentBranch: 'feature/new',
     })
 
-    expect(workspacePaneTabOpener(REPO_ID, 'feature/new', 'workspace-pane:changes')).toBe('workspace-pane:status')
+    expect(workspacePaneTabOpener(REPO_ID, repo.repoRuntimeId, 'feature/new', 'workspace-pane:changes')).toBe(
+      'workspace-pane:status',
+    )
   })
 
   test('marks opener recording unavailable when the repo branch read model is unavailable', () => {
@@ -161,7 +175,13 @@ describe('workspace pane tab target read model', () => {
     }))
 
     expect(
-      recordWorkspacePaneTabOpener(REPO_ID, 'feature/query', 'workspace-pane:changes', 'workspace-pane:status'),
+      recordWorkspacePaneTabOpener(
+        REPO_ID,
+        repo.repoRuntimeId,
+        'feature/query',
+        'workspace-pane:changes',
+        'workspace-pane:status',
+      ),
     ).toBe('unavailable')
   })
 })

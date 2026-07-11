@@ -4,7 +4,11 @@ import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-import type { TerminalAttachResult, TerminalSessionSummary } from '#/shared/terminal-types.ts'
+import type {
+  TerminalAttachResult,
+  TerminalSessionSummary,
+  TerminalSessionsRecoveryResult,
+} from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
 import type { ClientBridge } from '#/web/client-bridge-types.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
@@ -16,11 +20,12 @@ import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from 
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import {
   readWorkspacePaneTabsForTarget,
-  setWorkspacePaneTabsForTargetQueryData,
+  writeWorkspacePaneTabsSnapshotQueryData,
 } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 
 const projectionMocks = vi.hoisted(() => ({
-  reconcileServerSessions: vi.fn(() => true),
+  reconcileServerSessionsSnapshot: vi.fn(() => true),
 }))
 
 vi.mock('#/web/components/terminal/use-terminal-session-projection.ts', () => ({
@@ -45,7 +50,7 @@ const recoverSessionsMock =
   vi.fn<
     (
       ...args: Array<{ repoRoot: string; repoRuntimeId: string }>
-    ) => Promise<{ sessions: TerminalSessionSummary[]; snapshots: [] }>
+    ) => Promise<TerminalSessionsRecoveryResult>
   >()
 const listWorkspaceTabsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<WorkspacePaneTabsEntry[]>>()
 
@@ -55,10 +60,14 @@ describe('AppRuntimeProjectionProvider', () => {
     workspaceTabsChangedHandler = null
     recoveredHandler = null
     kickReconnectMock.mockClear()
-    projectionMocks.reconcileServerSessions.mockClear()
-    projectionMocks.reconcileServerSessions.mockReturnValue(true)
+    projectionMocks.reconcileServerSessionsSnapshot.mockClear()
+    projectionMocks.reconcileServerSessionsSnapshot.mockReturnValue(true)
     recoverSessionsMock.mockReset()
-    recoverSessionsMock.mockResolvedValue({ sessions: [], snapshots: [] })
+    recoverSessionsMock.mockResolvedValue({
+      terminalSessions: { revision: 0, sessions: [] },
+      snapshots: [],
+      workspacePaneTabs: { revision: 0, entries: [] },
+    })
     listWorkspaceTabsMock.mockReset()
     listWorkspaceTabsMock.mockResolvedValue([])
     resetReposStore()
@@ -121,8 +130,12 @@ describe('AppRuntimeProjectionProvider', () => {
     const repo = seedCurrentRepo()
     useReposStore.setState({ workspaceMembershipReady: false })
     recoverSessionsMock.mockResolvedValue({
-      sessions: [completeServerSession(serverSession('term-111111111111111111111'))],
+      terminalSessions: {
+        revision: 1,
+        sessions: [completeServerSession(serverSession('term-111111111111111111111'))],
+      },
       snapshots: [],
+      workspacePaneTabs: { revision: 0, entries: [] },
     })
     const result = renderRuntimeProvider(REPO_ID)
     try {
@@ -135,17 +148,51 @@ describe('AppRuntimeProjectionProvider', () => {
         useReposStore.setState({ workspaceMembershipReady: true })
       })
 
-      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
-      expect(projectionMocks.reconcileServerSessions).toHaveBeenCalledWith(
-        { repoRoot: REPO_ID, repoRuntimeId: repo.repoRuntimeId },
-        [completeServerSession(serverSession('term-111111111111111111111'))],
-        'client_sharedterminal',
-        expect.any(Map),
-      )
-      expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
-        repoRuntimeId: repo.repoRuntimeId,
-        phase: 'ready',
+      await vi.waitFor(() => {
+        expect(projectionMocks.reconcileServerSessionsSnapshot).toHaveBeenCalledWith(
+          { repoRoot: REPO_ID, repoRuntimeId: repo.repoRuntimeId },
+          {
+            revision: 1,
+            sessions: [completeServerSession(serverSession('term-111111111111111111111'))],
+          },
+          'client_sharedterminal',
+          expect.any(Map),
+        )
+        expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
+          repoRuntimeId: repo.repoRuntimeId,
+          phase: 'ready',
+        })
       })
+    } finally {
+      result.unmount()
+    }
+  })
+
+  test('applies terminal recovery independently from an older workspace tabs revision', async () => {
+    const repo = seedCurrentRepo()
+    writeWorkspacePaneTabsSnapshotQueryData(REPO_ID, repo.repoRuntimeId, { revision: 2, entries: [] })
+    recoverSessionsMock.mockResolvedValue({
+      terminalSessions: {
+        revision: 1,
+        sessions: [completeServerSession(serverSession('term-111111111111111111111'))],
+      },
+      snapshots: [],
+      workspacePaneTabs: { revision: 1, entries: [] },
+    })
+
+    const result = renderRuntimeProvider(REPO_ID)
+    try {
+      await vi.waitFor(() => {
+        expect(projectionMocks.reconcileServerSessionsSnapshot).toHaveBeenCalledWith(
+          { repoRoot: REPO_ID, repoRuntimeId: repo.repoRuntimeId },
+          expect.objectContaining({ revision: 1 }),
+          'client_sharedterminal',
+          expect.any(Map),
+        )
+      })
+      expect(
+        primaryWindowQueryClient.getQueryData(['workspace-pane-tabs', REPO_ID, repo.repoRuntimeId]),
+      ).toMatchObject({ revision: 2 })
     } finally {
       result.unmount()
     }
@@ -221,8 +268,12 @@ describe('AppRuntimeProjectionProvider', () => {
       recoverSessionsMock.mockClear()
       listWorkspaceTabsMock.mockClear()
       recoverSessionsMock.mockResolvedValue({
-        sessions: [completeServerSession(serverSession('term-111111111111111111111'))],
+        terminalSessions: {
+          revision: 2,
+          sessions: [completeServerSession(serverSession('term-111111111111111111111'))],
+        },
         snapshots: [],
+        workspacePaneTabs: { revision: 0, entries: [] },
       })
       listWorkspaceTabsMock.mockResolvedValue([
         {
@@ -237,15 +288,18 @@ describe('AppRuntimeProjectionProvider', () => {
         recoveredHandler?.('client_sharedterminal')
       })
 
-      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
-      await vi.waitFor(() => expect(listWorkspaceTabsMock).toHaveBeenCalledTimes(1))
-      expect(projectionMocks.reconcileServerSessions).toHaveBeenLastCalledWith(
-        { repoRoot: REPO_ID, repoRuntimeId: repo.repoRuntimeId },
-        [completeServerSession(serverSession('term-111111111111111111111'))],
-        'client_sharedterminal',
-        expect.any(Map),
-      )
-      expect(tabsFor(repo.repoRuntimeId)).toEqual([workspacePaneStaticTabEntry('history')])
+      await vi.waitFor(() => {
+        expect(projectionMocks.reconcileServerSessionsSnapshot).toHaveBeenLastCalledWith(
+          { repoRoot: REPO_ID, repoRuntimeId: repo.repoRuntimeId },
+          {
+            revision: 2,
+            sessions: [completeServerSession(serverSession('term-111111111111111111111'))],
+          },
+          'client_sharedterminal',
+          expect.any(Map),
+        )
+        expect(tabsFor(repo.repoRuntimeId)).toEqual([workspacePaneStaticTabEntry('history')])
+      })
     } finally {
       result.unmount()
     }
@@ -285,7 +339,7 @@ describe('AppRuntimeProjectionProvider', () => {
 
   test('drops a recovered terminal projection when the repo runtime changed before publish', async () => {
     const firstRepo = seedCurrentRepo()
-    const recovery = Promise.withResolvers<{ sessions: TerminalSessionSummary[]; snapshots: [] }>()
+    const recovery = Promise.withResolvers<TerminalSessionsRecoveryResult>()
     recoverSessionsMock.mockReturnValueOnce(recovery.promise)
     const result = renderRuntimeProvider(REPO_ID)
     try {
@@ -300,18 +354,27 @@ describe('AppRuntimeProjectionProvider', () => {
         preferredWorkspacePaneTab: 'terminal',
       })
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(2))
-      await vi.waitFor(() => expect(projectionMocks.reconcileServerSessions).toHaveBeenCalledTimes(1))
-      projectionMocks.reconcileServerSessions.mockClear()
+      await vi.waitFor(() => expect(projectionMocks.reconcileServerSessionsSnapshot).toHaveBeenCalledTimes(1))
+      projectionMocks.reconcileServerSessionsSnapshot.mockClear()
 
       await act(async () => {
         recovery.resolve({
-          sessions: [completeServerSession({ ...serverSession('term-111111111111111111111'), repoRuntimeId: firstRepo.repoRuntimeId })],
+          terminalSessions: {
+            revision: 1,
+            sessions: [
+              completeServerSession({
+                ...serverSession('term-111111111111111111111'),
+                repoRuntimeId: firstRepo.repoRuntimeId,
+              }),
+            ],
+          },
           snapshots: [],
+          workspacePaneTabs: { revision: 0, entries: [] },
         })
         await Promise.resolve()
       })
 
-      expect(projectionMocks.reconcileServerSessions).not.toHaveBeenCalled()
+      expect(projectionMocks.reconcileServerSessionsSnapshot).not.toHaveBeenCalled()
       expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).not.toMatchObject({
         repoRuntimeId: firstRepo.repoRuntimeId,
         phase: 'ready',
@@ -326,15 +389,42 @@ describe('AppRuntimeProjectionProvider', () => {
     recoverSessionsMock.mockRejectedValueOnce(new Error('error.repo-runtime-stale'))
     const result = renderRuntimeProvider(REPO_ID)
     try {
-      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
-      expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
-        repoRuntimeId: repo.repoRuntimeId,
-        phase: 'failed',
-        errorMessage: 'error.repo-runtime-stale',
+      await vi.waitFor(() => {
+        expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
+          repoRuntimeId: repo.repoRuntimeId,
+          phase: 'failed',
+          errorMessage: 'error.repo-runtime-stale',
+        })
       })
     } finally {
       result.unmount()
     }
+  })
+
+  test('does not publish a pending recovery after provider unmount', async () => {
+    const repo = seedCurrentRepo()
+    const recovery = Promise.withResolvers<TerminalSessionsRecoveryResult>()
+    recoverSessionsMock.mockReturnValueOnce(recovery.promise)
+    const result = renderRuntimeProvider(REPO_ID)
+    await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
+
+    result.unmount()
+    recovery.resolve({
+      terminalSessions: {
+        revision: 1,
+        sessions: [completeServerSession(serverSession('term-111111111111111111111'))],
+      },
+      snapshots: [],
+      workspacePaneTabs: { revision: 1, entries: [] },
+    })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(projectionMocks.reconcileServerSessionsSnapshot).not.toHaveBeenCalled()
+    expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).not.toMatchObject({
+      repoRuntimeId: repo.repoRuntimeId,
+      phase: 'ready',
+    })
   })
 
   test('failed focus projection refresh does not replace an already ready hydrate', async () => {
@@ -342,10 +432,11 @@ describe('AppRuntimeProjectionProvider', () => {
     useTerminalProjectionHydrationStore.setState({ refreshCooldownMs: 0 })
     const result = renderRuntimeProvider(REPO_ID)
     try {
-      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
-      expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
-        repoRuntimeId: repo.repoRuntimeId,
-        phase: 'ready',
+      await vi.waitFor(() => {
+        expect(useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(REPO_ID)).toMatchObject({
+          repoRuntimeId: repo.repoRuntimeId,
+          phase: 'ready',
+        })
       })
 
       recoverSessionsMock.mockRejectedValueOnce(new Error('error.network'))
@@ -435,6 +526,7 @@ function testBridge(): ClientBridge {
       takeover: vi.fn(async () => ({
         ok: true as const,
         terminalRuntimeSessionId: 'term-111111111111111111111',
+        terminalRuntimeGeneration: 1,
         role: 'controller' as const,
         controllerStatus: 'connected' as const,
         controller: { clientId: 'client_local', status: 'connected' as const },
@@ -443,9 +535,7 @@ function testBridge(): ClientBridge {
         phase: 'open' as const,
       })),
       close: vi.fn(async () => true),
-      create: vi.fn(async () => ({ ok: false as const, message: 'unavailable' })),
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
-      listSessions: vi.fn(async () => []),
       recoverSessions: recoverSessionsMock,
       notifyBell: vi.fn(async () => true),
       sendTestNotification: vi.fn(async () => true),
@@ -465,15 +555,19 @@ function testBridge(): ClientBridge {
       onSessionClosed: vi.fn(() => () => {}),
     }),
     workspacePaneTabs: () => ({
-      replace: vi.fn(async (input) => input.tabs),
-      update: vi.fn(async () => []),
-      list: listWorkspaceTabsMock,
+      replace: vi.fn(async () => ({ revision: 1, entries: [] })),
+      update: vi.fn(async () => ({ revision: 1, entries: [] })),
+      list: vi.fn(async (input) => ({ revision: 1, entries: await listWorkspaceTabsMock(input) })),
       onChanged: vi.fn((cb: (repoRoot: string) => void) => {
         workspaceTabsChangedHandler = cb
         return () => {
           if (workspaceTabsChangedHandler === cb) workspaceTabsChangedHandler = null
         }
       }),
+    }),
+    workspacePaneRuntime: () => ({
+      open: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
+      close: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
     }),
   }
 }
@@ -482,6 +576,7 @@ function attachResult(): TerminalAttachResult {
   return {
     ok: true,
     terminalRuntimeSessionId: 'unused',
+        terminalRuntimeGeneration: 1,
     snapshot: '',
     snapshotSeq: 0,
     outputEra: 0,
@@ -498,6 +593,7 @@ function attachResult(): TerminalAttachResult {
 function serverSession(terminalSessionId: string): TestTerminalSessionSummary {
   return {
     terminalRuntimeSessionId: `runtime-${terminalSessionId}`,
+        terminalRuntimeGeneration: 1,
     terminalSessionId,
     processName: 'zsh',
     canonicalTitle: null,

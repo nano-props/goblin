@@ -3,7 +3,18 @@
 import { describe, expect, test, vi } from 'vitest'
 import { createWorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { createWorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
-import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
+import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
+import {
+  replaceTestWorkspaceTabs,
+  testPhysicalWorktreeCapability,
+  testPhysicalWorktreeIdentity,
+  testPhysicalWorktrees,
+} from '#/server/test-utils/physical-worktree-identity.ts'
+import {
+  type WorkspacePaneTabEntry,
+  workspacePaneStaticTabEntry,
+  workspacePaneRuntimeTabEntry,
+} from '#/shared/workspace-pane.ts'
 
 const USER_ID = 'user-workspace-pane-tabs'
 const REPO_ROOT = '/repo'
@@ -17,6 +28,8 @@ describe('workspace pane tabs coordinator', () => {
     const broadcastChanged = vi.fn()
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
       runtimeProviders: [
         {
           type: 'terminal',
@@ -35,14 +48,12 @@ describe('workspace pane tabs coordinator', () => {
         assertCurrent: () => {},
         broadcastChanged,
       }),
-    ).resolves.toEqual([
-      {
-        repoRoot: REPO_ROOT,
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
-        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')],
-      },
-    ])
+    ).resolves.toEqual(
+      snapshot(1, [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
+      ]),
+    )
     expect(broadcastChanged).toHaveBeenCalledOnce()
   })
 
@@ -50,6 +61,8 @@ describe('workspace pane tabs coordinator', () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
       runtimeProviders: [
         {
           type: 'terminal',
@@ -63,6 +76,7 @@ describe('workspace pane tabs coordinator', () => {
     await expect(
       coordinator.replaceTabs({
         userId: USER_ID,
+        repoRoot: REPO_ROOT,
         scope: SCOPE,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
@@ -73,16 +87,20 @@ describe('workspace pane tabs coordinator', () => {
         ],
         assertCurrent: () => {},
       }),
-    ).resolves.toEqual([
-      workspacePaneStaticTabEntry('status'),
-      workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
-    ])
+    ).resolves.toEqual(
+      snapshot(1, [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
+      ]),
+    )
   })
 
   test('materializes missing live runtime sessions when replacing workspace tabs', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
       runtimeProviders: [
         {
           type: 'terminal',
@@ -96,24 +114,30 @@ describe('workspace pane tabs coordinator', () => {
     await expect(
       coordinator.replaceTabs({
         userId: USER_ID,
+        repoRoot: REPO_ROOT,
         scope: SCOPE,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         tabs: [workspacePaneStaticTabEntry('status')],
         assertCurrent: () => {},
       }),
-    ).resolves.toEqual([
+    ).resolves.toEqual(
+      snapshot(1, [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
+      ]),
+    )
+    expect(
+      workspaceTabs.tabs({ userId: USER_ID, scope: SCOPE, branchName: BRANCH_NAME, worktreePath: WORKTREE_PATH }),
+    ).toEqual([
       workspacePaneStaticTabEntry('status'),
       workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
     ])
-    expect(
-      workspaceTabs.tabs({ userId: USER_ID, scope: SCOPE, branchName: BRANCH_NAME, worktreePath: WORKTREE_PATH }),
-    ).toEqual([workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')])
   })
 
   test('materializes missing live runtime sessions when updating workspace tabs', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
-    workspaceTabs.replaceTabs({
+    replaceTestWorkspaceTabs(workspaceTabs, {
       userId: USER_ID,
       scope: SCOPE,
       branchName: BRANCH_NAME,
@@ -122,6 +146,8 @@ describe('workspace pane tabs coordinator', () => {
     })
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
       runtimeProviders: [
         {
           type: 'terminal',
@@ -135,22 +161,25 @@ describe('workspace pane tabs coordinator', () => {
     await expect(
       coordinator.updateTabs({
         userId: USER_ID,
+        repoRoot: REPO_ROOT,
         scope: SCOPE,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
         operation: { type: 'open-static', tabType: 'history' },
         assertCurrent: () => {},
       }),
-    ).resolves.toEqual([
-      workspacePaneStaticTabEntry('status'),
-      workspacePaneStaticTabEntry('history'),
-      workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
-    ])
+    ).resolves.toEqual(
+      snapshot(2, [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneStaticTabEntry('history'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
+      ]),
+    )
   })
 
   test('does not mutate workspace tabs when update canonicalization fails', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
-    workspaceTabs.replaceTabs({
+    replaceTestWorkspaceTabs(workspaceTabs, {
       userId: USER_ID,
       scope: SCOPE,
       branchName: BRANCH_NAME,
@@ -159,6 +188,8 @@ describe('workspace pane tabs coordinator', () => {
     })
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
       runtimeProviders: [
         {
           type: 'terminal',
@@ -172,6 +203,7 @@ describe('workspace pane tabs coordinator', () => {
     await expect(
       coordinator.updateTabs({
         userId: USER_ID,
+        repoRoot: REPO_ROOT,
         scope: SCOPE,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
@@ -184,12 +216,14 @@ describe('workspace pane tabs coordinator', () => {
 
   test('does not mutate workspace tabs when update becomes stale before commit', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
-    workspaceTabs.replaceTabs({
+    replaceTestWorkspaceTabs(workspaceTabs, {
       ...workspaceTarget(),
       tabs: [workspacePaneStaticTabEntry('status')],
     })
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
       runtimeProviders: [
         {
           type: 'terminal',
@@ -204,6 +238,7 @@ describe('workspace pane tabs coordinator', () => {
     await expect(
       coordinator.updateTabs({
         userId: USER_ID,
+        repoRoot: REPO_ROOT,
         scope: SCOPE,
         branchName: BRANCH_NAME,
         worktreePath: WORKTREE_PATH,
@@ -221,6 +256,8 @@ describe('workspace pane tabs coordinator', () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
       runtimeProviders: [
         {
           type: 'terminal',
@@ -238,21 +275,31 @@ describe('workspace pane tabs coordinator', () => {
     })
 
     await expect(
-      coordinator.reconcileWorktree({ userId: USER_ID, scope: SCOPE, worktreePath: WORKTREE_PATH }),
+      coordinator.reconcileWorktree({
+        userId: USER_ID,
+        repoRoot: REPO_ROOT,
+        scope: SCOPE,
+        worktreePath: WORKTREE_PATH,
+      }),
     ).rejects.toThrow('provider failed')
     expect(workspaceTabs.tabs(workspaceTarget())).toEqual([workspacePaneStaticTabEntry('status')])
   })
 
   test('serializes list canonicalization with scope updates', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
-    workspaceTabs.replaceTabs({
+    replaceTestWorkspaceTabs(workspaceTabs, {
       ...workspaceTarget(),
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1')],
+      tabs: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1'),
+      ],
     })
     const liveSessions = deferred<Array<{ sessionId: string; branch: string; worktreePath: string }>>()
     const listSessionsForUser = vi.fn(async () => await liveSessions.promise)
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
       runtimeProviders: [
         {
           type: 'terminal',
@@ -275,6 +322,7 @@ describe('workspace pane tabs coordinator', () => {
     ])
     const update = coordinator.updateTabs({
       userId: USER_ID,
+      repoRoot: REPO_ROOT,
       scope: SCOPE,
       branchName: BRANCH_NAME,
       worktreePath: WORKTREE_PATH,
@@ -282,21 +330,23 @@ describe('workspace pane tabs coordinator', () => {
       assertCurrent: () => {},
     })
 
-    liveSessions.resolve([{ sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH }])
+    liveSessions.resolve([
+      { sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+    ])
 
-    await expect(list).resolves.toEqual([
-      {
-        repoRoot: REPO_ROOT,
-        branchName: BRANCH_NAME,
-        worktreePath: WORKTREE_PATH,
-        tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')],
-      },
-    ])
-    await expect(update).resolves.toEqual([
-      workspacePaneStaticTabEntry('status'),
-      workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
-      workspacePaneStaticTabEntry('history'),
-    ])
+    await expect(list).resolves.toEqual(
+      snapshot(2, [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
+      ]),
+    )
+    await expect(update).resolves.toEqual(
+      snapshot(3, [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
+        workspacePaneStaticTabEntry('history'),
+      ]),
+    )
     expect(workspaceTabs.tabs(workspaceTarget())).toEqual([
       workspacePaneStaticTabEntry('status'),
       workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
@@ -306,25 +356,114 @@ describe('workspace pane tabs coordinator', () => {
 
   test('serializes scope close after pending reconciliation', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
-    workspaceTabs.replaceTabs({
+    replaceTestWorkspaceTabs(workspaceTabs, {
       ...workspaceTarget(),
-      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1')],
+      tabs: [
+        workspacePaneStaticTabEntry('status'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1'),
+      ],
     })
     const liveSessions = deferred<Array<{ sessionId: string; branch: string; worktreePath: string }>>()
     const listSessionsForUser = vi.fn(async () => await liveSessions.promise)
     const coordinator = createWorkspacePaneTabsCoordinator({
       workspaceTabs,
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
       runtimeProviders: [{ type: 'terminal', listSessionsForUser }],
     })
 
-    const reconcile = coordinator.reconcileWorktree({ userId: USER_ID, scope: SCOPE, worktreePath: WORKTREE_PATH })
+    const reconcile = coordinator.reconcileWorktree({
+      userId: USER_ID,
+      repoRoot: REPO_ROOT,
+      scope: SCOPE,
+      worktreePath: WORKTREE_PATH,
+    })
     await vi.waitFor(() => expect(listSessionsForUser).toHaveBeenCalledTimes(1))
     const close = coordinator.closeScope({ userId: USER_ID, scope: SCOPE })
 
-    liveSessions.resolve([{ sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH }])
+    liveSessions.resolve([
+      { sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+    ])
     await Promise.all([reconcile, close])
 
     expect(workspaceTabs.tabsForScope({ userId: USER_ID, scope: SCOPE })).toEqual([])
+  })
+
+  test('rejects canonical tab writes while worktree removal is admitted', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
+    const finishRemoval = deferred<void>()
+    const removal = worktreeOperations.runRemoval(
+      testPhysicalWorktreeCapability(WORKTREE_PATH),
+      async () => await finishRemoval.promise,
+    )
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      worktreeOperations,
+      physicalWorktrees: testPhysicalWorktrees,
+      runtimeProviders: [],
+    })
+
+    await expect(
+      coordinator.updateTabs({
+        userId: USER_ID,
+        repoRoot: REPO_ROOT,
+        scope: SCOPE,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        operation: { type: 'open-static', tabType: 'history' },
+        assertCurrent: () => {},
+      }),
+    ).rejects.toThrow('error.worktree-removal-in-progress')
+
+    await expect(
+      coordinator.updateTabs({
+        userId: 'other-user',
+        repoRoot: REPO_ROOT,
+        scope: `${REPO_ROOT}\0repo-runtime-other`,
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        operation: { type: 'open-static', tabType: 'history' },
+        assertCurrent: () => {},
+      }),
+    ).rejects.toThrow('error.worktree-removal-in-progress')
+
+    finishRemoval.resolve(undefined)
+    await removal
+  })
+
+  test('lets a canonical tab write admitted before removal finish in physical queue order', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
+    const physicalCapability = testPhysicalWorktreeCapability(WORKTREE_PATH)
+    const capturePhysicalWorktree = vi.fn(async () => physicalCapability)
+    const liveSessions = deferred<[]>()
+    const listSessionsForUser = vi.fn(async () => await liveSessions.promise)
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      worktreeOperations,
+      physicalWorktrees: { capture: capturePhysicalWorktree },
+      runtimeProviders: [{ type: 'terminal', listSessionsForUser }],
+    })
+
+    const update = coordinator.updateTabs({
+      userId: USER_ID,
+      repoRoot: REPO_ROOT,
+      scope: SCOPE,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      operation: { type: 'open-static', tabType: 'history' },
+      assertCurrent: () => {},
+    })
+    await vi.waitFor(() => expect(listSessionsForUser).toHaveBeenCalledOnce())
+
+    const removal = worktreeOperations.runRemoval(physicalCapability, async () => 'removed')
+    expect(worktreeOperations.isRemovalAdmitted(testPhysicalWorktreeIdentity(WORKTREE_PATH))).toBe(true)
+
+    liveSessions.resolve([])
+    await expect(update).resolves.toMatchObject({ revision: 1 })
+    expect(capturePhysicalWorktree).toHaveBeenCalledOnce()
+    await expect(removal).resolves.toEqual({ admitted: true, value: 'removed' })
   })
 })
 
@@ -334,6 +473,13 @@ function workspaceTarget() {
     scope: SCOPE,
     branchName: BRANCH_NAME,
     worktreePath: WORKTREE_PATH,
+  }
+}
+
+function snapshot(revision: number, tabs: WorkspacePaneTabEntry[]) {
+  return {
+    revision,
+    entries: [{ repoRoot: REPO_ROOT, branchName: BRANCH_NAME, worktreePath: WORKTREE_PATH, tabs }],
   }
 }
 

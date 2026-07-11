@@ -21,9 +21,11 @@ export type WorkspacePaneTabOpenerRecordResult = 'recorded' | 'missing' | 'unava
  *  would incorrectly resolve to the new tab itself. */
 export function captureWorkspacePaneActiveTabIdentity(
   repoId: string,
+  repoRuntimeId: string,
   branchName: string,
   options: WorkspacePaneTabTargetOptions,
 ): string | null {
+  if (useReposStore.getState().repos[repoId]?.repoRuntimeId !== repoRuntimeId) return null
   return workspacePaneTabTargetForBranch(repoId, branchName, options)?.activeTab?.identity ?? null
 }
 
@@ -40,13 +42,14 @@ export function captureWorkspacePaneActiveTabIdentity(
  *  commit was in flight) and would silently record into the wrong scope. */
 export function recordWorkspacePaneTabOpener(
   repoId: string,
+  repoRuntimeId: string,
   branchName: string,
   childIdentity: string,
   openerIdentity: string,
 ): WorkspacePaneTabOpenerRecordResult {
   const state = useReposStore.getState()
   const repo = state.repos[repoId]
-  if (!repo) return 'missing'
+  if (!repo || repo.repoRuntimeId !== repoRuntimeId) return 'missing'
   const branchModel = readRepoBranchQueryProjection(repo)
   if (!branchModel) return 'unavailable'
   const target = workspacePaneTabsTargetForRepoBranch(
@@ -54,29 +57,43 @@ export function recordWorkspacePaneTabOpener(
     branchName,
   )
   if (!target) return 'missing'
-  state.setTabOpener(tabOpenerScopeKey(target), childIdentity, openerIdentity)
+  state.setTabOpener(runtimeScopedTabOpenerKey(target, repoRuntimeId), childIdentity, openerIdentity)
   return 'recorded'
 }
 
 /** Reads the recorded opener for a closing tab's identity on `repoId`/`branchName`'s
  *  tab strip, if any. See `recordWorkspacePaneTabOpener` for why `branchName`
  *  must be passed explicitly rather than re-derived at call time. */
-export function workspacePaneTabOpener(repoId: string, branchName: string, closingIdentity: string): string | null {
-  const scopeKey = workspacePaneTabOpenerScopeKey(repoId, branchName)
+export function workspacePaneTabOpener(
+  repoId: string,
+  repoRuntimeId: string,
+  branchName: string,
+  closingIdentity: string,
+): string | null {
+  const scopeKey = workspacePaneTabOpenerScopeKey(repoId, repoRuntimeId, branchName)
   if (!scopeKey) return null
   return useReposStore.getState().tabOpenerIdentityByScope[scopeKey]?.[closingIdentity] ?? null
 }
 
 /** Clears a tab's recorded opener, e.g. once the tab has actually closed. */
-export function clearWorkspacePaneTabOpener(repoId: string, branchName: string, childIdentity: string): void {
-  const scopeKey = workspacePaneTabOpenerScopeKey(repoId, branchName)
+export function clearWorkspacePaneTabOpener(
+  repoId: string,
+  repoRuntimeId: string,
+  branchName: string,
+  childIdentity: string,
+): void {
+  const scopeKey = workspacePaneTabOpenerScopeKey(repoId, repoRuntimeId, branchName)
   if (!scopeKey) return
   useReposStore.getState().clearTabOpener(scopeKey, childIdentity)
 }
 
-function workspacePaneTabOpenerScopeKey(repoId: string, branchName: string): string | null {
+function workspacePaneTabOpenerScopeKey(repoId: string, repoRuntimeId: string, branchName: string): string | null {
   const target = workspacePaneTabOpenerTarget(repoId, branchName)
-  return target ? tabOpenerScopeKey(target) : null
+  return target ? runtimeScopedTabOpenerKey(target, repoRuntimeId) : null
+}
+
+function runtimeScopedTabOpenerKey(target: WorkspacePaneTabsTarget, repoRuntimeId: string): string {
+  return `${tabOpenerScopeKey(target)}\0${repoRuntimeId}`
 }
 
 function workspacePaneTabOpenerTarget(repoId: string, branchName: string): WorkspacePaneTabsTarget | null {

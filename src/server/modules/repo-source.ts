@@ -1,4 +1,6 @@
 import path from 'node:path'
+import { realpath, stat } from 'node:fs/promises'
+import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import { checkGitAvailable } from '#/system/git/git-exec.ts'
 import {
   deleteBranch,
@@ -126,7 +128,8 @@ export interface RepoSource {
       forceDeleteBranch?: boolean
       alsoDeleteUpstream?: boolean
     },
-    signal?: AbortSignal,
+    signal: AbortSignal | undefined,
+    lifecycle: RepoWorktreeRemovalLifecycle,
   ): Promise<RepoMutationResult>
   getPatch(worktreePath: string, signal?: AbortSignal): Promise<ExecResult>
   getBrowserRepoUrl(target: RepoUrlTarget, signal?: AbortSignal): Promise<string | null>
@@ -147,6 +150,22 @@ export async function runWithRepoSource<T>(
   task: (source: Awaited<ReturnType<typeof resolveRepoSource>>) => Promise<T>,
 ): Promise<T> {
   return await task(await resolveRepoSource(cwd))
+}
+
+export async function runWithCapturedRepoSource<T>(
+  cwd: string,
+  physicalWorktreeCapability: import('#/server/worktree-removal/physical-worktree-identity-resolver.ts').PhysicalWorktreeCapability,
+  task: (source: Awaited<ReturnType<typeof resolveRepoSource>>) => Promise<T>,
+): Promise<T> {
+  const { physicalWorktreeCapabilityExecution } = await import(
+    '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+  )
+  const execution = physicalWorktreeCapabilityExecution(physicalWorktreeCapability)
+  return await task(
+    execution.kind === 'remote'
+      ? await createRemoteRepoSource(cwd, execution.target, physicalWorktreeCapability)
+      : createLocalRepoSource(execution.canonicalWorktreePath, physicalWorktreeCapability),
+  )
 }
 
 export async function resolveRepoSource(repoId: string): Promise<RepoSource> {
@@ -253,7 +272,10 @@ async function probeGitRepo(cwd: string): Promise<ProbeAvailability> {
   return { ok: false, message: 'error.not-git-repo' }
 }
 
-function createLocalRepoSource(repoId: string): RepoSource {
+function createLocalRepoSource(
+  repoId: string,
+  physicalWorktreeCapability: import('#/server/worktree-removal/physical-worktree-identity-resolver.ts').PhysicalWorktreeCapability | null = null,
+): RepoSource {
   const capabilities: RepoSourceCapabilities = { pullRequests: 'cwd-github' }
 
   async function validateBranchDeletion(
@@ -299,7 +321,12 @@ function createLocalRepoSource(repoId: string): RepoSource {
     if (!deleted.ok || !upstream) return deleted
     const slash = upstream.indexOf('/')
     if (slash <= 0) return deleted
-    const upstreamDeleted = await deleteUpstreamBranch(gitCwd, upstream.slice(0, slash), upstream.slice(slash + 1), signal)
+    const upstreamDeleted = await deleteUpstreamBranch(
+      gitCwd,
+      upstream.slice(0, slash),
+      upstream.slice(slash + 1),
+      signal,
+    )
     return upstreamDeleted.ok ? upstreamDeleted : { ...upstreamDeleted, repoChanged: true }
   }
 
@@ -424,12 +451,18 @@ function createLocalRepoSource(repoId: string): RepoSource {
       const deleted = await deleteBranchAfterValidation(branch, options, signal)
       return deleted.ok || deleted.repoChanged ? withAffectedRepoIds(deleted, affectedRepoIds) : deleted
     },
-    async removeWorktree(input, signal) {
+    async removeWorktree(input, signal, lifecycle) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
       const worktrees = await getWorktrees(repoId, { signal })
       const affectedRepoIds = localWorktreeRepoIds(worktrees)
       const mainWorktreePath = worktrees.find((wt) => wt.isPrimary)?.path ?? worktrees[0]?.path ?? ''
-      const removable = resolveRemovableWorktree(worktrees, input.branch, input.worktreePath, mainWorktreePath)
+      const exactExecution = physicalWorktreeCapability
+        ? (await import('#/server/worktree-removal/physical-worktree-identity-resolver.ts')).physicalWorktreeCapabilityExecution(
+            physicalWorktreeCapability,
+          )
+        : null
+      const requestedPath = exactExecution?.kind === 'local' ? exactExecution.canonicalWorktreePath : input.worktreePath
+      const removable = resolveRemovableWorktree(worktrees, input.branch, requestedPath, mainWorktreePath)
       if (!removable.ok) return { ok: false, message: removable.message }
       const mutationCwd =
         path.resolve(removable.target.path) === path.resolve(repoId) && mainWorktreePath ? mainWorktreePath : repoId
@@ -446,18 +479,52 @@ function createLocalRepoSource(repoId: string): RepoSource {
         )
         if (validation) return validation
       }
-      const removed = await removeWorktree(mutationCwd, removable.target.path, signal)
-      if (!removed.ok) return removed
-      if (!input.alsoDeleteBranch) return withAffectedRepoIds(removed, affectedRepoIds)
-      return withAffectedRepoIds(
-        await deleteBranchAfterValidation(
-          input.branch,
-          { force: input.forceDeleteBranch, alsoDeleteUpstream: input.alsoDeleteUpstream },
-          signal,
+      const prepared = await lifecycle.beforeRemove()
+      if (!prepared.ok) return prepared
+      if (physicalWorktreeCapability) {
+        try {
+          const { validatePhysicalWorktreeCapabilityExecution } = await import(
+            '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+          )
+          await validatePhysicalWorktreeCapabilityExecution(physicalWorktreeCapability, signal)
+          const currentPath = await realpath(removable.target.path)
+          const currentStat = await stat(currentPath, { bigint: true })
+          if (
+            exactExecution?.kind !== 'local' ||
+            currentPath !== exactExecution.canonicalWorktreePath ||
+            currentStat.dev.toString(10) !== exactExecution.endpointMarker.deviceId ||
+            currentStat.ino.toString(10) !== exactExecution.endpointMarker.inode
+          ) throw new Error('error.repo-runtime-stale')
+        } catch (error) {
+          await lifecycle.afterRemoveFailed()
+          return { ok: false, message: error instanceof Error ? error.message : 'error.repo-runtime-stale' }
+        }
+      }
+      let removed: Awaited<ReturnType<typeof removeWorktree>>
+      try {
+        removed = await removeWorktree(
           mutationCwd,
-        ),
-        affectedRepoIds,
+          exactExecution?.kind === 'local' ? exactExecution.canonicalWorktreePath : removable.target.path,
+          signal,
+        )
+      } catch (error) {
+        await lifecycle.afterRemoveFailed()
+        throw error
+      }
+      if (!removed.ok) {
+        await lifecycle.afterRemoveFailed()
+        return removed
+      }
+      const finalized = await lifecycle.afterWorktreeRemoved()
+      if (!finalized.ok) return withAffectedRepoIds({ ...finalized, repoChanged: true }, affectedRepoIds)
+      if (!input.alsoDeleteBranch) return withAffectedRepoIds(removed, affectedRepoIds)
+      const deleted = await deleteBranchAfterValidation(
+        input.branch,
+        { force: input.forceDeleteBranch, alsoDeleteUpstream: input.alsoDeleteUpstream },
+        signal,
+        mutationCwd,
       )
+      return withAffectedRepoIds(deleted.ok ? deleted : { ...deleted, repoChanged: true }, affectedRepoIds)
     },
     async getPatch(worktreePath, signal) {
       if (!isValidCwd(repoId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -476,8 +543,12 @@ function createLocalRepoSource(repoId: string): RepoSource {
   }
 }
 
-async function createRemoteRepoSource(repoId: string): Promise<RepoSource> {
-  const target = await resolveRemoteRepoTarget(repoId)
+async function createRemoteRepoSource(
+  repoId: string,
+  capturedTarget?: RemoteRepoTarget,
+  physicalWorktreeCapability: import('#/server/worktree-removal/physical-worktree-identity-resolver.ts').PhysicalWorktreeCapability | null = null,
+): Promise<RepoSource> {
+  const target = capturedTarget ?? (await resolveRemoteRepoTarget(repoId))
   const capabilities: RepoSourceCapabilities = { pullRequests: 'derived-github-repo' }
   return {
     id: repoId,
@@ -562,8 +633,33 @@ async function createRemoteRepoSource(repoId: string): Promise<RepoSource> {
       })
       return deleted.ok || deleted.repoChanged ? withAffectedRepoIds(deleted, affectedRepoIds) : deleted
     },
-    async removeWorktree(input, signal) {
-      const result = await removeRemoteWorktree(target, { ...input, signal })
+    async removeWorktree(input, signal, lifecycle) {
+      const exactExecution = physicalWorktreeCapability
+        ? (await import('#/server/worktree-removal/physical-worktree-identity-resolver.ts')).physicalWorktreeCapabilityExecution(
+            physicalWorktreeCapability,
+          )
+        : null
+      const result = await removeRemoteWorktree(target, {
+        ...input,
+        worktreePath: exactExecution?.kind === 'remote' ? exactExecution.canonicalWorktreePath : input.worktreePath,
+        signal,
+        beforeRemove: lifecycle.beforeRemove,
+        afterWorktreeRemoved: lifecycle.afterWorktreeRemoved,
+        afterRemoveFailed: lifecycle.afterRemoveFailed,
+        validateBeforeRemove: physicalWorktreeCapability
+          ? async () => {
+              try {
+                const { validatePhysicalWorktreeCapabilityExecution } = await import(
+                  '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+                )
+                await validatePhysicalWorktreeCapabilityExecution(physicalWorktreeCapability, signal)
+                return { ok: true, message: '' }
+              } catch (error) {
+                return { ok: false, message: error instanceof Error ? error.message : 'error.repo-runtime-stale' }
+              }
+            }
+          : undefined,
+      })
       return withAffectedRepoIds(result, remoteWorktreeRepoIds(target, result.affectedWorktreePaths))
     },
     async getPatch(worktreePath, signal) {

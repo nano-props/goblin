@@ -162,6 +162,7 @@ export async function deleteRepoBranch(
 
 export async function removeRepoWorktree(
   cwd: string,
+  repoRuntimeId: string,
   options: {
     branch: string
     worktreePath: string
@@ -171,7 +172,7 @@ export async function removeRepoWorktree(
   },
   signal?: AbortSignal,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/remove-worktree', { cwd, ...options }, {
+  return await postServerJson('/api/repo/remove-worktree', { cwd, repoRuntimeId, ...options }, {
     signal,
     timeoutMs: REPO_REQUEST_TIMEOUT_MS.removeWorktree,
   })

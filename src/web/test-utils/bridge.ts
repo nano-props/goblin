@@ -28,26 +28,20 @@ import type { ClientBridge } from '#/web/client-bridge-types.ts'
 import type { RepoRuntimeProjection } from '#/shared/api-types.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { resetAcceptedRepoProjectionReadModelState } from '#/web/stores/repos/projection-read-model-effects.ts'
-import {
-  readWorkspacePaneTabsForTarget,
-  setWorkspacePaneTabsForTargetQueryData,
-} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
-import {
-  setRepoProjectionQueryData,
-} from '#/web/repo-data-query.ts'
+import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
+import { setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import {
   workspacePaneTabsWithStaticTab,
   workspacePaneTabsWithoutStaticTab,
 } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import { workspacePaneTabEntryIdentity } from '#/shared/workspace-pane.ts'
+import { workspacePaneTabEntryIdentity, workspacePaneTabsWithRuntimeTab } from '#/shared/workspace-pane.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { DEFAULT_ZEN_MODE, DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import type {
   TerminalAttachResult,
-  TerminalCreateResult,
   TerminalMutationResult,
-  TerminalSessionSummary,
   TerminalSessionsRecoveryResult,
   TerminalTakeoverResult,
 } from '#/shared/terminal-types.ts'
@@ -56,9 +50,15 @@ import type {
   WorkspacePaneTabsEntry,
   WorkspacePaneTabsListInput,
   WorkspacePaneTabsReplaceInput,
+  WorkspacePaneTabsSnapshot,
   WorkspacePaneTabsUpdateInput,
 } from '#/shared/workspace-pane-tabs.ts'
 import { WORKSPACE_PANE_TABS_SOCKET_ACTIONS } from '#/shared/workspace-pane-tabs.ts'
+import {
+  WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS,
+  type WorkspacePaneRuntimeCloseResult,
+  type WorkspacePaneRuntimeOpenResult,
+} from '#/shared/workspace-pane-runtime.ts'
 import type { BranchSnapshotInfo, PullRequestInfo, WorktreeStatus } from '#/web/types.ts'
 import { vi } from 'vitest'
 import { installWebSocketMock } from '#/web/test-utils/websocket-mock.ts'
@@ -133,14 +133,14 @@ interface TerminalClientTestOutputs {
   'terminal.resize': TerminalMutationResult
   'terminal.takeover': TerminalTakeoverResult
   'terminal.close': TerminalMutationResult
-  'terminal.create': TerminalCreateResult
   'terminal.prune': { pruned: number; remaining: number }
-  'terminal.listSessions': TerminalSessionSummary[]
   'terminal.recoverSessions': TerminalSessionsRecoveryResult
   'terminal.notifyBell': TerminalMutationResult
-  'workspacePaneTabs.replace': WorkspacePaneTabEntry[]
-  'workspacePaneTabs.update': WorkspacePaneTabEntry[]
-  'workspacePaneTabs.list': WorkspacePaneTabsEntry[]
+  'workspacePaneTabs.replace': WorkspacePaneTabsSnapshot
+  'workspacePaneTabs.update': WorkspacePaneTabsSnapshot
+  'workspacePaneTabs.list': WorkspacePaneTabsSnapshot
+  'workspacePaneRuntime.open': WorkspacePaneRuntimeOpenResult
+  'workspacePaneRuntime.close': WorkspacePaneRuntimeCloseResult
 }
 
 function terminalHandlerNameForSocketAction(action: string): keyof TerminalClientTestOutputs | null {
@@ -157,18 +157,18 @@ function terminalHandlerNameForSocketAction(action: string): keyof TerminalClien
       return 'terminal.takeover'
     case 'close':
       return 'terminal.close'
-    case 'create':
-      return 'terminal.create'
     case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.replace:
       return 'workspacePaneTabs.replace'
     case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update:
       return 'workspacePaneTabs.update'
     case WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list:
       return 'workspacePaneTabs.list'
+    case WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.open:
+      return 'workspacePaneRuntime.open'
+    case WORKSPACE_PANE_RUNTIME_SOCKET_ACTIONS.close:
+      return 'workspacePaneRuntime.close'
     case 'prune':
       return 'terminal.prune'
-    case 'list-sessions':
-      return 'terminal.listSessions'
     case 'recover-sessions':
       return 'terminal.recoverSessions'
     default:
@@ -216,12 +216,19 @@ export function installWorkspacePaneTabsTestBridge(
     listWorkspaceTabs?: (
       input: WorkspacePaneTabsListInput,
     ) => WorkspacePaneTabsEntry[] | Promise<WorkspacePaneTabsEntry[]>
+    onEffectIntent?: ClientBridge['onEffectIntent']
   } = {},
 ): void {
   let serverEntries: WorkspacePaneTabsEntry[] = []
+  let serverRevision = 0
   const targetKey = (input: { repoRoot: string; branchName: string; worktreePath: string | null }) =>
     workspacePaneTabsTargetIdentityKey(input)
-  const serverTabsForTarget = (input: WorkspacePaneTabsUpdateInput): WorkspacePaneTabEntry[] => {
+  const serverTabsForTarget = (input: {
+    repoRoot: string
+    repoRuntimeId: string
+    branchName: string
+    worktreePath: string | null
+  }): WorkspacePaneTabEntry[] => {
     const entry = serverEntries.find((candidate) => targetKey(candidate) === targetKey(input))
     if (entry) return [...entry.tabs]
     const tabs = readWorkspacePaneTabsForTarget(input)
@@ -244,6 +251,14 @@ export function installWorkspacePaneTabsTestBridge(
     ]
     return nextTabs
   }
+  const serverSnapshot = (): WorkspacePaneTabsSnapshot => ({
+    revision: serverRevision,
+    entries: serverEntries.map((entry) => ({ ...entry, tabs: [...entry.tabs] })),
+  })
+  const commitServerSnapshot = (): WorkspacePaneTabsSnapshot => {
+    serverRevision += 1
+    return serverSnapshot()
+  }
   setClientBridgeForTests({
     kind: () => 'web',
     hasCapability: () => false,
@@ -262,7 +277,7 @@ export function installWorkspacePaneTabsTestBridge(
     },
     abortIpc: async () => false,
     onIpcEvent: () => () => {},
-    onEffectIntent: () => () => {},
+    onEffectIntent: options.onEffectIntent ?? (() => () => {}),
     pathForFile: () => '',
     saveClipboardFiles: async () => [],
     host: () => null,
@@ -278,6 +293,7 @@ export function installWorkspacePaneTabsTestBridge(
       takeover: async () => ({
         ok: true as const,
         terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         role: 'controller' as const,
         controllerStatus: 'connected' as const,
         controller: { clientId: 'attachment_local', status: 'connected' as const },
@@ -290,9 +306,9 @@ export function installWorkspacePaneTabsTestBridge(
         ok: true as const,
         action: 'created' as const,
         terminalSessionId: 'term-testtesttesttesttest1',
-        tabs: [],
-        sessions: [],
+        terminalSessionsRevision: 1,
         terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
         snapshot: '',
         snapshotSeq: 0,
         outputEra: 0,
@@ -305,8 +321,11 @@ export function installWorkspacePaneTabsTestBridge(
         canonicalRows: 24,
       }),
       pruneTerminals: async () => ({ pruned: 0, remaining: 0 }),
-      listSessions: async () => [],
-      recoverSessions: async () => ({ sessions: [], snapshots: [] }),
+      recoverSessions: async () => ({
+        terminalSessions: { revision: 0, sessions: [] },
+        snapshots: [],
+        workspacePaneTabs: { revision: 0, entries: [] },
+      }),
       notifyBell: async () => true,
       sendTestNotification: async () => true,
       setBadge: () => {},
@@ -322,20 +341,92 @@ export function installWorkspacePaneTabsTestBridge(
     workspacePaneTabs: () => ({
       replace: async (input) => {
         const tabs = options.replaceWorkspaceTabs ? await options.replaceWorkspaceTabs(input) : [...input.tabs]
-        return replaceServerTarget(input, tabs)
+        replaceServerTarget(input, tabs)
+        return commitServerSnapshot()
       },
       update: async (input) => {
         if (options.updateWorkspaceTabs) serverTabsForTarget(input)
         const tabs = options.updateWorkspaceTabs
           ? await options.updateWorkspaceTabs(input)
           : defaultWorkspacePaneTabsOperationResult(input, serverTabsForTarget(input))
-        return replaceServerTarget(input, tabs)
+        replaceServerTarget(input, tabs)
+        return commitServerSnapshot()
       },
       list: async (input) => {
-        if (options.listWorkspaceTabs) return await options.listWorkspaceTabs(input)
-        return serverEntries.filter((entry) => entry.repoRoot === input.repoRoot)
+        if (options.listWorkspaceTabs) {
+          serverEntries = (await options.listWorkspaceTabs(input)).map((entry) => ({
+            ...entry,
+            tabs: [...entry.tabs],
+          }))
+        }
+        return {
+          revision: serverRevision,
+          entries: serverEntries.filter((entry) => entry.repoRoot === input.repoRoot),
+        }
       },
       onChanged: () => () => {},
+    }),
+    workspacePaneRuntime: () => ({
+      open: async (input) => {
+        const terminalSessionId = 'term-testtesttesttesttest1'
+        const terminalRuntimeSessionId = 'pty_test_aaaaaaaaa'
+        const target = {
+          repoRoot: input.request.repoRoot,
+          repoRuntimeId: input.request.repoRuntimeId,
+          branchName: input.request.branch,
+          worktreePath: input.request.worktreePath,
+        }
+        replaceServerTarget(
+          target,
+          workspacePaneTabsWithRuntimeTab(serverTabsForTarget(target), 'terminal', terminalSessionId, {
+            insertAfterIdentity: input.insertAfterIdentity,
+          }),
+        )
+        return {
+          ok: true,
+          runtimeType: 'terminal',
+          runtime: {
+            ok: true,
+            action: 'created',
+            terminalSessionId,
+            terminalSessionsRevision: 1,
+            terminalRuntimeSessionId,
+    terminalRuntimeGeneration: 1,
+            snapshot: '',
+            snapshotSeq: 0,
+            outputEra: 0,
+            processName: 'zsh',
+            canonicalTitle: null,
+            phase: 'open',
+            message: null,
+            controller: { clientId: input.request.clientId ?? 'attachment_local', status: 'connected' },
+            canonicalCols: input.request.cols ?? 80,
+            canonicalRows: input.request.rows ?? 24,
+          },
+          workspacePaneTabs: commitServerSnapshot(),
+        } as const
+      },
+      close: async (input) => {
+        const currentTabs = serverTabsForTarget(input.target)
+        const wasOpen = currentTabs.some(
+          (tab) => tab.type === input.runtimeType && tab.runtimeSessionId === input.sessionId,
+        )
+        replaceServerTarget(
+          input.target,
+          currentTabs.filter((tab) => tab.type !== input.runtimeType || tab.runtimeSessionId !== input.sessionId),
+        )
+        return {
+          ok: true,
+          runtimeType: input.runtimeType,
+          runtime: {
+            action: wasOpen ? ('closed' as const) : ('already-closed' as const),
+            terminalSessionId: input.sessionId,
+            terminalRuntimeSessionId: wasOpen ? 'pty_test_aaaaaaaaa' : null,
+            terminalRuntimeGeneration: wasOpen ? 1 : null,
+          },
+          workspacePaneTabs: commitServerSnapshot(),
+        }
+      },
     }),
   } satisfies ClientBridge)
 }
@@ -365,6 +456,24 @@ function isWorkspacePaneTabsUpdateInput(value: unknown): value is WorkspacePaneT
     (typeof input.worktreePath === 'string' || input.worktreePath === null) &&
     !!input.operation &&
     typeof input.operation === 'object'
+  )
+}
+
+function isWorkspacePaneTabsReplaceInput(value: unknown): value is WorkspacePaneTabsReplaceInput {
+  if (!value || typeof value !== 'object') return false
+  const input = value as {
+    repoRoot?: unknown
+    repoRuntimeId?: unknown
+    branchName?: unknown
+    worktreePath?: unknown
+    tabs?: unknown
+  }
+  return (
+    typeof input.repoRoot === 'string' &&
+    typeof input.repoRuntimeId === 'string' &&
+    typeof input.branchName === 'string' &&
+    (typeof input.worktreePath === 'string' || input.worktreePath === null) &&
+    Array.isArray(input.tabs)
   )
 }
 
@@ -464,13 +573,22 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
             Promise.resolve({
               ok: true as const,
               terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
+              terminalRuntimeGeneration: 1,
+              role: 'controller' as const,
+              controllerStatus: 'connected' as const,
               controller: { clientId: 'attachment_local', status: 'connected' as const },
+              canonicalCols: 80,
+              canonicalRows: 24,
+              phase: 'open' as const,
             }),
           close: () => Promise.resolve(true),
-          create: () => Promise.resolve({ ok: false, message: 'unhandled terminal create' }),
           pruneTerminals: () => Promise.resolve({ pruned: 0, remaining: 0 }),
-          listSessions: () => Promise.resolve([]),
-          recoverSessions: () => Promise.resolve({ sessions: [], snapshots: [] }),
+          recoverSessions: () =>
+            Promise.resolve({
+              terminalSessions: { revision: 0, sessions: [] },
+              snapshots: [],
+              workspacePaneTabs: { revision: 0, entries: [] },
+            }),
           notifyBell: () => Promise.resolve(true),
           sendTestNotification: () => Promise.resolve(true),
           setBadge: () => {},
@@ -503,7 +621,6 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     payload: unknown,
   ): TerminalClientTestOutputs['terminal.takeover']
   function callTerminalHandler(name: 'terminal.close', payload: unknown): TerminalClientTestOutputs['terminal.close']
-  function callTerminalHandler(name: 'terminal.create', payload: unknown): TerminalClientTestOutputs['terminal.create']
   function callTerminalHandler(
     name: 'workspacePaneTabs.replace',
     payload: unknown,
@@ -516,11 +633,15 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
     name: 'workspacePaneTabs.list',
     payload: unknown,
   ): TerminalClientTestOutputs['workspacePaneTabs.list']
-  function callTerminalHandler(name: 'terminal.prune', payload: unknown): TerminalClientTestOutputs['terminal.prune']
   function callTerminalHandler(
-    name: 'terminal.listSessions',
+    name: 'workspacePaneRuntime.open',
     payload: unknown,
-  ): TerminalClientTestOutputs['terminal.listSessions']
+  ): TerminalClientTestOutputs['workspacePaneRuntime.open']
+  function callTerminalHandler(
+    name: 'workspacePaneRuntime.close',
+    payload: unknown,
+  ): TerminalClientTestOutputs['workspacePaneRuntime.close']
+  function callTerminalHandler(name: 'terminal.prune', payload: unknown): TerminalClientTestOutputs['terminal.prune']
   function callTerminalHandler(
     name: 'terminal.recoverSessions',
     payload: unknown,
@@ -552,6 +673,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return {
             ok: true as const,
             terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
             role: 'controller' as const,
             controllerStatus: 'connected' as const,
             controller: { clientId: 'attachment_local', status: 'connected' as const },
@@ -562,41 +684,61 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         case 'terminal.prune':
           return { pruned: 0, remaining: 0 }
         case 'workspacePaneTabs.replace':
-          return Array.isArray((payload as { tabs?: unknown } | undefined)?.tabs)
-            ? ([...(payload as { tabs: WorkspacePaneTabEntry[] }).tabs] satisfies WorkspacePaneTabEntry[])
-            : []
-        case 'workspacePaneTabs.update':
-          return isWorkspacePaneTabsUpdateInput(payload)
-            ? defaultWorkspacePaneTabsOperationResult(payload, readWorkspacePaneTabsForTarget(payload))
-            : []
-        case 'workspacePaneTabs.list':
-          return []
-        case 'terminal.listSessions':
-          return []
-        case 'terminal.recoverSessions':
-          return { sessions: [], snapshots: [] }
-        case 'terminal.create': {
-          const terminalKind = (payload as { kind?: string } | undefined)?.kind
-          const terminalRuntimeSessionId = terminalKind === 'primary' ? 'pty_test_1_aaaaaaaaa' : 'pty_test_2_aaaaaaaaa'
           return {
-            ok: true,
-            action: terminalKind === 'primary' ? 'reused' : 'created',
-            terminalSessionId: terminalKind === 'primary' ? 'term-testtesttesttesttest1' : 'term-testtesttesttesttest2',
-            tabs: [],
-            sessions: [],
-            terminalRuntimeSessionId,
-            snapshot: '',
-            snapshotSeq: 0,
-            outputEra: 0,
-            processName: 'zsh',
-            canonicalTitle: null,
-            phase: 'open',
-            message: null,
-            controller: { clientId: 'attachment_local', status: 'connected' },
-            canonicalCols: 80,
-            canonicalRows: 24,
+            revision: 1,
+            entries: isWorkspacePaneTabsReplaceInput(payload)
+              ? [
+                  {
+                    repoRoot: payload.repoRoot,
+                    branchName: payload.branchName,
+                    worktreePath: payload.worktreePath,
+                    tabs: [...payload.tabs],
+                  },
+                ]
+              : [],
+          }
+        case 'workspacePaneTabs.update': {
+          const input = isWorkspacePaneTabsUpdateInput(payload) ? payload : null
+          return {
+            revision: 1,
+            entries: input
+              ? [
+                  {
+                    repoRoot: input.repoRoot,
+                    branchName: input.branchName,
+                    worktreePath: input.worktreePath,
+                    tabs: defaultWorkspacePaneTabsOperationResult(input, readWorkspacePaneTabsForTarget(input)),
+                  },
+                ]
+              : [],
           }
         }
+        case 'workspacePaneTabs.list':
+          return { revision: 0, entries: [] }
+        case 'workspacePaneRuntime.close': {
+          const runtimeType =
+            (payload as { runtimeType?: WorkspacePaneRuntimeCloseResult['runtimeType'] } | null)?.runtimeType ??
+            'terminal'
+          const terminalSessionId =
+            (payload as { sessionId?: string } | null)?.sessionId ?? 'term-testtesttesttesttest1'
+          return {
+            ok: true,
+            runtimeType,
+            runtime: {
+              action: 'closed',
+              terminalSessionId,
+              terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
+              terminalRuntimeGeneration: 1,
+            },
+            workspacePaneTabs: { revision: 1, entries: [] },
+          }
+        }
+        case 'terminal.recoverSessions':
+          return {
+            terminalSessions: { revision: 0, sessions: [] },
+            snapshots: [],
+            workspacePaneTabs: { revision: 0, entries: [] },
+          }
       }
     }
     return handler(payload) as TerminalClientTestOutputs[keyof TerminalClientTestOutputs]
@@ -684,9 +826,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       resize: async (input) => callTerminalHandler('terminal.resize', input),
       takeover: async (input) => callTerminalHandler('terminal.takeover', input),
       close: async (input) => callTerminalHandler('terminal.close', input),
-      create: async (input) => callTerminalHandler('terminal.create', input),
       pruneTerminals: async (repoRoot) => callTerminalHandler('terminal.prune', { repoRoot }),
-      listSessions: async (input) => callTerminalHandler('terminal.listSessions', input),
       recoverSessions: async (input) => callTerminalHandler('terminal.recoverSessions', input),
       notifyBell: async (input) => callTerminalHandler('terminal.notifyBell', input),
       sendTestNotification: async () => true,
@@ -705,6 +845,10 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       update: async (input) => callTerminalHandler('workspacePaneTabs.update', input),
       list: async (input) => callTerminalHandler('workspacePaneTabs.list', input),
       onChanged: () => () => {},
+    }),
+    workspacePaneRuntime: () => ({
+      open: async (input) => callTerminalHandler('workspacePaneRuntime.open', input),
+      close: async (input) => callTerminalHandler('workspacePaneRuntime.close', input),
     }),
   })
   vi.stubGlobal(

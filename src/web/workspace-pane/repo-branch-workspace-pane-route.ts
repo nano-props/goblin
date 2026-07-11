@@ -1,5 +1,7 @@
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
+import type { PrimaryWindowPresentationToken } from '#/web/primary-window-presentation.ts'
+import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import { createRepoWorkspaceTabModel, isRepoWorkspaceRuntimeTab } from '#/web/workspace-pane/repo-workspace-tab-model.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { preferredWorkspacePaneTabForTarget, workspacePaneTabsTargetForRepoBranch } from '#/web/stores/repos/workspace-pane-preferences.ts'
@@ -51,7 +53,7 @@ export function resolveRepoBranchWorkspacePaneRoute(
     branchName: target.branchName,
     worktreePath: target.worktreePath,
     preferredTab: preferredWorkspacePaneTabForTarget(repo.ui, target),
-    allowPreferredTabFallback: false,
+    allowPreferredTabFallback: true,
     tabEntries: tabEntriesProjection.tabs,
     tabEntriesProjectionPhase: tabEntriesProjection.phase,
     runtimeTabViews: runtimeProjection.runtimeTabViews,
@@ -75,18 +77,9 @@ export function openRepoBranchWorkspacePaneRoute(
   >,
   repoId: string,
   branchName: string,
-  options?: { replace?: boolean },
+  options?: { replace?: boolean; presentationToken?: PrimaryWindowPresentationToken; onCommit?: () => void },
 ): boolean {
   const resolution = resolveRepoBranchWorkspacePaneRoute(repoId, branchName)
   if (resolution.kind === 'missing' || resolution.kind === 'unavailable') return false
-  if (!resolution.route) {
-    return routeNavigation.openRepoBranch(repoId, branchName, options)
-  }
-  if (resolution.route.kind === 'terminal') {
-    return routeNavigation.openRepoBranchTerminal(repoId, branchName, resolution.route.terminalSessionId, options)
-  }
-  if (resolution.route.kind === 'static') {
-    return routeNavigation.openRepoBranchTab(repoId, branchName, resolution.route.tab, options)
-  }
-  return false
+  return openResolvedRepoBranchWorkspacePaneRoute(routeNavigation, repoId, branchName, resolution.route, options)
 }

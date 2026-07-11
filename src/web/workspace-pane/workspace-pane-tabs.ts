@@ -17,7 +17,9 @@ export function defaultWorkspacePaneTabs(): WorkspacePaneTabEntry[] {
 export function workspacePaneStaticTabsFromEntries(
   tabs: readonly WorkspacePaneTabEntry[],
 ): WorkspacePaneStaticTabType[] {
-  return normalizeWorkspacePaneTabs(tabs).flatMap((entry) => (isWorkspacePaneRuntimeTabEntry(entry) ? [] : [entry.type]))
+  return normalizeWorkspacePaneTabs(tabs).flatMap((entry) =>
+    isWorkspacePaneRuntimeTabEntry(entry) ? [] : [entry.type],
+  )
 }
 
 export function workspacePaneTabsWithStaticTab(

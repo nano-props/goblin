@@ -1,13 +1,10 @@
 import type { QueryClient } from '@tanstack/react-query'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneTabsSnapshot, WorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs.ts'
 import { gblLog } from '#/web/logger.ts'
 import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import {
-  cancelWorkspacePaneTabs,
-  setWorkspacePaneTabsForTargetQueryData,
-} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { writeWorkspacePaneTabsSnapshotQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { workspacePaneTabsClient } from '#/web/workspace-pane/workspace-pane-tabs-client.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
@@ -31,6 +28,8 @@ export type WorkspacePaneTabsMutationOperation = 'commit' | 'update' | 'reorder'
 
 export interface WorkspacePaneTabsMutationSuccess {
   ok: true
+  /** Whether this client runtime accepted the canonical server result into its query projection. */
+  projectionApplied: boolean
 }
 
 export interface WorkspacePaneTabsMutationFailure {
@@ -170,16 +169,9 @@ async function commitWorkspacePaneTabsNow(
   input: CommitWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabsMutationResult> {
   try {
-    await cancelWorkspacePaneTabs(input.repoRoot, input.repoRuntimeId)
-    const serverTabs = await replaceWorkspacePaneTabsOnServer(input)
-    const accepted = await writeCanonicalWorkspacePaneTabsForTarget({
-      repoRoot: input.repoRoot,
-      repoRuntimeId: input.repoRuntimeId,
-      branchName: input.branchName,
-      worktreePath: input.worktreePath,
-      tabs: serverTabs,
-    })
-    return accepted ? { ok: true } : canceledWorkspacePaneTabsMutation('commit', input)
+    const snapshot = await replaceWorkspacePaneTabsOnServer(input)
+    const accepted = writeCanonicalWorkspacePaneTabsSnapshot(input.repoRoot, input.repoRuntimeId, snapshot)
+    return { ok: true, projectionApplied: accepted }
   } catch (err) {
     return reportWorkspacePaneTabsFailure({
       operation: 'commit',
@@ -195,16 +187,9 @@ async function updateWorkspacePaneTabsNow(
   input: UpdateWorkspacePaneTabsInput,
 ): Promise<WorkspacePaneTabsMutationResult> {
   try {
-    await cancelWorkspacePaneTabs(input.repoRoot, input.repoRuntimeId)
-    const serverTabs = await updateWorkspacePaneTabsOnServer(input)
-    const accepted = await writeCanonicalWorkspacePaneTabsForTarget({
-      repoRoot: input.repoRoot,
-      repoRuntimeId: input.repoRuntimeId,
-      branchName: input.branchName,
-      worktreePath: input.worktreePath,
-      tabs: serverTabs,
-    })
-    return accepted ? { ok: true } : canceledWorkspacePaneTabsMutation('update', input)
+    const snapshot = await updateWorkspacePaneTabsOnServer(input)
+    const accepted = writeCanonicalWorkspacePaneTabsSnapshot(input.repoRoot, input.repoRuntimeId, snapshot)
+    return { ok: true, projectionApplied: accepted }
   } catch (err) {
     return reportWorkspacePaneTabsFailure({
       operation: 'update',
@@ -216,25 +201,19 @@ async function updateWorkspacePaneTabsNow(
   }
 }
 
-export async function writeCanonicalWorkspacePaneTabsForTarget(
-  input: CommitWorkspacePaneTabsInput,
+export function writeCanonicalWorkspacePaneTabsSnapshot(
+  repoRoot: string,
+  repoRuntimeId: string,
+  snapshot: WorkspacePaneTabsSnapshot,
   queryClient?: QueryClient,
-): Promise<boolean> {
-  if (!workspacePaneTabsProjectionScopeAccepted(input)) return false
-  // Server-returned tabs are the canonical runtime projection. Session
-  // persistence may observe this query cache later, but it is not a
-  // runtime source for tabs after boot restore.
-  // A list query may have started while the server write was in flight.
-  // Cancel again so stale list results cannot overwrite the canonical tabs.
-  await cancelWorkspacePaneTabs(input.repoRoot, input.repoRuntimeId, queryClient)
-  if (!workspacePaneTabsProjectionScopeAccepted(input)) return false
-  setWorkspacePaneTabsForTargetQueryData(input, queryClient)
-  return true
+): boolean {
+  if (!workspacePaneTabsProjectionScopeAccepted({ repoRoot, repoRuntimeId })) return false
+  return writeWorkspacePaneTabsSnapshotQueryData(repoRoot, repoRuntimeId, snapshot, queryClient)
 }
 
 export async function replaceWorkspacePaneTabsOnServer(
   input: CommitWorkspacePaneTabsInput,
-): Promise<WorkspacePaneTabEntry[]> {
+): Promise<WorkspacePaneTabsSnapshot> {
   return await workspacePaneTabsClient.replace({
     repoRoot: input.repoRoot,
     repoRuntimeId: input.repoRuntimeId,
@@ -246,7 +225,7 @@ export async function replaceWorkspacePaneTabsOnServer(
 
 export async function updateWorkspacePaneTabsOnServer(
   input: UpdateWorkspacePaneTabsInput,
-): Promise<WorkspacePaneTabEntry[]> {
+): Promise<WorkspacePaneTabsSnapshot> {
   return await workspacePaneTabsClient.update({
     repoRoot: input.repoRoot,
     repoRuntimeId: input.repoRuntimeId,
@@ -260,21 +239,4 @@ function workspacePaneTabsProjectionScopeAccepted(
   input: Pick<CommitWorkspacePaneTabsInput, 'repoRoot' | 'repoRuntimeId'>,
 ): boolean {
   return currentRepoRuntimeId(useReposStore.getState(), input.repoRoot) === input.repoRuntimeId
-}
-
-function canceledWorkspacePaneTabsMutation(
-  operation: WorkspacePaneTabsMutationOperation,
-  input: Pick<CommitWorkspacePaneTabsInput, 'repoRoot' | 'branchName' | 'worktreePath'>,
-): WorkspacePaneTabsMutationFailure {
-  const error = new Error('error.repo-runtime-stale')
-  return {
-    ok: false,
-    operation,
-    repoRoot: input.repoRoot,
-    branchName: input.branchName,
-    worktreePath: input.worktreePath,
-    message: error.message,
-    error,
-    canceled: true,
-  }
 }

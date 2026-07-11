@@ -50,10 +50,14 @@ Notes:
 - Store repo data may still exist as a projection for UI orchestration, action state, warm restore, and in-place server response application. New runtime reads should prefer the query-backed projection unless they are explicitly write-side projection code.
 - `ReposStore` actions are also grouped by local, restorable, runtime-coherent, and mutation responsibilities.
 - Transport payloads may bundle multiple classes together; consumers should split them back into runtime-coherent and restorable views before use.
+- A transport payload may also bundle multiple runtime-coherent projections,
+  but each authoritative model keeps its own revision. Terminal session
+  snapshots and workspace-pane tab snapshots are applied independently; a
+  tabs revision must never gate terminal collection recovery.
 - Runtime-coherent repo actions should prefer orchestration entrypoints plus focused helper modules for projection/state transitions and sync pipelines.
 - Settings truth lives on the server; clients read it through query snapshots or specialized runtime projections.
 - Settings writes belong in `src/web/settings-actions.ts`. `src/web/settings-client.ts` is the transport boundary, not a UI mutation API. UI stores may keep local projections such as theme/i18n state, but their server write-through path should use settings actions so the settings query cache stays coherent.
-- Workspace pane tabs truth lives in the server workspace-pane runtime. React Query caches the runtime projection. Reorder may use a short-lived optimistic query update, but success must replace it with server-returned tabs and failure must rollback or invalidate.
+- Workspace pane tabs truth lives in the server workspace-pane runtime. Every list or mutation returns a complete `WorkspacePaneTabsSnapshot { revision, entries }` for the repo-runtime scope. React Query accepts a snapshot only when its server revision is at least the cached revision. Canonical reorder is intentionally not optimistic; it waits for the server snapshot instead of mixing rollback tokens into the canonical cache.
 - Runtime-coherent state may use server-published invalidation plus targeted refetch or realtime streaming. It must not use client polling as the mechanism that discovers server-owned changes.
 - For runtime correctness boundaries, prefer server-owned fast fail over client guards. A mutation that no longer matches the live runtime should be rejected by the server, not locally guessed away by the client.
 - Do not introduce client-only async tokens or focus guards to suppress late navigation after a write completes. Model the operation as a server/projection-owned pending state, reject competing user operations at their entry point, and then project the server result.
@@ -63,6 +67,21 @@ Notes:
 - Cache identity must match runtime identity. If reopen can mint a new runtime for the same stable path, cache keys and mutation preconditions need a runtime dimension too.
 - Do not layer a client freshness check on top of a server-owned runtime id when the server can already validate the mutation from that id alone. That is not extra safety; it is a second authority and a new failure mode.
 - After a successful server mutation, prefer invalidation from server push over client-issued "confirming" fetches. If the server already owns the durable state transition, the client should re-project from the broadcast instead of trying to restage the transition locally.
+- When one user action creates a server-owned resource and must also establish
+  another server-owned projection of that resource, compose those writes in a
+  server application operation. Return the canonical projections together;
+  do not make the client issue a provider write followed by a second membership
+  write.
+- Mutation responses describe the exact committed effect. Do not attach an
+  unversioned full-collection read model to a mutation response and use it to
+  replace concurrent state. Full collections belong to revisioned query or
+  recovery snapshots.
+- Server application commands, server snapshot revision, repo-runtime identity,
+  and client presentation coordination have different jobs. The server command
+  orders resource changes, revision orders projection responses,
+  `repoRuntimeId` scopes projection/navigation, and client coordination handles
+  only dedupe, cancellation, and route transitions. Do not replace any of these
+  with client session-liveness or cache-generation guesses.
 
 ## Restorable state
 
@@ -125,16 +144,32 @@ The normal shape is:
 const plan = resolveOperationPlan(currentRoute, currentProjection)
 if (!plan.ok) return false
 const result = await performServerOrRuntimeWrite(plan.write)
-if (!result.ok) return false
-return commitPlannedNavigation(plan.route)
+if (!result.serverCommitted) return false
+applyCanonicalProjectionWhenCurrent(result.canonicalProjection)
+return await commitPlannedNavigation(plan.route)
 ```
 
+Keep server commit, local projection application, and route completion as
+separate outcomes. A server response that belongs to an old client runtime may
+be skipped by the local cache without reclassifying the server write as failed.
+After the server commit point, route failure is recoverable UI state and must
+not trigger destructive compensation against a long-lived runtime resource.
+Operation-owned navigation must settle against the requested route; merely
+scheduling `router.navigate(...)` is not completion.
+
 If a runtime write has a visible transitional lifecycle, project that lifecycle
-through the owning runtime model. For example, terminal close hides the session
-from the tab strip while close is in flight, and the terminal projection exposes
-that session id as closing. Route reconciliation can then wait on a real
-terminal lifecycle state instead of misclassifying the current URL as stale.
-That is acceptable projection state; it is not a command token or guard.
+through the owning runtime model without contradicting the current business
+state. Do not hide or remove an entity from a client projection before the
+runtime write that removes it has actually completed, then try to compensate
+with a secondary "closing" flag, render override, or route-reconciliation
+exception. That creates two sources of truth: the projection says the entity is
+gone, while the command still owns an in-flight close.
+
+The cleaner shape is sequential: the command captures the close-back target,
+awaits the owning runtime close, and only then commits both the projection
+removal and planned navigation. Reconciliation may wait on real runtime state,
+but it must not become a repair layer for an operation that prematurely hid its
+own target.
 
 ## Sync rules
 

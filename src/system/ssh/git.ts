@@ -642,9 +642,14 @@ export async function removeRemoteWorktree(
     alsoDeleteUpstream?: boolean
     signal?: AbortSignal
     run?: RemoteGitRunner
+    beforeRemove: () => Promise<ExecResult>
+    afterWorktreeRemoved: () => Promise<ExecResult>
+    afterRemoveFailed: () => Promise<void>
+    validateBeforeRemove?: () => Promise<ExecResult>
   },
 ): Promise<RemoteWorktreeMutationResult> {
   if (!isSafeBranchName(input.branch)) return { ok: false, message: 'error.invalid-arguments' }
+  if (!isValidRemotePath(input.worktreePath)) return { ok: false, message: 'error.invalid-path' }
   const run: RemoteGitRunner = input.run ?? ((command, t, runOptions) => runRemoteCommand(t, command, runOptions))
   const listResult = await run({ type: 'gitWorktreeList', path: target.remotePath }, target, { signal: input.signal })
   if (input.signal?.aborted) return { ok: false, message: 'cancelled' }
@@ -680,9 +685,7 @@ export async function removeRemoteWorktree(
     const validation = validateBranchDeletionPolicy({
       branch: input.branch,
       currentBranch,
-      isCheckedOutElsewhere: worktrees.some(
-        (worktree) => worktree.branch === input.branch && worktree.path !== resolved.path,
-      ),
+      isCheckedOutElsewhere: worktrees.some((worktree) => worktree.branch === input.branch && worktree !== resolved),
       force: shouldForceDeleteBranch,
       mergedToCurrent: mergeFacts.mergedToCurrent,
       mergedToUpstream: mergeFacts.mergedToUpstream,
@@ -691,27 +694,54 @@ export async function removeRemoteWorktree(
     if (validation) return validation
   }
 
-  const removeResult = await run(
-    { type: 'gitWorktreeRemove', path: mutationPath, worktreePath: resolved.path },
-    target,
-    { signal: input.signal, timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS },
-  )
-  if (input.signal?.aborted) return { ok: false, message: 'cancelled' }
-  if (!removeResult.ok) return remoteExecResult(removeResult)
+  const prepared = await input.beforeRemove()
+  if (!prepared.ok) return prepared
+  const exact = await input.validateBeforeRemove?.()
+  if (exact && !exact.ok) {
+    await input.afterRemoveFailed()
+    return exact
+  }
+  if (input.signal?.aborted) {
+    await input.afterRemoveFailed()
+    return { ok: false, message: 'cancelled' }
+  }
+
+  let removeResult: RemoteCommandResult
+  try {
+    removeResult = await run({ type: 'gitWorktreeRemove', path: mutationPath, worktreePath: resolved.path }, target, {
+      timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS,
+      signal: input.signal,
+    })
+  } catch (error) {
+    await input.afterRemoveFailed()
+    throw error
+  }
+  if (!removeResult.ok) {
+    await input.afterRemoveFailed()
+    return remoteExecResult(removeResult)
+  }
+  const finalized = await input.afterWorktreeRemoved()
+  if (!finalized.ok) {
+    return withAffectedWorktreePaths({ ...finalized, repoChanged: true }, affectedWorktreePaths)
+  }
   if (!input.alsoDeleteBranch) return withAffectedWorktreePaths(remoteExecResult(removeResult), affectedWorktreePaths)
 
   const upstream = input.alsoDeleteUpstream
-    ? await getRemoteUpstreamParts(target, input.branch, { signal: input.signal, run, path: mutationPath })
+      ? await getRemoteUpstreamParts(target, input.branch, { signal: input.signal, run, path: mutationPath })
     : null
-  if (input.signal?.aborted) return { ok: false, message: 'cancelled' }
   const deleteResult = await run(
     { type: 'gitBranchDelete', path: mutationPath, branch: input.branch, force: shouldForceDeleteBranch },
     target,
-    { signal: input.signal, timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS },
+    { timeoutMs: REMOTE_BRANCH_OP_TIMEOUT_MS, signal: input.signal },
   )
   const localDeleteResult = remoteExecResult(deleteResult)
-  if (!localDeleteResult.ok) return withAffectedWorktreePaths(localDeleteResult, affectedWorktreePaths)
-  const upstreamDeleteResult = await deleteRemoteUpstreamBranch(target, mutationPath, upstream, { signal: input.signal, run })
+  if (!localDeleteResult.ok) {
+    return withAffectedWorktreePaths({ ...localDeleteResult, repoChanged: true }, affectedWorktreePaths)
+  }
+  const upstreamDeleteResult = await deleteRemoteUpstreamBranch(target, mutationPath, upstream, {
+    signal: input.signal,
+    run,
+  })
   return withAffectedWorktreePaths(upstreamDeleteResult ?? localDeleteResult, affectedWorktreePaths)
 }
 
@@ -762,7 +792,10 @@ export async function deleteRemoteBranch(
   )
   const localDeleteResult = remoteExecResult(result)
   if (!localDeleteResult.ok) return localDeleteResult
-  return (await deleteRemoteUpstreamBranch(target, target.remotePath, upstream, { signal: input.signal, run })) ?? localDeleteResult
+  return (
+    (await deleteRemoteUpstreamBranch(target, target.remotePath, upstream, { signal: input.signal, run })) ??
+    localDeleteResult
+  )
 }
 
 export async function getRemoteBrowserUrl(
@@ -886,9 +919,15 @@ function resolveRemoteRemovableWorktree(
   worktreePath: string,
   mainWorktreePath: string,
 ): WorktreeInfo | ExecResult {
-  const target = worktrees.find((worktree) => worktree.path === worktreePath && worktree.branch === branch)
+  const resolvedPath = path.posix.resolve(worktreePath)
+  const target = worktrees.find(
+    (worktree) => path.posix.resolve(worktree.path) === resolvedPath && worktree.branch === branch,
+  )
   if (!target) return { ok: false, message: 'error.worktree-not-found-for-branch' }
-  if (target.isPrimary || (!!mainWorktreePath && target.path === mainWorktreePath)) {
+  if (
+    target.isPrimary ||
+    (!!mainWorktreePath && path.posix.resolve(target.path) === path.posix.resolve(mainWorktreePath))
+  ) {
     return { ok: false, message: 'error.cannot-remove-main-worktree' }
   }
   return target

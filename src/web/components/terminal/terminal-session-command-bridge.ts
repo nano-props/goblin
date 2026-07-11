@@ -1,12 +1,18 @@
 import type { TerminalCreateOptions, TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import type { TerminalSessionBase } from '#/shared/terminal-types.ts'
+import type { WorkspacePaneRuntimeTabPlacement } from '#/shared/workspace-pane-runtime.ts'
+import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/terminal-create-admission.ts'
 
 export interface TerminalSessionCommandBridge {
   terminalWorktreeSnapshot: (terminalWorktreeKey: string) => TerminalWorktreeSnapshot
   createTerminal: (base: TerminalSessionBase, options?: TerminalCreateOptions) => Promise<string>
+  createTerminalWithAdmission: (
+    base: TerminalSessionBase,
+    options?: TerminalCreateOptions,
+    placement?: WorkspacePaneRuntimeTabPlacement,
+  ) => Promise<TerminalCreateAdmissionResult>
   selectTerminal: (terminalWorktreeKey: string, terminalSessionId: string) => void
   closeTerminalByDescriptor?: (terminalSessionId: string, base: TerminalSessionBase) => Promise<boolean>
-  closeTerminalsForWorktree?: (base: TerminalSessionBase) => Promise<boolean>
 }
 
 let bridge: TerminalSessionCommandBridge | null = null

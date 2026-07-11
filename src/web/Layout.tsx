@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
-import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
+import { Outlet, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { useShallow } from 'zustand/react/shallow'
 import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
@@ -38,18 +38,31 @@ import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowNavigationStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
 import { branchNameFromSlug, repoIdFromSlug } from '#/web/repo-route-slugs.ts'
-import { returnToFromHref, usePrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
-import { useWorkspaceNavigationHistory } from '#/web/workspace-navigation-history.ts'
+import { returnToFromHref, usePrimaryWindowRouteActions } from '#/web/primary-window-route-navigation.ts'
+import {
+  usePrimaryWindowHistoryPresentationObserver,
+  useWorkspaceNavigationHistory,
+} from '#/web/workspace-navigation-history.ts'
 import type { WorkspaceNavigationRouteContext } from '#/web/workspace-navigation-history.ts'
 import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 
 const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapState>({
   status: 'restoring-workspace',
 })
 
 export type AuthenticatedAppShellMode = 'settings' | 'workspace-restore' | 'workspace-ready'
+
+export function primaryWindowLayoutRouteCallbacks(
+  routeActions: Pick<PrimaryWindowRouteNavigation, 'openSettings' | 'openHome'>,
+) {
+  return {
+    navigateToSettingsShortcuts: () => routeActions.openSettings('shortcuts'),
+    navigateToIndex: () => routeActions.openHome(),
+  }
+}
 
 export function authenticatedAppShellMode(
   pathname: string,
@@ -62,6 +75,7 @@ export function authenticatedAppShellMode(
 export function Layout() {
   usePublicAppBootstrap()
   useSettingsWriteErrorToast()
+  usePrimaryWindowHistoryPresentationObserver()
 
   return (
     <ErrorBoundary>
@@ -101,10 +115,8 @@ function AuthenticatedSettingsShell() {
 }
 
 function AuthenticatedWorkspaceShell() {
-  const navigate = useNavigate()
   const routeMatches = useRouterState({ select: (s) => s.matches })
   const routeHref = useRouterState({ select: (s) => s.location.href })
-
   const overlays = useAppOverlays()
   const modalOpen = overlays.anyOpen
 
@@ -124,7 +136,8 @@ function AuthenticatedWorkspaceShell() {
   const { closeRepo, goBackInWorkspaceNavigation, goForwardInWorkspaceNavigation } = useReposStore(
     useShallow(primaryWindowNavigationStoreActionsFromStore),
   )
-  const routeNavigation = usePrimaryWindowRouteNavigation()
+  const routeNavigation = usePrimaryWindowRouteActions()
+  const layoutRouteCallbacks = primaryWindowLayoutRouteCallbacks(routeNavigation)
   const navigation = useMemo(
     () =>
       createPrimaryWindowNavigationActions({
@@ -162,8 +175,8 @@ function AuthenticatedWorkspaceShell() {
         openRemoteRepo={overlays.openRemoteRepo}
         modalOpen={modalOpen}
         isSettingsOpen={false}
-        navigateToSettingsShortcuts={() => void navigate({ to: '/settings/shortcuts' })}
-        navigateToIndex={() => void navigate({ to: '/' })}
+        navigateToSettingsShortcuts={layoutRouteCallbacks.navigateToSettingsShortcuts}
+        navigateToIndex={layoutRouteCallbacks.navigateToIndex}
       />
       <PrimaryWindowNavigationProvider value={navigation}>
         <LayoutOverlayActions
@@ -220,7 +233,7 @@ interface RepoRouteContext {
   kind: 'empty' | 'dashboard' | 'branch' | 'newWorktree'
   repoSlug: string
   branchName?: string
-  workspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
+  workspacePaneRoute?: ParsedRepoBranchWorkspacePaneRoute | null
 }
 
 export function repoRouteContextFromMatches(
@@ -252,7 +265,7 @@ export function repoRouteContextFromMatches(
 
 function workspacePaneRouteFromMatches(
   matches: Array<{ routeId: string; params: Record<string, string> }>,
-): RepoBranchWorkspacePaneRoute | null {
+): ParsedRepoBranchWorkspacePaneRoute | null {
   const terminalMatch = [...matches].reverse().find((match) => typeof match.params.terminalSessionId === 'string')
   const terminalSessionId = terminalMatch?.params.terminalSessionId
   if (terminalSessionId) return { kind: 'terminal', terminalSessionId }
@@ -269,7 +282,7 @@ interface PrimaryWindowOverlaysProps {
   navigation: PrimaryWindowNavigationActions
   hydratedRouteRepoId: string | null
   currentBranchName: string | null
-  currentWorkspacePaneRoute: RepoBranchWorkspacePaneRoute | null
+  currentWorkspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null
 }
 
 function PrimaryWindowOverlays({
@@ -339,7 +352,7 @@ function AuthenticatedWorkspaceSideEffects({
   routedRepoId: string | null
   hydratedRouteRepoId: string | null
   currentBranchName: string | null
-  currentWorkspacePaneRoute: RepoBranchWorkspacePaneRoute | null
+  currentWorkspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null
   routeContext: WorkspaceNavigationRouteContext | null
   navigation: PrimaryWindowNavigationActions
   closeAllOverlays: () => void
@@ -395,7 +408,7 @@ function VisibleRepoProjectionRefreshEffect({
 }: {
   hydratedRouteRepoId: string | null
   currentBranchName: string | null
-  currentWorkspacePaneRoute: RepoBranchWorkspacePaneRoute | null
+  currentWorkspacePaneRoute: ParsedRepoBranchWorkspacePaneRoute | null
 }) {
   useVisibleRepoProjectionRefresh({
     hydratedRouteRepoId,

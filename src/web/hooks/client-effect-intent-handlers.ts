@@ -28,9 +28,10 @@ import type { PrimaryWindowNavigationActions } from '#/web/primary-window-naviga
 import type { OpenRepoResult } from '#/web/stores/repos/types.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
-import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { getRepoOperationsQueryData } from '#/web/repo-data-query.ts'
 import { projectBranchActionOperation } from '#/web/hooks/branch-action-state.ts'
+import { dispatchShowWorkspacePaneTerminalRouteAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 
 interface TerminalBellIntentDeps {
   navigation: PrimaryWindowNavigationActions
@@ -41,7 +42,7 @@ interface SharedClientIntentDeps {
   navigation: PrimaryWindowNavigationActions
   currentRepoId: string | null
   currentBranchName: string | null
-  currentWorkspacePaneRoute?: RepoBranchWorkspacePaneRoute | null
+  currentWorkspacePaneRoute?: ParsedRepoBranchWorkspacePaneRoute | null
   closeAllOverlays: () => void
   openRepoPathDialog: () => void
   openCloneRepo: () => void
@@ -72,7 +73,12 @@ export function handleTerminalBellClickIntent(
   deps.closeAllOverlays()
   switch (plan.kind) {
     case 'show-worktree-terminal':
-      deps.navigation.showRepoBranchTerminalSession(plan.repoId, plan.branch, plan.terminalSessionId)
+      void dispatchShowWorkspacePaneTerminalRouteAction({
+        repoId: plan.repoId,
+        branchName: plan.branch,
+        terminalSessionId: plan.terminalSessionId,
+        navigation: deps.navigation,
+      })
       return
   }
 }

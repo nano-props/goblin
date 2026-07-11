@@ -52,12 +52,14 @@ import type {
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabsEntry } from '#/shared/workspace-pane-tabs.ts'
-import { workspacePaneStaticTabEntry, workspacePaneRuntimeTabEntry } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import {
-  readWorkspacePaneTabsForTarget,
-  setWorkspacePaneTabsForTargetQueryData,
-} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+  workspacePaneStaticTabEntry,
+  workspacePaneRuntimeTabEntry,
+  workspacePaneTabsWithRuntimeTab,
+} from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspace-pane-tabs.ts'
 
 const mockSessions = vi.hoisted(
   () =>
@@ -132,6 +134,7 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
     private readonly hydrateSpy = vi.fn()
     private readonly detachSpy = vi.fn()
     private terminalRuntimeSessionId: string | null = null
+    private terminalRuntimeGeneration: number | null = null
     private snapshotValue: TerminalSnapshot
 
     constructor(descriptor: TerminalDescriptor, _notify: () => void) {
@@ -202,8 +205,44 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
       return this.terminalRuntimeSessionId
     }
 
+    currentRuntimeBinding() {
+      return this.terminalRuntimeSessionId && this.terminalRuntimeGeneration !== null
+        ? {
+            terminalRuntimeSessionId: this.terminalRuntimeSessionId,
+            terminalRuntimeGeneration: this.terminalRuntimeGeneration,
+          }
+        : null
+    }
+
+    addressableRuntimeBinding() {
+      return this.currentRuntimeBinding()
+    }
+
+    pendingAuthoritativeRuntimeBinding() {
+      return null
+    }
+
+    commitPendingAuthoritativeHydration(): boolean {
+      return false
+    }
+
+    classifyRuntimeBinding(binding: { terminalRuntimeSessionId: string; terminalRuntimeGeneration: number }) {
+      const current = this.currentRuntimeBinding()
+      if (!current) return 'future'
+      if (
+        current.terminalRuntimeSessionId === binding.terminalRuntimeSessionId &&
+        current.terminalRuntimeGeneration === binding.terminalRuntimeGeneration
+      ) return 'active'
+      if (
+        current.terminalRuntimeSessionId === binding.terminalRuntimeSessionId &&
+        binding.terminalRuntimeGeneration > current.terminalRuntimeGeneration
+      ) return 'future'
+      return 'foreign'
+    }
+
     hydrate(input: {
       terminalRuntimeSessionId: string
+      terminalRuntimeGeneration: number
       phase: 'opening' | 'open' | 'error'
       message: string | null
       processName: string
@@ -217,6 +256,7 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
     }) {
       this.hydrateSpy(input)
       this.terminalRuntimeSessionId = input.terminalRuntimeSessionId
+      this.terminalRuntimeGeneration = input.terminalRuntimeGeneration
       this.snapshotValue = {
         phase: input.phase,
         message: input.message,
@@ -283,6 +323,16 @@ const REPO_ID = '/tmp/gbl-terminal-provider-repo'
 const BRANCH_NAME = 'feature/worktree'
 const WORKTREE_PATH = '/tmp/gbl-terminal-provider-worktree'
 
+function terminalExitEvent(terminalSessionId: string): TerminalExitEvent {
+  return {
+    terminalRuntimeSessionId: terminalSessionId,
+    terminalRuntimeGeneration: 1,
+    terminalSessionId,
+    repoRoot: REPO_ID,
+    repoRuntimeId: useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
+  }
+}
+
 let exitHandler: ((event: TerminalExitEvent) => void) | null = null
 let outputHandler: ((event: TerminalOutputEvent) => void) | null = null
 let bellHandler: ((event: TerminalBellRealtimeEvent) => void) | null = null
@@ -294,6 +344,7 @@ let workspaceTabsChangedHandler: ((repoRoot: string) => void) | null = null
 let sessionClosedHandler:
   | ((event: {
       terminalRuntimeSessionId: string
+      terminalRuntimeGeneration: number
       terminalSessionId: string
       repoRoot: string
       worktreePath: string
@@ -317,6 +368,7 @@ let serverSessions: TestTerminalSessionSummary[] = []
 function completeServerSession(session: TestTerminalSessionSummary): TerminalSessionSummary {
   return {
     ...session,
+    terminalRuntimeGeneration: session.terminalRuntimeGeneration ?? 1,
     terminalSessionId: normalizeTestSessionId(session.terminalSessionId),
     repoRuntimeId: session.repoRuntimeId ?? useReposStore.getState().repos[REPO_ID]!.repoRuntimeId,
     repoRoot: session.repoRoot ?? REPO_ID,
@@ -327,10 +379,6 @@ function completeServerSession(session: TestTerminalSessionSummary): TerminalSes
 
 function completeServerSessions(sessions: TestTerminalSessionSummary[]): TerminalSessionSummary[] {
   return sessions.map(completeServerSession)
-}
-
-function workspaceTabsWithTerminal(terminalSessionId: string) {
-  return [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', terminalSessionId)]
 }
 
 function tabsFor(repoRoot: string, branchName: string): WorkspacePaneTabEntry[] {
@@ -363,6 +411,7 @@ function attachResult(): TerminalAttachResult {
   return {
     ok: true,
     terminalRuntimeSessionId: 'unused',
+        terminalRuntimeGeneration: 1,
     snapshot: '',
     snapshotSeq: 0,
     outputEra: 0,
@@ -421,10 +470,10 @@ beforeEach(() => {
       return {
         ok: true,
         action: 'reused',
+        terminalSessionsRevision: 1,
         terminalSessionId,
-        tabs: workspaceTabsWithTerminal(terminalSessionId),
-        sessions: completeServerSessions(serverSessions),
         terminalRuntimeSessionId: reused?.terminalRuntimeSessionId ?? 'term-111111111111111111111',
+        terminalRuntimeGeneration: 1,
         snapshot: '',
         snapshotSeq: 0,
         outputEra: 0,
@@ -447,6 +496,7 @@ beforeEach(() => {
         })),
       {
         terminalRuntimeSessionId: terminalSessionId,
+        terminalRuntimeGeneration: 1,
         terminalSessionId,
         repoRuntimeId: input.repoRuntimeId,
         repoRoot: input.repoRoot,
@@ -467,10 +517,10 @@ beforeEach(() => {
     return {
       ok: true,
       action: 'created',
+      terminalSessionsRevision: 1,
       terminalSessionId,
-      tabs: workspaceTabsWithTerminal(terminalSessionId),
-      sessions: completeServerSessions(serverSessions),
       terminalRuntimeSessionId: terminalSessionId,
+        terminalRuntimeGeneration: 1,
       snapshot: '',
       snapshotSeq: 0,
       outputEra: 0,
@@ -509,6 +559,7 @@ beforeEach(() => {
         attach: vi.fn(async () => ({
           ok: true,
           terminalRuntimeSessionId: 'unused',
+        terminalRuntimeGeneration: 1,
           snapshot: '',
           snapshotSeq: 0,
           outputEra: 0,
@@ -523,6 +574,7 @@ beforeEach(() => {
         restart: vi.fn(async () => ({
           ok: true,
           terminalRuntimeSessionId: 'unused',
+        terminalRuntimeGeneration: 1,
           snapshot: '',
           snapshotSeq: 0,
           outputEra: 0,
@@ -539,6 +591,7 @@ beforeEach(() => {
         takeover: vi.fn(async () => ({
           ok: true as const,
           terminalRuntimeSessionId: 'term-111111111111111111111',
+        terminalRuntimeGeneration: 1,
           role: 'controller' as const,
           controllerStatus: 'connected' as const,
           controller: { clientId: 'client_local', status: 'connected' as const },
@@ -549,12 +602,11 @@ beforeEach(() => {
         close: closeMock,
         notifyBell: vi.fn(async () => true),
         setBadge: vi.fn(async () => {}),
-        create: createTerminalMock,
         pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
-        listSessions: async (input: { repoRoot: string }) => completeServerSessions(await listSessionsMock(input)),
         recoverSessions: async (input: { repoRoot: string }) => ({
-          sessions: completeServerSessions(await listSessionsMock(input)),
+          terminalSessions: { revision: 1, sessions: completeServerSessions(await listSessionsMock(input)) },
           snapshots: [],
+          workspacePaneTabs: { revision: 0, entries: [] },
         }),
         onOutput: vi.fn((cb: (event: TerminalOutputEvent) => void) => {
           outputHandler = cb
@@ -591,7 +643,10 @@ beforeEach(() => {
       workspacePaneTabs: {
         replace: vi.fn(async (input: { tabs: unknown[] }) => input.tabs),
         update: vi.fn(async () => []),
-        list: async (input: { repoRoot: string }) => await listWorkspaceTabsMock(input),
+        list: async (input: { repoRoot: string }) => ({
+          revision: 1,
+          entries: await listWorkspaceTabsMock(input),
+        }),
         onChanged: vi.fn((cb: (repoRoot: string) => void) => {
           workspaceTabsChangedHandler = cb
           return () => {
@@ -649,6 +704,7 @@ beforeEach(() => {
       takeover: vi.fn(async () => ({
         ok: true as const,
         terminalRuntimeSessionId: 'term-111111111111111111111',
+        terminalRuntimeGeneration: 1,
         role: 'controller' as const,
         controllerStatus: 'connected' as const,
         controller: { clientId: 'client_local', status: 'connected' as const },
@@ -657,12 +713,11 @@ beforeEach(() => {
         phase: 'open' as const,
       })),
       close: closeMock,
-      create: createTerminalMock,
       pruneTerminals: vi.fn(async () => ({ pruned: 0, remaining: 0 })),
-      listSessions: async (input) => completeServerSessions(await listSessionsMock(input)),
       recoverSessions: async (input) => ({
-        sessions: completeServerSessions(await listSessionsMock(input)),
+        terminalSessions: { revision: 1, sessions: completeServerSessions(await listSessionsMock(input)) },
         snapshots: [],
+        workspacePaneTabs: { revision: 0, entries: [] },
       }),
       notifyBell: window.goblinNative.terminal.notifyBell ?? vi.fn(async () => true),
       sendTestNotification: vi.fn(async () => true),
@@ -701,6 +756,7 @@ beforeEach(() => {
         (
           cb: (event: {
             terminalRuntimeSessionId: string
+            terminalRuntimeGeneration: number
             terminalSessionId: string
             repoRoot: string
             worktreePath: string
@@ -714,15 +770,49 @@ beforeEach(() => {
       ),
     }),
     workspacePaneTabs: () => ({
-      replace: vi.fn(async (input) => input.tabs),
-      update: vi.fn(async () => []),
-      list: async (input) => await listWorkspaceTabsMock(input),
+      replace: vi.fn(async () => ({ revision: 1, entries: [] })),
+      update: vi.fn(async () => ({ revision: 1, entries: [] })),
+      list: async (input) => ({ revision: 1, entries: await listWorkspaceTabsMock(input) }),
       onChanged: vi.fn((cb: (repoRoot: string) => void) => {
         workspaceTabsChangedHandler = cb
         return () => {
           if (workspaceTabsChangedHandler === cb) workspaceTabsChangedHandler = null
         }
       }),
+    }),
+    workspacePaneRuntime: () => ({
+      open: vi.fn(async (input) => {
+        const runtime = await createTerminalMock(input.request)
+        if (!runtime.ok) return { ok: false as const, runtimeType: 'terminal' as const, message: runtime.message }
+        const tabs = workspacePaneTabsWithRuntimeTab(
+          readWorkspacePaneTabsForTarget({
+            repoRoot: input.request.repoRoot,
+            repoRuntimeId: input.request.repoRuntimeId,
+            branchName: input.request.branch,
+            worktreePath: input.request.worktreePath,
+          }),
+          'terminal',
+          runtime.terminalSessionId,
+          { insertAfterIdentity: input.insertAfterIdentity },
+        )
+        return {
+          ok: true as const,
+          runtimeType: 'terminal' as const,
+          runtime,
+          workspacePaneTabs: {
+            revision: 1,
+            entries: [
+              {
+                repoRoot: input.request.repoRoot,
+                branchName: input.request.branch,
+                worktreePath: input.request.worktreePath,
+                tabs,
+              },
+            ],
+          },
+        }
+      }),
+      close: vi.fn(async () => ({ ok: false as const, runtimeType: 'terminal' as const, message: 'unavailable' })),
     }),
   })
 })
@@ -776,7 +866,7 @@ describe('TerminalSessionProvider', () => {
       ])
 
       await act(async () => {
-        exitHandler?.({ terminalRuntimeSessionId: 'term-222222222222222222222', terminalSessionId: 'term-222222222222222222222' })
+        exitHandler?.(terminalExitEvent('term-222222222222222222222'))
       })
 
       expect(closeMock).not.toHaveBeenCalled()
@@ -791,7 +881,7 @@ describe('TerminalSessionProvider', () => {
       // at read time (covered by `workspace-pane-tabs.ts` and
       // `workspace-pane-tab.test.ts`).
       await act(async () => {
-        exitHandler?.({ terminalRuntimeSessionId: 'term-111111111111111111111', terminalSessionId: 'term-111111111111111111111' })
+        exitHandler?.(terminalExitEvent('term-111111111111111111111'))
       })
 
       expect(closeMock).not.toHaveBeenCalled()
@@ -828,6 +918,7 @@ describe('TerminalSessionProvider', () => {
       await act(async () => {
         bellHandler?.({
           terminalRuntimeSessionId: 'term-111111111111111111111',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
@@ -898,6 +989,7 @@ describe('TerminalSessionProvider', () => {
       await act(async () => {
         bellHandler?.({
           terminalRuntimeSessionId: 'term-111111111111111111111',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
@@ -946,6 +1038,7 @@ describe('TerminalSessionProvider', () => {
       await act(async () => {
         bellHandler?.({
           terminalRuntimeSessionId: 'term-111111111111111111111',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
@@ -988,13 +1081,18 @@ describe('TerminalSessionProvider', () => {
         await getContext().createTerminal(base)
       })
 
-      const first = mockSessions.find((session) => session.descriptor.terminalSessionId === 'term-111111111111111111111')
-      const second = mockSessions.find((session) => session.descriptor.terminalSessionId === 'term-222222222222222222222')
+      const first = mockSessions.find(
+        (session) => session.descriptor.terminalSessionId === 'term-111111111111111111111',
+      )
+      const second = mockSessions.find(
+        (session) => session.descriptor.terminalSessionId === 'term-222222222222222222222',
+      )
       if (!first || !second) throw new Error('missing terminal mock sessions')
 
       await act(async () => {
         outputHandler?.({
           terminalRuntimeSessionId: 'term-111111111111111111111',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           data: 'hello',
           seq: 1,
@@ -1003,6 +1101,7 @@ describe('TerminalSessionProvider', () => {
         })
         titleHandler?.({
           terminalRuntimeSessionId: 'term-111111111111111111111',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
@@ -1010,6 +1109,7 @@ describe('TerminalSessionProvider', () => {
         })
         identityHandler?.({
           terminalRuntimeSessionId: 'term-222222222222222222222',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-222222222222222222222',
           role: 'controller',
           controllerStatus: 'connected',
@@ -1018,6 +1118,7 @@ describe('TerminalSessionProvider', () => {
         })
         lifecycleHandler?.({
           terminalRuntimeSessionId: 'term-222222222222222222222',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-222222222222222222222',
           phase: 'open',
           message: null,
@@ -1028,6 +1129,7 @@ describe('TerminalSessionProvider', () => {
       expect(first.handleOutput).toHaveBeenCalledTimes(1)
       expect(first.handleOutput).toHaveBeenCalledWith({
         terminalRuntimeSessionId: 'term-111111111111111111111',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         data: 'hello',
         seq: 1,
@@ -1039,6 +1141,7 @@ describe('TerminalSessionProvider', () => {
       expect(second.handleIdentity).toHaveBeenCalledTimes(1)
       expect(second.handleIdentity).toHaveBeenCalledWith({
         terminalRuntimeSessionId: 'term-222222222222222222222',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-222222222222222222222',
         role: 'controller',
         controllerStatus: 'connected',
@@ -1047,6 +1150,7 @@ describe('TerminalSessionProvider', () => {
       })
       expect(second.handleLifecycle).toHaveBeenCalledWith({
         terminalRuntimeSessionId: 'term-222222222222222222222',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-222222222222222222222',
         phase: 'open',
         message: null,
@@ -1113,6 +1217,7 @@ describe('TerminalSessionProvider', () => {
         notifyBell.mockClear()
         bellHandler?.({
           terminalRuntimeSessionId: 'term-111111111111111111111',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
@@ -1144,6 +1249,7 @@ describe('TerminalSessionProvider', () => {
     listSessionsMock.mockResolvedValue([
       {
         terminalRuntimeSessionId: 'server_session_1',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_remote', status: 'connected' },
@@ -1164,10 +1270,13 @@ describe('TerminalSessionProvider', () => {
       expect(getProbe().summaries).toEqual([
         expect.objectContaining({ terminalSessionId: 'term-111111111111111111111', title: 'zsh', phase: 'open' }),
       ])
-      const hydrated = mockSessions.find((session) => session.descriptor.terminalSessionId === 'term-111111111111111111111')
+      const hydrated = mockSessions.find(
+        (session) => session.descriptor.terminalSessionId === 'term-111111111111111111111',
+      )
       expect(hydrated?.hydrate).toHaveBeenCalledWith(
         expect.objectContaining({
           terminalRuntimeSessionId: 'server_session_1',
+        terminalRuntimeGeneration: 1,
           processName: 'zsh',
           role: 'viewer',
           controllerStatus: 'connected',
@@ -1229,6 +1338,7 @@ describe('TerminalSessionProvider', () => {
       await act(async () => {
         sessionClosedHandler?.({
           terminalRuntimeSessionId: 'server_session_1',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           repoRoot: REPO_ID,
           worktreePath: WORKTREE_PATH,
@@ -1253,6 +1363,7 @@ describe('TerminalSessionProvider', () => {
     serverSessions = [
       {
         terminalRuntimeSessionId: 'server_session_1',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_local', status: 'connected' },
@@ -1310,6 +1421,7 @@ describe('TerminalSessionProvider', () => {
     serverSessions = [
       {
         terminalRuntimeSessionId: 'server_session_1',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         cwd: WORKTREE_PATH,
         controller: null,
@@ -1322,6 +1434,7 @@ describe('TerminalSessionProvider', () => {
       },
       {
         terminalRuntimeSessionId: 'server_session_2',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-222222222222222222222',
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_local', status: 'connected' },
@@ -1395,6 +1508,7 @@ describe('TerminalSessionProvider', () => {
     listSessionsMock.mockResolvedValue([
       {
         terminalRuntimeSessionId: 'server_session_2',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-222222222222222222222',
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_remote', status: 'connected' },
@@ -1418,7 +1532,10 @@ describe('TerminalSessionProvider', () => {
       })
 
       expect(createdKey).toBe('term-333333333333333333333')
-      expect(getProbe().summaries.map((session) => session.terminalSessionId)).toEqual(['term-222222222222222222222', 'term-333333333333333333333'])
+      expect(getProbe().summaries.map((session) => session.terminalSessionId)).toEqual([
+        'term-222222222222222222222',
+        'term-333333333333333333333',
+      ])
     } finally {
       await unmount()
     }
@@ -1434,6 +1551,7 @@ describe('TerminalSessionProvider', () => {
     listSessionsMock.mockResolvedValue([
       {
         terminalRuntimeSessionId: 'server_session_3',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_remote', status: 'connected' },
@@ -1461,6 +1579,7 @@ describe('TerminalSessionProvider', () => {
       listSessionsMock.mockResolvedValue([
         {
           terminalRuntimeSessionId: 'server_session_3',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           cwd: WORKTREE_PATH,
           controller: { clientId: 'client_remote', status: 'connected' },
@@ -1496,6 +1615,7 @@ describe('TerminalSessionProvider', () => {
     listSessionsMock.mockResolvedValue([
       {
         terminalRuntimeSessionId: 'server_session_old',
+        terminalRuntimeGeneration: 1,
         terminalSessionId: 'term-111111111111111111111',
         cwd: WORKTREE_PATH,
         controller: { clientId: 'client_remote', status: 'connected' },
@@ -1523,6 +1643,7 @@ describe('TerminalSessionProvider', () => {
       listSessionsMock.mockResolvedValue([
         {
           terminalRuntimeSessionId: 'server_session_new',
+        terminalRuntimeGeneration: 1,
           terminalSessionId: 'term-111111111111111111111',
           cwd: WORKTREE_PATH,
           controller: { clientId: 'client_remote', status: 'connected' },
@@ -1569,10 +1690,13 @@ describe('TerminalSessionProvider', () => {
       await act(async () => {
         await getContext().createTerminal(base)
       })
-      expect(getProbe()).toMatchObject({ count: 2, terminalIds: ['term-111111111111111111111', 'term-222222222222222222222'] })
+      expect(getProbe()).toMatchObject({
+        count: 2,
+        terminalIds: ['term-111111111111111111111', 'term-222222222222222222222'],
+      })
 
       await act(async () => {
-        exitHandler?.({ terminalRuntimeSessionId: 'term-222222222222222222222', terminalSessionId: 'term-222222222222222222222' })
+        exitHandler?.(terminalExitEvent('term-222222222222222222222'))
       })
       expect(getProbe()).toMatchObject({ count: 1, terminalIds: ['term-111111111111111111111'] })
     } finally {
@@ -1591,9 +1715,9 @@ describe('TerminalSessionProvider', () => {
       ok: true as const,
       action: 'created' as const,
       terminalSessionId: 'term-111111111111111111111',
-      tabs: [],
-      sessions: [],
+      terminalSessionsRevision: 1,
       terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+        terminalRuntimeGeneration: 1,
       snapshot: '',
       snapshotSeq: 0,
       outputEra: 0,

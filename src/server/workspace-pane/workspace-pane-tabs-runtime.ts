@@ -1,7 +1,6 @@
 import {
   isWorkspacePaneRuntimeTabEntry,
   type WorkspacePaneRuntimeTabType,
-  type WorkspacePaneStaticTabType,
   type WorkspacePaneTabEntry,
   workspacePaneRuntimeTabEntry,
   workspacePaneRuntimeTabSessionId,
@@ -14,13 +13,12 @@ import {
   workspacePaneTabsRuntimeScopePrefixKey,
   workspacePaneTabsRuntimeUserPrefixKey,
 } from '#/shared/workspace-pane-tabs-runtime-keys.ts'
+import { workspacePaneTabsUserScopeQueueKey } from '#/server/workspace-pane/workspace-pane-tabs-user-queue-key.ts'
+import { workspacePaneTabEntryArraysEqual } from '#/server/workspace-pane/workspace-pane-tabs-operations.ts'
 import {
-  workspacePaneTabEntryArraysEqual,
-  workspacePaneTabsWithIdentityOrder,
-  workspacePaneTabsWithRuntimeTab,
-  workspacePaneTabsWithoutStaticTab,
-  workspacePaneTabsWithStaticTab,
-} from '#/server/workspace-pane/workspace-pane-tabs-operations.ts'
+  physicalWorktreeIdentityKey,
+  type PhysicalWorktreeIdentity,
+} from '#/server/worktree-removal/physical-worktree-identity.ts'
 
 export interface WorkspacePaneTabsTargetInput<TUser extends string | number> {
   userId: TUser
@@ -33,6 +31,7 @@ export interface WorkspacePaneTabsReplaceInput<
   TUser extends string | number,
 > extends WorkspacePaneTabsTargetInput<TUser> {
   tabs: readonly WorkspacePaneTabEntry[]
+  physicalWorktreeIdentity: PhysicalWorktreeIdentity | null
 }
 
 export interface WorkspacePaneTabsWorktreeInput<TUser extends string | number> {
@@ -52,10 +51,12 @@ export interface WorkspacePaneTabsScopeEntry {
   tabs: WorkspacePaneTabEntry[]
 }
 
-interface StoredWorkspacePaneTabsEntry {
+interface StoredWorkspacePaneTabsEntry<TUser extends string | number> {
+  userId: TUser
   scope: string
   branchName: string
   worktreePath: string | null
+  physicalWorktreeKey: string | null
   tabs: WorkspacePaneTabEntry[]
 }
 
@@ -65,58 +66,38 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
   // Authoritative in-process runtime state for workspace pane tabs.
   // Client query caches and session snapshots are projections/restore
   // inputs; they should not be treated as competing runtime owners.
-  private readonly tabsByTarget = new Map<string, StoredWorkspacePaneTabsEntry>()
+  private readonly tabsByTarget = new Map<string, StoredWorkspacePaneTabsEntry<TUser>>()
+  private readonly revisionByUserScope = new Map<string, number>()
 
   replaceTabs(input: WorkspacePaneTabsReplaceInput<TUser>): WorkspacePaneTabEntry[] {
+    if (input.worktreePath !== null && input.physicalWorktreeIdentity === null) {
+      throw new Error('error.invalid-worktree-identity')
+    }
     const targetKey = this.targetKey(input)
     const tabs = normalizeWorkspacePaneTabs(input.tabs, { hasWorktree: input.worktreePath !== null })
+    const physicalWorktreeKey = input.worktreePath === null
+      ? null
+      : physicalWorktreeIdentityKey(input.physicalWorktreeIdentity!)
+    const existing = this.tabsByTarget.get(targetKey)
+    if (
+      existing &&
+      existing.branchName === input.branchName &&
+      existing.worktreePath === input.worktreePath &&
+      existing.physicalWorktreeKey === physicalWorktreeKey &&
+      workspacePaneTabEntryArraysEqual(existing.tabs, tabs)
+    ) {
+      return [...existing.tabs]
+    }
     this.tabsByTarget.set(targetKey, {
+      userId: input.userId,
       scope: input.scope,
       branchName: input.branchName,
       worktreePath: input.worktreePath,
+      physicalWorktreeKey,
       tabs,
     })
+    this.advanceRevision(input.userId, input.scope)
     return [...tabs]
-  }
-
-  ensureRuntimeTab(
-    input: WorkspacePaneTabsTargetInput<TUser>,
-    type: WorkspacePaneRuntimeTabType,
-    sessionId: string,
-    options?: { insertAfterIdentity?: string | null },
-  ): WorkspacePaneTabEntry[] {
-    const current = this.tabs(input)
-    if (input.worktreePath === null || sessionId.length === 0) return current
-    const tabs = workspacePaneTabsWithRuntimeTab(current, type, sessionId, options)
-    return workspacePaneTabEntryArraysEqual(current, tabs) ? current : this.replaceTabs({ ...input, tabs })
-  }
-
-  openStaticTab(
-    input: WorkspacePaneTabsTargetInput<TUser>,
-    tabType: WorkspacePaneStaticTabType,
-    options?: { insertAfterIdentity?: string | null },
-  ): WorkspacePaneTabEntry[] {
-    const current = this.tabs(input)
-    const tabs = workspacePaneTabsWithStaticTab(current, tabType, options)
-    return workspacePaneTabEntryArraysEqual(current, tabs) ? current : this.replaceTabs({ ...input, tabs })
-  }
-
-  closeStaticTab(
-    input: WorkspacePaneTabsTargetInput<TUser>,
-    tabType: WorkspacePaneStaticTabType,
-  ): WorkspacePaneTabEntry[] {
-    const current = this.tabs(input)
-    const tabs = workspacePaneTabsWithoutStaticTab(current, tabType)
-    return workspacePaneTabEntryArraysEqual(current, tabs) ? current : this.replaceTabs({ ...input, tabs })
-  }
-
-  reorderTabsByIdentity(
-    input: WorkspacePaneTabsTargetInput<TUser>,
-    tabIdentities: readonly string[],
-  ): WorkspacePaneTabEntry[] {
-    const current = this.tabs(input)
-    const tabs = workspacePaneTabsWithIdentityOrder(current, tabIdentities)
-    return workspacePaneTabEntryArraysEqual(current, tabs) ? current : this.replaceTabs({ ...input, tabs })
   }
 
   tabs(input: WorkspacePaneTabsTargetInput<TUser>): WorkspacePaneTabEntry[] {
@@ -143,17 +124,53 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
   }
 
   closeTabsForUser(userId: TUser): void {
-    const prefix = workspacePaneTabsRuntimeUserPrefixKey(userId)
-    for (const key of Array.from(this.tabsByTarget.keys())) {
-      if (key.startsWith(prefix)) this.tabsByTarget.delete(key)
-    }
+    for (const scope of this.scopesForUser(userId)) this.closeTabsForScope(userId, scope)
   }
 
   closeTabsForScope(userId: TUser, scope: string): void {
     const prefix = workspacePaneTabsRuntimeScopePrefixKey(userId, scope)
+    let changed = false
     for (const key of Array.from(this.tabsByTarget.keys())) {
-      if (key.startsWith(prefix)) this.tabsByTarget.delete(key)
+      if (!key.startsWith(prefix)) continue
+      this.tabsByTarget.delete(key)
+      changed = true
     }
+    if (changed) this.advanceRevision(userId, scope)
+  }
+
+  /** Releases a clock only after the owning repo-runtime epoch is invalid. */
+  releaseRevisionForScope(userId: TUser, scope: string): void {
+    if (this.tabsForScope({ userId, scope }).length > 0) {
+      throw new Error('cannot release workspace pane tabs revision with live targets')
+    }
+    this.revisionByUserScope.delete(workspacePaneTabsUserScopeQueueKey(userId, scope))
+  }
+
+  closeTabsForWorktree(input: WorkspacePaneTabsWorktreeInput<TUser> & { identity: PhysicalWorktreeIdentity }): void {
+    const prefix = workspacePaneTabsRuntimeScopePrefixKey(input.userId, input.scope)
+    const targetKey = physicalWorktreeIdentityKey(input.identity)
+    let changed = false
+    for (const [key, entry] of Array.from(this.tabsByTarget.entries())) {
+      if (!key.startsWith(prefix) || entry.physicalWorktreeKey !== targetKey) continue
+      this.tabsByTarget.delete(key)
+      changed = true
+    }
+    if (changed) this.advanceRevision(input.userId, input.scope)
+  }
+
+  physicalWorktreeScopes(identity: PhysicalWorktreeIdentity): Array<{ userId: TUser; scope: string }> {
+    const targetKey = physicalWorktreeIdentityKey(identity)
+    const affected = new Map<string, { userId: TUser; scope: string }>()
+    for (const entry of this.tabsByTarget.values()) {
+      if (entry.physicalWorktreeKey !== targetKey) continue
+      const userId = entry.userId
+      affected.set(`${String(userId)}\0${entry.scope}`, { userId, scope: entry.scope })
+    }
+    return Array.from(affected.values())
+  }
+
+  revision(input: WorkspacePaneTabsScopeInput<TUser>): number {
+    return this.revisionByUserScope.get(workspacePaneTabsUserScopeQueueKey(input.userId, input.scope)) ?? 0
   }
 
   scopesForUser(userId: TUser): string[] {
@@ -172,6 +189,11 @@ export class WorkspacePaneTabsRuntime<TUser extends string | number> {
       branchName: input.branchName,
       worktreePath: input.worktreePath,
     })
+  }
+
+  private advanceRevision(userId: TUser, scope: string): void {
+    const key = workspacePaneTabsUserScopeQueueKey(userId, scope)
+    this.revisionByUserScope.set(key, (this.revisionByUserScope.get(key) ?? 0) + 1)
   }
 }
 
