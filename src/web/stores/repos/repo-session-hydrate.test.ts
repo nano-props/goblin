@@ -366,7 +366,7 @@ describe('repo session hydration', () => {
     })
 
     resolvers.splice(0).forEach((resolve) => resolve())
-    for (let i = 0; i < 20 && resolvers.length < 2; i += 1) await Promise.resolve()
+    await vi.waitFor(() => expect(resolvers).toHaveLength(2))
     resolvers.splice(0).forEach((resolve) => resolve())
     await work
 

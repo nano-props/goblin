@@ -8,6 +8,7 @@ import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 
 interface RepoRuntimeState {
   currentRepoRuntimeId: string | null
+  members: Set<string>
   remoteLifecycle: RemoteRepoRuntimeLifecycle
   remoteAttemptController: AbortController | null
 }
@@ -49,6 +50,7 @@ function repoRuntimeState(userId: string, repoRoot: string): RepoRuntimeState {
   if (existing) return existing
   const created: RepoRuntimeState = {
     currentRepoRuntimeId: null,
+    members: new Set(),
     remoteLifecycle: { kind: 'idle', attemptId: 0 },
     remoteAttemptController: null,
   }
@@ -56,29 +58,27 @@ function repoRuntimeState(userId: string, repoRoot: string): RepoRuntimeState {
   return created
 }
 
-export function openRepoRuntime(userId: string, repoRoot: string): string {
+export function acquireRepoRuntime(userId: string, repoRoot: string, clientId: string): string {
   if (!repoRoot) throw new Error('repo runtime open requires repoRoot')
+  if (!clientId) throw new Error('repo runtime acquire requires clientId')
   const state = repoRuntimeState(userId, repoRoot)
-  const previousRepoRuntimeId = stopRepoRuntimeEpoch(state)
-  const repoRuntimeId = startRepoRuntimeEpoch(state)
-  if (previousRepoRuntimeId) emitRepoRuntimeClosed({ userId, repoRoot, repoRuntimeId: previousRepoRuntimeId })
+  const repoRuntimeId = state.currentRepoRuntimeId ?? startRepoRuntimeEpoch(state)
+  state.members.add(clientId)
   return repoRuntimeId
 }
 
-export function getOrOpenRepoRuntime(userId: string, repoRoot: string): string {
-  if (!repoRoot) throw new Error('repo runtime open requires repoRoot')
-  const state = repoRuntimeState(userId, repoRoot)
-  if (state.currentRepoRuntimeId) return state.currentRepoRuntimeId
-  return startRepoRuntimeEpoch(state)
-}
-
-export function closeRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean {
+export function releaseRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string, clientId: string): {
+  released: boolean
+  runtimeClosed: boolean
+} {
   const state = repoRuntimesByUser.get(userId)?.get(repoRoot)
-  if (!state) return false
-  if (state.currentRepoRuntimeId !== repoRuntimeId) return false
+  if (!state || state.currentRepoRuntimeId !== repoRuntimeId || !state.members.delete(clientId)) {
+    return { released: false, runtimeClosed: false }
+  }
+  if (state.members.size > 0) return { released: true, runtimeClosed: false }
   stopRepoRuntimeEpoch(state)
   emitRepoRuntimeClosed({ userId, repoRoot, repoRuntimeId })
-  return true
+  return { released: true, runtimeClosed: true }
 }
 
 export function listRepoRuntimes(userId: string): RepoRuntimeEntry[] {
@@ -190,6 +190,7 @@ function startRepoRuntimeEpoch(state: RepoRuntimeState): string {
   }
   const repoRuntimeId = createOpaqueId('repo-runtime')
   state.currentRepoRuntimeId = repoRuntimeId
+  state.members.clear()
   state.remoteLifecycle = { kind: 'idle', attemptId: 0 }
   return repoRuntimeId
 }
@@ -199,6 +200,7 @@ function stopRepoRuntimeEpoch(state: RepoRuntimeState): string | null {
   state.remoteAttemptController?.abort()
   state.remoteAttemptController = null
   state.currentRepoRuntimeId = null
+  state.members.clear()
   return repoRuntimeId
 }
 

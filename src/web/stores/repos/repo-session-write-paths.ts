@@ -1,4 +1,5 @@
 import { lastPathSegment } from '#/web/lib/paths.ts'
+import PQueue from 'p-queue'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import {
   restoreRepoProjectionFromCacheEntry,
@@ -68,6 +69,8 @@ export interface RuntimeOpenResolvedRepo {
   repoRuntimeId: string | null
 }
 
+const repoRuntimeMembershipQueues = new Map<string, PQueue>()
+
 export interface InitialRepoRefresh {
   id: string
   repoRuntimeId: string
@@ -121,6 +124,10 @@ export async function resolveRepoPath(
 
 export async function openLocalRepoRuntimeForInput(input: string | RepoSessionEntry): Promise<RuntimeOpenResolvedRepo> {
   const entry = sessionEntryFromInput(input)
+  return await runRepoRuntimeMembershipCommand(entry.id, async () => await openLocalRepoRuntimeForEntry(entry))
+}
+
+async function openLocalRepoRuntimeForEntry(entry: RepoSessionEntry): Promise<RuntimeOpenResolvedRepo> {
   const opened = await openRepoRuntimeForInput(entry.id)
   if (!opened.ok) {
     return {
@@ -140,21 +147,42 @@ export async function openLocalRepoRuntimeForInput(input: string | RepoSessionEn
 }
 
 export async function openRepoRuntimeWithCache(repoRoot: string): Promise<string> {
-  const repoRuntimeId = await openRepoRuntime(repoRoot)
-  await updateRepoRuntimeCache({ repoRoot, repoRuntimeId })
-  return repoRuntimeId
+  return await runRepoRuntimeMembershipCommand(repoRoot, async () => {
+    const repoRuntimeId = await openRepoRuntime(repoRoot)
+    await updateRepoRuntimeCache({ repoRoot, repoRuntimeId })
+    return repoRuntimeId
+  })
 }
 
 export async function closeRepoRuntimeWithCache(repoRoot: string, repoRuntimeId: string): Promise<void> {
+  await runRepoRuntimeMembershipCommand(repoRoot, async () => {
+    try {
+      const released = await closeRepoRuntime(repoRoot, repoRuntimeId)
+      if (released) await removeRepoRuntimeFromCache({ repoRoot, repoRuntimeId })
+      else await refreshRepoRuntimes()
+    } catch (err) {
+      await refreshRepoRuntimes()
+      throw err
+    } finally {
+      clearWorkspacePaneTabsProjectionState(repoRoot, repoRuntimeId)
+    }
+  })
+}
+
+async function runRepoRuntimeMembershipCommand<T>(repoKey: string, command: () => Promise<T>): Promise<T> {
+  let queue = repoRuntimeMembershipQueues.get(repoKey)
+  if (!queue) {
+    queue = new PQueue({ concurrency: 1 })
+    repoRuntimeMembershipQueues.set(repoKey, queue)
+  }
   try {
-    const closed = await closeRepoRuntime(repoRoot, repoRuntimeId)
-    if (closed) await removeRepoRuntimeFromCache({ repoRoot, repoRuntimeId })
-    else await refreshRepoRuntimes()
-  } catch (err) {
-    await refreshRepoRuntimes()
-    throw err
+    return await queue.add(command)
   } finally {
-    clearWorkspacePaneTabsProjectionState(repoRoot, repoRuntimeId)
+    void queue.onIdle().then(() => {
+      if (repoRuntimeMembershipQueues.get(repoKey) === queue && queue.size === 0 && queue.pending === 0) {
+        repoRuntimeMembershipQueues.delete(repoKey)
+      }
+    })
   }
 }
 

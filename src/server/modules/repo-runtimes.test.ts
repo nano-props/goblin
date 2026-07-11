@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
+  acquireRepoRuntime,
   clearRepoRuntimesForUser,
-  closeRepoRuntime,
   isCurrentRepoRuntime,
   onRepoRuntimeClosed,
-  openRepoRuntime,
+  releaseRepoRuntime,
 } from '#/server/modules/repo-runtimes.ts'
 
 const USER_ID = 'user_repo_runtime'
@@ -15,8 +15,8 @@ describe('repo runtimes', () => {
     clearRepoRuntimesForUser(USER_ID)
   })
 
-  test('isolates close listener failures from the repo runtime state machine', () => {
-    const first = openRepoRuntime(USER_ID, REPO_ROOT)
+  test('shares an epoch until the last client releases it', () => {
+    const first = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
     const badListener = vi.fn(() => {
       throw new Error('listener failed')
     })
@@ -25,14 +25,12 @@ describe('repo runtimes', () => {
     const unsubscribeGood = onRepoRuntimeClosed(goodListener)
 
     try {
-      const second = openRepoRuntime(USER_ID, REPO_ROOT)
-
-      expect(isCurrentRepoRuntime(USER_ID, REPO_ROOT, second)).toBe(true)
-      expect(isCurrentRepoRuntime(USER_ID, REPO_ROOT, first)).toBe(false)
-      expect(badListener).toHaveBeenCalledWith({ userId: USER_ID, repoRoot: REPO_ROOT, repoRuntimeId: first })
-      expect(goodListener).toHaveBeenCalledWith({ userId: USER_ID, repoRoot: REPO_ROOT, repoRuntimeId: first })
-
-      expect(closeRepoRuntime(USER_ID, REPO_ROOT, second)).toBe(true)
+      const second = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-b')
+      expect(second).toBe(first)
+      expect(releaseRepoRuntime(USER_ID, REPO_ROOT, first, 'client-a')).toEqual({ released: true, runtimeClosed: false })
+      expect(isCurrentRepoRuntime(USER_ID, REPO_ROOT, first)).toBe(true)
+      expect(goodListener).not.toHaveBeenCalled()
+      expect(releaseRepoRuntime(USER_ID, REPO_ROOT, second, 'client-b')).toEqual({ released: true, runtimeClosed: true })
       expect(isCurrentRepoRuntime(USER_ID, REPO_ROOT, second)).toBe(false)
       expect(goodListener).toHaveBeenLastCalledWith({ userId: USER_ID, repoRoot: REPO_ROOT, repoRuntimeId: second })
     } finally {
@@ -40,5 +38,12 @@ describe('repo runtimes', () => {
       unsubscribeGood()
       clearRepoRuntimesForUser(USER_ID)
     }
+  })
+
+  test('makes repeated acquire and release idempotent per client', () => {
+    const runtimeId = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
+    expect(acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')).toBe(runtimeId)
+    expect(releaseRepoRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toEqual({ released: true, runtimeClosed: true })
+    expect(releaseRepoRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toEqual({ released: false, runtimeClosed: false })
   })
 })

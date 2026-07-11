@@ -171,7 +171,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/runtime-open', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ repoInput: '/tmp/repo/subdir' }),
+        body: JSON.stringify({ repoInput: '/tmp/repo/subdir', clientId: 'client-test' }),
       }),
     )
 
@@ -194,7 +194,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/runtime-open', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ repoInput: '/missing' }),
+        body: JSON.stringify({ repoInput: '/missing', clientId: 'client-test' }),
       }),
     )
 
@@ -209,7 +209,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/runtime-open', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ repoRoot: '/tmp/runtime-list-repo' }),
+        body: JSON.stringify({ repoRoot: '/tmp/runtime-list-repo', clientId: 'client-test' }),
       }),
     )
     const opened = (await openResponse.json()) as { ok: true; repoRuntimeId: string }
@@ -227,6 +227,23 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(json.runtimes).toContainEqual({
       repoRoot: '/tmp/runtime-list-repo', repoRuntimeId: opened.repoRuntimeId, remoteLifecycle: null,
     })
+  })
+
+  test('keeps one shared runtime until the last client membership closes', async () => {
+    const app = createTestRepoRoutes()
+    const open = async (clientId: string) => await (await app.request(new Request('http://localhost/runtime-open', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ repoRoot: '/tmp/shared-runtime', clientId }),
+    }))).json() as { repoRuntimeId: string }
+    const first = await open('client-a')
+    const second = await open('client-b')
+    expect(second.repoRuntimeId).toBe(first.repoRuntimeId)
+    const close = async (clientId: string) => await (await app.request(new Request('http://localhost/runtime-close', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ repoRoot: '/tmp/shared-runtime', repoRuntimeId: first.repoRuntimeId, clientId }),
+    }))).json()
+    await expect(close('client-a')).resolves.toEqual({ ok: true, released: true, runtimeClosed: false })
+    await expect(close('client-b')).resolves.toEqual({ ok: true, released: true, runtimeClosed: true })
   })
 
   test('passes worktree bootstrap preview requests through to the module layer', async () => {

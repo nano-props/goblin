@@ -781,7 +781,6 @@ describe('terminal session service facade', () => {
     ).toEqual([
       workspacePaneStaticTabEntry('history'),
       workspacePaneStaticTabEntry('status'),
-      workspacePaneRuntimeTabEntry('terminal', 'term-closedclosedclosed001'),
     ])
   })
 

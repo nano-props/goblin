@@ -55,10 +55,14 @@ const RepoSessionEntrySchema = v.variant('kind', [
   v.object({ kind: v.literal('local'), id: v.string() }),
   v.object({ kind: v.literal('remote'), id: v.string(), ref: RemoteRepoRefSchema }),
 ])
-const RepoRuntimeOpenSchema = v.union([v.object({ repoRoot: v.string() }), v.object({ repoInput: v.string() })])
+const RepoRuntimeOpenSchema = v.union([
+  v.object({ repoRoot: v.string(), clientId: v.string() }),
+  v.object({ repoInput: v.string(), clientId: v.string() }),
+])
 const RepoRuntimeCloseSchema = v.object({
   repoRoot: v.string(),
   repoRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
+  clientId: v.string(),
 })
 const EmptyBodySchema = v.optional(v.object({}))
 

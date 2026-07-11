@@ -520,7 +520,8 @@ export function resetReposStore(): void {
 }
 
 export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>): void {
-  const repoRuntimeState = new Map<string, { currentRepoRuntimeId: string | null }>()
+  const repoRuntimeState = new Map<string, { currentRepoRuntimeId: string | null; members: Set<string> }>()
+  const sessionStorageValues = new Map<string, string>()
   const hostOpenExternalUrl = handlers['app.openExternalUrl']
   const hostOpenDirectoryDialog = handlers['repo.openDialog']
   const hostConsumeExternalOpenPaths = handlers['repo.consumeExternalOpenPaths']
@@ -606,6 +607,10 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         href: 'http://127.0.0.1:32100/',
         origin: 'http://127.0.0.1:32100',
         search: '',
+      },
+      sessionStorage: {
+        getItem: (key: string) => sessionStorageValues.get(key) ?? null,
+        setItem: (key: string, value: string) => sessionStorageValues.set(key, value),
       },
     },
   })
@@ -900,6 +905,8 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       const openRepoRuntime = async (payload: unknown) => {
         const repoRoot = typeof payload === 'object' && payload && 'repoRoot' in payload ? payload.repoRoot : null
         const repoInput = typeof payload === 'object' && payload && 'repoInput' in payload ? payload.repoInput : null
+        const clientId = typeof payload === 'object' && payload && 'clientId' in payload ? payload.clientId : null
+        if (typeof clientId !== 'string' || clientId.length === 0) throw new Error('runtime-open requires clientId')
         if (typeof repoInput === 'string' && repoInput.length > 0) {
           const probe = (await call('repo.probe', { cwd: repoInput })) as {
             ok: boolean
@@ -910,8 +917,9 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           if (!probe.ok || !probe.root) {
             return { ok: false as const, input: repoInput, reason: probe.message ?? 'error.not-git-repo' }
           }
-          const state = repoRuntimeState.get(probe.root) ?? { currentRepoRuntimeId: null }
+          const state = repoRuntimeState.get(probe.root) ?? { currentRepoRuntimeId: null, members: new Set<string>() }
           if (!state.currentRepoRuntimeId) state.currentRepoRuntimeId = createOpaqueId('repo-runtime')
+          state.members.add(clientId)
           repoRuntimeState.set(probe.root, state)
           return {
             ok: true as const,
@@ -920,9 +928,10 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           }
         }
         if (typeof repoRoot !== 'string' || repoRoot.length === 0) throw new Error('runtime-open requires repoRoot')
-        const state = repoRuntimeState.get(repoRoot) ?? { currentRepoRuntimeId: null }
-        const repoRuntimeId = createOpaqueId('repo-runtime')
+        const state = repoRuntimeState.get(repoRoot) ?? { currentRepoRuntimeId: null, members: new Set<string>() }
+        const repoRuntimeId = state.currentRepoRuntimeId ?? createOpaqueId('repo-runtime')
         state.currentRepoRuntimeId = repoRuntimeId
+        state.members.add(clientId)
         repoRuntimeState.set(repoRoot, state)
         return { ok: true as const, repoRuntimeId }
       }
@@ -930,13 +939,15 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
         const repoRoot = typeof payload === 'object' && payload && 'repoRoot' in payload ? payload.repoRoot : null
         const repoRuntimeId =
           typeof payload === 'object' && payload && 'repoRuntimeId' in payload ? payload.repoRuntimeId : null
-        if (typeof repoRoot !== 'string' || typeof repoRuntimeId !== 'string') {
-          throw new Error('runtime-close requires repoRoot and repoRuntimeId')
+        const clientId = typeof payload === 'object' && payload && 'clientId' in payload ? payload.clientId : null
+        if (typeof repoRoot !== 'string' || typeof repoRuntimeId !== 'string' || typeof clientId !== 'string') {
+          throw new Error('runtime-close requires repoRoot, repoRuntimeId, and clientId')
         }
         const state = repoRuntimeState.get(repoRoot)
-        const closed = !!state && state.currentRepoRuntimeId === repoRuntimeId
-        if (closed && state) state.currentRepoRuntimeId = null
-        return { ok: true as const, closed }
+        const released = !!state && state.currentRepoRuntimeId === repoRuntimeId && state.members.delete(clientId)
+        const runtimeClosed = released && !!state && state.members.size === 0
+        if (runtimeClosed) state.currentRepoRuntimeId = null
+        return { ok: true as const, released, runtimeClosed }
       }
       const listRepoRuntime = () => ({
         runtimes: Array.from(repoRuntimeState.entries()).flatMap(([repoRoot, state]) =>

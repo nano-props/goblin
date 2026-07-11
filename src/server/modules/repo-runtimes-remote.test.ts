@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import {
+  acquireRepoRuntime,
   clearRepoRuntimesForUser,
-  closeRepoRuntime,
-  getOrOpenRepoRuntime,
   listRepoRuntimes,
-  openRepoRuntime,
+  releaseRepoRuntime,
   runRepoRemoteLifecycle,
 } from '#/server/modules/repo-runtimes.ts'
 import type { RemoteRepoConnectionResult, RemoteRepoTarget } from '#/shared/remote-repo.ts'
@@ -23,12 +22,13 @@ const target: RemoteRepoTarget = {
 const ready: RemoteRepoConnectionResult = {
   kind: 'ready', repoId: repoRoot, name: 'repo', lifecycle: { kind: 'ready', target },
 }
+const clientId = 'client-test'
 
 describe('repo runtime remote lifecycle', () => {
   beforeEach(() => clearRepoRuntimesForUser(userId))
 
   test('latest attempt aborts its predecessor and owns the terminal state', async () => {
-    const runtimeId = openRepoRuntime(userId, repoRoot)
+    const runtimeId = acquireRepoRuntime(userId, repoRoot, clientId)
     let releaseFirst!: (value: RemoteRepoConnectionResult) => void
     let firstSignal!: AbortSignal
     const first = runRepoRemoteLifecycle(userId, repoRoot, runtimeId, (signal) => {
@@ -46,7 +46,7 @@ describe('repo runtime remote lifecycle', () => {
   })
 
   test('publishes lifecycle through the user-scoped runtime snapshot', async () => {
-    const runtimeId = openRepoRuntime(userId, repoRoot)
+    const runtimeId = acquireRepoRuntime(userId, repoRoot, clientId)
     await runRepoRemoteLifecycle(userId, repoRoot, runtimeId, async () => ready)
     expect(listRepoRuntimes(userId)).toEqual([{
       repoRoot,
@@ -56,22 +56,22 @@ describe('repo runtime remote lifecycle', () => {
   })
 
   test('close aborts the attempt and a reopened generation starts from idle', async () => {
-    const runtimeId = openRepoRuntime(userId, repoRoot)
+    const runtimeId = acquireRepoRuntime(userId, repoRoot, clientId)
     let signal!: AbortSignal
     void runRepoRemoteLifecycle(userId, repoRoot, runtimeId, (nextSignal) => {
       signal = nextSignal
       return new Promise(() => {})
     })
-    expect(closeRepoRuntime(userId, repoRoot, runtimeId)).toBe(true)
+    expect(releaseRepoRuntime(userId, repoRoot, runtimeId, clientId)).toEqual({ released: true, runtimeClosed: true })
     expect(signal.aborted).toBe(true)
-    const reopened = openRepoRuntime(userId, repoRoot)
+    const reopened = acquireRepoRuntime(userId, repoRoot, clientId)
     expect(listRepoRuntimes(userId)).toEqual([{
       repoRoot, repoRuntimeId: reopened, remoteLifecycle: { kind: 'idle', attemptId: 0 },
     }])
   })
 
   test('bulk user cleanup aborts the attempt and settles it as stale runtime', async () => {
-    const runtimeId = openRepoRuntime(userId, repoRoot)
+    const runtimeId = acquireRepoRuntime(userId, repoRoot, clientId)
     let signal!: AbortSignal
     const transitions: string[] = []
     const work = runRepoRemoteLifecycle(
@@ -99,12 +99,12 @@ describe('repo runtime remote lifecycle', () => {
     expect(listRepoRuntimes(userId)).toEqual([])
   })
 
-  test('get-or-open starts a fresh lifecycle epoch after close', async () => {
-    const runtimeId = openRepoRuntime(userId, repoRoot)
+  test('acquire starts a fresh lifecycle epoch after the last release', async () => {
+    const runtimeId = acquireRepoRuntime(userId, repoRoot, clientId)
     await runRepoRemoteLifecycle(userId, repoRoot, runtimeId, async () => ready)
-    expect(closeRepoRuntime(userId, repoRoot, runtimeId)).toBe(true)
+    expect(releaseRepoRuntime(userId, repoRoot, runtimeId, clientId)).toEqual({ released: true, runtimeClosed: true })
 
-    const reopened = getOrOpenRepoRuntime(userId, repoRoot)
+    const reopened = acquireRepoRuntime(userId, repoRoot, clientId)
 
     expect(reopened).not.toBe(runtimeId)
     expect(listRepoRuntimes(userId)).toEqual([
@@ -113,7 +113,7 @@ describe('repo runtime remote lifecycle', () => {
   })
 
   test('normalizes an aborted predecessor rejection to a superseded result', async () => {
-    const runtimeId = openRepoRuntime(userId, repoRoot)
+    const runtimeId = acquireRepoRuntime(userId, repoRoot, clientId)
     const first = runRepoRemoteLifecycle(userId, repoRoot, runtimeId, (signal) =>
       new Promise((_resolve, reject) => {
         signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')), { once: true })
@@ -124,7 +124,7 @@ describe('repo runtime remote lifecycle', () => {
   })
 
   test('settles a current unexpected failure instead of orphaning connecting', async () => {
-    const runtimeId = openRepoRuntime(userId, repoRoot)
+    const runtimeId = acquireRepoRuntime(userId, repoRoot, clientId)
     await expect(
       runRepoRemoteLifecycle(userId, repoRoot, runtimeId, async () => { throw new Error('transport failed') }),
     ).resolves.toEqual({ kind: 'settled', lifecycle: { kind: 'failed', attemptId: 1, reason: 'unknown' } })
@@ -134,19 +134,19 @@ describe('repo runtime remote lifecycle', () => {
   })
 
   test('returns stale-runtime when close replaces the running generation', async () => {
-    const runtimeId = openRepoRuntime(userId, repoRoot)
+    const runtimeId = acquireRepoRuntime(userId, repoRoot, clientId)
     let release!: (value: RemoteRepoConnectionResult) => void
     const work = runRepoRemoteLifecycle(userId, repoRoot, runtimeId, () =>
       new Promise((resolve) => { release = resolve }),
     )
-    closeRepoRuntime(userId, repoRoot, runtimeId)
-    openRepoRuntime(userId, repoRoot)
+    releaseRepoRuntime(userId, repoRoot, runtimeId, clientId)
+    acquireRepoRuntime(userId, repoRoot, clientId)
     release(ready)
     await expect(work).resolves.toEqual({ kind: 'stale-runtime' })
   })
 
   test('publishes only accepted connecting and terminal transitions', async () => {
-    const runtimeId = openRepoRuntime(userId, repoRoot)
+    const runtimeId = acquireRepoRuntime(userId, repoRoot, clientId)
     const transitions: string[] = []
     await runRepoRemoteLifecycle(userId, repoRoot, runtimeId, async () => ready, (lifecycle) => {
       transitions.push(`${lifecycle.kind}:${lifecycle.attemptId}`)

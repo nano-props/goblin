@@ -14,6 +14,7 @@ import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import type { ProbeResult } from '#/shared/api-types.ts'
 import type { CreateWorktreeInput } from '#/shared/worktree-create.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
+import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 
 const REPO_REQUEST_TIMEOUT_MS = {
   gitNetwork: 240_000,
@@ -209,25 +210,33 @@ export async function setBackgroundSyncRepos(repoIds: string[]): Promise<void> {
 }
 
 export async function openRepoRuntime(repoRoot: string): Promise<string> {
-  const result = await postServerJson<{ repoRoot: string }, { repoRuntimeId: string }>('/api/repo/runtime-open', {
-    repoRoot,
-  })
+  const result = await postServerJson<{ repoRoot: string; clientId: string }, { repoRuntimeId: string }>(
+    '/api/repo/runtime-open',
+    { repoRoot, clientId: readOrCreateWebTerminalClientId() },
+  )
   return result.repoRuntimeId
 }
 
 export async function openRepoRuntimeForInput(repoInput: string): Promise<RepoRuntimeOpenResult> {
-  return await postServerJson<{ repoInput: string }, RepoRuntimeOpenResult>('/api/repo/runtime-open', { repoInput })
+  return await postServerJson<{ repoInput: string; clientId: string }, RepoRuntimeOpenResult>('/api/repo/runtime-open', {
+    repoInput,
+    clientId: readOrCreateWebTerminalClientId(),
+  })
 }
 
 export async function closeRepoRuntime(repoRoot: string, repoRuntimeId: string): Promise<boolean> {
-  const result = await postServerJson<{ repoRoot: string; repoRuntimeId: string }, { ok: boolean; closed: boolean }>(
+  const result = await postServerJson<
+    { repoRoot: string; repoRuntimeId: string; clientId: string },
+    { ok: boolean; released: boolean; runtimeClosed: boolean }
+  >(
     '/api/repo/runtime-close',
     {
       repoRoot,
       repoRuntimeId,
+      clientId: readOrCreateWebTerminalClientId(),
     },
   )
-  return result.closed
+  return result.released
 }
 
 export async function listRepoRuntimes(signal?: AbortSignal): Promise<RepoRuntimesSnapshot> {

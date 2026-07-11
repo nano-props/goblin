@@ -342,9 +342,13 @@ export type IpcEvent =
 export interface AppIpcHandlers {
   repo: {
     probe: (input: { cwd: string }) => Promise<ProbeResult>
-    runtimeOpen: (input: { repoRoot: string } | { repoInput: string }) => Promise<RepoRuntimeOpenResponse>
+    runtimeOpen: (input: ({ repoRoot: string } | { repoInput: string }) & { clientId: string }) => Promise<RepoRuntimeOpenResponse>
     runtimeList: () => Promise<RepoRuntimesSnapshot>
-    runtimeClose: (input: { repoRoot: string; repoRuntimeId: string }) => Promise<{ ok: boolean; closed: boolean }>
+    runtimeClose: (input: { repoRoot: string; repoRuntimeId: string; clientId: string }) => Promise<{
+      ok: boolean
+      released: boolean
+      runtimeClosed: boolean
+    }>
     clone: (input: {
       url: string
       parentPath: string

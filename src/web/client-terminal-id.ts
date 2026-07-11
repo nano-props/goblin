@@ -2,9 +2,9 @@ import { normalizeClientServerClientId, readInjectedWebBootstrap } from '#/web/c
 import { createOpaqueId } from '#/shared/opaque-id.ts'
 
 const WEB_TERMINAL_CLIENT_ID_STORAGE_KEY = 'goblin:terminal-client-id'
+const fallbackWebTerminalClientId = createOpaqueId('client')
 
 export function readOrCreateWebTerminalClientId(): string {
-  const fallback = createOpaqueId('client')
   try {
     const bootstrapClientId = normalizeClientServerClientId(readInjectedWebBootstrap()?.initialServer?.clientId)
     if (bootstrapClientId) return bootstrapClientId
@@ -19,6 +19,6 @@ export function readOrCreateWebTerminalClientId(): string {
     storage?.setItem(WEB_TERMINAL_CLIENT_ID_STORAGE_KEY, created)
     return created
   } catch {
-    return fallback
+    return fallbackWebTerminalClientId
   }
 }

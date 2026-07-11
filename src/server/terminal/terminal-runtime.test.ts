@@ -8,7 +8,7 @@
 // protocol types in `shared/terminal-types.ts`.
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { clearRepoRuntimesForUser, closeRepoRuntime, openRepoRuntime } from '#/server/modules/repo-runtimes.ts'
+import { acquireRepoRuntime, clearRepoRuntimesForUser, releaseRepoRuntime } from '#/server/modules/repo-runtimes.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
@@ -200,10 +200,10 @@ function buildRuntime(): RuntimeHandle {
   const runtime = createServerTerminalRuntime({
     ptySupervisor: createInProcessPtySupervisor(),
   })
-  REPO_RUNTIME_ID = openRepoRuntime(USER_1, REPO_ROOT)
-  SSH_REPO_RUNTIME_ID = openRepoRuntime(USER_1, 'ssh-config://prod/srv/repo')
-  USER_2_REPO_RUNTIME_ID = openRepoRuntime(USER_2, REPO_ROOT)
-  openRepoRuntime(USER_2, 'ssh-config://prod/srv/repo')
+  REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_a')
+  SSH_REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, 'ssh-config://prod/srv/repo', 'client_a')
+  USER_2_REPO_RUNTIME_ID = acquireRepoRuntime(USER_2, REPO_ROOT, 'client_b')
+  acquireRepoRuntime(USER_2, 'ssh-config://prod/srv/repo', 'client_b')
   createTerminalApplications.set(runtime.host, runtime.workspacePaneRuntimeHost)
   return {
     host: runtime.host,
@@ -1065,14 +1065,14 @@ describe('server terminal runtime', () => {
     })
     socket.send.mockClear()
 
-    expect(closeRepoRuntime(USER_1, REPO_ROOT, REPO_RUNTIME_ID)).toBe(true)
+    expect(releaseRepoRuntime(USER_1, REPO_ROOT, REPO_RUNTIME_ID, 'client_a')).toEqual({ released: true, runtimeClosed: true })
     await vi.waitFor(() => {
       expect(
         sentSocketMessages(socket).filter((message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed),
       ).toHaveLength(1)
     })
     expect(sentSocketMessages(socket).filter((message) => message.type === 'sessions-changed')).toHaveLength(1)
-    const nextRepoRuntimeId = openRepoRuntime(USER_1, REPO_ROOT)
+    const nextRepoRuntimeId = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_a')
 
     await expect(
       host.listSessions('client_a', USER_1, { repoRoot: REPO_ROOT, repoRuntimeId: nextRepoRuntimeId }),

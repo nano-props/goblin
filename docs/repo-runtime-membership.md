@@ -13,6 +13,7 @@ The server owns:
 - stale runtime rejection
 - terminal/session cleanup when a repo runtime closes
 - the remote lifecycle and monotonic attempt generation for that runtime
+- the idempotent client-membership set that keeps the shared epoch alive
 
 The client window owns:
 
@@ -43,9 +44,10 @@ Open:
 Close:
 
 1. The client removes the repo from its window-local projection.
-2. The client asks the server to close the matching `repoRuntimeId`.
-3. If the server id is already stale, close is a no-op.
-4. Server-side repo-runtime close events clean up runtime-scoped terminal
+2. The client releases its `clientId` membership for the matching `repoRuntimeId`.
+3. Other client memberships keep the shared epoch current.
+4. The last release stops the epoch; stale and repeated releases are no-ops.
+5. Server-side repo-runtime close events clean up runtime-scoped terminal
    resources.
 
 Restore:

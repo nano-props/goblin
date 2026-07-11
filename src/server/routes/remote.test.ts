@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createRemoteRoutes } from '#/server/routes/remote.ts'
-import { clearRepoRuntimesForUser, openRepoRuntime } from '#/server/modules/repo-runtimes.ts'
+import { acquireRepoRuntime, clearRepoRuntimesForUser, releaseRepoRuntime } from '#/server/modules/repo-runtimes.ts'
 import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -30,7 +30,7 @@ describe('remote lifecycle route', () => {
 
   test('commands the runtime aggregate and invalidates connecting and terminal projections', async () => {
     const repoId = 'ssh-config://example/repo'
-    const repoRuntimeId = openRepoRuntime('user-test', repoId)
+    const repoRuntimeId = acquireRepoRuntime('user-test', repoId, 'client-test')
     const target = normalizeRemoteTarget({
       alias: 'example', host: 'example.test', user: 'developer', port: 22, remotePath: '/repo',
     })!
@@ -58,7 +58,7 @@ describe('remote lifecycle route', () => {
 
   test('returns superseded instead of 500 when a newer attempt replaces the request', async () => {
     const repoId = 'ssh-config://example/repo'
-    const repoRuntimeId = openRepoRuntime('user-test', repoId)
+    const repoRuntimeId = acquireRepoRuntime('user-test', repoId, 'client-test')
     let releaseFirst!: (value: never) => void
     mocks.resolveConnection
       .mockImplementationOnce(() => new Promise((resolve) => { releaseFirst = resolve }))
@@ -85,8 +85,9 @@ describe('remote lifecycle route', () => {
 
   test('returns stale-runtime instead of 500 for a closed generation', async () => {
     const repoId = 'ssh-config://example/repo'
-    const staleRuntimeId = openRepoRuntime('user-test', repoId)
-    openRepoRuntime('user-test', repoId)
+    const staleRuntimeId = acquireRepoRuntime('user-test', repoId, 'client-test')
+    releaseRepoRuntime('user-test', repoId, staleRuntimeId, 'client-test')
+    acquireRepoRuntime('user-test', repoId, 'client-test')
     const response = await createRemoteRoutes().request(new Request('http://localhost/lifecycle', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

@@ -30,12 +30,7 @@ import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
 import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
-import {
-  closeRepoRuntime,
-  getOrOpenRepoRuntime,
-  listRepoRuntimes,
-  openRepoRuntime,
-} from '#/server/modules/repo-runtimes.ts'
+import { acquireRepoRuntime, listRepoRuntimes, releaseRepoRuntime } from '#/server/modules/repo-runtimes.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import type { RepoLogResponse } from '#/shared/api-types.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
@@ -267,10 +262,10 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
       return c.json({
         ok: true as const,
         repo,
-        repoRuntimeId: getOrOpenRepoRuntime(userId, repo.id),
+        repoRuntimeId: acquireRepoRuntime(userId, repo.id, input.clientId),
       })
     }
-    return c.json({ ok: true as const, repoRuntimeId: openRepoRuntime(userId, input.repoRoot) })
+    return c.json({ ok: true as const, repoRuntimeId: acquireRepoRuntime(userId, input.repoRoot, input.clientId) })
   })
   app.post('/runtime-list', async (c) => {
     const userId = userIdFromContext(c)
@@ -281,8 +276,8 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
   app.post('/runtime-close', async (c) => {
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
-    const { repoRoot, repoRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.runtimeClose, c)
-    return c.json({ ok: true as const, closed: closeRepoRuntime(userId, repoRoot, repoRuntimeId) })
+    const { repoRoot, repoRuntimeId, clientId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.runtimeClose, c)
+    return c.json({ ok: true as const, ...releaseRepoRuntime(userId, repoRoot, repoRuntimeId, clientId) })
   })
   app.post('/abort', async (c) => {
     const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.abort, c)

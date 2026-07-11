@@ -172,8 +172,17 @@ export class WorkspacePaneTabsCoordinator {
           branchName: input.branchName,
           worktreePath: input.worktreePath,
         }
-        const updatedTabs = workspacePaneTabsWithUpdateOperation(this.workspaceTabs.tabs(target), input.operation)
-        const tabs = await this.canonicalRuntimeTabsForTarget({ ...input, tabs: updatedTabs })
+        const providerSnapshots = await this.runtimeProviderSnapshotsForTarget(input)
+        input.assertCurrent()
+        const currentTabs = canonicalWorkspaceRuntimeTabsForTarget({
+          entry: { branchName: input.branchName, worktreePath: input.worktreePath, tabs: this.workspaceTabs.tabs(target) },
+          providerSnapshots,
+        })
+        const updatedTabs = workspacePaneTabsWithUpdateOperation(currentTabs, input.operation)
+        const tabs = canonicalWorkspaceRuntimeTabsForTarget({
+          entry: { branchName: input.branchName, worktreePath: input.worktreePath, tabs: updatedTabs },
+          providerSnapshots,
+        })
         input.assertCurrent()
         this.workspaceTabs.replaceTabs({
           ...target,

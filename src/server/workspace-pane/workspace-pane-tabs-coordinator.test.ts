@@ -14,6 +14,7 @@ import {
   type WorkspacePaneTabEntry,
   workspacePaneStaticTabEntry,
   workspacePaneRuntimeTabEntry,
+  workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
 
 const USER_ID = 'user-workspace-pane-tabs'
@@ -165,10 +166,42 @@ describe('workspace pane tabs coordinator', () => {
     ).resolves.toEqual(
       snapshot(2, [
         workspacePaneStaticTabEntry('status'),
-        workspacePaneStaticTabEntry('history'),
         workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
+        workspacePaneStaticTabEntry('history'),
       ]),
     )
+  })
+
+  test('lets a projected-only runtime tab participate in reorder and insertion', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    replaceTestWorkspaceTabs(workspaceTabs, {
+      ...workspaceTarget(),
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+    })
+    const terminal = workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
+      runtimeProviders: [{ type: 'terminal', listSessionsForUser: vi.fn(async () => [
+        { sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+      ]) }],
+    })
+    const ordered = [workspacePaneStaticTabEntry('status'), terminal, workspacePaneStaticTabEntry('history')]
+    await expect(coordinator.updateTabs({
+      ...workspaceTarget(), repoRoot: REPO_ROOT,
+      operation: { type: 'reorder', tabIdentities: ordered.map(workspacePaneTabEntryIdentity) },
+      assertCurrent: () => {},
+    })).resolves.toEqual(snapshot(2, ordered))
+    await expect(coordinator.updateTabs({
+      ...workspaceTarget(), repoRoot: REPO_ROOT,
+      operation: {
+        type: 'open-static', tabType: 'files', insertAfterIdentity: workspacePaneTabEntryIdentity(terminal),
+      },
+      assertCurrent: () => {},
+    })).resolves.toEqual(snapshot(3, [
+      workspacePaneStaticTabEntry('status'), terminal, workspacePaneStaticTabEntry('files'), workspacePaneStaticTabEntry('history'),
+    ]))
   })
 
   test('does not mutate workspace tabs when update canonicalization fails', async () => {
@@ -330,20 +363,20 @@ describe('workspace pane tabs coordinator', () => {
     await expect(list).resolves.toEqual(
       snapshot(2, [
         workspacePaneStaticTabEntry('status'),
-        workspacePaneStaticTabEntry('history'),
         workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
+        workspacePaneStaticTabEntry('history'),
       ]),
     )
     await expect(update).resolves.toEqual(
       snapshot(2, [
         workspacePaneStaticTabEntry('status'),
-        workspacePaneStaticTabEntry('history'),
         workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
+        workspacePaneStaticTabEntry('history'),
       ]),
     )
     expect(workspaceTabs.tabs(workspaceTarget())).toEqual([
       workspacePaneStaticTabEntry('status'),
-      workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
       workspacePaneStaticTabEntry('history'),
     ])
   })
