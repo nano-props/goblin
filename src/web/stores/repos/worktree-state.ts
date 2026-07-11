@@ -53,13 +53,12 @@ export function worktreeStatesFromBranchReadModel(
     if (!snapshotWorktree) continue
     const statusEntry = statusByPath.get(snapshotWorktree.path)
     const statusCount = statusEntry?.entries.length
-    const snapshotSummary = snapshotWorktree.summary
     next[snapshotWorktree.path] = {
       path: snapshotWorktree.path,
       branch: statusEntry?.branch ?? branch.name,
       isMain: snapshotWorktree.isPrimary ?? statusEntry?.isMain ?? false,
-      isDirty: statusCount === undefined ? snapshotSummary?.dirty : statusCount > 0,
-      changeCount: statusCount ?? snapshotSummary?.changeCount,
+      isDirty: statusCount === undefined ? false : statusCount > 0,
+      changeCount: statusCount ?? 0,
       isLocked: snapshotWorktree.isLocked,
     }
   }

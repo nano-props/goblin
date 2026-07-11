@@ -84,6 +84,28 @@ describe('worktree state selectors', () => {
     })
   })
 
+  test('does not fall back to snapshot dirty metadata in the read model', () => {
+    const branches = [
+      createBranchSnapshot('feature/a', {
+        worktree: {
+          path: '/tmp/worktree-a',
+          summary: {
+            dirty: true,
+            changeCount: 3,
+          },
+        },
+      }),
+    ]
+
+    const worktreesByPath = worktreeStatesFromBranchReadModel(branches, [])
+
+    expect(worktreesByPath['/tmp/worktree-a']).toMatchObject({
+      branch: 'feature/a',
+      isDirty: false,
+      changeCount: 0,
+    })
+  })
+
   test('uses status metadata when branch state only has a worktree path', () => {
     const branches = [createRepoBranch('main', { worktree: { path: '/tmp/repo' } })]
 
