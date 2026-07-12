@@ -265,7 +265,6 @@ async function commitWorkspacePaneStaticTab(
       branchName: input.branchName,
       worktreePath: input.worktreePath,
     },
-    sourceRoute,
     route,
     input.navigation,
     undefined,

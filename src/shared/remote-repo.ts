@@ -105,7 +105,7 @@ export interface RemoteDiagnosticsResult {
  * sub-categories like `shell-failed`, `git-missing`, `cancelled`),
  * while this reason classifies the *outcome* of a lifecycle run at
  * the level the UI cares about. `cancelled` and transient sub-step
- * failures map to `unknown` here — the orchestrator's caller decides
+ * failures map to `unknown` here — the lifecycle command caller decides
  * whether to retry.
  */
 export type RemoteRepoFailureReason =

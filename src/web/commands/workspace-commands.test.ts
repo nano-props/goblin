@@ -999,7 +999,7 @@ describe('workspace commands', () => {
     await expect(duplicateCommand).resolves.toBe(true)
     expect(createTerminal).toHaveBeenCalledTimes(2)
     expect(createOperationCount()).toBe(2)
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledTimes(2)
+    expect(showRepoBranchTerminalSession).toHaveBeenCalledOnce()
     expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
       REPO_ID,
       'feature/worktree',
@@ -2876,7 +2876,7 @@ function workspacePaneTabsSnapshot(base: TerminalSessionBase, tabs: WorkspacePan
   }
 }
 
-test('rejects a queued selection after its observed route is replaced', async () => {
+test('rebases the latest queued absolute selection after an earlier route commit', async () => {
   const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -2915,9 +2915,9 @@ test('rejects a queued selection after its observed route is replaced', async ()
     navigation,
   })
   await expect(selectFiles).resolves.toBe(false)
-  await expect(selectHistory).resolves.toBe(false)
-  expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledOnce()
-  expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'files')
+  await expect(selectHistory).resolves.toBe(true)
+  expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(1, REPO_ID, 'feature/worktree', 'files')
+  expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'history')
 })
 
 test('serializes open then move through exact route commits', async () => {

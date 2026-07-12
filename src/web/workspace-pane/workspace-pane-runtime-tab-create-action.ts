@@ -101,22 +101,24 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
     return { ok: false, error, messageKey: 'terminal.createFailed' }
   }
   const target = terminalWorkspacePaneCoordinatorTarget(base)
-  return await runWorkspacePaneAction(target, async () =>
-    await runCreateTerminalTabCommand({
-      base,
-      createTerminal: options.createTerminal,
-      options: options.options,
-      insertAfterIdentity: options.insertAfterIdentity,
-      t: options.t,
-      logMessage: options.logMessage,
-      commitCreatedTerminalTab: async (admission) =>
-        await commitCreatedTerminalWorkspacePaneRuntimeTab({
-          base,
-          admission,
-          openerIdentity: options.openerIdentity,
-          showCreatedTerminalTab: options.showCreatedTerminalTab,
-        }),
-    }),
+  return await runWorkspacePaneAction(
+    target,
+    async () =>
+      await runCreateTerminalTabCommand({
+        base,
+        createTerminal: options.createTerminal,
+        options: options.options,
+        insertAfterIdentity: options.insertAfterIdentity,
+        t: options.t,
+        logMessage: options.logMessage,
+        commitCreatedTerminalTab: async (admission) =>
+          await commitCreatedTerminalWorkspacePaneRuntimeTab({
+            base,
+            admission,
+            openerIdentity: options.openerIdentity,
+            showCreatedTerminalTab: options.showCreatedTerminalTab,
+          }),
+      }),
   )
 }
 
@@ -128,12 +130,7 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
   const resolvedBase = terminalSessionBaseWithRuntime(base)
   if (!resolvedBase) return false
   const target = terminalWorkspacePaneCoordinatorTarget(resolvedBase)
-  return commitWorkspacePaneCurrentTargetRoute(
-    target,
-    undefined,
-    { kind: 'terminal', terminalSessionId },
-    navigation,
-  )
+  return commitWorkspacePaneCurrentTargetRoute(target, { kind: 'terminal', terminalSessionId }, navigation)
 }
 
 export async function commitCreatedTerminalWorkspacePaneRuntimeTab(

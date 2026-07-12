@@ -30,6 +30,7 @@ import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBrid
 import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/repo-refresh-actions.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import {
+  observeWorkspacePaneRouteForTest,
   observedWorkspacePaneRouteCommitForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
@@ -253,6 +254,15 @@ describe('openWorkspacePaneTab', () => {
     })
 
     const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
+    const navigation = navigationWithStoreActions(showRepoBranchWorkspacePaneTab)
+    const repoRuntimeId = useReposStore.getState().repos[REPO_ID]!.repoRuntimeId
+    observeWorkspacePaneRouteForTest({
+      repoId: REPO_ID,
+      repoRuntimeId,
+      branchName: 'feature/no-worktree',
+      worktreePath: null,
+      route: null,
+    })
     await expect(
       openWorkspacePaneTab({
         workspacePaneRoute: undefined,
@@ -260,7 +270,7 @@ describe('openWorkspacePaneTab', () => {
         branchName: 'feature/no-worktree',
         worktreePath: null,
         type: 'status',
-        navigation: navigationWithStoreActions(showRepoBranchWorkspacePaneTab),
+        navigation,
       }),
     ).resolves.toBe(true)
 

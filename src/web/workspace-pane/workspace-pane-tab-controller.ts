@@ -56,7 +56,8 @@ export function beginWorkspacePaneCloseActiveTabPresentationLease(input: {
 }): WorkspacePaneControllerPresentationLease | null {
   const branchName = input.target.branchName
   if (!branchName) return null
-  const fromRoute = workspacePaneTabControllerRouteFromParsed(input.workspacePaneRoute) ??
+  const fromRoute =
+    workspacePaneTabControllerRouteFromParsed(input.workspacePaneRoute) ??
     workspacePaneControllerRouteForTab(input.closingTab)
   if (!fromRoute) return null
   const toRoute = input.nextTab ? workspacePaneControllerRouteForTab(input.nextTab) : null
@@ -85,13 +86,12 @@ export function workspacePaneRouteKey(route: WorkspacePaneTabControllerRoute): s
 export async function selectWorkspacePaneControllerTab(
   target: RepoWorkspaceTabModel,
   tab: RepoWorkspaceTab,
-  fromRoute: WorkspacePaneTabControllerObservedRoute | undefined,
   navigation: WorkspacePaneTabControllerCommitNavigation,
   presentationToken: PrimaryWindowPresentationToken = beginPrimaryWindowPresentation(),
 ): Promise<boolean> {
   const route = workspacePaneControllerRouteForTab(tab)
   if (route === undefined) return false
-  return await commitWorkspacePaneExactTargetRoute(target, fromRoute, route, navigation, undefined, presentationToken)
+  return await commitWorkspacePaneCurrentTargetRoute(target, route, navigation, undefined, presentationToken)
 }
 
 export function commitWorkspacePaneControllerCloseBackTarget(
@@ -137,7 +137,8 @@ export async function commitWorkspacePaneControllerRoute(
     replace?: boolean
     presentationToken?: PrimaryWindowPresentationToken
     onCommit?: () => void
-    expectedCurrentRoute?: WorkspacePaneTabControllerRoute
+    routePrecondition?:
+      { kind: 'exact-route'; route: WorkspacePaneTabControllerRoute } | { kind: 'current-workspace-target' }
   },
 ): Promise<boolean> {
   try {
@@ -149,13 +150,25 @@ export async function commitWorkspacePaneControllerRoute(
 
 export async function commitWorkspacePaneCurrentTargetRoute(
   target: WorkspacePaneActionTarget,
-  fromRoute: WorkspacePaneTabControllerObservedRoute | undefined,
   route: WorkspacePaneTabControllerRoute,
   navigation: WorkspacePaneTabControllerCommitNavigation,
   options?: { replace?: boolean },
   presentationToken: PrimaryWindowPresentationToken = beginPrimaryWindowPresentation(),
 ): Promise<boolean> {
-  return await commitWorkspacePaneExactTargetRoute(target, fromRoute, route, navigation, options, presentationToken)
+  if (!primaryWindowPresentationIsCurrent(presentationToken)) return false
+  const branchName = target.branchName
+  if (!branchName || !workspacePaneTabControllerTargetIsCurrent(target)) return false
+  let supplementCommitted = false
+  const committed = await commitWorkspacePaneControllerRoute(target.repoId, branchName, route, navigation, {
+    ...options,
+    presentationToken,
+    routePrecondition: { kind: 'current-workspace-target' },
+    onCommit: () => {
+      supplementCommitted = commitWorkspacePaneRouteSupplement({ ...target, branchName }, route)
+    },
+  })
+  if (!committed || !supplementCommitted) return false
+  return primaryWindowPresentationIsCurrent(presentationToken) && workspacePaneTabControllerTargetIsCurrent(target)
 }
 
 export async function commitWorkspacePaneExactTargetRoute(
@@ -176,7 +189,7 @@ export async function commitWorkspacePaneExactTargetRoute(
   const committed = await commitWorkspacePaneControllerRoute(target.repoId, branchName, route, navigation, {
     ...options,
     presentationToken,
-    expectedCurrentRoute: sourceRoute,
+    routePrecondition: sourceRoute === undefined ? undefined : { kind: 'exact-route', route: sourceRoute },
     onCommit: () => {
       supplementCommitted = commitWorkspacePaneRouteSupplement({ ...target, branchName }, route)
     },

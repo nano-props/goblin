@@ -1,4 +1,9 @@
-import { isRemoteRepoId, type RemoteRepoFailureReason, type RemoteRepoLifecycleCommandResult, type RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import {
+  isRemoteRepoId,
+  type RemoteRepoFailureReason,
+  type RemoteRepoLifecycleCommandResult,
+  type RemoteRepoTarget,
+} from '#/shared/remote-repo.ts'
 import { resolveRemoteRepoConnection } from '#/web/remote-client.ts'
 import { acceptRemoteLifecycleProjection } from '#/web/stores/repos/remote-lifecycle-projection.ts'
 import { requestRepoProjectionReadModelRefresh } from '#/web/stores/repos/refresh.ts'
@@ -27,9 +32,8 @@ function commandOutcome(result: RemoteRepoLifecycleCommandResult): RemoteRepoCon
       target: lifecycle.target,
     }
   }
-  // The command settles server-side before responding. Keep this branch
-  // defensive for a malformed/forward-compatible response.
-  return { kind: 'failed', repoId: result.repoId, name: result.name, reason: 'unknown' }
+  const exhaustiveLifecycle: never = lifecycle
+  return exhaustiveLifecycle
 }
 
 /**

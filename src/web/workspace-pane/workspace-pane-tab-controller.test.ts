@@ -3,6 +3,7 @@ import {
   beginWorkspacePaneCloseActiveTabPresentationLease,
   commitWorkspacePaneControllerCloseBackTarget,
   commitWorkspacePaneExactTargetRoute,
+  selectWorkspacePaneControllerTab,
   type WorkspacePaneTabControllerCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
@@ -44,18 +45,34 @@ describe('workspace pane tab controller transactions', () => {
     const commitRepoBranchWorkspacePaneRoute = vi.fn(() => false)
 
     await expect(
-      commitWorkspacePaneExactTargetRoute(
-        workspacePaneTarget(),
-        SOURCE_ROUTE,
-        TARGET_ROUTE,
-        { commitRepoBranchWorkspacePaneRoute },
-      ),
+      commitWorkspacePaneExactTargetRoute(workspacePaneTarget(), SOURCE_ROUTE, TARGET_ROUTE, {
+        commitRepoBranchWorkspacePaneRoute,
+      }),
     ).resolves.toBe(false)
     expect(commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
       '/repo',
       'feature/a',
       TARGET_ROUTE,
-      expect.objectContaining({ expectedCurrentRoute: SOURCE_ROUTE }),
+      expect.objectContaining({ routePrecondition: { kind: 'exact-route', route: SOURCE_ROUTE } }),
+    )
+  })
+
+  test('rebases an absolute selection to the current workspace target at execution time', async () => {
+    const commitRepoBranchWorkspacePaneRoute = vi.fn((_repoId, _branchName, _route, options) => {
+      options?.onCommit?.()
+      return true
+    })
+
+    await expect(
+      selectWorkspacePaneControllerTab(workspacePaneTarget(), staticTab('status'), {
+        commitRepoBranchWorkspacePaneRoute,
+      }),
+    ).resolves.toBe(true)
+    expect(commitRepoBranchWorkspacePaneRoute).toHaveBeenCalledWith(
+      '/repo',
+      'feature/a',
+      TARGET_ROUTE,
+      expect.objectContaining({ routePrecondition: { kind: 'current-workspace-target' } }),
     )
   })
 

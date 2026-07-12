@@ -98,9 +98,21 @@ export function observedWorkspacePaneRouteCommitForTest(
       })
   }
   return (repoId, branchName, route, commitOptions) => {
-    if (commitOptions?.expectedCurrentRoute !== undefined) {
+    if (commitOptions?.routePrecondition?.kind === 'current-workspace-target') {
       const currentRoute = observedWorkspacePaneRouteForTarget(repoId, branchName)
-      if (currentRoute === undefined || !workspacePaneRoutesEqual(currentRoute, commitOptions.expectedCurrentRoute)) {
+      if (currentRoute === undefined) return false
+      if (workspacePaneRoutesEqual(currentRoute, route)) {
+        commitOptions.onCommit?.()
+        observeCommittedRoute(repoId, branchName, route)
+        return true
+      }
+    }
+    if (commitOptions?.routePrecondition?.kind === 'exact-route') {
+      const currentRoute = observedWorkspacePaneRouteForTarget(repoId, branchName)
+      if (
+        currentRoute === undefined ||
+        !workspacePaneRoutesEqual(currentRoute, commitOptions.routePrecondition.route)
+      ) {
         return false
       }
       if (workspacePaneRoutesEqual(currentRoute, route)) {

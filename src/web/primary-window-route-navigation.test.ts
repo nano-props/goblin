@@ -3,6 +3,7 @@ import {
   returnToFromHref,
   routeReturnSearch,
   settlePrimaryWindowRouteCommit,
+  workspacePaneHrefBelongsToBranch,
 } from '#/web/primary-window-route-navigation.ts'
 
 describe('primary window route navigation helpers', () => {
@@ -42,6 +43,16 @@ describe('primary window route navigation helpers', () => {
       }),
     ).resolves.toBe(false)
     expect(navigate).not.toHaveBeenCalled()
+  })
+
+  test('recognizes only workspace pane routes within the exact repo branch', () => {
+    const branchRoot = '/repo/example/branch/main'
+    expect(workspacePaneHrefBelongsToBranch(branchRoot, branchRoot)).toBe(true)
+    expect(workspacePaneHrefBelongsToBranch(`${branchRoot}/tab/files`, branchRoot)).toBe(true)
+    expect(workspacePaneHrefBelongsToBranch(`${branchRoot}/terminal/term-1`, branchRoot)).toBe(true)
+    expect(workspacePaneHrefBelongsToBranch('/repo/example/branch/other/tab/files', branchRoot)).toBe(false)
+    expect(workspacePaneHrefBelongsToBranch('/repo/other/branch/main/tab/files', branchRoot)).toBe(false)
+    expect(workspacePaneHrefBelongsToBranch(`${branchRoot}/dashboard`, branchRoot)).toBe(false)
   })
 
   test('rejects an operation route when navigation throws', async () => {

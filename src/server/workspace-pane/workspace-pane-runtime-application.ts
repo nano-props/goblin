@@ -98,16 +98,13 @@ export class WorkspacePaneRuntimeApplication {
     } catch (error) {
       return runtimeFailure(input.runtimeType, error instanceof Error ? error.message : String(error))
     }
-    const result = await this.deps.worktreeOperations.runOperation(
-      physicalCapability,
-      async (permit) => {
-        if (!this.isCurrentTarget(userId, target)) return runtimeFailure(input.runtimeType, 'error.repo-runtime-stale')
-        switch (input.runtimeType) {
-          case 'terminal':
-            return await this.closeTerminal(clientId, userId, target, input.sessionId, scope, physicalCapability, permit)
-        }
-      },
-    )
+    const result = await this.deps.worktreeOperations.runOperation(physicalCapability, async (permit) => {
+      if (!this.isCurrentTarget(userId, target)) return runtimeFailure(input.runtimeType, 'error.repo-runtime-stale')
+      switch (input.runtimeType) {
+        case 'terminal':
+          return await this.closeTerminal(clientId, userId, target, input.sessionId, scope, physicalCapability, permit)
+      }
+    })
     return result.admitted ? result.value : runtimeFailure(input.runtimeType, 'error.worktree-removal-in-progress')
   }
 
@@ -187,7 +184,7 @@ export class WorkspacePaneRuntimeApplication {
     return {
       ok: true,
       runtimeType: 'terminal',
-      runtime: terminalRuntimeOpenEffect(runtime),
+      runtime,
       workspacePaneTabs,
     }
   }
@@ -322,15 +319,6 @@ function runtimeFailure<TType extends 'terminal'>(runtimeType: TType, message: s
 
 function isWorkspacePaneTabsSnapshot(value: unknown): value is WorkspacePaneTabsSnapshot {
   return Boolean(value && typeof value === 'object' && 'revision' in value && 'entries' in value)
-}
-
-function terminalRuntimeOpenEffect(
-  runtime: Extract<TerminalCreateResult, { ok: true }>,
-): Extract<TerminalCreateResult, { ok: true }> {
-  const { sessions: _legacySessions, ...effect } = runtime as Extract<TerminalCreateResult, { ok: true }> & {
-    sessions?: unknown
-  }
-  return effect
 }
 
 export function createWorkspacePaneRuntimeApplication(

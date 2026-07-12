@@ -25,7 +25,8 @@ export interface PrimaryWindowPresentationNavigationOptions {
   replace?: boolean
   presentationToken?: PrimaryWindowPresentationToken
   onCommit?: () => void
-  expectedCurrentRoute?: RepoBranchWorkspacePaneRouteTarget
+  routePrecondition?:
+    { kind: 'exact-route'; route: RepoBranchWorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
 }
 
 export interface PrimaryWindowNavigationActions {
@@ -62,10 +63,7 @@ interface CreatePrimaryWindowNavigationActionsOptions {
   currentRepoId: string | null
   order: string[]
   closeRepo: (repoId: string) => void
-  peekWorkspaceNavigation: (
-    repoId: string,
-    direction: 'back' | 'forward',
-  ) => WorkspaceNavigationHistoryTraversal | null
+  peekWorkspaceNavigation: (repoId: string, direction: 'back' | 'forward') => WorkspaceNavigationHistoryTraversal | null
   commitWorkspaceNavigation: (traversal: WorkspaceNavigationHistoryTraversal) => boolean
   routeNavigation: PrimaryWindowRouteNavigation
 }
@@ -214,7 +212,7 @@ function commitRepoBranchWorkspacePaneRoute(
     replace: options?.replace,
     presentationToken: token,
     onCommit: options?.onCommit,
-    expectedCurrentRoute: options?.expectedCurrentRoute,
+    routePrecondition: options?.routePrecondition,
   }
   return routeNavigation.commitRepoBranchWorkspacePaneRoute
     ? routeNavigation.commitRepoBranchWorkspacePaneRoute(repoId, branchName, route, routeOptions)
