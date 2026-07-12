@@ -208,7 +208,14 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
     return c.json(await readRepoOperationsSnapshot(cwd, { includeSettled, repoRuntimeId, signal: c.req.raw.signal }))
   })
   app.post('/fetch', async (c) => {
-    const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fetch, c)
+    const { cwd, repoRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fetch, c)
+    const userId = userIdFromContext(c)
+    if (repoRuntimeId) {
+      assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
+      return c.json(
+        await runtimeReadJsonOrThrow(userId, () => fetchRepo(cwd, 'user', c.req.raw.signal, repoRuntimeId), 'fetch'),
+      )
+    }
     return c.json(await jsonOr(() => fetchRepo(cwd, 'user', c.req.raw.signal), READ_REPO_ERROR, 'fetch'))
   })
   app.post('/clone', async (c) => {
@@ -218,34 +225,59 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
     )
   })
   app.post('/pull', async (c) => {
-    const { cwd, branch, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pull, c)
+    const { cwd, repoRuntimeId, branch, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.pull, c)
+    const userId = userIdFromContext(c)
+    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
     return c.json(
-      await jsonOr(() => pullRepoBranch(cwd, branch, worktreePath, c.req.raw.signal), READ_REPO_ERROR, 'pull'),
+      await runtimeReadJsonOrThrow(
+        userId,
+        () => pullRepoBranch(cwd, branch, worktreePath, c.req.raw.signal, { repoRuntimeId }),
+        'pull',
+      ),
     )
   })
   app.post('/push', async (c) => {
-    const { cwd, branch } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.push, c)
-    return c.json(await jsonOr(() => pushRepoBranch(cwd, branch, c.req.raw.signal), READ_REPO_ERROR, 'push'))
+    const { cwd, repoRuntimeId, branch } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.push, c)
+    const userId = userIdFromContext(c)
+    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
+    return c.json(
+      await runtimeReadJsonOrThrow(
+        userId,
+        () => pushRepoBranch(cwd, branch, c.req.raw.signal, { repoRuntimeId }),
+        'push',
+      ),
+    )
   })
   app.post('/create-worktree', async (c) => {
-    const { cwd, worktreePath, mode, worktreeBootstrap } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.createWorktree, c)
+    const { cwd, repoRuntimeId, worktreePath, mode, worktreeBootstrap } = await parseHttpBody(
+      REPO_PROCEDURE_SCHEMAS.createWorktree,
+      c,
+    )
+    const userId = userIdFromContext(c)
+    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
     return c.json(
-      await jsonOr(
+      await runtimeReadJsonOrThrow(
+        userId,
         () =>
           createRepoWorktree(cwd, { worktreePath, mode }, c.req.raw.signal, {
+            repoRuntimeId,
             worktreeBootstrap,
           }),
-        READ_REPO_ERROR,
         'create-worktree',
       ),
     )
   })
   app.post('/delete-branch', async (c) => {
-    const { cwd, branch, force, alsoDeleteUpstream } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.deleteBranch, c)
+    const { cwd, repoRuntimeId, branch, force, alsoDeleteUpstream } = await parseHttpBody(
+      REPO_PROCEDURE_SCHEMAS.deleteBranch,
+      c,
+    )
+    const userId = userIdFromContext(c)
+    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
     return c.json(
-      await jsonOr(
-        () => deleteRepoBranch(cwd, branch, { force, alsoDeleteUpstream }, c.req.raw.signal),
-        READ_REPO_ERROR,
+      await runtimeReadJsonOrThrow(
+        userId,
+        () => deleteRepoBranch(cwd, branch, { force, alsoDeleteUpstream }, c.req.raw.signal, { repoRuntimeId }),
         'delete-branch',
       ),
     )
@@ -274,6 +306,7 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
                 lifecycle,
                 physicalWorktreeCapability,
                 signal,
+                { repoRuntimeId },
               ),
           }),
         READ_REPO_ERROR,

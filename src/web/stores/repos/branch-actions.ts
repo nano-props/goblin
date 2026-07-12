@@ -224,14 +224,15 @@ function runBranchActionIpc(
 ): Promise<ExecResult> {
   switch (action.kind) {
     case 'pull':
-      return pullRepoBranch(repoId, action.branch, action.worktreePath, signal)
+      return pullRepoBranch(repoId, repoRuntimeId, action.branch, action.worktreePath, signal)
     case 'push':
-      return pushRepoBranch(repoId, action.branch, signal)
+      return pushRepoBranch(repoId, repoRuntimeId, action.branch, signal)
     case 'createWorktree':
-      return createRepoWorktree(repoId, action.input, action.worktreeBootstrap, signal)
+      return createRepoWorktree(repoId, repoRuntimeId, action.input, action.worktreeBootstrap, signal)
     case 'deleteBranch':
       return deleteRepoBranch(
         repoId,
+        repoRuntimeId,
         action.branch,
         { force: action.force, alsoDeleteUpstream: action.alsoDeleteUpstream },
         signal,

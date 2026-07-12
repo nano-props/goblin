@@ -573,6 +573,50 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     })
   })
 
+  test('marks remote lifecycle failed when a runtime-scoped repo write hits transport failure', async () => {
+    const app = createTestRepoRoutes()
+    const repoId = 'ssh-config://prod/home/alice/service'
+    const repoRuntimeId = await openTestRepoRuntime(app, repoId)
+    mocks.pullRepoBranch.mockRejectedValueOnce(
+      new RemoteRepoRuntimeFailureError({
+        repoRoot: repoId,
+        repoRuntimeId,
+        reason: 'unreachable',
+        message: 'connection refused',
+      }),
+    )
+
+    const response = await app.request(
+      new Request('http://localhost/pull', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: repoId, repoRuntimeId, branch: 'feature/work' }),
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({ ok: false, message: 'error.failed-read-repo' })
+    expect(mocks.pullRepoBranch).toHaveBeenCalledWith(repoId, 'feature/work', undefined, expect.any(AbortSignal), {
+      repoRuntimeId,
+    })
+    const listResponse = await app.request(
+      new Request('http://localhost/runtime-list', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      }),
+    )
+    await expect(listResponse.json()).resolves.toMatchObject({
+      runtimes: [
+        {
+          repoRoot: repoId,
+          repoRuntimeId,
+          remoteLifecycle: { kind: 'failed', reason: 'unreachable' },
+        },
+      ],
+    })
+  })
+
   test('passes /tree requests through to the read layer', async () => {
     mocks.getRepositoryTree.mockResolvedValueOnce({
       nodes: [
@@ -902,6 +946,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
         }),
       }),
       expect.any(AbortSignal),
+      { repoRuntimeId: 'repo-runtime-test' },
     )
   })
 

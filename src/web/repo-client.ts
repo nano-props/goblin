@@ -101,8 +101,9 @@ export async function abortRepoOperation(cwd: string): Promise<boolean> {
 export async function fetchRepo(
   cwd: string,
   signal?: AbortSignal,
+  options?: { repoRuntimeId?: string },
 ): Promise<{ ok: boolean; message: string }> {
-  return await postServerJson('/api/repo/fetch', { cwd }, {
+  return await postServerJson('/api/repo/fetch', { cwd, repoRuntimeId: options?.repoRuntimeId }, {
     signal,
     timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
   })
@@ -110,23 +111,25 @@ export async function fetchRepo(
 
 export async function pullRepoBranch(
   cwd: string,
+  repoRuntimeId: string,
   branch: string,
   worktreePath?: string,
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   return await postServerJson(
     '/api/repo/pull',
-    { cwd, branch, worktreePath },
+    { cwd, repoRuntimeId, branch, worktreePath },
     { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork },
   )
 }
 
 export async function pushRepoBranch(
   cwd: string,
+  repoRuntimeId: string,
   branch: string,
   signal?: AbortSignal,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/push', { cwd, branch }, {
+  return await postServerJson('/api/repo/push', { cwd, repoRuntimeId, branch }, {
     signal,
     timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
   })
@@ -134,13 +137,14 @@ export async function pushRepoBranch(
 
 export async function createRepoWorktree(
   cwd: string,
+  repoRuntimeId: string,
   input: CreateWorktreeInput,
   worktreeBootstrap: WorktreeBootstrapDecision,
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   return await postServerJson(
     '/api/repo/create-worktree',
-    { cwd, ...input, worktreeBootstrap },
+    { cwd, repoRuntimeId, ...input, worktreeBootstrap },
     { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.worktreeCreate },
   )
 }
@@ -154,13 +158,14 @@ export async function getRepoWorktreeBootstrapPreview(
 
 export async function deleteRepoBranch(
   cwd: string,
+  repoRuntimeId: string,
   branch: string,
   options?: { force?: boolean; alsoDeleteUpstream?: boolean },
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   return await postServerJson(
     '/api/repo/delete-branch',
-    { cwd, branch, force: options?.force, alsoDeleteUpstream: options?.alsoDeleteUpstream },
+    { cwd, repoRuntimeId, branch, force: options?.force, alsoDeleteUpstream: options?.alsoDeleteUpstream },
     { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.branchMutation },
   )
 }

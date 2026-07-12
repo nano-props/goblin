@@ -9,6 +9,7 @@ import {
   issueTestPhysicalWorktreeCapability,
 } from '#/server/test-utils/physical-worktree-identity.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
+import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
 
 const target = {
   repoRoot: '/repo',
@@ -204,6 +205,46 @@ describe('WorktreeRemovalApplication', () => {
     gate.resolve()
     await active.catch(() => undefined)
   })
+
+  test('fails remote lifecycle when capture hits a remote runtime failure', async () => {
+    const failure = new RemoteRepoRuntimeFailureError({
+      repoRoot: target.repoRoot,
+      repoRuntimeId: target.repoRuntimeId,
+      reason: 'unreachable',
+      message: 'connection refused',
+    })
+    const failRemoteRuntime = vi.fn()
+    const application = createApplication({
+      physicalWorktrees: { capture: async () => { throw failure } },
+      failRemoteRuntime,
+    })
+
+    await expect(application.removeWorktree('user-a', { ...target, remove: async () => ({ ok: true, message: '' }) }))
+      .resolves.toEqual({ ok: false, message: 'connection refused' })
+    expect(failRemoteRuntime).toHaveBeenCalledWith('user-a', failure)
+  })
+
+  test('fails remote lifecycle when queued validation hits a remote runtime failure', async () => {
+    const failure = new RemoteRepoRuntimeFailureError({
+      repoRoot: target.repoRoot,
+      repoRuntimeId: target.repoRuntimeId,
+      reason: 'unreachable',
+      message: 'connection refused',
+    })
+    const capability = issueTestPhysicalWorktreeCapability({
+      identity: testPhysicalWorktreeIdentity(target.worktreePath),
+      validateExecution: async () => { throw failure },
+    })
+    const failRemoteRuntime = vi.fn()
+    const application = createApplication({
+      physicalWorktrees: { capture: async () => capability },
+      failRemoteRuntime,
+    })
+
+    await expect(application.removeWorktree('user-a', { ...target, remove: async () => ({ ok: true, message: '' }) }))
+      .resolves.toEqual({ ok: false, message: 'connection refused' })
+    expect(failRemoteRuntime).toHaveBeenCalledWith('user-a', failure)
+  })
 })
 
 function createApplication(
@@ -221,6 +262,7 @@ function createApplication(
     finalizePhysicalWorktreeRemoval?: () => Promise<void>
     broadcastWorkspaceTabsChanged?: (userId: string, repoRoot: string) => void
     broadcastSessionsChanged?: (userId: string, repoRoot: string) => void
+    failRemoteRuntime?: (userId: string, error: RemoteRepoRuntimeFailureError) => void
   } = {},
 ) {
   return createWorktreeRemovalApplication({
@@ -243,6 +285,7 @@ function createApplication(
         options.reconcilePhysicalWorktreeAfterRemovalFailure ?? (async () => {}),
     },
     isCurrentRepoRuntime: () => true,
+    failRemoteRuntime: options.failRemoteRuntime,
     broadcastSessionsChanged: options.broadcastSessionsChanged ?? (() => {}),
     broadcastWorkspaceTabsChanged: options.broadcastWorkspaceTabsChanged ?? (() => {}),
   })

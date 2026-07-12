@@ -196,6 +196,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     terminalWorktree: manager,
     workspaceTabs: workspaceTabsCoordinator,
     isCurrentRepoRuntime,
+    failRemoteRuntime: failRemoteRuntimeFromTerminal,
     broadcastSessionsChanged: broadcastRepoSessionsChanged,
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
   })

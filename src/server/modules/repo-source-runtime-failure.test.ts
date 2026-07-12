@@ -55,6 +55,23 @@ describe('repo source runtime failure classification', () => {
     } satisfies Partial<RemoteRepoRuntimeFailureError>)
   })
 
+  test('throws a typed remote runtime failure for classified remote write failures', async () => {
+    mocks.runRemoteCommand.mockResolvedValue({
+      ok: false,
+      stdout: '',
+      stderr: 'ssh: connect to host example.test port 22: Connection refused',
+      message: 'connection refused',
+    })
+    const { fetchRepo } = await import('#/server/modules/repo-write-paths.ts')
+
+    await expect(fetchRepo(target.id, 'user', undefined, 'repo-runtime-test')).rejects.toMatchObject({
+      name: 'RemoteRepoRuntimeFailureError',
+      repoRoot: target.id,
+      repoRuntimeId: 'repo-runtime-test',
+      reason: 'unreachable',
+    } satisfies Partial<RemoteRepoRuntimeFailureError>)
+  })
+
   test('preserves normal remote read failures when no runtime context is supplied', async () => {
     mocks.runRemoteCommand.mockResolvedValue({
       ok: false,

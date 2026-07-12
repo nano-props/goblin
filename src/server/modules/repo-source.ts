@@ -80,7 +80,7 @@ import {
 } from '#/shared/api-types.ts'
 import { normalizeRemoteRepoRef } from '#/shared/remote-repo.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
-import { remoteRuntimeFailureFromCommandResult } from '#/server/modules/remote-runtime-failure.ts'
+import { isRemoteRepoRuntimeFailure, remoteRuntimeFailureFromCommandResult } from '#/server/modules/remote-runtime-failure.ts'
 
 type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
@@ -164,6 +164,7 @@ export async function runWithCapturedRepoSource<T>(
   cwd: string,
   physicalWorktreeCapability: import('#/server/worktree-removal/physical-worktree-identity-resolver.ts').PhysicalWorktreeCapability,
   task: (source: Awaited<ReturnType<typeof resolveRepoSource>>) => Promise<T>,
+  runtime?: RepoSourceRuntimeContext,
 ): Promise<T> {
   const { physicalWorktreeCapabilityExecution } = await import(
     '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
@@ -171,7 +172,7 @@ export async function runWithCapturedRepoSource<T>(
   const execution = physicalWorktreeCapabilityExecution(physicalWorktreeCapability)
   return await task(
     execution.kind === 'remote'
-      ? await createRemoteRepoSource(cwd, execution.target, physicalWorktreeCapability)
+      ? await createRemoteRepoSource(cwd, execution.target, physicalWorktreeCapability, runtime)
       : createLocalRepoSource(execution.canonicalWorktreePath, physicalWorktreeCapability),
   )
 }
@@ -244,9 +245,13 @@ async function readLocalAffectedRepoIds(repoId: string, signal?: AbortSignal): P
   }
 }
 
-async function readRemoteAffectedRepoIds(target: RemoteRepoTarget, signal?: AbortSignal): Promise<string[]> {
+async function readRemoteAffectedRepoIds(
+  target: RemoteRepoTarget,
+  signal?: AbortSignal,
+  run?: RemoteGitRunner,
+): Promise<string[]> {
   try {
-    return remoteWorktreeRepoIds(target, await getRemoteRepoWorktreePaths(target, { signal }))
+    return remoteWorktreeRepoIds(target, await getRemoteRepoWorktreePaths(target, { signal, run }))
   } catch {
     return []
   }
@@ -596,31 +601,32 @@ async function createRemoteRepoSource(
       return await getSshRemoteTrackingBranches(target, { signal, run })
     },
     async fetch(signal) {
-      const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal)
-      const fetched = await fetchRemoteRepo(target, { signal })
+      const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
+      const fetched = await fetchRemoteRepo(target, { signal, run })
       return fetched.ok ? withAffectedRepoIds(fetched, affectedRepoIds) : fetched
     },
     async pull(branch, worktreePath, signal) {
-      const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal)
-      const pulled = await pullRemoteBranch(target, branch, worktreePath, { signal })
+      const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
+      const pulled = await pullRemoteBranch(target, branch, worktreePath, { signal, run })
       return pulled.ok ? withAffectedRepoIds(pulled, affectedRepoIds) : pulled
     },
     async push(branch, signal) {
-      const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal)
-      const pushed = await pushRemoteBranch(target, branch, { signal })
+      const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
+      const pushed = await pushRemoteBranch(target, branch, { signal, run })
       return pushed.ok ? withAffectedRepoIds(pushed, affectedRepoIds) : pushed
     },
     async getWorktreeBootstrapPreview(signal) {
-      return await getRemoteWorktreeBootstrapPreview(target, { signal })
+      return await getRemoteWorktreeBootstrapPreview(target, { signal, run })
     },
     async createWorktree(input, signal, options) {
-      const existingRepoIds = await readRemoteAffectedRepoIds(target, signal)
-      const created = await createRemoteWorktree(target, { ...input, signal })
+      const existingRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
+      const created = await createRemoteWorktree(target, { ...input, signal, run })
       const affectedRepoIds = [...existingRepoIds, ...remoteWorktreeRepoIds(target, created.affectedWorktreePaths)]
       if (!created.ok) return created.repoChanged ? withAffectedRepoIds(created, affectedRepoIds) : created
       if (options?.worktreeBootstrap?.kind !== 'run') return withAffectedRepoIds(created, affectedRepoIds)
       const bootstrapped = await bootstrapRemoteWorktreeAfterCreate(target, input.worktreePath, {
         signal,
+        run,
         expectedConfigHash: options.worktreeBootstrap.configHash,
       })
       if (!bootstrapped.ok) return withAffectedRepoIds({ ...bootstrapped, repoChanged: true }, affectedRepoIds)
@@ -634,12 +640,13 @@ async function createRemoteRepoSource(
       )
     },
     async deleteBranch(branch, options, signal) {
-      const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal)
+      const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal, run)
       const deleted = await deleteRemoteBranch(target, {
         branch,
         force: options?.force,
         alsoDeleteUpstream: options?.alsoDeleteUpstream,
         signal,
+        run,
       })
       return deleted.ok || deleted.repoChanged ? withAffectedRepoIds(deleted, affectedRepoIds) : deleted
     },
@@ -653,6 +660,7 @@ async function createRemoteRepoSource(
         ...input,
         worktreePath: exactExecution?.kind === 'remote' ? exactExecution.canonicalWorktreePath : input.worktreePath,
         signal,
+        run,
         beforeRemove: lifecycle.beforeRemove,
         afterWorktreeRemoved: lifecycle.afterWorktreeRemoved,
         afterRemoveFailed: lifecycle.afterRemoveFailed,
@@ -665,6 +673,7 @@ async function createRemoteRepoSource(
                 await validatePhysicalWorktreeCapabilityExecution(physicalWorktreeCapability, signal)
                 return { ok: true, message: '' }
               } catch (error) {
+                if (isRemoteRepoRuntimeFailure(error)) throw error
                 return { ok: false, message: error instanceof Error ? error.message : 'error.repo-runtime-stale' }
               }
             }

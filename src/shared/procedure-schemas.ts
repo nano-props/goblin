@@ -73,6 +73,7 @@ export const REPO_PROCEDURE_SCHEMAS = {
   // Action endpoints — POST with a JSON body.
   fetch: v.strictObject({
     cwd: v.string(),
+    repoRuntimeId: v.optional(RepoRuntimeIdSchema),
   }),
   clone: v.object({
     url: v.string(),
@@ -81,12 +82,14 @@ export const REPO_PROCEDURE_SCHEMAS = {
   }),
   pull: v.object({
     cwd: v.string(),
+    repoRuntimeId: RepoRuntimeIdSchema,
     branch: v.string(),
     worktreePath: v.optional(v.string()),
   }),
-  push: v.object({ cwd: v.string(), branch: v.string() }),
+  push: v.object({ cwd: v.string(), repoRuntimeId: RepoRuntimeIdSchema, branch: v.string() }),
   createWorktree: v.object({
     cwd: v.string(),
+    repoRuntimeId: RepoRuntimeIdSchema,
     worktreePath: v.string(),
     mode: v.variant('kind', [
       v.object({ kind: v.literal('newBranch'), newBranch: v.string(), baseRef: v.string() }),
@@ -99,6 +102,7 @@ export const REPO_PROCEDURE_SCHEMAS = {
   worktreeBootstrapPreview: CwdInput,
   deleteBranch: v.object({
     cwd: v.string(),
+    repoRuntimeId: RepoRuntimeIdSchema,
     branch: v.string(),
     force: v.optional(v.boolean()),
     alsoDeleteUpstream: v.optional(v.boolean()),

@@ -8,6 +8,7 @@ import {
   type PhysicalWorktreeOperationPermit,
 } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import {
+  issueTestPhysicalWorktreeCapability,
   testPhysicalWorktreeCapability,
   testPhysicalWorktreeIdentity,
   testPhysicalWorktrees,
@@ -137,6 +138,44 @@ describe('WorkspacePaneRuntimeApplication', () => {
       ok: false,
       runtimeType: 'terminal',
       message: 'unreachable',
+    })
+    expect(failRemoteRuntime).toHaveBeenCalledWith('user-test', failure)
+    expect(create).not.toHaveBeenCalled()
+    expect(ensureRuntimeTabForSession).not.toHaveBeenCalled()
+  })
+
+  test('reports remote runtime failure when queued physical validation proves transport failure', async () => {
+    const failure = new RemoteRepoRuntimeFailureError({
+      repoRoot: request.repoRoot,
+      repoRuntimeId: request.repoRuntimeId,
+      reason: 'unreachable',
+      message: 'connection refused',
+    })
+    const capability = issueTestPhysicalWorktreeCapability({
+      identity: testPhysicalWorktreeIdentity(request.worktreePath),
+      validateExecution: async () => { throw failure },
+    })
+    const create = vi.fn()
+    const ensureRuntimeTabForSession = vi.fn()
+    const failRemoteRuntime = vi.fn()
+    const application = createWorkspacePaneRuntimeApplication({
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: { capture: async () => capability },
+      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminal: { createAdmitted: create, close: () => false },
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession, reconcileWorktreeAdmitted: vi.fn() } as unknown as Pick<
+        WorkspacePaneTabsCoordinator,
+        'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'
+      >,
+      isCurrentRepoRuntime: () => true,
+      failRemoteRuntime,
+      broadcastWorkspaceTabsChanged: vi.fn(),
+    })
+
+    await expect(application.open('client-test', 'user-test', { runtimeType: 'terminal', request })).resolves.toEqual({
+      ok: false,
+      runtimeType: 'terminal',
+      message: 'connection refused',
     })
     expect(failRemoteRuntime).toHaveBeenCalledWith('user-test', failure)
     expect(create).not.toHaveBeenCalled()
