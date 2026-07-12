@@ -47,9 +47,10 @@ const NEW_WINDOW_SCRIPT = `
   end run
 `
 
-// Same shape as NEW_WINDOW_SCRIPT, but for SSH: types the SSH invocation
-// into the new window's shell and submits it, instead of setting a
-// working directory.
+// Same shape as NEW_WINDOW_SCRIPT, but for SSH: start Ghostty's surface
+// with the SSH command directly. Do not use `initial input` here: it
+// visibly types the shell-quoted command into the user's shell before
+// connecting.
 const REMOTE_NEW_WINDOW_SCRIPT = `
   on run argv
     set commandText to item 1 of argv
@@ -58,10 +59,7 @@ const REMOTE_NEW_WINDOW_SCRIPT = `
     end tell
     if not ghosttyIsRunning then return "not-running"
     tell application id "${GHOSTTY_BUNDLE_ID}"
-      set win to new window with configuration {}
-      set term to terminal 1 of selected tab of win
-      input text commandText to term
-      send key "enter" to term
+      new window with configuration {command:commandText}
     end tell
     return "opened"
   end run
@@ -148,10 +146,9 @@ export async function openInGhostty(p: string): Promise<{ ok: boolean; message: 
 }
 
 /** Open an SSH session in a new Ghostty window. Mirrors `openInGhostty`
- *  via the same `openGhosttyWindow` orchestration: on the warm path the
- *  SSH command is typed into a new window's shell; on cold start,
- *  Ghostty is launched with `-e ssh ...` so it spawns the SSH session
- *  itself. */
+ *  via the same `openGhosttyWindow` orchestration: the warm path uses
+ *  Ghostty's AppleScript `command` surface configuration, while cold start
+ *  uses `-e ssh ...` so Ghostty spawns the SSH session directly. */
 export async function openRemoteInGhostty(
   alias: string,
   remotePath: string,
