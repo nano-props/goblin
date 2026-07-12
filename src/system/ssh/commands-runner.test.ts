@@ -47,7 +47,14 @@ describe('runRemoteCommand', () => {
     const args = mocks.execa.mock.calls[0]?.[1] as string[]
     const script = args.at(-1) ?? ''
     expect(script).toContain(REMOTE_COMMAND_STARTED_MARKER)
-    expect(script.indexOf(REMOTE_COMMAND_STARTED_MARKER)).toBeLessThan(script.indexOf('$HOME'))
+    expectScriptOrder(script, [
+      REMOTE_COMMAND_STARTED_MARKER,
+      'goblin_old_umask=$(umask)',
+      'umask 077',
+      ': >"$goblin_stderr"',
+      'umask "$goblin_old_umask"',
+      '$HOME',
+    ])
     expect(mocks.execa).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(Array),
@@ -126,5 +133,14 @@ function target(): RemoteRepoTarget {
     port: 22,
     remotePath: '/srv/repo',
     displayName: 'prod:repo',
+  }
+}
+
+function expectScriptOrder(script: string, tokens: readonly string[]): void {
+  let previous = -1
+  for (const token of tokens) {
+    const index = script.indexOf(token)
+    expect(index).toBeGreaterThan(previous)
+    previous = index
   }
 }

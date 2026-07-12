@@ -295,6 +295,7 @@ function commandStartedMarkerScript(script: string): string {
   // upstream Git/SSH errors for this SSH session.
   return [
     `printf '%s\n' ${shellQuote(REMOTE_COMMAND_STARTED_MARKER)}`,
+    'goblin_old_umask=$(umask)',
     'umask 077',
     'if command -v mktemp >/dev/null 2>&1; then',
     '  goblin_stderr_dir=$(mktemp -d "${TMPDIR:-/tmp}/goblin-stderr.XXXXXX") || exit 125',
@@ -304,6 +305,8 @@ function commandStartedMarkerScript(script: string): string {
     'fi',
     'goblin_stderr="$goblin_stderr_dir/stderr"',
     `trap 'rm -rf -- "$goblin_stderr_dir"' EXIT`,
+    ': >"$goblin_stderr" || exit 125',
+    'umask "$goblin_old_umask"',
     '(',
     script,
     ') 2>"$goblin_stderr"',
