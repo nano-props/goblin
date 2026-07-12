@@ -84,13 +84,13 @@ export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeRes
   useEffect(() => {
     dispatchTreeState({
       type: 'replace',
-        state: cachedLazyRepoTreeState({
-          queryClient,
-          repoId,
-          repoRuntimeId,
-          worktreePath,
-          expandedKeys: expandedKeysRef.current,
-        }),
+      state: cachedLazyRepoTreeState({
+        queryClient,
+        repoId,
+        repoRuntimeId,
+        worktreePath,
+        expandedKeys: expandedKeysRef.current,
+      }),
     })
   }, [queryClient, repoId, repoRuntimeId, worktreePath])
 
