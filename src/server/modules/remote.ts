@@ -28,6 +28,7 @@ import {
 import { isSafeRemoteAbsolutePath } from '#/system/remote-shell.ts'
 import type { ExecResult } from '#/shared/git-types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
+import { remoteRuntimeFailureFromTargetResolutionError } from '#/server/modules/remote-runtime-failure.ts'
 
 async function resolveRemoteHomeDirectory(target: RemoteRepoTarget, signal?: AbortSignal): Promise<string> {
   const homeResult = await runRemoteCommand(target, { type: 'printHome' }, { signal })
@@ -266,7 +267,7 @@ export async function testServerRemoteRepo(
  *  parsed back into its alias / remotePath parts, then re-resolved so the
  *  SSH config hasn't been edited out from under us. */
 export async function openServerRemoteEditor(
-  input: { repoId: string; worktreePath: string; app: EditorApp },
+  input: { repoId: string; repoRuntimeId?: string; worktreePath: string; app: EditorApp },
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   if (!isRemoteRepoId(input.repoId) || !isSafeRemoteAbsolutePath(input.worktreePath)) {
@@ -278,7 +279,14 @@ export async function openServerRemoteEditor(
   let resolved: ResolvedRemoteTarget
   try {
     resolved = await resolveSshRemoteTarget(ref, signal)
-  } catch {
+  } catch (err) {
+    if (input.repoRuntimeId) {
+      throw remoteRuntimeFailureFromTargetResolutionError({
+        repoRoot: input.repoId,
+        repoRuntimeId: input.repoRuntimeId,
+        error: err,
+      })
+    }
     return { ok: false, message: 'error.ssh-config-changed' }
   }
 
@@ -286,7 +294,7 @@ export async function openServerRemoteEditor(
 }
 
 export async function openServerRemoteTerminal(
-  input: { repoId: string; worktreePath: string; app: TerminalApp },
+  input: { repoId: string; repoRuntimeId?: string; worktreePath: string; app: TerminalApp },
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   if (!isRemoteRepoId(input.repoId) || !isSafeRemoteAbsolutePath(input.worktreePath)) {
@@ -298,7 +306,14 @@ export async function openServerRemoteTerminal(
   let resolved: ResolvedRemoteTarget
   try {
     resolved = await resolveSshRemoteTarget(ref, signal)
-  } catch {
+  } catch (err) {
+    if (input.repoRuntimeId) {
+      throw remoteRuntimeFailureFromTargetResolutionError({
+        repoRoot: input.repoId,
+        repoRuntimeId: input.repoRuntimeId,
+        error: err,
+      })
+    }
     return { ok: false, message: 'error.ssh-config-changed' }
   }
 

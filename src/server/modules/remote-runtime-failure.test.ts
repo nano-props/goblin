@@ -70,6 +70,37 @@ describe('remote runtime failure classification', () => {
     ).toBeNull()
   })
 
+  test('classifies current SSH session transport loss after the remote shell starts', () => {
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult({
+        ok: false,
+        stdout: '',
+        stderr: 'Connection to example.com closed by remote host.',
+        message: 'Connection to example.com closed by remote host.',
+        remoteStarted: true,
+      }),
+    ).toBe('unreachable')
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult({
+        ok: false,
+        stdout: '',
+        stderr: 'client_loop: send disconnect: Broken pipe',
+        message: 'client_loop: send disconnect: Broken pipe',
+        remoteStarted: true,
+      }),
+    ).toBe('unreachable')
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult({
+        ok: false,
+        stdout: '',
+        stderr: '',
+        message: 'timeout',
+        timedOut: true,
+        remoteStarted: true,
+      }),
+    ).toBe('timeout')
+  })
+
   test('does not classify ordinary command failures or stale runtime as reachability failures', () => {
     expect(
       remoteRuntimeFailureReasonFromCommandResult({

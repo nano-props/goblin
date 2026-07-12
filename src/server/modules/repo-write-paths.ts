@@ -524,8 +524,9 @@ export async function openRepoTerminal(
   worktreePath: string,
   app: TerminalApp,
   signal?: AbortSignal,
+  options: { repoRuntimeId?: string } = {},
 ): Promise<ExecResult> {
-  if (isRemoteRepoId(repoId)) return await openServerRemoteTerminal({ repoId, worktreePath, app }, signal)
+  if (isRemoteRepoId(repoId)) return await openServerRemoteTerminal({ repoId, worktreePath, app, repoRuntimeId: options.repoRuntimeId }, signal)
   return await openInPreferredTerminal(worktreePath, app)
 }
 
@@ -534,8 +535,9 @@ export async function openRepoEditor(
   worktreePath: string,
   app: EditorApp,
   signal?: AbortSignal,
+  options: { repoRuntimeId?: string } = {},
 ): Promise<ExecResult> {
-  if (isRemoteRepoId(repoId)) return await openServerRemoteEditor({ repoId, worktreePath, app }, signal)
+  if (isRemoteRepoId(repoId)) return await openServerRemoteEditor({ repoId, worktreePath, app, repoRuntimeId: options.repoRuntimeId }, signal)
   return await openInPreferredEditor(worktreePath, app)
 }
 

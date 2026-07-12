@@ -215,18 +215,20 @@ export async function openRepoUrl(cwd: string, repoRuntimeId: string, target: Re
 
 export async function openRepoTerminal(
   repoId: string,
+  repoRuntimeId: string,
   worktreePath: string,
   app: TerminalApp,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/open-terminal', { repoId, worktreePath, app })
+  return await postServerJson('/api/repo/open-terminal', { repoId, repoRuntimeId, worktreePath, app })
 }
 
 export async function openRepoEditor(
   repoId: string,
+  repoRuntimeId: string,
   worktreePath: string,
   app: EditorApp,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/open-editor', { repoId, worktreePath, app })
+  return await postServerJson('/api/repo/open-editor', { repoId, repoRuntimeId, worktreePath, app })
 }
 
 export async function openRepoInFinder(repoId: string, worktreePath: string): Promise<ExecResult> {

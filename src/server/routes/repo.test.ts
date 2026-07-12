@@ -3,6 +3,7 @@ import { testPhysicalWorktreeCapability } from '#/server/test-utils/physical-wor
 import { createRepoRoutes } from '#/server/routes/repo.ts'
 import { clearRepoRuntimesForUser } from '#/server/modules/repo-runtimes.ts'
 import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
+import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
 
 const mocks = vi.hoisted(() => ({
   probeRepo: vi.fn(),
@@ -969,15 +970,16 @@ describe('repo routes — POST body validation (action endpoints)', () => {
   test('fetch route forwards the request abort signal', async () => {
     mocks.fetchRepo.mockResolvedValue({ ok: true, message: 'ok' })
     const app = createTestRepoRoutes()
+    const repoRuntimeId = await openTestRepoRuntime(app)
     const response = await app.request(
       new Request('http://localhost/fetch', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo' }),
+        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId }),
       }),
     )
     expect(response.status).toBe(200)
-    expect(mocks.fetchRepo).toHaveBeenCalledWith('/tmp/repo', 'user', expect.any(AbortSignal))
+    expect(mocks.fetchRepo).toHaveBeenCalledWith('/tmp/repo', 'user', expect.any(AbortSignal), repoRuntimeId)
   })
 
   test('clone route forwards url/parentPath/directoryName and the request abort signal', async () => {
@@ -1095,6 +1097,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
     mocks.openRepoEditor.mockResolvedValue({ ok: true, message: '' })
     mocks.openRepoInFinder.mockResolvedValue({ ok: true, message: '' })
     const app = createTestRepoRoutes()
+    const repoRuntimeId = await openTestRepoRuntime(app)
 
     await app.request(
       new Request('http://localhost/open-terminal', {
@@ -1102,6 +1105,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           repoId: '/tmp/repo',
+          repoRuntimeId,
           worktreePath: '/tmp/repo',
           app: 'ghostty',
         }),
@@ -1113,7 +1117,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           repoId: '/tmp/repo',
-          repoRuntimeId: 'repo-runtime-test',
+          repoRuntimeId,
           worktreePath: '/tmp/repo',
           app: 'vscode',
         }),
@@ -1127,9 +1131,50 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       }),
     )
 
-    expect(mocks.openRepoTerminal).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo', 'ghostty', expect.any(AbortSignal))
-    expect(mocks.openRepoEditor).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo', 'vscode', expect.any(AbortSignal))
+    expect(mocks.openRepoTerminal).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo', 'ghostty', expect.any(AbortSignal), {
+      repoRuntimeId,
+    })
+    expect(mocks.openRepoEditor).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo', 'vscode', expect.any(AbortSignal), {
+      repoRuntimeId,
+    })
     expect(mocks.openRepoInFinder).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo')
+  })
+
+  test('marks the current runtime failed when external app open hits a remote runtime failure', async () => {
+    const app = createTestRepoRoutes()
+    const target = normalizeRemoteTarget({
+      alias: 'example',
+      host: 'example.test',
+      user: 'deploy',
+      port: 22,
+      remotePath: '/srv/repo',
+    })
+    expect(target).not.toBeNull()
+    const repoId = target!.id
+    const repoRuntimeId = await openTestRepoRuntime(app, repoId)
+    mocks.openRepoTerminal.mockRejectedValue(
+      new RemoteRepoRuntimeFailureError({
+        repoRoot: repoId,
+        repoRuntimeId,
+        reason: 'unreachable',
+      }),
+    )
+
+    const response = await app.request(
+      new Request('http://localhost/open-terminal', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          repoId,
+          repoRuntimeId,
+          worktreePath: '/srv/repo',
+          app: 'ghostty',
+        }),
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    await expectRemoteRuntimeFailed(app, repoId, repoRuntimeId)
   })
 
   test('returns 400 for invalid external app choices', async () => {

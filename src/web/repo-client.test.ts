@@ -358,11 +358,11 @@ describe('repo-client', () => {
       },
     })
     const { openRepoEditor, openRepoInFinder, openRepoTerminal } = await import('#/web/repo-client.ts')
-    await expect(openRepoTerminal('/tmp/repo', '/tmp/repo', 'ghostty')).resolves.toEqual({
+    await expect(openRepoTerminal('/tmp/repo', 'repo-runtime-test', '/tmp/repo', 'ghostty')).resolves.toEqual({
       ok: true,
       message: 'server-terminal',
     })
-    await expect(openRepoEditor('/tmp/repo', '/tmp/repo', 'vscode')).resolves.toEqual({
+    await expect(openRepoEditor('/tmp/repo', 'repo-runtime-test', '/tmp/repo', 'vscode')).resolves.toEqual({
       ok: true,
       message: 'server-editor',
     })
@@ -380,6 +380,7 @@ describe('repo-client', () => {
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
         body: JSON.stringify({
           repoId: '/tmp/repo',
+          repoRuntimeId: 'repo-runtime-test',
           worktreePath: '/tmp/repo',
           app: 'ghostty',
         }),
@@ -393,6 +394,7 @@ describe('repo-client', () => {
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
         body: JSON.stringify({
           repoId: '/tmp/repo',
+          repoRuntimeId: 'repo-runtime-test',
           worktreePath: '/tmp/repo',
           app: 'vscode',
         }),
@@ -418,8 +420,8 @@ describe('repo-client', () => {
         .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-editor' }) }),
     )
     const { openRepoEditor, openRepoTerminal } = await import('#/web/repo-client.ts')
-    await openRepoTerminal('/tmp/repo', '/tmp/repo', 'ghostty')
-    await openRepoEditor('/tmp/repo', '/tmp/repo', 'vscode')
+    await openRepoTerminal('/tmp/repo', 'repo-runtime-test', '/tmp/repo', 'ghostty')
+    await openRepoEditor('/tmp/repo', 'repo-runtime-test', '/tmp/repo', 'vscode')
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -428,6 +430,7 @@ describe('repo-client', () => {
         method: 'POST',
         body: JSON.stringify({
           repoId: '/tmp/repo',
+          repoRuntimeId: 'repo-runtime-test',
           worktreePath: '/tmp/repo',
           app: 'ghostty',
         }),
@@ -440,6 +443,7 @@ describe('repo-client', () => {
         method: 'POST',
         body: JSON.stringify({
           repoId: '/tmp/repo',
+          repoRuntimeId: 'repo-runtime-test',
           worktreePath: '/tmp/repo',
           app: 'vscode',
         }),

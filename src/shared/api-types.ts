@@ -18,11 +18,13 @@ import type { WorkspacePaneSessionTabType, WorkspacePaneTabEntry } from '#/share
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type {
   EditorAppAvailability,
+  EditorApp,
   Lang,
   LangPref,
   ResolvedTheme,
   UserSettings,
   TerminalAppAvailability,
+  TerminalApp,
   ThemePref,
 } from '#/shared/settings.ts'
 import type {
@@ -390,9 +392,11 @@ export interface AppIpcHandlers {
     remoteBranches: (input: { cwd: string; repoRuntimeId: string }) => Promise<string[]>
     pull: (input: { cwd: string; repoRuntimeId: string; branch: string; worktreePath?: string }) => Promise<ExecResult>
     push: (input: { cwd: string; repoRuntimeId: string; branch: string }) => Promise<ExecResult>
-    fetch: (input: { cwd: string; repoRuntimeId?: string }) => Promise<ExecResult>
+    fetch: (input: { cwd: string; repoRuntimeId: string }) => Promise<ExecResult>
     abort: (input: { cwd: string }) => Promise<boolean>
     openUrl: (input: { cwd: string; repoRuntimeId: string; target: RepoUrlTarget }) => Promise<ExecResult>
+    openTerminal: (input: { repoId: string; repoRuntimeId: string; worktreePath: string; app: TerminalApp }) => Promise<ExecResult>
+    openEditor: (input: { repoId: string; repoRuntimeId: string; worktreePath: string; app: EditorApp }) => Promise<ExecResult>
     openRemote: (input: { cwd: string; branch?: string }) => Promise<ExecResult>
   }
   remote: {

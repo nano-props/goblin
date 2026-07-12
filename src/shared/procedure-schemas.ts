@@ -73,7 +73,7 @@ export const REPO_PROCEDURE_SCHEMAS = {
   // Action endpoints — POST with a JSON body.
   fetch: v.strictObject({
     cwd: v.string(),
-    repoRuntimeId: v.optional(RepoRuntimeIdSchema),
+    repoRuntimeId: RepoRuntimeIdSchema,
   }),
   clone: v.object({
     url: v.string(),
@@ -119,11 +119,13 @@ export const REPO_PROCEDURE_SCHEMAS = {
   openUrl: v.object({ cwd: v.string(), repoRuntimeId: RepoRuntimeIdSchema, target: RepoUrlTargetSchema }),
   openTerminal: v.object({
     repoId: RepoRootSchema,
+    repoRuntimeId: RepoRuntimeIdSchema,
     worktreePath: v.string(),
     app: TerminalAppSchema,
   }),
   openEditor: v.object({
     repoId: RepoRootSchema,
+    repoRuntimeId: RepoRuntimeIdSchema,
     worktreePath: v.string(),
     app: EditorAppSchema,
   }),

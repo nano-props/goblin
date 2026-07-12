@@ -31,7 +31,7 @@ export function remoteRuntimeFailureReasonFromCommandResult(
   result: RemoteCommandResult,
 ): RemoteRepoFailureReason | null {
   if (result.ok || result.message === 'cancelled') return null
-  if (result.remoteStarted) return null
+  if (result.remoteStarted) return remoteRuntimeTransportFailureAfterStart(result)
   if (result.timedOut || result.message === 'timeout') return 'timeout'
   const text = `${result.stderr}\n${result.stdout}\n${result.message ?? ''}`.toLowerCase()
   if (text.includes('host key verification failed') || text.includes('remote host identification has changed')) {
@@ -61,6 +61,19 @@ export function remoteRuntimeFailureReasonFromCommandResult(
     text.includes('operation timed out') ||
     text.includes('connection refused') ||
     text.includes('no route to host')
+  ) {
+    return 'unreachable'
+  }
+  return null
+}
+
+function remoteRuntimeTransportFailureAfterStart(result: RemoteCommandResult): RemoteRepoFailureReason | null {
+  if (result.timedOut || result.message === 'timeout') return 'timeout'
+  const text = `${result.stderr}\n${result.stdout}\n${result.message ?? ''}`.toLowerCase()
+  if (
+    text.includes('client_loop: send disconnect') ||
+    text.includes('connection reset by peer') ||
+    /connection to .* closed/u.test(text)
   ) {
     return 'unreachable'
   }

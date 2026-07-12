@@ -43,7 +43,9 @@ describe('runRemoteCommand', () => {
     })
 
     const args = mocks.execa.mock.calls[0]?.[1] as string[]
-    expect(args.at(-1)).toContain(REMOTE_COMMAND_STARTED_MARKER)
+    const script = args.at(-1) ?? ''
+    expect(script).toContain(REMOTE_COMMAND_STARTED_MARKER)
+    expect(script.indexOf(REMOTE_COMMAND_STARTED_MARKER)).toBeLessThan(script.indexOf('$HOME'))
     expect(mocks.execa).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(Array),

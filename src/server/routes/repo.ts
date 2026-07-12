@@ -223,13 +223,10 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
   app.post('/fetch', async (c) => {
     const { cwd, repoRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fetch, c)
     const userId = userIdFromContext(c)
-    if (repoRuntimeId) {
-      assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
-      return c.json(
-        await runtimeReadJsonOrThrow(userId, () => fetchRepo(cwd, 'user', c.req.raw.signal, repoRuntimeId), 'fetch'),
-      )
-    }
-    return c.json(await jsonOr(() => fetchRepo(cwd, 'user', c.req.raw.signal), READ_REPO_ERROR, 'fetch'))
+    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
+    return c.json(
+      await runtimeReadJsonOrThrow(userId, () => fetchRepo(cwd, 'user', c.req.raw.signal, repoRuntimeId), 'fetch'),
+    )
   })
   app.post('/clone', async (c) => {
     const { url, parentPath, directoryName } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.clone, c)
@@ -340,19 +337,27 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
     )
   })
   app.post('/open-terminal', async (c) => {
-    const { repoId, worktreePath, app } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openTerminal, c)
+    const { repoId, repoRuntimeId, worktreePath, app } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openTerminal, c)
+    const userId = userIdFromContext(c)
+    assertCurrentRepoRuntimeForRead(userId, repoId, repoRuntimeId)
     return c.json(
-      await jsonOr(
-        () => openRepoTerminal(repoId, worktreePath, app, c.req.raw.signal),
-        READ_REPO_ERROR,
+      await runtimeReadJsonOrThrow(
+        userId,
+        () => openRepoTerminal(repoId, worktreePath, app, c.req.raw.signal, { repoRuntimeId }),
         'open-terminal',
       ),
     )
   })
   app.post('/open-editor', async (c) => {
-    const { repoId, worktreePath, app } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openEditor, c)
+    const { repoId, repoRuntimeId, worktreePath, app } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openEditor, c)
+    const userId = userIdFromContext(c)
+    assertCurrentRepoRuntimeForRead(userId, repoId, repoRuntimeId)
     return c.json(
-      await jsonOr(() => openRepoEditor(repoId, worktreePath, app, c.req.raw.signal), READ_REPO_ERROR, 'open-editor'),
+      await runtimeReadJsonOrThrow(
+        userId,
+        () => openRepoEditor(repoId, worktreePath, app, c.req.raw.signal, { repoRuntimeId }),
+        'open-editor',
+      ),
     )
   })
   app.post('/open-in-finder', async (c) => {
