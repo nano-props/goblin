@@ -15,7 +15,7 @@ describe('openRemoteInAppleTerminal', () => {
     mocks.execa.mockResolvedValue({})
   })
 
-  test('opens Terminal.app with a cleared exec ssh command and readable title', async () => {
+  test('opens Terminal.app with a scrollback-clearing exec ssh command and readable title', async () => {
     const { openRemoteInAppleTerminal } = await import('#/system/apple-terminal.ts')
 
     await expect(openRemoteInAppleTerminal('prod', '/srv/repo-feature')).resolves.toEqual({
@@ -27,15 +27,22 @@ describe('openRemoteInAppleTerminal', () => {
       '/usr/bin/osascript',
       [
         '-e',
-        expect.stringContaining('set custom title of remoteTab to titleText'),
-        expect.stringContaining('clear; exec ssh'),
+        expect.any(String),
+        expect.stringContaining("printf '\\033[H\\033[2J\\033[3J'; exec ssh"),
         'prod:/srv/repo-feature',
       ],
       expect.objectContaining({ timeout: 10_000, forceKillAfterDelay: 500 }),
     )
     const commandText = mocks.execa.mock.calls[0]![1][2]
+    const script = mocks.execa.mock.calls[0]![1][1]
+    expect(script).toContain('set custom title of remoteTab to titleText')
+    expect(script.indexOf('if not terminalWasRunning then launch')).toBeLessThan(
+      script.indexOf('set remoteTab to do script commandText'),
+    )
+    expect(script.indexOf('set remoteTab to do script commandText')).toBeLessThan(script.indexOf('activate'))
     expect(commandText).toContain("'prod'")
     expect(commandText).toContain('/srv/repo-feature')
+    expect(commandText).not.toContain('clear;')
     expect(commandText).not.toMatch(/^'ssh'/)
   })
 

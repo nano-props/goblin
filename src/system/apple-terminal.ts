@@ -5,6 +5,7 @@ import { buildRemoteTerminalInvocation, type RemoteTerminalInvocation } from '#/
 import { shellQuote } from '#/system/remote-shell.ts'
 
 const OPEN_TIMEOUT_MS = 10_000
+const CLEAR_SCREEN_AND_SCROLLBACK = '\\033[H\\033[2J\\033[3J'
 export const TERMINAL_APP_CANDIDATES = [
   '/System/Applications/Utilities/Terminal.app',
   '/Applications/Utilities/Terminal.app',
@@ -40,15 +41,16 @@ export async function openInAppleTerminal(p: string): Promise<{ ok: boolean; mes
 }
 
 function appleTerminalRemoteCommand(invocation: RemoteTerminalInvocation): string {
-  return `clear; exec ${invocation.command} ${invocation.args.map(shellQuote).join(' ')}`
+  // Terminal.app `do script` starts a local shell first, so clear its visible bootstrap and scrollback.
+  return `printf '${CLEAR_SCREEN_AND_SCROLLBACK}'; exec ${invocation.command} ${invocation.args.map(shellQuote).join(' ')}`
 }
 
 /** Open an SSH session in a new macOS Terminal.app window.
  *
  *  Terminal.app only accepts a shell string through AppleScript `do script`,
- *  so the argv invocation is encoded for the local shell. Prefixing with
- *  `clear; exec` keeps Terminal's local shell bootstrap and command echo
- *  from staying visible once the SSH session takes over the tab. */
+ *  so the argv invocation is encoded for the local shell. The printf prefix
+ *  clears both the visible screen and scrollback after Terminal's local shell
+ *  has started, then `exec` lets SSH take over the tab. */
 export async function openRemoteInAppleTerminal(
   alias: string,
   remotePath: string,
@@ -62,9 +64,11 @@ export async function openRemoteInAppleTerminal(
     on run argv
       set commandText to item 1 of argv
       set titleText to item 2 of argv
+      set terminalWasRunning to application "Terminal" is running
       tell application "Terminal"
-        activate
+        if not terminalWasRunning then launch
         set remoteTab to do script commandText
+        activate
         try
           set custom title of remoteTab to titleText
         end try
