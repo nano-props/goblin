@@ -98,6 +98,18 @@ function createTestRepoRoutes(
   })
 }
 
+async function openTestRepoRuntime(app: ReturnType<typeof createTestRepoRoutes>, repoRoot = '/tmp/repo'): Promise<string> {
+  const response = await app.request(
+    new Request('http://localhost/runtime-open', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ repoRoot, clientId: 'client-read-test' }),
+    }),
+  )
+  const json = (await response.json()) as { ok: true; repoRuntimeId: string }
+  return json.repoRuntimeId
+}
+
 describe('repo routes — POST body validation (read endpoints)', () => {
   test('returns 400 when the body is missing required fields', async () => {
     const app = createTestRepoRoutes()
@@ -376,11 +388,12 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       loadedAt: 123,
     })
     const app = createTestRepoRoutes()
+    const repoRuntimeId = await openTestRepoRuntime(app)
     const response = await app.request(
       new Request('http://localhost/projection', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', branch: 'feature/a' }),
+        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, branch: 'feature/a' }),
       }),
     )
 
@@ -423,11 +436,12 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       loadedAt: 123,
     })
     const app = createTestRepoRoutes()
+    const repoRuntimeId = await openTestRepoRuntime(app)
     const response = await app.request(
       new Request('http://localhost/operations', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', includeSettled: true }),
+        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, includeSettled: true }),
       }),
     )
 
@@ -442,11 +456,12 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   test('passes patch body through to getRepoPatch', async () => {
     mocks.getRepoPatch.mockResolvedValue({ ok: true, message: 'diff --git a b' })
     const app = createTestRepoRoutes()
+    const repoRuntimeId = await openTestRepoRuntime(app)
     const response = await app.request(
       new Request('http://localhost/patch', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', worktreePath: '/tmp/repo/.worktrees/feature' }),
+        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, worktreePath: '/tmp/repo/.worktrees/feature' }),
       }),
     )
     expect(response.status).toBe(200)
@@ -460,11 +475,12 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   test('hard-fails when repo log reading fails', async () => {
     mocks.getRepoLog.mockRejectedValueOnce(new Error('fatal: bad revision'))
     const app = createTestRepoRoutes()
+    const repoRuntimeId = await openTestRepoRuntime(app)
     const response = await app.request(
       new Request('http://localhost/log', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', branch: 'feature/work' }),
+        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, branch: 'feature/work' }),
       }),
     )
 
@@ -474,6 +490,23 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       skip: 0,
       signal: expect.any(AbortSignal),
     })
+  })
+
+  test('rejects stale runtime-scoped repo reads before the module layer', async () => {
+    const app = createTestRepoRoutes()
+    await openTestRepoRuntime(app)
+
+    const response = await app.request(
+      new Request('http://localhost/log', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId: 'repo-runtime-stale', branch: 'feature/work' }),
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({ ok: false, message: 'error.repo-runtime-stale' })
+    expect(mocks.getRepoLog).not.toHaveBeenCalled()
   })
 
   test('passes /tree requests through to the read layer', async () => {
@@ -627,7 +660,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/log', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', branch: 'main', count: 0 }),
+        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId: 'repo-runtime-test', branch: 'main', count: 0 }),
       }),
     )
     expect(response.status).toBe(400)
@@ -641,7 +674,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/log', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', branch: 'main', count: 2.5 }),
+        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId: 'repo-runtime-test', branch: 'main', count: 2.5 }),
       }),
     )
     expect(response.status).toBe(400)
@@ -657,7 +690,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/log', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', branch: 'main', count: '50' }),
+        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId: 'repo-runtime-test', branch: 'main', count: '50' }),
       }),
     )
     expect(response.status).toBe(400)

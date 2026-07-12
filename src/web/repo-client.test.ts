@@ -278,7 +278,7 @@ describe('repo-client', () => {
     })
 
     const { getRepoPatch } = await import('#/web/repo-client.ts')
-    const request = getRepoPatch('/tmp/repo', '/tmp/repo-feature')
+    const request = getRepoPatch('/tmp/repo', 'repo-runtime-test', '/tmp/repo-feature')
     const assertion = expect(request).rejects.toThrow('error.request-timeout')
 
     await Promise.resolve()
@@ -295,13 +295,19 @@ describe('repo-client', () => {
       json: async () => ({ ok: false, message: 'error.failed-read-repo' }),
     }))
     const { getRepoLog } = await import('#/web/repo-client.ts')
-    await expect(getRepoLog('/tmp/repo', 'feature/work')).rejects.toThrow('error.failed-read-repo')
+    await expect(getRepoLog('/tmp/repo', 'repo-runtime-test', 'feature/work')).rejects.toThrow('error.failed-read-repo')
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:32100/api/repo/log',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
-        body: JSON.stringify({ cwd: '/tmp/repo', branch: 'feature/work', count: 50, skip: 0 }),
+        body: JSON.stringify({
+          cwd: '/tmp/repo',
+          repoRuntimeId: 'repo-runtime-test',
+          branch: 'feature/work',
+          count: 50,
+          skip: 0,
+        }),
       }),
     )
   })

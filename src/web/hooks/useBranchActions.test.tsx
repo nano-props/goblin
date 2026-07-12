@@ -114,7 +114,7 @@ describe('useBranchActions', () => {
     })
 
     expect(result).toBe(true)
-    expect(mocks.getRepoPatch).toHaveBeenCalledWith(REPO_ID, '/tmp/local-feature')
+    expect(mocks.getRepoPatch).toHaveBeenCalledWith(REPO_ID, repo.repoRuntimeId, '/tmp/local-feature')
     expect(writeText).toHaveBeenCalledWith('diff --git a/file.ts b/file.ts')
   })
 

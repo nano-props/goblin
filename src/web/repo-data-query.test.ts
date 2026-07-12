@@ -272,7 +272,13 @@ describe('repo projection query data', () => {
     const releases: Array<(projection: RepoRuntimeProjection) => void> = []
     setRepoProjectionQueryData('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', repoProjectionForTest(0), queryClient)
     repoClientMocks.getRepoProjection.mockImplementation(
-      (_repoRoot: string, _branch: string | null | undefined, _options: unknown, signal?: AbortSignal) =>
+      (
+        _repoRoot: string,
+        _repoRuntimeId: string,
+        _branch: string | null | undefined,
+        _options: unknown,
+        signal?: AbortSignal,
+      ) =>
         new Promise<RepoRuntimeProjection>((resolve) => {
           if (!signal) throw new Error('missing projection abort signal')
           signals.push(signal)
@@ -316,7 +322,13 @@ describe('repo projection query data', () => {
     const signals: AbortSignal[] = []
     const releases: Array<(projection: RepoRuntimeProjection) => void> = []
     repoClientMocks.getRepoProjection.mockImplementation(
-      (_repoRoot: string, _branch: string | null | undefined, _options: unknown, signal?: AbortSignal) =>
+      (
+        _repoRoot: string,
+        _repoRuntimeId: string,
+        _branch: string | null | undefined,
+        _options: unknown,
+        signal?: AbortSignal,
+      ) =>
         new Promise<RepoRuntimeProjection>((resolve) => {
           if (!signal) throw new Error('missing projection abort signal')
           signals.push(signal)
@@ -428,7 +440,13 @@ describe('repo projection query data', () => {
     const queryKey = repoProjectionQueryKey('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full')
     setRepoProjectionQueryData('/tmp/repo', 'repo-runtime-1', 'feature/a', 'full', repoProjectionForTest(0), queryClient)
     repoClientMocks.getRepoProjection.mockImplementation(
-      (_repoRoot: string, _branch: string | null | undefined, _options: unknown, signal?: AbortSignal) =>
+      (
+        _repoRoot: string,
+        _repoRuntimeId: string,
+        _branch: string | null | undefined,
+        _options: unknown,
+        signal?: AbortSignal,
+      ) =>
         new Promise<RepoRuntimeProjection>((resolve, reject) => {
           if (!signal) throw new Error('missing projection abort signal')
           signals.push(signal)
@@ -469,7 +487,13 @@ describe('repo projection query data', () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const signals: AbortSignal[] = []
     repoClientMocks.getRepoProjection.mockImplementation(
-      (_repoRoot: string, _branch: string | null | undefined, _options: unknown, signal?: AbortSignal) =>
+      (
+        _repoRoot: string,
+        _repoRuntimeId: string,
+        _branch: string | null | undefined,
+        _options: unknown,
+        signal?: AbortSignal,
+      ) =>
         new Promise<RepoRuntimeProjection>((_resolve, reject) => {
           if (!signal) throw new Error('missing projection abort signal')
           signals.push(signal)
@@ -501,7 +525,13 @@ describe('repo projection query data', () => {
     const signals: AbortSignal[] = []
     const releases: Array<(projection: RepoRuntimeProjection) => void> = []
     repoClientMocks.getRepoProjection.mockImplementation(
-      (_repoRoot: string, _branch: string | null | undefined, _options: unknown, signal?: AbortSignal) =>
+      (
+        _repoRoot: string,
+        _repoRuntimeId: string,
+        _branch: string | null | undefined,
+        _options: unknown,
+        signal?: AbortSignal,
+      ) =>
         new Promise<RepoRuntimeProjection>((resolve, reject) => {
           if (!signal) throw new Error('missing projection abort signal')
           signals.push(signal)
@@ -622,7 +652,12 @@ describe('repo projection query data', () => {
       release!.resolve(repoProjectionForTest(loadedAt, branch, mode))
     }
     repoClientMocks.getRepoProjection.mockImplementation(
-      (_repoRoot: string, branch: string | null | undefined, options?: { mode?: 'summary' | 'full' }) =>
+      (
+        _repoRoot: string,
+        _repoRuntimeId: string,
+        branch: string | null | undefined,
+        options?: { mode?: 'summary' | 'full' },
+      ) =>
         new Promise<RepoRuntimeProjection>((resolve) => {
           releases.push({ branch: branch ?? null, mode: options?.mode ?? 'full', resolved: false, resolve })
         }),

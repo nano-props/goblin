@@ -30,7 +30,7 @@ describe('repo web transport helpers', () => {
     }))
     const { getRepoPatch } = await import('#/web/repo-client.ts')
 
-    await expect(getRepoPatch('/tmp/repo', '/tmp/repo')).resolves.toEqual({
+    await expect(getRepoPatch('/tmp/repo', 'repo-runtime-test', '/tmp/repo')).resolves.toEqual({
       ok: true,
       message: 'diff --git a/file b/file',
     })

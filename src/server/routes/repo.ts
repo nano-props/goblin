@@ -32,12 +32,13 @@ import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import {
   acquireRepoRuntime,
+  isCurrentRepoRuntime,
   listRepoRuntimes,
   releaseRepoRuntime,
   replaceRepoRuntimeMembershipsForClient,
 } from '#/server/modules/repo-runtimes.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
-import type { RepoLogResponse } from '#/shared/api-types.ts'
+import { IpcError, type RepoLogResponse } from '#/shared/api-types.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import type { PhysicalWorktreeCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
@@ -67,13 +68,19 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
       throw err
     }
   }
+  function assertCurrentRepoRuntimeForRead(userId: string | null | undefined, repoRoot: string, repoRuntimeId: string): void {
+    if (!userId || !isCurrentRepoRuntime(userId, repoRoot, repoRuntimeId)) {
+      throw new IpcError({ code: 'BAD_REQUEST', message: 'error.repo-runtime-stale' })
+    }
+  }
 
   app.post('/probe', async (c) => {
     const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.probe, c)
     return c.json(await jsonOr(() => probeRepo(cwd), READ_REPO_ERROR, 'probe'))
   })
   app.post('/log', async (c) => {
-    const { cwd, branch, count, skip } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.log, c)
+    const { cwd, repoRuntimeId, branch, count, skip } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.log, c)
+    assertCurrentRepoRuntimeForRead(userIdFromContext(c), cwd, repoRuntimeId)
     return c.json(
       await readJsonOrThrow<RepoLogResponse>(
         () =>
@@ -87,7 +94,8 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
     )
   })
   app.post('/remote-branches', async (c) => {
-    const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.getRemoteBranches, c)
+    const { cwd, repoRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.getRemoteBranches, c)
+    assertCurrentRepoRuntimeForRead(userIdFromContext(c), cwd, repoRuntimeId)
     return c.json(await readJsonOrThrow(() => getRepoRemoteBranches(cwd, c.req.raw.signal), 'remote-branches'))
   })
   app.post('/worktree-bootstrap-preview', async (c) => {
@@ -101,7 +109,8 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
     )
   })
   app.post('/patch', async (c) => {
-    const { cwd, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.patch, c)
+    const { cwd, repoRuntimeId, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.patch, c)
+    assertCurrentRepoRuntimeForRead(userIdFromContext(c), cwd, repoRuntimeId)
     return c.json(await readJsonOrThrow(() => getRepoPatch(cwd, worktreePath, c.req.raw.signal), 'patch'))
   })
   app.post('/tree', async (c) => {
@@ -135,7 +144,8 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
     return c.json(result)
   })
   app.post('/projection', async (c) => {
-    const { cwd, branch, mode } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.projection, c)
+    const { cwd, repoRuntimeId, branch, mode } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.projection, c)
+    assertCurrentRepoRuntimeForRead(userIdFromContext(c), cwd, repoRuntimeId)
     return c.json(
       await readJsonOrThrow(
         () => readRepoProjection(cwd, { branch, mode: mode ?? 'full', signal: c.req.raw.signal }),
@@ -144,7 +154,8 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
     )
   })
   app.post('/operations', async (c) => {
-    const { cwd, includeSettled } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.operations, c)
+    const { cwd, repoRuntimeId, includeSettled } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.operations, c)
+    if (cwd && repoRuntimeId) assertCurrentRepoRuntimeForRead(userIdFromContext(c), cwd, repoRuntimeId)
     return c.json(await readRepoOperationsSnapshot(cwd, { includeSettled, signal: c.req.raw.signal }))
   })
   app.post('/fetch', async (c) => {

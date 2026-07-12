@@ -287,7 +287,7 @@ async function fetchRepoProjectionReadModel(
   queryClient: QueryClient,
 ): Promise<RepoRuntimeProjection> {
   const startedVersion = markRepoProjectionFetchStarted(repoRoot, repoRuntimeId, branch, mode, queryClient)
-  const projection = await getRepoProjection(repoRoot, branch, { mode }, signal)
+  const projection = await getRepoProjection(repoRoot, repoRuntimeId, branch, { mode }, signal)
   signal.throwIfAborted()
   if (startedVersion < getRepoRuntimeProjectionInvalidationVersion(repoRoot, repoRuntimeId, queryClient)) {
     throw new StaleRepoRuntimeReadError()
@@ -371,7 +371,7 @@ function repoLogQueryOptions(
   const skip = options.skip ?? 0
   return queryOptions({
     queryKey: repoLogQueryKey(repoRoot, repoRuntimeId, branch, count, skip),
-    queryFn: ({ signal }) => getRepoLog(repoRoot, branch, { count, skip, signal }),
+    queryFn: ({ signal }) => getRepoLog(repoRoot, repoRuntimeId, branch, { count, skip, signal }),
     enabled: options.enabled,
   })
 }
@@ -379,7 +379,7 @@ function repoLogQueryOptions(
 function repoRemoteBranchesQueryOptions(repoRoot: string, repoRuntimeId: string, options: { enabled?: boolean } = {}) {
   return queryOptions({
     queryKey: repoRemoteBranchesQueryKey(repoRoot, repoRuntimeId),
-    queryFn: ({ signal }) => getRepoRemoteBranches(repoRoot, signal),
+    queryFn: ({ signal }) => getRepoRemoteBranches(repoRoot, repoRuntimeId, signal),
     enabled: options.enabled,
   })
 }
@@ -408,7 +408,7 @@ async function fetchRepoOperationsReadModel(
   queryClient: QueryClient,
 ): Promise<RepoOperationsSnapshot> {
   const startedVersion = getRepoRuntimeProjectionInvalidationVersion(repoRoot, repoRuntimeId, queryClient)
-  const operations = await getRepoOperations(repoRoot, { includeSettled, signal })
+  const operations = await getRepoOperations(repoRoot, repoRuntimeId, { includeSettled, signal })
   signal.throwIfAborted()
   if (startedVersion < getRepoRuntimeProjectionInvalidationVersion(repoRoot, repoRuntimeId, queryClient)) {
     throw new StaleRepoRuntimeReadError()

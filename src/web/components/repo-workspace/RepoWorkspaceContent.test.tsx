@@ -1216,6 +1216,7 @@ describe('RepoWorkspaceContent', () => {
 
     expect(repoClientMocks.getRepoLog).toHaveBeenCalledWith(
       REPO_ID,
+      repo.repoRuntimeId,
       'feature/history',
       expect.objectContaining({ count: 50 }),
     )
