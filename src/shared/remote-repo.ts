@@ -307,14 +307,6 @@ export function normalizeRemoteTarget(input: RemoteRepoTargetInput): RemoteRepoT
   }
 }
 
-export function remoteTargetSubtitle(target: Pick<RemoteRepoTarget, 'host' | 'user' | 'remotePath'>): string {
-  return `${target.user}@${target.host}:${target.remotePath}`
-}
-
-export function remoteWorktreePathLabel(target: Pick<RemoteRepoTarget, 'host' | 'user'>, path: string): string {
-  return `${target.user}@${target.host}:${path}`
-}
-
 export function remoteDisplayName(target: Pick<RemoteRepoTargetInput, 'alias' | 'host' | 'remotePath'>): string {
   const alias = typeof target.alias === 'string' && safeText(target.alias) ? target.alias.trim() : null
   const host = typeof target.host === 'string' && safeText(target.host) ? target.host.trim() : 'remote'

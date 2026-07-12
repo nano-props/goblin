@@ -1,6 +1,7 @@
 import { homeDirectory } from '#/web/app-shell-client.ts'
+import { formatRemoteWorktreeLocator, formatRepoLocator as formatSharedRepoLocator } from '#/shared/repo-locator.ts'
 import { tildifyPath, untildifyPath } from '#/shared/paths.ts'
-import { remoteTargetSubtitle, remoteWorktreePathLabel, type RemoteRepoTarget } from '#/shared/remote-repo.ts'
+import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
 export { tildifyPath, untildifyPath } from '#/shared/paths.ts'
 
 /** Last segment of a path. Tolerant of either separator so worktree
@@ -52,9 +53,9 @@ export function untildify(path: string): string {
 }
 
 export function formatRepoLocator(path: string, target?: RemoteRepoTarget | null): string {
-  return target ? remoteTargetSubtitle(target) : tildify(path)
+  return formatSharedRepoLocator(path, homeDirectory(), target)
 }
 
 export function formatWorktreePath(path: string, target?: RemoteRepoTarget | null): string {
-  return target ? remoteWorktreePathLabel(target, path) : tildify(path)
+  return target ? formatRemoteWorktreeLocator(target, path) : tildify(path)
 }

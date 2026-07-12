@@ -21,7 +21,7 @@ import { menuNodeLog } from '#/node/logger.ts'
 import { openDataFolderMenuKey, t } from '#/main/i18n/index.ts'
 import { sendClientEffectIntent } from '#/main/client-surface-events.ts'
 import { getTheme } from '#/main/theme.ts'
-import { tildifyPath } from '#/shared/paths.ts'
+import { formatRepoSessionEntryLocator } from '#/shared/repo-locator.ts'
 import type { LangPref, ThemePref } from '#/shared/api-types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
@@ -173,20 +173,30 @@ function createFileMenu(state: AppMenuState): MenuItemConstructorOptions {
 }
 
 function createRecentReposMenu(recentRepos: RepoSessionEntry[]): MenuItemConstructorOptions[] {
+  if (recentRepos.length === 0) return [{ label: t('menu.file.no-recent'), enabled: false }]
+
   const home = app.getPath('home')
-  return recentRepos.length > 0
-    ? [
-        ...recentRepos.map((entry) => ({
-          label:
-            entry.kind === 'local'
-              ? tildifyPath(entry.id, home)
-              : `${entry.ref.displayName} — ${entry.ref.alias}:${entry.ref.remotePath}`,
-          click: () => send({ type: 'open-recent-repo-requested', entry }),
-        })),
-        separator(),
-        { label: t('menu.file.clear-recent'), click: () => send({ type: 'clear-recent-repos-requested' }) },
-      ]
-    : [{ label: t('menu.file.no-recent'), enabled: false }]
+  const localRepoItems = recentRepos
+    .filter((entry) => entry.kind === 'local')
+    .map((entry) => createRecentRepoMenuItem(entry, home))
+  const remoteRepoItems = recentRepos
+    .filter((entry) => entry.kind === 'remote')
+    .map((entry) => createRecentRepoMenuItem(entry, home))
+
+  return [
+    ...localRepoItems,
+    ...(localRepoItems.length > 0 && remoteRepoItems.length > 0 ? [separator()] : []),
+    ...remoteRepoItems,
+    separator(),
+    { label: t('menu.file.clear-recent'), click: () => send({ type: 'clear-recent-repos-requested' }) },
+  ]
+}
+
+function createRecentRepoMenuItem(entry: RepoSessionEntry, home: string): MenuItemConstructorOptions {
+  return {
+    label: formatRepoSessionEntryLocator(entry, home),
+    click: () => send({ type: 'open-recent-repo-requested', entry }),
+  }
 }
 
 function createEditMenu(): MenuItemConstructorOptions {

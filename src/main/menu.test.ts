@@ -190,6 +190,38 @@ describe('app menu actions', () => {
     expect(recentMenu?.submenu?.[0]?.label).toBe('~\\Developer\\repo')
   })
 
+  test('groups recent repos by local and remote entries', async () => {
+    mocks.readMenuRuntimeState.mockReturnValue({
+      ...defaultMenuRuntimeState(),
+      recentRepos: [
+        {
+          kind: 'remote',
+          id: 'remote:work/srv/remote-repo',
+          ref: {
+            id: 'remote:work/srv/remote-repo',
+            alias: 'work',
+            remotePath: '/srv/remote-repo',
+            displayName: 'remote-repo',
+          },
+        },
+        { kind: 'local', id: '/home/user/Developer/local-repo' },
+      ],
+    })
+    const { buildAppMenu } = await import('#/main/menu.ts')
+
+    buildAppMenu()
+
+    const fileMenu = mocks.template.find((entry) => entry.label === 'menu.file')
+    const recentMenu = fileMenu?.submenu?.find((entry: any) => entry.label === 'menu.file.open-recent')
+    expect(recentMenu?.submenu?.map((entry: any) => entry.label ?? entry.type)).toEqual([
+      '~/Developer/local-repo',
+      'separator',
+      'work:/srv/remote-repo',
+      'separator',
+      'menu.file.clear-recent',
+    ])
+  })
+
   test('keeps the shortcuts help item available when shortcuts are disabled', async () => {
     mocks.readMenuRuntimeState.mockReturnValue({
       ...defaultMenuRuntimeState(),
