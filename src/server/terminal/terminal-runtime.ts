@@ -41,7 +41,9 @@ import { type PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import { type ServerTerminalActionHost, type ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { GoblinTerminalCommandRuntime } from '#/server/terminal/g-command.ts'
 import type { TerminalSessionSummary } from '#/shared/terminal-types.ts'
-import { isCurrentRepoRuntime, onRepoRuntimeClosed } from '#/server/modules/repo-runtimes.ts'
+import { failRepoRemoteLifecycle, isCurrentRepoRuntime, onRepoRuntimeClosed } from '#/server/modules/repo-runtimes.ts'
+import { publishUserRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
+import type { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { createAppRealtimeHost } from '#/server/realtime/app-realtime-runtime.ts'
 import { createWorktreeRemovalApplication } from '#/server/worktree-removal/worktree-removal-application.ts'
@@ -185,6 +187,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     terminal: { ...terminalCreateProvider, close: actions.close },
     terminalWorktree: manager,
     isCurrentRepoRuntime,
+    failRemoteRuntime: failRemoteRuntimeFromTerminal,
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
   })
   const worktreeRemovalApplication = createWorktreeRemovalApplication({
@@ -336,5 +339,17 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
           'failed to reconcile workspace tabs after terminal session close',
         )
       })
+  }
+
+  function failRemoteRuntimeFromTerminal(userId: string, error: RemoteRepoRuntimeFailureError): void {
+    const failed = failRepoRemoteLifecycle({
+      userId,
+      repoRoot: error.repoRoot,
+      repoRuntimeId: error.repoRuntimeId,
+      reason: error.reason,
+      ...(error.target ? { target: error.target } : {}),
+    })
+    if (failed.kind !== 'settled') return
+    publishUserRepoQueryInvalidation(userId, { repoId: error.repoRoot, query: 'remote-lifecycle' })
   }
 }

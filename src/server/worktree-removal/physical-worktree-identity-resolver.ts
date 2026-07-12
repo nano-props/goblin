@@ -17,6 +17,7 @@ import {
   onRepoRuntimeClosed,
   type RepoRuntimeClosedEvent,
 } from '#/server/modules/repo-runtimes.ts'
+import { remoteRuntimeFailureFromCommandResult } from '#/server/modules/remote-runtime-failure.ts'
 import {
   physicalWorktreeIdentityKey,
   type PhysicalWorktreeIdentity,
@@ -241,7 +242,16 @@ export class PhysicalWorktreeIdentityResolver {
       { signal },
     )
     this.assertEpochActive(epoch)
-    if (!result.ok) throw new Error(result.message || result.stderr || 'error.unavailable')
+    if (!result.ok) {
+      const runtimeFailure = remoteRuntimeFailureFromCommandResult({
+        repoRoot: input.repoRoot,
+        repoRuntimeId: input.repoRuntimeId,
+        target: resolved.target,
+        result,
+      })
+      if (runtimeFailure) throw runtimeFailure
+      throw new Error(result.message || result.stderr || 'error.unavailable')
+    }
     const { identity, endpointMarker } = parseRemotePhysicalWorktreeCapture(result.stdout)
     return {
       identity,
@@ -279,7 +289,16 @@ export class PhysicalWorktreeIdentityResolver {
     )
     signal.throwIfAborted()
     this.assertEpochActive(epoch)
-    if (!result.ok) throw new Error(result.message || result.stderr || 'error.repo-runtime-stale')
+    if (!result.ok) {
+      const runtimeFailure = remoteRuntimeFailureFromCommandResult({
+        repoRoot: epoch.repoRoot,
+        repoRuntimeId: epoch.repoRuntimeId,
+        target: execution.target,
+        result,
+      })
+      if (runtimeFailure) throw runtimeFailure
+      throw new Error(result.message || result.stderr || 'error.repo-runtime-stale')
+    }
     const current = parseRemotePhysicalWorktreeCapture(result.stdout)
     if (
       physicalWorktreeIdentityKey(current.identity) !== physicalWorktreeIdentityKey(identity) ||

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   acquireRepoRuntime,
   clearRepoRuntimesForUser,
+  failRepoRemoteLifecycle,
   listRepoRuntimes,
   releaseRepoRuntime,
   runRepoRemoteLifecycle,
@@ -210,5 +211,68 @@ describe('repo runtime remote lifecycle', () => {
       transitions.push(`${lifecycle.kind}:${lifecycle.attemptId}`)
     })
     expect(transitions).toEqual(['connecting:1', 'ready:1'])
+  })
+
+  test('external failure settles the current remote lifecycle without closing the runtime', () => {
+    const runtimeId = acquireRepoRuntime(userId, repoRoot, clientId)
+
+    expect(
+      failRepoRemoteLifecycle({ userId, repoRoot, repoRuntimeId: runtimeId, reason: 'unreachable', target }),
+    ).toEqual({
+      kind: 'settled',
+      name: target.displayName,
+      lifecycle: { kind: 'failed', attemptId: 1, reason: 'unreachable', target },
+    })
+    expect(listRepoRuntimes(userId)).toEqual([
+      { repoRoot, repoRuntimeId: runtimeId, remoteLifecycle: { kind: 'failed', attemptId: 1, reason: 'unreachable', target } },
+    ])
+    expect(releaseRepoRuntime(userId, repoRoot, runtimeId, clientId)).toEqual({
+      released: true,
+      runtimeClosed: true,
+    })
+  })
+
+  test('external failure rejects stale and non-remote runtimes', () => {
+    const runtimeId = acquireRepoRuntime(userId, repoRoot, clientId)
+
+    expect(
+      failRepoRemoteLifecycle({ userId, repoRoot, repoRuntimeId: 'repo-runtime-stale', reason: 'timeout' }),
+    ).toEqual({ kind: 'stale-runtime' })
+    expect(
+      failRepoRemoteLifecycle({ userId, repoRoot: '/local/repo', repoRuntimeId: runtimeId, reason: 'timeout' }),
+    ).toEqual({ kind: 'not-remote' })
+  })
+
+  test('external failure aborts a connecting lifecycle and prevents older ready from winning', async () => {
+    const runtimeId = acquireRepoRuntime(userId, repoRoot, clientId)
+    let signal!: AbortSignal
+    let release!: (value: RemoteRepoConnectionResult) => void
+    const connecting = runRepoRemoteLifecycle(userId, repoRoot, runtimeId, (nextSignal) => {
+      signal = nextSignal
+      return new Promise((resolve) => { release = resolve })
+    })
+    expect(listRepoRuntimes(userId)[0]?.remoteLifecycle).toEqual({ kind: 'connecting', attemptId: 1 })
+
+    expect(failRepoRemoteLifecycle({ userId, repoRoot, repoRuntimeId: runtimeId, reason: 'timeout' })).toEqual({
+      kind: 'settled',
+      name: repoRoot,
+      lifecycle: { kind: 'failed', attemptId: 2, reason: 'timeout' },
+    })
+    expect(signal.aborted).toBe(true)
+    release(ready)
+
+    await expect(connecting).resolves.toEqual({ kind: 'superseded' })
+    expect(listRepoRuntimes(userId)[0]?.remoteLifecycle).toEqual({ kind: 'failed', attemptId: 2, reason: 'timeout' })
+  })
+
+  test('external failure preserves the last known remote target', async () => {
+    const runtimeId = acquireRepoRuntime(userId, repoRoot, clientId)
+    await runRepoRemoteLifecycle(userId, repoRoot, runtimeId, async () => ready)
+
+    expect(failRepoRemoteLifecycle({ userId, repoRoot, repoRuntimeId: runtimeId, reason: 'handshake-failed' })).toEqual({
+      kind: 'settled',
+      name: 'repo',
+      lifecycle: { kind: 'failed', attemptId: 2, reason: 'handshake-failed', target },
+    })
   })
 })

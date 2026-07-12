@@ -12,6 +12,7 @@ import {
   testPhysicalWorktreeIdentity,
   testPhysicalWorktrees,
 } from '#/server/test-utils/physical-worktree-identity.ts'
+import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
 
 const request = {
   repoRoot: '/repo',
@@ -107,6 +108,39 @@ describe('WorkspacePaneRuntimeApplication', () => {
     })
     expect(ensureRuntimeTabForSession).not.toHaveBeenCalled()
     expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
+  })
+
+  test('reports remote runtime failure when physical worktree capture proves transport failure', async () => {
+    const failure = new RemoteRepoRuntimeFailureError({
+      repoRoot: request.repoRoot,
+      repoRuntimeId: request.repoRuntimeId,
+      reason: 'unreachable',
+    })
+    const create = vi.fn()
+    const ensureRuntimeTabForSession = vi.fn()
+    const failRemoteRuntime = vi.fn()
+    const application = createWorkspacePaneRuntimeApplication({
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: { capture: async () => { throw failure } },
+      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminal: { createAdmitted: create, close: () => false },
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession, reconcileWorktreeAdmitted: vi.fn() } as unknown as Pick<
+        WorkspacePaneTabsCoordinator,
+        'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'
+      >,
+      isCurrentRepoRuntime: () => true,
+      failRemoteRuntime,
+      broadcastWorkspaceTabsChanged: vi.fn(),
+    })
+
+    await expect(application.open('client-test', 'user-test', { runtimeType: 'terminal', request })).resolves.toEqual({
+      ok: false,
+      runtimeType: 'terminal',
+      message: 'unreachable',
+    })
+    expect(failRemoteRuntime).toHaveBeenCalledWith('user-test', failure)
+    expect(create).not.toHaveBeenCalled()
+    expect(ensureRuntimeTabForSession).not.toHaveBeenCalled()
   })
 
   test.each(['created', 'reused', 'restored'] as const)(

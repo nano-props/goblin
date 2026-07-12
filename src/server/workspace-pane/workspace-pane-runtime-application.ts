@@ -25,6 +25,7 @@ import type {
   PhysicalWorktreeIdentityResolver,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import type { ServerTerminalCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
+import { isRemoteRepoRuntimeFailure, type RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
 
 type MaybePromise<T> = T | Promise<T>
 const workspacePaneRuntimeApplicationLogger = serverLogger.child({ module: 'workspace-pane-runtime-application' })
@@ -43,6 +44,7 @@ interface WorkspacePaneRuntimeApplicationDependencies {
     listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
   }
   isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
+  failRemoteRuntime?(userId: string, error: RemoteRepoRuntimeFailureError): void
   broadcastWorkspaceTabsChanged(userId: string, repoRoot: string): void
 }
 
@@ -73,6 +75,7 @@ export class WorkspacePaneRuntimeApplication {
     try {
       physicalCapability = await this.capturePhysicalWorktree(userId, input.request, worktreePath)
     } catch (error) {
+      this.failRemoteRuntimeIfNeeded(userId, error)
       return runtimeFailure(input.runtimeType, error instanceof Error ? error.message : String(error))
     }
     const result = await this.deps.worktreeOperations.runOperation(physicalCapability, async (permit) => {
@@ -96,6 +99,7 @@ export class WorkspacePaneRuntimeApplication {
     try {
       physicalCapability = await this.capturePhysicalWorktree(userId, target, target.worktreePath)
     } catch (error) {
+      this.failRemoteRuntimeIfNeeded(userId, error)
       return runtimeFailure(input.runtimeType, error instanceof Error ? error.message : String(error))
     }
     const result = await this.deps.worktreeOperations.runOperation(physicalCapability, async (permit) => {
@@ -299,6 +303,11 @@ export class WorkspacePaneRuntimeApplication {
       repoRuntimeId: target.repoRuntimeId,
       worktreePath,
     })
+  }
+
+  private failRemoteRuntimeIfNeeded(userId: string, error: unknown): void {
+    if (!isRemoteRepoRuntimeFailure(error)) return
+    this.deps.failRemoteRuntime?.(userId, error)
   }
 }
 
