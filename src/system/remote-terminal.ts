@@ -3,8 +3,9 @@ import { isSafeRemoteAbsolutePath, isSafeRemoteAlias, shellQuote } from '#/syste
 export interface RemoteTerminalInvocation {
   command: 'ssh'
   args: string[]
-  /** Fully shell-quoted command line, suitable for `osascript do script` or
-   *  AppleScript windows. Don't parse — display only. */
+  /** Fully shell-quoted command line for APIs that accept one shell string
+   *  instead of argv, such as Terminal.app `do script` or Ghostty's
+   *  AppleScript `command` surface configuration. */
   shellCommand: string
 }
 

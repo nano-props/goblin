@@ -118,6 +118,27 @@ describe('openRemoteInGhostty', () => {
     expect(execaMock).not.toHaveBeenCalled()
   })
 
+  test('reuses a running instance with an SSH command configuration', async () => {
+    existsSyncMock.mockReturnValue(true)
+    mockOsascriptOnce({ stdout: 'opened' })
+
+    const result = await openRemoteInGhostty('prod', '/srv/repo')
+
+    expect(result).toEqual({ ok: true, message: '/srv/repo' })
+    expect(execaMock).toHaveBeenCalledTimes(1)
+    const osascriptArgs = execaMock.mock.calls[0]
+    expect(osascriptArgs[0]).toBe('/usr/bin/osascript')
+    const argv = osascriptArgs[1] as string[]
+    expect(argv).toEqual([
+      '-e',
+      expect.stringContaining('command:commandText'),
+      expect.stringContaining("'ssh' '-tt' '--' 'prod'"),
+    ])
+    expect(argv[1]).not.toContain('input text')
+    expect(argv[1]).not.toContain('send key')
+    expect(argv[2]).not.toMatch(/\n$/)
+  })
+
   test('falls back to launching with -e ssh ... and without -n', async () => {
     existsSyncMock.mockReturnValue(true)
     mockOsascriptOnce({ stdout: 'not-running' })
