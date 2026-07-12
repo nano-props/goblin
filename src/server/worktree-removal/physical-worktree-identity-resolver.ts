@@ -231,27 +231,22 @@ export class PhysicalWorktreeIdentityResolver {
     }
     epoch.remoteConfigFingerprint = resolved.configFingerprint
 
+    const runRemoteCommand = this.runtimeAwareRemoteRunner({
+      repoRoot: input.repoRoot,
+      repoRuntimeId: input.repoRuntimeId,
+    })
     const known = await this.deps.resolveRemoteWorktree(resolved.target, worktreePath, {
       signal,
-      run: this.deps.runRemoteCommand,
+      run: runRemoteCommand,
     })
     this.assertEpochActive(epoch)
-    const result = await this.deps.runRemoteCommand(
+    const result = await runRemoteCommand(
       { type: 'resolvePhysicalWorktreeIdentity', path: known.path },
       resolved.target,
       { signal },
     )
     this.assertEpochActive(epoch)
-    if (!result.ok) {
-      const runtimeFailure = remoteRuntimeFailureFromCommandResult({
-        repoRoot: input.repoRoot,
-        repoRuntimeId: input.repoRuntimeId,
-        target: resolved.target,
-        result,
-      })
-      if (runtimeFailure) throw runtimeFailure
-      throw new Error(result.message || result.stderr || 'error.unavailable')
-    }
+    if (!result.ok) throw new Error(result.message || result.stderr || 'error.unavailable')
     const { identity, endpointMarker } = parseRemotePhysicalWorktreeCapture(result.stdout)
     return {
       identity,
@@ -282,23 +277,17 @@ export class PhysicalWorktreeIdentityResolver {
       }
       return
     }
-    const result = await this.deps.runRemoteCommand(
+    const result = await this.runtimeAwareRemoteRunner({
+      repoRoot: epoch.repoRoot,
+      repoRuntimeId: epoch.repoRuntimeId,
+    })(
       { type: 'resolvePhysicalWorktreeIdentity', path: execution.canonicalWorktreePath },
       execution.target,
       { signal },
     )
     signal.throwIfAborted()
     this.assertEpochActive(epoch)
-    if (!result.ok) {
-      const runtimeFailure = remoteRuntimeFailureFromCommandResult({
-        repoRoot: epoch.repoRoot,
-        repoRuntimeId: epoch.repoRuntimeId,
-        target: execution.target,
-        result,
-      })
-      if (runtimeFailure) throw runtimeFailure
-      throw new Error(result.message || result.stderr || 'error.repo-runtime-stale')
-    }
+    if (!result.ok) throw new Error(result.message || result.stderr || 'error.repo-runtime-stale')
     const current = parseRemotePhysicalWorktreeCapture(result.stdout)
     if (
       physicalWorktreeIdentityKey(current.identity) !== physicalWorktreeIdentityKey(identity) ||
@@ -341,6 +330,23 @@ export class PhysicalWorktreeIdentityResolver {
       !this.deps.isCurrentRepoRuntime(epoch.userId, epoch.repoRoot, epoch.repoRuntimeId)
     ) {
       throw new Error('error.repo-runtime-stale')
+    }
+  }
+
+  private runtimeAwareRemoteRunner(input: {
+    repoRoot: string
+    repoRuntimeId: string
+  }): RemoteCommandRunner {
+    return async (command, target, options) => {
+      const result = await this.deps.runRemoteCommand(command, target, options)
+      const runtimeFailure = remoteRuntimeFailureFromCommandResult({
+        repoRoot: input.repoRoot,
+        repoRuntimeId: input.repoRuntimeId,
+        target,
+        result,
+      })
+      if (runtimeFailure) throw runtimeFailure
+      return result
     }
   }
 

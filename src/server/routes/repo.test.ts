@@ -456,6 +456,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(response.status).toBe(200)
     expect(mocks.readRepoOperationsSnapshot).toHaveBeenCalledWith('/tmp/repo', {
       includeSettled: true,
+      repoRuntimeId,
       signal: expect.any(AbortSignal),
     })
     expect(await response.json()).toMatchObject({ operations: [{ kind: 'fetch', phase: 'running' }] })

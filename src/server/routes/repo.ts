@@ -205,7 +205,7 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
   app.post('/operations', async (c) => {
     const { cwd, repoRuntimeId, includeSettled } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.operations, c)
     if (cwd && repoRuntimeId) assertCurrentRepoRuntimeForRead(userIdFromContext(c), cwd, repoRuntimeId)
-    return c.json(await readRepoOperationsSnapshot(cwd, { includeSettled, signal: c.req.raw.signal }))
+    return c.json(await readRepoOperationsSnapshot(cwd, { includeSettled, repoRuntimeId, signal: c.req.raw.signal }))
   })
   app.post('/fetch', async (c) => {
     const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fetch, c)

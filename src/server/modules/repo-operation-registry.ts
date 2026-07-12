@@ -22,6 +22,7 @@ interface BeginRepoServerOperationInput {
 
 interface ListRepoServerOperationsOptions {
   repoId?: string
+  repoRuntimeId?: string
   includeSettled?: boolean
 }
 
@@ -170,6 +171,9 @@ export function listRepoServerOperations(options: ListRepoServerOperationsOption
   return sortedOperations(
     [...operations.values()].filter((operation) => {
       if (options.repoId && operation.repoId !== options.repoId) return false
+      if (options.repoRuntimeId && operation.repoRuntimeId && operation.repoRuntimeId !== options.repoRuntimeId) {
+        return false
+      }
       if (!includeSettled && (operation.phase === 'done' || operation.phase === 'failed')) return false
       return true
     }),

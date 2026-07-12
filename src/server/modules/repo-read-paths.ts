@@ -146,6 +146,7 @@ export interface RepoProjectionReadOptions {
 export interface RepoOperationsReadOptions {
   includeSettled?: boolean
   signal?: AbortSignal
+  repoRuntimeId?: string
 }
 
 function sortedRepoOperations(states: RepoServerOperationState[]): RepoServerOperationState[] {
@@ -267,7 +268,7 @@ export async function readRepoProjection(
   )
   return {
     ...result,
-    operations: await readRepoOperationsSnapshot(cwd, { signal: options.signal }),
+    operations: await readRepoOperationsSnapshot(cwd, { signal: options.signal, repoRuntimeId: options.repoRuntimeId }),
     requested: {
       branch,
       pullRequestMode: mode,
@@ -286,6 +287,7 @@ export async function readRepoOperationsSnapshot(
 ): Promise<RepoOperationsSnapshot> {
   const registrySnapshot = getRepoOperationsSnapshot({
     repoId: cwd,
+    repoRuntimeId: options.repoRuntimeId,
     includeSettled: options.includeSettled,
   })
   const writeOperations = await listRepoWriteOperationsForRepo(cwd, options)
