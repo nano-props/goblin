@@ -1,0 +1,103 @@
+import { beforeEach, describe, expect, test, vi } from 'vitest'
+import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+
+const mocks = vi.hoisted(() => ({
+  chmod: vi.fn(),
+  execa: vi.fn(),
+  mkdir: vi.fn(),
+}))
+
+vi.mock('execa', () => ({
+  ExecaError: class ExecaError extends Error {},
+  execa: mocks.execa,
+}))
+
+vi.mock('node:fs/promises', () => ({
+  chmod: mocks.chmod,
+  mkdir: mocks.mkdir,
+}))
+
+import { runRemoteCommand } from '#/system/ssh/commands.ts'
+
+const REMOTE_COMMAND_STARTED_MARKER = '__GOBLIN_REMOTE_COMMAND_STARTED__'
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  mocks.chmod.mockResolvedValue(undefined)
+  mocks.mkdir.mockResolvedValue(undefined)
+})
+
+describe('runRemoteCommand', () => {
+  test('marks the remote shell as started and strips the marker from successful stdout', async () => {
+    const signal = new AbortController().signal
+    mocks.execa.mockResolvedValueOnce({
+      stdout: `${REMOTE_COMMAND_STARTED_MARKER}\n/home/deploy\n`,
+      stderr: 'ignored warning\n',
+    })
+
+    await expect(runRemoteCommand(target(), { type: 'printHome' }, { signal, timeoutMs: 1234 })).resolves.toEqual({
+      ok: true,
+      stdout: '/home/deploy',
+      stderr: 'ignored warning',
+      remoteStarted: true,
+    })
+
+    const args = mocks.execa.mock.calls[0]?.[1] as string[]
+    expect(args.at(-1)).toContain(REMOTE_COMMAND_STARTED_MARKER)
+    expect(mocks.execa).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Array),
+      expect.objectContaining({
+        cancelSignal: signal,
+        forceKillAfterDelay: 500,
+        timeout: 1234,
+      }),
+    )
+  })
+
+  test('preserves remoteStarted on command failures after the remote shell starts', async () => {
+    mocks.execa.mockRejectedValueOnce({
+      stdout: `${REMOTE_COMMAND_STARTED_MARKER}\n`,
+      stderr: 'git@github.com: Permission denied (publickey).\n',
+      message: 'Command failed',
+    })
+
+    await expect(
+      runRemoteCommand(target(), { type: 'gitFetchRemote', path: '/srv/repo', remote: 'origin' }),
+    ).resolves.toEqual({
+      ok: false,
+      stdout: '',
+      stderr: 'git@github.com: Permission denied (publickey).',
+      message: 'git@github.com: Permission denied (publickey).',
+      remoteStarted: true,
+    })
+  })
+
+  test('leaves remoteStarted false when ssh fails before printing the marker', async () => {
+    mocks.execa.mockRejectedValueOnce({
+      stdout: '',
+      stderr: 'ssh: connect to host example.test port 22: Connection refused\n',
+      message: 'Command failed',
+    })
+
+    await expect(runRemoteCommand(target(), { type: 'checkShell' })).resolves.toEqual({
+      ok: false,
+      stdout: '',
+      stderr: 'ssh: connect to host example.test port 22: Connection refused',
+      message: 'ssh: connect to host example.test port 22: Connection refused',
+      remoteStarted: false,
+    })
+  })
+})
+
+function target(): RemoteRepoTarget {
+  return {
+    id: 'ssh-config://prod/srv/repo',
+    alias: 'prod',
+    host: 'example.test',
+    user: 'deploy',
+    port: 22,
+    remotePath: '/srv/repo',
+    displayName: 'prod:repo',
+  }
+}
