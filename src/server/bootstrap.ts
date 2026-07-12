@@ -70,6 +70,13 @@ export async function bootstrapServer(options: BootstrapServerOptions = {}): Pro
 
   server.on('connection', (socket: Socket) => {
     sockets.add(socket)
+    // HTTP stops owning the raw socket once an upgrade is accepted, while
+    // the WebSocket adapter only installs its handler after async routing has
+    // completed. Keep a connection-scoped error boundary across that handoff
+    // so a client reset can only terminate its own connection.
+    socket.on('error', () => {
+      socket.destroy()
+    })
     socket.once('close', () => {
       sockets.delete(socket)
     })
