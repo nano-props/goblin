@@ -256,15 +256,15 @@ is split out of the terminal session service:
   `{ type: 'terminal', runtimeSessionId: terminalSessionId }` tab entry
 - stale terminal tab entries must be pruned when no matching live session exists
 - existing static tabs and user-managed ordering are preserved where possible
-- the server broadcasts `workspace-pane-tabs.changed` when read-side
-  canonicalization changes the projection
+- reads do not write, advance the layout revision, or broadcast; provider
+  lifecycle events and explicit layout commands publish their own changes
 
 The server-side ownership is:
 
 - `src/server/workspace-pane/workspace-pane-runtime-tabs-projection.ts` owns
   the pure prune/materialize/dedupe rules for runtime sessions
 - `src/server/workspace-pane/workspace-pane-tabs-coordinator.ts` owns
-  queueing, live-session lookup, runtime writes, and read-side canonicalization
+  queueing, live-session lookup, layout-intent writes, and physical admission
 - `src/server/terminal/terminal-session-service.ts` remains the public facade that validates requests and delegates to the coordinator
 
 This keeps the client from inventing fallback rendering rules such as "show a

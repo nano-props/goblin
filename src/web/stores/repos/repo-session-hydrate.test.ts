@@ -366,7 +366,7 @@ describe('repo session hydration', () => {
     })
 
     resolvers.splice(0).forEach((resolve) => resolve())
-    for (let i = 0; i < 20 && resolvers.length < 2; i += 1) await Promise.resolve()
+    await vi.waitFor(() => expect(resolvers).toHaveLength(2))
     resolvers.splice(0).forEach((resolve) => resolve())
     await work
 
@@ -409,7 +409,7 @@ describe('repo session hydration', () => {
 
     // The lifecycle union owns the failure signal. The `availability`
     // mirror field is kept for refresh pipeline guards
-    // (refresh.ts / refresh-coordinator.ts), but is not authoritative;
+    // (refresh.ts / repo-refresh-actions.ts), but is not authoritative;
     // this assertion pins the union shape, not the mirror.
     expect(useReposStore.getState().repos[target!.id]).toMatchObject({
       id: target!.id,
@@ -435,6 +435,49 @@ describe('repo session hydration', () => {
     await useReposStore.getState().hydrateRepoSession([remoteRepoSessionEntry(target!)], target!.id)
 
     expect(calls.resolveTarget).toEqual([{ alias: 'example', remotePath: '/srv/repo' }])
+  })
+
+  test('hydrateRepoSession joins a remote transport failure before reporting restore failure', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'example', host: 'example.com', user: 'developer', port: 22, remotePath: '/srv/repo',
+    })
+    expect(target).not.toBeNull()
+    installGoblin({
+      'remote.lifecycle': () => {
+        throw new Error('offline')
+      },
+    })
+
+    await expect(
+      useReposStore.getState().hydrateRepoSession([remoteRepoSessionEntry(target!)], target!.id),
+    ).rejects.toThrow('session repo restore failed')
+    expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
+    expect(useReposStore.getState().repos[target!.id]).toBeDefined()
+  })
+
+  test('hydrateRepoSession absorbs cancellation while a remote command is pending', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'example', host: 'example.com', user: 'developer', port: 22, remotePath: '/srv/repo',
+    })
+    expect(target).not.toBeNull()
+    const commandStarted = Promise.withResolvers<void>()
+    installGoblin({
+      'remote.lifecycle': () => {
+        commandStarted.resolve()
+        return new Promise(() => {})
+      },
+    })
+    const controller = new AbortController()
+    const hydration = useReposStore.getState().hydrateRepoSession(
+      [remoteRepoSessionEntry(target!)],
+      target!.id,
+      { signal: controller.signal },
+    )
+    await commandStarted.promise
+
+    controller.abort()
+
+    await expect(hydration).resolves.toBeUndefined()
   })
 
   test('hydrateRepoSession stops processing probes when the signal is already aborted', async () => {

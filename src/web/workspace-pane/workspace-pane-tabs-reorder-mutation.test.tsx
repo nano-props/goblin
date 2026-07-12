@@ -21,7 +21,7 @@ import {
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsUpdateInput } from '#/shared/workspace-pane-tabs.ts'
-import { resetWorkspacePaneTabCoordinatorForTest } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
 const REPO_ROOT = '/tmp/workspace-pane-tabs-reorder-mutation-repo'
 const REPO_RUNTIME_ID = 'repo-runtime-test'
@@ -39,7 +39,7 @@ let queryClient: QueryClient
 let controls: WorkspacePaneTabsReorderMutationResult | null = null
 
 beforeEach(() => {
-  resetWorkspacePaneTabCoordinatorForTest()
+  resetWorkspacePaneActionQueueForTest()
   resetReposStore()
   seedWorkspacePaneTabsRepo(REPO_RUNTIME_ID)
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } })
@@ -47,7 +47,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  resetWorkspacePaneTabCoordinatorForTest()
+  resetWorkspacePaneActionQueueForTest()
   queryClient.clear()
   resetReposStore()
   setClientBridgeForTests(null)

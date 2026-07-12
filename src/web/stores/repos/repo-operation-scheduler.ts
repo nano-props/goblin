@@ -9,7 +9,7 @@ import {
   type RepoOperationTarget,
 } from '#/web/stores/repos/operations.ts'
 import { RepoOperationCancelledError } from '#/web/stores/repos/operation-cancellation.ts'
-export type RepoOperationLane = 'network' | 'read' | 'write' | 'lifecycle'
+export type RepoOperationLane = 'network' | 'read' | 'write'
 export type { RepoOperationKey, RepoOperationTarget }
 
 interface QueuedRepoOperation<T> {
@@ -48,12 +48,8 @@ class RepoOperationLaneQueue {
   private activeControllers = new Set<AbortController>()
   // Index of active tasks by their `replaceKey`, so a new
   // latest-wins submission can abort the previous run's signal
-  // in addition to draining the queue. The orchestrator relies
-  // on this to free the lane's concurrency slot immediately on
-  // supersede — without it, a long-running lifecycle probe (up
-  // to 20s) would block a retry that the user explicitly
-  // requested, because the new run is queued behind the old
-  // active one (concurrency=1).
+  // in addition to draining the queue, freeing a concurrency slot
+  // as soon as the superseded operation observes cancellation.
   private activeByReplaceKey = new Map<string, AbortController>()
   private queued: Array<QueuedRepoOperation<unknown>> = []
 
@@ -213,12 +209,6 @@ function createRepoOperationScheduler(): RepoOperationScheduler {
       network: new RepoOperationLaneQueue(1),
       read: new RepoOperationLaneQueue(3),
       write: new RepoOperationLaneQueue(1),
-      // Lifecycle runs are long-lived (resolveTarget + testRemote =
-      // up to 20s) and must not block runtime projection refreshes.
-      // Concurrency 1 per repo: a lifecycle run is its own critical
-      // section — concurrent runs of the same repo would race the
-      // lifecycle union writes.
-      lifecycle: new RepoOperationLaneQueue(1),
     },
     operations: {},
   }

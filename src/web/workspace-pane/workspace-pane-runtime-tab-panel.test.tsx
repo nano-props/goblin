@@ -12,11 +12,11 @@ import {
   PrimaryWindowNavigationProvider,
   type PrimaryWindowNavigationActions,
 } from '#/web/primary-window-navigation.tsx'
-import { observedWorkspacePaneRouteCommitForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import {
-  observeWorkspacePaneTabControllerRoute,
-  resetWorkspacePaneTabControllerForTest,
-} from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+  observeWorkspacePaneRouteForTest,
+  observedWorkspacePaneRouteCommitForTest,
+} from '#/web/test-utils/workspace-pane-navigation.ts'
+import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { renderWorkspacePaneRuntimeTabPanel } from '#/web/workspace-pane/workspace-pane-runtime-tab-panel.tsx'
 import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 
@@ -56,7 +56,7 @@ vi.mock('#/web/commands/terminal-create-command.ts', () => ({
 }))
 
 beforeEach(() => {
-  resetWorkspacePaneTabControllerForTest()
+  resetWorkspacePaneActionQueueForTest()
   resetReposStore()
   seedRepoWithReadModelForTest({
     id: '/repo',
@@ -64,7 +64,7 @@ beforeEach(() => {
     branches: [createRepoBranch('main', { worktree: { path: '/repo-worktree' } })],
     currentBranchName: 'main',
   })
-  observeWorkspacePaneTabControllerRoute({
+  observeWorkspacePaneRouteForTest({
     repoId: '/repo',
     repoRuntimeId: 'repo-runtime-1',
     branchName: 'main',
@@ -74,7 +74,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  resetWorkspacePaneTabControllerForTest()
+  resetWorkspacePaneActionQueueForTest()
   resetReposStore()
   terminalSessionViewMocks.props.length = 0
   terminalCreateCommandMocks.runCreateTerminalTabCommand.mockClear()
@@ -178,6 +178,7 @@ function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = 
 
 function navigationWith(): PrimaryWindowNavigationActions {
   const navigation: PrimaryWindowNavigationActions = {
+    currentRepoBranchWorkspacePaneRoute: () => undefined,
     activateRepo: vi.fn(),
     closeRepo: vi.fn(),
     cycleRepo: vi.fn(),

@@ -13,10 +13,7 @@ import {
   commitWorkspacePaneCurrentTargetRoute,
   type WorkspacePaneTabControllerCommitNavigation,
 } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
-import {
-  runWorkspacePaneTabCoordinatorTask,
-  workspacePaneTabCoordinatorObservedRoute,
-} from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { refreshWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { goblinLog } from '#/web/logger.ts'
@@ -104,22 +101,24 @@ export async function dispatchCreateTerminalWorkspacePaneRuntimeTabAction(
     return { ok: false, error, messageKey: 'terminal.createFailed' }
   }
   const target = terminalWorkspacePaneCoordinatorTarget(base)
-  return await runWorkspacePaneTabCoordinatorTask(target, async () =>
-    await runCreateTerminalTabCommand({
-      base,
-      createTerminal: options.createTerminal,
-      options: options.options,
-      insertAfterIdentity: options.insertAfterIdentity,
-      t: options.t,
-      logMessage: options.logMessage,
-      commitCreatedTerminalTab: async (admission) =>
-        await commitCreatedTerminalWorkspacePaneRuntimeTab({
-          base,
-          admission,
-          openerIdentity: options.openerIdentity,
-          showCreatedTerminalTab: options.showCreatedTerminalTab,
-        }),
-    }),
+  return await runWorkspacePaneAction(
+    target,
+    async () =>
+      await runCreateTerminalTabCommand({
+        base,
+        createTerminal: options.createTerminal,
+        options: options.options,
+        insertAfterIdentity: options.insertAfterIdentity,
+        t: options.t,
+        logMessage: options.logMessage,
+        commitCreatedTerminalTab: async (admission) =>
+          await commitCreatedTerminalWorkspacePaneRuntimeTab({
+            base,
+            admission,
+            openerIdentity: options.openerIdentity,
+            showCreatedTerminalTab: options.showCreatedTerminalTab,
+          }),
+      }),
   )
 }
 
@@ -131,12 +130,7 @@ export function showCreatedTerminalWorkspacePaneRuntimeTab(
   const resolvedBase = terminalSessionBaseWithRuntime(base)
   if (!resolvedBase) return false
   const target = terminalWorkspacePaneCoordinatorTarget(resolvedBase)
-  return commitWorkspacePaneCurrentTargetRoute(
-    target,
-    workspacePaneTabCoordinatorObservedRoute(target),
-    { kind: 'terminal', terminalSessionId },
-    navigation,
-  )
+  return commitWorkspacePaneCurrentTargetRoute(target, { kind: 'terminal', terminalSessionId }, navigation)
 }
 
 export async function commitCreatedTerminalWorkspacePaneRuntimeTab(

@@ -369,6 +369,7 @@ describe('terminal session service facade', () => {
         worktreePath: path.resolve(WORKTREE_PATH),
       }),
     ).toEqual([
+      workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1'),
       workspacePaneStaticTabEntry('status'),
       workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
     ])
@@ -546,8 +547,7 @@ describe('terminal session service facade', () => {
         },
       ],
     })
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledTimes(1)
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith(USER_ID, REPO_ROOT)
+    expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
   })
 
   test('preserves live terminal tabs after list canonicalization and later reorder operations', async () => {
@@ -685,6 +685,8 @@ describe('terminal session service facade', () => {
         worktreePath: path.resolve(WORKTREE_PATH),
       }),
     ).toEqual([
+      workspacePaneRuntimeTabEntry('terminal', 'term-closedclosedclosed001'),
+      workspacePaneRuntimeTabEntry('terminal', 'term-stalestalestalestale1'),
       workspacePaneStaticTabEntry('status'),
       workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1'),
     ])
@@ -776,7 +778,10 @@ describe('terminal session service facade', () => {
         branchName: BRANCH_NAME,
         worktreePath: path.resolve(WORKTREE_PATH),
       }),
-    ).toEqual([workspacePaneStaticTabEntry('history'), workspacePaneStaticTabEntry('status')])
+    ).toEqual([
+      workspacePaneStaticTabEntry('history'),
+      workspacePaneStaticTabEntry('status'),
+    ])
   })
 
   test('replaceTabs keeps no-worktree branch tabs server-owned and static-only', async () => {
@@ -981,7 +986,7 @@ describe('terminal session service facade', () => {
         },
       ],
     })
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith(USER_ID, REPO_ROOT)
+    expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
   })
 
   test('listWorkspaceTabs does not materialize terminal tabs after repo runtime goes stale during projection', async () => {
@@ -1057,7 +1062,7 @@ describe('terminal session service facade', () => {
         },
       ],
     })
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith(USER_ID, REMOTE_REPO_ROOT)
+    expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
   })
 
   test('listWorkspaceTabs prunes stale terminal tabs from the canonical projection', async () => {
@@ -1089,7 +1094,7 @@ describe('terminal session service facade', () => {
         },
       ],
     })
-    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith(USER_ID, REPO_ROOT)
+    expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
   })
 })
 
@@ -1117,7 +1122,10 @@ function createService(options: {
   const workspaceTabsCoordinator = createWorkspacePaneTabsCoordinator({
     workspaceTabs: options.workspaceTabs,
     worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
-    runtimeProviders: [terminalWorkspacePaneRuntimeTabsProvider(manager)],
+    runtimeProviders: [terminalWorkspacePaneRuntimeTabsProvider(manager, async () => ({
+      revision: 7,
+      sessions: await (typeof options.sessions === 'function' ? options.sessions() : options.sessions),
+    }))],
     physicalWorktrees: testPhysicalWorktrees,
   })
   return createTerminalSessionService({

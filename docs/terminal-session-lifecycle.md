@@ -213,13 +213,13 @@ turning into session deletion.
 `listWorkspaceTabs` is the canonical projection boundary between live terminal
 sessions and the workspace-pane tab strip.
 
-When the server lists workspace tabs it reconciles against live terminal
-sessions for the same user and repo runtime:
+When the server lists workspace tabs it purely projects stored layout intent
+against live terminal sessions for the same user and repo runtime:
 
 - live sessions materialize missing terminal runtime tab entries
 - stale terminal runtime tab entries are removed
 - static tabs and existing order are preserved where possible
-- any self-healing write broadcasts `workspace-pane-tabs.changed`
+- the read performs no self-healing write, revision increment, or broadcast
 
 Terminal sessions store their target `branch` at creation time. This is
 intentional: branch is runtime metadata for the terminal business object, not

@@ -56,7 +56,6 @@ let nextWriteOperationId = 1
 const repoWriteOperationRuntimesByBoundary = new Map<string, RepoWriteOperationQueueRuntime>()
 const repoWriteOperationRepoIdsByBoundary = new Map<string, Set<string>>()
 const repoWriteOperationBoundaryByRepoId = new Map<string, string>()
-let repoWriteOperationAdmission: Promise<void> = Promise.resolve()
 let repoRuntimeCloseSubscription: (() => void) | null = null
 
 function freshWriteOperationId(): string {
@@ -201,17 +200,6 @@ function publishRepoRuntimeInvalidation(
   for (const repoId of repoIds) {
     publishRepoQueryInvalidation({ repoId, query: 'repo-runtime' })
   }
-}
-
-async function acquireRepoWriteOperationAdmission(): Promise<() => void> {
-  const previous = repoWriteOperationAdmission
-  let release!: () => void
-  const next = new Promise<void>((resolve) => {
-    release = resolve
-  })
-  repoWriteOperationAdmission = previous.then(() => next)
-  await previous
-  return release
 }
 
 function registerRepoWriteOperationBoundaryRepoId(boundaryKey: string, repoId: string | null | undefined): Set<string> {
@@ -386,39 +374,36 @@ export async function enqueueRepoWriteOperation<T extends ExecResult>(
   prepareTask: (operation: RepoWriteOperationLifecycle, context: RepoWriteOperationContext) => () => Promise<T>,
 ): Promise<T> {
   if (signal?.aborted) return cancelledRepoWriteResult()
-  const releaseAdmission = await acquireRepoWriteOperationAdmission()
-  let work!: Promise<T>
+  let boundaryKey: string
   try {
-    let boundaryKey: string
-    try {
-      boundaryKey = await resolveRepoWriteBoundaryKey(repoId, signal)
-    } catch (err) {
-      if (signal?.aborted) return cancelledRepoWriteResult()
-      throw err
-    }
+    boundaryKey = await resolveRepoWriteBoundaryKey(repoId, signal)
+  } catch (err) {
     if (signal?.aborted) return cancelledRepoWriteResult()
-    const runtime = repoWriteOperationRuntimeForBoundary(boundaryKey, repoId)
-    const operation = beginRepoWriteOperation(runtime, operationInput)
-    const context = createRepoWriteOperationContext(runtime, operation, signal)
-    let task: () => Promise<T>
+    throw err
+  }
+  if (signal?.aborted) return cancelledRepoWriteResult()
+
+  // Registry admission is intentionally synchronous. Independent repositories
+  // resolve concurrently, while aliases that resolve to the same physical
+  // boundary still enter the same PQueue before the next async turn.
+  const runtime = repoWriteOperationRuntimeForBoundary(boundaryKey, repoId)
+  const operation = beginRepoWriteOperation(runtime, operationInput)
+  const context = createRepoWriteOperationContext(runtime, operation, signal)
+  let task: () => Promise<T>
+  try {
+    task = prepareTask(operation, context)
+  } catch (err) {
+    operation.settle({ ok: false, message: err instanceof Error ? err.message : String(err) })
+    throw err
+  }
+  return await runResolvedRepoWriteOperation(boundaryKey, runtime, operation, async () => {
     try {
-      task = prepareTask(operation, context)
+      return await task()
     } catch (err) {
       operation.settle({ ok: false, message: err instanceof Error ? err.message : String(err) })
       throw err
     }
-    work = runResolvedRepoWriteOperation(boundaryKey, runtime, operation, async () => {
-      try {
-        return await task()
-      } catch (err) {
-        operation.settle({ ok: false, message: err instanceof Error ? err.message : String(err) })
-        throw err
-      }
-    }, signal)
-  } finally {
-    releaseAdmission()
-  }
-  return await work
+  }, signal)
 }
 
 export async function abortRepoWriteNetworkOperation(
@@ -463,8 +448,24 @@ export function resetRepoWriteOperationCoordinatorForTests(): void {
   repoWriteOperationRuntimesByBoundary.clear()
   repoWriteOperationRepoIdsByBoundary.clear()
   repoWriteOperationBoundaryByRepoId.clear()
-  repoWriteOperationAdmission = Promise.resolve()
   repoRuntimeCloseSubscription?.()
   repoRuntimeCloseSubscription = null
   nextWriteOperationId = 1
+}
+
+export function repoWriteOperationCoordinatorStatsForTests(): {
+  boundaryRuntimes: number
+  registeredBoundaries: number
+  registeredRepoIds: number
+  queuedOperations: number
+  runningOperations: number
+} {
+  const runtimes = [...repoWriteOperationRuntimesByBoundary.values()]
+  return {
+    boundaryRuntimes: runtimes.length,
+    registeredBoundaries: repoWriteOperationRepoIdsByBoundary.size,
+    registeredRepoIds: repoWriteOperationBoundaryByRepoId.size,
+    queuedOperations: runtimes.reduce((total, runtime) => total + runtime.queue.size, 0),
+    runningOperations: runtimes.reduce((total, runtime) => total + runtime.queue.pending, 0),
+  }
 }

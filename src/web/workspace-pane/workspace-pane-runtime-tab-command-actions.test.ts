@@ -6,8 +6,8 @@ import {
   runWorkspacePaneRuntimePrimaryAction,
 } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-actions.ts'
 import { createTerminalWithAdmissionForTest } from '#/web/test-utils/terminal-session-command-bridge.ts'
-import { resetWorkspacePaneTabControllerForTest } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
-import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
 const terminalBase: TerminalSessionBase & { repoRuntimeId: string } = {
   repoRoot: '/repo',
@@ -18,7 +18,7 @@ const terminalBase: TerminalSessionBase & { repoRuntimeId: string } = {
 
 describe('workspace pane runtime tab command actions', () => {
   beforeEach(() => {
-    resetWorkspacePaneTabControllerForTest()
+    resetWorkspacePaneActionQueueForTest()
   })
 
   test('primary terminal action focuses the first existing runtime session', async () => {
@@ -65,7 +65,7 @@ describe('workspace pane runtime tab command actions', () => {
     const coordinatorStarted = new Promise<void>((resolve) => {
       markCoordinatorStarted = resolve
     })
-    const coordinatorBlocker = runWorkspacePaneTabCoordinatorTask(
+    const coordinatorBlocker = runWorkspacePaneAction(
       {
         repoId: terminalBase.repoRoot,
         repoRuntimeId: terminalBase.repoRuntimeId,

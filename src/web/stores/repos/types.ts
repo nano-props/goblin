@@ -78,6 +78,8 @@ export interface RepoRemoteState {
    * instead of inferring target state from other remote fields.
    */
   lifecycle: RemoteRepoConnectionLifecycle | null
+  /** Highest server-owned remote attempt accepted into this window projection. */
+  lifecycleAttemptId: number | null
   remotes?: string[]
   remoteDetails?: GitRemoteInfo[]
   hasRemotes?: boolean
@@ -260,7 +262,7 @@ interface RuntimeCoherentRepoProjectionActions {
    * entry point for "retry" (and the only path the
    * `useNetworkReconnect` hook calls to recover from a failed
    * lifecycle). Safe to call regardless of the current lifecycle
-   * phase — the orchestrator flips to `connecting` and re-runs.
+   * phase — the server starts a newer monotonic attempt.
    * Returns the new outcome, or `null` for non-remote ids.
    */
   retryRemoteRepoConnection: (id: string) => Promise<{ ok: boolean; reason?: string } | null>

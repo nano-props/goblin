@@ -6,7 +6,7 @@ import { PanelInset } from '#/web/components/ui/panel.tsx'
 import { formatRepoLocator } from '#/web/lib/paths.ts'
 import { usePrimaryWindowNavigation } from '#/web/primary-window-navigation.tsx'
 import { formatTranslatableReason, shouldOfferSshSettings, unavailableBodyKey } from '#/web/lib/remote-diagnostics.ts'
-import { runRepoRefreshIntent } from '#/web/stores/repos/refresh-coordinator.ts'
+import { runManualRepoSync } from '#/web/stores/repos/refresh.ts'
 import { isRepoUnavailable, remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useT } from '#/web/stores/i18n.ts'
@@ -66,11 +66,11 @@ export function UnavailableRepoView({ repo }: Props) {
                 type="button"
                 variant="default"
                 onClick={() =>
-                  void runRepoRefreshIntent({ get: useReposStore.getState, set: useReposStore.setState }, {
-                    kind: 'manual-refresh-requested',
-                    id: repo.id,
-                    repoRuntimeId: repo.repoRuntimeId,
-                  })
+                  void runManualRepoSync(
+                    { get: useReposStore.getState, set: useReposStore.setState },
+                    repo.id,
+                    { repoRuntimeId: repo.repoRuntimeId },
+                  )
                 }
               >
                 <RefreshCw />

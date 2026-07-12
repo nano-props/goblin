@@ -25,6 +25,8 @@ export interface PrimaryWindowPresentationNavigationOptions {
   replace?: boolean
   presentationToken?: PrimaryWindowPresentationToken
   onCommit?: () => void
+  routePrecondition?:
+    { kind: 'exact-route'; route: RepoBranchWorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
 }
 
 export interface PrimaryWindowNavigationActions {
@@ -51,6 +53,10 @@ export interface PrimaryWindowNavigationActions {
     route: RepoBranchWorkspacePaneRouteTarget,
     options?: PrimaryWindowPresentationNavigationOptions,
   ) => MaybePromise<boolean>
+  currentRepoBranchWorkspacePaneRoute: (
+    repoId: string,
+    branch: string,
+  ) => RepoBranchWorkspacePaneRouteTarget | undefined
   goBack: (repoId: string) => void
   goForward: (repoId: string) => void
   openSettings: (page: SettingsPage) => void
@@ -61,10 +67,7 @@ interface CreatePrimaryWindowNavigationActionsOptions {
   currentRepoId: string | null
   order: string[]
   closeRepo: (repoId: string) => void
-  peekWorkspaceNavigation: (
-    repoId: string,
-    direction: 'back' | 'forward',
-  ) => WorkspaceNavigationHistoryTraversal | null
+  peekWorkspaceNavigation: (repoId: string, direction: 'back' | 'forward') => WorkspaceNavigationHistoryTraversal | null
   commitWorkspaceNavigation: (traversal: WorkspaceNavigationHistoryTraversal) => boolean
   routeNavigation: PrimaryWindowRouteNavigation
 }
@@ -78,6 +81,9 @@ export function createPrimaryWindowNavigationActions({
   routeNavigation,
 }: CreatePrimaryWindowNavigationActionsOptions): PrimaryWindowNavigationActions {
   return {
+    currentRepoBranchWorkspacePaneRoute(repoId, branchName) {
+      return routeNavigation.currentRepoBranchWorkspacePaneRoute(repoId, branchName)
+    },
     activateRepo(repoId) {
       const presentationToken = beginPrimaryWindowPresentation()
       restoreRepoPresentationOrOpenDashboard(repoId, routeNavigation, presentationToken, { onBlocked: 'stay' })
@@ -209,7 +215,12 @@ function commitRepoBranchWorkspacePaneRoute(
 ): MaybePromise<boolean> {
   const token = options?.presentationToken ?? beginPrimaryWindowPresentation()
   if (!primaryWindowPresentationIsCurrent(token)) return false
-  const routeOptions = { replace: options?.replace, presentationToken: token, onCommit: options?.onCommit }
+  const routeOptions = {
+    replace: options?.replace,
+    presentationToken: token,
+    onCommit: options?.onCommit,
+    routePrecondition: options?.routePrecondition,
+  }
   return routeNavigation.commitRepoBranchWorkspacePaneRoute
     ? routeNavigation.commitRepoBranchWorkspacePaneRoute(repoId, branchName, route, routeOptions)
     : openResolvedRepoBranchWorkspacePaneRoute(routeNavigation, repoId, branchName, route, routeOptions)

@@ -21,6 +21,10 @@ export interface WorkspacePaneRuntimeTabsProjectionReplacement {
   tabs: WorkspacePaneTabEntry[]
 }
 
+export interface CanonicalWorkspacePaneTabsProjectionEntry extends WorkspacePaneRuntimeTabsProjectionEntry {
+  tabs: WorkspacePaneTabEntry[]
+}
+
 export interface WorkspacePaneRuntimeTabsProjectionSession {
   sessionId: string
   branch: string
@@ -28,6 +32,7 @@ export interface WorkspacePaneRuntimeTabsProjectionSession {
 
 export interface WorkspacePaneRuntimeTabsProviderSnapshot {
   type: WorkspacePaneRuntimeTabType
+  revision: number
   liveSessions: readonly WorkspacePaneRuntimeTabsProviderSnapshotSession[]
 }
 
@@ -155,6 +160,36 @@ export function projectWorkspaceRuntimeTabsFromProviderSnapshots(input: {
       ? [{ branchName: entry.branchName, worktreePath: entry.worktreePath, tabs: entry.tabs }]
       : []
   })
+}
+
+/** Pure full-scope projection used to keep stored layout and live membership separate. */
+export function projectCanonicalWorkspacePaneTabs(input: {
+  entries: readonly WorkspacePaneRuntimeTabsProjectionEntry[]
+  providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
+}): CanonicalWorkspacePaneTabsProjectionEntry[] {
+  let entries = input.entries.map((entry) => ({ ...entry, tabs: [...entry.tabs] }))
+  for (const entry of entries.filter((candidate) => candidate.worktreePath === null)) {
+    const index = entries.indexOf(entry)
+    entries[index] = {
+      ...entry,
+      tabs: canonicalWorkspaceRuntimeTabsForTarget({ entry, providerSnapshots: input.providerSnapshots }),
+    }
+  }
+  for (const worktreePath of workspaceRuntimeTabWorktreePaths({ entries, providerSnapshots: input.providerSnapshots })) {
+    const replacements = projectWorkspaceRuntimeTabsFromProviderSnapshots({
+      entries: entries.filter((entry) => entry.worktreePath === worktreePath),
+      providerSnapshots: input.providerSnapshots,
+      worktreePath,
+    })
+    for (const replacement of replacements) {
+      const index = entries.findIndex(
+        (entry) => entry.branchName === replacement.branchName && entry.worktreePath === replacement.worktreePath,
+      )
+      if (index === -1) entries.push(replacement)
+      else entries[index] = replacement
+    }
+  }
+  return entries
 }
 
 export function workspaceRuntimeTabWorktreePaths(input: {

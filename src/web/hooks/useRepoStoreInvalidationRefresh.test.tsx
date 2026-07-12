@@ -2,7 +2,6 @@
 import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
-import { resetRepoRefreshCoordinatorState } from '#/web/stores/repos/refresh-coordinator.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { repoDataQueryKey } from '#/web/repo-data-query.ts'
@@ -48,7 +47,6 @@ describe('useRepoStoreInvalidationRefresh', () => {
     vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
     listeners.clear()
     primaryWindowQueryClient.clear()
-    resetRepoRefreshCoordinatorState()
     storeState.repos['/tmp/repo'] = {
       id: '/tmp/repo',
       availability: { phase: 'available' },
@@ -64,7 +62,6 @@ describe('useRepoStoreInvalidationRefresh', () => {
   afterEach(() => {
     listeners.clear()
     primaryWindowQueryClient.clear()
-    resetRepoRefreshCoordinatorState()
     vi.useRealTimers()
   })
 

@@ -1,6 +1,6 @@
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
-import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
+import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/repo-refresh-actions.ts'
 import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
@@ -29,7 +29,7 @@ import {
   resolveWorkspacePaneDestinationTarget,
   workspacePaneTabInteractionBlockedForBranch,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import {
   beginPrimaryWindowPresentation,
   primaryWindowPresentationIsCurrent,
@@ -95,7 +95,7 @@ export async function dispatchShowWorkspacePaneStaticTabAction({
     placement: { kind: 'append', openerIdentity },
     navigation,
   }
-  return await runWorkspacePaneTabCoordinatorTask(lease, () =>
+  return await runWorkspacePaneAction(lease, () =>
     openWorkspacePaneStaticTabAction(input, {
       kind: 'destination',
       presentation,
@@ -126,7 +126,7 @@ export async function dispatchOpenWorkspacePaneStaticTabAction(
     navigation: input.navigation,
   }
   const presentationToken = beginPrimaryWindowPresentation()
-  const outcome = await runWorkspacePaneTabCoordinatorTask(
+  const outcome = await runWorkspacePaneAction(
     {
       repoId: input.repoId,
       repoRuntimeId,
@@ -265,7 +265,6 @@ async function commitWorkspacePaneStaticTab(
       branchName: input.branchName,
       worktreePath: input.worktreePath,
     },
-    sourceRoute,
     route,
     input.navigation,
     undefined,

@@ -8,7 +8,7 @@ import {
   writeCanonicalWorkspacePaneTabsSnapshot,
 } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { workspacePaneTabEntryListIdentity } from '#/web/workspace-pane/workspace-pane-tabs.ts'
-import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
 export interface WorkspacePaneTabsReorderMutationInput {
   repoRoot: string
@@ -69,7 +69,7 @@ async function runWorkspacePaneTabsReorder(
   queryClient: QueryClient,
   onReorderRejected: (() => void) | undefined,
 ): Promise<void> {
-  await runWorkspacePaneTabCoordinatorTask(
+  await runWorkspacePaneAction(
     {
       repoId: target.repoRoot,
       repoRuntimeId: target.repoRuntimeId,

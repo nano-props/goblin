@@ -21,11 +21,12 @@ export class InvalidationSocketLimitError extends Error {
   }
 }
 
-const sockets = new Set<InvalidationSocket>()
+const sockets = new Map<InvalidationSocket, string | null>()
 
-function publishInvalidationPayload(payload: string): void {
+function publishInvalidationPayload(payload: string, userId?: string): void {
   if (sockets.size === 0) return
-  for (const socket of Array.from(sockets)) {
+  for (const [socket, ownerId] of Array.from(sockets)) {
+    if (userId && ownerId !== userId) continue
     try {
       socket.send(payload)
     } catch {
@@ -34,11 +35,11 @@ function publishInvalidationPayload(payload: string): void {
   }
 }
 
-export function registerInvalidationSocket(ws: InvalidationSocket): void {
+export function registerInvalidationSocket(ws: InvalidationSocket, userId?: string): void {
   if (sockets.size >= MAX_INVALIDATION_SOCKETS) {
     throw new InvalidationSocketLimitError()
   }
-  sockets.add(ws)
+  sockets.set(ws, userId ?? null)
 }
 
 export function unregisterInvalidationSocket(ws: InvalidationSocket): void {
@@ -46,7 +47,7 @@ export function unregisterInvalidationSocket(ws: InvalidationSocket): void {
 }
 
 export function disconnectAllInvalidationSockets(): void {
-  for (const socket of Array.from(sockets)) {
+  for (const socket of Array.from(sockets.keys())) {
     try {
       socket.close(1001, 'server shutting down')
     } catch {}
@@ -57,6 +58,16 @@ export function disconnectAllInvalidationSockets(): void {
 export function publishRepoQueryInvalidation(event: Omit<RepoQueryInvalidationEvent, 'type'>): void {
   publishInvalidationPayload(
     JSON.stringify({ type: 'repo-query-invalidated', ...event } satisfies RepoQueryInvalidationEvent),
+  )
+}
+
+export function publishUserRepoQueryInvalidation(
+  userId: string,
+  event: Omit<RepoQueryInvalidationEvent, 'type'>,
+): void {
+  publishInvalidationPayload(
+    JSON.stringify({ type: 'repo-query-invalidated', ...event } satisfies RepoQueryInvalidationEvent),
+    userId,
   )
 }
 

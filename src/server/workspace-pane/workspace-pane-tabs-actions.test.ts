@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, test, vi } from 'vitest'
-import { clearRepoRuntimesForUser, isCurrentRepoRuntime, openRepoRuntime } from '#/server/modules/repo-runtimes.ts'
+import { acquireRepoRuntime, clearRepoRuntimesForUser, isCurrentRepoRuntime } from '#/server/modules/repo-runtimes.ts'
 import { createWorkspacePaneTabsActions } from '#/server/workspace-pane/workspace-pane-tabs-actions.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
@@ -11,7 +11,7 @@ const REPO_ROOT = '/repo'
 let REPO_RUNTIME_ID = ''
 
 function syncCurrentRepoRuntime(): void {
-  REPO_RUNTIME_ID = openRepoRuntime(USER_ID, REPO_ROOT)
+  REPO_RUNTIME_ID = acquireRepoRuntime(USER_ID, REPO_ROOT, CLIENT_ID)
 }
 
 function makeActions(

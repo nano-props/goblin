@@ -14,6 +14,7 @@ import {
   type RuntimeProjectionScope,
   type RuntimeProjectionScopeRegistry,
 } from '#/web/runtime/runtime-projection-scope.ts'
+import { reconcileOpenRepoRuntimeMemberships } from '#/web/stores/repos/repo-session-write-paths.ts'
 
 interface AppRuntimeProjectionProviderProps {
   children: ReactNode
@@ -87,9 +88,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
         },
         (error) => {
           appRuntimeProjectionLog.debug('failed to reconcile terminal sessions from server', { error })
-          const hydration = useTerminalProjectionHydrationStore
-            .getState()
-            .hydrationByRepo.get(scope.target.repoRoot)
+          const hydration = useTerminalProjectionHydrationStore.getState().hydrationByRepo.get(scope.target.repoRoot)
           if (hydration?.repoRuntimeId !== scope.target.repoRuntimeId || hydration.phase !== 'pending') return
           useTerminalProjectionHydrationStore
             .getState()
@@ -115,7 +114,9 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
     }
     document.addEventListener('visibilitychange', onVisibilityChange)
     window.addEventListener('pageshow', onPageShow)
-    const offVisibility = scopeRegistry.track(() => document.removeEventListener('visibilitychange', onVisibilityChange))
+    const offVisibility = scopeRegistry.track(() =>
+      document.removeEventListener('visibilitychange', onVisibilityChange),
+    )
     const offPageShow = scopeRegistry.track(() => window.removeEventListener('pageshow', onPageShow))
     return () => {
       offVisibility()
@@ -125,7 +126,8 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
 
   useEffect(() => {
     if (!workspaceMembershipReady || !currentRepoId || !currentRepoRuntimeId) return
-    const scope = scopeRegistry.scopeFor({ repoRoot: currentRepoId, repoRuntimeId: currentRepoRuntimeId })
+    const target = { repoRoot: currentRepoId, repoRuntimeId: currentRepoRuntimeId }
+    const scope = scopeRegistry.scopeFor(target)
     scope.commit(() => {
       useTerminalProjectionHydrationStore
         .getState()
@@ -134,20 +136,16 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
     recoverTerminalSessionsFromServer(scope)
 
     const handleFocus = () => {
-      scope.commit(() => {
-        if (!useTerminalProjectionHydrationStore.getState().shouldRefreshProjection(scope.target.repoRoot)) return
-        recoverTerminalSessionsFromServer(scope)
+      const currentScope = scopeRegistry.scopeFor(target)
+      currentScope.commit(() => {
+        if (!useTerminalProjectionHydrationStore.getState().shouldRefreshProjection(currentScope.target.repoRoot))
+          return
+        recoverTerminalSessionsFromServer(currentScope)
       })
     }
     window.addEventListener('focus', handleFocus)
-    return scope.track(() => window.removeEventListener('focus', handleFocus))
-  }, [
-    workspaceMembershipReady,
-    currentRepoId,
-    currentRepoRuntimeId,
-    recoverTerminalSessionsFromServer,
-    scopeRegistry,
-  ])
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [workspaceMembershipReady, currentRepoId, currentRepoRuntimeId, recoverTerminalSessionsFromServer, scopeRegistry])
 
   useEffect(() => {
     if (!workspaceMembershipReady) {
@@ -158,20 +156,36 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
       terminalClient.onSessionsChanged((repoRoot) => {
         const scope = currentScopeForRepo(scopeRegistry, repoRoot)
         if (!scope) return
-        scope.setTimer(
-          TERMINAL_SESSIONS_CHANGED_TIMER_LANE,
-          () => recoverTerminalSessionsFromServer(scope),
-          0,
-        )
+        scope.setTimer(TERMINAL_SESSIONS_CHANGED_TIMER_LANE, () => recoverTerminalSessionsFromServer(scope), 0)
       }),
     )
+    let membershipRecoveryGeneration = 0
     const offRecovered = scopeRegistry.track(
       appRealtimeClient.onRecovered(() => {
-        for (const target of currentRepoRuntimes()) {
-          const scope = scopeRegistry.scopeFor(target)
-          recoverTerminalSessionsFromServer(scope)
-          refreshWorkspacePaneTabsForScope(scope)
-        }
+        const generation = ++membershipRecoveryGeneration
+        void reconcileOpenRepoRuntimeMemberships(useReposStore.setState, useReposStore.getState)
+          .then((recovery) => {
+            if (generation !== membershipRecoveryGeneration) return
+            if (recovery.kind === 'superseded') return
+            scopeRegistry.disposeScopes()
+            for (const target of recovery.targets) {
+              if (repoRuntimeIdForRoot(target.repoRoot) !== target.repoRuntimeId) continue
+              const scope = scopeRegistry.scopeFor(target)
+              scope.commit(() => {
+                useTerminalProjectionHydrationStore
+                  .getState()
+                  .beginProjectionHydration(target.repoRoot, target.repoRuntimeId)
+              })
+              recoverTerminalSessionsFromServer(scope)
+              refreshWorkspacePaneTabsForScope(scope)
+            }
+          })
+          .catch((error) => {
+            if (generation !== membershipRecoveryGeneration) return
+            appRuntimeProjectionLog.warn('failed to reconcile repo runtime memberships after realtime recovery', {
+              error,
+            })
+          })
       }),
     )
     const offWorkspaceTabsChanged = scopeRegistry.track(
@@ -181,16 +195,12 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
       }),
     )
     return () => {
+      membershipRecoveryGeneration += 1
       offSessionsChanged()
       offRecovered()
       offWorkspaceTabsChanged()
     }
-  }, [
-    workspaceMembershipReady,
-    recoverTerminalSessionsFromServer,
-    refreshWorkspacePaneTabsForScope,
-    scopeRegistry,
-  ])
+  }, [workspaceMembershipReady, recoverTerminalSessionsFromServer, refreshWorkspacePaneTabsForScope, scopeRegistry])
 
   return <>{children}</>
 }
@@ -205,13 +215,6 @@ function currentScopeForRepo(
 
 function repoRuntimeIdForRoot(repoRoot: string): string | null {
   return useReposStore.getState().repos[repoRoot]?.repoRuntimeId ?? null
-}
-
-function currentRepoRuntimes(): Array<{ repoRoot: string; repoRuntimeId: string }> {
-  return Object.values(useReposStore.getState().repos).map((repo) => ({
-    repoRoot: repo.id,
-    repoRuntimeId: repo.repoRuntimeId,
-  }))
 }
 
 function terminalHydrationSnapshotMap(

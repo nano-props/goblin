@@ -95,10 +95,9 @@ export async function resolveServerRemoteTarget(
  *   4. classify the failure into a `RemoteRepoFailureReason`
  *   5. return a converged {@link RemoteRepoConnectionResult}
  *
- * The function NEVER returns a `connecting` lifecycle — that's
- * a client-side projection written by the orchestrator before
- * this RPC lands. The server's contract is "converged terminal
- * only".
+ * This resolver returns only a terminal result. The owning RepoRuntime wraps
+ * it with the authoritative connecting state, attempt id, cancellation, and
+ * stale-generation checks.
  *
  * The signal is plumbed through the entire pipeline:
  *   - `resolveServerRemoteTarget` propagates to the `ssh -G`
@@ -107,10 +106,8 @@ export async function resolveServerRemoteTarget(
  *     `runRemoteCommand` (the SSH handshake / checkShell / etc.
  *     execas in `system/ssh/commands.ts:runRemoteCommand`)
  *
- * Aborting the signal is the only way a `runRemoteRepoConnection`
- * orchestrator run in the client can free the lane's
- * concurrency slot before its natural timeout — see
- * `runLatestOperation` with the `lifecycle` lane.
+ * RepoRuntime aborts this signal when a newer attempt supersedes it or the
+ * runtime closes, so slow SSH work releases server resources promptly.
  */
 export interface RemoteRepoConnectionDeps {
   resolveTarget: (
@@ -137,7 +134,7 @@ export async function resolveServerRemoteRepoConnection(
 ): Promise<RemoteRepoConnectionResult> {
   const repoId = input.repoId
   // Defensive: local ids should never reach this server entry.
-  // The orchestrator gates on `isRemoteRepoId` before calling;
+  // The command client gates on `isRemoteRepoId` before calling;
   // if a non-remote id sneaks through, return a 'failed' with a
   // synthesized reason rather than letting the SSH resolver throw.
   if (!isRemoteRepoId(repoId)) {

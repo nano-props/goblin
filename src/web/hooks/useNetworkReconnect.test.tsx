@@ -3,65 +3,20 @@
 import { act, cleanup } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { normalizeRemoteTarget, type RemoteRepoConnectionLifecycle } from '#/shared/remote-repo.ts'
 import { useNetworkReconnect } from '#/web/hooks/useNetworkReconnect.ts'
+import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-command.ts'
+import { goblinLog } from '#/web/logger.ts'
 import { resetLifecycleTest } from '#/web/stores/repos/repo-session-test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { RepoState, ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
+import type { ReposSet } from '#/web/stores/repos/types.ts'
 
-// Mock the orchestrator so the hook test doesn't depend on
-// the IPC bridge / network. The mock simulates a successful
-// lifecycle run by flipping the repo's lifecycle to `ready`
-// with a target — derived from the previous lifecycle's
-// retained target (if any) or from a default test fixture.
-// This is enough to verify WHICH repos the hook re-probes
-// (the actual orchestrator behavior is covered by
-// `remote-lifecycle-orchestrator.test.ts`).
-vi.mock('#/web/stores/repos/remote-repo-connection-orchestrator.ts', () => ({
-  runRemoteRepoConnection: vi.fn(async (_set: ReposSet, _get: ReposGet, id: string) => {
-    useReposStore.setState((s) => {
-      const repo = s.repos[id]
-      if (!repo) return s
-      const previous = repo.remote.lifecycle
-      const retainedTarget =
-        previous && previous.kind === 'failed' && previous.target
-          ? previous.target
-          : previous && previous.kind === 'ready'
-            ? previous.target
-            : null
-      // Always produce a `ready` lifecycle with a target so
-      // the hook's `kind === 'ready'` skip-condition is
-      // observable. We synthesize a target when the previous
-      // failed-without-target case arises, because in
-      // production the server would have produced a target
-      // and the orchestrator would have cached it.
-      const target =
-        retainedTarget ??
-        normalizeRemoteTarget({
-          alias: 'example',
-          host: 'example.com',
-          user: 'alice',
-          port: 22,
-          remotePath: '/srv/repo',
-        })
-      if (!target) throw new Error('Failed to construct test target')
-      const lifecycle: RepoState['remote']['lifecycle'] = {
-        kind: 'ready',
-        target,
-      }
-      return {
-        ...s,
-        repos: {
-          ...s.repos,
-          [id]: {
-            ...repo,
-            remote: { ...repo.remote, lifecycle },
-          },
-        },
-      }
-    })
-    return { kind: 'ready' as const, repoId: id, name: id }
-  }),
+// Mock the server command adapter so the hook test doesn't depend on
+// the IPC bridge / network. Lifecycle projection behavior is covered by the
+// command and runtime-projection tests; this suite owns event submission.
+vi.mock('#/web/stores/repos/remote-repo-connection-command.ts', () => ({
+  runRemoteRepoConnection: vi.fn(async () => ({ kind: 'superseded' as const, repoId: 'remote', name: 'remote' })),
 }))
 
 beforeEach(() => {
@@ -74,6 +29,8 @@ beforeEach(() => {
   // bridge installed for this test. We only need a clean
   // store; `resetLifecycleTest` covers that.
   resetLifecycleTest()
+  vi.mocked(runRemoteRepoConnection).mockClear()
+  vi.mocked(runRemoteRepoConnection).mockResolvedValue({ kind: 'superseded', repoId: 'remote' })
 })
 
 function fireOnline(): void {
@@ -172,6 +129,7 @@ function seedRepo(id: string, lifecycle: RemoteRepoConnectionLifecycle | null) {
         projection: { source: 'fresh', savedAt: null },
         remote: {
           lifecycle,
+          lifecycleAttemptId: null,
           remotes: [],
           remoteDetails: [],
           hasRemotes: false,
@@ -196,11 +154,8 @@ describe('useNetworkReconnect', () => {
     mountHook()
 
     fireOnline()
-    // The orchestrator's task is async; let it settle.
-    for (let i = 0; i < 10; i += 1) await Promise.resolve()
-
-    const lifecycle = useReposStore.getState().repos[target.id]?.remote.lifecycle
-    expect(lifecycle?.kind).toBe('ready')
+    await flushMicrotasks(10)
+    expect(runRemoteRepoConnection).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), target.id)
   })
 
   test('skips a `ready` remote repo (no re-probe on online)', async () => {
@@ -209,11 +164,8 @@ describe('useNetworkReconnect', () => {
     mountHook()
 
     fireOnline()
-    for (let i = 0; i < 5; i += 1) await Promise.resolve()
-
-    // The lifecycle is unchanged — the hook did not re-probe.
-    const lifecycle = useReposStore.getState().repos[target.id]?.remote.lifecycle
-    expect(lifecycle?.kind).toBe('ready')
+    await flushMicrotasks(10)
+    expect(runRemoteRepoConnection).not.toHaveBeenCalled()
   })
 
   test('re-probes a `connecting` remote repo on `online` (orchestrator aborts stale run)', async () => {
@@ -222,14 +174,9 @@ describe('useNetworkReconnect', () => {
     mountHook()
 
     fireOnline()
-    for (let i = 0; i < 10; i += 1) await Promise.resolve()
+    await flushMicrotasks(10)
 
-    // The connecting repo was re-probed and settled to `ready`.
-    // Without this re-probe, a connecting run that started before
-    // the network came back would hold its SSH timeout before the
-    // user sees a recoverable `failed` state.
-    const lifecycle = useReposStore.getState().repos[target.id]?.remote.lifecycle
-    expect(lifecycle?.kind).toBe('ready')
+    expect(runRemoteRepoConnection).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), target.id)
   })
 
   test('skips local repos entirely', async () => {
@@ -237,7 +184,7 @@ describe('useNetworkReconnect', () => {
     mountHook()
 
     fireOnline()
-    for (let i = 0; i < 5; i += 1) await Promise.resolve()
+    await flushMicrotasks(10)
 
     // Local repos don't have a lifecycle at all. The hook
     // must not call `runRemoteRepoConnection` for them — which
@@ -258,11 +205,9 @@ describe('useNetworkReconnect', () => {
     })
 
     fireOnline()
-    for (let i = 0; i < 10; i += 1) await Promise.resolve()
+    await flushMicrotasks(10)
 
-    // Lifecycle stays `failed` — no re-probe after unmount.
-    const lifecycle = useReposStore.getState().repos[target.id]?.remote.lifecycle
-    expect(lifecycle?.kind).toBe('failed')
+    expect(runRemoteRepoConnection).not.toHaveBeenCalled()
   })
 
   test('reads the latest repo set on each event (not a captured snapshot)', async () => {
@@ -275,9 +220,25 @@ describe('useNetworkReconnect', () => {
     seedRepo(target.id, { kind: 'failed', reason: 'unreachable' })
 
     fireOnline()
-    for (let i = 0; i < 10; i += 1) await Promise.resolve()
+    await flushMicrotasks(10)
 
-    const lifecycle = useReposStore.getState().repos[target.id]?.remote.lifecycle
-    expect(lifecycle?.kind).toBe('ready')
+    expect(runRemoteRepoConnection).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), target.id)
+  })
+
+  test('owns transport failures from the fire-and-forget online event', async () => {
+    const target = remoteTargetFixture()
+    const warn = vi.spyOn(goblinLog, 'warn').mockImplementation(() => undefined)
+    vi.mocked(runRemoteRepoConnection).mockResolvedValueOnce({
+      kind: 'transport-failed',
+      repoId: target.id,
+      reason: 'unknown',
+    })
+    seedRepo(target.id, { kind: 'failed', reason: 'unreachable' })
+    mountHook()
+
+    fireOnline()
+    await flushMicrotasks(10)
+
+    expect(warn).toHaveBeenCalledWith('remote reconnect command failed', { repoId: target.id, reason: 'unknown' })
   })
 })

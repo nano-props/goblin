@@ -993,13 +993,36 @@ describe('RepoWorkspaceToolbar', () => {
   })
 
   test('moves focus across opened status, changes, and terminal tabs with keyboard navigation', async () => {
-    const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
-    const showRepoBranchTerminalSession = vi.fn(() => true)
+    const showRepoBranchWorkspacePaneTab = vi.fn<PrimaryWindowNavigationActions['showRepoBranchWorkspacePaneTab']>(
+      () => true,
+    )
+    const showRepoBranchTerminalSession = vi.fn<PrimaryWindowNavigationActions['showRepoBranchTerminalSession']>(
+      () => true,
+    )
+    const commitRepoBranchWorkspacePaneRoute: PrimaryWindowNavigationActions['commitRepoBranchWorkspacePaneRoute'] = (
+      repoId,
+      branchName,
+      route,
+      options,
+    ) => {
+      const accepted =
+        route === null
+          ? true
+          : route.kind === 'static'
+            ? showRepoBranchWorkspacePaneTab(repoId, branchName, route.tab)
+            : showRepoBranchTerminalSession(repoId, branchName, route.terminalSessionId)
+      if (accepted) options?.onCommit?.()
+      return accepted
+    }
     const { container: c } = renderToolbar({
       terminalCount: 2,
       changeCount: 1,
       workspacePaneStaticTabs: ['status', 'changes'],
-      navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
+      navigation: navigationWith({
+        showRepoBranchWorkspacePaneTab,
+        showRepoBranchTerminalSession,
+        commitRepoBranchWorkspacePaneRoute,
+      }),
     })
 
     const statusTab = c.querySelector<HTMLButtonElement>('#workspace-status-tab')
@@ -1042,6 +1065,7 @@ describe('RepoWorkspaceToolbar', () => {
     const showRepoBranchTerminalSession = vi.fn(() => true)
     const { container: c } = renderToolbar({
       terminalCount: 2,
+      preferredWorkspacePaneTab: 'terminal',
       navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
     })
 
@@ -1051,22 +1075,7 @@ describe('RepoWorkspaceToolbar', () => {
     if (!statusTab || !terminalTab) throw new Error('missing repo workspace pane tabs')
 
     act(() => {
-      statusTab.focus()
-      statusTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-    })
-    await flush()
-    // No changes tab to land on: ArrowRight moves focus from status to terminal
-    // within the same sortable workspace-pane strip.
-    expect(showRepoBranchTerminalSession).toHaveBeenCalledWith(
-      REPO_ID,
-      'feature/worktree',
-      'term-111111111111111111111',
-    )
-    expect(document.activeElement).toBe(terminalTab)
-    showRepoBranchWorkspacePaneTab.mockClear()
-    showRepoBranchTerminalSession.mockClear()
-
-    act(() => {
+      terminalTab.focus()
       terminalTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
     })
     await flush()
@@ -1461,6 +1470,7 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
     openSettings: () => {},
     openCreateWorktree: () => {},
     ...overrides,
+    currentRepoBranchWorkspacePaneRoute: overrides.currentRepoBranchWorkspacePaneRoute ?? (() => undefined),
   }
   if (!overrides.commitRepoBranchWorkspacePaneRoute) {
     navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)

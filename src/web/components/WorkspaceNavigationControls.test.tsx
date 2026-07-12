@@ -129,6 +129,7 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
     openSettings: () => {},
     openCreateWorktree: () => {},
     ...overrides,
+    currentRepoBranchWorkspacePaneRoute: overrides.currentRepoBranchWorkspacePaneRoute ?? (() => undefined),
   }
 }
 

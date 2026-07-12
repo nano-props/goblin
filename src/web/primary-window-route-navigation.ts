@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 import { branchSlugFromName, repoSlugFromId } from '#/web/repo-route-slugs.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
-import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import { isWorkspacePaneStaticTabType, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
 import {
   beginPrimaryWindowPresentation,
@@ -17,10 +17,16 @@ export interface PrimaryWindowRouteNavigationOptions {
   replace?: boolean
   presentationToken?: PrimaryWindowPresentationToken
   onCommit?: () => void
+  routePrecondition?:
+    { kind: 'exact-route'; route: RepoBranchWorkspacePaneRouteTarget } | { kind: 'current-workspace-target' }
 }
 
 export interface PrimaryWindowRouteNavigation {
   repoSlugForId: (repoId: string) => string | null
+  currentRepoBranchWorkspacePaneRoute: (
+    repoId: string,
+    branchName: string,
+  ) => RepoBranchWorkspacePaneRouteTarget | undefined
   openHome: (options?: PrimaryWindowRouteNavigationOptions) => void
   openSettings: (page: SettingsPage, options?: PrimaryWindowRouteNavigationOptions) => void
   closeSettings: (options?: PrimaryWindowRouteNavigationOptions) => void
@@ -64,6 +70,15 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
       repoSlugForId(repoId) {
         const repo = useReposStore.getState().repos[repoId]
         return repo ? repoSlugFromId(repo.id) : null
+      },
+      currentRepoBranchWorkspacePaneRoute(repoId, branchName) {
+        const repoSlug = repoSlugForId(repoId)
+        if (!repoSlug) return undefined
+        const branchRootHref = router.buildLocation({
+          to: '/repo/$repoSlug/branch/$branchSlug',
+          params: { repoSlug, branchSlug: branchSlugFromName(branchName) },
+        }).href
+        return workspacePaneRouteFromBranchHref(router.state.location.href, branchRootHref)
       },
       openHome(options) {
         if (!router) return
@@ -215,20 +230,58 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
       async commitRepoBranchWorkspacePaneRoute(repoId, branchName, route, options) {
         const repoSlug = repoSlugForId(repoId)
         if (!repoSlug) return false
+        const branchSlug = branchSlugFromName(branchName)
+        const routePrecondition = options?.routePrecondition
+        const currentHref = router.state.location.href
+        const branchRootHref = router.buildLocation({
+          to: '/repo/$repoSlug/branch/$branchSlug',
+          params: { repoSlug, branchSlug },
+        }).href
+        const expectedCurrentHref =
+          routePrecondition?.kind === 'current-workspace-target'
+            ? workspacePaneHrefBelongsToBranch(currentHref, branchRootHref)
+              ? currentHref
+              : null
+            : routePrecondition === undefined
+              ? undefined
+              : (routePrecondition.route === null
+                  ? router.buildLocation({
+                      to: '/repo/$repoSlug/branch/$branchSlug',
+                      params: { repoSlug, branchSlug },
+                    })
+                  : routePrecondition.route.kind === 'static'
+                    ? router.buildLocation({
+                        to: '/repo/$repoSlug/branch/$branchSlug/tab/$tabKey',
+                        params: { repoSlug, branchSlug, tabKey: routePrecondition.route.tab },
+                      })
+                    : router.buildLocation({
+                        to: '/repo/$repoSlug/branch/$branchSlug/terminal/$terminalSessionId',
+                        params: { repoSlug, branchSlug, terminalSessionId: routePrecondition.route.terminalSessionId },
+                      })
+                ).href
+        if (expectedCurrentHref === null) return false
         const replace = options?.replace
         if (route === null) {
           const target = router.buildLocation({
             to: '/repo/$repoSlug/branch/$branchSlug',
-            params: { repoSlug, branchSlug: branchSlugFromName(branchName) },
+            params: { repoSlug, branchSlug },
           })
+          if (
+            router.state.location.href === target.href &&
+            primaryWindowRoutePreconditionMatches(router.state.location.href, expectedCurrentHref)
+          ) {
+            options?.onCommit?.()
+            return true
+          }
           return await settleOwnedPrimaryWindowRouteCommit({
             token: options?.presentationToken,
             commitEffect: options?.onCommit,
             targetHref: target.href,
+            expectedCurrentHref,
             navigate: async (navigationId) => {
               await router.navigate({
                 to: '/repo/$repoSlug/branch/$branchSlug',
-                params: { repoSlug, branchSlug: branchSlugFromName(branchName) },
+                params: { repoSlug, branchSlug },
                 replace,
                 ignoreBlocker: true,
                 state: (state) => primaryWindowNavigationState(state, navigationId),
@@ -240,16 +293,24 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
         if (route.kind === 'static') {
           const target = router.buildLocation({
             to: '/repo/$repoSlug/branch/$branchSlug/tab/$tabKey',
-            params: { repoSlug, branchSlug: branchSlugFromName(branchName), tabKey: route.tab },
+            params: { repoSlug, branchSlug, tabKey: route.tab },
           })
+          if (
+            router.state.location.href === target.href &&
+            primaryWindowRoutePreconditionMatches(router.state.location.href, expectedCurrentHref)
+          ) {
+            options?.onCommit?.()
+            return true
+          }
           return await settleOwnedPrimaryWindowRouteCommit({
             token: options?.presentationToken,
             commitEffect: options?.onCommit,
             targetHref: target.href,
+            expectedCurrentHref,
             navigate: async (navigationId) => {
               await router.navigate({
                 to: '/repo/$repoSlug/branch/$branchSlug/tab/$tabKey',
-                params: { repoSlug, branchSlug: branchSlugFromName(branchName), tabKey: route.tab },
+                params: { repoSlug, branchSlug, tabKey: route.tab },
                 replace,
                 ignoreBlocker: true,
                 state: (state) => primaryWindowNavigationState(state, navigationId),
@@ -262,20 +323,28 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           to: '/repo/$repoSlug/branch/$branchSlug/terminal/$terminalSessionId',
           params: {
             repoSlug,
-            branchSlug: branchSlugFromName(branchName),
+            branchSlug,
             terminalSessionId: route.terminalSessionId,
           },
         })
+        if (
+          router.state.location.href === target.href &&
+          primaryWindowRoutePreconditionMatches(router.state.location.href, expectedCurrentHref)
+        ) {
+          options?.onCommit?.()
+          return true
+        }
         return await settleOwnedPrimaryWindowRouteCommit({
           token: options?.presentationToken,
           commitEffect: options?.onCommit,
           targetHref: target.href,
+          expectedCurrentHref,
           navigate: async (navigationId) => {
             await router.navigate({
               to: '/repo/$repoSlug/branch/$branchSlug/terminal/$terminalSessionId',
               params: {
                 repoSlug,
-                branchSlug: branchSlugFromName(branchName),
+                branchSlug,
                 terminalSessionId: route.terminalSessionId,
               },
               replace,
@@ -324,8 +393,7 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
               router.history.push(href, primaryWindowNavigationState(router.state.location.state, navigationId))
             },
           })
-        }
-        else {
+        } else {
           const repoSlug = repoSlugForId(repoId)
           if (repoSlug) this.openRepoRoot(repoId, options)
         }
@@ -358,6 +426,7 @@ export function runOwnedPrimaryWindowNavigation(input: {
 async function settleOwnedPrimaryWindowRouteCommit(input: {
   token?: PrimaryWindowPresentationToken
   targetHref: string
+  expectedCurrentHref?: string
   commitEffect?: () => void
   navigate(navigationId: string): Promise<void>
   currentHref(): string
@@ -368,6 +437,7 @@ async function settleOwnedPrimaryWindowRouteCommit(input: {
   try {
     return await settlePrimaryWindowRouteCommit({
       targetHref: input.targetHref,
+      expectedCurrentHref: input.expectedCurrentHref,
       navigate: async () => await input.navigate(navigationId),
       currentHref: input.currentHref,
     })
@@ -378,15 +448,58 @@ async function settleOwnedPrimaryWindowRouteCommit(input: {
 
 export async function settlePrimaryWindowRouteCommit(input: {
   targetHref: string
+  expectedCurrentHref?: string
   navigate: () => Promise<void>
   currentHref: () => string
 }): Promise<boolean> {
+  if (!primaryWindowRoutePreconditionMatches(input.currentHref(), input.expectedCurrentHref)) return false
   try {
     await input.navigate()
   } catch {
     return false
   }
   return input.currentHref() === input.targetHref
+}
+
+export function primaryWindowRoutePreconditionMatches(
+  currentHref: string,
+  expectedCurrentHref: string | undefined,
+): boolean {
+  return expectedCurrentHref === undefined || currentHref === expectedCurrentHref
+}
+
+export function workspacePaneHrefBelongsToBranch(currentHref: string, branchRootHref: string): boolean {
+  const currentPath = pathFromHref(currentHref)
+  const branchRootPath = pathFromHref(branchRootHref)
+  if (!currentPath || !branchRootPath) return false
+  return (
+    currentPath === branchRootPath ||
+    currentPath.startsWith(`${branchRootPath}/tab/`) ||
+    currentPath.startsWith(`${branchRootPath}/terminal/`)
+  )
+}
+
+export function workspacePaneRouteFromBranchHref(
+  currentHref: string,
+  branchRootHref: string,
+): RepoBranchWorkspacePaneRouteTarget | undefined {
+  const currentPath = pathFromHref(currentHref)
+  const branchRootPath = pathFromHref(branchRootHref)
+  if (!currentPath || !branchRootPath) return undefined
+  if (currentPath === branchRootPath) return null
+  const prefix = `${branchRootPath}/`
+  if (!currentPath.startsWith(prefix)) return undefined
+  const [kind, encodedValue, ...rest] = currentPath.slice(prefix.length).split('/')
+  if (!encodedValue || rest.length > 0) return undefined
+  let value: string
+  try {
+    value = decodeURIComponent(encodedValue)
+  } catch {
+    return undefined
+  }
+  if (kind === 'tab' && isWorkspacePaneStaticTabType(value)) return { kind: 'static', tab: value }
+  if (kind === 'terminal') return { kind: 'terminal', terminalSessionId: value }
+  return undefined
 }
 
 function repoSlugForId(repoId: string): string | null {

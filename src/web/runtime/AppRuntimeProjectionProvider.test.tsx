@@ -26,10 +26,16 @@ import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspa
 
 const projectionMocks = vi.hoisted(() => ({
   reconcileServerSessionsSnapshot: vi.fn(() => true),
+  reconcileOpenRepoRuntimeMemberships: vi.fn(),
 }))
 
 vi.mock('#/web/components/terminal/use-terminal-session-projection.ts', () => ({
   useTerminalSessionProjection: () => projectionMocks,
+}))
+
+vi.mock('#/web/stores/repos/repo-session-write-paths.ts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('#/web/stores/repos/repo-session-write-paths.ts')>()),
+  reconcileOpenRepoRuntimeMemberships: projectionMocks.reconcileOpenRepoRuntimeMemberships,
 }))
 
 const REPO_ID = '/tmp/goblin-runtime-provider-repo'
@@ -47,11 +53,7 @@ let workspaceTabsChangedHandler: ((repoRoot: string) => void) | null = null
 let recoveredHandler: ((clientId: string) => void) | null = null
 const kickReconnectMock = vi.fn(() => {})
 const recoverSessionsMock =
-  vi.fn<
-    (
-      ...args: Array<{ repoRoot: string; repoRuntimeId: string }>
-    ) => Promise<TerminalSessionsRecoveryResult>
-  >()
+  vi.fn<(...args: Array<{ repoRoot: string; repoRuntimeId: string }>) => Promise<TerminalSessionsRecoveryResult>>()
 const listWorkspaceTabsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<WorkspacePaneTabsEntry[]>>()
 
 describe('AppRuntimeProjectionProvider', () => {
@@ -62,6 +64,15 @@ describe('AppRuntimeProjectionProvider', () => {
     kickReconnectMock.mockClear()
     projectionMocks.reconcileServerSessionsSnapshot.mockClear()
     projectionMocks.reconcileServerSessionsSnapshot.mockReturnValue(true)
+    projectionMocks.reconcileOpenRepoRuntimeMemberships.mockReset()
+    projectionMocks.reconcileOpenRepoRuntimeMemberships.mockImplementation(async () => ({
+      kind: 'settled' as const,
+      targets: Object.values(useReposStore.getState().repos).map((repo) => ({
+        repoRoot: repo.id,
+        repoRuntimeId: repo.repoRuntimeId,
+      })),
+      changedTargets: [],
+    }))
     recoverSessionsMock.mockReset()
     recoverSessionsMock.mockResolvedValue({
       terminalSessions: { revision: 0, sessions: [] },
@@ -190,9 +201,9 @@ describe('AppRuntimeProjectionProvider', () => {
           expect.any(Map),
         )
       })
-      expect(
-        primaryWindowQueryClient.getQueryData(['workspace-pane-tabs', REPO_ID, repo.repoRuntimeId]),
-      ).toMatchObject({ revision: 2 })
+      expect(primaryWindowQueryClient.getQueryData(['workspace-pane-tabs', REPO_ID, repo.repoRuntimeId])).toMatchObject(
+        { revision: 2 },
+      )
     } finally {
       result.unmount()
     }
@@ -289,6 +300,7 @@ describe('AppRuntimeProjectionProvider', () => {
       })
 
       await vi.waitFor(() => {
+        expect(projectionMocks.reconcileOpenRepoRuntimeMemberships).toHaveBeenCalledOnce()
         expect(projectionMocks.reconcileServerSessionsSnapshot).toHaveBeenLastCalledWith(
           { repoRoot: REPO_ID, repoRuntimeId: repo.repoRuntimeId },
           {
@@ -299,6 +311,58 @@ describe('AppRuntimeProjectionProvider', () => {
           expect.any(Map),
         )
         expect(tabsFor(repo.repoRuntimeId)).toEqual([workspacePaneStaticTabEntry('history')])
+      })
+
+      recoverSessionsMock.mockClear()
+      useTerminalProjectionHydrationStore.setState({ refreshCooldownMs: 0 })
+      await act(async () => {
+        window.dispatchEvent(new Event('focus'))
+      })
+      await vi.waitFor(() => {
+        expect(recoverSessionsMock).toHaveBeenCalledOnce()
+        expect(recoverSessionsMock).toHaveBeenCalledWith({
+          repoRoot: REPO_ID,
+          repoRuntimeId: repo.repoRuntimeId,
+        })
+      })
+    } finally {
+      result.unmount()
+    }
+  })
+
+  test('reconciles a replaced repo epoch before recovering runtime projections', async () => {
+    const repo = seedCurrentRepo()
+    const nextRepoRuntimeId = 'repo-runtime-123456789012345678901'
+    projectionMocks.reconcileOpenRepoRuntimeMemberships.mockImplementationOnce(async () => {
+      useReposStore.setState((state) => ({
+        repos: {
+          ...state.repos,
+          [REPO_ID]: { ...state.repos[REPO_ID]!, repoRuntimeId: nextRepoRuntimeId },
+        },
+      }))
+      return {
+        kind: 'settled' as const,
+        targets: [{ repoRoot: REPO_ID, repoRuntimeId: nextRepoRuntimeId }],
+        changedTargets: [
+          { repoRoot: REPO_ID, previousRepoRuntimeId: repo.repoRuntimeId, repoRuntimeId: nextRepoRuntimeId },
+        ],
+      }
+    })
+    const result = renderRuntimeProvider(REPO_ID)
+    try {
+      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
+      recoverSessionsMock.mockClear()
+
+      await act(async () => {
+        recoveredHandler?.('client_sharedterminal')
+      })
+
+      await vi.waitFor(() => {
+        expect(recoverSessionsMock).toHaveBeenCalledWith({ repoRoot: REPO_ID, repoRuntimeId: nextRepoRuntimeId })
+      })
+      expect(recoverSessionsMock).not.toHaveBeenCalledWith({
+        repoRoot: REPO_ID,
+        repoRuntimeId: repo.repoRuntimeId,
       })
     } finally {
       result.unmount()
@@ -425,6 +489,37 @@ describe('AppRuntimeProjectionProvider', () => {
       repoRuntimeId: repo.repoRuntimeId,
       phase: 'ready',
     })
+  })
+
+  test('invalidates a pending membership recovery when the provider unmounts', async () => {
+    const repo = seedCurrentRepo()
+    const membershipRecovery = Promise.withResolvers<{
+      kind: 'settled'
+      targets: Array<{ repoRoot: string; repoRuntimeId: string }>
+      changedTargets: []
+    }>()
+    projectionMocks.reconcileOpenRepoRuntimeMemberships.mockReturnValueOnce(membershipRecovery.promise)
+    const result = renderRuntimeProvider(REPO_ID)
+    await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledOnce())
+    recoverSessionsMock.mockClear()
+    listWorkspaceTabsMock.mockClear()
+
+    await act(async () => {
+      recoveredHandler?.('client_sharedterminal')
+    })
+    await vi.waitFor(() => expect(projectionMocks.reconcileOpenRepoRuntimeMemberships).toHaveBeenCalledOnce())
+    result.unmount()
+
+    membershipRecovery.resolve({
+      kind: 'settled',
+      targets: [{ repoRoot: REPO_ID, repoRuntimeId: repo.repoRuntimeId }],
+      changedTargets: [],
+    })
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(recoverSessionsMock).not.toHaveBeenCalled()
+    expect(listWorkspaceTabsMock).not.toHaveBeenCalled()
   })
 
   test('failed focus projection refresh does not replace an already ready hydrate', async () => {
@@ -576,7 +671,7 @@ function attachResult(): TerminalAttachResult {
   return {
     ok: true,
     terminalRuntimeSessionId: 'unused',
-        terminalRuntimeGeneration: 1,
+    terminalRuntimeGeneration: 1,
     snapshot: '',
     snapshotSeq: 0,
     outputEra: 0,
@@ -593,7 +688,7 @@ function attachResult(): TerminalAttachResult {
 function serverSession(terminalSessionId: string): TestTerminalSessionSummary {
   return {
     terminalRuntimeSessionId: `runtime-${terminalSessionId}`,
-        terminalRuntimeGeneration: 1,
+    terminalRuntimeGeneration: 1,
     terminalSessionId,
     processName: 'zsh',
     canonicalTitle: null,

@@ -11,10 +11,10 @@ import {
 } from '#/web/primary-window-presentation.ts'
 import {
   resolveWorkspacePaneDestinationTargetLease,
-  workspacePaneDestinationTargetLeaseIsCurrent,
+  workspacePaneTargetLeaseIsCurrent,
   type WorkspacePaneDestinationTargetLease,
 } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
-import { runWorkspacePaneTabCoordinatorTask } from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 
 export type WorkspacePaneDestinationNavigation = Pick<
   PrimaryWindowNavigationActions,
@@ -35,7 +35,7 @@ export function beginWorkspacePaneDestinationPresentation(
 export function workspacePaneDestinationPresentationIsCurrent(
   presentation: WorkspacePaneDestinationPresentation,
 ): boolean {
-  return primaryWindowPresentationIsCurrent(presentation.token) && workspacePaneDestinationTargetLeaseIsCurrent(presentation.lease)
+  return primaryWindowPresentationIsCurrent(presentation.token) && workspacePaneTargetLeaseIsCurrent(presentation.lease)
 }
 
 export function resetWorkspacePaneDestinationPresentationForTest(): void {
@@ -55,7 +55,7 @@ export async function dispatchWorkspacePaneDestinationRoute(input: {
     return { kind: 'unsupported', reason: 'worktree-required' }
   }
   const presentation = beginWorkspacePaneDestinationPresentation(lease)
-  return await runWorkspacePaneTabCoordinatorTask(lease, () =>
+  return await runWorkspacePaneAction(lease, () =>
     commitWorkspacePaneDestinationRoute(presentation, input.route, input.navigation, input.options),
   )
 }

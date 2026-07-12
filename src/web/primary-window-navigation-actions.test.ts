@@ -5,10 +5,7 @@ import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from 
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type {
-  WorkspaceNavigationHistoryEntry,
-  WorkspaceNavigationHistoryTraversal,
-} from '#/web/stores/repos/types.ts'
+import type { WorkspaceNavigationHistoryEntry, WorkspaceNavigationHistoryTraversal } from '#/web/stores/repos/types.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import {
   preferredWorkspacePaneTabForTarget,
@@ -745,28 +742,31 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(navigation.openRepoBranchTerminal).not.toHaveBeenCalled()
   })
 
-  test.each(['back', 'forward'] as const)('does not commit %s history when route restore is unavailable', (direction) => {
-    const target = branchHistoryEntry('/tmp/repo-a', 'feature/test', 'history')
-    const traversal = { ...historyTraversal(target), direction }
-    const peekWorkspaceNavigation = vi.fn(() => traversal)
-    const commitWorkspaceNavigation = vi.fn(() => true)
-    const navigation = routeNavigation()
-    vi.mocked(navigation.openRepoBranchTab).mockReturnValue(false)
-    const actions = createPrimaryWindowNavigationActions({
-      currentRepoId: '/tmp/repo-a',
-      order: ['/tmp/repo-a'],
-      closeRepo: vi.fn(),
-      peekWorkspaceNavigation,
-      commitWorkspaceNavigation,
-      routeNavigation: navigation,
-    })
+  test.each(['back', 'forward'] as const)(
+    'does not commit %s history when route restore is unavailable',
+    (direction) => {
+      const target = branchHistoryEntry('/tmp/repo-a', 'feature/test', 'history')
+      const traversal = { ...historyTraversal(target), direction }
+      const peekWorkspaceNavigation = vi.fn(() => traversal)
+      const commitWorkspaceNavigation = vi.fn(() => true)
+      const navigation = routeNavigation()
+      vi.mocked(navigation.openRepoBranchTab).mockReturnValue(false)
+      const actions = createPrimaryWindowNavigationActions({
+        currentRepoId: '/tmp/repo-a',
+        order: ['/tmp/repo-a'],
+        closeRepo: vi.fn(),
+        peekWorkspaceNavigation,
+        commitWorkspaceNavigation,
+        routeNavigation: navigation,
+      })
 
-    if (direction === 'back') actions.goBack('/tmp/repo-a')
-    else actions.goForward('/tmp/repo-a')
+      if (direction === 'back') actions.goBack('/tmp/repo-a')
+      else actions.goForward('/tmp/repo-a')
 
-    expect(peekWorkspaceNavigation).toHaveBeenCalledWith('/tmp/repo-a', direction)
-    expect(commitWorkspaceNavigation).not.toHaveBeenCalled()
-  })
+      expect(peekWorkspaceNavigation).toHaveBeenCalledWith('/tmp/repo-a', direction)
+      expect(commitWorkspaceNavigation).not.toHaveBeenCalled()
+    },
+  )
 
   test('does not open create worktree without a current repo', () => {
     const navigation = routeNavigation()
@@ -841,6 +841,7 @@ function createPrimaryWindowNavigationActions(options: PrimaryWindowNavigationAc
 function routeNavigation(): PrimaryWindowRouteNavigation {
   return {
     repoSlugForId: vi.fn(() => 'repo-slug'),
+    currentRepoBranchWorkspacePaneRoute: () => undefined,
     openHome: vi.fn(),
     openSettings: vi.fn(),
     closeSettings: vi.fn(),

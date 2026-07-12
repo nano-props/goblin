@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { testPhysicalWorktreeCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
+import { clearRepoRuntimesForUser } from '#/server/modules/repo-runtimes.ts'
 
 const mocks = vi.hoisted(() => ({
   probeRepo: vi.fn(),
@@ -74,6 +75,7 @@ vi.mock('#/server/common/identity.ts', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  clearRepoRuntimesForUser('user-test')
 })
 
 function createTestRepoRoutes(
@@ -169,7 +171,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/runtime-open', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ repoInput: '/tmp/repo/subdir' }),
+        body: JSON.stringify({ repoInput: '/tmp/repo/subdir', clientId: 'client-test' }),
       }),
     )
 
@@ -192,7 +194,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/runtime-open', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ repoInput: '/missing' }),
+        body: JSON.stringify({ repoInput: '/missing', clientId: 'client-test' }),
       }),
     )
 
@@ -207,7 +209,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/runtime-open', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ repoRoot: '/tmp/runtime-list-repo' }),
+        body: JSON.stringify({ repoRoot: '/tmp/runtime-list-repo', clientId: 'client-test' }),
       }),
     )
     const opened = (await openResponse.json()) as { ok: true; repoRuntimeId: string }
@@ -222,7 +224,118 @@ describe('repo routes — POST body validation (read endpoints)', () => {
 
     expect(response.status).toBe(200)
     const json = (await response.json()) as { runtimes: Array<{ repoRoot: string; repoRuntimeId: string }> }
-    expect(json.runtimes).toContainEqual({ repoRoot: '/tmp/runtime-list-repo', repoRuntimeId: opened.repoRuntimeId })
+    expect(json.runtimes).toContainEqual({
+      repoRoot: '/tmp/runtime-list-repo',
+      repoRuntimeId: opened.repoRuntimeId,
+      remoteLifecycle: null,
+    })
+  })
+
+  test('keeps one shared runtime until the last client membership closes', async () => {
+    const app = createTestRepoRoutes()
+    const open = async (clientId: string) =>
+      (await (
+        await app.request(
+          new Request('http://localhost/runtime-open', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ repoRoot: '/tmp/shared-runtime', clientId }),
+          }),
+        )
+      ).json()) as { repoRuntimeId: string }
+    const first = await open('client-a')
+    const second = await open('client-b')
+    expect(second.repoRuntimeId).toBe(first.repoRuntimeId)
+    const close = async (clientId: string) =>
+      await (
+        await app.request(
+          new Request('http://localhost/runtime-close', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ repoRoot: '/tmp/shared-runtime', repoRuntimeId: first.repoRuntimeId, clientId }),
+          }),
+        )
+      ).json()
+    await expect(close('client-a')).resolves.toEqual({ ok: true, released: true, runtimeClosed: false })
+    await expect(close('client-b')).resolves.toEqual({ ok: true, released: true, runtimeClosed: true })
+  })
+
+  test.each([
+    ['/runtime-open', { repoRoot: '/tmp/invalid-client', clientId: '' }],
+    ['/runtime-open', { repoRoot: '/tmp/invalid-client', clientId: 'x'.repeat(129) }],
+    ['/runtime-close', { repoRoot: '/tmp/invalid-client', repoRuntimeId: 'repo-runtime-test', clientId: '' }],
+    [
+      '/runtime-close',
+      { repoRoot: '/tmp/invalid-client', repoRuntimeId: 'repo-runtime-test', clientId: 'x'.repeat(129) },
+    ],
+    ['/runtime-reconcile', { repoRoots: ['/tmp/invalid-client'], clientId: '' }],
+    ['/runtime-reconcile', { repoRoots: ['/tmp/invalid-client'], clientId: 'x'.repeat(129) }],
+  ])('returns 400 when %s receives an invalid clientId', async (path, body) => {
+    const response = await createTestRepoRoutes().request(
+      new Request(`http://localhost${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+    )
+
+    expect(response.status).toBe(400)
+  })
+
+  test('returns 400 when runtime reconcile contains an empty repo root', async () => {
+    const response = await createTestRepoRoutes().request(
+      new Request('http://localhost/runtime-reconcile', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ clientId: 'client-a', repoRoots: ['/tmp/valid', ''] }),
+      }),
+    )
+
+    expect(response.status).toBe(400)
+  })
+
+  test('reconciles a client window membership declaration in one request', async () => {
+    const app = createTestRepoRoutes()
+    const post = async (path: string, body: object) =>
+      await app.request(
+        new Request(`http://localhost${path}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        }),
+      )
+    const old = (await (
+      await post('/runtime-open', {
+        repoRoot: '/tmp/reconcile-old',
+        clientId: 'client-a',
+      })
+    ).json()) as { repoRuntimeId: string }
+    await post('/runtime-open', { repoRoot: '/tmp/reconcile-old', clientId: 'client-b' })
+
+    const response = await post('/runtime-reconcile', {
+      clientId: 'client-a',
+      repoRoots: ['/tmp/reconcile-new'],
+    })
+
+    expect(response.status).toBe(200)
+    const reconciled = (await response.json()) as {
+      runtimes: Array<{ repoRoot: string; repoRuntimeId: string }>
+    }
+    expect(reconciled.runtimes).toContainEqual(
+      expect.objectContaining({
+        repoRoot: '/tmp/reconcile-new',
+        repoRuntimeId: expect.stringMatching(/^repo-runtime-/),
+      }),
+    )
+    const listed = (await (await post('/runtime-list', {})).json()) as {
+      runtimes: Array<{ repoRoot: string; repoRuntimeId: string }>
+    }
+    expect(listed.runtimes).toContainEqual(
+      expect.objectContaining({
+        repoRoot: '/tmp/reconcile-old',
+        repoRuntimeId: old.repoRuntimeId,
+      }),
+    )
   })
 
   test('passes worktree bootstrap preview requests through to the module layer', async () => {

@@ -6,10 +6,7 @@ import type { TerminalSessionCommandBridge } from '#/web/components/terminal/ter
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import type { WorkspacePaneTabControllerCommitNavigation } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
 import { commitWorkspacePaneCurrentTargetRoute } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
-import {
-  runWorkspacePaneTabCoordinatorTask,
-  workspacePaneTabCoordinatorObservedRoute,
-} from '#/web/workspace-pane/workspace-pane-tab-coordinator.ts'
+import { runWorkspacePaneAction } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import { workspacePaneRuntimeTabCommandContext } from '#/web/workspace-pane/workspace-pane-runtime-tab-command-context.ts'
 import { dispatchCreateTerminalWorkspacePaneRuntimeTabAction } from '#/web/workspace-pane/workspace-pane-runtime-tab-create-action.ts'
@@ -131,12 +128,7 @@ function showTerminalRuntimeTab(
   if (type !== 'terminal') return false
   const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute })
   if (!target) return false
-  return commitWorkspacePaneCurrentTargetRoute(
-    target,
-    workspacePaneTabCoordinatorObservedRoute(target) ?? workspacePaneRoute,
-    { kind: 'terminal', terminalSessionId: sessionId },
-    navigation,
-  )
+  return commitWorkspacePaneCurrentTargetRoute(target, { kind: 'terminal', terminalSessionId: sessionId }, navigation)
 }
 
 async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandContext): Promise<boolean> {
@@ -150,7 +142,7 @@ async function runTerminalPrimaryAction(context: WorkspacePaneRuntimeTabCommandC
   if (worktree.count > 0) {
     const target = terminalCoordinatorTarget(base)
     if (!target) return false
-    return await runWorkspacePaneTabCoordinatorTask(target, async () => {
+    return await runWorkspacePaneAction(target, async () => {
       const nextWorktree = bridge.terminalWorktreeSnapshot(terminalWorktreeKey)
       if (nextWorktree.createPending) return true
       const firstSession = nextWorktree.sessions[0]

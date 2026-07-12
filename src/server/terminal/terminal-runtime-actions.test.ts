@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, test, vi } from 'vitest'
-import { clearRepoRuntimesForUser, openRepoRuntime } from '#/server/modules/repo-runtimes.ts'
+import { acquireRepoRuntime, clearRepoRuntimesForUser } from '#/server/modules/repo-runtimes.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
@@ -101,7 +101,7 @@ function makeActions(
 }
 
 function syncCurrentRepoRuntime(): void {
-  REPO_RUNTIME_ID = openRepoRuntime(USER_ID, REPO_ROOT)
+  REPO_RUNTIME_ID = acquireRepoRuntime(USER_ID, REPO_ROOT, CLIENT_ID)
 }
 
 describe('terminal-runtime-actions close broadcast', () => {

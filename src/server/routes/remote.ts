@@ -3,12 +3,13 @@ import {
   getServerSshHosts,
   openServerRemoteEditor,
   openServerRemoteTerminal,
-  resolveServerRemoteRepoConnection,
   resolveServerRemoteTarget,
   testServerRemoteRepo,
 } from '#/server/modules/remote.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { REMOTE_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
+import { userIdFromContext } from '#/server/common/identity.ts'
+import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
 
 export function createRemoteRoutes() {
   const app = createRouteApp()
@@ -17,13 +18,11 @@ export function createRemoteRoutes() {
     const { alias, remotePath } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.resolveTarget, c)
     return c.json(await resolveServerRemoteTarget({ alias, remotePath }, c.req.raw.signal))
   })
-  // Unified lifecycle boundary (docs/.../plan §5). The client
-  // calls this from the orchestrator's task; the server returns
-  // a converged `ready`/`failed` lifecycle result. NEVER
-  // returns `connecting` — that's a client projection.
   app.post('/lifecycle', async (c) => {
-    const { repoId } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.remoteLifecycle, c)
-    return c.json(await resolveServerRemoteRepoConnection({ repoId }, c.req.raw.signal))
+    const userId = userIdFromContext(c)
+    if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
+    const { repoId, repoRuntimeId, mode } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.remoteLifecycle, c)
+    return c.json(await runRemoteLifecycleWrite({ userId, repoId, repoRuntimeId, mode: mode ?? 'restart' }))
   })
   app.post('/path-suggestions', async (c) => {
     const { alias, remotePath, prefix } = await parseHttpBody(REMOTE_PROCEDURE_SCHEMAS.pathSuggestions, c)

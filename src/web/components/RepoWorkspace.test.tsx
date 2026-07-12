@@ -40,12 +40,9 @@ import { setWorkspacePaneTabsForTargetQueryData } from '#/web/test-utils/workspa
 import { terminalSessionContextForTest } from '#/web/test-utils/terminal-session-context.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
-import { resetWorkspacePaneTabControllerForTest } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
-import {
-  recordWorkspacePaneTabOpener,
-  workspacePaneTabOpener,
-} from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
   observedWorkspacePaneRouteCommitForTest,
@@ -99,6 +96,7 @@ const terminalCommandContext: TerminalSessionContextValue = terminalSessionConte
 })
 
 const navigation: PrimaryWindowNavigationActions = {
+  currentRepoBranchWorkspacePaneRoute: () => undefined,
   activateRepo: vi.fn(),
   closeRepo: vi.fn(),
   cycleRepo: vi.fn(),
@@ -114,7 +112,7 @@ const navigation: PrimaryWindowNavigationActions = {
 }
 
 beforeEach(() => {
-  resetWorkspacePaneTabControllerForTest()
+  resetWorkspacePaneActionQueueForTest()
   primaryWindowQueryClient.clear()
   resetReposStore()
   installWorkspacePaneTabsTestBridge()
@@ -864,7 +862,7 @@ describe('RepoWorkspace', () => {
           nextBranch,
         ) => {
           useReposStore.getState().setWorkspacePaneTab(repoId, nextBranch, null)
-          setTimeout(() => setRoute(null), 0)
+          setRoute(null)
           return true
         }
         const showRepoBranchWorkspacePaneTab: PrimaryWindowNavigationActions['showRepoBranchWorkspacePaneTab'] = (
@@ -873,7 +871,7 @@ describe('RepoWorkspace', () => {
           tab,
         ) => {
           useReposStore.getState().setWorkspacePaneTab(repoId, nextBranch, tab)
-          setTimeout(() => setRoute({ kind: 'static', tab }), 0)
+          setRoute({ kind: 'static', tab })
           return true
         }
         seedInitialObservedWorkspacePaneRouteForTest()
@@ -1045,6 +1043,55 @@ describe('RepoWorkspace', () => {
 
     await expect(closePromise).resolves.toBe(true)
     expect(route.openRepoBranchTab).toHaveBeenCalledWith(REPO_ID, branchName, 'status', presentationOptions())
+  })
+
+  test('reconciles a closed active tab after close-back navigation rejects', async () => {
+    const branchName = 'feature/close-route-rejected'
+    const worktreePath = '/tmp/close-route-rejected-worktree'
+    seedRepoWithReadModelForTest({
+      id: REPO_ID,
+      branches: [createRepoBranch(branchName, { worktree: { path: worktreePath } })],
+      currentBranchName: branchName,
+      preferredWorkspacePaneTab: 'files',
+      workspacePaneTabsByBranch: {
+        [branchName]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
+      },
+    })
+    const route = routeNavigation()
+    vi.mocked(route.openRepoBranchTab).mockImplementation(() => {
+      throw new Error('navigation rejected')
+    })
+    const actions = navigationWithStore(route)
+
+    render(
+      <QueryClientProvider client={primaryWindowQueryClient}>
+        <PrimaryWindowNavigationProvider value={actions}>
+          <TerminalSessionContext value={terminalCommandContext}>
+            <TerminalSessionReadContext value={terminalReadContext}>
+              <RepoWorkspace
+                repoId={REPO_ID}
+                currentBranchName={branchName}
+                workspacePaneRouteContext={{ kind: 'routed', route: { kind: 'static', tab: 'files' } }}
+              />
+            </TerminalSessionReadContext>
+          </TerminalSessionContext>
+        </PrimaryWindowNavigationProvider>
+      </QueryClientProvider>,
+    )
+    vi.mocked(route.openRepoBranch).mockClear()
+
+    await expect(
+      runCloseWorkspacePaneTabCommand({
+        repoId: REPO_ID,
+        branchName,
+        workspacePaneRoute: { kind: 'static', tab: 'files' },
+        navigation: actions,
+      }),
+    ).resolves.toBe(false)
+
+    await waitFor(() => {
+      expect(route.openRepoBranch).toHaveBeenCalledWith(REPO_ID, branchName, presentationOptions({ replace: true }))
+    })
   })
 
   test('replaces an unrenderable static route with the bare branch route', async () => {
@@ -1296,6 +1343,7 @@ function navigationWithStore(
 function routeNavigation(): PrimaryWindowRouteNavigation {
   return {
     repoSlugForId: vi.fn(() => 'repo-workspace-container-repo'),
+    currentRepoBranchWorkspacePaneRoute: () => undefined,
     openHome: vi.fn(),
     openSettings: vi.fn(),
     closeSettings: vi.fn(),

@@ -55,10 +55,16 @@ const RepoSessionEntrySchema = v.variant('kind', [
   v.object({ kind: v.literal('local'), id: v.string() }),
   v.object({ kind: v.literal('remote'), id: v.string(), ref: RemoteRepoRefSchema }),
 ])
-const RepoRuntimeOpenSchema = v.union([v.object({ repoRoot: v.string() }), v.object({ repoInput: v.string() })])
+const ClientIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
+const RepoRootSchema = v.pipe(v.string(), v.minLength(1))
+const RepoRuntimeOpenSchema = v.union([
+  v.object({ repoRoot: RepoRootSchema, clientId: ClientIdSchema }),
+  v.object({ repoInput: v.string(), clientId: ClientIdSchema }),
+])
 const RepoRuntimeCloseSchema = v.object({
-  repoRoot: v.string(),
+  repoRoot: RepoRootSchema,
   repoRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
+  clientId: ClientIdSchema,
 })
 const EmptyBodySchema = v.optional(v.object({}))
 
@@ -111,6 +117,10 @@ export const REPO_PROCEDURE_SCHEMAS = {
   openInFinder: v.object({ path: v.string() }),
   backgroundSyncRepos: v.object({ repoIds: StringArray }),
   runtimeOpen: RepoRuntimeOpenSchema,
+  runtimeReconcile: v.object({
+    clientId: ClientIdSchema,
+    repoRoots: v.pipe(v.array(RepoRootSchema), v.maxLength(100)),
+  }),
   runtimeList: EmptyBodySchema,
   runtimeClose: RepoRuntimeCloseSchema,
   abort: CwdInput,
@@ -154,12 +164,13 @@ export const REPO_PROCEDURE_SCHEMAS = {
 
 export const REMOTE_PROCEDURE_SCHEMAS = {
   resolveTarget: RemoteConnectionInputSchema,
-  // Unified lifecycle boundary (docs/.../plan §5): body is the
-  // repo id. The server parses the id, resolves the SSH target,
-  // probes the remote repo, classifies the failure, and returns
-  // a converged `RemoteRepoConnectionResult`. NEVER returns
-  // 'connecting' — that's a client projection.
-  remoteLifecycle: v.object({ repoId: v.string() }),
+  // Starts a server-owned attempt for one repo-runtime generation and
+  // returns its accepted terminal lifecycle projection.
+  remoteLifecycle: v.object({
+    repoId: v.string(),
+    repoRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
+    mode: v.optional(v.picklist(['restart', 'ensure'])),
+  }),
   pathSuggestions: RemotePathSuggestionsInputSchema,
   testRepo: v.object({ target: RemoteTargetSchema }),
   openEditor: v.object({ repoId: v.string(), worktreePath: v.string(), app: EditorAppSchema }),

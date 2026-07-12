@@ -39,7 +39,7 @@ import {
 } from '#/shared/workspace-pane.ts'
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { observedWorkspacePaneRouteCommitForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
-import { observeWorkspacePaneTabControllerRoute } from '#/web/workspace-pane/workspace-pane-tab-controller.ts'
+import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import {
@@ -408,7 +408,7 @@ describe('RepoWorkspaceContent', () => {
     )
 
     expect(pathButton).not.toBeNull()
-    observeWorkspacePaneTabControllerRoute({
+    observeWorkspacePaneRouteForTest({
       repoId: REPO_ID,
       repoRuntimeId: repo.repoRuntimeId,
       branchName: 'feature/status-links',
@@ -426,7 +426,7 @@ describe('RepoWorkspaceContent', () => {
     )
 
     showRepoBranchWorkspacePaneTab.mockClear()
-    observeWorkspacePaneTabControllerRoute({
+    observeWorkspacePaneRouteForTest({
       repoId: REPO_ID,
       repoRuntimeId: repo.repoRuntimeId,
       branchName: 'feature/status-links',
@@ -488,7 +488,7 @@ describe('RepoWorkspaceContent', () => {
     )
 
     expect(changesButton).not.toBeNull()
-    observeWorkspacePaneTabControllerRoute({
+    observeWorkspacePaneRouteForTest({
       repoId: REPO_ID,
       repoRuntimeId: repo.repoRuntimeId,
       branchName: 'feature/status-links',
@@ -1035,11 +1035,7 @@ describe('RepoWorkspaceContent', () => {
                 repoRoot: REPO_ID,
                 branchName,
                 worktreePath,
-                tabs: [
-                  staticEntry('files'),
-                  terminalEntry('term-111111111111111111111'),
-                  staticEntry('status'),
-                ],
+                tabs: [staticEntry('files'), terminalEntry('term-111111111111111111111'), staticEntry('status')],
               },
             ],
           },
@@ -1063,9 +1059,7 @@ describe('RepoWorkspaceContent', () => {
     renderInJsdom(
       <QueryClientProvider client={queryClient}>
         <PrimaryWindowNavigationProvider value={navigation}>
-          <TerminalSessionContext
-            value={terminalCommandContextWith({ createTerminalWithAdmission, writeInput })}
-          >
+          <TerminalSessionContext value={terminalCommandContextWith({ createTerminalWithAdmission, writeInput })}>
             <TerminalSessionReadContext value={emptyTerminalReadContext}>
               <BranchActionSurfaceContext value={defaultBranchActionSurface()}>
                 <RepoWorkspaceContentHarness
@@ -1081,7 +1075,7 @@ describe('RepoWorkspaceContent', () => {
     )
 
     const row = await screen.findByRole('treeitem', { name: 'README.md' })
-    observeWorkspacePaneTabControllerRoute({
+    observeWorkspacePaneRouteForTest({
       repoId: REPO_ID,
       repoRuntimeId: repo.repoRuntimeId,
       branchName,
@@ -1138,14 +1132,9 @@ describe('RepoWorkspaceContent', () => {
     // Chrome-tab-style opener tracking: the terminal this opened should be
     // attributed to "files" (the only tab open, and active, when the file
     // was double-clicked), scoped to this workspace pane target.
-    expect(
-      workspacePaneTabOpener(
-        REPO_ID,
-        repo.repoRuntimeId,
-        branchName,
-        'terminal:term-111111111111111111111',
-      ),
-    ).toBe('workspace-pane:files')
+    expect(workspacePaneTabOpener(REPO_ID, repo.repoRuntimeId, branchName, 'terminal:term-111111111111111111111')).toBe(
+      'workspace-pane:files',
+    )
   })
 
   test('falls back to status when a branch preference names a closed tab', async () => {
@@ -1376,6 +1365,7 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
     openSettings: () => {},
     openCreateWorktree: () => {},
     ...overrides,
+    currentRepoBranchWorkspacePaneRoute: overrides.currentRepoBranchWorkspacePaneRoute ?? (() => undefined),
   }
   navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)
   return navigation

@@ -27,16 +27,17 @@ import { readWorkspacePaneTabsForTarget } from '#/web/workspace-pane/workspace-p
 import { workspacePaneStaticTabsFromEntries } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { setTerminalSessionCommandBridgeForTest as setTerminalSessionCommandBridge } from '#/web/test-utils/terminal-session-command-bridge.ts'
-import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/refresh-coordinator.ts'
+import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/repo-refresh-actions.ts'
 import type { TerminalWorktreeSnapshot } from '#/web/components/terminal/types.ts'
 import {
+  observeWorkspacePaneRouteForTest,
   observedWorkspacePaneRouteCommitForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
 
-vi.mock('#/web/stores/repos/refresh-coordinator.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#/web/stores/repos/refresh-coordinator.ts')>()
+vi.mock('#/web/stores/repos/repo-refresh-actions.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#/web/stores/repos/repo-refresh-actions.ts')>()
   return { ...actual, requestVisibleRepoProjectionRefresh: vi.fn() }
 })
 
@@ -253,6 +254,15 @@ describe('openWorkspacePaneTab', () => {
     })
 
     const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
+    const navigation = navigationWithStoreActions(showRepoBranchWorkspacePaneTab)
+    const repoRuntimeId = useReposStore.getState().repos[REPO_ID]!.repoRuntimeId
+    observeWorkspacePaneRouteForTest({
+      repoId: REPO_ID,
+      repoRuntimeId,
+      branchName: 'feature/no-worktree',
+      worktreePath: null,
+      route: null,
+    })
     await expect(
       openWorkspacePaneTab({
         workspacePaneRoute: undefined,
@@ -260,12 +270,12 @@ describe('openWorkspacePaneTab', () => {
         branchName: 'feature/no-worktree',
         worktreePath: null,
         type: 'status',
-        navigation: navigationWithStoreActions(showRepoBranchWorkspacePaneTab),
+        navigation,
       }),
     ).resolves.toBe(true)
 
-    expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
-    expect(preferredWorkspacePaneTab('feature/no-worktree')).toBe('changes')
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/no-worktree', 'status')
+    expect(preferredWorkspacePaneTab('feature/no-worktree')).toBe('status')
   })
 
   test('opens history as a branch-static workspace pane tab', async () => {
