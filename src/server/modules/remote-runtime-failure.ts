@@ -29,9 +29,10 @@ export function isRemoteRepoRuntimeFailure(error: unknown): error is RemoteRepoR
 
 export function remoteRuntimeFailureReasonFromCommandResult(
   result: RemoteCommandResult,
+  target?: RemoteRepoTarget,
 ): RemoteRepoFailureReason | null {
   if (result.ok || result.message === 'cancelled') return null
-  if (result.remoteStarted) return remoteRuntimeTransportFailureAfterStart(result)
+  if (result.remoteStarted) return remoteRuntimeTransportFailureAfterStart(result, target)
   if (result.timedOut || result.message === 'timeout') return 'timeout'
   const text = `${result.stderr}\n${result.stdout}\n${result.message ?? ''}`.toLowerCase()
   if (text.includes('host key verification failed') || text.includes('remote host identification has changed')) {
@@ -67,17 +68,33 @@ export function remoteRuntimeFailureReasonFromCommandResult(
   return null
 }
 
-function remoteRuntimeTransportFailureAfterStart(result: RemoteCommandResult): RemoteRepoFailureReason | null {
-  if (result.timedOut || result.message === 'timeout') return 'timeout'
-  const text = `${result.stderr}\n${result.stdout}\n${result.message ?? ''}`.toLowerCase()
-  if (
-    text.includes('client_loop: send disconnect') ||
-    text.includes('connection reset by peer') ||
-    /connection to .* closed/u.test(text)
-  ) {
+function remoteRuntimeTransportFailureAfterStart(
+  result: RemoteCommandResult,
+  target?: RemoteRepoTarget,
+): RemoteRepoFailureReason | null {
+  if (result.timedOut) return 'timeout'
+  // Post-start stderr also contains the remote command's stderr, so only accept
+  // the local ssh close line when it names the argv destination near the tail.
+  const text = result.stderr.toLowerCase()
+  if (target && text.includes('connection to ') && textMentionsTargetClosedConnection(text, target)) {
     return 'unreachable'
   }
   return null
+}
+
+function textMentionsTargetClosedConnection(text: string, target: RemoteRepoTarget): boolean {
+  const destination = (target.sshConnection?.destination ?? target.alias).trim().toLowerCase()
+  if (!destination) return false
+  const prefix = `connection to ${destination}`
+  const tailLines = text
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(-2)
+  for (const line of tailLines) {
+    if (line.startsWith(prefix) && /^ closed\b/u.test(line.slice(prefix.length))) return true
+  }
+  return false
 }
 
 export function remoteRuntimeFailureFromCommandResult(input: {
@@ -86,7 +103,7 @@ export function remoteRuntimeFailureFromCommandResult(input: {
   target?: RemoteRepoTarget
   result: RemoteCommandResult
 }): RemoteRepoRuntimeFailureError | null {
-  const reason = remoteRuntimeFailureReasonFromCommandResult(input.result)
+  const reason = remoteRuntimeFailureReasonFromCommandResult(input.result, input.target)
   if (!reason) return null
   return new RemoteRepoRuntimeFailureError({
     repoRoot: input.repoRoot,

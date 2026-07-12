@@ -1,5 +1,20 @@
 import { describe, expect, test } from 'vitest'
 import { remoteRuntimeFailureReasonFromCommandResult } from '#/server/modules/remote-runtime-failure.ts'
+import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
+
+const target: RemoteRepoTarget = {
+  id: 'ssh-config://example/srv/repo',
+  alias: 'example',
+  host: 'example.test',
+  user: 'deploy',
+  port: 22,
+  remotePath: '/srv/repo',
+  displayName: 'example:repo',
+  sshConnection: {
+    destination: 'example',
+    options: ['hostname=example.test', 'user=deploy', 'port=22'],
+  },
+}
 
 describe('remote runtime failure classification', () => {
   test('classifies SSH transport failures', () => {
@@ -68,26 +83,41 @@ describe('remote runtime failure classification', () => {
         remoteStarted: true,
       }),
     ).toBeNull()
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult({
+        ok: false,
+        stdout: '',
+        stderr: 'timeout',
+        message: 'timeout',
+        remoteStarted: true,
+      }),
+    ).toBeNull()
   })
 
   test('classifies current SSH session transport loss after the remote shell starts', () => {
     expect(
-      remoteRuntimeFailureReasonFromCommandResult({
-        ok: false,
-        stdout: '',
-        stderr: 'Connection to example.com closed by remote host.',
-        message: 'Connection to example.com closed by remote host.',
-        remoteStarted: true,
-      }),
+      remoteRuntimeFailureReasonFromCommandResult(
+        {
+          ok: false,
+          stdout: '',
+          stderr: 'Connection to example closed by remote host.',
+          message: 'Connection to example closed by remote host.',
+          remoteStarted: true,
+        },
+        target,
+      ),
     ).toBe('unreachable')
     expect(
-      remoteRuntimeFailureReasonFromCommandResult({
-        ok: false,
-        stdout: '',
-        stderr: 'client_loop: send disconnect: Broken pipe',
-        message: 'client_loop: send disconnect: Broken pipe',
-        remoteStarted: true,
-      }),
+      remoteRuntimeFailureReasonFromCommandResult(
+        {
+          ok: false,
+          stdout: '',
+          stderr: 'client_loop: send disconnect: Broken pipe\nConnection to example closed.',
+          message: 'client_loop: send disconnect: Broken pipe\nConnection to example closed.',
+          remoteStarted: true,
+        },
+        target,
+      ),
     ).toBe('unreachable')
     expect(
       remoteRuntimeFailureReasonFromCommandResult({
@@ -99,6 +129,71 @@ describe('remote runtime failure classification', () => {
         remoteStarted: true,
       }),
     ).toBe('timeout')
+  })
+
+  test('does not classify upstream SSH transport text after the remote shell starts', () => {
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult(
+        {
+          ok: false,
+          stdout: '',
+          stderr: 'Connection to github.com closed by remote host.',
+          message: 'Connection to github.com closed by remote host.',
+          remoteStarted: true,
+        },
+        target,
+      ),
+    ).toBeNull()
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult(
+        {
+          ok: false,
+          stdout: '',
+          stderr: 'client_loop: send disconnect: Broken pipe',
+          message: 'client_loop: send disconnect: Broken pipe',
+          remoteStarted: true,
+        },
+        target,
+      ),
+    ).toBeNull()
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult(
+        {
+          ok: false,
+          stdout: 'Connection to example closed by remote host.',
+          stderr: '',
+          message: 'Connection to example closed by remote host.',
+          remoteStarted: true,
+        },
+        target,
+      ),
+    ).toBeNull()
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult(
+        {
+          ok: false,
+          stdout: '',
+          stderr: '',
+          message: 'Connection to example closed by remote host.',
+          remoteStarted: true,
+        },
+        target,
+      ),
+    ).toBeNull()
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult(
+        {
+          ok: false,
+          stdout: '',
+          stderr:
+            'Connection to example interrupted before upstream closed\nConnection to github.com closed by remote host.',
+          message:
+            'Connection to example interrupted before upstream closed\nConnection to github.com closed by remote host.',
+          remoteStarted: true,
+        },
+        target,
+      ),
+    ).toBeNull()
   })
 
   test('does not classify ordinary command failures or stale runtime as reachability failures', () => {
