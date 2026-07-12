@@ -21,7 +21,7 @@ import { menuNodeLog } from '#/node/logger.ts'
 import { openDataFolderMenuKey, t } from '#/main/i18n/index.ts'
 import { sendClientEffectIntent } from '#/main/client-surface-events.ts'
 import { getTheme } from '#/main/theme.ts'
-import { tildifyPath } from '#/shared/paths.ts'
+import { formatRepoSessionEntryLocator } from '#/shared/repo-locator.ts'
 import type { LangPref, ThemePref } from '#/shared/api-types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { ClientEffectIntent } from '#/shared/client-effect-intents.ts'
@@ -194,10 +194,7 @@ function createRecentReposMenu(recentRepos: RepoSessionEntry[]): MenuItemConstru
 
 function createRecentRepoMenuItem(entry: RepoSessionEntry, home: string): MenuItemConstructorOptions {
   return {
-    label:
-      entry.kind === 'local'
-        ? tildifyPath(entry.id, home)
-        : `${entry.ref.displayName} — ${entry.ref.alias}:${entry.ref.remotePath}`,
+    label: formatRepoSessionEntryLocator(entry, home),
     click: () => send({ type: 'open-recent-repo-requested', entry }),
   }
 }

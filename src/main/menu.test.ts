@@ -216,7 +216,7 @@ describe('app menu actions', () => {
     expect(recentMenu?.submenu?.map((entry: any) => entry.label ?? entry.type)).toEqual([
       '~/Developer/local-repo',
       'separator',
-      'remote-repo — work:/srv/remote-repo',
+      'work:/srv/remote-repo',
       'separator',
       'menu.file.clear-recent',
     ])
