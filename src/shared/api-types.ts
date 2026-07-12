@@ -370,6 +370,7 @@ export interface AppIpcHandlers {
     trashFile: (input: { cwd: string; worktreePath: string; path: string }) => Promise<ExecResult>
     deleteBranch: (input: {
       cwd: string
+      repoRuntimeId: string
       branch: string
       force?: boolean
       alsoDeleteUpstream?: boolean
@@ -386,9 +387,9 @@ export interface AppIpcHandlers {
     createWorktree: (input: CreateWorktreeIpcInput) => Promise<ExecResult>
     worktreeBootstrapPreview: (input: { cwd: string }) => Promise<WorktreeBootstrapPreviewResult>
     remoteBranches: (input: { cwd: string; repoRuntimeId: string }) => Promise<string[]>
-    pull: (input: { cwd: string; branch: string; worktreePath?: string }) => Promise<ExecResult>
-    push: (input: { cwd: string; branch: string }) => Promise<ExecResult>
-    fetch: (input: { cwd: string }) => Promise<ExecResult>
+    pull: (input: { cwd: string; repoRuntimeId: string; branch: string; worktreePath?: string }) => Promise<ExecResult>
+    push: (input: { cwd: string; repoRuntimeId: string; branch: string }) => Promise<ExecResult>
+    fetch: (input: { cwd: string; repoRuntimeId?: string }) => Promise<ExecResult>
     abort: (input: { cwd: string }) => Promise<boolean>
     openRemote: (input: { cwd: string; branch?: string }) => Promise<ExecResult>
   }
