@@ -72,6 +72,7 @@ describe('remote runtime failure classification', () => {
         stderr: 'git@github.com: Permission denied (publickey).',
         message: 'git@github.com: Permission denied (publickey).',
         remoteStarted: true,
+        transportStderr: '',
       }),
     ).toBeNull()
     expect(
@@ -81,6 +82,7 @@ describe('remote runtime failure classification', () => {
         stderr: 'Host key verification failed.',
         message: 'Host key verification failed.',
         remoteStarted: true,
+        transportStderr: '',
       }),
     ).toBeNull()
     expect(
@@ -90,6 +92,7 @@ describe('remote runtime failure classification', () => {
         stderr: 'timeout',
         message: 'timeout',
         remoteStarted: true,
+        transportStderr: '',
       }),
     ).toBeNull()
     expect(
@@ -100,6 +103,7 @@ describe('remote runtime failure classification', () => {
         message: 'timeout',
         timedOut: true,
         remoteStarted: true,
+        transportStderr: '',
       }),
     ).toBeNull()
   })
@@ -110,7 +114,8 @@ describe('remote runtime failure classification', () => {
         {
           ok: false,
           stdout: '',
-          stderr: 'Connection to example closed by remote host.',
+          stderr: '',
+          transportStderr: 'Connection to example closed by remote host.',
           message: 'Connection to example closed by remote host.',
           remoteStarted: true,
         },
@@ -122,7 +127,21 @@ describe('remote runtime failure classification', () => {
         {
           ok: false,
           stdout: '',
-          stderr: 'client_loop: send disconnect: Broken pipe\nConnection to example closed.',
+          stderr: '',
+          transportStderr: 'client_loop: send disconnect: Broken pipe',
+          message: 'client_loop: send disconnect: Broken pipe',
+          remoteStarted: true,
+        },
+        target,
+      ),
+    ).toBe('unreachable')
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult(
+        {
+          ok: false,
+          stdout: '',
+          stderr: '',
+          transportStderr: 'client_loop: send disconnect: Broken pipe\nConnection to example closed.',
           message: 'client_loop: send disconnect: Broken pipe\nConnection to example closed.',
           remoteStarted: true,
         },
@@ -134,7 +153,8 @@ describe('remote runtime failure classification', () => {
         {
           ok: false,
           stdout: '',
-          stderr: 'Connection closed by example port 22',
+          stderr: '',
+          transportStderr: 'Connection closed by example port 22',
           message: 'Connection closed by example port 22',
           remoteStarted: true,
         },
@@ -146,7 +166,8 @@ describe('remote runtime failure classification', () => {
         {
           ok: false,
           stdout: '',
-          stderr: 'Connection reset by example port 22',
+          stderr: '',
+          transportStderr: 'Connection reset by example port 22',
           message: 'Connection reset by example port 22',
           remoteStarted: true,
         },
@@ -158,7 +179,8 @@ describe('remote runtime failure classification', () => {
         {
           ok: false,
           stdout: '',
-          stderr: 'Connection to example port 22: Broken pipe',
+          stderr: '',
+          transportStderr: 'Connection to example port 22: Broken pipe',
           message: 'Connection to example port 22: Broken pipe',
           remoteStarted: true,
         },
@@ -170,7 +192,8 @@ describe('remote runtime failure classification', () => {
         {
           ok: false,
           stdout: '',
-          stderr: 'Connection to example port 22: Connection closed by remote host',
+          stderr: '',
+          transportStderr: 'Connection to example port 22: Connection closed by remote host',
           message: 'Connection to example port 22: Connection closed by remote host',
           remoteStarted: true,
         },
@@ -188,6 +211,7 @@ describe('remote runtime failure classification', () => {
           stderr: 'Connection to github.com closed by remote host.',
           message: 'Connection to github.com closed by remote host.',
           remoteStarted: true,
+          transportStderr: '',
         },
         target,
       ),
@@ -197,7 +221,8 @@ describe('remote runtime failure classification', () => {
         {
           ok: false,
           stdout: '',
-          stderr: 'Connection closed by example port 222',
+          stderr: '',
+          transportStderr: 'Connection closed by example port 222',
           message: 'Connection closed by example port 222',
           remoteStarted: true,
         },
@@ -210,6 +235,7 @@ describe('remote runtime failure classification', () => {
           ok: false,
           stdout: '',
           stderr: 'client_loop: send disconnect: Broken pipe',
+          transportStderr: '',
           message: 'client_loop: send disconnect: Broken pipe',
           remoteStarted: true,
         },
@@ -224,6 +250,7 @@ describe('remote runtime failure classification', () => {
           stderr: 'Connection closed by github.com port 22',
           message: 'Connection closed by github.com port 22',
           remoteStarted: true,
+          transportStderr: '',
         },
         target,
       ),
@@ -236,6 +263,20 @@ describe('remote runtime failure classification', () => {
           stderr: 'Connection to github.com port 22: Broken pipe',
           message: 'Connection to github.com port 22: Broken pipe',
           remoteStarted: true,
+          transportStderr: '',
+        },
+        target,
+      ),
+    ).toBeNull()
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult(
+        {
+          ok: false,
+          stdout: '',
+          stderr: 'Connection closed by example port 22',
+          message: 'Connection closed by example port 22',
+          remoteStarted: true,
+          transportStderr: '',
         },
         target,
       ),

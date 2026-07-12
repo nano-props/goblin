@@ -40,7 +40,10 @@ import {
 } from '#/server/modules/repo-runtimes.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import { IpcError, type RepoLogResponse } from '#/shared/api-types.ts'
-import { isRemoteRepoRuntimeFailure, type RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
+import {
+  isRemoteRepoRuntimeFailure,
+  type RemoteRepoRuntimeFailureError,
+} from '#/server/modules/remote-runtime-failure.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import type { PhysicalWorktreeCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
@@ -60,14 +63,6 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
     } catch (err) {
       serverRepoNodeLog.warn({ err, label }, 'failed')
       return fallback
-    }
-  }
-  async function readJsonOrThrow<T>(run: () => Promise<T>, label: string): Promise<T> {
-    try {
-      return await run()
-    } catch (err) {
-      serverRepoNodeLog.warn({ err, label }, 'failed')
-      throw err
     }
   }
   async function runtimeReadJsonOrThrow<T>(userId: string, run: () => Promise<T>, label: string): Promise<T> {

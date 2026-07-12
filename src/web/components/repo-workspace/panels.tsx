@@ -285,7 +285,7 @@ function FiletreeTab({
       if (node.kind !== 'file') return
       openTrashFileConfirm({ repoId, repoRuntimeId, worktreePath, path: node.path, name: node.name })
     },
-    [openTrashFileConfirm, repoId, worktreePath],
+    [openTrashFileConfirm, repoId, repoRuntimeId, worktreePath],
   )
 
   return (

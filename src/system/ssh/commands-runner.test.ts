@@ -20,6 +20,8 @@ vi.mock('node:fs/promises', () => ({
 import { runRemoteCommand } from '#/system/ssh/commands.ts'
 
 const REMOTE_COMMAND_STARTED_MARKER = '__GOBLIN_REMOTE_COMMAND_STARTED__'
+const REMOTE_COMMAND_STDERR_BEGIN_MARKER = '__GOBLIN_REMOTE_COMMAND_STDERR_BEGIN__'
+const REMOTE_COMMAND_STDERR_END_MARKER = '__GOBLIN_REMOTE_COMMAND_STDERR_END__'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -60,7 +62,12 @@ describe('runRemoteCommand', () => {
   test('preserves remoteStarted on command failures after the remote shell starts', async () => {
     mocks.execa.mockRejectedValueOnce({
       stdout: `${REMOTE_COMMAND_STARTED_MARKER}\n`,
-      stderr: 'git@github.com: Permission denied (publickey).\n',
+      stderr: [
+        REMOTE_COMMAND_STDERR_BEGIN_MARKER,
+        'git@github.com: Permission denied (publickey).',
+        REMOTE_COMMAND_STDERR_END_MARKER,
+        '',
+      ].join('\n'),
       message: 'Command failed',
     })
 
@@ -72,6 +79,24 @@ describe('runRemoteCommand', () => {
       stderr: 'git@github.com: Permission denied (publickey).',
       message: 'git@github.com: Permission denied (publickey).',
       remoteStarted: true,
+      transportStderr: '',
+    })
+  })
+
+  test('keeps post-start SSH client diagnostics separate from remote command stderr', async () => {
+    mocks.execa.mockRejectedValueOnce({
+      stdout: `${REMOTE_COMMAND_STARTED_MARKER}\n`,
+      stderr: 'Connection to prod closed by remote host.\n',
+      message: 'Command failed',
+    })
+
+    await expect(runRemoteCommand(target(), { type: 'gitStatus', path: '/srv/repo' })).resolves.toEqual({
+      ok: false,
+      stdout: '',
+      stderr: 'Connection to prod closed by remote host.',
+      message: 'Connection to prod closed by remote host.',
+      remoteStarted: true,
+      transportStderr: 'Connection to prod closed by remote host.',
     })
   })
 

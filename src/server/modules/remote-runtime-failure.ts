@@ -72,15 +72,24 @@ function remoteRuntimeTransportFailureAfterStart(
   result: RemoteCommandResult,
   target?: RemoteRepoTarget,
 ): RemoteRepoFailureReason | null {
-  // Post-start stderr also contains the remote command's stderr, and a process
-  // timeout can mean the remote command's own upstream Git/SSH operation hung.
-  // Only accept local ssh transport lines that name the argv destination near
-  // the tail.
-  const text = result.stderr.toLowerCase()
+  // Post-start command stderr is ambiguous unless the SSH runner separated it
+  // from the local client's diagnostics. Only classify the separated transport
+  // stream; remote command stderr may include upstream Git/SSH failures.
+  if (result.transportStderr === undefined) return null
+  const text = result.transportStderr.toLowerCase()
+  if (textMentionsOpenSshClientLoopTransportFailure(text)) return 'unreachable'
   if (target && text.includes('connection') && textMentionsTargetTransportFailure(text, target)) {
     return 'unreachable'
   }
   return null
+}
+
+function textMentionsOpenSshClientLoopTransportFailure(text: string): boolean {
+  const prefix = 'client_loop: send disconnect:'
+  for (const line of transportTailLines(text)) {
+    if (line.startsWith(prefix) && isTargetPortTransportFailure(line.slice(prefix.length))) return true
+  }
+  return false
 }
 
 function textMentionsTargetTransportFailure(text: string, target: RemoteRepoTarget): boolean {
@@ -89,12 +98,7 @@ function textMentionsTargetTransportFailure(text: string, target: RemoteRepoTarg
   const prefix = `connection to ${destination}`
   const port = String(target.port)
   const portPrefix = `${prefix} port ${port}: `
-  const tailLines = text
-    .split(/\r?\n/u)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .slice(-2)
-  for (const line of tailLines) {
+  for (const line of transportTailLines(text)) {
     if (line.startsWith(prefix) && /^ closed\b/u.test(line.slice(prefix.length))) return true
     if (lineStartsWithCompleteToken(line, `connection closed by ${destination} port ${port}`)) return true
     if (lineStartsWithCompleteToken(line, `connection reset by ${destination} port ${port}`)) return true
@@ -103,6 +107,14 @@ function textMentionsTargetTransportFailure(text: string, target: RemoteRepoTarg
     }
   }
   return false
+}
+
+function transportTailLines(text: string): string[] {
+  return text
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(-2)
 }
 
 function lineStartsWithCompleteToken(line: string, prefix: string): boolean {
