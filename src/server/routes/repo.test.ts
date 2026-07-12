@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { testPhysicalWorktreeCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
 import { clearRepoRuntimesForUser } from '#/server/modules/repo-runtimes.ts'
+import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
 
 const mocks = vi.hoisted(() => ({
   probeRepo: vi.fn(),
@@ -28,6 +29,8 @@ const mocks = vi.hoisted(() => ({
   getRepositoryTree: vi.fn(),
   getRepositoryFileViewer: vi.fn(),
   trashRepositoryFile: vi.fn(),
+  publishRepoQueryInvalidation: vi.fn(),
+  publishUserRepoQueryInvalidation: vi.fn(),
 }))
 
 vi.mock('#/server/modules/background-sync.ts', () => ({
@@ -68,6 +71,10 @@ vi.mock('#/server/modules/repo-write-paths.ts', () => ({
 }))
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerFetchIntervalSec: mocks.getServerFetchIntervalSec,
+}))
+vi.mock('#/server/modules/invalidation-broker.ts', () => ({
+  publishRepoQueryInvalidation: mocks.publishRepoQueryInvalidation,
+  publishUserRepoQueryInvalidation: mocks.publishUserRepoQueryInvalidation,
 }))
 vi.mock('#/server/common/identity.ts', () => ({
   userIdFromContext: () => 'user-test',
@@ -402,6 +409,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       branch: 'feature/a',
       mode: 'full',
       signal: expect.any(AbortSignal),
+      repoRuntimeId,
     })
     expect(await response.json()).toMatchObject({ requested: { branch: 'feature/a', pullRequestMode: 'full' } })
   })
@@ -468,7 +476,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(mocks.getRepoPatch).toHaveBeenCalledWith(
       '/tmp/repo',
       '/tmp/repo/.worktrees/feature',
-      expect.any(AbortSignal),
+      { signal: expect.any(AbortSignal), repoRuntimeId },
     )
   })
 
@@ -489,6 +497,7 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       count: 50,
       skip: 0,
       signal: expect.any(AbortSignal),
+      repoRuntimeId,
     })
   })
 
@@ -507,6 +516,60 @@ describe('repo routes — POST body validation (read endpoints)', () => {
     expect(response.status).toBe(400)
     await expect(response.json()).resolves.toMatchObject({ ok: false, message: 'error.repo-runtime-stale' })
     expect(mocks.getRepoLog).not.toHaveBeenCalled()
+  })
+
+  test('marks remote lifecycle failed when a runtime-scoped repo read hits transport failure', async () => {
+    const app = createTestRepoRoutes()
+    const repoId = 'ssh-config://prod/home/alice/service'
+    const repoRuntimeId = await openTestRepoRuntime(app, repoId)
+    mocks.getRepoLog.mockRejectedValueOnce(
+      new RemoteRepoRuntimeFailureError({
+        repoRoot: repoId,
+        repoRuntimeId,
+        reason: 'unreachable',
+        target: {
+          id: repoId,
+          alias: 'prod',
+          remotePath: '/home/alice/service',
+          displayName: 'prod:service',
+          host: 'example.test',
+          user: 'alice',
+          port: 22,
+        },
+        message: 'connection refused',
+      }),
+    )
+
+    const response = await app.request(
+      new Request('http://localhost/log', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cwd: repoId, repoRuntimeId, branch: 'feature/work' }),
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({ ok: false, message: 'error.failed-read-repo' })
+    const listResponse = await app.request(
+      new Request('http://localhost/runtime-list', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      }),
+    )
+    await expect(listResponse.json()).resolves.toMatchObject({
+      runtimes: [
+        {
+          repoRoot: repoId,
+          repoRuntimeId,
+          remoteLifecycle: { kind: 'failed', reason: 'unreachable' },
+        },
+      ],
+    })
+    expect(mocks.publishUserRepoQueryInvalidation).toHaveBeenCalledWith('user-test', {
+      repoId,
+      query: 'remote-lifecycle',
+    })
   })
 
   test('passes /tree requests through to the read layer', async () => {

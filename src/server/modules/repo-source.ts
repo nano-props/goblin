@@ -62,10 +62,12 @@ import {
   getRemoteStatus,
   getRemoteWorktreeBootstrapPreview,
   getRemoteTrackingBranches as getSshRemoteTrackingBranches,
+  type RemoteGitRunner,
   pullRemoteBranch,
   pushRemoteBranch,
   removeRemoteWorktree,
 } from '#/system/ssh/git.ts'
+import { runRemoteCommand } from '#/system/ssh/commands.ts'
 import { getBranchPullRequests, getBranchPullRequestsForRepoRef } from '#/system/git/pull-requests.ts'
 import { parseGitHubRemoteUrl, type GitHubRepoRef } from '#/system/github/graphql.ts'
 import {
@@ -78,6 +80,7 @@ import {
 } from '#/shared/api-types.ts'
 import { normalizeRemoteRepoRef } from '#/shared/remote-repo.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
+import { remoteRuntimeFailureFromCommandResult } from '#/server/modules/remote-runtime-failure.ts'
 
 type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
@@ -139,6 +142,10 @@ interface RepoSourceCapabilities {
   pullRequests: 'cwd-github' | 'derived-github-repo'
 }
 
+export interface RepoSourceRuntimeContext {
+  repoRuntimeId: string
+}
+
 export async function resolveRemoteRepoTarget(repoId: string): Promise<RemoteRepoTarget> {
   const parsed = parseRemoteRepoId(repoId)
   if (!parsed) throw new Error('error.ssh-config-changed')
@@ -148,8 +155,9 @@ export async function resolveRemoteRepoTarget(repoId: string): Promise<RemoteRep
 export async function runWithRepoSource<T>(
   cwd: string,
   task: (source: Awaited<ReturnType<typeof resolveRepoSource>>) => Promise<T>,
+  runtime?: RepoSourceRuntimeContext,
 ): Promise<T> {
-  return await task(await resolveRepoSource(cwd))
+  return await task(await resolveRepoSource(cwd, runtime))
 }
 
 export async function runWithCapturedRepoSource<T>(
@@ -168,8 +176,8 @@ export async function runWithCapturedRepoSource<T>(
   )
 }
 
-export async function resolveRepoSource(repoId: string): Promise<RepoSource> {
-  return isRemoteRepoId(repoId) ? await createRemoteRepoSource(repoId) : createLocalRepoSource(repoId)
+export async function resolveRepoSource(repoId: string, runtime?: RepoSourceRuntimeContext): Promise<RepoSource> {
+  return isRemoteRepoId(repoId) ? await createRemoteRepoSource(repoId, undefined, null, runtime) : createLocalRepoSource(repoId)
 }
 
 function repoWriteBoundaryKey(boundary: RepoWriteBoundary): string {
@@ -547,9 +555,11 @@ async function createRemoteRepoSource(
   repoId: string,
   capturedTarget?: RemoteRepoTarget,
   physicalWorktreeCapability: import('#/server/worktree-removal/physical-worktree-identity-resolver.ts').PhysicalWorktreeCapability | null = null,
+  runtime?: RepoSourceRuntimeContext,
 ): Promise<RepoSource> {
   const target = capturedTarget ?? (await resolveRemoteRepoTarget(repoId))
   const capabilities: RepoSourceCapabilities = { pullRequests: 'derived-github-repo' }
+  const run = runtime ? remoteRuntimeAwareGitRunner(repoId, runtime.repoRuntimeId, target) : undefined
   return {
     id: repoId,
     kind: 'remote',
@@ -559,19 +569,19 @@ async function createRemoteRepoSource(
       return { ok: true, root: target.id, name: target.displayName }
     },
     async getSnapshot(signal) {
-      const remoteSnapshot = await getRemoteSnapshot(target, { signal })
+      const remoteSnapshot = await getRemoteSnapshot(target, { signal, run })
       if (signal?.aborted || !remoteSnapshot) return null
       return { branches: remoteSnapshot.branches, current: remoteSnapshot.current, remote: remoteSnapshot.remote }
     },
     async getStatus(signal) {
-      const status = await getRemoteStatus(target, { signal })
+      const status = await getRemoteStatus(target, { signal, run })
       return signal?.aborted ? [] : status
     },
     async getPullRequests(branches, options) {
       const branchSet = normalizeRequestedBranches(branches)
       if (branchSet?.size === 0) return []
       if (capabilities.pullRequests !== 'derived-github-repo') return null
-      const repo = await remotePullRequestRepoRef(target, options?.signal)
+      const repo = await remotePullRequestRepoRef(target, { signal: options?.signal, run })
       if (!repo) return null
       const prs = await getBranchPullRequestsForRepoRef(repoId, repo, branchSet, {
         mode: options?.mode,
@@ -580,10 +590,10 @@ async function createRemoteRepoSource(
       return pullRequestEntries(prs)
     },
     async getLog(branch, options) {
-      return await getRemoteLog(target, branch, options?.count, options?.skip, { signal: options?.signal })
+      return await getRemoteLog(target, branch, options?.count, options?.skip, { signal: options?.signal, run })
     },
     async getRemoteBranches(signal) {
-      return await getSshRemoteTrackingBranches(target, { signal })
+      return await getSshRemoteTrackingBranches(target, { signal, run })
     },
     async fetch(signal) {
       const affectedRepoIds = await readRemoteAffectedRepoIds(target, signal)
@@ -663,11 +673,29 @@ async function createRemoteRepoSource(
       return withAffectedRepoIds(result, remoteWorktreeRepoIds(target, result.affectedWorktreePaths))
     },
     async getPatch(worktreePath, signal) {
-      return await getRemotePatch(target, worktreePath, { signal })
+      return await getRemotePatch(target, worktreePath, { signal, run })
     },
     async getBrowserRepoUrl(urlTarget, signal) {
-      return await getRemoteBrowserUrl(target, urlTarget, { signal })
+      return await getRemoteBrowserUrl(target, urlTarget, { signal, run })
     },
+  }
+}
+
+function remoteRuntimeAwareGitRunner(
+  repoRoot: string,
+  repoRuntimeId: string,
+  sourceTarget: RemoteRepoTarget,
+): RemoteGitRunner {
+  return async (command, target, options) => {
+    const result = await runRemoteCommand(target, command, options)
+    const failure = remoteRuntimeFailureFromCommandResult({
+      repoRoot,
+      repoRuntimeId,
+      target: sourceTarget,
+      result,
+    })
+    if (failure) throw failure
+    return result
   }
 }
 
@@ -694,8 +722,11 @@ function pullRequestEntries(prs: Map<string, PullRequestInfo> | null): PullReque
   return prs ? Array.from(prs, ([branch, pullRequest]) => ({ branch, pullRequest })) : null
 }
 
-async function remotePullRequestRepoRef(target: RemoteRepoTarget, signal?: AbortSignal): Promise<GitHubRepoRef | null> {
-  const snapshot = await getRemoteSnapshot(target, { signal })
+async function remotePullRequestRepoRef(
+  target: RemoteRepoTarget,
+  options: { signal?: AbortSignal; run?: RemoteGitRunner } = {},
+): Promise<GitHubRepoRef | null> {
+  const snapshot = await getRemoteSnapshot(target, { signal: options.signal, run: options.run })
   if (!snapshot?.remote?.hasGitHubRemote) return null
   return preferredGitHubRepoRef(snapshot.remote.remotes)
 }

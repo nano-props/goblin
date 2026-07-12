@@ -366,9 +366,16 @@ async function syncWorktreeBootstrapTrustAfterSuccessfulRun(
   }
 }
 
-export async function getRepoRemoteBranches(cwd: string, signal?: AbortSignal): Promise<string[]> {
+export async function getRepoRemoteBranches(
+  cwd: string,
+  options: { signal?: AbortSignal; repoRuntimeId?: string } = {},
+): Promise<string[]> {
   if (!isValidRepoLocator(cwd)) return []
-  return await runWithRepoSource(cwd, async (source) => await source.getRemoteBranches(signal))
+  return await runWithRepoSource(
+    cwd,
+    async (source) => await source.getRemoteBranches(options.signal),
+    options.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined,
+  )
 }
 
 export async function deleteRepoBranch(
