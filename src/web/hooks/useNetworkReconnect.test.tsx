@@ -3,6 +3,7 @@
 import { act, cleanup } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
+import { flushMicrotasks } from '#/test-utils/microtasks.ts'
 import { normalizeRemoteTarget, type RemoteRepoConnectionLifecycle } from '#/shared/remote-repo.ts'
 import { useNetworkReconnect } from '#/web/hooks/useNetworkReconnect.ts'
 import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-command.ts'
@@ -153,7 +154,7 @@ describe('useNetworkReconnect', () => {
     mountHook()
 
     fireOnline()
-    for (let i = 0; i < 10; i += 1) await Promise.resolve()
+    await flushMicrotasks(10)
     expect(runRemoteRepoConnection).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), target.id)
   })
 
@@ -163,7 +164,7 @@ describe('useNetworkReconnect', () => {
     mountHook()
 
     fireOnline()
-    for (let i = 0; i < 5; i += 1) await Promise.resolve()
+    await flushMicrotasks(10)
     expect(runRemoteRepoConnection).not.toHaveBeenCalled()
   })
 
@@ -173,7 +174,7 @@ describe('useNetworkReconnect', () => {
     mountHook()
 
     fireOnline()
-    for (let i = 0; i < 10; i += 1) await Promise.resolve()
+    await flushMicrotasks(10)
 
     expect(runRemoteRepoConnection).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), target.id)
   })
@@ -183,7 +184,7 @@ describe('useNetworkReconnect', () => {
     mountHook()
 
     fireOnline()
-    for (let i = 0; i < 5; i += 1) await Promise.resolve()
+    await flushMicrotasks(10)
 
     // Local repos don't have a lifecycle at all. The hook
     // must not call `runRemoteRepoConnection` for them — which
@@ -204,7 +205,7 @@ describe('useNetworkReconnect', () => {
     })
 
     fireOnline()
-    for (let i = 0; i < 10; i += 1) await Promise.resolve()
+    await flushMicrotasks(10)
 
     expect(runRemoteRepoConnection).not.toHaveBeenCalled()
   })
@@ -219,7 +220,7 @@ describe('useNetworkReconnect', () => {
     seedRepo(target.id, { kind: 'failed', reason: 'unreachable' })
 
     fireOnline()
-    for (let i = 0; i < 10; i += 1) await Promise.resolve()
+    await flushMicrotasks(10)
 
     expect(runRemoteRepoConnection).toHaveBeenCalledWith(expect.any(Function), expect.any(Function), target.id)
   })
@@ -228,13 +229,15 @@ describe('useNetworkReconnect', () => {
     const target = remoteTargetFixture()
     const warn = vi.spyOn(goblinLog, 'warn').mockImplementation(() => undefined)
     vi.mocked(runRemoteRepoConnection).mockResolvedValueOnce({
-      kind: 'transport-failed', repoId: target.id, reason: 'unknown',
+      kind: 'transport-failed',
+      repoId: target.id,
+      reason: 'unknown',
     })
     seedRepo(target.id, { kind: 'failed', reason: 'unreachable' })
     mountHook()
 
     fireOnline()
-    for (let i = 0; i < 10; i += 1) await Promise.resolve()
+    await flushMicrotasks(10)
 
     expect(warn).toHaveBeenCalledWith('remote reconnect command failed', { repoId: target.id, reason: 'unknown' })
   })

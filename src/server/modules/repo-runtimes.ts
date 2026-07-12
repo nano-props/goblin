@@ -1,9 +1,6 @@
-import { createOpaqueId } from '#/shared/opaque-id.ts'
+import { createOpaqueId, isOpaqueId } from '#/shared/opaque-id.ts'
 import { serverLogger } from '#/server/logger.ts'
-import type {
-  RemoteRepoConnectionResult,
-  RemoteRepoRuntimeLifecycle,
-} from '#/shared/remote-repo.ts'
+import type { RemoteRepoConnectionResult, RemoteRepoRuntimeLifecycle } from '#/shared/remote-repo.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 
 interface RepoRuntimeState {
@@ -98,7 +95,12 @@ function acquireRepoRuntimeMembership(userId: string, repoRoot: string, clientId
   return repoRuntimeId
 }
 
-export function releaseRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string, clientId: string): {
+export function releaseRepoRuntime(
+  userId: string,
+  repoRoot: string,
+  repoRuntimeId: string,
+  clientId: string,
+): {
   released: boolean
   runtimeClosed: boolean
 } {
@@ -177,6 +179,7 @@ export function replaceRepoRuntimeMembershipsForClient(
   clientId: string,
   repoRoots: readonly string[],
 ): RepoRuntimeEntry[] {
+  assertValidRepoRuntimeMembershipDeclaration(clientId, repoRoots)
   const desired = new Set(repoRoots)
   const states = repoRuntimesByUser.get(userId)
   const closed: RepoRuntimeClosedEvent[] = []
@@ -195,6 +198,14 @@ export function replaceRepoRuntimeMembershipsForClient(
   // The runtime query is user-scoped, so return its complete canonical
   // snapshot rather than only this window's declaration.
   return listRepoRuntimes(userId)
+}
+
+function assertValidRepoRuntimeMembershipDeclaration(clientId: string, repoRoots: readonly string[]): void {
+  if (!isOpaqueId(clientId)) throw new Error('repo runtime reconcile requires a valid clientId')
+  if (repoRoots.length > 100) throw new Error('repo runtime reconcile accepts at most 100 repo roots')
+  for (const repoRoot of repoRoots) {
+    if (!repoRoot) throw new Error('repo runtime reconcile requires non-empty repo roots')
+  }
 }
 
 export function isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean {
@@ -323,10 +334,7 @@ function settledRepoRemoteLifecycleResult(
   return { kind: 'settled', name: state.remoteName, lifecycle: state.remoteLifecycle }
 }
 
-function supersededRemoteLifecycleResult(
-  state: RepoRuntimeState,
-  repoRuntimeId: string,
-): RepoRemoteLifecycleRunResult {
+function supersededRemoteLifecycleResult(state: RepoRuntimeState, repoRuntimeId: string): RepoRemoteLifecycleRunResult {
   return state.currentRepoRuntimeId === repoRuntimeId ? { kind: 'superseded' } : { kind: 'stale-runtime' }
 }
 
@@ -338,7 +346,10 @@ function notifyRemoteLifecycleTransition(
   try {
     listener(lifecycle)
   } catch (err) {
-    repoRuntimeLogger.warn({ err, repoRoot, attemptId: lifecycle.attemptId }, 'remote lifecycle transition listener failed')
+    repoRuntimeLogger.warn(
+      { err, repoRoot, attemptId: lifecycle.attemptId },
+      'remote lifecycle transition listener failed',
+    )
   }
 }
 
@@ -407,7 +418,10 @@ function emitRepoRuntimeMembershipAcquired(event: RepoRuntimeMembershipAcquiredE
     try {
       listener(event)
     } catch (err) {
-      repoRuntimeLogger.warn({ err, userId: event.userId, clientId: event.clientId }, 'membership acquire listener failed')
+      repoRuntimeLogger.warn(
+        { err, userId: event.userId, clientId: event.clientId },
+        'membership acquire listener failed',
+      )
     }
   }
 }

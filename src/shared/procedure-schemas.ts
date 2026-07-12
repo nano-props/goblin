@@ -56,12 +56,13 @@ const RepoSessionEntrySchema = v.variant('kind', [
   v.object({ kind: v.literal('remote'), id: v.string(), ref: RemoteRepoRefSchema }),
 ])
 const ClientIdSchema = v.pipe(v.string(), v.regex(OPAQUE_ID_RE))
+const RepoRootSchema = v.pipe(v.string(), v.minLength(1))
 const RepoRuntimeOpenSchema = v.union([
-  v.object({ repoRoot: v.string(), clientId: ClientIdSchema }),
+  v.object({ repoRoot: RepoRootSchema, clientId: ClientIdSchema }),
   v.object({ repoInput: v.string(), clientId: ClientIdSchema }),
 ])
 const RepoRuntimeCloseSchema = v.object({
-  repoRoot: v.string(),
+  repoRoot: RepoRootSchema,
   repoRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
   clientId: ClientIdSchema,
 })
@@ -118,7 +119,7 @@ export const REPO_PROCEDURE_SCHEMAS = {
   runtimeOpen: RepoRuntimeOpenSchema,
   runtimeReconcile: v.object({
     clientId: ClientIdSchema,
-    repoRoots: v.pipe(v.array(v.string()), v.maxLength(100)),
+    repoRoots: v.pipe(v.array(RepoRootSchema), v.maxLength(100)),
   }),
   runtimeList: EmptyBodySchema,
   runtimeClose: RepoRuntimeCloseSchema,

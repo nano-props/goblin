@@ -31,10 +31,16 @@ describe('repo runtimes', () => {
     try {
       const second = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-b')
       expect(second).toBe(first)
-      expect(releaseRepoRuntime(USER_ID, REPO_ROOT, first, 'client-a')).toEqual({ released: true, runtimeClosed: false })
+      expect(releaseRepoRuntime(USER_ID, REPO_ROOT, first, 'client-a')).toEqual({
+        released: true,
+        runtimeClosed: false,
+      })
       expect(isCurrentRepoRuntime(USER_ID, REPO_ROOT, first)).toBe(true)
       expect(goodListener).not.toHaveBeenCalled()
-      expect(releaseRepoRuntime(USER_ID, REPO_ROOT, second, 'client-b')).toEqual({ released: true, runtimeClosed: true })
+      expect(releaseRepoRuntime(USER_ID, REPO_ROOT, second, 'client-b')).toEqual({
+        released: true,
+        runtimeClosed: true,
+      })
       expect(isCurrentRepoRuntime(USER_ID, REPO_ROOT, second)).toBe(false)
       expect(goodListener).toHaveBeenLastCalledWith({ userId: USER_ID, repoRoot: REPO_ROOT, repoRuntimeId: second })
     } finally {
@@ -47,8 +53,14 @@ describe('repo runtimes', () => {
   test('makes repeated acquire and release idempotent per client', () => {
     const runtimeId = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
     expect(acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')).toBe(runtimeId)
-    expect(releaseRepoRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toEqual({ released: true, runtimeClosed: true })
-    expect(releaseRepoRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toEqual({ released: false, runtimeClosed: false })
+    expect(releaseRepoRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toEqual({
+      released: true,
+      runtimeClosed: true,
+    })
+    expect(releaseRepoRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toEqual({
+      released: false,
+      runtimeClosed: false,
+    })
   })
 
   test('expires only memberships captured when a client went offline', () => {
@@ -112,6 +124,32 @@ describe('repo runtimes', () => {
     try {
       replaceRepoRuntimeMembershipsForClient(USER_ID, 'client-a', [newRoot])
       expect(observedSnapshots).toEqual([[newRoot]])
+    } finally {
+      unsubscribe()
+    }
+  })
+
+  test('rejects an invalid declaration before changing any memberships', () => {
+    const oldRoot = '/repo-runtimes/atomic-old'
+    const newRoot = '/repo-runtimes/atomic-new'
+    const oldRuntimeId = acquireRepoRuntime(USER_ID, oldRoot, 'client-a')
+    const closed = vi.fn()
+    const unsubscribe = onRepoRuntimeClosed(closed)
+    try {
+      expect(() => replaceRepoRuntimeMembershipsForClient(USER_ID, '', [newRoot])).toThrow(
+        'repo runtime reconcile requires a valid clientId',
+      )
+      expect(() => replaceRepoRuntimeMembershipsForClient(USER_ID, 'client-a', [newRoot, ''])).toThrow(
+        'repo runtime reconcile requires non-empty repo roots',
+      )
+      expect(listRepoRuntimes(USER_ID)).toEqual([
+        expect.objectContaining({ repoRoot: oldRoot, repoRuntimeId: oldRuntimeId }),
+      ])
+      expect(closed).not.toHaveBeenCalled()
+      expect(releaseRepoRuntime(USER_ID, oldRoot, oldRuntimeId, 'client-a')).toEqual({
+        released: true,
+        runtimeClosed: true,
+      })
     } finally {
       unsubscribe()
     }
