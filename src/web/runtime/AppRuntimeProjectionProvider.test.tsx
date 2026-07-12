@@ -53,11 +53,7 @@ let workspaceTabsChangedHandler: ((repoRoot: string) => void) | null = null
 let recoveredHandler: ((clientId: string) => void) | null = null
 const kickReconnectMock = vi.fn(() => {})
 const recoverSessionsMock =
-  vi.fn<
-    (
-      ...args: Array<{ repoRoot: string; repoRuntimeId: string }>
-    ) => Promise<TerminalSessionsRecoveryResult>
-  >()
+  vi.fn<(...args: Array<{ repoRoot: string; repoRuntimeId: string }>) => Promise<TerminalSessionsRecoveryResult>>()
 const listWorkspaceTabsMock = vi.fn<(...args: Array<{ repoRoot: string }>) => Promise<WorkspacePaneTabsEntry[]>>()
 
 describe('AppRuntimeProjectionProvider', () => {
@@ -205,9 +201,9 @@ describe('AppRuntimeProjectionProvider', () => {
           expect.any(Map),
         )
       })
-      expect(
-        primaryWindowQueryClient.getQueryData(['workspace-pane-tabs', REPO_ID, repo.repoRuntimeId]),
-      ).toMatchObject({ revision: 2 })
+      expect(primaryWindowQueryClient.getQueryData(['workspace-pane-tabs', REPO_ID, repo.repoRuntimeId])).toMatchObject(
+        { revision: 2 },
+      )
     } finally {
       result.unmount()
     }
@@ -315,6 +311,19 @@ describe('AppRuntimeProjectionProvider', () => {
           expect.any(Map),
         )
         expect(tabsFor(repo.repoRuntimeId)).toEqual([workspacePaneStaticTabEntry('history')])
+      })
+
+      recoverSessionsMock.mockClear()
+      useTerminalProjectionHydrationStore.setState({ refreshCooldownMs: 0 })
+      await act(async () => {
+        window.dispatchEvent(new Event('focus'))
+      })
+      await vi.waitFor(() => {
+        expect(recoverSessionsMock).toHaveBeenCalledOnce()
+        expect(recoverSessionsMock).toHaveBeenCalledWith({
+          repoRoot: REPO_ID,
+          repoRuntimeId: repo.repoRuntimeId,
+        })
       })
     } finally {
       result.unmount()
@@ -662,7 +671,7 @@ function attachResult(): TerminalAttachResult {
   return {
     ok: true,
     terminalRuntimeSessionId: 'unused',
-        terminalRuntimeGeneration: 1,
+    terminalRuntimeGeneration: 1,
     snapshot: '',
     snapshotSeq: 0,
     outputEra: 0,
@@ -679,7 +688,7 @@ function attachResult(): TerminalAttachResult {
 function serverSession(terminalSessionId: string): TestTerminalSessionSummary {
   return {
     terminalRuntimeSessionId: `runtime-${terminalSessionId}`,
-        terminalRuntimeGeneration: 1,
+    terminalRuntimeGeneration: 1,
     terminalSessionId,
     processName: 'zsh',
     canonicalTitle: null,

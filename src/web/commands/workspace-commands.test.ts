@@ -2876,7 +2876,7 @@ function workspacePaneTabsSnapshot(base: TerminalSessionBase, tabs: WorkspacePan
   }
 }
 
-test('serializes A to B to C selection through exact route commits', async () => {
+test('rejects a queued selection after its observed route is replaced', async () => {
   const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
     branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -2892,10 +2892,12 @@ test('serializes A to B to C selection through exact route commits', async () =>
     worktreePath: WORKTREE_PATH,
   }
   observeWorkspacePaneRouteForTest({ ...target, route: { kind: 'static', tab: 'status' } })
-  const showRepoBranchWorkspacePaneTab = vi.fn((repoId: string, branchName: string, tab: WorkspacePaneStaticTabType) => {
-    useReposStore.getState().setWorkspacePaneTab(repoId, branchName, tab)
-    return true
-  })
+  const showRepoBranchWorkspacePaneTab = vi.fn(
+    (repoId: string, branchName: string, tab: WorkspacePaneStaticTabType) => {
+      useReposStore.getState().setWorkspacePaneTab(repoId, branchName, tab)
+      return true
+    },
+  )
   const navigation = navigationWith({ showRepoBranchWorkspacePaneTab }, { autoSeedInitialRoute: false })
 
   const selectFiles = dispatchSelectWorkspacePaneTabByIdentityAction({
@@ -2913,9 +2915,9 @@ test('serializes A to B to C selection through exact route commits', async () =>
     navigation,
   })
   await expect(selectFiles).resolves.toBe(false)
-  await expect(selectHistory).resolves.toBe(true)
-  expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(1, REPO_ID, 'feature/worktree', 'files')
-  expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'history')
+  await expect(selectHistory).resolves.toBe(false)
+  expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledOnce()
+  expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'files')
 })
 
 test('serializes open then move through exact route commits', async () => {
@@ -2934,10 +2936,12 @@ test('serializes open then move through exact route commits', async () => {
     worktreePath: WORKTREE_PATH,
   }
   observeWorkspacePaneRouteForTest({ ...target, route: { kind: 'static', tab: 'status' } })
-  const showRepoBranchWorkspacePaneTab = vi.fn((repoId: string, branchName: string, tab: WorkspacePaneStaticTabType) => {
-    useReposStore.getState().setWorkspacePaneTab(repoId, branchName, tab)
-    return true
-  })
+  const showRepoBranchWorkspacePaneTab = vi.fn(
+    (repoId: string, branchName: string, tab: WorkspacePaneStaticTabType) => {
+      useReposStore.getState().setWorkspacePaneTab(repoId, branchName, tab)
+      return true
+    },
+  )
   const navigation = navigationWith({ showRepoBranchWorkspacePaneTab }, { autoSeedInitialRoute: false })
 
   const openFiles = openWorkspacePaneTab({

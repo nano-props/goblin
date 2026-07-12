@@ -993,13 +993,36 @@ describe('RepoWorkspaceToolbar', () => {
   })
 
   test('moves focus across opened status, changes, and terminal tabs with keyboard navigation', async () => {
-    const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
-    const showRepoBranchTerminalSession = vi.fn(() => true)
+    const showRepoBranchWorkspacePaneTab = vi.fn<PrimaryWindowNavigationActions['showRepoBranchWorkspacePaneTab']>(
+      () => true,
+    )
+    const showRepoBranchTerminalSession = vi.fn<PrimaryWindowNavigationActions['showRepoBranchTerminalSession']>(
+      () => true,
+    )
+    const commitRepoBranchWorkspacePaneRoute: PrimaryWindowNavigationActions['commitRepoBranchWorkspacePaneRoute'] = (
+      repoId,
+      branchName,
+      route,
+      options,
+    ) => {
+      const accepted =
+        route === null
+          ? true
+          : route.kind === 'static'
+            ? showRepoBranchWorkspacePaneTab(repoId, branchName, route.tab)
+            : showRepoBranchTerminalSession(repoId, branchName, route.terminalSessionId)
+      if (accepted) options?.onCommit?.()
+      return accepted
+    }
     const { container: c } = renderToolbar({
       terminalCount: 2,
       changeCount: 1,
       workspacePaneStaticTabs: ['status', 'changes'],
-      navigation: navigationWith({ showRepoBranchWorkspacePaneTab, showRepoBranchTerminalSession }),
+      navigation: navigationWith({
+        showRepoBranchWorkspacePaneTab,
+        showRepoBranchTerminalSession,
+        commitRepoBranchWorkspacePaneRoute,
+      }),
     })
 
     const statusTab = c.querySelector<HTMLButtonElement>('#workspace-status-tab')
