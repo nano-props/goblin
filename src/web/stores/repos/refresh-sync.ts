@@ -73,7 +73,7 @@ export function createRefreshSyncHelpers(
       if (!canStartRemoteFetch(repo)) return null
     }
     try {
-      return await runNetworkTask(id, (signal) => fetchRepo(id, signal, { repoRuntimeId }), {
+      return await runNetworkTask(id, (signal) => fetchRepo(id, repoRuntimeId, signal), {
         repoRuntimeId,
         reason: 'user-fetch',
         priority: 100,

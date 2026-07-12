@@ -2,7 +2,7 @@ import path from 'node:path'
 import type { RepoFileViewerResult } from '#/shared/api-types.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
-import { resolveRemoteRepoTarget } from '#/server/modules/repo-source.ts'
+import { remoteRuntimeAwareGitRunner, resolveRemoteRepoTarget } from '#/server/modules/repo-source.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import { remoteCommandExists, resolveRemoteWorktree } from '#/system/ssh/git.ts'
 import { userShellCommandExists } from '#/system/user-shell.ts'
@@ -15,6 +15,7 @@ export async function getRepositoryFileViewer(
   cwd: string,
   worktreePath: string,
   signal?: AbortSignal,
+  options: { repoRuntimeId?: string } = {},
 ): Promise<RepoFileViewerResult> {
   const fallbackViewer = localFallbackViewer()
   if (signal?.aborted) throw new Error('aborted')
@@ -22,10 +23,15 @@ export async function getRepositoryFileViewer(
 
   if (isRemoteRepoId(cwd)) {
     const target = await resolveRemoteRepoTarget(cwd)
-    const worktree = await resolveRemoteWorktree(target, worktreePath, { signal })
+    const run = options.repoRuntimeId ? remoteRuntimeAwareGitRunner(cwd, options.repoRuntimeId, target) : undefined
+    const worktree = await resolveRemoteWorktree(target, worktreePath, { signal, ...(run ? { run } : {}) })
     const knownWorktrees = [worktree]
     for (const viewer of BAT_VIEWERS) {
-      const exists = await remoteCommandExists(target, worktree.path, viewer, { signal, knownWorktrees })
+      const exists = await remoteCommandExists(target, worktree.path, viewer, {
+        signal,
+        knownWorktrees,
+        ...(run ? { run } : {}),
+      })
       if (exists) return { viewer, shell: 'posix' }
     }
     return POSIX_CAT_VIEWER

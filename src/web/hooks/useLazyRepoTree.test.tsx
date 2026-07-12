@@ -15,6 +15,7 @@ vi.mock('#/web/filetree-client.ts', () => ({
 }))
 
 const listeners = new Set<(event: unknown) => void>()
+const REPO_RUNTIME_ID = 'repo-runtime-lazy-tree-test'
 
 vi.mock('#/web/repo-query-invalidation-ingress.ts', () => ({
   subscribeRepoQueryInvalidation(listener: (event: unknown) => void) {
@@ -35,13 +36,14 @@ type HarnessSnapshot = {
 
 interface HarnessProps {
   readonly repoId: string
+  readonly repoRuntimeId?: string
   readonly worktreePath: string
   readonly expandedKeys?: readonly string[]
   readonly onSnapshot: (snapshot: HarnessSnapshot) => void
 }
 
-function Harness({ repoId, worktreePath, expandedKeys, onSnapshot }: HarnessProps) {
-  const result = useLazyRepoTree({ repoId, worktreePath, expandedKeys })
+function Harness({ repoId, repoRuntimeId = REPO_RUNTIME_ID, worktreePath, expandedKeys, onSnapshot }: HarnessProps) {
+  const result = useLazyRepoTree({ repoId, repoRuntimeId, worktreePath, expandedKeys })
   onSnapshot(result)
   return null
 }
@@ -120,7 +122,7 @@ async function flush() {
 describe('useLazyRepoTree', () => {
   test('hydrates the initial aggregate from cached root data without an empty-tree flash', async () => {
     const snapshots: HarnessSnapshot[] = []
-    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', '/repo-a', '/repo-a/main', ''], {
+    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', '/repo-a', REPO_RUNTIME_ID, '/repo-a/main', ''], {
       nodes: [{ id: 'README.md', path: 'README.md', name: 'README.md', parentId: null, kind: 'file', status: 'clean' }],
       truncated: false,
     })
@@ -140,15 +142,15 @@ describe('useLazyRepoTree', () => {
 
   test('hydrates cached restored children and ancestors into the initial aggregate', async () => {
     const snapshots: HarnessSnapshot[] = []
-    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', '/repo-a', '/repo-a/main', ''], {
+    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', '/repo-a', REPO_RUNTIME_ID, '/repo-a/main', ''], {
       nodes: [{ id: 'src', path: 'src', name: 'src', parentId: null, kind: 'directory', status: 'clean' }],
       truncated: false,
     })
-    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', '/repo-a', '/repo-a/main', 'src'], {
+    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', '/repo-a', REPO_RUNTIME_ID, '/repo-a/main', 'src'], {
       nodes: [{ id: 'src/web', path: 'src/web', name: 'web', parentId: 'src', kind: 'directory', status: 'clean' }],
       truncated: false,
     })
-    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', '/repo-a', '/repo-a/main', 'src/web'], {
+    queryClient.setQueryData<RepoTreeResult>(['repo-tree-children', '/repo-a', REPO_RUNTIME_ID, '/repo-a/main', 'src/web'], {
       nodes: [
         {
           id: 'src/web/FiletreeView.tsx',

@@ -19,6 +19,7 @@ import type { RepoFileViewerResult, RepoTreeResult } from '#/shared/api-types.ts
 import type { ExecResult } from '#/shared/git-types.ts'
 
 export interface GetRepositoryTreeClientOptions {
+  readonly repoRuntimeId: string
   readonly prefix?: string
   readonly signal?: AbortSignal
 }
@@ -26,12 +27,13 @@ export interface GetRepositoryTreeClientOptions {
 export async function getRepositoryTree(
   cwd: string,
   worktreePath: string,
-  options: GetRepositoryTreeClientOptions = {},
+  options: GetRepositoryTreeClientOptions,
 ): Promise<RepoTreeResult> {
   return await postServerJson(
     '/api/repo/tree',
     {
       cwd,
+      repoRuntimeId: options.repoRuntimeId,
       worktreePath,
       ...(options.prefix !== undefined ? { prefix: options.prefix } : {}),
     },
@@ -51,7 +53,11 @@ export async function trashRepositoryFile(
 export async function getRepositoryFileViewer(
   cwd: string,
   worktreePath: string,
-  options: { readonly signal?: AbortSignal } = {},
+  options: { readonly repoRuntimeId: string; readonly signal?: AbortSignal },
 ): Promise<RepoFileViewerResult> {
-  return await postServerJson('/api/repo/file-viewer', { cwd, worktreePath }, { signal: options.signal })
+  return await postServerJson(
+    '/api/repo/file-viewer',
+    { cwd, repoRuntimeId: options.repoRuntimeId, worktreePath },
+    { signal: options.signal },
+  )
 }

@@ -505,8 +505,17 @@ async function removeRepoWorktreeWithBinding(
   })
 }
 
-export async function openRepoUrl(cwd: string, target: RepoUrlTarget, signal?: AbortSignal): Promise<ExecResult> {
-  const url = await runWithRepoSource(cwd, async (source) => await source.getBrowserRepoUrl(target, signal))
+export async function openRepoUrl(
+  cwd: string,
+  target: RepoUrlTarget,
+  signal?: AbortSignal,
+  options: { repoRuntimeId?: string } = {},
+): Promise<ExecResult> {
+  const url = await runWithRepoSource(
+    cwd,
+    async (source) => await source.getBrowserRepoUrl(target, signal),
+    options.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined,
+  )
   return url ? { ok: true, message: url } : { ok: false, message: 'error.no-remote-url' }
 }
 

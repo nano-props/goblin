@@ -10,7 +10,7 @@ import { execa } from 'execa'
 import type { RepoTreeNode } from '#/shared/api-types.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import type { RemoteRepoTarget } from '#/shared/remote-repo.ts'
-import { getRemoteTreeWalk } from '#/system/ssh/git.ts'
+import { getRemoteTreeWalk, type RemoteGitRunner } from '#/system/ssh/git.ts'
 import {
   buildLimitedChildNodes,
   parseNullSeparatedPaths,
@@ -45,12 +45,13 @@ export interface GetRepoTreeSourceRemoteInput {
   readonly worktreePath: string
   readonly options: RepoTreeSourceOptions
   readonly signal: AbortSignal | undefined
+  readonly run?: RemoteGitRunner
   /** Optional trusted worktree list from the caller. */
   readonly knownWorktrees?: ReadonlyArray<WorktreeInfo>
 }
 
 export async function getRepoTreeSourceRemote(input: GetRepoTreeSourceRemoteInput): Promise<RepoTreeSourceResult> {
-  const { target, worktreePath, options, signal, knownWorktrees } = input
+  const { target, worktreePath, options, signal, run, knownWorktrees } = input
   if (signal?.aborted) throw new Error('aborted')
 
   const prefix = normalizePrefix(options.prefix)
@@ -59,6 +60,7 @@ export async function getRepoTreeSourceRemote(input: GetRepoTreeSourceRemoteInpu
   const remoteResult = await getRemoteTreeWalk(target, worktreePath, {
     signal,
     prefix,
+    ...(run ? { run } : {}),
     ...(knownWorktrees ? { knownWorktrees } : {}),
   })
   if (signal?.aborted) throw new Error('aborted')

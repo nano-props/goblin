@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   resolveRemoteRepoTarget: vi.fn(),
+  remoteRuntimeAwareGitRunner: vi.fn(),
   getRepoTreeSourceLocal: vi.fn(),
   getRepoTreeSourceRemote: vi.fn(),
   getWorktrees: vi.fn(),
@@ -9,6 +10,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('#/server/modules/repo-source.ts', () => ({
   resolveRemoteRepoTarget: mocks.resolveRemoteRepoTarget,
+  remoteRuntimeAwareGitRunner: mocks.remoteRuntimeAwareGitRunner,
 }))
 
 vi.mock('#/server/modules/repo-tree-source.ts', () => ({
@@ -37,6 +39,7 @@ const remoteTarget: RemoteRepoTarget = {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.remoteRuntimeAwareGitRunner.mockReturnValue(async () => ({ ok: true, stdout: '', stderr: '', code: 0 }))
   mocks.getWorktrees.mockResolvedValue([
     { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
     { path: '/tmp/repo/.worktrees/feature', branch: 'feature', isBare: false, isPrimary: false },
@@ -137,6 +140,24 @@ describe('repo-tree — read layer', () => {
     expect(mocks.getRepoTreeSourceRemote).toHaveBeenCalledWith(
       expect.objectContaining({ knownWorktrees: precomputedWorktrees }),
     )
+  })
+
+  test('threads the runtime-aware runner into remote tree reads', async () => {
+    const run = async () => ({ ok: true as const, stdout: '', stderr: '', code: 0 })
+    mocks.remoteRuntimeAwareGitRunner.mockReturnValueOnce(run)
+    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(remoteTarget)
+    mocks.getRepoTreeSourceRemote.mockResolvedValueOnce({ nodes: [], truncated: false })
+
+    await getRepositoryTree(remoteRepoId, '/srv/repos/myrepo/.worktrees/feature', {
+      repoRuntimeId: 'repo-runtime-tree-test',
+    })
+
+    expect(mocks.remoteRuntimeAwareGitRunner).toHaveBeenCalledWith(
+      remoteRepoId,
+      'repo-runtime-tree-test',
+      remoteTarget,
+    )
+    expect(mocks.getRepoTreeSourceRemote).toHaveBeenCalledWith(expect.objectContaining({ run }))
   })
 
   test('rejects when remote target resolution fails', async () => {

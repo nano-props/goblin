@@ -139,11 +139,13 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
     )
   })
   app.post('/worktree-bootstrap-preview', async (c) => {
-    const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.worktreeBootstrapPreview, c)
+    const { cwd, repoRuntimeId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.worktreeBootstrapPreview, c)
+    const userId = userIdFromContext(c)
+    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
     return c.json(
-      await jsonOr(
-        () => getRepoWorktreeBootstrapPreview(cwd, c.req.raw.signal),
-        { ok: false as const, message: 'error.failed-read-repo' },
+      await runtimeReadJsonOrThrow(
+        userId,
+        () => getRepoWorktreeBootstrapPreview(cwd, { signal: c.req.raw.signal, repoRuntimeId }),
         'worktree-bootstrap-preview',
       ),
     )
@@ -161,21 +163,30 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
     )
   })
   app.post('/tree', async (c) => {
-    const { cwd, worktreePath, prefix } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.tree, c)
+    const { cwd, repoRuntimeId, worktreePath, prefix } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.tree, c)
+    const userId = userIdFromContext(c)
+    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
     return c.json(
-      await readJsonOrThrow(
+      await runtimeReadJsonOrThrow(
+        userId,
         // Do not pipe the HTTP request signal into the git tree read.
         // In the Electron/Vite proxy path that signal can abort while
         // React Query is still settling the tab render.
-        () => getRepositoryTree(cwd, worktreePath, { prefix }),
+        () => getRepositoryTree(cwd, worktreePath, { prefix, repoRuntimeId }),
         'tree',
       ),
     )
   })
   app.post('/file-viewer', async (c) => {
-    const { cwd, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fileViewer, c)
+    const { cwd, repoRuntimeId, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.fileViewer, c)
+    const userId = userIdFromContext(c)
+    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
     return c.json(
-      await readJsonOrThrow(() => getRepositoryFileViewer(cwd, worktreePath, c.req.raw.signal), 'file-viewer'),
+      await runtimeReadJsonOrThrow(
+        userId,
+        () => getRepositoryFileViewer(cwd, worktreePath, c.req.raw.signal, { repoRuntimeId }),
+        'file-viewer',
+      ),
     )
   })
   app.post('/trash-file', async (c) => {
@@ -315,8 +326,16 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
     )
   })
   app.post('/open-url', async (c) => {
-    const { cwd, target } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openUrl, c)
-    return c.json(await jsonOr(() => openRepoUrl(cwd, target, c.req.raw.signal), READ_REPO_ERROR, 'open-url'))
+    const { cwd, repoRuntimeId, target } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openUrl, c)
+    const userId = userIdFromContext(c)
+    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
+    return c.json(
+      await runtimeReadJsonOrThrow(
+        userId,
+        () => openRepoUrl(cwd, target, c.req.raw.signal, { repoRuntimeId }),
+        'open-url',
+      ),
+    )
   })
   app.post('/open-terminal', async (c) => {
     const { repoId, worktreePath, app } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openTerminal, c)

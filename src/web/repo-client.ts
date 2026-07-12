@@ -100,10 +100,10 @@ export async function abortRepoOperation(cwd: string): Promise<boolean> {
 
 export async function fetchRepo(
   cwd: string,
+  repoRuntimeId: string,
   signal?: AbortSignal,
-  options?: { repoRuntimeId?: string },
 ): Promise<{ ok: boolean; message: string }> {
-  return await postServerJson('/api/repo/fetch', { cwd, repoRuntimeId: options?.repoRuntimeId }, {
+  return await postServerJson('/api/repo/fetch', { cwd, repoRuntimeId }, {
     signal,
     timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
   })
@@ -151,9 +151,10 @@ export async function createRepoWorktree(
 
 export async function getRepoWorktreeBootstrapPreview(
   cwd: string,
+  repoRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<WorktreeBootstrapPreviewResult> {
-  return await postServerJson('/api/repo/worktree-bootstrap-preview', { cwd }, { signal })
+  return await postServerJson('/api/repo/worktree-bootstrap-preview', { cwd, repoRuntimeId }, { signal })
 }
 
 export async function deleteRepoBranch(
@@ -201,9 +202,10 @@ export async function getRepoPatch(
   )
 }
 
-export async function openRepoUrl(cwd: string, target: RepoUrlTarget): Promise<ExecResult> {
-  const result = await postServerJson<{ cwd: string; target: RepoUrlTarget }, ExecResult>('/api/repo/open-url', {
+export async function openRepoUrl(cwd: string, repoRuntimeId: string, target: RepoUrlTarget): Promise<ExecResult> {
+  const result = await postServerJson<{ cwd: string; repoRuntimeId: string; target: RepoUrlTarget }, ExecResult>('/api/repo/open-url', {
     cwd,
+    repoRuntimeId,
     target,
   })
   if (!result.ok || !result.message) return result

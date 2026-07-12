@@ -555,7 +555,7 @@ describe('RepoWorkspaceContent', () => {
       upstreamButton?.click()
       await Promise.resolve()
     })
-    expect(repoClientMocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, {
+    expect(repoClientMocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, repo.repoRuntimeId, {
       type: 'branch',
       branch: 'main',
       remote: 'origin/team',
@@ -567,7 +567,7 @@ describe('RepoWorkspaceContent', () => {
       commitButton?.click()
       await Promise.resolve()
     })
-    expect(repoClientMocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, {
+    expect(repoClientMocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, repo.repoRuntimeId, {
       type: 'commit',
       hash: 'ecff955e65e045ee673dc730c06a9a7350d8a558',
     })
@@ -1237,7 +1237,7 @@ describe('RepoWorkspaceContent', () => {
     await act(async () => {
       hashButton?.click()
     })
-    expect(repoClientMocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, {
+    expect(repoClientMocks.openRepoUrl).toHaveBeenCalledWith(REPO_ID, repo.repoRuntimeId, {
       type: 'commit',
       hash: '78c150a000000000000000000000000000000000',
     })

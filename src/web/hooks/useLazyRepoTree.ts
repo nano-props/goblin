@@ -18,6 +18,7 @@ import type { RepoTreeResult } from '#/shared/api-types.ts'
 
 export interface UseLazyRepoTreeInput {
   readonly repoId: string
+  readonly repoRuntimeId: string
   readonly worktreePath: string
   readonly expandedKeys?: readonly string[]
 }
@@ -40,25 +41,29 @@ const EMPTY_EXPANDED_KEYS: readonly string[] = []
 interface CachedLazyRepoTreeStateInput {
   readonly queryClient: QueryClient
   readonly repoId: string
+  readonly repoRuntimeId: string
   readonly worktreePath: string
   readonly expandedKeys: readonly string[]
 }
 
-function repoTreeChildrenQueryKey(repoId: string, worktreePath: string, prefix: string) {
-  return ['repo-tree-children', repoId, worktreePath, prefix] as const
+function repoTreeChildrenQueryKey(repoId: string, repoRuntimeId: string, worktreePath: string, prefix: string) {
+  return ['repo-tree-children', repoId, repoRuntimeId, worktreePath, prefix] as const
 }
 
 export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeResult {
-  const { repoId, worktreePath } = input
+  const { repoId, repoRuntimeId, worktreePath } = input
   const expandedKeys = input.expandedKeys ?? EMPTY_EXPANDED_KEYS
   const queryClient = useQueryClient()
-  const enabled = repoId.length > 0 && worktreePath.length > 0
-  const rootQueryKey = useMemo(() => repoTreeChildrenQueryKey(repoId, worktreePath, ''), [repoId, worktreePath])
+  const enabled = repoId.length > 0 && repoRuntimeId.length > 0 && worktreePath.length > 0
+  const rootQueryKey = useMemo(
+    () => repoTreeChildrenQueryKey(repoId, repoRuntimeId, worktreePath, ''),
+    [repoId, repoRuntimeId, worktreePath],
+  )
   const expandedKeysCacheSignal = useMemo(() => expandedKeys.map(normalizePrefix).join('\0'), [expandedKeys])
   const cachedExpandedPrefixes = useMemo(() => cachedPrefixesForExpandedKeys(expandedKeys), [expandedKeysCacheSignal])
   const [treeState, dispatchTreeState] = useReducer(
     lazyRepoTreeReducer,
-    { queryClient, repoId, worktreePath, expandedKeys },
+    { queryClient, repoId, repoRuntimeId, worktreePath, expandedKeys },
     cachedLazyRepoTreeState,
   )
   const expandedKeysRef = useRef(expandedKeys)
@@ -67,7 +72,7 @@ export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeRes
   const rootQuery = useQuery({
     queryKey: rootQueryKey,
     enabled,
-    queryFn: ({ signal }) => getRepositoryTree(repoId, worktreePath, { signal }),
+    queryFn: ({ signal }) => getRepositoryTree(repoId, worktreePath, { repoRuntimeId, signal }),
     retry: false,
   })
   const { data: rootData, error: rootError, isPending, refetch } = rootQuery
@@ -79,18 +84,26 @@ export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeRes
   useEffect(() => {
     dispatchTreeState({
       type: 'replace',
-      state: cachedLazyRepoTreeState({ queryClient, repoId, worktreePath, expandedKeys: expandedKeysRef.current }),
+        state: cachedLazyRepoTreeState({
+          queryClient,
+          repoId,
+          repoRuntimeId,
+          worktreePath,
+          expandedKeys: expandedKeysRef.current,
+        }),
     })
-  }, [queryClient, repoId, worktreePath])
+  }, [queryClient, repoId, repoRuntimeId, worktreePath])
 
   useEffect(() => {
     if (!enabled) return
     for (const prefix of cachedExpandedPrefixes) {
-      const result = queryClient.getQueryData<RepoTreeResult>(repoTreeChildrenQueryKey(repoId, worktreePath, prefix))
+      const result = queryClient.getQueryData<RepoTreeResult>(
+        repoTreeChildrenQueryKey(repoId, repoRuntimeId, worktreePath, prefix),
+      )
       if (!result) continue
       dispatchTreeState({ type: 'childrenLoaded', prefix, result })
     }
-  }, [cachedExpandedPrefixes, enabled, queryClient, repoId, worktreePath])
+  }, [cachedExpandedPrefixes, enabled, queryClient, repoId, repoRuntimeId, worktreePath])
 
   useEffect(() => {
     if (!rootData) return
@@ -108,9 +121,9 @@ export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeRes
       dispatchTreeState({ type: 'childrenLoading', prefix: normalizedPrefix })
       try {
         const result = await queryClient.fetchQuery({
-          queryKey: repoTreeChildrenQueryKey(repoId, worktreePath, normalizedPrefix),
+          queryKey: repoTreeChildrenQueryKey(repoId, repoRuntimeId, worktreePath, normalizedPrefix),
           queryFn: ({ signal }) =>
-            getRepositoryTree(repoId, worktreePath, { prefix: normalizedPrefix || undefined, signal }),
+            getRepositoryTree(repoId, worktreePath, { repoRuntimeId, prefix: normalizedPrefix || undefined, signal }),
           retry: false,
         })
         dispatchTreeState({ type: 'childrenLoaded', prefix: normalizedPrefix, result })
@@ -125,6 +138,7 @@ export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeRes
       enabled,
       queryClient,
       repoId,
+      repoRuntimeId,
       treeState.errorPrefixes,
       treeState.loadedPrefixes,
       treeState.loadingPrefixes,
@@ -148,9 +162,9 @@ export function useLazyRepoTree(input: UseLazyRepoTreeInput): UseLazyRepoTreeRes
       if (event.query !== 'repo-snapshot') return
       if (event.repoId !== repoId) return
       dispatchTreeState({ type: 'markForReload' })
-      void queryClient.invalidateQueries({ queryKey: ['repo-tree-children', repoId, worktreePath] })
+      void queryClient.invalidateQueries({ queryKey: ['repo-tree-children', repoId, repoRuntimeId, worktreePath] })
     })
-  }, [queryClient, repoId, worktreePath])
+  }, [queryClient, repoId, repoRuntimeId, worktreePath])
 
   useEffect(() => {
     if (!rootData) return
@@ -182,13 +196,16 @@ function normalizePrefix(prefix: string): string {
 function cachedLazyRepoTreeState({
   queryClient,
   repoId,
+  repoRuntimeId,
   worktreePath,
   expandedKeys,
 }: CachedLazyRepoTreeStateInput): LazyRepoTreeState {
   if (!repoId || !worktreePath) return emptyLazyRepoTreeState()
   let state = emptyLazyRepoTreeState()
   for (const prefix of cachedPrefixesForExpandedKeys(expandedKeys)) {
-    const result = queryClient.getQueryData<RepoTreeResult>(repoTreeChildrenQueryKey(repoId, worktreePath, prefix))
+    const result = queryClient.getQueryData<RepoTreeResult>(
+      repoTreeChildrenQueryKey(repoId, repoRuntimeId, worktreePath, prefix),
+    )
     if (!result) continue
     state = lazyRepoTreeReducer(state, { type: 'childrenLoaded', prefix, result })
   }

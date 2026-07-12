@@ -5,22 +5,23 @@ import { StatusLink, type Tone } from '#/web/components/repo-workspace/status-ui
 
 type CommitHashLinkProps = Omit<ComponentProps<'button'>, 'type' | 'children' | 'onClick'> & {
   repoId: string
+  repoRuntimeId: string
   hash: string
   shortHash?: string
   tone?: Tone
 }
 
-export function CommitHashLink({ repoId, hash, shortHash, tone, title, className, ...props }: CommitHashLinkProps) {
+export function CommitHashLink({ repoId, repoRuntimeId, hash, shortHash, tone, title, className, ...props }: CommitHashLinkProps) {
   const handleClick = useMemo(
     () =>
       throttle(
         () => {
-          void openRepoUrl(repoId, { type: 'commit', hash }).catch(() => {})
+          void openRepoUrl(repoId, repoRuntimeId, { type: 'commit', hash }).catch(() => {})
         },
         500,
         { edges: ['leading'] },
       ),
-    [repoId, hash],
+    [repoId, repoRuntimeId, hash],
   )
 
   return (

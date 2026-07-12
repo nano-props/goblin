@@ -99,7 +99,7 @@ export const REPO_PROCEDURE_SCHEMAS = {
     worktreeBootstrap: WorktreeBootstrapDecisionSchema,
   }),
   getRemoteBranches: v.object({ cwd: v.string(), repoRuntimeId: RepoRuntimeIdSchema }),
-  worktreeBootstrapPreview: CwdInput,
+  worktreeBootstrapPreview: v.object({ cwd: v.string(), repoRuntimeId: RepoRuntimeIdSchema }),
   deleteBranch: v.object({
     cwd: v.string(),
     repoRuntimeId: RepoRuntimeIdSchema,
@@ -116,7 +116,7 @@ export const REPO_PROCEDURE_SCHEMAS = {
     forceDeleteBranch: v.optional(v.boolean()),
     alsoDeleteUpstream: v.optional(v.boolean()),
   }),
-  openUrl: v.object({ cwd: v.string(), target: RepoUrlTargetSchema }),
+  openUrl: v.object({ cwd: v.string(), repoRuntimeId: RepoRuntimeIdSchema, target: RepoUrlTargetSchema }),
   openTerminal: v.object({
     repoId: RepoRootSchema,
     worktreePath: v.string(),
@@ -156,6 +156,7 @@ export const REPO_PROCEDURE_SCHEMAS = {
   // still verifies `worktreePath` against the worktree list.
   tree: v.object({
     cwd: v.string(),
+    repoRuntimeId: RepoRuntimeIdSchema,
     worktreePath: v.string(),
     prefix: v.optional(RepoTreePrefixSchema),
   }),
@@ -166,6 +167,7 @@ export const REPO_PROCEDURE_SCHEMAS = {
   }),
   fileViewer: v.object({
     cwd: v.string(),
+    repoRuntimeId: RepoRuntimeIdSchema,
     worktreePath: v.string(),
   }),
   projection: v.object({

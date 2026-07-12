@@ -43,7 +43,7 @@ describe('repo web transport helpers', () => {
     }))
     const { openRepoUrl } = await import('#/web/repo-client.ts')
 
-    await expect(openRepoUrl('/tmp/repo', { type: 'branch', branch: 'feature/a' })).resolves.toEqual({
+    await expect(openRepoUrl('/tmp/repo', 'repo-runtime-web-transport-test', { type: 'branch', branch: 'feature/a' })).resolves.toEqual({
       ok: true,
       message: '',
     })

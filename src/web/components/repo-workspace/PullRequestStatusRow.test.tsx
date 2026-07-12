@@ -38,6 +38,7 @@ vi.mock('#/web/hooks/openBranchExternalTarget.ts', () => ({
 const openExternalMock = vi.mocked(openBranchExternalTarget)
 
 const REPO_ID = '/tmp/goblin-pr-row-test-repo'
+const REPO_RUNTIME_ID = 'repo-runtime-pr-row-test'
 const BRANCH_NAME = 'feature/pr'
 
 beforeEach(() => {
@@ -50,7 +51,9 @@ describe('PullRequestStatusRow', () => {
       state: 'open',
       url: 'https://github.com/acme/repo/pull/178',
     })
-    renderInJsdom(<PullRequestStatusRow repoId={REPO_ID} branchName={BRANCH_NAME} pullRequest={pullRequest} />)
+    renderInJsdom(
+      <PullRequestStatusRow repoId={REPO_ID} repoRuntimeId={REPO_RUNTIME_ID} branchName={BRANCH_NAME} pullRequest={pullRequest} />,
+    )
 
     const chip = document.querySelector<HTMLButtonElement>('[data-pull-request-link]')
     expect(chip).not.toBeNull()
@@ -68,13 +71,15 @@ describe('PullRequestStatusRow', () => {
       isDraft: true,
       url: 'https://github.com/acme/repo/pull/105',
     })
-    renderInJsdom(<PullRequestStatusRow repoId={REPO_ID} branchName={BRANCH_NAME} pullRequest={pullRequest} />)
+    renderInJsdom(
+      <PullRequestStatusRow repoId={REPO_ID} repoRuntimeId={REPO_RUNTIME_ID} branchName={BRANCH_NAME} pullRequest={pullRequest} />,
+    )
 
     const chip = document.querySelector<HTMLButtonElement>('[data-pull-request-link]')!
     fireEvent.click(chip)
 
     expect(openExternalMock).toHaveBeenCalledTimes(1)
-    expect(openExternalMock).toHaveBeenCalledWith(REPO_ID, { name: BRANCH_NAME, pullRequest })
+    expect(openExternalMock).toHaveBeenCalledWith(REPO_ID, REPO_RUNTIME_ID, { name: BRANCH_NAME, pullRequest })
   })
 
   test('absorbs accidental double-clicks within the latch window', () => {
@@ -84,7 +89,9 @@ describe('PullRequestStatusRow', () => {
         state: 'open',
         url: 'https://github.com/acme/repo/pull/178',
       })
-      renderInJsdom(<PullRequestStatusRow repoId={REPO_ID} branchName={BRANCH_NAME} pullRequest={pullRequest} />)
+      renderInJsdom(
+        <PullRequestStatusRow repoId={REPO_ID} repoRuntimeId={REPO_RUNTIME_ID} branchName={BRANCH_NAME} pullRequest={pullRequest} />,
+      )
 
       const chip = document.querySelector<HTMLButtonElement>('[data-pull-request-link]')!
       fireEvent.click(chip)

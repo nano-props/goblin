@@ -103,10 +103,14 @@ export async function getRepoPatch(
 
 export async function getRepoWorktreeBootstrapPreview(
   cwd: string,
-  signal?: AbortSignal,
+  options: { signal?: AbortSignal; repoRuntimeId?: string } = {},
 ): Promise<WorktreeBootstrapPreviewResult> {
   if (!isValidRepoLocator(cwd)) return { ok: false, message: 'error.invalid-arguments' }
-  return await runWithRepoSource(cwd, async (source) => await source.getWorktreeBootstrapPreview(signal))
+  return await runWithRepoSource(
+    cwd,
+    async (source) => await source.getWorktreeBootstrapPreview(options.signal),
+    repoReadRuntime(options),
+  )
 }
 
 export type RepoBulkReadSection = 'snapshot' | 'status' | 'pullRequests'

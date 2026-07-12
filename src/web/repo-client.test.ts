@@ -71,6 +71,8 @@ function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
 }
 
 describe('repo-client', () => {
+  const repoRuntimeId = 'repo-runtime-test'
+
   beforeEach(() => {
     vi.resetModules()
     vi.restoreAllMocks()
@@ -105,7 +107,7 @@ describe('repo-client', () => {
       json: async () => ({ ok: true, message: 'https://github.com/acme/repo/tree/feature/test' }),
     }))
     const { openRepoUrl } = await import('#/web/repo-client.ts')
-    await expect(openRepoUrl('/tmp/repo', { type: 'branch', branch: 'feature/test' })).resolves.toEqual({
+    await expect(openRepoUrl('/tmp/repo', repoRuntimeId, { type: 'branch', branch: 'feature/test' })).resolves.toEqual({
       ok: true,
       message: '',
     })
@@ -119,7 +121,7 @@ describe('repo-client', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
-        body: JSON.stringify({ cwd: '/tmp/repo', target: { type: 'branch', branch: 'feature/test' } }),
+        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, target: { type: 'branch', branch: 'feature/test' } }),
       }),
     )
   })
@@ -148,7 +150,7 @@ describe('repo-client', () => {
     }))
     const { openRepoUrl } = await import('#/web/repo-client.ts')
 
-    await expect(openRepoUrl('/tmp/repo', { type: 'commit', hash: 'abcdef1' })).resolves.toEqual({
+    await expect(openRepoUrl('/tmp/repo', repoRuntimeId, { type: 'commit', hash: 'abcdef1' })).resolves.toEqual({
       ok: true,
       message: '',
     })
@@ -157,7 +159,7 @@ describe('repo-client', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
-        body: JSON.stringify({ cwd: '/tmp/repo', target: { type: 'commit', hash: 'abcdef1' } }),
+        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, target: { type: 'commit', hash: 'abcdef1' } }),
       }),
     )
     expect(openExternalUrl).toHaveBeenCalledWith({
@@ -207,7 +209,7 @@ describe('repo-client', () => {
     })
 
     const { fetchRepo } = await import('#/web/repo-client.ts')
-    const request = fetchRepo('/tmp/repo')
+    const request = fetchRepo('/tmp/repo', repoRuntimeId)
     const assertion = expect(request).rejects.toThrow('error.request-timeout')
 
     await vi.advanceTimersByTimeAsync(240_000)

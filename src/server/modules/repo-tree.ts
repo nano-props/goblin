@@ -16,7 +16,7 @@ import path from 'node:path'
 import type { RepoTreeResult } from '#/shared/api-types.ts'
 import type { WorktreeInfo } from '#/shared/git-types.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
-import { resolveRemoteRepoTarget } from '#/server/modules/repo-source.ts'
+import { remoteRuntimeAwareGitRunner, resolveRemoteRepoTarget } from '#/server/modules/repo-source.ts'
 import {
   type RepoTreeSourceOptions,
   getRepoTreeSourceLocal,
@@ -27,6 +27,7 @@ import { getWorktrees } from '#/system/git/worktrees.ts'
 export interface RepositoryTreeReadOptions extends RepoTreeSourceOptions {
   /** Optional worktree list from callers that already have one. */
   readonly precomputedWorktrees?: ReadonlyArray<WorktreeInfo>
+  readonly repoRuntimeId?: string
 }
 
 /** Read the file tree rooted at `worktreePath`. An empty result is
@@ -83,6 +84,9 @@ export async function getRepositoryTree(
         worktreePath,
         options,
         signal: undefined,
+        ...(options.repoRuntimeId
+          ? { run: remoteRuntimeAwareGitRunner(cwd, options.repoRuntimeId, remoteTarget as Awaited<ReturnType<typeof resolveRemoteRepoTarget>>) }
+          : {}),
         ...(worktrees ? { knownWorktrees: worktrees } : {}),
       })
     : await getRepoTreeSourceLocal(worktreePath, options, undefined)

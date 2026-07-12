@@ -690,7 +690,7 @@ async function createRemoteRepoSource(
   }
 }
 
-function remoteRuntimeAwareGitRunner(
+export function remoteRuntimeAwareGitRunner(
   repoRoot: string,
   repoRuntimeId: string,
   sourceTarget: RemoteRepoTarget,

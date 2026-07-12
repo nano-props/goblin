@@ -6,13 +6,18 @@ import type { ExecResult } from '#/web/types.ts'
 
 export async function openBranchExternalTarget(
   repoId: string,
+  repoRuntimeId: string,
   branch: Pick<RepoBranchState, 'name' | 'pullRequest'>,
 ): Promise<ExecResult> {
   if (branch.pullRequest?.url) return await openExternalUrl(branch.pullRequest.url)
-  return await openRepoUrl(repoId, { type: 'branch', branch: branch.name })
+  return await openRepoUrl(repoId, repoRuntimeId, { type: 'branch', branch: branch.name })
 }
 
-export async function openUpstreamBranchExternalTarget(repoId: string, tracking: string): Promise<ExecResult> {
+export async function openUpstreamBranchExternalTarget(
+  repoId: string,
+  repoRuntimeId: string,
+  tracking: string,
+): Promise<ExecResult> {
   const repo = useReposStore.getState().repos[repoId]
   const remoteName = resolveTrackingRemoteName(
     tracking,
@@ -23,7 +28,7 @@ export async function openUpstreamBranchExternalTarget(repoId: string, tracking:
   }
   const branch = tracking.slice(remoteName.length + 1)
   if (!branch) return { ok: false, message: 'error.invalid-upstream-ref' }
-  return await openRepoUrl(repoId, { type: 'branch', branch, remote: remoteName })
+  return await openRepoUrl(repoId, repoRuntimeId, { type: 'branch', branch, remote: remoteName })
 }
 
 function resolveTrackingRemoteName(tracking: string, remotes: readonly string[]): string | null {

@@ -239,7 +239,7 @@ function isBootstrapLoadForRepo(load: BootstrapLoad | null, repoId: string, repo
 }
 
 async function loadBootstrap(repoId: string, repoRuntimeId: string, signal: AbortSignal): Promise<BootstrapLoad> {
-  const previewResult = await getRepoWorktreeBootstrapPreview(repoId, signal).catch(
+  const previewResult = await getRepoWorktreeBootstrapPreview(repoId, repoRuntimeId, signal).catch(
     (): WorktreeBootstrapPreviewResult => ({ ok: false, message: 'error.failed-read-repo' }),
   )
   let settingsSnapshot: SettingsSnapshot | undefined
