@@ -23,8 +23,6 @@ const mocks = vi.hoisted(() => ({
   openRepoInFinder: vi.fn(),
   openRepoTerminal: vi.fn(),
   openRepoUrl: vi.fn(),
-  openRemoteRepositoryEditor: vi.fn(),
-  openRemoteRepositoryTerminal: vi.fn(),
   openExternalUrl: vi.fn(),
 }))
 
@@ -34,11 +32,6 @@ vi.mock('#/web/repo-client.ts', () => ({
   openRepoInFinder: mocks.openRepoInFinder,
   openRepoTerminal: mocks.openRepoTerminal,
   openRepoUrl: mocks.openRepoUrl,
-}))
-
-vi.mock('#/web/remote-client.ts', () => ({
-  openRemoteRepositoryEditor: mocks.openRemoteRepositoryEditor,
-  openRemoteRepositoryTerminal: mocks.openRemoteRepositoryTerminal,
 }))
 
 vi.mock('#/web/app-shell-client.ts', () => ({
@@ -54,8 +47,6 @@ describe('useBranchActions', () => {
     mocks.openRepoEditor.mockReset()
     mocks.openRepoInFinder.mockReset()
     mocks.openRepoTerminal.mockReset()
-    mocks.openRemoteRepositoryEditor.mockReset()
-    mocks.openRemoteRepositoryTerminal.mockReset()
   })
 
   test('openTerminal routes to the remote IPC for remote repos', async () => {
@@ -81,7 +72,7 @@ describe('useBranchActions', () => {
         hasGitHubRemote: true,
       },
     })
-    mocks.openRemoteRepositoryTerminal.mockResolvedValue({ ok: true, message: '' })
+    mocks.openRepoTerminal.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
     renderInJsdom(
@@ -92,8 +83,11 @@ describe('useBranchActions', () => {
       await actions?.openTerminal?.('ghostty')
     })
 
-    expect(mocks.openRemoteRepositoryTerminal).toHaveBeenCalledWith(target!.id, '/srv/repo-feature', 'ghostty')
-    expect(mocks.openRepoTerminal).not.toHaveBeenCalled()
+    expect(mocks.openRepoTerminal).toHaveBeenCalledWith(
+      target!.id,
+      '/srv/repo-feature',
+      'ghostty',
+    )
   })
 
   test('copyPatch reads the server patch through a mutation and writes it to the clipboard', async () => {
@@ -147,7 +141,7 @@ describe('useBranchActions', () => {
         hasGitHubRemote: true,
       },
     })
-    mocks.openRemoteRepositoryEditor.mockResolvedValue({ ok: true, message: '' })
+    mocks.openRepoEditor.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
     renderInJsdom(
@@ -158,8 +152,7 @@ describe('useBranchActions', () => {
       await actions?.openEditor?.('vscode')
     })
 
-    expect(mocks.openRemoteRepositoryEditor).toHaveBeenCalledWith(target!.id, '/srv/repo-feature', 'vscode')
-    expect(mocks.openRepoEditor).not.toHaveBeenCalled()
+    expect(mocks.openRepoEditor).toHaveBeenCalledWith(target!.id, '/srv/repo-feature', 'vscode')
   })
 
   test('openTerminal and openEditor forward explicit app choices for remote repos', async () => {
@@ -185,8 +178,8 @@ describe('useBranchActions', () => {
         hasGitHubRemote: true,
       },
     })
-    mocks.openRemoteRepositoryTerminal.mockResolvedValue({ ok: true, message: '' })
-    mocks.openRemoteRepositoryEditor.mockResolvedValue({ ok: true, message: '' })
+    mocks.openRepoTerminal.mockResolvedValue({ ok: true, message: '' })
+    mocks.openRepoEditor.mockResolvedValue({ ok: true, message: '' })
 
     let actions: ReturnType<typeof useBranchActions>['actions'] | null = null
     renderInJsdom(
@@ -200,10 +193,12 @@ describe('useBranchActions', () => {
       await actions?.openEditor?.('vscode')
     })
 
-    expect(mocks.openRemoteRepositoryTerminal).toHaveBeenCalledWith(target!.id, '/srv/repo-feature', 'ghostty')
-    expect(mocks.openRemoteRepositoryEditor).toHaveBeenCalledWith(target!.id, '/srv/repo-feature', 'vscode')
-    expect(mocks.openRepoTerminal).not.toHaveBeenCalled()
-    expect(mocks.openRepoEditor).not.toHaveBeenCalled()
+    expect(mocks.openRepoTerminal).toHaveBeenCalledWith(
+      target!.id,
+      '/srv/repo-feature',
+      'ghostty',
+    )
+    expect(mocks.openRepoEditor).toHaveBeenCalledWith(target!.id, '/srv/repo-feature', 'vscode')
   })
 
   test('openTerminal uses the embedded server route for non-remote repos', async () => {
@@ -223,8 +218,7 @@ describe('useBranchActions', () => {
       await actions?.openTerminal?.('ghostty')
     })
 
-    expect(mocks.openRepoTerminal).toHaveBeenCalledWith('/tmp/local-feature', 'ghostty')
-    expect(mocks.openRemoteRepositoryTerminal).not.toHaveBeenCalled()
+    expect(mocks.openRepoTerminal).toHaveBeenCalledWith(REPO_ID, '/tmp/local-feature', 'ghostty')
   })
 
   test('openEditor forwards an explicit editor app for local repos', async () => {
@@ -244,8 +238,7 @@ describe('useBranchActions', () => {
       await actions?.openEditor?.('vscode')
     })
 
-    expect(mocks.openRepoEditor).toHaveBeenCalledWith('/tmp/local-feature', 'vscode')
-    expect(mocks.openRemoteRepositoryEditor).not.toHaveBeenCalled()
+    expect(mocks.openRepoEditor).toHaveBeenCalledWith(REPO_ID, '/tmp/local-feature', 'vscode')
   })
 
   test('openFinder uses the embedded server route for non-remote repos', async () => {
@@ -265,7 +258,7 @@ describe('useBranchActions', () => {
       await actions?.openFinder?.()
     })
 
-    expect(mocks.openRepoInFinder).toHaveBeenCalledWith('/tmp/local-feature')
+    expect(mocks.openRepoInFinder).toHaveBeenCalledWith(REPO_ID, '/tmp/local-feature')
   })
 
   test('clears local pending state when the branch action target changes', async () => {

@@ -30,6 +30,8 @@ import { cloneRepo as cloneGitRepo } from '#/system/git/clone.ts'
 import { openInPreferredEditor } from '#/system/editors.ts'
 import { openInPreferredTerminal } from '#/system/terminals.ts'
 import { openInFinder } from '#/system/finder.ts'
+import { isRemoteRepoId } from '#/shared/remote-repo.ts'
+import { openServerRemoteEditor, openServerRemoteTerminal } from '#/server/modules/remote.ts'
 import { type ExecResult, type RepoUrlTarget } from '#/shared/git-types.ts'
 import type { NetworkOpKind, RepoServerOperationKind, RepoServerOperationTarget } from '#/shared/api-types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
@@ -473,16 +475,29 @@ export async function openRepoUrl(cwd: string, target: RepoUrlTarget, signal?: A
   return url ? { ok: true, message: url } : { ok: false, message: 'error.no-remote-url' }
 }
 
-export async function openRepoTerminal(path: string, app: TerminalApp): Promise<ExecResult> {
-  return await openInPreferredTerminal(path, app)
+export async function openRepoTerminal(
+  repoId: string,
+  worktreePath: string,
+  app: TerminalApp,
+  signal?: AbortSignal,
+): Promise<ExecResult> {
+  if (isRemoteRepoId(repoId)) return await openServerRemoteTerminal({ repoId, worktreePath, app }, signal)
+  return await openInPreferredTerminal(worktreePath, app)
 }
 
-export async function openRepoEditor(path: string, app: EditorApp): Promise<ExecResult> {
-  return await openInPreferredEditor(path, app)
+export async function openRepoEditor(
+  repoId: string,
+  worktreePath: string,
+  app: EditorApp,
+  signal?: AbortSignal,
+): Promise<ExecResult> {
+  if (isRemoteRepoId(repoId)) return await openServerRemoteEditor({ repoId, worktreePath, app }, signal)
+  return await openInPreferredEditor(worktreePath, app)
 }
 
-export async function openRepoInFinder(path: string): Promise<ExecResult> {
-  return await openInFinder(path)
+export async function openRepoInFinder(repoId: string, worktreePath: string): Promise<ExecResult> {
+  if (isRemoteRepoId(repoId)) return { ok: false, message: 'error.invalid-path' }
+  return await openInFinder(worktreePath)
 }
 
 export async function abortRepoOperation(cwd: string): Promise<boolean> {

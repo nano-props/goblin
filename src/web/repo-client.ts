@@ -194,16 +194,24 @@ export async function openRepoUrl(cwd: string, target: RepoUrlTarget): Promise<E
   return opened.ok ? { ok: true, message: '' } : opened
 }
 
-export async function openRepoTerminal(path: string, app: TerminalApp): Promise<ExecResult> {
-  return await postServerJson('/api/repo/open-terminal', { path, app })
+export async function openRepoTerminal(
+  repoId: string,
+  worktreePath: string,
+  app: TerminalApp,
+): Promise<ExecResult> {
+  return await postServerJson('/api/repo/open-terminal', { repoId, worktreePath, app })
 }
 
-export async function openRepoEditor(path: string, app: EditorApp): Promise<ExecResult> {
-  return await postServerJson('/api/repo/open-editor', { path, app })
+export async function openRepoEditor(
+  repoId: string,
+  worktreePath: string,
+  app: EditorApp,
+): Promise<ExecResult> {
+  return await postServerJson('/api/repo/open-editor', { repoId, worktreePath, app })
 }
 
-export async function openRepoInFinder(path: string): Promise<ExecResult> {
-  return await postServerJson('/api/repo/open-in-finder', { path })
+export async function openRepoInFinder(repoId: string, worktreePath: string): Promise<ExecResult> {
+  return await postServerJson('/api/repo/open-in-finder', { repoId, worktreePath })
 }
 
 export async function setBackgroundSyncRepos(repoIds: string[]): Promise<void> {

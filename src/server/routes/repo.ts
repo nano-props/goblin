@@ -226,16 +226,24 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
     return c.json(await jsonOr(() => openRepoUrl(cwd, target, c.req.raw.signal), READ_REPO_ERROR, 'open-url'))
   })
   app.post('/open-terminal', async (c) => {
-    const { path, app } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openTerminal, c)
-    return c.json(await jsonOr(() => openRepoTerminal(path, app), READ_REPO_ERROR, 'open-terminal'))
+    const { repoId, worktreePath, app } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openTerminal, c)
+    return c.json(
+      await jsonOr(
+        () => openRepoTerminal(repoId, worktreePath, app, c.req.raw.signal),
+        READ_REPO_ERROR,
+        'open-terminal',
+      ),
+    )
   })
   app.post('/open-editor', async (c) => {
-    const { path, app } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openEditor, c)
-    return c.json(await jsonOr(() => openRepoEditor(path, app), READ_REPO_ERROR, 'open-editor'))
+    const { repoId, worktreePath, app } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openEditor, c)
+    return c.json(
+      await jsonOr(() => openRepoEditor(repoId, worktreePath, app, c.req.raw.signal), READ_REPO_ERROR, 'open-editor'),
+    )
   })
   app.post('/open-in-finder', async (c) => {
-    const { path } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openInFinder, c)
-    return c.json(await jsonOr(() => openRepoInFinder(path), READ_REPO_ERROR, 'open-in-finder'))
+    const { repoId, worktreePath } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.openInFinder, c)
+    return c.json(await jsonOr(() => openRepoInFinder(repoId, worktreePath), READ_REPO_ERROR, 'open-in-finder'))
   })
   app.post('/background-sync-repos', async (c) => {
     const { repoIds } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.backgroundSyncRepos, c)

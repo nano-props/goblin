@@ -369,7 +369,7 @@ describe('RepoWorkspaceToolbar', () => {
         body: JSON.stringify({ repoId: REPO_ID, worktreePath: WORKTREE_PATH, itemId: 'finder' }),
       }),
     )
-    expect(repoClientMocks.openRepoInFinder).toHaveBeenCalledWith(WORKTREE_PATH)
+    expect(repoClientMocks.openRepoInFinder).toHaveBeenCalledWith(REPO_ID, WORKTREE_PATH)
 
     // Simulate the server-driven settings-snapshot invalidation that
     // `publishSettingsInvalidation(['settings-snapshot'])` would push to
@@ -429,7 +429,7 @@ describe('RepoWorkspaceToolbar', () => {
     expect(toastMocks.error).toHaveBeenCalledWith('action.result-error', {
       description: 'Server request failed (HTTP 500)',
     })
-    expect(repoClientMocks.openRepoInFinder).toHaveBeenCalledWith(WORKTREE_PATH)
+    expect(repoClientMocks.openRepoInFinder).toHaveBeenCalledWith(REPO_ID, WORKTREE_PATH)
     expect(c.querySelector<HTMLButtonElement>('button[aria-label="settings.terminal.ghostty"]')).not.toBeNull()
   })
 

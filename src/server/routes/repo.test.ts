@@ -837,27 +837,36 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       new Request('http://localhost/open-terminal', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path: '/tmp/repo', app: 'ghostty' }),
+        body: JSON.stringify({
+          repoId: '/tmp/repo',
+          worktreePath: '/tmp/repo',
+          app: 'ghostty',
+        }),
       }),
     )
     await app.request(
       new Request('http://localhost/open-editor', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path: '/tmp/repo', app: 'vscode' }),
+        body: JSON.stringify({
+          repoId: '/tmp/repo',
+          repoRuntimeId: 'repo-runtime-test',
+          worktreePath: '/tmp/repo',
+          app: 'vscode',
+        }),
       }),
     )
     await app.request(
       new Request('http://localhost/open-in-finder', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path: '/tmp/repo' }),
+        body: JSON.stringify({ repoId: '/tmp/repo', worktreePath: '/tmp/repo' }),
       }),
     )
 
-    expect(mocks.openRepoTerminal).toHaveBeenCalledWith('/tmp/repo', 'ghostty')
-    expect(mocks.openRepoEditor).toHaveBeenCalledWith('/tmp/repo', 'vscode')
-    expect(mocks.openRepoInFinder).toHaveBeenCalledWith('/tmp/repo')
+    expect(mocks.openRepoTerminal).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo', 'ghostty', expect.any(AbortSignal))
+    expect(mocks.openRepoEditor).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo', 'vscode', expect.any(AbortSignal))
+    expect(mocks.openRepoInFinder).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo')
   })
 
   test('returns 400 for invalid external app choices', async () => {
@@ -866,7 +875,11 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       new Request('http://localhost/open-editor', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ path: '/tmp/repo', app: 'not-an-editor' }),
+        body: JSON.stringify({
+          repoId: '/tmp/repo',
+          worktreePath: '/tmp/repo',
+          app: 'not-an-editor',
+        }),
       }),
     )
 
