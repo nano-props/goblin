@@ -116,6 +116,9 @@ Notes:
 
 ## Sequential command workflows
 
+Workspace-pane command classification and the queue/token/CAS concurrency matrix are normative in
+`workspace-pane-command-invariants.md`.
+
 User operations that combine server writes, client projection supplements, and
 route changes must be modeled as one ordered workflow. At the operation entry
 point, read the current route and projection once, prove the preconditions, and

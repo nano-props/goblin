@@ -23,3 +23,4 @@ Use these docs for app-level product and architecture decisions:
 - `terminal-takeover.md`: terminal takeover — who controls the cursor (single-user, multi-device, intent-recent, user-scoped)
 - `filetree.md`: worktree-scoped file tree view (server-first, read-only v1)
 - `workspace-tab-opener.md`: workspace pane tab opener model — open-after-opener vs. append, close-back-to-opener
+- `workspace-pane-command-invariants.md`: command ownership, queue/token/CAS semantics, and required concurrency cases

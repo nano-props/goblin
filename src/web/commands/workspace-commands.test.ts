@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import type { RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
 import {
   runCloseWorkspacePaneTabCommand,
   runCloseWorkspacePaneTabOrWindowCommand,
@@ -2967,6 +2968,127 @@ test('resolves each queued relative move from the route current at execution tim
   await expect(secondMove).resolves.toBe(true)
   expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(1, REPO_ID, 'feature/worktree', 'files')
   expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'history')
+})
+
+test('rejects a queued relative move after its repo runtime epoch is replaced', async () => {
+  const repo = seedRepoWithReadModelForTest({
+    id: REPO_ID,
+    branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+    currentBranchName: 'feature/worktree',
+    workspacePaneTabsByBranch: {
+      'feature/worktree': [staticEntry('status'), staticEntry('files')],
+    },
+  })
+  const target = {
+    repoId: REPO_ID,
+    repoRuntimeId: repo.repoRuntimeId,
+    branchName: 'feature/worktree',
+    worktreePath: WORKTREE_PATH,
+  }
+  observeWorkspacePaneRouteForTest({ ...target, route: { kind: 'static', tab: 'status' } })
+  const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
+  const navigation = navigationWith({ showRepoBranchWorkspacePaneTab }, { autoSeedInitialRoute: false })
+  const blocker = Promise.withResolvers<void>()
+  const blockingAction = runWorkspacePaneAction(target, () => blocker.promise)
+  const move = dispatchMoveWorkspacePaneTabAction({
+    repoId: REPO_ID,
+    branchName: 'feature/worktree',
+    workspacePaneRoute: { kind: 'static', tab: 'status' },
+    direction: 1,
+    navigation,
+  })
+
+  useReposStore.setState((state) => ({
+    repos: {
+      ...state.repos,
+      [REPO_ID]: { ...state.repos[REPO_ID]!, repoRuntimeId: 'repo-runtime-replaced' },
+    },
+  }))
+  blocker.resolve()
+  await blockingAction
+
+  await expect(move).resolves.toBe(false)
+  expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
+})
+
+test('rejects a queued absolute selection after its repo runtime epoch is replaced', async () => {
+  const repo = seedRepoWithReadModelForTest({
+    id: REPO_ID,
+    branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+    currentBranchName: 'feature/worktree',
+    workspacePaneTabsByBranch: {
+      'feature/worktree': [staticEntry('status'), staticEntry('files')],
+    },
+  })
+  const target = {
+    repoId: REPO_ID,
+    repoRuntimeId: repo.repoRuntimeId,
+    branchName: 'feature/worktree',
+    worktreePath: WORKTREE_PATH,
+  }
+  observeWorkspacePaneRouteForTest({ ...target, route: { kind: 'static', tab: 'status' } })
+  const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
+  const navigation = navigationWith({ showRepoBranchWorkspacePaneTab }, { autoSeedInitialRoute: false })
+  const blocker = Promise.withResolvers<void>()
+  const blockingAction = runWorkspacePaneAction(target, () => blocker.promise)
+  const select = dispatchSelectWorkspacePaneTabByIdentityAction({
+    repoId: REPO_ID,
+    branchName: 'feature/worktree',
+    workspacePaneRoute: { kind: 'static', tab: 'status' },
+    identity: 'workspace-pane:files',
+    navigation,
+  })
+
+  useReposStore.setState((state) => ({
+    repos: {
+      ...state.repos,
+      [REPO_ID]: { ...state.repos[REPO_ID]!, repoRuntimeId: 'repo-runtime-replaced' },
+    },
+  }))
+  blocker.resolve()
+  await blockingAction
+
+  await expect(select).resolves.toBe(false)
+  expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
+})
+
+test('rejects a queued relative move after the router leaves its workspace target', async () => {
+  const repo = seedRepoWithReadModelForTest({
+    id: REPO_ID,
+    branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+    currentBranchName: 'feature/worktree',
+    workspacePaneTabsByBranch: {
+      'feature/worktree': [staticEntry('status'), staticEntry('files')],
+    },
+  })
+  const target = {
+    repoId: REPO_ID,
+    repoRuntimeId: repo.repoRuntimeId,
+    branchName: 'feature/worktree',
+    worktreePath: WORKTREE_PATH,
+  }
+  let currentRoute: RepoBranchWorkspacePaneRouteTarget | undefined = { kind: 'static', tab: 'status' }
+  const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
+  const navigation = navigationWith({
+    currentRepoBranchWorkspacePaneRoute: () => currentRoute,
+    showRepoBranchWorkspacePaneTab,
+  })
+  const blocker = Promise.withResolvers<void>()
+  const blockingAction = runWorkspacePaneAction(target, () => blocker.promise)
+  const move = dispatchMoveWorkspacePaneTabAction({
+    repoId: REPO_ID,
+    branchName: 'feature/worktree',
+    workspacePaneRoute: { kind: 'static', tab: 'status' },
+    direction: 1,
+    navigation,
+  })
+
+  currentRoute = undefined
+  blocker.resolve()
+  await blockingAction
+
+  await expect(move).resolves.toBe(false)
+  expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
 })
 
 test('serializes open then move through exact route commits', async () => {
