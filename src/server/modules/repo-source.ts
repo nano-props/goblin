@@ -80,7 +80,11 @@ import {
 } from '#/shared/api-types.ts'
 import { normalizeRemoteRepoRef } from '#/shared/remote-repo.ts'
 import type { WorktreeBootstrapDecision, WorktreeBootstrapPreviewResult } from '#/shared/worktree-bootstrap-summary.ts'
-import { isRemoteRepoRuntimeFailure, remoteRuntimeFailureFromCommandResult } from '#/server/modules/remote-runtime-failure.ts'
+import {
+  isRemoteRepoRuntimeFailure,
+  remoteRuntimeFailureFromCommandResult,
+  remoteRuntimeFailureFromTargetResolutionError,
+} from '#/server/modules/remote-runtime-failure.ts'
 
 type ProbeAvailability = { ok: true } | { ok: false; message: string }
 
@@ -146,10 +150,22 @@ export interface RepoSourceRuntimeContext {
   repoRuntimeId: string
 }
 
-export async function resolveRemoteRepoTarget(repoId: string): Promise<RemoteRepoTarget> {
-  const parsed = parseRemoteRepoId(repoId)
-  if (!parsed) throw new Error('error.ssh-config-changed')
-  return (await resolveSshRemoteTarget(parsed)).target
+export async function resolveRemoteRepoTarget(
+  repoId: string,
+  runtime?: RepoSourceRuntimeContext,
+): Promise<RemoteRepoTarget> {
+  try {
+    const parsed = parseRemoteRepoId(repoId)
+    if (!parsed) throw new Error('error.ssh-config-changed')
+    return (await resolveSshRemoteTarget(parsed)).target
+  } catch (err) {
+    if (!runtime) throw err
+    throw remoteRuntimeFailureFromTargetResolutionError({
+      repoRoot: repoId,
+      repoRuntimeId: runtime.repoRuntimeId,
+      error: err,
+    })
+  }
 }
 
 export async function runWithRepoSource<T>(
@@ -562,7 +578,7 @@ async function createRemoteRepoSource(
   physicalWorktreeCapability: import('#/server/worktree-removal/physical-worktree-identity-resolver.ts').PhysicalWorktreeCapability | null = null,
   runtime?: RepoSourceRuntimeContext,
 ): Promise<RepoSource> {
-  const target = capturedTarget ?? (await resolveRemoteRepoTarget(repoId))
+  const target = capturedTarget ?? (await resolveRemoteRepoTarget(repoId, runtime))
   const capabilities: RepoSourceCapabilities = { pullRequests: 'derived-github-repo' }
   const run = runtime ? remoteRuntimeAwareGitRunner(repoId, runtime.repoRuntimeId, target) : undefined
   return {

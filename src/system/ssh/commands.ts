@@ -105,6 +105,7 @@ export interface RemoteCommandResult {
   stderr: string
   message?: string
   timedOut?: boolean
+  remoteStarted?: boolean
 }
 
 export interface RemoteCommandInvocation {
@@ -125,6 +126,7 @@ const SNAPSHOT_MANAGED_SSH_OPTIONS = new Set([
   'stricthostkeychecking',
   'user',
 ])
+const REMOTE_COMMAND_STARTED_MARKER = '__GOBLIN_REMOTE_COMMAND_STARTED__'
 
 /** Converts one `ssh -G` result into argv-safe options that never consult config again. */
 export function buildCanonicalSshConnectionSnapshot(
@@ -226,7 +228,11 @@ export async function runRemoteCommand(
   options?: { signal?: AbortSignal; timeoutMs?: number },
 ): Promise<RemoteCommandResult> {
   if (options?.signal?.aborted) return { ok: false, stdout: '', stderr: '', message: 'cancelled' }
-  const invocation = buildRemoteCommandInvocation(target, command)
+  const invocation = buildCanonicalSshInvocation(
+    target,
+    commandStartedMarkerScript(scriptForCommand(command)),
+    ['-T', '-o', 'RequestTTY=no'],
+  )
   // Ensure the ControlMaster socket directory exists. ssh will refuse to
   // create a control socket in a missing directory, which on a fresh
   // install manifests as every probe failing before the handshake.
@@ -238,19 +244,32 @@ export async function runRemoteCommand(
       forceKillAfterDelay: 500,
       maxBuffer: 2 * 1024 * 1024,
     })
-    return { ok: true, stdout: stdout.trimEnd(), stderr: stderr.trimEnd() }
+    const stripped = stripCommandStartedMarker(stdout.trimEnd())
+    return { ok: true, stdout: stripped.stdout, stderr: stderr.trimEnd(), remoteStarted: stripped.remoteStarted }
   } catch (err) {
     const e = err as { stdout?: unknown; stderr?: unknown; timedOut?: boolean; isCanceled?: boolean; message?: string }
-    const stdout = typeof e.stdout === 'string' ? e.stdout.trimEnd() : ''
+    const stripped = stripCommandStartedMarker(typeof e.stdout === 'string' ? e.stdout.trimEnd() : '')
+    const stdout = stripped.stdout
     const stderr = typeof e.stderr === 'string' ? e.stderr.trimEnd() : ''
     if (options?.signal?.aborted || e.isCanceled === true) {
-      return { ok: false, stdout, stderr, message: 'cancelled' }
+      return { ok: false, stdout, stderr, message: 'cancelled', remoteStarted: stripped.remoteStarted }
     }
     if (err instanceof ExecaError && e.timedOut) {
-      return { ok: false, stdout, stderr, message: 'timeout', timedOut: true }
+      return { ok: false, stdout, stderr, message: 'timeout', timedOut: true, remoteStarted: stripped.remoteStarted }
     }
-    return { ok: false, stdout, stderr, message: stderr || e.message || 'unknown' }
+    return { ok: false, stdout, stderr, message: stderr || e.message || 'unknown', remoteStarted: stripped.remoteStarted }
   }
+}
+
+function commandStartedMarkerScript(script: string): string {
+  return `printf '%s\n' ${shellQuote(REMOTE_COMMAND_STARTED_MARKER)}\n${script}`
+}
+
+function stripCommandStartedMarker(stdout: string): { stdout: string; remoteStarted: boolean } {
+  const lines = stdout.split('\n')
+  const markerIndex = lines.findIndex((line) => line === REMOTE_COMMAND_STARTED_MARKER)
+  if (markerIndex === -1) return { stdout, remoteStarted: false }
+  return { stdout: lines.slice(markerIndex + 1).join('\n'), remoteStarted: true }
 }
 
 function scriptForCommand(command: RemoteCommandKind): string {

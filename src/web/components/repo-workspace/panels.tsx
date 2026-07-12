@@ -283,7 +283,7 @@ function FiletreeTab({
   const requestTrashFile = useCallback(
     (node: RepoTreeNode) => {
       if (node.kind !== 'file') return
-      openTrashFileConfirm({ repoId, worktreePath, path: node.path, name: node.name })
+      openTrashFileConfirm({ repoId, repoRuntimeId, worktreePath, path: node.path, name: node.name })
     },
     [openTrashFileConfirm, repoId, worktreePath],
   )

@@ -58,7 +58,10 @@ export async function getRepositoryTree(
   // handing the worktree path to the remote source.
   let remoteTarget: Awaited<ReturnType<typeof resolveRemoteRepoTarget>> | undefined
   if (isRemote) {
-    remoteTarget = await resolveRemoteRepoTarget(cwd)
+    remoteTarget = await resolveRemoteRepoTarget(
+      cwd,
+      options.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined,
+    )
   }
 
   const worktrees =

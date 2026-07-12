@@ -117,7 +117,7 @@ describe('repo-tree — read layer', () => {
     const result = await getRepositoryTree(remoteRepoId, '/srv/repos/myrepo/.worktrees/feature', { prefix: 'src' })
 
     expect(mocks.getWorktrees).not.toHaveBeenCalled()
-    expect(mocks.resolveRemoteRepoTarget).toHaveBeenCalledWith(remoteRepoId)
+    expect(mocks.resolveRemoteRepoTarget).toHaveBeenCalledWith(remoteRepoId, undefined)
     expect(mocks.getRepoTreeSourceRemote).toHaveBeenCalledWith(
       expect.objectContaining({
         target: remoteTarget,
@@ -152,6 +152,9 @@ describe('repo-tree — read layer', () => {
       repoRuntimeId: 'repo-runtime-tree-test',
     })
 
+    expect(mocks.resolveRemoteRepoTarget).toHaveBeenCalledWith(remoteRepoId, {
+      repoRuntimeId: 'repo-runtime-tree-test',
+    })
     expect(mocks.remoteRuntimeAwareGitRunner).toHaveBeenCalledWith(
       remoteRepoId,
       'repo-runtime-tree-test',

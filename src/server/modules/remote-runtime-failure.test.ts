@@ -33,6 +33,41 @@ describe('remote runtime failure classification', () => {
         stderr: 'Host key verification failed.',
       }),
     ).toBe('host-key')
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult({
+        ok: false,
+        stdout: '',
+        stderr: 'Received disconnect from 192.0.2.1 port 22:2: Too many authentication failures',
+      }),
+    ).toBe('auth-failed')
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult({
+        ok: false,
+        stdout: '',
+        stderr: 'kex_exchange_identification: Connection closed by UNKNOWN port 65535',
+      }),
+    ).toBe('handshake-failed')
+  })
+
+  test('does not classify remote command failures after the remote shell starts', () => {
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult({
+        ok: false,
+        stdout: '',
+        stderr: 'git@github.com: Permission denied (publickey).',
+        message: 'git@github.com: Permission denied (publickey).',
+        remoteStarted: true,
+      }),
+    ).toBeNull()
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult({
+        ok: false,
+        stdout: '',
+        stderr: 'Host key verification failed.',
+        message: 'Host key verification failed.',
+        remoteStarted: true,
+      }),
+    ).toBeNull()
   })
 
   test('does not classify ordinary command failures or stale runtime as reachability failures', () => {

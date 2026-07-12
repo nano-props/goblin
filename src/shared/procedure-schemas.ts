@@ -162,6 +162,7 @@ export const REPO_PROCEDURE_SCHEMAS = {
   }),
   trashFile: v.object({
     cwd: v.string(),
+    repoRuntimeId: RepoRuntimeIdSchema,
     worktreePath: v.string(),
     path: RepoTreePrefixSchema,
   }),

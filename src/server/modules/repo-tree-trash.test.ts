@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getWorktrees: vi.fn(),
   movePathToTrash: vi.fn(),
   resolveRemoteRepoTarget: vi.fn(),
+  remoteRuntimeAwareGitRunner: vi.fn(),
   trashRemoteFile: vi.fn(),
 }))
 
@@ -22,6 +23,7 @@ vi.mock('#/system/trash.ts', () => ({
 
 vi.mock('#/server/modules/repo-source.ts', () => ({
   resolveRemoteRepoTarget: mocks.resolveRemoteRepoTarget,
+  remoteRuntimeAwareGitRunner: mocks.remoteRuntimeAwareGitRunner,
 }))
 
 vi.mock('#/system/ssh/git.ts', () => ({
@@ -39,6 +41,7 @@ beforeEach(() => {
   ])
   mocks.lstat.mockResolvedValue({ isDirectory: () => false })
   mocks.movePathToTrash.mockResolvedValue({ ok: true, message: 'ok', repoChanged: true })
+  mocks.remoteRuntimeAwareGitRunner.mockReturnValue(async () => ({ ok: true, stdout: '', stderr: '', code: 0 }))
 })
 
 describe('repo-tree trash write layer', () => {
@@ -87,5 +90,36 @@ describe('repo-tree trash write layer', () => {
     expect(result).toEqual({ ok: true, message: 'ok', repoChanged: true })
     expect(mocks.trashRemoteFile).toHaveBeenCalledWith(target, '/srv/repo-feature', 'README.md', { signal: undefined })
     expect(mocks.getWorktrees).not.toHaveBeenCalled()
+  })
+
+  test('uses the runtime-aware runner for remote trash when provided', async () => {
+    const repoRuntimeId = 'repo-runtime-trash-test'
+    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
+    const target = {
+      id: repoId,
+      alias: 'prod',
+      remotePath: '/srv/repo',
+      displayName: 'prod:repo',
+      host: 'example.com',
+      user: 'tester',
+      port: 22,
+    }
+    const run = async () => ({ ok: true as const, stdout: '', stderr: '', code: 0 })
+    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
+    mocks.remoteRuntimeAwareGitRunner.mockReturnValueOnce(run)
+    mocks.trashRemoteFile.mockResolvedValueOnce({ ok: true, message: 'ok', repoChanged: true })
+
+    await expect(trashRepositoryFile(repoId, '/srv/repo-feature', 'README.md', undefined, { repoRuntimeId })).resolves.toEqual({
+      ok: true,
+      message: 'ok',
+      repoChanged: true,
+    })
+
+    expect(mocks.resolveRemoteRepoTarget).toHaveBeenCalledWith(repoId, { repoRuntimeId })
+    expect(mocks.remoteRuntimeAwareGitRunner).toHaveBeenCalledWith(repoId, repoRuntimeId, target)
+    expect(mocks.trashRemoteFile).toHaveBeenCalledWith(target, '/srv/repo-feature', 'README.md', {
+      signal: undefined,
+      run,
+    })
   })
 })

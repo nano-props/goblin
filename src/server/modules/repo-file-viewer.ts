@@ -22,7 +22,10 @@ export async function getRepositoryFileViewer(
   if (!hasUsableWorktreePath(worktreePath)) throw new Error('invalid worktree path')
 
   if (isRemoteRepoId(cwd)) {
-    const target = await resolveRemoteRepoTarget(cwd)
+    const target = await resolveRemoteRepoTarget(
+      cwd,
+      options.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined,
+    )
     const run = options.repoRuntimeId ? remoteRuntimeAwareGitRunner(cwd, options.repoRuntimeId, target) : undefined
     const worktree = await resolveRemoteWorktree(target, worktreePath, { signal, ...(run ? { run } : {}) })
     const knownWorktrees = [worktree]

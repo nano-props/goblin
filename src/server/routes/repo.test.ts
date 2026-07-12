@@ -637,6 +637,17 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       }),
       mock: mocks.openRepoUrl,
     },
+    {
+      name: 'trash-file',
+      path: '/trash-file',
+      body: (repoId: string, repoRuntimeId: string) => ({
+        cwd: repoId,
+        repoRuntimeId,
+        worktreePath: '/home/alice/service/.worktrees/feature',
+        path: 'src/index.ts',
+      }),
+      mock: mocks.trashRepositoryFile,
+    },
   ])('marks remote lifecycle failed when /$name hits transport failure', async ({ path, body, mock }) => {
     const app = createTestRepoRoutes()
     const repoId = 'ssh-config://prod/home/alice/service'
@@ -829,12 +840,14 @@ describe('repo routes — POST body validation (read endpoints)', () => {
   test('passes /trash-file requests through to the filetree write layer', async () => {
     mocks.trashRepositoryFile.mockResolvedValueOnce({ ok: true, message: 'ok' })
     const app = createTestRepoRoutes()
+    const repoRuntimeId = await openTestRepoRuntime(app)
     const response = await app.request(
       new Request('http://localhost/trash-file', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           cwd: '/tmp/repo',
+          repoRuntimeId,
           worktreePath: '/tmp/repo/.worktrees/feature',
           path: 'src/index.ts',
         }),
@@ -848,16 +861,18 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       '/tmp/repo/.worktrees/feature',
       'src/index.ts',
       expect.any(AbortSignal),
+      { repoRuntimeId },
     )
   })
 
   test('returns 400 when /trash-file path escapes the worktree', async () => {
     const app = createTestRepoRoutes()
+    const repoRuntimeId = await openTestRepoRuntime(app)
     const response = await app.request(
       new Request('http://localhost/trash-file', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', worktreePath: '/tmp/repo', path: '../secret.txt' }),
+        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, worktreePath: '/tmp/repo', path: '../secret.txt' }),
       }),
     )
     expect(response.status).toBe(400)

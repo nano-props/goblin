@@ -43,11 +43,12 @@ export async function getRepositoryTree(
 
 export async function trashRepositoryFile(
   cwd: string,
+  repoRuntimeId: string,
   worktreePath: string,
   path: string,
   options: { readonly signal?: AbortSignal } = {},
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/trash-file', { cwd, worktreePath, path }, { signal: options.signal })
+  return await postServerJson('/api/repo/trash-file', { cwd, repoRuntimeId, worktreePath, path }, { signal: options.signal })
 }
 
 export async function getRepositoryFileViewer(

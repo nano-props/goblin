@@ -176,6 +176,7 @@ describe('repo file viewer read layer', () => {
       shell: 'posix',
     })
 
+    expect(mocks.resolveRemoteRepoTarget).toHaveBeenCalledWith(repoId, { repoRuntimeId })
     expect(mocks.remoteRuntimeAwareGitRunner).toHaveBeenCalledWith(repoId, repoRuntimeId, target)
     expect(mocks.resolveRemoteWorktree).toHaveBeenCalledWith(target, '/srv/repo-feature', {
       signal: undefined,

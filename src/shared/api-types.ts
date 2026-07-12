@@ -11,6 +11,7 @@ import type {
   PullRequestFetchMode,
   PullRequestInfo,
   RepoRemoteInfo,
+  RepoUrlTarget,
   WorktreeStatus,
 } from '#/shared/git-types.ts'
 import type { WorkspacePaneSessionTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
@@ -367,7 +368,7 @@ export interface AppIpcHandlers {
     }) => Promise<RepoRuntimeProjection>
     operations: (input: { cwd?: string; repoRuntimeId?: string; includeSettled?: boolean }) => Promise<RepoOperationsSnapshot>
     patch: (input: { cwd: string; repoRuntimeId: string; worktreePath: string }) => Promise<ExecResult>
-    trashFile: (input: { cwd: string; worktreePath: string; path: string }) => Promise<ExecResult>
+    trashFile: (input: { cwd: string; repoRuntimeId: string; worktreePath: string; path: string }) => Promise<ExecResult>
     deleteBranch: (input: {
       cwd: string
       repoRuntimeId: string
@@ -385,12 +386,13 @@ export interface AppIpcHandlers {
       alsoDeleteUpstream?: boolean
     }) => Promise<ExecResult>
     createWorktree: (input: CreateWorktreeIpcInput) => Promise<ExecResult>
-    worktreeBootstrapPreview: (input: { cwd: string }) => Promise<WorktreeBootstrapPreviewResult>
+    worktreeBootstrapPreview: (input: { cwd: string; repoRuntimeId: string }) => Promise<WorktreeBootstrapPreviewResult>
     remoteBranches: (input: { cwd: string; repoRuntimeId: string }) => Promise<string[]>
     pull: (input: { cwd: string; repoRuntimeId: string; branch: string; worktreePath?: string }) => Promise<ExecResult>
     push: (input: { cwd: string; repoRuntimeId: string; branch: string }) => Promise<ExecResult>
     fetch: (input: { cwd: string; repoRuntimeId?: string }) => Promise<ExecResult>
     abort: (input: { cwd: string }) => Promise<boolean>
+    openUrl: (input: { cwd: string; repoRuntimeId: string; target: RepoUrlTarget }) => Promise<ExecResult>
     openRemote: (input: { cwd: string; branch?: string }) => Promise<ExecResult>
   }
   remote: {

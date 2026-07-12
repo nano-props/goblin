@@ -190,10 +190,12 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
     )
   })
   app.post('/trash-file', async (c) => {
-    const { cwd, worktreePath, path } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.trashFile, c)
-    const result = await jsonOr(
-      () => trashRepositoryFile(cwd, worktreePath, path, c.req.raw.signal),
-      { ok: false as const, message: 'error.failed-trash-file' },
+    const { cwd, repoRuntimeId, worktreePath, path } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.trashFile, c)
+    const userId = userIdFromContext(c)
+    assertCurrentRepoRuntimeForRead(userId, cwd, repoRuntimeId)
+    const result = await runtimeReadJsonOrThrow(
+      userId,
+      () => trashRepositoryFile(cwd, worktreePath, path, c.req.raw.signal, { repoRuntimeId }),
       'trash-file',
     )
     if (result.ok || result.repoChanged === true) {

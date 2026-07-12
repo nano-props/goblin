@@ -83,4 +83,18 @@ describe('repo source runtime failure classification', () => {
 
     await expect(getRepoLog(target.id, 'main')).rejects.toThrow('connection refused')
   })
+
+  test('throws a typed remote runtime failure when target resolution fails under runtime context', async () => {
+    mocks.resolveRemoteTarget.mockRejectedValueOnce(new Error('error.ssh-config-changed'))
+    const { getRepoLog } = await import('#/server/modules/repo-read-paths.ts')
+
+    await expect(
+      getRepoLog(target.id, 'main', { repoRuntimeId: 'repo-runtime-test' }),
+    ).rejects.toMatchObject({
+      name: 'RemoteRepoRuntimeFailureError',
+      repoRoot: target.id,
+      repoRuntimeId: 'repo-runtime-test',
+      reason: 'config-changed',
+    } satisfies Partial<RemoteRepoRuntimeFailureError>)
+  })
 })
