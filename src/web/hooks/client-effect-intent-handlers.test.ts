@@ -20,9 +20,7 @@ import {
   seedRepoReadModelQueryData,
   seedRepoWithReadModelForTest,
 } from '#/web/test-utils/bridge.ts'
-import {
-  observedWorkspacePaneRouteCommitForTest,
-} from '#/web/test-utils/workspace-pane-navigation.ts'
+import { observedWorkspacePaneRouteCommitForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { setRepoOperationsQueryData } from '#/web/repo-data-query.ts'
@@ -172,6 +170,7 @@ function deps(currentRepoId: string | null, currentBranchName = 'feature/worktre
 
 function navigationWithStoreActions(): PrimaryWindowNavigationActions {
   const navigation: PrimaryWindowNavigationActions = {
+    currentRepoBranchWorkspacePaneRoute: () => undefined,
     activateRepo: vi.fn(),
     closeRepo: (repoId) => useReposStore.getState().closeRepo(repoId),
     cycleRepo: vi.fn(),

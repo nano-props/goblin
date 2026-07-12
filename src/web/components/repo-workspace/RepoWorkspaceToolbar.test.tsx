@@ -1470,6 +1470,7 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
     openSettings: () => {},
     openCreateWorktree: () => {},
     ...overrides,
+    currentRepoBranchWorkspacePaneRoute: overrides.currentRepoBranchWorkspacePaneRoute ?? (() => undefined),
   }
   if (!overrides.commitRepoBranchWorkspacePaneRoute) {
     navigation.commitRepoBranchWorkspacePaneRoute = observedWorkspacePaneRouteCommitForTest(navigation)

@@ -45,12 +45,16 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/repo-refresh-actions.ts'
-import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import {
+  resetWorkspacePaneActionQueueForTest,
+  runWorkspacePaneAction,
+} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { dispatchSelectWorkspacePaneTabByIdentityAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import { dispatchMoveWorkspacePaneTabAction } from '#/web/workspace-pane/workspace-pane-tab-select-action.ts'
 import { openWorkspacePaneTab } from '#/web/components/repo-workspace/open-workspace-pane-tab.ts'
 import { observeWorkspacePaneRouteForTest } from '#/web/test-utils/workspace-pane-navigation.ts'
 import {
+  observedWorkspacePaneRouteForTarget,
   observedWorkspacePaneRouteCommitForTest,
   seedInitialObservedWorkspacePaneRouteForTest,
   type WorkspacePaneNavigationObservation,
@@ -2020,8 +2024,8 @@ describe('workspace commands', () => {
 
     await expect(closePromise).resolves.toBe(true)
     await expect(movePromise).resolves.toBe(true)
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledOnce()
-    expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'status')
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(1, REPO_ID, 'feature/worktree', 'files')
+    expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'status')
   })
 
   test('new terminal command queues behind an in-flight static close on the same target', async () => {
@@ -2920,6 +2924,51 @@ test('rebases the latest queued absolute selection after an earlier route commit
   expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'history')
 })
 
+test('resolves each queued relative move from the route current at execution time', async () => {
+  const repo = seedRepoWithReadModelForTest({
+    id: REPO_ID,
+    branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
+    currentBranchName: 'feature/worktree',
+    workspacePaneTabsByBranch: {
+      'feature/worktree': [staticEntry('status'), staticEntry('files'), staticEntry('history')],
+    },
+  })
+  const target = {
+    repoId: REPO_ID,
+    repoRuntimeId: repo.repoRuntimeId,
+    branchName: 'feature/worktree',
+    worktreePath: WORKTREE_PATH,
+  }
+  observeWorkspacePaneRouteForTest({ ...target, route: { kind: 'static', tab: 'status' } })
+  const showRepoBranchWorkspacePaneTab = vi.fn(() => true)
+  const navigation = navigationWith({ showRepoBranchWorkspacePaneTab }, { autoSeedInitialRoute: false })
+  const blocker = Promise.withResolvers<void>()
+  const blockingAction = runWorkspacePaneAction(target, () => blocker.promise)
+
+  const firstMove = dispatchMoveWorkspacePaneTabAction({
+    repoId: REPO_ID,
+    branchName: 'feature/worktree',
+    workspacePaneRoute: { kind: 'static', tab: 'status' },
+    direction: 1,
+    navigation,
+  })
+  const secondMove = dispatchMoveWorkspacePaneTabAction({
+    repoId: REPO_ID,
+    branchName: 'feature/worktree',
+    workspacePaneRoute: { kind: 'static', tab: 'status' },
+    direction: 1,
+    navigation,
+  })
+  expect(showRepoBranchWorkspacePaneTab).not.toHaveBeenCalled()
+
+  blocker.resolve()
+  await blockingAction
+  await expect(firstMove).resolves.toBe(true)
+  await expect(secondMove).resolves.toBe(true)
+  expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(1, REPO_ID, 'feature/worktree', 'files')
+  expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'history')
+})
+
 test('serializes open then move through exact route commits', async () => {
   const repo = seedRepoWithReadModelForTest({
     id: REPO_ID,
@@ -2961,8 +3010,8 @@ test('serializes open then move through exact route commits', async () => {
   })
   await expect(openFiles).resolves.toBe(true)
   await expect(move).resolves.toBe(true)
-  expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledOnce()
-  expect(showRepoBranchWorkspacePaneTab).toHaveBeenCalledWith(REPO_ID, 'feature/worktree', 'history')
+  expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(1, REPO_ID, 'feature/worktree', 'files')
+  expect(showRepoBranchWorkspacePaneTab).toHaveBeenNthCalledWith(2, REPO_ID, 'feature/worktree', 'history')
 })
 
 function navigationWith(
@@ -2971,6 +3020,7 @@ function navigationWith(
 ): PrimaryWindowNavigationActions {
   seedInitialObservedWorkspacePaneRouteForTest(undefined, { autoSeed: options.autoSeedInitialRoute !== false })
   const navigation: PrimaryWindowNavigationActions = {
+    currentRepoBranchWorkspacePaneRoute: observedWorkspacePaneRouteForTarget,
     activateRepo: (repoId) => useReposStore.setState({ restoredRepoId: repoId }),
     closeRepo: () => {},
     cycleRepo: () => {},

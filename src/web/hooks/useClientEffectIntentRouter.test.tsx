@@ -79,6 +79,7 @@ beforeEach(() => {
   currentWorkspacePaneRoute = null
   setTerminalSessionCommandBridge(null)
   navigation = {
+    currentRepoBranchWorkspacePaneRoute: () => undefined,
     activateRepo: (repoId) => {
       activateRepoSpy(repoId)
     },
@@ -462,7 +463,7 @@ describe('useClientEffectIntentRouter', () => {
     showRepoBranchTerminalSessionSpy.mockClear()
     expect(
       workspacePaneTabTargetForBranch(repo.id, 'main', {
-      workspacePaneRoute: currentWorkspacePaneRoute,
+        workspacePaneRoute: currentWorkspacePaneRoute,
       })?.activeTab?.identity,
     ).toBe('terminal:term-222222222222222222222')
     seedInitialObservedWorkspacePaneRouteForTest({

@@ -42,10 +42,7 @@ import { preferredWorkspacePaneTabForTarget } from '#/web/stores/repos/workspace
 import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { runCloseWorkspacePaneTabCommand } from '#/web/commands/workspace-commands.ts'
-import {
-  recordWorkspacePaneTabOpener,
-  workspacePaneTabOpener,
-} from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
+import { recordWorkspacePaneTabOpener, workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
 import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 import {
   observedWorkspacePaneRouteCommitForTest,
@@ -99,6 +96,7 @@ const terminalCommandContext: TerminalSessionContextValue = terminalSessionConte
 })
 
 const navigation: PrimaryWindowNavigationActions = {
+  currentRepoBranchWorkspacePaneRoute: () => undefined,
   activateRepo: vi.fn(),
   closeRepo: vi.fn(),
   cycleRepo: vi.fn(),
@@ -1345,6 +1343,7 @@ function navigationWithStore(
 function routeNavigation(): PrimaryWindowRouteNavigation {
   return {
     repoSlugForId: vi.fn(() => 'repo-workspace-container-repo'),
+    currentRepoBranchWorkspacePaneRoute: () => undefined,
     openHome: vi.fn(),
     openSettings: vi.fn(),
     closeSettings: vi.fn(),

@@ -130,31 +130,23 @@ export async function dispatchMoveWorkspacePaneTabAction(options: MoveWorkspaceP
   if (!options.repoId || !options.branchName) return false
   const coordinatorTarget = workspacePaneTabActionCoordinatorTarget(options)
   if (!coordinatorTarget) return false
-  const presentationToken = beginPrimaryWindowPresentation()
-  const targetIdentity = adjacentRepoWorkspaceTab(
-    coordinatorTarget.tabs,
-    coordinatorTarget.activeTab?.identity,
-    options.direction,
-  )?.identity
-  if (!targetIdentity) return false
-  return await runWorkspacePaneAction(coordinatorTarget, () =>
-    moveWorkspacePaneTabAction(options, coordinatorTarget, presentationToken, targetIdentity),
-  )
+  return await runWorkspacePaneAction(coordinatorTarget, () => moveWorkspacePaneTabAction(options))
 }
 
-async function moveWorkspacePaneTabAction(
-  { repoId, branchName, workspacePaneRoute, navigation }: MoveWorkspacePaneTabActionOptions,
-  coordinatorTarget: RepoWorkspaceTabModel,
-  presentationToken: PrimaryWindowPresentationToken,
-  targetIdentity: string,
-): Promise<boolean> {
+async function moveWorkspacePaneTabAction({
+  repoId,
+  branchName,
+  direction,
+  navigation,
+}: MoveWorkspacePaneTabActionOptions): Promise<boolean> {
   if (!repoId || !branchName) return false
-  const sourceRoute = workspacePaneRoute
-  const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute: sourceRoute })
-  const tab = target?.tabs.find((candidate) => candidate.identity === targetIdentity) ?? null
+  const currentRoute = navigation.currentRepoBranchWorkspacePaneRoute(repoId, branchName)
+  if (currentRoute === undefined) return false
+  const target = workspacePaneTabTargetForBranch(repoId, branchName, { workspacePaneRoute: currentRoute })
+  const tab = target ? adjacentRepoWorkspaceTab(target.tabs, target.activeTab?.identity, direction) : null
   if (!target || !tab) return false
   if (workspacePaneTabTargetBlocksInteraction(target)) return false
-  return await selectWorkspacePaneControllerTab(target, tab, navigation, presentationToken)
+  return await selectWorkspacePaneControllerTab(target, tab, navigation, beginPrimaryWindowPresentation())
 }
 
 function workspacePaneTabActionCoordinatorTarget(input: {

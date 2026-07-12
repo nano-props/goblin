@@ -178,6 +178,7 @@ function renderPanel(input: { terminalContext?: TerminalSessionContextValue } = 
 
 function navigationWith(): PrimaryWindowNavigationActions {
   const navigation: PrimaryWindowNavigationActions = {
+    currentRepoBranchWorkspacePaneRoute: () => undefined,
     activateRepo: vi.fn(),
     closeRepo: vi.fn(),
     cycleRepo: vi.fn(),

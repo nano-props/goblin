@@ -1,5 +1,5 @@
 import { afterEach } from 'vitest'
-import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
+import type { ParsedRepoBranchWorkspacePaneRoute, RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
 import { openResolvedRepoBranchWorkspacePaneRoute } from '#/web/workspace-pane/repo-branch-workspace-pane-route-navigation.ts'
 import {
@@ -143,13 +143,13 @@ export function observedWorkspacePaneRouteCommitForTest(
   }
 }
 
-function observedWorkspacePaneRouteForTarget(
+export function observedWorkspacePaneRouteForTarget(
   repoId: string,
   branchName: string,
-): ParsedRepoBranchWorkspacePaneRoute | null | undefined {
+): RepoBranchWorkspacePaneRouteTarget | undefined {
   const target = workspacePaneTabTargetForBranch(repoId, branchName, workspacePanePreferenceTargetOptions)
   if (!target?.branchName) return undefined
-  return observedWorkspacePaneRoutes.get(
+  const route = observedWorkspacePaneRoutes.get(
     workspacePaneObservationKey({
       repoId: target.repoId,
       repoRuntimeId: target.repoRuntimeId,
@@ -157,6 +157,7 @@ function observedWorkspacePaneRouteForTarget(
       worktreePath: target.worktreePath,
     }),
   )
+  return route?.kind === 'invalid-static' ? undefined : route
 }
 
 function workspacePaneObservationKey(observation: Omit<WorkspacePaneNavigationObservation, 'route'>): string {

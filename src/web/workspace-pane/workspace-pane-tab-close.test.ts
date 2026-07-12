@@ -9,9 +9,7 @@ import {
   dispatchCloseWorkspacePaneTabAction,
   dispatchConfirmCloseTerminalWorkspacePaneTabAction,
 } from '#/web/workspace-pane/workspace-pane-tab-close-action.ts'
-import {
-  resetWorkspacePaneActionQueueForTest,
-} from '#/web/workspace-pane/workspace-pane-action-queue.ts'
+import { resetWorkspacePaneActionQueueForTest } from '#/web/workspace-pane/workspace-pane-action-queue.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
@@ -176,7 +174,6 @@ test('clears the close transition when the server close command rejects', async 
       },
     }),
   ).resolves.toBe(false)
-
 })
 
 test('does not let a late close from an old runtime navigate or clear the replacement runtime opener', async () => {
@@ -276,6 +273,7 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions> = {})
     openSettings: vi.fn(),
     openCreateWorktree: vi.fn(),
     ...overrides,
+    currentRepoBranchWorkspacePaneRoute: overrides.currentRepoBranchWorkspacePaneRoute ?? (() => undefined),
   }
   if (!overrides.commitRepoBranchWorkspacePaneRoute) {
     navigation.commitRepoBranchWorkspacePaneRoute = vi.fn(observedWorkspacePaneRouteCommitForTest(navigation))

@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 import { branchSlugFromName, repoSlugFromId } from '#/web/repo-route-slugs.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
-import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
+import { isWorkspacePaneStaticTabType, type WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
 import {
   beginPrimaryWindowPresentation,
@@ -23,6 +23,10 @@ export interface PrimaryWindowRouteNavigationOptions {
 
 export interface PrimaryWindowRouteNavigation {
   repoSlugForId: (repoId: string) => string | null
+  currentRepoBranchWorkspacePaneRoute: (
+    repoId: string,
+    branchName: string,
+  ) => RepoBranchWorkspacePaneRouteTarget | undefined
   openHome: (options?: PrimaryWindowRouteNavigationOptions) => void
   openSettings: (page: SettingsPage, options?: PrimaryWindowRouteNavigationOptions) => void
   closeSettings: (options?: PrimaryWindowRouteNavigationOptions) => void
@@ -66,6 +70,15 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
       repoSlugForId(repoId) {
         const repo = useReposStore.getState().repos[repoId]
         return repo ? repoSlugFromId(repo.id) : null
+      },
+      currentRepoBranchWorkspacePaneRoute(repoId, branchName) {
+        const repoSlug = repoSlugForId(repoId)
+        if (!repoSlug) return undefined
+        const branchRootHref = router.buildLocation({
+          to: '/repo/$repoSlug/branch/$branchSlug',
+          params: { repoSlug, branchSlug: branchSlugFromName(branchName) },
+        }).href
+        return workspacePaneRouteFromBranchHref(router.state.location.href, branchRootHref)
       },
       openHome(options) {
         if (!router) return
@@ -464,6 +477,29 @@ export function workspacePaneHrefBelongsToBranch(currentHref: string, branchRoot
     currentPath.startsWith(`${branchRootPath}/tab/`) ||
     currentPath.startsWith(`${branchRootPath}/terminal/`)
   )
+}
+
+export function workspacePaneRouteFromBranchHref(
+  currentHref: string,
+  branchRootHref: string,
+): RepoBranchWorkspacePaneRouteTarget | undefined {
+  const currentPath = pathFromHref(currentHref)
+  const branchRootPath = pathFromHref(branchRootHref)
+  if (!currentPath || !branchRootPath) return undefined
+  if (currentPath === branchRootPath) return null
+  const prefix = `${branchRootPath}/`
+  if (!currentPath.startsWith(prefix)) return undefined
+  const [kind, encodedValue, ...rest] = currentPath.slice(prefix.length).split('/')
+  if (!encodedValue || rest.length > 0) return undefined
+  let value: string
+  try {
+    value = decodeURIComponent(encodedValue)
+  } catch {
+    return undefined
+  }
+  if (kind === 'tab' && isWorkspacePaneStaticTabType(value)) return { kind: 'static', tab: value }
+  if (kind === 'terminal') return { kind: 'terminal', terminalSessionId: value }
+  return undefined
 }
 
 function repoSlugForId(repoId: string): string | null {

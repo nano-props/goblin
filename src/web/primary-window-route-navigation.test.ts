@@ -4,6 +4,7 @@ import {
   routeReturnSearch,
   settlePrimaryWindowRouteCommit,
   workspacePaneHrefBelongsToBranch,
+  workspacePaneRouteFromBranchHref,
 } from '#/web/primary-window-route-navigation.ts'
 
 describe('primary window route navigation helpers', () => {
@@ -53,6 +54,21 @@ describe('primary window route navigation helpers', () => {
     expect(workspacePaneHrefBelongsToBranch('/repo/example/branch/other/tab/files', branchRoot)).toBe(false)
     expect(workspacePaneHrefBelongsToBranch('/repo/other/branch/main/tab/files', branchRoot)).toBe(false)
     expect(workspacePaneHrefBelongsToBranch(`${branchRoot}/dashboard`, branchRoot)).toBe(false)
+  })
+
+  test('reads the current workspace pane route only for the exact repo branch', () => {
+    const branchRoot = '/repo/example/branch/main'
+    expect(workspacePaneRouteFromBranchHref(branchRoot, branchRoot)).toBeNull()
+    expect(workspacePaneRouteFromBranchHref(`${branchRoot}/tab/files`, branchRoot)).toEqual({
+      kind: 'static',
+      tab: 'files',
+    })
+    expect(workspacePaneRouteFromBranchHref(`${branchRoot}/terminal/term-1`, branchRoot)).toEqual({
+      kind: 'terminal',
+      terminalSessionId: 'term-1',
+    })
+    expect(workspacePaneRouteFromBranchHref('/repo/example/branch/other/tab/files', branchRoot)).toBeUndefined()
+    expect(workspacePaneRouteFromBranchHref(`${branchRoot}/tab/not-a-tab`, branchRoot)).toBeUndefined()
   })
 
   test('rejects an operation route when navigation throws', async () => {

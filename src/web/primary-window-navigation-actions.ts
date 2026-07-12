@@ -53,6 +53,10 @@ export interface PrimaryWindowNavigationActions {
     route: RepoBranchWorkspacePaneRouteTarget,
     options?: PrimaryWindowPresentationNavigationOptions,
   ) => MaybePromise<boolean>
+  currentRepoBranchWorkspacePaneRoute: (
+    repoId: string,
+    branch: string,
+  ) => RepoBranchWorkspacePaneRouteTarget | undefined
   goBack: (repoId: string) => void
   goForward: (repoId: string) => void
   openSettings: (page: SettingsPage) => void
@@ -77,6 +81,9 @@ export function createPrimaryWindowNavigationActions({
   routeNavigation,
 }: CreatePrimaryWindowNavigationActionsOptions): PrimaryWindowNavigationActions {
   return {
+    currentRepoBranchWorkspacePaneRoute(repoId, branchName) {
+      return routeNavigation.currentRepoBranchWorkspacePaneRoute(repoId, branchName)
+    },
     activateRepo(repoId) {
       const presentationToken = beginPrimaryWindowPresentation()
       restoreRepoPresentationOrOpenDashboard(repoId, routeNavigation, presentationToken, { onBlocked: 'stay' })
