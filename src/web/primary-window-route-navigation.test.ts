@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { describe, expect, test, vi } from 'vitest'
 import {
   returnToFromHref,
   routeReturnSearch,
@@ -28,6 +28,20 @@ describe('primary window route navigation helpers', () => {
         currentHref: () => '/repo/example/branch/main/tab/history',
       }),
     ).resolves.toBe(false)
+  })
+
+  test('rejects a stale source-route precondition without navigating', async () => {
+    const navigate = vi.fn(async () => {})
+
+    await expect(
+      settlePrimaryWindowRouteCommit({
+        targetHref: '/repo/example/branch/main/tab/history',
+        expectedCurrentHref: '/repo/example/branch/main/tab/files',
+        navigate,
+        currentHref: () => '/repo/example/branch/main/tab/status',
+      }),
+    ).resolves.toBe(false)
+    expect(navigate).not.toHaveBeenCalled()
   })
 
   test('rejects an operation route when navigation throws', async () => {

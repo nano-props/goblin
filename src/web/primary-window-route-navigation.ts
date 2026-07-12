@@ -218,30 +218,34 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
         if (!repoSlug) return false
         const branchSlug = branchSlugFromName(branchName)
         const expectedCurrentRoute = options?.expectedCurrentRoute
-        if (expectedCurrentRoute !== undefined) {
-          const expectedLocation = expectedCurrentRoute === null
-            ? router.buildLocation({
-                to: '/repo/$repoSlug/branch/$branchSlug',
-                params: { repoSlug, branchSlug },
-              })
-            : expectedCurrentRoute.kind === 'static'
-              ? router.buildLocation({
-                  to: '/repo/$repoSlug/branch/$branchSlug/tab/$tabKey',
-                  params: { repoSlug, branchSlug, tabKey: expectedCurrentRoute.tab },
-                })
-              : router.buildLocation({
-                  to: '/repo/$repoSlug/branch/$branchSlug/terminal/$terminalSessionId',
-                  params: { repoSlug, branchSlug, terminalSessionId: expectedCurrentRoute.terminalSessionId },
-                })
-          if (router.state.location.href !== expectedLocation.href) return false
-        }
+        const expectedCurrentHref =
+          expectedCurrentRoute === undefined
+            ? undefined
+            : (expectedCurrentRoute === null
+                ? router.buildLocation({
+                    to: '/repo/$repoSlug/branch/$branchSlug',
+                    params: { repoSlug, branchSlug },
+                  })
+                : expectedCurrentRoute.kind === 'static'
+                  ? router.buildLocation({
+                      to: '/repo/$repoSlug/branch/$branchSlug/tab/$tabKey',
+                      params: { repoSlug, branchSlug, tabKey: expectedCurrentRoute.tab },
+                    })
+                  : router.buildLocation({
+                      to: '/repo/$repoSlug/branch/$branchSlug/terminal/$terminalSessionId',
+                      params: { repoSlug, branchSlug, terminalSessionId: expectedCurrentRoute.terminalSessionId },
+                    })
+              ).href
         const replace = options?.replace
         if (route === null) {
           const target = router.buildLocation({
             to: '/repo/$repoSlug/branch/$branchSlug',
             params: { repoSlug, branchSlug },
           })
-          if (router.state.location.href === target.href) {
+          if (
+            router.state.location.href === target.href &&
+            primaryWindowRoutePreconditionMatches(router.state.location.href, expectedCurrentHref)
+          ) {
             options?.onCommit?.()
             return true
           }
@@ -249,6 +253,7 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
             token: options?.presentationToken,
             commitEffect: options?.onCommit,
             targetHref: target.href,
+            expectedCurrentHref,
             navigate: async (navigationId) => {
               await router.navigate({
                 to: '/repo/$repoSlug/branch/$branchSlug',
@@ -266,7 +271,10 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
             to: '/repo/$repoSlug/branch/$branchSlug/tab/$tabKey',
             params: { repoSlug, branchSlug, tabKey: route.tab },
           })
-          if (router.state.location.href === target.href) {
+          if (
+            router.state.location.href === target.href &&
+            primaryWindowRoutePreconditionMatches(router.state.location.href, expectedCurrentHref)
+          ) {
             options?.onCommit?.()
             return true
           }
@@ -274,6 +282,7 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
             token: options?.presentationToken,
             commitEffect: options?.onCommit,
             targetHref: target.href,
+            expectedCurrentHref,
             navigate: async (navigationId) => {
               await router.navigate({
                 to: '/repo/$repoSlug/branch/$branchSlug/tab/$tabKey',
@@ -294,7 +303,10 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
             terminalSessionId: route.terminalSessionId,
           },
         })
-        if (router.state.location.href === target.href) {
+        if (
+          router.state.location.href === target.href &&
+          primaryWindowRoutePreconditionMatches(router.state.location.href, expectedCurrentHref)
+        ) {
           options?.onCommit?.()
           return true
         }
@@ -302,6 +314,7 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
           token: options?.presentationToken,
           commitEffect: options?.onCommit,
           targetHref: target.href,
+          expectedCurrentHref,
           navigate: async (navigationId) => {
             await router.navigate({
               to: '/repo/$repoSlug/branch/$branchSlug/terminal/$terminalSessionId',
@@ -356,8 +369,7 @@ export function usePrimaryWindowRouteNavigation(): PrimaryWindowRouteNavigation 
               router.history.push(href, primaryWindowNavigationState(router.state.location.state, navigationId))
             },
           })
-        }
-        else {
+        } else {
           const repoSlug = repoSlugForId(repoId)
           if (repoSlug) this.openRepoRoot(repoId, options)
         }
@@ -390,6 +402,7 @@ export function runOwnedPrimaryWindowNavigation(input: {
 async function settleOwnedPrimaryWindowRouteCommit(input: {
   token?: PrimaryWindowPresentationToken
   targetHref: string
+  expectedCurrentHref?: string
   commitEffect?: () => void
   navigate(navigationId: string): Promise<void>
   currentHref(): string
@@ -400,6 +413,7 @@ async function settleOwnedPrimaryWindowRouteCommit(input: {
   try {
     return await settlePrimaryWindowRouteCommit({
       targetHref: input.targetHref,
+      expectedCurrentHref: input.expectedCurrentHref,
       navigate: async () => await input.navigate(navigationId),
       currentHref: input.currentHref,
     })
@@ -410,15 +424,24 @@ async function settleOwnedPrimaryWindowRouteCommit(input: {
 
 export async function settlePrimaryWindowRouteCommit(input: {
   targetHref: string
+  expectedCurrentHref?: string
   navigate: () => Promise<void>
   currentHref: () => string
 }): Promise<boolean> {
+  if (!primaryWindowRoutePreconditionMatches(input.currentHref(), input.expectedCurrentHref)) return false
   try {
     await input.navigate()
   } catch {
     return false
   }
   return input.currentHref() === input.targetHref
+}
+
+export function primaryWindowRoutePreconditionMatches(
+  currentHref: string,
+  expectedCurrentHref: string | undefined,
+): boolean {
+  return expectedCurrentHref === undefined || currentHref === expectedCurrentHref
 }
 
 function repoSlugForId(repoId: string): string | null {
