@@ -340,9 +340,11 @@ function splitRemoteCommandStderr(stderr: string): { stderr: string; transportSt
     endIndex = index
     break
   }
-  if (endIndex === -1) return { stderr, transportStderr: stderr }
+  // Incomplete framing means stderr was not safely separated. Keep the raw
+  // text visible as command stderr, but do not expose it as transport stderr.
+  if (endIndex === -1) return { stderr, transportStderr: '' }
   const beginIndex = lines.findIndex((line, index) => index < endIndex && line === REMOTE_COMMAND_STDERR_BEGIN_MARKER)
-  if (beginIndex === -1) return { stderr, transportStderr: stderr }
+  if (beginIndex === -1) return { stderr, transportStderr: '' }
 
   const remoteStderr = lines.slice(beginIndex + 1, endIndex).join('\n').trimEnd()
   const before = lines.slice(0, beginIndex).join('\n').trimEnd()

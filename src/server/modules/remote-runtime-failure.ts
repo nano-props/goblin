@@ -32,6 +32,10 @@ export function remoteRuntimeFailureReasonFromCommandResult(
   target?: RemoteRepoTarget,
 ): RemoteRepoFailureReason | null {
   if (result.ok || result.message === 'cancelled') return null
+  // Before the remote-start marker, stderr is the local OpenSSH client's
+  // startup stream. After the marker, only trust stderr that the runner
+  // separated into transportStderr; raw command stderr may contain upstream
+  // Git/SSH failures from inside the remote shell.
   if (result.remoteStarted) return remoteRuntimeTransportFailureAfterStart(result, target)
   if (result.timedOut || result.message === 'timeout') return 'timeout'
   const text = `${result.stderr}\n${result.stdout}\n${result.message ?? ''}`.toLowerCase()
@@ -78,7 +82,7 @@ function remoteRuntimeTransportFailureAfterStart(
   if (result.transportStderr === undefined) return null
   const text = result.transportStderr.toLowerCase()
   if (textMentionsOpenSshClientLoopTransportFailure(text)) return 'unreachable'
-  if (target && text.includes('connection') && textMentionsTargetTransportFailure(text, target)) {
+  if (target && textMentionsTargetTransportFailure(text, target)) {
     return 'unreachable'
   }
   return null

@@ -93,6 +93,30 @@ describe('runRemoteCommand', () => {
   test('keeps post-start SSH client diagnostics separate from remote command stderr', async () => {
     mocks.execa.mockRejectedValueOnce({
       stdout: `${REMOTE_COMMAND_STARTED_MARKER}\n`,
+      stderr: [
+        'Connection to prod closed by remote host.',
+        REMOTE_COMMAND_STDERR_BEGIN_MARKER,
+        'remote command stderr',
+        REMOTE_COMMAND_STDERR_END_MARKER,
+        'client_loop: send disconnect: Broken pipe',
+        '',
+      ].join('\n'),
+      message: 'Command failed',
+    })
+
+    await expect(runRemoteCommand(target(), { type: 'gitStatus', path: '/srv/repo' })).resolves.toEqual({
+      ok: false,
+      stdout: '',
+      stderr: 'remote command stderr',
+      message: 'remote command stderr',
+      remoteStarted: true,
+      transportStderr: 'Connection to prod closed by remote host.\nclient_loop: send disconnect: Broken pipe',
+    })
+  })
+
+  test('does not treat unframed post-start stderr as separated transport diagnostics', async () => {
+    mocks.execa.mockRejectedValueOnce({
+      stdout: `${REMOTE_COMMAND_STARTED_MARKER}\n`,
       stderr: 'Connection to prod closed by remote host.\n',
       message: 'Command failed',
     })
@@ -103,7 +127,7 @@ describe('runRemoteCommand', () => {
       stderr: 'Connection to prod closed by remote host.',
       message: 'Connection to prod closed by remote host.',
       remoteStarted: true,
-      transportStderr: 'Connection to prod closed by remote host.',
+      transportStderr: '',
     })
   })
 
