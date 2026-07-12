@@ -92,6 +92,16 @@ describe('remote runtime failure classification', () => {
         remoteStarted: true,
       }),
     ).toBeNull()
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult({
+        ok: false,
+        stdout: '',
+        stderr: '',
+        message: 'timeout',
+        timedOut: true,
+        remoteStarted: true,
+      }),
+    ).toBeNull()
   })
 
   test('classifies current SSH session transport loss after the remote shell starts', () => {
@@ -120,15 +130,53 @@ describe('remote runtime failure classification', () => {
       ),
     ).toBe('unreachable')
     expect(
-      remoteRuntimeFailureReasonFromCommandResult({
-        ok: false,
-        stdout: '',
-        stderr: '',
-        message: 'timeout',
-        timedOut: true,
-        remoteStarted: true,
-      }),
-    ).toBe('timeout')
+      remoteRuntimeFailureReasonFromCommandResult(
+        {
+          ok: false,
+          stdout: '',
+          stderr: 'Connection closed by example port 22',
+          message: 'Connection closed by example port 22',
+          remoteStarted: true,
+        },
+        target,
+      ),
+    ).toBe('unreachable')
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult(
+        {
+          ok: false,
+          stdout: '',
+          stderr: 'Connection reset by example port 22',
+          message: 'Connection reset by example port 22',
+          remoteStarted: true,
+        },
+        target,
+      ),
+    ).toBe('unreachable')
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult(
+        {
+          ok: false,
+          stdout: '',
+          stderr: 'Connection to example port 22: Broken pipe',
+          message: 'Connection to example port 22: Broken pipe',
+          remoteStarted: true,
+        },
+        target,
+      ),
+    ).toBe('unreachable')
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult(
+        {
+          ok: false,
+          stdout: '',
+          stderr: 'Connection to example port 22: Connection closed by remote host',
+          message: 'Connection to example port 22: Connection closed by remote host',
+          remoteStarted: true,
+        },
+        target,
+      ),
+    ).toBe('unreachable')
   })
 
   test('does not classify upstream SSH transport text after the remote shell starts', () => {
@@ -149,8 +197,44 @@ describe('remote runtime failure classification', () => {
         {
           ok: false,
           stdout: '',
+          stderr: 'Connection closed by example port 222',
+          message: 'Connection closed by example port 222',
+          remoteStarted: true,
+        },
+        target,
+      ),
+    ).toBeNull()
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult(
+        {
+          ok: false,
+          stdout: '',
           stderr: 'client_loop: send disconnect: Broken pipe',
           message: 'client_loop: send disconnect: Broken pipe',
+          remoteStarted: true,
+        },
+        target,
+      ),
+    ).toBeNull()
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult(
+        {
+          ok: false,
+          stdout: '',
+          stderr: 'Connection closed by github.com port 22',
+          message: 'Connection closed by github.com port 22',
+          remoteStarted: true,
+        },
+        target,
+      ),
+    ).toBeNull()
+    expect(
+      remoteRuntimeFailureReasonFromCommandResult(
+        {
+          ok: false,
+          stdout: '',
+          stderr: 'Connection to github.com port 22: Broken pipe',
+          message: 'Connection to github.com port 22: Broken pipe',
           remoteStarted: true,
         },
         target,

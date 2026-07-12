@@ -72,20 +72,23 @@ function remoteRuntimeTransportFailureAfterStart(
   result: RemoteCommandResult,
   target?: RemoteRepoTarget,
 ): RemoteRepoFailureReason | null {
-  if (result.timedOut) return 'timeout'
-  // Post-start stderr also contains the remote command's stderr, so only accept
-  // the local ssh close line when it names the argv destination near the tail.
+  // Post-start stderr also contains the remote command's stderr, and a process
+  // timeout can mean the remote command's own upstream Git/SSH operation hung.
+  // Only accept local ssh transport lines that name the argv destination near
+  // the tail.
   const text = result.stderr.toLowerCase()
-  if (target && text.includes('connection to ') && textMentionsTargetClosedConnection(text, target)) {
+  if (target && text.includes('connection') && textMentionsTargetTransportFailure(text, target)) {
     return 'unreachable'
   }
   return null
 }
 
-function textMentionsTargetClosedConnection(text: string, target: RemoteRepoTarget): boolean {
+function textMentionsTargetTransportFailure(text: string, target: RemoteRepoTarget): boolean {
   const destination = (target.sshConnection?.destination ?? target.alias).trim().toLowerCase()
   if (!destination) return false
   const prefix = `connection to ${destination}`
+  const port = String(target.port)
+  const portPrefix = `${prefix} port ${port}: `
   const tailLines = text
     .split(/\r?\n/u)
     .map((line) => line.trim())
@@ -93,8 +96,31 @@ function textMentionsTargetClosedConnection(text: string, target: RemoteRepoTarg
     .slice(-2)
   for (const line of tailLines) {
     if (line.startsWith(prefix) && /^ closed\b/u.test(line.slice(prefix.length))) return true
+    if (lineStartsWithCompleteToken(line, `connection closed by ${destination} port ${port}`)) return true
+    if (lineStartsWithCompleteToken(line, `connection reset by ${destination} port ${port}`)) return true
+    if (line.startsWith(portPrefix) && isTargetPortTransportFailure(line.slice(portPrefix.length))) {
+      return true
+    }
   }
   return false
+}
+
+function lineStartsWithCompleteToken(line: string, prefix: string): boolean {
+  if (!line.startsWith(prefix)) return false
+  const next = line.at(prefix.length)
+  return next === undefined || next === '.' || next === ':' || /\s/u.test(next)
+}
+
+function isTargetPortTransportFailure(text: string): boolean {
+  return (
+    text.includes('connection reset') ||
+    text.includes('connection closed') ||
+    text.includes('connection timed out') ||
+    text.includes('operation timed out') ||
+    text.includes('broken pipe') ||
+    text.includes('connection refused') ||
+    text.includes('no route to host')
+  )
 }
 
 export function remoteRuntimeFailureFromCommandResult(input: {
