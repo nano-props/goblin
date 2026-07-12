@@ -41,12 +41,28 @@ export const CLIPBOARD_TEMP_FILE_MAX_AGE_MS = 24 * 60 * 60 * 1000
  * Filename used when a `File` synthesised from `clipboardData.items` (or
  * otherwise constructed without a `name`) hits the multipart upload path.
  * Multipart requires a filename for `File` parts; the server-side
- * `sanitizeBaseName` then preserves this literal (it contains no
- * Windows-reserved characters). Both the Electron preload and the web
- * HTTP backend must use this constant so the upload shape stays
- * symmetric across repoOperationSchedulers.
+ * `sanitizeClipboardFileBaseName` then preserves this literal (it
+ * contains no Windows-reserved characters). Both the Electron preload
+ * and the web HTTP backend must use this constant so the upload shape
+ * stays symmetric across repoOperationSchedulers.
  */
 export const CLIPBOARD_FALLBACK_FILE_NAME = 'clipboard.bin'
+
+/**
+ * Fallback used by `sanitizeClipboardFileBaseName` when a name
+ * sanitises down to an empty string — in practice, an empty input
+ * or a whitespace-only input (the `path.basename` + reserved-char
+ * regex chain leaves anything containing a non-whitespace byte
+ * with at least one output character; Windows-reserved names
+ * trigger the `_` prefix in `avoidWindowsReservedBaseName`, not
+ * this fallback). Tracked as a separate constant from
+ * `CLIPBOARD_FALLBACK_FILE_NAME` even though both currently resolve
+ * to `'clipboard.bin'` — the two paths serve different concerns
+ * (multipart-boundary empty `File.name` vs. post-sanitisation
+ * residue) and may legitimately diverge in the future. The shared
+ * value is what gives both the same on-disk appearance today.
+ */
+export const CLIPBOARD_SANITIZE_FALLBACK_FILE_NAME = 'clipboard.bin'
 
 /**
  * Paths typed into a PTY must not contain terminal/input control bytes.

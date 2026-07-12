@@ -1,9 +1,16 @@
-import { mkdir, readdir, rm, stat, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, rm, stat, unlink, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { ipcMain } from 'electron'
 import { CLIPBOARD_SAVE_FILES_CHANNEL } from '#/shared/ipc-channels.ts'
-import { CLIPBOARD_TEMP_FILE_MAX_AGE_MS, PASTE_FILE_MAX_BYTES } from '#/shared/clipboard-paste.ts'
+import {
+  CLIPBOARD_TEMP_FILE_MAX_AGE_MS,
+  PASTE_FILE_MAX_BYTES,
+} from '#/shared/clipboard-paste.ts'
+import {
+  createClipboardTimestampedFileName,
+  listDirEntries,
+} from '#/shared/clipboard-paste-node.ts'
 import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
 
 /**
@@ -14,7 +21,7 @@ import { isTrustedIpcEvent } from '#/main/ipc/trusted-webcontents.ts'
  *
  * The native host only owns the *blob save* path: when a file has no
  * filesystem path (image copied from a browser tab, screenshot, etc.) the
- * client ships `{name, bytes}` over IPC and we persist it under a temp
+ * client ships `{name, bytes}` over IPC, and we persist it under a temp
  * dir so the PTY can read it as a real file.
  */
 export interface BinaryClipboardFile {
@@ -23,60 +30,19 @@ export interface BinaryClipboardFile {
 }
 
 const TEMP_DIR_NAME = `goblin-clipboard-${process.pid}`
-const WINDOWS_RESERVED_FILE_STEM_RE = /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
 
 function clipboardTempDir(): string {
   return path.join(os.tmpdir(), TEMP_DIR_NAME)
 }
 
-function avoidWindowsReservedBaseName(base: string): string {
-  const dot = base.lastIndexOf('.')
-  const stem = (dot > 0 ? base.slice(0, dot) : base).replace(/\.+$/g, '')
-  return WINDOWS_RESERVED_FILE_STEM_RE.test(stem) ? `_${base}` : base
-}
-
-function sanitizeBaseName(name: string): string {
-  // `path.basename` strips path separators (defence in depth — the
-  // preload should not be sending path-shaped input in the first
-  // place). The regex replaces the Windows-reserved set plus ASCII
-  // control characters; if nothing is left after that, fall back to
-  // `clipboard.bin`. Note: this fallback is *not* the same as
-  // `CLIPBOARD_FALLBACK_FILE_NAME` in shared/clipboard-paste.ts —
-  // that one substitutes for an empty `File.name` at the multipart
-  // boundary, while this one substitutes for a name whose
-  // post-sanitisation residue is empty.
-  const base = path
-    .basename(name)
-    .replace(/[<>:"/\\|?*\x00-\x1f\x7f-\x9f]/g, '_')
-    .trim()
-  return base.length > 0 ? avoidWindowsReservedBaseName(base) : 'clipboard.bin'
-}
-
-// Process-level monotonically increasing counter. The previous
-// `${ISO-timestamp}-${index}` scheme collided when two single-file
-// pastes landed in the same millisecond from the same paste event —
-// the second `writeFile` silently overwrote the first. The counter
-// (combined with the per-request index) is unique within the
-// process lifetime.
-let filenameCounter = 0
-function timestampedFileName(index: number, name: string): string {
-  // Format: <ISO>-<index>-<counter>-<name>. The counter is the
-  // process-level increment; the index is the per-request array
-  // position. Multi-file pastes still get index 0..N within a
-  // single counter step, but two *different* paste events in the
-  // same millisecond land at different counter values.
-  filenameCounter += 1
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
-  return `${timestamp}-${index}-${filenameCounter}-${sanitizeBaseName(name)}`
-}
+const timestampedFileName = createClipboardTimestampedFileName()
 
 // Module-level handle to the periodic prune interval. `wireClipboardIpc`
-// can be called more than once in the test harness (and could be in a
-// future hot-reload), and `setInterval` itself has no idea about that —
-// without this handle, each call would schedule an additional 1 h timer
-// and the old ones would never be cleared. The IPC handler is
-// overwritten by `ipcMain.handle`, so the *handler* leak is not an
-// issue, but the *timer* leak is.
+// can be called more than once in the test harness and could be in a
+// future hot-reload. Without this handle, each call would schedule an
+// additional 1 h timer and the old ones would never be cleared. The IPC
+// handler is overwritten by `ipcMain.handle`, so the *handler* leak is
+// not an issue, but the *timer* leak is.
 let periodicPrune: NodeJS.Timeout | null = null
 
 /**
@@ -84,7 +50,7 @@ let periodicPrune: NodeJS.Timeout | null = null
  *
  * Throws if any single payload exceeds `PASTE_FILE_MAX_BYTES`. The client
  * is supposed to short-circuit oversize files with a `paste-file-too-large`
- * toast *before* IPC; this guard is defence in depth for a misbehaving or
+ * toast *before* IPC; this guard is defense in depth for a misbehaving or
  * skipped preload.
  */
 export async function saveClipboardBinaryFiles(files: BinaryClipboardFile[]): Promise<string[]> {
@@ -117,15 +83,9 @@ export async function saveClipboardBinaryFiles(files: BinaryClipboardFile[]): Pr
  */
 export async function pruneStaleClipboardTempDirs(): Promise<void> {
   const tmp = os.tmpdir()
-  let entries: string[]
-  try {
-    entries = await readdir(tmp)
-  } catch {
-    return
-  }
-  const selfDirName = TEMP_DIR_NAME
+  const entries = await listDirEntries(tmp)
   for (const entry of entries) {
-    if (!entry.startsWith('goblin-clipboard-') || entry === selfDirName) continue
+    if (!entry.startsWith('goblin-clipboard-') || entry === TEMP_DIR_NAME) continue
     try {
       await rm(path.join(tmp, entry), { recursive: true, force: true })
     } catch {
@@ -143,12 +103,7 @@ export async function pruneExpiredClipboardTempFiles(
   // housekeeping cap for the current long-running process; stale
   // previous-process dirs are handled separately at startup.
   const dir = clipboardTempDir()
-  let entries: string[]
-  try {
-    entries = await readdir(dir)
-  } catch {
-    return
-  }
+  const entries = await listDirEntries(dir)
   for (const entry of entries) {
     const filePath = path.join(dir, entry)
     try {
