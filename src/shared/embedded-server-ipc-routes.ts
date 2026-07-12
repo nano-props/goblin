@@ -22,8 +22,6 @@ export const EMBEDDED_SERVER_IPC_ROUTES = {
   'remote.resolveTarget': { route: '/api/remote/resolve-target', method: 'POST' },
   'remote.listPathSuggestions': { route: '/api/remote/path-suggestions', method: 'POST' },
   'remote.testRepo': { route: '/api/remote/test-repo', method: 'POST' },
-  'remote.openEditor': { route: '/api/remote/open-editor', method: 'POST' },
-  'remote.openTerminal': { route: '/api/remote/open-terminal', method: 'POST' },
 } as const
 
 export type EmbeddedServerIpcPath = keyof typeof EMBEDDED_SERVER_IPC_ROUTES

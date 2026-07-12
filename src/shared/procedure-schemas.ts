@@ -112,9 +112,20 @@ export const REPO_PROCEDURE_SCHEMAS = {
     alsoDeleteUpstream: v.optional(v.boolean()),
   }),
   openUrl: v.object({ cwd: v.string(), target: RepoUrlTargetSchema }),
-  openTerminal: v.object({ path: v.string(), app: TerminalAppSchema }),
-  openEditor: v.object({ path: v.string(), app: EditorAppSchema }),
-  openInFinder: v.object({ path: v.string() }),
+  openTerminal: v.object({
+    repoId: RepoRootSchema,
+    worktreePath: v.string(),
+    app: TerminalAppSchema,
+  }),
+  openEditor: v.object({
+    repoId: RepoRootSchema,
+    worktreePath: v.string(),
+    app: EditorAppSchema,
+  }),
+  openInFinder: v.object({
+    repoId: RepoRootSchema,
+    worktreePath: v.string(),
+  }),
   backgroundSyncRepos: v.object({ repoIds: StringArray }),
   runtimeOpen: RepoRuntimeOpenSchema,
   runtimeReconcile: v.object({
@@ -173,8 +184,6 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
   }),
   pathSuggestions: RemotePathSuggestionsInputSchema,
   testRepo: v.object({ target: RemoteTargetSchema }),
-  openEditor: v.object({ repoId: v.string(), worktreePath: v.string(), app: EditorAppSchema }),
-  openTerminal: v.object({ repoId: v.string(), worktreePath: v.string(), app: TerminalAppSchema }),
 } as const
 
 // Schemas for the settings command handlers. Each shape matches the typed

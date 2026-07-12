@@ -1,12 +1,11 @@
 import { useMutation } from '@tanstack/react-query'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { remoteRepoTarget } from '#/web/stores/repos/repo-guards.ts'
+import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import type { RepoBranchState } from '#/web/stores/repos/types.ts'
 import type { ExecResult } from '#/web/types.ts'
 import type { EditorApp, TerminalApp } from '#/shared/api-types.ts'
 import { PROTECTED_BRANCHES } from '#/shared/git-types.ts'
 import { getRepoPatch, openRepoEditor, openRepoInFinder, openRepoTerminal } from '#/web/repo-client.ts'
-import { openRemoteRepositoryEditor, openRemoteRepositoryTerminal } from '#/web/remote-client.ts'
 import { useAsyncPending } from '#/web/hooks/useAsyncPending.ts'
 import { getBranchWorktreeState } from '#/web/stores/repos/worktree-state.ts'
 import {
@@ -63,7 +62,7 @@ export function getBranchActionCapabilities(repo: BranchActionRepo, branch: Repo
   const canRemoveWorktree = !!branch.worktree?.path && !worktreeState?.isMain
   const canCopyPatch = !!branch.worktree?.path && (worktreeState?.dirty ?? false)
   const hasWorktree = !!branch.worktree?.path
-  const isRemoteRepo = remoteRepoTarget(repo.id, repo.remote.lifecycle) !== null
+  const isRemoteRepo = isRemoteRepoId(repo.id)
   return {
     canRemoveWorktree,
     isRegularBranch,
@@ -179,26 +178,20 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   function openTerminal(app: TerminalApp) {
     if (!branch.worktree?.path) return
     const worktreePath = branch.worktree.path
-    if (remoteRepoTarget(repo.id, repo.remote.lifecycle)) {
-      return runUiAction('terminal', () => openRemoteRepositoryTerminal(repo.id, worktreePath, app))
-    }
-    return runUiAction('terminal', () => openRepoTerminal(worktreePath, app))
+    return runUiAction('terminal', () => openRepoTerminal(repo.id, worktreePath, app))
   }
 
   function openEditor(app: EditorApp) {
     if (!branch.worktree?.path) return
     const worktreePath = branch.worktree.path
-    if (remoteRepoTarget(repo.id, repo.remote.lifecycle)) {
-      return runUiAction('editor', () => openRemoteRepositoryEditor(repo.id, worktreePath, app))
-    }
-    return runUiAction('editor', () => openRepoEditor(worktreePath, app))
+    return runUiAction('editor', () => openRepoEditor(repo.id, worktreePath, app))
   }
 
   function openFinder() {
     if (!branch.worktree?.path) return
     const worktreePath = branch.worktree.path
-    if (remoteRepoTarget(repo.id, repo.remote.lifecycle)) return
-    return runUiAction('finder', () => openRepoInFinder(worktreePath))
+    if (isRemoteRepoId(repo.id)) return
+    return runUiAction('finder', () => openRepoInFinder(repo.id, worktreePath))
   }
 
   function requestDeleteBranch() {
