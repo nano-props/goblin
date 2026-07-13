@@ -211,7 +211,7 @@ async function invalidateExactRepoProjectionQuery(
   queryClient: QueryClient,
   queryKey: ReturnType<typeof repoProjectionQueryKey>,
 ): Promise<void> {
-  await queryClient.invalidateQueries({ queryKey, exact: true, refetchType: 'none' })
+  await queryClient.invalidateQueries({ queryKey, exact: true, refetchType: 'none' }, { cancelRefetch: false })
 }
 
 function hasRepoProjectionFetchInProgress(

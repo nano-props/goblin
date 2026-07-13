@@ -156,7 +156,7 @@ describe('useSessionPersistence', () => {
     })
   })
 
-  test('flushes the latest route-visible session during unload', () => {
+  test('does not flush an already-saved session during unload', async () => {
     const inactiveRepo = emptyRepo('/tmp/inactive-repo', 'inactive-repo', 'inactive-repo-runtime')
     const visibleRepo = emptyRepo('/tmp/visible-repo', 'visible-repo', 'visible-repo-runtime')
     useReposStore.setState({
@@ -168,15 +168,84 @@ describe('useSessionPersistence', () => {
     })
 
     renderInJsdom(<Harness routedRepoId={visibleRepo.id} />)
+    await vi.waitFor(() => {
+      expect(persistWorkspaceSessionStateMock).toHaveBeenCalled()
+    })
+    await Promise.resolve()
+    persistWorkspaceSessionStateOnUnloadMock.mockClear()
     act(() => {
       window.dispatchEvent(new Event('pagehide'))
+      window.dispatchEvent(new Event('beforeunload'))
     })
 
+    expect(persistWorkspaceSessionStateOnUnloadMock).not.toHaveBeenCalled()
+  })
+
+  test('flushes an unsaved in-flight session change during unload', () => {
+    const inactiveRepo = emptyRepo('/tmp/inactive-repo', 'inactive-repo', 'inactive-repo-runtime')
+    const visibleRepo = emptyRepo('/tmp/visible-repo', 'visible-repo', 'visible-repo-runtime')
+    const pendingSave = Promise.withResolvers<void>()
+    persistWorkspaceSessionStateMock.mockImplementation(() => pendingSave.promise)
+    useReposStore.setState({
+      repos: { [inactiveRepo.id]: inactiveRepo, [visibleRepo.id]: visibleRepo },
+      order: [inactiveRepo.id, visibleRepo.id],
+      restoredRepoId: inactiveRepo.id,
+      workspaceMembershipReady: true,
+      sessionPersistenceReady: true,
+    })
+
+    renderInJsdom(<Harness routedRepoId={visibleRepo.id} />)
+    persistWorkspaceSessionStateOnUnloadMock.mockClear()
+
+    act(() => {
+      window.dispatchEvent(new Event('pagehide'))
+      window.dispatchEvent(new Event('beforeunload'))
+    })
+
+    expect(persistWorkspaceSessionStateOnUnloadMock).toHaveBeenCalledOnce()
     expect(persistWorkspaceSessionStateOnUnloadMock).toHaveBeenCalledWith(
       expect.objectContaining({
         restoredRepoId: visibleRepo.id,
       }),
     )
+    pendingSave.resolve()
+  })
+
+  test('allows another unload flush after the page becomes visible again', () => {
+    const inactiveRepo = emptyRepo('/tmp/inactive-repo', 'inactive-repo', 'inactive-repo-runtime')
+    const visibleRepo = emptyRepo('/tmp/visible-repo', 'visible-repo', 'visible-repo-runtime')
+    const pendingSave = Promise.withResolvers<void>()
+    persistWorkspaceSessionStateMock.mockImplementation(() => pendingSave.promise)
+    useReposStore.setState({
+      repos: { [inactiveRepo.id]: inactiveRepo, [visibleRepo.id]: visibleRepo },
+      order: [inactiveRepo.id, visibleRepo.id],
+      restoredRepoId: inactiveRepo.id,
+      workspaceMembershipReady: true,
+      sessionPersistenceReady: true,
+    })
+
+    renderInJsdom(<Harness routedRepoId={visibleRepo.id} />)
+    persistWorkspaceSessionStateOnUnloadMock.mockClear()
+    try {
+      act(() => {
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+        document.dispatchEvent(new Event('visibilitychange'))
+        window.dispatchEvent(new Event('pagehide'))
+      })
+      expect(persistWorkspaceSessionStateOnUnloadMock).toHaveBeenCalledOnce()
+
+      act(() => {
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' })
+        document.dispatchEvent(new Event('visibilitychange'))
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' })
+        document.dispatchEvent(new Event('visibilitychange'))
+      })
+
+      expect(persistWorkspaceSessionStateOnUnloadMock).toHaveBeenCalledTimes(2)
+    } finally {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' })
+      pendingSave.resolve()
+    }
   })
 
   test('persists explicitly closed workspace pane tabs as empty arrays', () => {
@@ -518,7 +587,10 @@ describe('useSessionPersistence', () => {
     )
   })
 
-  test('flushes a debounced session save when the native app is quitting', async () => {
+  test('waits for an in-flight session save before draining native app quit', async () => {
+    const persistDeferred = Promise.withResolvers<void>()
+    persistWorkspaceSessionStateMock.mockImplementationOnce(async () => await persistDeferred.promise)
+    persistWorkspaceSessionStateMock.mockImplementation(async () => {})
     const repo = seedRepoWithReadModelForTest({
       id: '/tmp/repo',
       branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
@@ -532,21 +604,27 @@ describe('useSessionPersistence', () => {
     })
 
     renderInJsdom(<Harness />)
-    persistWorkspaceSessionStateMock.mockClear()
+    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledTimes(1)
 
     flushSync(() => {
       useReposStore.setState({
         selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'term-222222222222222222222' },
       })
     })
-    expect(persistWorkspaceSessionStateMock).not.toHaveBeenCalled()
+    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledTimes(1)
 
     const { markAppQuitting } = await import('#/web/app-lifecycle.ts')
+    const quitting = markAppQuitting()
+    await Promise.resolve()
+    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledTimes(1)
+
+    persistDeferred.resolve()
     await act(async () => {
-      await markAppQuitting()
+      await quitting
     })
 
-    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
+    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledTimes(2)
+    expect(persistWorkspaceSessionStateMock).toHaveBeenLastCalledWith(
       expect.objectContaining({
         selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'term-222222222222222222222' },
       }),

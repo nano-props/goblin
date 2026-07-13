@@ -36,6 +36,7 @@ export interface RepoWorkspaceRepo extends BranchActionRepo {
   }
   ui: Pick<RepoState['ui'], 'preferredWorkspacePaneTabByTarget'> & { currentBranchName: string | null }
   dataLoads: Pick<RepoState['dataLoads'], 'visibleStatus'>
+  unavailable: boolean
   remote: BranchActionRepo['remote'] & Pick<RepoState['remote'], 'lifecycle'>
 }
 

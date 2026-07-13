@@ -45,7 +45,6 @@ import { formatTerminalWorktreeKey } from '#/shared/terminal-worktree-key.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { workspacePaneTabOpener } from '#/web/workspace-pane/workspace-pane-tab-opener.ts'
-import { requestVisibleRepoProjectionRefresh } from '#/web/stores/repos/repo-refresh-actions.ts'
 import {
   resetWorkspacePaneActionQueueForTest,
   runWorkspacePaneAction,
@@ -65,11 +64,6 @@ const toastMocks = vi.hoisted(() => ({
   error: vi.fn(),
 }))
 
-vi.mock('#/web/stores/repos/repo-refresh-actions.ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('#/web/stores/repos/repo-refresh-actions.ts')>()
-  return { ...actual, requestVisibleRepoProjectionRefresh: vi.fn() }
-})
-
 vi.mock('sonner', () => ({
   toast: {
     error: toastMocks.error,
@@ -80,7 +74,6 @@ const REPO_ID = '/tmp/goblin-workspace-command-repo'
 const OTHER_REPO_ID = '/tmp/goblin-workspace-command-other-repo'
 const WORKTREE_PATH = '/tmp/goblin-workspace-command-worktree'
 const WORKTREE_KEY = `${REPO_ID}\0${WORKTREE_PATH}`
-const requestVisibleRefresh = vi.mocked(requestVisibleRepoProjectionRefresh)
 
 beforeEach(() => {
   resetWorkspacePaneActionQueueForTest()
@@ -89,7 +82,6 @@ beforeEach(() => {
   installWorkspacePaneTabsTestBridge()
   resetTerminalActionDialogsStore()
   useTerminalProjectionHydrationStore.setState({ hydrationByRepo: new Map(), refreshedAtByRepo: new Map() })
-  requestVisibleRefresh.mockClear()
 })
 
 afterEach(() => {
@@ -239,7 +231,7 @@ describe('workspace commands', () => {
   })
 
   test.each(['status', 'changes'] as const)(
-    'show workspace pane tab command refreshes status when opening %s',
+    'show workspace pane tab command opens %s',
     async (tab) => {
       seedRepoWithReadModelForTest({
         id: REPO_ID,
@@ -271,11 +263,8 @@ describe('workspace commands', () => {
         }),
       ).resolves.toBe(true)
 
-      expect(requestVisibleRefresh).toHaveBeenCalledWith(
-        expect.objectContaining({ get: useReposStore.getState, set: useReposStore.setState }),
-        REPO_ID,
-        'feature/worktree',
-      )
+      expect(preferredWorkspacePaneTab()).toBe(tab)
+      expect(openTabsFor('feature/worktree')).toContain(tab)
     },
   )
 
