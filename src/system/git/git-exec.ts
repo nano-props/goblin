@@ -73,6 +73,10 @@ export async function gitResultWithOptions(
     if (err instanceof ExecaError) {
       if (opts?.signal?.aborted || err.isCanceled) return { ok: false, message: 'cancelled' }
       if (err.timedOut) {
+        // No auto-clean of stray .lock files on timeout — we can't tell
+        // ours from a concurrent tool's, and a stale-clean is worse than
+        // the retry's "lock exists" stderr. Same conservative stance as
+        // stripNoise below; revisit with data if this actually bites.
         return { ok: false, message: `git timed out after ${(opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS) / 1000}s` }
       }
       const stderr = typeof err.stderr === 'string' ? err.stderr : ''
