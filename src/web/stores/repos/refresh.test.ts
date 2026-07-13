@@ -26,6 +26,7 @@ import {
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import {
+  markRepoRuntimeProjectionInvalidated,
   repoDataQueryKey,
   repoProjectionQueryKey,
   repoProjectionQueryOptions,
@@ -811,6 +812,49 @@ describe('projection refresh request ordering', () => {
 
     expect(invalidateSpy).not.toHaveBeenCalled()
     expect(cachedRepoProjection(repoRuntimeId, 'feature/a')?.status).toEqual(freshStatus)
+  })
+
+  test('workspace visible status cache refresh drops stale results after projection invalidation', async () => {
+    const repoRuntimeId = seedRepo([branch('feature/a')])
+    let projectionCalls = 0
+    let resolveProjection!: (projection: RepoRuntimeProjection) => void
+    const staleStatus: WorktreeStatus[] = [
+      { path: REPO_ID, branch: 'feature/a', isMain: true, entries: [{ x: 'M', y: ' ', path: 'stale.ts' }] },
+    ]
+    const newerStatus: WorktreeStatus[] = [
+      { path: REPO_ID, branch: 'feature/a', isMain: true, entries: [{ x: 'M', y: ' ', path: 'newer.ts' }] },
+    ]
+    ipcHandlers['repo.projection'] = async () => {
+      projectionCalls += 1
+      return await new Promise<RepoRuntimeProjection>((resolve) => {
+        resolveProjection = resolve
+      })
+    }
+
+    const refresh = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId, 'feature/a')
+    await vi.waitFor(() => {
+      expect(projectionCalls).toBe(1)
+    })
+    markRepoRuntimeProjectionInvalidated(REPO_ID, repoRuntimeId, primaryWindowQueryClient)
+    setRepoProjectionQueryData(
+      REPO_ID,
+      repoRuntimeId,
+      'feature/a',
+      'full',
+      repoProjection({ branches: [branch('feature/a')], current: 'feature/a' }, newerStatus, {
+        requested: { branch: 'feature/a', pullRequestMode: 'full' },
+      }),
+    )
+
+    resolveProjection(
+      repoProjection({ branches: [branch('feature/a')], current: 'feature/a' }, staleStatus, {
+        requested: { branch: 'feature/a', pullRequestMode: 'full' },
+      }),
+    )
+    await refresh
+
+    expect(cachedRepoProjection(repoRuntimeId, 'feature/a')?.status).toEqual(newerStatus)
+    expect(useReposStore.getState().repos[REPO_ID]!.dataLoads.visibleStatus.phase).toBe('idle')
   })
 
   test('workspace visible status cache refresh guards stale runtimes and busy or unavailable repos', async () => {

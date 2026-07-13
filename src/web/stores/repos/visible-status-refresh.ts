@@ -1,9 +1,13 @@
 import { getRepoProjection } from '#/web/repo-client.ts'
-import { repoProjectionQueryKey, setRepoProjectionQueryData } from '#/web/repo-data-query.ts'
+import {
+  getRepoRuntimeProjectionInvalidationVersion,
+  repoProjectionQueryKey,
+  setRepoProjectionQueryData,
+} from '#/web/repo-data-query.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { refreshStatusLog } from '#/web/logger.ts'
 import { isRepoUnavailableReason, markRepoUnavailable } from '#/web/stores/repos/availability.ts'
-import { finishDataLoadError, startDataLoad } from '#/web/stores/repos/repo-data-load-state.ts'
+import { cancelDataLoad, finishDataLoadError, startDataLoad } from '#/web/stores/repos/repo-data-load-state.ts'
 import { isRepoUnavailable, updateIfFresh } from '#/web/stores/repos/repo-guards.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { acceptRepoProjectionReadModel } from '#/web/stores/repos/projection-read-model-effects.ts'
@@ -50,6 +54,11 @@ export async function refreshVisibleStatusCache(
     return
   }
   visibleStatusRefreshesInFlight.add(key)
+  const startedInvalidationVersion = getRepoRuntimeProjectionInvalidationVersion(
+    repoRoot,
+    repoRuntimeId,
+    primaryWindowQueryClient,
+  )
   updateIfFresh(store.set, repoRoot, repoRuntimeId, (repo) => {
     startDataLoad(repo.dataLoads.visibleStatus, {
       hasData: (readRepoBranchQueryProjection(repo)?.status.length ?? 0) > 0,
@@ -59,6 +68,15 @@ export async function refreshVisibleStatusCache(
     const projection = await getRepoProjection(repoRoot, repoRuntimeId, branchName, { mode: 'full' })
     const repo = store.get().repos[repoRoot]
     if (!repo || repo.repoRuntimeId !== repoRuntimeId) return
+    if (
+      startedInvalidationVersion <
+      getRepoRuntimeProjectionInvalidationVersion(repoRoot, repoRuntimeId, primaryWindowQueryClient)
+    ) {
+      updateIfFresh(store.set, repoRoot, repoRuntimeId, (repo) => {
+        cancelDataLoad(repo.dataLoads.visibleStatus)
+      })
+      return
+    }
     setRepoProjectionQueryData(repoRoot, repoRuntimeId, branchName, 'full', projection)
     acceptRepoProjectionReadModel(
       store.set,
