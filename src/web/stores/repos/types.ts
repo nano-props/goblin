@@ -277,7 +277,7 @@ interface RuntimeCoherentRepoProjectionActions {
 export type RepoRuntimeProjectionRefreshScope = 'repo-read-model' | 'visible-status'
 export type RepoRuntimeProjectionRefreshOptions =
   | { repoRuntimeId?: string; scope: 'repo-read-model' }
-  | { repoRuntimeId?: string; scope: 'visible-status'; branchName: string | null }
+  | { repoRuntimeId?: string; scope: 'visible-status' }
 
 interface RepoMutationActions {
   runBranchAction: (

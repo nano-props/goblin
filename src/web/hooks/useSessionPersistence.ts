@@ -30,6 +30,20 @@ interface SessionPersistenceInput {
   >[0]['filetreeInteractionByScope']
 }
 
+type SessionSaveCandidate = {
+  session: ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState>
+  serialized: string
+}
+
+interface SessionSaveState {
+  queued: SessionSaveCandidate | null
+  drain: Promise<void> | null
+  startedSerialized: string | null
+  completedSerialized: string | null
+  unloadFlushedSerialized: string | null
+  lastError: unknown
+}
+
 export function useSessionPersistence({ routedRepoId }: { routedRepoId: string | null }) {
   const restoredRepoId = useReposStore((s) => s.restoredRepoId)
   const order = useReposStore((s) => s.order)
@@ -44,55 +58,50 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
   const repos = useReposStore((s) => s.repos)
   const workspacePaneTabsVersion = useWorkspacePaneTabsCacheVersion()
   const filetreeInteractionByScope = useFiletreeInteractionStore((s) => s.interactionByScope)
-  const lastSavedRef = useRef<string | null>(null)
+  const sessionSaveStateRef = useRef<SessionSaveState>({
+    queued: null,
+    drain: null,
+    startedSerialized: null,
+    completedSerialized: null,
+    unloadFlushedSerialized: null,
+    lastError: null,
+  })
   const lastImmediateKeyRef = useRef<string | null>(null)
   const lastRoutedRepoIdRef = useRef<string | null>(null)
-  const queuedSaveRef = useRef<{
-    session: ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState>
-    serialized: string
-  } | null>(null)
-  const latestSaveRef = useRef<{
-    session: ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState>
-    serialized: string
-  } | null>(null)
-  const saveDrainRef = useRef<Promise<void> | null>(null)
   const debounceTimerRef = useRef<number | null>(null)
-  const lastSaveErrorRef = useRef<unknown>(null)
 
-  const enqueueSave = (
-    session: ReturnType<typeof workspaceSessionStateFromRestorableWorkspaceState>,
-    serialized: string,
-    options?: { throwOnFailure?: boolean },
-  ) => {
-    lastSaveErrorRef.current = null
-    queuedSaveRef.current = { session, serialized }
-    if (saveDrainRef.current) {
+  const enqueueSave = (candidate: SessionSaveCandidate, options?: { throwOnFailure?: boolean }) => {
+    const state = sessionSaveStateRef.current
+    state.lastError = null
+    state.queued = candidate
+    if (state.drain) {
       return options?.throwOnFailure
-        ? saveDrainRef.current.then(() => {
-            if (lastSaveErrorRef.current) throw lastSaveErrorRef.current
+        ? state.drain.then(() => {
+            if (state.lastError) throw state.lastError
           })
-        : saveDrainRef.current
+        : state.drain
     }
-    saveDrainRef.current = (async () => {
-      while (queuedSaveRef.current) {
-        const next = queuedSaveRef.current
-        queuedSaveRef.current = null
-        lastSavedRef.current = next.serialized
+    state.drain = (async () => {
+      while (state.queued) {
+        const next = state.queued
+        state.queued = null
+        state.startedSerialized = next.serialized
         try {
           await persistWorkspaceSessionState(next.session)
-          lastSaveErrorRef.current = null
+          state.completedSerialized = next.serialized
+          state.lastError = null
         } catch (err) {
-          if (lastSavedRef.current === next.serialized) lastSavedRef.current = null
-          lastSaveErrorRef.current = err
+          if (state.startedSerialized === next.serialized) state.startedSerialized = null
+          state.lastError = err
           sessionLog.warn('save failed', { err })
           if (options?.throwOnFailure) throw err
         }
       }
     })().finally(() => {
-      saveDrainRef.current = null
-      if (queuedSaveRef.current) enqueueSave(queuedSaveRef.current.session, queuedSaveRef.current.serialized)
+      state.drain = null
+      if (state.queued) enqueueSave(state.queued)
     })
-    return saveDrainRef.current
+    return state.drain
   }
 
   const latestSessionSaveCandidate = useEffectEvent(() => {
@@ -122,9 +131,14 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
     }
     const latest = latestSessionSaveCandidate()
     if (!latest) return
-    latestSaveRef.current = latest
-    if (lastSavedRef.current === latest.serialized) return
-    await enqueueSave(latest.session, latest.serialized, { throwOnFailure: true })
+    const state = sessionSaveStateRef.current
+    if (state.completedSerialized === latest.serialized) return
+    if (state.startedSerialized === latest.serialized && state.drain) {
+      await state.drain
+      if (state.lastError) throw state.lastError
+      return
+    }
+    await enqueueSave(latest, { throwOnFailure: true })
   })
 
   useLayoutEffect(() => {
@@ -148,7 +162,7 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
       return
     }
     const { session, serialized } = latest
-    latestSaveRef.current = latest
+    const state = sessionSaveStateRef.current
     // Restorable session writes should be immediate only for coarse
     // workspace-structure changes. High-frequency runtime churn such as
     // terminal selection and workspace-tab mutation is still restorable, but
@@ -162,8 +176,8 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
     })
     const immediate = lastImmediateKeyRef.current !== immediateKey
     lastImmediateKeyRef.current = immediateKey
-    if (lastSavedRef.current === serialized) return
-    const save = () => enqueueSave(session, serialized)
+    if (state.startedSerialized === serialized) return
+    const save = () => enqueueSave(latest)
     if (immediate) {
       save()
       return
@@ -198,13 +212,23 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
     const flushLatestSession = () => {
       try {
         const latest = latestSessionSaveCandidate()
-        if (latest) persistWorkspaceSessionStateOnUnload(latest.session)
+        const state = sessionSaveStateRef.current
+        if (!latest || state.completedSerialized === latest.serialized) return
+        if (state.unloadFlushedSerialized === latest.serialized) return
+        state.unloadFlushedSerialized = latest.serialized
+        // TODO: Add server-side session write ordering/versioning so an older
+        // in-flight normal save cannot overwrite this newer unload keepalive flush.
+        persistWorkspaceSessionStateOnUnload(latest.session)
       } catch (err) {
         sessionLog.warn('unload save blocked', { err })
       }
     }
     const flushWhenHidden = () => {
-      if (document.visibilityState === 'hidden') flushLatestSession()
+      if (document.visibilityState === 'hidden') {
+        flushLatestSession()
+        return
+      }
+      sessionSaveStateRef.current.unloadFlushedSerialized = null
     }
     window.addEventListener('pagehide', flushLatestSession)
     window.addEventListener('beforeunload', flushLatestSession)

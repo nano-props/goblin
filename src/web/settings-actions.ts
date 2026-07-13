@@ -67,6 +67,7 @@ export async function restorePersistedWorkspaceSession(
 }
 
 export function persistWorkspaceSessionStateOnUnload(session: WorkspaceSessionState): void {
+  // TODO: Add server-side session write ordering/versioning for keepalive vs in-flight normal saves.
   void saveSession(session, { keepalive: true }).catch((err) => {
     settingsLog.warn('failed to flush session during unload', { err })
   })

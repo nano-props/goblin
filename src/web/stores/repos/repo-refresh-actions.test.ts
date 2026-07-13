@@ -2,10 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { repoDataQueryKey } from '#/web/repo-data-query.ts'
 import { requestRepoRuntimeProjectionRefresh } from '#/web/stores/repos/refresh.ts'
-import {
-  handleRepoInvalidationRefresh,
-  requestVisibleRepoRuntimeProjectionRefresh,
-} from '#/web/stores/repos/repo-refresh-actions.ts'
+import { handleRepoInvalidationRefresh } from '#/web/stores/repos/repo-refresh-actions.ts'
 import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 import { refreshRepoRuntimes } from '#/web/repo-runtime-query.ts'
 import { acceptRemoteLifecycleSnapshot } from '#/web/stores/repos/remote-lifecycle-projection.ts'
@@ -44,20 +41,6 @@ describe('repo refresh actions', () => {
   })
 
   afterEach(() => primaryWindowQueryClient.clear())
-
-  test('requests a visible projection only for the current idle runtime', async () => {
-    const store = repoRefreshStoreAccess()
-
-    await requestVisibleRepoRuntimeProjectionRefresh(store, '/repo', 'repo-runtime-test-9', 'feature/query')
-    await requestVisibleRepoRuntimeProjectionRefresh(store, '/repo', 'repo-runtime-stale', 'feature/query')
-
-    expect(requestRepoRuntimeProjectionRefresh).toHaveBeenCalledOnce()
-    expect(requestRepoRuntimeProjectionRefresh).toHaveBeenCalledWith(store, '/repo', {
-      repoRuntimeId: 'repo-runtime-test-9',
-      scope: 'visible-status',
-      branchName: 'feature/query',
-    })
-  })
 
   test('routes repo snapshot invalidation through query invalidation only', async () => {
     const store = repoRefreshStoreAccess()

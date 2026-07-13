@@ -601,12 +601,10 @@ describe('projection refresh request ordering', () => {
     const first = requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
       repoRuntimeId,
       scope: 'visible-status',
-      branchName: null,
     })
     const second = requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
       repoRuntimeId,
       scope: 'visible-status',
-      branchName: null,
     })
     const fresh = [{ path: '/repo', isMain: true, entries: [{ x: 'M', y: ' ', path: 'fresh.ts' }] }]
 
@@ -699,7 +697,6 @@ describe('projection refresh request ordering', () => {
     await requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
       repoRuntimeId,
       scope: 'visible-status',
-      branchName: null,
     })
 
     const repo = useReposStore.getState().repos[REPO_ID]!
@@ -729,13 +726,12 @@ describe('projection refresh request ordering', () => {
     await requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
       repoRuntimeId,
       scope: 'visible-status',
-      branchName: null,
     })
 
     expect(cachedRepoProjection(repoRuntimeId)?.status).toEqual(status)
   })
 
-  test('status projection refresh writes branch-scoped visible results into the matching query cache', async () => {
+  test('status projection refresh writes repo-scoped visible results without touching branch caches', async () => {
     const repoRuntimeId = seedRepo([branch('feature/a')])
     const staleStatus: WorktreeStatus[] = [
       { path: REPO_ID, branch: 'feature/a', isMain: true, entries: [{ x: 'M', y: ' ', path: 'stale.ts' }] },
@@ -760,20 +756,18 @@ describe('projection refresh request ordering', () => {
       repoProjection({ branches: [branch('feature/a')], current: 'feature/a' }, staleStatus),
     )
     ipcHandlers['repo.projection'] = async (input) => {
-      expect(input).toMatchObject({ cwd: REPO_ID, branch: 'feature/a', mode: 'full' })
-      return repoProjection({ branches: [branch('feature/a')], current: 'feature/a' }, freshStatus, {
-        requested: { branch: 'feature/a', pullRequestMode: 'full' },
-      })
+      expect(input).toMatchObject({ cwd: REPO_ID, mode: 'full' })
+      expect(input.branch).toBeUndefined()
+      return repoProjection({ branches: [branch('feature/a')], current: 'feature/a' }, freshStatus)
     }
 
     await requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
       repoRuntimeId,
       scope: 'visible-status',
-      branchName: 'feature/a',
     })
 
-    expect(cachedRepoProjection(repoRuntimeId, 'feature/a')?.status).toEqual(freshStatus)
-    expect(cachedRepoProjection(repoRuntimeId, null)?.status).toEqual(staleStatus)
+    expect(cachedRepoProjection(repoRuntimeId, null)?.status).toEqual(freshStatus)
+    expect(cachedRepoProjection(repoRuntimeId, 'feature/a')?.status).toEqual(staleStatus)
   })
 
   test('repo read-model projection refresh keeps status-derived worktree dirtiness authoritative', async () => {
@@ -879,7 +873,6 @@ describe('projection refresh request ordering', () => {
     const work = requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
       repoRuntimeId,
       scope: 'visible-status',
-      branchName: null,
     })
 
     expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.visibleStatus).toMatchObject({
@@ -910,7 +903,6 @@ describe('projection refresh request ordering', () => {
     await requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
       repoRuntimeId,
       scope: 'visible-status',
-      branchName: null,
     })
 
     expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.visibleStatus).toMatchObject({
@@ -942,62 +934,6 @@ describe('projection refresh request ordering', () => {
     })
   })
 
-  test('does not let an older repo read-model refresh settle a newer visible-status load', async () => {
-    const repoRuntimeId = seedRepo([branch('feature/a')])
-    const resolveReadModels: Array<() => void> = []
-    let resolveVisibleStatus!: () => void
-    ipcHandlers['repo.projection'] = (input: { branch?: string }) =>
-      new Promise((resolve) => {
-        if (input.branch === 'feature/a') {
-          resolveVisibleStatus = () =>
-            resolve(
-              repoProjection(
-                { branches: [branch('feature/a')], current: 'feature/a' },
-                [{ path: REPO_ID, branch: 'feature/a', isMain: true, entries: [] }],
-              ),
-            )
-          return
-        }
-        resolveReadModels.push(() => resolve(repoProjection({ branches: [branch('feature/a')], current: 'feature/a' })))
-      })
-
-    const readModel = requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
-      repoRuntimeId,
-      scope: 'repo-read-model',
-    })
-    await vi.waitFor(() => {
-      expect(resolveReadModels).toHaveLength(1)
-    })
-    const visibleStatus = requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
-      repoRuntimeId,
-      scope: 'visible-status',
-      branchName: 'feature/a',
-    })
-    await vi.waitFor(() => {
-      expect(resolveVisibleStatus).toEqual(expect.any(Function))
-    })
-
-    resolveReadModels[0]?.()
-    await vi.waitFor(() => {
-      expect(resolveReadModels).toHaveLength(2)
-    })
-    resolveReadModels[1]?.()
-    await readModel
-
-    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.repoReadModel).toMatchObject({ phase: 'idle' })
-    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.visibleStatus).toMatchObject({
-      phase: 'loading',
-      error: null,
-    })
-
-    resolveVisibleStatus()
-    await visibleStatus
-    expect(useReposStore.getState().repos[REPO_ID]?.dataLoads.visibleStatus).toMatchObject({
-      phase: 'idle',
-      error: null,
-    })
-  })
-
   test('coalesces equivalent read operations through one projection query', async () => {
     const repoRuntimeId = seedRepo([branch('feature/a')])
     const resolvers: Array<(value: WorktreeStatus[]) => void> = []
@@ -1012,7 +948,6 @@ describe('projection refresh request ordering', () => {
       requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
         repoRuntimeId,
         scope: 'visible-status',
-        branchName: null,
       }),
     )
 
@@ -1043,7 +978,6 @@ describe('projection refresh request ordering', () => {
       requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
         repoRuntimeId,
         scope: 'visible-status',
-        branchName: null,
       }),
     )
     await vi.waitFor(() => {
@@ -1072,7 +1006,6 @@ describe('projection refresh request ordering', () => {
       requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
         repoRuntimeId,
         scope: 'visible-status',
-        branchName: null,
       }),
     )
     const fresh = [{ path: '/repo', isMain: true, entries: [{ x: 'M', y: ' ', path: 'fresh.ts' }] }]

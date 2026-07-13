@@ -83,7 +83,6 @@ describe('settings command handlers', () => {
       filetreeViewStateByWorktreeByRepo: {},
     }
     mocks.setServerSessionState.mockResolvedValue(session)
-    mocks.setServerSessionState.mockResolvedValue(session as WorkspaceSessionState)
     const { handleSetSession } = await import('#/server/modules/settings-write-paths.ts')
 
     await expect(handleSetSession({ session })).resolves.toEqual({
