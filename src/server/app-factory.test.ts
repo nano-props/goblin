@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
+import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 
 const mocks = vi.hoisted(() => ({
   access: vi.fn(async () => undefined),
@@ -63,6 +64,12 @@ const appRealtimeHostStub = {
   shutdown: vi.fn(),
 } satisfies ServerAppRealtimeHost
 
+const workspacePaneTabsHostStub = {
+  listWorkspaceTabs: vi.fn(),
+  replaceTabs: vi.fn(),
+  updateTabs: vi.fn(),
+} satisfies ServerWorkspacePaneTabsHost
+
 const worktreeRemovalApplicationStub = {
   removeWorktree: vi.fn(async () => ({ ok: false as const, message: 'unused' })),
 }
@@ -110,6 +117,7 @@ describe('server app body limit', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     const oversized = 'x'.repeat(2 * 1024 * 1024)
@@ -135,6 +143,7 @@ describe('server app body limit', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     // A small, well-formed body: validation will run after the body
@@ -187,6 +196,7 @@ describe('server app html static', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
 
@@ -206,6 +216,7 @@ describe('server app html static', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
 
@@ -238,6 +249,7 @@ describe('server app html static', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     for (const path of ['/repos/abc123', '/repos/abc123/changes', '/settings', '/settings/general']) {
@@ -261,6 +273,7 @@ describe('server app html static', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     const response = await app.request(new Request('http://127.0.0.1:32100/api/host'))
@@ -279,6 +292,7 @@ describe('server app html static', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     const response = await app.request(new Request('http://127.0.0.1:32100/api/unknown'))
@@ -318,6 +332,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     // 5 MiB body — well over the 1 MiB cap; Content-Length is set.
@@ -341,6 +356,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     const response = await app.request(
@@ -373,6 +389,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     const form = new FormData()
@@ -403,6 +420,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     const response = await app.request(
@@ -431,6 +449,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     const response = await app.request(
@@ -454,6 +473,7 @@ describe('per-sub-path body limits and auth ordering', () => {
       startedAt: Date.now(),
       accessToken: 'secret',
       appRealtimeHost: appRealtimeHostStub,
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
       worktreeRemovalApplication: worktreeRemovalApplicationStub,
     })
     // Two-kilobyte body to a hypothetical /api/health endpoint —

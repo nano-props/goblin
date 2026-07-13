@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
+import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 
 const mocks = vi.hoisted(() => ({
   createApp: vi.fn(() => ({ fetch: vi.fn() })),
@@ -10,6 +11,11 @@ const mocks = vi.hoisted(() => ({
       isValidClientId: (_value: unknown): _value is string => true,
       shutdown: vi.fn(),
     } as unknown as ServerAppRealtimeHost,
+    workspacePaneTabsHost: {
+      listWorkspaceTabs: vi.fn(),
+      replaceTabs: vi.fn(),
+      updateTabs: vi.fn(),
+    },
     worktreeRemovalApplication: { removeWorktree: vi.fn() },
     shutdown: vi.fn(),
   })),
@@ -31,6 +37,14 @@ vi.mock('#/server/terminal/terminal-runtime.ts', () => ({
   createServerTerminalRuntime: mocks.createServerTerminalRuntime,
 }))
 
+function makeWorkspacePaneTabsHost(): ServerWorkspacePaneTabsHost {
+  return {
+    listWorkspaceTabs: vi.fn(),
+    replaceTabs: vi.fn(),
+    updateTabs: vi.fn(),
+  }
+}
+
 describe('server runtime', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -39,6 +53,7 @@ describe('server runtime', () => {
   test('injects the app realtime host into the server app factory', async () => {
     const { createServerRuntime } = await import('#/server/runtime.ts')
     const appRealtimeHost = { shutdown: vi.fn() } as unknown as ServerAppRealtimeHost
+    const workspacePaneTabsHost = makeWorkspacePaneTabsHost()
     const worktreeRemovalApplication = { removeWorktree: vi.fn() }
 
     const runtime = createServerRuntime({
@@ -48,6 +63,7 @@ describe('server runtime', () => {
       serverHost: '127.0.0.1',
       serverPort: 32100,
       appRealtimeHost,
+      workspacePaneTabsHost,
       worktreeRemovalApplication,
     })
 
@@ -59,8 +75,27 @@ describe('server runtime', () => {
       serverHost: '127.0.0.1',
       serverPort: 32100,
       appRealtimeHost,
+      workspacePaneTabsHost,
       worktreeRemovalApplication,
     })
+  })
+
+  test('rejects partial host injection instead of mixing injected and managed hosts', async () => {
+    const { createServerRuntime } = await import('#/server/runtime.ts')
+    const appRealtimeHost = { shutdown: vi.fn() } as unknown as ServerAppRealtimeHost
+
+    expect(() =>
+      createServerRuntime({
+        version: '0.1.0',
+        startedAt: 1,
+        accessToken: 'secret',
+        serverHost: '127.0.0.1',
+        serverPort: 32100,
+        appRealtimeHost,
+      } as never),
+    ).toThrow('server runtime host injection must include all hosts')
+    expect(mocks.createServerTerminalRuntime).not.toHaveBeenCalled()
+    expect(mocks.createApp).not.toHaveBeenCalled()
   })
 
   test('wires the in-process pty supervisor into the terminal runtime by default', async () => {
@@ -88,6 +123,7 @@ describe('server runtime', () => {
       serverHost: '127.0.0.1',
       serverPort: 32100,
       appRealtimeHost: runtime.appRealtimeHost,
+      workspacePaneTabsHost: mocks.createServerTerminalRuntime.mock.results[0]?.value.workspacePaneTabsHost,
       worktreeRemovalApplication: mocks.createServerTerminalRuntime.mock.results[0]?.value.worktreeRemovalApplication,
     })
   })
@@ -100,6 +136,7 @@ describe('server runtime', () => {
         events.push('terminal')
       }),
     } as unknown as ServerAppRealtimeHost
+    const workspacePaneTabsHost = makeWorkspacePaneTabsHost()
     const worktreeRemovalApplication = { removeWorktree: vi.fn() }
     mocks.stopBackgroundSync.mockImplementation(() => {
       events.push('background-sync')
@@ -112,6 +149,7 @@ describe('server runtime', () => {
       serverHost: '127.0.0.1',
       serverPort: 32100,
       appRealtimeHost,
+      workspacePaneTabsHost,
       worktreeRemovalApplication,
     })
 

@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { SessionWorkspacePaneRestoreState } from '#/web/stores/repos/types.ts'
 import type {
   WorkspacePaneStaticTabType,
   WorkspacePaneTabEntry,
@@ -18,7 +17,6 @@ import {
   preferredWorkspacePaneTabForTarget,
   workspacePaneTabsTargetForRepoBranch,
 } from '#/web/stores/repos/workspace-pane-preferences.ts'
-import { restoreSessionWorkspacePaneStateInRepos } from '#/web/stores/repos/workspace-pane-session-restore.ts'
 import type { BranchSnapshotInfo } from '#/web/types.ts'
 import { DEFAULT_WORKSPACE_PANE_SIZE } from '#/shared/workspace-layout.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
@@ -101,18 +99,6 @@ function preferredTabFor(branchName?: string | null): WorkspacePaneTabType | nul
           : null,
       )
     : null
-}
-
-function restoreWorkspacePaneState(restoreState: Partial<SessionWorkspacePaneRestoreState>) {
-  const normalizedRestoreState: SessionWorkspacePaneRestoreState = {
-    workspacePaneTabsByTargetByRepo: restoreState.workspacePaneTabsByTargetByRepo ?? {},
-    preferredWorkspacePaneTabByTargetByRepo: restoreState.preferredWorkspacePaneTabByTargetByRepo ?? {},
-  }
-  useReposStore.setState((s) => {
-    const result = restoreSessionWorkspacePaneStateInRepos(s.repos, normalizedRestoreState)
-    if (result.status === 'failed') throw new Error('workspace pane preferred tab restore failed')
-    return result.repos === s.repos ? s : { repos: result.repos }
-  })
 }
 
 async function flushAsyncWork() {
@@ -255,44 +241,8 @@ describe('setWorkspacePaneTab', () => {
     expect(openTabsFor('main')).toEqual(['status', 'files'])
   })
 
-  test('fails to restore files as preferred when the files tab projection is missing', () => {
-    seedRepo({ currentBranchName: 'main', preferredWorkspacePaneTab: 'status', workspacePaneStaticTabs: ['status'] })
-
-    expect(() =>
-      restoreWorkspacePaneState({
-        preferredWorkspacePaneTabByTargetByRepo: { [REPO_ID]: { [worktreeTargetKey('main', '/repo')]: 'files' } },
-      }),
-    ).toThrow('workspace pane preferred tab restore failed')
-
-    expect(preferredTabFor('main')).toBe('status')
-    expect(openTabsFor('main')).toEqual(['status'])
-  })
-
-  test('fails to restore a session-preferred tab when the branch read model is unavailable', () => {
-    seedRepoShellWithoutBranchReadModel()
-
-    expect(() =>
-      restoreWorkspacePaneState({
-        preferredWorkspacePaneTabByTargetByRepo: { [REPO_ID]: { [worktreeTargetKey('main', '/repo')]: 'files' } },
-      }),
-    ).toThrow('workspace pane preferred tab restore failed')
-  })
-
   test('files is a worktree-scoped static tab and lives in the worktree-only bucket', () => {
     expect(WORKSPACE_PANE_WORKTREE_STATIC_TAB_TYPES).toContain('files')
-  })
-
-  test('fails to restore a target-level preferred tab whose tab projection is missing', () => {
-    seedRepo({ currentBranchName: 'main', preferredWorkspacePaneTab: 'status', workspacePaneStaticTabs: ['status'] })
-
-    expect(() =>
-      restoreWorkspacePaneState({
-        preferredWorkspacePaneTabByTargetByRepo: { [REPO_ID]: { [worktreeTargetKey('main', '/repo')]: 'history' } },
-      }),
-    ).toThrow('workspace pane preferred tab restore failed')
-
-    expect(preferredTabFor('main')).toBe('status')
-    expect(openTabsFor('main')).toEqual(['status'])
   })
 
   test('keeps selected workspace pane tabs isolated by branch', () => {
@@ -313,16 +263,6 @@ describe('setWorkspacePaneTab', () => {
     seedRepo({ currentBranchName: 'main', preferredWorkspacePaneTab: 'status' })
 
     useReposStore.getState().setWorkspacePaneTab(REPO_ID, 'main', null)
-
-    expect(preferredTabFor('main')).toBeNull()
-  })
-
-  test('restores an intentional empty workspace pane preference from session state', () => {
-    seedRepo({ currentBranchName: 'main', preferredWorkspacePaneTab: 'status', workspacePaneStaticTabs: ['status'] })
-
-    restoreWorkspacePaneState({
-      preferredWorkspacePaneTabByTargetByRepo: { [REPO_ID]: { [worktreeTargetKey('main', '/repo')]: null } },
-    })
 
     expect(preferredTabFor('main')).toBeNull()
   })

@@ -90,19 +90,27 @@ function repoRuntimeState(userId: string, repoRoot: string): RepoRuntimeState {
 }
 
 export function acquireRepoRuntime(userId: string, repoRoot: string, clientId: string): string {
-  const repoRuntimeId = acquireRepoRuntimeMembership(userId, repoRoot, clientId)
-  emitRepoRuntimeMembershipAcquired({ userId, clientId })
-  return repoRuntimeId
+  return acquireRepoRuntimeLease(userId, repoRoot, clientId).repoRuntimeId
 }
 
-function acquireRepoRuntimeMembership(userId: string, repoRoot: string, clientId: string): string {
+export function acquireRepoRuntimeLease(
+  userId: string,
+  repoRoot: string,
+  clientId: string,
+): RepoRuntimeMembershipLeaseEntry {
+  const lease = acquireRepoRuntimeMembership(userId, repoRoot, clientId)
+  emitRepoRuntimeMembershipAcquired({ userId, clientId })
+  return lease
+}
+
+function acquireRepoRuntimeMembership(userId: string, repoRoot: string, clientId: string): RepoRuntimeMembershipLeaseEntry {
   if (!repoRoot) throw new Error('repo runtime open requires repoRoot')
   if (!clientId) throw new Error('repo runtime acquire requires clientId')
   const state = repoRuntimeState(userId, repoRoot)
   const repoRuntimeId = state.currentRepoRuntimeId ?? startRepoRuntimeEpoch(state)
   state.nextMembershipGeneration += 1
   state.members.set(clientId, state.nextMembershipGeneration)
-  return repoRuntimeId
+  return { repoRoot, repoRuntimeId, generation: state.nextMembershipGeneration }
 }
 
 export function releaseRepoRuntime(
@@ -115,12 +123,45 @@ export function releaseRepoRuntime(
   runtimeClosed: boolean
 } {
   const state = repoRuntimesByUser.get(userId)?.get(repoRoot)
-  if (!state || state.currentRepoRuntimeId !== repoRuntimeId || !state.members.delete(clientId)) {
+  if (!state?.members.has(clientId)) return { released: false, runtimeClosed: false }
+  return releaseRepoRuntimeMembershipForCurrentState(userId, clientId, {
+    repoRoot,
+    repoRuntimeId,
+    generation: state.members.get(clientId)!,
+  })
+}
+
+export function releaseRepoRuntimeMembershipLease(
+  userId: string,
+  clientId: string,
+  lease: RepoRuntimeMembershipLeaseEntry,
+): {
+  released: boolean
+  runtimeClosed: boolean
+} {
+  return releaseRepoRuntimeMembershipForCurrentState(userId, clientId, lease)
+}
+
+function releaseRepoRuntimeMembershipForCurrentState(
+  userId: string,
+  clientId: string,
+  lease: RepoRuntimeMembershipLeaseEntry,
+): {
+  released: boolean
+  runtimeClosed: boolean
+} {
+  const state = repoRuntimesByUser.get(userId)?.get(lease.repoRoot)
+  if (
+    !state ||
+    state.currentRepoRuntimeId !== lease.repoRuntimeId ||
+    state.members.get(clientId) !== lease.generation
+  ) {
     return { released: false, runtimeClosed: false }
   }
+  state.members.delete(clientId)
   if (state.members.size > 0) return { released: true, runtimeClosed: false }
   stopRepoRuntimeEpoch(state)
-  emitRepoRuntimeClosed({ userId, repoRoot, repoRuntimeId })
+  emitRepoRuntimeClosed({ userId, repoRoot: lease.repoRoot, repoRuntimeId: lease.repoRuntimeId })
   return { released: true, runtimeClosed: true }
 }
 

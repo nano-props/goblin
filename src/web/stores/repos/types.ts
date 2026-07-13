@@ -6,12 +6,8 @@ import type {
   GitRemoteInfo,
 } from '#/web/types.ts'
 import type { RemoteRepoConnectionLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { WorkspaceSessionState } from '#/shared/api-types.ts'
-import type {
-  WorkspacePaneSessionTabType,
-  WorkspacePaneTabEntry,
-  WorkspacePaneTabType,
-} from '#/shared/workspace-pane.ts'
+import type { WorkspaceRuntimeRestoreSnapshot, WorkspaceSessionState } from '#/shared/api-types.ts'
+import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repos/branch-action-types.ts'
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
 import type { RepoDataLoadBundle } from '#/web/stores/repos/repo-data-load-state.ts'
@@ -183,14 +179,8 @@ export interface WorkspaceNavigationHistoryTraversal {
   target: WorkspaceNavigationHistoryEntry
 }
 
-export interface SessionWorkspacePaneRestoreState {
-  workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>
-  preferredWorkspacePaneTabByTargetByRepo: Record<string, Record<string, WorkspacePaneSessionTabType | null>>
-}
-
 export interface RepoSessionHydrationOptions {
   signal?: AbortSignal
-  workspacePaneRestoreState?: SessionWorkspacePaneRestoreState
 }
 
 interface LocalWorkspaceState {
@@ -274,9 +264,8 @@ interface RuntimeCoherentRepoProjectionActions {
   setBranchViewMode: (id: string, viewMode: BranchViewMode) => void
   setLastResult: (id: string, result: ExecResult, repoRuntimeId: string, options?: RepoResultEventOptions) => void
   clearEvents: (id: string, eventIds: number[]) => void
-  hydrateRepoSession: (
-    openRepoEntries: RepoSessionEntry[],
-    restoredRepoId: string | null,
+  hydrateRestoredWorkspaceRuntime: (
+    runtime: WorkspaceRuntimeRestoreSnapshot,
     options?: RepoSessionHydrationOptions,
   ) => Promise<void>
   /** Clear the fetchFailed flag — called by manual fetch success and

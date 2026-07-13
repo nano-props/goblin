@@ -19,6 +19,7 @@ import { createRepoRoutes } from '#/server/routes/repo.ts'
 import { createRepoViewRoutes } from '#/server/routes/repo-view.ts'
 import { createSettingsRoutes } from '#/server/routes/settings.ts'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
+import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
 import { MAX_PASTE_BATCH_BYTES } from '#/shared/clipboard-paste.ts'
@@ -35,6 +36,7 @@ export interface ServerAppOptions {
    */
   accessToken: string
   appRealtimeHost: ServerAppRealtimeHost
+  workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   worktreeRemovalApplication: ServerWorktreeRemovalHost
   /**
    * The actual host the server is listening on. Used by the CORS
@@ -206,7 +208,7 @@ export function createApp(options: ServerAppOptions): Hono {
       onError: (c) => errorJson(c, 'PAYLOAD_TOO_LARGE', 'Request body too large'),
     }),
   )
-  app.route('/api/settings', createSettingsRoutes(settingsState))
+  app.route('/api/settings', createSettingsRoutes({ settingsState, workspacePaneTabsHost: options.workspacePaneTabsHost }))
   // i18n is mounted at a separate public path so the client can
   // fetch it before the user is authenticated. The token gate's
   // labels are translated by this endpoint; if it were under

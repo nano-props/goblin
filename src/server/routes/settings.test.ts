@@ -1,5 +1,7 @@
+import { Hono } from 'hono'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
+import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -13,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   handleClearRecentRepos: vi.fn(),
   handleSetSession: vi.fn(),
   handleUpdateUserSettings: vi.fn(),
+  restoreServerWorkspaceSession: vi.fn(),
 }))
 
 vi.mock('#/server/modules/external-apps.ts', () => ({
@@ -40,6 +43,23 @@ vi.mock('#/server/modules/settings-write-paths.ts', () => ({
   handleUpdateUserSettings: mocks.handleUpdateUserSettings,
 }))
 
+vi.mock('#/server/modules/session-restore.ts', () => ({
+  restoreServerWorkspaceSession: mocks.restoreServerWorkspaceSession,
+}))
+
+const workspacePaneTabsHostStub = {
+  listWorkspaceTabs: vi.fn(),
+  replaceTabs: vi.fn(),
+  updateTabs: vi.fn(),
+} satisfies ServerWorkspacePaneTabsHost
+
+function settingsRouteOptions() {
+  return {
+    settingsState: createNativeShortcutRegistrationState(),
+    workspacePaneTabsHost: workspacePaneTabsHostStub,
+  }
+}
+
 describe('settings routes', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -53,7 +73,7 @@ describe('settings routes', () => {
     })
 
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
-    const app = createSettingsRoutes(createNativeShortcutRegistrationState())
+    const app = createSettingsRoutes(settingsRouteOptions())
     const response = await app.request(
       new Request('http://127.0.0.1:32100/prefs', {
         method: 'POST',
@@ -90,7 +110,7 @@ describe('settings routes', () => {
     mocks.handleSetSession.mockResolvedValue({ ok: true, session })
 
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
-    const app = createSettingsRoutes(createNativeShortcutRegistrationState())
+    const app = createSettingsRoutes(settingsRouteOptions())
     const response = await app.request(
       new Request('http://127.0.0.1:32100/session', {
         method: 'POST',
@@ -104,6 +124,87 @@ describe('settings routes', () => {
       session,
     })
     expect(mocks.handleSetSession).toHaveBeenCalledWith({ session })
+  })
+
+  test('delegates session restore to the server restore coordinator', async () => {
+    const restored = {
+      status: 'restored' as const,
+      session: {
+        openRepoEntries: [],
+        restoredRepoId: null,
+        zenMode: false,
+        workspacePaneSize: 45,
+        selectedTerminalSessionIdByTerminalWorktree: {},
+        preferredWorkspacePaneTabByTargetByRepo: {},
+        workspacePaneTabsByTargetByRepo: {},
+        filetreeViewStateByWorktreeByRepo: {},
+      },
+      runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
+    }
+    mocks.restoreServerWorkspaceSession.mockResolvedValue(restored)
+    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
+    const app = new Hono<{ Variables: { userId: string } }>()
+    app.use('*', async (c, next) => {
+      c.set('userId', 'user-test')
+      await next()
+    })
+    app.route('/', createSettingsRoutes(settingsRouteOptions()))
+
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/session/restore', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ clientId: 'client_test000000000000' }),
+      }),
+    )
+
+    await expect(response.json()).resolves.toEqual(restored)
+    expect(mocks.restoreServerWorkspaceSession).toHaveBeenCalledWith({
+      userId: 'user-test',
+      clientId: 'client_test000000000000',
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
+      signal: expect.any(AbortSignal),
+    })
+  })
+
+  test('rejects session restore without an authenticated user id', async () => {
+    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
+    const app = createSettingsRoutes(settingsRouteOptions())
+
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/session/restore', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ clientId: 'client_test000000000000' }),
+      }),
+    )
+
+    expect(response.status).toBe(401)
+    await expect(response.json()).resolves.toEqual({ ok: false, message: 'Unauthorized' })
+    expect(mocks.restoreServerWorkspaceSession).not.toHaveBeenCalled()
+  })
+
+  test('rejects session restore when client id is invalid', async () => {
+    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
+    const app = new Hono<{ Variables: { userId: string } }>()
+    app.use('*', async (c, next) => {
+      c.set('userId', 'user-test')
+      await next()
+    })
+    app.route('/', createSettingsRoutes(settingsRouteOptions()))
+
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/session/restore', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    const json = (await response.json()) as { code: string }
+    expect(json.code).toBe('BAD_REQUEST')
+    expect(mocks.restoreServerWorkspaceSession).not.toHaveBeenCalled()
   })
 
   test('accepts a session state with files in preferred tab and mixed tab list picklist', async () => {
@@ -132,7 +233,7 @@ describe('settings routes', () => {
     mocks.handleSetSession.mockResolvedValue({ ok: true, session })
 
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
-    const app = createSettingsRoutes(createNativeShortcutRegistrationState())
+    const app = createSettingsRoutes(settingsRouteOptions())
     const response = await app.request(
       new Request('http://127.0.0.1:32100/session', {
         method: 'POST',
@@ -150,7 +251,7 @@ describe('settings routes', () => {
     mocks.handleAddRecentRepo.mockResolvedValue({ ok: true, recentRepos: [repo], addedRepo: repo })
     mocks.handleClearRecentRepos.mockResolvedValue({ ok: true })
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
-    const app = createSettingsRoutes(createNativeShortcutRegistrationState())
+    const app = createSettingsRoutes(settingsRouteOptions())
 
     const addResponse = await app.request(
       new Request('http://127.0.0.1:32100/recent-repos/add', {
@@ -179,7 +280,7 @@ describe('settings routes', () => {
 
   test('returns 400 BAD_REQUEST when the body is missing required fields', async () => {
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
-    const app = createSettingsRoutes(createNativeShortcutRegistrationState())
+    const app = createSettingsRoutes(settingsRouteOptions())
     const response = await app.request(
       new Request('http://127.0.0.1:32100/fetch-interval', {
         method: 'POST',
@@ -195,7 +296,7 @@ describe('settings routes', () => {
 
   test('returns 400 when global-shortcut-state body has wrong type for `registered`', async () => {
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
-    const app = createSettingsRoutes(createNativeShortcutRegistrationState())
+    const app = createSettingsRoutes(settingsRouteOptions())
     const response = await app.request(
       new Request('http://127.0.0.1:32100/global-shortcut-state', {
         method: 'POST',
@@ -216,7 +317,7 @@ describe('settings routes', () => {
     }
     mocks.getServerGitHubCliState.mockResolvedValue(state)
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
-    const app = createSettingsRoutes(createNativeShortcutRegistrationState())
+    const app = createSettingsRoutes(settingsRouteOptions())
 
     const hostsResponse = await app.request(
       new Request('http://127.0.0.1:32100/github-cli', {
@@ -245,7 +346,7 @@ describe('settings routes', () => {
     // shape was unreachable; POST body makes it possible to send
     // a bare string and now the schema must reject it.
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
-    const app = createSettingsRoutes(createNativeShortcutRegistrationState())
+    const app = createSettingsRoutes(settingsRouteOptions())
     const response = await app.request(
       new Request('http://127.0.0.1:32100/github-cli', {
         method: 'POST',

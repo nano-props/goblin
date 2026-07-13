@@ -11,6 +11,7 @@ import type {
   RepoSettingsState,
   RuntimeRecentReposState,
   WorkspaceSessionState,
+  WorkspaceSessionRestoreResult,
   UserSettings,
   UserSettingsUpdateResponse,
   SettingsSnapshot,
@@ -158,6 +159,13 @@ export async function saveSession(
     { ok: boolean; session: WorkspaceSessionState }
   >('/api/settings/session', { session }, { keepalive: options?.keepalive })
   return result.session
+}
+
+export async function restoreWorkspaceSession(
+  clientId: string,
+  options?: { signal?: AbortSignal },
+): Promise<WorkspaceSessionRestoreResult> {
+  return await postServerJson('/api/settings/session/restore', { clientId }, { signal: options?.signal })
 }
 
 export async function setSettingsFetchInterval(sec: number): Promise<number> {

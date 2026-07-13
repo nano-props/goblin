@@ -211,9 +211,7 @@ describe('web invalidation sync', () => {
       ok: true,
       json: async () => settingsSnapshotResponse(),
     }))
-    const { useSessionRestoreStore } = await import('#/web/stores/session-restore.ts')
     const { useThemeStore } = await import('#/web/stores/theme.ts')
-    await useSessionRestoreStore.getState().hydrate()
     await useThemeStore.getState().hydrate()
     const beforeInvalidationFetchCount = fetchMock.mock.calls.length
 
@@ -221,10 +219,6 @@ describe('web invalidation sync', () => {
     await flushAsyncWork()
 
     expect(fetchMock).toHaveBeenCalledTimes(beforeInvalidationFetchCount)
-    expect(useSessionRestoreStore.getState().bootSessionSnapshot).toMatchObject({
-      openRepoEntries: [],
-      restoredRepoId: null,
-    })
     expect(useThemeStore.getState()).toMatchObject({ pref: 'auto', resolved: 'light', colorTheme: 'default' })
   })
 

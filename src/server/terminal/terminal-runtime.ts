@@ -71,6 +71,7 @@ export interface ServerTerminalRuntimeOptions {
 export interface ServerTerminalRuntime {
   host: ServerTerminalHost
   workspacePaneRuntimeHost: ServerWorkspacePaneRuntimeHost
+  workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   workspacePaneRuntimeApplication: ReturnType<typeof createWorkspacePaneRuntimeApplication>
   worktreeRemovalApplication: ReturnType<typeof createWorktreeRemovalApplication>
   shutdown(): void
@@ -217,6 +218,9 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     async replaceTabs(clientId, userId, input) {
       return await workspacePaneTabsActions.replaceTabs(clientId, userId, input)
     },
+    async replaceTabsBatch(clientId, userId, input) {
+      return await workspacePaneTabsActions.replaceTabsBatch(clientId, userId, input)
+    },
     async updateTabs(clientId, userId, input) {
       return await workspacePaneTabsActions.updateTabs(clientId, userId, input)
     },
@@ -303,6 +307,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   return {
     host,
     workspacePaneRuntimeHost,
+    workspacePaneTabsHost,
     workspacePaneRuntimeApplication,
     worktreeRemovalApplication,
     shutdown() {
