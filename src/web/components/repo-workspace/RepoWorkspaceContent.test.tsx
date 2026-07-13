@@ -141,6 +141,7 @@ function repoWorkspaceRepo(repo: RepoState): RepoWorkspaceRepo {
     ui: { ...repo.ui, currentBranchName },
     branchAction: repo.operations.branchAction,
     branchModel: { ...branchModel, statusReady: true },
+    unavailable: false,
   }
 }
 

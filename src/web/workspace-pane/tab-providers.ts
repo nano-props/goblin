@@ -88,6 +88,8 @@ export abstract class WorkspacePaneTabProvider<TType extends WorkspacePaneTabTyp
   readonly type: TType
   readonly icon: LucideIcon
   abstract readonly kind: WorkspacePaneTabProviderKind
+  abstract readonly refreshOnOpen: boolean
+  abstract readonly refreshOnVisible: boolean
 
   constructor(input: { type: TType; icon: LucideIcon }) {
     this.type = input.type
@@ -182,6 +184,9 @@ export abstract class WorkspacePaneRuntimeTabProvider<
 }
 
 class StatusWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'status'> {
+  readonly refreshOnOpen = true
+  readonly refreshOnVisible = true
+
   constructor() {
     super({ type: 'status', icon: GitBranch })
   }
@@ -196,6 +201,9 @@ class StatusWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'sta
 }
 
 class ChangesWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'changes'> {
+  readonly refreshOnOpen = true
+  readonly refreshOnVisible = true
+
   constructor() {
     super({ type: 'changes', icon: Diff })
   }
@@ -213,6 +221,9 @@ class ChangesWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'ch
 }
 
 class HistoryWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'history'> {
+  readonly refreshOnOpen = false
+  readonly refreshOnVisible = false
+
   constructor() {
     super({ type: 'history', icon: History })
   }
@@ -227,6 +238,9 @@ class HistoryWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'hi
 }
 
 class FilesWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'files'> {
+  readonly refreshOnOpen = true
+  readonly refreshOnVisible = false
+
   constructor() {
     super({ type: 'files', icon: FolderTree })
   }
@@ -242,6 +256,9 @@ class FilesWorkspacePaneTabProvider extends WorkspacePaneStaticTabProvider<'file
 }
 
 export class TerminalWorkspacePaneTabProvider extends WorkspacePaneRuntimeTabProvider<'terminal'> {
+  readonly refreshOnOpen = false
+  readonly refreshOnVisible = false
+
   constructor() {
     super({ type: 'terminal', icon: Terminal })
   }

@@ -9,6 +9,7 @@ import {
 import { RepoWorkspaceToolbar } from '#/web/components/repo-workspace/RepoWorkspaceToolbar.tsx'
 import { RepoWorkspaceContent } from '#/web/components/repo-workspace/RepoWorkspaceContent.tsx'
 import { useRepoWorkspaceTabModel } from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
+import { useWorkspacePaneVisibleStatusRefresh } from '#/web/components/repo-workspace/use-workspace-pane-visible-status-refresh.ts'
 import { useBranchActionItems } from '#/web/hooks/useBranchActionItems.ts'
 import { useBranchActionShortcutRegistry } from '#/web/hooks/useBranchActionShortcutRegistry.ts'
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
@@ -19,6 +20,7 @@ import { RepoWorkspaceSkeleton } from '#/web/components/Skeleton.tsx'
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { useWorkspacePaneRouteController } from '#/web/components/repo-workspace/workspace-pane-route-controller.ts'
 import { projectBranchActionRepo } from '#/web/hooks/branch-action-state.ts'
+import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
 
 export type RepoWorkspacePaneRouteContext =
@@ -52,6 +54,7 @@ function repoWorkspaceRepoShellEqual(
       a.ui.currentBranchName === b.ui.currentBranchName &&
       a.ui.preferredWorkspacePaneTabByTarget === b.ui.preferredWorkspacePaneTabByTarget &&
       a.dataLoads.visibleStatus === b.dataLoads.visibleStatus &&
+      a.unavailable === b.unavailable &&
       a.operations.branchAction === b.operations.branchAction &&
       a.remote.lifecycle === b.remote.lifecycle &&
       a.remote.hasRemotes === b.remote.hasRemotes &&
@@ -87,6 +90,7 @@ export function RepoWorkspace({
             dataLoads: {
               visibleStatus: repo.dataLoads.visibleStatus,
             },
+            unavailable: isRepoUnavailable(repo),
             operations: {
               branchAction: repo.operations.branchAction,
             },
@@ -226,6 +230,14 @@ function RepoWorkspacePane({
   const workspacePaneRoute = workspacePaneRouteContext.kind === 'routed' ? workspacePaneRouteContext.route : undefined
   const routeControllerRoute = workspacePaneRouteContext.kind === 'routed' ? workspacePaneRouteContext.route : null
   const workspacePaneTabModel = useRepoWorkspaceTabModel(repo, detail, workspacePaneRoute)
+  useWorkspacePaneVisibleStatusRefresh({
+    repoId: repo.id,
+    repoRuntimeId: repo.repoRuntimeId,
+    branchName: workspacePaneTabModel.branchName,
+    renderedTab: workspacePaneTabModel.renderedTab,
+    visibleStatusPhase: repo.dataLoads.visibleStatus.phase,
+    unavailable: repo.unavailable,
+  })
   useWorkspacePaneRouteController({
     enabled: workspacePaneRouteContext.kind === 'routed',
     repoId: repo.id,

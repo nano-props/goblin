@@ -2,8 +2,22 @@ import type { RepoQueryInvalidationEvent } from '#/shared/repo-query-invalidatio
 import { invalidateRepoDataQueries, invalidateRepoRuntimeProjectionQueries } from '#/web/repo-data-query.ts'
 import { isRepoUnavailable } from '#/web/stores/repos/repo-guards.ts'
 import type { RepoRefreshStoreAccess } from '#/web/stores/repos/refresh.ts'
+import { refreshVisibleStatusCache } from '#/web/stores/repos/visible-status-refresh.ts'
 import { refreshRepoRuntimes } from '#/web/repo-runtime-query.ts'
 import { acceptRemoteLifecycleSnapshot } from '#/web/stores/repos/remote-lifecycle-projection.ts'
+
+export function requestVisibleWorkspaceStatusRefresh(
+  store: RepoRefreshStoreAccess,
+  id: string,
+  repoRuntimeId: string,
+  branchName: string | null,
+): boolean {
+  const repo = store.get().repos[id]
+  if (!repo || repo.repoRuntimeId !== repoRuntimeId || !branchName) return false
+  if (isRepoUnavailable(repo) || repo.dataLoads.visibleStatus.phase !== 'idle') return false
+  void refreshVisibleStatusCache(store, id, repoRuntimeId, branchName)
+  return true
+}
 
 export async function handleRepoInvalidationRefresh(
   store: RepoRefreshStoreAccess,

@@ -3,6 +3,7 @@ import { workspacePaneStaticTabId, type WorkspacePaneStaticTabType } from '#/sha
 import { currentRepoRuntimeId } from '#/web/stores/repos/repo-guards.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { workspacePaneStaticTabProvider } from '#/web/workspace-pane/tab-providers.ts'
+import { requestVisibleWorkspaceStatusRefresh } from '#/web/stores/repos/repo-refresh-actions.ts'
 import {
   commitWorkspacePaneCurrentTargetRoute,
   type WorkspacePaneTabControllerCommitNavigation,
@@ -223,6 +224,7 @@ async function openWorkspacePaneStaticTabAction(
       openerIdentity,
     )
   }
+  if (provider.refreshOnOpen) requestVisibleStatusRefreshOnOpen(input)
   if (transaction.kind === 'current' && !primaryWindowPresentationIsCurrent(transaction.presentationToken)) {
     return { kind: 'completed', changed: !alreadyOpen, presentation: 'superseded' }
   }
@@ -232,6 +234,15 @@ async function openWorkspacePaneStaticTabAction(
   const navigationOutcome = await commitWorkspacePaneStaticTab(input, sourceRoute, transaction)
   if (!workspacePaneActionOutcomeSucceeded(navigationOutcome)) return navigationOutcome
   return navigationOutcome.kind === 'completed' ? { ...navigationOutcome, changed: !alreadyOpen } : navigationOutcome
+}
+
+function requestVisibleStatusRefreshOnOpen(input: ResolvedOpenWorkspacePaneStaticTabActionOptions): void {
+  void requestVisibleWorkspaceStatusRefresh(
+    { get: useReposStore.getState, set: useReposStore.setState },
+    input.repoId,
+    input.repoRuntimeId,
+    input.branchName,
+  )
 }
 
 async function commitWorkspacePaneStaticTab(

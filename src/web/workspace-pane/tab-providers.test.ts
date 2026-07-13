@@ -60,11 +60,21 @@ const terminalView: WorkspacePaneTabSummary = {
 }
 
 describe('workspace pane tab providers', () => {
-  test('centralizes static tab scope', () => {
+  test('centralizes static tab scope and refresh behavior', () => {
     expect(statusWorkspacePaneTabProvider.scope).toBe('branch')
+    expect(statusWorkspacePaneTabProvider.refreshOnOpen).toBe(true)
+    expect(statusWorkspacePaneTabProvider.refreshOnVisible).toBe(true)
     expect(changesWorkspacePaneTabProvider.scope).toBe('worktree')
+    expect(changesWorkspacePaneTabProvider.refreshOnOpen).toBe(true)
+    expect(changesWorkspacePaneTabProvider.refreshOnVisible).toBe(true)
     expect(historyWorkspacePaneTabProvider.scope).toBe('branch')
+    expect(historyWorkspacePaneTabProvider.refreshOnOpen).toBe(false)
+    expect(historyWorkspacePaneTabProvider.refreshOnVisible).toBe(false)
     expect(filesWorkspacePaneTabProvider.scope).toBe('worktree')
+    expect(filesWorkspacePaneTabProvider.refreshOnOpen).toBe(true)
+    expect(filesWorkspacePaneTabProvider.refreshOnVisible).toBe(false)
+    expect(terminalWorkspacePaneTabProvider.refreshOnOpen).toBe(false)
+    expect(terminalWorkspacePaneTabProvider.refreshOnVisible).toBe(false)
   })
 
   test('derives provider scope from the shared workspace pane scope definitions', () => {

@@ -68,7 +68,7 @@ async function runRuntimeProjectionRefresh(
 ): Promise<void> {
   const { scope } = options
   const { wantsReadModelLoad, wantsVisibleStatusLoad, operationKey, priority, targets } = projectionRefreshPlan(scope)
-  const branchName = null
+  const branchName = scope === 'visible-status' ? options.branchName : null
 
   updateIfFresh(store.set, id, repoRuntimeId, (r) => {
     if (wantsReadModelLoad) {

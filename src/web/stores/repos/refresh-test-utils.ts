@@ -8,6 +8,7 @@ import {
   seedRepoWithReadModelForTest,
   type IpcTestHandler,
 } from '#/web/test-utils/bridge.ts'
+import { resetVisibleStatusRefreshStateForTest } from '#/web/stores/repos/visible-status-refresh.ts'
 export const REPO_ID = '/tmp/goblin-test-repo'
 export const ipcHandlers: Record<string, IpcTestHandler> = {}
 export const pullRequest = createPullRequest
@@ -61,6 +62,7 @@ export function seedRepo(branches: BranchSnapshotInfo[], repoRuntimeId = 'repo-r
 
 export function resetRefreshTest(): void {
   for (const key of Object.keys(ipcHandlers)) delete ipcHandlers[key]
+  resetVisibleStatusRefreshStateForTest()
   resetReposStore()
   installGoblinTestBridge(ipcHandlers)
   ipcHandlers['repo.abort'] = async () => false

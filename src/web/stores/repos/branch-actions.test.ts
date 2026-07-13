@@ -425,6 +425,7 @@ describe('runBranchAction', () => {
 
     const statusWork = requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
       scope: 'visible-status',
+      branchName: null,
     })
     await flushAsyncWork()
     const deleteWork = useReposStore.getState().runBranchAction(REPO_ID, {
@@ -469,7 +470,7 @@ describe('runBranchAction', () => {
       },
     })
 
-    void requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, { scope: 'visible-status' })
+    void requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, { scope: 'visible-status', branchName: null })
     await flushAsyncWork()
     const result = await useReposStore.getState().runBranchAction(
       REPO_ID,
@@ -567,6 +568,7 @@ describe('runBranchAction', () => {
 
     const statusWork = requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
       scope: 'visible-status',
+      branchName: null,
     })
     await flushAsyncWork()
     const pullWork = useReposStore.getState().runBranchAction(REPO_ID, { kind: 'pull', branch: 'feature/a' })
@@ -626,6 +628,7 @@ describe('runBranchAction', () => {
 
       const statusWork = requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
         scope: 'visible-status',
+        branchName: null,
       })
       await flushAsyncWork()
       const actionWork = useReposStore.getState().runBranchAction(REPO_ID, action)

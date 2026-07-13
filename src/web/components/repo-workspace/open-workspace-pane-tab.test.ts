@@ -34,6 +34,12 @@ import {
   seedInitialObservedWorkspacePaneRouteForTest,
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
+import { requestVisibleWorkspaceStatusRefresh } from '#/web/stores/repos/repo-refresh-actions.ts'
+
+vi.mock('#/web/stores/repos/repo-refresh-actions.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('#/web/stores/repos/repo-refresh-actions.ts')>()
+  return { ...actual, requestVisibleWorkspaceStatusRefresh: vi.fn(() => true) }
+})
 
 const REPO_ID = '/tmp/workspace-pane-tab-repo'
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-worktree'
@@ -43,6 +49,8 @@ beforeEach(() => {
   resetReposStore()
   installWorkspacePaneTabsTestBridge()
   setTerminalSessionCommandBridge(null)
+  vi.mocked(requestVisibleWorkspaceStatusRefresh).mockReset()
+  vi.mocked(requestVisibleWorkspaceStatusRefresh).mockReturnValue(true)
 })
 
 afterEach(() => {
@@ -275,6 +283,50 @@ describe('openWorkspacePaneTab', () => {
 
     expect(openTabsFor('feature/worktree')).toContain('history')
     expect(preferredWorkspacePaneTab()).toBe('history')
+  })
+
+  test.each(['status', 'changes', 'files'] satisfies WorkspacePaneStaticTabType[])(
+    'refreshes repo-scoped visible status after opening %s',
+    async (type) => {
+      seedWorktreeRepo(type)
+      const repoRuntimeId = useReposStore.getState().repos[REPO_ID]!.repoRuntimeId
+
+      await expect(
+        openWorkspacePaneTab({
+          workspacePaneRoute: undefined,
+          repoId: REPO_ID,
+          branchName: 'feature/worktree',
+          worktreePath: WORKTREE_PATH,
+          type,
+          navigation: navigationWithStoreActions(),
+        }),
+      ).resolves.toBe(true)
+
+      expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledOnce()
+      expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledWith(
+        expect.any(Object),
+        REPO_ID,
+        repoRuntimeId,
+        'feature/worktree',
+      )
+    },
+  )
+
+  test('does not refresh visible status after opening history', async () => {
+    seedWorktreeRepo('history')
+
+    await expect(
+      openWorkspacePaneTab({
+        workspacePaneRoute: undefined,
+        repoId: REPO_ID,
+        branchName: 'feature/worktree',
+        worktreePath: WORKTREE_PATH,
+        type: 'history',
+        navigation: navigationWithStoreActions(),
+      }),
+    ).resolves.toBe(true)
+
+    expect(requestVisibleWorkspaceStatusRefresh).not.toHaveBeenCalled()
   })
 
   test('fast-fails before static tab mutation while terminal creation is pending', async () => {
@@ -680,6 +732,7 @@ describe('openWorkspacePaneTab', () => {
 
   test('refreshes a committed open even when a newer presentation supersedes its route', async () => {
     seedWorktreeRepo('status')
+    const repoRuntimeId = useReposStore.getState().repos[REPO_ID]!.repoRuntimeId
     const mutation = Promise.withResolvers<WorkspacePaneTabEntry[]>()
     installWorkspacePaneTabsTestBridge({ updateWorkspaceTabs: async () => await mutation.promise })
 
@@ -696,6 +749,12 @@ describe('openWorkspacePaneTab', () => {
     mutation.resolve([workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('changes')])
 
     await expect(opened).resolves.toBe(true)
+    expect(requestVisibleWorkspaceStatusRefresh).toHaveBeenCalledWith(
+      expect.any(Object),
+      REPO_ID,
+      repoRuntimeId,
+      'feature/worktree',
+    )
   })
 })
 
