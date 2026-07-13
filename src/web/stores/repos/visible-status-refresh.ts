@@ -13,6 +13,16 @@ import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { acceptRepoProjectionReadModel } from '#/web/stores/repos/projection-read-model-effects.ts'
 import type { RepoRefreshStoreAccess } from '#/web/stores/repos/refresh.ts'
 
+// Why this lives next to `requestRepoRuntimeProjectionRefresh` instead of
+// sharing its lane: the latter routes through `runRuntimeProjectionRefresh`
+// / `runLatestOperation`, which is the right home for branch-action and
+// read-model refreshes, but tab-open and visibility-driven refreshes are
+// user-initiated and must not be deduped or stalled behind that lane. So
+// this module calls `getRepoProjection` directly, and uses the local
+// `visibleStatusRefreshesInFlight` set (plus `matchingProjectionFetchInProgress`)
+// to dedupe, and the `startedInvalidationVersion` check below to discard
+// stale results if a server-pushed invalidation bumps the version while
+// the fetch is still in flight.
 const visibleStatusRefreshesInFlight = new Set<string>()
 
 function visibleStatusRefreshKey(repoRoot: string, repoRuntimeId: string, branchName: string): string {
