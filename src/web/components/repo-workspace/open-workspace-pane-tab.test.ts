@@ -35,11 +35,13 @@ import {
 } from '#/web/test-utils/workspace-pane-navigation.ts'
 import { beginPrimaryWindowPresentation } from '#/web/primary-window-presentation.ts'
 import { requestVisibleWorkspaceStatusRefresh } from '#/web/stores/repos/repo-refresh-actions.ts'
+import { requestRepoRuntimeProjectionRefresh } from '#/web/stores/repos/refresh.ts'
 
 vi.mock('#/web/stores/repos/repo-refresh-actions.ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('#/web/stores/repos/repo-refresh-actions.ts')>()
   return { ...actual, requestVisibleWorkspaceStatusRefresh: vi.fn(() => true) }
 })
+vi.mock('#/web/stores/repos/refresh.ts', () => ({ requestRepoRuntimeProjectionRefresh: vi.fn(async () => {}) }))
 
 const REPO_ID = '/tmp/workspace-pane-tab-repo'
 const WORKTREE_PATH = '/tmp/workspace-pane-tab-worktree'
@@ -51,6 +53,8 @@ beforeEach(() => {
   setTerminalSessionCommandBridge(null)
   vi.mocked(requestVisibleWorkspaceStatusRefresh).mockReset()
   vi.mocked(requestVisibleWorkspaceStatusRefresh).mockReturnValue(true)
+  vi.mocked(requestRepoRuntimeProjectionRefresh).mockReset()
+  vi.mocked(requestRepoRuntimeProjectionRefresh).mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -309,6 +313,7 @@ describe('openWorkspacePaneTab', () => {
         repoRuntimeId,
         'feature/worktree',
       )
+      expect(requestRepoRuntimeProjectionRefresh).not.toHaveBeenCalled()
     },
   )
 
@@ -327,6 +332,7 @@ describe('openWorkspacePaneTab', () => {
     ).resolves.toBe(true)
 
     expect(requestVisibleWorkspaceStatusRefresh).not.toHaveBeenCalled()
+    expect(requestRepoRuntimeProjectionRefresh).not.toHaveBeenCalled()
   })
 
   test('fast-fails before static tab mutation while terminal creation is pending', async () => {
@@ -755,6 +761,7 @@ describe('openWorkspacePaneTab', () => {
       repoRuntimeId,
       'feature/worktree',
     )
+    expect(requestRepoRuntimeProjectionRefresh).not.toHaveBeenCalled()
   })
 })
 
