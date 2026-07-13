@@ -6,6 +6,8 @@ import { useMemo, useState } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RepoWorkspace } from '#/web/components/RepoWorkspace.tsx'
 import {
+  EMPTY_TERMINAL_SNAPSHOT,
+  EMPTY_TERMINAL_WORKTREE_SNAPSHOT,
   TerminalSessionContext,
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
@@ -53,24 +55,12 @@ const REPO_ID = '/tmp/repo-workspace-container-repo'
 const presentationOptions = (options: { replace?: boolean } = {}) =>
   expect.objectContaining({ ...options, presentationToken: expect.any(Object) })
 
-const emptyWorktreeSnapshot: TerminalWorktreeSnapshot = {
-  terminalWorktreeKey: '',
-  selectedDescriptor: null,
-  sessions: [],
-  count: 0,
-  bellCount: 0,
-  outputActiveCount: 0,
-  createPending: false,
-}
-
-const emptyTerminalSnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
-
 const terminalReadContext: TerminalSessionReadContextValue = {
-  terminalWorktreeSnapshot: () => emptyWorktreeSnapshot,
+  terminalWorktreeSnapshot: () => EMPTY_TERMINAL_WORKTREE_SNAPSHOT,
   subscribeTerminalWorktree: () => () => {},
   repoBellCount: () => 0,
   subscribeRepoBellCount: () => () => {},
-  snapshot: () => emptyTerminalSnapshot,
+  snapshot: () => EMPTY_TERMINAL_SNAPSHOT,
   subscribeSnapshot: () => () => {},
 }
 
@@ -1318,7 +1308,7 @@ function terminalReadContextWithSessions(
   }
   return {
     ...terminalReadContext,
-    terminalWorktreeSnapshot: (key) => (key === terminalWorktreeKey ? snapshot : emptyWorktreeSnapshot),
+    terminalWorktreeSnapshot: (key) => (key === terminalWorktreeKey ? snapshot : EMPTY_TERMINAL_WORKTREE_SNAPSHOT),
   }
 }
 

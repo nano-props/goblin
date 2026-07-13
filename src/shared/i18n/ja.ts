@@ -542,6 +542,9 @@ export const ja: Record<DictKey, string> = {
   'error.terminal-create-timeout': 'ターミナルの作成がタイムアウトしました。もう一度お試しください。',
   'error.terminal-connection-unavailable': 'ターミナルサービスを利用できません。もう一度お試しください。',
   'error.terminal-host-not-measurable': 'ターミナルパネルが見えません',
+  'error.terminal-context-unavailable': 'ターミナルセッションを利用できません',
+  'error.terminal-context-unavailable-description':
+    '一部のターミナル状態インジケーターが表示されない可能性があります — 不具合ですのでご報告ください。',
   'error.vscode-not-installed': 'VS Code がインストールされていません',
   'error.editor-not-installed': 'エディタが見つかりません',
   'error.finder-not-available': 'Finder は macOS でのみ利用できます',

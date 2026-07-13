@@ -520,6 +520,8 @@ export const zh: Record<DictKey, string> = {
   'error.terminal-create-timeout': '创建终端超时，请重试。',
   'error.terminal-connection-unavailable': '终端服务暂不可用，请重试。',
   'error.terminal-host-not-measurable': '终端面板不可见',
+  'error.terminal-context-unavailable': '终端会话不可用',
+  'error.terminal-context-unavailable-description': '部分终端状态指示器可能缺失 — 这是程序缺陷,请反馈。',
   'error.vscode-not-installed': '未安装 VS Code',
   'error.editor-not-installed': '未找到编辑器',
   'error.finder-not-available': '访达仅在 macOS 上可用',
