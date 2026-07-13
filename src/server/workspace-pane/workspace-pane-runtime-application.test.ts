@@ -8,10 +8,18 @@ import {
   type PhysicalWorktreeOperationPermit,
 } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import {
+  issueTestPhysicalWorktreeCapability,
   testPhysicalWorktreeCapability,
   testPhysicalWorktreeIdentity,
   testPhysicalWorktrees,
 } from '#/server/test-utils/physical-worktree-identity.ts'
+import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
+
+const failRemoteRuntimeIfNeededMock = vi.hoisted(() => vi.fn())
+vi.mock('#/server/modules/remote-runtime-failure-settlement.ts', async (importActual) => {
+  const actual = await importActual<typeof import('#/server/modules/remote-runtime-failure-settlement.ts')>()
+  return { ...actual, failRemoteRuntimeIfNeeded: failRemoteRuntimeIfNeededMock }
+})
 
 const request = {
   repoRoot: '/repo',
@@ -107,6 +115,75 @@ describe('WorkspacePaneRuntimeApplication', () => {
     })
     expect(ensureRuntimeTabForSession).not.toHaveBeenCalled()
     expect(broadcastWorkspaceTabsChanged).not.toHaveBeenCalled()
+  })
+
+  test('reports remote runtime failure when physical worktree capture proves transport failure', async () => {
+    const failure = new RemoteRepoRuntimeFailureError({
+      repoRoot: request.repoRoot,
+      repoRuntimeId: request.repoRuntimeId,
+      reason: 'unreachable',
+    })
+    const create = vi.fn()
+    const ensureRuntimeTabForSession = vi.fn()
+    failRemoteRuntimeIfNeededMock.mockClear()
+    const application = createWorkspacePaneRuntimeApplication({
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: { capture: async () => { throw failure } },
+      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminal: { createAdmitted: create, close: () => false },
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession, reconcileWorktreeAdmitted: vi.fn() } as unknown as Pick<
+        WorkspacePaneTabsCoordinator,
+        'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'
+      >,
+      isCurrentRepoRuntime: () => true,
+      broadcastWorkspaceTabsChanged: vi.fn(),
+    })
+
+    await expect(application.open('client-test', 'user-test', { runtimeType: 'terminal', request })).resolves.toEqual({
+      ok: false,
+      runtimeType: 'terminal',
+      message: 'unreachable',
+    })
+    expect(failRemoteRuntimeIfNeededMock).toHaveBeenCalledWith('user-test', failure)
+    expect(create).not.toHaveBeenCalled()
+    expect(ensureRuntimeTabForSession).not.toHaveBeenCalled()
+  })
+
+  test('reports remote runtime failure when queued physical validation proves transport failure', async () => {
+    const failure = new RemoteRepoRuntimeFailureError({
+      repoRoot: request.repoRoot,
+      repoRuntimeId: request.repoRuntimeId,
+      reason: 'unreachable',
+      message: 'connection refused',
+    })
+    const capability = issueTestPhysicalWorktreeCapability({
+      identity: testPhysicalWorktreeIdentity(request.worktreePath),
+      validateExecution: async () => { throw failure },
+    })
+    const create = vi.fn()
+    const ensureRuntimeTabForSession = vi.fn()
+    failRemoteRuntimeIfNeededMock.mockClear()
+    const application = createWorkspacePaneRuntimeApplication({
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: { capture: async () => capability },
+      terminalWorktree: { listSessionsForUser: async () => [] },
+      terminal: { createAdmitted: create, close: () => false },
+      workspaceTabsCoordinator: { ensureRuntimeTabForSession, reconcileWorktreeAdmitted: vi.fn() } as unknown as Pick<
+        WorkspacePaneTabsCoordinator,
+        'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'
+      >,
+      isCurrentRepoRuntime: () => true,
+      broadcastWorkspaceTabsChanged: vi.fn(),
+    })
+
+    await expect(application.open('client-test', 'user-test', { runtimeType: 'terminal', request })).resolves.toEqual({
+      ok: false,
+      runtimeType: 'terminal',
+      message: 'connection refused',
+    })
+    expect(failRemoteRuntimeIfNeededMock).toHaveBeenCalledWith('user-test', failure)
+    expect(create).not.toHaveBeenCalled()
+    expect(ensureRuntimeTabForSession).not.toHaveBeenCalled()
   })
 
   test.each(['created', 'reused', 'restored'] as const)(

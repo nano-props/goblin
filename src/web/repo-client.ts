@@ -50,12 +50,13 @@ export async function cloneRepository(input: {
 
 export async function getRepoLog(
   cwd: string,
+  repoRuntimeId: string,
   branch: string,
   options?: { count?: number; skip?: number; signal?: AbortSignal },
 ): Promise<LogEntry[]> {
   const result = await postServerJson(
     '/api/repo/log',
-    { cwd, branch, count: options?.count ?? DEFAULT_REPOSITORY_LOG_COUNT, skip: options?.skip ?? 0 },
+    { cwd, repoRuntimeId, branch, count: options?.count ?? DEFAULT_REPOSITORY_LOG_COUNT, skip: options?.skip ?? 0 },
     { signal: options?.signal },
   )
   const log = result as RepoLogResponse
@@ -63,30 +64,32 @@ export async function getRepoLog(
   throw new Error(log.message)
 }
 
-export async function getRepoRemoteBranches(cwd: string, signal?: AbortSignal): Promise<string[]> {
-  return await postServerJson('/api/repo/remote-branches', { cwd }, { signal })
+export async function getRepoRemoteBranches(cwd: string, repoRuntimeId: string, signal?: AbortSignal): Promise<string[]> {
+  return await postServerJson('/api/repo/remote-branches', { cwd, repoRuntimeId }, { signal })
 }
 
 export async function getRepoProjection(
   cwd: string,
+  repoRuntimeId: string,
   branch?: string | null,
   options?: { mode?: PullRequestFetchMode },
   signal?: AbortSignal,
 ): Promise<RepoRuntimeProjection> {
   return await postServerJson(
     '/api/repo/projection',
-    { cwd, branch: branch || undefined, mode: options?.mode },
+    { cwd, repoRuntimeId, branch: branch || undefined, mode: options?.mode },
     { signal },
   )
 }
 
 export async function getRepoOperations(
   cwd: string,
+  repoRuntimeId: string,
   options?: { includeSettled?: boolean; signal?: AbortSignal },
 ): Promise<RepoOperationsSnapshot> {
   return await postServerJson(
     '/api/repo/operations',
-    { cwd, includeSettled: options?.includeSettled },
+    { cwd, repoRuntimeId, includeSettled: options?.includeSettled },
     { signal: options?.signal },
   )
 }
@@ -97,9 +100,10 @@ export async function abortRepoOperation(cwd: string): Promise<boolean> {
 
 export async function fetchRepo(
   cwd: string,
+  repoRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<{ ok: boolean; message: string }> {
-  return await postServerJson('/api/repo/fetch', { cwd }, {
+  return await postServerJson('/api/repo/fetch', { cwd, repoRuntimeId }, {
     signal,
     timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
   })
@@ -107,23 +111,25 @@ export async function fetchRepo(
 
 export async function pullRepoBranch(
   cwd: string,
+  repoRuntimeId: string,
   branch: string,
   worktreePath?: string,
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   return await postServerJson(
     '/api/repo/pull',
-    { cwd, branch, worktreePath },
+    { cwd, repoRuntimeId, branch, worktreePath },
     { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork },
   )
 }
 
 export async function pushRepoBranch(
   cwd: string,
+  repoRuntimeId: string,
   branch: string,
   signal?: AbortSignal,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/push', { cwd, branch }, {
+  return await postServerJson('/api/repo/push', { cwd, repoRuntimeId, branch }, {
     signal,
     timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
   })
@@ -131,33 +137,36 @@ export async function pushRepoBranch(
 
 export async function createRepoWorktree(
   cwd: string,
+  repoRuntimeId: string,
   input: CreateWorktreeInput,
   worktreeBootstrap: WorktreeBootstrapDecision,
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   return await postServerJson(
     '/api/repo/create-worktree',
-    { cwd, ...input, worktreeBootstrap },
+    { cwd, repoRuntimeId, ...input, worktreeBootstrap },
     { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.worktreeCreate },
   )
 }
 
 export async function getRepoWorktreeBootstrapPreview(
   cwd: string,
+  repoRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<WorktreeBootstrapPreviewResult> {
-  return await postServerJson('/api/repo/worktree-bootstrap-preview', { cwd }, { signal })
+  return await postServerJson('/api/repo/worktree-bootstrap-preview', { cwd, repoRuntimeId }, { signal })
 }
 
 export async function deleteRepoBranch(
   cwd: string,
+  repoRuntimeId: string,
   branch: string,
   options?: { force?: boolean; alsoDeleteUpstream?: boolean },
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   return await postServerJson(
     '/api/repo/delete-branch',
-    { cwd, branch, force: options?.force, alsoDeleteUpstream: options?.alsoDeleteUpstream },
+    { cwd, repoRuntimeId, branch, force: options?.force, alsoDeleteUpstream: options?.alsoDeleteUpstream },
     { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.branchMutation },
   )
 }
@@ -180,13 +189,23 @@ export async function removeRepoWorktree(
   })
 }
 
-export async function getRepoPatch(cwd: string, worktreePath: string, signal?: AbortSignal): Promise<ExecResult> {
-  return await postServerJson('/api/repo/patch', { cwd, worktreePath }, { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.patch })
+export async function getRepoPatch(
+  cwd: string,
+  repoRuntimeId: string,
+  worktreePath: string,
+  signal?: AbortSignal,
+): Promise<ExecResult> {
+  return await postServerJson(
+    '/api/repo/patch',
+    { cwd, repoRuntimeId, worktreePath },
+    { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.patch },
+  )
 }
 
-export async function openRepoUrl(cwd: string, target: RepoUrlTarget): Promise<ExecResult> {
-  const result = await postServerJson<{ cwd: string; target: RepoUrlTarget }, ExecResult>('/api/repo/open-url', {
+export async function openRepoUrl(cwd: string, repoRuntimeId: string, target: RepoUrlTarget): Promise<ExecResult> {
+  const result = await postServerJson<{ cwd: string; repoRuntimeId: string; target: RepoUrlTarget }, ExecResult>('/api/repo/open-url', {
     cwd,
+    repoRuntimeId,
     target,
   })
   if (!result.ok || !result.message) return result
@@ -196,18 +215,20 @@ export async function openRepoUrl(cwd: string, target: RepoUrlTarget): Promise<E
 
 export async function openRepoTerminal(
   repoId: string,
+  repoRuntimeId: string,
   worktreePath: string,
   app: TerminalApp,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/open-terminal', { repoId, worktreePath, app })
+  return await postServerJson('/api/repo/open-terminal', { repoId, repoRuntimeId, worktreePath, app })
 }
 
 export async function openRepoEditor(
   repoId: string,
+  repoRuntimeId: string,
   worktreePath: string,
   app: EditorApp,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/open-editor', { repoId, worktreePath, app })
+  return await postServerJson('/api/repo/open-editor', { repoId, repoRuntimeId, worktreePath, app })
 }
 
 export async function openRepoInFinder(repoId: string, worktreePath: string): Promise<ExecResult> {

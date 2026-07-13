@@ -17,6 +17,7 @@ import {
   onRepoRuntimeClosed,
   type RepoRuntimeClosedEvent,
 } from '#/server/modules/repo-runtimes.ts'
+import { remoteRuntimeFailureFromCommandResult } from '#/server/modules/remote-runtime-failure.ts'
 import {
   physicalWorktreeIdentityKey,
   type PhysicalWorktreeIdentity,
@@ -230,12 +231,16 @@ export class PhysicalWorktreeIdentityResolver {
     }
     epoch.remoteConfigFingerprint = resolved.configFingerprint
 
+    const runRemoteCommand = this.runtimeAwareRemoteRunner({
+      repoRoot: input.repoRoot,
+      repoRuntimeId: input.repoRuntimeId,
+    })
     const known = await this.deps.resolveRemoteWorktree(resolved.target, worktreePath, {
       signal,
-      run: this.deps.runRemoteCommand,
+      run: runRemoteCommand,
     })
     this.assertEpochActive(epoch)
-    const result = await this.deps.runRemoteCommand(
+    const result = await runRemoteCommand(
       { type: 'resolvePhysicalWorktreeIdentity', path: known.path },
       resolved.target,
       { signal },
@@ -272,7 +277,10 @@ export class PhysicalWorktreeIdentityResolver {
       }
       return
     }
-    const result = await this.deps.runRemoteCommand(
+    const result = await this.runtimeAwareRemoteRunner({
+      repoRoot: epoch.repoRoot,
+      repoRuntimeId: epoch.repoRuntimeId,
+    })(
       { type: 'resolvePhysicalWorktreeIdentity', path: execution.canonicalWorktreePath },
       execution.target,
       { signal },
@@ -322,6 +330,23 @@ export class PhysicalWorktreeIdentityResolver {
       !this.deps.isCurrentRepoRuntime(epoch.userId, epoch.repoRoot, epoch.repoRuntimeId)
     ) {
       throw new Error('error.repo-runtime-stale')
+    }
+  }
+
+  private runtimeAwareRemoteRunner(input: {
+    repoRoot: string
+    repoRuntimeId: string
+  }): RemoteCommandRunner {
+    return async (command, target, options) => {
+      const result = await this.deps.runRemoteCommand(command, target, options)
+      const runtimeFailure = remoteRuntimeFailureFromCommandResult({
+        repoRoot: input.repoRoot,
+        repoRuntimeId: input.repoRuntimeId,
+        target,
+        result,
+      })
+      if (runtimeFailure) throw runtimeFailure
+      return result
     }
   }
 

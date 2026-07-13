@@ -12,6 +12,7 @@ import type {
   PhysicalWorktreeCapability,
   PhysicalWorktreeIdentityResolver,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import { failRemoteRuntimeIfNeeded } from '#/server/modules/remote-runtime-failure-settlement.ts'
 
 const worktreeRemovalLogger = serverLogger.child({ module: 'worktree-removal-application' })
 
@@ -61,6 +62,7 @@ export class WorktreeRemovalApplication {
         refresh: true,
       })
     } catch (error) {
+      failRemoteRuntimeIfNeeded(userId, error)
       return { ok: false, message: error instanceof Error ? error.message : String(error) }
     }
     try {
@@ -115,6 +117,7 @@ export class WorktreeRemovalApplication {
       }, input.signal)
       return result.admitted ? result.value : { ok: false, message: 'error.worktree-removal-in-progress' }
     } catch (error) {
+      failRemoteRuntimeIfNeeded(userId, error)
       return { ok: false, message: abortMessage(error) }
     }
   }

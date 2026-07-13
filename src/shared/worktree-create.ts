@@ -28,6 +28,7 @@ export interface CreateWorktreeInput {
 /** Wire-shape envelope used by the IPC bridge: includes `cwd` on top of the canonical input. */
 export interface CreateWorktreeIpcInput extends CreateWorktreeInput {
   cwd: string
+  repoRuntimeId: string
   worktreeBootstrap: WorktreeBootstrapDecision
 }
 

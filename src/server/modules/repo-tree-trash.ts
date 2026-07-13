@@ -2,7 +2,7 @@ import path from 'node:path'
 import { lstat } from 'node:fs/promises'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import type { ExecResult, WorktreeInfo } from '#/shared/git-types.ts'
-import { resolveRemoteRepoTarget } from '#/server/modules/repo-source.ts'
+import { remoteRuntimeAwareGitRunner, resolveRemoteRepoTarget } from '#/server/modules/repo-source.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import { trashRemoteFile } from '#/system/ssh/git.ts'
 import { movePathToTrash } from '#/system/trash.ts'
@@ -12,13 +12,18 @@ export async function trashRepositoryFile(
   worktreePath: string,
   filePath: string,
   signal?: AbortSignal,
+  options: { repoRuntimeId?: string } = {},
 ): Promise<ExecResult> {
   if (signal?.aborted) return { ok: false, message: 'cancelled' }
   if (!hasUsableWorktreePath(worktreePath)) return { ok: false, message: 'error.invalid-worktree-path' }
 
   if (isRemoteRepoId(cwd)) {
-    const target = await resolveRemoteRepoTarget(cwd)
-    return await trashRemoteFile(target, worktreePath, filePath, { signal })
+    const target = await resolveRemoteRepoTarget(
+      cwd,
+      options.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined,
+    )
+    const run = options.repoRuntimeId ? remoteRuntimeAwareGitRunner(cwd, options.repoRuntimeId, target) : undefined
+    return await trashRemoteFile(target, worktreePath, filePath, { signal, ...(run ? { run } : {}) })
   }
 
   const worktrees = await getWorktrees(cwd, { includeStatus: false, signal })

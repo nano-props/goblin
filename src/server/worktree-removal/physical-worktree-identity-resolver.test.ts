@@ -125,6 +125,50 @@ describe('PhysicalWorktreeIdentityResolver', () => {
     resolver.dispose()
   })
 
+  test('classifies transport failures while resolving the remote worktree list', async () => {
+    const repoRoot = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
+    const resolver = new PhysicalWorktreeIdentityResolver({
+      async resolveRemoteTarget() {
+        return {
+          target: {
+            id: repoRoot,
+            alias: 'prod',
+            host: 'example.invalid',
+            user: 'developer',
+            port: 22,
+            remotePath: '/srv/repo',
+            displayName: 'prod',
+          },
+          configFingerprint: 'same-ssh-config',
+        }
+      },
+      async resolveRemoteWorktree(target, worktreePath, options = {}) {
+        await options.run?.({ type: 'gitWorktreeList', path: target.remotePath }, target, { signal: options.signal })
+        return { path: worktreePath } as WorktreeInfo
+      },
+      async runRemoteCommand() {
+        return {
+          ok: false,
+          stdout: '',
+          stderr: 'ssh_exchange_identification: Connection closed by remote host',
+          message: 'ssh failed',
+        }
+      },
+      isCurrentRepoRuntime: () => true,
+      onRepoRuntimeClosed: () => () => undefined,
+    })
+
+    await expect(
+      resolver.capture({ ...LOCAL_INPUT, repoRoot, worktreePath: '/srv/worktrees/feature' }),
+    ).rejects.toMatchObject({
+      name: 'RemoteRepoRuntimeFailureError',
+      repoRoot,
+      repoRuntimeId: LOCAL_INPUT.repoRuntimeId,
+      reason: 'handshake-failed',
+    })
+    resolver.dispose()
+  })
+
   test('fences a deferred resolve when its repo runtime closes', async () => {
     const worktrees = Promise.withResolvers<WorktreeInfo[]>()
     let current = true

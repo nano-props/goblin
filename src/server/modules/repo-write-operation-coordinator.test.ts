@@ -157,6 +157,46 @@ describe('repo write operation coordinator', () => {
     })
   })
 
+  test('filters write operations by runtime while retaining repo-scoped operations', async () => {
+    await enqueueRepoWriteOperation(
+      '/tmp/repo',
+      undefined,
+      { repoId: '/tmp/repo', kind: 'fetch', source: 'background' },
+      (operation) => async () => {
+        operation.start()
+        operation.settle({ ok: true, message: 'repo-scoped' })
+        return { ok: true, message: 'repo-scoped' }
+      },
+    )
+    await enqueueRepoWriteOperation(
+      '/tmp/repo',
+      undefined,
+      { repoId: '/tmp/repo', repoRuntimeId: 'repo-runtime-current', kind: 'delete-branch', source: 'user' },
+      (operation) => async () => {
+        operation.start()
+        operation.settle({ ok: true, message: 'current' })
+        return { ok: true, message: 'current' }
+      },
+    )
+    await enqueueRepoWriteOperation(
+      '/tmp/repo',
+      undefined,
+      { repoId: '/tmp/repo', repoRuntimeId: 'repo-runtime-stale', kind: 'remove-worktree', source: 'user' },
+      (operation) => async () => {
+        operation.start()
+        operation.settle({ ok: true, message: 'stale' })
+        return { ok: true, message: 'stale' }
+      },
+    )
+
+    await expect(
+      listRepoWriteOperationsForRepo('/tmp/repo', { repoRuntimeId: 'repo-runtime-current', includeSettled: true }),
+    ).resolves.toMatchObject([
+      { kind: 'fetch', repoRuntimeId: null },
+      { kind: 'delete-branch', repoRuntimeId: 'repo-runtime-current' },
+    ])
+  })
+
   test('keeps settled write operations globally bounded', async () => {
     for (let index = 0; index < 105; index += 1) {
       const repoId = `/tmp/repo-${index}`

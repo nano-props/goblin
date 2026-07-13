@@ -95,11 +95,11 @@ function selectedRuntimeSessionId(selection: RepoWorkspaceSelection, type: Works
   return tab.kind === 'runtime' && tab.runtimeType === type ? tab.sessionId : null
 }
 
-function StatusWorkspacePanePanel({ workspacePaneId, panelLabel, detail }: WorkspacePanePanelProps) {
+function StatusWorkspacePanePanel({ repo, workspacePaneId, panelLabel, detail }: WorkspacePanePanelProps) {
   return (
     <WorkspacePanePanelFrame id={`${workspacePaneId}-status-panel`} {...panelLabel} busy={detail.loading.pullRequests}>
       <ScrollPane>
-        <BranchStatus detail={detail} />
+        <BranchStatus detail={detail} repoRuntimeId={repo.repoRuntimeId} />
       </ScrollPane>
     </WorkspacePanePanelFrame>
   )
@@ -180,7 +180,7 @@ function FiletreeTab({
   const expandedKeyList = useFiletreeInteractionStore(
     (s) => s.interactionByScope[interactionScopeKey]?.expandedKeys ?? emptyFiletreeInteractionSnapshot().expandedKeys,
   )
-  const result = useLazyRepoTree({ repoId, worktreePath, expandedKeys: expandedKeyList })
+  const result = useLazyRepoTree({ repoId, repoRuntimeId, worktreePath, expandedKeys: expandedKeyList })
   const setSelectedKeys = useFiletreeInteractionStore((s) => s.setSelectedKeys)
   const setExpandedKey = useFiletreeInteractionStore((s) => s.setExpandedKey)
   const setTopVisibleRowIndex = useFiletreeInteractionStore((s) => s.setTopVisibleRowIndex)
@@ -255,7 +255,7 @@ function FiletreeTab({
           insertAfterIdentity: openerIdentity,
           options: {
             resolveStartupShellCommand: async () => {
-              const viewerResult = await getRepositoryFileViewer(repoId, worktreePath)
+              const viewerResult = await getRepositoryFileViewer(repoId, worktreePath, { repoRuntimeId })
               return fileReadCommand(viewerResult, absoluteFilePathForTerminal(worktreePath, node.path))
             },
           },
@@ -283,9 +283,9 @@ function FiletreeTab({
   const requestTrashFile = useCallback(
     (node: RepoTreeNode) => {
       if (node.kind !== 'file') return
-      openTrashFileConfirm({ repoId, worktreePath, path: node.path, name: node.name })
+      openTrashFileConfirm({ repoId, repoRuntimeId, worktreePath, path: node.path, name: node.name })
     },
-    [openTrashFileConfirm, repoId, worktreePath],
+    [openTrashFileConfirm, repoId, repoRuntimeId, worktreePath],
   )
 
   return (
@@ -373,7 +373,7 @@ function BranchHistoryTab({
         <EmptyState title={t('log.empty-for-branch', { branch: branchName })} />
       ) : (
         <ScrollPane>
-          <HistoryCommitGraph repoId={repoId} entries={entries} />
+          <HistoryCommitGraph repoId={repoId} repoRuntimeId={repoRuntimeId} entries={entries} />
         </ScrollPane>
       )}
     </WorkspacePanePanelFrame>

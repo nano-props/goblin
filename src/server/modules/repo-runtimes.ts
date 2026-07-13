@@ -1,6 +1,11 @@
 import { createOpaqueId, isOpaqueId } from '#/shared/opaque-id.ts'
 import { serverLogger } from '#/server/logger.ts'
-import type { RemoteRepoConnectionResult, RemoteRepoRuntimeLifecycle } from '#/shared/remote-repo.ts'
+import type {
+  RemoteRepoConnectionResult,
+  RemoteRepoFailureReason,
+  RemoteRepoRuntimeLifecycle,
+  RemoteRepoTarget,
+} from '#/shared/remote-repo.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 
 interface RepoRuntimeState {
@@ -47,6 +52,11 @@ type TerminalRemoteLifecycle = Extract<RemoteRepoRuntimeLifecycle, { kind: 'read
 export type RepoRemoteLifecycleRunResult =
   | { kind: 'settled'; name: string; lifecycle: TerminalRemoteLifecycle }
   | { kind: 'superseded' }
+  | { kind: 'stale-runtime' }
+
+export type RepoRemoteLifecycleFailResult =
+  | { kind: 'settled'; name: string; lifecycle: Extract<RemoteRepoRuntimeLifecycle, { kind: 'failed' }> }
+  | { kind: 'not-remote' }
   | { kind: 'stale-runtime' }
 
 const repoRuntimesByUser = new Map<string, Map<string, RepoRuntimeState>>()
@@ -212,6 +222,32 @@ export function isCurrentRepoRuntime(userId: string, repoRoot: string, repoRunti
   return repoRuntimesByUser.get(userId)?.get(repoRoot)?.currentRepoRuntimeId === repoRuntimeId
 }
 
+export function failRepoRemoteLifecycle(input: {
+  userId: string
+  repoRoot: string
+  repoRuntimeId: string
+  reason: RemoteRepoFailureReason
+  target?: RemoteRepoTarget
+}): RepoRemoteLifecycleFailResult {
+  if (!isRemoteRepoId(input.repoRoot)) return { kind: 'not-remote' }
+  const state = repoRuntimesByUser.get(input.userId)?.get(input.repoRoot)
+  if (!state || state.currentRepoRuntimeId !== input.repoRuntimeId) return { kind: 'stale-runtime' }
+
+  state.remoteAttemptController?.abort()
+  state.remoteAttemptController = null
+  state.remoteAttemptPromise = null
+  const attemptId = state.remoteLifecycle.attemptId + 1
+  const target = input.target ?? remoteLifecycleTarget(state.remoteLifecycle) ?? undefined
+  state.remoteLifecycle = {
+    kind: 'failed',
+    attemptId,
+    reason: input.reason,
+    ...(target ? { target } : {}),
+  }
+  state.remoteName = state.remoteName ?? target?.displayName ?? input.repoRoot
+  return { kind: 'settled', name: state.remoteName, lifecycle: state.remoteLifecycle }
+}
+
 export async function runRepoRemoteLifecycle(
   userId: string,
   repoRoot: string,
@@ -332,6 +368,10 @@ function settledRepoRemoteLifecycleResult(
   }
   if (state.remoteName === null) throw new Error(`repo remote lifecycle name is missing for ${repoRoot}`)
   return { kind: 'settled', name: state.remoteName, lifecycle: state.remoteLifecycle }
+}
+
+function remoteLifecycleTarget(lifecycle: RemoteRepoRuntimeLifecycle): RemoteRepoTarget | null {
+  return lifecycle.kind === 'ready' || lifecycle.kind === 'failed' ? (lifecycle.target ?? null) : null
 }
 
 function supersededRemoteLifecycleResult(state: RepoRuntimeState, repoRuntimeId: string): RepoRemoteLifecycleRunResult {

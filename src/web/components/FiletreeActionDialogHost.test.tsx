@@ -45,6 +45,7 @@ describe('FiletreeActionDialogHost', () => {
     act(() => {
       useFiletreeActionDialogsStore.getState().openTrashFileConfirm({
         repoId: '/repo',
+        repoRuntimeId: 'repo-runtime-filetree-action-test',
         worktreePath: '/repo-worktree',
         path: 'src/example.ts',
         name: 'example.ts',

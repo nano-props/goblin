@@ -105,6 +105,8 @@ export interface RemoteCommandResult {
   stderr: string
   message?: string
   timedOut?: boolean
+  remoteStarted?: boolean
+  transportStderr?: string
 }
 
 export interface RemoteCommandInvocation {
@@ -125,6 +127,9 @@ const SNAPSHOT_MANAGED_SSH_OPTIONS = new Set([
   'stricthostkeychecking',
   'user',
 ])
+const REMOTE_COMMAND_STARTED_MARKER = '__GOBLIN_REMOTE_COMMAND_STARTED__'
+const REMOTE_COMMAND_STDERR_BEGIN_MARKER = '__GOBLIN_REMOTE_COMMAND_STDERR_BEGIN__'
+const REMOTE_COMMAND_STDERR_END_MARKER = '__GOBLIN_REMOTE_COMMAND_STDERR_END__'
 
 /** Converts one `ssh -G` result into argv-safe options that never consult config again. */
 export function buildCanonicalSshConnectionSnapshot(
@@ -226,7 +231,11 @@ export async function runRemoteCommand(
   options?: { signal?: AbortSignal; timeoutMs?: number },
 ): Promise<RemoteCommandResult> {
   if (options?.signal?.aborted) return { ok: false, stdout: '', stderr: '', message: 'cancelled' }
-  const invocation = buildRemoteCommandInvocation(target, command)
+  const invocation = buildCanonicalSshInvocation(
+    target,
+    commandStartedMarkerScript(scriptForCommand(command)),
+    ['-T', '-o', 'RequestTTY=no'],
+  )
   // Ensure the ControlMaster socket directory exists. ssh will refuse to
   // create a control socket in a missing directory, which on a fresh
   // install manifests as every probe failing before the handshake.
@@ -238,19 +247,117 @@ export async function runRemoteCommand(
       forceKillAfterDelay: 500,
       maxBuffer: 2 * 1024 * 1024,
     })
-    return { ok: true, stdout: stdout.trimEnd(), stderr: stderr.trimEnd() }
+    const parsed = parseRemoteCommandOutput(stdout, stderr)
+    return { ok: true, stdout: parsed.stdout, stderr: parsed.stderr, remoteStarted: parsed.remoteStarted }
   } catch (err) {
     const e = err as { stdout?: unknown; stderr?: unknown; timedOut?: boolean; isCanceled?: boolean; message?: string }
-    const stdout = typeof e.stdout === 'string' ? e.stdout.trimEnd() : ''
-    const stderr = typeof e.stderr === 'string' ? e.stderr.trimEnd() : ''
+    const parsed = parseRemoteCommandOutput(
+      typeof e.stdout === 'string' ? e.stdout : '',
+      typeof e.stderr === 'string' ? e.stderr : '',
+    )
+    const transport = parsed.remoteStarted ? { transportStderr: parsed.transportStderr } : {}
     if (options?.signal?.aborted || e.isCanceled === true) {
-      return { ok: false, stdout, stderr, message: 'cancelled' }
+      return {
+        ok: false,
+        stdout: parsed.stdout,
+        stderr: parsed.stderr,
+        message: 'cancelled',
+        remoteStarted: parsed.remoteStarted,
+        ...transport,
+      }
     }
     if (err instanceof ExecaError && e.timedOut) {
-      return { ok: false, stdout, stderr, message: 'timeout', timedOut: true }
+      return {
+        ok: false,
+        stdout: parsed.stdout,
+        stderr: parsed.stderr,
+        message: 'timeout',
+        timedOut: true,
+        remoteStarted: parsed.remoteStarted,
+        ...transport,
+      }
     }
-    return { ok: false, stdout, stderr, message: stderr || e.message || 'unknown' }
+    return {
+      ok: false,
+      stdout: parsed.stdout,
+      stderr: parsed.stderr,
+      message: parsed.stderr || parsed.transportStderr || e.message || 'unknown',
+      remoteStarted: parsed.remoteStarted,
+      ...transport,
+    }
   }
+}
+
+function commandStartedMarkerScript(script: string): string {
+  // OpenSSH writes both remote stderr and local client diagnostics to the
+  // local stderr fd. Capture remote stderr on the host and replay it in a
+  // framed block so callers can classify transport failures without mistaking
+  // upstream Git/SSH errors for this SSH session.
+  return [
+    `printf '%s\n' ${shellQuote(REMOTE_COMMAND_STARTED_MARKER)}`,
+    'goblin_old_umask=$(umask)',
+    'umask 077',
+    'if command -v mktemp >/dev/null 2>&1; then',
+    '  goblin_stderr_dir=$(mktemp -d "${TMPDIR:-/tmp}/goblin-stderr.XXXXXX") || exit 125',
+    'else',
+    '  goblin_stderr_dir="${TMPDIR:-/tmp}/goblin-stderr.$$"',
+    '  mkdir -m 700 -- "$goblin_stderr_dir" || exit 125',
+    'fi',
+    'goblin_stderr="$goblin_stderr_dir/stderr"',
+    `trap 'rm -rf -- "$goblin_stderr_dir"' EXIT`,
+    ': >"$goblin_stderr" || exit 125',
+    'umask "$goblin_old_umask"',
+    '(',
+    script,
+    ') 2>"$goblin_stderr"',
+    'goblin_status=$?',
+    `printf '%s\n' ${shellQuote(REMOTE_COMMAND_STDERR_BEGIN_MARKER)} >&2`,
+    'cat -- "$goblin_stderr" >&2',
+    `printf '\\n%s\\n' ${shellQuote(REMOTE_COMMAND_STDERR_END_MARKER)} >&2`,
+    'exit "$goblin_status"',
+  ].join('\n')
+}
+
+function parseRemoteCommandOutput(
+  stdout: string,
+  stderr: string,
+): { stdout: string; stderr: string; transportStderr: string; remoteStarted: boolean } {
+  const stripped = stripCommandStartedMarker(stdout.trimEnd())
+  const split = splitRemoteCommandStderr(stderr.trimEnd())
+  return {
+    stdout: stripped.stdout,
+    stderr: split.stderr,
+    transportStderr: split.transportStderr,
+    remoteStarted: stripped.remoteStarted,
+  }
+}
+
+function splitRemoteCommandStderr(stderr: string): { stderr: string; transportStderr: string } {
+  const lines = stderr.split('\n')
+  let endIndex = -1
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    if (lines[index] !== REMOTE_COMMAND_STDERR_END_MARKER) continue
+    endIndex = index
+    break
+  }
+  // Incomplete framing means stderr was not safely separated. Keep the raw
+  // text visible as command stderr, but do not expose it as transport stderr.
+  if (endIndex === -1) return { stderr, transportStderr: '' }
+  const beginIndex = lines.findIndex((line, index) => index < endIndex && line === REMOTE_COMMAND_STDERR_BEGIN_MARKER)
+  if (beginIndex === -1) return { stderr, transportStderr: '' }
+
+  const remoteStderr = lines.slice(beginIndex + 1, endIndex).join('\n').trimEnd()
+  const before = lines.slice(0, beginIndex).join('\n').trimEnd()
+  const after = lines.slice(endIndex + 1).join('\n').trimEnd()
+  const transportStderr = [before, after].filter(Boolean).join('\n').trimEnd()
+  return { stderr: remoteStderr, transportStderr }
+}
+
+function stripCommandStartedMarker(stdout: string): { stdout: string; remoteStarted: boolean } {
+  const lines = stdout.split('\n')
+  const markerIndex = lines.findIndex((line) => line === REMOTE_COMMAND_STARTED_MARKER)
+  if (markerIndex === -1) return { stdout, remoteStarted: false }
+  return { stdout: lines.slice(markerIndex + 1).join('\n'), remoteStarted: true }
 }
 
 function scriptForCommand(command: RemoteCommandKind): string {

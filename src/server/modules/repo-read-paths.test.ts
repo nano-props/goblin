@@ -130,7 +130,7 @@ describe('getRepoWorktreeBootstrapPreview', () => {
     const { getRepoWorktreeBootstrapPreview } = await import('#/server/modules/repo-read-paths.ts')
     const signal = new AbortController().signal
 
-    await expect(getRepoWorktreeBootstrapPreview('/tmp/repo', signal)).resolves.toMatchObject({
+    await expect(getRepoWorktreeBootstrapPreview('/tmp/repo', { signal })).resolves.toMatchObject({
       ok: true,
       preview: { hasOperations: true },
     })
@@ -179,6 +179,37 @@ describe('readRepoProjection', () => {
     expect(getPullRequests).toHaveBeenCalledWith(['feature/a'], {
       mode: 'full',
       signal: expect.any(AbortSignal),
+    })
+    expect(mocks.listRepoWriteOperationsForRepo).toHaveBeenCalledWith('/tmp/repo', {
+      signal,
+      repoRuntimeId: undefined,
+    })
+  })
+
+  test('scopes embedded operations to the requested repo runtime', async () => {
+    mocks.listRepoWriteOperationsForRepo.mockResolvedValue([
+      {
+        id: 'op-current',
+        repoId: '/tmp/repo',
+        repoRuntimeId: 'repo-runtime-current',
+        kind: 'fetch',
+        source: 'background',
+        phase: 'running',
+        enqueuedAt: 1,
+        startedAt: 2,
+        settledAt: null,
+        error: null,
+      },
+    ])
+    const { readRepoProjection } = await import('#/server/modules/repo-read-paths.ts')
+    const signal = new AbortController().signal
+
+    const result = await readRepoProjection('/tmp/repo', { signal, repoRuntimeId: 'repo-runtime-current' })
+
+    expect(result.operations.operations).toMatchObject([{ id: 'op-current', repoRuntimeId: 'repo-runtime-current' }])
+    expect(mocks.listRepoWriteOperationsForRepo).toHaveBeenCalledWith('/tmp/repo', {
+      signal,
+      repoRuntimeId: 'repo-runtime-current',
     })
   })
 

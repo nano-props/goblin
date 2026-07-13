@@ -71,6 +71,8 @@ function testBridge(overrides: Partial<ClientBridge> = {}): ClientBridge {
 }
 
 describe('repo-client', () => {
+  const repoRuntimeId = 'repo-runtime-test'
+
   beforeEach(() => {
     vi.resetModules()
     vi.restoreAllMocks()
@@ -105,7 +107,7 @@ describe('repo-client', () => {
       json: async () => ({ ok: true, message: 'https://github.com/acme/repo/tree/feature/test' }),
     }))
     const { openRepoUrl } = await import('#/web/repo-client.ts')
-    await expect(openRepoUrl('/tmp/repo', { type: 'branch', branch: 'feature/test' })).resolves.toEqual({
+    await expect(openRepoUrl('/tmp/repo', repoRuntimeId, { type: 'branch', branch: 'feature/test' })).resolves.toEqual({
       ok: true,
       message: '',
     })
@@ -119,7 +121,7 @@ describe('repo-client', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
-        body: JSON.stringify({ cwd: '/tmp/repo', target: { type: 'branch', branch: 'feature/test' } }),
+        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, target: { type: 'branch', branch: 'feature/test' } }),
       }),
     )
   })
@@ -148,7 +150,7 @@ describe('repo-client', () => {
     }))
     const { openRepoUrl } = await import('#/web/repo-client.ts')
 
-    await expect(openRepoUrl('/tmp/repo', { type: 'commit', hash: 'abcdef1' })).resolves.toEqual({
+    await expect(openRepoUrl('/tmp/repo', repoRuntimeId, { type: 'commit', hash: 'abcdef1' })).resolves.toEqual({
       ok: true,
       message: '',
     })
@@ -157,7 +159,7 @@ describe('repo-client', () => {
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
-        body: JSON.stringify({ cwd: '/tmp/repo', target: { type: 'commit', hash: 'abcdef1' } }),
+        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, target: { type: 'commit', hash: 'abcdef1' } }),
       }),
     )
     expect(openExternalUrl).toHaveBeenCalledWith({
@@ -207,7 +209,7 @@ describe('repo-client', () => {
     })
 
     const { fetchRepo } = await import('#/web/repo-client.ts')
-    const request = fetchRepo('/tmp/repo')
+    const request = fetchRepo('/tmp/repo', repoRuntimeId)
     const assertion = expect(request).rejects.toThrow('error.request-timeout')
 
     await vi.advanceTimersByTimeAsync(240_000)
@@ -278,7 +280,7 @@ describe('repo-client', () => {
     })
 
     const { getRepoPatch } = await import('#/web/repo-client.ts')
-    const request = getRepoPatch('/tmp/repo', '/tmp/repo-feature')
+    const request = getRepoPatch('/tmp/repo', 'repo-runtime-test', '/tmp/repo-feature')
     const assertion = expect(request).rejects.toThrow('error.request-timeout')
 
     await Promise.resolve()
@@ -295,13 +297,19 @@ describe('repo-client', () => {
       json: async () => ({ ok: false, message: 'error.failed-read-repo' }),
     }))
     const { getRepoLog } = await import('#/web/repo-client.ts')
-    await expect(getRepoLog('/tmp/repo', 'feature/work')).rejects.toThrow('error.failed-read-repo')
+    await expect(getRepoLog('/tmp/repo', 'repo-runtime-test', 'feature/work')).rejects.toThrow('error.failed-read-repo')
     expect(fetchMock).toHaveBeenCalledWith(
       'http://127.0.0.1:32100/api/repo/log',
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
-        body: JSON.stringify({ cwd: '/tmp/repo', branch: 'feature/work', count: 50, skip: 0 }),
+        body: JSON.stringify({
+          cwd: '/tmp/repo',
+          repoRuntimeId: 'repo-runtime-test',
+          branch: 'feature/work',
+          count: 50,
+          skip: 0,
+        }),
       }),
     )
   })
@@ -350,11 +358,11 @@ describe('repo-client', () => {
       },
     })
     const { openRepoEditor, openRepoInFinder, openRepoTerminal } = await import('#/web/repo-client.ts')
-    await expect(openRepoTerminal('/tmp/repo', '/tmp/repo', 'ghostty')).resolves.toEqual({
+    await expect(openRepoTerminal('/tmp/repo', 'repo-runtime-test', '/tmp/repo', 'ghostty')).resolves.toEqual({
       ok: true,
       message: 'server-terminal',
     })
-    await expect(openRepoEditor('/tmp/repo', '/tmp/repo', 'vscode')).resolves.toEqual({
+    await expect(openRepoEditor('/tmp/repo', 'repo-runtime-test', '/tmp/repo', 'vscode')).resolves.toEqual({
       ok: true,
       message: 'server-editor',
     })
@@ -372,6 +380,7 @@ describe('repo-client', () => {
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
         body: JSON.stringify({
           repoId: '/tmp/repo',
+          repoRuntimeId: 'repo-runtime-test',
           worktreePath: '/tmp/repo',
           app: 'ghostty',
         }),
@@ -385,6 +394,7 @@ describe('repo-client', () => {
         headers: expect.objectContaining({ 'x-goblin-access-token': 'secret' }),
         body: JSON.stringify({
           repoId: '/tmp/repo',
+          repoRuntimeId: 'repo-runtime-test',
           worktreePath: '/tmp/repo',
           app: 'vscode',
         }),
@@ -410,8 +420,8 @@ describe('repo-client', () => {
         .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, message: 'server-editor' }) }),
     )
     const { openRepoEditor, openRepoTerminal } = await import('#/web/repo-client.ts')
-    await openRepoTerminal('/tmp/repo', '/tmp/repo', 'ghostty')
-    await openRepoEditor('/tmp/repo', '/tmp/repo', 'vscode')
+    await openRepoTerminal('/tmp/repo', 'repo-runtime-test', '/tmp/repo', 'ghostty')
+    await openRepoEditor('/tmp/repo', 'repo-runtime-test', '/tmp/repo', 'vscode')
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -420,6 +430,7 @@ describe('repo-client', () => {
         method: 'POST',
         body: JSON.stringify({
           repoId: '/tmp/repo',
+          repoRuntimeId: 'repo-runtime-test',
           worktreePath: '/tmp/repo',
           app: 'ghostty',
         }),
@@ -432,6 +443,7 @@ describe('repo-client', () => {
         method: 'POST',
         body: JSON.stringify({
           repoId: '/tmp/repo',
+          repoRuntimeId: 'repo-runtime-test',
           worktreePath: '/tmp/repo',
           app: 'vscode',
         }),

@@ -1,4 +1,4 @@
-import { runWithRepoSource } from '#/server/modules/repo-source.ts'
+import { runWithRepoSource, type RepoSourceRuntimeContext } from '#/server/modules/repo-source.ts'
 import { getRepoOperationsSnapshot } from '#/server/modules/repo-operation-registry.ts'
 import { listRepoWriteOperationsForRepo } from '#/server/modules/repo-write-operation-coordinator.ts'
 import { isValidRepoLocator } from '#/shared/input-validation.ts'
@@ -23,18 +23,32 @@ export async function probeRepo(cwd: string): Promise<ProbeResult> {
   return await runWithRepoSource(cwd, async (source) => await source.probe())
 }
 
-export async function getRepoSnapshot(cwd: string, signal?: AbortSignal): Promise<RepoSnapshot | null> {
-  return signal?.aborted ? null : await runWithRepoSource(cwd, async (source) => await source.getSnapshot(signal))
+export async function getRepoSnapshot(
+  cwd: string,
+  options: { signal?: AbortSignal; repoRuntimeId?: string } = {},
+): Promise<RepoSnapshot | null> {
+  return options.signal?.aborted
+    ? null
+    : await runWithRepoSource(
+        cwd,
+        async (source) => await source.getSnapshot(options.signal),
+        repoReadRuntime(options),
+      )
 }
 
-export async function getRepoStatus(cwd: string, signal?: AbortSignal): Promise<WorktreeStatus[]> {
-  return signal?.aborted ? [] : await runWithRepoSource(cwd, async (source) => await source.getStatus(signal))
+export async function getRepoStatus(
+  cwd: string,
+  options: { signal?: AbortSignal; repoRuntimeId?: string } = {},
+): Promise<WorktreeStatus[]> {
+  return options.signal?.aborted
+    ? []
+    : await runWithRepoSource(cwd, async (source) => await source.getStatus(options.signal), repoReadRuntime(options))
 }
 
 export async function getRepoPullRequests(
   cwd: string,
   branches?: string[],
-  options?: { mode?: PullRequestFetchMode; signal?: AbortSignal },
+  options?: { mode?: PullRequestFetchMode; signal?: AbortSignal; repoRuntimeId?: string },
 ): Promise<PullRequestEntry[] | null> {
   if (branches !== undefined && !Array.isArray(branches)) return null
   const mode: PullRequestFetchMode = options?.mode === 'summary' ? 'summary' : 'full'
@@ -51,6 +65,7 @@ export async function getRepoPullRequests(
   const prs = await runWithRepoSource(
     cwd,
     async (source) => await source.getPullRequests(branchNames, { mode, signal: options?.signal }),
+    repoReadRuntime(options),
   )
   if (!prs) return null
   return prs
@@ -59,7 +74,7 @@ export async function getRepoPullRequests(
 export async function getRepoLog(
   cwd: string,
   branch: string,
-  options?: { count?: number; skip?: number; signal?: AbortSignal },
+  options?: { count?: number; skip?: number; signal?: AbortSignal; repoRuntimeId?: string },
 ): Promise<LogEntry[]> {
   if (typeof branch !== 'string' || branch.length === 0) return []
   return await runWithRepoSource(
@@ -70,19 +85,32 @@ export async function getRepoLog(
         skip: options?.skip ?? 0,
         signal: options?.signal,
       }),
+    repoReadRuntime(options),
   )
 }
 
-export async function getRepoPatch(cwd: string, worktreePath: string, signal?: AbortSignal): Promise<ExecResult> {
-  return await runWithRepoSource(cwd, async (source) => await source.getPatch(worktreePath, signal))
+export async function getRepoPatch(
+  cwd: string,
+  worktreePath: string,
+  options: { signal?: AbortSignal; repoRuntimeId?: string } = {},
+): Promise<ExecResult> {
+  return await runWithRepoSource(
+    cwd,
+    async (source) => await source.getPatch(worktreePath, options.signal),
+    repoReadRuntime(options),
+  )
 }
 
 export async function getRepoWorktreeBootstrapPreview(
   cwd: string,
-  signal?: AbortSignal,
+  options: { signal?: AbortSignal; repoRuntimeId?: string } = {},
 ): Promise<WorktreeBootstrapPreviewResult> {
   if (!isValidRepoLocator(cwd)) return { ok: false, message: 'error.invalid-arguments' }
-  return await runWithRepoSource(cwd, async (source) => await source.getWorktreeBootstrapPreview(signal))
+  return await runWithRepoSource(
+    cwd,
+    async (source) => await source.getWorktreeBootstrapPreview(options.signal),
+    repoReadRuntime(options),
+  )
 }
 
 export type RepoBulkReadSection = 'snapshot' | 'status' | 'pullRequests'
@@ -106,6 +134,7 @@ export interface RepoBulkReadOptions {
   branches?: string[]
   mode?: PullRequestFetchMode
   signal?: AbortSignal
+  repoRuntimeId?: string
   /** Per-section timeout in ms. `0` disables. Default 15 000. */
   timeoutMs?: number
 }
@@ -115,11 +144,13 @@ export interface RepoProjectionReadOptions {
   mode?: PullRequestFetchMode
   signal?: AbortSignal
   timeoutMs?: number
+  repoRuntimeId?: string
 }
 
 export interface RepoOperationsReadOptions {
   includeSettled?: boolean
   signal?: AbortSignal
+  repoRuntimeId?: string
 }
 
 function sortedRepoOperations(states: RepoServerOperationState[]): RepoServerOperationState[] {
@@ -196,13 +227,21 @@ export async function readRepoBulk(
   try {
     const [snapshot, status, pullRequests] = await Promise.all([
       snapshotCtl
-        ? getRepoSnapshot(cwd, snapshotCtl.signal).finally(() => snapshotCtl.cancel())
+        ? getRepoSnapshot(cwd, { signal: snapshotCtl.signal, repoRuntimeId: options.repoRuntimeId }).finally(() =>
+            snapshotCtl.cancel(),
+          )
         : Promise.resolve(null as RepoSnapshot | null),
       statusCtl
-        ? getRepoStatus(cwd, statusCtl.signal).finally(() => statusCtl.cancel())
+        ? getRepoStatus(cwd, { signal: statusCtl.signal, repoRuntimeId: options.repoRuntimeId }).finally(() =>
+            statusCtl.cancel(),
+          )
         : Promise.resolve([] as WorktreeStatus[]),
       prsCtl
-        ? getRepoPullRequests(cwd, branches, { mode, signal: prsCtl.signal }).finally(() => prsCtl.cancel())
+        ? getRepoPullRequests(cwd, branches, {
+            mode,
+            signal: prsCtl.signal,
+            repoRuntimeId: options.repoRuntimeId,
+          }).finally(() => prsCtl.cancel())
         : Promise.resolve(null as PullRequestEntry[] | null),
     ])
     return { snapshot, status, pullRequests }
@@ -228,11 +267,12 @@ export async function readRepoProjection(
       mode,
       signal: options.signal,
       timeoutMs: options.timeoutMs,
+      repoRuntimeId: options.repoRuntimeId,
     },
   )
   return {
     ...result,
-    operations: await readRepoOperationsSnapshot(cwd, { signal: options.signal }),
+    operations: await readRepoOperationsSnapshot(cwd, { signal: options.signal, repoRuntimeId: options.repoRuntimeId }),
     requested: {
       branch,
       pullRequestMode: mode,
@@ -241,12 +281,17 @@ export async function readRepoProjection(
   }
 }
 
+function repoReadRuntime(options: { repoRuntimeId?: string } | undefined): RepoSourceRuntimeContext | undefined {
+  return options?.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined
+}
+
 export async function readRepoOperationsSnapshot(
   cwd?: string,
   options: RepoOperationsReadOptions = {},
 ): Promise<RepoOperationsSnapshot> {
   const registrySnapshot = getRepoOperationsSnapshot({
     repoId: cwd,
+    repoRuntimeId: options.repoRuntimeId,
     includeSettled: options.includeSettled,
   })
   const writeOperations = await listRepoWriteOperationsForRepo(cwd, options)

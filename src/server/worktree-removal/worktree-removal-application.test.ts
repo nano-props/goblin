@@ -9,6 +9,13 @@ import {
   issueTestPhysicalWorktreeCapability,
 } from '#/server/test-utils/physical-worktree-identity.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
+import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
+
+const failRemoteRuntimeIfNeededMock = vi.hoisted(() => vi.fn())
+vi.mock('#/server/modules/remote-runtime-failure-settlement.ts', async (importActual) => {
+  const actual = await importActual<typeof import('#/server/modules/remote-runtime-failure-settlement.ts')>()
+  return { ...actual, failRemoteRuntimeIfNeeded: failRemoteRuntimeIfNeededMock }
+})
 
 const target = {
   repoRoot: '/repo',
@@ -203,6 +210,44 @@ describe('WorktreeRemovalApplication', () => {
     expect(remove).not.toHaveBeenCalled()
     gate.resolve()
     await active.catch(() => undefined)
+  })
+
+  test('fails remote lifecycle when capture hits a remote runtime failure', async () => {
+    const failure = new RemoteRepoRuntimeFailureError({
+      repoRoot: target.repoRoot,
+      repoRuntimeId: target.repoRuntimeId,
+      reason: 'unreachable',
+      message: 'connection refused',
+    })
+    failRemoteRuntimeIfNeededMock.mockClear()
+    const application = createApplication({
+      physicalWorktrees: { capture: async () => { throw failure } },
+    })
+
+    await expect(application.removeWorktree('user-a', { ...target, remove: async () => ({ ok: true, message: '' }) }))
+      .resolves.toEqual({ ok: false, message: 'connection refused' })
+    expect(failRemoteRuntimeIfNeededMock).toHaveBeenCalledWith('user-a', failure)
+  })
+
+  test('fails remote lifecycle when queued validation hits a remote runtime failure', async () => {
+    const failure = new RemoteRepoRuntimeFailureError({
+      repoRoot: target.repoRoot,
+      repoRuntimeId: target.repoRuntimeId,
+      reason: 'unreachable',
+      message: 'connection refused',
+    })
+    const capability = issueTestPhysicalWorktreeCapability({
+      identity: testPhysicalWorktreeIdentity(target.worktreePath),
+      validateExecution: async () => { throw failure },
+    })
+    failRemoteRuntimeIfNeededMock.mockClear()
+    const application = createApplication({
+      physicalWorktrees: { capture: async () => capability },
+    })
+
+    await expect(application.removeWorktree('user-a', { ...target, remove: async () => ({ ok: true, message: '' }) }))
+      .resolves.toEqual({ ok: false, message: 'connection refused' })
+    expect(failRemoteRuntimeIfNeededMock).toHaveBeenCalledWith('user-a', failure)
   })
 })
 

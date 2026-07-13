@@ -25,6 +25,7 @@ import type {
   PhysicalWorktreeIdentityResolver,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import type { ServerTerminalCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
+import { failRemoteRuntimeIfNeeded } from '#/server/modules/remote-runtime-failure-settlement.ts'
 
 type MaybePromise<T> = T | Promise<T>
 const workspacePaneRuntimeApplicationLogger = serverLogger.child({ module: 'workspace-pane-runtime-application' })
@@ -73,14 +74,21 @@ export class WorkspacePaneRuntimeApplication {
     try {
       physicalCapability = await this.capturePhysicalWorktree(userId, input.request, worktreePath)
     } catch (error) {
+      failRemoteRuntimeIfNeeded(userId, error)
       return runtimeFailure(input.runtimeType, error instanceof Error ? error.message : String(error))
     }
-    const result = await this.deps.worktreeOperations.runOperation(physicalCapability, async (permit) => {
-      switch (input.runtimeType) {
-        case 'terminal':
-          return await this.openTerminal(clientId, userId, input, scope, worktreePath, physicalCapability, permit)
-      }
-    })
+    let result: { admitted: true; value: WorkspacePaneRuntimeOpenResult } | { admitted: false }
+    try {
+      result = await this.deps.worktreeOperations.runOperation(physicalCapability, async (permit) => {
+        switch (input.runtimeType) {
+          case 'terminal':
+            return await this.openTerminal(clientId, userId, input, scope, worktreePath, physicalCapability, permit)
+        }
+      })
+    } catch (error) {
+      failRemoteRuntimeIfNeeded(userId, error)
+      return runtimeFailure(input.runtimeType, error instanceof Error ? error.message : String(error))
+    }
     return result.admitted ? result.value : runtimeFailure(input.runtimeType, 'error.worktree-removal-in-progress')
   }
 
@@ -96,15 +104,22 @@ export class WorkspacePaneRuntimeApplication {
     try {
       physicalCapability = await this.capturePhysicalWorktree(userId, target, target.worktreePath)
     } catch (error) {
+      failRemoteRuntimeIfNeeded(userId, error)
       return runtimeFailure(input.runtimeType, error instanceof Error ? error.message : String(error))
     }
-    const result = await this.deps.worktreeOperations.runOperation(physicalCapability, async (permit) => {
-      if (!this.isCurrentTarget(userId, target)) return runtimeFailure(input.runtimeType, 'error.repo-runtime-stale')
-      switch (input.runtimeType) {
-        case 'terminal':
-          return await this.closeTerminal(clientId, userId, target, input.sessionId, scope, physicalCapability, permit)
-      }
-    })
+    let result: { admitted: true; value: WorkspacePaneRuntimeCloseResult } | { admitted: false }
+    try {
+      result = await this.deps.worktreeOperations.runOperation(physicalCapability, async (permit) => {
+        if (!this.isCurrentTarget(userId, target)) return runtimeFailure(input.runtimeType, 'error.repo-runtime-stale')
+        switch (input.runtimeType) {
+          case 'terminal':
+            return await this.closeTerminal(clientId, userId, target, input.sessionId, scope, physicalCapability, permit)
+        }
+      })
+    } catch (error) {
+      failRemoteRuntimeIfNeeded(userId, error)
+      return runtimeFailure(input.runtimeType, error instanceof Error ? error.message : String(error))
+    }
     return result.admitted ? result.value : runtimeFailure(input.runtimeType, 'error.worktree-removal-in-progress')
   }
 

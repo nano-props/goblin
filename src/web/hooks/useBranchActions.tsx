@@ -88,7 +88,7 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   const runBranchAction = useReposStore((s) => s.runBranchAction)
   const copyPatchMutation = useMutation({
     mutationKey: ['repo-data', repo.id, repo.repoRuntimeId, 'patch'],
-    mutationFn: async (worktreePath: string) => await getRepoPatch(repo.id, worktreePath),
+    mutationFn: async (worktreePath: string) => await getRepoPatch(repo.id, repo.repoRuntimeId, worktreePath),
   })
   const branchActionBusy = isBranchActionBlocked(repo)
   const branchBusyAction = branchActionBusyItemId(repo, branch.name)
@@ -178,13 +178,13 @@ export function useBranchActions(repo: BranchActionRepo, branch: RepoBranchState
   function openTerminal(app: TerminalApp) {
     if (!branch.worktree?.path) return
     const worktreePath = branch.worktree.path
-    return runUiAction('terminal', () => openRepoTerminal(repo.id, worktreePath, app))
+    return runUiAction('terminal', () => openRepoTerminal(repo.id, repo.repoRuntimeId, worktreePath, app))
   }
 
   function openEditor(app: EditorApp) {
     if (!branch.worktree?.path) return
     const worktreePath = branch.worktree.path
-    return runUiAction('editor', () => openRepoEditor(repo.id, worktreePath, app))
+    return runUiAction('editor', () => openRepoEditor(repo.id, repo.repoRuntimeId, worktreePath, app))
   }
 
   function openFinder() {

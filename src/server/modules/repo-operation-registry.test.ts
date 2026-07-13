@@ -37,4 +37,26 @@ describe('repo operation registry', () => {
       listRepoServerOperations({ repoId: '/tmp/repo', includeSettled: true }).map((operation) => operation.id),
     ).toEqual([first.id, second.id])
   })
+
+  test('filters runtime-scoped operations while retaining repo-scoped operations', () => {
+    const repoScoped = beginRepoServerOperation({ repoId: '/tmp/repo', kind: 'fetch', source: 'background' })
+    const current = beginRepoServerOperation({
+      repoId: '/tmp/repo',
+      repoRuntimeId: 'repo-runtime-current',
+      kind: 'delete-branch',
+      source: 'user',
+    })
+    beginRepoServerOperation({
+      repoId: '/tmp/repo',
+      repoRuntimeId: 'repo-runtime-stale',
+      kind: 'remove-worktree',
+      source: 'user',
+    })
+
+    expect(
+      listRepoServerOperations({ repoId: '/tmp/repo', repoRuntimeId: 'repo-runtime-current' }).map(
+        (operation) => operation.id,
+      ),
+    ).toEqual([repoScoped.id, current.id])
+  })
 })

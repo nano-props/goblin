@@ -421,7 +421,7 @@ export async function abortRepoWriteNetworkOperation(
 
 export async function listRepoWriteOperationsForRepo(
   repoId: string | undefined,
-  options: { includeSettled?: boolean; signal?: AbortSignal } = {},
+  options: { includeSettled?: boolean; repoRuntimeId?: string; signal?: AbortSignal } = {},
 ): Promise<RepoServerOperationState[]> {
   const includeSettled = options.includeSettled === true
   let runtimes: RepoWriteOperationQueueRuntime[]
@@ -437,6 +437,9 @@ export async function listRepoWriteOperationsForRepo(
   return sortedOperations(
     runtimes.flatMap((runtime) =>
       [...runtime.operations.values()].filter((operation) => {
+        if (options.repoRuntimeId && operation.repoRuntimeId && operation.repoRuntimeId !== options.repoRuntimeId) {
+          return false
+        }
         if (!includeSettled && (operation.phase === 'done' || operation.phase === 'failed')) return false
         return true
       }),

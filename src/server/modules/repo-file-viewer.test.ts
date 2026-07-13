@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   getWorktrees: vi.fn(),
   userShellCommandExists: vi.fn(),
   resolveRemoteRepoTarget: vi.fn(),
+  remoteRuntimeAwareGitRunner: vi.fn(),
   remoteCommandExists: vi.fn(),
   resolveRemoteWorktree: vi.fn(),
 }))
@@ -18,6 +19,7 @@ vi.mock('#/system/user-shell.ts', () => ({
 
 vi.mock('#/server/modules/repo-source.ts', () => ({
   resolveRemoteRepoTarget: mocks.resolveRemoteRepoTarget,
+  remoteRuntimeAwareGitRunner: mocks.remoteRuntimeAwareGitRunner,
 }))
 
 vi.mock('#/system/ssh/git.ts', () => ({
@@ -30,6 +32,7 @@ import { normalizeRemoteRepoId } from '#/shared/remote-repo.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.remoteRuntimeAwareGitRunner.mockReturnValue(async () => ({ ok: true, stdout: '', stderr: '', code: 0 }))
   mocks.getWorktrees.mockResolvedValue([
     { path: '/tmp/repo', branch: 'main', isBare: false, isPrimary: true },
     { path: '/tmp/repo-feature', branch: 'feature', isBare: false, isPrimary: false },
@@ -149,6 +152,42 @@ describe('repo file viewer read layer', () => {
       knownWorktrees: [{ path: '/srv/repo-feature', branch: 'feature', isBare: false, isPrimary: false }],
       signal: undefined,
     })
+  })
+
+  test('uses the runtime-aware runner for remote viewer probes when provided', async () => {
+    const repoRuntimeId = 'repo-runtime-file-viewer-test'
+    const repoId = normalizeRemoteRepoId({ alias: 'prod', remotePath: '/srv/repo' })
+    const target = {
+      id: repoId,
+      alias: 'prod',
+      remotePath: '/srv/repo',
+      displayName: 'prod:repo',
+      host: 'example.com',
+      user: 'tester',
+      port: 22,
+    }
+    const run = async () => ({ ok: true as const, stdout: '', stderr: '', code: 0 })
+    mocks.remoteRuntimeAwareGitRunner.mockReturnValueOnce(run)
+    mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
+    mocks.remoteCommandExists.mockResolvedValueOnce(true)
+
+    await expect(getRepositoryFileViewer(repoId, '/srv/repo-feature', undefined, { repoRuntimeId })).resolves.toEqual({
+      viewer: 'bat',
+      shell: 'posix',
+    })
+
+    expect(mocks.resolveRemoteRepoTarget).toHaveBeenCalledWith(repoId, { repoRuntimeId })
+    expect(mocks.remoteRuntimeAwareGitRunner).toHaveBeenCalledWith(repoId, repoRuntimeId, target)
+    expect(mocks.resolveRemoteWorktree).toHaveBeenCalledWith(target, '/srv/repo-feature', {
+      signal: undefined,
+      run,
+    })
+    expect(mocks.remoteCommandExists).toHaveBeenCalledWith(
+      target,
+      '/srv/repo-feature',
+      'bat',
+      expect.objectContaining({ run }),
+    )
   })
 
   test('rejects unknown remote worktrees without probing viewer commands', async () => {

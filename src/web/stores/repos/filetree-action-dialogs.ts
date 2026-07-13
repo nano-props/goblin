@@ -2,6 +2,7 @@ import { create } from 'zustand'
 
 export interface FiletreeTrashFilePayload {
   readonly repoId: string
+  readonly repoRuntimeId: string
   readonly worktreePath: string
   readonly path: string
   readonly name: string
