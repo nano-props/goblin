@@ -48,6 +48,8 @@ function projectionRefreshPlan(scope: RepoRuntimeProjectionRefreshScope): Projec
         ],
       }
     case 'visible-status':
+      // Workspace open/visible refresh uses requestVisibleWorkspaceStatusRefresh instead
+      // of this operation-backed scope so it will not invalidate or cancel active projection queries.
       return {
         wantsReadModelLoad: false,
         wantsVisibleStatusLoad: true,

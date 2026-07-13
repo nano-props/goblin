@@ -69,6 +69,14 @@ export async function refreshVisibleStatusCache(
     repoRuntimeId,
     primaryWindowQueryClient,
   )
+  const refreshAttemptStale = () =>
+    startedInvalidationVersion <
+    getRepoRuntimeProjectionInvalidationVersion(repoRoot, repoRuntimeId, primaryWindowQueryClient)
+  const cancelStaleRefresh = () => {
+    updateIfFresh(store.set, repoRoot, repoRuntimeId, (repo) => {
+      cancelDataLoad(repo.dataLoads.visibleStatus)
+    })
+  }
   updateIfFresh(store.set, repoRoot, repoRuntimeId, (repo) => {
     startDataLoad(repo.dataLoads.visibleStatus, {
       hasData: (readRepoBranchQueryProjection(repo)?.status.length ?? 0) > 0,
@@ -78,13 +86,8 @@ export async function refreshVisibleStatusCache(
     const projection = await getRepoProjection(repoRoot, repoRuntimeId, branchName, { mode: 'full' })
     const repo = store.get().repos[repoRoot]
     if (!repo || repo.repoRuntimeId !== repoRuntimeId) return
-    if (
-      startedInvalidationVersion <
-      getRepoRuntimeProjectionInvalidationVersion(repoRoot, repoRuntimeId, primaryWindowQueryClient)
-    ) {
-      updateIfFresh(store.set, repoRoot, repoRuntimeId, (repo) => {
-        cancelDataLoad(repo.dataLoads.visibleStatus)
-      })
+    if (refreshAttemptStale()) {
+      cancelStaleRefresh()
       return
     }
     setRepoProjectionQueryData(repoRoot, repoRuntimeId, branchName, 'full', projection)
@@ -95,6 +98,10 @@ export async function refreshVisibleStatusCache(
       { scope: 'visible-status', settleVisibleStatus: true },
     )
   } catch (err) {
+    if (refreshAttemptStale()) {
+      cancelStaleRefresh()
+      return
+    }
     const message = err instanceof Error ? err.message : String(err)
     refreshStatusLog.warn('failed', { err: new Error(message) })
     updateIfFresh(store.set, repoRoot, repoRuntimeId, (repo) => {

@@ -857,6 +857,31 @@ describe('projection refresh request ordering', () => {
     expect(useReposStore.getState().repos[REPO_ID]!.dataLoads.visibleStatus.phase).toBe('idle')
   })
 
+  test('workspace visible status cache refresh drops stale errors after projection invalidation', async () => {
+    const repoRuntimeId = seedRepo([branch('feature/a')])
+    let projectionCalls = 0
+    let rejectProjection!: (err: Error) => void
+    ipcHandlers['repo.projection'] = async () => {
+      projectionCalls += 1
+      return await new Promise<RepoRuntimeProjection>((_resolve, reject) => {
+        rejectProjection = reject
+      })
+    }
+
+    const refresh = refreshVisibleStatusCache(refreshStoreAccess, REPO_ID, repoRuntimeId, 'feature/a')
+    await vi.waitFor(() => {
+      expect(projectionCalls).toBe(1)
+    })
+    markRepoRuntimeProjectionInvalidated(REPO_ID, repoRuntimeId, primaryWindowQueryClient)
+
+    rejectProjection(new Error('error.path-not-found'))
+    await refresh
+
+    const repo = useReposStore.getState().repos[REPO_ID]!
+    expect(repo.availability.phase).toBe('available')
+    expect(repo.dataLoads.visibleStatus).toMatchObject({ phase: 'idle', error: null })
+  })
+
   test('workspace visible status cache refresh guards stale runtimes and busy or unavailable repos', async () => {
     const repoRuntimeId = seedRepo([branch('feature/a')])
     let projectionCalls = 0
