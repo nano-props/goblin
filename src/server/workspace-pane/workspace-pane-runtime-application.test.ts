@@ -15,6 +15,12 @@ import {
 } from '#/server/test-utils/physical-worktree-identity.ts'
 import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
 
+const failRemoteRuntimeIfNeededMock = vi.hoisted(() => vi.fn())
+vi.mock('#/server/modules/remote-runtime-failure.ts', async (importActual) => {
+  const actual = await importActual<typeof import('#/server/modules/remote-runtime-failure.ts')>()
+  return { ...actual, failRemoteRuntimeIfNeeded: failRemoteRuntimeIfNeededMock }
+})
+
 const request = {
   repoRoot: '/repo',
   repoRuntimeId: 'repo-runtime-test',
@@ -119,7 +125,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     })
     const create = vi.fn()
     const ensureRuntimeTabForSession = vi.fn()
-    const failRemoteRuntime = vi.fn()
+    failRemoteRuntimeIfNeededMock.mockClear()
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: { capture: async () => { throw failure } },
@@ -130,7 +136,6 @@ describe('WorkspacePaneRuntimeApplication', () => {
         'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'
       >,
       isCurrentRepoRuntime: () => true,
-      failRemoteRuntime,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -139,7 +144,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       runtimeType: 'terminal',
       message: 'unreachable',
     })
-    expect(failRemoteRuntime).toHaveBeenCalledWith('user-test', failure)
+    expect(failRemoteRuntimeIfNeededMock).toHaveBeenCalledWith('user-test', failure)
     expect(create).not.toHaveBeenCalled()
     expect(ensureRuntimeTabForSession).not.toHaveBeenCalled()
   })
@@ -157,7 +162,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     })
     const create = vi.fn()
     const ensureRuntimeTabForSession = vi.fn()
-    const failRemoteRuntime = vi.fn()
+    failRemoteRuntimeIfNeededMock.mockClear()
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: { capture: async () => capability },
@@ -168,7 +173,6 @@ describe('WorkspacePaneRuntimeApplication', () => {
         'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'
       >,
       isCurrentRepoRuntime: () => true,
-      failRemoteRuntime,
       broadcastWorkspaceTabsChanged: vi.fn(),
     })
 
@@ -177,7 +181,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       runtimeType: 'terminal',
       message: 'connection refused',
     })
-    expect(failRemoteRuntime).toHaveBeenCalledWith('user-test', failure)
+    expect(failRemoteRuntimeIfNeededMock).toHaveBeenCalledWith('user-test', failure)
     expect(create).not.toHaveBeenCalled()
     expect(ensureRuntimeTabForSession).not.toHaveBeenCalled()
   })

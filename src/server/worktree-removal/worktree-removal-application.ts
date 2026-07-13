@@ -12,7 +12,7 @@ import type {
   PhysicalWorktreeCapability,
   PhysicalWorktreeIdentityResolver,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
-import { isRemoteRepoRuntimeFailure, type RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
+import { failRemoteRuntimeIfNeeded } from '#/server/modules/remote-runtime-failure.ts'
 
 const worktreeRemovalLogger = serverLogger.child({ module: 'worktree-removal-application' })
 
@@ -25,7 +25,6 @@ interface WorktreeRemovalApplicationDependencies {
     'finalizePhysicalWorktreeRemoval' | 'physicalWorktreeScopes' | 'reconcilePhysicalWorktreeAfterRemovalFailure'
   >
   isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
-  failRemoteRuntime?(userId: string, error: RemoteRepoRuntimeFailureError): void
   broadcastSessionsChanged(userId: string, repoRoot: string): void
   broadcastWorkspaceTabsChanged(userId: string, repoRoot: string): void
 }
@@ -63,7 +62,7 @@ export class WorktreeRemovalApplication {
         refresh: true,
       })
     } catch (error) {
-      this.failRemoteRuntimeIfNeeded(userId, error)
+      failRemoteRuntimeIfNeeded(userId, error)
       return { ok: false, message: error instanceof Error ? error.message : String(error) }
     }
     try {
@@ -118,18 +117,13 @@ export class WorktreeRemovalApplication {
       }, input.signal)
       return result.admitted ? result.value : { ok: false, message: 'error.worktree-removal-in-progress' }
     } catch (error) {
-      this.failRemoteRuntimeIfNeeded(userId, error)
+      failRemoteRuntimeIfNeeded(userId, error)
       return { ok: false, message: abortMessage(error) }
     }
   }
 
   private isCurrentRuntime(userId: string, input: { repoRoot: string; repoRuntimeId: string }): boolean {
     return this.deps.isCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
-  }
-
-  private failRemoteRuntimeIfNeeded(userId: string, error: unknown): void {
-    if (!isRemoteRepoRuntimeFailure(error)) return
-    this.deps.failRemoteRuntime?.(userId, error)
   }
 
   private async quiesce(

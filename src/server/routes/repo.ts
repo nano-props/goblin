@@ -27,12 +27,11 @@ import {
   removeCapturedRepoWorktree,
 } from '#/server/modules/repo-write-paths.ts'
 import { getServerFetchIntervalSec } from '#/server/modules/settings-source.ts'
-import { publishRepoQueryInvalidation, publishUserRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
+import { publishRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
 import { userIdFromContext } from '#/server/common/identity.ts'
 import {
   acquireRepoRuntime,
-  failRepoRemoteLifecycle,
   isCurrentRepoRuntime,
   listRepoRuntimes,
   releaseRepoRuntime,
@@ -42,7 +41,7 @@ import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import { IpcError, type RepoLogResponse } from '#/shared/api-types.ts'
 import {
   isRemoteRepoRuntimeFailure,
-  type RemoteRepoRuntimeFailureError,
+  settleRemoteRuntimeFailure,
 } from '#/server/modules/remote-runtime-failure.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
@@ -70,7 +69,7 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
       return await run()
     } catch (err) {
       if (isRemoteRepoRuntimeFailure(err)) {
-        failRemoteRuntimeFromRead(userId, err)
+        settleRemoteRuntimeFailure(userId, err)
         serverRepoNodeLog.warn({ err, label }, 'failed')
         throw new IpcError({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
       }
@@ -86,17 +85,6 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
     if (!userId || !isCurrentRepoRuntime(userId, repoRoot, repoRuntimeId)) {
       throw new IpcError({ code: 'BAD_REQUEST', message: 'error.repo-runtime-stale' })
     }
-  }
-  function failRemoteRuntimeFromRead(userId: string, error: RemoteRepoRuntimeFailureError): void {
-    const failed = failRepoRemoteLifecycle({
-      userId,
-      repoRoot: error.repoRoot,
-      repoRuntimeId: error.repoRuntimeId,
-      reason: error.reason,
-      ...(error.target ? { target: error.target } : {}),
-    })
-    if (failed.kind !== 'settled') return
-    publishUserRepoQueryInvalidation(userId, { repoId: error.repoRoot, query: 'remote-lifecycle' })
   }
 
   app.post('/probe', async (c) => {
