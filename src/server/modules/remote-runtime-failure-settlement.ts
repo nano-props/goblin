@@ -9,9 +9,9 @@ import {
  * Mark a repo's remote lifecycle as failed from a classified
  * `RemoteRepoRuntimeFailureError`, then invalidate the affected user's
  * `remote-lifecycle` query so the frontend refetches and reflects the new
- * state. The `kind !== 'settled'` branch silently no-ops: it means the
- * runtime was already closed by another client, so there is nothing to
- * fail.
+ * state. The non-`'settled'` branch silently no-ops: either the lifecycle
+ * is stale, superseded, or the repo is not actually remote — in every case
+ * there is nothing to fail or invalidate.
  */
 export function settleRemoteRuntimeFailure(userId: string, error: RemoteRepoRuntimeFailureError): void {
   const failed = failRepoRemoteLifecycle({
