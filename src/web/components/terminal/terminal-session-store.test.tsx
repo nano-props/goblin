@@ -15,6 +15,7 @@ import {
 import {
   useTerminalSessionSummaries,
   useTerminalSnapshot,
+  useRepoTerminalBellCounts,
   useTerminalWorktreeBellCount,
   useTerminalWorktreeCount,
   useTerminalWorktreeCreatePending,
@@ -183,6 +184,54 @@ describe('null key returns empty-derived values', () => {
     }
     const { getByTestId } = renderInJsdom(withRead(makeReadContext(), <Probe />))
     expect(getByTestId('v').textContent).toBe(EMPTY_TERMINAL_SNAPSHOT.phase)
+  })
+
+  test('null worktree key still requires the read provider', () => {
+    function Probe() {
+      useTerminalWorktreeCount(null)
+      return null
+    }
+    expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')
+  })
+
+  test('null session id still requires the read provider', () => {
+    function Probe() {
+      useTerminalSnapshot(null)
+      return null
+    }
+    expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')
+  })
+
+  test('empty repo bell count query still requires the read provider', () => {
+    function Probe() {
+      useRepoTerminalBellCounts([])
+      return null
+    }
+    expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')
+  })
+
+  test('real worktree key still requires the read provider', () => {
+    function Probe() {
+      useTerminalWorktreeCount(WORKTREE_KEY)
+      return null
+    }
+    expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')
+  })
+
+  test('real session id still requires the read provider', () => {
+    function Probe() {
+      useTerminalSnapshot(SESSION_ID)
+      return null
+    }
+    expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')
+  })
+
+  test('non-empty repo bell count query still requires the read provider', () => {
+    function Probe() {
+      useRepoTerminalBellCounts(['/repo'])
+      return null
+    }
+    expect(() => renderInJsdom(<Probe />)).toThrow('Terminal session read context is unavailable')
   })
 })
 

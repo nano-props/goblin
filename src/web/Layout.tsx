@@ -93,14 +93,16 @@ function AuthenticatedAppShell() {
 
   return (
     <AuthenticatedWorkspaceRestoreContext value={bootstrapState}>
-      {shellMode === 'settings' ? (
-        <AuthenticatedSettingsShell />
-      ) : shellMode === 'workspace-restore' ? (
-        <WorkspaceSessionRestorePlaceholder />
-      ) : (
-        <AuthenticatedWorkspaceShell />
-      )}
-      {import.meta.env.DEV ? <TanStackRouterDevtools /> : null}
+      <TerminalSessionProvider>
+        {shellMode === 'settings' ? (
+          <AuthenticatedSettingsShell />
+        ) : shellMode === 'workspace-restore' ? (
+          <WorkspaceSessionRestorePlaceholder />
+        ) : (
+          <AuthenticatedWorkspaceShell />
+        )}
+        {import.meta.env.DEV ? <TanStackRouterDevtools /> : null}
+      </TerminalSessionProvider>
     </AuthenticatedWorkspaceRestoreContext>
   )
 }
@@ -188,30 +190,28 @@ function AuthenticatedWorkspaceShell() {
           }}
         >
           <AppRuntimeProjectionProvider currentRepoId={hydratedRouteRepoId}>
-            <TerminalSessionProvider>
-              <VisibleRepoProjectionRefreshEffect
+            <VisibleRepoProjectionRefreshEffect
+              hydratedRouteRepoId={hydratedRouteRepoId}
+              currentBranchName={currentBranchName}
+              currentWorkspacePaneRoute={currentWorkspacePaneRoute}
+            />
+            <div
+              className="relative flex h-full flex-col"
+              onDragEnter={repoDrop.onDragEnter}
+              onDragOver={repoDrop.onDragOver}
+              onDragLeave={repoDrop.onDragLeave}
+              onDrop={repoDrop.onDrop}
+            >
+              <Outlet />
+              <PrimaryWindowOverlays
+                overlays={overlays}
+                repoDrop={repoDrop}
+                navigation={navigation}
                 hydratedRouteRepoId={hydratedRouteRepoId}
                 currentBranchName={currentBranchName}
                 currentWorkspacePaneRoute={currentWorkspacePaneRoute}
               />
-              <div
-                className="relative flex h-full flex-col"
-                onDragEnter={repoDrop.onDragEnter}
-                onDragOver={repoDrop.onDragOver}
-                onDragLeave={repoDrop.onDragLeave}
-                onDrop={repoDrop.onDrop}
-              >
-                <Outlet />
-                <PrimaryWindowOverlays
-                  overlays={overlays}
-                  repoDrop={repoDrop}
-                  navigation={navigation}
-                  hydratedRouteRepoId={hydratedRouteRepoId}
-                  currentBranchName={currentBranchName}
-                  currentWorkspacePaneRoute={currentWorkspacePaneRoute}
-                />
-              </div>
-            </TerminalSessionProvider>
+            </div>
           </AppRuntimeProjectionProvider>
         </LayoutOverlayActions>
       </PrimaryWindowNavigationProvider>

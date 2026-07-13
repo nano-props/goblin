@@ -24,10 +24,6 @@ import type {
  * `useCallback`, while `subscribe` / `getSnapshot` stay referentially stable
  * (required by `useSyncExternalStore`).
  *
- * `useTerminalSessionReadContext` always returns a non-null value (the
- * EMPTY fallback when the provider is missing), so callers only branch on
- * the key.
- *
  * Exported so callers can compose custom derived hooks without rebuilding
  * the subscribe/getSnapshot plumbing, and so tests can verify the
  * latest-ref pattern in isolation.
