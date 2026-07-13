@@ -6,10 +6,11 @@ import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-i
 import { WorkerBackedPtySupervisor } from '#/server/terminal/pty-supervisor-worker.ts'
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
+import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 
 interface ServerRuntimeBaseOptions extends Omit<
   ServerAppOptions,
-  'appRealtimeHost' | 'worktreeRemovalApplication' | 'serverHost' | 'serverPort'
+  'appRealtimeHost' | 'workspacePaneTabsHost' | 'worktreeRemovalApplication' | 'serverHost' | 'serverPort'
 > {
   /**
    * On-disk path of the bundled PTY worker entry. When provided, the
@@ -25,14 +26,15 @@ interface ServerRuntimeBaseOptions extends Omit<
   serverPort: number
 }
 
-export type ServerRuntimeOptions = ServerRuntimeBaseOptions &
-  (
-    | { appRealtimeHost?: undefined; worktreeRemovalApplication?: undefined }
-    | {
-        appRealtimeHost: ServerAppRealtimeHost
-        worktreeRemovalApplication: ServerWorktreeRemovalHost
-      }
-  )
+interface ServerRuntimeInjectedHosts {
+  appRealtimeHost: ServerAppRealtimeHost
+  workspacePaneTabsHost: ServerWorkspacePaneTabsHost
+  worktreeRemovalApplication: ServerWorktreeRemovalHost
+}
+
+type ServerRuntimeManagedHosts = Partial<Record<keyof ServerRuntimeInjectedHosts, never>>
+
+export type ServerRuntimeOptions = ServerRuntimeBaseOptions & (ServerRuntimeManagedHosts | ServerRuntimeInjectedHosts)
 
 export interface ServerRuntime {
   app: Hono
@@ -40,10 +42,27 @@ export interface ServerRuntime {
   shutdown(): void
 }
 
+function isServerRuntimeInjectedHosts(options: ServerRuntimeOptions): options is ServerRuntimeBaseOptions & ServerRuntimeInjectedHosts {
+  return (
+    options.appRealtimeHost !== undefined &&
+    options.workspacePaneTabsHost !== undefined &&
+    options.worktreeRemovalApplication !== undefined
+  )
+}
+
+function hasAnyServerRuntimeInjectedHost(options: ServerRuntimeOptions): boolean {
+  return (
+    options.appRealtimeHost !== undefined ||
+    options.workspacePaneTabsHost !== undefined ||
+    options.worktreeRemovalApplication !== undefined
+  )
+}
+
 export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntime {
   const {
-    appRealtimeHost: providedAppRealtimeHost,
-    worktreeRemovalApplication: providedWorktreeRemovalApplication,
+    appRealtimeHost: _appRealtimeHost,
+    workspacePaneTabsHost: _workspacePaneTabsHost,
+    worktreeRemovalApplication: _worktreeRemovalApplication,
     ptyWorkerEntry,
     gCommandEntry,
     gCommandBinDir,
@@ -52,46 +71,60 @@ export function createServerRuntime(options: ServerRuntimeOptions): ServerRuntim
     serverPort,
     ...appOptions
   } = options
-  const runtime = providedAppRealtimeHost
-    ? null
-    : createServerTerminalRuntime({
-        ptySupervisor: ptyWorkerEntry
-          ? new WorkerBackedPtySupervisor({ workerEntry: ptyWorkerEntry })
-          : createInProcessPtySupervisor(),
-        gCommand: gCommandEntry
-          ? {
-              serverUrl: embeddedServerUrl(serverHost, serverPort),
-              accessToken: appOptions.accessToken,
-              entryPath: gCommandEntry,
-              binDir: gCommandBinDir,
-              nodePath: gCommandNodePath,
-            }
-          : undefined,
-      })
-  const appRealtimeHost = providedAppRealtimeHost ?? (runtime?.host as ServerAppRealtimeHost)
-  const worktreeRemovalApplication = providedWorktreeRemovalApplication ?? runtime?.worktreeRemovalApplication
-  if (!worktreeRemovalApplication) throw new Error('worktree removal application is required')
+  const injectedHosts = isServerRuntimeInjectedHosts(options)
+    ? {
+        appRealtimeHost: options.appRealtimeHost,
+        workspacePaneTabsHost: options.workspacePaneTabsHost,
+        worktreeRemovalApplication: options.worktreeRemovalApplication,
+      }
+    : null
+  if (!injectedHosts && hasAnyServerRuntimeInjectedHost(options)) {
+    throw new Error('server runtime host injection must include all hosts')
+  }
+
+  let terminalRuntime: ReturnType<typeof createServerTerminalRuntime> | null = null
+  const hosts = injectedHosts ?? (() => {
+    terminalRuntime = createServerTerminalRuntime({
+      ptySupervisor: ptyWorkerEntry
+        ? new WorkerBackedPtySupervisor({ workerEntry: ptyWorkerEntry })
+        : createInProcessPtySupervisor(),
+      gCommand: gCommandEntry
+        ? {
+            serverUrl: embeddedServerUrl(serverHost, serverPort),
+            accessToken: appOptions.accessToken,
+            entryPath: gCommandEntry,
+            binDir: gCommandBinDir,
+            nodePath: gCommandNodePath,
+          }
+        : undefined,
+    })
+    return {
+      appRealtimeHost: terminalRuntime.host as ServerAppRealtimeHost,
+      workspacePaneTabsHost: terminalRuntime.workspacePaneTabsHost,
+      worktreeRemovalApplication: terminalRuntime.worktreeRemovalApplication,
+    }
+  })()
+
   // `appOptions` carries `accessToken` (renamed from the pre-PR
   // `internalSecret`); it's forwarded straight to `createApp`.
   const app = createApp({
     ...appOptions,
-    appRealtimeHost,
-    worktreeRemovalApplication,
+    ...hosts,
     serverHost,
     serverPort,
   })
   let stopped = false
   return {
     app,
-    appRealtimeHost,
+    appRealtimeHost: hosts.appRealtimeHost,
     shutdown() {
       if (stopped) return
       stopped = true
       stopBackgroundSync()
-      if (runtime) {
-        runtime.shutdown()
+      if (terminalRuntime) {
+        terminalRuntime.shutdown()
       } else {
-        appRealtimeHost.shutdown()
+        hosts.appRealtimeHost.shutdown()
       }
     },
   }

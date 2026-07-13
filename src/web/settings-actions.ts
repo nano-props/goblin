@@ -1,13 +1,20 @@
 // Actions are the write boundary that commits to the server transport and
 // projects server-returned values into React Query.
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { GlobalShortcutState, I18nSnapshot, ThemeState, WorkspaceSessionState } from '#/shared/api-types.ts'
+import type {
+  GlobalShortcutState,
+  I18nSnapshot,
+  ThemeState,
+  WorkspaceSessionRestoreResult,
+  WorkspaceSessionState,
+} from '#/shared/api-types.ts'
 import { settingsLog } from '#/web/logger.ts'
 import {
   addRecentRepo,
   clearRecentRepos,
   refreshExternalAppsSnapshot,
   refreshGitHubCliState,
+  restoreWorkspaceSession,
   saveSession,
   setGlobalShortcut as setSettingsGlobalShortcut,
   setGlobalShortcutDisabled as setSettingsGlobalShortcutDisabled,
@@ -48,6 +55,15 @@ export async function clearRecentRepoHistory(): Promise<void> {
 export async function persistWorkspaceSessionState(session: WorkspaceSessionState): Promise<void> {
   const savedSession = await saveSession(session)
   updateRestorableWorkspaceSessionStateCache(primaryWindowQueryClient, savedSession)
+}
+
+export async function restorePersistedWorkspaceSession(
+  clientId: string,
+  options?: { signal?: AbortSignal },
+): Promise<WorkspaceSessionRestoreResult> {
+  const restored = await restoreWorkspaceSession(clientId, options)
+  updateRestorableWorkspaceSessionStateCache(primaryWindowQueryClient, restored.session)
+  return restored
 }
 
 export function persistWorkspaceSessionStateOnUnload(session: WorkspaceSessionState): void {

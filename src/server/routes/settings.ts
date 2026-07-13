@@ -2,7 +2,9 @@ import { getServerExternalAppsSnapshot } from '#/server/modules/external-apps.ts
 import { getServerGitHubCliState } from '#/server/modules/github-cli.ts'
 import { getSettingsSnapshot } from '#/server/modules/settings-snapshot.ts'
 import { getUserSettings } from '#/server/modules/settings-source.ts'
+import { restoreServerWorkspaceSession } from '#/server/modules/session-restore.ts'
 import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
+import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import {
   handleSetFetchInterval,
   handleSetGlobalShortcutRegistered,
@@ -15,13 +17,18 @@ import {
 import { getLanUrls, isLanAddress } from '#/shared/lan-addresses.ts'
 import type { LanInfo } from '#/shared/api-types.ts'
 import { createRouteApp, parseHttpBody } from '#/server/common/http-validate.ts'
+import { userIdFromContext } from '#/server/common/identity.ts'
 import {
   GITHUB_CLI_REFRESH_SCHEMA,
   SETTINGS_PATCH_SCHEMAS,
   SETTINGS_PROCEDURE_SCHEMAS,
 } from '#/shared/procedure-schemas.ts'
 
-export function createSettingsRoutes(settingsState: NativeShortcutRegistrationState) {
+export function createSettingsRoutes(options: {
+  settingsState: NativeShortcutRegistrationState
+  workspacePaneTabsHost: ServerWorkspacePaneTabsHost
+}) {
+  const { settingsState, workspacePaneTabsHost } = options
   const app = createRouteApp()
   app.get('/', async (c) => c.json(await getSettingsSnapshot(settingsState)))
   app.post('/github-cli', async (c) => {
@@ -64,6 +71,12 @@ export function createSettingsRoutes(settingsState: NativeShortcutRegistrationSt
   app.post('/session', async (c) => {
     const { session } = await parseHttpBody(SETTINGS_PATCH_SCHEMAS.session, c)
     return c.json(await handleSetSession({ session }))
+  })
+  app.post('/session/restore', async (c) => {
+    const userId = userIdFromContext(c)
+    if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
+    const { clientId } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.sessionRestore, c)
+    return c.json(await restoreServerWorkspaceSession({ userId, clientId, workspacePaneTabsHost, signal: c.req.raw.signal }))
   })
   app.post('/recent-repos/add', async (c) => {
     const { repo } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.recentReposAdd, c)

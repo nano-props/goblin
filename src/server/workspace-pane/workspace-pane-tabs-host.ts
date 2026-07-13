@@ -1,4 +1,5 @@
 import type {
+  WorkspacePaneTabsBatchReplaceInput,
   WorkspacePaneTabsListInput,
   WorkspacePaneTabsReplaceInput,
   WorkspacePaneTabsSnapshot,
@@ -18,6 +19,11 @@ export interface ServerWorkspacePaneTabsHost {
     userId: string,
     input: WorkspacePaneTabsReplaceInput,
   ): MaybePromise<WorkspacePaneTabsSnapshot>
+  replaceTabsBatch?(
+    clientId: string,
+    userId: string,
+    input: WorkspacePaneTabsBatchReplaceInput,
+  ): MaybePromise<Array<{ repoRoot: string; repoRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>>
   updateTabs(
     clientId: string,
     userId: string,

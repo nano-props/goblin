@@ -629,6 +629,29 @@ export async function setServerSessionState(session: WorkspaceSessionState): Pro
   })
 }
 
+export async function saveRebuiltServerSessionState(input: {
+  persistedSnapshot: WorkspaceSessionState
+  rebuiltSession: WorkspaceSessionState
+}): Promise<{ saved: true; session: WorkspaceSessionState } | { saved: false; latestSession: WorkspaceSessionState }> {
+  return await mutateUserSettings<
+    { saved: true; session: WorkspaceSessionState } | { saved: false; latestSession: WorkspaceSessionState }
+  >(async (data) => {
+    const current = cloneSession(data.session)
+    if (!sameWorkspaceSessionState(current, input.persistedSnapshot)) {
+      return unchangedUserSettings(data, { saved: false, latestSession: current })
+    }
+    const next = normalizeSession(input.rebuiltSession)
+    return {
+      next: { ...data, session: next },
+      result: { saved: true, session: cloneSession(next) },
+    }
+  })
+}
+
+function sameWorkspaceSessionState(a: WorkspaceSessionState, b: WorkspaceSessionState): boolean {
+  return JSON.stringify(normalizeSession(a)) === JSON.stringify(normalizeSession(b))
+}
+
 export async function getServerRecentRepos(): Promise<RepoSessionEntry[]> {
   return [...(await loadUserSettings()).recentRepos]
 }

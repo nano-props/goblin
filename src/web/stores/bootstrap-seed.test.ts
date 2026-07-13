@@ -30,14 +30,6 @@ describe('client bootstrap seeding', () => {
     vi.resetModules()
   })
 
-  test('settings store no longer mirrors preload settings payload', async () => {
-    installBridge()
-
-    const { useSessionRestoreStore } = await import('#/web/stores/session-restore.ts')
-
-    expect(useSessionRestoreStore.getState()).toMatchObject({ bootSessionSnapshot: null })
-  })
-
   test('i18n store starts empty and waits for the entrypoint hydrate from /api/i18n', async () => {
     installBridge()
     const { useI18nStore } = await import('#/web/stores/i18n.ts')

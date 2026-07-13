@@ -1,5 +1,6 @@
 import { isValidCwd, isValidRepoLocator } from '#/shared/input-validation.ts'
 import type {
+  WorkspacePaneTabsBatchReplaceInput,
   WorkspacePaneTabsListInput,
   WorkspacePaneTabsReplaceInput,
   WorkspacePaneTabsSnapshot,
@@ -35,6 +36,34 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       const tabs = await sessionService.replaceTabs(userId, input)
       deps.broadcastWorkspaceTabsChanged(userId, input.repoRoot)
       return tabs
+    },
+
+    async replaceTabsBatch(
+      clientId: string,
+      userId: string,
+      input: WorkspacePaneTabsBatchReplaceInput,
+    ): Promise<Array<{ repoRoot: string; repoRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>> {
+      if (!isValidClientId(clientId)) return []
+      if (!Array.isArray(input?.replacements)) return []
+      const snapshots: Array<{ repoRoot: string; repoRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }> = []
+      for (const replacement of input.replacements) {
+        if (!isValidRepoLocator(replacement?.repoRoot)) return []
+        if (replacement?.worktreePath !== null && !isValidCwd(replacement?.worktreePath)) return []
+        assertCurrentRepoRuntime(userId, replacement.repoRoot, replacement.repoRuntimeId)
+      }
+      for (const replacement of input.replacements) {
+        const snapshot = await sessionService.replaceTabs(userId, replacement)
+        const index = snapshots.findIndex(
+          (entry) => entry.repoRoot === replacement.repoRoot && entry.repoRuntimeId === replacement.repoRuntimeId,
+        )
+        const entry = { repoRoot: replacement.repoRoot, repoRuntimeId: replacement.repoRuntimeId, snapshot }
+        if (index === -1) snapshots.push(entry)
+        else snapshots[index] = entry
+      }
+      for (const repoRoot of new Set(input.replacements.map((replacement) => replacement.repoRoot))) {
+        deps.broadcastWorkspaceTabsChanged(userId, repoRoot)
+      }
+      return snapshots
     },
 
     async updateTabs(

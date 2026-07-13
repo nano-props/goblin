@@ -5,7 +5,7 @@ import { defaultSettingsSnapshot, defaultWorkspaceSessionState } from '#/shared/
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { githubCliQueryKey, lanInfoQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { GitHubCliState, RepoSettingsState } from '#/shared/api-types.ts'
+import type { GitHubCliState, RepoSettingsState, WorkspaceSessionRestoreResult } from '#/shared/api-types.ts'
 
 type AddRecentRepoResult = {
   recentRepos: RepoSessionEntry[]
@@ -34,6 +34,20 @@ const appDataClientMocks = vi.hoisted(() => ({
     detectedAt: 0,
     hosts: {},
   })),
+  restoreWorkspaceSession: vi.fn<() => Promise<WorkspaceSessionRestoreResult>>(async () => ({
+    status: 'restored' as const,
+    session: {
+      openRepoEntries: [],
+      restoredRepoId: null,
+      zenMode: false,
+      workspacePaneSize: 0.4,
+      selectedTerminalSessionIdByTerminalWorktree: {},
+      preferredWorkspacePaneTabByTargetByRepo: {},
+      workspacePaneTabsByTargetByRepo: {},
+      filetreeViewStateByWorktreeByRepo: {},
+    },
+    runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
+  })),
   saveSession: vi.fn(async (session) => session),
   setGlobalShortcut: vi.fn(async (accelerator) => ({ accelerator, registered: true })),
   setGlobalShortcutDisabled: vi.fn(async (disabled) => disabled),
@@ -50,6 +64,7 @@ vi.mock('#/web/settings-client.ts', () => ({
   getSettingsSnapshot: appDataClientMocks.getSettingsSnapshot,
   refreshExternalAppsSnapshot: appDataClientMocks.refreshExternalAppsSnapshot,
   refreshGitHubCliState: appDataClientMocks.refreshGitHubCliState,
+  restoreWorkspaceSession: appDataClientMocks.restoreWorkspaceSession,
   saveSession: appDataClientMocks.saveSession,
   setGlobalShortcut: appDataClientMocks.setGlobalShortcut,
   setGlobalShortcutDisabled: appDataClientMocks.setGlobalShortcutDisabled,
@@ -88,6 +103,12 @@ describe('settings actions', () => {
       version: null,
       detectedAt: 0,
       hosts: {},
+    })
+    appDataClientMocks.restoreWorkspaceSession.mockReset()
+    appDataClientMocks.restoreWorkspaceSession.mockResolvedValue({
+      status: 'restored',
+      session: defaultWorkspaceSessionState(),
+      runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
     })
     appDataClientMocks.saveSession.mockReset()
     appDataClientMocks.saveSession.mockImplementation(async (session) => session)
@@ -151,6 +172,32 @@ describe('settings actions', () => {
     expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
       session,
     })
+  })
+
+  test('restorePersistedWorkspaceSession syncs the server-restored session into the settings snapshot cache', async () => {
+    primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
+    const session = {
+      ...defaultWorkspaceSessionState(),
+      openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo-a' }],
+      restoredRepoId: '/tmp/repo-a',
+      workspacePaneSize: 333,
+    }
+    appDataClientMocks.restoreWorkspaceSession.mockResolvedValue({
+      status: 'rebuilt',
+      session,
+      runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: session.restoredRepoId },
+    })
+    const { restorePersistedWorkspaceSession } = await import('#/web/settings-actions.ts')
+
+    const result = await restorePersistedWorkspaceSession('client_test000000000000')
+
+    expect(result).toEqual({
+      status: 'rebuilt',
+      session,
+      runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: session.restoredRepoId },
+    })
+    expect(appDataClientMocks.restoreWorkspaceSession).toHaveBeenCalledWith('client_test000000000000', undefined)
+    expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({ session })
   })
 
   test('refreshGitHubCliDetection writes refreshed state into the GitHub CLI cache', async () => {

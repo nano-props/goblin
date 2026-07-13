@@ -1,24 +1,21 @@
 // Authenticated bootstrap primes query state from the server transport before
 // feature stores start reading it.
 import { useEffect, useRef, useState } from 'react'
-import type { SettingsSnapshot } from '#/shared/api-types.ts'
+import type { SettingsSnapshot, WorkspaceSessionState } from '#/shared/api-types.ts'
 import { normalizeWorkspaceSessionLayoutState } from '#/shared/workspace-layout.ts'
 import { bootstrapLog } from '#/web/logger.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { restoreFiletreeViewStateFromSession } from '#/web/filetree-session-state.ts'
 import { restoreRestorableWorkspaceStateFromSession } from '#/web/restorable-workspace-state.ts'
 import { getExternalAppsSnapshot, getSettingsSnapshot } from '#/web/settings-client.ts'
+import { restorePersistedWorkspaceSession } from '#/web/settings-actions.ts'
 import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { useSessionRestoreStore } from '#/web/stores/session-restore.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
-import {
-  restoreServerWorkspacePaneTabsFromSession,
-  type RestoreWorkspacePaneTabsFromSessionResult,
-} from '#/web/workspace-pane/workspace-pane-session-tabs-restore.ts'
 import { createTimeoutAbortController } from '#/web/lib/abort.ts'
+import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 
 export type AuthenticatedAppBootstrapState = { status: 'restoring-workspace' } | { status: 'ready' }
 
@@ -33,7 +30,6 @@ interface AuthenticatedWorkspaceRestoreRun {
 }
 
 type WorkspaceRestoreOutcome = { status: 'completed' } | { status: 'cancelled' }
-type WorkspaceRestoreCancellationKind = 'cleanup' | 'failure'
 
 export function useAuthenticatedAppBootstrap(): AuthenticatedAppBootstrapState {
   const restoreRunRef = useRef<AuthenticatedWorkspaceRestoreRun | null>(null)
@@ -58,12 +54,12 @@ function startAuthenticatedWorkspaceRestoreRun(onReady: () => void): Authenticat
     AUTHENTICATED_WORKSPACE_RESTORE_TIMEOUT_MS,
     `authenticated workspace restore timed out after ${AUTHENTICATED_WORKSPACE_RESTORE_TIMEOUT_MS}ms`,
   )
-  // One settings read fans out to cache priming, theme, and session restore.
+  // One settings read fans out to theme and session restore.
   // Promise.resolve() converts synchronous configuration failures into the same
   // async failure channel as fetch errors, so restoreBootSession owns the result.
   const settingsSnapshot = Promise.resolve().then(() => getSettingsSnapshot({ signal: timeout.signal }))
-  void primeSettingsQueryCache(settingsSnapshot, timeout.signal).catch((err) => {
-    if (!timeout.signal.aborted) bootstrapLog.warn('settings priming failed', { err })
+  void primeExternalAppsQueryCache(timeout.signal).catch((err) => {
+    if (!timeout.signal.aborted) bootstrapLog.warn('external apps priming failed', { err })
   })
   void hydrateNonCriticalAuthenticatedState(settingsSnapshot, timeout.signal)
   void restoreBootSession(settingsSnapshot, timeout.signal).then((outcome) => {
@@ -102,49 +98,45 @@ async function restoreBootSession(
 ): Promise<WorkspaceRestoreOutcome> {
   try {
     useReposStore.setState({ sessionPersistenceReady: false, sessionRestoreError: null })
-    useSessionRestoreStore.getState().hydrateFromSettingsSnapshot(await abortable(settingsSnapshot, signal))
+    const snapshot = await abortable(settingsSnapshot, signal)
+    primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), snapshot)
     if (signal.aborted) throw abortReason(signal)
-    const session = useSessionRestoreStore.getState().consumeBootSessionSnapshot()
-    const normalizedLayout = normalizeWorkspaceSessionLayoutState(session)
-    const { hydrateRepoSession, applySessionLayoutState, applySessionSelectedTerminalState } = useReposStore.getState()
-    // Apply layout prefs before repo probing finishes so the first
-    // restored paint uses the saved geometry. useSessionPersistence
-    // still waits for workspaceMembershipReady, so this cannot overwrite the
-    // persisted session with a partially hydrated one.
-    const restoredWorkspaceState = restoreRestorableWorkspaceStateFromSession(session)
-    restoreFiletreeViewStateFromSession(session.filetreeViewStateByWorktreeByRepo)
-    applySessionLayoutState(normalizedLayout)
-    applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalSessionIdByTerminalWorktree)
+    const restored = await abortable(
+      restorePersistedWorkspaceSession(readOrCreateWebTerminalClientId(), { signal }),
+      signal,
+    )
+    if (restored.status === 'rebuilt') bootstrapLog.warn('invalid persisted session rebuilt by server')
+    applyRestoredWorkspaceSession(restored.session)
     await abortable(
-      hydrateRepoSession(session.openRepoEntries, session.restoredRepoId, {
+      useReposStore.getState().hydrateRestoredWorkspaceRuntime(restored.runtime, {
         signal,
-        workspacePaneRestoreState: {
-          workspacePaneTabsByTargetByRepo: restoredWorkspaceState.workspacePaneTabsByTargetByRepo,
-          preferredWorkspacePaneTabByTargetByRepo: restoredWorkspaceState.preferredWorkspacePaneTabByTargetByRepo,
-        },
       }),
       signal,
     )
     if (signal.aborted) throw abortReason(signal)
-    const workspaceTabsRestoreResult = await abortable(
-      restoreServerWorkspacePaneTabsFromSession(restoredWorkspaceState.workspacePaneTabsByTargetByRepo, {
-        signal,
-      }),
-      signal,
-    )
-
-    if (workspaceTabsRestoreResult.status === 'cancelled') {
-      if (workspaceRestoreCancellationKind(signal) === 'cleanup') return { status: 'cancelled' }
-      throw abortReason(signal)
-    }
-    finishWorkspacePaneTabsBootRestore(workspaceTabsRestoreResult)
+    useReposStore.setState({ sessionPersistenceReady: true, sessionRestoreError: null })
     return { status: 'completed' }
   } catch (err) {
-    if (err === AUTHENTICATED_WORKSPACE_RESTORE_CANCELLED) return { status: 'cancelled' }
+    if (signal.reason === AUTHENTICATED_WORKSPACE_RESTORE_CANCELLED && isAbortReason(err, signal)) {
+      return { status: 'cancelled' }
+    }
     bootstrapLog.warn('session restore failed', { err })
     blockSessionPersistenceAfterRestoreFailure(restoreFailureMessage(err))
     return { status: 'completed' }
   }
+}
+
+function applyRestoredWorkspaceSession(session: WorkspaceSessionState): void {
+  // Apply layout prefs before repo probing finishes so the first
+  // restored paint uses the saved geometry. useSessionPersistence
+  // still waits for workspaceMembershipReady, so this cannot overwrite the
+  // persisted session with a partially hydrated one.
+  const normalizedLayout = normalizeWorkspaceSessionLayoutState(session)
+  const restoredWorkspaceState = restoreRestorableWorkspaceStateFromSession(session)
+  const { applySessionLayoutState, applySessionSelectedTerminalState } = useReposStore.getState()
+  restoreFiletreeViewStateFromSession(session.filetreeViewStateByWorktreeByRepo)
+  applySessionLayoutState(normalizedLayout)
+  applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalSessionIdByTerminalWorktree)
 }
 
 async function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
@@ -158,28 +150,6 @@ async function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T
     return await Promise.race([promise, aborted])
   } finally {
     if (onAbort) signal.removeEventListener('abort', onAbort)
-  }
-}
-
-function finishWorkspacePaneTabsBootRestore(
-  result: Exclude<RestoreWorkspacePaneTabsFromSessionResult, { status: 'cancelled' }>,
-): void {
-  switch (result.status) {
-    case 'restored':
-      useReposStore.setState({ sessionPersistenceReady: true, sessionRestoreError: null })
-      return
-    case 'failed':
-      bootstrapLog.warn('workspace pane tabs restore failed', workspacePaneTabsRestoreSummary(result))
-      blockSessionPersistenceAfterRestoreFailure('workspace pane tabs restore failed')
-      return
-  }
-}
-
-function workspacePaneTabsRestoreSummary(result: RestoreWorkspacePaneTabsFromSessionResult) {
-  return {
-    unresolvedRepos: result.unresolvedRepos,
-    unresolvedTargets: result.unresolvedTargets,
-    failedCommitCount: result.failedCommits.length,
   }
 }
 
@@ -199,10 +169,6 @@ function abortReason(signal: AbortSignal): unknown {
   return signal.reason instanceof Error ? signal.reason : new Error('authenticated workspace restore aborted')
 }
 
-function workspaceRestoreCancellationKind(signal: AbortSignal): WorkspaceRestoreCancellationKind {
-  return signal.reason === AUTHENTICATED_WORKSPACE_RESTORE_CANCELLED ? 'cleanup' : 'failure'
-}
-
 function isAbortReason(err: unknown, signal: AbortSignal): boolean {
   if (err === signal.reason) return true
   return err instanceof Error && err.name === 'AbortError'
@@ -218,40 +184,16 @@ async function runOptionalBootstrapTask(label: string, task: () => Promise<void>
 }
 
 /**
- * Prime the settings and external-apps query cache from the authenticated
- * `/api/settings` + `/api/settings/external-apps` endpoints so the
- * settings pages render with their persisted values on first paint
- * instead of flashing the defaults. Each call sites its own error
- * log on failure - the client's boot must not be blocked by a
- * settings fetch outage.
+ * Prime external-apps query cache from the authenticated endpoint so settings
+ * pages render with persisted values on first paint instead of flashing the
+ * defaults. Settings snapshot cache is populated by restoreBootSession, which
+ * also owns server-rebuilt session reconciliation.
  */
-async function primeSettingsQueryCache(
-  settingsSnapshot: Promise<SettingsSnapshot>,
-  signal: AbortSignal,
-): Promise<void> {
-  // `getSettingsSnapshot()` / `getExternalAppsSnapshot()` can throw
-  // synchronously when the bootstrap is missing (the request never
-  // reaches `fetch`). Wrap each one individually so the other can
-  // still succeed and so a synchronous throw doesn't propagate up
-  // and abort the rest of the boot.
-  const fetchAndPrime = async (
-    label: string,
-    fetcher: () => Promise<unknown>,
-    queryKey: readonly unknown[],
-  ): Promise<void> => {
-    try {
-      const snapshot = await fetcher()
-      primaryWindowQueryClient.setQueryData(queryKey, snapshot)
-    } catch (err) {
-      if (signal.aborted && isAbortReason(err, signal)) return
-      // Settings fetch failure must not block boot - the page will
-      // retry the auto-fetch on first use. The empty cache is the
-      // same state the client had before this priming pass.
-      bootstrapLog.warn(`${label} query prime failed`, { err })
-    }
+async function primeExternalAppsQueryCache(signal: AbortSignal): Promise<void> {
+  try {
+    primaryWindowQueryClient.setQueryData(externalAppsQueryKey(), await getExternalAppsSnapshot({ signal }))
+  } catch (err) {
+    if (signal.aborted && isAbortReason(err, signal)) return
+    bootstrapLog.warn('external apps query prime failed', { err })
   }
-  await Promise.all([
-    fetchAndPrime('settings snapshot', () => settingsSnapshot, settingsSnapshotQueryKey()),
-    fetchAndPrime('external apps', () => getExternalAppsSnapshot({ signal }), externalAppsQueryKey()),
-  ])
 }

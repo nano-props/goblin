@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   acquireRepoRuntime,
+  acquireRepoRuntimeLease,
   captureRepoRuntimeMembershipLease,
   clearRepoRuntimesForUser,
   expireRepoRuntimeMembershipLease,
@@ -8,6 +9,7 @@ import {
   listRepoRuntimes,
   onRepoRuntimeClosed,
   releaseRepoRuntime,
+  releaseRepoRuntimeMembershipLease,
   replaceRepoRuntimeMembershipsForClient,
 } from '#/server/modules/repo-runtimes.ts'
 
@@ -87,6 +89,21 @@ describe('repo runtimes', () => {
 
     expect(expireRepoRuntimeMembershipLease(staleLease)).toEqual([])
     expect(releaseRepoRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toEqual({
+      released: true,
+      runtimeClosed: true,
+    })
+  })
+
+  test('does not let an old explicit membership lease remove a renewed membership', () => {
+    const staleLease = acquireRepoRuntimeLease(USER_ID, REPO_ROOT, 'client-a')
+    const renewedLease = acquireRepoRuntimeLease(USER_ID, REPO_ROOT, 'client-a')
+
+    expect(releaseRepoRuntimeMembershipLease(USER_ID, 'client-a', staleLease)).toEqual({
+      released: false,
+      runtimeClosed: false,
+    })
+    expect(isCurrentRepoRuntime(USER_ID, REPO_ROOT, renewedLease.repoRuntimeId)).toBe(true)
+    expect(releaseRepoRuntimeMembershipLease(USER_ID, 'client-a', renewedLease)).toEqual({
       released: true,
       runtimeClosed: true,
     })

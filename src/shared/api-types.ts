@@ -15,6 +15,7 @@ import type {
   WorktreeStatus,
 } from '#/shared/git-types.ts'
 import type { WorkspacePaneSessionTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type {
   EditorAppAvailability,
@@ -122,6 +123,27 @@ export interface RepoRuntimesSnapshot {
 
 export interface RepoRuntimeMembershipReconcileResult {
   runtimes: RepoRuntimeEntry[]
+}
+
+export interface RestoredWorkspaceRepoRuntime {
+  entry: RepoSessionEntry
+  repoRoot: string
+  repoRuntimeId: string
+  name: string
+  target?: RemoteRepoTarget
+  projection: RepoRuntimeProjection
+}
+
+export interface WorkspaceRuntimeRestoreSnapshot {
+  repos: RestoredWorkspaceRepoRuntime[]
+  workspacePaneTabs: Array<{ repoRoot: string; repoRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>
+  restoredRepoId: string | null
+}
+
+export interface WorkspaceSessionRestoreResult {
+  status: 'restored' | 'rebuilt'
+  session: WorkspaceSessionState
+  runtime: WorkspaceRuntimeRestoreSnapshot
 }
 
 export interface RepoSettingsState {

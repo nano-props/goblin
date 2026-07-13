@@ -3,6 +3,7 @@ import { disconnectAllClientIntentSockets, registerClientIntentSocket } from '#/
 import { createRepoViewRoutes } from '#/server/routes/repo-view.ts'
 import { createApp } from '#/server/app-factory.ts'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
+import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 
 // Minimal app realtime host stub for the auth-integration `createApp()`
 // tests. Mirrors the one in `app-factory.test.ts`; a future refactor
@@ -18,6 +19,12 @@ function makeAppRealtimeHost(): ServerAppRealtimeHost {
     shutdown: vi.fn(),
   }
 }
+
+const workspacePaneTabsHost = {
+  listWorkspaceTabs: vi.fn(),
+  replaceTabs: vi.fn(),
+  updateTabs: vi.fn(),
+} satisfies ServerWorkspacePaneTabsHost
 
 const worktreeRemovalApplication = {
   removeWorktree: vi.fn(async () => ({ ok: false as const, message: 'unused' })),
@@ -128,6 +135,7 @@ describe('POST /api/repo/view — auth integration via createApp()', () => {
       startedAt: 0,
       accessToken: 'secret',
       appRealtimeHost: makeAppRealtimeHost(),
+      workspacePaneTabsHost,
       worktreeRemovalApplication,
     })
     const res = await app.request(
@@ -151,6 +159,7 @@ describe('POST /api/repo/view — auth integration via createApp()', () => {
       startedAt: 0,
       accessToken: 'secret',
       appRealtimeHost: makeAppRealtimeHost(),
+      workspacePaneTabsHost,
       worktreeRemovalApplication,
     })
     const res = await app.request(

@@ -257,6 +257,7 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
     itemId: v.pipe(v.string(), v.minLength(1), v.maxLength(64)),
   }),
   githubCli: GITHUB_CLI_REFRESH_SCHEMA,
+  sessionRestore: v.object({ clientId: ClientIdSchema }),
 } as const
 
 // `prefs` accepts a permissive patch — the underlying
