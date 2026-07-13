@@ -14,6 +14,8 @@ import {
   TerminalSessionContext,
   TerminalSessionReadContext,
   useTerminalSessionReadContext,
+  EMPTY_TERMINAL_SNAPSHOT,
+  EMPTY_TERMINAL_WORKTREE_SNAPSHOT,
 } from '#/web/components/terminal/terminal-session-context.ts'
 import type {
   TerminalSessionContextValue,
@@ -1292,17 +1294,8 @@ describe('RepoWorkspaceContent', () => {
   })
 })
 
-const emptyWorktreeSnapshot: TerminalWorktreeSnapshot = {
-  terminalWorktreeKey: '',
-  selectedDescriptor: null,
-  sessions: [],
-  count: 0,
-  bellCount: 0,
-  outputActiveCount: 0,
-  createPending: false,
-}
-
-const emptyTerminalSnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
+const emptyWorktreeSnapshot = EMPTY_TERMINAL_WORKTREE_SNAPSHOT
+const emptyTerminalSnapshot = EMPTY_TERMINAL_SNAPSHOT
 
 const emptyTerminalReadContext: TerminalSessionReadContextValue = {
   terminalWorktreeSnapshot: () => emptyWorktreeSnapshot,

@@ -10,6 +10,7 @@ import { getCurrentRepoWorkspacePresentation, type RepoWorkspaceRepo } from '#/w
 import { useRepoWorkspaceTabModel } from '#/web/components/repo-workspace/use-repo-workspace-tab-model.ts'
 import { useBranchActions, type BranchActions } from '#/web/hooks/useBranchActions.tsx'
 import {
+  EMPTY_TERMINAL_SNAPSHOT,
   TerminalSessionContext,
   TerminalSessionReadContext,
 } from '#/web/components/terminal/terminal-session-context.ts'
@@ -1334,7 +1335,7 @@ function renderToolbar(options: {
     outputActiveCount: 0,
     createPending: options.createPending ?? false,
   }
-  const terminalSnapshot = { phase: 'opening' as const, message: null, processName: 'terminal' }
+  const terminalSnapshot = EMPTY_TERMINAL_SNAPSHOT
   const readContext: TerminalSessionReadContextValue = {
     terminalWorktreeSnapshot: () => terminalWorktreeSnapshot,
     subscribeTerminalWorktree: () => () => {},
