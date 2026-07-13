@@ -25,7 +25,7 @@ import type {
   PhysicalWorktreeIdentityResolver,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import type { ServerTerminalCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
-import { failRemoteRuntimeIfNeeded } from '#/server/modules/remote-runtime-failure.ts'
+import { failRemoteRuntimeIfNeeded } from '#/server/modules/remote-runtime-failure-settlement.ts'
 
 type MaybePromise<T> = T | Promise<T>
 const workspacePaneRuntimeApplicationLogger = serverLogger.child({ module: 'workspace-pane-runtime-application' })

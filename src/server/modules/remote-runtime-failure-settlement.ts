@@ -1,0 +1,32 @@
+import { failRepoRemoteLifecycle } from '#/server/modules/repo-runtimes.ts'
+import { publishUserRepoQueryInvalidation } from '#/server/modules/invalidation-broker.ts'
+import {
+  isRemoteRepoRuntimeFailure,
+  type RemoteRepoRuntimeFailureError,
+} from '#/server/modules/remote-runtime-failure.ts'
+
+/**
+ * Mark a repo's remote lifecycle as failed from a classified
+ * `RemoteRepoRuntimeFailureError`, then invalidate the affected user's
+ * `remote-lifecycle` query so the frontend refetches and reflects the new
+ * state. The `kind !== 'settled'` branch silently no-ops: it means the
+ * runtime was already closed by another client, so there is nothing to
+ * fail.
+ */
+export function settleRemoteRuntimeFailure(userId: string, error: RemoteRepoRuntimeFailureError): void {
+  const failed = failRepoRemoteLifecycle({
+    userId,
+    repoRoot: error.repoRoot,
+    repoRuntimeId: error.repoRuntimeId,
+    reason: error.reason,
+    ...(error.target ? { target: error.target } : {}),
+  })
+  if (failed.kind !== 'settled') return
+  publishUserRepoQueryInvalidation(userId, { repoId: error.repoRoot, query: 'remote-lifecycle' })
+}
+
+/** Type guard wrapper that fans out to `settleRemoteRuntimeFailure` only when the error matches. */
+export function failRemoteRuntimeIfNeeded(userId: string, error: unknown): void {
+  if (!isRemoteRepoRuntimeFailure(error)) return
+  settleRemoteRuntimeFailure(userId, error)
+}

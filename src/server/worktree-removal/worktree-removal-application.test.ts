@@ -12,8 +12,8 @@ import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physica
 import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
 
 const failRemoteRuntimeIfNeededMock = vi.hoisted(() => vi.fn())
-vi.mock('#/server/modules/remote-runtime-failure.ts', async (importActual) => {
-  const actual = await importActual<typeof import('#/server/modules/remote-runtime-failure.ts')>()
+vi.mock('#/server/modules/remote-runtime-failure-settlement.ts', async (importActual) => {
+  const actual = await importActual<typeof import('#/server/modules/remote-runtime-failure-settlement.ts')>()
   return { ...actual, failRemoteRuntimeIfNeeded: failRemoteRuntimeIfNeededMock }
 })
 

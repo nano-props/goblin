@@ -39,10 +39,8 @@ import {
 } from '#/server/modules/repo-runtimes.ts'
 import { REPO_PROCEDURE_SCHEMAS } from '#/shared/procedure-schemas.ts'
 import { IpcError, type RepoLogResponse } from '#/shared/api-types.ts'
-import {
-  isRemoteRepoRuntimeFailure,
-  settleRemoteRuntimeFailure,
-} from '#/server/modules/remote-runtime-failure.ts'
+import { isRemoteRepoRuntimeFailure } from '#/server/modules/remote-runtime-failure.ts'
+import { settleRemoteRuntimeFailure } from '#/server/modules/remote-runtime-failure-settlement.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import type { PhysicalWorktreeCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'

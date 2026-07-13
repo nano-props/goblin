@@ -12,7 +12,7 @@ import type {
   PhysicalWorktreeCapability,
   PhysicalWorktreeIdentityResolver,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
-import { failRemoteRuntimeIfNeeded } from '#/server/modules/remote-runtime-failure.ts'
+import { failRemoteRuntimeIfNeeded } from '#/server/modules/remote-runtime-failure-settlement.ts'
 
 const worktreeRemovalLogger = serverLogger.child({ module: 'worktree-removal-application' })
 
