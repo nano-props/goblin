@@ -68,15 +68,9 @@ test('persists updates and notifies subscribers from the server settings store',
     globalShortcut: 'CommandOrControl+Alt+G',
     lanEnabled: false,
   })
-  await mod.saveRebuiltServerWorkspaceState({
-    persistedSnapshot: defaultServerWorkspaceState(),
-    rebuiltWorkspace: {
-      workspacePaneTabsByTargetByRepo: {
-        '/repo-b': {
-          [branchTargetKey('/repo-b', 'main')]: [],
-        },
-      },
-    },
+  await mod.recordServerWorkspaceTabs('/repo-b', {
+    revision: 1,
+    entries: [{ repoRoot: '/repo-b', branchName: 'main', worktreePath: null, tabs: [] }],
   })
   await mod.addServerRecentRepo({ kind: 'local', id: '/repo-b' })
   await mod.trustServerRepoWorktreeBootstrapConfig({
@@ -189,6 +183,65 @@ test('persists canonical tabs independently of runtime membership', async () => 
   })
 })
 
+test('clears unchanged repo tabs without affecting another repo', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  const mod = await import('#/server/modules/settings-source.ts')
+  const repoATabs = [workspacePaneStaticTabEntry('history')]
+  const repoBTabs = [workspacePaneStaticTabEntry('status')]
+  await mod.recordServerWorkspaceTabs('/repo-a', {
+    revision: 1,
+    entries: [{ repoRoot: '/repo-a', branchName: 'main', worktreePath: null, tabs: repoATabs }],
+  })
+  await mod.recordServerWorkspaceTabs('/repo-b', {
+    revision: 1,
+    entries: [{ repoRoot: '/repo-b', branchName: 'main', worktreePath: null, tabs: repoBTabs }],
+  })
+
+  await expect(
+    mod.clearServerWorkspaceTabsIfUnchanged({
+      repoRoot: '/repo-a',
+      expectedTabsByTarget: { [branchTargetKey('/repo-a', 'main')]: repoATabs },
+    }),
+  ).resolves.toMatchObject({
+    cleared: true,
+    workspace: {
+      workspacePaneTabsByTargetByRepo: {
+        '/repo-b': { [branchTargetKey('/repo-b', 'main')]: repoBTabs },
+      },
+    },
+  })
+})
+
+test('does not clear repo tabs after that repo changed', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  const mod = await import('#/server/modules/settings-source.ts')
+  const currentTabs = [workspacePaneStaticTabEntry('history')]
+  await mod.recordServerWorkspaceTabs('/repo-a', {
+    revision: 2,
+    entries: [{ repoRoot: '/repo-a', branchName: 'main', worktreePath: null, tabs: currentTabs }],
+  })
+
+  await expect(
+    mod.clearServerWorkspaceTabsIfUnchanged({
+      repoRoot: '/repo-a',
+      expectedTabsByTarget: {
+        [branchTargetKey('/repo-a', 'main')]: [workspacePaneStaticTabEntry('status')],
+      },
+    }),
+  ).resolves.toMatchObject({
+    cleared: false,
+    latestWorkspace: {
+      workspacePaneTabsByTargetByRepo: {
+        '/repo-a': { [branchTargetKey('/repo-a', 'main')]: currentTabs },
+      },
+    },
+  })
+})
+
 test('updates repo-level worktree bootstrap trust by repo id', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
@@ -281,33 +334,39 @@ test('normalizes workspace pane tab list in server sessions', async () => {
   const worktreeTargetKeyValue = worktreeTargetKey('/repo-b', 'feature/worktree', '/tmp/repo-b-worktree')
   const emptyTargetKey = branchTargetKey('/repo-b', 'empty')
   const invalidTargetKey = branchTargetKey('/repo-b', 'invalid')
-  await mod.saveRebuiltServerWorkspaceState({
-    persistedSnapshot: defaultServerWorkspaceState(),
-    rebuiltWorkspace: {
-      workspacePaneTabsByTargetByRepo: {
-        '/repo-b': {
-          [mainTargetKey]: [
-            workspacePaneStaticTabEntry('status'),
-            { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
-            workspacePaneStaticTabEntry('history'),
-            workspacePaneStaticTabEntry('status'),
-            workspacePaneStaticTabEntry('changes'),
-          ],
-          [worktreeTargetKeyValue]: [
-            workspacePaneStaticTabEntry('status'),
-            { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
-            workspacePaneStaticTabEntry('changes'),
-          ],
-          [emptyTargetKey]: [],
-          '/repo-b\0branch\0bad\0branch': [workspacePaneStaticTabEntry('status')],
-          [invalidTargetKey]: [{ type: 'changes', tabId: WORKSPACE_PANE_STATIC_TAB_IDS.status }],
-        },
-        '/repo-c': {
-          [branchTargetKey('/repo-c', 'main')]: [workspacePaneStaticTabEntry('status')],
-        },
-        '/repo-array': [workspacePaneStaticTabEntry('status')],
-      } as never,
-    },
+  await mod.recordServerWorkspaceTabs('/repo-b', {
+    revision: 1,
+    entries: [
+      {
+        repoRoot: '/repo-b',
+        branchName: 'main',
+        worktreePath: null,
+        tabs: [
+          workspacePaneStaticTabEntry('status'),
+          { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
+          workspacePaneStaticTabEntry('history'),
+          workspacePaneStaticTabEntry('status'),
+          workspacePaneStaticTabEntry('changes'),
+        ],
+      },
+      {
+        repoRoot: '/repo-b',
+        branchName: 'feature/worktree',
+        worktreePath: '/tmp/repo-b-worktree',
+        tabs: [
+          workspacePaneStaticTabEntry('status'),
+          { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
+          workspacePaneStaticTabEntry('changes'),
+        ],
+      },
+      { repoRoot: '/repo-b', branchName: 'empty', worktreePath: null, tabs: [] },
+      {
+        repoRoot: '/repo-b',
+        branchName: 'invalid',
+        worktreePath: null,
+        tabs: [{ type: 'changes', tabId: WORKSPACE_PANE_STATIC_TAB_IDS.status }],
+      },
+    ] as never,
   })
 
   expect(await mod.getServerWorkspaceState()).toMatchObject({

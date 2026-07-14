@@ -451,29 +451,37 @@ export async function getServerWorkspaceState(): Promise<ServerWorkspaceState> {
   return cloneWorkspace((await loadUserSettings()).workspace)
 }
 
-export async function saveRebuiltServerWorkspaceState(input: {
-  persistedSnapshot: ServerWorkspaceState
-  rebuiltWorkspace: ServerWorkspaceState
+export async function clearServerWorkspaceTabsIfUnchanged(input: {
+  repoRoot: string
+  expectedTabsByTarget: Record<string, WorkspacePaneTabEntry[]>
 }): Promise<
-  { saved: true; workspace: ServerWorkspaceState } | { saved: false; latestWorkspace: ServerWorkspaceState }
+  { cleared: true; workspace: ServerWorkspaceState } | { cleared: false; latestWorkspace: ServerWorkspaceState }
 > {
-  return await mutateUserSettings<
-    { saved: true; workspace: ServerWorkspaceState } | { saved: false; latestWorkspace: ServerWorkspaceState }
-  >(async (data) => {
-    const current = cloneWorkspace(data.workspace)
-    if (!sameServerWorkspaceState(current, input.persistedSnapshot)) {
-      return unchangedUserSettings(data, { saved: false, latestWorkspace: current })
+  type ClearResult =
+    { cleared: true; workspace: ServerWorkspaceState } | { cleared: false; latestWorkspace: ServerWorkspaceState }
+  return await mutateUserSettings<ClearResult>(async (data) => {
+    const currentTabsByTarget = data.workspace.workspacePaneTabsByTargetByRepo[input.repoRoot] ?? {}
+    if (!sameServerWorkspaceTabsForRepo(input.repoRoot, currentTabsByTarget, input.expectedTabsByTarget)) {
+      return unchangedUserSettings(data, { cleared: false as const, latestWorkspace: cloneWorkspace(data.workspace) })
     }
-    const next = normalizeWorkspace(input.rebuiltWorkspace)
+    const workspacePaneTabsByTargetByRepo = { ...data.workspace.workspacePaneTabsByTargetByRepo }
+    delete workspacePaneTabsByTargetByRepo[input.repoRoot]
+    const workspace = { workspacePaneTabsByTargetByRepo }
     return {
-      next: { ...data, workspace: next },
-      result: { saved: true, workspace: cloneWorkspace(next) },
+      next: { ...data, workspace },
+      result: { cleared: true as const, workspace: cloneWorkspace(workspace) },
     }
   })
 }
 
-function sameServerWorkspaceState(a: ServerWorkspaceState, b: ServerWorkspaceState): boolean {
-  return JSON.stringify(normalizeWorkspace(a)) === JSON.stringify(normalizeWorkspace(b))
+function sameServerWorkspaceTabsForRepo(
+  repoRoot: string,
+  a: Record<string, WorkspacePaneTabEntry[]>,
+  b: Record<string, WorkspacePaneTabEntry[]>,
+): boolean {
+  const normalize = (tabsByTarget: Record<string, WorkspacePaneTabEntry[]>) =>
+    normalizeWorkspacePaneTabsByTargetByRepo({ [repoRoot]: tabsByTarget })[repoRoot] ?? {}
+  return JSON.stringify(normalize(a)) === JSON.stringify(normalize(b))
 }
 
 export async function recordServerWorkspaceTabs(

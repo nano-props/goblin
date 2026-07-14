@@ -29,7 +29,7 @@ import {
   type RepoRuntimeMembershipLeaseEntry,
 } from '#/server/modules/repo-runtimes.ts'
 import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
-import { getServerWorkspaceState, saveRebuiltServerWorkspaceState } from '#/server/modules/settings-source.ts'
+import { clearServerWorkspaceTabsIfUnchanged, getServerWorkspaceState } from '#/server/modules/settings-source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 
 export interface RestoreServerWorkspaceInput {
@@ -81,7 +81,7 @@ interface WorkspacePaneTabsRestoreReplacement {
   tabs: WorkspacePaneTabEntry[]
 }
 
-const MAX_REBUILD_CONFLICT_RETRIES = 3
+const MAX_WORKSPACE_REPAIR_CONFLICT_RETRIES = 3
 const restoreQueues = new Map<string, PQueue>()
 
 export async function restoreServerWorkspace(input: RestoreServerWorkspaceInput): Promise<RestoredServerWorkspace> {
@@ -95,7 +95,6 @@ export async function restoreServerWorkspace(input: RestoreServerWorkspaceInput)
       const restored = await restoreServerWorkspaceSnapshot(
         { ...input, activeRepoRoot: input.activeRepoRoot ?? input.openRepoEntries[0]?.id ?? null },
         { workspace, openRepoEntries: input.openRepoEntries },
-        0,
       )
       return restored
     })
@@ -122,7 +121,6 @@ function restoreQueueFor(key: string): PQueue {
 async function restoreServerWorkspaceSnapshot(
   input: RestoreServerWorkspaceInput,
   source: { workspace: ServerWorkspaceState; openRepoEntries: RepoSessionEntry[] },
-  conflictRetries: number,
 ): Promise<RestoredServerWorkspaceSnapshot> {
   input.signal?.throwIfAborted()
   const opened: OpenedRepoSessionEntry[] = []
@@ -147,38 +145,18 @@ async function restoreServerWorkspaceSnapshot(
     // cannot resolve — and their tabs will be restored lazily when the user
     // navigates to them via `restoreRepoTabsForRepo`.
     const openedActive = opened.filter(isOpenedProjectedRepo)
-    if (!validateWorkspacePaneTabs(source.workspace, openedActive).ok) {
-      const saved = await saveRebuiltServerWorkspaceState({
-        persistedSnapshot: source.workspace,
-        rebuiltWorkspace: workspaceWithoutRepoTabs(source.workspace, openedActive[0]?.repoRoot),
-      })
-      if (saved.saved) {
-        openedMembershipsCommitted = true
-        return {
-          status: 'repaired',
-          openRepoEntries: opened.map((repo) => repo.entry),
-          workspace: saved.workspace,
-          runtime: runtimeSnapshotFromOpened(opened, activeRepoRootForOpened(input.activeRepoRoot, opened), []),
-        }
-      }
-      if (conflictRetries >= MAX_REBUILD_CONFLICT_RETRIES) {
-        throw new Error('workspace session restore was superseded too many times')
-      }
-      return await restoreServerWorkspaceSnapshot(
-        input,
-        { workspace: saved.latestWorkspace, openRepoEntries: source.openRepoEntries },
-        conflictRetries + 1,
-      )
-    }
+    const validatedWorkspace = openedActive[0]
+      ? await validateOrRepairWorkspacePaneTabs(source.workspace, openedActive[0])
+      : { workspace: source.workspace, repaired: false }
 
     input.signal?.throwIfAborted()
-    const workspacePaneTabs = await restoreWorkspacePaneTabsForRepos(input, source.workspace, openedActive)
+    const workspacePaneTabs = await restoreWorkspacePaneTabsForRepos(input, validatedWorkspace.workspace, openedActive)
     input.signal?.throwIfAborted()
     openedMembershipsCommitted = true
     return {
-      status: repoRestoreFailed ? 'repaired' : 'restored',
+      status: repoRestoreFailed || validatedWorkspace.repaired ? 'repaired' : 'restored',
       openRepoEntries: opened.map((repo) => repo.entry),
-      workspace: source.workspace,
+      workspace: validatedWorkspace.workspace,
       runtime: runtimeSnapshotFromOpened(
         opened,
         activeRepoRootForOpened(input.activeRepoRoot, opened),
@@ -188,13 +166,6 @@ async function restoreServerWorkspaceSnapshot(
   } finally {
     if (!openedMembershipsCommitted) releaseOpenedRepoRuntimes(input, opened)
   }
-}
-
-function workspaceWithoutRepoTabs(workspace: ServerWorkspaceState, repoRoot: string | undefined): ServerWorkspaceState {
-  if (!repoRoot) return workspace
-  const workspacePaneTabsByTargetByRepo = { ...workspace.workspacePaneTabsByTargetByRepo }
-  delete workspacePaneTabsByTargetByRepo[repoRoot]
-  return { workspacePaneTabsByTargetByRepo }
 }
 
 async function openSessionRepo(
@@ -394,10 +365,7 @@ export async function restoreRepoTabsForRepo(input: RestoreRepoTabsInput): Promi
   }
 
   const persistedWorkspace = await getServerWorkspaceState()
-  const workspace = workspaceForRepoTabs(persistedWorkspace, input.repoRoot)
-  if (!validateWorkspacePaneTabs(workspace, [repo]).ok) {
-    return { repo, snapshot: null }
-  }
+  const validatedWorkspace = await validateOrRepairWorkspacePaneTabs(persistedWorkspace, repo)
 
   const snapshots = await restoreWorkspacePaneTabsForRepos(
     {
@@ -407,13 +375,34 @@ export async function restoreRepoTabsForRepo(input: RestoreRepoTabsInput): Promi
       workspacePaneTabsHost: input.workspacePaneTabsHost,
       signal: input.signal,
     },
-    workspace,
+    validatedWorkspace.workspace,
     [repo],
   )
   assertCurrentRepoRuntime(input)
   return {
     repo,
     snapshot: snapshots[0]?.snapshot ?? null,
+  }
+}
+
+async function validateOrRepairWorkspacePaneTabs(
+  initialWorkspace: ServerWorkspaceState,
+  repo: ProjectedRestoredWorkspaceRepoRuntime,
+): Promise<{ workspace: ServerWorkspaceState; repaired: boolean }> {
+  let workspace = initialWorkspace
+  for (let conflicts = 0; ; conflicts += 1) {
+    const repoWorkspace = workspaceForRepoTabs(workspace, repo.repoRoot)
+    if (validateWorkspacePaneTabs(repoWorkspace, [repo]).ok) return { workspace, repaired: false }
+    const expectedTabsByTarget = repoWorkspace.workspacePaneTabsByTargetByRepo[repo.repoRoot] ?? {}
+    const cleared = await clearServerWorkspaceTabsIfUnchanged({
+      repoRoot: repo.repoRoot,
+      expectedTabsByTarget,
+    })
+    if (cleared.cleared) return { workspace: cleared.workspace, repaired: true }
+    if (conflicts >= MAX_WORKSPACE_REPAIR_CONFLICT_RETRIES) {
+      throw new Error('workspace tabs repair was superseded too many times')
+    }
+    workspace = cleared.latestWorkspace
   }
 }
 

@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerWorkspaceState: mocks.getServerWorkspaceState,
-  saveRebuiltServerWorkspaceState: vi.fn(),
+  clearServerWorkspaceTabsIfUnchanged: vi.fn(),
 }))
 
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({

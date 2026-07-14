@@ -118,6 +118,8 @@ Notes:
 - Restorable state is not runtime-coherent shared state.
 - Do not add a whole-session client -> server write. Each side persists only the state it owns.
 - Workspace pane tab commands persist their canonical server snapshot at the accepted command boundary.
+- Restore repairs invalid canonical pane-tab targets with a repo-local compare-and-clear operation. It must not rebuild
+  the whole workspace or overwrite tabs that changed after validation.
 - Workspace pane target preference distinguishes three states: no target (`null` render selection), uninitialized target (use `INITIAL_WORKSPACE_PANE_TAB`), and explicit empty pane (`preferredWorkspacePaneTabByTarget[targetKey] === null`). Do not use `status` as a fallback for route misses, projection misses, or bare branch URLs.
 - URL-backed workspace pane routes are the visible-pane source of truth. Client preference and selected runtime-session state are restorable projection supplements, not command authorities. Internal workspace-pane commands must decide their target route and write the matching preference/selection supplement through the navigation action that accepted the route.
 - Route effects may sync an externally arrived URL (manual address entry, browser Back/Forward, restore) into preference/selection so the restorable projection stays coherent. Command correctness must not depend on those effects running after the route changes.

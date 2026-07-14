@@ -33,6 +33,8 @@ The primary window boot path has two separate concerns: public shell hydration a
    - When navigation reaches a stub, the server projects that repo and restores tabs from the current server-owned `ServerWorkspaceState`.
    - The client sends only its repo entry and server-issued runtime identity; it never sends a canonical tabs snapshot back to the server.
    - Availability failures leave the stub and membership intact so a later navigation can retry.
+   - If the current repo projection proves persisted pane-tab targets invalid, the server clears only that repo's
+     unchanged tab state before initializing the runtime scope. Concurrent tab writes win the repo-local comparison.
 
 6. Workspace shell side effects
    - Owner: `AuthenticatedWorkspaceShell` and `AuthenticatedWorkspaceSideEffects`.
