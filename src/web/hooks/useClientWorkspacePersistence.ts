@@ -155,7 +155,7 @@ function clientWorkspaceFromPersistenceInput(
   lastRoutedRepoId: string | null,
 ): ClientWorkspaceState | null {
   if (!workspaceSessionPersistenceOpenFromStore(input)) return null
-  const session = workspaceSessionStateFromRestorableWorkspaceState({
+  return workspaceSessionStateFromRestorableWorkspaceState({
     repos: input.repos,
     restorableWorkspaceState: restorableWorkspaceStateFromStore({
       order: input.order,
@@ -167,15 +167,6 @@ function clientWorkspaceFromPersistenceInput(
     filetreeInteractionByScope: input.filetreeInteractionByScope,
     restoredSessionBaseline: input.restoredSessionBaseline,
   })
-  return {
-    openRepoEntries: session.openRepoEntries,
-    restoredRepoId: session.restoredRepoId,
-    zenMode: session.zenMode,
-    workspacePaneSize: session.workspacePaneSize,
-    selectedTerminalSessionIdByTerminalWorktree: session.selectedTerminalSessionIdByTerminalWorktree,
-    preferredWorkspacePaneTabByTargetByRepo: session.preferredWorkspacePaneTabByTargetByRepo,
-    filetreeViewStateByWorktreeByRepo: session.filetreeViewStateByWorktreeByRepo,
-  }
 }
 
 function useWorkspacePaneTabsCacheVersion(): number {

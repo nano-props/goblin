@@ -2,9 +2,9 @@ import type { StoreApi } from 'zustand'
 import type { BranchSnapshotInfo, BrowserRemoteProvider, ExecResult, GitRemoteInfo } from '#/web/types.ts'
 import type { RemoteRepoConnectionLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type {
+  ClientWorkspaceState,
   RepoWorkspaceTabsRestoreResult,
   WorkspaceRuntimeRestoreSnapshot,
-  WorkspaceSessionState,
 } from '#/shared/api-types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repos/branch-action-types.ts'
@@ -143,20 +143,20 @@ interface RepoSnapshotCacheState {
 }
 
 export interface RestorableWorkspaceState {
-  /** Client workspace UI state that is serialized into WorkspaceSessionState for
+  /** Client workspace UI state that is serialized into ClientWorkspaceState for
    *  next-launch restore. This is restorable state, not runtime-coherent
    *  shared state. */
-  /** Open repository order restored from WorkspaceSessionState.openRepoEntries. */
+  /** Open repository order restored from ClientWorkspaceState.openRepoEntries. */
   order: string[]
   /**
-   * Session repo restored from WorkspaceSessionState.restoredRepoId.
+   * Session repo restored from ClientWorkspaceState.restoredRepoId.
    * The route owns the current repo.
    */
   restoredRepoId: string | null
-  /** Large-screen Zen Mode restored from WorkspaceSessionState. Compact UI is stronger and always shows one pane at a time. */
+  /** Large-screen Zen Mode restored from ClientWorkspaceState. Compact UI is stronger and always shows one pane at a time. */
   zenMode: boolean
   workspacePaneSize: number
-  /** Per worktree terminal selection restored from WorkspaceSessionState.selectedTerminalSessionIdByTerminalWorktree. */
+  /** Per worktree terminal selection restored from ClientWorkspaceState.selectedTerminalSessionIdByTerminalWorktree. */
   selectedTerminalSessionIdByTerminalWorktree: Record<string, string>
 }
 
@@ -192,27 +192,26 @@ export interface WorkspaceNavigationHistoryTraversal {
 
 export interface RepoSessionHydrationOptions {
   signal?: AbortSignal
-  restoredSession?: WorkspaceSessionState
+  restoredSession?: ClientWorkspaceState
 }
 
 interface LocalWorkspaceState {
   /** Client-only workspace UI state that should never be serialized into
-   *  WorkspaceSessionState or treated as restorable workspace state. */
+   *  ClientWorkspaceState or treated as restorable workspace state. */
   /** Workspace membership restore flag. True once boot session entries have
    *  produced the placeholder repo set (or proved there are no repos), so the
    *  workspace shell can render without overwriting the saved session with an
    *  empty one before restore. Repo content hydration may still be running. */
   workspaceMembershipReady: boolean
   /** Persistence gate — true only after all boot-restored state that can
-   *  affect WorkspaceSessionState has converged back into the client store. */
+   *  affect ClientWorkspaceState has converged back into the client store. */
   sessionPersistenceReady: boolean
   /** Boot restore failure that blocks session persistence. UI can render, but
    *  persisted workspace state must not be overwritten until the restore issue
    *  is resolved by a successful boot. */
   sessionRestoreError: string | null
-  /** Server-owned session state from boot restore. Used only to preserve
-   *  target-scoped state for repos that are still restore stubs. */
-  restoredSessionBaseline: WorkspaceSessionState | null
+  /** Client-owned state from boot restore, retained while repos remain stubs. */
+  restoredSessionBaseline: ClientWorkspaceState | null
   /** Chrome-tab-style "opener" tracking, covering every workspace pane tab
    *  (static and terminal): maps a tab's identity (see
    *  `workspacePaneTabEntryIdentity`) to the identity of the tab that was
@@ -245,7 +244,7 @@ interface LocalWorkspaceActions {
 }
 
 interface RestorableWorkspaceActions {
-  applySessionLayoutState: (layout: Pick<WorkspaceSessionState, 'zenMode' | 'workspacePaneSize'>) => void
+  applySessionLayoutState: (layout: Pick<ClientWorkspaceState, 'zenMode' | 'workspacePaneSize'>) => void
   applySessionSelectedTerminalState: (selectedTerminalSessionIdByTerminalWorktree: Record<string, string>) => void
   setZenMode: (enabled: boolean) => void
   toggleZenMode: () => void

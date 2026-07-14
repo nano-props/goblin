@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
     promoteRestoredWorkspaceRepo: vi.fn(),
   } as {
     repos: Record<string, ReturnType<typeof stubRepo> | undefined>
-    restoredSessionBaseline?: import('#/shared/api-types.ts').WorkspaceSessionState | null
+    restoredSessionBaseline?: import('#/shared/api-types.ts').ClientWorkspaceState | null
     promoteRestoredWorkspaceRepo: ReturnType<typeof vi.fn>
   },
 }))

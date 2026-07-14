@@ -22,7 +22,7 @@ The client window owns:
 - which repos are shown in that window
 - repo switcher order
 - active repo
-- restored workspace membership from `WorkspaceSessionState`
+- restored workspace membership from `ClientWorkspaceState`
 
 ## Why
 

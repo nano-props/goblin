@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { defaultServerWorkspaceState, defaultWorkspaceSessionState } from '#/shared/settings-defaults.ts'
+import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import type { ServerWorkspaceState, WorkspaceSessionState } from '#/shared/api-types.ts'
+import type { ServerWorkspaceState } from '#/shared/api-types.ts'
+import {
+  defaultTestWorkspaceSessionState as defaultWorkspaceSessionState,
+  type TestWorkspaceSessionState as WorkspaceSessionState,
+} from '#/test-utils/workspace-session-state.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -87,6 +91,7 @@ describe('restoreServerWorkspace', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -101,12 +106,17 @@ describe('restoreServerWorkspace', () => {
     })
 
     expect(result.status).toBe('restored')
-    expect(workspacePaneTabsHost.replaceTabs).toHaveBeenCalledWith('client_test000000000000', 'user-test', {
+    expect(workspacePaneTabsHost.initializeTabs).toHaveBeenCalledWith('user-test', {
       repoRoot: '/repo',
       repoRuntimeId: 'repo-runtime-test',
-      branchName: 'main',
-      worktreePath: null,
-      tabs: [workspacePaneStaticTabEntry('history')],
+      entries: [
+        {
+          repoRoot: '/repo',
+          branchName: 'main',
+          worktreePath: null,
+          tabs: [workspacePaneStaticTabEntry('history')],
+        },
+      ],
     })
     expect(result.runtime).toMatchObject({
       restoredRepoId: '/repo',
@@ -129,6 +139,7 @@ describe('restoreServerWorkspace', () => {
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     mocks.probeRepo.mockResolvedValue({ ok: true, root: '/repo', name: 'repo' })
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -149,7 +160,7 @@ describe('restoreServerWorkspace', () => {
     expect(mocks.saveRebuiltServerWorkspaceState).not.toHaveBeenCalled()
   })
 
-  test('uses the workspace tabs batch host and returns canonical tab snapshots', async () => {
+  test('initializes the workspace tabs scope and returns its canonical snapshot', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({ repoRoot: '/repo', branchName: 'main', worktreePath: null })
     const session: WorkspaceSessionState = {
       ...defaultWorkspaceSessionState(),
@@ -163,9 +174,7 @@ describe('restoreServerWorkspace', () => {
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(),
-      replaceTabsBatch: vi.fn(async () => [
-        { repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', snapshot: { revision: 3, entries: [] } },
-      ]),
+      initializeTabs: vi.fn(async () => ({ revision: 3, entries: [] })),
       updateTabs: vi.fn(),
     }
 
@@ -179,11 +188,12 @@ describe('restoreServerWorkspace', () => {
 
     expect(result.status).toBe('restored')
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
-    expect(workspacePaneTabsHost.replaceTabsBatch).toHaveBeenCalledWith('client_test000000000000', 'user-test', {
-      replacements: [
+    expect(workspacePaneTabsHost.initializeTabs).toHaveBeenCalledWith('user-test', {
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-test',
+      entries: [
         {
           repoRoot: '/repo',
-          repoRuntimeId: 'repo-runtime-test',
           branchName: 'main',
           worktreePath: null,
           tabs: [workspacePaneStaticTabEntry('history')],
@@ -204,6 +214,7 @@ describe('restoreServerWorkspace', () => {
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -231,6 +242,7 @@ describe('restoreServerWorkspace', () => {
     mocks.getServerWorkspaceState.mockResolvedValue(defaultServerWorkspaceState())
     mocks.probeRepo.mockResolvedValue({ ok: false, message: 'error.path-permission-denied' })
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(),
       updateTabs: vi.fn(),
@@ -270,6 +282,7 @@ describe('restoreServerWorkspace', () => {
       name: 'repo',
     })
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -308,10 +321,11 @@ describe('restoreServerWorkspace', () => {
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const commitError = new Error('commit failed')
     const workspacePaneTabsHost = {
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(async () => {
+      initializeTabs: vi.fn(async () => {
         throw commitError
       }),
+      listWorkspaceTabs: vi.fn(),
+      replaceTabs: vi.fn(),
       updateTabs: vi.fn(),
     }
 
@@ -357,6 +371,7 @@ describe('restoreServerWorkspace', () => {
       }
     })
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -397,6 +412,7 @@ describe('restoreServerWorkspace', () => {
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     mocks.runRemoteLifecycleWrite.mockImplementation(() => new Promise(() => {}))
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -439,6 +455,7 @@ describe('restoreServerWorkspace', () => {
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     mocks.saveRebuiltServerWorkspaceState.mockRejectedValue(persistError)
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -492,6 +509,7 @@ describe('restoreServerWorkspace', () => {
       .mockResolvedValueOnce(serverWorkspaceFromSession(currentSession))
     mocks.saveRebuiltServerWorkspaceState.mockResolvedValueOnce({ saved: false, latestWorkspace: currentSession })
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -560,6 +578,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -586,9 +605,15 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(stub.projection).toBeNull()
     expect(stub.repoRuntimeId).toBe('runtime-_repo_stub')
     expect(stub.name).toBe('repo')
-    // Stub repos do not contribute to the tabs restore.
+    // Only the projected active repo contributes a tabs scope snapshot.
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
-    expect(result.runtime.workspacePaneTabs).toEqual([])
+    expect(result.runtime.workspacePaneTabs).toEqual([
+      {
+        repoRoot: '/repo-active',
+        repoRuntimeId: 'runtime-_repo_active',
+        snapshot: { revision: 0, entries: [] },
+      },
+    ])
   })
 
   test('uses activeRepoRoot instead of restoredRepoId to choose the eager restore repo', async () => {
@@ -602,6 +627,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -640,6 +666,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       name: 'repo',
     }))
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -680,6 +707,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -724,6 +752,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -784,6 +813,7 @@ describe('restoreRepoTabsForRepo', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
       updateTabs: vi.fn(),
@@ -810,12 +840,17 @@ describe('restoreRepoTabsForRepo', () => {
     expect(mocks.probeRepo).toHaveBeenCalledWith('/repo')
     expect(mocks.acquireRepoRuntimeLease).not.toHaveBeenCalled()
     expect(mocks.releaseRepoRuntimeMembershipLease).not.toHaveBeenCalled()
-    expect(workspacePaneTabsHost.replaceTabs).toHaveBeenCalledWith('client_test000000000000', 'user-test', {
+    expect(workspacePaneTabsHost.initializeTabs).toHaveBeenCalledWith('user-test', {
       repoRoot: '/repo',
       repoRuntimeId: 'repo-runtime-test',
-      branchName: 'main',
-      worktreePath: null,
-      tabs: [workspacePaneStaticTabEntry('history')],
+      entries: [
+        {
+          repoRoot: '/repo',
+          branchName: 'main',
+          worktreePath: null,
+          tabs: [workspacePaneStaticTabEntry('history')],
+        },
+      ],
     })
   })
 
@@ -840,6 +875,7 @@ describe('restoreRepoTabsForRepo', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
       updateTabs: vi.fn(),
@@ -870,6 +906,7 @@ describe('restoreRepoTabsForRepo', () => {
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     mocks.isCurrentRepoRuntime.mockReturnValue(false)
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(),
       updateTabs: vi.fn(),
@@ -897,6 +934,7 @@ describe('restoreRepoTabsForRepo', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(),
       updateTabs: vi.fn(),
@@ -924,6 +962,7 @@ describe('restoreRepoTabsForRepo', () => {
     })
     mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(),
       updateTabs: vi.fn(),
@@ -961,6 +1000,7 @@ describe('restoreRepoTabsForRepo', () => {
       name: 'repo',
     })
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(),
       updateTabs: vi.fn(),
@@ -993,6 +1033,7 @@ describe('restoreRepoTabsForRepo', () => {
       .mockReturnValueOnce(true)
       .mockReturnValueOnce(false)
     const workspacePaneTabsHost = {
+      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(),
       updateTabs: vi.fn(),

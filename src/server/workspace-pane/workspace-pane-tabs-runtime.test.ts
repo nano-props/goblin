@@ -4,6 +4,18 @@ import { testPhysicalWorktreeIdentity } from '#/server/test-utils/physical-workt
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 describe('workspace pane tabs runtime storage', () => {
+  test('tracks initialized scope lifecycle independently from stored entries', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+    const scope = { userId: 'user-a', scope: '/repo' }
+
+    expect(runtime.isScopeInitialized(scope)).toBe(false)
+    runtime.initializeScope(scope)
+    expect(runtime.isScopeInitialized(scope)).toBe(true)
+    expect(runtime.scopesForUser(scope.userId)).toEqual([scope.scope])
+    runtime.closeTabsForScope(scope.userId, scope.scope)
+    expect(runtime.isScopeInitialized(scope)).toBe(false)
+  })
+
   test('stores mixed tabs and projects terminal session order', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
     const tabs = [

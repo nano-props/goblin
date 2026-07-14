@@ -491,31 +491,25 @@ async function restoreWorkspacePaneTabsForRepos(
   workspace: ServerWorkspaceState,
   opened: ProjectedRestoredWorkspaceRepoRuntime[],
 ): Promise<Array<{ repoRoot: string; repoRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>> {
+  if (opened.length === 0) return []
   const replacements = workspacePaneTabRestoreReplacements(workspace, opened)
-  if (replacements.length === 0) return []
   input.signal?.throwIfAborted()
-  if (input.workspacePaneTabsHost.replaceTabsBatch) {
-    return await input.workspacePaneTabsHost.replaceTabsBatch(input.clientId, input.userId, {
-      replacements: replacements.map((replacement) => ({
-        repoRoot: replacement.repoRoot,
-        repoRuntimeId: replacement.repoRuntimeId,
-        branchName: replacement.target.branchName,
-        worktreePath: replacement.target.worktreePath,
-        tabs: replacement.tabs,
-      })),
-    })
-  }
-  const snapshots: Array<{ repoRoot: string; repoRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }> = []
-  for (const replacement of replacements) {
+  const snapshots = []
+  for (const repo of opened) {
     input.signal?.throwIfAborted()
-    const snapshot = await input.workspacePaneTabsHost.replaceTabs(input.clientId, input.userId, {
-      repoRoot: replacement.repoRoot,
-      repoRuntimeId: replacement.repoRuntimeId,
-      branchName: replacement.target.branchName,
-      worktreePath: replacement.target.worktreePath,
-      tabs: replacement.tabs,
+    const snapshot = await input.workspacePaneTabsHost.initializeTabs(input.userId, {
+      repoRoot: repo.repoRoot,
+      repoRuntimeId: repo.repoRuntimeId,
+      entries: replacements
+        .filter((replacement) => replacement.repoRoot === repo.repoRoot)
+        .map((replacement) => ({
+          repoRoot: replacement.repoRoot,
+          branchName: replacement.target.branchName,
+          worktreePath: replacement.target.worktreePath,
+          tabs: replacement.tabs,
+        })),
     })
-    upsertWorkspacePaneTabsSnapshot(snapshots, replacement.repoRoot, replacement.repoRuntimeId, snapshot)
+    snapshots.push({ repoRoot: repo.repoRoot, repoRuntimeId: repo.repoRuntimeId, snapshot })
   }
   return snapshots
 }
@@ -536,18 +530,6 @@ function workspacePaneTabRestoreReplacements(
     }
   }
   return replacements
-}
-
-function upsertWorkspacePaneTabsSnapshot(
-  snapshots: Array<{ repoRoot: string; repoRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>,
-  repoRoot: string,
-  repoRuntimeId: string,
-  snapshot: WorkspacePaneTabsSnapshot,
-): void {
-  const index = snapshots.findIndex((entry) => entry.repoRoot === repoRoot && entry.repoRuntimeId === repoRuntimeId)
-  const entry = { repoRoot, repoRuntimeId, snapshot }
-  if (index === -1) snapshots.push(entry)
-  else snapshots[index] = entry
 }
 
 function targetForSessionKey(

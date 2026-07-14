@@ -7,7 +7,11 @@ import {
   type TerminalSessionsSnapshot,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabsSnapshot, WorkspacePaneTabsUpdateInput } from '#/shared/workspace-pane-tabs.ts'
+import type {
+  WorkspacePaneTabsEntry,
+  WorkspacePaneTabsSnapshot,
+  WorkspacePaneTabsUpdateInput,
+} from '#/shared/workspace-pane-tabs.ts'
 import { isValidTerminalClientId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import { createTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import { terminalSessionRuntimeScope, terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
@@ -167,6 +171,31 @@ class TerminalSessionService {
       branchName: input.branchName,
       worktreePath,
       tabs: input.tabs,
+      assertCurrent: () => this.assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId),
+    })
+  }
+
+  async initializeTabs(
+    userId: string,
+    input: { repoRoot: string; repoRuntimeId: string; entries: WorkspacePaneTabsEntry[] },
+  ): Promise<WorkspacePaneTabsSnapshot> {
+    if (!isValidRepoLocator(input.repoRoot)) return emptyWorkspacePaneTabsSnapshot()
+    for (const entry of input.entries) {
+      if (entry.repoRoot !== input.repoRoot) return emptyWorkspacePaneTabsSnapshot()
+      if (!isValidBranch(entry.branchName)) return emptyWorkspacePaneTabsSnapshot()
+      if (entry.worktreePath !== null && !isValidCwd(entry.worktreePath)) return emptyWorkspacePaneTabsSnapshot()
+    }
+    const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
+    return await this.workspaceTabsCoordinator.initializeScope({
+      userId,
+      repoRoot: input.repoRoot,
+      scope,
+      entries: input.entries.map((entry) => ({
+        branchName: entry.branchName,
+        worktreePath:
+          entry.worktreePath === null ? null : terminalSessionWorktreePath(input.repoRoot, entry.worktreePath),
+        tabs: entry.tabs,
+      })),
       assertCurrent: () => this.assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId),
     })
   }

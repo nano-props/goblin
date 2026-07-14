@@ -41,10 +41,6 @@ export interface WorkspacePaneTabsReplaceInput extends WorkspacePaneTabsTarget, 
   tabs: WorkspacePaneTabEntry[]
 }
 
-export interface WorkspacePaneTabsBatchReplaceInput {
-  replacements: WorkspacePaneTabsReplaceInput[]
-}
-
 export type WorkspacePaneTabsUpdateOperation =
   | {
       type: 'open-static'

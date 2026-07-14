@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { defaultSettingsSnapshot, defaultWorkspaceSessionState } from '#/shared/settings-defaults.ts'
+import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { flushMicrotasks, renderInJsdom } from '#/test-utils/render.tsx'
 import { useAuthenticatedAppBootstrap } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 import { usePublicAppBootstrap } from '#/web/hooks/usePublicAppBootstrap.ts'
@@ -20,7 +20,11 @@ import { useThemeStore } from '#/web/stores/theme.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
-import type { WorkspaceRuntimeRestoreSnapshot, WorkspaceSessionState } from '#/shared/api-types.ts'
+import type { WorkspaceRuntimeRestoreSnapshot } from '#/shared/api-types.ts'
+import {
+  defaultTestWorkspaceSessionState as defaultWorkspaceSessionState,
+  type TestWorkspaceSessionState as WorkspaceSessionState,
+} from '#/test-utils/workspace-session-state.ts'
 import { readClientWorkspaceState } from '#/web/client-workspace-state.ts'
 
 vi.mock('#/web/settings-client.ts', async (importOriginal) => {
@@ -137,7 +141,7 @@ describe('app bootstrap hooks', () => {
     })
     expect(hydrateRestoredRuntime).toHaveBeenCalledWith(restoredRuntimeForSession(session), {
       signal: expect.any(AbortSignal),
-      restoredSession: session,
+      restoredSession: clientPresentationForSession(session),
     })
     expect(hydrateTheme).toHaveBeenCalledWith(settings)
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(1)
@@ -189,7 +193,7 @@ describe('app bootstrap hooks', () => {
 
     expect(hydrateRestoredRuntime).toHaveBeenCalledWith(restoredRuntimeForSession(session), {
       signal: expect.any(AbortSignal),
-      restoredSession: session,
+      restoredSession: clientPresentationForSession(session),
     })
     expect(useReposStore.getState().workspacePaneSize).toBe(55)
     expect(useReposStore.getState().sessionPersistenceReady).toBe(true)
@@ -270,7 +274,7 @@ describe('app bootstrap hooks', () => {
 
     expect(hydrateRestoredRuntime).toHaveBeenCalledWith(restoredRuntimeForSession(rebuiltSession), {
       signal: expect.any(AbortSignal),
-      restoredSession: rebuiltSession,
+      restoredSession: clientPresentationForSession(rebuiltSession),
     })
     expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).not.toHaveProperty('session')
     expect(useReposStore.getState().sessionRestoreError).toBeNull()
@@ -496,7 +500,11 @@ function mockServerRestore(session: WorkspaceSessionState): void {
 }
 
 function mockClientPresentation(session: WorkspaceSessionState): void {
-  mockedReadClientWorkspaceState.mockResolvedValue({
+  mockedReadClientWorkspaceState.mockResolvedValue(clientPresentationForSession(session))
+}
+
+function clientPresentationForSession(session: WorkspaceSessionState) {
+  return {
     openRepoEntries: session.openRepoEntries,
     restoredRepoId: session.restoredRepoId,
     zenMode: session.zenMode,
@@ -504,7 +512,7 @@ function mockClientPresentation(session: WorkspaceSessionState): void {
     selectedTerminalSessionIdByTerminalWorktree: session.selectedTerminalSessionIdByTerminalWorktree,
     preferredWorkspacePaneTabByTargetByRepo: session.preferredWorkspacePaneTabByTargetByRepo,
     filetreeViewStateByWorktreeByRepo: session.filetreeViewStateByWorktreeByRepo,
-  })
+  }
 }
 
 function restoredRuntimeForSession(session: WorkspaceSessionState): WorkspaceRuntimeRestoreSnapshot {

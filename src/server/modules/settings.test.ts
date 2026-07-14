@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { defaultWorkspaceSessionState } from '#/shared/settings-defaults.ts'
+import { defaultTestWorkspaceSessionState as defaultWorkspaceSessionState } from '#/test-utils/workspace-session-state.ts'
 import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 
 const mocks = vi.hoisted(() => ({

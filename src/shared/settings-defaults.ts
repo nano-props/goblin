@@ -4,7 +4,6 @@ import type {
   ClientWorkspaceState,
   LangPref,
   ServerWorkspaceState,
-  WorkspaceSessionState,
   UserSettings,
   SettingsSnapshot,
   ThemePref,
@@ -19,13 +18,6 @@ export const DEFAULT_TERMINAL_NOTIFICATIONS_ENABLED = false
 export const DEFAULT_SHORTCUTS_DISABLED = false
 export const DEFAULT_GLOBAL_SHORTCUT_DISABLED = false
 export const DEFAULT_LAN_ENABLED = false
-
-export function defaultWorkspaceSessionState(): WorkspaceSessionState {
-  return {
-    ...defaultServerWorkspaceState(),
-    ...defaultClientWorkspaceState(),
-  }
-}
 
 export function defaultServerWorkspaceState(): ServerWorkspaceState {
   return { workspacePaneTabsByTargetByRepo: {} }

@@ -214,14 +214,14 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     persistWorkspaceTabs: recordServerWorkspaceTabs,
   })
   const workspacePaneTabsHost: ServerWorkspacePaneTabsHost = {
+    async initializeTabs(userId, input) {
+      return await sessionService.initializeTabs(userId, input)
+    },
     async listWorkspaceTabs(clientId, userId, input) {
       return await workspacePaneTabsActions.listWorkspaceTabs(clientId, userId, input)
     },
     async replaceTabs(clientId, userId, input) {
       return await workspacePaneTabsActions.replaceTabs(clientId, userId, input)
-    },
-    async replaceTabsBatch(clientId, userId, input) {
-      return await workspacePaneTabsActions.replaceTabsBatch(clientId, userId, input)
     },
     async updateTabs(clientId, userId, input) {
       return await workspacePaneTabsActions.updateTabs(clientId, userId, input)

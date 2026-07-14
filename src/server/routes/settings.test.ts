@@ -48,6 +48,7 @@ vi.mock('#/server/modules/session-restore.ts', () => ({
 }))
 
 const workspacePaneTabsHostStub = {
+  initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
   listWorkspaceTabs: vi.fn(),
   replaceTabs: vi.fn(),
   updateTabs: vi.fn(),

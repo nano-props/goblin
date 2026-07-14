@@ -1,10 +1,9 @@
-import type { WorkspaceSessionState } from '#/shared/api-types.ts'
+import type { ClientWorkspaceState } from '#/shared/api-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { RestorableWorkspaceState, ReposStore } from '#/web/stores/repos/types.ts'
 import { persistedOpenWorkspaceEntries } from '#/web/open-workspace-state.ts'
 import {
   persistedRestoredRepoIdForSession,
-  persistedWorkspacePaneTabsByTargetByRepoForSession,
   persistedSelectedTerminalSessionIdByTerminalWorktreeForSession,
   persistedPreferredWorkspacePaneTabByTargetByRepoForSession,
 } from '#/web/session-persistence-state.ts'
@@ -31,8 +30,8 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
   repos: ReposStore['repos']
   restorableWorkspaceState: RestorableWorkspaceState
   filetreeInteractionByScope?: Readonly<Record<string, FiletreeInteractionSnapshot>>
-  restoredSessionBaseline?: WorkspaceSessionState | null
-}): WorkspaceSessionState {
+  restoredSessionBaseline?: ClientWorkspaceState | null
+}): ClientWorkspaceState {
   const { repos, restorableWorkspaceState } = input
   // Workspace membership is shell state: it must remain restorable even
   // while repo data queries are unavailable. Target-scoped state below
@@ -44,7 +43,7 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
     repos,
     restorableWorkspaceState.order,
   )
-  const session: WorkspaceSessionState = {
+  const session: ClientWorkspaceState = {
     openRepoEntries: persistedOpenWorkspaceEntries(restorableWorkspaceState.order, shellRepos),
     restoredRepoId: persistedRestoredRepoIdForSession(restorableWorkspaceState.restoredRepoId),
     zenMode: restorableWorkspaceState.zenMode,
@@ -54,11 +53,6 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
       projectedRepos,
     ),
     preferredWorkspacePaneTabByTargetByRepo: persistedPreferredWorkspacePaneTabByTargetByRepoForSession(
-      projectedRepos,
-      restorableWorkspaceState.order,
-      workspacePaneTabsByTargetByRepo,
-    ),
-    workspacePaneTabsByTargetByRepo: persistedWorkspacePaneTabsByTargetByRepoForSession(
       projectedRepos,
       restorableWorkspaceState.order,
       workspacePaneTabsByTargetByRepo,
@@ -128,11 +122,11 @@ function workspacePaneTabsByTargetByRepoFromQueryCache(
 }
 
 function sessionWithStubBaseline(
-  session: WorkspaceSessionState,
-  baseline: WorkspaceSessionState | null | undefined,
+  session: ClientWorkspaceState,
+  baseline: ClientWorkspaceState | null | undefined,
   repos: ReposStore['repos'],
   order: readonly string[],
-): WorkspaceSessionState {
+): ClientWorkspaceState {
   if (!baseline) return session
   const stubRepoIds = new Set(order.filter((id) => repos[id]?.session.projectionState === 'stub'))
   if (stubRepoIds.size === 0) return session
@@ -146,11 +140,6 @@ function sessionWithStubBaseline(
     preferredWorkspacePaneTabByTargetByRepo: mergeBaselineRepoMap(
       session.preferredWorkspacePaneTabByTargetByRepo,
       baseline.preferredWorkspacePaneTabByTargetByRepo,
-      stubRepoIds,
-    ),
-    workspacePaneTabsByTargetByRepo: mergeBaselineRepoMap(
-      session.workspacePaneTabsByTargetByRepo,
-      baseline.workspacePaneTabsByTargetByRepo,
       stubRepoIds,
     ),
     filetreeViewStateByWorktreeByRepo: mergeBaselineRepoMap(
@@ -197,19 +186,18 @@ function repoIdFromTerminalWorktreeKey(key: string): string | null {
   return key.slice(0, index)
 }
 
-/** Restores only the restorable workspace UI projection from WorkspaceSessionState.
- *  It intentionally does not establish a live binding back to WorkspaceSessionState;
+/** Restores only the restorable workspace UI projection from ClientWorkspaceState.
+ *  It intentionally does not establish a live binding back to ClientWorkspaceState;
  *  subsequent local updates flow through useClientWorkspacePersistence. */
 interface RestoredWorkspaceStateFromSession extends Pick<
   RestorableWorkspaceState,
   'restoredRepoId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalSessionIdByTerminalWorktree'
 > {
-  preferredWorkspacePaneTabByTargetByRepo: WorkspaceSessionState['preferredWorkspacePaneTabByTargetByRepo']
-  workspacePaneTabsByTargetByRepo: WorkspaceSessionState['workspacePaneTabsByTargetByRepo']
+  preferredWorkspacePaneTabByTargetByRepo: ClientWorkspaceState['preferredWorkspacePaneTabByTargetByRepo']
 }
 
 export function restoreRestorableWorkspaceStateFromSession(
-  session: WorkspaceSessionState,
+  session: ClientWorkspaceState,
   restoredRepoId: string | null = session.restoredRepoId,
 ): RestoredWorkspaceStateFromSession {
   return {
@@ -218,6 +206,5 @@ export function restoreRestorableWorkspaceStateFromSession(
     workspacePaneSize: session.workspacePaneSize,
     selectedTerminalSessionIdByTerminalWorktree: session.selectedTerminalSessionIdByTerminalWorktree,
     preferredWorkspacePaneTabByTargetByRepo: session.preferredWorkspacePaneTabByTargetByRepo,
-    workspacePaneTabsByTargetByRepo: session.workspacePaneTabsByTargetByRepo,
   }
 }

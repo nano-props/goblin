@@ -3,9 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type {
   ClientWorkspaceState,
-  ServerWorkspaceState,
   SettingsSnapshot,
-  WorkspaceSessionState,
 } from '#/shared/api-types.ts'
 import { normalizeWorkspaceSessionLayoutState } from '#/shared/workspace-layout.ts'
 import { bootstrapLog } from '#/web/logger.ts'
@@ -128,7 +126,6 @@ async function restoreBootSession(
     }
     const session = composeRestoredWorkspaceSession(
       restored.openRepoEntries,
-      restored.workspace,
       presentation,
       restored.runtime.restoredRepoId,
     )
@@ -156,7 +153,7 @@ async function restoreBootSession(
   }
 }
 
-function applyRestoredWorkspaceSession(session: WorkspaceSessionState): void {
+function applyRestoredWorkspaceSession(session: ClientWorkspaceState): void {
   // Apply layout prefs before repo probing finishes so the first
   // restored paint uses the saved geometry. Client workspace persistence
   // still waits for workspaceMembershipReady, so this cannot overwrite the
@@ -192,14 +189,12 @@ function blockSessionPersistenceAfterRestoreFailure(message: string): void {
 }
 
 function composeRestoredWorkspaceSession(
-  openRepoEntries: WorkspaceSessionState['openRepoEntries'],
-  workspace: ServerWorkspaceState,
+  openRepoEntries: ClientWorkspaceState['openRepoEntries'],
   presentation: ClientWorkspaceState,
   serverRestoredRepoId: string | null,
-): WorkspaceSessionState {
+): ClientWorkspaceState {
   const openRepoIds = new Set(openRepoEntries.map(repoSessionEntryId))
   return {
-    ...workspace,
     ...presentation,
     openRepoEntries,
     restoredRepoId:

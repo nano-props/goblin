@@ -100,9 +100,6 @@ export interface ClientWorkspaceState {
 
 export type NativeClientWorkspaceReadResult = { kind: 'missing' } | { kind: 'loaded'; state: unknown }
 
-/** Boot-only client composition. This type is never accepted by a server write endpoint. */
-export interface WorkspaceSessionState extends ServerWorkspaceState, ClientWorkspaceState {}
-
 export interface FiletreeSessionViewState {
   selectedKeys: string[]
   expandedKeys: string[]
