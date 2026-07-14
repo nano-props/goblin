@@ -88,6 +88,7 @@ interface WorkspacePaneTabsCoordinatorOptions {
   workspaceTabs: WorkspacePaneTabsCoordinatorRuntime
   worktreeOperations: PhysicalWorktreeOperationCoordinator
   physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
+  persistLayout: (repoRoot: string, snapshot: WorkspacePaneTabsSnapshot) => Promise<unknown>
 }
 
 export class WorkspacePaneTabsCoordinator {
@@ -95,6 +96,7 @@ export class WorkspacePaneTabsCoordinator {
   private readonly workspaceTabs: WorkspacePaneTabsCoordinatorRuntime
   private readonly worktreeOperations: PhysicalWorktreeOperationCoordinator
   private readonly physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
+  private readonly persistLayout: (repoRoot: string, snapshot: WorkspacePaneTabsSnapshot) => Promise<unknown>
   private readonly operationQueuesByScope = new Map<string, PQueue>()
   private readonly canonicalRevisionByScope = new Map<string, CanonicalWorkspaceTabsRevisionState>()
 
@@ -103,6 +105,7 @@ export class WorkspacePaneTabsCoordinator {
     this.workspaceTabs = options.workspaceTabs
     this.worktreeOperations = options.worktreeOperations
     this.physicalWorktrees = options.physicalWorktrees
+    this.persistLayout = options.persistLayout
   }
 
   async ensureRuntimeTabForSession<TFailure>(input: {
@@ -165,14 +168,16 @@ export class WorkspacePaneTabsCoordinator {
         input.assertCurrent()
         const providerSnapshots = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
         input.assertCurrent()
-        this.workspaceTabs.replaceTabs({
+        const replacement = {
           userId: input.userId,
           scope: input.scope,
           branchName: input.branchName,
           worktreePath: input.worktreePath,
           physicalWorktreeIdentity: physicalCapability?.identity ?? null,
           tabs: input.tabs,
-        })
+        }
+        await this.persistPlannedLayout(input.repoRoot, input.userId, input.scope, replacement)
+        this.workspaceTabs.replaceTabs(replacement)
         return this.projectedScopeSnapshot(input.userId, input.repoRoot, input.scope, providerSnapshots)
       })
     if (input.worktreePath === null) return await operation()
@@ -267,11 +272,13 @@ export class WorkspacePaneTabsCoordinator {
           mutate: (currentTabs) => workspacePaneTabsWithUpdateOperation(currentTabs, input.operation),
         })
         input.assertCurrent()
-        this.workspaceTabs.replaceTabs({
+        const replacement = {
           ...target,
           physicalWorktreeIdentity: physicalCapability?.identity ?? null,
           tabs: layoutTabs,
-        })
+        }
+        await this.persistPlannedLayout(input.repoRoot, input.userId, input.scope, replacement)
+        this.workspaceTabs.replaceTabs(replacement)
         return this.projectedScopeSnapshot(input.userId, input.repoRoot, input.scope, providerSnapshots)
       })
     if (input.worktreePath === null) return await operation()
@@ -484,6 +491,31 @@ export class WorkspacePaneTabsCoordinator {
         providerSnapshots,
       }).map((entry) => ({ repoRoot, ...entry })),
     }
+  }
+
+  private async persistPlannedLayout(
+    repoRoot: string,
+    userId: string,
+    scope: string,
+    replacement: Parameters<WorkspacePaneTabsCoordinatorRuntime['replaceTabs']>[0],
+  ): Promise<void> {
+    const entries = this.workspaceTabs
+      .tabsForScope({ userId, scope })
+      .filter((entry) => entry.branchName !== replacement.branchName || entry.worktreePath !== replacement.worktreePath)
+    entries.push({
+      branchName: replacement.branchName,
+      worktreePath: replacement.worktreePath,
+      tabs: [...replacement.tabs],
+    })
+    await this.persistLayout(repoRoot, {
+      revision: 0,
+      entries: entries.map((entry) => ({
+        repoRoot,
+        branchName: entry.branchName,
+        worktreePath: entry.worktreePath,
+        tabs: entry.tabs.filter((tab) => isWorkspacePaneStaticTabType(tab.type)),
+      })),
+    })
   }
 
   private canonicalProjectionRevision(

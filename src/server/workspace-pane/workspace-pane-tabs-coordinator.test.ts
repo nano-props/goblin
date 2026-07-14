@@ -35,12 +35,14 @@ type TestRuntimeProvider =
     }
 
 function createWorkspacePaneTabsCoordinator(
-  options: Omit<ProductionCoordinatorOptions, 'runtimeProviders'> & {
+  options: Omit<ProductionCoordinatorOptions, 'runtimeProviders' | 'persistLayout'> & {
     runtimeProviders: readonly TestRuntimeProvider[]
+    persistLayout?: ProductionCoordinatorOptions['persistLayout']
   },
 ) {
   return createProductionWorkspacePaneTabsCoordinator({
     ...options,
+    persistLayout: options.persistLayout ?? (async () => {}),
     runtimeProviders: options.runtimeProviders.map((provider) => {
       if ('captureSnapshotForUser' in provider) return provider
       return {
@@ -54,6 +56,72 @@ function createWorkspacePaneTabsCoordinator(
 }
 
 describe('workspace pane tabs coordinator', () => {
+  test('persists durable layout before committing an explicit replacement', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    const persistLayout = vi.fn(async () => {
+      throw new Error('disk unavailable')
+    })
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
+      runtimeProviders: [],
+      persistLayout,
+    })
+
+    await expect(
+      coordinator.replaceTabs({
+        userId: USER_ID,
+        repoRoot: REPO_ROOT,
+        scope: SCOPE,
+        branchName: 'main',
+        worktreePath: null,
+        tabs: [workspacePaneStaticTabEntry('history')],
+        assertCurrent: () => {},
+      }),
+    ).rejects.toThrow('disk unavailable')
+
+    expect(workspaceTabs.tabsForScope({ userId: USER_ID, scope: SCOPE })).toEqual([])
+    expect(workspaceTabs.revision({ userId: USER_ID, scope: SCOPE })).toBe(0)
+  })
+
+  test('persists only restart-durable static layout entries', async () => {
+    const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+    const persistLayout = vi.fn(async () => {})
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      workspaceTabs,
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
+      runtimeProviders: [],
+      persistLayout,
+    })
+
+    await coordinator.replaceTabs({
+      userId: USER_ID,
+      repoRoot: REPO_ROOT,
+      scope: SCOPE,
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      tabs: [
+        workspacePaneStaticTabEntry('changes'),
+        workspacePaneRuntimeTabEntry('terminal', 'term-liveduringrequest1'),
+      ],
+      assertCurrent: () => {},
+    })
+
+    expect(persistLayout).toHaveBeenCalledWith(REPO_ROOT, {
+      revision: 0,
+      entries: [
+        {
+          repoRoot: REPO_ROOT,
+          branchName: BRANCH_NAME,
+          worktreePath: WORKTREE_PATH,
+          tabs: [workspacePaneStaticTabEntry('changes')],
+        },
+      ],
+    })
+  })
+
   test('does not let restore initialization overwrite an initialized scope', async () => {
     const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
     const coordinator = createWorkspacePaneTabsCoordinator({

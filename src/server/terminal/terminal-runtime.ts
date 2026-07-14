@@ -126,6 +126,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     runtimeProviders: [terminalWorkspacePaneRuntimeTabsProvider(manager)],
     worktreeOperations,
     physicalWorktrees,
+    persistLayout: recordServerWorkspaceTabs,
   })
   const coordinator = createTerminalRuntimeCoordinator({
     manager,
@@ -196,14 +197,10 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   })
   const workspacePaneRuntimeHost: ServerWorkspacePaneRuntimeHost = {
     async openRuntime(clientId, userId, input) {
-      const result = await workspacePaneRuntimeApplication.open(clientId, userId, input)
-      if (result.ok) await recordServerWorkspaceTabs(input.request.repoRoot, result.workspacePaneTabs)
-      return result
+      return await workspacePaneRuntimeApplication.open(clientId, userId, input)
     },
     async closeRuntime(clientId, userId, input) {
-      const result = await workspacePaneRuntimeApplication.close(clientId, userId, input)
-      if (result.ok) await recordServerWorkspaceTabs(input.target.repoRoot, result.workspacePaneTabs)
-      return result
+      return await workspacePaneRuntimeApplication.close(clientId, userId, input)
     },
   }
   const workspacePaneTabsActions = createWorkspacePaneTabsActions({
@@ -211,7 +208,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     isValidClientId: isValidTerminalClientId,
     isCurrentRepoRuntime: isCurrentRepoRuntime,
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
-    persistWorkspaceTabs: recordServerWorkspaceTabs,
   })
   const workspacePaneTabsHost: ServerWorkspacePaneTabsHost = {
     async initializeTabs(userId, input) {

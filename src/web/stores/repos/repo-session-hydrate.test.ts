@@ -17,10 +17,72 @@ import {
   resetLifecycleTest,
 } from '#/web/stores/repos/repo-session-test-utils.ts'
 import { acceptRemoteLifecycleProjection } from '#/web/stores/repos/remote-lifecycle-projection.ts'
+import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
+import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 beforeEach(resetLifecycleTest)
 
 describe('repo session hydration', () => {
+  test('restores a validated preferred tab for an eagerly projected repo', async () => {
+    const targetKey = workspacePaneTabsTargetIdentityKey({
+      repoRoot: REPO_A,
+      branchName: 'main',
+      worktreePath: null,
+    })
+    await useReposStore.getState().hydrateRestoredWorkspaceRuntime(
+      {
+        repos: [
+          {
+            entry: localRepoSessionEntry(REPO_A),
+            repoRoot: REPO_A,
+            repoRuntimeId: 'repo-runtime-server-a',
+            name: 'server-a',
+            projection: {
+              snapshot: { branches: [branchSnapshot('main')], current: 'main' },
+              status: [],
+              pullRequests: null,
+              operations: { operations: [], loadedAt: 0 },
+              requested: { branch: null, pullRequestMode: 'full' },
+              loadedAt: 10,
+            },
+          },
+        ],
+        workspacePaneTabs: [
+          {
+            repoRoot: REPO_A,
+            repoRuntimeId: 'repo-runtime-server-a',
+            snapshot: {
+              revision: 1,
+              entries: [
+                {
+                  repoRoot: REPO_A,
+                  branchName: 'main',
+                  worktreePath: null,
+                  tabs: [workspacePaneStaticTabEntry('history')],
+                },
+              ],
+            },
+          },
+        ],
+        restoredRepoId: REPO_A,
+      },
+      {
+        restoredSession: {
+          ...defaultClientWorkspaceState(),
+          preferredWorkspacePaneTabByTargetByRepo: { [REPO_A]: { [targetKey]: 'history' } },
+        },
+      },
+    )
+
+    expect(useReposStore.getState().repos[REPO_A]?.ui.preferredWorkspacePaneTabByTarget).toEqual({
+      [targetKey]: 'history',
+    })
+    expect(
+      useReposStore.getState().restoredSessionBaseline?.preferredWorkspacePaneTabByTargetByRepo[REPO_A],
+    ).toBeUndefined()
+  })
+
   test('hydrateRestoredWorkspaceRuntime applies the server canonical snapshot as client projection', async () => {
     installGoblin({
       projection: () => new Promise(() => {}),
@@ -169,6 +231,70 @@ describe('repo session hydration', () => {
       revision: 3,
       entries: [],
     })
+  })
+
+  test('restores preferred tabs when a lazy repo is promoted', async () => {
+    const targetKey = workspacePaneTabsTargetIdentityKey({
+      repoRoot: REPO_A,
+      branchName: 'main',
+      worktreePath: null,
+    })
+    await useReposStore.getState().hydrateRestoredWorkspaceRuntime(
+      {
+        repos: [
+          {
+            entry: localRepoSessionEntry(REPO_A),
+            repoRoot: REPO_A,
+            repoRuntimeId: 'repo-runtime-server-a',
+            name: 'server-a',
+            projection: null,
+          },
+        ],
+        workspacePaneTabs: [],
+        restoredRepoId: REPO_A,
+      },
+      {
+        restoredSession: {
+          ...defaultClientWorkspaceState(),
+          preferredWorkspacePaneTabByTargetByRepo: { [REPO_A]: { [targetKey]: 'history' } },
+        },
+      },
+    )
+
+    useReposStore.getState().promoteRestoredWorkspaceRepo({
+      repo: {
+        entry: localRepoSessionEntry(REPO_A),
+        repoRoot: REPO_A,
+        repoRuntimeId: 'repo-runtime-server-a',
+        name: 'server-a',
+        projection: {
+          snapshot: { branches: [branchSnapshot('main')], current: 'main' },
+          status: [],
+          pullRequests: null,
+          operations: { operations: [], loadedAt: 0 },
+          requested: { branch: null, pullRequestMode: 'full' },
+          loadedAt: 10,
+        },
+      },
+      snapshot: {
+        revision: 1,
+        entries: [
+          {
+            repoRoot: REPO_A,
+            branchName: 'main',
+            worktreePath: null,
+            tabs: [workspacePaneStaticTabEntry('history')],
+          },
+        ],
+      },
+    })
+
+    expect(useReposStore.getState().repos[REPO_A]?.ui.preferredWorkspacePaneTabByTarget).toEqual({
+      [targetKey]: 'history',
+    })
+    expect(
+      useReposStore.getState().restoredSessionBaseline?.preferredWorkspacePaneTabByTargetByRepo[REPO_A],
+    ).toBeUndefined()
   })
 
   test('rejects a late promotion after the stub closes or changes runtime epoch', async () => {

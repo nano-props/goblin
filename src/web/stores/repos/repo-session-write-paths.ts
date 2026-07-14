@@ -1,4 +1,5 @@
 import { lastPathSegment } from '#/web/lib/paths.ts'
+import { recordWithoutKey } from '#/shared/record.ts'
 import PQueue from 'p-queue'
 import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 import {
@@ -435,6 +436,24 @@ function removeRepoFromSessionState(s: ReposStore, id: string): Partial<ReposSto
   }
   const order = s.order.filter((x) => x !== id)
   const restoredRepoId = nextRestoredRepoIdAfterWorkspaceClose(s.order, s.restoredRepoId, id)
+  const restoredSessionBaseline = s.restoredSessionBaseline
+    ? {
+        ...s.restoredSessionBaseline,
+        preferredWorkspacePaneTabByTargetByRepo: recordWithoutKey(
+          s.restoredSessionBaseline.preferredWorkspacePaneTabByTargetByRepo,
+          id,
+        ),
+        filetreeViewStateByWorktreeByRepo: recordWithoutKey(
+          s.restoredSessionBaseline.filetreeViewStateByWorktreeByRepo,
+          id,
+        ),
+        selectedTerminalSessionIdByTerminalWorktree: Object.fromEntries(
+          Object.entries(s.restoredSessionBaseline.selectedTerminalSessionIdByTerminalWorktree).filter(
+            ([key]) => !key.startsWith(`${id}\0`),
+          ),
+        ),
+      }
+    : null
   return {
     repos,
     selectedTerminalSessionIdByTerminalWorktree,
@@ -442,6 +461,7 @@ function removeRepoFromSessionState(s: ReposStore, id: string): Partial<ReposSto
     navigationHistoryByRepo,
     order,
     restoredRepoId,
+    restoredSessionBaseline,
   }
 }
 

@@ -15,6 +15,10 @@ import { updateRepoRuntimeCache } from '#/web/repo-runtime-query.ts'
 import { seedRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import { acceptRepoProjectionReadModel } from '#/web/stores/repos/projection-read-model-effects.ts'
 import { writeWorkspacePaneTabsSnapshotQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { workspacePaneTabsByTargetFromQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { restoredPreferredWorkspacePaneTabByTarget } from '#/web/session-persistence-state.ts'
+import { recordWithoutKey } from '#/shared/record.ts'
 
 interface InitialRepoRefresh {
   id: string
@@ -92,6 +96,14 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
           },
           { scope: 'repo-read-model' },
         )
+        if (isProjectedRestoredWorkspaceRepo(restoredRepo)) {
+          applyRestoredPreferredWorkspacePaneTabs(
+            set,
+            get,
+            restoredRepo.repoRoot,
+            tabsSnapshotForRepo(runtime, restoredRepo.repoRoot),
+          )
+        }
       }
       if (signal?.aborted) return
       set((s) => {
@@ -116,22 +128,14 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         ) {
           return s
         }
-        const { repos } = addResolvedRepo(
-          s,
-          resolvedRepoForStubPromotion(restoredRepo),
-          restoredRepo.repoRuntimeId,
-        )
+        const { repos } = addResolvedRepo(s, resolvedRepoForStubPromotion(restoredRepo), restoredRepo.repoRuntimeId)
         promoted = true
         return repos === s.repos ? s : { repos }
       })
       if (!promoted) return false
 
       seedRepoProjectionQueryData(restoredRepo.repoRoot, restoredRepo.repoRuntimeId, restoredRepo.projection)
-      writeWorkspacePaneTabsSnapshotQueryData(
-        restoredRepo.repoRoot,
-        restoredRepo.repoRuntimeId,
-        result.snapshot,
-      )
+      writeWorkspacePaneTabsSnapshotQueryData(restoredRepo.repoRoot, restoredRepo.repoRuntimeId, result.snapshot)
       acceptRepoProjectionReadModel(
         set,
         get,
@@ -142,9 +146,62 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         },
         { scope: 'repo-read-model' },
       )
+      applyRestoredPreferredWorkspacePaneTabs(set, get, restoredRepo.repoRoot, result.snapshot)
       return true
     },
   }
+}
+
+function tabsSnapshotForRepo(runtime: WorkspaceRuntimeRestoreSnapshot, repoRoot: string) {
+  return runtime.workspacePaneTabs.find((entry) => entry.repoRoot === repoRoot)?.snapshot ?? null
+}
+
+function applyRestoredPreferredWorkspacePaneTabs(
+  set: ReposSet,
+  get: ReposGet,
+  repoRoot: string,
+  snapshot: RepoWorkspaceTabsRestoreResult['snapshot'],
+): void {
+  const state = get()
+  const repo = state.repos[repoRoot]
+  const branches = repo ? readRepoBranchQueryProjection(repo)?.branches : null
+  const restoredPreferred = state.restoredSessionBaseline?.preferredWorkspacePaneTabByTargetByRepo[repoRoot]
+  if (!repo || !branches || !restoredPreferred) return
+  const preferredWorkspacePaneTabByTarget = restoredPreferredWorkspacePaneTabByTarget(
+    repoRoot,
+    { branches },
+    restoredPreferred,
+    snapshot ? workspacePaneTabsByTargetFromQueryData(snapshot) : {},
+  )
+  set((current) => {
+    const currentRepo = current.repos[repoRoot]
+    if (!currentRepo || currentRepo.repoRuntimeId !== repo.repoRuntimeId) return current
+    const baseline = current.restoredSessionBaseline
+    return {
+      repos: {
+        ...current.repos,
+        [repoRoot]: {
+          ...currentRepo,
+          ui: {
+            ...currentRepo.ui,
+            preferredWorkspacePaneTabByTarget: {
+              ...preferredWorkspacePaneTabByTarget,
+              ...currentRepo.ui.preferredWorkspacePaneTabByTarget,
+            },
+          },
+        },
+      },
+      restoredSessionBaseline: baseline
+        ? {
+            ...baseline,
+            preferredWorkspacePaneTabByTargetByRepo: recordWithoutKey(
+              baseline.preferredWorkspacePaneTabByTargetByRepo,
+              repoRoot,
+            ),
+          }
+        : null,
+    }
+  })
 }
 
 export function createRepoSessionActions(set: ReposSet, get: ReposGet) {

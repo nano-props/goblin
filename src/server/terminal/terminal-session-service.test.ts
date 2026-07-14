@@ -1120,6 +1120,7 @@ function createService(options: {
     closeSession: options.closeSession ?? vi.fn(async () => false),
   }
   const workspaceTabsCoordinator = createWorkspacePaneTabsCoordinator({
+    persistLayout: async () => {},
     workspaceTabs: options.workspaceTabs,
     worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
     runtimeProviders: [terminalWorkspacePaneRuntimeTabsProvider(manager, async () => ({

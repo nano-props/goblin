@@ -47,13 +47,38 @@ export function persistedPreferredWorkspacePaneTabByTargetByRepoForSession(
       if (tab !== null && !isWorkspacePaneSessionTabType(tab)) continue
       if (tab !== null && target.kind === 'branch' && workspacePaneTabRequiresWorktree(tab)) continue
       const targetTabs = workspacePaneTabsByTargetByRepo[id]?.[targetKey] ?? defaultWorkspacePaneTabs()
-      if (tab !== null && isWorkspacePaneStaticTabType(tab) && !workspacePaneStaticTabsFromEntries(targetTabs).includes(tab))
+      if (
+        tab !== null &&
+        isWorkspacePaneStaticTabType(tab) &&
+        !workspacePaneStaticTabsFromEntries(targetTabs).includes(tab)
+      )
         continue
       byTarget[targetKey] = tab
     }
     if (Object.keys(byTarget).length > 0) byRepo[id] = byTarget
   }
   return byRepo
+}
+
+export function restoredPreferredWorkspacePaneTabByTarget(
+  repoRoot: string,
+  repo: WorkspaceSessionRepoProjection,
+  preferredByTarget: Record<string, WorkspacePaneSessionTabType | null> | undefined,
+  workspacePaneTabsByTarget: Record<string, WorkspacePaneTabEntry[]>,
+): Record<string, WorkspacePaneSessionTabType | null> {
+  if (!preferredByTarget) return {}
+  return (
+    persistedPreferredWorkspacePaneTabByTargetByRepoForSession(
+      {
+        [repoRoot]: {
+          ...repo,
+          ui: { preferredWorkspacePaneTabByTarget: preferredByTarget },
+        },
+      },
+      [repoRoot],
+      { [repoRoot]: workspacePaneTabsByTarget },
+    )[repoRoot] ?? {}
+  )
 }
 
 function workspacePaneTabsTargetKeyBelongsToRepo(
