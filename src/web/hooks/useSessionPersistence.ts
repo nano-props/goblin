@@ -19,6 +19,7 @@ interface SessionPersistenceInput {
   workspaceMembershipReady: boolean
   sessionPersistenceReady: boolean
   sessionRestoreError: string | null
+  restoredSessionBaseline: ReturnType<typeof useReposStore.getState>['restoredSessionBaseline']
   repos: ReturnType<typeof useReposStore.getState>['repos']
   order: string[]
   restoredRepoId: string | null
@@ -55,6 +56,7 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
   const workspaceMembershipReady = useReposStore((s) => s.workspaceMembershipReady)
   const sessionPersistenceReady = useReposStore((s) => s.sessionPersistenceReady)
   const sessionRestoreError = useReposStore((s) => s.sessionRestoreError)
+  const restoredSessionBaseline = useReposStore((s) => s.restoredSessionBaseline)
   const repos = useReposStore((s) => s.repos)
   const workspacePaneTabsVersion = useWorkspacePaneTabsCacheVersion()
   const filetreeInteractionByScope = useFiletreeInteractionStore((s) => s.interactionByScope)
@@ -110,6 +112,7 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
         workspaceMembershipReady,
         sessionPersistenceReady,
         sessionRestoreError,
+        restoredSessionBaseline,
         repos,
         order,
         restoredRepoId,
@@ -199,6 +202,7 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
     sessionRestoreError,
     order,
     restoredRepoId,
+    restoredSessionBaseline,
     routedRepoId,
     workspacePaneSize,
     zenMode,
@@ -256,6 +260,7 @@ function sessionFromPersistenceInput(
       selectedTerminalSessionIdByTerminalWorktree: input.selectedTerminalSessionIdByTerminalWorktree,
     }),
     filetreeInteractionByScope: input.filetreeInteractionByScope,
+    restoredSessionBaseline: input.restoredSessionBaseline,
   })
 }
 

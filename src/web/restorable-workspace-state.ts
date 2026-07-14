@@ -31,6 +31,7 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
   repos: ReposStore['repos']
   restorableWorkspaceState: RestorableWorkspaceState
   filetreeInteractionByScope?: Readonly<Record<string, FiletreeInteractionSnapshot>>
+  restoredSessionBaseline?: WorkspaceSessionState | null
 }): WorkspaceSessionState {
   const { repos, restorableWorkspaceState } = input
   // Workspace membership is shell state: it must remain restorable even
@@ -43,7 +44,7 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
     repos,
     restorableWorkspaceState.order,
   )
-  return {
+  const session: WorkspaceSessionState = {
     openRepoEntries: persistedOpenWorkspaceEntries(restorableWorkspaceState.order, shellRepos),
     restoredRepoId: persistedRestoredRepoIdForSession(restorableWorkspaceState.restoredRepoId),
     zenMode: restorableWorkspaceState.zenMode,
@@ -68,6 +69,7 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
       restorableWorkspaceState.order,
     ),
   }
+  return sessionWithStubBaseline(session, input.restoredSessionBaseline, repos, restorableWorkspaceState.order)
 }
 
 function workspaceSessionRepoProjections(
@@ -78,6 +80,7 @@ function workspaceSessionRepoProjections(
   for (const id of order) {
     const repo = repos[id]
     if (!repo) continue
+    if (repo.session.projectionState === 'stub') continue
     const branchModel = readRepoBranchQueryProjection(repo)
     if (!branchModel) continue
     projectedRepos[id] = {
@@ -95,24 +98,25 @@ function workspaceSessionRepoProjections(
 function workspaceSessionRepoShells(
   repos: ReposStore['repos'],
   order: readonly string[],
-): Record<string, Pick<ReposStore['repos'][string], 'id' | 'remote'> | undefined> {
-  const shells: Record<string, Pick<ReposStore['repos'][string], 'id' | 'remote'> | undefined> = {}
+): Record<string, Pick<ReposStore['repos'][string], 'id' | 'remote' | 'session'> | undefined> {
+  const shells: Record<string, Pick<ReposStore['repos'][string], 'id' | 'remote' | 'session'> | undefined> = {}
   for (const id of order) {
     const repo = repos[id]
     if (!repo) continue
-    shells[id] = { id: repo.id, remote: repo.remote }
+    shells[id] = { id: repo.id, remote: repo.remote, session: repo.session }
   }
   return shells
 }
 
 function workspacePaneTabsByTargetByRepoFromQueryCache(
-  repos: Record<string, Pick<ReposStore['repos'][string], 'repoRuntimeId'> | undefined>,
+  repos: Record<string, Pick<ReposStore['repos'][string], 'repoRuntimeId' | 'session'> | undefined>,
   order: readonly string[],
 ): Record<string, Record<string, WorkspacePaneTabEntry[]>> {
   const byRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>> = {}
   for (const id of order) {
     const repo = repos[id]
     if (!repo) continue
+    if (repo.session.projectionState === 'stub') continue
     const data = primaryWindowQueryClient.getQueryData<WorkspacePaneTabsQueryData>(
       workspacePaneTabsQueryKey(id, repo.repoRuntimeId),
     )
@@ -121,6 +125,76 @@ function workspacePaneTabsByTargetByRepoFromQueryCache(
     if (Object.keys(byTarget).length > 0) byRepo[id] = byTarget
   }
   return byRepo
+}
+
+function sessionWithStubBaseline(
+  session: WorkspaceSessionState,
+  baseline: WorkspaceSessionState | null | undefined,
+  repos: ReposStore['repos'],
+  order: readonly string[],
+): WorkspaceSessionState {
+  if (!baseline) return session
+  const stubRepoIds = new Set(order.filter((id) => repos[id]?.session.projectionState === 'stub'))
+  if (stubRepoIds.size === 0) return session
+  return {
+    ...session,
+    selectedTerminalSessionIdByTerminalWorktree: mergeBaselineSelectedTerminals(
+      session.selectedTerminalSessionIdByTerminalWorktree,
+      baseline.selectedTerminalSessionIdByTerminalWorktree,
+      stubRepoIds,
+    ),
+    preferredWorkspacePaneTabByTargetByRepo: mergeBaselineRepoMap(
+      session.preferredWorkspacePaneTabByTargetByRepo,
+      baseline.preferredWorkspacePaneTabByTargetByRepo,
+      stubRepoIds,
+    ),
+    workspacePaneTabsByTargetByRepo: mergeBaselineRepoMap(
+      session.workspacePaneTabsByTargetByRepo,
+      baseline.workspacePaneTabsByTargetByRepo,
+      stubRepoIds,
+    ),
+    filetreeViewStateByWorktreeByRepo: mergeBaselineRepoMap(
+      session.filetreeViewStateByWorktreeByRepo,
+      baseline.filetreeViewStateByWorktreeByRepo,
+      stubRepoIds,
+    ),
+  }
+}
+
+function mergeBaselineRepoMap<T>(
+  current: Record<string, T>,
+  baseline: Record<string, T>,
+  stubRepoIds: ReadonlySet<string>,
+): Record<string, T> {
+  let merged = current
+  for (const repoId of stubRepoIds) {
+    const value = baseline[repoId]
+    if (value === undefined) continue
+    if (merged === current) merged = { ...current }
+    merged[repoId] = value
+  }
+  return merged
+}
+
+function mergeBaselineSelectedTerminals(
+  current: Record<string, string>,
+  baseline: Record<string, string>,
+  stubRepoIds: ReadonlySet<string>,
+): Record<string, string> {
+  let merged = current
+  for (const [terminalWorktreeKey, terminalSessionId] of Object.entries(baseline)) {
+    const repoId = repoIdFromTerminalWorktreeKey(terminalWorktreeKey)
+    if (!repoId || !stubRepoIds.has(repoId)) continue
+    if (merged === current) merged = { ...current }
+    merged[terminalWorktreeKey] = terminalSessionId
+  }
+  return merged
+}
+
+function repoIdFromTerminalWorktreeKey(key: string): string | null {
+  const index = key.indexOf('\0')
+  if (index <= 0) return null
+  return key.slice(0, index)
 }
 
 /** Restores only the restorable workspace UI projection from WorkspaceSessionState.

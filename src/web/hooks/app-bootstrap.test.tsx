@@ -107,7 +107,9 @@ describe('app bootstrap hooks', () => {
     const hydrateTheme = vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
-    const hydrateRestoredRuntime = vi.spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockResolvedValue(undefined)
+    const hydrateRestoredRuntime = vi
+      .spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime')
+      .mockResolvedValue(undefined)
 
     renderInJsdom(<Harness />)
     await vi.waitFor(() => {
@@ -129,6 +131,7 @@ describe('app bootstrap hooks', () => {
     })
     expect(hydrateRestoredRuntime).toHaveBeenCalledWith(restoredRuntimeForSession(session), {
       signal: expect.any(AbortSignal),
+      restoredSession: session,
     })
     expect(hydrateTheme).toHaveBeenCalledWith(settings)
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(1)
@@ -168,7 +171,9 @@ describe('app bootstrap hooks', () => {
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockRejectedValue(new Error('theme unavailable'))
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockRejectedValue(new Error('i18n unavailable'))
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockRejectedValue(new Error('host unavailable'))
-    const hydrateRestoredRuntime = vi.spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockResolvedValue(undefined)
+    const hydrateRestoredRuntime = vi
+      .spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime')
+      .mockResolvedValue(undefined)
 
     renderInJsdom(<Harness />)
     await vi.waitFor(() => {
@@ -177,6 +182,7 @@ describe('app bootstrap hooks', () => {
 
     expect(hydrateRestoredRuntime).toHaveBeenCalledWith(restoredRuntimeForSession(session), {
       signal: expect.any(AbortSignal),
+      restoredSession: session,
     })
     expect(useReposStore.getState().workspacePaneSize).toBe(55)
     expect(useReposStore.getState().sessionPersistenceReady).toBe(true)
@@ -199,7 +205,9 @@ describe('app bootstrap hooks', () => {
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
-    const hydrateRestoredRuntime = vi.spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockResolvedValue(undefined)
+    const hydrateRestoredRuntime = vi
+      .spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime')
+      .mockResolvedValue(undefined)
 
     renderInJsdom(<Harness />)
     await vi.waitFor(() => {
@@ -240,7 +248,9 @@ describe('app bootstrap hooks', () => {
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
-    const hydrateRestoredRuntime = vi.spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockResolvedValue(undefined)
+    const hydrateRestoredRuntime = vi
+      .spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime')
+      .mockResolvedValue(undefined)
 
     renderInJsdom(<Harness />)
     await vi.waitFor(() => {
@@ -249,6 +259,7 @@ describe('app bootstrap hooks', () => {
 
     expect(hydrateRestoredRuntime).toHaveBeenCalledWith(restoredRuntimeForSession(rebuiltSession), {
       signal: expect.any(AbortSignal),
+      restoredSession: rebuiltSession,
     })
     expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({ session: rebuiltSession })
     expect(useReposStore.getState().sessionRestoreError).toBeNull()
@@ -270,7 +281,9 @@ describe('app bootstrap hooks', () => {
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
-    vi.spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockRejectedValue(new Error('session repo restore failed'))
+    vi.spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockRejectedValue(
+      new Error('session repo restore failed'),
+    )
 
     renderInJsdom(<Harness />)
     await vi.waitFor(() => {
@@ -360,7 +373,9 @@ describe('app bootstrap hooks', () => {
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
-    vi.spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockImplementation(() => new Promise(() => {}))
+    vi.spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockImplementation(
+      () => new Promise(() => {}),
+    )
 
     renderInJsdom(<Harness />)
     await flushMicrotasks(3)

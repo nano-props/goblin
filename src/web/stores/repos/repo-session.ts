@@ -24,9 +24,15 @@ type RestorableWorkspaceLifecycleActions = Pick<ReposStore, 'hydrateRestoredWork
 
 function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet): RestorableWorkspaceLifecycleActions {
   return {
-    async hydrateRestoredWorkspaceRuntime(runtime: WorkspaceRuntimeRestoreSnapshot, options?: RepoSessionHydrationOptions) {
+    async hydrateRestoredWorkspaceRuntime(
+      runtime: WorkspaceRuntimeRestoreSnapshot,
+      options?: RepoSessionHydrationOptions,
+    ) {
       const { signal } = options ?? {}
       if (signal?.aborted) return
+      if (options && 'restoredSession' in options) {
+        set({ restoredSessionBaseline: options.restoredSession ?? null })
+      }
       const rankById = new Map<string, number>()
       runtime.repos.forEach((repo, index) => {
         if (!rankById.has(repo.repoRoot)) rankById.set(repo.repoRoot, index)
@@ -48,7 +54,12 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       for (const restoredRepo of runtime.repos) {
         seedRepoProjectionQueryData(restoredRepo.repoRoot, restoredRepo.repoRuntimeId, restoredRepo.projection)
         set((s) => {
-          const { repos, order } = addResolvedRepo(s, resolvedRepoFromRestoredRuntime(restoredRepo), restoredRepo.repoRuntimeId, rankById)
+          const { repos, order } = addResolvedRepo(
+            s,
+            resolvedRepoFromRestoredRuntime(restoredRepo),
+            restoredRepo.repoRuntimeId,
+            rankById,
+          )
           const repo = repos[restoredRepo.repoRoot]
           // Stub leases (projection: null) skip the post-hydration projection
           // refresh — that's the entire point of the active-only restore. The
@@ -70,7 +81,11 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         acceptRepoProjectionReadModel(
           set,
           get,
-          { repoRoot: restoredRepo.repoRoot, repoRuntimeId: restoredRepo.repoRuntimeId, projection: restoredRepo.projection },
+          {
+            repoRoot: restoredRepo.repoRoot,
+            repoRuntimeId: restoredRepo.repoRuntimeId,
+            projection: restoredRepo.projection,
+          },
           { scope: 'repo-read-model' },
         )
       }
@@ -99,5 +114,9 @@ function resolvedRepoFromRestoredRuntime(restored: RestoredWorkspaceRepoRuntime)
     id: restored.repoRoot,
     name: restored.name,
     ...(restored.target ? { target: restored.target } : {}),
+    session: {
+      entry: restored.entry,
+      projectionState: isProjectedRestoredWorkspaceRepo(restored) ? ('projected' as const) : ('stub' as const),
+    },
   }
 }

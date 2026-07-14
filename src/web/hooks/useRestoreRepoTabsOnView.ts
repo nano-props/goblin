@@ -27,13 +27,17 @@ const MAX_LAZY_RESTORE_ATTEMPTS = 3
 const failedRestores = new Map<string, { attempts: number; lastError: string }>()
 
 type RestoreResult =
-  | { ok: true; repo: import('#/shared/api-types.ts').RestoredWorkspaceRepoRuntime; snapshot: import('#/shared/workspace-pane-tabs.ts').WorkspacePaneTabsSnapshot | null }
+  | {
+      ok: true
+      repo: import('#/shared/api-types.ts').RestoredWorkspaceRepoRuntime
+      snapshot: import('#/shared/workspace-pane-tabs.ts').WorkspacePaneTabsSnapshot | null
+    }
   | { ok: false; message: string }
 
 interface LazyRestoreTarget {
   repoRoot: string
   repoRuntimeId: string
-  loadedAt: number | null
+  projectionState: 'projected' | 'stub'
 }
 
 export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) {
@@ -45,18 +49,16 @@ export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) 
       return {
         repoRoot: repo.id,
         repoRuntimeId: repo.repoRuntimeId,
-        loadedAt: repo.dataLoads.repoReadModel.loadedAt,
+        projectionState: repo.session.projectionState,
       }
     }),
   )
 
   useEffect(() => {
     if (!target) return
-    // Already restored (active repo at cold start, or already-restored stub).
-    // The discriminator is `repoReadModel.loadedAt` — it is `null` for stubs
-    // (no projection accepted yet) and a timestamp after a successful
-    // hydrateRestoredWorkspaceRuntime run.
-    if (target.loadedAt !== null) return
+    // Already client-owned (active repo at cold start, normal user-opened
+    // repo, or a stub that has already been projected).
+    if (target.projectionState !== 'stub') return
 
     const failed = failedRestores.get(target.repoRoot)
     if (failed && failed.attempts >= MAX_LAZY_RESTORE_ATTEMPTS) return
@@ -76,11 +78,17 @@ export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) 
 async function runLazyRestore(repoRoot: string, repoRuntimeId: string): Promise<void> {
   const result = await fetchLazyRestore(repoRoot, repoRuntimeId)
   if (result.ok) {
+    if (!lazyRestoreTargetStillCurrent(repoRoot, repoRuntimeId)) return
     await applyLazyRestore(repoRoot, result)
     return
   }
   if (staleRuntimeRestoreFailure(result.message)) return
   recordLazyRestoreFailure(repoRoot, result.message)
+}
+
+function lazyRestoreTargetStillCurrent(repoRoot: string, repoRuntimeId: string): boolean {
+  const repo = useReposStore.getState().repos[repoRoot]
+  return !!repo && repo.repoRuntimeId === repoRuntimeId && repo.session.projectionState === 'stub'
 }
 
 async function fetchLazyRestore(repoRoot: string, repoRuntimeId: string): Promise<RestoreResult> {
@@ -129,8 +137,9 @@ function recordLazyRestoreFailure(repoRoot: string, message: string): void {
   }
   toast.error(translate('lazy-restore.failed'), {
     id: `lazy-restore:${repoRoot}`,
-    description: attempts >= MAX_LAZY_RESTORE_ATTEMPTS
-      ? `${message} — ${translate('lazy-restore.gave-up', { attempts })}`
-      : message,
+    description:
+      attempts >= MAX_LAZY_RESTORE_ATTEMPTS
+        ? `${message} — ${translate('lazy-restore.gave-up', { attempts })}`
+        : message,
   })
 }

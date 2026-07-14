@@ -1,10 +1,5 @@
 import type { StoreApi } from 'zustand'
-import type {
-  BranchSnapshotInfo,
-  BrowserRemoteProvider,
-  ExecResult,
-  GitRemoteInfo,
-} from '#/web/types.ts'
+import type { BranchSnapshotInfo, BrowserRemoteProvider, ExecResult, GitRemoteInfo } from '#/web/types.ts'
 import type { RemoteRepoConnectionLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspaceRuntimeRestoreSnapshot, WorkspaceSessionState } from '#/shared/api-types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
@@ -94,6 +89,17 @@ export interface RepoRemoteState {
   fetchError: string | null
 }
 
+export type RepoSessionProjectionState = 'projected' | 'stub'
+
+export interface RepoSessionState {
+  /** Canonical session entry for the workspace shell. Remote stubs only know a
+   *  ref, not a resolved target, so the entry must be preserved directly. */
+  entry: RepoSessionEntry | null
+  /** Whether target-scoped session state is client-owned yet. Stub repos keep
+   *  the server baseline until the repo is projected on view. */
+  projectionState: RepoSessionProjectionState
+}
+
 type RepoAvailabilityState = { phase: 'available' } | { phase: 'unavailable'; reason: string; checkedAt: number }
 
 export interface RepoSnapshotCacheEntry {
@@ -116,6 +122,7 @@ export interface RepoState {
   operations: RepoOperationsState
   ui: RepoUiState
   projection: RepoProjectionMeta
+  session: RepoSessionState
   remote: RepoRemoteState
   availability: RepoAvailabilityState
   events: RepoEvent[]
@@ -181,6 +188,7 @@ export interface WorkspaceNavigationHistoryTraversal {
 
 export interface RepoSessionHydrationOptions {
   signal?: AbortSignal
+  restoredSession?: WorkspaceSessionState
 }
 
 interface LocalWorkspaceState {
@@ -198,6 +206,9 @@ interface LocalWorkspaceState {
    *  persisted workspace state must not be overwritten until the restore issue
    *  is resolved by a successful boot. */
   sessionRestoreError: string | null
+  /** Server-owned session state from boot restore. Used only to preserve
+   *  target-scoped state for repos that are still restore stubs. */
+  restoredSessionBaseline: WorkspaceSessionState | null
   /** Chrome-tab-style "opener" tracking, covering every workspace pane tab
    *  (static and terminal): maps a tab's identity (see
    *  `workspacePaneTabEntryIdentity`) to the identity of the tab that was
@@ -225,10 +236,7 @@ interface LocalWorkspaceActions {
     entry: WorkspaceNavigationHistoryEntry,
     options?: { replace?: boolean; browserHistoryTraversal?: 'back' | 'forward' },
   ) => void
-  peekWorkspaceNavigation: (
-    repoId: string,
-    direction: 'back' | 'forward',
-  ) => WorkspaceNavigationHistoryTraversal | null
+  peekWorkspaceNavigation: (repoId: string, direction: 'back' | 'forward') => WorkspaceNavigationHistoryTraversal | null
   commitWorkspaceNavigation: (traversal: WorkspaceNavigationHistoryTraversal) => boolean
 }
 

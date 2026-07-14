@@ -20,6 +20,7 @@ import {
   resetFiletreeInteractionStore,
   useFiletreeInteractionStore,
 } from '#/web/stores/repos/filetree-interaction-state.ts'
+import { localRepoSessionEntry } from '#/shared/remote-repo.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { useWorkspacePaneTabsQuery } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import {
@@ -415,11 +416,14 @@ describe('useSessionPersistence', () => {
         },
       },
     })
-    seedRepoReadModelQueryData({ id: repo.id, repoRuntimeId: currentRepoRuntimeId }, {
-      branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
-      currentBranch: 'feature/worktree',
-      status: [],
-    })
+    seedRepoReadModelQueryData(
+      { id: repo.id, repoRuntimeId: currentRepoRuntimeId },
+      {
+        branches: [createRepoBranch('feature/worktree', { worktree: { path: '/tmp/worktree' } })],
+        currentBranch: 'feature/worktree',
+        status: [],
+      },
+    )
 
     renderInJsdom(<Harness />)
 
@@ -501,6 +505,72 @@ describe('useSessionPersistence', () => {
       }),
     )
     result.unmount()
+  })
+
+  test('preserves baseline target-scoped state for inactive restore stubs on first save', () => {
+    const activeTargetKey = worktreeTargetKey('/tmp/repo-a', 'feature/active', '/tmp/active-worktree')
+    const stubTargetKey = worktreeTargetKey('/tmp/repo-b', 'feature/stub', '/tmp/stub-worktree')
+    const activeRepo = seedRepoWithReadModelForTest({
+      id: '/tmp/repo-a',
+      branches: [createRepoBranch('feature/active', { worktree: { path: '/tmp/active-worktree' } })],
+      currentBranchName: 'feature/active',
+      preferredWorkspacePaneTab: 'status',
+      workspacePaneTabsByBranch: {
+        'feature/active': [workspacePaneStaticTabEntry('status')],
+      },
+    })
+    const stubRepo = emptyRepo('/tmp/repo-b', 'repo-b', 'repo-runtime-b')
+    stubRepo.session = {
+      entry: localRepoSessionEntry(stubRepo.id),
+      projectionState: 'stub',
+    }
+    useReposStore.setState({
+      repos: { [activeRepo.id]: activeRepo, [stubRepo.id]: stubRepo },
+      order: [activeRepo.id, stubRepo.id],
+      restoredRepoId: activeRepo.id,
+      workspaceMembershipReady: true,
+      sessionPersistenceReady: true,
+      selectedTerminalSessionIdByTerminalWorktree: {
+        '/tmp/repo-a\0/tmp/active-worktree': 'term-active0000000000000',
+        '/tmp/repo-b\0/tmp/stub-worktree': 'term-stub00000000000000',
+      },
+      restoredSessionBaseline: {
+        openRepoEntries: [localRepoSessionEntry(activeRepo.id), localRepoSessionEntry(stubRepo.id)],
+        restoredRepoId: activeRepo.id,
+        zenMode: false,
+        workspacePaneSize: 55,
+        selectedTerminalSessionIdByTerminalWorktree: {
+          '/tmp/repo-b\0/tmp/stub-worktree': 'term-stub00000000000000',
+        },
+        preferredWorkspacePaneTabByTargetByRepo: {
+          [stubRepo.id]: { [stubTargetKey]: 'files' },
+        },
+        workspacePaneTabsByTargetByRepo: {
+          [stubRepo.id]: { [stubTargetKey]: [workspacePaneStaticTabEntry('files')] },
+        },
+        filetreeViewStateByWorktreeByRepo: {},
+      },
+    })
+
+    renderInJsdom(<Harness />)
+
+    expect(persistWorkspaceSessionStateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        openRepoEntries: [localRepoSessionEntry(activeRepo.id), localRepoSessionEntry(stubRepo.id)],
+        selectedTerminalSessionIdByTerminalWorktree: {
+          '/tmp/repo-a\0/tmp/active-worktree': 'term-active0000000000000',
+          '/tmp/repo-b\0/tmp/stub-worktree': 'term-stub00000000000000',
+        },
+        preferredWorkspacePaneTabByTargetByRepo: {
+          [activeRepo.id]: { [activeTargetKey]: 'status' },
+          [stubRepo.id]: { [stubTargetKey]: 'files' },
+        },
+        workspacePaneTabsByTargetByRepo: {
+          [activeRepo.id]: { [activeTargetKey]: [workspacePaneStaticTabEntry('status')] },
+          [stubRepo.id]: { [stubTargetKey]: [workspacePaneStaticTabEntry('files')] },
+        },
+      }),
+    )
   })
 
   test('does not emit a render-phase update warning when a workspace tabs observer mounts', () => {

@@ -31,7 +31,9 @@ interface AuthenticatedWorkspaceRestoreRun {
 
 type WorkspaceRestoreOutcome = { status: 'completed' } | { status: 'cancelled' }
 
-export function useAuthenticatedAppBootstrap(options?: { activeRepoRoot?: string | null }): AuthenticatedAppBootstrapState {
+export function useAuthenticatedAppBootstrap(options?: {
+  activeRepoRoot?: string | null
+}): AuthenticatedAppBootstrapState {
   const activeRepoRootRef = useRef(options?.activeRepoRoot ?? null)
   const restoreRunRef = useRef<AuthenticatedWorkspaceRestoreRun | null>(null)
   const [state, setState] = useState<AuthenticatedAppBootstrapState>(RESTORING_WORKSPACE_BOOTSTRAP_STATE)
@@ -115,6 +117,7 @@ async function restoreBootSession(
     await abortable(
       useReposStore.getState().hydrateRestoredWorkspaceRuntime(restored.runtime, {
         signal,
+        restoredSession: restored.session,
       }),
       signal,
     )

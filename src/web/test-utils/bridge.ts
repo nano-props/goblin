@@ -120,6 +120,7 @@ export function seedRepoShellForTest(options: {
     workspaceMembershipReady: true,
     sessionPersistenceReady: true,
     sessionRestoreError: null,
+    restoredSessionBaseline: null,
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
   })
@@ -391,7 +392,7 @@ export function installWorkspacePaneTabsTestBridge(
             terminalSessionId,
             terminalSessionsRevision: 1,
             terminalRuntimeSessionId,
-    terminalRuntimeGeneration: 1,
+            terminalRuntimeGeneration: 1,
             snapshot: '',
             snapshotSeq: 0,
             outputEra: 0,
@@ -511,6 +512,7 @@ export function resetReposStore(): void {
     workspaceMembershipReady: false,
     sessionPersistenceReady: false,
     sessionRestoreError: null,
+    restoredSessionBaseline: null,
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,
     selectedTerminalSessionIdByTerminalWorktree: {},
@@ -678,7 +680,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return {
             ok: true as const,
             terminalRuntimeSessionId: 'pty_test_aaaaaaaaa',
-        terminalRuntimeGeneration: 1,
+            terminalRuntimeGeneration: 1,
             role: 'controller' as const,
             controllerStatus: 'connected' as const,
             controller: { clientId: 'attachment_local', status: 'connected' as const },
@@ -952,7 +954,11 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
       const reconcileRepoRuntimeMemberships = (payload: unknown) => {
         const clientId = typeof payload === 'object' && payload && 'clientId' in payload ? payload.clientId : null
         const repoRoots = typeof payload === 'object' && payload && 'repoRoots' in payload ? payload.repoRoots : null
-        if (typeof clientId !== 'string' || !Array.isArray(repoRoots) || !repoRoots.every((root) => typeof root === 'string')) {
+        if (
+          typeof clientId !== 'string' ||
+          !Array.isArray(repoRoots) ||
+          !repoRoots.every((root) => typeof root === 'string')
+        ) {
           throw new Error('runtime-reconcile requires clientId and repoRoots')
         }
         const desired = new Set(repoRoots)

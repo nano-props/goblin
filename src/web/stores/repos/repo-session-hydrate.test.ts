@@ -4,7 +4,10 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
 import { repoRuntimesQueryKey } from '#/web/repo-runtime-query.ts'
-import { workspacePaneTabsQueryKey, type WorkspacePaneTabsQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import {
+  workspacePaneTabsQueryKey,
+  type WorkspacePaneTabsQueryData,
+} from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import type { RepoRuntimesSnapshot, WorkspaceRuntimeRestoreSnapshot } from '#/shared/api-types.ts'
 import {
   branchSnapshot,
@@ -41,7 +44,9 @@ describe('repo session hydration', () => {
           },
         },
       ],
-      workspacePaneTabs: [{ repoRoot: REPO_A, repoRuntimeId: 'repo-runtime-server-a', snapshot: { revision: 2, entries: [] } }],
+      workspacePaneTabs: [
+        { repoRoot: REPO_A, repoRuntimeId: 'repo-runtime-server-a', snapshot: { revision: 2, entries: [] } },
+      ],
       restoredRepoId: REPO_A,
     }
 
@@ -49,6 +54,10 @@ describe('repo session hydration', () => {
 
     const repo = useReposStore.getState().repos[REPO_A]
     expect(repo?.repoRuntimeId).toBe('repo-runtime-server-a')
+    expect(repo?.session).toEqual({
+      entry: localRepoSessionEntry(REPO_A),
+      projectionState: 'projected',
+    })
     expect(useReposStore.getState().order).toEqual([REPO_A])
     expect(useReposStore.getState().restoredRepoId).toBe(REPO_A)
     expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
@@ -67,10 +76,50 @@ describe('repo session hydration', () => {
   })
 
   test('hydrateRestoredWorkspaceRuntime clears the workspace restore skeleton for an empty snapshot', async () => {
-    await useReposStore.getState().hydrateRestoredWorkspaceRuntime({ repos: [], workspacePaneTabs: [], restoredRepoId: null })
+    await useReposStore
+      .getState()
+      .hydrateRestoredWorkspaceRuntime({ repos: [], workspacePaneTabs: [], restoredRepoId: null })
 
     expect(useReposStore.getState().order).toEqual([])
     expect(useReposStore.getState().restoredRepoId).toBeNull()
     expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
+  })
+
+  test('hydrateRestoredWorkspaceRuntime keeps stub state explicit when warm cache seeds loadedAt', async () => {
+    const savedAt = Date.now()
+    useReposStore.setState({
+      repoSnapshotCache: {
+        [REPO_A]: {
+          savedAt,
+          name: 'cached-a',
+          data: {
+            branches: [branchSnapshot('cached-main')],
+            currentBranch: 'cached-main',
+          },
+          ui: { branchViewMode: 'all' },
+        },
+      },
+    })
+
+    await useReposStore.getState().hydrateRestoredWorkspaceRuntime({
+      repos: [
+        {
+          entry: localRepoSessionEntry(REPO_A),
+          repoRoot: REPO_A,
+          repoRuntimeId: 'repo-runtime-server-a',
+          name: 'server-a',
+          projection: null,
+        },
+      ],
+      workspacePaneTabs: [],
+      restoredRepoId: REPO_A,
+    })
+
+    const repo = useReposStore.getState().repos[REPO_A]
+    expect(repo?.session).toEqual({
+      entry: localRepoSessionEntry(REPO_A),
+      projectionState: 'stub',
+    })
+    expect(repo?.dataLoads.repoReadModel.loadedAt).toBe(savedAt)
   })
 })

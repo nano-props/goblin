@@ -10,7 +10,7 @@ import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connecti
 import { goblinLog } from '#/web/logger.ts'
 import { resetLifecycleTest } from '#/web/stores/repos/repo-session-test-utils.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import type { ReposSet } from '#/web/stores/repos/types.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 
 // Mock the server command adapter so the hook test doesn't depend on
 // the IPC bridge / network. Lifecycle projection behavior is covered by the
@@ -59,90 +59,13 @@ function remoteTargetFixture() {
 }
 
 function seedRepo(id: string, lifecycle: RemoteRepoConnectionLifecycle | null) {
-  const set = useReposStore.setState as ReposSet
-  set((s) => ({
+  const repo = emptyRepo(id, id, 'repo-runtime-test')
+  repo.remote.lifecycle = lifecycle
+  useReposStore.setState((s) => ({
     ...s,
     repos: {
       ...s.repos,
-      [id]: {
-        id,
-        name: id,
-        repoRuntimeId: 'repo-runtime-test',
-        dataLoads: {
-          repoReadModel: { phase: 'idle', loadedAt: null, stale: false, error: null },
-          visibleStatus: { phase: 'idle', loadedAt: null, stale: false, error: null },
-          fetch: { phase: 'idle', loadedAt: null, stale: false, error: null },
-        },
-        operations: {
-          fetch: {
-            operationId: 0,
-            phase: 'idle',
-            reason: null,
-            target: null,
-            startedAt: null,
-            settledAt: null,
-            error: null,
-          },
-          manualRefresh: {
-            operationId: 0,
-            phase: 'idle',
-            reason: null,
-            target: null,
-            startedAt: null,
-            settledAt: null,
-            error: null,
-          },
-          repoReadModel: {
-            operationId: 0,
-            phase: 'idle',
-            reason: null,
-            target: null,
-            startedAt: null,
-            settledAt: null,
-            error: null,
-          },
-          visibleStatus: {
-            operationId: 0,
-            phase: 'idle',
-            reason: null,
-            target: null,
-            startedAt: null,
-            settledAt: null,
-            error: null,
-          },
-          branchAction: {
-            operationId: 0,
-            phase: 'idle',
-            reason: null,
-            target: null,
-            startedAt: null,
-            settledAt: null,
-            error: null,
-          },
-        },
-        ui: {
-          currentBranchName: null,
-          branchViewMode: 'all',
-          workspacePaneTabsByBranch: {},
-          preferredWorkspacePaneTabByTarget: {},
-        },
-        projection: { source: 'fresh', savedAt: null },
-        remote: {
-          lifecycle,
-          lifecycleAttemptId: null,
-          remotes: [],
-          remoteDetails: [],
-          hasRemotes: false,
-          hasBrowserRemote: false,
-          browserRemoteProvider: undefined,
-          remoteProviders: {},
-          hasGitHubRemote: false,
-          fetchFailed: false,
-          fetchError: null,
-        },
-        availability: { phase: 'available' },
-        events: [],
-      },
+      [id]: repo,
     },
   }))
 }

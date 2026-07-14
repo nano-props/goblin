@@ -56,12 +56,19 @@ vi.mock('#/web/stores/repos/store.ts', async (importActual) => {
   }
 })
 
-function stubRepo(id: string, repoRuntimeId: string) {
+function stubRepo(
+  id: string,
+  repoRuntimeId: string,
+  options: { projectionState?: 'projected' | 'stub'; loadedAt?: number | null } = {},
+) {
   return {
     id,
     repoRuntimeId,
+    session: {
+      projectionState: options.projectionState ?? 'stub',
+    },
     dataLoads: {
-      repoReadModel: { phase: 'idle', loadedAt: null as number | null, error: null, stale: false },
+      repoReadModel: { phase: 'idle', loadedAt: options.loadedAt ?? null, error: null, stale: false },
     },
   }
 }
@@ -87,23 +94,41 @@ describe('useRestoreRepoTabsOnView', () => {
     await waitFor(() => expect(mocks.restoreRepoTabsOnView).not.toHaveBeenCalled())
   })
 
-  test('does nothing when the repo is already restored (loadedAt set)', async () => {
+  test('does nothing when the repo is already client-owned', async () => {
     function Host() {
       useRestoreRepoTabsOnView({ repoId: 'repo-a' })
       return null
     }
     mocks.storeState = {
       repos: {
-        'repo-a': {
-          id: 'repo-a',
-          repoRuntimeId: 'rta',
-          dataLoads: { repoReadModel: { phase: 'idle', loadedAt: 1, error: null, stale: false } },
-        },
+        'repo-a': stubRepo('repo-a', 'rta', { projectionState: 'projected', loadedAt: null }),
       },
       hydrateRestoredWorkspaceRuntime: mocks.hydrateRestoredWorkspaceRuntime,
     }
     renderInJsdom(<Host />)
     await waitFor(() => expect(mocks.restoreRepoTabsOnView).not.toHaveBeenCalled())
+  })
+
+  test('restores a stub even when warm cache has populated loadedAt', async () => {
+    function Host() {
+      useRestoreRepoTabsOnView({ repoId: 'repo-a' })
+      return null
+    }
+    mocks.storeState = {
+      repos: {
+        'repo-a': stubRepo('repo-a', 'rta', { projectionState: 'stub', loadedAt: 1 }),
+      },
+      hydrateRestoredWorkspaceRuntime: mocks.hydrateRestoredWorkspaceRuntime,
+    }
+    mocks.restoreRepoTabsOnView.mockResolvedValue({
+      repo: { repoRoot: 'repo-a', repoRuntimeId: 'rta' },
+      snapshot: null,
+    })
+
+    renderInJsdom(<Host />)
+
+    await waitFor(() => expect(mocks.restoreRepoTabsOnView).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(mocks.hydrateRestoredWorkspaceRuntime).toHaveBeenCalledTimes(1))
   })
 
   test('on success, hydrates the store with the returned repo and snapshot', async () => {
@@ -154,6 +179,39 @@ describe('useRestoreRepoTabsOnView', () => {
     renderInJsdom(<Host />)
     await waitFor(() => expect(mocks.hydrateRestoredWorkspaceRuntime).toHaveBeenCalledTimes(1))
     expect(mocks.hydrateRestoredWorkspaceRuntime.mock.calls[0]?.[0].workspacePaneTabs).toEqual([])
+  })
+
+  test('does not apply a lazy restore response after the repo closes', async () => {
+    let resolveFetch: ((value: unknown) => void) | null = null
+    mocks.restoreRepoTabsOnView.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveFetch = resolve
+        }),
+    )
+    mocks.storeState = {
+      repos: { 'repo-a': stubRepo('repo-a', 'rta') },
+      hydrateRestoredWorkspaceRuntime: mocks.hydrateRestoredWorkspaceRuntime,
+    }
+
+    function Host() {
+      useRestoreRepoTabsOnView({ repoId: 'repo-a' })
+      return null
+    }
+
+    renderInJsdom(<Host />)
+    await waitFor(() => expect(mocks.restoreRepoTabsOnView).toHaveBeenCalledTimes(1))
+
+    mocks.storeState = {
+      repos: {},
+      hydrateRestoredWorkspaceRuntime: mocks.hydrateRestoredWorkspaceRuntime,
+    }
+    await act(async () => {
+      resolveFetch?.({ repo: { repoRoot: 'repo-a', repoRuntimeId: 'rta' }, snapshot: null })
+      await Promise.resolve()
+    })
+
+    expect(mocks.hydrateRestoredWorkspaceRuntime).not.toHaveBeenCalled()
   })
 
   test('on failure, emits a toast and does not hydrate', async () => {

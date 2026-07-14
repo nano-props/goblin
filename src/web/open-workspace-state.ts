@@ -12,6 +12,9 @@ import {
  *  depend on the full store types. */
 interface OpenWorkspaceRepoLike {
   id: string
+  session?: {
+    entry: RepoSessionEntry | null
+  }
   remote: {
     lifecycle: RemoteRepoConnectionLifecycle | null
   }
@@ -24,6 +27,7 @@ export function persistedOpenWorkspaceEntries(
   return order.flatMap<RepoSessionEntry>((id) => {
     const repo = repos[id]
     if (!repo) return []
+    if (repo.session?.entry) return [repo.session.entry]
     if (!isRemoteRepoId(repo.id)) return [{ kind: 'local', id: repo.id }]
     // For remote repos, reconstruct the session entry from the
     // last-known target (lifecycle.target). A failed lifecycle

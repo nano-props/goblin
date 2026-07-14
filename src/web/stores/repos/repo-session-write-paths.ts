@@ -30,13 +30,11 @@ import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { runRemoteRepoConnection } from '#/web/stores/repos/remote-repo-connection-command.ts'
 import { acceptRemoteLifecycleSnapshot } from '#/web/stores/repos/remote-lifecycle-projection.ts'
 import { emptyRepoOperations } from '#/web/stores/repos/operations.ts'
-import {
-  markRemoteLifecycleFailed,
-  markRemoteLifecycleReady,
-} from '#/web/stores/repos/availability.ts'
+import { markRemoteLifecycleFailed, markRemoteLifecycleReady } from '#/web/stores/repos/availability.ts'
 import type {
   OpenRepoPostOpenError,
   OpenRepoResult,
+  RepoSessionProjectionState,
   ReposGet,
   ReposSet,
   RepoState,
@@ -58,6 +56,10 @@ interface ResolvedRepo {
   id: string
   name: string
   target?: RemoteRepoTarget
+  session?: {
+    entry: RepoSessionEntry
+    projectionState: RepoSessionProjectionState
+  }
 }
 
 interface ProbeResult {
@@ -248,10 +250,12 @@ async function reconcileOpenRepoRuntimeMembershipsNow(
 async function reconcileCapturedRepoRuntimeMemberships(
   set: ReposSet,
   get: ReposGet,
-): Promise<SettledRepoRuntimeMembershipRecovery & {
-  declaredRepoRoots: string[]
-  remoteEnsureTargets: Array<{ repoRoot: string; repoRuntimeId: string }>
-}> {
+): Promise<
+  SettledRepoRuntimeMembershipRecovery & {
+    declaredRepoRoots: string[]
+    remoteEnsureTargets: Array<{ repoRoot: string; repoRuntimeId: string }>
+  }
+> {
   const captured = Object.values(get().repos).map((repo) => ({
     repoRoot: repo.id,
     repoRuntimeId: repo.repoRuntimeId,
@@ -459,6 +463,29 @@ function remoteTargetsEqual(a: RemoteRepoTarget | undefined | null, b: RemoteRep
   )
 }
 
+function sessionEntryForResolvedRepo(resolvedRepo: ResolvedRepo): RepoSessionEntry {
+  return (
+    resolvedRepo.session?.entry ??
+    (resolvedRepo.target ? remoteRepoSessionEntry(resolvedRepo.target) : localRepoSessionEntry(resolvedRepo.id))
+  )
+}
+
+function sessionProjectionStateForResolvedRepo(resolvedRepo: ResolvedRepo): RepoSessionProjectionState {
+  return resolvedRepo.session?.projectionState ?? 'projected'
+}
+
+function sameSessionEntry(a: RepoSessionEntry | null, b: RepoSessionEntry): boolean {
+  if (!a) return false
+  if (a.kind !== b.kind || a.id !== b.id) return false
+  if (a.kind === 'local' || b.kind === 'local') return true
+  return (
+    a.ref.alias === b.ref.alias &&
+    a.ref.remotePath === b.ref.remotePath &&
+    a.ref.displayName === b.ref.displayName &&
+    a.ref.id === b.ref.id
+  )
+}
+
 /** Upsert a repo by id, centralising the "if it exists, mutate; if
  *  not, create + insert" pattern shared by addResolvedRepo,
  *  addUnavailableRepo, and insertPlaceholderRepo.
@@ -508,6 +535,10 @@ export function addResolvedRepo(
     rankById,
     create: () => {
       const repo = buildNewRepo(s, resolvedRepo.id, [resolvedRepo.name], repoRuntimeId)
+      repo.session = {
+        entry: sessionEntryForResolvedRepo(resolvedRepo),
+        projectionState: sessionProjectionStateForResolvedRepo(resolvedRepo),
+      }
       // Local resolves carry no target, so `lifecycle` stays null
       // (emptyRepo's default). Remote resolves with a target settle
       // to 'ready'. The `addResolvedRepo` write path is only ever
@@ -519,11 +550,21 @@ export function addResolvedRepo(
     update: (existing) => {
       const runtimeChanged = existing.repoRuntimeId !== repoRuntimeId
       const nameChanged = resolvedRepo.name.length > 0 && existing.name !== resolvedRepo.name
+      const sessionEntry = sessionEntryForResolvedRepo(resolvedRepo)
+      const sessionProjectionState = sessionProjectionStateForResolvedRepo(resolvedRepo)
+      const sessionChanged =
+        existing.session.projectionState !== sessionProjectionState ||
+        !sameSessionEntry(existing.session.entry, sessionEntry)
       if (!resolvedRepo.target) {
-        if (!runtimeChanged) return null
+        if (!runtimeChanged && !nameChanged && !sessionChanged) return null
         return {
           ...existing,
-          repoRuntimeId,
+          repoRuntimeId: runtimeChanged ? repoRuntimeId : existing.repoRuntimeId,
+          name: nameChanged ? resolvedRepo.name : existing.name,
+          session: {
+            entry: sessionEntry,
+            projectionState: sessionProjectionState,
+          },
         }
       }
       const lifecycleReady = existing.remote.lifecycle?.kind === 'ready'
@@ -531,7 +572,7 @@ export function addResolvedRepo(
         remoteRepoConnectionTarget(existing.remote.lifecycle),
         resolvedRepo.target,
       )
-      if (!runtimeChanged && !nameChanged && lifecycleReady && !targetChanged) return null
+      if (!runtimeChanged && !nameChanged && !sessionChanged && lifecycleReady && !targetChanged) return null
       // Promote the existing remote repo from 'connecting' or
       // 'failed' to 'ready' even when the retained target is the
       // same. The converged lifecycle result is authoritative; target
@@ -540,6 +581,10 @@ export function addResolvedRepo(
         ...existing,
         repoRuntimeId: runtimeChanged ? repoRuntimeId : existing.repoRuntimeId,
         name: nameChanged ? resolvedRepo.name : existing.name,
+        session: {
+          entry: sessionEntry,
+          projectionState: sessionProjectionState,
+        },
         remote: { ...existing.remote },
       }
       markRemoteLifecycleReady(next, resolvedRepo.target)
@@ -571,6 +616,10 @@ export function addUnavailableRepo(
     rankById,
     create: () => {
       const repo = buildNewRepo(s, id, [target?.displayName], repoRuntimeId)
+      repo.session = {
+        entry: target ? remoteRepoSessionEntry(target) : repo.session.entry,
+        projectionState: 'projected',
+      }
       // New repo: write the failed lifecycle (with last-known target
       // if the probe got far enough to resolve one).
       markRemoteLifecycleFailed(repo, reason, target)
@@ -589,6 +638,10 @@ export function addUnavailableRepo(
       const next: RepoState = {
         ...existing,
         repoRuntimeId: runtimeChanged ? repoRuntimeId : existing.repoRuntimeId,
+        session: {
+          entry: target ? remoteRepoSessionEntry(target) : existing.session.entry,
+          projectionState: 'projected',
+        },
         remote: { ...existing.remote },
       }
       markRemoteLifecycleFailed(next, reason, retainedTarget)
@@ -624,6 +677,10 @@ export function insertPlaceholderRepo(
     create: () => {
       const fallbackName = entry.kind === 'remote' ? entry.ref.displayName : null
       const repo = buildNewRepo(s, entry.id, [fallbackName], repoRuntimeId)
+      repo.session = {
+        entry,
+        projectionState: 'projected',
+      }
       // Placeholders exist only to occupy the repo switcher slot during a
       // remote-repo lifecycle run. For a local placeholder the
       // lifecycle stays null (local repos don't have one); for a
@@ -636,7 +693,12 @@ export function insertPlaceholderRepo(
       // (dataLoadInitialLoading would hide them).
       const cached = s.repoSnapshotCache[entry.id]
       if (cached && cached.data.branches.length > 0) {
-        repo.dataLoads.repoReadModel = { ...repo.dataLoads.repoReadModel, phase: 'refreshing', error: null, stale: true }
+        repo.dataLoads.repoReadModel = {
+          ...repo.dataLoads.repoReadModel,
+          phase: 'refreshing',
+          error: null,
+          stale: true,
+        }
       }
       return repo
     },
