@@ -60,10 +60,10 @@ If a name fails any step above, rename it before adding more code around it.
 
 Goblin uses three state classes:
 
-| Class            | Meaning                                                               | Typical names                                    |
-| ---------------- | --------------------------------------------------------------------- | ------------------------------------------------ |
-| Local            | State that never needs to converge across windows                     | React state, `*Query`, `open`, `pending`         |
-| Runtime-coherent | State that should converge during the current run and is server-owned | `*Projection`, `*Snapshot`, `Runtime*`           |
+| Class            | Meaning                                                               | Typical names                                                           |
+| ---------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Local            | State that never needs to converge across windows                     | React state, `*Query`, `open`, `pending`                                |
+| Runtime-coherent | State that should converge during the current run and is server-owned | `*Projection`, `*Snapshot`, `Runtime*`                                  |
 | Restorable       | State that survives relaunch without live sync                        | `*Cache`, `Restorable*`, `ClientWorkspaceState`, `ServerWorkspaceState` |
 
 Rules:
@@ -154,8 +154,9 @@ Canonical examples:
 Canonical rules:
 
 - Use `UserSettings` for user-configurable preferences.
-- Use `ServerWorkspaceState` for server-persisted repo/tab restore data.
-- Use `ClientWorkspaceState` for locally persisted window repo membership and UI state.
+- Use `ServerWorkspaceState` for shared open-repo membership/order and durable
+  static pane layout.
+- Use `ClientWorkspaceState` for locally persisted active repo and UI state.
 - Keep `ClientWorkspaceState` and `ServerWorkspaceState` separate during boot and persistence.
 - Use `handle*` for command handlers when the module is handling a command, not just mutating state.
 

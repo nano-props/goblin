@@ -11,7 +11,7 @@ Use these docs for app-level product and architecture decisions:
 - `client-model.md`: client model
 - `testing.md`: testing strategy
 - `realtime.md`: realtime rules
-- `repo-runtime-membership.md`: repo runtime identity and window-local membership ownership
+- `repo-runtime-membership.md`: durable workspace membership, runtime identity, and client lease ownership
 - `g-command.md`: `g` shell command architecture (registry, control vs. data plane, error envelope)
 - `terminology.md`: canonical naming reference for subsystems, components, and state classes
 - `transient-surfaces.md`: transient hover/proximity surfaces and descendant floating-surface pinning

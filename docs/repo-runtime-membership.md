@@ -4,8 +4,8 @@ Use this doc for repo open/close ownership.
 
 ## Decision
 
-Repo runtime identity is server-owned. Repo workspace membership is
-client-window-owned.
+Repo runtime identity and durable workspace membership are server-owned.
+Runtime leases and workspace projections remain client-scoped.
 
 The server owns:
 
@@ -17,22 +17,26 @@ The server owns:
 - presence-backed membership expiry after a client remains disconnected for
   the configured grace period
 
+The server workspace owns:
+
+- the shared open-repo set and picker order persisted in
+  `ServerWorkspaceState.openRepoEntries`
+
 The client window owns:
 
-- which repos are shown in that window
-- repo switcher order
 - active repo
-- restored workspace membership from `ClientWorkspaceState`
+- its projection of the shared workspace
+- the `clientId` runtime leases that keep repo epochs alive
 
 ## Why
 
-Different windows may reasonably show different repositories or focus a
-different active repository. Making repo membership globally server-owned
-would make a close in one window implicitly close the repo in another window,
-which is not the current product model.
+Open-repo membership is a user-level workspace declaration, so it survives
+relaunch and is shared across client surfaces. Active navigation remains local:
+two windows may focus different repos without synchronizing routes.
 
-The server still needs to own runtime identity because repo-scoped terminal
-and mutation paths must fail fast when a client targets a stale runtime.
+This durable membership is distinct from runtime lease membership. Runtime
+leases are scoped by `clientId`; they keep a shared epoch alive and let
+repo-scoped terminal and mutation paths fail fast on stale runtime identities.
 
 ## Data Flow
 
@@ -40,14 +44,16 @@ Open:
 
 1. The client asks the server to open or resolve a repo runtime.
 2. The server returns a canonical `repoRuntimeId`.
-3. The client inserts or updates its window-local repo projection with that
-   runtime id.
+3. The explicit open command commits the repo to the shared durable workspace.
+4. The client inserts or updates its window-local projection only after the
+   required server commits succeed.
 
 Close:
 
-1. The client removes the repo from its window-local projection.
-2. The client releases its `clientId` membership for the matching `repoRuntimeId`.
-3. Other client memberships keep the shared epoch current.
+1. The explicit close command removes the repo from the shared durable workspace.
+2. The client removes the repo from its local projection and releases its
+   `clientId` lease for the matching `repoRuntimeId`.
+3. Other client leases keep the shared epoch current until they converge or expire.
 4. The last release stops the epoch; stale and repeated releases are no-ops.
 5. Server-side repo-runtime close events clean up runtime-scoped terminal
    resources.
@@ -55,7 +61,7 @@ Close:
 Restore:
 
 1. `ServerWorkspaceState.openRepoEntries` is read as the shared boot restore
-   intent for that window.
+   intent.
 2. Restore reopens runtimes through the server before writing any
    repo projection.
 3. The server returns canonical repo entries and runtime identities. Membership
@@ -91,8 +97,10 @@ Realtime recovery:
 
 ## Rules
 
-- Do not create a global server-persisted open-repo list. Membership is scoped
-  by `clientId`; the next-launch declaration is window-local state.
+- Keep durable workspace membership and runtime lease membership separate.
+  `ServerWorkspaceState.openRepoEntries` is user-level restore state;
+  runtime leases are scoped by `clientId`.
+- Only explicit open and close commands may mutate durable workspace membership.
 - Do not let the client mint or validate `repoRuntimeId` locally.
 - Server routes that mutate repo-scoped runtime resources should validate the
   server-owned `repoRuntimeId` when the operation targets runtime state.
@@ -104,9 +112,8 @@ Realtime recovery:
 
 ## React Query Implication
 
-React Query can own server data for a repo after the client window has opened
-that repo, but React Query should not become a global open-repo membership
-owner under the current product model.
+React Query can own server data for a repo after the client window has projected
+that repo, but it must not become an independent workspace-membership authority.
 
 Good candidates for React Query ownership:
 

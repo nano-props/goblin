@@ -14,7 +14,6 @@ import {
   RemotePathSuggestionsInputSchema,
   RemoteTargetSchema,
 } from '#/shared/api-types.ts'
-import { WORKSPACE_PANE_RUNTIME_TAB_TYPES, WORKSPACE_PANE_STATIC_TAB_IDS } from '#/shared/workspace-pane.ts'
 import { NativeHostProjectionSchema } from '#/shared/native-host-projection.ts'
 import { RepoTreePrefixSchema } from '#/shared/repo-tree-schema.ts'
 import { GIT_HASH_RE } from '#/shared/git-types.ts'
@@ -204,16 +203,6 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
 // `#/server/modules/settings-write-paths.ts` — the route layer
 // validates with these, then passes the parsed object directly to the
 // module layer.
-const WorkspacePaneStaticTabEntrySchema = v.variant('type', [
-  v.object({ type: v.literal('status'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.status) }),
-  v.object({ type: v.literal('changes'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.changes) }),
-  v.object({ type: v.literal('history'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.history) }),
-  v.object({ type: v.literal('files'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.files) }),
-])
-const WorkspacePaneRuntimeTabEntrySchema = v.object({
-  type: v.picklist(WORKSPACE_PANE_RUNTIME_TAB_TYPES),
-  runtimeSessionId: v.pipe(v.string(), v.minLength(1)),
-})
 const FiletreeSessionViewStateSchema = v.object({
   selectedKeys: v.array(v.string()),
   expandedKeys: v.array(v.string()),

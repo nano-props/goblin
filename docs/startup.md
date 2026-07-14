@@ -60,14 +60,16 @@ Code that needs the combined state should use `workspaceRestoreStatusFromStore` 
 
 ## Persistence Rules
 
-- Server workspace-tab commands persist canonical `ServerWorkspaceState` directly.
+- Explicit workspace-tab layout commands persist restart-durable static layout
+  in `ServerWorkspaceState`; live runtime tabs remain projection-only.
 - The client persists only `ClientWorkspaceState`: in native `userData` for
   Electron, and in local storage for Web.
 - The server reads the shared `ServerWorkspaceState.openRepoEntries` membership at boot;
   the server returns canonical entries and runtime identities.
 - Do not compose client and server workspace persistence into a whole-session payload.
 - Do not persist client workspace state until `workspaceSessionPersistenceOpenFromStore` is true.
-- High-frequency client state may be debounced; pagehide flush is synchronous and local.
+- High-frequency client state may be debounced; page lifecycle events initiate
+  a final client-local flush.
 
 ## Adding Startup Work
 
@@ -75,7 +77,8 @@ When adding startup behavior, choose one stage and document why it belongs there
 
 - Public, unauthenticated work goes in public bootstrap.
 - Authenticated but non-blocking work can run as an optional task in authenticated bootstrap and must log but not block workspace restore.
-- Work that affects repo membership belongs in `hydrateRepoSession`.
+- Boot membership work belongs in server restore and client workspace hydration;
+  live membership changes belong in explicit open/close commands.
 - Work that affects boot composition must complete before `sessionPersistenceReady` opens.
 - Work that needs hydrated repo data but is not part of restore belongs in workspace shell side effects.
 
