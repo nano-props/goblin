@@ -61,7 +61,7 @@ describe('useRestoreRepoTabsOnView', () => {
     vi.restoreAllMocks()
   })
 
-  test('does nothing when hydratedRouteRepoId is null', async () => {
+  test('does nothing when repoId is null', async () => {
     function Host() {
       useRestoreRepoTabsOnView({ repoId: null })
       return null
