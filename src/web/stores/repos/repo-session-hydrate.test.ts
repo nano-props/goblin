@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { localRepoSessionEntry } from '#/shared/remote-repo.ts'
+import { localRepoSessionEntry, normalizeRemoteTarget, remoteRepoSessionEntry } from '#/shared/remote-repo.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
@@ -16,6 +16,7 @@ import {
   REPO_B,
   resetLifecycleTest,
 } from '#/web/stores/repos/repo-session-test-utils.ts'
+import { acceptRemoteLifecycleProjection } from '#/web/stores/repos/remote-lifecycle-projection.ts'
 
 beforeEach(resetLifecycleTest)
 
@@ -215,5 +216,64 @@ describe('repo session hydration', () => {
     expect(useReposStore.getState().promoteRestoredWorkspaceRepo(result)).toBe(false)
     expect(useReposStore.getState().repos[REPO_A]).toBeUndefined()
     expect(useReposStore.getState().order).toEqual([])
+  })
+
+  test('does not overwrite a newer remote lifecycle while promoting projection state', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'example',
+      host: 'example.test',
+      user: 'developer',
+      port: 22,
+      remotePath: '/repo',
+    })!
+    const entry = remoteRepoSessionEntry(target)
+    const repoRuntimeId = 'repo-runtime-remote'
+    await useReposStore.getState().hydrateRestoredWorkspaceRuntime({
+      repos: [
+        {
+          entry,
+          repoRoot: entry.id,
+          repoRuntimeId,
+          name: 'repo',
+          projection: null,
+        },
+      ],
+      workspacePaneTabs: [],
+      restoredRepoId: entry.id,
+    })
+    expect(
+      acceptRemoteLifecycleProjection(useReposStore.setState, useReposStore.getState, {
+        repoRoot: entry.id,
+        repoRuntimeId,
+        remoteLifecycle: { kind: 'failed', attemptId: 5, reason: 'unreachable', target },
+      }),
+    ).toBe(true)
+
+    expect(
+      useReposStore.getState().promoteRestoredWorkspaceRepo({
+        repo: {
+          entry,
+          repoRoot: entry.id,
+          repoRuntimeId,
+          name: 'repo',
+          target,
+          projection: {
+            snapshot: { branches: [branchSnapshot('main')], current: 'main' },
+            status: [],
+            pullRequests: null,
+            operations: { operations: [], loadedAt: 0 },
+            requested: { branch: null, pullRequestMode: 'full' },
+            loadedAt: 10,
+          },
+        },
+        snapshot: null,
+      }),
+    ).toBe(true)
+
+    expect(useReposStore.getState().repos[entry.id]?.session.projectionState).toBe('projected')
+    expect(useReposStore.getState().repos[entry.id]?.remote).toMatchObject({
+      lifecycleAttemptId: 5,
+      lifecycle: { kind: 'failed', reason: 'unreachable', target },
+    })
   })
 })

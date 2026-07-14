@@ -118,7 +118,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         }
         const { repos } = addResolvedRepo(
           s,
-          resolvedRepoFromRestoredRuntime(restoredRepo),
+          resolvedRepoForStubPromotion(restoredRepo),
           restoredRepo.repoRuntimeId,
         )
         promoted = true
@@ -126,13 +126,6 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       })
       if (!promoted) return false
 
-      void updateRepoRuntimeCache({
-        repoRoot: restoredRepo.repoRoot,
-        repoRuntimeId: restoredRepo.repoRuntimeId,
-        ...(restoredRepo.target
-          ? { remoteLifecycle: { kind: 'ready' as const, attemptId: 0, target: restoredRepo.target } }
-          : {}),
-      })
       seedRepoProjectionQueryData(restoredRepo.repoRoot, restoredRepo.repoRuntimeId, restoredRepo.projection)
       writeWorkspacePaneTabsSnapshotQueryData(
         restoredRepo.repoRoot,
@@ -169,6 +162,17 @@ function resolvedRepoFromRestoredRuntime(restored: RestoredWorkspaceRepoRuntime)
     session: {
       entry: restored.entry,
       projectionState: isProjectedRestoredWorkspaceRepo(restored) ? ('projected' as const) : ('stub' as const),
+    },
+  }
+}
+
+function resolvedRepoForStubPromotion(restored: RepoWorkspaceTabsRestoreResult['repo']) {
+  return {
+    id: restored.repoRoot,
+    name: restored.name,
+    session: {
+      entry: restored.entry,
+      projectionState: 'projected' as const,
     },
   }
 }
