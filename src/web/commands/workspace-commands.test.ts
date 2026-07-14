@@ -3133,7 +3133,7 @@ function navigationWith(
   const navigation: PrimaryWindowNavigationActions = {
     currentRepoBranchWorkspacePaneRoute: observedWorkspacePaneRouteForTarget,
     activateRepo: (repoId) => useReposStore.setState({ restoredRepoId: repoId }),
-    closeRepo: async () => {},
+    closeRepo: async () => ({ ok: true }),
     cycleRepo: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,

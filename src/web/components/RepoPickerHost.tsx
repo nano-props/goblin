@@ -15,6 +15,7 @@ import { repoPickerStoreActionsFromStore } from '#/web/stores/repos/selector-act
 import { latestRepoSyncTime } from '#/web/stores/repos/sync-time.ts'
 import { useMemo } from 'react'
 import { useRepoTerminalBellCounts } from '#/web/components/terminal/terminal-session-store.ts'
+import { toast } from 'sonner'
 
 interface RepoPickerHostProps {
   currentRepoId: string | null
@@ -76,6 +77,11 @@ export function RepoPickerHost({
     })
   }
 
+  async function handleClose(repoId: string) {
+    const result = await navigation.closeRepo(repoId)
+    if (!result.ok) toast.error(t(result.message))
+  }
+
   return (
     <RepoPicker
       repos={summariesWithTerminalBells}
@@ -94,7 +100,7 @@ export function RepoPickerHost({
         unavailable: t('repo-unavailable.title'),
       }}
       onActivate={navigation.activateRepo}
-      onClose={navigation.closeRepo}
+      onClose={(repoId) => void handleClose(repoId)}
       onOpenLocal={handleOpenLocal}
       onOpenRemote={onOpenRemote}
       onClone={onClone}

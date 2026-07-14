@@ -61,6 +61,16 @@ Restore:
 3. The server returns canonical repo entries and runtime identities. Membership
    remains server-owned; the client persists only its local selection and presentation.
 
+Live commands:
+
+1. Each client serializes open and close commands per repo.
+2. A local repo becomes visible only after its runtime and durable workspace
+   membership are both accepted.
+3. A remote repo commits membership before lifecycle probing, so an unavailable
+   remote remains a shared, retryable workspace entry.
+4. Lifecycle completion never writes membership; only explicit open and close
+   commands may change the shared repo set.
+
 Realtime recovery:
 
 1. WebSocket heartbeat and socket counts are the only online-presence

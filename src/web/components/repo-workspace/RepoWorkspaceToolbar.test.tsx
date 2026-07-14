@@ -1460,7 +1460,7 @@ function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): Pri
   seedInitialObservedWorkspacePaneRouteForTest()
   const navigation: PrimaryWindowNavigationActions = {
     activateRepo: () => {},
-    closeRepo: async () => {},
+    closeRepo: async () => ({ ok: true }),
     cycleRepo: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,

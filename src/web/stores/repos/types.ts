@@ -42,6 +42,8 @@ export interface OpenRepoPostOpenError {
 export type OpenRepoResult =
   { ok: true; id: string; postOpenEffects?: Promise<OpenRepoPostOpenError[]> } | { ok: false; message: string }
 
+export type CloseRepoResult = { ok: true } | { ok: false; message: string }
+
 export interface RepoWorktreeState {
   path: string
   branch?: string
@@ -257,7 +259,7 @@ interface RuntimeCoherentRepoProjectionActions {
   /** Ensure a repo belongs to the open workspace set without implying
    *  anything about the current active selection. */
   ensureWorkspaceOpen: (path: string | RepoSessionEntry) => Promise<OpenRepoResult>
-  closeRepo: (id: string) => Promise<void>
+  closeRepo: (id: string) => Promise<CloseRepoResult>
   /**
    * Re-probe a remote repo's lifecycle. The single user-facing
    * entry point for "retry" (and the only path the
