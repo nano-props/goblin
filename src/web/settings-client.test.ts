@@ -176,13 +176,19 @@ describe('settings-client', () => {
   test('posts repo root and runtime id when lazily restoring repo tabs', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     const restored = {
-      status: 'restored' as const,
       repo: {
         entry: { kind: 'local' as const, id: '/tmp/routed-repo' },
         repoRoot: '/tmp/routed-repo',
         repoRuntimeId: 'repo_runtime_test',
         name: 'routed-repo',
-        projection: null,
+        projection: {
+          snapshot: { current: 'main', branches: [] },
+          status: [],
+          pullRequests: null,
+          operations: { operations: [], loadedAt: 0 },
+          requested: { branch: null, pullRequestMode: 'full' as const },
+          loadedAt: 1,
+        },
       },
       snapshot: null,
     }

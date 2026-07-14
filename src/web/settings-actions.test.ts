@@ -54,13 +54,19 @@ const appDataClientMocks = vi.hoisted(() => ({
     runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
   })),
   restoreRepoWorkspaceTabs: vi.fn(async () => ({
-    status: 'restored' as const,
     repo: {
       entry: { kind: 'local' as const, id: '/tmp/repo-a' },
       repoRoot: '/tmp/repo-a',
       repoRuntimeId: 'repo_runtime_test',
       name: 'repo-a',
-      projection: null,
+      projection: {
+        snapshot: { current: 'main', branches: [] },
+        status: [],
+        pullRequests: null,
+        operations: { operations: [], loadedAt: 0 },
+        requested: { branch: null, pullRequestMode: 'full' as const },
+        loadedAt: 1,
+      },
     },
     snapshot: null,
   })),
@@ -129,13 +135,19 @@ describe('settings actions', () => {
     })
     appDataClientMocks.restoreRepoWorkspaceTabs.mockReset()
     appDataClientMocks.restoreRepoWorkspaceTabs.mockResolvedValue({
-      status: 'restored',
       repo: {
         entry: { kind: 'local', id: '/tmp/repo-a' },
         repoRoot: '/tmp/repo-a',
         repoRuntimeId: 'repo_runtime_test',
         name: 'repo-a',
-        projection: null,
+        projection: {
+          snapshot: { current: 'main', branches: [] },
+          status: [],
+          pullRequests: null,
+          operations: { operations: [], loadedAt: 0 },
+          requested: { branch: null, pullRequestMode: 'full' },
+          loadedAt: 1,
+        },
       },
       snapshot: null,
     })
@@ -235,7 +247,6 @@ describe('settings actions', () => {
     await expect(
       restoreRepoTabsOnView('client_test000000000000', '/tmp/repo-a', 'repo_runtime_test'),
     ).resolves.toMatchObject({
-      status: 'restored',
       repo: { repoRoot: '/tmp/repo-a', repoRuntimeId: 'repo_runtime_test' },
       snapshot: null,
     })

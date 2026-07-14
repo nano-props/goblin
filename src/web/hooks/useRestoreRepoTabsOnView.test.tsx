@@ -116,7 +116,6 @@ describe('useRestoreRepoTabsOnView', () => {
       hydrateRestoredWorkspaceRuntime: mocks.hydrateRestoredWorkspaceRuntime,
     }
     mocks.restoreRepoTabsOnView.mockResolvedValue({
-      status: 'restored',
       repo: { repoRoot: '/r/a', repoRuntimeId: 'rta' },
       snapshot: { tabs: [{ key: 'status' }] },
     })
@@ -148,7 +147,6 @@ describe('useRestoreRepoTabsOnView', () => {
       hydrateRestoredWorkspaceRuntime: mocks.hydrateRestoredWorkspaceRuntime,
     }
     mocks.restoreRepoTabsOnView.mockResolvedValue({
-      status: 'restored',
       repo: { repoRoot: '/r/a', repoRuntimeId: 'rta' },
       snapshot: null,
     })
@@ -268,7 +266,7 @@ describe('useRestoreRepoTabsOnView', () => {
     }
     mocks.restoreRepoTabsOnView
       .mockRejectedValueOnce(new Error('Server request failed (BAD_REQUEST: error.repo-runtime-stale)'))
-      .mockResolvedValueOnce({ status: 'restored', repo: { repoRoot: 'repo-stale', repoRuntimeId: 'rt-new' }, snapshot: null })
+      .mockResolvedValueOnce({ repo: { repoRoot: 'repo-stale', repoRuntimeId: 'rt-new' }, snapshot: null })
 
     const host = renderInJsdom(<Host />)
     await waitFor(() => expect(mocks.restoreRepoTabsOnView).toHaveBeenCalledTimes(1))

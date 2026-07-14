@@ -357,15 +357,11 @@ export async function restoreRepoTabsForRepo(
     throw new IpcError({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
   }
 
-  let status: RepoWorkspaceTabsRestoreResult['status'] = 'restored'
   if (
     !validateWorkspacePaneTabs(session, [opened.opened]).ok ||
     !validatePreferredWorkspacePaneTabs(session, [opened.opened]).ok
   ) {
-    await saveCleanLazyRestoreSession(input, session)
-    status = 'rebuilt'
     return {
-      status,
       repo: projectionRepoFromOpened(opened.opened),
       snapshot: null,
     }
@@ -377,18 +373,9 @@ export async function restoreRepoTabsForRepo(
     [opened.opened],
   )
   return {
-    status,
     repo: projectionRepoFromOpened(opened.opened),
     snapshot: snapshots[0]?.snapshot ?? null,
   }
-}
-
-async function saveCleanLazyRestoreSession(input: RestoreRepoTabsInput, session: WorkspaceSessionState): Promise<void> {
-  const saved = await saveRebuiltServerSessionState({
-    persistedSnapshot: session,
-    rebuiltSession: cleanSessionFromEntries(session, session.openRepoEntries),
-  })
-  if (!saved.saved) throw new Error('workspace session restore was superseded while cleaning lazy restore state')
 }
 
 function projectionRepoFromOpened(opened: OpenedProjectedRepoSessionEntry): ProjectedRestoredWorkspaceRepoRuntime {

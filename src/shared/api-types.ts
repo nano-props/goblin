@@ -166,7 +166,6 @@ export interface WorkspaceSessionRestoreResult {
 }
 
 export interface RepoWorkspaceTabsRestoreResult {
-  status: 'restored' | 'rebuilt'
   repo: ProjectedRestoredWorkspaceRepoRuntime
   snapshot: WorkspacePaneTabsSnapshot | null
 }

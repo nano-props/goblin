@@ -755,7 +755,7 @@ describe('restoreRepoTabsForRepo', () => {
     })
   })
 
-  test('cleans invalid deferred tab state instead of silently skipping it', async () => {
+  test('skips invalid deferred tab state without writing the persisted session', async () => {
     const staleTargetKey = workspacePaneTabsTargetIdentityKey({
       repoRoot: '/repo',
       branchName: 'deleted-branch',
@@ -790,20 +790,10 @@ describe('restoreRepoTabsForRepo', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.status).toBe('rebuilt')
     expect(result.snapshot).toBeNull()
     expect(result.repo.projection).not.toBeNull()
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
-    expect(mocks.saveRebuiltServerSessionState).toHaveBeenCalledWith({
-      persistedSnapshot: session,
-      rebuiltSession: {
-        ...defaultWorkspaceSessionState(),
-        openRepoEntries: [{ kind: 'local', id: '/repo' }],
-        restoredRepoId: '/repo',
-        zenMode: true,
-        workspacePaneSize: 41,
-      },
-    })
+    expect(mocks.saveRebuiltServerSessionState).not.toHaveBeenCalled()
   })
 
   test('throws repo-runtime-stale when clientId/repoRuntimeId does not match the active lease', async () => {

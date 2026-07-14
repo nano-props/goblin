@@ -172,7 +172,6 @@ describe('settings routes', () => {
 
   test('delegates lazy repo tab restore to the server restore coordinator', async () => {
     const restored = {
-      status: 'restored' as const,
       repo: {
         entry: { kind: 'local' as const, id: '/repo-active' },
         repoRoot: '/repo-active',
