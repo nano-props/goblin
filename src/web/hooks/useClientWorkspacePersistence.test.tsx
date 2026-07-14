@@ -190,6 +190,27 @@ describe('useClientWorkspacePersistence', () => {
       }),
     )
   })
+
+  test('consumes background persistence failures', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: '/tmp/repo',
+      branches: [createRepoBranch('feature/a', { worktree: { path: '/tmp/a' } })],
+      currentBranchName: 'feature/a',
+    })
+    useReposStore.setState({
+      repos: { [repo.id]: repo },
+      order: [repo.id],
+      restoredRepoId: repo.id,
+      workspaceMembershipReady: true,
+      sessionPersistenceReady: true,
+    })
+    writePresentationMock.mockRejectedValueOnce(new Error('native write failed'))
+
+    renderInJsdom(<Harness routedRepoId={repo.id} />)
+    await Promise.resolve()
+
+    expect(writePresentationMock).toHaveBeenCalledOnce()
+  })
 })
 
 function Harness({ routedRepoId = null }: { routedRepoId?: string | null }) {

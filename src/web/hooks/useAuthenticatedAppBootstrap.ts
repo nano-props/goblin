@@ -123,7 +123,9 @@ async function restoreBootSession(
       }),
       signal,
     )
-    if (restored.status === 'rebuilt') bootstrapLog.warn('invalid persisted session rebuilt by server')
+    if (restored.status === 'repaired') {
+      bootstrapLog.warn('workspace restore dropped invalid or unavailable state')
+    }
     const session = composeRestoredWorkspaceSession(
       restored.openRepoEntries,
       restored.workspace,
@@ -233,7 +235,7 @@ async function runOptionalBootstrapTask(label: string, task: () => Promise<void>
  * Prime external-apps query cache from the authenticated endpoint so settings
  * pages render with persisted values on first paint instead of flashing the
  * defaults. Settings snapshot cache is populated by restoreBootSession, which
- * also owns server-rebuilt session reconciliation.
+ * also owns server-repaired session reconciliation.
  */
 async function primeExternalAppsQueryCache(signal: AbortSignal): Promise<void> {
   try {

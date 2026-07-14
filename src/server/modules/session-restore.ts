@@ -42,7 +42,7 @@ export interface RestoreServerWorkspaceInput {
 }
 
 export interface RestoredServerWorkspace {
-  status: 'restored' | 'rebuilt'
+  status: 'restored' | 'repaired'
   openRepoEntries: RepoSessionEntry[]
   workspace: ServerWorkspaceState
   runtime: WorkspaceRuntimeRestoreSnapshot
@@ -151,7 +151,7 @@ async function restoreServerWorkspaceSnapshot(
       if (saved.saved) {
         openedMembershipsCommitted = true
         return {
-          status: 'rebuilt',
+          status: 'repaired',
           openRepoEntries: opened.map((repo) => repo.entry),
           workspace: saved.workspace,
           runtime: runtimeSnapshotFromOpened(opened, activeRepoRootForOpened(input.activeRepoRoot, opened), []),
@@ -172,7 +172,7 @@ async function restoreServerWorkspaceSnapshot(
     input.signal?.throwIfAborted()
     openedMembershipsCommitted = true
     return {
-      status: repoRestoreFailed ? 'rebuilt' : 'restored',
+      status: repoRestoreFailed ? 'repaired' : 'restored',
       openRepoEntries: opened.map((repo) => repo.entry),
       workspace: source.workspace,
       runtime: runtimeSnapshotFromOpened(

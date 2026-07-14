@@ -12,10 +12,12 @@ import { invokeNativeIpcPath } from '#/web/native-host-client.ts'
 const CLIENT_WORKSPACE_STORAGE_KEY = 'goblin.workspace'
 
 export async function readClientWorkspaceState(): Promise<ClientWorkspaceState> {
+  if (readNativeBridge()) {
+    // A native read failure must block boot persistence. Returning an empty
+    // workspace here would allow a transient IPC error to overwrite good data.
+    return normalizeClientWorkspaceState(await invokeNativeIpcPath('clientWorkspace.read', undefined))
+  }
   try {
-    if (readNativeBridge()) {
-      return normalizeClientWorkspaceState(await invokeNativeIpcPath('clientWorkspace.read', undefined))
-    }
     const raw = globalThis.localStorage?.getItem(CLIENT_WORKSPACE_STORAGE_KEY)
     return normalizeClientWorkspaceState(raw ? JSON.parse(raw) : null)
   } catch (err) {

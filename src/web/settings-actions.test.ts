@@ -200,7 +200,7 @@ describe('settings actions', () => {
       workspacePaneSize: 333,
     }
     appDataClientMocks.restoreServerWorkspace.mockResolvedValue({
-      status: 'rebuilt',
+      status: 'repaired',
       openRepoEntries: session.openRepoEntries,
       workspace: {
         workspacePaneTabsByTargetByRepo: session.workspacePaneTabsByTargetByRepo,
@@ -212,7 +212,7 @@ describe('settings actions', () => {
     const result = await restoreWorkspaceAtBoot('client_test000000000000', session.openRepoEntries)
 
     expect(result).toEqual({
-      status: 'rebuilt',
+      status: 'repaired',
       openRepoEntries: session.openRepoEntries,
       workspace: {
         workspacePaneTabsByTargetByRepo: session.workspacePaneTabsByTargetByRepo,

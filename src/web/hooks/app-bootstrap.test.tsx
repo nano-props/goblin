@@ -226,7 +226,7 @@ describe('app bootstrap hooks', () => {
     expect(hydrateRestoredRuntime).not.toHaveBeenCalled()
   })
 
-  test('continues with a clean rebuilt session returned by server restore', async () => {
+  test('continues with a repaired session returned by server restore', async () => {
     const persistedSession = {
       openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
       restoredRepoId: '/tmp/repo',
@@ -248,7 +248,7 @@ describe('app bootstrap hooks', () => {
     }
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
     mockedRestorePersistedWorkspaceSession.mockResolvedValue({
-      status: 'rebuilt',
+      status: 'repaired',
       openRepoEntries: rebuiltSession.openRepoEntries,
       workspace: {
         workspacePaneTabsByTargetByRepo: rebuiltSession.workspacePaneTabsByTargetByRepo,

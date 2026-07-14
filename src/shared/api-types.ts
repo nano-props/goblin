@@ -164,7 +164,7 @@ export interface WorkspaceRuntimeRestoreSnapshot {
 }
 
 export interface WorkspaceRestoreResult {
-  status: 'restored' | 'rebuilt'
+  status: 'restored' | 'repaired'
   openRepoEntries: RepoSessionEntry[]
   workspace: ServerWorkspaceState
   runtime: WorkspaceRuntimeRestoreSnapshot

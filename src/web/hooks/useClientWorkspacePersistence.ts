@@ -85,6 +85,10 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
     lastSavedRef.current = serialized
   })
 
+  const flushClientWorkspaceInBackground = useEffectEvent(() => {
+    void flushLatestClientWorkspace().catch(() => {})
+  })
+
   useLayoutEffect(() => {
     if (routedRepoId) lastRoutedRepoIdRef.current = routedRepoId
   }, [routedRepoId])
@@ -108,14 +112,11 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
     const immediate = immediateKey !== lastImmediateKeyRef.current
     lastImmediateKeyRef.current = immediateKey
     if (immediate) {
-      void flushLatestClientWorkspace()
+      flushClientWorkspaceInBackground()
       return
     }
     if (debounceTimerRef.current !== null) window.clearTimeout(debounceTimerRef.current)
-    debounceTimerRef.current = window.setTimeout(
-      () => void flushLatestClientWorkspace(),
-      CLIENT_WORKSPACE_SAVE_DEBOUNCE_MS,
-    )
+    debounceTimerRef.current = window.setTimeout(flushClientWorkspaceInBackground, CLIENT_WORKSPACE_SAVE_DEBOUNCE_MS)
     return () => {
       if (debounceTimerRef.current !== null) {
         window.clearTimeout(debounceTimerRef.current)
@@ -140,14 +141,14 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
 
   useEffect(() => {
     const flushWhenHidden = () => {
-      if (document.visibilityState === 'hidden') void flushLatestClientWorkspace()
+      if (document.visibilityState === 'hidden') flushClientWorkspaceInBackground()
     }
-    window.addEventListener('pagehide', flushLatestClientWorkspace)
-    window.addEventListener('beforeunload', flushLatestClientWorkspace)
+    window.addEventListener('pagehide', flushClientWorkspaceInBackground)
+    window.addEventListener('beforeunload', flushClientWorkspaceInBackground)
     document.addEventListener('visibilitychange', flushWhenHidden)
     return () => {
-      window.removeEventListener('pagehide', flushLatestClientWorkspace)
-      window.removeEventListener('beforeunload', flushLatestClientWorkspace)
+      window.removeEventListener('pagehide', flushClientWorkspaceInBackground)
+      window.removeEventListener('beforeunload', flushClientWorkspaceInBackground)
       document.removeEventListener('visibilitychange', flushWhenHidden)
     }
   }, [])

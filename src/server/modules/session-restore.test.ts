@@ -142,7 +142,7 @@ describe('restoreServerWorkspace', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.status).toBe('rebuilt')
+    expect(result.status).toBe('repaired')
     expect(result.workspace).toEqual(defaultServerWorkspaceState())
     expect(result.openRepoEntries).toEqual([])
     expect(result.runtime.repos).toEqual([])
@@ -217,7 +217,7 @@ describe('restoreServerWorkspace', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.status).toBe('rebuilt')
+    expect(result.status).toBe('repaired')
     expect(result.workspace).toEqual(defaultServerWorkspaceState())
     expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
       repoRoot: '/repo',
@@ -256,7 +256,7 @@ describe('restoreServerWorkspace', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.status).toBe('rebuilt')
+    expect(result.status).toBe('repaired')
     expect(result.workspace).toEqual(defaultServerWorkspaceState())
     expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
       repoRoot: remoteEntry.id,
@@ -623,7 +623,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.status).toBe('rebuilt')
+    expect(result.status).toBe('repaired')
     expect(result.workspace).toEqual(defaultServerWorkspaceState())
     expect(result.openRepoEntries).toEqual([{ kind: 'local', id: '/repo-active' }])
     expect(result.runtime.repos).toHaveLength(1)
