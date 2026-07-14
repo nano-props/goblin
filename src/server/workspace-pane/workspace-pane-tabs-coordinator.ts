@@ -1,7 +1,15 @@
 import PQueue from 'p-queue'
-import type { WorkspacePaneRuntimeTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import type {
+  WorkspacePaneRuntimeTabType,
+  WorkspacePaneStaticTabEntry,
+  WorkspacePaneTabEntry,
+} from '#/shared/workspace-pane.ts'
 import { isWorkspacePaneStaticTabType, workspacePaneTabsWithRuntimeTab } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabsSnapshot, WorkspacePaneTabsUpdateOperation } from '#/shared/workspace-pane-tabs.ts'
+import type {
+  WorkspacePaneDurableLayout,
+  WorkspacePaneTabsSnapshot,
+  WorkspacePaneTabsUpdateOperation,
+} from '#/shared/workspace-pane-tabs.ts'
 import { workspacePaneTabsUserScopeQueueKey } from '#/server/workspace-pane/workspace-pane-tabs-user-queue-key.ts'
 import type {
   WorkspacePaneTabsRuntime,
@@ -88,7 +96,7 @@ interface WorkspacePaneTabsCoordinatorOptions {
   workspaceTabs: WorkspacePaneTabsCoordinatorRuntime
   worktreeOperations: PhysicalWorktreeOperationCoordinator
   physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
-  persistLayout: (repoRoot: string, snapshot: WorkspacePaneTabsSnapshot) => Promise<unknown>
+  persistLayout: (repoRoot: string, layout: WorkspacePaneDurableLayout) => Promise<unknown>
 }
 
 export class WorkspacePaneTabsCoordinator {
@@ -96,7 +104,7 @@ export class WorkspacePaneTabsCoordinator {
   private readonly workspaceTabs: WorkspacePaneTabsCoordinatorRuntime
   private readonly worktreeOperations: PhysicalWorktreeOperationCoordinator
   private readonly physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
-  private readonly persistLayout: (repoRoot: string, snapshot: WorkspacePaneTabsSnapshot) => Promise<unknown>
+  private readonly persistLayout: (repoRoot: string, layout: WorkspacePaneDurableLayout) => Promise<unknown>
   private readonly operationQueuesByScope = new Map<string, PQueue>()
   private readonly canonicalRevisionByScope = new Map<string, CanonicalWorkspaceTabsRevisionState>()
 
@@ -508,12 +516,11 @@ export class WorkspacePaneTabsCoordinator {
       tabs: [...replacement.tabs],
     })
     await this.persistLayout(repoRoot, {
-      revision: 0,
       entries: entries.map((entry) => ({
         repoRoot,
         branchName: entry.branchName,
         worktreePath: entry.worktreePath,
-        tabs: entry.tabs.filter((tab) => isWorkspacePaneStaticTabType(tab.type)),
+        tabs: entry.tabs.filter((tab): tab is WorkspacePaneStaticTabEntry => isWorkspacePaneStaticTabType(tab.type)),
       })),
     })
   }

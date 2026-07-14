@@ -110,7 +110,6 @@ describe('workspace pane tabs coordinator', () => {
     })
 
     expect(persistLayout).toHaveBeenCalledWith(REPO_ROOT, {
-      revision: 0,
       entries: [
         {
           repoRoot: REPO_ROOT,

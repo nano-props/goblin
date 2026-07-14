@@ -23,6 +23,8 @@ import {
   workspaceExternalAppRecentKey,
 } from '#/shared/repo-settings.ts'
 import {
+  isWorkspacePaneRuntimeTabEntry,
+  type WorkspacePaneStaticTabEntry,
   type WorkspacePaneTabEntry,
   workspacePaneTabEntryFromUnknown,
   workspacePaneTabEntryIdentity,
@@ -33,7 +35,7 @@ import {
   workspacePaneTabsTargetIdentityKey,
   type WorkspacePaneTabsTargetIdentity,
 } from '#/shared/workspace-pane-tabs-target.ts'
-import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
 import { normalizeGlobalShortcut } from '#/shared/accelerator.ts'
 import { isColorTheme, type ColorTheme } from '#/shared/color-theme.ts'
 import {
@@ -130,21 +132,21 @@ function defaultWorkspace(): ServerWorkspaceState {
 
 function normalizeWorkspacePaneTabsByTargetByRepo(
   value: unknown,
-): Record<string, Record<string, WorkspacePaneTabEntry[]>> {
+): Record<string, Record<string, WorkspacePaneStaticTabEntry[]>> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-  const normalized: Record<string, Record<string, WorkspacePaneTabEntry[]>> = {}
+  const normalized: Record<string, Record<string, WorkspacePaneStaticTabEntry[]>> = {}
   for (const [repoId, rawByTarget] of Object.entries(value)) {
     const safeRepoId = toSafeRepoLocator(repoId)
     if (!safeRepoId || !rawByTarget || typeof rawByTarget !== 'object' || Array.isArray(rawByTarget)) continue
-    const byTarget: Record<string, WorkspacePaneTabEntry[]> = {}
+    const byTarget: Record<string, WorkspacePaneStaticTabEntry[]> = {}
     for (const [targetKey, rawTabs] of Object.entries(rawByTarget)) {
       const target = safeWorkspacePaneTabsTargetIdentity(safeRepoId, targetKey)
       if (!target || !Array.isArray(rawTabs)) continue
-      const tabs: WorkspacePaneTabEntry[] = []
+      const tabs: WorkspacePaneStaticTabEntry[] = []
       const seen = new Set<string>()
       for (const raw of rawTabs) {
         const entry = workspacePaneTabEntryFromUnknown(raw)
-        if (!entry) continue
+        if (!entry || isWorkspacePaneRuntimeTabEntry(entry)) continue
         if (target.kind === 'branch' && workspacePaneTabRequiresWorktree(entry.type)) continue
         const identity = workspacePaneTabEntryIdentity(entry)
         if (seen.has(identity)) continue
@@ -546,13 +548,13 @@ function sameServerWorkspaceTabsForRepo(
   return JSON.stringify(normalize(a)) === JSON.stringify(normalize(b))
 }
 
-export async function recordServerWorkspaceTabs(
+export async function recordServerWorkspacePaneLayout(
   repoRoot: string,
-  snapshot: WorkspacePaneTabsSnapshot,
+  layout: WorkspacePaneDurableLayout,
 ): Promise<ServerWorkspaceState> {
   return await mutateUserSettings(async (data) => {
     const byTarget = Object.fromEntries(
-      snapshot.entries.map((entry) => [workspacePaneTabsTargetIdentityKey(entry), entry.tabs]),
+      layout.entries.map((entry) => [workspacePaneTabsTargetIdentityKey(entry), entry.tabs]),
     )
     const workspace = normalizeWorkspace({
       ...data.workspace,

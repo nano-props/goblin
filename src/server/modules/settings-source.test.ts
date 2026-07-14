@@ -68,8 +68,7 @@ test('persists updates and notifies subscribers from the server settings store',
     globalShortcut: 'CommandOrControl+Alt+G',
     lanEnabled: false,
   })
-  await mod.recordServerWorkspaceTabs('/repo-b', {
-    revision: 1,
+  await mod.recordServerWorkspacePaneLayout('/repo-b', {
     entries: [{ repoRoot: '/repo-b', branchName: 'main', worktreePath: null, tabs: [] }],
   })
   await mod.addServerRecentRepo({ kind: 'local', id: '/repo-b' })
@@ -186,13 +185,12 @@ test('repairs open repos only when the source membership is unchanged', async ()
   })
 })
 
-test('persists canonical tabs independently of runtime membership', async () => {
+test('persists durable tabs independently of runtime membership', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
   const mod = await import('#/server/modules/settings-source.ts')
-  await mod.recordServerWorkspaceTabs('/repo-a', {
-    revision: 3,
+  await mod.recordServerWorkspacePaneLayout('/repo-a', {
     entries: [
       {
         repoRoot: '/repo-a',
@@ -225,12 +223,10 @@ test('clears unchanged repo tabs without affecting another repo', async () => {
   const mod = await import('#/server/modules/settings-source.ts')
   const repoATabs = [workspacePaneStaticTabEntry('history')]
   const repoBTabs = [workspacePaneStaticTabEntry('status')]
-  await mod.recordServerWorkspaceTabs('/repo-a', {
-    revision: 1,
+  await mod.recordServerWorkspacePaneLayout('/repo-a', {
     entries: [{ repoRoot: '/repo-a', branchName: 'main', worktreePath: null, tabs: repoATabs }],
   })
-  await mod.recordServerWorkspaceTabs('/repo-b', {
-    revision: 1,
+  await mod.recordServerWorkspacePaneLayout('/repo-b', {
     entries: [{ repoRoot: '/repo-b', branchName: 'main', worktreePath: null, tabs: repoBTabs }],
   })
 
@@ -255,8 +251,7 @@ test('does not clear repo tabs after that repo changed', async () => {
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
   const mod = await import('#/server/modules/settings-source.ts')
   const currentTabs = [workspacePaneStaticTabEntry('history')]
-  await mod.recordServerWorkspaceTabs('/repo-a', {
-    revision: 2,
+  await mod.recordServerWorkspacePaneLayout('/repo-a', {
     entries: [{ repoRoot: '/repo-a', branchName: 'main', worktreePath: null, tabs: currentTabs }],
   })
 
@@ -369,8 +364,7 @@ test('normalizes workspace pane tab list in server sessions', async () => {
   const worktreeTargetKeyValue = worktreeTargetKey('/repo-b', 'feature/worktree', '/tmp/repo-b-worktree')
   const emptyTargetKey = branchTargetKey('/repo-b', 'empty')
   const invalidTargetKey = branchTargetKey('/repo-b', 'invalid')
-  await mod.recordServerWorkspaceTabs('/repo-b', {
-    revision: 1,
+  await mod.recordServerWorkspacePaneLayout('/repo-b', {
     entries: [
       {
         repoRoot: '/repo-b',
@@ -378,7 +372,6 @@ test('normalizes workspace pane tab list in server sessions', async () => {
         worktreePath: null,
         tabs: [
           workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
           workspacePaneStaticTabEntry('history'),
           workspacePaneStaticTabEntry('status'),
           workspacePaneStaticTabEntry('changes'),
@@ -390,7 +383,6 @@ test('normalizes workspace pane tab list in server sessions', async () => {
         worktreePath: '/tmp/repo-b-worktree',
         tabs: [
           workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
           workspacePaneStaticTabEntry('changes'),
         ],
       },
@@ -408,11 +400,7 @@ test('normalizes workspace pane tab list in server sessions', async () => {
     workspacePaneTabsByTargetByRepo: {
       '/repo-b': {
         [mainTargetKey]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
-        [worktreeTargetKeyValue]: [
-          workspacePaneStaticTabEntry('status'),
-          { type: 'terminal', runtimeSessionId: 'term-111111111111111111111' },
-          workspacePaneStaticTabEntry('changes'),
-        ],
+        [worktreeTargetKeyValue]: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('changes')],
         [emptyTargetKey]: [],
         [invalidTargetKey]: [],
       },

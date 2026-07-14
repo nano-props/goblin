@@ -29,7 +29,7 @@ import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-re
 import { createWorkspacePaneRuntimeRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-runtime-realtime.ts'
 import type { ServerWorkspacePaneRuntimeHost } from '#/server/workspace-pane/workspace-pane-runtime-host.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
-import { recordServerWorkspaceTabs } from '#/server/modules/settings-source.ts'
+import { recordServerWorkspacePaneLayout } from '#/server/modules/settings-source.ts'
 import { isValidTerminalClientId, isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import {
   TerminalSessionManager,
@@ -126,7 +126,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     runtimeProviders: [terminalWorkspacePaneRuntimeTabsProvider(manager)],
     worktreeOperations,
     physicalWorktrees,
-    persistLayout: recordServerWorkspaceTabs,
+    persistLayout: recordServerWorkspacePaneLayout,
   })
   const coordinator = createTerminalRuntimeCoordinator({
     manager,

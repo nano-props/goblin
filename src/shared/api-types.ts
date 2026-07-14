@@ -14,7 +14,7 @@ import type {
   RepoUrlTarget,
   WorktreeStatus,
 } from '#/shared/git-types.ts'
-import type { WorkspacePaneSessionTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneSessionTabType, WorkspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type {
@@ -82,8 +82,8 @@ export interface ThemeState {
 export interface ServerWorkspaceState {
   /** User-level repository membership, in picker order. */
   openRepoEntries: RepoSessionEntry[]
-  /** Per-repo, per-target canonical workspace pane tab membership. */
-  workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>
+  /** Per-repo, per-target workspace pane layout that survives a server restart. */
+  workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneStaticTabEntry[]>>
 }
 
 export interface ClientWorkspaceState {

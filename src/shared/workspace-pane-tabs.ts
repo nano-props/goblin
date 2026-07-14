@@ -1,4 +1,8 @@
-import type { WorkspacePaneStaticTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import type {
+  WorkspacePaneStaticTabEntry,
+  WorkspacePaneStaticTabType,
+  WorkspacePaneTabEntry,
+} from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 
 export const WORKSPACE_PANE_TABS_SOCKET_ACTIONS = {
@@ -56,6 +60,15 @@ export interface WorkspacePaneTabsUpdateInput extends WorkspacePaneTabsTarget, W
 
 export interface WorkspacePaneTabsEntry extends WorkspacePaneTabsTarget {
   tabs: WorkspacePaneTabEntry[]
+}
+
+export interface WorkspacePaneDurableLayoutEntry extends WorkspacePaneTabsTarget {
+  tabs: WorkspacePaneStaticTabEntry[]
+}
+
+/** Restart-durable layout intent. Live runtime sessions are projection-only. */
+export interface WorkspacePaneDurableLayout {
+  entries: WorkspacePaneDurableLayoutEntry[]
 }
 
 /**
