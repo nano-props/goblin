@@ -72,6 +72,7 @@ const RULES: Rule[] = [
         'clearRecentRepos',
         'refreshExternalAppsSnapshot',
         'refreshGitHubCliState',
+        'restoreRepoWorkspaceTabs',
         'restoreWorkspaceSession',
         'saveSession',
         'setGlobalShortcut',

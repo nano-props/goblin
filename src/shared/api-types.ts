@@ -131,7 +131,11 @@ export interface RestoredWorkspaceRepoRuntime {
   repoRuntimeId: string
   name: string
   target?: RemoteRepoTarget
-  projection: RepoRuntimeProjection
+  // `null` means the repo is a stub lease only — no git probe, no projection
+  // read happened at restore time. Non-active repos carry `null` so cold
+  // start avoids per-repo git I/O. The projection is filled in lazily when
+  // the user navigates to the repo via `useRestoreRepoTabsOnView`.
+  projection: RepoRuntimeProjection | null
 }
 
 export interface WorkspaceRuntimeRestoreSnapshot {

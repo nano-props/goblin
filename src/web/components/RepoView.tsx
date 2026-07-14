@@ -11,6 +11,7 @@ import {
 } from '#/web/components/Skeleton.tsx'
 import { RepoWorkspacePane } from '#/web/components/Layout.tsx'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
+import { useRestoreRepoTabsOnView } from '#/web/hooks/useRestoreRepoTabsOnView.ts'
 import { getRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import { UnavailableRepoView } from '#/web/components/UnavailableRepoView.tsx'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
@@ -75,6 +76,7 @@ export function RepoView({
   const setWorkspacePaneSize = useReposStore((s) => s.setWorkspacePaneSize)
   const repo = useReposStore((s) => s.repos[repoId])
   useRepoToasts(repoId)
+  useRestoreRepoTabsOnView({ hydratedRouteRepoId: repo ? repoId : null })
 
   const routeBranchName = routeView?.kind === 'branch' ? routeView.branchName : null
 

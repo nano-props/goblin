@@ -14,6 +14,7 @@ import {
   clearRecentRepos,
   refreshExternalAppsSnapshot,
   refreshGitHubCliState,
+  restoreRepoWorkspaceTabs,
   restoreWorkspaceSession,
   saveSession,
   setGlobalShortcut as setSettingsGlobalShortcut,
@@ -64,6 +65,21 @@ export async function restorePersistedWorkspaceSession(
   const restored = await restoreWorkspaceSession(clientId, options)
   updateRestorableWorkspaceSessionStateCache(primaryWindowQueryClient, restored.session)
   return restored
+}
+
+/**
+ * Lazy per-repo restore: probes + projects + restores pane tabs for a single
+ * repo on demand. Triggered by `useRestoreRepoTabsOnView` when the user
+ * navigates to a repo that was hydrated as a stub at cold start. Returns the
+ * server result so the caller can feed it to the repo store hydration sink.
+ */
+export async function restoreRepoTabsOnView(
+  clientId: string,
+  repoRoot: string,
+  repoRuntimeId: string,
+  options?: { signal?: AbortSignal },
+) {
+  return await restoreRepoWorkspaceTabs(clientId, repoRoot, repoRuntimeId, options)
 }
 
 export function persistWorkspaceSessionStateOnUnload(session: WorkspaceSessionState): void {

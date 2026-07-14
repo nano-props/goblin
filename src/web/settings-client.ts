@@ -9,6 +9,7 @@ import type {
   LangPref,
   LanInfo,
   RepoSettingsState,
+  RestoredWorkspaceRepoRuntime,
   RuntimeRecentReposState,
   WorkspaceSessionState,
   WorkspaceSessionRestoreResult,
@@ -24,9 +25,10 @@ import {
   pickNativeSettingsProjectionPatch,
 } from '#/shared/native-host-projection.ts'
 import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
+import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
+import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 
 type RecentReposUpdateResponse = { ok: boolean; addedRepo?: RepoSessionEntry | null } & RuntimeRecentReposState
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 
 export async function getSettingsSnapshot(options?: { signal?: AbortSignal }): Promise<SettingsSnapshot> {
   return await fetchServerJson<SettingsSnapshot>('/api/settings', { signal: options?.signal })
@@ -166,6 +168,24 @@ export async function restoreWorkspaceSession(
   options?: { signal?: AbortSignal },
 ): Promise<WorkspaceSessionRestoreResult> {
   return await postServerJson('/api/settings/session/restore', { clientId }, { signal: options?.signal })
+}
+
+export interface RepoWorkspaceTabsRestore {
+  repo: RestoredWorkspaceRepoRuntime
+  snapshot: WorkspacePaneTabsSnapshot | null
+}
+
+export async function restoreRepoWorkspaceTabs(
+  clientId: string,
+  repoRoot: string,
+  repoRuntimeId: string,
+  options?: { signal?: AbortSignal },
+): Promise<RepoWorkspaceTabsRestore> {
+  return await postServerJson(
+    '/api/settings/session/restore-repo-tabs',
+    { clientId, repoRoot, repoRuntimeId },
+    { signal: options?.signal },
+  )
 }
 
 export async function setSettingsFetchInterval(sec: number): Promise<number> {

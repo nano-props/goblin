@@ -46,7 +46,13 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         set((s) => {
           const { repos, order } = addResolvedRepo(s, resolvedRepoFromRestoredRuntime(restoredRepo), restoredRepo.repoRuntimeId, rankById)
           const repo = repos[restoredRepo.repoRoot]
-          if (repo) initialRefreshes.push({ id: repo.id, repoRuntimeId: repo.repoRuntimeId })
+          // Stub leases (projection: null) skip the post-hydration projection
+          // refresh — that's the entire point of the active-only restore. The
+          // lazy `useRestoreRepoTabsOnView` hook fires the first refresh when
+          // the user navigates to a stub repo.
+          if (repo && restoredRepo.projection !== null) {
+            initialRefreshes.push({ id: repo.id, repoRuntimeId: repo.repoRuntimeId })
+          }
           const nextRestoredRepoId = restoredRepoIdAfterWorkspaceHydration(
             s.restoredRepoId,
             repos,

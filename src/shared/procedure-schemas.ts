@@ -258,6 +258,13 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
   }),
   githubCli: GITHUB_CLI_REFRESH_SCHEMA,
   sessionRestore: v.object({ clientId: ClientIdSchema }),
+  // Lazy per-repo restore endpoint — fires when the user navigates to a
+  // non-active repo that was hydrated as a stub at cold start.
+  restoreRepoTabs: v.object({
+    clientId: ClientIdSchema,
+    repoRoot: RepoRootSchema,
+    repoRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
+  }),
 } as const
 
 // `prefs` accepts a permissive patch — the underlying

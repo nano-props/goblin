@@ -7,6 +7,7 @@ import type { WorkspaceSessionState } from '#/shared/api-types.ts'
 const mocks = vi.hoisted(() => ({
   acquireRepoRuntimeLease: vi.fn(),
   releaseRepoRuntimeMembershipLease: vi.fn(),
+  isCurrentRepoRuntime: vi.fn(),
   getServerSessionState: vi.fn(),
   saveRebuiltServerSessionState: vi.fn(),
   probeRepo: vi.fn(),
@@ -17,6 +18,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('#/server/modules/repo-runtimes.ts', () => ({
   acquireRepoRuntimeLease: mocks.acquireRepoRuntimeLease,
   releaseRepoRuntimeMembershipLease: mocks.releaseRepoRuntimeMembershipLease,
+  isCurrentRepoRuntime: mocks.isCurrentRepoRuntime,
 }))
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
@@ -41,6 +43,7 @@ describe('restoreServerWorkspaceSession', () => {
       repoRuntimeId: 'repo-runtime-test',
       generation: 1,
     }))
+    mocks.isCurrentRepoRuntime.mockReturnValue(true)
     mocks.probeRepo.mockResolvedValue({ ok: true, root: '/repo', name: 'repo' })
     mocks.readRepoProjection.mockResolvedValue({
       snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: '/repo' } }] },
@@ -464,5 +467,228 @@ describe('restoreServerWorkspaceSession', () => {
     expect(result).toMatchObject({ status: 'restored', session: currentSession })
     expect(mocks.saveRebuiltServerSessionState).toHaveBeenCalledTimes(1)
     expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', { repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', generation: 1 })
+  })
+})
+
+describe('restoreServerWorkspaceSession — active-only restore', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.acquireRepoRuntimeLease.mockImplementation((_userId: string, repoRoot: string) => ({
+      repoRoot,
+      repoRuntimeId: `runtime-${repoRoot.replace(/[^a-z0-9]/gi, '_')}`,
+      generation: 1,
+    }))
+    mocks.isCurrentRepoRuntime.mockReturnValue(true)
+    mocks.probeRepo.mockImplementation(async (repoRoot: string) => ({ ok: true, root: repoRoot, name: 'repo' }))
+    mocks.readRepoProjection.mockImplementation(async (repoRoot: string) => ({
+      snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: repoRoot } }] },
+      status: [],
+      pullRequests: null,
+      operations: { operations: [], loadedAt: 0 },
+      requested: { branch: null, pullRequestMode: 'full' },
+      loadedAt: 1,
+    }))
+    mocks.saveRebuiltServerSessionState.mockImplementation(async ({ rebuiltSession }: { rebuiltSession: WorkspaceSessionState }) => ({
+      saved: true,
+      session: rebuiltSession,
+    }))
+  })
+
+  test('non-active repos are stubs — no probe, no projection read, projection: null', async () => {
+    const session: WorkspaceSessionState = {
+      ...defaultWorkspaceSessionState(),
+      openRepoEntries: [
+        { kind: 'local', id: '/repo-active' },
+        { kind: 'local', id: '/repo-stub' },
+      ],
+      restoredRepoId: '/repo-active',
+    }
+    mocks.getServerSessionState.mockResolvedValue(session)
+    const workspacePaneTabsHost = {
+      listWorkspaceTabs: vi.fn(),
+      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
+      updateTabs: vi.fn(),
+    }
+
+    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreServerWorkspaceSession({
+      userId: 'user-test',
+      clientId: 'client_test000000000000',
+      workspacePaneTabsHost,
+    })
+
+    expect(result.status).toBe('restored')
+    // Probe + read only happen for the active repo.
+    expect(mocks.probeRepo).toHaveBeenCalledTimes(1)
+    expect(mocks.probeRepo).toHaveBeenCalledWith('/repo-active')
+    expect(mocks.readRepoProjection).toHaveBeenCalledTimes(1)
+    const repos = result.runtime.repos
+    const active = repos.find((r) => r.repoRoot === '/repo-active')!
+    const stub = repos.find((r) => r.repoRoot === '/repo-stub')!
+    expect(active.projection).not.toBeNull()
+    expect(stub.projection).toBeNull()
+    expect(stub.repoRuntimeId).toBe('runtime-_repo_stub')
+    expect(stub.name).toBe('repo-stub')
+    // Stub repos do not contribute to the tabs restore.
+    expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
+    expect(result.runtime.workspacePaneTabs).toEqual([])
+  })
+
+  test('non-active repos with stale tabs are ignored during validation', async () => {
+    const staleTargetKey = workspacePaneTabsTargetIdentityKey({
+      repoRoot: '/repo-stub',
+      branchName: 'feature',
+      worktreePath: null,
+    })
+    const session: WorkspaceSessionState = {
+      ...defaultWorkspaceSessionState(),
+      openRepoEntries: [
+        { kind: 'local', id: '/repo-active' },
+        { kind: 'local', id: '/repo-stub' },
+      ],
+      restoredRepoId: '/repo-active',
+      workspacePaneTabsByTargetByRepo: {
+        // Stale tab entry for the stub repo that would normally force a
+        // rebuild — but plan B skips validation for stubs.
+        '/repo-stub': { [staleTargetKey]: [workspacePaneStaticTabEntry('history')] },
+      },
+    }
+    mocks.getServerSessionState.mockResolvedValue(session)
+    const workspacePaneTabsHost = {
+      listWorkspaceTabs: vi.fn(),
+      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
+      updateTabs: vi.fn(),
+    }
+
+    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreServerWorkspaceSession({
+      userId: 'user-test',
+      clientId: 'client_test000000000000',
+      workspacePaneTabsHost,
+    })
+
+    expect(result.status).toBe('restored')
+    expect(mocks.saveRebuiltServerSessionState).not.toHaveBeenCalled()
+  })
+})
+
+describe('restoreRepoTabsForRepo', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.acquireRepoRuntimeLease.mockImplementation((_userId: string, repoRoot: string) => ({
+      repoRoot,
+      repoRuntimeId: 'repo-runtime-test',
+      generation: 1,
+    }))
+    mocks.isCurrentRepoRuntime.mockReturnValue(true)
+    mocks.probeRepo.mockImplementation(async (repoRoot: string) => ({ ok: true, root: repoRoot, name: 'repo' }))
+    mocks.readRepoProjection.mockResolvedValue({
+      snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: '/repo' } }] },
+      status: [],
+      pullRequests: null,
+      operations: { operations: [], loadedAt: 0 },
+      requested: { branch: null, pullRequestMode: 'full' },
+      loadedAt: 1,
+    })
+    mocks.saveRebuiltServerSessionState.mockImplementation(async ({ rebuiltSession }: { rebuiltSession: WorkspaceSessionState }) => ({
+      saved: true,
+      session: rebuiltSession,
+    }))
+  })
+
+  test('probes + projects + restores tabs for a single repo', async () => {
+    const targetKey = workspacePaneTabsTargetIdentityKey({ repoRoot: '/repo', branchName: 'main', worktreePath: null })
+    const session: WorkspaceSessionState = {
+      ...defaultWorkspaceSessionState(),
+      openRepoEntries: [{ kind: 'local', id: '/repo' }],
+      restoredRepoId: '/repo',
+      workspacePaneTabsByTargetByRepo: {
+        '/repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
+      },
+    }
+    mocks.getServerSessionState.mockResolvedValue(session)
+    const workspacePaneTabsHost = {
+      listWorkspaceTabs: vi.fn(),
+      replaceTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
+      updateTabs: vi.fn(),
+    }
+
+    const { restoreRepoTabsForRepo } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreRepoTabsForRepo({
+      userId: 'user-test',
+      clientId: 'client_test000000000000',
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-test',
+      workspacePaneTabsHost,
+    })
+
+    expect(result.repo).toMatchObject({
+      entry: { kind: 'local', id: '/repo' },
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-test',
+      name: 'repo',
+    })
+    expect(result.repo.projection).not.toBeNull()
+    expect(result.snapshot).toEqual({ revision: 5, entries: [] })
+    expect(mocks.probeRepo).toHaveBeenCalledWith('/repo')
+    expect(workspacePaneTabsHost.replaceTabs).toHaveBeenCalledWith('client_test000000000000', 'user-test', {
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-test',
+      branchName: 'main',
+      worktreePath: null,
+      tabs: [workspacePaneStaticTabEntry('history')],
+    })
+  })
+
+  test('throws repo-runtime-stale when clientId/repoRuntimeId does not match the active lease', async () => {
+    const session: WorkspaceSessionState = {
+      ...defaultWorkspaceSessionState(),
+      openRepoEntries: [{ kind: 'local', id: '/repo' }],
+      restoredRepoId: '/repo',
+    }
+    mocks.getServerSessionState.mockResolvedValue(session)
+    mocks.isCurrentRepoRuntime.mockReturnValue(false)
+    const workspacePaneTabsHost = {
+      listWorkspaceTabs: vi.fn(),
+      replaceTabs: vi.fn(),
+      updateTabs: vi.fn(),
+    }
+
+    const { restoreRepoTabsForRepo } = await import('#/server/modules/session-restore.ts')
+    await expect(
+      restoreRepoTabsForRepo({
+        userId: 'user-test',
+        clientId: 'client_test000000000000',
+        repoRoot: '/repo',
+        repoRuntimeId: 'stale-runtime',
+        workspacePaneTabsHost,
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.repo-runtime-stale' })
+    expect(mocks.probeRepo).not.toHaveBeenCalled()
+  })
+
+  test('throws repo-not-in-session when the requested repo is not in the saved session', async () => {
+    const session: WorkspaceSessionState = {
+      ...defaultWorkspaceSessionState(),
+      openRepoEntries: [{ kind: 'local', id: '/other' }],
+      restoredRepoId: '/other',
+    }
+    mocks.getServerSessionState.mockResolvedValue(session)
+    const workspacePaneTabsHost = {
+      listWorkspaceTabs: vi.fn(),
+      replaceTabs: vi.fn(),
+      updateTabs: vi.fn(),
+    }
+
+    const { restoreRepoTabsForRepo } = await import('#/server/modules/session-restore.ts')
+    await expect(
+      restoreRepoTabsForRepo({
+        userId: 'user-test',
+        clientId: 'client_test000000000000',
+        repoRoot: '/repo',
+        repoRuntimeId: 'repo-runtime-test',
+        workspacePaneTabsHost,
+      }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
   })
 })
