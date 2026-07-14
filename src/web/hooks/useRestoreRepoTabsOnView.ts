@@ -3,12 +3,12 @@
 // the per-repo `POST /api/settings/session/restore-repo-tabs` request and
 // hydrates the returned repo into the store.
 //
-// Why per-repo: cold start used to probe + project every persisted repo.
-// That's a lot of git I/O for repos the user isn't viewing. The active
-// repo is fully restored at startup; non-active repos are stub leases
-// until the user opens them.
+// Why per-repo: cold start validates persisted repo identity, but only the
+// active repo needs an immediate projection read. Non-active repos remain
+// stub leases until the user opens them.
 
 import { useEffect } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { toast } from 'sonner'
 import { restoreRepoTabsOnView } from '#/web/settings-actions.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
@@ -30,30 +30,47 @@ type RestoreResult =
   | { ok: true; repo: import('#/shared/api-types.ts').RestoredWorkspaceRepoRuntime; snapshot: import('#/shared/workspace-pane-tabs.ts').WorkspacePaneTabsSnapshot | null }
   | { ok: false; message: string }
 
+interface LazyRestoreTarget {
+  repoRoot: string
+  repoRuntimeId: string
+  loadedAt: number | null
+}
+
 export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) {
+  const target = useReposStore(
+    useShallow((s): LazyRestoreTarget | null => {
+      if (!repoId) return null
+      const repo = s.repos[repoId]
+      if (!repo) return null
+      return {
+        repoRoot: repo.id,
+        repoRuntimeId: repo.repoRuntimeId,
+        loadedAt: repo.dataLoads.repoReadModel.loadedAt,
+      }
+    }),
+  )
+
   useEffect(() => {
-    if (!repoId) return
-    const repo = useReposStore.getState().repos[repoId]
-    if (!repo) return
+    if (!target) return
     // Already restored (active repo at cold start, or already-restored stub).
     // The discriminator is `repoReadModel.loadedAt` — it is `null` for stubs
     // (no projection accepted yet) and a timestamp after a successful
     // hydrateRestoredWorkspaceRuntime run.
-    if (repo.dataLoads.repoReadModel.loadedAt !== null) return
+    if (target.loadedAt !== null) return
 
-    const failed = failedRestores.get(repoId)
+    const failed = failedRestores.get(target.repoRoot)
     if (failed && failed.attempts >= MAX_LAZY_RESTORE_ATTEMPTS) return
 
-    const key = `${repoId}\0${repo.repoRuntimeId}`
+    const key = `${target.repoRoot}\0${target.repoRuntimeId}`
     let promise = inFlightRestores.get(key)
     if (!promise) {
-      promise = runLazyRestore(repoId, repo.repoRuntimeId).finally(() => {
+      promise = runLazyRestore(target.repoRoot, target.repoRuntimeId).finally(() => {
         inFlightRestores.delete(key)
       })
       inFlightRestores.set(key, promise)
     }
     void promise
-  }, [repoId])
+  }, [target])
 }
 
 async function runLazyRestore(repoRoot: string, repoRuntimeId: string): Promise<void> {
@@ -62,6 +79,7 @@ async function runLazyRestore(repoRoot: string, repoRuntimeId: string): Promise<
     await applyLazyRestore(repoRoot, result)
     return
   }
+  if (staleRuntimeRestoreFailure(result.message)) return
   recordLazyRestoreFailure(repoRoot, result.message)
 }
 
@@ -85,6 +103,10 @@ async function applyLazyRestore(repoRoot: string, result: Extract<RestoreResult,
     restoredRepoId: result.repo.repoRoot,
   })
   failedRestores.delete(repoRoot)
+}
+
+function staleRuntimeRestoreFailure(message: string): boolean {
+  return message.includes('error.repo-runtime-stale')
 }
 
 function recordLazyRestoreFailure(repoRoot: string, message: string): void {

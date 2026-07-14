@@ -173,6 +173,37 @@ describe('settings-client', () => {
     })
   })
 
+  test('posts repo root and runtime id when lazily restoring repo tabs', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const restored = {
+      status: 'restored' as const,
+      repo: {
+        entry: { kind: 'local' as const, id: '/tmp/routed-repo' },
+        repoRoot: '/tmp/routed-repo',
+        repoRuntimeId: 'repo_runtime_test',
+        name: 'routed-repo',
+        projection: null,
+      },
+      snapshot: null,
+    }
+    const fetchMock = mockFetch(async () => ({
+      ok: true,
+      json: async () => restored,
+    }))
+
+    const { restoreRepoWorkspaceTabs } = await import('#/web/settings-client.ts')
+    await expect(
+      restoreRepoWorkspaceTabs('client_test000000000000', '/tmp/routed-repo', 'repo_runtime_test'),
+    ).resolves.toEqual(restored)
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(String(init.body))).toEqual({
+      clientId: 'client_test000000000000',
+      repoRoot: '/tmp/routed-repo',
+      repoRuntimeId: 'repo_runtime_test',
+    })
+  })
+
   test('sets the global shortcut through the native bridge even when the embedded server is available', async () => {
     const invokeIpc = vi.fn(async () => ({ accelerator: 'CommandOrControl+Shift+K', registered: true }))
     Object.defineProperty(globalThis, 'window', {

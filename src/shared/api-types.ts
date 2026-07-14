@@ -138,8 +138,8 @@ export interface ProjectedRestoredWorkspaceRepoRuntime extends RestoredWorkspace
 }
 
 export interface StubRestoredWorkspaceRepoRuntime extends RestoredWorkspaceRepoRuntimeBase {
-  // Stub leases do not run git probe/projection at cold start. They are
-  // restored lazily when the user navigates to the repo.
+  // Stub leases have a validated runtime identity but no projection. They are
+  // projected lazily when the user navigates to the repo.
   projection: null
 }
 
@@ -163,6 +163,12 @@ export interface WorkspaceSessionRestoreResult {
   status: 'restored' | 'rebuilt'
   session: WorkspaceSessionState
   runtime: WorkspaceRuntimeRestoreSnapshot
+}
+
+export interface RepoWorkspaceTabsRestoreResult {
+  status: 'restored' | 'rebuilt'
+  repo: ProjectedRestoredWorkspaceRepoRuntime
+  snapshot: WorkspacePaneTabsSnapshot | null
 }
 
 export interface RepoSettingsState {

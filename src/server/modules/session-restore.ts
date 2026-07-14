@@ -4,6 +4,7 @@ import {
   IpcError,
   isProjectedRestoredWorkspaceRepo,
   type ProjectedRestoredWorkspaceRepoRuntime,
+  type RepoWorkspaceTabsRestoreResult,
   type RepoRuntimeProjection,
   type RestoredWorkspaceRepoRuntime,
   type WorkspaceRuntimeRestoreSnapshot,
@@ -36,9 +37,9 @@ export interface RestoreServerWorkspaceSessionInput {
   userId: string
   clientId: string
   // The repo the user is currently viewing. Only this repo gets the full
-  // git probe + projection read + pane-tab restore at cold start. Other
-  // repos get stub leases (no git I/O) and are restored lazily when the
-  // user navigates to them.
+  // projection read + pane-tab restore at cold start. Other repos are
+  // validated/canonicalized, then returned as stub leases and restored lazily
+  // when the user navigates to them.
   activeRepoRoot?: string | null
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   signal?: AbortSignal
@@ -139,7 +140,7 @@ async function restoreServerWorkspaceSessionSnapshot(
     // Only the active repo's tabs are validated and restored at startup.
     // Non-active repos carry `projection: null` so their `targetForSessionKey`
     // cannot resolve — and their tabs will be restored lazily when the user
-    // navigates to them via `restoreWorkspacePaneTabsForRepo`.
+    // navigates to them via `restoreRepoTabsForRepo`.
     const openedActive = opened.filter(isOpenedProjectedRepo)
     if (
       !validateWorkspacePaneTabs(session, openedActive).ok ||
@@ -195,26 +196,26 @@ async function openSessionRepo(
 ): Promise<OpenSessionRepoResult> {
   input.signal?.throwIfAborted()
   if (entry.kind === 'remote') return await openRemoteSessionRepo(input, entry, options)
+  const probe = await probeRepo(entry.id)
+  if (!probe.ok || !probe.root) return { ok: false }
+  if (probe.root !== entry.id) return { ok: false }
+  const lease = acquireRepoRuntimeLease(input.userId, probe.root, input.clientId)
   if (!options.active) {
-    // Stub path: lease only. No `probeRepo`, no `readRepoProjection`, no
-    // git I/O. The lease is keyed on `entry.id` (= repoRoot) and is reused
-    // later when the user navigates to this repo.
-    const lease = acquireRepoRuntimeLease(input.userId, entry.id, input.clientId)
+    // Stub path: validated lease only. No projection read or pane-tab restore.
+    // Persisted local entries must already be canonical; this branch refuses to
+    // migrate non-canonical paths and lets the session rebuild path clean them.
     return {
       ok: true,
       opened: {
-        entry: { kind: 'local', id: entry.id },
-        repoRoot: entry.id,
+        entry: { kind: 'local', id: probe.root },
+        repoRoot: probe.root,
         repoRuntimeId: lease.repoRuntimeId,
-        name: lastPathSegment(entry.id),
+        name: probe.name ?? lastPathSegment(probe.root),
         projection: null,
         lease,
       },
     }
   }
-  const probe = await probeRepo(entry.id)
-  if (!probe.ok || !probe.root) return { ok: false }
-  const lease = acquireRepoRuntimeLease(input.userId, probe.root, input.clientId)
   try {
     const projection = await readRepoProjection(probe.root, { repoRuntimeId: lease.repoRuntimeId, signal: input.signal, mode: 'full' })
     if (!projection.snapshot) {
@@ -338,10 +339,7 @@ function validateWorkspacePaneTabs(
  */
 export async function restoreRepoTabsForRepo(
   input: RestoreRepoTabsInput,
-): Promise<{
-  repo: RestoredWorkspaceRepoRuntime
-  snapshot: WorkspacePaneTabsSnapshot | null
-}> {
+): Promise<RepoWorkspaceTabsRestoreResult> {
   input.signal?.throwIfAborted()
   if (!isCurrentRepoRuntime(input.userId, input.repoRoot, input.repoRuntimeId)) {
     throw new IpcError({ code: 'BAD_REQUEST', message: 'error.repo-runtime-stale' })
@@ -359,18 +357,41 @@ export async function restoreRepoTabsForRepo(
     throw new IpcError({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
   }
 
+  let status: RepoWorkspaceTabsRestoreResult['status'] = 'restored'
+  if (
+    !validateWorkspacePaneTabs(session, [opened.opened]).ok ||
+    !validatePreferredWorkspacePaneTabs(session, [opened.opened]).ok
+  ) {
+    await saveCleanLazyRestoreSession(input, session)
+    status = 'rebuilt'
+    return {
+      status,
+      repo: projectionRepoFromOpened(opened.opened),
+      snapshot: null,
+    }
+  }
+
   const snapshots = await restoreWorkspacePaneTabsForRepos(
     { userId: input.userId, clientId: input.clientId, workspacePaneTabsHost: input.workspacePaneTabsHost, signal: input.signal },
     session,
     [opened.opened],
   )
   return {
+    status,
     repo: projectionRepoFromOpened(opened.opened),
     snapshot: snapshots[0]?.snapshot ?? null,
   }
 }
 
-function projectionRepoFromOpened(opened: OpenedRepoSessionEntry): RestoredWorkspaceRepoRuntime {
+async function saveCleanLazyRestoreSession(input: RestoreRepoTabsInput, session: WorkspaceSessionState): Promise<void> {
+  const saved = await saveRebuiltServerSessionState({
+    persistedSnapshot: session,
+    rebuiltSession: cleanSessionFromEntries(session, session.openRepoEntries),
+  })
+  if (!saved.saved) throw new Error('workspace session restore was superseded while cleaning lazy restore state')
+}
+
+function projectionRepoFromOpened(opened: OpenedProjectedRepoSessionEntry): ProjectedRestoredWorkspaceRepoRuntime {
   const { lease: _lease, ...repo } = opened
   return repo
 }
@@ -506,7 +527,13 @@ function cleanSessionFromOpened(
   session: WorkspaceSessionState,
   opened: OpenedRepoSessionEntry[],
 ): WorkspaceSessionState {
-  const openRepoEntries = opened.map((repo) => repo.entry)
+  return cleanSessionFromEntries(session, opened.map((repo) => repo.entry))
+}
+
+function cleanSessionFromEntries(
+  session: WorkspaceSessionState,
+  openRepoEntries: RepoSessionEntry[],
+): WorkspaceSessionState {
   return {
     ...defaultWorkspaceSessionState(),
     openRepoEntries,

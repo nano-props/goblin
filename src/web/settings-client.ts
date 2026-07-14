@@ -9,7 +9,7 @@ import type {
   LangPref,
   LanInfo,
   RepoSettingsState,
-  RestoredWorkspaceRepoRuntime,
+  RepoWorkspaceTabsRestoreResult,
   RuntimeRecentReposState,
   WorkspaceSessionState,
   WorkspaceSessionRestoreResult,
@@ -25,7 +25,6 @@ import {
   pickNativeSettingsProjectionPatch,
 } from '#/shared/native-host-projection.ts'
 import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
-import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 
 type RecentReposUpdateResponse = { ok: boolean; addedRepo?: RepoSessionEntry | null } & RuntimeRecentReposState
@@ -177,17 +176,12 @@ export async function restoreWorkspaceSession(
   )
 }
 
-export interface RepoWorkspaceTabsRestore {
-  repo: RestoredWorkspaceRepoRuntime
-  snapshot: WorkspacePaneTabsSnapshot | null
-}
-
 export async function restoreRepoWorkspaceTabs(
   clientId: string,
   repoRoot: string,
   repoRuntimeId: string,
   options?: { signal?: AbortSignal },
-): Promise<RepoWorkspaceTabsRestore> {
+): Promise<RepoWorkspaceTabsRestoreResult> {
   return await postServerJson(
     '/api/settings/session/restore-repo-tabs',
     { clientId, repoRoot, repoRuntimeId },

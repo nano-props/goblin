@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   handleSetSession: vi.fn(),
   handleUpdateUserSettings: vi.fn(),
   restoreServerWorkspaceSession: vi.fn(),
+  restoreRepoTabsForRepo: vi.fn(),
 }))
 
 vi.mock('#/server/modules/external-apps.ts', () => ({
@@ -45,6 +46,7 @@ vi.mock('#/server/modules/settings-write-paths.ts', () => ({
 
 vi.mock('#/server/modules/session-restore.ts', () => ({
   restoreServerWorkspaceSession: mocks.restoreServerWorkspaceSession,
+  restoreRepoTabsForRepo: mocks.restoreRepoTabsForRepo,
 }))
 
 const workspacePaneTabsHostStub = {
@@ -163,6 +165,57 @@ describe('settings routes', () => {
       userId: 'user-test',
       clientId: 'client_test000000000000',
       activeRepoRoot: '/repo-active',
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
+      signal: expect.any(AbortSignal),
+    })
+  })
+
+  test('delegates lazy repo tab restore to the server restore coordinator', async () => {
+    const restored = {
+      status: 'restored' as const,
+      repo: {
+        entry: { kind: 'local' as const, id: '/repo-active' },
+        repoRoot: '/repo-active',
+        repoRuntimeId: 'repo_runtime_test',
+        name: 'repo-active',
+        projection: {
+          snapshot: { current: 'main', branches: [] },
+          status: [],
+          pullRequests: null,
+          operations: { operations: [], loadedAt: 0 },
+          requested: { branch: null, pullRequestMode: 'full' as const },
+          loadedAt: 1,
+        },
+      },
+      snapshot: null,
+    }
+    mocks.restoreRepoTabsForRepo.mockResolvedValue(restored)
+    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
+    const app = new Hono<{ Variables: { userId: string } }>()
+    app.use('*', async (c, next) => {
+      c.set('userId', 'user-test')
+      await next()
+    })
+    app.route('/', createSettingsRoutes(settingsRouteOptions()))
+
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/session/restore-repo-tabs', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          clientId: 'client_test000000000000',
+          repoRoot: '/repo-active',
+          repoRuntimeId: 'repo_runtime_test',
+        }),
+      }),
+    )
+
+    await expect(response.json()).resolves.toEqual(restored)
+    expect(mocks.restoreRepoTabsForRepo).toHaveBeenCalledWith({
+      userId: 'user-test',
+      clientId: 'client_test000000000000',
+      repoRoot: '/repo-active',
+      repoRuntimeId: 'repo_runtime_test',
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       signal: expect.any(AbortSignal),
     })

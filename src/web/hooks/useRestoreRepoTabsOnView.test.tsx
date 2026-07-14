@@ -4,12 +4,18 @@ import { act, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useRestoreRepoTabsOnView } from '#/web/hooks/useRestoreRepoTabsOnView.ts'
-import { useReposStore } from '#/web/stores/repos/store.ts'
 
 const mocks = vi.hoisted(() => ({
   restoreRepoTabsOnView: vi.fn(),
   hydrateRestoredWorkspaceRuntime: vi.fn(),
   toastError: vi.fn(),
+  storeState: {
+    repos: {},
+    hydrateRestoredWorkspaceRuntime: vi.fn(),
+  } as {
+    repos: Record<string, ReturnType<typeof stubRepo> | undefined>
+    hydrateRestoredWorkspaceRuntime: ReturnType<typeof vi.fn>
+  },
 }))
 
 vi.mock('#/web/settings-actions.ts', () => ({
@@ -40,12 +46,11 @@ vi.mock('#/web/stores/repos/store.ts', async (importActual) => {
   return {
     ...actual,
     useReposStore: Object.assign(
-      vi.fn(actual.useReposStore),
+      vi.fn((selector?: (state: typeof mocks.storeState) => unknown) => {
+        return selector ? selector(mocks.storeState) : mocks.storeState
+      }),
       {
-        getState: () => ({
-          repos: {},
-          hydrateRestoredWorkspaceRuntime: mocks.hydrateRestoredWorkspaceRuntime,
-        }),
+        getState: () => mocks.storeState,
       },
     ),
   }
@@ -56,7 +61,7 @@ function stubRepo(id: string, repoRuntimeId: string) {
     id,
     repoRuntimeId,
     dataLoads: {
-      repoReadModel: { phase: 'idle', loadedAt: null, error: null, stale: false },
+      repoReadModel: { phase: 'idle', loadedAt: null as number | null, error: null, stale: false },
     },
   }
 }
@@ -66,6 +71,10 @@ describe('useRestoreRepoTabsOnView', () => {
     mocks.restoreRepoTabsOnView.mockReset()
     mocks.hydrateRestoredWorkspaceRuntime.mockReset()
     mocks.toastError.mockReset()
+    mocks.storeState = {
+      repos: {},
+      hydrateRestoredWorkspaceRuntime: mocks.hydrateRestoredWorkspaceRuntime,
+    }
     vi.restoreAllMocks()
   })
 
@@ -83,7 +92,7 @@ describe('useRestoreRepoTabsOnView', () => {
       useRestoreRepoTabsOnView({ repoId: 'repo-a' })
       return null
     }
-    vi.spyOn(useReposStore, 'getState').mockReturnValue({
+    mocks.storeState = {
       repos: {
         'repo-a': {
           id: 'repo-a',
@@ -91,7 +100,8 @@ describe('useRestoreRepoTabsOnView', () => {
           dataLoads: { repoReadModel: { phase: 'idle', loadedAt: 1, error: null, stale: false } },
         },
       },
-    } as never)
+      hydrateRestoredWorkspaceRuntime: mocks.hydrateRestoredWorkspaceRuntime,
+    }
     renderInJsdom(<Host />)
     await waitFor(() => expect(mocks.restoreRepoTabsOnView).not.toHaveBeenCalled())
   })
@@ -101,11 +111,12 @@ describe('useRestoreRepoTabsOnView', () => {
       useRestoreRepoTabsOnView({ repoId: 'repo-a' })
       return null
     }
-    vi.spyOn(useReposStore, 'getState').mockReturnValue({
+    mocks.storeState = {
       repos: { 'repo-a': stubRepo('repo-a', 'rta') },
       hydrateRestoredWorkspaceRuntime: mocks.hydrateRestoredWorkspaceRuntime,
-    } as never)
+    }
     mocks.restoreRepoTabsOnView.mockResolvedValue({
+      status: 'restored',
       repo: { repoRoot: '/r/a', repoRuntimeId: 'rta' },
       snapshot: { tabs: [{ key: 'status' }] },
     })
@@ -132,11 +143,12 @@ describe('useRestoreRepoTabsOnView', () => {
       useRestoreRepoTabsOnView({ repoId: 'repo-a' })
       return null
     }
-    vi.spyOn(useReposStore, 'getState').mockReturnValue({
+    mocks.storeState = {
       repos: { 'repo-a': stubRepo('repo-a', 'rta') },
       hydrateRestoredWorkspaceRuntime: mocks.hydrateRestoredWorkspaceRuntime,
-    } as never)
+    }
     mocks.restoreRepoTabsOnView.mockResolvedValue({
+      status: 'restored',
       repo: { repoRoot: '/r/a', repoRuntimeId: 'rta' },
       snapshot: null,
     })
@@ -151,10 +163,10 @@ describe('useRestoreRepoTabsOnView', () => {
       useRestoreRepoTabsOnView({ repoId: 'repo-a' })
       return null
     }
-    vi.spyOn(useReposStore, 'getState').mockReturnValue({
+    mocks.storeState = {
       repos: { 'repo-a': stubRepo('repo-a', 'rta') },
       hydrateRestoredWorkspaceRuntime: mocks.hydrateRestoredWorkspaceRuntime,
-    } as never)
+    }
     mocks.restoreRepoTabsOnView.mockRejectedValue(new Error('disk gone'))
 
     renderInJsdom(<Host />)
@@ -171,10 +183,10 @@ describe('useRestoreRepoTabsOnView', () => {
       useRestoreRepoTabsOnView({ repoId: 'repo-retry' })
       return null
     }
-    vi.spyOn(useReposStore, 'getState').mockReturnValue({
+    mocks.storeState = {
       repos: { 'repo-retry': stubRepo('repo-retry', 'rtr') },
       hydrateRestoredWorkspaceRuntime: mocks.hydrateRestoredWorkspaceRuntime,
-    } as never)
+    }
     // One controllable rejection queue so we know exactly when each call
     // settles — including the `.finally` that clears the in-flight Map.
     const rejections: Array<(err: Error) => void> = []
@@ -220,10 +232,10 @@ describe('useRestoreRepoTabsOnView', () => {
         }),
     )
     // Use a unique repoRoot so the prior test's failure counter doesn't gate us.
-    vi.spyOn(useReposStore, 'getState').mockReturnValue({
+    mocks.storeState = {
       repos: { 'repo-dedupe': stubRepo('repo-dedupe', 'rtd') },
       hydrateRestoredWorkspaceRuntime: mocks.hydrateRestoredWorkspaceRuntime,
-    } as never)
+    }
 
     function Host() {
       useRestoreRepoTabsOnView({ repoId: 'repo-dedupe' })
@@ -243,5 +255,33 @@ describe('useRestoreRepoTabsOnView', () => {
     })
     hostA.unmount()
     hostB.unmount()
+  })
+
+  test('does not burn retry budget for stale runtime failures and retries after runtime changes', async () => {
+    function Host() {
+      useRestoreRepoTabsOnView({ repoId: 'repo-stale' })
+      return null
+    }
+    mocks.storeState = {
+      repos: { 'repo-stale': stubRepo('repo-stale', 'rt-old') },
+      hydrateRestoredWorkspaceRuntime: mocks.hydrateRestoredWorkspaceRuntime,
+    }
+    mocks.restoreRepoTabsOnView
+      .mockRejectedValueOnce(new Error('Server request failed (BAD_REQUEST: error.repo-runtime-stale)'))
+      .mockResolvedValueOnce({ status: 'restored', repo: { repoRoot: 'repo-stale', repoRuntimeId: 'rt-new' }, snapshot: null })
+
+    const host = renderInJsdom(<Host />)
+    await waitFor(() => expect(mocks.restoreRepoTabsOnView).toHaveBeenCalledTimes(1))
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(mocks.toastError).not.toHaveBeenCalled()
+
+    mocks.storeState = {
+      repos: { 'repo-stale': stubRepo('repo-stale', 'rt-new') },
+      hydrateRestoredWorkspaceRuntime: mocks.hydrateRestoredWorkspaceRuntime,
+    }
+    host.rerender(<Host />)
+
+    await waitFor(() => expect(mocks.restoreRepoTabsOnView).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(mocks.hydrateRestoredWorkspaceRuntime).toHaveBeenCalledTimes(1))
   })
 })

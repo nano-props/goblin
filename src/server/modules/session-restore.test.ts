@@ -108,7 +108,7 @@ describe('restoreServerWorkspaceSession', () => {
     expect(mocks.saveRebuiltServerSessionState).not.toHaveBeenCalled()
   })
 
-  test('returns canonical repo roots for local session inputs restored from subdirectories', async () => {
+  test('rebuilds instead of migrating non-canonical local session entries', async () => {
     const session: WorkspaceSessionState = {
       ...defaultWorkspaceSessionState(),
       openRepoEntries: [{ kind: 'local', id: '/repo/src' }],
@@ -129,12 +129,13 @@ describe('restoreServerWorkspaceSession', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.status).toBe('restored')
-    expect(result.session.openRepoEntries).toEqual([{ kind: 'local', id: '/repo' }])
-    expect(result.session.restoredRepoId).toBe('/repo')
-    expect(result.runtime.restoredRepoId).toBe('/repo')
-    expect(result.runtime.repos).toMatchObject([{ entry: { kind: 'local', id: '/repo' }, repoRoot: '/repo' }])
-    expect(mocks.saveRebuiltServerSessionState).not.toHaveBeenCalled()
+    expect(result.status).toBe('rebuilt')
+    expect(result.session).toEqual(defaultWorkspaceSessionState())
+    expect(result.runtime.repos).toEqual([])
+    expect(mocks.saveRebuiltServerSessionState).toHaveBeenCalledWith({
+      persistedSnapshot: session,
+      rebuiltSession: defaultWorkspaceSessionState(),
+    })
   })
 
   test('uses the workspace tabs batch host and returns canonical tab snapshots', async () => {
@@ -494,7 +495,7 @@ describe('restoreServerWorkspaceSession — active-only restore', () => {
     }))
   })
 
-  test('non-active repos are stubs — no probe, no projection read, projection: null', async () => {
+  test('non-active repos are validated stubs — no projection read, projection: null', async () => {
     const session: WorkspaceSessionState = {
       ...defaultWorkspaceSessionState(),
       openRepoEntries: [
@@ -518,9 +519,10 @@ describe('restoreServerWorkspaceSession — active-only restore', () => {
     })
 
     expect(result.status).toBe('restored')
-    // Probe + read only happen for the active repo.
-    expect(mocks.probeRepo).toHaveBeenCalledTimes(1)
+    // All local repos are probed for canonical identity; only the active repo is projected.
+    expect(mocks.probeRepo).toHaveBeenCalledTimes(2)
     expect(mocks.probeRepo).toHaveBeenCalledWith('/repo-active')
+    expect(mocks.probeRepo).toHaveBeenCalledWith('/repo-stub')
     expect(mocks.readRepoProjection).toHaveBeenCalledTimes(1)
     const repos = result.runtime.repos
     const active = repos.find((r) => r.repoRoot === '/repo-active')!
@@ -528,7 +530,7 @@ describe('restoreServerWorkspaceSession — active-only restore', () => {
     expect(active.projection).not.toBeNull()
     expect(stub.projection).toBeNull()
     expect(stub.repoRuntimeId).toBe('runtime-_repo_stub')
-    expect(stub.name).toBe('repo-stub')
+    expect(stub.name).toBe('repo')
     // Stub repos do not contribute to the tabs restore.
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
     expect(result.runtime.workspacePaneTabs).toEqual([])
@@ -558,10 +560,50 @@ describe('restoreServerWorkspaceSession — active-only restore', () => {
       workspacePaneTabsHost,
     })
 
-    expect(mocks.probeRepo).toHaveBeenCalledTimes(1)
+    expect(mocks.probeRepo).toHaveBeenCalledTimes(2)
+    expect(mocks.probeRepo).toHaveBeenCalledWith('/repo-a')
     expect(mocks.probeRepo).toHaveBeenCalledWith('/repo-b')
+    expect(mocks.readRepoProjection).toHaveBeenCalledTimes(1)
     expect(result.runtime.repos.find((r) => r.repoRoot === '/repo-a')?.projection).toBeNull()
     expect(result.runtime.repos.find((r) => r.repoRoot === '/repo-b')?.projection).not.toBeNull()
+  })
+
+  test('rebuilds when a non-active local entry is not canonical', async () => {
+    const session: WorkspaceSessionState = {
+      ...defaultWorkspaceSessionState(),
+      openRepoEntries: [
+        { kind: 'local', id: '/repo-active' },
+        { kind: 'local', id: '/repo-stub/src' },
+      ],
+      restoredRepoId: '/repo-active',
+    }
+    mocks.getServerSessionState.mockResolvedValue(session)
+    mocks.probeRepo.mockImplementation(async (repoRoot: string) => ({
+      ok: true,
+      root: repoRoot === '/repo-stub/src' ? '/repo-stub' : repoRoot,
+      name: 'repo',
+    }))
+    const workspacePaneTabsHost = {
+      listWorkspaceTabs: vi.fn(),
+      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
+      updateTabs: vi.fn(),
+    }
+
+    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreServerWorkspaceSession({
+      userId: 'user-test',
+      clientId: 'client_test000000000000',
+      workspacePaneTabsHost,
+    })
+
+    expect(result.status).toBe('rebuilt')
+    expect(result.session).toEqual(defaultWorkspaceSessionState())
+    expect(result.runtime.repos).toEqual([])
+    expect(mocks.readRepoProjection).toHaveBeenCalledTimes(1)
+    expect(mocks.saveRebuiltServerSessionState).toHaveBeenCalledWith({
+      persistedSnapshot: session,
+      rebuiltSession: defaultWorkspaceSessionState(),
+    })
   })
 
   test('non-active remote repos use their display name without opening remote lifecycle', async () => {
@@ -710,6 +752,57 @@ describe('restoreRepoTabsForRepo', () => {
       branchName: 'main',
       worktreePath: null,
       tabs: [workspacePaneStaticTabEntry('history')],
+    })
+  })
+
+  test('cleans invalid deferred tab state instead of silently skipping it', async () => {
+    const staleTargetKey = workspacePaneTabsTargetIdentityKey({
+      repoRoot: '/repo',
+      branchName: 'deleted-branch',
+      worktreePath: null,
+    })
+    const session: WorkspaceSessionState = {
+      ...defaultWorkspaceSessionState(),
+      openRepoEntries: [{ kind: 'local', id: '/repo' }],
+      restoredRepoId: '/repo',
+      zenMode: true,
+      workspacePaneSize: 41,
+      workspacePaneTabsByTargetByRepo: {
+        '/repo': { [staleTargetKey]: [workspacePaneStaticTabEntry('history')] },
+      },
+      preferredWorkspacePaneTabByTargetByRepo: {
+        '/repo': { [staleTargetKey]: 'history' },
+      },
+    }
+    mocks.getServerSessionState.mockResolvedValue(session)
+    const workspacePaneTabsHost = {
+      listWorkspaceTabs: vi.fn(),
+      replaceTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
+      updateTabs: vi.fn(),
+    }
+
+    const { restoreRepoTabsForRepo } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreRepoTabsForRepo({
+      userId: 'user-test',
+      clientId: 'client_test000000000000',
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-test',
+      workspacePaneTabsHost,
+    })
+
+    expect(result.status).toBe('rebuilt')
+    expect(result.snapshot).toBeNull()
+    expect(result.repo.projection).not.toBeNull()
+    expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
+    expect(mocks.saveRebuiltServerSessionState).toHaveBeenCalledWith({
+      persistedSnapshot: session,
+      rebuiltSession: {
+        ...defaultWorkspaceSessionState(),
+        openRepoEntries: [{ kind: 'local', id: '/repo' }],
+        restoredRepoId: '/repo',
+        zenMode: true,
+        workspacePaneSize: 41,
+      },
     })
   })
 
