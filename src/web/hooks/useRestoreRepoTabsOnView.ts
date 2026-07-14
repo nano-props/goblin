@@ -9,16 +9,26 @@
 // until the user opens them.
 
 import { useEffect } from 'react'
+import { toast } from 'sonner'
 import { restoreRepoTabsOnView } from '#/web/settings-actions.ts'
-import { writeWorkspacePaneTabsSnapshotQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
-import { updateRepoRuntimeCache } from '#/web/repo-runtime-query.ts'
-import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import { bootstrapLog } from '#/web/logger.ts'
+import { translate } from '#/web/stores/i18n.ts'
+import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 
 // Module-level dedupe so concurrent mounts (e.g. user clicks a stub while
 // the route is still hydrating) share a single in-flight restore.
 const inFlightRestores = new Map<string, Promise<void>>()
+
+// Track per-repo failure counts so a persistently broken repo (e.g. disk
+// error) doesn't get retried forever. After `MAX_LAZY_RESTORE_ATTEMPTS`
+// failures we stop firing the endpoint until the next app launch.
+const MAX_LAZY_RESTORE_ATTEMPTS = 3
+const failedRestores = new Map<string, { attempts: number; lastError: string }>()
+
+type RestoreResult =
+  | { ok: true; repo: import('#/shared/api-types.ts').RestoredWorkspaceRepoRuntime; snapshot: import('#/shared/workspace-pane-tabs.ts').WorkspacePaneTabsSnapshot | null }
+  | { ok: false; message: string }
 
 export function useRestoreRepoTabsOnView({ hydratedRouteRepoId }: { hydratedRouteRepoId: string | null }) {
   useEffect(() => {
@@ -30,6 +40,9 @@ export function useRestoreRepoTabsOnView({ hydratedRouteRepoId }: { hydratedRout
     // (no projection accepted yet) and a timestamp after a successful
     // hydrateRestoredWorkspaceRuntime run.
     if (repo.dataLoads.repoReadModel.loadedAt !== null) return
+
+    const failed = failedRestores.get(hydratedRouteRepoId)
+    if (failed && failed.attempts >= MAX_LAZY_RESTORE_ATTEMPTS) return
 
     const key = `${hydratedRouteRepoId}\0${repo.repoRuntimeId}`
     let promise = inFlightRestores.get(key)
@@ -44,31 +57,45 @@ export function useRestoreRepoTabsOnView({ hydratedRouteRepoId }: { hydratedRout
 }
 
 async function runLazyRestore(repoRoot: string, repoRuntimeId: string): Promise<void> {
-  try {
-    const result = await restoreRepoTabsOnView(readOrCreateWebTerminalClientId(), repoRoot, repoRuntimeId)
-    await updateRepoRuntimeCache({
-      repoRoot: result.repo.repoRoot,
-      repoRuntimeId: result.repo.repoRuntimeId,
-      ...(result.repo.target ? { remoteLifecycle: { kind: 'ready' as const, attemptId: 0, target: result.repo.target } } : {}),
-    })
-    writeWorkspacePaneTabsSnapshotQueryData(
-      result.repo.repoRoot,
-      result.repo.repoRuntimeId,
-      result.snapshot,
-    )
-    // Re-use the existing hydration sink. The stub entry in the store
-    // (projection: null) gets overwritten with the full repo + projection;
-    // acceptRepoProjectionReadModel runs through the same code path as a
-    // fresh restore, and the post-hydration refresh loop fires once for
-    // this single repo — exactly what we want.
-    await useReposStore.getState().hydrateRestoredWorkspaceRuntime({
-      repos: [result.repo],
-      workspacePaneTabs: result.snapshot
-        ? [{ repoRoot: result.repo.repoRoot, repoRuntimeId: result.repo.repoRuntimeId, snapshot: result.snapshot }]
-        : [],
-      restoredRepoId: result.repo.repoRoot,
-    })
-  } catch (err) {
-    bootstrapLog.warn('lazy restore-repo-tabs failed', { err, repoRoot })
+  const result = await fetchLazyRestore(repoRoot, repoRuntimeId)
+  if (result.ok) {
+    await applyLazyRestore(repoRoot, result)
+    return
   }
+  recordLazyRestoreFailure(repoRoot, result.message)
+}
+
+async function fetchLazyRestore(repoRoot: string, repoRuntimeId: string): Promise<RestoreResult> {
+  return restoreRepoTabsOnView(readOrCreateWebTerminalClientId(), repoRoot, repoRuntimeId).then(
+    (response) => ({ ok: true as const, repo: response.repo, snapshot: response.snapshot }),
+    (err: unknown) => ({ ok: false as const, message: err instanceof Error ? err.message : String(err) }),
+  )
+}
+
+async function applyLazyRestore(repoRoot: string, result: Extract<RestoreResult, { ok: true }>): Promise<void> {
+  // `hydrateRestoredWorkspaceRuntime` already wires `updateRepoRuntimeCache`,
+  // `writeWorkspacePaneTabsSnapshotQueryData`, `seedRepoProjectionQueryData`,
+  // the in-store repo entry, `acceptRepoProjectionReadModel`, and the
+  // post-hydration projection refresh. One call, single source of truth.
+  await useReposStore.getState().hydrateRestoredWorkspaceRuntime({
+    repos: [result.repo],
+    workspacePaneTabs: result.snapshot
+      ? [{ repoRoot: result.repo.repoRoot, repoRuntimeId: result.repo.repoRuntimeId, snapshot: result.snapshot }]
+      : [],
+    restoredRepoId: result.repo.repoRoot,
+  })
+  failedRestores.delete(repoRoot)
+}
+
+function recordLazyRestoreFailure(repoRoot: string, message: string): void {
+  const prior = failedRestores.get(repoRoot)
+  const attempts = (prior?.attempts ?? 0) + 1
+  failedRestores.set(repoRoot, { attempts, lastError: message })
+  bootstrapLog.warn('lazy restore-repo-tabs failed', { err: new Error(message), repoRoot, attempts })
+  toast.error(translate('lazy-restore.failed'), {
+    id: `lazy-restore:${repoRoot}`,
+    description: attempts >= MAX_LAZY_RESTORE_ATTEMPTS
+      ? `${message} — ${translate('lazy-restore.gave-up')}`
+      : message,
+  })
 }
