@@ -31,7 +31,7 @@ export interface PrimaryWindowPresentationNavigationOptions {
 
 export interface PrimaryWindowNavigationActions {
   activateRepo: (repoId: string) => void
-  closeRepo: (repoId: string) => void
+  closeRepo: (repoId: string) => Promise<void>
   cycleRepo: (direction: 1 | -1) => void
   selectRepoBranch: (repoId: string, branch: string, options?: { replace?: boolean }) => boolean
   showRepoBranchEmptyWorkspacePane: (repoId: string, branch: string, options?: { replace?: boolean }) => boolean
@@ -66,7 +66,7 @@ export interface PrimaryWindowNavigationActions {
 interface CreatePrimaryWindowNavigationActionsOptions {
   currentRepoId: string | null
   order: string[]
-  closeRepo: (repoId: string) => void
+  closeRepo: (repoId: string) => Promise<void>
   peekWorkspaceNavigation: (repoId: string, direction: 'back' | 'forward') => WorkspaceNavigationHistoryTraversal | null
   commitWorkspaceNavigation: (traversal: WorkspaceNavigationHistoryTraversal) => boolean
   routeNavigation: PrimaryWindowRouteNavigation
@@ -88,10 +88,10 @@ export function createPrimaryWindowNavigationActions({
       const presentationToken = beginPrimaryWindowPresentation()
       restoreRepoPresentationOrOpenDashboard(repoId, routeNavigation, presentationToken, { onBlocked: 'stay' })
     },
-    closeRepo(repoId) {
+    async closeRepo(repoId) {
       const nextRepoId = repoId === currentRepoId ? nextNavigationRepoIdAfterClose(order, repoId) : null
       const presentationToken = repoId === currentRepoId ? beginPrimaryWindowPresentation() : null
-      closeRepo(repoId)
+      await closeRepo(repoId)
       if (repoId !== currentRepoId) return
       if (nextRepoId)
         restoreRepoPresentationOrOpenDashboard(nextRepoId, routeNavigation, presentationToken!, {

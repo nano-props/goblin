@@ -1,7 +1,6 @@
 import type { ClientWorkspaceState } from '#/shared/api-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { RestorableWorkspaceState, ReposStore } from '#/web/stores/repos/types.ts'
-import { persistedOpenWorkspaceEntries } from '#/web/open-workspace-state.ts'
 import {
   persistedRestoredRepoIdForSession,
   persistedSelectedTerminalSessionIdByTerminalWorktreeForSession,
@@ -37,14 +36,12 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
   // while repo data queries are unavailable. Target-scoped state below
   // is different; it references branch/worktree identities and is only
   // persisted for repos whose branch read model can validate those targets.
-  const shellRepos = workspaceSessionRepoShells(repos, restorableWorkspaceState.order)
   const projectedRepos = workspaceSessionRepoProjections(repos, restorableWorkspaceState.order)
   const workspacePaneTabsByTargetByRepo = workspacePaneTabsByTargetByRepoFromQueryCache(
     repos,
     restorableWorkspaceState.order,
   )
   const session: ClientWorkspaceState = {
-    openRepoEntries: persistedOpenWorkspaceEntries(restorableWorkspaceState.order, shellRepos),
     restoredRepoId: persistedRestoredRepoIdForSession(restorableWorkspaceState.restoredRepoId),
     zenMode: restorableWorkspaceState.zenMode,
     workspacePaneSize: restorableWorkspaceState.workspacePaneSize,
@@ -87,19 +84,6 @@ function workspaceSessionRepoProjections(
     }
   }
   return projectedRepos
-}
-
-function workspaceSessionRepoShells(
-  repos: ReposStore['repos'],
-  order: readonly string[],
-): Record<string, Pick<ReposStore['repos'][string], 'id' | 'remote' | 'session'> | undefined> {
-  const shells: Record<string, Pick<ReposStore['repos'][string], 'id' | 'remote' | 'session'> | undefined> = {}
-  for (const id of order) {
-    const repo = repos[id]
-    if (!repo) continue
-    shells[id] = { id: repo.id, remote: repo.remote, session: repo.session }
-  }
-  return shells
 }
 
 function workspacePaneTabsByTargetByRepoFromQueryCache(

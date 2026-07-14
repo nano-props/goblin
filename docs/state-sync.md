@@ -104,7 +104,7 @@ Notes:
 - `ClientWorkspaceState` is persisted in stable native `userData` storage for
   Electron and browser local storage for Web. Native storage must not depend
   on the embedded server's dynamically allocated origin.
-- At boot, the client submits `openRepoEntries` once as restore intent. This is
+- At boot, the server reads `openRepoEntries` from its workspace state. This is
   not an ongoing client-to-server synchronization channel.
 - Lazy repo promotion sends the client-owned repo entry but reads canonical
   pane tabs from the server source at promotion time. Do not carry server tabs

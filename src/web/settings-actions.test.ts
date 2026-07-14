@@ -203,25 +203,26 @@ describe('settings actions', () => {
       status: 'repaired',
       openRepoEntries: session.openRepoEntries,
       workspace: {
+        openRepoEntries: session.openRepoEntries,
         workspacePaneTabsByTargetByRepo: session.workspacePaneTabsByTargetByRepo,
       },
       runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: session.restoredRepoId },
     })
     const { restoreWorkspaceAtBoot } = await import('#/web/settings-actions.ts')
 
-    const result = await restoreWorkspaceAtBoot('client_test000000000000', session.openRepoEntries)
+    const result = await restoreWorkspaceAtBoot('client_test000000000000')
 
     expect(result).toEqual({
       status: 'repaired',
       openRepoEntries: session.openRepoEntries,
       workspace: {
+        openRepoEntries: session.openRepoEntries,
         workspacePaneTabsByTargetByRepo: session.workspacePaneTabsByTargetByRepo,
       },
       runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: session.restoredRepoId },
     })
     expect(appDataClientMocks.restoreServerWorkspace).toHaveBeenCalledWith(
       'client_test000000000000',
-      session.openRepoEntries,
       undefined,
     )
   })

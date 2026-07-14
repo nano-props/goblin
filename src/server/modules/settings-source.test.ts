@@ -151,6 +151,41 @@ test('serializes concurrent settings mutations without dropping updates', async 
   expect(existsSync(path.join(tmp, 'user-settings.json'))).toBe(true)
 })
 
+test('stores the shared open repo order without applying the recent-repo limit', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  const mod = await import('#/server/modules/settings-source.ts')
+  const entries = Array.from({ length: 12 }, (_, index) => ({ kind: 'local' as const, id: `/repo-${index}` }))
+
+  for (const entry of entries) await mod.addServerWorkspaceRepo(entry)
+  await mod.addServerWorkspaceRepo(entries[3]!)
+
+  expect((await mod.getServerWorkspaceState()).openRepoEntries).toEqual(entries)
+})
+
+test('repairs open repos only when the source membership is unchanged', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  const mod = await import('#/server/modules/settings-source.ts')
+  const repoA = { kind: 'local' as const, id: '/repo-a' }
+  const repoB = { kind: 'local' as const, id: '/repo-b' }
+  const repoC = { kind: 'local' as const, id: '/repo-c' }
+  await mod.addServerWorkspaceRepo(repoA)
+  await mod.addServerWorkspaceRepo(repoB)
+
+  await expect(mod.replaceServerWorkspaceReposIfUnchanged([repoA, repoB], [repoA])).resolves.toMatchObject({
+    replaced: true,
+    workspace: { openRepoEntries: [repoA] },
+  })
+  await mod.addServerWorkspaceRepo(repoC)
+  await expect(mod.replaceServerWorkspaceReposIfUnchanged([repoA], [])).resolves.toMatchObject({
+    replaced: false,
+    workspace: { openRepoEntries: [repoA, repoC] },
+  })
+})
+
 test('persists canonical tabs independently of runtime membership', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR

@@ -1163,7 +1163,7 @@ describe('projection refresh request ordering', () => {
     })
     expect(repoOperation(REPO_ID, 'visibleStatus').phase).not.toBe('idle')
 
-    useReposStore.getState().closeRepo(REPO_ID)
+    await useReposStore.getState().closeRepo(REPO_ID)
     resolveProjection()
 
     await expect(Promise.all(works)).resolves.toEqual([undefined, undefined, undefined, undefined])

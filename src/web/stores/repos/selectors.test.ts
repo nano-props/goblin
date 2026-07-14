@@ -103,7 +103,7 @@ describe('repo selectors', () => {
     })
     expect(
       primaryWindowNavigationStoreActionsFromStore({
-        closeRepo: fnA,
+        closeRepo: fnA as never,
         peekWorkspaceNavigation: fnA as never,
         commitWorkspaceNavigation: fnA as never,
       }),

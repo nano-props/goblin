@@ -29,13 +29,16 @@ import {
   type RepoRuntimeMembershipLeaseEntry,
 } from '#/server/modules/repo-runtimes.ts'
 import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
-import { clearServerWorkspaceTabsIfUnchanged, getServerWorkspaceState } from '#/server/modules/settings-source.ts'
+import {
+  clearServerWorkspaceTabsIfUnchanged,
+  getServerWorkspaceState,
+  replaceServerWorkspaceReposIfUnchanged,
+} from '#/server/modules/settings-source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 
 export interface RestoreServerWorkspaceInput {
   userId: string
   clientId: string
-  openRepoEntries: RepoSessionEntry[]
   // The repo the user is currently viewing. Only this repo gets the full
   // projection read + pane-tab restore at cold start. Other repos are
   // validated/canonicalized, then returned as stub leases and restored lazily
@@ -93,8 +96,8 @@ export async function restoreServerWorkspace(input: RestoreServerWorkspaceInput)
       input.signal?.throwIfAborted()
       const workspace = await getServerWorkspaceState()
       const restored = await restoreServerWorkspaceSnapshot(
-        { ...input, activeRepoRoot: input.activeRepoRoot ?? input.openRepoEntries[0]?.id ?? null },
-        { workspace, openRepoEntries: input.openRepoEntries },
+        { ...input, activeRepoRoot: input.activeRepoRoot ?? workspace.openRepoEntries[0]?.id ?? null },
+        { workspace, openRepoEntries: workspace.openRepoEntries },
       )
       return restored
     })
@@ -140,14 +143,20 @@ async function restoreServerWorkspaceSnapshot(
     }
 
     input.signal?.throwIfAborted()
+    const membershipRepair = repoRestoreFailed
+      ? await replaceServerWorkspaceReposIfUnchanged(
+          source.openRepoEntries,
+          opened.map((repo) => repo.entry),
+        )
+      : { replaced: false, workspace: source.workspace }
     // Only the active repo's tabs are validated and restored at startup.
     // Non-active repos carry `projection: null` so their `targetForSessionKey`
     // cannot resolve — and their tabs will be restored lazily when the user
     // navigates to them via `restoreRepoTabsForRepo`.
     const openedActive = opened.filter(isOpenedProjectedRepo)
     const validatedWorkspace = openedActive[0]
-      ? await validateOrRepairWorkspacePaneTabs(source.workspace, openedActive[0])
-      : { workspace: source.workspace, repaired: false }
+      ? await validateOrRepairWorkspacePaneTabs(membershipRepair.workspace, openedActive[0])
+      : { workspace: membershipRepair.workspace, repaired: false }
 
     input.signal?.throwIfAborted()
     const workspacePaneTabs = await restoreWorkspacePaneTabsForRepos(input, validatedWorkspace.workspace, openedActive)
@@ -371,7 +380,6 @@ export async function restoreRepoTabsForRepo(input: RestoreRepoTabsInput): Promi
     {
       userId: input.userId,
       clientId: input.clientId,
-      openRepoEntries: [],
       workspacePaneTabsHost: input.workspacePaneTabsHost,
       signal: input.signal,
     },
@@ -408,6 +416,7 @@ async function validateOrRepairWorkspacePaneTabs(
 
 function workspaceForRepoTabs(workspace: ServerWorkspaceState, repoRoot: string): ServerWorkspaceState {
   return {
+    openRepoEntries: workspace.openRepoEntries,
     workspacePaneTabsByTargetByRepo: {
       [repoRoot]: workspace.workspacePaneTabsByTargetByRepo[repoRoot] ?? {},
     },

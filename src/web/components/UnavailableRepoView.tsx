@@ -82,7 +82,7 @@ export function UnavailableRepoView({ repo }: Props) {
                   {t('repo-picker.open-remote-open-ssh-settings')}
                 </Button>
               )}
-              <Button type="button" variant="ghost" onClick={() => navigation.closeRepo(repo.id)}>
+              <Button type="button" variant="ghost" onClick={() => void navigation.closeRepo(repo.id)}>
                 <X />
                 {t('repo-unavailable.close')}
               </Button>

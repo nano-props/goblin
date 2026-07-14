@@ -152,18 +152,24 @@ export async function setRecentWorkspaceExternalApp(input: {
 
 export async function restoreServerWorkspace(
   clientId: string,
-  openRepoEntries: RepoSessionEntry[],
   options?: { activeRepoRoot?: string | null; signal?: AbortSignal },
 ): Promise<WorkspaceRestoreResult> {
   return await postServerJson(
     '/api/settings/workspace/restore',
     {
       clientId,
-      openRepoEntries,
       ...(options && 'activeRepoRoot' in options ? { activeRepoRoot: options.activeRepoRoot } : {}),
     },
     { signal: options?.signal },
   )
+}
+
+export async function addWorkspaceRepo(entry: RepoSessionEntry): Promise<void> {
+  await postServerJson('/api/settings/workspace/repos/add', { entry })
+}
+
+export async function removeWorkspaceRepo(repoRoot: string): Promise<void> {
+  await postServerJson('/api/settings/workspace/repos/remove', { repoRoot })
 }
 
 export async function restoreRepoWorkspaceTabs(

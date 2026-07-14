@@ -3,8 +3,7 @@ import type {
   FiletreeSessionViewState,
   NativeClientWorkspaceReadResult,
 } from '#/shared/api-types.ts'
-import { toSafeRepoLocator, toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
-import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
+import { toSafeRepoLocator } from '#/shared/input-validation.ts'
 import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
 import { isWorkspacePaneSessionTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneSessionTabType } from '#/shared/workspace-pane.ts'
@@ -56,7 +55,6 @@ export function normalizeClientWorkspaceState(value: unknown): ClientWorkspaceSt
   const raw = value as Partial<ClientWorkspaceState>
   const layout = normalizeWorkspaceSessionLayoutState(raw)
   return {
-    openRepoEntries: normalizeOpenRepoEntries(raw.openRepoEntries),
     restoredRepoId: toSafeRepoLocator(raw.restoredRepoId) ?? null,
     ...layout,
     selectedTerminalSessionIdByTerminalWorktree: normalizeSelectedTerminals(
@@ -65,21 +63,6 @@ export function normalizeClientWorkspaceState(value: unknown): ClientWorkspaceSt
     preferredWorkspacePaneTabByTargetByRepo: normalizePreferredTabs(raw.preferredWorkspacePaneTabByTargetByRepo),
     filetreeViewStateByWorktreeByRepo: normalizeFiletreeState(raw.filetreeViewStateByWorktreeByRepo),
   }
-}
-
-function normalizeOpenRepoEntries(value: unknown): RepoSessionEntry[] {
-  if (!Array.isArray(value)) return []
-  const seen = new Set<string>()
-  const entries: RepoSessionEntry[] = []
-  for (const candidate of value) {
-    const entry = toSafeSessionRepoEntry(candidate)
-    if (!entry) continue
-    const id = repoSessionEntryId(entry)
-    if (seen.has(id)) continue
-    seen.add(id)
-    entries.push(entry)
-  }
-  return entries
 }
 
 function normalizeSelectedTerminals(value: unknown): Record<string, string> {

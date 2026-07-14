@@ -20,7 +20,7 @@ import { useThemeStore } from '#/web/stores/theme.ts'
 import { createTimeoutAbortController } from '#/web/lib/abort.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import { readClientWorkspaceState } from '#/web/client-workspace-state.ts'
-import { repoSessionEntryId } from '#/shared/remote-repo.ts'
+import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 
 export type AuthenticatedAppBootstrapState = { status: 'restoring-workspace' } | { status: 'ready' }
 
@@ -115,7 +115,7 @@ async function restoreBootSession(
     primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), snapshot)
     if (signal.aborted) throw abortReason(signal)
     const restored = await abortable(
-      restoreWorkspaceAtBoot(readOrCreateWebTerminalClientId(), presentation.openRepoEntries, {
+      restoreWorkspaceAtBoot(readOrCreateWebTerminalClientId(), {
         activeRepoRoot: activeRepoRoot ?? presentation.restoredRepoId,
         signal,
       }),
@@ -189,14 +189,13 @@ function blockSessionPersistenceAfterRestoreFailure(message: string): void {
 }
 
 function composeRestoredWorkspaceSession(
-  openRepoEntries: ClientWorkspaceState['openRepoEntries'],
+  openRepoEntries: RepoSessionEntry[],
   presentation: ClientWorkspaceState,
   serverRestoredRepoId: string | null,
 ): ClientWorkspaceState {
   const openRepoIds = new Set(openRepoEntries.map(repoSessionEntryId))
   return {
     ...presentation,
-    openRepoEntries,
     restoredRepoId:
       presentation.restoredRepoId && openRepoIds.has(presentation.restoredRepoId)
         ? presentation.restoredRepoId

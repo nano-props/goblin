@@ -36,6 +36,7 @@ import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-
 
 const appDataClientMocks = vi.hoisted(() => ({
   clearRecentRepoHistory: vi.fn(async () => {}),
+  removeRepoFromWorkspace: vi.fn(async () => {}),
 }))
 
 vi.mock('#/web/settings-actions.ts', async () => {
@@ -43,6 +44,7 @@ vi.mock('#/web/settings-actions.ts', async () => {
   return {
     ...actual,
     clearRecentRepoHistory: appDataClientMocks.clearRecentRepoHistory,
+    removeRepoFromWorkspace: appDataClientMocks.removeRepoFromWorkspace,
   }
 })
 
@@ -70,6 +72,7 @@ beforeEach(() => {
   showRepoBranchWorkspacePaneTabSpy.mockClear()
   showRepoBranchTerminalSessionSpy.mockClear()
   appDataClientMocks.clearRecentRepoHistory.mockClear()
+  appDataClientMocks.removeRepoFromWorkspace.mockClear()
   consumeExternalOpenPathsSpy.mockReset()
   consumeExternalOpenPathsSpy.mockResolvedValue([])
   overlayOpen = false
@@ -83,9 +86,9 @@ beforeEach(() => {
     activateRepo: (repoId) => {
       activateRepoSpy(repoId)
     },
-    closeRepo: (repoId) => {
+    closeRepo: async (repoId) => {
       closeRepoSpy(repoId)
-      useReposStore.getState().closeRepo(repoId)
+      await useReposStore.getState().closeRepo(repoId)
     },
     cycleRepo: () => {},
     selectRepoBranch: () => true,

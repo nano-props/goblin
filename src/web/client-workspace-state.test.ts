@@ -28,17 +28,6 @@ describe('client workspace persistence', () => {
     await expect(readClientWorkspaceState()).resolves.toEqual(normalizeClientWorkspaceState(null))
   })
 
-  test('preserves four open repos in picker order across a local reload', async () => {
-    const openRepoEntries = ['/repo-a', '/repo-b', '/repo-c', '/repo-d'].map((id) => ({
-      kind: 'local' as const,
-      id,
-    }))
-
-    await writeClientWorkspaceState(normalizeClientWorkspaceState({ openRepoEntries }))
-
-    expect((await readClientWorkspaceState()).openRepoEntries).toEqual(openRepoEntries)
-  })
-
   test('round-trips client-owned presentation without server workspace fields', async () => {
     const presentation = normalizeClientWorkspaceState({
       restoredRepoId: '/repo-a',
@@ -51,7 +40,6 @@ describe('client workspace persistence', () => {
           '/worktree': { selectedKeys: ['README.md'], expandedKeys: ['src'], topVisibleRowIndex: 7 },
         },
       },
-      openRepoEntries: [{ kind: 'local', id: '/repo-a' }],
       workspacePaneTabsByTargetByRepo: { '/must-not-persist': {} },
     })
 
@@ -59,7 +47,7 @@ describe('client workspace persistence', () => {
 
     expect(await readClientWorkspaceState()).toEqual(presentation)
     const raw = JSON.parse(localStorage.getItem('goblin.workspace') ?? '{}')
-    expect(raw.openRepoEntries).toEqual([{ kind: 'local', id: '/repo-a' }])
+    expect(raw).not.toHaveProperty('openRepoEntries')
     expect(raw).not.toHaveProperty('workspacePaneTabsByTargetByRepo')
   })
 
@@ -77,7 +65,6 @@ describe('client workspace persistence', () => {
     )
 
     expect(await readClientWorkspaceState()).toEqual({
-      openRepoEntries: [],
       restoredRepoId: null,
       zenMode: false,
       workspacePaneSize: 70,

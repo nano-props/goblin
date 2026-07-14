@@ -157,7 +157,6 @@ describe('app bootstrap hooks', () => {
     await vi.waitFor(() => {
       expect(mockedRestorePersistedWorkspaceSession).toHaveBeenCalledWith(
         expect.any(String),
-        [],
         expect.objectContaining({
           activeRepoRoot: '/tmp/routed-repo',
           signal: expect.any(AbortSignal),
@@ -255,6 +254,7 @@ describe('app bootstrap hooks', () => {
       status: 'repaired',
       openRepoEntries: rebuiltSession.openRepoEntries,
       workspace: {
+        openRepoEntries: rebuiltSession.openRepoEntries,
         workspacePaneTabsByTargetByRepo: rebuiltSession.workspacePaneTabsByTargetByRepo,
       },
       runtime: restoredRuntimeForSession(rebuiltSession),
@@ -492,6 +492,7 @@ function mockServerRestore(session: WorkspaceSessionState): void {
     status: 'restored',
     openRepoEntries: session.openRepoEntries,
     workspace: {
+      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsByTargetByRepo: session.workspacePaneTabsByTargetByRepo,
     },
     runtime: restoredRuntimeForSession(session),
@@ -505,7 +506,6 @@ function mockClientPresentation(session: WorkspaceSessionState): void {
 
 function clientPresentationForSession(session: WorkspaceSessionState) {
   return {
-    openRepoEntries: session.openRepoEntries,
     restoredRepoId: session.restoredRepoId,
     zenMode: session.zenMode,
     workspacePaneSize: session.workspacePaneSize,

@@ -16,7 +16,7 @@ import {
   reconcileRepoRuntimeMemberships,
 } from '#/web/repo-client.ts'
 import { resolveRemoteRepositoryTarget } from '#/web/remote-client.ts'
-import { recordRecentRepo } from '#/web/settings-actions.ts'
+import { addRepoToWorkspace, recordRecentRepo, removeRepoFromWorkspace } from '#/web/settings-actions.ts'
 import {
   invalidateRepoRuntimes,
   removeRepoRuntimeFromCache,
@@ -422,6 +422,37 @@ function removeRepoFromSessionState(s: ReposStore, id: string): Partial<ReposSto
   }
 }
 
+async function rollbackNewWorkspaceRepo(
+  set: ReposSet,
+  get: ReposGet,
+  repoRoot: string,
+  repoRuntimeId: string,
+): Promise<void> {
+  if (get().repos[repoRoot]?.repoRuntimeId !== repoRuntimeId) return
+  disposeRepoOperationScheduler(repoRoot)
+  set((state) =>
+    state.repos[repoRoot]?.repoRuntimeId === repoRuntimeId ? removeRepoFromSessionState(state, repoRoot) : state,
+  )
+  try {
+    await closeRepoRuntimeWithCache(repoRoot, repoRuntimeId)
+  } catch (err) {
+    reposLog.warn('failed to release repo runtime after workspace membership write failed', {
+      repoRoot,
+      repoRuntimeId,
+      err,
+    })
+    try {
+      await invalidateRepoRuntimes()
+    } catch (refreshErr) {
+      reposLog.warn('failed to refresh repo runtimes after workspace open rollback', {
+        repoRoot,
+        repoRuntimeId,
+        err: refreshErr,
+      })
+    }
+  }
+}
+
 async function recordRecentRepoPostOpen(repo: RepoSessionEntry): Promise<OpenRepoPostOpenError[]> {
   try {
     await recordRecentRepo(repo)
@@ -722,8 +753,10 @@ export function createRuntimeRepoSessionActions(
       // only translates its canonical outcome into OpenRepoResult.
       if (isRemoteRepoId(entry.id)) {
         // Pre-insert the window-local shell before applying the server result.
+        let openedRepoRuntimeId: string | null = null
         if (!get().repos[entry.id]) {
           await openRepoRuntimeWithCache(entry.id, (repoRuntimeId) => {
+            openedRepoRuntimeId = repoRuntimeId
             set((s) => {
               const result = insertPlaceholderRepo(
                 { repos: s.repos, repoSnapshotCache: s.repoSnapshotCache, order: s.order },
@@ -746,20 +779,27 @@ export function createRuntimeRepoSessionActions(
         }
         if (outcome.kind === 'ready') {
           const recentEntry = remoteRepoSessionEntry(outcome.target)
+          try {
+            await addRepoToWorkspace(recentEntry)
+          } catch (err) {
+            if (openedRepoRuntimeId) await rollbackNewWorkspaceRepo(set, get, outcome.repoId, openedRepoRuntimeId)
+            reposLog.warn('failed to add repo to server workspace', { repoRoot: outcome.repoId, err })
+            return { ok: false, message: 'error.failed-read-repo' }
+          }
           return { ok: true, id: outcome.repoId, postOpenEffects: recordRecentRepoPostOpen(recentEntry) }
         }
         return { ok: false, message: outcome.reason ?? 'error.failed-read-repo' }
       }
       // Local repos use the direct runtime-open path — there's no remote
       // lifecycle command to converge.
-      let initialRefresh: InitialRepoRefresh | null = null
+      const initialRefreshRef: { current: InitialRepoRefresh | null } = { current: null }
       const resolved = await openLocalRepoRuntimeForInput(entry, (opened) => {
         if (!opened.repo || !opened.repoRuntimeId) return
         const repo = opened.repo
         const repoRuntimeId = opened.repoRuntimeId
         set((s) => {
           const { repos, order, changed } = addResolvedRepo(s, repo, repoRuntimeId)
-          if (changed) initialRefresh = { id: repo.id, repoRuntimeId: repos[repo.id]!.repoRuntimeId }
+          if (changed) initialRefreshRef.current = { id: repo.id, repoRuntimeId: repos[repo.id]!.repoRuntimeId }
           return changed ? { repos, order } : s
         })
       })
@@ -769,12 +809,26 @@ export function createRuntimeRepoSessionActions(
       const { id } = repo
       const recentEntry = repo.target ? remoteRepoSessionEntry(repo.target) : { kind: 'local' as const, id }
 
-      if (initialRefresh) refreshInitialRepoState(set, get, initialRefresh)
+      try {
+        await addRepoToWorkspace(recentEntry)
+      } catch (err) {
+        if (initialRefreshRef.current)
+          await rollbackNewWorkspaceRepo(set, get, id, initialRefreshRef.current.repoRuntimeId)
+        reposLog.warn('failed to add repo to server workspace', { repoRoot: id, err })
+        return { ok: false, message: 'error.failed-read-repo' }
+      }
+      if (initialRefreshRef.current) refreshInitialRepoState(set, get, initialRefreshRef.current)
       return { ok: true, id, postOpenEffects: recordRecentRepoPostOpen(recentEntry) }
     },
 
-    closeRepo(id: string) {
+    async closeRepo(id: string) {
       const repoRuntimeId = get().repos[id]?.repoRuntimeId ?? null
+      try {
+        await removeRepoFromWorkspace(id)
+      } catch (err) {
+        reposLog.warn('failed to remove repo from server workspace', { id, err })
+        return
+      }
       disposeRepoOperationScheduler(id)
       // Tell main to abort any cancellable network op for this repo —
       // otherwise a `git push` started right before the user closed the

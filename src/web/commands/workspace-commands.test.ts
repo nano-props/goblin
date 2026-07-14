@@ -1138,7 +1138,7 @@ describe('workspace commands', () => {
       branchName: 'feature/worktree',
       navigation: navigationWith({ showRepoBranchTerminalSession }),
     })
-    useReposStore.getState().closeRepo(REPO_ID)
+    await useReposStore.getState().closeRepo(REPO_ID)
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/reopened', { worktree: { path: WORKTREE_PATH } })],
@@ -3133,7 +3133,7 @@ function navigationWith(
   const navigation: PrimaryWindowNavigationActions = {
     currentRepoBranchWorkspacePaneRoute: observedWorkspacePaneRouteForTarget,
     activateRepo: (repoId) => useReposStore.setState({ restoredRepoId: repoId }),
-    closeRepo: () => {},
+    closeRepo: async () => {},
     cycleRepo: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,

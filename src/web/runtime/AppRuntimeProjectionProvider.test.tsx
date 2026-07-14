@@ -409,7 +409,7 @@ describe('AppRuntimeProjectionProvider', () => {
     try {
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
 
-      useReposStore.getState().closeRepo(REPO_ID)
+      await useReposStore.getState().closeRepo(REPO_ID)
       seedRepoWithReadModelForTest({
         id: REPO_ID,
         repoRuntimeId: 'repo-runtime-reopened',

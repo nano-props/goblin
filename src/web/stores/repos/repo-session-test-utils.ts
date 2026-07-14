@@ -13,6 +13,7 @@ export async function flushIpc(): Promise<void> {
 export function installGoblin(overrides: Record<string, (input: any) => unknown> = {}) {
   const calls = {
     recent: [] as RepoSessionEntry[],
+    workspaceRepos: [] as RepoSessionEntry[],
     projection: [] as string[],
     resolveTarget: [] as Array<{ alias: string; remotePath: string }>,
   }
@@ -43,6 +44,17 @@ export function installGoblin(overrides: Record<string, (input: any) => unknown>
     'settings.addRecentRepo': ({ repo }: { repo: RepoSessionEntry }) => {
       calls.recent.push(repo)
       return calls.recent
+    },
+    'settings.addWorkspaceRepo': ({ entry }: { entry: RepoSessionEntry }) => {
+      const existingIndex = calls.workspaceRepos.findIndex((candidate) => candidate.id === entry.id)
+      if (existingIndex === -1) calls.workspaceRepos.push(entry)
+      else calls.workspaceRepos[existingIndex] = entry
+      return undefined
+    },
+    'settings.removeWorkspaceRepo': ({ repoRoot }: { repoRoot: string }) => {
+      const index = calls.workspaceRepos.findIndex((entry) => entry.id === repoRoot)
+      if (index !== -1) calls.workspaceRepos.splice(index, 1)
+      return undefined
     },
     'settings.applyNativeHostProjection': async () => undefined,
   }

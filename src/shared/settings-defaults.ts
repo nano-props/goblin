@@ -20,12 +20,11 @@ export const DEFAULT_GLOBAL_SHORTCUT_DISABLED = false
 export const DEFAULT_LAN_ENABLED = false
 
 export function defaultServerWorkspaceState(): ServerWorkspaceState {
-  return { workspacePaneTabsByTargetByRepo: {} }
+  return { openRepoEntries: [], workspacePaneTabsByTargetByRepo: {} }
 }
 
 export function defaultClientWorkspaceState(): ClientWorkspaceState {
   return {
-    openRepoEntries: [],
     restoredRepoId: null,
     zenMode: DEFAULT_ZEN_MODE,
     workspacePaneSize: DEFAULT_WORKSPACE_PANE_SIZE,

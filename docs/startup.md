@@ -63,7 +63,7 @@ Code that needs the combined state should use `workspaceRestoreStatusFromStore` 
 - Server workspace-tab commands persist canonical `ServerWorkspaceState` directly.
 - The client persists only `ClientWorkspaceState`: in native `userData` for
   Electron, and in local storage for Web.
-- The client submits its local `openRepoEntries` once as boot restore intent;
+- The server reads the shared `ServerWorkspaceState.openRepoEntries` membership at boot;
   the server returns canonical entries and runtime identities.
 - Do not compose client and server workspace persistence into a whole-session payload.
 - Do not persist client workspace state until `workspaceSessionPersistenceOpenFromStore` is true.

@@ -188,7 +188,7 @@ export async function handleWorkspaceClientIntent(
         navigation: deps.navigation,
       })
     case 'close-repo':
-      deps.navigation.closeRepo(plan.repoId)
+      await deps.navigation.closeRepo(plan.repoId)
       return true
     case 'close-window':
       window.close()

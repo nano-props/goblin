@@ -46,7 +46,7 @@ describe('useClientWorkspacePersistence', () => {
       expect.objectContaining({ restoredRepoId: repo.id, zenMode: true, workspacePaneSize: 55 }),
     )
     const saved = writePresentationMock.mock.calls[0]?.[0]
-    expect(saved.openRepoEntries).toEqual([{ kind: 'local', id: repo.id }])
+    expect(saved).not.toHaveProperty('openRepoEntries')
     expect(saved).not.toHaveProperty('workspacePaneTabsByTargetByRepo')
   })
 

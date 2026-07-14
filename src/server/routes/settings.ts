@@ -1,7 +1,7 @@
 import { getServerExternalAppsSnapshot } from '#/server/modules/external-apps.ts'
 import { getServerGitHubCliState } from '#/server/modules/github-cli.ts'
 import { getSettingsSnapshot } from '#/server/modules/settings-snapshot.ts'
-import { getUserSettings } from '#/server/modules/settings-source.ts'
+import { addServerWorkspaceRepo, getUserSettings, removeServerWorkspaceRepo } from '#/server/modules/settings-source.ts'
 import { restoreRepoTabsForRepo, restoreServerWorkspace } from '#/server/modules/session-restore.ts'
 import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
@@ -70,7 +70,7 @@ export function createSettingsRoutes(options: {
   app.post('/workspace/restore', async (c) => {
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
-    const { clientId, openRepoEntries, activeRepoRoot } = await parseHttpBody(
+    const { clientId, activeRepoRoot } = await parseHttpBody(
       SETTINGS_PROCEDURE_SCHEMAS.workspaceRestore,
       c,
     )
@@ -78,12 +78,23 @@ export function createSettingsRoutes(options: {
       await restoreServerWorkspace({
         userId,
         clientId,
-        openRepoEntries,
         activeRepoRoot: activeRepoRoot ?? null,
         workspacePaneTabsHost,
         signal: c.req.raw.signal,
       }),
     )
+  })
+  app.post('/workspace/repos/add', async (c) => {
+    const userId = userIdFromContext(c)
+    if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
+    const { entry } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.workspaceRepoAdd, c)
+    return c.json(await addServerWorkspaceRepo(entry))
+  })
+  app.post('/workspace/repos/remove', async (c) => {
+    const userId = userIdFromContext(c)
+    if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
+    const { repoRoot } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.workspaceRepoRemove, c)
+    return c.json(await removeServerWorkspaceRepo(repoRoot))
   })
   app.post('/workspace/restore-repo-tabs', async (c) => {
     const userId = userIdFromContext(c)

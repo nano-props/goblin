@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   handleUpdateUserSettings: vi.fn(),
   restoreServerWorkspace: vi.fn(),
   restoreRepoTabsForRepo: vi.fn(),
+  addServerWorkspaceRepo: vi.fn(),
+  removeServerWorkspaceRepo: vi.fn(),
 }))
 
 vi.mock('#/server/modules/external-apps.ts', () => ({
@@ -32,6 +34,8 @@ vi.mock('#/server/modules/settings-snapshot.ts', () => ({
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getUserSettings: mocks.getUserSettings,
+  addServerWorkspaceRepo: mocks.addServerWorkspaceRepo,
+  removeServerWorkspaceRepo: mocks.removeServerWorkspaceRepo,
 }))
 
 vi.mock('#/server/modules/settings-write-paths.ts', () => ({
@@ -102,6 +106,7 @@ describe('settings routes', () => {
       status: 'restored' as const,
       openRepoEntries: [],
       workspace: {
+        openRepoEntries: [],
         workspacePaneTabsByTargetByRepo: {},
       },
       runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
@@ -121,7 +126,6 @@ describe('settings routes', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           clientId: 'client_test000000000000',
-          openRepoEntries: [{ kind: 'local', id: '/repo-active' }],
           activeRepoRoot: '/repo-active',
         }),
       }),
@@ -131,11 +135,42 @@ describe('settings routes', () => {
     expect(mocks.restoreServerWorkspace).toHaveBeenCalledWith({
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      openRepoEntries: [{ kind: 'local', id: '/repo-active' }],
       activeRepoRoot: '/repo-active',
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       signal: expect.any(AbortSignal),
     })
+  })
+
+  test('delegates authenticated workspace membership commands', async () => {
+    const workspace = {
+      openRepoEntries: [{ kind: 'local' as const, id: '/repo-a' }],
+      workspacePaneTabsByTargetByRepo: {},
+    }
+    mocks.addServerWorkspaceRepo.mockResolvedValue(workspace)
+    mocks.removeServerWorkspaceRepo.mockResolvedValue({ ...workspace, openRepoEntries: [] })
+    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
+    const app = new Hono<{ Variables: { userId: string } }>()
+    app.use('*', async (c, next) => {
+      c.set('userId', 'user-test')
+      await next()
+    })
+    app.route('/', createSettingsRoutes(settingsRouteOptions()))
+
+    const addResponse = await app.request('/workspace/repos/add', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ entry: { kind: 'local', id: '/repo-a' } }),
+    })
+    const removeResponse = await app.request('/workspace/repos/remove', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ repoRoot: '/repo-a' }),
+    })
+
+    await expect(addResponse.json()).resolves.toEqual(workspace)
+    await expect(removeResponse.json()).resolves.toEqual({ ...workspace, openRepoEntries: [] })
+    expect(mocks.addServerWorkspaceRepo).toHaveBeenCalledWith({ kind: 'local', id: '/repo-a' })
+    expect(mocks.removeServerWorkspaceRepo).toHaveBeenCalledWith('/repo-a')
   })
 
   test('delegates lazy repo tab restore to the server restore coordinator', async () => {

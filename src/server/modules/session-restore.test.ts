@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   releaseRepoRuntimeMembershipLease: vi.fn(),
   isCurrentRepoRuntime: vi.fn(),
   getServerWorkspaceState: vi.fn(),
+  replaceServerWorkspaceReposIfUnchanged: vi.fn(),
   clearServerWorkspaceTabsIfUnchanged: vi.fn(),
   probeRepo: vi.fn(),
   readRepoProjection: vi.fn(),
@@ -28,6 +29,7 @@ vi.mock('#/server/modules/repo-runtimes.ts', () => ({
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerWorkspaceState: mocks.getServerWorkspaceState,
+  replaceServerWorkspaceReposIfUnchanged: mocks.replaceServerWorkspaceReposIfUnchanged,
   clearServerWorkspaceTabsIfUnchanged: mocks.clearServerWorkspaceTabsIfUnchanged,
 }))
 
@@ -41,12 +43,15 @@ vi.mock('#/server/modules/remote-lifecycle-write-paths.ts', () => ({
 }))
 
 function serverWorkspaceFromSession(session: WorkspaceSessionState): ServerWorkspaceState {
-  return { workspacePaneTabsByTargetByRepo: session.workspacePaneTabsByTargetByRepo }
+  return {
+    openRepoEntries: session.openRepoEntries,
+    workspacePaneTabsByTargetByRepo: session.workspacePaneTabsByTargetByRepo,
+  }
 }
 
 describe('restoreServerWorkspace', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.resetAllMocks()
     mocks.acquireRepoRuntimeLease.mockImplementation((_userId: string, repoRoot: string) => ({
       repoRoot,
       repoRuntimeId: 'repo-runtime-test',
@@ -64,8 +69,14 @@ describe('restoreServerWorkspace', () => {
     })
     mocks.clearServerWorkspaceTabsIfUnchanged.mockImplementation(async ({ repoRoot }: { repoRoot: string }) => ({
       cleared: true,
-      workspace: { workspacePaneTabsByTargetByRepo: {} },
+      workspace: { openRepoEntries: [], workspacePaneTabsByTargetByRepo: {} },
     }))
+    mocks.replaceServerWorkspaceReposIfUnchanged.mockImplementation(
+      async (_expected: RepoSessionEntry[], replacement: RepoSessionEntry[]) => ({
+        replaced: true,
+        workspace: { openRepoEntries: replacement, workspacePaneTabsByTargetByRepo: {} },
+      }),
+    )
     mocks.runRemoteLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       lifecycle: { kind: 'ready' },
@@ -99,7 +110,6 @@ describe('restoreServerWorkspace', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsHost,
     })
 
@@ -147,7 +157,6 @@ describe('restoreServerWorkspace', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsHost,
     })
 
@@ -180,7 +189,6 @@ describe('restoreServerWorkspace', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsHost,
     })
 
@@ -222,12 +230,11 @@ describe('restoreServerWorkspace', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsHost,
     })
 
     expect(result.status).toBe('restored')
-    expect(result.workspace).toEqual(defaultServerWorkspaceState())
+    expect(result.workspace).toEqual(serverWorkspaceFromSession(session))
     expect(result.openRepoEntries).toEqual(session.openRepoEntries)
     expect(result.runtime.repos).toEqual([
       expect.objectContaining({ repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', projection: null }),
@@ -237,7 +244,10 @@ describe('restoreServerWorkspace', () => {
 
   test('keeps a local repo declaration as a stub when its path is temporarily unavailable', async () => {
     const entry = { kind: 'local' as const, id: '/repo' }
-    mocks.getServerWorkspaceState.mockResolvedValue(defaultServerWorkspaceState())
+    mocks.getServerWorkspaceState.mockResolvedValue({
+      ...defaultServerWorkspaceState(),
+      openRepoEntries: [entry],
+    })
     mocks.probeRepo.mockResolvedValue({ ok: false, message: 'error.path-permission-denied' })
     const workspacePaneTabsHost = {
       initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
@@ -250,7 +260,6 @@ describe('restoreServerWorkspace', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      openRepoEntries: [entry],
       workspacePaneTabsHost,
     })
 
@@ -290,12 +299,11 @@ describe('restoreServerWorkspace', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsHost,
     })
 
     expect(result.status).toBe('restored')
-    expect(result.workspace).toEqual(defaultServerWorkspaceState())
+    expect(result.workspace).toEqual(serverWorkspaceFromSession(session))
     expect(result.openRepoEntries).toEqual(session.openRepoEntries)
     expect(result.runtime.repos).toEqual([expect.not.objectContaining({ target: expect.anything() })])
     expect(result.runtime.repos[0]).toMatchObject({
@@ -332,7 +340,6 @@ describe('restoreServerWorkspace', () => {
       restoreServerWorkspace({
         userId: 'user-test',
         clientId: 'client_test000000000000',
-        openRepoEntries: session.openRepoEntries,
         workspacePaneTabsHost,
       }),
     ).rejects.toBe(commitError)
@@ -380,7 +387,6 @@ describe('restoreServerWorkspace', () => {
       restoreServerWorkspace({
         userId: 'user-test',
         clientId: 'client_test000000000000',
-        openRepoEntries: session.openRepoEntries,
         workspacePaneTabsHost,
         signal: controller.signal,
       }),
@@ -420,7 +426,6 @@ describe('restoreServerWorkspace', () => {
     const restore = restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsHost,
       signal: controller.signal,
     })
@@ -464,7 +469,6 @@ describe('restoreServerWorkspace', () => {
       restoreServerWorkspace({
         userId: 'user-test',
         clientId: 'client_test000000000000',
-        openRepoEntries: session.openRepoEntries,
         workspacePaneTabsHost,
       }),
     ).rejects.toBe(persistError)
@@ -520,7 +524,6 @@ describe('restoreServerWorkspace', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      openRepoEntries: invalidSession.openRepoEntries,
       workspacePaneTabsHost,
     })
 
@@ -538,7 +541,7 @@ describe('restoreServerWorkspace', () => {
 
 describe('restoreServerWorkspace — active-only restore', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.resetAllMocks()
     mocks.acquireRepoRuntimeLease.mockImplementation((_userId: string, repoRoot: string) => ({
       repoRoot,
       repoRuntimeId: `runtime-${repoRoot.replace(/[^a-z0-9]/gi, '_')}`,
@@ -556,8 +559,14 @@ describe('restoreServerWorkspace — active-only restore', () => {
     }))
     mocks.clearServerWorkspaceTabsIfUnchanged.mockResolvedValue({
       cleared: true,
-      workspace: { workspacePaneTabsByTargetByRepo: {} },
+      workspace: defaultServerWorkspaceState(),
     })
+    mocks.replaceServerWorkspaceReposIfUnchanged.mockImplementation(
+      async (_expected: RepoSessionEntry[], replacement: RepoSessionEntry[]) => ({
+        replaced: true,
+        workspace: { openRepoEntries: replacement, workspacePaneTabsByTargetByRepo: {} },
+      }),
+    )
   })
 
   test('non-active repos are validated stubs — no projection read, projection: null', async () => {
@@ -581,7 +590,6 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsHost,
     })
 
@@ -630,7 +638,6 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      openRepoEntries: session.openRepoEntries,
       activeRepoRoot: '/repo-b',
       workspacePaneTabsHost,
     })
@@ -669,12 +676,11 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsHost,
     })
 
     expect(result.status).toBe('repaired')
-    expect(result.workspace).toEqual(defaultServerWorkspaceState())
+    expect(result.workspace.openRepoEntries).toEqual([{ kind: 'local', id: '/repo-active' }])
     expect(result.openRepoEntries).toEqual([{ kind: 'local', id: '/repo-active' }])
     expect(result.runtime.repos).toHaveLength(1)
     expect(result.runtime.repos[0]).toMatchObject({ repoRoot: '/repo-active' })
@@ -710,7 +716,6 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsHost,
     })
 
@@ -755,7 +760,6 @@ describe('restoreServerWorkspace — active-only restore', () => {
     const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
-      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsHost,
     })
 

@@ -146,6 +146,10 @@ describe('repo runtime membership recovery', () => {
         repoRuntimeId: 'repo-runtime-123456789012345678901',
       }),
       'repo.runtimeReconcile': reconcile,
+      'settings.addWorkspaceRepo': async () => ({
+        openRepoEntries: [{ kind: 'local', id: REPO_ROOT }],
+        workspacePaneTabsByTargetByRepo: {},
+      }),
     })
 
     const opening = useReposStore.getState().ensureWorkspaceOpen(REPO_ROOT)

@@ -220,7 +220,6 @@ const FiletreeSessionViewStateSchema = v.object({
   topVisibleRowIndex: v.number(),
 })
 const ClientWorkspaceStateSchema = v.object({
-  openRepoEntries: v.array(RepoSessionEntrySchema),
   restoredRepoId: v.nullable(v.string()),
   zenMode: v.boolean(),
   workspacePaneSize: v.number(),
@@ -255,9 +254,10 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
   githubCli: GITHUB_CLI_REFRESH_SCHEMA,
   workspaceRestore: v.object({
     clientId: ClientIdSchema,
-    openRepoEntries: v.array(RepoSessionEntrySchema),
     activeRepoRoot: v.optional(v.nullable(RepoRootSchema)),
   }),
+  workspaceRepoAdd: v.object({ entry: RepoSessionEntrySchema }),
+  workspaceRepoRemove: v.object({ repoRoot: RepoRootSchema }),
   // Lazy per-repo restore endpoint — fires when the user navigates to a
   // non-active repo that was hydrated as a stub at cold start.
   restoreRepoTabs: v.object({

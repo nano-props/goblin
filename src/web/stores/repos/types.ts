@@ -146,7 +146,7 @@ export interface RestorableWorkspaceState {
   /** Client workspace UI state that is serialized into ClientWorkspaceState for
    *  next-launch restore. This is restorable state, not runtime-coherent
    *  shared state. */
-  /** Open repository order restored from ClientWorkspaceState.openRepoEntries. */
+  /** Open repository order restored from the server workspace. */
   order: string[]
   /**
    * Session repo restored from ClientWorkspaceState.restoredRepoId.
@@ -257,7 +257,7 @@ interface RuntimeCoherentRepoProjectionActions {
   /** Ensure a repo belongs to the open workspace set without implying
    *  anything about the current active selection. */
   ensureWorkspaceOpen: (path: string | RepoSessionEntry) => Promise<OpenRepoResult>
-  closeRepo: (id: string) => void
+  closeRepo: (id: string) => Promise<void>
   /**
    * Re-probe a remote repo's lifecycle. The single user-facing
    * entry point for "retry" (and the only path the

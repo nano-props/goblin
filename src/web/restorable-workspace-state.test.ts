@@ -40,7 +40,6 @@ describe('restorable-workspace-state', () => {
         },
       }),
     ).toEqual({
-      openRepoEntries: [localRepoSessionEntry('/tmp/repo')],
       restoredRepoId: '/tmp/repo',
       zenMode: false,
       workspacePaneSize: 55,
@@ -67,7 +66,6 @@ describe('restorable-workspace-state', () => {
         },
       }),
     ).toEqual({
-      openRepoEntries: [localRepoSessionEntry(repo.id)],
       restoredRepoId: repo.id,
       zenMode: false,
       workspacePaneSize: 55,
@@ -109,7 +107,6 @@ describe('restorable-workspace-state', () => {
           },
         },
         restoredSessionBaseline: {
-          openRepoEntries: [localRepoSessionEntry(activeRepo.id), localRepoSessionEntry(stubRepo.id)],
           restoredRepoId: activeRepo.id,
           zenMode: false,
           workspacePaneSize: 55,
@@ -131,7 +128,6 @@ describe('restorable-workspace-state', () => {
         },
       }),
     ).toEqual({
-      openRepoEntries: [localRepoSessionEntry(activeRepo.id), localRepoSessionEntry(stubRepo.id)],
       restoredRepoId: activeRepo.id,
       zenMode: false,
       workspacePaneSize: 55,
@@ -242,7 +238,6 @@ describe('restorable-workspace-state', () => {
   test('restores restorable workspace state from ClientWorkspaceState', () => {
     expect(
       restoreRestorableWorkspaceStateFromSession({
-        openRepoEntries: [localRepoSessionEntry('/tmp/repo')],
         restoredRepoId: '/tmp/repo',
         zenMode: false,
         workspacePaneSize: 40,

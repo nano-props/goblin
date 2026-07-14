@@ -80,13 +80,13 @@ export interface ThemeState {
 }
 
 export interface ServerWorkspaceState {
+  /** User-level repository membership, in picker order. */
+  openRepoEntries: RepoSessionEntry[]
   /** Per-repo, per-target canonical workspace pane tab membership. */
   workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>
 }
 
 export interface ClientWorkspaceState {
-  /** Window-local repo membership declaration, in picker order. */
-  openRepoEntries: RepoSessionEntry[]
   /** Repo id restored when opening `/` — null when no repos were open. */
   restoredRepoId: string | null
   zenMode: boolean

@@ -10,6 +10,8 @@ import {
   refreshGitHubCliState,
   restoreRepoWorkspaceTabs,
   restoreServerWorkspace,
+  addWorkspaceRepo,
+  removeWorkspaceRepo,
   setGlobalShortcut as setSettingsGlobalShortcut,
   setGlobalShortcutDisabled as setSettingsGlobalShortcutDisabled,
   setI18nPref as setSettingsI18nPref,
@@ -47,11 +49,18 @@ export async function clearRecentRepoHistory(): Promise<void> {
 
 export async function restoreWorkspaceAtBoot(
   clientId: string,
-  openRepoEntries: RepoSessionEntry[],
   options?: { activeRepoRoot?: string | null; signal?: AbortSignal },
 ): Promise<WorkspaceRestoreResult> {
-  const restored = await restoreServerWorkspace(clientId, openRepoEntries, options)
+  const restored = await restoreServerWorkspace(clientId, options)
   return restored
+}
+
+export async function addRepoToWorkspace(entry: RepoSessionEntry): Promise<void> {
+  await addWorkspaceRepo(entry)
+}
+
+export async function removeRepoFromWorkspace(repoRoot: string): Promise<void> {
+  await removeWorkspaceRepo(repoRoot)
 }
 
 /**

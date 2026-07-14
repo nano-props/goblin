@@ -69,11 +69,13 @@ const RULES: Rule[] = [
       '/src/web/hooks/useAuthenticatedAppBootstrap.ts': ['getExternalAppsSnapshot', 'getSettingsSnapshot'],
       '/src/web/settings-actions.ts': [
         'addRecentRepo',
+        'addWorkspaceRepo',
         'clearRecentRepos',
         'refreshExternalAppsSnapshot',
         'refreshGitHubCliState',
         'restoreRepoWorkspaceTabs',
         'restoreServerWorkspace',
+        'removeWorkspaceRepo',
         'setGlobalShortcut',
         'setGlobalShortcutDisabled',
         'setI18nPref',

@@ -13,6 +13,7 @@ import {
 } from '#/server/modules/settings-persistence.ts'
 import type { LangPref, ServerWorkspaceState, UserSettings, ThemePref } from '#/shared/api-types.ts'
 import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
+import { recordWithoutKey } from '#/shared/record.ts'
 import {
   isKnownWorkspaceExternalAppItemId,
   isWorktreeBootstrapConfigHash,
@@ -171,15 +172,20 @@ function normalizeWorkspace(value: unknown): ServerWorkspaceState {
   if (!value || typeof value !== 'object') return defaultWorkspace()
   const partial = value as Partial<ServerWorkspaceState>
   return {
+    openRepoEntries: normalizeRepoEntries(partial.openRepoEntries),
     workspacePaneTabsByTargetByRepo: normalizeWorkspacePaneTabsByTargetByRepo(partial.workspacePaneTabsByTargetByRepo),
   }
 }
 
 function normalizeRecentRepos(value: unknown): RepoSessionEntry[] {
+  return normalizeRepoEntries(value).slice(0, MAX_RECENT_REPOS)
+}
+
+function normalizeRepoEntries(value: unknown): RepoSessionEntry[] {
   if (!Array.isArray(value)) return []
   return dedupeRepoEntries(
     value.map(toSafeSessionRepoEntry).filter((entry): entry is RepoSessionEntry => entry !== null),
-  ).slice(0, MAX_RECENT_REPOS)
+  )
 }
 
 function normalizeWorktreeBootstrapTrust(value: unknown): WorktreeBootstrapTrust | undefined {
@@ -451,6 +457,60 @@ export async function getServerWorkspaceState(): Promise<ServerWorkspaceState> {
   return cloneWorkspace((await loadUserSettings()).workspace)
 }
 
+export async function addServerWorkspaceRepo(entry: RepoSessionEntry): Promise<ServerWorkspaceState> {
+  return await mutateUserSettings(async (data) => {
+    const id = repoSessionEntryId(entry)
+    const existingIndex = data.workspace.openRepoEntries.findIndex((candidate) => repoSessionEntryId(candidate) === id)
+    const openRepoEntries = [...data.workspace.openRepoEntries]
+    if (existingIndex === -1) openRepoEntries.push(entry)
+    else openRepoEntries[existingIndex] = entry
+    const workspace = { ...data.workspace, openRepoEntries }
+    return { next: { ...data, workspace }, result: cloneWorkspace(workspace) }
+  })
+}
+
+export async function removeServerWorkspaceRepo(repoRoot: string): Promise<ServerWorkspaceState> {
+  return await mutateUserSettings(async (data) => {
+    const openRepoEntries = data.workspace.openRepoEntries.filter((entry) => repoSessionEntryId(entry) !== repoRoot)
+    if (openRepoEntries.length === data.workspace.openRepoEntries.length) {
+      return unchangedUserSettings(data, cloneWorkspace(data.workspace))
+    }
+    const workspace = { ...data.workspace, openRepoEntries }
+    return { next: { ...data, workspace }, result: cloneWorkspace(workspace) }
+  })
+}
+
+export async function replaceServerWorkspaceReposIfUnchanged(
+  expected: RepoSessionEntry[],
+  replacement: RepoSessionEntry[],
+): Promise<{ replaced: boolean; workspace: ServerWorkspaceState }> {
+  return await mutateUserSettings<{ replaced: boolean; workspace: ServerWorkspaceState }>(async (data) => {
+    if (!sameRepoEntries(data.workspace.openRepoEntries, expected)) {
+      return unchangedUserSettings(data, { replaced: false, workspace: cloneWorkspace(data.workspace) })
+    }
+    const workspace = { ...data.workspace, openRepoEntries: replacement }
+    return {
+      next: { ...data, workspace },
+      result: { replaced: true, workspace: cloneWorkspace(workspace) },
+    }
+  })
+}
+
+function sameRepoEntries(a: RepoSessionEntry[], b: RepoSessionEntry[]): boolean {
+  return a.length === b.length && a.every((entry, index) => sameRepoEntry(entry, b[index]))
+}
+
+function sameRepoEntry(a: RepoSessionEntry, b: RepoSessionEntry | undefined): boolean {
+  if (!b || a.kind !== b.kind || a.id !== b.id) return false
+  if (a.kind === 'local' || b.kind === 'local') return true
+  return (
+    a.ref.id === b.ref.id &&
+    a.ref.alias === b.ref.alias &&
+    a.ref.remotePath === b.ref.remotePath &&
+    a.ref.displayName === b.ref.displayName
+  )
+}
+
 export async function clearServerWorkspaceTabsIfUnchanged(input: {
   repoRoot: string
   expectedTabsByTarget: Record<string, WorkspacePaneTabEntry[]>
@@ -464,9 +524,11 @@ export async function clearServerWorkspaceTabsIfUnchanged(input: {
     if (!sameServerWorkspaceTabsForRepo(input.repoRoot, currentTabsByTarget, input.expectedTabsByTarget)) {
       return unchangedUserSettings(data, { cleared: false as const, latestWorkspace: cloneWorkspace(data.workspace) })
     }
-    const workspacePaneTabsByTargetByRepo = { ...data.workspace.workspacePaneTabsByTargetByRepo }
-    delete workspacePaneTabsByTargetByRepo[input.repoRoot]
-    const workspace = { workspacePaneTabsByTargetByRepo }
+    const workspacePaneTabsByTargetByRepo = recordWithoutKey(
+      data.workspace.workspacePaneTabsByTargetByRepo,
+      input.repoRoot,
+    )
+    const workspace = { ...data.workspace, workspacePaneTabsByTargetByRepo }
     return {
       next: { ...data, workspace },
       result: { cleared: true as const, workspace: cloneWorkspace(workspace) },

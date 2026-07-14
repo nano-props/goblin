@@ -124,7 +124,7 @@ describe('RepoCloneDialog', () => {
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
   return {
     activateRepo: () => {},
-    closeRepo: () => {},
+    closeRepo: async () => {},
     cycleRepo: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,

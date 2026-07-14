@@ -19,10 +19,6 @@ test('persists client workspace independently of the embedded server origin', as
   const persistence = await import('#/main/client-workspace-state.ts')
   const state = {
     ...defaultClientWorkspaceState(),
-    openRepoEntries: ['/repo-a', '/repo-b', '/repo-c', '/repo-d'].map((id) => ({
-      kind: 'local' as const,
-      id,
-    })),
     restoredRepoId: '/repo-d',
   }
 

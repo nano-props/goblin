@@ -48,6 +48,36 @@ describe('repo lifecycle', () => {
     ])
   })
 
+  test('ensureWorkspaceOpen rolls back a newly opened runtime when shared membership persistence fails', async () => {
+    installGoblin({
+      'settings.addWorkspaceRepo': () => {
+        throw new Error('workspace write failed')
+      },
+    })
+
+    await expect(useReposStore.getState().ensureWorkspaceOpen(REPO_A)).resolves.toEqual({
+      ok: false,
+      message: 'error.failed-read-repo',
+    })
+    expect(useReposStore.getState().repos[REPO_A]).toBeUndefined()
+    expect(useReposStore.getState().order).not.toContain(REPO_A)
+  })
+
+  test('closeRepo keeps local state when shared membership persistence fails', async () => {
+    installGoblin({
+      'settings.removeWorkspaceRepo': () => {
+        throw new Error('workspace write failed')
+      },
+    })
+    await expect(useReposStore.getState().ensureWorkspaceOpen(REPO_A)).resolves.toMatchObject({ ok: true })
+    const repoRuntimeId = useReposStore.getState().repos[REPO_A]!.repoRuntimeId
+
+    await useReposStore.getState().closeRepo(REPO_A)
+
+    expect(useReposStore.getState().repos[REPO_A]?.repoRuntimeId).toBe(repoRuntimeId)
+    expect(useReposStore.getState().order).toContain(REPO_A)
+  })
+
   test('ensureWorkspaceOpen reports recent-history write failures without rolling back the opened repo', async () => {
     installGoblin({
       'settings.addRecentRepo': () => {
@@ -147,7 +177,7 @@ describe('repo lifecycle', () => {
       expect(snapshotResolvers).toHaveLength(1)
     })
     const firstToken = useReposStore.getState().repos[REPO_A]?.repoRuntimeId
-    useReposStore.getState().closeRepo(REPO_A)
+    await useReposStore.getState().closeRepo(REPO_A)
     const second = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
     if (second.ok) useReposStore.setState({ restoredRepoId: second.id })
     const secondToken = useReposStore.getState().repos[REPO_A]?.repoRuntimeId
@@ -180,7 +210,7 @@ describe('repo lifecycle', () => {
     expect(result).toMatchObject({ ok: true, id: REPO_A })
     const repoRuntimeId = useReposStore.getState().repos[REPO_A]!.repoRuntimeId
 
-    useReposStore.getState().closeRepo(REPO_A)
+    await useReposStore.getState().closeRepo(REPO_A)
     await vi.waitFor(() => {
       const cached = primaryWindowQueryClient.getQueryData<RepoRuntimesSnapshot>( repoRuntimesQueryKey())
       expect(cached?.runtimes).not.toContainEqual({ repoRoot: REPO_A, repoRuntimeId })
@@ -354,7 +384,7 @@ describe('repo lifecycle', () => {
     })
   })
 
-  test('closeRepo clears recorded tab openers scoped to that repo, but leaves other repos untouched', () => {
+  test('closeRepo clears recorded tab openers scoped to that repo, but leaves other repos untouched', async () => {
     // seedRepoWithReadModelForTest replaces the whole `repos` map, so seed both repos
     // before merging them back together into one multi-repo store state.
     const repoA = seedRepoWithReadModelForTest({
@@ -387,7 +417,7 @@ describe('repo lifecycle', () => {
         'workspace-pane:status',
       )
 
-    useReposStore.getState().closeRepo(REPO_A)
+    await useReposStore.getState().closeRepo(REPO_A)
 
     const openers = useReposStore.getState().tabOpenerIdentityByScope
     expect(openers[tabOpenerScopeKey({ repoRoot: REPO_A, branchName: 'feature/a', worktreePath: null })]).toBeUndefined()
@@ -398,7 +428,7 @@ describe('repo lifecycle', () => {
     ).toBe('workspace-pane:status')
   })
 
-  test('closeRepo clears workspace navigation history scoped to that repo', () => {
+  test('closeRepo clears workspace navigation history scoped to that repo', async () => {
     const repoA = seedRepoWithReadModelForTest({
       id: REPO_A,
       branches: [createRepoBranch('feature/a')],
@@ -420,7 +450,7 @@ describe('repo lifecycle', () => {
       route: { kind: 'newWorktree', returnTo: '/repo/repo-b/dashboard' },
     })
 
-    useReposStore.getState().closeRepo(REPO_A)
+    await useReposStore.getState().closeRepo(REPO_A)
 
     const history = useReposStore.getState().navigationHistoryByRepo
     expect(history[REPO_A]).toBeUndefined()

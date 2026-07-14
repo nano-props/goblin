@@ -54,12 +54,12 @@ Close:
 
 Restore:
 
-1. `ClientWorkspaceState.openRepoEntries` is submitted once as boot restore
+1. `ServerWorkspaceState.openRepoEntries` is read as the shared boot restore
    intent for that window.
 2. Restore reopens runtimes through the server before writing any
    repo projection.
-3. The server returns canonical repo entries and runtime identities. The client
-   persists the entries locally for its next launch.
+3. The server returns canonical repo entries and runtime identities. Membership
+   remains server-owned; the client persists only its local selection and presentation.
 
 Realtime recovery:
 

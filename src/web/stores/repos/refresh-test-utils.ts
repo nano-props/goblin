@@ -67,6 +67,10 @@ export function resetRefreshTest(): void {
   installGoblinTestBridge(ipcHandlers)
   ipcHandlers['repo.abort'] = async () => false
   ipcHandlers['repo.fetch'] = async () => ({ ok: true, message: 'ok' })
+  ipcHandlers['settings.removeWorkspaceRepo'] = async () => ({
+    openRepoEntries: [],
+    workspacePaneTabsByTargetByRepo: {},
+  })
   // Tests that need repo read responses install `repo.projection`
   // directly; snapshot/status are no longer standalone read routes.
   ipcHandlers['terminal.prune'] = async () => ({ pruned: 0, remaining: 0 })

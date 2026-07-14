@@ -160,7 +160,7 @@ describe('settings-client', () => {
 
     const { restoreServerWorkspace } = await import('#/web/settings-client.ts')
     await expect(
-      restoreServerWorkspace('client_test000000000000', [], { activeRepoRoot: '/tmp/routed-repo' }),
+      restoreServerWorkspace('client_test000000000000', { activeRepoRoot: '/tmp/routed-repo' }),
     ).resolves.toEqual({
       status: 'restored',
       openRepoEntries: [],
@@ -171,7 +171,6 @@ describe('settings-client', () => {
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(JSON.parse(String(init.body))).toEqual({
       clientId: 'client_test000000000000',
-      openRepoEntries: [],
       activeRepoRoot: '/tmp/routed-repo',
     })
   })
