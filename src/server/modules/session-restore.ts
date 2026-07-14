@@ -1,5 +1,4 @@
 import PQueue from 'p-queue'
-import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import {
   IpcError,
   isProjectedRestoredWorkspaceRepo,
@@ -123,6 +122,7 @@ async function restoreServerWorkspaceSnapshot(
 ): Promise<RestoredServerWorkspaceSnapshot> {
   input.signal?.throwIfAborted()
   const opened: OpenedRepoSessionEntry[] = []
+  let repoRestoreFailed = false
   let openedMembershipsCommitted = false
   const activeRepoRoot = input.activeRepoRoot ?? null
   try {
@@ -131,12 +131,8 @@ async function restoreServerWorkspaceSnapshot(
         active: repoSessionEntryId(entry) === activeRepoRoot,
       })
       if (!result.ok) {
-        return {
-          status: 'rebuilt',
-          openRepoEntries: [],
-          workspace: source.workspace,
-          runtime: runtimeSnapshotFromOpened([], null, []),
-        }
+        repoRestoreFailed = true
+        continue
       }
       opened.push(result.opened)
     }
@@ -150,7 +146,7 @@ async function restoreServerWorkspaceSnapshot(
     if (!validateWorkspacePaneTabs(source.workspace, openedActive).ok) {
       const saved = await saveRebuiltServerWorkspaceState({
         persistedSnapshot: source.workspace,
-        rebuiltWorkspace: defaultServerWorkspaceState(),
+        rebuiltWorkspace: workspaceWithoutRepoTabs(source.workspace, openedActive[0]?.repoRoot),
       })
       if (saved.saved) {
         openedMembershipsCommitted = true
@@ -176,7 +172,7 @@ async function restoreServerWorkspaceSnapshot(
     input.signal?.throwIfAborted()
     openedMembershipsCommitted = true
     return {
-      status: 'restored',
+      status: repoRestoreFailed ? 'rebuilt' : 'restored',
       openRepoEntries: opened.map((repo) => repo.entry),
       workspace: source.workspace,
       runtime: runtimeSnapshotFromOpened(
@@ -188,6 +184,13 @@ async function restoreServerWorkspaceSnapshot(
   } finally {
     if (!openedMembershipsCommitted) releaseOpenedRepoRuntimes(input, opened)
   }
+}
+
+function workspaceWithoutRepoTabs(workspace: ServerWorkspaceState, repoRoot: string | undefined): ServerWorkspaceState {
+  if (!repoRoot) return workspace
+  const workspacePaneTabsByTargetByRepo = { ...workspace.workspacePaneTabsByTargetByRepo }
+  delete workspacePaneTabsByTargetByRepo[repoRoot]
+  return { workspacePaneTabsByTargetByRepo }
 }
 
 async function openSessionRepo(

@@ -498,6 +498,10 @@ export interface AppIpcHandlers {
 }
 
 export interface NativeHostIpcHandlers {
+  clientWorkspace: {
+    read: () => Promise<unknown | null>
+    write: (input: ClientWorkspaceState) => Promise<void>
+  }
   settings: {
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
     applyNativeHostProjection: (input: NativeHostProjection) => Promise<void>

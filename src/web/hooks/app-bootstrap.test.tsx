@@ -496,7 +496,7 @@ function mockServerRestore(session: WorkspaceSessionState): void {
 }
 
 function mockClientPresentation(session: WorkspaceSessionState): void {
-  mockedReadClientWorkspaceState.mockReturnValue({
+  mockedReadClientWorkspaceState.mockResolvedValue({
     openRepoEntries: session.openRepoEntries,
     restoredRepoId: session.restoredRepoId,
     zenMode: session.zenMode,

@@ -10,18 +10,18 @@ import {
 beforeEach(() => localStorage.clear())
 
 describe('client workspace persistence', () => {
-  test('preserves four open repos in picker order across a local reload', () => {
+  test('preserves four open repos in picker order across a local reload', async () => {
     const openRepoEntries = ['/repo-a', '/repo-b', '/repo-c', '/repo-d'].map((id) => ({
       kind: 'local' as const,
       id,
     }))
 
-    writeClientWorkspaceState(normalizeClientWorkspaceState({ openRepoEntries }))
+    await writeClientWorkspaceState(normalizeClientWorkspaceState({ openRepoEntries }))
 
-    expect(readClientWorkspaceState().openRepoEntries).toEqual(openRepoEntries)
+    expect((await readClientWorkspaceState()).openRepoEntries).toEqual(openRepoEntries)
   })
 
-  test('round-trips client-owned presentation without server workspace fields', () => {
+  test('round-trips client-owned presentation without server workspace fields', async () => {
     const presentation = normalizeClientWorkspaceState({
       restoredRepoId: '/repo-a',
       zenMode: true,
@@ -37,15 +37,15 @@ describe('client workspace persistence', () => {
       workspacePaneTabsByTargetByRepo: { '/must-not-persist': {} },
     })
 
-    writeClientWorkspaceState(presentation)
+    await writeClientWorkspaceState(presentation)
 
-    expect(readClientWorkspaceState()).toEqual(presentation)
+    expect(await readClientWorkspaceState()).toEqual(presentation)
     const raw = JSON.parse(localStorage.getItem('goblin.workspace') ?? '{}')
     expect(raw.openRepoEntries).toEqual([{ kind: 'local', id: '/repo-a' }])
     expect(raw).not.toHaveProperty('workspacePaneTabsByTargetByRepo')
   })
 
-  test('normalizes malformed local presentation to safe defaults', () => {
+  test('normalizes malformed local presentation to safe defaults', async () => {
     localStorage.setItem(
       'goblin.workspace',
       JSON.stringify({
@@ -58,7 +58,7 @@ describe('client workspace persistence', () => {
       }),
     )
 
-    expect(readClientWorkspaceState()).toEqual({
+    expect(await readClientWorkspaceState()).toEqual({
       openRepoEntries: [],
       restoredRepoId: null,
       zenMode: false,

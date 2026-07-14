@@ -6,11 +6,16 @@ import { isWorkspacePaneSessionTabType } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneSessionTabType } from '#/shared/workspace-pane.ts'
 import { normalizeWorkspaceSessionLayoutState } from '#/shared/workspace-layout.ts'
 import { sessionLog } from '#/web/logger.ts'
+import { readNativeBridge } from '#/web/native-bridge.ts'
+import { invokeNativeIpcPath } from '#/web/native-host-client.ts'
 
 const CLIENT_WORKSPACE_STORAGE_KEY = 'goblin.workspace'
 
-export function readClientWorkspaceState(): ClientWorkspaceState {
+export async function readClientWorkspaceState(): Promise<ClientWorkspaceState> {
   try {
+    if (readNativeBridge()) {
+      return normalizeClientWorkspaceState(await invokeNativeIpcPath('clientWorkspace.read', undefined))
+    }
     const raw = globalThis.localStorage?.getItem(CLIENT_WORKSPACE_STORAGE_KEY)
     return normalizeClientWorkspaceState(raw ? JSON.parse(raw) : null)
   } catch (err) {
@@ -19,11 +24,20 @@ export function readClientWorkspaceState(): ClientWorkspaceState {
   }
 }
 
-export function writeClientWorkspaceState(state: ClientWorkspaceState): void {
+export async function writeClientWorkspaceState(state: ClientWorkspaceState): Promise<void> {
+  const native = readNativeBridge()
   try {
-    globalThis.localStorage?.setItem(CLIENT_WORKSPACE_STORAGE_KEY, JSON.stringify(normalizeClientWorkspaceState(state)))
+    const normalized = normalizeClientWorkspaceState(state)
+    if (native) {
+      // Electron's embedded HTTP port may change between launches, so its
+      // origin-scoped localStorage cannot own durable window state.
+      await invokeNativeIpcPath('clientWorkspace.write', normalized)
+      return
+    }
+    globalThis.localStorage?.setItem(CLIENT_WORKSPACE_STORAGE_KEY, JSON.stringify(normalized))
   } catch (err) {
     sessionLog.warn('failed to persist local workspace state', { err })
+    if (native) throw err
   }
 }
 

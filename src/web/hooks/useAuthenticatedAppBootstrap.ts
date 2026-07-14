@@ -112,7 +112,7 @@ async function restoreBootSession(
 ): Promise<WorkspaceRestoreOutcome> {
   try {
     useReposStore.setState({ sessionPersistenceReady: false, sessionRestoreError: null })
-    const presentation = readClientWorkspaceState()
+    const presentation = await readClientWorkspaceState()
     const snapshot = await abortable(settingsSnapshot, signal)
     primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), snapshot)
     if (signal.aborted) throw abortReason(signal)

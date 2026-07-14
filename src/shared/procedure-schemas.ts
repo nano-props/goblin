@@ -214,6 +214,23 @@ const WorkspacePaneRuntimeTabEntrySchema = v.object({
   type: v.picklist(WORKSPACE_PANE_RUNTIME_TAB_TYPES),
   runtimeSessionId: v.pipe(v.string(), v.minLength(1)),
 })
+const FiletreeSessionViewStateSchema = v.object({
+  selectedKeys: v.array(v.string()),
+  expandedKeys: v.array(v.string()),
+  topVisibleRowIndex: v.number(),
+})
+const ClientWorkspaceStateSchema = v.object({
+  openRepoEntries: v.array(RepoSessionEntrySchema),
+  restoredRepoId: v.nullable(v.string()),
+  zenMode: v.boolean(),
+  workspacePaneSize: v.number(),
+  selectedTerminalSessionIdByTerminalWorktree: v.record(v.string(), v.string()),
+  preferredWorkspacePaneTabByTargetByRepo: v.record(
+    v.string(),
+    v.record(v.string(), v.nullable(v.picklist(['status', 'changes', 'history', 'files', 'terminal']))),
+  ),
+  filetreeViewStateByWorktreeByRepo: v.record(v.string(), v.record(v.string(), FiletreeSessionViewStateSchema)),
+})
 
 // Shared shape for the GitHub CLI state endpoints (`/api/settings/github-cli`
 // and `/api/settings/github-cli/refresh`): both accept an optional `hosts`
@@ -268,6 +285,10 @@ export const SETTINGS_PATCH_SCHEMAS = {
 // Native host IPC procedures — Electron-only operations that bypass
 // the HTTP server entirely. Handlers live in `main/native-host-ipc-router.ts`.
 export const NATIVE_HOST_IPC_PROCEDURE_SCHEMAS = {
+  clientWorkspace: {
+    read: v.undefined(),
+    write: ClientWorkspaceStateSchema,
+  },
   settings: {
     setGlobalShortcut: v.object({ accelerator: v.string() }),
     applyNativeHostProjection: NativeHostProjectionSchema,

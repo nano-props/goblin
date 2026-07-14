@@ -144,6 +144,7 @@ describe('restoreServerWorkspace', () => {
 
     expect(result.status).toBe('rebuilt')
     expect(result.workspace).toEqual(defaultServerWorkspaceState())
+    expect(result.openRepoEntries).toEqual([])
     expect(result.runtime.repos).toEqual([])
     expect(mocks.saveRebuiltServerWorkspaceState).not.toHaveBeenCalled()
   })
@@ -436,12 +437,18 @@ describe('restoreServerWorkspace', () => {
       branchName: 'missing',
       worktreePath: null,
     })
+    const otherTargetKey = workspacePaneTabsTargetIdentityKey({
+      repoRoot: '/other',
+      branchName: 'main',
+      worktreePath: null,
+    })
     const invalidSession: WorkspaceSessionState = {
       ...defaultWorkspaceSessionState(),
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
       restoredRepoId: '/repo',
       workspacePaneTabsByTargetByRepo: {
         '/repo': { [targetKey]: [workspacePaneStaticTabEntry('files')] },
+        '/other': { [otherTargetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
     const currentSession: WorkspaceSessionState = {
@@ -470,6 +477,14 @@ describe('restoreServerWorkspace', () => {
 
     expect(result).toMatchObject({ status: 'restored', workspace: currentSession })
     expect(mocks.saveRebuiltServerWorkspaceState).toHaveBeenCalledTimes(1)
+    expect(mocks.saveRebuiltServerWorkspaceState).toHaveBeenCalledWith({
+      persistedSnapshot: serverWorkspaceFromSession(invalidSession),
+      rebuiltWorkspace: {
+        workspacePaneTabsByTargetByRepo: {
+          '/other': { [otherTargetKey]: [workspacePaneStaticTabEntry('history')] },
+        },
+      },
+    })
     expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
       repoRoot: '/repo',
       repoRuntimeId: 'repo-runtime-test',
@@ -610,7 +625,9 @@ describe('restoreServerWorkspace — active-only restore', () => {
 
     expect(result.status).toBe('rebuilt')
     expect(result.workspace).toEqual(defaultServerWorkspaceState())
-    expect(result.runtime.repos).toEqual([])
+    expect(result.openRepoEntries).toEqual([{ kind: 'local', id: '/repo-active' }])
+    expect(result.runtime.repos).toHaveLength(1)
+    expect(result.runtime.repos[0]).toMatchObject({ repoRoot: '/repo-active' })
     expect(mocks.readRepoProjection).toHaveBeenCalledTimes(1)
     expect(mocks.saveRebuiltServerWorkspaceState).not.toHaveBeenCalled()
   })

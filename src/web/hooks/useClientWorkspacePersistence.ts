@@ -72,7 +72,7 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
     ),
   )
 
-  const flushLatestClientWorkspace = useEffectEvent(() => {
+  const flushLatestClientWorkspace = useEffectEvent(async () => {
     if (debounceTimerRef.current !== null) {
       window.clearTimeout(debounceTimerRef.current)
       debounceTimerRef.current = null
@@ -81,7 +81,7 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
     if (!workspace) return
     const serialized = JSON.stringify(workspace)
     if (serialized === lastSavedRef.current) return
-    writeClientWorkspaceState(workspace)
+    await writeClientWorkspaceState(workspace)
     lastSavedRef.current = serialized
   })
 
@@ -108,11 +108,14 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
     const immediate = immediateKey !== lastImmediateKeyRef.current
     lastImmediateKeyRef.current = immediateKey
     if (immediate) {
-      flushLatestClientWorkspace()
+      void flushLatestClientWorkspace()
       return
     }
     if (debounceTimerRef.current !== null) window.clearTimeout(debounceTimerRef.current)
-    debounceTimerRef.current = window.setTimeout(flushLatestClientWorkspace, CLIENT_WORKSPACE_SAVE_DEBOUNCE_MS)
+    debounceTimerRef.current = window.setTimeout(
+      () => void flushLatestClientWorkspace(),
+      CLIENT_WORKSPACE_SAVE_DEBOUNCE_MS,
+    )
     return () => {
       if (debounceTimerRef.current !== null) {
         window.clearTimeout(debounceTimerRef.current)
@@ -137,7 +140,7 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
 
   useEffect(() => {
     const flushWhenHidden = () => {
-      if (document.visibilityState === 'hidden') flushLatestClientWorkspace()
+      if (document.visibilityState === 'hidden') void flushLatestClientWorkspace()
     }
     window.addEventListener('pagehide', flushLatestClientWorkspace)
     window.addEventListener('beforeunload', flushLatestClientWorkspace)

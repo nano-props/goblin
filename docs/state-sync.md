@@ -101,7 +101,9 @@ Notes:
 
 - `ServerWorkspaceState` contains canonical pane tabs and is persisted by
   server tab commands.
-- `ClientWorkspaceState` is persisted directly in the browser's local storage.
+- `ClientWorkspaceState` is persisted in stable native `userData` storage for
+  Electron and browser local storage for Web. Native storage must not depend
+  on the embedded server's dynamically allocated origin.
 - At boot, the client submits `openRepoEntries` once as restore intent. This is
   not an ongoing client-to-server synchronization channel.
 - `WorkspaceSessionState` is a boot-only client composition of those two states, never a server write payload.
