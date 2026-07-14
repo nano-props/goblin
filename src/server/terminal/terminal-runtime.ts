@@ -25,12 +25,11 @@ import { broadcastWorkspacePaneTabsChanged } from '#/server/workspace-pane/works
 import { createTerminalRealtimeHandlers } from '#/server/terminal/terminal-runtime-realtime.ts'
 import { createWorkspacePaneTabsRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-tabs-runtime-realtime.ts'
 import { createWorkspacePaneRuntimeApplication } from '#/server/workspace-pane/workspace-pane-runtime-application.ts'
-import {
-  createPhysicalWorktreeOperationCoordinator,
-} from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
+import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { createWorkspacePaneRuntimeRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-runtime-realtime.ts'
 import type { ServerWorkspacePaneRuntimeHost } from '#/server/workspace-pane/workspace-pane-runtime-host.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import { recordServerWorkspaceTabs } from '#/server/modules/settings-source.ts'
 import { isValidTerminalClientId, isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import {
   TerminalSessionManager,
@@ -46,9 +45,7 @@ import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-
 import { createAppRealtimeHost } from '#/server/realtime/app-realtime-runtime.ts'
 import { createWorktreeRemovalApplication } from '#/server/worktree-removal/worktree-removal-application.ts'
 import { createPhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
-import {
-  createTerminalSessionCreateProvider,
-} from '#/server/terminal/terminal-session-create-provider.ts'
+import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
 
 // Intentionally long TTL: we want terminals to survive as long as possible in
 // the background so users can leave builds or long-running tasks unattended.
@@ -199,10 +196,14 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
   })
   const workspacePaneRuntimeHost: ServerWorkspacePaneRuntimeHost = {
     async openRuntime(clientId, userId, input) {
-      return await workspacePaneRuntimeApplication.open(clientId, userId, input)
+      const result = await workspacePaneRuntimeApplication.open(clientId, userId, input)
+      if (result.ok) await recordServerWorkspaceTabs(input.request.repoRoot, result.workspacePaneTabs)
+      return result
     },
     async closeRuntime(clientId, userId, input) {
-      return await workspacePaneRuntimeApplication.close(clientId, userId, input)
+      const result = await workspacePaneRuntimeApplication.close(clientId, userId, input)
+      if (result.ok) await recordServerWorkspaceTabs(input.target.repoRoot, result.workspacePaneTabs)
+      return result
     },
   }
   const workspacePaneTabsActions = createWorkspacePaneTabsActions({
@@ -210,6 +211,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     isValidClientId: isValidTerminalClientId,
     isCurrentRepoRuntime: isCurrentRepoRuntime,
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
+    persistWorkspaceTabs: recordServerWorkspaceTabs,
   })
   const workspacePaneTabsHost: ServerWorkspacePaneTabsHost = {
     async listWorkspaceTabs(clientId, userId, input) {

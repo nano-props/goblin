@@ -12,8 +12,7 @@ import type {
   RepoWorkspaceTabsRestoreResult,
   RepoWorkspaceTabsRestoreIntent,
   RuntimeRecentReposState,
-  WorkspaceSessionState,
-  WorkspaceSessionRestoreResult,
+  WorkspaceRestoreResult,
   UserSettings,
   UserSettingsUpdateResponse,
   SettingsSnapshot,
@@ -152,26 +151,16 @@ export async function setRecentWorkspaceExternalApp(input: {
   >('/api/settings/repo-external-app-recent', input)
 }
 
-export async function saveSession(
-  session: WorkspaceSessionState,
-  writer: { clientId: string; sessionWriterId: string; sessionWriterSequence: number },
-  options?: { keepalive?: boolean },
-): Promise<WorkspaceSessionState> {
-  const result = await postServerJson<
-    { clientId: string; sessionWriterId: string; sessionWriterSequence: number; session: WorkspaceSessionState },
-    { ok: boolean; accepted: boolean; session: WorkspaceSessionState }
-  >('/api/settings/session', { ...writer, session }, { keepalive: options?.keepalive })
-  return result.session
-}
-
-export async function restoreWorkspaceSession(
+export async function restoreServerWorkspace(
   clientId: string,
+  openRepoEntries: RepoSessionEntry[],
   options?: { activeRepoRoot?: string | null; signal?: AbortSignal },
-): Promise<WorkspaceSessionRestoreResult> {
+): Promise<WorkspaceRestoreResult> {
   return await postServerJson(
-    '/api/settings/session/restore',
+    '/api/settings/workspace/restore',
     {
       clientId,
+      openRepoEntries,
       ...(options && 'activeRepoRoot' in options ? { activeRepoRoot: options.activeRepoRoot } : {}),
     },
     { signal: options?.signal },
@@ -186,7 +175,7 @@ export async function restoreRepoWorkspaceTabs(
   options?: { signal?: AbortSignal },
 ): Promise<RepoWorkspaceTabsRestoreResult> {
   return await postServerJson(
-    '/api/settings/session/restore-repo-tabs',
+    '/api/settings/workspace/restore-repo-tabs',
     { clientId, repoRoot, repoRuntimeId, intent },
     { signal: options?.signal },
   )

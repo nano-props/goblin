@@ -43,6 +43,7 @@ function makeActions(
     updateTabs: vi.fn(async () => updatedSnapshot),
   }
   const isValidClientId = options.isValidClientId ?? ((value: unknown): value is string => value === CLIENT_ID)
+  const persistWorkspaceTabs = vi.fn(async () => {})
 
   return {
     actions: createWorkspacePaneTabsActions({
@@ -50,9 +51,11 @@ function makeActions(
       isValidClientId,
       isCurrentRepoRuntime: isCurrentRepoRuntime,
       broadcastWorkspaceTabsChanged: broadcasts as unknown as (userId: string, repoRoot: string) => void,
+      persistWorkspaceTabs,
     }),
     broadcasts,
     sessionService,
+    persistWorkspaceTabs,
   }
 }
 

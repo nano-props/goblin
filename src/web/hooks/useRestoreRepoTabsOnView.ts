@@ -1,6 +1,6 @@
 // Lazy restore hook: when the user navigates to a repo that was hydrated
 // as a stub at cold start (no projection, no pane tabs), this hook fires
-// the per-repo `POST /api/settings/session/restore-repo-tabs` request and
+// the per-repo `POST /api/settings/workspace/restore-repo-tabs` request and
 // hydrates the returned repo into the store.
 //
 // Why per-repo: cold start validates persisted repo identity, but only the
@@ -48,10 +48,7 @@ export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) 
         intent: repo.session.entry
           ? {
               entry: repo.session.entry,
-              workspacePaneTabsByTarget:
-                s.restoredSessionBaseline?.workspacePaneTabsByTargetByRepo[repo.id] ?? {},
-              preferredWorkspacePaneTabByTarget:
-                s.restoredSessionBaseline?.preferredWorkspacePaneTabByTargetByRepo[repo.id] ?? {},
+              workspacePaneTabsByTarget: s.restoredSessionBaseline?.workspacePaneTabsByTargetByRepo[repo.id] ?? {},
             }
           : null,
       }

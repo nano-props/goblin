@@ -122,7 +122,7 @@ describe('server app body limit', () => {
     })
     const oversized = 'x'.repeat(2 * 1024 * 1024)
     const response = await app.request(
-      new Request('http://127.0.0.1:32100/api/settings/session', {
+      new Request('http://127.0.0.1:32100/api/settings/prefs', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -149,7 +149,7 @@ describe('server app body limit', () => {
     // A small, well-formed body: validation will run after the body
     // limit middleware, so we expect 400 (BAD_REQUEST) — not 413.
     const response = await app.request(
-      new Request('http://127.0.0.1:32100/api/settings/session', {
+      new Request('http://127.0.0.1:32100/api/settings/prefs', {
         method: 'POST',
         headers: {
           'content-type': 'application/json',

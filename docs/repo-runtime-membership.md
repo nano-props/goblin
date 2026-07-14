@@ -54,11 +54,12 @@ Close:
 
 Restore:
 
-1. `WorkspaceSessionState.openRepoEntries` is boot-only restore input.
+1. `ClientWorkspaceState.openRepoEntries` is submitted once as boot restore
+   intent for that window.
 2. Restore reopens runtimes through the server before writing any
    repo projection.
-3. After boot, session persistence records window-local membership for the
-   next launch; it is not live runtime truth.
+3. The server returns canonical repo entries and runtime identities. The client
+   persists the entries locally for its next launch.
 
 Realtime recovery:
 
@@ -80,10 +81,8 @@ Realtime recovery:
 
 ## Rules
 
-- Do not add a global server-owned open repo list unless the product model
-  changes to cross-window repo membership.
-- Do not make `WorkspaceSessionState.openRepoEntries` a live synchronization
-  source.
+- Do not create a global server-persisted open-repo list. Membership is scoped
+  by `clientId`; the next-launch declaration is window-local state.
 - Do not let the client mint or validate `repoRuntimeId` locally.
 - Server routes that mutate repo-scoped runtime resources should validate the
   server-owned `repoRuntimeId` when the operation targets runtime state.

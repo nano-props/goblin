@@ -91,23 +91,28 @@ Notes:
 
 Representative examples:
 
-- saved session state
-- workspace layout and pane sizes
-- active repo and open repo set for next launch
+- server-owned canonical workspace pane tabs
+- client-local workspace state (open repo declaration/order, route, layout,
+  selection, and filetree view)
 - `repoSnapshotCache` for warm restore
 - boot-only `useSessionRestoreStore`
 
 Notes:
 
-- `RestorableWorkspaceState` names the workspace fields that serialize into `WorkspaceSessionState`.
+- `ServerWorkspaceState` contains canonical pane tabs and is persisted by
+  server tab commands.
+- `ClientWorkspaceState` is persisted directly in the browser's local storage.
+- At boot, the client submits `openRepoEntries` once as restore intent. This is
+  not an ongoing client-to-server synchronization channel.
+- `WorkspaceSessionState` is a boot-only client composition of those two states, never a server write payload.
 - `repoSnapshotCache` names the warm-start repo cache slice.
 - `RepoSnapshotCacheEntry` is the stored snapshot shape inside that cache.
 - Restorable helpers should focus on boot restore and persistence boundaries, not on live runtime convergence.
 - `repoSnapshotCache` is a startup affordance, not a runtime authority. Persist it from query-projected repo data when available; use it to paint placeholders during boot, then converge through normal server/query refresh.
 - `hydrateSession` belongs to the restorable boot path, while `ensureWorkspaceOpen` and `closeRepo` belong to runtime repo lifecycle.
 - Restorable state is not runtime-coherent shared state.
-- Session writes are client -> persistence only after boot restore; they do not publish runtime invalidation.
-- Workspace pane tabs in saved session state are boot-only import data. After restore, runtime tab changes flow server -> React Query -> later persistence; saved session data must not become a live tab authority.
+- Do not add a whole-session client -> server write. Each side persists only the state it owns.
+- Workspace pane tab commands persist their canonical server snapshot at the accepted command boundary.
 - Workspace pane target preference distinguishes three states: no target (`null` render selection), uninitialized target (use `INITIAL_WORKSPACE_PANE_TAB`), and explicit empty pane (`preferredWorkspacePaneTabByTarget[targetKey] === null`). Do not use `status` as a fallback for route misses, projection misses, or bare branch URLs.
 - URL-backed workspace pane routes are the visible-pane source of truth. Client preference and selected runtime-session state are restorable projection supplements, not command authorities. Internal workspace-pane commands must decide their target route and write the matching preference/selection supplement through the navigation action that accepted the route.
 - Route effects may sync an externally arrived URL (manual address entry, browser Back/Forward, restore) into preference/selection so the restorable projection stays coherent. Command correctness must not depend on those effects running after the route changes.

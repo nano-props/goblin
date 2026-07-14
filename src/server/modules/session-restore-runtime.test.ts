@@ -8,15 +8,15 @@ import {
 } from '#/server/modules/repo-runtimes.ts'
 
 const mocks = vi.hoisted(() => ({
-  getServerSessionState: vi.fn(),
+  getServerWorkspaceState: vi.fn(),
   probeRepo: vi.fn(),
   readRepoProjection: vi.fn(),
   runRemoteLifecycleWrite: vi.fn(),
 }))
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
-  getServerSessionState: mocks.getServerSessionState,
-  saveRebuiltServerSessionState: vi.fn(),
+  getServerWorkspaceState: mocks.getServerWorkspaceState,
+  saveRebuiltServerWorkspaceState: vi.fn(),
 }))
 
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({
@@ -35,7 +35,7 @@ const REPO_ROOT = '/repo'
 describe('session restore runtime ownership', () => {
   beforeEach(() => {
     clearRepoRuntimesForUser(USER_ID)
-    mocks.getServerSessionState.mockResolvedValue({
+    mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultWorkspaceSessionState(),
       openRepoEntries: [{ kind: 'local', id: REPO_ROOT }],
       restoredRepoId: REPO_ROOT,
@@ -62,7 +62,6 @@ describe('session restore runtime ownership', () => {
         intent: {
           entry: { kind: 'local', id: REPO_ROOT },
           workspacePaneTabsByTarget: {},
-          preferredWorkspacePaneTabByTarget: {},
         },
         workspacePaneTabsHost,
       }),

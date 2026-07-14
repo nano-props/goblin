@@ -3,138 +3,47 @@ import {
   buildRuntimeRecentReposState,
   buildRuntimeSettingsSnapshot,
   buildSettingsSnapshot,
-  restorableWorkspaceSessionStateFromSettingsSnapshot,
   runtimeSettingsSnapshotFromSettingsSnapshot,
 } from '#/shared/settings-snapshot.ts'
-import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+
+const prefs = {
+  lang: 'ja' as const,
+  theme: 'dark' as const,
+  colorTheme: 'github' as const,
+  fetchIntervalSec: 300,
+  terminalNotificationsEnabled: true,
+  shortcutsDisabled: true,
+  globalShortcutDisabled: false,
+  globalShortcut: 'CommandOrControl+Shift+K',
+  lanEnabled: true,
+}
 
 describe('settings snapshot partitions', () => {
-  test('builds runtime settings without recent repo or restorable session fields', () => {
-    expect(
-      buildRuntimeSettingsSnapshot({
-        prefs: {
-          lang: 'ja',
-          theme: 'dark',
-          colorTheme: 'github',
-          fetchIntervalSec: 300,
-          terminalNotificationsEnabled: true,
-          shortcutsDisabled: true,
-          globalShortcutDisabled: false,
-          globalShortcut: 'CommandOrControl+Shift+K',
-          lanEnabled: true,
-        },
-        globalShortcutRegistered: true,
-      }),
-    ).toEqual({
-      lang: 'ja',
-      theme: 'dark',
-      colorTheme: 'github',
-      fetchIntervalSec: 300,
-      terminalNotificationsEnabled: true,
-      shortcutsDisabled: true,
-      globalShortcutDisabled: false,
-      globalShortcut: 'CommandOrControl+Shift+K',
+  test('builds runtime settings without workspace restore state', () => {
+    expect(buildRuntimeSettingsSnapshot({ prefs, globalShortcutRegistered: true })).toEqual({
+      ...prefs,
       globalShortcutRegistered: true,
-      lanEnabled: true,
     })
   })
 
   test('builds runtime recent repos separately from settings prefs', () => {
-    expect(
-      buildRuntimeRecentReposState({
-        recentRepos: [{ kind: 'local', id: '/tmp/repo-a' }],
-      }),
-    ).toEqual({
+    expect(buildRuntimeRecentReposState({ recentRepos: [{ kind: 'local', id: '/tmp/repo-a' }] })).toEqual({
       recentRepos: [{ kind: 'local', id: '/tmp/repo-a' }],
     })
   })
 
-  test('splits a full settings snapshot into runtime settings and restorable session', () => {
-    const mainTargetKey = workspacePaneTabsTargetIdentityKey({
-      repoRoot: '/tmp/repo-b',
-      branchName: 'main',
-      worktreePath: null,
-    })
+  test('keeps workspace restore state out of the settings snapshot', () => {
     const snapshot = buildSettingsSnapshot({
-      prefs: {
-        lang: 'auto',
-        theme: 'auto',
-        colorTheme: 'macos',
-        fetchIntervalSec: 120,
-        terminalNotificationsEnabled: false,
-        shortcutsDisabled: false,
-        globalShortcutDisabled: true,
-        globalShortcut: 'CommandOrControl+Shift+G',
-        lanEnabled: false,
-      },
+      prefs,
       globalShortcutRegistered: false,
       recentRepos: [{ kind: 'local', id: '/tmp/repo-b' }],
-      repoSettings: [
-        {
-          repoId: '/tmp/repo-b',
-          worktreeBootstrapTrust: {
-            configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-            trustedAt: '2026-01-01T00:00:00.000Z',
-          },
-        },
-      ],
-      session: {
-        openRepoEntries: [{ kind: 'local', id: '/tmp/repo-b' }],
-        restoredRepoId: '/tmp/repo-b',
-        zenMode: false,
-        workspacePaneSize: 50,
-        selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'term-111111111111111111111' },
-        preferredWorkspacePaneTabByTargetByRepo: {},
-        workspacePaneTabsByTargetByRepo: {
-          '/tmp/repo-b': {
-            [mainTargetKey]: [],
-          },
-        },
-        filetreeViewStateByWorktreeByRepo: {
-          '/tmp/repo-b': {
-            '/tmp/repo-b': {
-              selectedKeys: ['README.md'],
-              expandedKeys: ['src'],
-              topVisibleRowIndex: 24,
-            },
-          },
-        },
-      },
+      repoSettings: [],
     })
 
     expect(runtimeSettingsSnapshotFromSettingsSnapshot(snapshot)).toMatchObject({
       globalShortcutRegistered: false,
     })
-    expect(restorableWorkspaceSessionStateFromSettingsSnapshot(snapshot)).toEqual({
-      openRepoEntries: [{ kind: 'local', id: '/tmp/repo-b' }],
-      restoredRepoId: '/tmp/repo-b',
-      zenMode: false,
-      workspacePaneSize: 50,
-      selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo-b\0/tmp/repo-b': 'term-111111111111111111111' },
-      preferredWorkspacePaneTabByTargetByRepo: {},
-      workspacePaneTabsByTargetByRepo: {
-        '/tmp/repo-b': {
-          [mainTargetKey]: [],
-        },
-      },
-      filetreeViewStateByWorktreeByRepo: {
-        '/tmp/repo-b': {
-          '/tmp/repo-b': {
-            selectedKeys: ['README.md'],
-            expandedKeys: ['src'],
-            topVisibleRowIndex: 24,
-          },
-        },
-      },
-    })
-    expect(snapshot.repoSettings).toEqual([
-      {
-        repoId: '/tmp/repo-b',
-        worktreeBootstrapTrust: {
-          configHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-          trustedAt: '2026-01-01T00:00:00.000Z',
-        },
-      },
-    ])
+    expect(snapshot).not.toHaveProperty('session')
+    expect(snapshot).not.toHaveProperty('workspace')
   })
 })

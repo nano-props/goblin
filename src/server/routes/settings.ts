@@ -2,7 +2,7 @@ import { getServerExternalAppsSnapshot } from '#/server/modules/external-apps.ts
 import { getServerGitHubCliState } from '#/server/modules/github-cli.ts'
 import { getSettingsSnapshot } from '#/server/modules/settings-snapshot.ts'
 import { getUserSettings } from '#/server/modules/settings-source.ts'
-import { restoreRepoTabsForRepo, restoreServerWorkspaceSession } from '#/server/modules/session-restore.ts'
+import { restoreRepoTabsForRepo, restoreServerWorkspace } from '#/server/modules/session-restore.ts'
 import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import {
@@ -11,7 +11,6 @@ import {
   handleAddRecentRepo,
   handleClearRecentRepos,
   handleSetRepoWorkspaceExternalAppRecent,
-  handleSetSession,
   handleUpdateUserSettings,
 } from '#/server/modules/settings-write-paths.ts'
 import { getLanUrls, isLanAddress } from '#/shared/lan-addresses.ts'
@@ -68,28 +67,25 @@ export function createSettingsRoutes(options: {
     const { registered } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.globalShortcutState, c)
     return c.json(handleSetGlobalShortcutRegistered({ registered }, settingsState))
   })
-  app.post('/session', async (c) => {
-    const { clientId, sessionWriterId, sessionWriterSequence, session } = await parseHttpBody(
-      SETTINGS_PATCH_SCHEMAS.session,
-      c,
-    )
-    return c.json(await handleSetSession({ clientId, sessionWriterId, sessionWriterSequence, session }))
-  })
-  app.post('/session/restore', async (c) => {
+  app.post('/workspace/restore', async (c) => {
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
-    const { clientId, activeRepoRoot } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.sessionRestore, c)
+    const { clientId, openRepoEntries, activeRepoRoot } = await parseHttpBody(
+      SETTINGS_PROCEDURE_SCHEMAS.workspaceRestore,
+      c,
+    )
     return c.json(
-      await restoreServerWorkspaceSession({
+      await restoreServerWorkspace({
         userId,
         clientId,
+        openRepoEntries,
         activeRepoRoot: activeRepoRoot ?? null,
         workspacePaneTabsHost,
         signal: c.req.raw.signal,
       }),
     )
   })
-  app.post('/session/restore-repo-tabs', async (c) => {
+  app.post('/workspace/restore-repo-tabs', async (c) => {
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
     const { clientId, repoRoot, repoRuntimeId, intent } = await parseHttpBody(

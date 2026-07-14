@@ -11,14 +11,7 @@ import {
   resetUserSettingsPersistenceForTests,
   writeUserSettingsJson,
 } from '#/server/modules/settings-persistence.ts'
-import type {
-  FiletreeSessionViewState,
-  LangPref,
-  WorkspaceSessionState,
-  UserSettings,
-  ThemePref,
-} from '#/shared/api-types.ts'
-import { DEFAULT_ZEN_MODE, normalizeWorkspacePaneSize } from '#/shared/workspace-layout.ts'
+import type { LangPref, ServerWorkspaceState, UserSettings, ThemePref } from '#/shared/api-types.ts'
 import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 import {
   isKnownWorkspaceExternalAppItemId,
@@ -29,11 +22,6 @@ import {
   workspaceExternalAppRecentKey,
 } from '#/shared/repo-settings.ts'
 import {
-  isWorkspacePaneSessionTabType,
-  isWorkspacePaneRuntimeTabEntry,
-  isWorkspacePaneStaticTabType,
-  type WorkspacePaneSessionTabType,
-  type WorkspacePaneStaticTabType,
   type WorkspacePaneTabEntry,
   workspacePaneTabEntryFromUnknown,
   workspacePaneTabEntryIdentity,
@@ -41,8 +29,10 @@ import {
 } from '#/shared/workspace-pane.ts'
 import {
   parseWorkspacePaneTabsTargetIdentityKey,
+  workspacePaneTabsTargetIdentityKey,
   type WorkspacePaneTabsTargetIdentity,
 } from '#/shared/workspace-pane-tabs-target.ts'
+import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import { normalizeGlobalShortcut } from '#/shared/accelerator.ts'
 import { isColorTheme, type ColorTheme } from '#/shared/color-theme.ts'
 import {
@@ -52,9 +42,8 @@ import {
   DEFAULT_THEME_PREF,
   MAX_RECENT_REPOS,
   defaultUserSettings,
-  defaultWorkspaceSessionState,
+  defaultServerWorkspaceState,
 } from '#/shared/settings-defaults.ts'
-import { createOpaqueId } from '#/shared/opaque-id.ts'
 
 type FetchIntervalListener = (sec: number) => void
 interface UserSettingsData {
@@ -67,7 +56,7 @@ interface UserSettingsData {
   globalShortcutDisabled: boolean
   globalShortcut: string
   lanEnabled: boolean
-  session: WorkspaceSessionState
+  workspace: ServerWorkspaceState
   recentRepos: RepoSessionEntry[]
   repoSettings: RepoSettingsEntry[]
 }
@@ -79,7 +68,6 @@ let settingsData: UserSettingsData | null = null
 let settingsLoadPromise: Promise<UserSettingsData> | null = null
 let settingsMutationPromise: Promise<void> = Promise.resolve()
 const listeners = new Set<FetchIntervalListener>()
-const sessionWritersByClient = new Map<string, { writerId: string; latestSequence: number }>()
 
 function normalizeFetchInterval(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value)
@@ -135,80 +123,18 @@ function dedupeRepoEntries(entries: RepoSessionEntry[]): RepoSessionEntry[] {
   return normalized
 }
 
-function defaultSession(): WorkspaceSessionState {
-  return defaultWorkspaceSessionState()
-}
-
-function normalizeSelectedTerminalSessionIdByTerminalWorktree(value: unknown): Record<string, string> {
-  if (!value || typeof value !== 'object') return {}
-  const normalized: Record<string, string> = {}
-  for (const [terminalWorktreeKey, terminalSessionId] of Object.entries(value)) {
-    if (
-      typeof terminalWorktreeKey !== 'string' ||
-      typeof terminalSessionId !== 'string' ||
-      terminalSessionId.length === 0
-    )
-      continue
-    const parts = terminalWorktreeKey.split('\0')
-    if (parts.length !== 2 || !parts[0] || !parts[1]) continue
-    normalized[terminalWorktreeKey] = terminalSessionId
-  }
-  return normalized
-}
-
-function normalizePreferredWorkspacePaneTabByTargetByRepo(
-  value: unknown,
-  openRepoEntries: RepoSessionEntry[],
-  tabsByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
-): Record<string, Record<string, WorkspacePaneSessionTabType>> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-  const openRepoIds = new Set(openRepoEntries.map(repoSessionEntryId))
-  const normalized: Record<string, Record<string, WorkspacePaneSessionTabType>> = {}
-  for (const [repoId, rawByTarget] of Object.entries(value)) {
-    const safeRepoId = toSafeRepoLocator(repoId)
-    if (
-      !safeRepoId ||
-      !openRepoIds.has(safeRepoId) ||
-      !rawByTarget ||
-      typeof rawByTarget !== 'object' ||
-      Array.isArray(rawByTarget)
-    )
-      continue
-    const byTarget: Record<string, WorkspacePaneSessionTabType> = {}
-    for (const [targetKey, paneTab] of Object.entries(rawByTarget)) {
-      const target = safeWorkspacePaneTabsTargetIdentity(safeRepoId, targetKey)
-      if (!target) continue
-      if (typeof paneTab !== 'string' || !isWorkspacePaneSessionTabType(paneTab)) continue
-      if (target.kind === 'branch' && workspacePaneTabRequiresWorktree(paneTab)) continue
-      if (
-        isWorkspacePaneStaticTabType(paneTab) &&
-        !workspacePaneStaticTabs(tabsByRepo[safeRepoId]?.[targetKey] ?? []).includes(paneTab)
-      )
-        continue
-      byTarget[targetKey] = paneTab
-    }
-    if (Object.keys(byTarget).length > 0) normalized[safeRepoId] = byTarget
-  }
-  return normalized
+function defaultWorkspace(): ServerWorkspaceState {
+  return defaultServerWorkspaceState()
 }
 
 function normalizeWorkspacePaneTabsByTargetByRepo(
   value: unknown,
-  openRepoEntries: RepoSessionEntry[],
 ): Record<string, Record<string, WorkspacePaneTabEntry[]>> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-  const openRepoIds = new Set(openRepoEntries.map(repoSessionEntryId))
   const normalized: Record<string, Record<string, WorkspacePaneTabEntry[]>> = {}
   for (const [repoId, rawByTarget] of Object.entries(value)) {
     const safeRepoId = toSafeRepoLocator(repoId)
-    if (
-      !safeRepoId ||
-      !openRepoIds.has(safeRepoId) ||
-      !rawByTarget ||
-      typeof rawByTarget !== 'object' ||
-      Array.isArray(rawByTarget)
-    )
-      continue
+    if (!safeRepoId || !rawByTarget || typeof rawByTarget !== 'object' || Array.isArray(rawByTarget)) continue
     const byTarget: Record<string, WorkspacePaneTabEntry[]> = {}
     for (const [targetKey, rawTabs] of Object.entries(rawByTarget)) {
       const target = safeWorkspacePaneTabsTargetIdentity(safeRepoId, targetKey)
@@ -241,108 +167,12 @@ function safeWorkspacePaneTabsTargetIdentity(
   return toSafeSessionPath(parsed.worktreePath) === parsed.worktreePath ? parsed : null
 }
 
-function normalizeFiletreeViewStateByWorktreeByRepo(
-  value: unknown,
-  openRepoEntries: RepoSessionEntry[],
-): Record<string, Record<string, FiletreeSessionViewState>> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-  const openRepoIds = new Set(openRepoEntries.map(repoSessionEntryId))
-  const normalized: Record<string, Record<string, FiletreeSessionViewState>> = {}
-  for (const [repoId, rawByWorktree] of Object.entries(value)) {
-    const safeRepoId = toSafeRepoLocator(repoId)
-    if (
-      !safeRepoId ||
-      !openRepoIds.has(safeRepoId) ||
-      !rawByWorktree ||
-      typeof rawByWorktree !== 'object' ||
-      Array.isArray(rawByWorktree)
-    )
-      continue
-    const byWorktree: Record<string, FiletreeSessionViewState> = {}
-    for (const [worktreePath, rawViewState] of Object.entries(rawByWorktree)) {
-      if (!worktreePath || worktreePath.includes('\0')) continue
-      const viewState = normalizeFiletreeViewState(rawViewState)
-      if (!viewState) continue
-      if (
-        viewState.selectedKeys.length === 0 &&
-        viewState.expandedKeys.length === 0 &&
-        viewState.topVisibleRowIndex === 0
-      )
-        continue
-      byWorktree[worktreePath] = viewState
-    }
-    if (Object.keys(byWorktree).length > 0) normalized[safeRepoId] = byWorktree
-  }
-  return normalized
-}
-
-function normalizeFiletreeViewState(value: unknown): FiletreeSessionViewState | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
-  const raw = value as Partial<FiletreeSessionViewState>
+function normalizeWorkspace(value: unknown): ServerWorkspaceState {
+  if (!value || typeof value !== 'object') return defaultWorkspace()
+  const partial = value as Partial<ServerWorkspaceState>
   return {
-    selectedKeys: normalizeFiletreeKeys(raw.selectedKeys),
-    expandedKeys: normalizeFiletreeKeys(raw.expandedKeys),
-    topVisibleRowIndex: normalizeFiletreeTopVisibleRowIndex(raw.topVisibleRowIndex),
+    workspacePaneTabsByTargetByRepo: normalizeWorkspacePaneTabsByTargetByRepo(partial.workspacePaneTabsByTargetByRepo),
   }
-}
-
-function normalizeFiletreeKeys(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  const normalized: string[] = []
-  const seen = new Set<string>()
-  for (const key of value) {
-    if (typeof key !== 'string' || !key || key.includes('\0') || seen.has(key)) continue
-    seen.add(key)
-    normalized.push(key)
-  }
-  return normalized
-}
-
-function normalizeFiletreeTopVisibleRowIndex(value: unknown): number {
-  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0
-}
-
-function normalizeSession(value: unknown): WorkspaceSessionState {
-  if (!value || typeof value !== 'object') return defaultSession()
-  const partial = value as Partial<WorkspaceSessionState>
-  const openRepoEntries = Array.isArray(partial.openRepoEntries)
-    ? dedupeRepoEntries(
-        partial.openRepoEntries
-          .map(toSafeSessionRepoEntry)
-          .filter((entry): entry is RepoSessionEntry => entry !== null),
-      )
-    : []
-  const restoredRepoId = toSafeRepoLocator(partial.restoredRepoId)
-  const workspacePaneTabsByTargetByRepo = normalizeWorkspacePaneTabsByTargetByRepo(
-    partial.workspacePaneTabsByTargetByRepo,
-    openRepoEntries,
-  )
-  return {
-    openRepoEntries,
-    restoredRepoId:
-      restoredRepoId && openRepoEntries.some((entry) => repoSessionEntryId(entry) === restoredRepoId)
-        ? restoredRepoId
-        : null,
-    zenMode: typeof partial.zenMode === 'boolean' ? partial.zenMode : DEFAULT_ZEN_MODE,
-    workspacePaneSize: normalizeWorkspacePaneSize(partial.workspacePaneSize),
-    selectedTerminalSessionIdByTerminalWorktree: normalizeSelectedTerminalSessionIdByTerminalWorktree(
-      partial.selectedTerminalSessionIdByTerminalWorktree,
-    ),
-    preferredWorkspacePaneTabByTargetByRepo: normalizePreferredWorkspacePaneTabByTargetByRepo(
-      partial.preferredWorkspacePaneTabByTargetByRepo,
-      openRepoEntries,
-      workspacePaneTabsByTargetByRepo,
-    ),
-    workspacePaneTabsByTargetByRepo,
-    filetreeViewStateByWorktreeByRepo: normalizeFiletreeViewStateByWorktreeByRepo(
-      partial.filetreeViewStateByWorktreeByRepo,
-      openRepoEntries,
-    ),
-  }
-}
-
-function workspacePaneStaticTabs(tabs: readonly WorkspacePaneTabEntry[]): WorkspacePaneStaticTabType[] {
-  return tabs.flatMap((entry) => (isWorkspacePaneRuntimeTabEntry(entry) ? [] : [entry.type]))
 }
 
 function normalizeRecentRepos(value: unknown): RepoSessionEntry[] {
@@ -417,8 +247,8 @@ function cloneRepoSettings(repoSettings: readonly RepoSettingsEntry[]): RepoSett
   }))
 }
 
-function cloneSession(session: WorkspaceSessionState): WorkspaceSessionState {
-  return normalizeSession(session)
+function cloneWorkspace(workspace: ServerWorkspaceState): ServerWorkspaceState {
+  return normalizeWorkspace(workspace)
 }
 
 async function readUserSettingsFile(): Promise<UserSettingsData | null> {
@@ -435,7 +265,7 @@ async function readUserSettingsFile(): Promise<UserSettingsData | null> {
     globalShortcutDisabled: parsed.globalShortcutDisabled === true,
     globalShortcut: normalizeGlobalShortcut(parsed.globalShortcut),
     lanEnabled: normalizeLanEnabled(parsed.lanEnabled),
-    session: normalizeSession(parsed.session),
+    workspace: normalizeWorkspace(parsed.workspace),
     recentRepos: normalizeRecentRepos(parsed.recentRepos),
     repoSettings: normalizeRepoSettings(parsed.repoSettings),
   }
@@ -455,7 +285,7 @@ async function loadUserSettings(): Promise<UserSettingsData> {
     } else {
       data = {
         ...defaultUserSettings(),
-        session: defaultSession(),
+        workspace: defaultWorkspace(),
         recentRepos: [],
         repoSettings: [],
       }
@@ -617,74 +447,52 @@ export async function updateUserSettings(patch: UserSettingsPatch): Promise<User
   })
 }
 
-export async function getServerSessionState(): Promise<WorkspaceSessionState> {
-  return cloneSession((await loadUserSettings()).session)
+export async function getServerWorkspaceState(): Promise<ServerWorkspaceState> {
+  return cloneWorkspace((await loadUserSettings()).workspace)
 }
 
-export async function beginServerSessionWriter(clientId: string): Promise<string> {
-  return await mutateUserSettings(async (data) => {
-    const writerId = createOpaqueId('session-writer')
-    return {
-      next: data,
-      result: writerId,
-      changed: false,
-      afterCommit: () => {
-        sessionWritersByClient.set(clientId, { writerId, latestSequence: 0 })
-      },
-    }
-  })
-}
-
-export async function setServerSessionState(session: WorkspaceSessionState): Promise<WorkspaceSessionState> {
-  return await mutateUserSettings(async (data) => {
-    const next = normalizeSession(session)
-    return { next: { ...data, session: next }, result: cloneSession(next) }
-  })
-}
-
-export async function setServerSessionStateOrdered(input: {
-  clientId: string
-  sessionWriterId: string
-  sessionWriterSequence: number
-  session: WorkspaceSessionState
-}): Promise<{ accepted: boolean; session: WorkspaceSessionState }> {
-  return await mutateUserSettings<{ accepted: boolean; session: WorkspaceSessionState }>(async (data) => {
-    const writer = sessionWritersByClient.get(input.clientId)
-    if (!writer || writer.writerId !== input.sessionWriterId || input.sessionWriterSequence <= writer.latestSequence) {
-      return unchangedUserSettings(data, { accepted: false, session: cloneSession(data.session) })
-    }
-    const next = normalizeSession(input.session)
-    return {
-      next: { ...data, session: next },
-      result: { accepted: true, session: cloneSession(next) },
-      afterCommit: () => {
-        writer.latestSequence = input.sessionWriterSequence
-      },
-    }
-  })
-}
-
-export async function saveRebuiltServerSessionState(input: {
-  persistedSnapshot: WorkspaceSessionState
-  rebuiltSession: WorkspaceSessionState
-}): Promise<{ saved: true; session: WorkspaceSessionState } | { saved: false; latestSession: WorkspaceSessionState }> {
+export async function saveRebuiltServerWorkspaceState(input: {
+  persistedSnapshot: ServerWorkspaceState
+  rebuiltWorkspace: ServerWorkspaceState
+}): Promise<
+  { saved: true; workspace: ServerWorkspaceState } | { saved: false; latestWorkspace: ServerWorkspaceState }
+> {
   return await mutateUserSettings<
-    { saved: true; session: WorkspaceSessionState } | { saved: false; latestSession: WorkspaceSessionState }
+    { saved: true; workspace: ServerWorkspaceState } | { saved: false; latestWorkspace: ServerWorkspaceState }
   >(async (data) => {
-    const current = cloneSession(data.session)
-    if (!sameWorkspaceSessionState(current, input.persistedSnapshot)) {
-      return unchangedUserSettings(data, { saved: false, latestSession: current })
+    const current = cloneWorkspace(data.workspace)
+    if (!sameServerWorkspaceState(current, input.persistedSnapshot)) {
+      return unchangedUserSettings(data, { saved: false, latestWorkspace: current })
     }
-    const next = normalizeSession(input.rebuiltSession)
+    const next = normalizeWorkspace(input.rebuiltWorkspace)
     return {
-      next: { ...data, session: next },
-      result: { saved: true, session: cloneSession(next) },
+      next: { ...data, workspace: next },
+      result: { saved: true, workspace: cloneWorkspace(next) },
     }
   })
 }
 
-function sameWorkspaceSessionState(a: WorkspaceSessionState, b: WorkspaceSessionState): boolean {
-  return JSON.stringify(normalizeSession(a)) === JSON.stringify(normalizeSession(b))
+function sameServerWorkspaceState(a: ServerWorkspaceState, b: ServerWorkspaceState): boolean {
+  return JSON.stringify(normalizeWorkspace(a)) === JSON.stringify(normalizeWorkspace(b))
+}
+
+export async function recordServerWorkspaceTabs(
+  repoRoot: string,
+  snapshot: WorkspacePaneTabsSnapshot,
+): Promise<ServerWorkspaceState> {
+  return await mutateUserSettings(async (data) => {
+    const byTarget = Object.fromEntries(
+      snapshot.entries.map((entry) => [workspacePaneTabsTargetIdentityKey(entry), entry.tabs]),
+    )
+    const workspace = normalizeWorkspace({
+      ...data.workspace,
+      workspacePaneTabsByTargetByRepo: {
+        ...data.workspace.workspacePaneTabsByTargetByRepo,
+        [repoRoot]: byTarget,
+      },
+    })
+    return { next: { ...data, workspace }, result: cloneWorkspace(workspace) }
+  })
 }
 
 export async function getServerRecentRepos(): Promise<RepoSessionEntry[]> {
@@ -855,7 +663,6 @@ export function resetServerSettingsSourceForTests(): void {
   settingsData = null
   settingsLoadPromise = null
   settingsMutationPromise = Promise.resolve()
-  sessionWritersByClient.clear()
   listeners.clear()
   cachedFetchIntervalSec = DEFAULT_FETCH_INTERVAL_SEC
   resetUserSettingsPersistenceForTests()

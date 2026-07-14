@@ -43,7 +43,7 @@ The primary window boot path has two separate concerns: public shell hydration a
 The repos store keeps low-level fields because different UI surfaces need different boundaries:
 
 - `workspaceMembershipReady`: restored repo membership has settled.
-- `sessionPersistenceReady`: all boot-restored state that can affect session persistence has converged back into client-observable state.
+- `sessionPersistenceReady`: server workspace restore and client-local workspace hydrate have both converged.
 - `sessionRestoreError`: restore failed in a way that must block persistence.
 
 Code that needs the combined state should use `workspaceRestoreStatusFromStore` or `workspaceSessionPersistenceOpenFromStore` from `src/web/stores/repos/selector-state.ts` instead of recombining booleans at call sites.
@@ -53,14 +53,17 @@ Code that needs the combined state should use `workspaceRestoreStatusFromStore` 
 - Repo routes derive `RepoRouteView` directly from the URL before store hydration.
 - A routed repo may be missing from the repo store while workspace membership is restoring. Render restore skeletons until `workspaceMembershipReady` is true.
 - After membership is ready, a routed repo missing from the store is a not-found state, not an empty placeholder.
-- Session persistence should prefer the routed repo id over `restoredRepoId` so deep links are not overwritten by stale boot state.
+- Client workspace persistence should prefer the routed repo id over `restoredRepoId`.
 
 ## Persistence Rules
 
-- Session persistence is client-to-settings only. Boot restore owns initial settings-to-client hydration.
-- Do not persist until `workspaceSessionPersistenceOpenFromStore` is true.
-- Restore failures must block persistence so the saved session is not overwritten with a partial or empty workspace.
-- High-frequency runtime state should stay debounced; coarse workspace structure changes may save immediately.
+- Server workspace-tab commands persist canonical `ServerWorkspaceState` directly.
+- The client persists only `ClientWorkspaceState` in local storage.
+- The client submits its local `openRepoEntries` once as boot restore intent;
+  the server returns canonical entries and runtime identities.
+- Do not POST a composed `WorkspaceSessionState` back to the server.
+- Do not persist client workspace state until `workspaceSessionPersistenceOpenFromStore` is true.
+- High-frequency client state may be debounced; pagehide flush is synchronous and local.
 
 ## Adding Startup Work
 
@@ -69,7 +72,7 @@ When adding startup behavior, choose one stage and document why it belongs there
 - Public, unauthenticated work goes in public bootstrap.
 - Authenticated but non-blocking work can run as an optional task in authenticated bootstrap and must log but not block workspace restore.
 - Work that affects repo membership belongs in `hydrateRepoSession`.
-- Work that affects persisted workspace session must complete before `sessionPersistenceReady` opens.
+- Work that affects boot composition must complete before `sessionPersistenceReady` opens.
 - Work that needs hydrated repo data but is not part of restore belongs in workspace shell side effects.
 
 Every async startup task needs a cleanup story: cancellation must not commit success, unblock persistence, or set React state after unmount.

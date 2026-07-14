@@ -5,7 +5,6 @@ import type {
   RepoSettingsState,
   RuntimeRecentReposState,
   RuntimeSettingsSnapshot,
-  WorkspaceSessionState,
   SettingsSnapshot,
 } from '#/shared/api-types.ts'
 import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
@@ -49,16 +48,6 @@ export function updateRuntimeRecentReposStateCache(queryClient: QueryClient, nex
   updateSettingsSnapshotCache(queryClient, (current) => ({
     ...current,
     recentRepos: next.recentRepos,
-  }))
-}
-
-export function updateRestorableWorkspaceSessionStateCache(
-  queryClient: QueryClient,
-  session: WorkspaceSessionState,
-): void {
-  updateSettingsSnapshotCache(queryClient, (current) => ({
-    ...current,
-    session,
   }))
 }
 

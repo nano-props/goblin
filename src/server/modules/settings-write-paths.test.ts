@@ -1,15 +1,11 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import type { WorkspaceSessionState } from '#/shared/api-types.ts'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
-import { WORKSPACE_PANE_STATIC_TAB_IDS, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
-import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 const mocks = vi.hoisted(() => ({
   publishSettingsInvalidation: vi.fn(),
   addServerRecentRepo: vi.fn(),
   clearServerRecentRepos: vi.fn(),
   setServerFetchIntervalSec: vi.fn(),
-  setServerSessionStateOrdered: vi.fn(),
   updateUserSettings: vi.fn(),
   settingsInvalidationScopesForPrefsPatch: vi.fn(),
 }))
@@ -22,7 +18,6 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
   addServerRecentRepo: mocks.addServerRecentRepo,
   clearServerRecentRepos: mocks.clearServerRecentRepos,
   setServerFetchIntervalSec: mocks.setServerFetchIntervalSec,
-  setServerSessionStateOrdered: mocks.setServerSessionStateOrdered,
   updateUserSettings: mocks.updateUserSettings,
 }))
 
@@ -71,41 +66,6 @@ describe('settings command handlers', () => {
     expect(mocks.publishSettingsInvalidation).toHaveBeenCalledWith(['i18n'])
   })
 
-  test('persists session state without publishing settings invalidation', async () => {
-    const session: WorkspaceSessionState = {
-      openRepoEntries: [],
-      restoredRepoId: null,
-      zenMode: true,
-      workspacePaneSize: 50,
-      selectedTerminalSessionIdByTerminalWorktree: {},
-      preferredWorkspacePaneTabByTargetByRepo: {},
-      workspacePaneTabsByTargetByRepo: {},
-      filetreeViewStateByWorktreeByRepo: {},
-    }
-    mocks.setServerSessionStateOrdered.mockResolvedValue({ accepted: true, session })
-    const { handleSetSession } = await import('#/server/modules/settings-write-paths.ts')
-
-    await expect(
-      handleSetSession({
-        clientId: 'client_test000000000000',
-        sessionWriterId: 'session_writer_test',
-        sessionWriterSequence: 1,
-        session,
-      }),
-    ).resolves.toEqual({
-      ok: true,
-      accepted: true,
-      session,
-    })
-    expect(mocks.setServerSessionStateOrdered).toHaveBeenCalledWith({
-      clientId: 'client_test000000000000',
-      sessionWriterId: 'session_writer_test',
-      sessionWriterSequence: 1,
-      session,
-    })
-    expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
-  })
-
   test('adds recent repos and publishes settings snapshot invalidation', async () => {
     const repo = { kind: 'local', id: '/tmp/repo-a' } as const
     mocks.addServerRecentRepo.mockResolvedValue([repo])
@@ -124,125 +84,4 @@ describe('settings command handlers', () => {
     const { parseHttpInput } = await import('#/server/common/http-validate.ts')
     expect(() => parseHttpInput(SETTINGS_PROCEDURE_SCHEMAS.fetchInterval, { sec: '5m' })).toThrow()
   })
-
-  test('schema accepts well-formed session state via the perimeter', async () => {
-    const { SETTINGS_PATCH_SCHEMAS } = await import('#/shared/procedure-schemas.ts')
-    const { parseHttpInput } = await import('#/server/common/http-validate.ts')
-    const targetKey = branchTargetKey('/tmp/repo', 'main')
-    const parsed = parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
-      clientId: 'client_test000000000000',
-      sessionWriterId: 'session_writer_test',
-      sessionWriterSequence: 1,
-      session: {
-        openRepoEntries: [],
-        restoredRepoId: null,
-        zenMode: true,
-        workspacePaneSize: 42.5,
-        selectedTerminalSessionIdByTerminalWorktree: {},
-        preferredWorkspacePaneTabByTargetByRepo: {},
-        workspacePaneTabsByTargetByRepo: {
-          '/tmp/repo': {
-            [targetKey]: [{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }],
-          },
-        },
-        filetreeViewStateByWorktreeByRepo: {},
-      },
-    })
-    expect(parsed.session.zenMode).toBe(true)
-    expect(parsed.session.workspacePaneSize).toBe(42.5)
-  })
-
-  test('schema accepts changes as a session-restorable preferred tab', async () => {
-    const { SETTINGS_PATCH_SCHEMAS } = await import('#/shared/procedure-schemas.ts')
-    const { parseHttpInput } = await import('#/server/common/http-validate.ts')
-    const targetKey = branchTargetKey('/tmp/repo', 'main')
-
-    expect(() =>
-      parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
-        clientId: 'client_test000000000000',
-        sessionWriterId: 'session_writer_test',
-        sessionWriterSequence: 1,
-        session: {
-          openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
-          restoredRepoId: '/tmp/repo',
-          zenMode: true,
-          workspacePaneSize: 42.5,
-          selectedTerminalSessionIdByTerminalWorktree: {},
-          preferredWorkspacePaneTabByTargetByRepo: {
-            '/tmp/repo': {
-              [targetKey]: 'changes',
-            },
-          },
-          workspacePaneTabsByTargetByRepo: {
-            '/tmp/repo': {
-              [targetKey]: [workspacePaneStaticTabEntry('changes')],
-            },
-          },
-          filetreeViewStateByWorktreeByRepo: {},
-        },
-      }),
-    ).not.toThrow()
-  })
-
-  test('schema rejects malformed workspace pane tab list entries at the perimeter', async () => {
-    const { SETTINGS_PATCH_SCHEMAS } = await import('#/shared/procedure-schemas.ts')
-    const { parseHttpInput } = await import('#/server/common/http-validate.ts')
-    const targetKey = branchTargetKey('/tmp/repo', 'main')
-
-    const session = {
-      openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
-      restoredRepoId: '/tmp/repo',
-      zenMode: true,
-      workspacePaneSize: 42.5,
-      selectedTerminalSessionIdByTerminalWorktree: {},
-      preferredWorkspacePaneTabByTargetByRepo: {},
-      workspacePaneTabsByTargetByRepo: {
-        '/tmp/repo': {
-          [targetKey]: [],
-        },
-      },
-      filetreeViewStateByWorktreeByRepo: {},
-    }
-
-    expect(() =>
-      parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
-        session: {
-          ...session,
-          workspacePaneTabsByTargetByRepo: {
-            '/tmp/repo': {
-              [targetKey]: [{ type: 'status', tabId: WORKSPACE_PANE_STATIC_TAB_IDS.history }],
-            },
-          },
-        },
-      }),
-    ).toThrow()
-    expect(() =>
-      parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
-        session: {
-          ...session,
-          workspacePaneTabsByTargetByRepo: {
-            '/tmp/repo': {
-              [targetKey]: [{ type: 'terminal', terminalSessionId: '' }],
-            },
-          },
-        },
-      }),
-    ).toThrow()
-    expect(() =>
-      parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
-        session: {
-          ...session,
-          workspacePaneTabsByTargetByRepo: {
-            '/tmp/repo': {
-              [targetKey]: [{ type: 'terminal', runtimeSessionId: '' }],
-            },
-          },
-        },
-      }),
-    ).toThrow()
-  })
 })
-
-function branchTargetKey(repoRoot: string, branchName: string): string {
-  return workspacePaneTabsTargetIdentityKey({ repoRoot, branchName, worktreePath: null })
-}

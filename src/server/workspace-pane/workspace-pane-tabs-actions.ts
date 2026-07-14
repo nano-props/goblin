@@ -18,6 +18,7 @@ export interface WorkspacePaneTabsActionDependencies {
   isValidClientId(value: unknown): value is string
   isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
   broadcastWorkspaceTabsChanged(userId: string, repoRoot: string): void
+  persistWorkspaceTabs(repoRoot: string, snapshot: WorkspacePaneTabsSnapshot): Promise<unknown>
 }
 
 export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDependencies) {
@@ -34,6 +35,7 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return emptyWorkspacePaneTabsSnapshot()
       assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
       const tabs = await sessionService.replaceTabs(userId, input)
+      await deps.persistWorkspaceTabs(input.repoRoot, tabs)
       deps.broadcastWorkspaceTabsChanged(userId, input.repoRoot)
       return tabs
     },
@@ -53,6 +55,7 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       }
       for (const replacement of input.replacements) {
         const snapshot = await sessionService.replaceTabs(userId, replacement)
+        await deps.persistWorkspaceTabs(replacement.repoRoot, snapshot)
         const index = snapshots.findIndex(
           (entry) => entry.repoRoot === replacement.repoRoot && entry.repoRuntimeId === replacement.repoRuntimeId,
         )
@@ -76,6 +79,7 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return emptyWorkspacePaneTabsSnapshot()
       assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
       const tabs = await sessionService.updateTabs(userId, input)
+      await deps.persistWorkspaceTabs(input.repoRoot, tabs)
       deps.broadcastWorkspaceTabsChanged(userId, input.repoRoot)
       return tabs
     },

@@ -46,7 +46,7 @@ function createRestorableWorkspaceActions(set: ReposSet): RestorableWorkspaceAct
   return {
     applySessionLayoutState(layoutState: Parameters<ReposStore['applySessionLayoutState']>[0]) {
       // One-shot boot/session restore of restorable layout fields. Runtime
-      // edits are persisted later through useSessionPersistence.
+      // edits are persisted later through useClientWorkspacePersistence.
       set((s) => {
         const next = normalizeWorkspaceSessionLayoutState(layoutState)
         if (s.zenMode === next.zenMode && s.workspacePaneSize === next.workspacePaneSize) {
@@ -129,10 +129,7 @@ function createRestorableWorkspaceActions(set: ReposSet): RestorableWorkspaceAct
 function createRuntimeWorkspacePreferenceActions(set: ReposSet, get: ReposGet): RuntimeWorkspacePreferenceActions {
   // Shared post-write effects for view preferences that affect warm restore or
   // visible branch data. Centralized so each preference write stays coherent.
-  function afterWorkspacePreferenceChange(
-    id: string,
-    repoRuntimeId: string,
-  ): void {
+  function afterWorkspacePreferenceChange(id: string, repoRuntimeId: string): void {
     const repo = get().repos[id]
     if (!repo) return
     persistRepoSnapshotCacheEntry(set, repo, repoRuntimeId)

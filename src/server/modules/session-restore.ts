@@ -1,5 +1,5 @@
 import PQueue from 'p-queue'
-import { defaultWorkspaceSessionState } from '#/shared/settings-defaults.ts'
+import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import {
   IpcError,
   isProjectedRestoredWorkspaceRepo,
@@ -9,15 +9,10 @@ import {
   type RepoRuntimeProjection,
   type RestoredWorkspaceRepoRuntime,
   type WorkspaceRuntimeRestoreSnapshot,
-  type WorkspaceSessionState,
+  type ServerWorkspaceState,
 } from '#/shared/api-types.ts'
 import { repoSessionEntryId, type RemoteRepoSessionEntry, type RepoSessionEntry } from '#/shared/remote-repo.ts'
-import {
-  isWorkspacePaneStaticTabType,
-  type WorkspacePaneSessionTabType,
-  type WorkspacePaneTabEntry,
-  workspacePaneTabRequiresWorktree,
-} from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import {
   parseWorkspacePaneTabsTargetIdentityKey,
@@ -31,16 +26,13 @@ import {
   type RepoRuntimeMembershipLeaseEntry,
 } from '#/server/modules/repo-runtimes.ts'
 import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
-import {
-  beginServerSessionWriter,
-  getServerSessionState,
-  saveRebuiltServerSessionState,
-} from '#/server/modules/settings-source.ts'
+import { getServerWorkspaceState, saveRebuiltServerWorkspaceState } from '#/server/modules/settings-source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 
-export interface RestoreServerWorkspaceSessionInput {
+export interface RestoreServerWorkspaceInput {
   userId: string
   clientId: string
+  openRepoEntries: RepoSessionEntry[]
   // The repo the user is currently viewing. Only this repo gets the full
   // projection read + pane-tab restore at cold start. Other repos are
   // validated/canonicalized, then returned as stub leases and restored lazily
@@ -50,14 +42,14 @@ export interface RestoreServerWorkspaceSessionInput {
   signal?: AbortSignal
 }
 
-export interface RestoredServerWorkspaceSession {
+export interface RestoredServerWorkspace {
   status: 'restored' | 'rebuilt'
-  session: WorkspaceSessionState
+  openRepoEntries: RepoSessionEntry[]
+  workspace: ServerWorkspaceState
   runtime: WorkspaceRuntimeRestoreSnapshot
-  sessionWriterId: string
 }
 
-type RestoredServerWorkspaceSessionSnapshot = Omit<RestoredServerWorkspaceSession, 'sessionWriterId'>
+type RestoredServerWorkspaceSnapshot = RestoredServerWorkspace
 
 export interface RestoreRepoTabsInput {
   userId: string
@@ -89,22 +81,20 @@ interface WorkspacePaneTabsRestoreReplacement {
 const MAX_REBUILD_CONFLICT_RETRIES = 3
 const restoreQueues = new Map<string, PQueue>()
 
-export async function restoreServerWorkspaceSession(
-  input: RestoreServerWorkspaceSessionInput,
-): Promise<RestoredServerWorkspaceSession> {
+export async function restoreServerWorkspace(input: RestoreServerWorkspaceInput): Promise<RestoredServerWorkspace> {
   input.signal?.throwIfAborted()
   const key = restoreQueueKey(input.userId, input.clientId)
   const queue = restoreQueueFor(key)
   try {
     return await queue.add(async () => {
       input.signal?.throwIfAborted()
-      const session = await getServerSessionState()
-      const restored = await restoreServerWorkspaceSessionSnapshot(
-        { ...input, activeRepoRoot: input.activeRepoRoot ?? session.restoredRepoId ?? null },
-        session,
+      const workspace = await getServerWorkspaceState()
+      const restored = await restoreServerWorkspaceSnapshot(
+        { ...input, activeRepoRoot: input.activeRepoRoot ?? input.openRepoEntries[0]?.id ?? null },
+        { workspace, openRepoEntries: input.openRepoEntries },
         0,
       )
-      return { ...restored, sessionWriterId: await beginServerSessionWriter(input.clientId) }
+      return restored
     })
   } finally {
     void queue.onIdle().then(() => {
@@ -126,22 +116,27 @@ function restoreQueueFor(key: string): PQueue {
   return queue
 }
 
-async function restoreServerWorkspaceSessionSnapshot(
-  input: RestoreServerWorkspaceSessionInput,
-  session: WorkspaceSessionState,
+async function restoreServerWorkspaceSnapshot(
+  input: RestoreServerWorkspaceInput,
+  source: { workspace: ServerWorkspaceState; openRepoEntries: RepoSessionEntry[] },
   conflictRetries: number,
-): Promise<RestoredServerWorkspaceSessionSnapshot> {
+): Promise<RestoredServerWorkspaceSnapshot> {
   input.signal?.throwIfAborted()
   const opened: OpenedRepoSessionEntry[] = []
   let openedMembershipsCommitted = false
   const activeRepoRoot = input.activeRepoRoot ?? null
   try {
-    for (const entry of session.openRepoEntries) {
+    for (const entry of source.openRepoEntries) {
       const result = await openSessionRepo(input, entry, {
         active: repoSessionEntryId(entry) === activeRepoRoot,
       })
       if (!result.ok) {
-        return await saveRebuiltOrRestoreLatest(input, session, defaultWorkspaceSessionState(), conflictRetries)
+        return {
+          status: 'rebuilt',
+          openRepoEntries: [],
+          workspace: source.workspace,
+          runtime: runtimeSnapshotFromOpened([], null, []),
+        }
       }
       opened.push(result.opened)
     }
@@ -152,55 +147,51 @@ async function restoreServerWorkspaceSessionSnapshot(
     // cannot resolve — and their tabs will be restored lazily when the user
     // navigates to them via `restoreRepoTabsForRepo`.
     const openedActive = opened.filter(isOpenedProjectedRepo)
-    if (
-      !validateWorkspacePaneTabs(session, openedActive).ok ||
-      !validatePreferredWorkspacePaneTabs(session, openedActive).ok
-    ) {
-      const saved = await saveRebuiltServerSessionState({
-        persistedSnapshot: session,
-        rebuiltSession: cleanSessionFromOpened(session, opened),
+    if (!validateWorkspacePaneTabs(source.workspace, openedActive).ok) {
+      const saved = await saveRebuiltServerWorkspaceState({
+        persistedSnapshot: source.workspace,
+        rebuiltWorkspace: defaultServerWorkspaceState(),
       })
       if (saved.saved) {
         openedMembershipsCommitted = true
-        return { status: 'rebuilt', session: saved.session, runtime: runtimeSnapshotFromOpened(opened, saved.session.restoredRepoId, []) }
+        return {
+          status: 'rebuilt',
+          openRepoEntries: opened.map((repo) => repo.entry),
+          workspace: saved.workspace,
+          runtime: runtimeSnapshotFromOpened(opened, activeRepoRootForOpened(input.activeRepoRoot, opened), []),
+        }
       }
       if (conflictRetries >= MAX_REBUILD_CONFLICT_RETRIES) {
         throw new Error('workspace session restore was superseded too many times')
       }
-      return await restoreServerWorkspaceSessionSnapshot(input, saved.latestSession, conflictRetries + 1)
+      return await restoreServerWorkspaceSnapshot(
+        input,
+        { workspace: saved.latestWorkspace, openRepoEntries: source.openRepoEntries },
+        conflictRetries + 1,
+      )
     }
 
     input.signal?.throwIfAborted()
-    const workspacePaneTabs = await restoreWorkspacePaneTabsForRepos(input, session, openedActive)
+    const workspacePaneTabs = await restoreWorkspacePaneTabsForRepos(input, source.workspace, openedActive)
     input.signal?.throwIfAborted()
     openedMembershipsCommitted = true
-    const restoredSession = canonicalSessionFromOpened(session, opened)
     return {
       status: 'restored',
-      session: restoredSession,
-      runtime: runtimeSnapshotFromOpened(opened, restoredSession.restoredRepoId, workspacePaneTabs),
+      openRepoEntries: opened.map((repo) => repo.entry),
+      workspace: source.workspace,
+      runtime: runtimeSnapshotFromOpened(
+        opened,
+        activeRepoRootForOpened(input.activeRepoRoot, opened),
+        workspacePaneTabs,
+      ),
     }
   } finally {
     if (!openedMembershipsCommitted) releaseOpenedRepoRuntimes(input, opened)
   }
 }
 
-async function saveRebuiltOrRestoreLatest(
-  input: RestoreServerWorkspaceSessionInput,
-  session: WorkspaceSessionState,
-  rebuiltSession: WorkspaceSessionState,
-  conflictRetries: number,
-): Promise<RestoredServerWorkspaceSessionSnapshot> {
-  const saved = await saveRebuiltServerSessionState({ persistedSnapshot: session, rebuiltSession })
-  if (saved.saved) return { status: 'rebuilt', session: saved.session, runtime: runtimeSnapshotFromOpened([], null, []) }
-  if (conflictRetries >= MAX_REBUILD_CONFLICT_RETRIES) {
-    throw new Error('workspace session restore was superseded too many times')
-  }
-  return await restoreServerWorkspaceSessionSnapshot(input, saved.latestSession, conflictRetries + 1)
-}
-
 async function openSessionRepo(
-  input: RestoreServerWorkspaceSessionInput,
+  input: RestoreServerWorkspaceInput,
   entry: RepoSessionEntry,
   options: { active: boolean },
 ): Promise<OpenSessionRepoResult> {
@@ -227,7 +218,11 @@ async function openSessionRepo(
     }
   }
   try {
-    const projection = await readRepoProjection(probe.root, { repoRuntimeId: lease.repoRuntimeId, signal: input.signal, mode: 'full' })
+    const projection = await readRepoProjection(probe.root, {
+      repoRuntimeId: lease.repoRuntimeId,
+      signal: input.signal,
+      mode: 'full',
+    })
     if (!projection.snapshot) {
       releaseSessionRepoRuntime(input, lease)
       return { ok: false }
@@ -250,7 +245,7 @@ async function openSessionRepo(
 }
 
 async function openRemoteSessionRepo(
-  input: RestoreServerWorkspaceSessionInput,
+  input: RestoreServerWorkspaceInput,
   entry: RemoteRepoSessionEntry,
   options: { active: boolean },
 ): Promise<OpenSessionRepoResult> {
@@ -283,7 +278,11 @@ async function openRemoteSessionRepo(
       releaseSessionRepoRuntime(input, lease)
       return { ok: false }
     }
-    const projection = await readRepoProjection(entry.id, { repoRuntimeId: lease.repoRuntimeId, signal: input.signal, mode: 'full' })
+    const projection = await readRepoProjection(entry.id, {
+      repoRuntimeId: lease.repoRuntimeId,
+      signal: input.signal,
+      mode: 'full',
+    })
     if (!projection.snapshot) {
       releaseSessionRepoRuntime(input, lease)
       return { ok: false }
@@ -322,11 +321,11 @@ async function abortable<T>(promise: Promise<T>, signal?: AbortSignal): Promise<
 }
 
 function validateWorkspacePaneTabs(
-  session: WorkspaceSessionState,
+  workspace: ServerWorkspaceState,
   opened: ProjectedRestoredWorkspaceRepoRuntime[],
 ): WorkspaceSessionValidationResult {
   const openedByRoot = openedRepoByRoot(opened)
-  for (const [repoRoot, tabsByTarget] of Object.entries(session.workspacePaneTabsByTargetByRepo)) {
+  for (const [repoRoot, tabsByTarget] of Object.entries(workspace.workspacePaneTabsByTargetByRepo)) {
     const repo = openedByRoot.get(repoRoot)
     // Stub leases (non-active repos at cold start) carry `projection: null`
     // and their tabs will be restored lazily. Defer validation to the lazy
@@ -347,32 +346,33 @@ function validateWorkspacePaneTabs(
  * `WorkspaceRuntimeRestoreSnapshot.workspacePaneTabs`, plus the
  * restored repo (with projection) so the caller can hydrate the store.
  */
-export async function restoreRepoTabsForRepo(
-  input: RestoreRepoTabsInput,
-): Promise<RepoWorkspaceTabsRestoreResult> {
+export async function restoreRepoTabsForRepo(input: RestoreRepoTabsInput): Promise<RepoWorkspaceTabsRestoreResult> {
   input.signal?.throwIfAborted()
   assertCurrentRepoRuntime(input)
   const entry = input.intent.entry
   if (repoSessionEntryId(entry) !== input.repoRoot) {
     throw new IpcError({ code: 'BAD_REQUEST', message: 'error.invalid-arguments' })
   }
-  const session = deferredRepoRestoreSession(input.repoRoot, input.intent)
+  const workspace = deferredRepoRestoreWorkspace(input.repoRoot, input.intent)
 
   const repo = await projectSessionRepo(input, entry)
   if (!repo) {
     throw new IpcError({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
   }
 
-  if (
-    !validateWorkspacePaneTabs(session, [repo]).ok ||
-    !validatePreferredWorkspacePaneTabs(session, [repo]).ok
-  ) {
+  if (!validateWorkspacePaneTabs(workspace, [repo]).ok) {
     return { repo, snapshot: null }
   }
 
   const snapshots = await restoreWorkspacePaneTabsForRepos(
-    { userId: input.userId, clientId: input.clientId, workspacePaneTabsHost: input.workspacePaneTabsHost, signal: input.signal },
-    session,
+    {
+      userId: input.userId,
+      clientId: input.clientId,
+      openRepoEntries: [],
+      workspacePaneTabsHost: input.workspacePaneTabsHost,
+      signal: input.signal,
+    },
+    workspace,
     [repo],
   )
   assertCurrentRepoRuntime(input)
@@ -382,16 +382,9 @@ export async function restoreRepoTabsForRepo(
   }
 }
 
-function deferredRepoRestoreSession(
-  repoRoot: string,
-  intent: RepoWorkspaceTabsRestoreIntent,
-): WorkspaceSessionState {
+function deferredRepoRestoreWorkspace(repoRoot: string, intent: RepoWorkspaceTabsRestoreIntent): ServerWorkspaceState {
   return {
-    ...defaultWorkspaceSessionState(),
-    openRepoEntries: [intent.entry],
-    restoredRepoId: repoRoot,
     workspacePaneTabsByTargetByRepo: { [repoRoot]: intent.workspacePaneTabsByTarget },
-    preferredWorkspacePaneTabByTargetByRepo: { [repoRoot]: intent.preferredWorkspacePaneTabByTarget },
   }
 }
 
@@ -457,11 +450,11 @@ function isOpenedProjectedRepo(repo: OpenedRepoSessionEntry): repo is OpenedProj
 }
 
 async function restoreWorkspacePaneTabsForRepos(
-  input: RestoreServerWorkspaceSessionInput,
-  session: WorkspaceSessionState,
+  input: RestoreServerWorkspaceInput,
+  workspace: ServerWorkspaceState,
   opened: ProjectedRestoredWorkspaceRepoRuntime[],
 ): Promise<Array<{ repoRoot: string; repoRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>> {
-  const replacements = workspacePaneTabRestoreReplacements(session, opened)
+  const replacements = workspacePaneTabRestoreReplacements(workspace, opened)
   if (replacements.length === 0) return []
   input.signal?.throwIfAborted()
   if (input.workspacePaneTabsHost.replaceTabsBatch) {
@@ -491,12 +484,12 @@ async function restoreWorkspacePaneTabsForRepos(
 }
 
 function workspacePaneTabRestoreReplacements(
-  session: WorkspaceSessionState,
+  workspace: ServerWorkspaceState,
   opened: ProjectedRestoredWorkspaceRepoRuntime[],
 ): WorkspacePaneTabsRestoreReplacement[] {
   const openedByRoot = openedRepoByRoot(opened)
   const replacements: WorkspacePaneTabsRestoreReplacement[] = []
-  for (const [repoRoot, tabsByTarget] of Object.entries(session.workspacePaneTabsByTargetByRepo)) {
+  for (const [repoRoot, tabsByTarget] of Object.entries(workspace.workspacePaneTabsByTargetByRepo)) {
     const repo = openedByRoot.get(repoRoot)
     if (!repo) continue
     for (const [targetKey, tabs] of Object.entries(tabsByTarget)) {
@@ -520,41 +513,10 @@ function upsertWorkspacePaneTabsSnapshot(
   else snapshots[index] = entry
 }
 
-function validatePreferredWorkspacePaneTabs(
-  session: WorkspaceSessionState,
-  opened: ProjectedRestoredWorkspaceRepoRuntime[],
-): WorkspaceSessionValidationResult {
-  const openedByRoot = openedRepoByRoot(opened)
-  for (const [repoRoot, preferredByTarget] of Object.entries(session.preferredWorkspacePaneTabByTargetByRepo)) {
-    const repo = openedByRoot.get(repoRoot)
-    // See `validateWorkspacePaneTabs` — defer stub repos to the lazy path.
-    if (!repo) continue
-    for (const [targetKey, preferredTab] of Object.entries(preferredByTarget)) {
-      const target = targetForSessionKey(repo, targetKey)
-      if (!target) return { ok: false }
-      if (!preferredTabValidForTarget(preferredTab, target, session.workspacePaneTabsByTargetByRepo[repoRoot]?.[targetKey] ?? [])) {
-        return { ok: false }
-      }
-    }
-  }
-  return { ok: true }
-}
-
-function preferredTabValidForTarget(
-  preferredTab: WorkspacePaneSessionTabType | null,
-  target: WorkspacePaneTabsTarget,
-  tabs: WorkspacePaneTabEntry[],
-): boolean {
-  if (preferredTab === null) return true
-  if (target.worktreePath === null && workspacePaneTabRequiresWorktree(preferredTab)) return false
-  return !(
-    isWorkspacePaneStaticTabType(preferredTab) &&
-    preferredTab !== 'status' &&
-    !tabs.some((tab) => tab.type === preferredTab)
-  )
-}
-
-function targetForSessionKey(repo: ProjectedRestoredWorkspaceRepoRuntime, targetKey: string): WorkspacePaneTabsTarget | null {
+function targetForSessionKey(
+  repo: ProjectedRestoredWorkspaceRepoRuntime,
+  targetKey: string,
+): WorkspacePaneTabsTarget | null {
   if (!repo.projection.snapshot) return null
   const target = parseWorkspacePaneTabsTargetIdentityKey(targetKey)
   if (!target || target.repoRoot !== repo.repoRoot) return null
@@ -565,53 +527,15 @@ function targetForSessionKey(repo: ProjectedRestoredWorkspaceRepoRuntime, target
       : null
   }
   const branch = branches.find((candidate) => candidate.worktree?.path === target.worktreePath)
-  return branch
-    ? { repoRoot: repo.repoRoot, branchName: branch.name, worktreePath: target.worktreePath }
-    : null
+  return branch ? { repoRoot: repo.repoRoot, branchName: branch.name, worktreePath: target.worktreePath } : null
 }
 
-function canonicalSessionFromOpened(
-  session: WorkspaceSessionState,
+function activeRepoRootForOpened(
+  activeRepoRoot: string | null | undefined,
   opened: OpenedRepoSessionEntry[],
-): WorkspaceSessionState {
-  const openRepoEntries = opened.map((repo) => repo.entry)
-  const restoredRepoId = canonicalRestoredRepoId(session, openRepoEntries)
-  return { ...session, openRepoEntries, restoredRepoId }
-}
-
-function cleanSessionFromOpened(
-  session: WorkspaceSessionState,
-  opened: OpenedRepoSessionEntry[],
-): WorkspaceSessionState {
-  return cleanSessionFromEntries(session, opened.map((repo) => repo.entry))
-}
-
-function cleanSessionFromEntries(
-  session: WorkspaceSessionState,
-  openRepoEntries: RepoSessionEntry[],
-): WorkspaceSessionState {
-  return {
-    ...defaultWorkspaceSessionState(),
-    openRepoEntries,
-    restoredRepoId: canonicalRestoredRepoId(session, openRepoEntries),
-    zenMode: session.zenMode,
-    workspacePaneSize: session.workspacePaneSize,
-  }
-}
-
-function canonicalRestoredRepoId(session: WorkspaceSessionState, openRepoEntries: RepoSessionEntry[]): string | null {
-  if (session.restoredRepoId) {
-    for (let index = 0; index < session.openRepoEntries.length; index += 1) {
-      const persistedEntry = session.openRepoEntries[index]
-      const canonicalEntry = openRepoEntries[index]
-      if (persistedEntry && canonicalEntry && repoSessionEntryId(persistedEntry) === session.restoredRepoId) {
-        return repoSessionEntryId(canonicalEntry)
-      }
-    }
-    const openRepoIds = new Set(openRepoEntries.map(repoSessionEntryId))
-    if (openRepoIds.has(session.restoredRepoId)) return session.restoredRepoId
-  }
-  return openRepoEntries[0]?.id ?? null
+): string | null {
+  if (activeRepoRoot && opened.some((repo) => repo.repoRoot === activeRepoRoot)) return activeRepoRoot
+  return opened[0]?.repoRoot ?? null
 }
 
 function openedRepoByRoot<T extends RestoredWorkspaceRepoRuntime>(opened: T[]): Map<string, T> {
@@ -630,11 +554,11 @@ function runtimeSnapshotFromOpened(
   }
 }
 
-function releaseOpenedRepoRuntimes(input: RestoreServerWorkspaceSessionInput, opened: OpenedRepoSessionEntry[]): void {
+function releaseOpenedRepoRuntimes(input: RestoreServerWorkspaceInput, opened: OpenedRepoSessionEntry[]): void {
   for (const repo of opened) releaseSessionRepoRuntime(input, repo.lease)
 }
 
-function releaseSessionRepoRuntime(input: RestoreServerWorkspaceSessionInput, lease: RepoRuntimeMembershipLeaseEntry): void {
+function releaseSessionRepoRuntime(input: RestoreServerWorkspaceInput, lease: RepoRuntimeMembershipLeaseEntry): void {
   releaseRepoRuntimeMembershipLease(input.userId, input.clientId, lease)
 }
 

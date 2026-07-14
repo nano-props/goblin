@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
-import { defaultWorkspaceSessionState } from '#/shared/settings-defaults.ts'
+import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
@@ -147,55 +147,32 @@ describe('settings-client', () => {
 
   test('posts the active repo root when restoring the workspace session', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
-    const session = defaultWorkspaceSessionState()
+    const workspace = defaultServerWorkspaceState()
     const fetchMock = mockFetch(async () => ({
       ok: true,
       json: async () => ({
         status: 'restored',
-        session,
+        openRepoEntries: [],
+        workspace,
         runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
       }),
     }))
 
-    const { restoreWorkspaceSession } = await import('#/web/settings-client.ts')
+    const { restoreServerWorkspace } = await import('#/web/settings-client.ts')
     await expect(
-      restoreWorkspaceSession('client_test000000000000', { activeRepoRoot: '/tmp/routed-repo' }),
+      restoreServerWorkspace('client_test000000000000', [], { activeRepoRoot: '/tmp/routed-repo' }),
     ).resolves.toEqual({
       status: 'restored',
-      session,
+      openRepoEntries: [],
+      workspace,
       runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
     })
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(JSON.parse(String(init.body))).toEqual({
       clientId: 'client_test000000000000',
+      openRepoEntries: [],
       activeRepoRoot: '/tmp/routed-repo',
-    })
-  })
-
-  test('posts session writer ordering metadata when saving a session', async () => {
-    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
-    const session = defaultWorkspaceSessionState()
-    const fetchMock = mockFetch(async () => ({
-      ok: true,
-      json: async () => ({ ok: true, accepted: true, session }),
-    }))
-
-    const { saveSession } = await import('#/web/settings-client.ts')
-    await expect(
-      saveSession(session, {
-        clientId: 'client_test000000000000',
-        sessionWriterId: 'session_writer_test',
-        sessionWriterSequence: 3,
-      }),
-    ).resolves.toEqual(session)
-
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
-    expect(JSON.parse(String(init.body))).toEqual({
-      clientId: 'client_test000000000000',
-      sessionWriterId: 'session_writer_test',
-      sessionWriterSequence: 3,
-      session,
     })
   })
 
@@ -227,7 +204,6 @@ describe('settings-client', () => {
     const intent = {
       entry: { kind: 'local' as const, id: '/tmp/routed-repo' },
       workspacePaneTabsByTarget: {},
-      preferredWorkspacePaneTabByTarget: {},
     }
     await expect(
       restoreRepoWorkspaceTabs('client_test000000000000', '/tmp/routed-repo', 'repo_runtime_test', intent),

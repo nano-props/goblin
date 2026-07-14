@@ -111,7 +111,6 @@ export const useReposStore = create<ReposStore>()(
       workspaceMembershipReady: false,
       sessionPersistenceReady: false,
       sessionRestoreError: null,
-      sessionWriterId: null,
       restoredSessionBaseline: null,
       tabOpenerIdentityByScope: {},
       navigationHistoryByRepo: {},

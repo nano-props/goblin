@@ -1,23 +1,21 @@
 // Actions are the write boundary that commits to the server transport and
 // projects server-returned values into React Query.
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import { settingsLog } from '#/web/logger.ts'
 import type {
   GlobalShortcutState,
   I18nSnapshot,
   ThemeState,
-  WorkspaceSessionRestoreResult,
-  WorkspaceSessionState,
+  WorkspaceRestoreResult,
   RepoWorkspaceTabsRestoreIntent,
 } from '#/shared/api-types.ts'
-import { settingsLog } from '#/web/logger.ts'
 import {
   addRecentRepo,
   clearRecentRepos,
   refreshExternalAppsSnapshot,
   refreshGitHubCliState,
   restoreRepoWorkspaceTabs,
-  restoreWorkspaceSession,
-  saveSession,
+  restoreServerWorkspace,
   setGlobalShortcut as setSettingsGlobalShortcut,
   setGlobalShortcutDisabled as setSettingsGlobalShortcutDisabled,
   setI18nPref as setSettingsI18nPref,
@@ -32,13 +30,11 @@ import {
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
-import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import {
   externalAppsQueryKey,
   lanInfoQueryKey,
   updateGitHubCliCache,
   updateRepoSettingsStateCache,
-  updateRestorableWorkspaceSessionStateCache,
   updateRuntimeRecentReposStateCache,
   updateRuntimeSettingsSnapshotCache,
 } from '#/web/settings-query-cache.ts'
@@ -55,25 +51,12 @@ export async function clearRecentRepoHistory(): Promise<void> {
   updateRuntimeRecentReposStateCache(primaryWindowQueryClient, { recentRepos: [] })
 }
 
-export async function persistWorkspaceSessionState(
-  session: WorkspaceSessionState,
-  sessionWriterId: string,
-  sessionWriterSequence: number,
-): Promise<void> {
-  const savedSession = await saveSession(session, {
-    clientId: readOrCreateWebTerminalClientId(),
-    sessionWriterId,
-    sessionWriterSequence,
-  })
-  updateRestorableWorkspaceSessionStateCache(primaryWindowQueryClient, savedSession)
-}
-
-export async function restorePersistedWorkspaceSession(
+export async function restoreWorkspaceAtBoot(
   clientId: string,
+  openRepoEntries: RepoSessionEntry[],
   options?: { activeRepoRoot?: string | null; signal?: AbortSignal },
-): Promise<WorkspaceSessionRestoreResult> {
-  const restored = await restoreWorkspaceSession(clientId, options)
-  updateRestorableWorkspaceSessionStateCache(primaryWindowQueryClient, restored.session)
+): Promise<WorkspaceRestoreResult> {
+  const restored = await restoreServerWorkspace(clientId, openRepoEntries, options)
   return restored
 }
 
@@ -91,20 +74,6 @@ export async function restoreRepoTabsOnView(
   options?: { signal?: AbortSignal },
 ) {
   return await restoreRepoWorkspaceTabs(clientId, repoRoot, repoRuntimeId, intent, options)
-}
-
-export function persistWorkspaceSessionStateOnUnload(
-  session: WorkspaceSessionState,
-  sessionWriterId: string,
-  sessionWriterSequence: number,
-): void {
-  void saveSession(
-    session,
-    { clientId: readOrCreateWebTerminalClientId(), sessionWriterId, sessionWriterSequence },
-    { keepalive: true },
-  ).catch((err) => {
-    settingsLog.warn('failed to flush session during unload', { err })
-  })
 }
 
 export async function setFetchInterval(sec: number): Promise<number> {

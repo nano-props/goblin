@@ -25,7 +25,7 @@ import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRo
 import { useRepoDrop } from '#/web/hooks/useRepoDrop.ts'
 import { useRepoStoreInvalidationRefresh } from '#/web/hooks/useRepoStoreInvalidationRefresh.ts'
 import { useRepoProjectionQueryEffects } from '#/web/repo-projection-query-effects.ts'
-import { useSessionPersistence } from '#/web/hooks/useSessionPersistence.ts'
+import { useClientWorkspacePersistence } from '#/web/hooks/useClientWorkspacePersistence.ts'
 import { useSettingsWriteErrorToast } from '#/web/hooks/useSettingsWriteErrorToast.ts'
 import { useSettingsQueryInvalidationSync } from '#/web/settings-queries.ts'
 import { createPrimaryWindowNavigationActions } from '#/web/primary-window-navigation-actions.ts'
@@ -152,14 +152,7 @@ function AuthenticatedWorkspaceShell() {
         commitWorkspaceNavigation,
         routeNavigation,
       }),
-    [
-      closeRepo,
-      peekWorkspaceNavigation,
-      commitWorkspaceNavigation,
-      order,
-      routeNavigation,
-      hydratedRouteRepoId,
-    ],
+    [closeRepo, peekWorkspaceNavigation, commitWorkspaceNavigation, order, routeNavigation, hydratedRouteRepoId],
   )
 
   const repoDrop = useRepoDrop({ blocked: modalOpen })
@@ -388,7 +381,7 @@ function AuthenticatedWorkspaceSideEffects({
     openCreateWorktree: navigation.openCreateWorktree,
   })
 
-  useSessionPersistence({ routedRepoId })
+  useClientWorkspacePersistence({ routedRepoId })
   useWorkspaceNavigationHistory({ routeContext })
   useBackgroundFetch({ hydratedRouteRepoId })
   useNetworkReconnect()

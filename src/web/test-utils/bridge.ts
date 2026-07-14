@@ -991,8 +991,7 @@ export function installGoblinTestBridge(handlers: Record<string, IpcTestHandler>
           return init?.method === 'POST' ? call('externalApps.refresh', body) : call('externalApps.get', undefined)
         }
         if (url.pathname === '/api/settings/recent-repos/add') return call('settings.addRecentRepo', body)
-        if (url.pathname === '/api/settings/session') return call('settings.saveSession', body)
-        if (url.pathname === '/api/settings/session/restore') return call('settings.restoreSession', body)
+        if (url.pathname === '/api/settings/workspace/restore') return call('settings.restoreSession', body)
         if (url.pathname === '/api/settings/fetch-interval') return call('settings.setFetchInterval', body)
         if (url.pathname === '/api/settings/prefs') return call('settings.updateUserSettings', body)
         if (url.pathname === '/api/remote/ssh-hosts') return call('remote.listSshHosts', undefined)

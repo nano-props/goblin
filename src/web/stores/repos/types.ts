@@ -210,7 +210,6 @@ interface LocalWorkspaceState {
    *  persisted workspace state must not be overwritten until the restore issue
    *  is resolved by a successful boot. */
   sessionRestoreError: string | null
-  sessionWriterId: string | null
   /** Server-owned session state from boot restore. Used only to preserve
    *  target-scoped state for repos that are still restore stubs. */
   restoredSessionBaseline: WorkspaceSessionState | null

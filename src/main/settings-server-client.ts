@@ -2,7 +2,7 @@ import type { UserSettings, SettingsSnapshot } from '#/shared/api-types.ts'
 import { postEmbeddedServerJson, requestEmbeddedServerJson } from '#/shared/embedded-server-client.ts'
 import { getEmbeddedServerRuntime } from '#/main/embedded-server-lifecycle.ts'
 
-// Main-process client for server-owned settings/session APIs.
+// Main-process client for server-owned settings APIs.
 export type UserSettingsPatch = Partial<UserSettings>
 
 function requireEmbeddedServerRuntime() {

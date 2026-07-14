@@ -9,7 +9,6 @@ vi.mock('#/server/common/identity.ts', () => ({ userIdFromContext: () => 'user-t
 vi.mock('#/server/modules/remote-lifecycle-write-paths.ts', () => ({
   runRemoteLifecycleWrite: mocks.runLifecycleWrite,
 }))
-
 describe('remote lifecycle route', () => {
   beforeEach(() => vi.clearAllMocks())
 

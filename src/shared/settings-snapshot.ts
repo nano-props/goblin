@@ -3,7 +3,6 @@ import type { RepoSettingsEntry } from '#/shared/repo-settings.ts'
 import type {
   RuntimeRecentReposState,
   RuntimeSettingsSnapshot,
-  WorkspaceSessionState,
   UserSettings,
   SettingsSnapshot,
 } from '#/shared/api-types.ts'
@@ -35,7 +34,6 @@ export function buildRuntimeRecentReposState(input: { recentRepos: RepoSessionEn
 export function buildSettingsSnapshot(input: {
   prefs: UserSettings
   globalShortcutRegistered: boolean
-  session: WorkspaceSessionState
   recentRepos: RepoSessionEntry[]
   repoSettings: RepoSettingsEntry[]
 }): SettingsSnapshot {
@@ -46,7 +44,6 @@ export function buildSettingsSnapshot(input: {
     }),
     ...buildRuntimeRecentReposState({ recentRepos: input.recentRepos }),
     repoSettings: input.repoSettings,
-    session: input.session,
   }
 }
 
@@ -77,10 +74,4 @@ export function runtimeSettingsSnapshotFromSettingsSnapshot(
     globalShortcutRegistered: snapshot.globalShortcutRegistered,
     lanEnabled: snapshot.lanEnabled,
   }
-}
-
-export function restorableWorkspaceSessionStateFromSettingsSnapshot(
-  snapshot: Pick<SettingsSnapshot, 'session'>,
-): WorkspaceSessionState {
-  return snapshot.session
 }

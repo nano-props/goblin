@@ -1,17 +1,16 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { defaultWorkspaceSessionState } from '#/shared/settings-defaults.ts'
+import { defaultServerWorkspaceState, defaultWorkspaceSessionState } from '#/shared/settings-defaults.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import type { WorkspaceSessionState } from '#/shared/api-types.ts'
+import type { ServerWorkspaceState, WorkspaceSessionState } from '#/shared/api-types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 
 const mocks = vi.hoisted(() => ({
   acquireRepoRuntimeLease: vi.fn(),
   releaseRepoRuntimeMembershipLease: vi.fn(),
   isCurrentRepoRuntime: vi.fn(),
-  getServerSessionState: vi.fn(),
-  beginServerSessionWriter: vi.fn(),
-  saveRebuiltServerSessionState: vi.fn(),
+  getServerWorkspaceState: vi.fn(),
+  saveRebuiltServerWorkspaceState: vi.fn(),
   probeRepo: vi.fn(),
   readRepoProjection: vi.fn(),
   runRemoteLifecycleWrite: vi.fn(),
@@ -24,9 +23,8 @@ vi.mock('#/server/modules/repo-runtimes.ts', () => ({
 }))
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
-  beginServerSessionWriter: mocks.beginServerSessionWriter,
-  getServerSessionState: mocks.getServerSessionState,
-  saveRebuiltServerSessionState: mocks.saveRebuiltServerSessionState,
+  getServerWorkspaceState: mocks.getServerWorkspaceState,
+  saveRebuiltServerWorkspaceState: mocks.saveRebuiltServerWorkspaceState,
 }))
 
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({
@@ -38,10 +36,13 @@ vi.mock('#/server/modules/remote-lifecycle-write-paths.ts', () => ({
   runRemoteLifecycleWrite: mocks.runRemoteLifecycleWrite,
 }))
 
-describe('restoreServerWorkspaceSession', () => {
+function serverWorkspaceFromSession(session: WorkspaceSessionState): ServerWorkspaceState {
+  return { workspacePaneTabsByTargetByRepo: session.workspacePaneTabsByTargetByRepo }
+}
+
+describe('restoreServerWorkspace', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.beginServerSessionWriter.mockReturnValue('session_writer_test')
     mocks.acquireRepoRuntimeLease.mockImplementation((_userId: string, repoRoot: string) => ({
       repoRoot,
       repoRuntimeId: 'repo-runtime-test',
@@ -57,10 +58,12 @@ describe('restoreServerWorkspaceSession', () => {
       requested: { branch: null, pullRequestMode: 'full' },
       loadedAt: 1,
     })
-    mocks.saveRebuiltServerSessionState.mockImplementation(async ({ rebuiltSession }: { rebuiltSession: WorkspaceSessionState }) => ({
-      saved: true,
-      session: rebuiltSession,
-    }))
+    mocks.saveRebuiltServerWorkspaceState.mockImplementation(
+      async ({ rebuiltWorkspace }: { rebuiltWorkspace: WorkspaceSessionState }) => ({
+        saved: true,
+        workspace: rebuiltWorkspace,
+      }),
+    )
     mocks.runRemoteLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       lifecycle: { kind: 'ready' },
@@ -82,17 +85,18 @@ describe('restoreServerWorkspaceSession', () => {
         '/repo': { [targetKey]: 'history' },
       },
     }
-    mocks.getServerSessionState.mockResolvedValue(session)
+    mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
     }
 
-    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
-    const result = await restoreServerWorkspaceSession({
+    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsHost,
     })
 
@@ -106,10 +110,14 @@ describe('restoreServerWorkspaceSession', () => {
     })
     expect(result.runtime).toMatchObject({
       restoredRepoId: '/repo',
-      repos: [{ entry: { kind: 'local', id: '/repo' }, repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', name: 'repo' }],
-      workspacePaneTabs: [{ repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', snapshot: { revision: 1, entries: [] } }],
+      repos: [
+        { entry: { kind: 'local', id: '/repo' }, repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', name: 'repo' },
+      ],
+      workspacePaneTabs: [
+        { repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', snapshot: { revision: 1, entries: [] } },
+      ],
     })
-    expect(mocks.saveRebuiltServerSessionState).not.toHaveBeenCalled()
+    expect(mocks.saveRebuiltServerWorkspaceState).not.toHaveBeenCalled()
   })
 
   test('rebuilds instead of migrating non-canonical local session entries', async () => {
@@ -118,7 +126,7 @@ describe('restoreServerWorkspaceSession', () => {
       openRepoEntries: [{ kind: 'local', id: '/repo/src' }],
       restoredRepoId: '/repo/src',
     }
-    mocks.getServerSessionState.mockResolvedValue(session)
+    mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     mocks.probeRepo.mockResolvedValue({ ok: true, root: '/repo', name: 'repo' })
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
@@ -126,20 +134,18 @@ describe('restoreServerWorkspaceSession', () => {
       updateTabs: vi.fn(),
     }
 
-    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
-    const result = await restoreServerWorkspaceSession({
+    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsHost,
     })
 
     expect(result.status).toBe('rebuilt')
-    expect(result.session).toEqual(defaultWorkspaceSessionState())
+    expect(result.workspace).toEqual(defaultServerWorkspaceState())
     expect(result.runtime.repos).toEqual([])
-    expect(mocks.saveRebuiltServerSessionState).toHaveBeenCalledWith({
-      persistedSnapshot: session,
-      rebuiltSession: defaultWorkspaceSessionState(),
-    })
+    expect(mocks.saveRebuiltServerWorkspaceState).not.toHaveBeenCalled()
   })
 
   test('uses the workspace tabs batch host and returns canonical tab snapshots', async () => {
@@ -152,7 +158,7 @@ describe('restoreServerWorkspaceSession', () => {
         '/repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
-    mocks.getServerSessionState.mockResolvedValue(session)
+    mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(),
@@ -162,10 +168,11 @@ describe('restoreServerWorkspaceSession', () => {
       updateTabs: vi.fn(),
     }
 
-    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
-    const result = await restoreServerWorkspaceSession({
+    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsHost,
     })
 
@@ -187,57 +194,13 @@ describe('restoreServerWorkspaceSession', () => {
     ])
   })
 
-  test('rebuilds clean session without committing tabs when preferred state violates invariants', async () => {
-    const targetKey = workspacePaneTabsTargetIdentityKey({ repoRoot: '/repo', branchName: 'main', worktreePath: null })
-    const session: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
-      openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      restoredRepoId: '/repo',
-      zenMode: true,
-      workspacePaneSize: 420,
-      workspacePaneTabsByTargetByRepo: {
-        '/repo': { [targetKey]: [workspacePaneStaticTabEntry('status')] },
-      },
-      preferredWorkspacePaneTabByTargetByRepo: {
-        '/repo': { [targetKey]: 'files' },
-      },
-    }
-    mocks.getServerSessionState.mockResolvedValue(session)
-    const workspacePaneTabsHost = {
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
-      updateTabs: vi.fn(),
-    }
-
-    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
-    const result = await restoreServerWorkspaceSession({
-      userId: 'user-test',
-      clientId: 'client_test000000000000',
-      workspacePaneTabsHost,
-    })
-
-    expect(result.status).toBe('rebuilt')
-    expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
-    expect(mocks.saveRebuiltServerSessionState).toHaveBeenCalledWith({
-      persistedSnapshot: session,
-      rebuiltSession: {
-        ...defaultWorkspaceSessionState(),
-        openRepoEntries: [{ kind: 'local', id: '/repo' }],
-        restoredRepoId: '/repo',
-        zenMode: true,
-        workspacePaneSize: 420,
-      },
-    })
-    expect(mocks.releaseRepoRuntimeMembershipLease).not.toHaveBeenCalled()
-  })
-
   test('releases the acquired local runtime when projection restore fails before membership settles', async () => {
     const session: WorkspaceSessionState = {
       ...defaultWorkspaceSessionState(),
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
       restoredRepoId: '/repo',
     }
-    mocks.getServerSessionState.mockResolvedValue(session)
+    mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
@@ -245,16 +208,21 @@ describe('restoreServerWorkspaceSession', () => {
       updateTabs: vi.fn(),
     }
 
-    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
-    const result = await restoreServerWorkspaceSession({
+    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsHost,
     })
 
     expect(result.status).toBe('rebuilt')
-    expect(result.session).toEqual(defaultWorkspaceSessionState())
-    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', { repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', generation: 1 })
+    expect(result.workspace).toEqual(defaultServerWorkspaceState())
+    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-test',
+      generation: 1,
+    })
   })
 
   test('releases the acquired remote runtime when lifecycle restore fails before membership settles', async () => {
@@ -268,23 +236,27 @@ describe('restoreServerWorkspaceSession', () => {
       openRepoEntries: [remoteEntry],
       restoredRepoId: remoteEntry.id,
     }
-    mocks.getServerSessionState.mockResolvedValue(session)
-    mocks.runRemoteLifecycleWrite.mockResolvedValue({ kind: 'settled', lifecycle: { kind: 'failed', reason: 'unreachable' } })
+    mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
+    mocks.runRemoteLifecycleWrite.mockResolvedValue({
+      kind: 'settled',
+      lifecycle: { kind: 'failed', reason: 'unreachable' },
+    })
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
     }
 
-    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
-    const result = await restoreServerWorkspaceSession({
+    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsHost,
     })
 
     expect(result.status).toBe('rebuilt')
-    expect(result.session).toEqual(defaultWorkspaceSessionState())
+    expect(result.workspace).toEqual(defaultServerWorkspaceState())
     expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
       repoRoot: remoteEntry.id,
       repoRuntimeId: 'repo-runtime-test',
@@ -302,7 +274,7 @@ describe('restoreServerWorkspaceSession', () => {
         '/repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
-    mocks.getServerSessionState.mockResolvedValue(session)
+    mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const commitError = new Error('commit failed')
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
@@ -312,16 +284,21 @@ describe('restoreServerWorkspaceSession', () => {
       updateTabs: vi.fn(),
     }
 
-    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
+    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     await expect(
-      restoreServerWorkspaceSession({
+      restoreServerWorkspace({
         userId: 'user-test',
         clientId: 'client_test000000000000',
+        openRepoEntries: session.openRepoEntries,
         workspacePaneTabsHost,
       }),
     ).rejects.toBe(commitError)
 
-    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', { repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', generation: 1 })
+    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-test',
+      generation: 1,
+    })
   })
 
   test('releases opened runtimes and skips tab commits when aborted after projection restore', async () => {
@@ -336,7 +313,7 @@ describe('restoreServerWorkspaceSession', () => {
     }
     const controller = new AbortController()
     const abortReason = new Error('request aborted')
-    mocks.getServerSessionState.mockResolvedValue(session)
+    mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     mocks.readRepoProjection.mockImplementation(async () => {
       controller.abort(abortReason)
       return {
@@ -354,18 +331,23 @@ describe('restoreServerWorkspaceSession', () => {
       updateTabs: vi.fn(),
     }
 
-    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
+    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     await expect(
-      restoreServerWorkspaceSession({
+      restoreServerWorkspace({
         userId: 'user-test',
         clientId: 'client_test000000000000',
+        openRepoEntries: session.openRepoEntries,
         workspacePaneTabsHost,
         signal: controller.signal,
       }),
     ).rejects.toBe(abortReason)
 
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
-    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', { repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', generation: 1 })
+    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-test',
+      generation: 1,
+    })
   })
 
   test('releases the acquired remote runtime when remote lifecycle restore is aborted', async () => {
@@ -381,7 +363,7 @@ describe('restoreServerWorkspaceSession', () => {
     }
     const controller = new AbortController()
     const abortReason = new Error('remote restore aborted')
-    mocks.getServerSessionState.mockResolvedValue(session)
+    mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     mocks.runRemoteLifecycleWrite.mockImplementation(() => new Promise(() => {}))
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
@@ -389,10 +371,11 @@ describe('restoreServerWorkspaceSession', () => {
       updateTabs: vi.fn(),
     }
 
-    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
-    const restore = restoreServerWorkspaceSession({
+    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const restore = restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsHost,
       signal: controller.signal,
     })
@@ -408,44 +391,57 @@ describe('restoreServerWorkspaceSession', () => {
   })
 
   test('releases opened runtimes when clean session rebuild persistence fails', async () => {
-    const targetKey = workspacePaneTabsTargetIdentityKey({ repoRoot: '/repo', branchName: 'main', worktreePath: null })
+    const targetKey = workspacePaneTabsTargetIdentityKey({
+      repoRoot: '/repo',
+      branchName: 'missing',
+      worktreePath: null,
+    })
     const session: WorkspaceSessionState = {
       ...defaultWorkspaceSessionState(),
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
       restoredRepoId: '/repo',
-      preferredWorkspacePaneTabByTargetByRepo: {
-        '/repo': { [targetKey]: 'files' },
+      workspacePaneTabsByTargetByRepo: {
+        '/repo': { [targetKey]: [workspacePaneStaticTabEntry('files')] },
       },
     }
     const persistError = new Error('settings write failed')
-    mocks.getServerSessionState.mockResolvedValue(session)
-    mocks.saveRebuiltServerSessionState.mockRejectedValue(persistError)
+    mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
+    mocks.saveRebuiltServerWorkspaceState.mockRejectedValue(persistError)
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
     }
 
-    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
+    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     await expect(
-      restoreServerWorkspaceSession({
+      restoreServerWorkspace({
         userId: 'user-test',
         clientId: 'client_test000000000000',
+        openRepoEntries: session.openRepoEntries,
         workspacePaneTabsHost,
       }),
     ).rejects.toBe(persistError)
 
-    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', { repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', generation: 1 })
+    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-test',
+      generation: 1,
+    })
   })
 
   test('does not overwrite a concurrently changed session when rebuilding invalid persisted state', async () => {
-    const targetKey = workspacePaneTabsTargetIdentityKey({ repoRoot: '/repo', branchName: 'main', worktreePath: null })
+    const targetKey = workspacePaneTabsTargetIdentityKey({
+      repoRoot: '/repo',
+      branchName: 'missing',
+      worktreePath: null,
+    })
     const invalidSession: WorkspaceSessionState = {
       ...defaultWorkspaceSessionState(),
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
       restoredRepoId: '/repo',
-      preferredWorkspacePaneTabByTargetByRepo: {
-        '/repo': { [targetKey]: 'files' },
+      workspacePaneTabsByTargetByRepo: {
+        '/repo': { [targetKey]: [workspacePaneStaticTabEntry('files')] },
       },
     }
     const currentSession: WorkspaceSessionState = {
@@ -454,28 +450,35 @@ describe('restoreServerWorkspaceSession', () => {
       restoredRepoId: '/repo',
       workspacePaneSize: 333,
     }
-    mocks.getServerSessionState.mockResolvedValueOnce(invalidSession).mockResolvedValueOnce(currentSession)
-    mocks.saveRebuiltServerSessionState.mockResolvedValueOnce({ saved: false, latestSession: currentSession })
+    mocks.getServerWorkspaceState
+      .mockResolvedValueOnce(serverWorkspaceFromSession(invalidSession))
+      .mockResolvedValueOnce(serverWorkspaceFromSession(currentSession))
+    mocks.saveRebuiltServerWorkspaceState.mockResolvedValueOnce({ saved: false, latestWorkspace: currentSession })
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
     }
 
-    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
-    const result = await restoreServerWorkspaceSession({
+    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      openRepoEntries: invalidSession.openRepoEntries,
       workspacePaneTabsHost,
     })
 
-    expect(result).toMatchObject({ status: 'restored', session: currentSession })
-    expect(mocks.saveRebuiltServerSessionState).toHaveBeenCalledTimes(1)
-    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', { repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', generation: 1 })
+    expect(result).toMatchObject({ status: 'restored', workspace: currentSession })
+    expect(mocks.saveRebuiltServerWorkspaceState).toHaveBeenCalledTimes(1)
+    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-test',
+      generation: 1,
+    })
   })
 })
 
-describe('restoreServerWorkspaceSession — active-only restore', () => {
+describe('restoreServerWorkspace — active-only restore', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.acquireRepoRuntimeLease.mockImplementation((_userId: string, repoRoot: string) => ({
@@ -493,10 +496,12 @@ describe('restoreServerWorkspaceSession — active-only restore', () => {
       requested: { branch: null, pullRequestMode: 'full' },
       loadedAt: 1,
     }))
-    mocks.saveRebuiltServerSessionState.mockImplementation(async ({ rebuiltSession }: { rebuiltSession: WorkspaceSessionState }) => ({
-      saved: true,
-      session: rebuiltSession,
-    }))
+    mocks.saveRebuiltServerWorkspaceState.mockImplementation(
+      async ({ rebuiltWorkspace }: { rebuiltWorkspace: WorkspaceSessionState }) => ({
+        saved: true,
+        workspace: rebuiltWorkspace,
+      }),
+    )
   })
 
   test('non-active repos are validated stubs — no projection read, projection: null', async () => {
@@ -508,17 +513,18 @@ describe('restoreServerWorkspaceSession — active-only restore', () => {
       ],
       restoredRepoId: '/repo-active',
     }
-    mocks.getServerSessionState.mockResolvedValue(session)
+    mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
     }
 
-    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
-    const result = await restoreServerWorkspaceSession({
+    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsHost,
     })
 
@@ -549,17 +555,18 @@ describe('restoreServerWorkspaceSession — active-only restore', () => {
       ],
       restoredRepoId: '/repo-a',
     }
-    mocks.getServerSessionState.mockResolvedValue(session)
+    mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
     }
 
-    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
-    const result = await restoreServerWorkspaceSession({
+    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      openRepoEntries: session.openRepoEntries,
       activeRepoRoot: '/repo-b',
       workspacePaneTabsHost,
     })
@@ -581,7 +588,7 @@ describe('restoreServerWorkspaceSession — active-only restore', () => {
       ],
       restoredRepoId: '/repo-active',
     }
-    mocks.getServerSessionState.mockResolvedValue(session)
+    mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     mocks.probeRepo.mockImplementation(async (repoRoot: string) => ({
       ok: true,
       root: repoRoot === '/repo-stub/src' ? '/repo-stub' : repoRoot,
@@ -593,21 +600,19 @@ describe('restoreServerWorkspaceSession — active-only restore', () => {
       updateTabs: vi.fn(),
     }
 
-    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
-    const result = await restoreServerWorkspaceSession({
+    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsHost,
     })
 
     expect(result.status).toBe('rebuilt')
-    expect(result.session).toEqual(defaultWorkspaceSessionState())
+    expect(result.workspace).toEqual(defaultServerWorkspaceState())
     expect(result.runtime.repos).toEqual([])
     expect(mocks.readRepoProjection).toHaveBeenCalledTimes(1)
-    expect(mocks.saveRebuiltServerSessionState).toHaveBeenCalledWith({
-      persistedSnapshot: session,
-      rebuiltSession: defaultWorkspaceSessionState(),
-    })
+    expect(mocks.saveRebuiltServerWorkspaceState).not.toHaveBeenCalled()
   })
 
   test('non-active remote repos use their display name without opening remote lifecycle', async () => {
@@ -623,23 +628,21 @@ describe('restoreServerWorkspaceSession — active-only restore', () => {
     }
     const session: WorkspaceSessionState = {
       ...defaultWorkspaceSessionState(),
-      openRepoEntries: [
-        { kind: 'local', id: '/repo-active' },
-        remoteEntry,
-      ],
+      openRepoEntries: [{ kind: 'local', id: '/repo-active' }, remoteEntry],
       restoredRepoId: '/repo-active',
     }
-    mocks.getServerSessionState.mockResolvedValue(session)
+    mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
     }
 
-    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
-    const result = await restoreServerWorkspaceSession({
+    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsHost,
     })
 
@@ -672,22 +675,23 @@ describe('restoreServerWorkspaceSession — active-only restore', () => {
         '/repo-stub': { [staleTargetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
-    mocks.getServerSessionState.mockResolvedValue(session)
+    mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
     }
 
-    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
-    const result = await restoreServerWorkspaceSession({
+    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreServerWorkspace({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      openRepoEntries: session.openRepoEntries,
       workspacePaneTabsHost,
     })
 
     expect(result.status).toBe('restored')
-    expect(mocks.saveRebuiltServerSessionState).not.toHaveBeenCalled()
+    expect(mocks.saveRebuiltServerWorkspaceState).not.toHaveBeenCalled()
   })
 })
 
@@ -709,17 +713,18 @@ describe('restoreRepoTabsForRepo', () => {
       requested: { branch: null, pullRequestMode: 'full' },
       loadedAt: 1,
     })
-    mocks.saveRebuiltServerSessionState.mockImplementation(async ({ rebuiltSession }: { rebuiltSession: WorkspaceSessionState }) => ({
-      saved: true,
-      session: rebuiltSession,
-    }))
+    mocks.saveRebuiltServerWorkspaceState.mockImplementation(
+      async ({ rebuiltWorkspace }: { rebuiltWorkspace: WorkspaceSessionState }) => ({
+        saved: true,
+        workspace: rebuiltWorkspace,
+      }),
+    )
   })
 
   function restoreIntent(entry: RepoSessionEntry, session: WorkspaceSessionState = defaultWorkspaceSessionState()) {
     return {
       entry,
       workspacePaneTabsByTarget: session.workspacePaneTabsByTargetByRepo[entry.id] ?? {},
-      preferredWorkspacePaneTabByTarget: session.preferredWorkspacePaneTabByTargetByRepo[entry.id] ?? {},
     }
   }
 
@@ -733,7 +738,7 @@ describe('restoreRepoTabsForRepo', () => {
         '/repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
-    mocks.getServerSessionState.mockResolvedValue(session)
+    mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
@@ -789,7 +794,7 @@ describe('restoreRepoTabsForRepo', () => {
         '/repo': { [staleTargetKey]: 'history' },
       },
     }
-    mocks.getServerSessionState.mockResolvedValue(session)
+    mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
@@ -809,7 +814,7 @@ describe('restoreRepoTabsForRepo', () => {
     expect(result.snapshot).toBeNull()
     expect(result.repo.projection).not.toBeNull()
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
-    expect(mocks.saveRebuiltServerSessionState).not.toHaveBeenCalled()
+    expect(mocks.saveRebuiltServerWorkspaceState).not.toHaveBeenCalled()
   })
 
   test('throws repo-runtime-stale when clientId/repoRuntimeId does not match the active lease', async () => {
@@ -818,7 +823,7 @@ describe('restoreRepoTabsForRepo', () => {
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
       restoredRepoId: '/repo',
     }
-    mocks.getServerSessionState.mockResolvedValue(session)
+    mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     mocks.isCurrentRepoRuntime.mockReturnValue(false)
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
@@ -846,7 +851,7 @@ describe('restoreRepoTabsForRepo', () => {
       openRepoEntries: [{ kind: 'local', id: '/other' }],
       restoredRepoId: '/other',
     }
-    mocks.getServerSessionState.mockResolvedValue(session)
+    mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(),
@@ -864,11 +869,11 @@ describe('restoreRepoTabsForRepo', () => {
         workspacePaneTabsHost,
       }),
     ).resolves.toMatchObject({ repo: { repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test' } })
-    expect(mocks.getServerSessionState).not.toHaveBeenCalled()
+    expect(mocks.getServerWorkspaceState).not.toHaveBeenCalled()
   })
 
   test('keeps the existing membership when lazy local projection fails', async () => {
-    mocks.getServerSessionState.mockResolvedValue({
+    mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultWorkspaceSessionState(),
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
       restoredRepoId: '/repo',
@@ -901,7 +906,7 @@ describe('restoreRepoTabsForRepo', () => {
       id: 'ssh-config://host/repo',
       ref: { id: 'ssh-config://host/repo', alias: 'host', remotePath: '/repo', displayName: 'repo' },
     }
-    mocks.getServerSessionState.mockResolvedValue({
+    mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultWorkspaceSessionState(),
       openRepoEntries: [remoteEntry],
       restoredRepoId: remoteEntry.id,
@@ -933,7 +938,7 @@ describe('restoreRepoTabsForRepo', () => {
   })
 
   test('rejects a projection if the membership becomes stale while reading', async () => {
-    mocks.getServerSessionState.mockResolvedValue({
+    mocks.getServerWorkspaceState.mockResolvedValue({
       ...defaultWorkspaceSessionState(),
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
       restoredRepoId: '/repo',
@@ -962,5 +967,4 @@ describe('restoreRepoTabsForRepo', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.repo-runtime-stale' })
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
   })
-
 })

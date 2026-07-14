@@ -154,7 +154,9 @@ Canonical examples:
 Canonical rules:
 
 - Use `UserSettings` for user-configurable preferences.
-- Use `WorkspaceSessionState` for persisted workspace session data.
+- Use `ServerWorkspaceState` for server-persisted repo/tab restore data.
+- Use `ClientWorkspaceState` for locally persisted window repo membership and UI state.
+- Use `WorkspaceSessionState` only for their boot-time client composition.
 - Use `handle*` for command handlers when the module is handling a command, not just mutating state.
 
 Selected mappings:
@@ -163,7 +165,8 @@ Selected mappings:
 | ---------------------------------- | --------------------------------- | --------------------- |
 | User-configurable preferences      | `UserSettings`                    | `SettingsPrefs`       |
 | Prefs PATCH body key               | `prefs`                           | `settings`            |
-| Persisted workspace session        | `WorkspaceSessionState`           | `SessionState`        |
+| Server workspace restore state     | `ServerWorkspaceState`            | `SessionState`        |
+| Client workspace state             | `ClientWorkspaceState`            | `SessionState`        |
 | Native shortcut registration state | `NativeShortcutRegistrationState` | `ServerSettingsState` |
 
 ### Native host

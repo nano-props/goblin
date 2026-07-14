@@ -199,7 +199,7 @@ function repoIdFromTerminalWorktreeKey(key: string): string | null {
 
 /** Restores only the restorable workspace UI projection from WorkspaceSessionState.
  *  It intentionally does not establish a live binding back to WorkspaceSessionState;
- *  subsequent updates flow through useSessionPersistence. */
+ *  subsequent local updates flow through useClientWorkspacePersistence. */
 interface RestoredWorkspaceStateFromSession extends Pick<
   RestorableWorkspaceState,
   'restoredRepoId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalSessionIdByTerminalWorktree'

@@ -214,27 +214,6 @@ const WorkspacePaneRuntimeTabEntrySchema = v.object({
   type: v.picklist(WORKSPACE_PANE_RUNTIME_TAB_TYPES),
   runtimeSessionId: v.pipe(v.string(), v.minLength(1)),
 })
-const FiletreeSessionViewStateSchema = v.object({
-  selectedKeys: v.array(v.string()),
-  expandedKeys: v.array(v.string()),
-  topVisibleRowIndex: v.number(),
-})
-const WorkspaceSessionStateSchema = v.object({
-  openRepoEntries: v.array(RepoSessionEntrySchema),
-  restoredRepoId: v.nullable(v.string()),
-  zenMode: v.boolean(),
-  workspacePaneSize: v.number(),
-  selectedTerminalSessionIdByTerminalWorktree: v.record(v.string(), v.string()),
-  preferredWorkspacePaneTabByTargetByRepo: v.record(
-    v.string(),
-    v.record(v.string(), v.nullable(v.picklist(['status', 'changes', 'history', 'files', 'terminal']))),
-  ),
-  workspacePaneTabsByTargetByRepo: v.record(
-    v.string(),
-    v.record(v.string(), v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneRuntimeTabEntrySchema]))),
-  ),
-  filetreeViewStateByWorktreeByRepo: v.record(v.string(), v.record(v.string(), FiletreeSessionViewStateSchema)),
-})
 
 // Shared shape for the GitHub CLI state endpoints (`/api/settings/github-cli`
 // and `/api/settings/github-cli/refresh`): both accept an optional `hosts`
@@ -257,8 +236,9 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
     itemId: v.pipe(v.string(), v.minLength(1), v.maxLength(64)),
   }),
   githubCli: GITHUB_CLI_REFRESH_SCHEMA,
-  sessionRestore: v.object({
+  workspaceRestore: v.object({
     clientId: ClientIdSchema,
+    openRepoEntries: v.array(RepoSessionEntrySchema),
     activeRepoRoot: v.optional(v.nullable(RepoRootSchema)),
   }),
   // Lazy per-repo restore endpoint — fires when the user navigates to a
@@ -273,10 +253,6 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
         v.string(),
         v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneRuntimeTabEntrySchema])),
       ),
-      preferredWorkspacePaneTabByTarget: v.record(
-        v.string(),
-        v.nullable(v.picklist(['status', 'changes', 'history', 'files', 'terminal'])),
-      ),
     }),
   }),
 } as const
@@ -287,12 +263,6 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
 // object at the perimeter.
 export const SETTINGS_PATCH_SCHEMAS = {
   prefs: v.object({ prefs: v.record(v.string(), v.unknown()) }),
-  session: v.object({
-    clientId: ClientIdSchema,
-    sessionWriterId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
-    sessionWriterSequence: v.pipe(v.number(), v.integer(), v.minValue(1)),
-    session: WorkspaceSessionStateSchema,
-  }),
 } as const
 
 // Native host IPC procedures — Electron-only operations that bypass
