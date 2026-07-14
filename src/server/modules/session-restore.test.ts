@@ -6,6 +6,7 @@ import type { WorkspaceSessionState } from '#/shared/api-types.ts'
 
 const mocks = vi.hoisted(() => ({
   acquireRepoRuntimeLease: vi.fn(),
+  releaseRepoRuntime: vi.fn(),
   releaseRepoRuntimeMembershipLease: vi.fn(),
   isCurrentRepoRuntime: vi.fn(),
   getServerSessionState: vi.fn(),
@@ -17,6 +18,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('#/server/modules/repo-runtimes.ts', () => ({
   acquireRepoRuntimeLease: mocks.acquireRepoRuntimeLease,
+  releaseRepoRuntime: mocks.releaseRepoRuntime,
   releaseRepoRuntimeMembershipLease: mocks.releaseRepoRuntimeMembershipLease,
   isCurrentRepoRuntime: mocks.isCurrentRepoRuntime,
 }))
@@ -690,5 +692,71 @@ describe('restoreRepoTabsForRepo', () => {
         workspacePaneTabsHost,
       }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
+  })
+
+  test('releases the stub lease when entry.id is non-canonical (e.g. legacy ~/repo session)', async () => {
+    // Legacy sessions may carry a non-canonical path like `~/repo`. At cold
+    // start the stub path acquires a lease under `~/repo`; when the user
+    // navigates, the lazy restore probes and discovers the canonical
+    // `/Users/x/repo`. The stub lease must be released so the runtime
+    // registry doesn't leak for the rest of the session.
+    const session: WorkspaceSessionState = {
+      ...defaultWorkspaceSessionState(),
+      openRepoEntries: [{ kind: 'local', id: '~/repo' }],
+      restoredRepoId: '~/repo',
+    }
+    mocks.getServerSessionState.mockResolvedValue(session)
+    // Probe canonicalizes the non-canonical input.
+    mocks.probeRepo.mockResolvedValue({ ok: true, root: '/Users/x/repo', name: 'repo' })
+    const workspacePaneTabsHost = {
+      listWorkspaceTabs: vi.fn(),
+      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
+      updateTabs: vi.fn(),
+    }
+
+    const { restoreRepoTabsForRepo } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreRepoTabsForRepo({
+      userId: 'user-test',
+      clientId: 'client_test000000000000',
+      repoRoot: '~/repo',
+      repoRuntimeId: 'repo-runtime-test',
+      workspacePaneTabsHost,
+    })
+
+    expect(result.repo.repoRoot).toBe('/Users/x/repo')
+    // The stub lease under the user-given path is released; the new lease
+    // lives under the canonical path that the active path acquired.
+    expect(mocks.releaseRepoRuntime).toHaveBeenCalledWith(
+      'user-test',
+      '~/repo',
+      'repo-runtime-test',
+      'client_test000000000000',
+    )
+  })
+
+  test('does not release the stub lease when entry.id is already canonical', async () => {
+    const session: WorkspaceSessionState = {
+      ...defaultWorkspaceSessionState(),
+      openRepoEntries: [{ kind: 'local', id: '/repo' }],
+      restoredRepoId: '/repo',
+    }
+    mocks.getServerSessionState.mockResolvedValue(session)
+    mocks.probeRepo.mockResolvedValue({ ok: true, root: '/repo', name: 'repo' })
+    const workspacePaneTabsHost = {
+      listWorkspaceTabs: vi.fn(),
+      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
+      updateTabs: vi.fn(),
+    }
+
+    const { restoreRepoTabsForRepo } = await import('#/server/modules/session-restore.ts')
+    await restoreRepoTabsForRepo({
+      userId: 'user-test',
+      clientId: 'client_test000000000000',
+      repoRoot: '/repo',
+      repoRuntimeId: 'repo-runtime-test',
+      workspacePaneTabsHost,
+    })
+
+    expect(mocks.releaseRepoRuntime).not.toHaveBeenCalled()
   })
 })

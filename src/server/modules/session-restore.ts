@@ -17,6 +17,7 @@ import { probeRepo, readRepoProjection } from '#/server/modules/repo-read-paths.
 import {
   acquireRepoRuntimeLease,
   isCurrentRepoRuntime,
+  releaseRepoRuntime,
   releaseRepoRuntimeMembershipLease,
   type RepoRuntimeMembershipLeaseEntry,
 } from '#/server/modules/repo-runtimes.ts'
@@ -348,6 +349,14 @@ export async function restoreRepoTabsForRepo(
     throw new IpcError({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
   }
 
+  // If `entry.id` was a non-canonical path (e.g. `~/repo`) and the active
+  // path's probe canonicalized it to `/Users/x/repo`, the stub lease we
+  // acquired at cold start under `entry.id` is now orphaned. Release it so
+  // we don't leak a runtime for the rest of the session.
+  if (opened.opened.repoRoot !== input.repoRoot) {
+    releaseRepoRuntime(input.userId, input.repoRoot, input.repoRuntimeId, input.clientId)
+  }
+
   const snapshots = await restoreWorkspacePaneTabsForRepos(
     { userId: input.userId, clientId: input.clientId, workspacePaneTabsHost: input.workspacePaneTabsHost, signal: input.signal },
     session,
@@ -360,8 +369,7 @@ export async function restoreRepoTabsForRepo(
 }
 
 function projectionRepoFromOpened(opened: OpenedRepoSessionEntry): RestoredWorkspaceRepoRuntime {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { lease, ...repo } = opened
+  const { lease: _lease, ...repo } = opened
   return repo
 }
 

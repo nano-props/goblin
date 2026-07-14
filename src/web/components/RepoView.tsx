@@ -76,7 +76,7 @@ export function RepoView({
   const setWorkspacePaneSize = useReposStore((s) => s.setWorkspacePaneSize)
   const repo = useReposStore((s) => s.repos[repoId])
   useRepoToasts(repoId)
-  useRestoreRepoTabsOnView({ hydratedRouteRepoId: repo ? repoId : null })
+  useRestoreRepoTabsOnView({ repoId: repo ? repoId : null })
 
   const routeBranchName = routeView?.kind === 'branch' ? routeView.branchName : null
 

@@ -63,7 +63,7 @@ describe('useRestoreRepoTabsOnView', () => {
 
   test('does nothing when hydratedRouteRepoId is null', async () => {
     function Host() {
-      useRestoreRepoTabsOnView({ hydratedRouteRepoId: null })
+      useRestoreRepoTabsOnView({ repoId: null })
       return null
     }
     renderInJsdom(<Host />)
@@ -72,7 +72,7 @@ describe('useRestoreRepoTabsOnView', () => {
 
   test('does nothing when the repo is already restored (loadedAt set)', async () => {
     function Host() {
-      useRestoreRepoTabsOnView({ hydratedRouteRepoId: 'repo-a' })
+      useRestoreRepoTabsOnView({ repoId: 'repo-a' })
       return null
     }
     vi.spyOn(useReposStore, 'getState').mockReturnValue({
@@ -90,7 +90,7 @@ describe('useRestoreRepoTabsOnView', () => {
 
   test('on success, hydrates the store with the returned repo and snapshot', async () => {
     function Host() {
-      useRestoreRepoTabsOnView({ hydratedRouteRepoId: 'repo-a' })
+      useRestoreRepoTabsOnView({ repoId: 'repo-a' })
       return null
     }
     vi.spyOn(useReposStore, 'getState').mockReturnValue({
@@ -121,7 +121,7 @@ describe('useRestoreRepoTabsOnView', () => {
 
   test('on success with null snapshot, hydrates with empty workspacePaneTabs', async () => {
     function Host() {
-      useRestoreRepoTabsOnView({ hydratedRouteRepoId: 'repo-a' })
+      useRestoreRepoTabsOnView({ repoId: 'repo-a' })
       return null
     }
     vi.spyOn(useReposStore, 'getState').mockReturnValue({
@@ -140,7 +140,7 @@ describe('useRestoreRepoTabsOnView', () => {
 
   test('on failure, emits a toast and does not hydrate', async () => {
     function Host() {
-      useRestoreRepoTabsOnView({ hydratedRouteRepoId: 'repo-a' })
+      useRestoreRepoTabsOnView({ repoId: 'repo-a' })
       return null
     }
     vi.spyOn(useReposStore, 'getState').mockReturnValue({
@@ -160,7 +160,7 @@ describe('useRestoreRepoTabsOnView', () => {
 
   test('stops retrying after MAX_LAZY_RESTORE_ATTEMPTS (3) failures', async () => {
     function Host() {
-      useRestoreRepoTabsOnView({ hydratedRouteRepoId: 'repo-retry' })
+      useRestoreRepoTabsOnView({ repoId: 'repo-retry' })
       return null
     }
     vi.spyOn(useReposStore, 'getState').mockReturnValue({
@@ -214,7 +214,7 @@ describe('useRestoreRepoTabsOnView', () => {
     } as never)
 
     function Host() {
-      useRestoreRepoTabsOnView({ hydratedRouteRepoId: 'repo-dedupe' })
+      useRestoreRepoTabsOnView({ repoId: 'repo-dedupe' })
       return null
     }
     // Two separate mounts before the in-flight promise settles: the second

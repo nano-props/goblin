@@ -30,10 +30,10 @@ type RestoreResult =
   | { ok: true; repo: import('#/shared/api-types.ts').RestoredWorkspaceRepoRuntime; snapshot: import('#/shared/workspace-pane-tabs.ts').WorkspacePaneTabsSnapshot | null }
   | { ok: false; message: string }
 
-export function useRestoreRepoTabsOnView({ hydratedRouteRepoId }: { hydratedRouteRepoId: string | null }) {
+export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) {
   useEffect(() => {
-    if (!hydratedRouteRepoId) return
-    const repo = useReposStore.getState().repos[hydratedRouteRepoId]
+    if (!repoId) return
+    const repo = useReposStore.getState().repos[repoId]
     if (!repo) return
     // Already restored (active repo at cold start, or already-restored stub).
     // The discriminator is `repoReadModel.loadedAt` — it is `null` for stubs
@@ -41,19 +41,19 @@ export function useRestoreRepoTabsOnView({ hydratedRouteRepoId }: { hydratedRout
     // hydrateRestoredWorkspaceRuntime run.
     if (repo.dataLoads.repoReadModel.loadedAt !== null) return
 
-    const failed = failedRestores.get(hydratedRouteRepoId)
+    const failed = failedRestores.get(repoId)
     if (failed && failed.attempts >= MAX_LAZY_RESTORE_ATTEMPTS) return
 
-    const key = `${hydratedRouteRepoId}\0${repo.repoRuntimeId}`
+    const key = `${repoId}\0${repo.repoRuntimeId}`
     let promise = inFlightRestores.get(key)
     if (!promise) {
-      promise = runLazyRestore(hydratedRouteRepoId, repo.repoRuntimeId).finally(() => {
+      promise = runLazyRestore(repoId, repo.repoRuntimeId).finally(() => {
         inFlightRestores.delete(key)
       })
       inFlightRestores.set(key, promise)
     }
     void promise
-  }, [hydratedRouteRepoId])
+  }, [repoId])
 }
 
 async function runLazyRestore(repoRoot: string, repoRuntimeId: string): Promise<void> {
@@ -91,7 +91,20 @@ function recordLazyRestoreFailure(repoRoot: string, message: string): void {
   const prior = failedRestores.get(repoRoot)
   const attempts = (prior?.attempts ?? 0) + 1
   failedRestores.set(repoRoot, { attempts, lastError: message })
-  bootstrapLog.warn('lazy restore-repo-tabs failed', { err: new Error(message), repoRoot, attempts })
+  // Reserve warn-level for the final exhaustion — transient retries are debug.
+  if (attempts >= MAX_LAZY_RESTORE_ATTEMPTS) {
+    bootstrapLog.warn('lazy restore-repo-tabs gave up', {
+      err: new Error(message),
+      repoRoot,
+      attempts,
+    })
+  } else {
+    bootstrapLog.debug('lazy restore-repo-tabs failed', {
+      err: new Error(message),
+      repoRoot,
+      attempts,
+    })
+  }
   toast.error(translate('lazy-restore.failed'), {
     id: `lazy-restore:${repoRoot}`,
     description: attempts >= MAX_LAZY_RESTORE_ATTEMPTS
