@@ -263,16 +263,6 @@ export function isCurrentRepoRuntime(userId: string, repoRoot: string, repoRunti
   return repoRuntimesByUser.get(userId)?.get(repoRoot)?.currentRepoRuntimeId === repoRuntimeId
 }
 
-export function isCurrentRepoRuntimeMembership(
-  userId: string,
-  repoRoot: string,
-  repoRuntimeId: string,
-  clientId: string,
-): boolean {
-  const state = repoRuntimesByUser.get(userId)?.get(repoRoot)
-  return state?.currentRepoRuntimeId === repoRuntimeId && state.members.has(clientId)
-}
-
 export function failRepoRemoteLifecycle(input: {
   userId: string
   repoRoot: string
@@ -313,7 +303,7 @@ export async function runRepoRemoteLifecycle(
   if (mode === 'ensure') {
     const joined = await joinRepoRemoteLifecycleAttempt(state, repoRuntimeId)
     if (joined) return joined
-    if (state.remoteLifecycle.kind === 'ready' || state.remoteLifecycle.kind === 'failed') {
+    if (state.remoteLifecycle.kind === 'ready') {
       return settledRepoRemoteLifecycleResult(state, repoRoot)
     }
   }

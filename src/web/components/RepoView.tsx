@@ -180,7 +180,7 @@ export function RepoView({
     )
   }
 
-  if (view.initialLoading) {
+  if (repo.session.projectionState === 'stub' || view.initialLoading) {
     return (
       <RepoLayoutWorkspaceShell
         repoId={repoId}

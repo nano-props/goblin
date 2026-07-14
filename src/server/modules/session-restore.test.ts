@@ -7,7 +7,7 @@ import type { WorkspaceSessionState } from '#/shared/api-types.ts'
 const mocks = vi.hoisted(() => ({
   acquireRepoRuntimeLease: vi.fn(),
   releaseRepoRuntimeMembershipLease: vi.fn(),
-  isCurrentRepoRuntimeMembership: vi.fn(),
+  isCurrentRepoRuntime: vi.fn(),
   getServerSessionState: vi.fn(),
   saveRebuiltServerSessionState: vi.fn(),
   probeRepo: vi.fn(),
@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('#/server/modules/repo-runtimes.ts', () => ({
   acquireRepoRuntimeLease: mocks.acquireRepoRuntimeLease,
   releaseRepoRuntimeMembershipLease: mocks.releaseRepoRuntimeMembershipLease,
-  isCurrentRepoRuntimeMembership: mocks.isCurrentRepoRuntimeMembership,
+  isCurrentRepoRuntime: mocks.isCurrentRepoRuntime,
 }))
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
@@ -43,7 +43,7 @@ describe('restoreServerWorkspaceSession', () => {
       repoRuntimeId: 'repo-runtime-test',
       generation: 1,
     }))
-    mocks.isCurrentRepoRuntimeMembership.mockReturnValue(true)
+    mocks.isCurrentRepoRuntime.mockReturnValue(true)
     mocks.probeRepo.mockResolvedValue({ ok: true, root: '/repo', name: 'repo' })
     mocks.readRepoProjection.mockResolvedValue({
       snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: '/repo' } }] },
@@ -479,7 +479,7 @@ describe('restoreServerWorkspaceSession — active-only restore', () => {
       repoRuntimeId: `runtime-${repoRoot.replace(/[^a-z0-9]/gi, '_')}`,
       generation: 1,
     }))
-    mocks.isCurrentRepoRuntimeMembership.mockReturnValue(true)
+    mocks.isCurrentRepoRuntime.mockReturnValue(true)
     mocks.probeRepo.mockImplementation(async (repoRoot: string) => ({ ok: true, root: repoRoot, name: 'repo' }))
     mocks.readRepoProjection.mockImplementation(async (repoRoot: string) => ({
       snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: repoRoot } }] },
@@ -695,7 +695,7 @@ describe('restoreRepoTabsForRepo', () => {
       repoRuntimeId: 'repo-runtime-test',
       generation: 1,
     }))
-    mocks.isCurrentRepoRuntimeMembership.mockReturnValue(true)
+    mocks.isCurrentRepoRuntime.mockReturnValue(true)
     mocks.probeRepo.mockImplementation(async (repoRoot: string) => ({ ok: true, root: repoRoot, name: 'repo' }))
     mocks.readRepoProjection.mockResolvedValue({
       snapshot: { current: 'main', branches: [{ name: 'main', worktree: { path: '/repo' } }] },
@@ -805,7 +805,7 @@ describe('restoreRepoTabsForRepo', () => {
       restoredRepoId: '/repo',
     }
     mocks.getServerSessionState.mockResolvedValue(session)
-    mocks.isCurrentRepoRuntimeMembership.mockReturnValue(false)
+    mocks.isCurrentRepoRuntime.mockReturnValue(false)
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(),
@@ -919,7 +919,7 @@ describe('restoreRepoTabsForRepo', () => {
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
       restoredRepoId: '/repo',
     })
-    mocks.isCurrentRepoRuntimeMembership
+    mocks.isCurrentRepoRuntime
       .mockReturnValueOnce(true)
       .mockReturnValueOnce(true)
       .mockReturnValueOnce(true)

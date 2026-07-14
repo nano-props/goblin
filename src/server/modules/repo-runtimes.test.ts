@@ -6,12 +6,12 @@ import {
   clearRepoRuntimesForUser,
   expireRepoRuntimeMembershipLease,
   isCurrentRepoRuntime,
-  isCurrentRepoRuntimeMembership,
   listRepoRuntimes,
   onRepoRuntimeClosed,
   releaseRepoRuntime,
   releaseRepoRuntimeMembershipLease,
   replaceRepoRuntimeMembershipsForClient,
+  runRepoRemoteLifecycle,
 } from '#/server/modules/repo-runtimes.ts'
 
 const USER_ID = 'user_repo_runtime'
@@ -66,21 +66,6 @@ describe('repo runtimes', () => {
     })
   })
 
-  test('recognizes only a current runtime membership owned by the client', () => {
-    const firstRuntimeId = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
-
-    expect(isCurrentRepoRuntimeMembership(USER_ID, REPO_ROOT, firstRuntimeId, 'client-a')).toBe(true)
-    expect(isCurrentRepoRuntimeMembership(USER_ID, REPO_ROOT, firstRuntimeId, 'client-b')).toBe(false)
-
-    releaseRepoRuntime(USER_ID, REPO_ROOT, firstRuntimeId, 'client-a')
-    expect(isCurrentRepoRuntimeMembership(USER_ID, REPO_ROOT, firstRuntimeId, 'client-a')).toBe(false)
-
-    const nextRuntimeId = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
-    expect(nextRuntimeId).not.toBe(firstRuntimeId)
-    expect(isCurrentRepoRuntimeMembership(USER_ID, REPO_ROOT, firstRuntimeId, 'client-a')).toBe(false)
-    expect(isCurrentRepoRuntimeMembership(USER_ID, REPO_ROOT, nextRuntimeId, 'client-a')).toBe(true)
-  })
-
   test('expires only memberships captured when a client went offline', () => {
     const runtimeId = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
     acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-b')
@@ -123,6 +108,45 @@ describe('repo runtimes', () => {
       released: true,
       runtimeClosed: true,
     })
+  })
+
+  test('ensure retries a failed remote lifecycle and joins the ready state', async () => {
+    const repoRoot = 'ssh-config://example/repo'
+    const repoRuntimeId = acquireRepoRuntime(USER_ID, repoRoot, 'client-a')
+    const failed = vi.fn(async () => ({
+      kind: 'failed' as const,
+      repoId: repoRoot,
+      name: 'repo',
+      lifecycle: { kind: 'failed' as const, reason: 'unreachable' as const },
+    }))
+    const ready = vi.fn(async () => ({
+      kind: 'ready' as const,
+      repoId: repoRoot,
+      name: 'repo',
+      lifecycle: {
+        kind: 'ready' as const,
+        target: {
+          id: repoRoot,
+          alias: 'example',
+          host: 'example.test',
+          user: 'developer',
+          port: 22,
+          remotePath: '/repo',
+          displayName: 'repo',
+        },
+      },
+    }))
+
+    await expect(runRepoRemoteLifecycle(USER_ID, repoRoot, repoRuntimeId, failed, undefined, 'ensure')).resolves.toMatchObject({
+      kind: 'settled',
+      lifecycle: { kind: 'failed' },
+    })
+    await expect(runRepoRemoteLifecycle(USER_ID, repoRoot, repoRuntimeId, ready, undefined, 'ensure')).resolves.toMatchObject({
+      kind: 'settled',
+      lifecycle: { kind: 'ready' },
+    })
+    expect(failed).toHaveBeenCalledTimes(1)
+    expect(ready).toHaveBeenCalledTimes(1)
   })
 
   test('atomically replaces one client membership set without changing sibling clients', () => {

@@ -1,5 +1,6 @@
 import {
   isProjectedRestoredWorkspaceRepo,
+  type RepoWorkspaceTabsRestoreResult,
   type RestoredWorkspaceRepoRuntime,
   type WorkspaceRuntimeRestoreSnapshot,
 } from '#/shared/api-types.ts'
@@ -20,7 +21,10 @@ interface InitialRepoRefresh {
   repoRuntimeId: string
 }
 
-type RestorableWorkspaceLifecycleActions = Pick<ReposStore, 'hydrateRestoredWorkspaceRuntime'>
+type RestorableWorkspaceLifecycleActions = Pick<
+  ReposStore,
+  'hydrateRestoredWorkspaceRuntime' | 'promoteRestoredWorkspaceRepo'
+>
 
 function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet): RestorableWorkspaceLifecycleActions {
   return {
@@ -98,6 +102,54 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         if (signal?.aborted) return
         refreshInitialRepoState(set, get, initialRefresh)
       }
+    },
+
+    promoteRestoredWorkspaceRepo(result: RepoWorkspaceTabsRestoreResult): boolean {
+      const restoredRepo = result.repo
+      let promoted = false
+      set((s) => {
+        const current = s.repos[restoredRepo.repoRoot]
+        if (
+          !current ||
+          current.repoRuntimeId !== restoredRepo.repoRuntimeId ||
+          current.session.projectionState !== 'stub'
+        ) {
+          return s
+        }
+        const { repos } = addResolvedRepo(
+          s,
+          resolvedRepoFromRestoredRuntime(restoredRepo),
+          restoredRepo.repoRuntimeId,
+        )
+        promoted = true
+        return repos === s.repos ? s : { repos }
+      })
+      if (!promoted) return false
+
+      void updateRepoRuntimeCache({
+        repoRoot: restoredRepo.repoRoot,
+        repoRuntimeId: restoredRepo.repoRuntimeId,
+        ...(restoredRepo.target
+          ? { remoteLifecycle: { kind: 'ready' as const, attemptId: 0, target: restoredRepo.target } }
+          : {}),
+      })
+      seedRepoProjectionQueryData(restoredRepo.repoRoot, restoredRepo.repoRuntimeId, restoredRepo.projection)
+      writeWorkspacePaneTabsSnapshotQueryData(
+        restoredRepo.repoRoot,
+        restoredRepo.repoRuntimeId,
+        result.snapshot,
+      )
+      acceptRepoProjectionReadModel(
+        set,
+        get,
+        {
+          repoRoot: restoredRepo.repoRoot,
+          repoRuntimeId: restoredRepo.repoRuntimeId,
+          projection: restoredRepo.projection,
+        },
+        { scope: 'repo-read-model' },
+      )
+      return true
     },
   }
 }

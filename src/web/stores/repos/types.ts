@@ -1,7 +1,11 @@
 import type { StoreApi } from 'zustand'
 import type { BranchSnapshotInfo, BrowserRemoteProvider, ExecResult, GitRemoteInfo } from '#/web/types.ts'
 import type { RemoteRepoConnectionLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { WorkspaceRuntimeRestoreSnapshot, WorkspaceSessionState } from '#/shared/api-types.ts'
+import type {
+  RepoWorkspaceTabsRestoreResult,
+  WorkspaceRuntimeRestoreSnapshot,
+  WorkspaceSessionState,
+} from '#/shared/api-types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repos/branch-action-types.ts'
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
@@ -276,6 +280,7 @@ interface RuntimeCoherentRepoProjectionActions {
     runtime: WorkspaceRuntimeRestoreSnapshot,
     options?: RepoSessionHydrationOptions,
   ) => Promise<void>
+  promoteRestoredWorkspaceRepo: (result: RepoWorkspaceTabsRestoreResult) => boolean
   /** Clear the fetchFailed flag — called by manual fetch success and
    *  by an explicit refresh, so a stale badge doesn't follow the user
    *  around forever. */

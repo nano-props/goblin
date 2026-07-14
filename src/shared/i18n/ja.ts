@@ -766,5 +766,4 @@ export const ja: Record<DictKey, string> = {
   'auth.gate.error-empty': 'アクセストークンを入力してください',
   'auth.gate.error-failed': 'ログインに失敗しました',
   'lazy-restore.failed': 'リポジトリを開けません',
-  'lazy-restore.gave-up': '{attempts} 回試行してあきらめました',
 }

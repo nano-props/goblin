@@ -3,7 +3,7 @@ import { defaultWorkspaceSessionState } from '#/shared/settings-defaults.ts'
 import {
   acquireRepoRuntimeLease,
   clearRepoRuntimesForUser,
-  isCurrentRepoRuntimeMembership,
+  isCurrentRepoRuntime,
   releaseRepoRuntimeMembershipLease,
 } from '#/server/modules/repo-runtimes.ts'
 
@@ -63,7 +63,7 @@ describe('session restore runtime ownership', () => {
       }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
 
-    expect(isCurrentRepoRuntimeMembership(USER_ID, REPO_ROOT, lease.repoRuntimeId, CLIENT_ID)).toBe(true)
+    expect(isCurrentRepoRuntime(USER_ID, REPO_ROOT, lease.repoRuntimeId)).toBe(true)
     expect(releaseRepoRuntimeMembershipLease(USER_ID, CLIENT_ID, lease)).toEqual({
       released: true,
       runtimeClosed: true,

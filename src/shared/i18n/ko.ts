@@ -758,5 +758,4 @@ export const ko: Record<DictKey, string> = {
   'auth.gate.error-empty': '접근 토큰을 입력하세요',
   'auth.gate.error-failed': '로그인 실패',
   'lazy-restore.failed': '저장소를 열 수 없습니다',
-  'lazy-restore.gave-up': '{attempts}회 시도 후 포기',
 }

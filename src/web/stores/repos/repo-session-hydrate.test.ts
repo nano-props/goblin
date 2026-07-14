@@ -122,4 +122,98 @@ describe('repo session hydration', () => {
     })
     expect(repo?.dataLoads.repoReadModel.loadedAt).toBe(savedAt)
   })
+
+  test('promotes only the matching existing stub without changing workspace membership', async () => {
+    await useReposStore.getState().hydrateRestoredWorkspaceRuntime({
+      repos: [
+        {
+          entry: localRepoSessionEntry(REPO_A),
+          repoRoot: REPO_A,
+          repoRuntimeId: 'repo-runtime-server-a',
+          name: 'server-a',
+          projection: null,
+        },
+      ],
+      workspacePaneTabs: [],
+      restoredRepoId: REPO_A,
+    })
+    const projection = {
+      snapshot: { branches: [branchSnapshot('main')], current: 'main' },
+      status: [],
+      pullRequests: null,
+      operations: { operations: [], loadedAt: 0 },
+      requested: { branch: null, pullRequestMode: 'full' as const },
+      loadedAt: 10,
+    }
+
+    expect(
+      useReposStore.getState().promoteRestoredWorkspaceRepo({
+        repo: {
+          entry: localRepoSessionEntry(REPO_A),
+          repoRoot: REPO_A,
+          repoRuntimeId: 'repo-runtime-server-a',
+          name: 'server-a',
+          projection,
+        },
+        snapshot: { revision: 3, entries: [] },
+      }),
+    ).toBe(true)
+
+    const state = useReposStore.getState()
+    expect(state.order).toEqual([REPO_A])
+    expect(state.restoredRepoId).toBe(REPO_A)
+    expect(state.repos[REPO_A]?.session.projectionState).toBe('projected')
+    expect(readRepoBranchQueryProjection(state.repos[REPO_A]!)?.currentBranch).toBe('main')
+    expect(primaryWindowQueryClient.getQueryData(workspacePaneTabsQueryKey(REPO_A, 'repo-runtime-server-a'))).toEqual({
+      revision: 3,
+      entries: [],
+    })
+  })
+
+  test('rejects a late promotion after the stub closes or changes runtime epoch', async () => {
+    await useReposStore.getState().hydrateRestoredWorkspaceRuntime({
+      repos: [
+        {
+          entry: localRepoSessionEntry(REPO_A),
+          repoRoot: REPO_A,
+          repoRuntimeId: 'repo-runtime-old',
+          name: 'server-a',
+          projection: null,
+        },
+      ],
+      workspacePaneTabs: [],
+      restoredRepoId: REPO_A,
+    })
+    const result = {
+      repo: {
+        entry: localRepoSessionEntry(REPO_A),
+        repoRoot: REPO_A,
+        repoRuntimeId: 'repo-runtime-old',
+        name: 'server-a',
+        projection: {
+          snapshot: { branches: [branchSnapshot('main')], current: 'main' },
+          status: [],
+          pullRequests: null,
+          operations: { operations: [], loadedAt: 0 },
+          requested: { branch: null, pullRequestMode: 'full' as const },
+          loadedAt: 10,
+        },
+      },
+      snapshot: null,
+    }
+
+    useReposStore.setState((state) => ({
+      repos: {
+        ...state.repos,
+        [REPO_A]: { ...state.repos[REPO_A]!, repoRuntimeId: 'repo-runtime-new' },
+      },
+    }))
+    expect(useReposStore.getState().promoteRestoredWorkspaceRepo(result)).toBe(false)
+    expect(useReposStore.getState().repos[REPO_A]?.session.projectionState).toBe('stub')
+
+    useReposStore.setState({ repos: {}, order: [], restoredRepoId: null })
+    expect(useReposStore.getState().promoteRestoredWorkspaceRepo(result)).toBe(false)
+    expect(useReposStore.getState().repos[REPO_A]).toBeUndefined()
+    expect(useReposStore.getState().order).toEqual([])
+  })
 })
