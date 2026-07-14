@@ -109,7 +109,7 @@ describe('settings routes', () => {
       workspacePaneTabsByTargetByRepo: {},
       filetreeViewStateByWorktreeByRepo: {},
     } as const
-    mocks.handleSetSession.mockResolvedValue({ ok: true, session })
+    mocks.handleSetSession.mockResolvedValue({ ok: true, accepted: true, session })
 
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
     const app = createSettingsRoutes(settingsRouteOptions())
@@ -117,15 +117,26 @@ describe('settings routes', () => {
       new Request('http://127.0.0.1:32100/session', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ session }),
+        body: JSON.stringify({
+          clientId: 'client_test000000000000',
+          sessionWriterId: 'session_writer_test',
+          sessionWriterSequence: 1,
+          session,
+        }),
       }),
     )
 
     await expect(response.json()).resolves.toEqual({
       ok: true,
+      accepted: true,
       session,
     })
-    expect(mocks.handleSetSession).toHaveBeenCalledWith({ session })
+    expect(mocks.handleSetSession).toHaveBeenCalledWith({
+      clientId: 'client_test000000000000',
+      sessionWriterId: 'session_writer_test',
+      sessionWriterSequence: 1,
+      session,
+    })
   })
 
   test('delegates session restore to the server restore coordinator', async () => {
@@ -205,6 +216,11 @@ describe('settings routes', () => {
           clientId: 'client_test000000000000',
           repoRoot: '/repo-active',
           repoRuntimeId: 'repo_runtime_test',
+          intent: {
+            entry: { kind: 'local', id: '/repo-active' },
+            workspacePaneTabsByTarget: {},
+            preferredWorkspacePaneTabByTarget: {},
+          },
         }),
       }),
     )
@@ -215,6 +231,11 @@ describe('settings routes', () => {
       clientId: 'client_test000000000000',
       repoRoot: '/repo-active',
       repoRuntimeId: 'repo_runtime_test',
+      intent: {
+        entry: { kind: 'local', id: '/repo-active' },
+        workspacePaneTabsByTarget: {},
+        preferredWorkspacePaneTabByTarget: {},
+      },
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       signal: expect.any(AbortSignal),
     })
@@ -283,7 +304,7 @@ describe('settings routes', () => {
       },
       filetreeViewStateByWorktreeByRepo: {},
     } as const
-    mocks.handleSetSession.mockResolvedValue({ ok: true, session })
+    mocks.handleSetSession.mockResolvedValue({ ok: true, accepted: true, session })
 
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
     const app = createSettingsRoutes(settingsRouteOptions())
@@ -291,12 +312,22 @@ describe('settings routes', () => {
       new Request('http://127.0.0.1:32100/session', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ session }),
+        body: JSON.stringify({
+          clientId: 'client_test000000000000',
+          sessionWriterId: 'session_writer_test',
+          sessionWriterSequence: 1,
+          session,
+        }),
       }),
     )
 
     expect(response.status).toBe(200)
-    expect(mocks.handleSetSession).toHaveBeenCalledWith({ session })
+    expect(mocks.handleSetSession).toHaveBeenCalledWith({
+      clientId: 'client_test000000000000',
+      sessionWriterId: 'session_writer_test',
+      sessionWriterSequence: 1,
+      session,
+    })
   })
 
   test('delegates recent-repo writes to the settings command handler layer', async () => {

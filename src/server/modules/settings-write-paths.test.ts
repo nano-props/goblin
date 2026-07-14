@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   addServerRecentRepo: vi.fn(),
   clearServerRecentRepos: vi.fn(),
   setServerFetchIntervalSec: vi.fn(),
-  setServerSessionState: vi.fn(),
+  setServerSessionStateOrdered: vi.fn(),
   updateUserSettings: vi.fn(),
   settingsInvalidationScopesForPrefsPatch: vi.fn(),
 }))
@@ -22,7 +22,7 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
   addServerRecentRepo: mocks.addServerRecentRepo,
   clearServerRecentRepos: mocks.clearServerRecentRepos,
   setServerFetchIntervalSec: mocks.setServerFetchIntervalSec,
-  setServerSessionState: mocks.setServerSessionState,
+  setServerSessionStateOrdered: mocks.setServerSessionStateOrdered,
   updateUserSettings: mocks.updateUserSettings,
 }))
 
@@ -82,14 +82,27 @@ describe('settings command handlers', () => {
       workspacePaneTabsByTargetByRepo: {},
       filetreeViewStateByWorktreeByRepo: {},
     }
-    mocks.setServerSessionState.mockResolvedValue(session)
+    mocks.setServerSessionStateOrdered.mockResolvedValue({ accepted: true, session })
     const { handleSetSession } = await import('#/server/modules/settings-write-paths.ts')
 
-    await expect(handleSetSession({ session })).resolves.toEqual({
+    await expect(
+      handleSetSession({
+        clientId: 'client_test000000000000',
+        sessionWriterId: 'session_writer_test',
+        sessionWriterSequence: 1,
+        session,
+      }),
+    ).resolves.toEqual({
       ok: true,
+      accepted: true,
       session,
     })
-    expect(mocks.setServerSessionState).toHaveBeenCalledWith(session)
+    expect(mocks.setServerSessionStateOrdered).toHaveBeenCalledWith({
+      clientId: 'client_test000000000000',
+      sessionWriterId: 'session_writer_test',
+      sessionWriterSequence: 1,
+      session,
+    })
     expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
   })
 
@@ -117,6 +130,9 @@ describe('settings command handlers', () => {
     const { parseHttpInput } = await import('#/server/common/http-validate.ts')
     const targetKey = branchTargetKey('/tmp/repo', 'main')
     const parsed = parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
+      clientId: 'client_test000000000000',
+      sessionWriterId: 'session_writer_test',
+      sessionWriterSequence: 1,
       session: {
         openRepoEntries: [],
         restoredRepoId: null,
@@ -143,6 +159,9 @@ describe('settings command handlers', () => {
 
     expect(() =>
       parseHttpInput(SETTINGS_PATCH_SCHEMAS.session, {
+        clientId: 'client_test000000000000',
+        sessionWriterId: 'session_writer_test',
+        sessionWriterSequence: 1,
         session: {
           openRepoEntries: [{ kind: 'local', id: '/tmp/repo' }],
           restoredRepoId: '/tmp/repo',

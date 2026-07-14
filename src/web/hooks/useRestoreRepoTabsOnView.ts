@@ -14,6 +14,7 @@ import { restoreRepoTabsOnView } from '#/web/settings-actions.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 import { translate } from '#/web/stores/i18n.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
+import type { RepoWorkspaceTabsRestoreIntent } from '#/shared/api-types.ts'
 
 // Module-level dedupe so concurrent mounts (e.g. user clicks a stub while
 // the route is still hydrating) share a single in-flight restore.
@@ -31,6 +32,7 @@ interface LazyRestoreTarget {
   repoRoot: string
   repoRuntimeId: string
   projectionState: 'projected' | 'stub'
+  intent: RepoWorkspaceTabsRestoreIntent | null
 }
 
 export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) {
@@ -43,6 +45,15 @@ export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) 
         repoRoot: repo.id,
         repoRuntimeId: repo.repoRuntimeId,
         projectionState: repo.session.projectionState,
+        intent: repo.session.entry
+          ? {
+              entry: repo.session.entry,
+              workspacePaneTabsByTarget:
+                s.restoredSessionBaseline?.workspacePaneTabsByTargetByRepo[repo.id] ?? {},
+              preferredWorkspacePaneTabByTarget:
+                s.restoredSessionBaseline?.preferredWorkspacePaneTabByTargetByRepo[repo.id] ?? {},
+            }
+          : null,
       }
     }),
   )
@@ -51,12 +62,12 @@ export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) 
     if (!target) return
     // Already client-owned (active repo at cold start, normal user-opened
     // repo, or a stub that has already been projected).
-    if (target.projectionState !== 'stub') return
+    if (target.projectionState !== 'stub' || !target.intent) return
 
     const key = `${target.repoRoot}\0${target.repoRuntimeId}`
     let promise = inFlightRestores.get(key)
     if (!promise) {
-      promise = runLazyRestore(target.repoRoot, target.repoRuntimeId).finally(() => {
+      promise = runLazyRestore(target.repoRoot, target.repoRuntimeId, target.intent).finally(() => {
         inFlightRestores.delete(key)
       })
       inFlightRestores.set(key, promise)
@@ -65,8 +76,12 @@ export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) 
   }, [target])
 }
 
-async function runLazyRestore(repoRoot: string, repoRuntimeId: string): Promise<void> {
-  const result = await fetchLazyRestore(repoRoot, repoRuntimeId)
+async function runLazyRestore(
+  repoRoot: string,
+  repoRuntimeId: string,
+  intent: RepoWorkspaceTabsRestoreIntent,
+): Promise<void> {
+  const result = await fetchLazyRestore(repoRoot, repoRuntimeId, intent)
   if (!lazyRestoreTargetStillCurrent(repoRoot, repoRuntimeId)) return
   if (result.ok) {
     useReposStore.getState().promoteRestoredWorkspaceRepo({
@@ -86,8 +101,12 @@ function lazyRestoreTargetStillCurrent(repoRoot: string, repoRuntimeId: string):
   return !!repo && repo.repoRuntimeId === repoRuntimeId && repo.session.projectionState === 'stub'
 }
 
-async function fetchLazyRestore(repoRoot: string, repoRuntimeId: string): Promise<RestoreResult> {
-  return restoreRepoTabsOnView(readOrCreateWebTerminalClientId(), repoRoot, repoRuntimeId).then(
+async function fetchLazyRestore(
+  repoRoot: string,
+  repoRuntimeId: string,
+  intent: RepoWorkspaceTabsRestoreIntent,
+): Promise<RestoreResult> {
+  return restoreRepoTabsOnView(readOrCreateWebTerminalClientId(), repoRoot, repoRuntimeId, intent).then(
     (response) => ({ ok: true as const, repo: response.repo, snapshot: response.snapshot }),
     (err: unknown) => ({ ok: false as const, message: err instanceof Error ? err.message : String(err) }),
   )

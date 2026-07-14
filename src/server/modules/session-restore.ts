@@ -4,6 +4,7 @@ import {
   IpcError,
   isProjectedRestoredWorkspaceRepo,
   type ProjectedRestoredWorkspaceRepoRuntime,
+  type RepoWorkspaceTabsRestoreIntent,
   type RepoWorkspaceTabsRestoreResult,
   type RepoRuntimeProjection,
   type RestoredWorkspaceRepoRuntime,
@@ -30,7 +31,11 @@ import {
   type RepoRuntimeMembershipLeaseEntry,
 } from '#/server/modules/repo-runtimes.ts'
 import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
-import { getServerSessionState, saveRebuiltServerSessionState } from '#/server/modules/settings-source.ts'
+import {
+  beginServerSessionWriter,
+  getServerSessionState,
+  saveRebuiltServerSessionState,
+} from '#/server/modules/settings-source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 
 export interface RestoreServerWorkspaceSessionInput {
@@ -49,13 +54,17 @@ export interface RestoredServerWorkspaceSession {
   status: 'restored' | 'rebuilt'
   session: WorkspaceSessionState
   runtime: WorkspaceRuntimeRestoreSnapshot
+  sessionWriterId: string
 }
+
+type RestoredServerWorkspaceSessionSnapshot = Omit<RestoredServerWorkspaceSession, 'sessionWriterId'>
 
 export interface RestoreRepoTabsInput {
   userId: string
   clientId: string
   repoRoot: string
   repoRuntimeId: string
+  intent: RepoWorkspaceTabsRestoreIntent
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   signal?: AbortSignal
 }
@@ -90,11 +99,12 @@ export async function restoreServerWorkspaceSession(
     return await queue.add(async () => {
       input.signal?.throwIfAborted()
       const session = await getServerSessionState()
-      return await restoreServerWorkspaceSessionSnapshot(
+      const restored = await restoreServerWorkspaceSessionSnapshot(
         { ...input, activeRepoRoot: input.activeRepoRoot ?? session.restoredRepoId ?? null },
         session,
         0,
       )
+      return { ...restored, sessionWriterId: await beginServerSessionWriter(input.clientId) }
     })
   } finally {
     void queue.onIdle().then(() => {
@@ -120,7 +130,7 @@ async function restoreServerWorkspaceSessionSnapshot(
   input: RestoreServerWorkspaceSessionInput,
   session: WorkspaceSessionState,
   conflictRetries: number,
-): Promise<RestoredServerWorkspaceSession> {
+): Promise<RestoredServerWorkspaceSessionSnapshot> {
   input.signal?.throwIfAborted()
   const opened: OpenedRepoSessionEntry[] = []
   let openedMembershipsCommitted = false
@@ -180,7 +190,7 @@ async function saveRebuiltOrRestoreLatest(
   session: WorkspaceSessionState,
   rebuiltSession: WorkspaceSessionState,
   conflictRetries: number,
-): Promise<RestoredServerWorkspaceSession> {
+): Promise<RestoredServerWorkspaceSessionSnapshot> {
   const saved = await saveRebuiltServerSessionState({ persistedSnapshot: session, rebuiltSession })
   if (saved.saved) return { status: 'rebuilt', session: saved.session, runtime: runtimeSnapshotFromOpened([], null, []) }
   if (conflictRetries >= MAX_REBUILD_CONFLICT_RETRIES) {
@@ -342,10 +352,11 @@ export async function restoreRepoTabsForRepo(
 ): Promise<RepoWorkspaceTabsRestoreResult> {
   input.signal?.throwIfAborted()
   assertCurrentRepoRuntime(input)
-  const session = await getServerSessionState()
-  assertCurrentRepoRuntime(input)
-  const entry = session.openRepoEntries.find((candidate) => repoSessionEntryId(candidate) === input.repoRoot)
-  if (!entry) throw new IpcError({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
+  const entry = input.intent.entry
+  if (repoSessionEntryId(entry) !== input.repoRoot) {
+    throw new IpcError({ code: 'BAD_REQUEST', message: 'error.invalid-arguments' })
+  }
+  const session = deferredRepoRestoreSession(input.repoRoot, input.intent)
 
   const repo = await projectSessionRepo(input, entry)
   if (!repo) {
@@ -368,6 +379,19 @@ export async function restoreRepoTabsForRepo(
   return {
     repo,
     snapshot: snapshots[0]?.snapshot ?? null,
+  }
+}
+
+function deferredRepoRestoreSession(
+  repoRoot: string,
+  intent: RepoWorkspaceTabsRestoreIntent,
+): WorkspaceSessionState {
+  return {
+    ...defaultWorkspaceSessionState(),
+    openRepoEntries: [intent.entry],
+    restoredRepoId: repoRoot,
+    workspacePaneTabsByTargetByRepo: { [repoRoot]: intent.workspacePaneTabsByTarget },
+    preferredWorkspacePaneTabByTargetByRepo: { [repoRoot]: intent.preferredWorkspacePaneTabByTarget },
   }
 }
 

@@ -54,6 +54,7 @@ import {
   defaultUserSettings,
   defaultWorkspaceSessionState,
 } from '#/shared/settings-defaults.ts'
+import { createOpaqueId } from '#/shared/opaque-id.ts'
 
 type FetchIntervalListener = (sec: number) => void
 interface UserSettingsData {
@@ -78,6 +79,7 @@ let settingsData: UserSettingsData | null = null
 let settingsLoadPromise: Promise<UserSettingsData> | null = null
 let settingsMutationPromise: Promise<void> = Promise.resolve()
 const listeners = new Set<FetchIntervalListener>()
+const sessionWritersByClient = new Map<string, { writerId: string; latestSequence: number }>()
 
 function normalizeFetchInterval(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value)
@@ -619,12 +621,45 @@ export async function getServerSessionState(): Promise<WorkspaceSessionState> {
   return cloneSession((await loadUserSettings()).session)
 }
 
+export async function beginServerSessionWriter(clientId: string): Promise<string> {
+  return await mutateUserSettings(async (data) => {
+    const writerId = createOpaqueId('session-writer')
+    return {
+      next: data,
+      result: writerId,
+      changed: false,
+      afterCommit: () => {
+        sessionWritersByClient.set(clientId, { writerId, latestSequence: 0 })
+      },
+    }
+  })
+}
+
 export async function setServerSessionState(session: WorkspaceSessionState): Promise<WorkspaceSessionState> {
   return await mutateUserSettings(async (data) => {
     const next = normalizeSession(session)
+    return { next: { ...data, session: next }, result: cloneSession(next) }
+  })
+}
+
+export async function setServerSessionStateOrdered(input: {
+  clientId: string
+  sessionWriterId: string
+  sessionWriterSequence: number
+  session: WorkspaceSessionState
+}): Promise<{ accepted: boolean; session: WorkspaceSessionState }> {
+  return await mutateUserSettings<{ accepted: boolean; session: WorkspaceSessionState }>(async (data) => {
+    const writer = sessionWritersByClient.get(input.clientId)
+    if (!writer || writer.writerId !== input.sessionWriterId || input.sessionWriterSequence <= writer.latestSequence) {
+      return unchangedUserSettings(data, { accepted: false, session: cloneSession(data.session) })
+    }
+    const next = normalizeSession(input.session)
     return {
       next: { ...data, session: next },
-      result: cloneSession(next),
+      result: { accepted: true, session: cloneSession(next) },
+      afterCommit: () => {
+        writer.latestSequence = input.sessionWriterSequence
+      },
     }
   })
 }
@@ -820,6 +855,7 @@ export function resetServerSettingsSourceForTests(): void {
   settingsData = null
   settingsLoadPromise = null
   settingsMutationPromise = Promise.resolve()
+  sessionWritersByClient.clear()
   listeners.clear()
   cachedFetchIntervalSec = DEFAULT_FETCH_INTERVAL_SEC
   resetUserSettingsPersistenceForTests()

@@ -244,6 +244,7 @@ describe('app bootstrap hooks', () => {
       status: 'rebuilt',
       session: rebuiltSession,
       runtime: restoredRuntimeForSession(rebuiltSession),
+      sessionWriterId: 'session_writer_test',
     })
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
@@ -477,6 +478,7 @@ function mockServerRestore(session: ReturnType<typeof defaultSettingsSnapshot>['
     status: 'restored',
     session,
     runtime: restoredRuntimeForSession(session),
+    sessionWriterId: 'session_writer_test',
   })
 }
 

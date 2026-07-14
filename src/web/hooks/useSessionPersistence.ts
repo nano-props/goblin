@@ -19,6 +19,7 @@ interface SessionPersistenceInput {
   workspaceMembershipReady: boolean
   sessionPersistenceReady: boolean
   sessionRestoreError: string | null
+  sessionWriterId: string | null
   restoredSessionBaseline: ReturnType<typeof useReposStore.getState>['restoredSessionBaseline']
   repos: ReturnType<typeof useReposStore.getState>['repos']
   order: string[]
@@ -36,8 +37,13 @@ type SessionSaveCandidate = {
   serialized: string
 }
 
+type QueuedSessionSaveCandidate = SessionSaveCandidate & {
+  sessionWriterId: string
+  sessionWriterSequence: number
+}
+
 interface SessionSaveState {
-  queued: SessionSaveCandidate | null
+  queued: QueuedSessionSaveCandidate | null
   drain: Promise<void> | null
   startedSerialized: string | null
   completedSerialized: string | null
@@ -56,6 +62,7 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
   const workspaceMembershipReady = useReposStore((s) => s.workspaceMembershipReady)
   const sessionPersistenceReady = useReposStore((s) => s.sessionPersistenceReady)
   const sessionRestoreError = useReposStore((s) => s.sessionRestoreError)
+  const sessionWriterId = useReposStore((s) => s.sessionWriterId)
   const restoredSessionBaseline = useReposStore((s) => s.restoredSessionBaseline)
   const repos = useReposStore((s) => s.repos)
   const workspacePaneTabsVersion = useWorkspacePaneTabsCacheVersion()
@@ -71,11 +78,24 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
   const lastImmediateKeyRef = useRef<string | null>(null)
   const lastRoutedRepoIdRef = useRef<string | null>(null)
   const debounceTimerRef = useRef<number | null>(null)
+  const sessionWriterRef = useRef({ id: sessionWriterId, sequence: 0 })
+  if (sessionWriterRef.current.id !== sessionWriterId) {
+    sessionWriterRef.current = { id: sessionWriterId, sequence: 0 }
+  }
+
+  const queuedSessionSaveCandidate = (candidate: SessionSaveCandidate): QueuedSessionSaveCandidate | null => {
+    const writer = sessionWriterRef.current
+    if (!writer.id) return null
+    writer.sequence += 1
+    return { ...candidate, sessionWriterId: writer.id, sessionWriterSequence: writer.sequence }
+  }
 
   const enqueueSave = (candidate: SessionSaveCandidate, options?: { throwOnFailure?: boolean }) => {
     const state = sessionSaveStateRef.current
     state.lastError = null
-    state.queued = candidate
+    const queued = queuedSessionSaveCandidate(candidate)
+    if (!queued) return Promise.resolve()
+    state.queued = queued
     if (state.drain) {
       return options?.throwOnFailure
         ? state.drain.then(() => {
@@ -89,7 +109,7 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
         state.queued = null
         state.startedSerialized = next.serialized
         try {
-          await persistWorkspaceSessionState(next.session)
+          await persistWorkspaceSessionState(next.session, next.sessionWriterId, next.sessionWriterSequence)
           state.completedSerialized = next.serialized
           state.lastError = null
         } catch (err) {
@@ -112,6 +132,7 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
         workspaceMembershipReady,
         sessionPersistenceReady,
         sessionRestoreError,
+        sessionWriterId,
         restoredSessionBaseline,
         repos,
         order,
@@ -123,7 +144,7 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
       },
       routedRepoId ?? lastRoutedRepoIdRef.current,
     )
-    if (!session) return null
+    if (!session || !sessionWriterId) return null
     return { session, serialized: JSON.stringify(session) }
   })
 
@@ -200,6 +221,7 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
     workspaceMembershipReady,
     sessionPersistenceReady,
     sessionRestoreError,
+    sessionWriterId,
     order,
     restoredRepoId,
     restoredSessionBaseline,
@@ -220,9 +242,10 @@ export function useSessionPersistence({ routedRepoId }: { routedRepoId: string |
         if (!latest || state.completedSerialized === latest.serialized) return
         if (state.unloadFlushedSerialized === latest.serialized) return
         state.unloadFlushedSerialized = latest.serialized
-        // TODO: Add server-side session write ordering/versioning so an older
-        // in-flight normal save cannot overwrite this newer unload keepalive flush.
-        persistWorkspaceSessionStateOnUnload(latest.session)
+        const writer = sessionWriterRef.current
+        if (!writer.id) return
+        writer.sequence += 1
+        persistWorkspaceSessionStateOnUnload(latest.session, writer.id, writer.sequence)
       } catch (err) {
         sessionLog.warn('unload save blocked', { err })
       }

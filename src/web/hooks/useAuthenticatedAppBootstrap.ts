@@ -122,7 +122,11 @@ async function restoreBootSession(
       signal,
     )
     if (signal.aborted) throw abortReason(signal)
-    useReposStore.setState({ sessionPersistenceReady: true, sessionRestoreError: null })
+    useReposStore.setState({
+      sessionPersistenceReady: true,
+      sessionRestoreError: null,
+      sessionWriterId: restored.sessionWriterId,
+    })
     return { status: 'completed' }
   } catch (err) {
     if (signal.reason === AUTHENTICATED_WORKSPACE_RESTORE_CANCELLED && isAbortReason(err, signal)) {
@@ -166,6 +170,7 @@ function blockSessionPersistenceAfterRestoreFailure(message: string): void {
     workspaceMembershipReady: true,
     sessionPersistenceReady: false,
     sessionRestoreError: message,
+    sessionWriterId: null,
   })
 }
 

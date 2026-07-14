@@ -10,6 +10,7 @@ import type {
   LanInfo,
   RepoSettingsState,
   RepoWorkspaceTabsRestoreResult,
+  RepoWorkspaceTabsRestoreIntent,
   RuntimeRecentReposState,
   WorkspaceSessionState,
   WorkspaceSessionRestoreResult,
@@ -153,12 +154,13 @@ export async function setRecentWorkspaceExternalApp(input: {
 
 export async function saveSession(
   session: WorkspaceSessionState,
+  writer: { clientId: string; sessionWriterId: string; sessionWriterSequence: number },
   options?: { keepalive?: boolean },
 ): Promise<WorkspaceSessionState> {
   const result = await postServerJson<
-    { session: WorkspaceSessionState },
-    { ok: boolean; session: WorkspaceSessionState }
-  >('/api/settings/session', { session }, { keepalive: options?.keepalive })
+    { clientId: string; sessionWriterId: string; sessionWriterSequence: number; session: WorkspaceSessionState },
+    { ok: boolean; accepted: boolean; session: WorkspaceSessionState }
+  >('/api/settings/session', { ...writer, session }, { keepalive: options?.keepalive })
   return result.session
 }
 
@@ -180,11 +182,12 @@ export async function restoreRepoWorkspaceTabs(
   clientId: string,
   repoRoot: string,
   repoRuntimeId: string,
+  intent: RepoWorkspaceTabsRestoreIntent,
   options?: { signal?: AbortSignal },
 ): Promise<RepoWorkspaceTabsRestoreResult> {
   return await postServerJson(
     '/api/settings/session/restore-repo-tabs',
-    { clientId, repoRoot, repoRuntimeId },
+    { clientId, repoRoot, repoRuntimeId, intent },
     { signal: options?.signal },
   )
 }

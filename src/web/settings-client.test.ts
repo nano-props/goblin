@@ -173,6 +173,32 @@ describe('settings-client', () => {
     })
   })
 
+  test('posts session writer ordering metadata when saving a session', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const session = defaultWorkspaceSessionState()
+    const fetchMock = mockFetch(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, accepted: true, session }),
+    }))
+
+    const { saveSession } = await import('#/web/settings-client.ts')
+    await expect(
+      saveSession(session, {
+        clientId: 'client_test000000000000',
+        sessionWriterId: 'session_writer_test',
+        sessionWriterSequence: 3,
+      }),
+    ).resolves.toEqual(session)
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(String(init.body))).toEqual({
+      clientId: 'client_test000000000000',
+      sessionWriterId: 'session_writer_test',
+      sessionWriterSequence: 3,
+      session,
+    })
+  })
+
   test('posts repo root and runtime id when lazily restoring repo tabs', async () => {
     installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
     const restored = {
@@ -198,8 +224,13 @@ describe('settings-client', () => {
     }))
 
     const { restoreRepoWorkspaceTabs } = await import('#/web/settings-client.ts')
+    const intent = {
+      entry: { kind: 'local' as const, id: '/tmp/routed-repo' },
+      workspacePaneTabsByTarget: {},
+      preferredWorkspacePaneTabByTarget: {},
+    }
     await expect(
-      restoreRepoWorkspaceTabs('client_test000000000000', '/tmp/routed-repo', 'repo_runtime_test'),
+      restoreRepoWorkspaceTabs('client_test000000000000', '/tmp/routed-repo', 'repo_runtime_test', intent),
     ).resolves.toEqual(restored)
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
@@ -207,6 +238,7 @@ describe('settings-client', () => {
       clientId: 'client_test000000000000',
       repoRoot: '/tmp/routed-repo',
       repoRuntimeId: 'repo_runtime_test',
+      intent,
     })
   })
 

@@ -31,17 +31,30 @@ import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 
 const persistWorkspaceSessionStateMock = vi.fn(async (_session: unknown) => {})
 const persistWorkspaceSessionStateOnUnloadMock = vi.fn((_session: unknown) => {})
+const sessionWriteMetadataMock = vi.fn((_sessionWriterId: string, _sessionWriterSequence: number) => {})
+const unloadSessionWriteMetadataMock = vi.fn((_sessionWriterId: string, _sessionWriterSequence: number) => {})
 
 vi.mock('#/web/settings-actions.ts', () => ({
-  persistWorkspaceSessionState: (session: unknown) => persistWorkspaceSessionStateMock(session),
-  persistWorkspaceSessionStateOnUnload: (session: unknown) => persistWorkspaceSessionStateOnUnloadMock(session),
+  persistWorkspaceSessionState: (session: unknown, sessionWriterId: string, sessionWriterSequence: number) =>
+    (sessionWriteMetadataMock(sessionWriterId, sessionWriterSequence), persistWorkspaceSessionStateMock(session)),
+  persistWorkspaceSessionStateOnUnload: (
+    session: unknown,
+    sessionWriterId: string,
+    sessionWriterSequence: number,
+  ) => {
+    unloadSessionWriteMetadataMock(sessionWriterId, sessionWriterSequence)
+    persistWorkspaceSessionStateOnUnloadMock(session)
+  },
 }))
 
 beforeEach(() => {
   resetReposStore()
+  useReposStore.setState({ sessionWriterId: 'session_writer_test' })
   resetFiletreeInteractionStore()
   persistWorkspaceSessionStateMock.mockReset()
   persistWorkspaceSessionStateOnUnloadMock.mockReset()
+  sessionWriteMetadataMock.mockReset()
+  unloadSessionWriteMetadataMock.mockReset()
 })
 
 describe('useSessionPersistence', () => {
@@ -209,6 +222,8 @@ describe('useSessionPersistence', () => {
         restoredRepoId: visibleRepo.id,
       }),
     )
+    expect(sessionWriteMetadataMock).toHaveBeenCalledWith('session_writer_test', 1)
+    expect(unloadSessionWriteMetadataMock).toHaveBeenCalledWith('session_writer_test', 2)
     pendingSave.resolve()
   })
 

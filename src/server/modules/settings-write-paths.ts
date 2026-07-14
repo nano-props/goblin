@@ -4,7 +4,7 @@ import {
   clearServerRecentRepos,
   setServerFetchIntervalSec,
   setServerRepoWorkspaceExternalAppRecent,
-  setServerSessionState,
+  setServerSessionStateOrdered,
   updateUserSettings,
 } from '#/server/modules/settings-source.ts'
 import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
@@ -34,6 +34,9 @@ export interface SetGlobalShortcutRegisteredInput {
   registered: boolean
 }
 export interface SetSessionInput {
+  clientId: string
+  sessionWriterId: string
+  sessionWriterSequence: number
   session: WorkspaceSessionState
 }
 export interface AddRecentRepoInput {
@@ -76,9 +79,16 @@ export function handleSetGlobalShortcutRegistered(
   return { ok: true, registered }
 }
 
-export async function handleSetSession(input: SetSessionInput): Promise<{ ok: true; session: WorkspaceSessionState }> {
-  const session = await setServerSessionState(input.session)
-  return { ok: true, session }
+export async function handleSetSession(
+  input: SetSessionInput,
+): Promise<{ ok: true; accepted: boolean; session: WorkspaceSessionState }> {
+  const result = await setServerSessionStateOrdered({
+    clientId: input.clientId,
+    sessionWriterId: input.sessionWriterId,
+    sessionWriterSequence: input.sessionWriterSequence,
+    session: input.session,
+  })
+  return { ok: true, ...result }
 }
 
 export async function handleAddRecentRepo(

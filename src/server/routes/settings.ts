@@ -69,8 +69,11 @@ export function createSettingsRoutes(options: {
     return c.json(handleSetGlobalShortcutRegistered({ registered }, settingsState))
   })
   app.post('/session', async (c) => {
-    const { session } = await parseHttpBody(SETTINGS_PATCH_SCHEMAS.session, c)
-    return c.json(await handleSetSession({ session }))
+    const { clientId, sessionWriterId, sessionWriterSequence, session } = await parseHttpBody(
+      SETTINGS_PATCH_SCHEMAS.session,
+      c,
+    )
+    return c.json(await handleSetSession({ clientId, sessionWriterId, sessionWriterSequence, session }))
   })
   app.post('/session/restore', async (c) => {
     const userId = userIdFromContext(c)
@@ -89,7 +92,7 @@ export function createSettingsRoutes(options: {
   app.post('/session/restore-repo-tabs', async (c) => {
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
-    const { clientId, repoRoot, repoRuntimeId } = await parseHttpBody(
+    const { clientId, repoRoot, repoRuntimeId, intent } = await parseHttpBody(
       SETTINGS_PROCEDURE_SCHEMAS.restoreRepoTabs,
       c,
     )
@@ -99,6 +102,7 @@ export function createSettingsRoutes(options: {
         clientId,
         repoRoot,
         repoRuntimeId,
+        intent,
         workspacePaneTabsHost,
         signal: c.req.raw.signal,
       }),

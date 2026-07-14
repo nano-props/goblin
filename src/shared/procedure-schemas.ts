@@ -267,6 +267,17 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
     clientId: ClientIdSchema,
     repoRoot: RepoRootSchema,
     repoRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
+    intent: v.object({
+      entry: RepoSessionEntrySchema,
+      workspacePaneTabsByTarget: v.record(
+        v.string(),
+        v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneRuntimeTabEntrySchema])),
+      ),
+      preferredWorkspacePaneTabByTarget: v.record(
+        v.string(),
+        v.nullable(v.picklist(['status', 'changes', 'history', 'files', 'terminal'])),
+      ),
+    }),
   }),
 } as const
 
@@ -276,7 +287,12 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
 // object at the perimeter.
 export const SETTINGS_PATCH_SCHEMAS = {
   prefs: v.object({ prefs: v.record(v.string(), v.unknown()) }),
-  session: v.object({ session: WorkspaceSessionStateSchema }),
+  session: v.object({
+    clientId: ClientIdSchema,
+    sessionWriterId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
+    sessionWriterSequence: v.pipe(v.number(), v.integer(), v.minValue(1)),
+    session: WorkspaceSessionStateSchema,
+  }),
 } as const
 
 // Native host IPC procedures — Electron-only operations that bypass

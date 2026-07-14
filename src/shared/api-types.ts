@@ -163,11 +163,18 @@ export interface WorkspaceSessionRestoreResult {
   status: 'restored' | 'rebuilt'
   session: WorkspaceSessionState
   runtime: WorkspaceRuntimeRestoreSnapshot
+  sessionWriterId: string
 }
 
 export interface RepoWorkspaceTabsRestoreResult {
   repo: ProjectedRestoredWorkspaceRepoRuntime
   snapshot: WorkspacePaneTabsSnapshot | null
+}
+
+export interface RepoWorkspaceTabsRestoreIntent {
+  entry: RepoSessionEntry
+  workspacePaneTabsByTarget: Record<string, WorkspacePaneTabEntry[]>
+  preferredWorkspacePaneTabByTarget: Record<string, WorkspacePaneSessionTabType | null>
 }
 
 export interface RepoSettingsState {

@@ -52,6 +52,7 @@ const appDataClientMocks = vi.hoisted(() => ({
       filetreeViewStateByWorktreeByRepo: {},
     },
     runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
+    sessionWriterId: 'session_writer_test',
   })),
   restoreRepoWorkspaceTabs: vi.fn(async () => ({
     repo: {
@@ -132,6 +133,7 @@ describe('settings actions', () => {
       status: 'restored',
       session: defaultWorkspaceSessionState(),
       runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
+      sessionWriterId: 'session_writer_test',
     })
     appDataClientMocks.restoreRepoWorkspaceTabs.mockReset()
     appDataClientMocks.restoreRepoWorkspaceTabs.mockResolvedValue({
@@ -208,7 +210,13 @@ describe('settings actions', () => {
     appDataClientMocks.saveSession.mockResolvedValue(session)
     const { persistWorkspaceSessionState } = await import('#/web/settings-actions.ts')
 
-    await persistWorkspaceSessionState(session)
+    await persistWorkspaceSessionState(session, 'session_writer_test', 1)
+
+    expect(appDataClientMocks.saveSession).toHaveBeenCalledWith(session, {
+      clientId: expect.any(String),
+      sessionWriterId: 'session_writer_test',
+      sessionWriterSequence: 1,
+    })
 
     expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({
       session,
@@ -227,6 +235,7 @@ describe('settings actions', () => {
       status: 'rebuilt',
       session,
       runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: session.restoredRepoId },
+      sessionWriterId: 'session_writer_test',
     })
     const { restorePersistedWorkspaceSession } = await import('#/web/settings-actions.ts')
 
@@ -236,6 +245,7 @@ describe('settings actions', () => {
       status: 'rebuilt',
       session,
       runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: session.restoredRepoId },
+      sessionWriterId: 'session_writer_test',
     })
     expect(appDataClientMocks.restoreWorkspaceSession).toHaveBeenCalledWith('client_test000000000000', undefined)
     expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).toMatchObject({ session })
@@ -243,9 +253,14 @@ describe('settings actions', () => {
 
   test('restoreRepoTabsOnView delegates lazy repo tab restore to the settings client', async () => {
     const { restoreRepoTabsOnView } = await import('#/web/settings-actions.ts')
+    const intent = {
+      entry: { kind: 'local' as const, id: '/tmp/repo-a' },
+      workspacePaneTabsByTarget: {},
+      preferredWorkspacePaneTabByTarget: {},
+    }
 
     await expect(
-      restoreRepoTabsOnView('client_test000000000000', '/tmp/repo-a', 'repo_runtime_test'),
+      restoreRepoTabsOnView('client_test000000000000', '/tmp/repo-a', 'repo_runtime_test', intent),
     ).resolves.toMatchObject({
       repo: { repoRoot: '/tmp/repo-a', repoRuntimeId: 'repo_runtime_test' },
       snapshot: null,
@@ -255,6 +270,7 @@ describe('settings actions', () => {
       'client_test000000000000',
       '/tmp/repo-a',
       'repo_runtime_test',
+      intent,
       undefined,
     )
   })

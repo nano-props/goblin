@@ -164,6 +164,73 @@ test('serializes concurrent settings mutations without dropping updates', async 
   expect(existsSync(path.join(tmp, 'user-settings.json'))).toBe(true)
 })
 
+test('rejects stale session writes that arrive after a newer write from the same writer', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+
+  const mod = await import('#/server/modules/settings-source.ts')
+  const writerId = await mod.beginServerSessionWriter('client_test000000000000')
+  const newerSession = {
+    ...defaultWorkspaceSessionState(),
+    openRepoEntries: [{ kind: 'local' as const, id: '/repo-newer' }],
+    restoredRepoId: '/repo-newer',
+  }
+  const staleSession = {
+    ...defaultWorkspaceSessionState(),
+    openRepoEntries: [{ kind: 'local' as const, id: '/repo-stale' }],
+    restoredRepoId: '/repo-stale',
+  }
+
+  await expect(
+    mod.setServerSessionStateOrdered({
+      clientId: 'client_test000000000000',
+      sessionWriterId: writerId,
+      sessionWriterSequence: 2,
+      session: newerSession,
+    }),
+  ).resolves.toMatchObject({ accepted: true, session: newerSession })
+  await expect(
+    mod.setServerSessionStateOrdered({
+      clientId: 'client_test000000000000',
+      sessionWriterId: writerId,
+      sessionWriterSequence: 1,
+      session: staleSession,
+    }),
+  ).resolves.toMatchObject({ accepted: false, session: newerSession })
+  await expect(mod.getServerSessionState()).resolves.toEqual(newerSession)
+})
+
+test('a new session writer supersedes the previous writer for the same client', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+
+  const mod = await import('#/server/modules/settings-source.ts')
+  const oldWriterId = await mod.beginServerSessionWriter('client_test000000000000')
+  const newWriterId = await mod.beginServerSessionWriter('client_test000000000000')
+  const oldSession = { ...defaultWorkspaceSessionState(), zenMode: true }
+  const newSession = { ...defaultWorkspaceSessionState(), workspacePaneSize: 64 }
+
+  await expect(
+    mod.setServerSessionStateOrdered({
+      clientId: 'client_test000000000000',
+      sessionWriterId: oldWriterId,
+      sessionWriterSequence: 1,
+      session: oldSession,
+    }),
+  ).resolves.toMatchObject({ accepted: false })
+  await expect(
+    mod.setServerSessionStateOrdered({
+      clientId: 'client_test000000000000',
+      sessionWriterId: newWriterId,
+      sessionWriterSequence: 1,
+      session: newSession,
+    }),
+  ).resolves.toMatchObject({ accepted: true, session: newSession })
+  await expect(mod.getServerSessionState()).resolves.toEqual(newSession)
+})
+
 test('updates repo-level worktree bootstrap trust by repo id', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR

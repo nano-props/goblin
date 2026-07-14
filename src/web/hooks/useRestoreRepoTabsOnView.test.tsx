@@ -11,9 +11,11 @@ const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
   storeState: {
     repos: {},
+    restoredSessionBaseline: null,
     promoteRestoredWorkspaceRepo: vi.fn(),
   } as {
     repos: Record<string, ReturnType<typeof stubRepo> | undefined>
+    restoredSessionBaseline?: import('#/shared/api-types.ts').WorkspaceSessionState | null
     promoteRestoredWorkspaceRepo: ReturnType<typeof vi.fn>
   },
 }))
@@ -64,6 +66,7 @@ function stubRepo(
     id,
     repoRuntimeId,
     session: {
+      entry: { kind: 'local' as const, id },
       projectionState: options.projectionState ?? 'stub',
     },
     dataLoads: {
@@ -79,6 +82,7 @@ describe('useRestoreRepoTabsOnView', () => {
     mocks.toastError.mockReset()
     mocks.storeState = {
       repos: {},
+      restoredSessionBaseline: null,
       promoteRestoredWorkspaceRepo: mocks.promoteRestoredWorkspaceRepo,
     }
     vi.restoreAllMocks()

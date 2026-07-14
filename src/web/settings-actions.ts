@@ -7,6 +7,7 @@ import type {
   ThemeState,
   WorkspaceSessionRestoreResult,
   WorkspaceSessionState,
+  RepoWorkspaceTabsRestoreIntent,
 } from '#/shared/api-types.ts'
 import { settingsLog } from '#/web/logger.ts'
 import {
@@ -31,6 +32,7 @@ import {
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type { LangPref, ThemePref } from '#/shared/settings.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
+import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import {
   externalAppsQueryKey,
   lanInfoQueryKey,
@@ -53,8 +55,16 @@ export async function clearRecentRepoHistory(): Promise<void> {
   updateRuntimeRecentReposStateCache(primaryWindowQueryClient, { recentRepos: [] })
 }
 
-export async function persistWorkspaceSessionState(session: WorkspaceSessionState): Promise<void> {
-  const savedSession = await saveSession(session)
+export async function persistWorkspaceSessionState(
+  session: WorkspaceSessionState,
+  sessionWriterId: string,
+  sessionWriterSequence: number,
+): Promise<void> {
+  const savedSession = await saveSession(session, {
+    clientId: readOrCreateWebTerminalClientId(),
+    sessionWriterId,
+    sessionWriterSequence,
+  })
   updateRestorableWorkspaceSessionStateCache(primaryWindowQueryClient, savedSession)
 }
 
@@ -77,14 +87,22 @@ export async function restoreRepoTabsOnView(
   clientId: string,
   repoRoot: string,
   repoRuntimeId: string,
+  intent: RepoWorkspaceTabsRestoreIntent,
   options?: { signal?: AbortSignal },
 ) {
-  return await restoreRepoWorkspaceTabs(clientId, repoRoot, repoRuntimeId, options)
+  return await restoreRepoWorkspaceTabs(clientId, repoRoot, repoRuntimeId, intent, options)
 }
 
-export function persistWorkspaceSessionStateOnUnload(session: WorkspaceSessionState): void {
-  // TODO: Add server-side session write ordering/versioning for keepalive vs in-flight normal saves.
-  void saveSession(session, { keepalive: true }).catch((err) => {
+export function persistWorkspaceSessionStateOnUnload(
+  session: WorkspaceSessionState,
+  sessionWriterId: string,
+  sessionWriterSequence: number,
+): void {
+  void saveSession(
+    session,
+    { clientId: readOrCreateWebTerminalClientId(), sessionWriterId, sessionWriterSequence },
+    { keepalive: true },
+  ).catch((err) => {
     settingsLog.warn('failed to flush session during unload', { err })
   })
 }
