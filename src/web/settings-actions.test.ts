@@ -12,6 +12,11 @@ type AddRecentRepoResult = {
   addedRepo: RepoSessionEntry | null
 }
 
+type RestoreWorkspaceSessionMock = (
+  clientId: string,
+  options?: { activeRepoRoot?: string | null; signal?: AbortSignal },
+) => Promise<WorkspaceSessionRestoreResult>
+
 const appDataClientMocks = vi.hoisted(() => ({
   addRecentRepo: vi.fn<() => Promise<AddRecentRepoResult>>(async () => ({ recentRepos: [], addedRepo: null })),
   clearRecentRepos: vi.fn(async () => {}),
@@ -34,7 +39,7 @@ const appDataClientMocks = vi.hoisted(() => ({
     detectedAt: 0,
     hosts: {},
   })),
-  restoreWorkspaceSession: vi.fn<() => Promise<WorkspaceSessionRestoreResult>>(async () => ({
+  restoreWorkspaceSession: vi.fn<RestoreWorkspaceSessionMock>(async () => ({
     status: 'restored' as const,
     session: {
       openRepoEntries: [],

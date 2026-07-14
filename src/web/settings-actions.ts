@@ -60,7 +60,7 @@ export async function persistWorkspaceSessionState(session: WorkspaceSessionStat
 
 export async function restorePersistedWorkspaceSession(
   clientId: string,
-  options?: { signal?: AbortSignal },
+  options?: { activeRepoRoot?: string | null; signal?: AbortSignal },
 ): Promise<WorkspaceSessionRestoreResult> {
   const restored = await restoreWorkspaceSession(clientId, options)
   updateRestorableWorkspaceSessionStateCache(primaryWindowQueryClient, restored.session)

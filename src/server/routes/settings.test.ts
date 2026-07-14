@@ -154,7 +154,7 @@ describe('settings routes', () => {
       new Request('http://127.0.0.1:32100/session/restore', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ clientId: 'client_test000000000000' }),
+        body: JSON.stringify({ clientId: 'client_test000000000000', activeRepoRoot: '/repo-active' }),
       }),
     )
 
@@ -162,6 +162,7 @@ describe('settings routes', () => {
     expect(mocks.restoreServerWorkspaceSession).toHaveBeenCalledWith({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      activeRepoRoot: '/repo-active',
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       signal: expect.any(AbortSignal),
     })

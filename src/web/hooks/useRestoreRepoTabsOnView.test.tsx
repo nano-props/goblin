@@ -27,6 +27,14 @@ vi.mock('sonner', () => ({
   },
 }))
 
+vi.mock('#/web/stores/i18n.ts', () => ({
+  translate: (key: string, params?: Record<string, string | number>) => {
+    if (key === 'lazy-restore.failed') return 'Could not open repository'
+    if (key === 'lazy-restore.gave-up') return `giving up after ${params?.attempts ?? 'missing'} attempts`
+    return key
+  },
+}))
+
 vi.mock('#/web/stores/repos/store.ts', async (importActual) => {
   const actual = await importActual<typeof import('#/web/stores/repos/store.ts')>()
   return {
@@ -196,6 +204,10 @@ describe('useRestoreRepoTabsOnView', () => {
     await new Promise((resolve) => setTimeout(resolve, 20))
     expect(mocks.restoreRepoTabsOnView).toHaveBeenCalledTimes(3)
     expect(mocks.toastError).toHaveBeenCalledTimes(3)
+    expect(mocks.toastError).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.objectContaining({ description: 'boom — giving up after 3 attempts' }),
+    )
     finalHost.unmount()
   })
 

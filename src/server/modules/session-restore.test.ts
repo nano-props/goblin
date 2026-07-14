@@ -536,6 +536,79 @@ describe('restoreServerWorkspaceSession — active-only restore', () => {
     expect(result.runtime.workspacePaneTabs).toEqual([])
   })
 
+  test('uses activeRepoRoot instead of restoredRepoId to choose the eager restore repo', async () => {
+    const session: WorkspaceSessionState = {
+      ...defaultWorkspaceSessionState(),
+      openRepoEntries: [
+        { kind: 'local', id: '/repo-a' },
+        { kind: 'local', id: '/repo-b' },
+      ],
+      restoredRepoId: '/repo-a',
+    }
+    mocks.getServerSessionState.mockResolvedValue(session)
+    const workspacePaneTabsHost = {
+      listWorkspaceTabs: vi.fn(),
+      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
+      updateTabs: vi.fn(),
+    }
+
+    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreServerWorkspaceSession({
+      userId: 'user-test',
+      clientId: 'client_test000000000000',
+      activeRepoRoot: '/repo-b',
+      workspacePaneTabsHost,
+    })
+
+    expect(mocks.probeRepo).toHaveBeenCalledTimes(1)
+    expect(mocks.probeRepo).toHaveBeenCalledWith('/repo-b')
+    expect(result.runtime.repos.find((r) => r.repoRoot === '/repo-a')?.projection).toBeNull()
+    expect(result.runtime.repos.find((r) => r.repoRoot === '/repo-b')?.projection).not.toBeNull()
+  })
+
+  test('non-active remote repos use their display name without opening remote lifecycle', async () => {
+    const remoteEntry = {
+      kind: 'remote' as const,
+      id: 'ssh-config://prod/srv/repo',
+      ref: {
+        id: 'ssh-config://prod/srv/repo',
+        alias: 'prod',
+        remotePath: '/srv/repo',
+        displayName: 'prod:repo',
+      },
+    }
+    const session: WorkspaceSessionState = {
+      ...defaultWorkspaceSessionState(),
+      openRepoEntries: [
+        { kind: 'local', id: '/repo-active' },
+        remoteEntry,
+      ],
+      restoredRepoId: '/repo-active',
+    }
+    mocks.getServerSessionState.mockResolvedValue(session)
+    const workspacePaneTabsHost = {
+      listWorkspaceTabs: vi.fn(),
+      replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
+      updateTabs: vi.fn(),
+    }
+
+    const { restoreServerWorkspaceSession } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreServerWorkspaceSession({
+      userId: 'user-test',
+      clientId: 'client_test000000000000',
+      workspacePaneTabsHost,
+    })
+
+    const remoteStub = result.runtime.repos.find((r) => r.repoRoot === remoteEntry.id)!
+    expect(remoteStub).toMatchObject({
+      entry: remoteEntry,
+      repoRoot: remoteEntry.id,
+      name: 'prod:repo',
+      projection: null,
+    })
+    expect(mocks.runRemoteLifecycleWrite).not.toHaveBeenCalled()
+  })
+
   test('non-active repos with stale tabs are ignored during validation', async () => {
     const staleTargetKey = workspacePaneTabsTargetIdentityKey({
       repoRoot: '/repo-stub',

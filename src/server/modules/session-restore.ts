@@ -1,7 +1,7 @@
 import PQueue from 'p-queue'
 import { defaultWorkspaceSessionState } from '#/shared/settings-defaults.ts'
 import { IpcError, type RepoRuntimeProjection, type RestoredWorkspaceRepoRuntime, type WorkspaceRuntimeRestoreSnapshot, type WorkspaceSessionState } from '#/shared/api-types.ts'
-import { isRemoteRepoId, repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
+import { repoSessionEntryId, type RemoteRepoSessionEntry, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 import {
   isWorkspacePaneStaticTabType,
   type WorkspacePaneSessionTabType,
@@ -184,7 +184,7 @@ async function openSessionRepo(
   options: { active: boolean },
 ): Promise<OpenSessionRepoResult> {
   input.signal?.throwIfAborted()
-  if (isRemoteRepoId(entry.id)) return await openRemoteSessionRepo(input, entry, options)
+  if (entry.kind === 'remote') return await openRemoteSessionRepo(input, entry, options)
   if (!options.active) {
     // Stub path: lease only. No `probeRepo`, no `readRepoProjection`, no
     // git I/O. The lease is keyed on `entry.id` (= repoRoot) and is reused
@@ -230,7 +230,7 @@ async function openSessionRepo(
 
 async function openRemoteSessionRepo(
   input: RestoreServerWorkspaceSessionInput,
-  entry: RepoSessionEntry,
+  entry: RemoteRepoSessionEntry,
   options: { active: boolean },
 ): Promise<OpenSessionRepoResult> {
   const lease = acquireRepoRuntimeLease(input.userId, entry.id, input.clientId)
@@ -242,7 +242,7 @@ async function openRemoteSessionRepo(
         entry,
         repoRoot: entry.id,
         repoRuntimeId: lease.repoRuntimeId,
-        name: lastPathSegment(entry.id),
+        name: entry.ref.displayName,
         projection: null,
         lease,
       },

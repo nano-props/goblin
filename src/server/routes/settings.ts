@@ -75,8 +75,16 @@ export function createSettingsRoutes(options: {
   app.post('/session/restore', async (c) => {
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
-    const { clientId } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.sessionRestore, c)
-    return c.json(await restoreServerWorkspaceSession({ userId, clientId, workspacePaneTabsHost, signal: c.req.raw.signal }))
+    const { clientId, activeRepoRoot } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.sessionRestore, c)
+    return c.json(
+      await restoreServerWorkspaceSession({
+        userId,
+        clientId,
+        activeRepoRoot: activeRepoRoot ?? null,
+        workspacePaneTabsHost,
+        signal: c.req.raw.signal,
+      }),
+    )
   })
   app.post('/session/restore-repo-tabs', async (c) => {
     const userId = userIdFromContext(c)

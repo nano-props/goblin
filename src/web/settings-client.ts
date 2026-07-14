@@ -165,9 +165,16 @@ export async function saveSession(
 
 export async function restoreWorkspaceSession(
   clientId: string,
-  options?: { signal?: AbortSignal },
+  options?: { activeRepoRoot?: string | null; signal?: AbortSignal },
 ): Promise<WorkspaceSessionRestoreResult> {
-  return await postServerJson('/api/settings/session/restore', { clientId }, { signal: options?.signal })
+  return await postServerJson(
+    '/api/settings/session/restore',
+    {
+      clientId,
+      ...(options && 'activeRepoRoot' in options ? { activeRepoRoot: options.activeRepoRoot } : {}),
+    },
+    { signal: options?.signal },
+  )
 }
 
 export interface RepoWorkspaceTabsRestore {

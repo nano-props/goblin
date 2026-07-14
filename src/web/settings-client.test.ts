@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { defaultWorkspaceSessionState } from '#/shared/settings-defaults.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
@@ -142,6 +143,34 @@ describe('settings-client', () => {
     controller.abort(new Error('cancelled'))
     expect(requestSignal?.aborted).toBe(true)
     await assertion
+  })
+
+  test('posts the active repo root when restoring the workspace session', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const session = defaultWorkspaceSessionState()
+    const fetchMock = mockFetch(async () => ({
+      ok: true,
+      json: async () => ({
+        status: 'restored',
+        session,
+        runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
+      }),
+    }))
+
+    const { restoreWorkspaceSession } = await import('#/web/settings-client.ts')
+    await expect(
+      restoreWorkspaceSession('client_test000000000000', { activeRepoRoot: '/tmp/routed-repo' }),
+    ).resolves.toEqual({
+      status: 'restored',
+      session,
+      runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
+    })
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(String(init.body))).toEqual({
+      clientId: 'client_test000000000000',
+      activeRepoRoot: '/tmp/routed-repo',
+    })
   })
 
   test('sets the global shortcut through the native bridge even when the embedded server is available', async () => {

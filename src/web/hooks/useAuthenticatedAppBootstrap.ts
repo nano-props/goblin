@@ -31,13 +31,14 @@ interface AuthenticatedWorkspaceRestoreRun {
 
 type WorkspaceRestoreOutcome = { status: 'completed' } | { status: 'cancelled' }
 
-export function useAuthenticatedAppBootstrap(): AuthenticatedAppBootstrapState {
+export function useAuthenticatedAppBootstrap(options?: { activeRepoRoot?: string | null }): AuthenticatedAppBootstrapState {
+  const activeRepoRootRef = useRef(options?.activeRepoRoot ?? null)
   const restoreRunRef = useRef<AuthenticatedWorkspaceRestoreRun | null>(null)
   const [state, setState] = useState<AuthenticatedAppBootstrapState>(RESTORING_WORKSPACE_BOOTSTRAP_STATE)
 
   useEffect(() => {
     if (restoreRunRef.current) return
-    const run = startAuthenticatedWorkspaceRestoreRun(() => setState(READY_BOOTSTRAP_STATE))
+    const run = startAuthenticatedWorkspaceRestoreRun(() => setState(READY_BOOTSTRAP_STATE), activeRepoRootRef.current)
     restoreRunRef.current = run
     return () => {
       run.cancel()
@@ -48,7 +49,10 @@ export function useAuthenticatedAppBootstrap(): AuthenticatedAppBootstrapState {
   return state
 }
 
-function startAuthenticatedWorkspaceRestoreRun(onReady: () => void): AuthenticatedWorkspaceRestoreRun {
+function startAuthenticatedWorkspaceRestoreRun(
+  onReady: () => void,
+  activeRepoRoot: string | null,
+): AuthenticatedWorkspaceRestoreRun {
   let cancelled = false
   const timeout = createTimeoutAbortController(
     AUTHENTICATED_WORKSPACE_RESTORE_TIMEOUT_MS,
@@ -62,7 +66,7 @@ function startAuthenticatedWorkspaceRestoreRun(onReady: () => void): Authenticat
     if (!timeout.signal.aborted) bootstrapLog.warn('external apps priming failed', { err })
   })
   void hydrateNonCriticalAuthenticatedState(settingsSnapshot, timeout.signal)
-  void restoreBootSession(settingsSnapshot, timeout.signal).then((outcome) => {
+  void restoreBootSession(settingsSnapshot, timeout.signal, activeRepoRoot).then((outcome) => {
     timeout.dispose()
     if (!cancelled && outcome.status === 'completed') onReady()
   })
@@ -95,6 +99,7 @@ async function hydrateNonCriticalAuthenticatedState(
 async function restoreBootSession(
   settingsSnapshot: Promise<SettingsSnapshot>,
   signal: AbortSignal,
+  activeRepoRoot: string | null,
 ): Promise<WorkspaceRestoreOutcome> {
   try {
     useReposStore.setState({ sessionPersistenceReady: false, sessionRestoreError: null })
@@ -102,7 +107,7 @@ async function restoreBootSession(
     primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), snapshot)
     if (signal.aborted) throw abortReason(signal)
     const restored = await abortable(
-      restorePersistedWorkspaceSession(readOrCreateWebTerminalClientId(), { signal }),
+      restorePersistedWorkspaceSession(readOrCreateWebTerminalClientId(), { activeRepoRoot, signal }),
       signal,
     )
     if (restored.status === 'rebuilt') bootstrapLog.warn('invalid persisted session rebuilt by server')

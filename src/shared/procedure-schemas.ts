@@ -257,7 +257,10 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
     itemId: v.pipe(v.string(), v.minLength(1), v.maxLength(64)),
   }),
   githubCli: GITHUB_CLI_REFRESH_SCHEMA,
-  sessionRestore: v.object({ clientId: ClientIdSchema }),
+  sessionRestore: v.object({
+    clientId: ClientIdSchema,
+    activeRepoRoot: v.optional(v.nullable(RepoRootSchema)),
+  }),
   // Lazy per-repo restore endpoint — fires when the user navigates to a
   // non-active repo that was hydrated as a stub at cold start.
   restoreRepoTabs: v.object({

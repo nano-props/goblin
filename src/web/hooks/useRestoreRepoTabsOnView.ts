@@ -108,7 +108,7 @@ function recordLazyRestoreFailure(repoRoot: string, message: string): void {
   toast.error(translate('lazy-restore.failed'), {
     id: `lazy-restore:${repoRoot}`,
     description: attempts >= MAX_LAZY_RESTORE_ATTEMPTS
-      ? `${message} — ${translate('lazy-restore.gave-up')}`
+      ? `${message} — ${translate('lazy-restore.gave-up', { attempts })}`
       : message,
   })
 }

@@ -138,6 +138,20 @@ describe('app bootstrap hooks', () => {
     expect(state.sessionPersistenceReady).toBe(true)
   })
 
+  test('passes the routed repo root to server workspace restore', async () => {
+    renderInJsdom(<Harness activeRepoRoot="/tmp/routed-repo" />)
+
+    await vi.waitFor(() => {
+      expect(mockedRestorePersistedWorkspaceSession).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          activeRepoRoot: '/tmp/routed-repo',
+          signal: expect.any(AbortSignal),
+        }),
+      )
+    })
+  })
+
   test('restores the boot session when non-critical authenticated hydrates fail', async () => {
     const session = {
       openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
@@ -433,8 +447,8 @@ describe('app bootstrap hooks', () => {
   })
 })
 
-function Harness() {
-  useAuthenticatedAppBootstrap()
+function Harness({ activeRepoRoot = null }: { activeRepoRoot?: string | null }) {
+  useAuthenticatedAppBootstrap({ activeRepoRoot })
   return null
 }
 
