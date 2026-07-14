@@ -125,17 +125,32 @@ export interface RepoRuntimeMembershipReconcileResult {
   runtimes: RepoRuntimeEntry[]
 }
 
-export interface RestoredWorkspaceRepoRuntime {
+interface RestoredWorkspaceRepoRuntimeBase {
   entry: RepoSessionEntry
   repoRoot: string
   repoRuntimeId: string
   name: string
   target?: RemoteRepoTarget
-  // `null` means the repo is a stub lease only — no git probe, no projection
-  // read happened at restore time. Non-active repos carry `null` so cold
-  // start avoids per-repo git I/O. The projection is filled in lazily when
-  // the user navigates to the repo via `useRestoreRepoTabsOnView`.
-  projection: RepoRuntimeProjection | null
+}
+
+export interface ProjectedRestoredWorkspaceRepoRuntime extends RestoredWorkspaceRepoRuntimeBase {
+  projection: RepoRuntimeProjection
+}
+
+export interface StubRestoredWorkspaceRepoRuntime extends RestoredWorkspaceRepoRuntimeBase {
+  // Stub leases do not run git probe/projection at cold start. They are
+  // restored lazily when the user navigates to the repo.
+  projection: null
+}
+
+export type RestoredWorkspaceRepoRuntime =
+  | ProjectedRestoredWorkspaceRepoRuntime
+  | StubRestoredWorkspaceRepoRuntime
+
+export function isProjectedRestoredWorkspaceRepo(
+  repo: RestoredWorkspaceRepoRuntime,
+): repo is ProjectedRestoredWorkspaceRepoRuntime {
+  return repo.projection !== null
 }
 
 export interface WorkspaceRuntimeRestoreSnapshot {

@@ -1,4 +1,8 @@
-import type { RestoredWorkspaceRepoRuntime, WorkspaceRuntimeRestoreSnapshot } from '#/shared/api-types.ts'
+import {
+  isProjectedRestoredWorkspaceRepo,
+  type RestoredWorkspaceRepoRuntime,
+  type WorkspaceRuntimeRestoreSnapshot,
+} from '#/shared/api-types.ts'
 import type { RepoSessionHydrationOptions, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
 import {
   addResolvedRepo,
@@ -50,7 +54,7 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
           // refresh — that's the entire point of the active-only restore. The
           // lazy `useRestoreRepoTabsOnView` hook fires the first refresh when
           // the user navigates to a stub repo.
-          if (repo && restoredRepo.projection !== null) {
+          if (repo && isProjectedRestoredWorkspaceRepo(restoredRepo)) {
             initialRefreshes.push({ id: repo.id, repoRuntimeId: repo.repoRuntimeId })
           }
           const nextRestoredRepoId = restoredRepoIdAfterWorkspaceHydration(
