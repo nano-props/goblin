@@ -50,7 +50,6 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
   const filetreeInteractionByScope = useFiletreeInteractionStore((s) => s.interactionByScope)
   const lastImmediateKeyRef = useRef<string | null>(null)
   const lastRoutedRepoIdRef = useRef<string | null>(null)
-  const lastSavedRef = useRef<string | null>(null)
   const debounceTimerRef = useRef<number | null>(null)
 
   const latestClientWorkspace = useEffectEvent(() =>
@@ -79,10 +78,7 @@ export function useClientWorkspacePersistence({ routedRepoId }: { routedRepoId: 
     }
     const workspace = latestClientWorkspace()
     if (!workspace) return
-    const serialized = JSON.stringify(workspace)
-    if (serialized === lastSavedRef.current) return
     await writeClientWorkspaceState(workspace)
-    lastSavedRef.current = serialized
   })
 
   const flushClientWorkspaceInBackground = useEffectEvent(() => {

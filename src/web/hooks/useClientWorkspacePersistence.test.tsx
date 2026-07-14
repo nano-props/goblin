@@ -211,6 +211,44 @@ describe('useClientWorkspacePersistence', () => {
 
     expect(writePresentationMock).toHaveBeenCalledOnce()
   })
+
+  test('persists A-B-A transitions while the B write is still pending', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: '/tmp/repo',
+      branches: [createRepoBranch('feature/a', { worktree: { path: '/tmp/a' } })],
+      currentBranchName: 'feature/a',
+    })
+    useReposStore.setState({
+      repos: { [repo.id]: repo },
+      order: [repo.id],
+      restoredRepoId: repo.id,
+      zenMode: false,
+      workspaceMembershipReady: true,
+      sessionPersistenceReady: true,
+    })
+    let resolveFirstWrite!: () => void
+    writePresentationMock
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            resolveFirstWrite = resolve
+          }),
+      )
+      .mockImplementation(() => new Promise<void>(() => {}))
+
+    renderInJsdom(<Harness routedRepoId={repo.id} />)
+    expect(writePresentationMock).toHaveBeenCalledOnce()
+    await act(async () => {
+      resolveFirstWrite()
+      await Promise.resolve()
+    })
+
+    act(() => useReposStore.setState({ zenMode: true }))
+    act(() => useReposStore.setState({ zenMode: false }))
+
+    expect(writePresentationMock).toHaveBeenCalledTimes(3)
+    expect(writePresentationMock.mock.calls.map(([state]) => state.zenMode)).toEqual([false, true, false])
+  })
 })
 
 function Harness({ routedRepoId = null }: { routedRepoId?: string | null }) {
