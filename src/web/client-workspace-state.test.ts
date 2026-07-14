@@ -21,6 +21,13 @@ describe('client workspace persistence', () => {
     await expect(readClientWorkspaceState()).rejects.toBe(readError)
   })
 
+  test('uses defaults only for an explicit native missing result', async () => {
+    vi.spyOn(nativeBridge, 'readNativeBridge').mockReturnValue({} as Window['goblinNative'])
+    vi.spyOn(nativeHostClient, 'invokeNativeIpcPath').mockResolvedValue({ kind: 'missing' })
+
+    await expect(readClientWorkspaceState()).resolves.toEqual(normalizeClientWorkspaceState(null))
+  })
+
   test('preserves four open repos in picker order across a local reload', async () => {
     const openRepoEntries = ['/repo-a', '/repo-b', '/repo-c', '/repo-d'].map((id) => ({
       kind: 'local' as const,

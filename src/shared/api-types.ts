@@ -98,6 +98,8 @@ export interface ClientWorkspaceState {
   filetreeViewStateByWorktreeByRepo: Record<string, Record<string, FiletreeSessionViewState>>
 }
 
+export type NativeClientWorkspaceReadResult = { kind: 'missing' } | { kind: 'loaded'; state: unknown }
+
 /** Boot-only client composition. This type is never accepted by a server write endpoint. */
 export interface WorkspaceSessionState extends ServerWorkspaceState, ClientWorkspaceState {}
 
@@ -499,7 +501,7 @@ export interface AppIpcHandlers {
 
 export interface NativeHostIpcHandlers {
   clientWorkspace: {
-    read: () => Promise<unknown | null>
+    read: () => Promise<NativeClientWorkspaceReadResult>
     write: (input: ClientWorkspaceState) => Promise<void>
   }
   settings: {

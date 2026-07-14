@@ -2,7 +2,7 @@ import { app } from 'electron'
 import { mkdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import writeFileAtomic from 'write-file-atomic'
-import type { ClientWorkspaceState } from '#/shared/api-types.ts'
+import type { ClientWorkspaceState, NativeClientWorkspaceReadResult } from '#/shared/api-types.ts'
 import { windowStateNodeLog } from '#/node/logger.ts'
 
 const CLIENT_WORKSPACE_FILE = 'client-workspace.json'
@@ -12,14 +12,13 @@ function clientWorkspaceFile(): string {
   return path.join(app.getPath('userData'), CLIENT_WORKSPACE_FILE)
 }
 
-export async function readNativeClientWorkspaceState(): Promise<unknown | null> {
+export async function readNativeClientWorkspaceState(): Promise<NativeClientWorkspaceReadResult> {
   try {
-    return JSON.parse(await readFile(clientWorkspaceFile(), 'utf-8'))
+    return { kind: 'loaded', state: JSON.parse(await readFile(clientWorkspaceFile(), 'utf-8')) }
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
-      windowStateNodeLog.warn({ err }, 'failed to read client workspace state')
-    }
-    return null
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { kind: 'missing' }
+    windowStateNodeLog.warn({ err }, 'failed to read client workspace state')
+    throw err
   }
 }
 

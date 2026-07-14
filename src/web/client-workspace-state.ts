@@ -1,4 +1,8 @@
-import type { ClientWorkspaceState, FiletreeSessionViewState } from '#/shared/api-types.ts'
+import type {
+  ClientWorkspaceState,
+  FiletreeSessionViewState,
+  NativeClientWorkspaceReadResult,
+} from '#/shared/api-types.ts'
 import { toSafeRepoLocator, toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
 import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { defaultClientWorkspaceState } from '#/shared/settings-defaults.ts'
@@ -15,7 +19,10 @@ export async function readClientWorkspaceState(): Promise<ClientWorkspaceState> 
   if (readNativeBridge()) {
     // A native read failure must block boot persistence. Returning an empty
     // workspace here would allow a transient IPC error to overwrite good data.
-    return normalizeClientWorkspaceState(await invokeNativeIpcPath('clientWorkspace.read', undefined))
+    const result = await invokeNativeIpcPath<NativeClientWorkspaceReadResult>('clientWorkspace.read', undefined)
+    if (result.kind === 'missing') return defaultClientWorkspaceState()
+    if (result.kind === 'loaded') return normalizeClientWorkspaceState(result.state)
+    throw new Error('Invalid native client workspace read result')
   }
   try {
     const raw = globalThis.localStorage?.getItem(CLIENT_WORKSPACE_STORAGE_KEY)
