@@ -23,15 +23,16 @@ The primary window boot path has two separate concerns: public shell hydration a
    - Cleanup cancellation is not a restore failure. Timeouts and actual restore errors are failures and must leave enough state for the UI to render without opening persistence.
 
 4. Workspace membership restore
-   - Owner: `hydrateRepoSession` in the repos store.
+   - Owner: server `restoreServerWorkspace` and client `hydrateRestoredWorkspaceRuntime`.
+   - The server validates repo identity, eagerly projects the routed repo, and returns other or temporarily unavailable repos as stub leases.
    - Produces the restored repo membership and placeholder repos. `workspaceMembershipReady` means membership has settled; repo content may still be loading.
    - If the restore signal is aborted, this stage must return without flipping `workspaceMembershipReady`.
 
-5. Server-owned workspace tab restore
-   - Owner: `restoreServerWorkspacePaneTabsFromSession`.
-   - Imports persisted workspace pane tabs into the server runtime after repo membership exists.
-   - Accepts an optional `AbortSignal`. It can skip work before commits start and report `cancelled` after commits settle; it does not currently interrupt an already-started terminal mutation.
-   - After this stage succeeds, `sessionPersistenceReady` may open.
+5. Lazy repo promotion
+   - Owner: `useRestoreRepoTabsOnView` and server `restoreRepoTabsForRepo`.
+   - When navigation reaches a stub, the server projects that repo and restores tabs from the current server-owned `ServerWorkspaceState`.
+   - The client sends only its repo entry and server-issued runtime identity; it never sends a canonical tabs snapshot back to the server.
+   - Availability failures leave the stub and membership intact so a later navigation can retry.
 
 6. Workspace shell side effects
    - Owner: `AuthenticatedWorkspaceShell` and `AuthenticatedWorkspaceSideEffects`.

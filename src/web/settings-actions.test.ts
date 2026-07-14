@@ -228,13 +228,10 @@ describe('settings actions', () => {
 
   test('restoreRepoTabsOnView delegates lazy repo tab restore to the settings client', async () => {
     const { restoreRepoTabsOnView } = await import('#/web/settings-actions.ts')
-    const intent = {
-      entry: { kind: 'local' as const, id: '/tmp/repo-a' },
-      workspacePaneTabsByTarget: {},
-    }
+    const entry = { kind: 'local' as const, id: '/tmp/repo-a' }
 
     await expect(
-      restoreRepoTabsOnView('client_test000000000000', '/tmp/repo-a', 'repo_runtime_test', intent),
+      restoreRepoTabsOnView('client_test000000000000', '/tmp/repo-a', 'repo_runtime_test', entry),
     ).resolves.toMatchObject({
       repo: { repoRoot: '/tmp/repo-a', repoRuntimeId: 'repo_runtime_test' },
       snapshot: null,
@@ -244,7 +241,7 @@ describe('settings actions', () => {
       'client_test000000000000',
       '/tmp/repo-a',
       'repo_runtime_test',
-      intent,
+      entry,
       undefined,
     )
   })

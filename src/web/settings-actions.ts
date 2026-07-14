@@ -2,13 +2,7 @@
 // projects server-returned values into React Query.
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { settingsLog } from '#/web/logger.ts'
-import type {
-  GlobalShortcutState,
-  I18nSnapshot,
-  ThemeState,
-  WorkspaceRestoreResult,
-  RepoWorkspaceTabsRestoreIntent,
-} from '#/shared/api-types.ts'
+import type { GlobalShortcutState, I18nSnapshot, ThemeState, WorkspaceRestoreResult } from '#/shared/api-types.ts'
 import {
   addRecentRepo,
   clearRecentRepos,
@@ -70,10 +64,10 @@ export async function restoreRepoTabsOnView(
   clientId: string,
   repoRoot: string,
   repoRuntimeId: string,
-  intent: RepoWorkspaceTabsRestoreIntent,
+  entry: RepoSessionEntry,
   options?: { signal?: AbortSignal },
 ) {
-  return await restoreRepoWorkspaceTabs(clientId, repoRoot, repoRuntimeId, intent, options)
+  return await restoreRepoWorkspaceTabs(clientId, repoRoot, repoRuntimeId, entry, options)
 }
 
 export async function setFetchInterval(sec: number): Promise<number> {

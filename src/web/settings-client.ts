@@ -10,7 +10,6 @@ import type {
   LanInfo,
   RepoSettingsState,
   RepoWorkspaceTabsRestoreResult,
-  RepoWorkspaceTabsRestoreIntent,
   RuntimeRecentReposState,
   WorkspaceRestoreResult,
   UserSettings,
@@ -20,12 +19,12 @@ import type {
   ThemeState,
 } from '#/shared/api-types.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
+import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import {
   nativeSettingsProjectionStateFromSettings,
   pickNativeSettingsProjectionPatch,
 } from '#/shared/native-host-projection.ts'
 import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 
 type RecentReposUpdateResponse = { ok: boolean; addedRepo?: RepoSessionEntry | null } & RuntimeRecentReposState
 
@@ -171,12 +170,12 @@ export async function restoreRepoWorkspaceTabs(
   clientId: string,
   repoRoot: string,
   repoRuntimeId: string,
-  intent: RepoWorkspaceTabsRestoreIntent,
+  entry: RepoSessionEntry,
   options?: { signal?: AbortSignal },
 ): Promise<RepoWorkspaceTabsRestoreResult> {
   return await postServerJson(
     '/api/settings/workspace/restore-repo-tabs',
-    { clientId, repoRoot, repoRuntimeId, intent },
+    { clientId, repoRoot, repoRuntimeId, entry },
     { signal: options?.signal },
   )
 }

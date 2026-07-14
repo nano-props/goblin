@@ -195,7 +195,7 @@ describe('restoreServerWorkspace', () => {
     ])
   })
 
-  test('releases the acquired local runtime when projection restore fails before membership settles', async () => {
+  test('keeps a canonical active local repo as a stub when projection is temporarily unavailable', async () => {
     const session: WorkspaceSessionState = {
       ...defaultWorkspaceSessionState(),
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
@@ -217,16 +217,42 @@ describe('restoreServerWorkspace', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.status).toBe('repaired')
+    expect(result.status).toBe('restored')
     expect(result.workspace).toEqual(defaultServerWorkspaceState())
-    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
-      repoRoot: '/repo',
-      repoRuntimeId: 'repo-runtime-test',
-      generation: 1,
-    })
+    expect(result.openRepoEntries).toEqual(session.openRepoEntries)
+    expect(result.runtime.repos).toEqual([
+      expect.objectContaining({ repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', projection: null }),
+    ])
+    expect(mocks.releaseRepoRuntimeMembershipLease).not.toHaveBeenCalled()
   })
 
-  test('releases the acquired remote runtime when lifecycle restore fails before membership settles', async () => {
+  test('keeps a local repo declaration as a stub when its path is temporarily unavailable', async () => {
+    const entry = { kind: 'local' as const, id: '/repo' }
+    mocks.getServerWorkspaceState.mockResolvedValue(defaultServerWorkspaceState())
+    mocks.probeRepo.mockResolvedValue({ ok: false, message: 'error.path-permission-denied' })
+    const workspacePaneTabsHost = {
+      listWorkspaceTabs: vi.fn(),
+      replaceTabs: vi.fn(),
+      updateTabs: vi.fn(),
+    }
+
+    const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
+    const result = await restoreServerWorkspace({
+      userId: 'user-test',
+      clientId: 'client_test000000000000',
+      openRepoEntries: [entry],
+      workspacePaneTabsHost,
+    })
+
+    expect(result.status).toBe('restored')
+    expect(result.openRepoEntries).toEqual([entry])
+    expect(result.runtime.repos).toEqual([
+      expect.objectContaining({ entry, repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', projection: null }),
+    ])
+    expect(mocks.releaseRepoRuntimeMembershipLease).not.toHaveBeenCalled()
+  })
+
+  test('keeps an active remote repo as a stub when lifecycle is temporarily unavailable', async () => {
     const remoteEntry = {
       kind: 'remote' as const,
       id: 'ssh-config://prod/srv/repo',
@@ -241,6 +267,7 @@ describe('restoreServerWorkspace', () => {
     mocks.runRemoteLifecycleWrite.mockResolvedValue({
       kind: 'settled',
       lifecycle: { kind: 'failed', reason: 'unreachable' },
+      name: 'repo',
     })
     const workspacePaneTabsHost = {
       listWorkspaceTabs: vi.fn(),
@@ -256,13 +283,16 @@ describe('restoreServerWorkspace', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result.status).toBe('repaired')
+    expect(result.status).toBe('restored')
     expect(result.workspace).toEqual(defaultServerWorkspaceState())
-    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
+    expect(result.openRepoEntries).toEqual(session.openRepoEntries)
+    expect(result.runtime.repos).toEqual([expect.not.objectContaining({ target: expect.anything() })])
+    expect(result.runtime.repos[0]).toMatchObject({
       repoRoot: remoteEntry.id,
       repoRuntimeId: 'repo-runtime-test',
-      generation: 1,
+      projection: null,
     })
+    expect(mocks.releaseRepoRuntimeMembershipLease).not.toHaveBeenCalled()
   })
 
   test('releases opened runtimes when workspace tab commit fails unexpectedly', async () => {
@@ -738,11 +768,8 @@ describe('restoreRepoTabsForRepo', () => {
     )
   })
 
-  function restoreIntent(entry: RepoSessionEntry, session: WorkspaceSessionState = defaultWorkspaceSessionState()) {
-    return {
-      entry,
-      workspacePaneTabsByTarget: session.workspacePaneTabsByTargetByRepo[entry.id] ?? {},
-    }
+  function restoreEntry(entry: RepoSessionEntry): RepoSessionEntry {
+    return entry
   }
 
   test('probes + projects + restores tabs for a single repo', async () => {
@@ -768,7 +795,7 @@ describe('restoreRepoTabsForRepo', () => {
       clientId: 'client_test000000000000',
       repoRoot: '/repo',
       repoRuntimeId: 'repo-runtime-test',
-      intent: restoreIntent({ kind: 'local', id: '/repo' }, session),
+      entry: restoreEntry({ kind: 'local', id: '/repo' }),
       workspacePaneTabsHost,
     })
 
@@ -824,7 +851,7 @@ describe('restoreRepoTabsForRepo', () => {
       clientId: 'client_test000000000000',
       repoRoot: '/repo',
       repoRuntimeId: 'repo-runtime-test',
-      intent: restoreIntent({ kind: 'local', id: '/repo' }, session),
+      entry: restoreEntry({ kind: 'local', id: '/repo' }),
       workspacePaneTabsHost,
     })
 
@@ -855,14 +882,14 @@ describe('restoreRepoTabsForRepo', () => {
         clientId: 'client_test000000000000',
         repoRoot: '/repo',
         repoRuntimeId: 'stale-runtime',
-        intent: restoreIntent({ kind: 'local', id: '/repo' }, session),
+        entry: restoreEntry({ kind: 'local', id: '/repo' }),
         workspacePaneTabsHost,
       }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.repo-runtime-stale' })
     expect(mocks.probeRepo).not.toHaveBeenCalled()
   })
 
-  test('restores from deferred intent when the mutable saved session no longer contains the repo', async () => {
+  test('restores client-owned repo membership using current server-owned tabs', async () => {
     const session: WorkspaceSessionState = {
       ...defaultWorkspaceSessionState(),
       openRepoEntries: [{ kind: 'local', id: '/other' }],
@@ -882,11 +909,11 @@ describe('restoreRepoTabsForRepo', () => {
         clientId: 'client_test000000000000',
         repoRoot: '/repo',
         repoRuntimeId: 'repo-runtime-test',
-        intent: restoreIntent({ kind: 'local', id: '/repo' }),
+        entry: restoreEntry({ kind: 'local', id: '/repo' }),
         workspacePaneTabsHost,
       }),
     ).resolves.toMatchObject({ repo: { repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test' } })
-    expect(mocks.getServerWorkspaceState).not.toHaveBeenCalled()
+    expect(mocks.getServerWorkspaceState).toHaveBeenCalledOnce()
   })
 
   test('keeps the existing membership when lazy local projection fails', async () => {
@@ -909,7 +936,7 @@ describe('restoreRepoTabsForRepo', () => {
         clientId: 'client_test000000000000',
         repoRoot: '/repo',
         repoRuntimeId: 'repo-runtime-test',
-        intent: restoreIntent({ kind: 'local', id: '/repo' }),
+        entry: restoreEntry({ kind: 'local', id: '/repo' }),
         workspacePaneTabsHost,
       }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
@@ -946,7 +973,7 @@ describe('restoreRepoTabsForRepo', () => {
         clientId: 'client_test000000000000',
         repoRoot: remoteEntry.id,
         repoRuntimeId: 'repo-runtime-test',
-        intent: restoreIntent(remoteEntry),
+        entry: restoreEntry(remoteEntry),
         workspacePaneTabsHost,
       }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
@@ -978,7 +1005,7 @@ describe('restoreRepoTabsForRepo', () => {
         clientId: 'client_test000000000000',
         repoRoot: '/repo',
         repoRuntimeId: 'repo-runtime-test',
-        intent: restoreIntent({ kind: 'local', id: '/repo' }),
+        entry: restoreEntry({ kind: 'local', id: '/repo' }),
         workspacePaneTabsHost,
       }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.repo-runtime-stale' })

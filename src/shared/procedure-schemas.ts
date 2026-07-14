@@ -264,13 +264,7 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
     clientId: ClientIdSchema,
     repoRoot: RepoRootSchema,
     repoRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
-    intent: v.object({
-      entry: RepoSessionEntrySchema,
-      workspacePaneTabsByTarget: v.record(
-        v.string(),
-        v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneRuntimeTabEntrySchema])),
-      ),
-    }),
+    entry: RepoSessionEntrySchema,
   }),
 } as const
 

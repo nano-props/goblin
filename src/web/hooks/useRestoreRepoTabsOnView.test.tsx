@@ -131,6 +131,10 @@ describe('useRestoreRepoTabsOnView', () => {
     renderInJsdom(<Host />)
 
     await waitFor(() => expect(mocks.restoreRepoTabsOnView).toHaveBeenCalledTimes(1))
+    expect(mocks.restoreRepoTabsOnView).toHaveBeenCalledWith('test-client-id', 'repo-a', 'rta', {
+      kind: 'local',
+      id: 'repo-a',
+    })
     await waitFor(() => expect(mocks.promoteRestoredWorkspaceRepo).toHaveBeenCalledTimes(1))
   })
 
@@ -285,5 +289,4 @@ describe('useRestoreRepoTabsOnView', () => {
     hostA.unmount()
     hostB.unmount()
   })
-
 })

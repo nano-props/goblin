@@ -88,7 +88,7 @@ export function createSettingsRoutes(options: {
   app.post('/workspace/restore-repo-tabs', async (c) => {
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
-    const { clientId, repoRoot, repoRuntimeId, intent } = await parseHttpBody(
+    const { clientId, repoRoot, repoRuntimeId, entry } = await parseHttpBody(
       SETTINGS_PROCEDURE_SCHEMAS.restoreRepoTabs,
       c,
     )
@@ -98,7 +98,7 @@ export function createSettingsRoutes(options: {
         clientId,
         repoRoot,
         repoRuntimeId,
-        intent,
+        entry,
         workspacePaneTabsHost,
         signal: c.req.raw.signal,
       }),

@@ -3,14 +3,18 @@ import {
   IpcError,
   isProjectedRestoredWorkspaceRepo,
   type ProjectedRestoredWorkspaceRepoRuntime,
-  type RepoWorkspaceTabsRestoreIntent,
   type RepoWorkspaceTabsRestoreResult,
   type RepoRuntimeProjection,
   type RestoredWorkspaceRepoRuntime,
   type WorkspaceRuntimeRestoreSnapshot,
   type ServerWorkspaceState,
 } from '#/shared/api-types.ts'
-import { repoSessionEntryId, type RemoteRepoSessionEntry, type RepoSessionEntry } from '#/shared/remote-repo.ts'
+import {
+  repoSessionEntryId,
+  type RemoteRepoSessionEntry,
+  type RemoteRepoTarget,
+  type RepoSessionEntry,
+} from '#/shared/remote-repo.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import {
@@ -55,12 +59,12 @@ export interface RestoreRepoTabsInput {
   clientId: string
   repoRoot: string
   repoRuntimeId: string
-  intent: RepoWorkspaceTabsRestoreIntent
+  entry: RepoSessionEntry
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   signal?: AbortSignal
 }
 
-type OpenSessionRepoResult = { ok: true; opened: OpenedRepoSessionEntry } | { ok: false }
+type OpenSessionRepoResult = { kind: 'opened'; opened: OpenedRepoSessionEntry } | { kind: 'invalid' }
 type WorkspaceSessionValidationResult = { ok: true } | { ok: false }
 
 type OpenedRepoSessionEntry = RestoredWorkspaceRepoRuntime & {
@@ -130,7 +134,7 @@ async function restoreServerWorkspaceSnapshot(
       const result = await openSessionRepo(input, entry, {
         active: repoSessionEntryId(entry) === activeRepoRoot,
       })
-      if (!result.ok) {
+      if (result.kind === 'invalid') {
         repoRestoreFailed = true
         continue
       }
@@ -201,23 +205,19 @@ async function openSessionRepo(
   input.signal?.throwIfAborted()
   if (entry.kind === 'remote') return await openRemoteSessionRepo(input, entry, options)
   const probe = await probeRepo(entry.id)
-  if (!probe.ok || !probe.root) return { ok: false }
-  if (probe.root !== entry.id) return { ok: false }
+  if (!probe.ok || !probe.root) {
+    const lease = acquireRepoRuntimeLease(input.userId, entry.id, input.clientId)
+    return { kind: 'opened', opened: localRepoStub(entry.id, null, lease) }
+  }
+  if (probe.root !== entry.id) return { kind: 'invalid' }
   const lease = acquireRepoRuntimeLease(input.userId, probe.root, input.clientId)
   if (!options.active) {
     // Stub path: validated lease only. No projection read or pane-tab restore.
     // Persisted local entries must already be canonical; this branch refuses to
     // migrate non-canonical paths and lets the session rebuild path clean them.
     return {
-      ok: true,
-      opened: {
-        entry: { kind: 'local', id: probe.root },
-        repoRoot: probe.root,
-        repoRuntimeId: lease.repoRuntimeId,
-        name: probe.name ?? lastPathSegment(probe.root),
-        projection: null,
-        lease,
-      },
+      kind: 'opened',
+      opened: localRepoStub(probe.root, probe.name, lease),
     }
   }
   try {
@@ -227,11 +227,10 @@ async function openSessionRepo(
       mode: 'full',
     })
     if (!projection.snapshot) {
-      releaseSessionRepoRuntime(input, lease)
-      return { ok: false }
+      return { kind: 'opened', opened: localRepoStub(probe.root, probe.name, lease) }
     }
     return {
-      ok: true,
+      kind: 'opened',
       opened: {
         entry: { kind: 'local', id: probe.root },
         repoRoot: probe.root,
@@ -256,15 +255,8 @@ async function openRemoteSessionRepo(
   if (!options.active) {
     // Stub path for remote repos: still need a name but no lifecycle / projection.
     return {
-      ok: true,
-      opened: {
-        entry,
-        repoRoot: entry.id,
-        repoRuntimeId: lease.repoRuntimeId,
-        name: entry.ref.displayName,
-        projection: null,
-        lease,
-      },
+      kind: 'opened',
+      opened: remoteRepoStub(entry, entry.ref.displayName, lease),
     }
   }
   try {
@@ -278,8 +270,14 @@ async function openRemoteSessionRepo(
       input.signal,
     )
     if (lifecycle.kind !== 'settled' || lifecycle.lifecycle.kind !== 'ready') {
+      if (lifecycle.kind === 'settled') {
+        return {
+          kind: 'opened',
+          opened: remoteRepoStub(entry, lifecycle.name, lease),
+        }
+      }
       releaseSessionRepoRuntime(input, lease)
-      return { ok: false }
+      throw new Error('workspace repo runtime was superseded during restore')
     }
     const projection = await readRepoProjection(entry.id, {
       repoRuntimeId: lease.repoRuntimeId,
@@ -287,11 +285,13 @@ async function openRemoteSessionRepo(
       mode: 'full',
     })
     if (!projection.snapshot) {
-      releaseSessionRepoRuntime(input, lease)
-      return { ok: false }
+      return {
+        kind: 'opened',
+        opened: remoteRepoStub(entry, lifecycle.name, lease, lifecycle.lifecycle.target),
+      }
     }
     return {
-      ok: true,
+      kind: 'opened',
       opened: {
         entry,
         repoRoot: entry.id,
@@ -305,6 +305,38 @@ async function openRemoteSessionRepo(
   } catch (err) {
     releaseSessionRepoRuntime(input, lease)
     throw err
+  }
+}
+
+function localRepoStub(
+  repoRoot: string,
+  name: string | null | undefined,
+  lease: RepoRuntimeMembershipLeaseEntry,
+): OpenedRepoSessionEntry {
+  return {
+    entry: { kind: 'local', id: repoRoot },
+    repoRoot,
+    repoRuntimeId: lease.repoRuntimeId,
+    name: name ?? lastPathSegment(repoRoot),
+    projection: null,
+    lease,
+  }
+}
+
+function remoteRepoStub(
+  entry: RemoteRepoSessionEntry,
+  name: string,
+  lease: RepoRuntimeMembershipLeaseEntry,
+  target?: RemoteRepoTarget,
+): OpenedRepoSessionEntry {
+  return {
+    entry,
+    repoRoot: entry.id,
+    repoRuntimeId: lease.repoRuntimeId,
+    name,
+    ...(target ? { target } : {}),
+    projection: null,
+    lease,
   }
 }
 
@@ -352,17 +384,17 @@ function validateWorkspacePaneTabs(
 export async function restoreRepoTabsForRepo(input: RestoreRepoTabsInput): Promise<RepoWorkspaceTabsRestoreResult> {
   input.signal?.throwIfAborted()
   assertCurrentRepoRuntime(input)
-  const entry = input.intent.entry
+  const entry = input.entry
   if (repoSessionEntryId(entry) !== input.repoRoot) {
     throw new IpcError({ code: 'BAD_REQUEST', message: 'error.invalid-arguments' })
   }
-  const workspace = deferredRepoRestoreWorkspace(input.repoRoot, input.intent)
-
   const repo = await projectSessionRepo(input, entry)
   if (!repo) {
     throw new IpcError({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
   }
 
+  const persistedWorkspace = await getServerWorkspaceState()
+  const workspace = workspaceForRepoTabs(persistedWorkspace, input.repoRoot)
   if (!validateWorkspacePaneTabs(workspace, [repo]).ok) {
     return { repo, snapshot: null }
   }
@@ -385,9 +417,11 @@ export async function restoreRepoTabsForRepo(input: RestoreRepoTabsInput): Promi
   }
 }
 
-function deferredRepoRestoreWorkspace(repoRoot: string, intent: RepoWorkspaceTabsRestoreIntent): ServerWorkspaceState {
+function workspaceForRepoTabs(workspace: ServerWorkspaceState, repoRoot: string): ServerWorkspaceState {
   return {
-    workspacePaneTabsByTargetByRepo: { [repoRoot]: intent.workspacePaneTabsByTarget },
+    workspacePaneTabsByTargetByRepo: {
+      [repoRoot]: workspace.workspacePaneTabsByTargetByRepo[repoRoot] ?? {},
+    },
   }
 }
 

@@ -106,6 +106,9 @@ Notes:
   on the embedded server's dynamically allocated origin.
 - At boot, the client submits `openRepoEntries` once as restore intent. This is
   not an ongoing client-to-server synchronization channel.
+- Lazy repo promotion sends the client-owned repo entry but reads canonical
+  pane tabs from the server source at promotion time. Do not carry server tabs
+  in a client restore intent or baseline write-back.
 - `WorkspaceSessionState` is a boot-only client composition of those two states, never a server write payload.
 - `repoSnapshotCache` names the warm-start repo cache slice.
 - `RepoSnapshotCacheEntry` is the stored snapshot shape inside that cache.

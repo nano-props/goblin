@@ -177,11 +177,6 @@ export interface RepoWorkspaceTabsRestoreResult {
   snapshot: WorkspacePaneTabsSnapshot | null
 }
 
-export interface RepoWorkspaceTabsRestoreIntent {
-  entry: RepoSessionEntry
-  workspacePaneTabsByTarget: Record<string, WorkspacePaneTabEntry[]>
-}
-
 export interface RepoSettingsState {
   repoSettings: RepoSettingsEntry[]
 }

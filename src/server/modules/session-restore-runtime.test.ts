@@ -59,10 +59,7 @@ describe('session restore runtime ownership', () => {
         clientId: CLIENT_ID,
         repoRoot: REPO_ROOT,
         repoRuntimeId: lease.repoRuntimeId,
-        intent: {
-          entry: { kind: 'local', id: REPO_ROOT },
-          workspacePaneTabsByTarget: {},
-        },
+        entry: { kind: 'local', id: REPO_ROOT },
         workspacePaneTabsHost,
       }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
