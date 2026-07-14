@@ -1,11 +1,7 @@
 // @vitest-environment jsdom
 
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import {
-  defaultServerWorkspaceState,
-  defaultSettingsSnapshot,
-} from '#/shared/settings-defaults.ts'
-import { defaultTestWorkspaceSessionState as defaultWorkspaceSessionState } from '#/test-utils/workspace-session-state.ts'
+import { defaultServerWorkspaceState, defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { githubCliQueryKey, lanInfoQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
@@ -194,7 +190,7 @@ describe('settings actions', () => {
   test('restoreWorkspaceAtBoot returns the server-owned workspace restore result', async () => {
     primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), defaultSettingsSnapshot())
     const session = {
-      ...defaultWorkspaceSessionState(),
+      ...defaultServerWorkspaceState(),
       openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo-a' }],
       restoredRepoId: '/tmp/repo-a',
       workspacePaneSize: 333,
@@ -221,10 +217,7 @@ describe('settings actions', () => {
       },
       runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: session.restoredRepoId },
     })
-    expect(appDataClientMocks.restoreServerWorkspace).toHaveBeenCalledWith(
-      'client_test000000000000',
-      undefined,
-    )
+    expect(appDataClientMocks.restoreServerWorkspace).toHaveBeenCalledWith('client_test000000000000', undefined)
   })
 
   test('restoreRepoTabsOnView delegates lazy repo tab restore to the settings client', async () => {

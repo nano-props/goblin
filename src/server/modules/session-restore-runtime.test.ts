@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { defaultTestWorkspaceSessionState as defaultWorkspaceSessionState } from '#/test-utils/workspace-session-state.ts'
+import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import {
   acquireRepoRuntimeLease,
   clearRepoRuntimesForUser,
@@ -36,9 +36,8 @@ describe('session restore runtime ownership', () => {
   beforeEach(() => {
     clearRepoRuntimesForUser(USER_ID)
     mocks.getServerWorkspaceState.mockResolvedValue({
-      ...defaultWorkspaceSessionState(),
+      ...defaultServerWorkspaceState(),
       openRepoEntries: [{ kind: 'local', id: REPO_ROOT }],
-      restoredRepoId: REPO_ROOT,
     })
     mocks.probeRepo.mockResolvedValue({ ok: true, root: REPO_ROOT, name: 'repo' })
     mocks.readRepoProjection.mockResolvedValue({ snapshot: null })

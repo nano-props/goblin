@@ -3,10 +3,6 @@ import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ServerWorkspaceState } from '#/shared/api-types.ts'
-import {
-  defaultTestWorkspaceSessionState as defaultWorkspaceSessionState,
-  type TestWorkspaceSessionState as WorkspaceSessionState,
-} from '#/test-utils/workspace-session-state.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -42,11 +38,11 @@ vi.mock('#/server/modules/remote-lifecycle-write-paths.ts', () => ({
   runRemoteLifecycleWrite: mocks.runRemoteLifecycleWrite,
 }))
 
-function serverWorkspaceFromSession(session: WorkspaceSessionState): ServerWorkspaceState {
-  return {
-    openRepoEntries: session.openRepoEntries,
-    workspacePaneTabsByTargetByRepo: session.workspacePaneTabsByTargetByRepo,
-  }
+type TestServerWorkspaceState = ServerWorkspaceState
+const defaultTestServerWorkspaceState = defaultServerWorkspaceState
+
+function serverWorkspaceFromSession(session: ServerWorkspaceState): ServerWorkspaceState {
+  return session
 }
 
 describe('restoreServerWorkspace', () => {
@@ -87,15 +83,11 @@ describe('restoreServerWorkspace', () => {
 
   test('restores server-owned workspace tabs only after strict validation succeeds', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({ repoRoot: '/repo', branchName: 'main', worktreePath: null })
-    const session: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
+    const session: TestServerWorkspaceState = {
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      restoredRepoId: '/repo',
       workspacePaneTabsByTargetByRepo: {
         '/repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
-      },
-      preferredWorkspacePaneTabByTargetByRepo: {
-        '/repo': { [targetKey]: 'history' },
       },
     }
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
@@ -139,10 +131,9 @@ describe('restoreServerWorkspace', () => {
   })
 
   test('rebuilds instead of migrating non-canonical local session entries', async () => {
-    const session: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
+    const session: TestServerWorkspaceState = {
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [{ kind: 'local', id: '/repo/src' }],
-      restoredRepoId: '/repo/src',
     }
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     mocks.probeRepo.mockResolvedValue({ ok: true, root: '/repo', name: 'repo' })
@@ -169,10 +160,9 @@ describe('restoreServerWorkspace', () => {
 
   test('initializes the workspace tabs scope and returns its canonical snapshot', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({ repoRoot: '/repo', branchName: 'main', worktreePath: null })
-    const session: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
+    const session: TestServerWorkspaceState = {
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      restoredRepoId: '/repo',
       workspacePaneTabsByTargetByRepo: {
         '/repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
@@ -212,10 +202,9 @@ describe('restoreServerWorkspace', () => {
   })
 
   test('keeps a canonical active local repo as a stub when projection is temporarily unavailable', async () => {
-    const session: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
+    const session: TestServerWorkspaceState = {
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      restoredRepoId: '/repo',
     }
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
@@ -277,10 +266,9 @@ describe('restoreServerWorkspace', () => {
       id: 'ssh-config://prod/srv/repo',
       ref: { id: 'ssh-config://prod/srv/repo', alias: 'prod', remotePath: '/srv/repo', displayName: 'repo' },
     }
-    const session: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
+    const session: TestServerWorkspaceState = {
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [remoteEntry],
-      restoredRepoId: remoteEntry.id,
     }
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     mocks.runRemoteLifecycleWrite.mockResolvedValue({
@@ -316,10 +304,9 @@ describe('restoreServerWorkspace', () => {
 
   test('releases opened runtimes when workspace tab commit fails unexpectedly', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({ repoRoot: '/repo', branchName: 'main', worktreePath: null })
-    const session: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
+    const session: TestServerWorkspaceState = {
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      restoredRepoId: '/repo',
       workspacePaneTabsByTargetByRepo: {
         '/repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
@@ -353,10 +340,9 @@ describe('restoreServerWorkspace', () => {
 
   test('releases opened runtimes and skips tab commits when aborted after projection restore', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({ repoRoot: '/repo', branchName: 'main', worktreePath: null })
-    const session: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
+    const session: TestServerWorkspaceState = {
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      restoredRepoId: '/repo',
       workspacePaneTabsByTargetByRepo: {
         '/repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
@@ -406,10 +392,9 @@ describe('restoreServerWorkspace', () => {
       id: 'ssh-config://prod/srv/repo',
       ref: { id: 'ssh-config://prod/srv/repo', alias: 'prod', remotePath: '/srv/repo', displayName: 'repo' },
     }
-    const session: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
+    const session: TestServerWorkspaceState = {
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [remoteEntry],
-      restoredRepoId: remoteEntry.id,
     }
     const controller = new AbortController()
     const abortReason = new Error('remote restore aborted')
@@ -446,10 +431,9 @@ describe('restoreServerWorkspace', () => {
       branchName: 'missing',
       worktreePath: null,
     })
-    const session: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
+    const session: TestServerWorkspaceState = {
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      restoredRepoId: '/repo',
       workspacePaneTabsByTargetByRepo: {
         '/repo': { [targetKey]: [workspacePaneStaticTabEntry('files')] },
       },
@@ -491,20 +475,17 @@ describe('restoreServerWorkspace', () => {
       branchName: 'main',
       worktreePath: null,
     })
-    const invalidSession: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
+    const invalidSession: TestServerWorkspaceState = {
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      restoredRepoId: '/repo',
       workspacePaneTabsByTargetByRepo: {
         '/repo': { [targetKey]: [workspacePaneStaticTabEntry('files')] },
         '/other': { [otherTargetKey]: [workspacePaneStaticTabEntry('history')] },
       },
     }
-    const currentSession: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
+    const currentSession: TestServerWorkspaceState = {
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      restoredRepoId: '/repo',
-      workspacePaneSize: 333,
     }
     mocks.getServerWorkspaceState
       .mockResolvedValueOnce(serverWorkspaceFromSession(invalidSession))
@@ -570,13 +551,12 @@ describe('restoreServerWorkspace — active-only restore', () => {
   })
 
   test('non-active repos are validated stubs — no projection read, projection: null', async () => {
-    const session: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
+    const session: TestServerWorkspaceState = {
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [
         { kind: 'local', id: '/repo-active' },
         { kind: 'local', id: '/repo-stub' },
       ],
-      restoredRepoId: '/repo-active',
     }
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
@@ -618,13 +598,12 @@ describe('restoreServerWorkspace — active-only restore', () => {
   })
 
   test('uses activeRepoRoot instead of restoredRepoId to choose the eager restore repo', async () => {
-    const session: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
+    const session: TestServerWorkspaceState = {
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [
         { kind: 'local', id: '/repo-a' },
         { kind: 'local', id: '/repo-b' },
       ],
-      restoredRepoId: '/repo-a',
     }
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
@@ -651,13 +630,12 @@ describe('restoreServerWorkspace — active-only restore', () => {
   })
 
   test('rebuilds when a non-active local entry is not canonical', async () => {
-    const session: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
+    const session: TestServerWorkspaceState = {
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [
         { kind: 'local', id: '/repo-active' },
         { kind: 'local', id: '/repo-stub/src' },
       ],
-      restoredRepoId: '/repo-active',
     }
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     mocks.probeRepo.mockImplementation(async (repoRoot: string) => ({
@@ -699,10 +677,9 @@ describe('restoreServerWorkspace — active-only restore', () => {
         displayName: 'prod:repo',
       },
     }
-    const session: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
+    const session: TestServerWorkspaceState = {
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [{ kind: 'local', id: '/repo-active' }, remoteEntry],
-      restoredRepoId: '/repo-active',
     }
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
@@ -735,13 +712,12 @@ describe('restoreServerWorkspace — active-only restore', () => {
       branchName: 'feature',
       worktreePath: null,
     })
-    const session: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
+    const session: TestServerWorkspaceState = {
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [
         { kind: 'local', id: '/repo-active' },
         { kind: 'local', id: '/repo-stub' },
       ],
-      restoredRepoId: '/repo-active',
       workspacePaneTabsByTargetByRepo: {
         // Stale tab entry for the stub repo that would normally force a
         // rebuild — but plan B skips validation for stubs.
@@ -798,10 +774,9 @@ describe('restoreRepoTabsForRepo', () => {
 
   test('probes + projects + restores tabs for a single repo', async () => {
     const targetKey = workspacePaneTabsTargetIdentityKey({ repoRoot: '/repo', branchName: 'main', worktreePath: null })
-    const session: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
+    const session: TestServerWorkspaceState = {
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      restoredRepoId: '/repo',
       workspacePaneTabsByTargetByRepo: {
         '/repo': { [targetKey]: [workspacePaneStaticTabEntry('history')] },
       },
@@ -855,17 +830,11 @@ describe('restoreRepoTabsForRepo', () => {
       branchName: 'deleted-branch',
       worktreePath: null,
     })
-    const session: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
+    const session: TestServerWorkspaceState = {
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      restoredRepoId: '/repo',
-      zenMode: true,
-      workspacePaneSize: 41,
       workspacePaneTabsByTargetByRepo: {
         '/repo': { [staleTargetKey]: [workspacePaneStaticTabEntry('history')] },
-      },
-      preferredWorkspacePaneTabByTargetByRepo: {
-        '/repo': { [staleTargetKey]: 'history' },
       },
     }
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
@@ -903,10 +872,9 @@ describe('restoreRepoTabsForRepo', () => {
   })
 
   test('throws repo-runtime-stale when clientId/repoRuntimeId does not match the active lease', async () => {
-    const session: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
+    const session: TestServerWorkspaceState = {
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      restoredRepoId: '/repo',
     }
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     mocks.isCurrentRepoRuntime.mockReturnValue(false)
@@ -932,10 +900,9 @@ describe('restoreRepoTabsForRepo', () => {
   })
 
   test('restores client-owned repo membership using current server-owned tabs', async () => {
-    const session: WorkspaceSessionState = {
-      ...defaultWorkspaceSessionState(),
+    const session: TestServerWorkspaceState = {
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [{ kind: 'local', id: '/other' }],
-      restoredRepoId: '/other',
     }
     mocks.getServerWorkspaceState.mockResolvedValue(serverWorkspaceFromSession(session))
     const workspacePaneTabsHost = {
@@ -961,9 +928,8 @@ describe('restoreRepoTabsForRepo', () => {
 
   test('keeps the existing membership when lazy local projection fails', async () => {
     mocks.getServerWorkspaceState.mockResolvedValue({
-      ...defaultWorkspaceSessionState(),
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      restoredRepoId: '/repo',
     })
     mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
     const workspacePaneTabsHost = {
@@ -995,9 +961,8 @@ describe('restoreRepoTabsForRepo', () => {
       ref: { id: 'ssh-config://host/repo', alias: 'host', remotePath: '/repo', displayName: 'repo' },
     }
     mocks.getServerWorkspaceState.mockResolvedValue({
-      ...defaultWorkspaceSessionState(),
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [remoteEntry],
-      restoredRepoId: remoteEntry.id,
     })
     mocks.runRemoteLifecycleWrite.mockResolvedValue({
       kind: 'settled',
@@ -1028,9 +993,8 @@ describe('restoreRepoTabsForRepo', () => {
 
   test('rejects a projection if the membership becomes stale while reading', async () => {
     mocks.getServerWorkspaceState.mockResolvedValue({
-      ...defaultWorkspaceSessionState(),
+      ...defaultTestServerWorkspaceState(),
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
-      restoredRepoId: '/repo',
     })
     mocks.isCurrentRepoRuntime
       .mockReturnValueOnce(true)

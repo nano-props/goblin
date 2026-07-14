@@ -1,7 +1,11 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { defaultSettingsSnapshot } from '#/shared/settings-defaults.ts'
+import {
+  defaultClientWorkspaceState,
+  defaultServerWorkspaceState,
+  defaultSettingsSnapshot,
+} from '#/shared/settings-defaults.ts'
 import { flushMicrotasks, renderInJsdom } from '#/test-utils/render.tsx'
 import { useAuthenticatedAppBootstrap } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 import { usePublicAppBootstrap } from '#/web/hooks/usePublicAppBootstrap.ts'
@@ -20,11 +24,7 @@ import { useThemeStore } from '#/web/stores/theme.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
-import type { WorkspaceRuntimeRestoreSnapshot } from '#/shared/api-types.ts'
-import {
-  defaultTestWorkspaceSessionState as defaultWorkspaceSessionState,
-  type TestWorkspaceSessionState as WorkspaceSessionState,
-} from '#/test-utils/workspace-session-state.ts'
+import type { ClientWorkspaceState, ServerWorkspaceState, WorkspaceRuntimeRestoreSnapshot } from '#/shared/api-types.ts'
 import { readClientWorkspaceState } from '#/web/client-workspace-state.ts'
 
 vi.mock('#/web/settings-client.ts', async (importOriginal) => {
@@ -65,7 +65,7 @@ beforeEach(() => {
   const settings = defaultSettingsSnapshot()
   mockedGetSettingsSnapshot.mockResolvedValue(settings)
   mockedRestorePersistedWorkspaceSession.mockReset()
-  mockServerRestore(defaultWorkspaceSessionState())
+  mockServerRestore(defaultWorkspaceRestoreFixture())
 })
 
 afterEach(() => {
@@ -89,28 +89,32 @@ describe('app bootstrap hooks', () => {
 
   test('canonicalizes boot session pane state before applying it to the repos store', async () => {
     const targetKey = branchTargetKey('/tmp/repo', 'main')
-    const session = {
-      openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
-      restoredRepoId: '/tmp/repo',
-      zenMode: false,
-      workspacePaneSize: 45,
-      selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'term-222222222222222222222' },
-      preferredWorkspacePaneTabByTargetByRepo: {},
-      workspacePaneTabsByTargetByRepo: {
-        '/tmp/repo': {
-          [targetKey]: [],
-        },
-      },
-      filetreeViewStateByWorktreeByRepo: {
-        '/tmp/repo': {
-          '/tmp/worktree': {
-            selectedKeys: ['src/index.ts'],
-            expandedKeys: ['src'],
-            topVisibleRowIndex: 140,
+    const session = workspaceRestoreFixture(
+      {
+        openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
+        workspacePaneTabsByTargetByRepo: {
+          '/tmp/repo': {
+            [targetKey]: [],
           },
         },
       },
-    }
+      {
+        restoredRepoId: '/tmp/repo',
+        zenMode: false,
+        workspacePaneSize: 45,
+        selectedTerminalSessionIdByTerminalWorktree: { '/tmp/repo\0/tmp/worktree': 'term-222222222222222222222' },
+        preferredWorkspacePaneTabByTargetByRepo: {},
+        filetreeViewStateByWorktreeByRepo: {
+          '/tmp/repo': {
+            '/tmp/worktree': {
+              selectedKeys: ['src/index.ts'],
+              expandedKeys: ['src'],
+              topVisibleRowIndex: 140,
+            },
+          },
+        },
+      },
+    )
     const settings = defaultSettingsSnapshot()
     mockedGetSettingsSnapshot.mockResolvedValue(settings)
     mockServerRestore(session)
@@ -139,10 +143,13 @@ describe('app bootstrap hooks', () => {
         topVisibleRowIndex: 140,
       },
     })
-    expect(hydrateRestoredRuntime).toHaveBeenCalledWith(restoredRuntimeForSession(session), {
-      signal: expect.any(AbortSignal),
-      restoredSession: clientPresentationForSession(session),
-    })
+    expect(hydrateRestoredRuntime).toHaveBeenCalledWith(
+      restoredRuntimeForWorkspace(session.serverWorkspace, session.clientWorkspace.restoredRepoId),
+      {
+        signal: expect.any(AbortSignal),
+        restoredSession: session.clientWorkspace,
+      },
+    )
     expect(hydrateTheme).toHaveBeenCalledWith(settings)
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(1)
     expect(mockedGetExternalAppsSnapshot).toHaveBeenCalledWith({ signal: expect.any(AbortSignal) })
@@ -166,16 +173,19 @@ describe('app bootstrap hooks', () => {
   })
 
   test('restores the boot session when non-critical authenticated hydrates fail', async () => {
-    const session = {
-      openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
-      restoredRepoId: '/tmp/repo',
-      zenMode: true,
-      workspacePaneSize: 55,
-      selectedTerminalSessionIdByTerminalWorktree: {},
-      preferredWorkspacePaneTabByTargetByRepo: {},
-      workspacePaneTabsByTargetByRepo: {},
-      filetreeViewStateByWorktreeByRepo: {},
-    }
+    const session = workspaceRestoreFixture(
+      {
+        openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
+      },
+      {
+        restoredRepoId: '/tmp/repo',
+        zenMode: true,
+        workspacePaneSize: 55,
+        selectedTerminalSessionIdByTerminalWorktree: {},
+        preferredWorkspacePaneTabByTargetByRepo: {},
+        filetreeViewStateByWorktreeByRepo: {},
+      },
+    )
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
     mockServerRestore(session)
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockRejectedValue(new Error('theme unavailable'))
@@ -190,26 +200,32 @@ describe('app bootstrap hooks', () => {
       expect(hydrateRestoredRuntime).toHaveBeenCalled()
     })
 
-    expect(hydrateRestoredRuntime).toHaveBeenCalledWith(restoredRuntimeForSession(session), {
-      signal: expect.any(AbortSignal),
-      restoredSession: clientPresentationForSession(session),
-    })
+    expect(hydrateRestoredRuntime).toHaveBeenCalledWith(
+      restoredRuntimeForWorkspace(session.serverWorkspace, session.clientWorkspace.restoredRepoId),
+      {
+        signal: expect.any(AbortSignal),
+        restoredSession: session.clientWorkspace,
+      },
+    )
     expect(useReposStore.getState().workspacePaneSize).toBe(55)
     expect(useReposStore.getState().sessionPersistenceReady).toBe(true)
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(1)
   })
 
   test('blocks persistence when server session restore fails', async () => {
-    const session = {
-      openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
-      restoredRepoId: '/tmp/repo',
-      zenMode: true,
-      workspacePaneSize: 55,
-      selectedTerminalSessionIdByTerminalWorktree: {},
-      preferredWorkspacePaneTabByTargetByRepo: {},
-      workspacePaneTabsByTargetByRepo: {},
-      filetreeViewStateByWorktreeByRepo: {},
-    }
+    const session = workspaceRestoreFixture(
+      {
+        openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
+      },
+      {
+        restoredRepoId: '/tmp/repo',
+        zenMode: true,
+        workspacePaneSize: 55,
+        selectedTerminalSessionIdByTerminalWorktree: {},
+        preferredWorkspacePaneTabByTargetByRepo: {},
+        filetreeViewStateByWorktreeByRepo: {},
+      },
+    )
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
     mockedRestorePersistedWorkspaceSession.mockRejectedValue(new Error('server session restore failed'))
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
@@ -230,36 +246,38 @@ describe('app bootstrap hooks', () => {
   })
 
   test('continues with a repaired session returned by server restore', async () => {
-    const persistedSession = {
-      openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
-      restoredRepoId: '/tmp/repo',
-      zenMode: true,
-      workspacePaneSize: 55,
-      selectedTerminalSessionIdByTerminalWorktree: {},
-      preferredWorkspacePaneTabByTargetByRepo: {
-        '/tmp/repo': {
-          [branchTargetKey('/tmp/repo', 'main')]: 'files' as const,
-        },
+    const persistedSession = workspaceRestoreFixture(
+      {
+        openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
       },
-      workspacePaneTabsByTargetByRepo: {},
-      filetreeViewStateByWorktreeByRepo: {},
-    }
-    const rebuiltSession = {
-      ...persistedSession,
+      {
+        restoredRepoId: '/tmp/repo',
+        zenMode: true,
+        workspacePaneSize: 55,
+        selectedTerminalSessionIdByTerminalWorktree: {},
+        preferredWorkspacePaneTabByTargetByRepo: {
+          '/tmp/repo': {
+            [branchTargetKey('/tmp/repo', 'main')]: 'files' as const,
+          },
+        },
+        filetreeViewStateByWorktreeByRepo: {},
+      },
+    )
+    const rebuiltSession = workspaceRestoreFixture(persistedSession.serverWorkspace, {
+      ...persistedSession.clientWorkspace,
       preferredWorkspacePaneTabByTargetByRepo: {},
-      workspacePaneTabsByTargetByRepo: {},
-    }
+    })
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
     mockedRestorePersistedWorkspaceSession.mockResolvedValue({
       status: 'repaired',
-      openRepoEntries: rebuiltSession.openRepoEntries,
-      workspace: {
-        openRepoEntries: rebuiltSession.openRepoEntries,
-        workspacePaneTabsByTargetByRepo: rebuiltSession.workspacePaneTabsByTargetByRepo,
-      },
-      runtime: restoredRuntimeForSession(rebuiltSession),
+      openRepoEntries: rebuiltSession.serverWorkspace.openRepoEntries,
+      workspace: rebuiltSession.serverWorkspace,
+      runtime: restoredRuntimeForWorkspace(
+        rebuiltSession.serverWorkspace,
+        rebuiltSession.clientWorkspace.restoredRepoId,
+      ),
     })
-    mockClientPresentation(rebuiltSession)
+    mockClientPresentation(rebuiltSession.clientWorkspace)
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
@@ -272,25 +290,31 @@ describe('app bootstrap hooks', () => {
       expect(useReposStore.getState().sessionPersistenceReady).toBe(true)
     })
 
-    expect(hydrateRestoredRuntime).toHaveBeenCalledWith(restoredRuntimeForSession(rebuiltSession), {
-      signal: expect.any(AbortSignal),
-      restoredSession: clientPresentationForSession(rebuiltSession),
-    })
+    expect(hydrateRestoredRuntime).toHaveBeenCalledWith(
+      restoredRuntimeForWorkspace(rebuiltSession.serverWorkspace, rebuiltSession.clientWorkspace.restoredRepoId),
+      {
+        signal: expect.any(AbortSignal),
+        restoredSession: rebuiltSession.clientWorkspace,
+      },
+    )
     expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).not.toHaveProperty('session')
     expect(useReposStore.getState().sessionRestoreError).toBeNull()
   })
 
   test('blocks persistence when repo session hydration fails', async () => {
-    const session = {
-      openRepoEntries: [{ kind: 'local' as const, id: '/tmp/missing-repo' }],
-      restoredRepoId: '/tmp/missing-repo',
-      zenMode: true,
-      workspacePaneSize: 55,
-      selectedTerminalSessionIdByTerminalWorktree: {},
-      preferredWorkspacePaneTabByTargetByRepo: {},
-      workspacePaneTabsByTargetByRepo: {},
-      filetreeViewStateByWorktreeByRepo: {},
-    }
+    const session = workspaceRestoreFixture(
+      {
+        openRepoEntries: [{ kind: 'local' as const, id: '/tmp/missing-repo' }],
+      },
+      {
+        restoredRepoId: '/tmp/missing-repo',
+        zenMode: true,
+        workspacePaneSize: 55,
+        selectedTerminalSessionIdByTerminalWorktree: {},
+        preferredWorkspacePaneTabByTargetByRepo: {},
+        filetreeViewStateByWorktreeByRepo: {},
+      },
+    )
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
     mockServerRestore(session)
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
@@ -344,16 +368,6 @@ describe('app bootstrap hooks', () => {
 
   test('reports timeout when server session restore does not return after abort', async () => {
     vi.useFakeTimers()
-    const session = {
-      openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
-      restoredRepoId: '/tmp/repo',
-      zenMode: true,
-      workspacePaneSize: 55,
-      selectedTerminalSessionIdByTerminalWorktree: {},
-      preferredWorkspacePaneTabByTargetByRepo: {},
-      workspacePaneTabsByTargetByRepo: {},
-      filetreeViewStateByWorktreeByRepo: {},
-    }
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
@@ -373,16 +387,19 @@ describe('app bootstrap hooks', () => {
 
   test('reports timeout when repo session hydration does not return after abort', async () => {
     vi.useFakeTimers()
-    const session = {
-      openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
-      restoredRepoId: '/tmp/repo',
-      zenMode: true,
-      workspacePaneSize: 55,
-      selectedTerminalSessionIdByTerminalWorktree: {},
-      preferredWorkspacePaneTabByTargetByRepo: {},
-      workspacePaneTabsByTargetByRepo: {},
-      filetreeViewStateByWorktreeByRepo: {},
-    }
+    const session = workspaceRestoreFixture(
+      {
+        openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
+      },
+      {
+        restoredRepoId: '/tmp/repo',
+        zenMode: true,
+        workspacePaneSize: 55,
+        selectedTerminalSessionIdByTerminalWorktree: {},
+        preferredWorkspacePaneTabByTargetByRepo: {},
+        filetreeViewStateByWorktreeByRepo: {},
+      },
+    )
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
     mockServerRestore(session)
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
@@ -487,37 +504,49 @@ function PublicHarness() {
   return null
 }
 
-function mockServerRestore(session: WorkspaceSessionState): void {
-  mockedRestorePersistedWorkspaceSession.mockResolvedValue({
-    status: 'restored',
-    openRepoEntries: session.openRepoEntries,
-    workspace: {
-      openRepoEntries: session.openRepoEntries,
-      workspacePaneTabsByTargetByRepo: session.workspacePaneTabsByTargetByRepo,
-    },
-    runtime: restoredRuntimeForSession(session),
-  })
-  mockClientPresentation(session)
+interface WorkspaceRestoreFixture {
+  serverWorkspace: ServerWorkspaceState
+  clientWorkspace: ClientWorkspaceState
 }
 
-function mockClientPresentation(session: WorkspaceSessionState): void {
-  mockedReadClientWorkspaceState.mockResolvedValue(clientPresentationForSession(session))
-}
-
-function clientPresentationForSession(session: WorkspaceSessionState) {
+function defaultWorkspaceRestoreFixture(): WorkspaceRestoreFixture {
   return {
-    restoredRepoId: session.restoredRepoId,
-    zenMode: session.zenMode,
-    workspacePaneSize: session.workspacePaneSize,
-    selectedTerminalSessionIdByTerminalWorktree: session.selectedTerminalSessionIdByTerminalWorktree,
-    preferredWorkspacePaneTabByTargetByRepo: session.preferredWorkspacePaneTabByTargetByRepo,
-    filetreeViewStateByWorktreeByRepo: session.filetreeViewStateByWorktreeByRepo,
+    serverWorkspace: defaultServerWorkspaceState(),
+    clientWorkspace: defaultClientWorkspaceState(),
   }
 }
 
-function restoredRuntimeForSession(session: WorkspaceSessionState): WorkspaceRuntimeRestoreSnapshot {
+function workspaceRestoreFixture(
+  serverWorkspace: Partial<ServerWorkspaceState>,
+  clientWorkspace: Partial<ClientWorkspaceState>,
+): WorkspaceRestoreFixture {
   return {
-    repos: session.openRepoEntries.map((entry) => ({
+    serverWorkspace: { ...defaultServerWorkspaceState(), ...serverWorkspace },
+    clientWorkspace: { ...defaultClientWorkspaceState(), ...clientWorkspace },
+  }
+}
+
+function mockServerRestore(fixture: WorkspaceRestoreFixture): void {
+  const { serverWorkspace, clientWorkspace } = fixture
+  mockedRestorePersistedWorkspaceSession.mockResolvedValue({
+    status: 'restored',
+    openRepoEntries: serverWorkspace.openRepoEntries,
+    workspace: serverWorkspace,
+    runtime: restoredRuntimeForWorkspace(serverWorkspace, clientWorkspace.restoredRepoId),
+  })
+  mockClientPresentation(clientWorkspace)
+}
+
+function mockClientPresentation(clientWorkspace: ClientWorkspaceState): void {
+  mockedReadClientWorkspaceState.mockResolvedValue(clientWorkspace)
+}
+
+function restoredRuntimeForWorkspace(
+  serverWorkspace: ServerWorkspaceState,
+  restoredRepoId: string | null,
+): WorkspaceRuntimeRestoreSnapshot {
+  return {
+    repos: serverWorkspace.openRepoEntries.map((entry) => ({
       entry,
       repoRoot: entry.id,
       repoRuntimeId: `repo-runtime-${entry.id}`,
@@ -547,7 +576,7 @@ function restoredRuntimeForSession(session: WorkspaceSessionState): WorkspaceRun
       },
     })),
     workspacePaneTabs: [],
-    restoredRepoId: session.restoredRepoId,
+    restoredRepoId,
   }
 }
 
