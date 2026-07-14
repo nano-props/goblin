@@ -6,6 +6,7 @@ import {
   clearRepoRuntimesForUser,
   expireRepoRuntimeMembershipLease,
   isCurrentRepoRuntime,
+  isCurrentRepoRuntimeMembership,
   listRepoRuntimes,
   onRepoRuntimeClosed,
   releaseRepoRuntime,
@@ -63,6 +64,21 @@ describe('repo runtimes', () => {
       released: false,
       runtimeClosed: false,
     })
+  })
+
+  test('recognizes only a current runtime membership owned by the client', () => {
+    const firstRuntimeId = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
+
+    expect(isCurrentRepoRuntimeMembership(USER_ID, REPO_ROOT, firstRuntimeId, 'client-a')).toBe(true)
+    expect(isCurrentRepoRuntimeMembership(USER_ID, REPO_ROOT, firstRuntimeId, 'client-b')).toBe(false)
+
+    releaseRepoRuntime(USER_ID, REPO_ROOT, firstRuntimeId, 'client-a')
+    expect(isCurrentRepoRuntimeMembership(USER_ID, REPO_ROOT, firstRuntimeId, 'client-a')).toBe(false)
+
+    const nextRuntimeId = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
+    expect(nextRuntimeId).not.toBe(firstRuntimeId)
+    expect(isCurrentRepoRuntimeMembership(USER_ID, REPO_ROOT, firstRuntimeId, 'client-a')).toBe(false)
+    expect(isCurrentRepoRuntimeMembership(USER_ID, REPO_ROOT, nextRuntimeId, 'client-a')).toBe(true)
   })
 
   test('expires only memberships captured when a client went offline', () => {
