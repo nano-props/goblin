@@ -420,6 +420,7 @@ describe('restoreServerWorkspace', () => {
     controller.abort(abortReason)
 
     await expect(restore).rejects.toBe(abortReason)
+    expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledOnce()
     expect(mocks.releaseRepoRuntimeMembershipLease).toHaveBeenCalledWith('user-test', 'client_test000000000000', {
       repoRoot: remoteEntry.id,
       repoRuntimeId: 'repo-runtime-test',
