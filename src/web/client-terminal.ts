@@ -56,9 +56,6 @@ export function createServerTerminalClient(options: {
     takeover(input) {
       return options.realtime.request('takeover', input)
     },
-    close(input) {
-      return options.realtime.request('close', input)
-    },
     pruneTerminals(repoRoot, repoRuntimeId) {
       return options.realtime.request('prune', { repoRoot, repoRuntimeId })
     },

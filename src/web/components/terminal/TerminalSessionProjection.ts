@@ -169,8 +169,7 @@ export class TerminalSessionProjection {
   private readonly preferredSelectedTerminalSessionIdByTerminalWorktree = new Map<string, string>()
   private readonly hostByWorktree = new Map<string, HTMLElement>()
   private readonly startupGeometryHintByWorktree = new Map<string, { cols: number; rows: number }>()
-  // Owns pending create and durable close promises. The projection decides
-  // when to drain them; the helper owns dedupe and settle mechanics.
+  // Owns pending create promises; server-owned composed commands own close.
   private readonly lifecycleQueues = new TerminalSessionLifecycleQueues<
     TerminalSessionBase,
     TerminalCreateQueueRequest,
@@ -180,20 +179,6 @@ export class TerminalSessionProjection {
     Promise<TerminalCreateQueueResult>,
     Promise<string>
   >()
-  // Durable close queue rationale. `TerminalSession.dispose` used to fire
-  // `terminalClient.close({ terminalRuntimeSessionId })` as a `void ... .catch(() => {})`
-  // — if the WebSocket was already closing (or `closeSocketIfIdle` raced
-  // the request), the request was rejected before the server saw it and
-  // the PTY stayed alive. The next `createTerminal` then reattached to
-  // the orphan and printed the previous shell's `Restored session: …`
-  // line a second time.
-  //
-  // Enqueue stores a promise, the background close settles it, and
-  // `flushCreateRequest` awaits closes for the same worktree before
-  // creating so the session service cannot reattach to an orphan.
-  // Failures are logged (the old path swallowed them silently) so any
-  // future regression is visible in `terminalLog` rather than invisible
-  // shell ghosts in the buffer.
   // User-initiated close remains visible until server cleanup succeeds. The
   // promise map is the lifecycle owner for dedupe and for ignoring server
   // echoes that arrive before the close command settles.
@@ -265,7 +250,7 @@ export class TerminalSessionProjection {
   destroy(): void {
     setTerminalFocused(false)
     this.lifecycleQueues.rejectAll(new Error('terminal session projection destroyed'))
-    for (const session of this.sessions.values()) session.dispose({ closeSession: false })
+    for (const session of this.sessions.values()) session.dispose()
     this.sessions.clear()
     this.terminalSessionIdByTerminalRuntimeSessionId.clear()
     this.terminalRuntimeBindingByTerminalSessionId.clear()
@@ -840,10 +825,6 @@ export class TerminalSessionProjection {
     terminalWorktreeKey: string,
     pending: TerminalCreateQueueEntry<TerminalSessionBase, TerminalCreateQueueRequest, TerminalCreateQueueResult>,
   ): Promise<TerminalCreateQueueResult> {
-    // Close-drain lives here (not at the top of `createTerminal`) so
-    // `enqueueCreateRequest` puts the entry into the map first and
-    // emits the synchronous `createPending: true` snapshot.
-    await this.flushPendingClosesForWorktree(terminalWorktreeKey)
     if (this.lifecycleQueues.getCreate(terminalWorktreeKey) !== pending) {
       throw new Error('terminal create request canceled')
     }
@@ -867,49 +848,6 @@ export class TerminalSessionProjection {
     const createOptions = await resolveTerminalCreateOptionsUntilCreateSettles(request.createOptions, pending.promise)
     this.requireCurrentCreateRequest(terminalWorktreeKey, pending)
     return createOptions
-  }
-
-  // --- Durable close --------------------------------------------------------
-
-  // Queue a close against the server. Returns immediately with a
-  // promise the caller can ignore; the close fires in the background
-  // and the entry is removed when it settles (resolve or reject).
-  //
-  // Returning a stable promise (deduped per terminalRuntimeSessionId) is intentional:
-  // a `restart` and a `dispose` can both call this for the same
-  // terminalRuntimeSessionId in quick succession. The first call owns the request;
-  // the second is a no-op and just observes the same outcome.
-  enqueueDurableClose(input: { terminalRuntimeSessionId: string; terminalWorktreeKey: string }): Promise<void> {
-    return this.lifecycleQueues.enqueueClose(input, async (closeInput) => await this.performDurableClose(closeInput))
-  }
-
-  // Awaited at the top of `createTerminal` for the same worktree.
-  // Drains every in-flight close targeting `terminalWorktreeKey` so
-  // the session service sees a clean slate. Failures are swallowed at this
-  // seam: the user is about to create, and a stuck close should not
-  // block them — the failure is already logged inside
-  // `performDurableClose` and the user can `pruneTerminals` from the
-  // UI to recover if the orphan ever resurfaces.
-  private async flushPendingClosesForWorktree(terminalWorktreeKey: string): Promise<void> {
-    if (!this.lifecycleQueues.hasCloses()) return
-    const pendingForWorktree = this.lifecycleQueues.closesForWorktree(terminalWorktreeKey)
-    if (pendingForWorktree.length === 0) return
-    await Promise.allSettled(pendingForWorktree.map((entry) => entry.promise))
-  }
-
-  private async performDurableClose(input: { terminalRuntimeSessionId: string }): Promise<void> {
-    const { terminalRuntimeSessionId } = input
-    try {
-      await terminalClient.close({ terminalRuntimeSessionId })
-    } catch (err) {
-      // The old fire-and-forget path swallowed this rejection. Loud
-      // logging is intentional: the failure mode (orphan PTY surviving
-      // a tab close) is otherwise invisible to operators and surfaces
-      // only as a confused user re-opening a tab and seeing the prior
-      // shell's `Restored session: …` line print twice.
-      terminalSessionProviderLog.warn('durable close failed for terminal session', { terminalRuntimeSessionId, err })
-      throw err
-    }
   }
 
   private selectedDescriptor(terminalWorktreeKey: string): TerminalDescriptor | null {
@@ -1252,7 +1190,7 @@ export class TerminalSessionProjection {
     this.outputActivityState.remove(terminalSessionId)
     this.notifySnapshot(terminalSessionId)
     this.bellState.remove(terminalSessionId)
-    if (options.dispose) session.dispose({ closeSession: options.closeSession !== false })
+    if (options.dispose) session.dispose()
     if (wasSelected) {
       const nextSessionId = resolveAdjacentTerminalSelectionAfterRemoval(
         visibleTerminalSessionIdsBeforeRemoval,
@@ -1492,15 +1430,9 @@ export class TerminalSessionProjection {
       this.notifyWorktree(descriptor.terminalWorktreeKey)
       return current
     }
-    let session!: TerminalSession
-    session = new TerminalSession(
+    const session = new TerminalSession(
       descriptor,
       () => this.notifySession(descriptor.terminalSessionId),
-      (terminalRuntimeSessionId) =>
-        this.enqueueDurableClose({
-          terminalRuntimeSessionId,
-          terminalWorktreeKey: session.descriptor.terminalWorktreeKey,
-        }),
       this.writeFailureReporter,
     )
     this.sessions.set(descriptor.terminalSessionId, session)

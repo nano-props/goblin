@@ -8,8 +8,6 @@
  * the same terminalSessionId; distinct requests must get their own later create
  * attempt.
  *
- * Close requests are deduped by terminalRuntimeSessionId and are awaited by later creates
- * for the same worktree so a fresh create cannot race an orphan close.
  */
 export interface TerminalCreateQueueEntry<TBase, TOptions, TResult = string> {
   base: TBase
@@ -26,17 +24,8 @@ export interface TerminalCreateQueueAdmission<TResult = string> {
   ownsAdmission: boolean
 }
 
-export interface PendingTerminalClose {
-  terminalRuntimeSessionId: string
-  terminalWorktreeKey: string
-  promise: Promise<void>
-  resolve: () => void
-  reject: (error: unknown) => void
-}
-
 export class TerminalSessionLifecycleQueues<TBase, TOptions, TResult = string> {
   private readonly createEntriesByWorktree = new Map<string, TerminalCreateQueueEntry<TBase, TOptions, TResult>[]>()
-  private readonly pendingCloseByTerminalRuntimeSessionId = new Map<string, PendingTerminalClose>()
 
   enqueueCreate(input: {
     terminalWorktreeKey: string
@@ -100,45 +89,11 @@ export class TerminalSessionLifecycleQueues<TBase, TOptions, TResult = string> {
     return rejected.length > 0
   }
 
-  enqueueClose(
-    input: Omit<PendingTerminalClose, 'promise' | 'resolve' | 'reject'>,
-    perform: (input: Omit<PendingTerminalClose, 'promise' | 'resolve' | 'reject'>) => Promise<void>,
-  ): Promise<void> {
-    const existing = this.pendingCloseByTerminalRuntimeSessionId.get(input.terminalRuntimeSessionId)
-    if (existing) return existing.promise
-
-    let resolve!: () => void
-    let reject!: (error: unknown) => void
-    const promise = new Promise<void>((innerResolve, innerReject) => {
-      resolve = innerResolve
-      reject = innerReject
-    })
-    const entry: PendingTerminalClose = { ...input, promise, resolve, reject }
-    this.pendingCloseByTerminalRuntimeSessionId.set(input.terminalRuntimeSessionId, entry)
-    void perform(input).then(
-      () => this.settleClose(input.terminalRuntimeSessionId, entry, null),
-      (error) => this.settleClose(input.terminalRuntimeSessionId, entry, error),
-    )
-    return promise
-  }
-
-  hasCloses(): boolean {
-    return this.pendingCloseByTerminalRuntimeSessionId.size > 0
-  }
-
-  closesForWorktree(terminalWorktreeKey: string): PendingTerminalClose[] {
-    return Array.from(this.pendingCloseByTerminalRuntimeSessionId.values()).filter(
-      (entry) => entry.terminalWorktreeKey === terminalWorktreeKey,
-    )
-  }
-
   rejectAll(error: unknown): void {
     for (const queue of this.createEntriesByWorktree.values()) {
       for (const pending of queue) pending.reject(error)
     }
-    for (const pending of this.pendingCloseByTerminalRuntimeSessionId.values()) pending.reject(error)
     this.createEntriesByWorktree.clear()
-    this.pendingCloseByTerminalRuntimeSessionId.clear()
   }
 
   private createQueue(terminalWorktreeKey: string): TerminalCreateQueueEntry<TBase, TOptions, TResult>[] {
@@ -149,10 +104,4 @@ export class TerminalSessionLifecycleQueues<TBase, TOptions, TResult = string> {
     return next
   }
 
-  private settleClose(terminalRuntimeSessionId: string, entry: PendingTerminalClose, error: unknown): void {
-    if (this.pendingCloseByTerminalRuntimeSessionId.get(terminalRuntimeSessionId) !== entry) return
-    this.pendingCloseByTerminalRuntimeSessionId.delete(terminalRuntimeSessionId)
-    if (error === null) entry.resolve()
-    else entry.reject(error)
-  }
 }

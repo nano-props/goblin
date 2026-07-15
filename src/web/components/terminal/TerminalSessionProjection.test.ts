@@ -1037,28 +1037,6 @@ describe('TerminalSessionProjection', () => {
       expect(projection.terminalWorktreeSnapshot(WORKTREE_KEY).count).toBe(0)
     })
 
-    test('durable close callback does not require a fresh repo runtime id', async () => {
-      projection.setRepoIndex(makeRepoIndex())
-      projection.reconcileServerSessions(
-        { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
-        [makeServerSession('pty_session_1_aaaaaaaaa', 'term-111111111111111111111')],
-        'client_local',
-        new Map(),
-      )
-
-      const terminalSessionId = projection.terminalWorktreeSnapshot(WORKTREE_KEY).sessions[0]!.terminalSessionId
-      const session = (projection as any).sessions.get(terminalSessionId) as TerminalSession
-      const closeSpy = vi.spyOn(terminalClient, 'close').mockResolvedValue(true)
-      ;(session as any).descriptor = { ...session.descriptor, repoRuntimeId: undefined }
-
-      try {
-        await expect((session as any).requestDurableClose('pty_session_1_aaaaaaaaa')).resolves.toBeUndefined()
-        expect(closeSpy).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa' })
-      } finally {
-        closeSpy.mockRestore()
-      }
-    })
-
     test('closeTerminalByDescriptor selects an adjacent terminal after server close settles', async () => {
       projection.setRepoIndex(makeRepoIndex())
       projection.reconcileServerSessions(

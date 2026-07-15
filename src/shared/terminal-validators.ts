@@ -34,7 +34,6 @@ const TERMINAL_SOCKET_ACTIONS = [
   'write',
   'resize',
   'takeover',
-  'close',
   'recover-sessions',
   'prune',
 ] as const satisfies TerminalSocketRequestAction[]
@@ -346,12 +345,6 @@ const TerminalClientMessageSchema = v.variant('type', [
   v.object({
     type: v.literal('request'),
     requestId: TerminalRequestIdSchema,
-    action: v.literal('close'),
-    input: TerminalSessionInputSchema,
-  }),
-  v.object({
-    type: v.literal('request'),
-    requestId: TerminalRequestIdSchema,
     action: v.literal('recover-sessions'),
     input: TerminalListSessionsInputSchema,
   }),
@@ -495,7 +488,6 @@ function normalizeTerminalSocketResponsePayload(action: TerminalSocketRequestAct
     case 'write':
       return normalizeWithSchema(TerminalWriteResultSchema, payload)
     case 'resize':
-    case 'close':
       return normalizeWithSchema(TerminalMutationResultSchema, payload)
     case 'takeover':
       return normalizeWithSchema(TerminalTakeoverResultSchema, payload)

@@ -44,9 +44,6 @@ export function createTerminalRealtimeHandlers(host: ServerTerminalActionHost): 
     takeover(clientId, userId, input) {
       return host.takeover(clientId, userId, { ...input, clientId })
     },
-    close(clientId, userId, input) {
-      return host.close(clientId, userId, input)
-    },
     'recover-sessions'(clientId, userId, input) {
       return host.recoverSessions(clientId, userId, input)
     },

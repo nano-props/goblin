@@ -76,9 +76,6 @@ vi.mock('#/web/components/terminal/TerminalSession.ts', () => {
     restart(): void {}
     focus(): void {}
     dispose(): void {}
-    closeServerResourcesAndWait(): Promise<void> {
-      return Promise.resolve()
-    }
     isTerminalFocusTarget(): boolean {
       return false
     }
@@ -244,13 +241,6 @@ function emitBellForKey(projection: TerminalSessionProjection, terminalSessionId
     },
     { processName: 'zsh', visible: false },
   )
-}
-
-function durableCloseInput() {
-  return {
-    terminalRuntimeSessionId: 'term-stalestalestalestale1',
-    terminalWorktreeKey: WORKTREE_KEY,
-  }
 }
 
 describe('TerminalSessionProjection create flow', () => {
@@ -755,140 +745,6 @@ describe('TerminalSessionProjection create flow', () => {
       rows: 24,
       clientId: 'client_local',
     })
-  })
-
-  test('durable close: awaits an in-flight close for the same worktree before creating', async () => {
-    // Regression for the duplicate `Restored session:` bug: the prior
-    // dispose path was fire-and-forget, so a create could race the
-    // close and reattach to the orphan. The projection's durable-close
-    // queue guarantees create waits for the close to settle.
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    projection.registerHost(WORKTREE_KEY, host)
-
-    // Order closeMock to record its call order relative to createMock.
-    const callOrder: string[] = []
-    mocks.closeMock.mockImplementation(async () => {
-      callOrder.push('close')
-      return true
-    })
-    mocks.createMock.mockImplementation(async () => {
-      callOrder.push('create')
-      return makeCreateResult()
-    })
-
-    // Enqueue a durable close and DO NOT await it. The next
-    // createTerminal must wait for the close to settle before
-    // issuing its own create call.
-    const closePromise = projection.enqueueDurableClose({
-      ...durableCloseInput(),
-    })
-
-    // Start the create before the close settles. The promise must
-    // resolve only after both have run, in the right order.
-    const createPromise = projection.createTerminal(terminalBase())
-
-    // Both promises settle eventually.
-    await expect(closePromise).resolves.toBeUndefined()
-    await expect(createPromise).resolves.toBe('term-111111111111111111111')
-
-    // Close is awaited before create. Without the durable-close
-    // guard, create would resolve first because the close promise
-    // was launched with `void`.
-    expect(callOrder).toEqual(['close', 'create'])
-
-    // The pending entry is cleaned up after the close settles.
-    expect((projection as any).lifecycleQueues.hasCloses()).toBe(false)
-  })
-
-  test('durable close: failures do not block the next create', async () => {
-    // The flush-and-proceed seam: a stuck close (e.g., socket
-    // already closing) must not strand the user. The create still
-    // runs; the failure is already logged inside performDurableClose.
-    const host = document.createElement('div')
-    document.body.appendChild(host)
-    projection.registerHost(WORKTREE_KEY, host)
-
-    const callOrder: string[] = []
-    const close = Promise.withResolvers<boolean>()
-    mocks.closeMock.mockImplementationOnce(async () => {
-      callOrder.push('close')
-      return await close.promise
-    })
-    mocks.createMock.mockImplementationOnce(async () => {
-      callOrder.push('create')
-      return makeCreateResult()
-    })
-
-    const closePromise = projection.enqueueDurableClose({
-      ...durableCloseInput(),
-    })
-
-    const createPromise = projection.createTerminal(terminalBase())
-
-    await Promise.resolve()
-    expect(mocks.createMock).not.toHaveBeenCalled()
-
-    close.reject(new Error('Terminal socket closed'))
-
-    await expect(closePromise).rejects.toThrow('Terminal socket closed')
-    await expect(createPromise).resolves.toBe('term-111111111111111111111')
-    expect(mocks.createMock).toHaveBeenCalledTimes(1)
-    expect(callOrder).toEqual(['close', 'create'])
-    expect((projection as any).lifecycleQueues.hasCloses()).toBe(false)
-  })
-
-  test('durable close: deduplicates concurrent enqueues for the same session', async () => {
-    // The session service may surface a session-closed event AND a parallel
-    // dispose() call for the same terminalRuntimeSessionId. The first call owns the
-    // request; the second observes the same outcome.
-    let resolveClose!: (value: boolean) => void
-    mocks.closeMock.mockReturnValueOnce(
-      new Promise<boolean>((resolve) => {
-        resolveClose = resolve
-      }),
-    )
-
-    const first = projection.enqueueDurableClose({
-      ...durableCloseInput(),
-    })
-    const second = projection.enqueueDurableClose({
-      ...durableCloseInput(),
-    })
-
-    // Only one close call was dispatched.
-    expect(mocks.closeMock).toHaveBeenCalledTimes(1)
-    expect(mocks.closeMock).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'term-stalestalestalestale1' })
-
-    resolveClose(true)
-    await expect(first).resolves.toBeUndefined()
-    await expect(second).resolves.toBeUndefined()
-  })
-
-  test('durable close: destroys reject pending entries', async () => {
-    // The pending-close map mirrors the pending-create map: on
-    // destroy, every entry rejects so callers awaiting it can clean
-    // up. The mock `close` is left hanging so the entry is still
-    // pending when destroy runs.
-    let resolveClose!: (value: boolean) => void
-    mocks.closeMock.mockReturnValueOnce(
-      new Promise<boolean>((resolve) => {
-        resolveClose = resolve
-      }),
-    )
-
-    const closePromise = projection.enqueueDurableClose({
-      ...durableCloseInput(),
-    })
-
-    expect((projection as any).lifecycleQueues.hasCloses()).toBe(true)
-    projection.destroy()
-    await expect(closePromise).rejects.toThrow('terminal session projection destroyed')
-    expect((projection as any).lifecycleQueues.hasCloses()).toBe(false)
-    resolveClose(true)
-    await vi.waitFor(() =>
-      expect(mocks.closeMock).toHaveBeenCalledWith({ terminalRuntimeSessionId: 'term-stalestalestalestale1' }),
-    )
   })
 
   test('durable close: handleSessionClosed drops the matching local session', async () => {

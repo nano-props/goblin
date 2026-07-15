@@ -56,7 +56,6 @@ export interface TerminalSocketRequestInputs {
   write: TerminalWriteInput
   resize: TerminalResizeInput
   takeover: TerminalTakeoverInput
-  close: TerminalSessionInput
   'recover-sessions': TerminalListSessionsInput
   prune: TerminalPruneInput
 }
@@ -67,7 +66,6 @@ export interface TerminalSocketResponseOutputs {
   write: TerminalWriteResult
   resize: TerminalMutationResult
   takeover: TerminalTakeoverResult
-  close: TerminalMutationResult
   'recover-sessions': TerminalSessionsRecoveryResult
   prune: { pruned: number; remaining: number }
 }

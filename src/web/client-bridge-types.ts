@@ -43,7 +43,6 @@ export interface ClientTerminal {
   write: (input: TerminalWriteInput) => Promise<TerminalWriteResult>
   resize: (input: TerminalResizeInput) => Promise<TerminalMutationResult>
   takeover: (input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>
-  close: (input: TerminalSessionInput) => Promise<TerminalMutationResult>
   pruneTerminals: (repoRoot: string, repoRuntimeId: string) => Promise<{ pruned: number; remaining: number }>
   recoverSessions: (input: TerminalListSessionsInput) => Promise<TerminalSessionsRecoveryResult>
   notifyBell: (input: TerminalNotifyBellInput) => Promise<TerminalMutationResult>
