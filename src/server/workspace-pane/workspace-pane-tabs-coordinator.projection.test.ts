@@ -1,10 +1,6 @@
 // @vitest-environment node
 
 import { describe, expect, test, vi } from 'vitest'
-import {
-  createWorkspacePaneTabsCoordinator as createProductionWorkspacePaneTabsCoordinator,
-  type WorkspacePaneRuntimeTabsLiveSession,
-} from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { createWorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import {
@@ -14,57 +10,20 @@ import {
   testPhysicalWorktrees,
 } from '#/server/test-utils/physical-worktree-identity.ts'
 import {
-  type WorkspacePaneTabEntry,
+  TEST_WORKSPACE_PANE_BRANCH_NAME as BRANCH_NAME,
+  TEST_WORKSPACE_PANE_REPO_ROOT as REPO_ROOT,
+  TEST_WORKSPACE_PANE_SCOPE as SCOPE,
+  TEST_WORKSPACE_PANE_USER_ID as USER_ID,
+  TEST_WORKSPACE_PANE_WORKTREE_PATH as WORKTREE_PATH,
+  createTestWorkspacePaneTabsCoordinator as createWorkspacePaneTabsCoordinator,
+  testWorkspacePaneSnapshot as snapshot,
+  testWorkspacePaneTarget as workspaceTarget,
+} from '#/server/test-utils/workspace-pane-tabs-coordinator.ts'
+import {
   workspacePaneStaticTabEntry,
   workspacePaneRuntimeTabEntry,
   workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
-
-const USER_ID = 'user-workspace-pane-tabs'
-const REPO_ROOT = '/repo'
-const SCOPE = 'repo-runtime-scope'
-const BRANCH_NAME = 'feature/worktree'
-const WORKTREE_PATH = '/repo/worktree'
-
-type ProductionCoordinatorOptions = Parameters<typeof createProductionWorkspacePaneTabsCoordinator>[0]
-type TestRuntimeProvider =
-  | ProductionCoordinatorOptions['runtimeProviders'][number]
-  | {
-      type: 'terminal'
-      listSessionsForUser(userId: string, scope: string): Promise<WorkspacePaneRuntimeTabsLiveSession[]>
-    }
-
-function createWorkspacePaneTabsCoordinator(
-  options: Omit<ProductionCoordinatorOptions, 'runtimeProviders' | 'persistLayout'> & {
-    runtimeProviders: readonly TestRuntimeProvider[]
-    persistLayout?: ProductionCoordinatorOptions['persistLayout']
-  },
-) {
-  return createProductionWorkspacePaneTabsCoordinator({
-    ...options,
-    persistLayout: options.persistLayout ?? (async () => {}),
-    runtimeProviders: options.runtimeProviders.map((provider) => {
-      if ('captureSnapshotForUser' in provider) return provider
-      return {
-        type: provider.type,
-        async captureSnapshotForUser(userId: string, scope: string) {
-          return { revision: 0, liveSessions: await provider.listSessionsForUser(userId, scope) }
-        },
-      }
-    }),
-  })
-}
-
-function workspaceTarget() {
-  return { userId: USER_ID, scope: SCOPE, branchName: BRANCH_NAME, worktreePath: WORKTREE_PATH }
-}
-
-function snapshot(revision: number, tabs: WorkspacePaneTabEntry[]) {
-  return {
-    revision,
-    entries: [{ repoRoot: REPO_ROOT, branchName: BRANCH_NAME, worktreePath: WORKTREE_PATH, tabs }],
-  }
-}
 
 describe('workspace pane tabs coordinator projection', () => {
   test('does not let restore initialization overwrite an initialized scope', async () => {
