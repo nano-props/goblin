@@ -16,6 +16,8 @@ import type {
   WorkspacePaneTabsScopeEntry,
 } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import type { WorkspacePaneTabsTargetIdentity } from '#/shared/workspace-pane-tabs-target.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type {
   PhysicalWorktreeOperationCoordinator,
   PhysicalWorktreeOperationPermit,
@@ -307,6 +309,31 @@ export class WorkspacePaneTabsCoordinator {
           return this.projectedScopeSnapshot(input.userId, input.repoRoot, input.scope, providerSnapshots)
         }),
     )
+  }
+
+  async restoreScope(input: {
+    userId: string
+    repoRoot: string
+    scope: string
+    targets: readonly WorkspacePaneTabsTarget[]
+    expectedRepoEntry: RepoSessionEntry
+    assertCurrent: () => void
+  }): Promise<WorkspacePaneTabsSnapshot> {
+    if (!this.layoutAggregate) {
+      return await this.initializeScope({ ...input, entries: [], assertCurrent: input.assertCurrent })
+    }
+    return await this.runWorkspaceTabsOperationByKey(`repo\0${input.repoRoot}`, async () => {
+      input.assertCurrent()
+      const providers = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
+      input.assertCurrent()
+      return await this.layoutAggregate!.validateRepairAndSnapshot({
+        ...aggregateScope(input.userId, input.repoRoot, input.scope),
+        validTargets: input.targets,
+        expectedRepoEntry: input.expectedRepoEntry,
+        providerSnapshots: providers,
+        assertCurrent: input.assertCurrent,
+      })
+    })
   }
 
   async updateTabs(input: {

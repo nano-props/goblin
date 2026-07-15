@@ -55,7 +55,7 @@ vi.mock('#/server/modules/repo-workspace-tabs-restore.ts', () => ({
 }))
 
 const workspacePaneTabsHostStub = {
-  initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
+  restoreTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
   listWorkspaceTabs: vi.fn(),
   replaceTabs: vi.fn(),
   updateTabs: vi.fn(),

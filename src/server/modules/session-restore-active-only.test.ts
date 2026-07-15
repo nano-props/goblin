@@ -87,7 +87,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
+      restoreTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -238,7 +238,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
+      restoreTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -275,7 +275,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       name: 'repo',
     }))
     const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
+      restoreTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -313,7 +313,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
+      restoreTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -356,7 +356,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
+      restoreTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),

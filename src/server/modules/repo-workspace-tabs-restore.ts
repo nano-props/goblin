@@ -10,7 +10,6 @@ import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write
 import { confirmServerWorkspaceRepoEntry, getServerWorkspaceState } from '#/server/modules/settings-source.ts'
 import {
   initializeWorkspacePaneTabsWithMembershipGuard,
-  validateOrRepairWorkspacePaneTabs,
   workspaceRepoEntry,
 } from '#/server/modules/workspace-pane-tabs-restore.ts'
 import { abortableWorkspaceRestore, workspaceRepoDisplayName } from '#/server/modules/workspace-restore-utils.ts'
@@ -37,11 +36,9 @@ export async function restoreRepoTabsForRepo(input: RestoreRepoTabsInput): Promi
 
   const membership = await confirmServerWorkspaceRepoEntry(entry)
   if (!membership.matched) throw repoNotInWorkspace()
-  const validatedWorkspace = await validateOrRepairWorkspacePaneTabs(membership.workspace, repo, entry)
-  if (validatedWorkspace.kind === 'membership-conflict') throw repoNotInWorkspace()
   const initializedTabs = await initializeWorkspacePaneTabsWithMembershipGuard({
     restoreInput: input,
-    workspace: validatedWorkspace.workspace,
+    workspace: membership.workspace,
     repos: [repo],
     confirmMembership: async () => await confirmServerWorkspaceRepoEntry(entry),
     assertCurrent: () => assertCurrentRepoRuntimeMembership(input),

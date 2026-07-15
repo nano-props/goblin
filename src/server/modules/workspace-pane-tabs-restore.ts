@@ -79,9 +79,8 @@ export async function initializeWorkspacePaneTabsWithMembershipGuard(input: {
 > {
   const confirmed = await input.confirmMembership()
   if (!confirmed.matched) return confirmed
-  const stableWorkspace = { ...input.workspace, openRepoEntries: confirmed.workspace.openRepoEntries }
   input.restoreInput.signal?.throwIfAborted()
-  const snapshots = await restoreWorkspacePaneTabsForRepos(input.restoreInput, stableWorkspace, input.repos)
+  const snapshots = await restoreWorkspacePaneTabsForRepos(input.restoreInput, input.repos)
   input.assertCurrent?.()
   input.restoreInput.signal?.throwIfAborted()
   const committed = await input.confirmMembership()
@@ -106,40 +105,25 @@ function validateWorkspacePaneTabs(
 
 async function restoreWorkspacePaneTabsForRepos(
   input: WorkspacePaneTabsRestoreInput,
-  workspace: ServerWorkspaceState,
   repos: ProjectedRestoredWorkspaceRepoRuntime[],
 ) {
-  const replacements = workspacePaneTabRestoreReplacements(workspace, repos)
   const snapshots: Array<{ repoRoot: string; repoRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }> = []
   for (const repo of repos) {
     input.signal?.throwIfAborted()
-    const snapshot = await input.workspacePaneTabsHost.initializeTabs(input.userId, {
+    const targets = (repo.projection.snapshot?.branches ?? []).map((branch) => ({
+      repoRoot: repo.repoRoot,
+      branchName: branch.name,
+      worktreePath: branch.worktree?.path ?? null,
+    }))
+    const snapshot = await input.workspacePaneTabsHost.restoreTabs(input.userId, {
       repoRoot: repo.repoRoot,
       repoRuntimeId: repo.repoRuntimeId,
-      entries: replacements
-        .filter((item) => item.repoRoot === repo.repoRoot)
-        .map(({ target, tabs }) => ({ ...target, tabs })),
+      expectedRepoEntry: repo.entry,
+      targets,
     })
     snapshots.push({ repoRoot: repo.repoRoot, repoRuntimeId: repo.repoRuntimeId, snapshot })
   }
   return snapshots
-}
-
-function workspacePaneTabRestoreReplacements(
-  workspace: ServerWorkspaceState,
-  repos: ProjectedRestoredWorkspaceRepoRuntime[],
-): Array<{ repoRoot: string; target: WorkspacePaneTabsTarget; tabs: WorkspacePaneTabEntry[] }> {
-  const reposByRoot = new Map(repos.map((repo) => [repo.repoRoot, repo]))
-  const replacements = []
-  for (const [repoRoot, tabsByTarget] of Object.entries(workspace.workspacePaneTabsByTargetByRepo)) {
-    const repo = reposByRoot.get(repoRoot)
-    if (!repo) continue
-    for (const [targetKey, tabs] of Object.entries(tabsByTarget)) {
-      const target = targetForWorkspaceKey(repo, targetKey)
-      if (target) replacements.push({ repoRoot, target, tabs })
-    }
-  }
-  return replacements
 }
 
 function targetForWorkspaceKey(repo: ProjectedRestoredWorkspaceRepoRuntime, targetKey: string) {

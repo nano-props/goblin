@@ -14,6 +14,7 @@ import type {
   PhysicalWorktreeIdentityResolver,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { failRemoteRuntimeIfNeeded } from '#/server/modules/remote-runtime-failure-settlement.ts'
+import { workspacePaneTabsTargetIdentityKeyFromIdentity } from '#/shared/workspace-pane-tabs-target.ts'
 
 const worktreeRemovalLogger = serverLogger.child({ module: 'worktree-removal-application' })
 
@@ -102,8 +103,19 @@ export class WorktreeRemovalApplication {
               afterWorktreeRemoved: async () => {
                 try {
                   this.deps.worktreeOperations.assertPermit(physicalCapability, permit)
+                  const requestedTarget = {
+                    userId,
+                    repoRuntimeId: input.repoRuntimeId,
+                    target: { kind: 'worktree' as const, repoRoot: input.repoRoot, worktreePath },
+                  }
+                  const targetsByStableIdentity = new Map(
+                    [requestedTarget, ...affectedTargets].map((target) => [
+                      workspacePaneTabsTargetIdentityKeyFromIdentity(target.target),
+                      target,
+                    ]),
+                  )
                   await Promise.all(
-                    affectedTargets.map(async ({ userId: affectedUserId, repoRuntimeId, target }) => {
+                    Array.from(targetsByStableIdentity.values()).map(async ({ userId: affectedUserId, repoRuntimeId, target }) => {
                       await this.deps.workspacePaneTabs.retireTarget(affectedUserId, {
                         repoRuntimeId,
                         target,
@@ -115,7 +127,11 @@ export class WorktreeRemovalApplication {
                 } catch (error) {
                   worktreeRemovalLogger.error({ error, repoRoot: input.repoRoot, worktreePath }, 'tabs finalize failed')
                   this.broadcast(affectedScopes)
-                  return { ok: false, message: error instanceof Error ? error.message : String(error) }
+                  return {
+                    ok: false,
+                    message: error instanceof Error ? error.message : String(error),
+                    repositoryStateChanged: true,
+                  }
                 }
               },
               afterRemoveFailed: async () =>

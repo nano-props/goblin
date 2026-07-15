@@ -86,7 +86,7 @@ describe('restoreRepoTabsForRepo', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
+      restoreTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
       updateTabs: vi.fn(),
@@ -112,17 +112,11 @@ describe('restoreRepoTabsForRepo', () => {
     expect(mocks.probeRepo).toHaveBeenCalledWith('/repo')
     expect(mocks.acquireRepoRuntimeLease).not.toHaveBeenCalled()
     expect(mocks.releaseRepoRuntimeMembershipLease).not.toHaveBeenCalled()
-    expect(workspacePaneTabsHost.initializeTabs).toHaveBeenCalledWith('user-test', {
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
       repoRoot: '/repo',
       repoRuntimeId: 'repo-runtime-test',
-      entries: [
-        {
-          repoRoot: '/repo',
-          branchName: 'main',
-          worktreePath: null,
-          tabs: [workspacePaneStaticTabEntry('history')],
-        },
-      ],
+      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      targets: [{ repoRoot: '/repo', branchName: 'main', worktreePath: '/repo' }],
     })
   })
 
@@ -141,7 +135,7 @@ describe('restoreRepoTabsForRepo', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
+      restoreTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
       updateTabs: vi.fn(),
@@ -159,17 +153,12 @@ describe('restoreRepoTabsForRepo', () => {
     expect(result.snapshot).toEqual({ revision: 0, entries: [] })
     expect(result.repo.projection).not.toBeNull()
     expect(workspacePaneTabsHost.replaceTabs).not.toHaveBeenCalled()
-    expect(mocks.clearServerWorkspaceTabsIfUnchanged).toHaveBeenCalledWith({
-      repoRoot: '/repo',
-      expectedRepoEntry: { kind: 'local', id: '/repo' },
-      expectedTabsByTarget: {
-        [staleTargetKey]: [workspacePaneStaticTabEntry('history')],
-      },
-    })
-    expect(workspacePaneTabsHost.initializeTabs).toHaveBeenCalledWith('user-test', {
+    expect(mocks.clearServerWorkspaceTabsIfUnchanged).not.toHaveBeenCalled()
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledWith('user-test', {
       repoRoot: '/repo',
       repoRuntimeId: 'repo-runtime-test',
-      entries: [],
+      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      targets: [{ repoRoot: '/repo', branchName: 'main', worktreePath: '/repo' }],
     })
   })
 
@@ -237,7 +226,7 @@ describe('restoreRepoTabsForRepo', () => {
         workspacePaneTabsHost,
       }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
-    expect(workspacePaneTabsHost.initializeTabs).not.toHaveBeenCalled()
+    expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
   })
 
   test('rejects lazy restore when the repo is closed during pane initialization', async () => {
@@ -260,7 +249,7 @@ describe('restoreRepoTabsForRepo', () => {
         workspacePaneTabsHost,
       }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
-    expect(workspacePaneTabsHost.initializeTabs).toHaveBeenCalledOnce()
+    expect(workspacePaneTabsHost.restoreTabs).toHaveBeenCalledOnce()
   })
 
   test('does not repair pane tabs after repo membership is removed', async () => {
@@ -277,7 +266,9 @@ describe('restoreRepoTabsForRepo', () => {
       },
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    mocks.confirmServerWorkspaceRepoEntry.mockResolvedValueOnce({ matched: true, workspace })
+    mocks.confirmServerWorkspaceRepoEntry
+      .mockResolvedValueOnce({ matched: true, workspace })
+      .mockResolvedValueOnce({ matched: false, latestWorkspace: defaultServerWorkspaceState() })
     mocks.clearServerWorkspaceTabsIfUnchanged.mockResolvedValue({
       cleared: false,
       latestWorkspace: defaultServerWorkspaceState(),
@@ -294,7 +285,7 @@ describe('restoreRepoTabsForRepo', () => {
         workspacePaneTabsHost,
       }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
-    expect(workspacePaneTabsHost.initializeTabs).not.toHaveBeenCalled()
+    expect(workspacePaneTabsHost.restoreTabs).not.toHaveBeenCalled()
   })
 
   test('keeps the existing membership when lazy local projection fails', async () => {

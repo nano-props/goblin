@@ -28,6 +28,7 @@ import {
   type WorkspacePaneLayoutRepository,
 } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import type { WorkspacePaneRuntimeTabsProviderSnapshot } from '#/server/workspace-pane/workspace-pane-runtime-tabs-projection.ts'
+import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 
 const MAX_LAYOUT_CAS_RETRIES = 3
 
@@ -85,6 +86,7 @@ export class WorkspacePaneLayoutAggregate {
       })
       if (outcome.kind === 'conflict' && conflicts < MAX_LAYOUT_CAS_RETRIES) continue
       if (outcome.kind !== 'accepted') throw new Error('error.workspace-tabs-layout-conflict')
+      this.overlay.retireTarget(input.target)
       return await this.snapshot(input, input.providerSnapshots, outcome.snapshot.layout)
     }
   }
@@ -97,6 +99,47 @@ export class WorkspacePaneLayoutAggregate {
     const layout = knownLayout ?? (await this.repository.load(scope.repoRoot)).layout
     const entries = projectCanonicalEntries(scope, layout, this.overlay, providerSnapshots)
     return { revision: this.revision(scope, layout, providerSnapshots, entries), entries }
+  }
+
+  async validateRepairAndSnapshot(input: WorkspacePaneEpochScope & {
+    validTargets: readonly WorkspacePaneTabsTarget[]
+    expectedRepoEntry: RepoSessionEntry
+    providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
+    assertCurrent?: () => void
+  }): Promise<WorkspacePaneTabsSnapshot> {
+    for (const target of input.validTargets) {
+      this.overlay.registerTargetMetadata({
+        ...input,
+        target: targetIdentity(target),
+        branchName: target.branchName,
+      })
+    }
+    const validKeys = new Set(input.validTargets.map(workspacePaneTabsTargetIdentityKey))
+    for (let conflicts = 0; ; conflicts += 1) {
+      input.assertCurrent?.()
+      const current = await this.repository.load(input.repoRoot)
+      const filtered = {
+        entries: current.layout.entries.filter((entry) => validKeys.has(workspacePaneTabsTargetIdentityKey(entry))),
+      }
+      if (filtered.entries.length === current.layout.entries.length) {
+        return await this.snapshot(input, input.providerSnapshots, current.layout)
+      }
+      try {
+        const outcome = await this.repository.compareAndSwap({
+          repoRoot: input.repoRoot,
+          expected: current.layout,
+          replacement: filtered,
+          expectedRepoEntry: input.expectedRepoEntry,
+        })
+        if (outcome.kind === 'conflict' && conflicts < MAX_LAYOUT_CAS_RETRIES) continue
+        if (outcome.kind === 'membership-conflict') throw new Error('error.repo-not-in-session')
+        if (outcome.kind !== 'accepted') throw new Error('error.workspace-tabs-layout-conflict')
+        return await this.snapshot(input, input.providerSnapshots, outcome.snapshot.layout)
+      } catch (error) {
+        if (error instanceof Error && error.message === 'error.repo-not-in-session') throw error
+        return await this.snapshot(input, input.providerSnapshots, filtered)
+      }
+    }
   }
 
   closeEpoch(scope: WorkspacePaneEpochScope): void {

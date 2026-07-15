@@ -115,6 +115,41 @@ describe('workspace pane layout aggregate', () => {
       workspacePaneTabEntryIdentity(terminal),
     ])
   })
+
+  test('repairs invalid targets locally while preserving valid siblings', async () => {
+    const valid = { repoRoot: '/repo', branchName: 'main', worktreePath: null, tabs: [workspacePaneStaticTabEntry('history')] }
+    const invalid = { repoRoot: '/repo', branchName: 'deleted', worktreePath: null, tabs: [workspacePaneStaticTabEntry('status')] }
+    const repository = memoryRepository({ entries: [valid, invalid] })
+    const aggregate = new WorkspacePaneLayoutAggregate({ repository })
+
+    const snapshot = await aggregate.validateRepairAndSnapshot({
+      ...scope,
+      validTargets: [{ repoRoot: '/repo', branchName: 'main', worktreePath: null }],
+      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      providerSnapshots: [],
+    })
+
+    expect(repository.layout).toEqual({ entries: [valid] })
+    expect(snapshot.entries).toEqual([valid])
+  })
+
+  test('suppresses invalid targets when repair persistence fails', async () => {
+    const repository = memoryRepository({ entries: [{
+      repoRoot: '/repo', branchName: 'deleted', worktreePath: null, tabs: [workspacePaneStaticTabEntry('status')],
+    }] })
+    repository.compareAndSwap = vi.fn(async () => { throw new Error('disk full') })
+    const aggregate = new WorkspacePaneLayoutAggregate({ repository })
+
+    const snapshot = await aggregate.validateRepairAndSnapshot({
+      ...scope,
+      validTargets: [],
+      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      providerSnapshots: [],
+    })
+
+    expect(snapshot.entries).toEqual([])
+    expect(repository.layout.entries).toHaveLength(1)
+  })
 })
 
 interface MemoryRepository extends WorkspacePaneLayoutRepository {

@@ -131,6 +131,25 @@ export class WorkspacePaneEpochOverlay {
     if (active?.size === 0) this.epochsByRepoRoot.delete(scope.repoRoot)
   }
 
+  retireTarget(target: WorkspacePaneTabsTargetIdentity): WorkspacePaneEpochScope[] {
+    const targetKey = workspacePaneTabsTargetIdentityKeyFromIdentity(target)
+    const affected: WorkspacePaneEpochScope[] = []
+    for (const [key, state] of this.epochs) {
+      const branchChanged = state.branchNamesByTarget.delete(targetKey)
+      const placementChanged = state.placementsByTarget.delete(targetKey)
+      const physicalKey = state.physicalKeysByTarget.get(targetKey)
+      if (physicalKey) {
+        const scope = scopeFromEpochKey(key)
+        this.removePhysicalTarget(physicalKey, scope, targetKey)
+        state.physicalKeysByTarget.delete(targetKey)
+      }
+      if (!branchChanged && !placementChanged && !physicalKey) continue
+      state.overlayRevision += 1
+      affected.push(scopeFromEpochKey(key))
+    }
+    return affected
+  }
+
   private state(scope: WorkspacePaneEpochScope): EpochState {
     const key = epochKey(scope)
     let state = this.epochs.get(key)
@@ -220,6 +239,12 @@ export function runtimeIdentity(type: WorkspacePaneRuntimeTabType, sessionId: st
 
 function epochKey(scope: WorkspacePaneEpochScope): string {
   return `${scope.userId}\0${scope.repoRoot}\0${scope.repoRuntimeId}`
+}
+
+function scopeFromEpochKey(key: string): WorkspacePaneEpochScope {
+  const [userId, repoRoot, repoRuntimeId] = key.split('\0')
+  if (!userId || !repoRoot || !repoRuntimeId) throw new Error('invalid workspace pane epoch key')
+  return { userId, repoRoot, repoRuntimeId }
 }
 
 function epochTargetKey(scope: WorkspacePaneEpochScope, targetKey: string): string {

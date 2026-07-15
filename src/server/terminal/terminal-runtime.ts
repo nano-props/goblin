@@ -239,8 +239,8 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
   })
   const workspacePaneTabsHost: ServerWorkspacePaneTabsHost & ServerWorkspacePaneTargetLifecycleHost = {
-    async initializeTabs(userId, input) {
-      return await sessionService.initializeTabs(userId, input)
+    async restoreTabs(userId, input) {
+      return await sessionService.restoreTabs(userId, input)
     },
     async listWorkspaceTabs(clientId, userId, input) {
       return await workspacePaneTabsActions.listWorkspaceTabs(clientId, userId, input)

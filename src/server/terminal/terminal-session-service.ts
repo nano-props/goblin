@@ -8,7 +8,6 @@ import {
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type {
-  WorkspacePaneTabsEntry,
   WorkspacePaneTabsSnapshot,
   WorkspacePaneTabsUpdateInput,
 } from '#/shared/workspace-pane-tabs.ts'
@@ -21,6 +20,8 @@ import {
   type WorkspacePaneRuntimeTabsProvider,
 } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import type { WorkspacePaneTabsTargetIdentity } from '#/shared/workspace-pane-tabs-target.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
 import {
   createTerminalSessionEnsurer,
@@ -176,27 +177,28 @@ class TerminalSessionService {
     })
   }
 
-  async initializeTabs(
+  async restoreTabs(
     userId: string,
-    input: { repoRoot: string; repoRuntimeId: string; entries: WorkspacePaneTabsEntry[] },
+    input: {
+      repoRoot: string
+      repoRuntimeId: string
+      targets: WorkspacePaneTabsTarget[]
+      expectedRepoEntry: RepoSessionEntry
+    },
   ): Promise<WorkspacePaneTabsSnapshot> {
     if (!isValidRepoLocator(input.repoRoot)) return emptyWorkspacePaneTabsSnapshot()
-    for (const entry of input.entries) {
-      if (entry.repoRoot !== input.repoRoot) return emptyWorkspacePaneTabsSnapshot()
-      if (!isValidBranch(entry.branchName)) return emptyWorkspacePaneTabsSnapshot()
-      if (entry.worktreePath !== null && !isValidCwd(entry.worktreePath)) return emptyWorkspacePaneTabsSnapshot()
-    }
     const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
-    return await this.workspaceTabsCoordinator.initializeScope({
+    return await this.workspaceTabsCoordinator.restoreScope({
       userId,
       repoRoot: input.repoRoot,
       scope,
-      entries: input.entries.map((entry) => ({
-        branchName: entry.branchName,
-        worktreePath:
-          entry.worktreePath === null ? null : terminalSessionWorktreePath(input.repoRoot, entry.worktreePath),
-        tabs: entry.tabs,
+      targets: input.targets.map((target) => ({
+        ...target,
+        worktreePath: target.worktreePath === null
+          ? null
+          : terminalSessionWorktreePath(input.repoRoot, target.worktreePath),
       })),
+      expectedRepoEntry: input.expectedRepoEntry,
       assertCurrent: () => this.assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId),
     })
   }
