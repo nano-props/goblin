@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { runRepoProjectionPromotion } from '#/web/repo-projection-promotion-command.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
 
@@ -11,7 +10,6 @@ interface LazyRestoreTarget {
   repoRoot: string
   repoRuntimeId: string
   projectionState: 'projected' | 'stub'
-  entry: RepoSessionEntry | null
 }
 
 interface PromotionTargetIdentity {
@@ -36,7 +34,6 @@ export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) 
         repoRoot: repo.id,
         repoRuntimeId: repo.repoRuntimeId,
         projectionState: repo.session.projectionState,
-        entry: repo.session.entry,
       }
     }),
   )
@@ -44,14 +41,13 @@ export function useRestoreRepoTabsOnView({ repoId }: { repoId: string | null }) 
   const [targetState, setTargetState] = useState<TargetPromotionViewState | null>(null)
 
   useEffect(() => {
-    if (target?.projectionState !== 'stub' || !target.entry) return
+    if (target?.projectionState !== 'stub') return
     const targetIdentity = { repoRoot: target.repoRoot, repoRuntimeId: target.repoRuntimeId }
     let current = true
     setTargetState({ target: targetIdentity, state: { phase: 'promoting' } })
     void runRepoProjectionPromotion({
       repoRoot: target.repoRoot,
       repoRuntimeId: target.repoRuntimeId,
-      entry: target.entry,
     }).then((result) => {
       if (!current) return
       if (!result.ok) {

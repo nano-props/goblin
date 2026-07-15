@@ -18,12 +18,13 @@ The primary window boot path has two separate concerns: public shell hydration a
 3. Authenticated workspace restore
    - Owner: `useAuthenticatedAppBootstrap`.
    - A single restore run owns the settings snapshot, non-critical authenticated hydration, workspace session restore, timeout, and cleanup cancellation.
-   - The hook exposes an explicit shell state: `{ status: 'restoring-workspace' }` or `{ status: 'ready' }`.
-   - The run returns an explicit outcome: `completed` or `cancelled`. Only `completed` may transition the authenticated shell to `{ status: 'ready' }`.
+   - The hook exposes an explicit shell state: `restoring-workspace`, `ready`, or `failed`. Failed state carries a message and the hook exposes an explicit retry command.
+   - The run returns an explicit outcome: `completed`, `cancelled`, or `failed`. Only `completed` may transition the authenticated shell to `ready`.
    - Cleanup cancellation is not a restore failure. Timeouts and actual restore errors are failures and must leave enough state for the UI to render without opening persistence.
 
 4. Workspace membership restore
    - Owner: server `restoreServerWorkspace` and client `hydrateRestoredWorkspaceRuntime`.
+   - The server incrementally converges acquired leases against the latest durable membership. Concurrent membership changes retain unchanged leases, release removed entries, and open added entries before the result is committed.
    - The server validates repo identity, eagerly projects the routed repo, and returns other or temporarily unavailable repos as stub leases.
    - Produces the restored repo membership and placeholder repos. `workspaceMembershipReady` means membership has settled; repo content may still be loading.
    - If the restore signal is aborted, this stage must return without flipping `workspaceMembershipReady`.
@@ -31,7 +32,8 @@ The primary window boot path has two separate concerns: public shell hydration a
 5. Lazy repo promotion
    - Owner: `useRestoreRepoTabsOnView` and server `restoreRepoTabsForRepo`.
    - When navigation reaches a stub, the server projects that repo and restores tabs from the current server-owned `ServerWorkspaceState`.
-   - The client sends only its repo entry and server-issued runtime identity; it never sends a canonical tabs snapshot back to the server.
+   - The client sends only the repo root and server-issued runtime identity. The server reads the canonical repo entry from current durable membership; client stub data is never command authority.
+   - Promotion validates both the requesting client's runtime lease and durable membership before initializing pane runtime state.
    - Availability failures leave the stub and membership intact so a later navigation can retry.
    - If the current repo projection proves persisted pane-tab targets invalid, the server clears only that repo's
      unchanged tab state before initializing the runtime scope. Concurrent tab writes win the repo-local comparison.

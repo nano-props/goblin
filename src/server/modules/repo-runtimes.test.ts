@@ -6,6 +6,7 @@ import {
   clearRepoRuntimesForUser,
   expireRepoRuntimeMembershipLease,
   isCurrentRepoRuntime,
+  isCurrentRepoRuntimeMembership,
   listRepoRuntimes,
   onRepoRuntimeClosed,
   releaseRepoRuntime,
@@ -64,6 +65,16 @@ describe('repo runtimes', () => {
       released: false,
       runtimeClosed: false,
     })
+  })
+
+  test('checks runtime authority and client lease together', () => {
+    const runtimeId = acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-a')
+    expect(isCurrentRepoRuntimeMembership(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toBe(true)
+    expect(isCurrentRepoRuntimeMembership(USER_ID, REPO_ROOT, runtimeId, 'client-b')).toBe(false)
+    acquireRepoRuntime(USER_ID, REPO_ROOT, 'client-b')
+    expect(isCurrentRepoRuntimeMembership(USER_ID, REPO_ROOT, runtimeId, 'client-b')).toBe(true)
+    releaseRepoRuntime(USER_ID, REPO_ROOT, runtimeId, 'client-a')
+    expect(isCurrentRepoRuntimeMembership(USER_ID, REPO_ROOT, runtimeId, 'client-a')).toBe(false)
   })
 
   test('expires only memberships captured when a client went offline', () => {
@@ -137,11 +148,15 @@ describe('repo runtimes', () => {
       },
     }))
 
-    await expect(runRepoRemoteLifecycle(USER_ID, repoRoot, repoRuntimeId, failed, undefined, 'ensure')).resolves.toMatchObject({
+    await expect(
+      runRepoRemoteLifecycle(USER_ID, repoRoot, repoRuntimeId, failed, undefined, 'ensure'),
+    ).resolves.toMatchObject({
       kind: 'settled',
       lifecycle: { kind: 'failed' },
     })
-    await expect(runRepoRemoteLifecycle(USER_ID, repoRoot, repoRuntimeId, ready, undefined, 'ensure')).resolves.toMatchObject({
+    await expect(
+      runRepoRemoteLifecycle(USER_ID, repoRoot, repoRuntimeId, ready, undefined, 'ensure'),
+    ).resolves.toMatchObject({
       kind: 'settled',
       lifecycle: { kind: 'ready' },
     })

@@ -62,9 +62,11 @@ Restore:
 
 1. `ServerWorkspaceState.openRepoEntries` is read as the shared boot restore
    intent.
-2. Restore reopens runtimes through the server before writing any
-   repo projection.
-3. The server returns canonical repo entries and runtime identities. Membership
+2. Restore performs slow repo I/O outside the settings mutation queue, then
+   compares membership through a short server-side CAS.
+3. Concurrent membership changes are converged by retaining unchanged leases,
+   releasing removed entries, and opening newly added entries.
+4. The server returns canonical repo entries and runtime identities. Membership
    remains server-owned; the client persists only its local selection and presentation.
 
 Live commands:
@@ -101,6 +103,8 @@ Realtime recovery:
   `ServerWorkspaceState.openRepoEntries` is user-level restore state;
   runtime leases are scoped by `clientId`.
 - Only explicit open and close commands may mutate durable workspace membership.
+- Restore and lazy promotion may compare durable membership, but never recreate
+  a client-provided membership declaration.
 - Do not let the client mint or validate `repoRuntimeId` locally.
 - Server routes that mutate repo-scoped runtime resources should validate the
   server-owned `repoRuntimeId` when the operation targets runtime state.

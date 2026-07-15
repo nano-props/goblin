@@ -253,7 +253,6 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
     clientId: ClientIdSchema,
     repoRoot: RepoRootSchema,
     repoRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
-    entry: RepoSessionEntrySchema,
   }),
 } as const
 

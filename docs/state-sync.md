@@ -106,9 +106,10 @@ Notes:
 - At boot, the server reads `openRepoEntries` from its workspace state. Later
   membership changes use fine-grained server open/close commands, not a client
   whole-workspace snapshot.
-- Lazy repo promotion sends the server-restored repo entry carried by the client
-  stub and reads durable pane layout from the server source at promotion time.
-  Do not carry server layout in a client restore intent or baseline write-back.
+- Lazy repo promotion sends only the repo root and server-issued runtime id.
+  The server resolves the canonical entry and durable pane layout from current
+  workspace membership. Do not carry membership or server layout in a client
+  restore intent or baseline write-back.
 - Boot keeps `ClientWorkspaceState` and `ServerWorkspaceState` separate. The client never constructs or writes a combined session snapshot.
 - `repoSnapshotCache` names the warm-start repo cache slice.
 - `RepoSnapshotCacheEntry` is the stored snapshot shape inside that cache.

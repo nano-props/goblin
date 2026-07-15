@@ -73,10 +73,9 @@ export async function restoreRepoTabsOnView(
   clientId: string,
   repoRoot: string,
   repoRuntimeId: string,
-  entry: RepoSessionEntry,
   options?: { signal?: AbortSignal },
 ) {
-  return await restoreRepoWorkspaceTabs(clientId, repoRoot, repoRuntimeId, entry, options)
+  return await restoreRepoWorkspaceTabs(clientId, repoRoot, repoRuntimeId, options)
 }
 
 export async function setFetchInterval(sec: number): Promise<number> {

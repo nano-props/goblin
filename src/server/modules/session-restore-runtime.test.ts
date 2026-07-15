@@ -4,6 +4,7 @@ import {
   acquireRepoRuntimeLease,
   clearRepoRuntimesForUser,
   isCurrentRepoRuntime,
+  isCurrentRepoRuntimeMembership,
   releaseRepoRuntimeMembershipLease,
 } from '#/server/modules/repo-runtimes.ts'
 
@@ -16,6 +17,18 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerWorkspaceState: mocks.getServerWorkspaceState,
+  compareAndReplaceServerWorkspaceRepos: vi.fn(),
+  confirmServerWorkspaceRepoEntry: vi.fn(async (entry) => ({
+    matched: true,
+    workspace: { openRepoEntries: [entry], workspacePaneTabsByTargetByRepo: {} },
+  })),
+  confirmServerWorkspaceTabsUnchanged: vi.fn(async (input) => ({
+    matched: true,
+    workspace: {
+      openRepoEntries: [input.expectedRepoEntry],
+      workspacePaneTabsByTargetByRepo: { [input.repoRoot]: input.expectedTabsByTarget },
+    },
+  })),
   clearServerWorkspaceTabsIfUnchanged: vi.fn(),
 }))
 
@@ -45,6 +58,7 @@ describe('session restore runtime ownership', () => {
 
   test('preserves the existing stub membership when lazy projection fails', async () => {
     const lease = acquireRepoRuntimeLease(USER_ID, REPO_ROOT, CLIENT_ID)
+    expect(isCurrentRepoRuntimeMembership(USER_ID, REPO_ROOT, lease.repoRuntimeId, CLIENT_ID)).toBe(true)
     const workspacePaneTabsHost = {
       initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
       listWorkspaceTabs: vi.fn(),
@@ -59,7 +73,6 @@ describe('session restore runtime ownership', () => {
         clientId: CLIENT_ID,
         repoRoot: REPO_ROOT,
         repoRuntimeId: lease.repoRuntimeId,
-        entry: { kind: 'local', id: REPO_ROOT },
         workspacePaneTabsHost,
       }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })

@@ -176,12 +176,11 @@ export async function restoreRepoWorkspaceTabs(
   clientId: string,
   repoRoot: string,
   repoRuntimeId: string,
-  entry: RepoSessionEntry,
   options?: { signal?: AbortSignal },
 ): Promise<RepoWorkspaceTabsRestoreResult> {
   return await postServerJson(
     '/api/settings/workspace/restore-repo-tabs',
-    { clientId, repoRoot, repoRuntimeId, entry },
+    { clientId, repoRoot, repoRuntimeId },
     { signal: options?.signal },
   )
 }

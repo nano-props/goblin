@@ -103,7 +103,11 @@ export function acquireRepoRuntimeLease(
   return lease
 }
 
-function acquireRepoRuntimeMembership(userId: string, repoRoot: string, clientId: string): RepoRuntimeMembershipLeaseEntry {
+function acquireRepoRuntimeMembership(
+  userId: string,
+  repoRoot: string,
+  clientId: string,
+): RepoRuntimeMembershipLeaseEntry {
   if (!repoRoot) throw new Error('repo runtime open requires repoRoot')
   if (!clientId) throw new Error('repo runtime acquire requires clientId')
   const state = repoRuntimeState(userId, repoRoot)
@@ -261,6 +265,16 @@ function assertValidRepoRuntimeMembershipDeclaration(clientId: string, repoRoots
 
 export function isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean {
   return repoRuntimesByUser.get(userId)?.get(repoRoot)?.currentRepoRuntimeId === repoRuntimeId
+}
+
+export function isCurrentRepoRuntimeMembership(
+  userId: string,
+  repoRoot: string,
+  repoRuntimeId: string,
+  clientId: string,
+): boolean {
+  const state = repoRuntimesByUser.get(userId)?.get(repoRoot)
+  return state?.currentRepoRuntimeId === repoRuntimeId && state.members.has(clientId)
 }
 
 export function failRepoRemoteLifecycle(input: {

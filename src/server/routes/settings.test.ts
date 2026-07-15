@@ -208,7 +208,6 @@ describe('settings routes', () => {
           clientId: 'client_test000000000000',
           repoRoot: '/repo-active',
           repoRuntimeId: 'repo_runtime_test',
-          entry: { kind: 'local', id: '/repo-active' },
         }),
       }),
     )
@@ -219,7 +218,6 @@ describe('settings routes', () => {
       clientId: 'client_test000000000000',
       repoRoot: '/repo-active',
       repoRuntimeId: 'repo_runtime_test',
-      entry: { kind: 'local', id: '/repo-active' },
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       signal: expect.any(AbortSignal),
     })

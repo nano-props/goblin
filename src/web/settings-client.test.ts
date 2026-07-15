@@ -200,9 +200,8 @@ describe('settings-client', () => {
     }))
 
     const { restoreRepoWorkspaceTabs } = await import('#/web/settings-client.ts')
-    const entry = { kind: 'local' as const, id: '/tmp/routed-repo' }
     await expect(
-      restoreRepoWorkspaceTabs('client_test000000000000', '/tmp/routed-repo', 'repo_runtime_test', entry),
+      restoreRepoWorkspaceTabs('client_test000000000000', '/tmp/routed-repo', 'repo_runtime_test'),
     ).resolves.toEqual(restored)
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
@@ -210,7 +209,6 @@ describe('settings-client', () => {
       clientId: 'client_test000000000000',
       repoRoot: '/tmp/routed-repo',
       repoRuntimeId: 'repo_runtime_test',
-      entry,
     })
   })
 

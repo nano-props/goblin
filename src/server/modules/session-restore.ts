@@ -24,15 +24,17 @@ import {
 import { probeRepo, readRepoProjection } from '#/server/modules/repo-read-paths.ts'
 import {
   acquireRepoRuntimeLease,
-  isCurrentRepoRuntime,
+  isCurrentRepoRuntimeMembership,
   releaseRepoRuntimeMembershipLease,
   type RepoRuntimeMembershipLeaseEntry,
 } from '#/server/modules/repo-runtimes.ts'
 import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
 import {
   clearServerWorkspaceTabsIfUnchanged,
+  compareAndReplaceServerWorkspaceRepos,
+  confirmServerWorkspaceRepoEntry,
+  confirmServerWorkspaceTabsUnchanged,
   getServerWorkspaceState,
-  replaceServerWorkspaceReposIfUnchanged,
 } from '#/server/modules/settings-source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 
@@ -62,7 +64,6 @@ export interface RestoreRepoTabsInput {
   clientId: string
   repoRoot: string
   repoRuntimeId: string
-  entry: RepoSessionEntry
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   signal?: AbortSignal
 }
@@ -85,6 +86,7 @@ interface WorkspacePaneTabsRestoreReplacement {
 }
 
 const MAX_WORKSPACE_REPAIR_CONFLICT_RETRIES = 3
+const MAX_WORKSPACE_MEMBERSHIP_CONFLICT_RETRIES = 3
 const restoreQueues = new Map<string, PQueue>()
 
 export async function restoreServerWorkspace(input: RestoreServerWorkspaceInput): Promise<RestoredServerWorkspace> {
@@ -94,12 +96,33 @@ export async function restoreServerWorkspace(input: RestoreServerWorkspaceInput)
   try {
     return await queue.add(async () => {
       input.signal?.throwIfAborted()
-      const workspace = await getServerWorkspaceState()
-      const restored = await restoreServerWorkspaceSnapshot(
-        { ...input, activeRepoRoot: input.activeRepoRoot ?? workspace.openRepoEntries[0]?.id ?? null },
-        { workspace, openRepoEntries: workspace.openRepoEntries },
-      )
-      return restored
+      let workspace = await getServerWorkspaceState()
+      const restoreInput = {
+        ...input,
+        activeRepoRoot: input.activeRepoRoot ?? workspace.openRepoEntries[0]?.id ?? null,
+      }
+      const openedByRoot = new Map<string, OpenedRepoSessionEntry>()
+      let repaired = false
+      let committed = false
+      try {
+        for (let conflicts = 0; ; conflicts += 1) {
+          const outcome = await restoreServerWorkspaceSnapshot(restoreInput, workspace, openedByRoot)
+          if (outcome.kind === 'restored') {
+            committed = true
+            return {
+              ...outcome.value,
+              status: repaired || outcome.value.status === 'repaired' ? 'repaired' : 'restored',
+            }
+          }
+          repaired ||= outcome.repaired
+          if (conflicts >= MAX_WORKSPACE_MEMBERSHIP_CONFLICT_RETRIES) {
+            throw new Error('workspace membership restore was superseded too many times')
+          }
+          workspace = outcome.latestWorkspace
+        }
+      } finally {
+        if (!committed) releaseOpenedRepoRuntimes(input, openedByRoot.values())
+      }
     })
   } finally {
     void queue.onIdle().then(() => {
@@ -121,60 +144,126 @@ function restoreQueueFor(key: string): PQueue {
   return queue
 }
 
+type RestoreServerWorkspaceSnapshotOutcome =
+  | { kind: 'restored'; value: RestoredServerWorkspaceSnapshot }
+  | { kind: 'membership-conflict'; latestWorkspace: ServerWorkspaceState; repaired: boolean }
+
 async function restoreServerWorkspaceSnapshot(
   input: RestoreServerWorkspaceInput,
-  source: { workspace: ServerWorkspaceState; openRepoEntries: RepoSessionEntry[] },
-): Promise<RestoredServerWorkspaceSnapshot> {
+  source: ServerWorkspaceState,
+  openedByRoot: Map<string, OpenedRepoSessionEntry>,
+): Promise<RestoreServerWorkspaceSnapshotOutcome> {
   input.signal?.throwIfAborted()
-  const opened: OpenedRepoSessionEntry[] = []
   let repoRestoreFailed = false
-  let openedMembershipsCommitted = false
   const activeRepoRoot = input.activeRepoRoot ?? null
-  try {
-    for (const entry of source.openRepoEntries) {
-      const result = await openSessionRepo(input, entry, {
-        active: repoSessionEntryId(entry) === activeRepoRoot,
-      })
-      if (result.kind === 'invalid') {
-        repoRestoreFailed = true
-        continue
-      }
-      opened.push(result.opened)
+  reconcileOpenedRepoMemberships(input, source.openRepoEntries, openedByRoot)
+  for (const entry of source.openRepoEntries) {
+    if (openedByRoot.has(repoSessionEntryId(entry))) continue
+    const result = await openSessionRepo(input, entry, {
+      active: repoSessionEntryId(entry) === activeRepoRoot,
+    })
+    if (result.kind === 'invalid') {
+      repoRestoreFailed = true
+      continue
     }
+    openedByRoot.set(result.opened.repoRoot, result.opened)
+  }
 
-    input.signal?.throwIfAborted()
-    const membershipRepair = repoRestoreFailed
-      ? await replaceServerWorkspaceReposIfUnchanged(
-          source.openRepoEntries,
-          opened.map((repo) => repo.entry),
-        )
-      : { replaced: false, workspace: source.workspace }
-    // Only the active repo's tabs are validated and restored at startup.
-    // Non-active repos carry `projection: null` so their `targetForSessionKey`
-    // cannot resolve — and their tabs will be restored lazily when the user
-    // navigates to them via `restoreRepoTabsForRepo`.
-    const openedActive = opened.filter(isOpenedProjectedRepo)
-    const validatedWorkspace = openedActive[0]
-      ? await validateOrRepairWorkspacePaneTabs(membershipRepair.workspace, openedActive[0])
-      : { workspace: membershipRepair.workspace, repaired: false }
+  input.signal?.throwIfAborted()
+  const opened = source.openRepoEntries.flatMap((entry) => {
+    const repo = openedByRoot.get(repoSessionEntryId(entry))
+    return repo ? [repo] : []
+  })
+  const membership = await compareAndReplaceServerWorkspaceRepos(
+    source.openRepoEntries,
+    opened.map((repo) => repo.entry),
+  )
+  if (!membership.matched) {
+    return { kind: 'membership-conflict', latestWorkspace: membership.latestWorkspace, repaired: false }
+  }
 
-    input.signal?.throwIfAborted()
-    const workspacePaneTabs = await restoreWorkspacePaneTabsForRepos(input, validatedWorkspace.workspace, openedActive)
-    input.signal?.throwIfAborted()
-    openedMembershipsCommitted = true
+  // Only the active repo's tabs are validated and restored at startup.
+  // Non-active repos carry `projection: null` and are restored lazily.
+  const openedActive = opened.filter(isOpenedProjectedRepo)
+  const validatedWorkspace = openedActive[0]
+    ? await validateOrRepairWorkspacePaneTabs(membership.workspace, openedActive[0], openedActive[0].entry)
+    : { kind: 'validated' as const, workspace: membership.workspace, repaired: false }
+  if (validatedWorkspace.kind === 'membership-conflict') {
     return {
+      kind: 'membership-conflict',
+      latestWorkspace: validatedWorkspace.latestWorkspace,
+      repaired: repoRestoreFailed,
+    }
+  }
+
+  const confirmed = await compareAndReplaceServerWorkspaceRepos(
+    membership.workspace.openRepoEntries,
+    membership.workspace.openRepoEntries,
+  )
+  if (!confirmed.matched) {
+    return {
+      kind: 'membership-conflict',
+      latestWorkspace: confirmed.latestWorkspace,
+      repaired: repoRestoreFailed || validatedWorkspace.repaired,
+    }
+  }
+
+  const stableWorkspace = {
+    ...validatedWorkspace.workspace,
+    openRepoEntries: confirmed.workspace.openRepoEntries,
+  }
+  input.signal?.throwIfAborted()
+  const workspacePaneTabs = await restoreWorkspacePaneTabsForRepos(input, stableWorkspace, openedActive)
+  input.signal?.throwIfAborted()
+  const committedMembership = await compareAndReplaceServerWorkspaceRepos(
+    stableWorkspace.openRepoEntries,
+    stableWorkspace.openRepoEntries,
+  )
+  if (!committedMembership.matched) {
+    return {
+      kind: 'membership-conflict',
+      latestWorkspace: committedMembership.latestWorkspace,
+      repaired: repoRestoreFailed || validatedWorkspace.repaired,
+    }
+  }
+  return {
+    kind: 'restored',
+    value: {
       status: repoRestoreFailed || validatedWorkspace.repaired ? 'repaired' : 'restored',
       openRepoEntries: opened.map((repo) => repo.entry),
-      workspace: validatedWorkspace.workspace,
+      workspace: stableWorkspace,
       runtime: runtimeSnapshotFromOpened(
         opened,
         activeRepoRootForOpened(input.activeRepoRoot, opened),
         workspacePaneTabs,
       ),
-    }
-  } finally {
-    if (!openedMembershipsCommitted) releaseOpenedRepoRuntimes(input, opened)
+    },
   }
+}
+
+function reconcileOpenedRepoMemberships(
+  input: RestoreServerWorkspaceInput,
+  entries: readonly RepoSessionEntry[],
+  openedByRoot: Map<string, OpenedRepoSessionEntry>,
+): void {
+  const expectedByRoot = new Map(entries.map((entry) => [repoSessionEntryId(entry), entry]))
+  for (const [repoRoot, opened] of openedByRoot) {
+    const expected = expectedByRoot.get(repoRoot)
+    if (expected && sameRepoSessionEntry(opened.entry, expected)) continue
+    releaseSessionRepoRuntime(input, opened.lease)
+    openedByRoot.delete(repoRoot)
+  }
+}
+
+function sameRepoSessionEntry(a: RepoSessionEntry, b: RepoSessionEntry): boolean {
+  if (a.kind !== b.kind || a.id !== b.id) return false
+  if (a.kind === 'local' || b.kind === 'local') return true
+  return (
+    a.ref.id === b.ref.id &&
+    a.ref.alias === b.ref.alias &&
+    a.ref.remotePath === b.ref.remotePath &&
+    a.ref.displayName === b.ref.displayName
+  )
 }
 
 async function openSessionRepo(
@@ -363,18 +452,24 @@ function validateWorkspacePaneTabs(
  */
 export async function restoreRepoTabsForRepo(input: RestoreRepoTabsInput): Promise<RepoWorkspaceTabsRestoreResult> {
   input.signal?.throwIfAborted()
-  assertCurrentRepoRuntime(input)
-  const entry = input.entry
-  if (repoSessionEntryId(entry) !== input.repoRoot) {
-    throw new IpcError({ code: 'BAD_REQUEST', message: 'error.invalid-arguments' })
-  }
+  assertCurrentRepoRuntimeMembership(input)
+  const initialWorkspace = await getServerWorkspaceState()
+  assertCurrentRepoRuntimeMembership(input)
+  const entry = workspaceRepoEntry(initialWorkspace, input.repoRoot)
+  if (!entry) throw new IpcError({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
   const repo = await projectSessionRepo(input, entry)
   if (!repo) {
     throw new IpcError({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
   }
 
-  const persistedWorkspace = await getServerWorkspaceState()
-  const validatedWorkspace = await validateOrRepairWorkspacePaneTabs(persistedWorkspace, repo)
+  const membership = await confirmServerWorkspaceRepoEntry(entry)
+  if (!membership.matched) throw new IpcError({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
+  const validatedWorkspace = await validateOrRepairWorkspacePaneTabs(membership.workspace, repo, entry)
+  if (validatedWorkspace.kind === 'membership-conflict') {
+    throw new IpcError({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
+  }
+  const confirmed = await confirmServerWorkspaceRepoEntry(entry)
+  if (!confirmed.matched) throw new IpcError({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
 
   const snapshots = await restoreWorkspacePaneTabsForRepos(
     {
@@ -386,7 +481,11 @@ export async function restoreRepoTabsForRepo(input: RestoreRepoTabsInput): Promi
     validatedWorkspace.workspace,
     [repo],
   )
-  assertCurrentRepoRuntime(input)
+  assertCurrentRepoRuntimeMembership(input)
+  const committedMembership = await confirmServerWorkspaceRepoEntry(entry)
+  if (!committedMembership.matched) {
+    throw new IpcError({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
+  }
   return {
     repo,
     snapshot: snapshots[0]?.snapshot ?? null,
@@ -396,22 +495,47 @@ export async function restoreRepoTabsForRepo(input: RestoreRepoTabsInput): Promi
 async function validateOrRepairWorkspacePaneTabs(
   initialWorkspace: ServerWorkspaceState,
   repo: ProjectedRestoredWorkspaceRepoRuntime,
-): Promise<{ workspace: ServerWorkspaceState; repaired: boolean }> {
+  expectedRepoEntry: RepoSessionEntry,
+): Promise<
+  | { kind: 'validated'; workspace: ServerWorkspaceState; repaired: boolean }
+  | { kind: 'membership-conflict'; latestWorkspace: ServerWorkspaceState }
+> {
   let workspace = initialWorkspace
   for (let conflicts = 0; ; conflicts += 1) {
+    const currentEntry = workspaceRepoEntry(workspace, repo.repoRoot)
+    if (!currentEntry || !sameRepoSessionEntry(currentEntry, expectedRepoEntry)) {
+      return { kind: 'membership-conflict', latestWorkspace: workspace }
+    }
     const repoWorkspace = workspaceForRepoTabs(workspace, repo.repoRoot)
-    if (validateWorkspacePaneTabs(repoWorkspace, [repo]).ok) return { workspace, repaired: false }
     const expectedTabsByTarget = repoWorkspace.workspacePaneTabsByTargetByRepo[repo.repoRoot] ?? {}
+    if (validateWorkspacePaneTabs(repoWorkspace, [repo]).ok) {
+      const confirmed = await confirmServerWorkspaceTabsUnchanged({
+        repoRoot: repo.repoRoot,
+        expectedRepoEntry,
+        expectedTabsByTarget,
+      })
+      if (confirmed.matched) return { kind: 'validated', workspace: confirmed.workspace, repaired: false }
+      if (conflicts >= MAX_WORKSPACE_REPAIR_CONFLICT_RETRIES) {
+        throw new Error('workspace tabs validation was superseded too many times')
+      }
+      workspace = confirmed.latestWorkspace
+      continue
+    }
     const cleared = await clearServerWorkspaceTabsIfUnchanged({
       repoRoot: repo.repoRoot,
+      expectedRepoEntry,
       expectedTabsByTarget,
     })
-    if (cleared.cleared) return { workspace: cleared.workspace, repaired: true }
+    if (cleared.cleared) return { kind: 'validated', workspace: cleared.workspace, repaired: true }
     if (conflicts >= MAX_WORKSPACE_REPAIR_CONFLICT_RETRIES) {
       throw new Error('workspace tabs repair was superseded too many times')
     }
     workspace = cleared.latestWorkspace
   }
+}
+
+function workspaceRepoEntry(workspace: ServerWorkspaceState, repoRoot: string): RepoSessionEntry | null {
+  return workspace.openRepoEntries.find((entry) => repoSessionEntryId(entry) === repoRoot) ?? null
 }
 
 function workspaceForRepoTabs(workspace: ServerWorkspaceState, repoRoot: string): ServerWorkspaceState {
@@ -437,14 +561,14 @@ async function projectSessionRepo(
       }),
       input.signal,
     )
-    assertCurrentRepoRuntime(input)
+    assertCurrentRepoRuntimeMembership(input)
     if (lifecycle.kind !== 'settled' || lifecycle.lifecycle.kind !== 'ready') return null
     const projection = await readRepoProjection(entry.id, {
       repoRuntimeId: input.repoRuntimeId,
       signal: input.signal,
       mode: 'full',
     })
-    assertCurrentRepoRuntime(input)
+    assertCurrentRepoRuntimeMembership(input)
     if (!projection.snapshot) return null
     return {
       entry,
@@ -457,14 +581,14 @@ async function projectSessionRepo(
   }
 
   const probe = await probeRepo(entry.id)
-  assertCurrentRepoRuntime(input)
+  assertCurrentRepoRuntimeMembership(input)
   if (!probe.ok || !probe.root || probe.root !== entry.id) return null
   const projection = await readRepoProjection(probe.root, {
     repoRuntimeId: input.repoRuntimeId,
     signal: input.signal,
     mode: 'full',
   })
-  assertCurrentRepoRuntime(input)
+  assertCurrentRepoRuntimeMembership(input)
   if (!projection.snapshot) return null
   return {
     entry: { kind: 'local', id: probe.root },
@@ -475,8 +599,10 @@ async function projectSessionRepo(
   }
 }
 
-function assertCurrentRepoRuntime(input: RestoreRepoTabsInput): void {
-  if (isCurrentRepoRuntime(input.userId, input.repoRoot, input.repoRuntimeId)) return
+function assertCurrentRepoRuntimeMembership(input: RestoreRepoTabsInput): void {
+  if (isCurrentRepoRuntimeMembership(input.userId, input.repoRoot, input.repoRuntimeId, input.clientId)) {
+    return
+  }
   throw new IpcError({ code: 'BAD_REQUEST', message: 'error.repo-runtime-stale' })
 }
 
@@ -571,7 +697,7 @@ function runtimeSnapshotFromOpened(
   }
 }
 
-function releaseOpenedRepoRuntimes(input: RestoreServerWorkspaceInput, opened: OpenedRepoSessionEntry[]): void {
+function releaseOpenedRepoRuntimes(input: RestoreServerWorkspaceInput, opened: Iterable<OpenedRepoSessionEntry>): void {
   for (const repo of opened) releaseSessionRepoRuntime(input, repo.lease)
 }
 
