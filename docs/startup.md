@@ -31,12 +31,12 @@ The primary window boot path has two separate concerns: public shell hydration a
 
 5. Lazy repo promotion
    - Owner: `useRestoreRepoTabsOnView` and server `restoreRepoTabsForRepo`.
-   - When navigation reaches a stub, the server projects that repo and restores tabs from the current server-owned `ServerWorkspaceState`.
+   - When navigation reaches a stub, the server projects that repo and asks the pane aggregate for a canonical snapshot.
    - The client sends only the repo root and server-issued runtime identity. The server reads the canonical repo entry from current durable membership; client stub data is never command authority.
-   - Promotion validates both the requesting client's runtime lease and durable membership before initializing pane runtime state.
+   - Promotion validates both the requesting client's runtime lease and durable membership, validates or target-locally repairs durable layout through repository CAS, and then performs a pure projection. It never initializes or copies layout into epoch state.
    - Availability failures leave the stub and membership intact so a later navigation can retry.
-   - If the current repo projection proves persisted pane-tab targets invalid, the server clears only that repo's
-     unchanged tab state before initializing the runtime scope. Concurrent tab writes win the repo-local comparison.
+   - If the current repo projection proves persisted pane-tab targets invalid, the aggregate suppresses those targets from the response and retires only the invalid targets with membership-aware CAS. Concurrent tab writes cause a re-read and re-plan.
+   - After all asynchronous projection/provider work, lazy promotion performs a final durable-membership authorization before returning. Startup separately retains full ordered-membership convergence because its response contains the complete membership and lease set.
 
 6. Workspace shell side effects
    - Owner: `AuthenticatedWorkspaceShell` and `AuthenticatedWorkspaceSideEffects`.

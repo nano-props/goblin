@@ -53,10 +53,13 @@ The ownership split is:
   action/event names and their validation.
 - `src/shared/workspace-pane-runtime.ts` owns the application protocol for
   opening a provider runtime and its canonical tab as one server result.
-- `src/server/workspace-pane/*` owns server-side tab runtime state,
-  layout-intent writes, pure live-session projection, realtime invalidation,
-  and the cross-provider runtime-open application operation. Provider snapshots
-  are the sole live-membership authority; list never writes derived membership.
+- `WorkspacePaneLayoutRepository` is the sole durable static-layout representation.
+- `WorkspacePaneEpochOverlay` owns only runtime placement constraints, physical
+  reverse indexes, active repo projections, and epoch clocks.
+- `src/server/workspace-pane/*` owns aggregate layout commands, pure projection,
+  realtime invalidation, and the cross-provider runtime-open operation. Provider
+  snapshots are the sole live-membership authority; list and restore never copy
+  or write derived membership.
 - `src/web/workspace-pane/*` owns client query/cache projection and mutation
   orchestration for server-owned tab state.
 - `src/web/workspace-pane/tab-providers.ts` owns per-tab-type
@@ -81,8 +84,10 @@ Runtime creation follows three responsibility layers:
    runtime/tab writes, while explicit server operation permits let mutations
    admitted earlier finish in queue order. After repository validation it awaits provider
    quiescence, runs the Git removal past a non-cancelable commit point, then
-   finalizes canonical tabs. A Git failure reconciles runtime tabs while
-   preserving the worktree's static projection.
+   retires durable targets once and clears every affected epoch overlay. A Git
+   failure reconciles runtime tabs while preserving the worktree's static
+   projection. Git success followed by layout-finalize failure is reported as
+   a committed repository change and remains idempotently retryable.
    Provider commands return the exact target lifecycle effect plus the
    canonical tabs snapshot produced by that command. Full terminal collections
    are query snapshots with their own terminal projection revision; clients

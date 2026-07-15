@@ -4,12 +4,40 @@ Normative rules for workspace-pane commands, queues, routing, and tests.
 
 ## Ownership
 
-- Server: runtime resources, canonical tabs/layout revision, and `repoRuntimeId` validity.
+- `WorkspacePaneLayoutRepository`: the only restart-durable static target and tab order.
+- `WorkspacePaneEpochOverlay`: runtime placement constraints, physical reverse indexes, active repo projections, and epoch clocks.
+- Runtime providers: the only live runtime-session membership authority.
+- Server aggregate: layout commands, target repair/retirement, and deterministic canonical projection.
 - Router: visible repo, branch, and pane route.
 - React Query: canonical-tab projection. Repo store: restorable preferences, selection, and opener facts.
 - Action queue: ordering only. Presentation token: permission to publish one navigation result only.
 
 Never mirror router currentness or infer server runtime validity from client timing.
+
+Canonical tabs are a one-way projection:
+
+```text
+durable static layout + epoch placement/index state + provider snapshots
+-> versioned WorkspacePaneTabsSnapshot
+-> React Query projection
+```
+
+The overlay may retain same-epoch placement hints for a temporarily missing runtime session, but it never creates membership or copies durable static order. A missing durable target may synthesize `status`; an explicitly persisted target with `tabs: []` remains empty.
+
+## Server Commit Order
+
+Durable commands obey this lock order:
+
+```text
+physical worktree permit
+-> repoRoot layout queue
+-> synchronous epoch overlay commit
+-> settings mutation queue inside the repository adapter
+```
+
+The repository CAS commits before overlay/revision state. A conflict re-reads current layout and re-plans the original intent. Persistence failure commits no overlay. Provider snapshots are sampled again after persistence before returning the canonical snapshot.
+
+Target repair and retirement use the same aggregate boundary. Repair removes only invalid targets and preserves valid siblings. Physical removal retires each stable repo/target once, then clears every affected live overlay. Git success followed by layout persistence failure reports `repositoryStateChanged: true`; physical deletion is never described as rolled back.
 
 ## Commands
 
@@ -31,6 +59,8 @@ Never mirror router currentness or infer server runtime validity from client tim
 5. Exact transitions never rebase. A failed route CAS does not undo an already committed resource write.
 6. Reconciliation may canonicalize external stale state, but cannot invent command success.
 7. Rejection, replacement, cleanup, and unmount leave no pending intent or operation-owned listener.
+8. Equal canonical revision implies equal normalized entries; durable, overlay, and provider-only changes share one monotonic epoch clock.
+9. Runtime close clears only its epoch overlay/index/clock. Durable layout survives the next epoch and server restart.
 
 ## Required concurrency tests
 
