@@ -19,7 +19,7 @@ export async function movePathToTrash(path: string, signal?: AbortSignal): Promi
         reject: true,
         cancelSignal: signal,
       })
-      return { ok: true, message: 'ok', repoChanged: true }
+      return { ok: true, message: 'ok', repositoryStateChanged: true }
     } catch (err) {
       if (signal?.aborted) return { ok: false, message: 'cancelled' }
       if (isCommandMissing(err)) continue

@@ -21,7 +21,7 @@ export type RepoEventAction =
   | { kind: 'push'; branch: string }
   | { kind: 'createWorktree'; branch: string; worktreePath: string }
   | { kind: 'deleteBranch'; branch: string }
-  | { kind: 'removeWorktree'; branch: string; worktreePath: string; alsoDeleteBranch: boolean }
+  | { kind: 'removeWorktree'; branch: string; worktreePath: string; deleteBranch: boolean }
 
 export interface RepoResultEventOptions {
   action?: RepoEventAction

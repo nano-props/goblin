@@ -8,11 +8,19 @@ export function createRepoMutationApplication(deps: {
     async deleteBranch(userId, input) {
       const result = await input.deleteBranch()
       if (!result.ok) return result
-      await deps.workspacePaneTabs.retireTarget(userId, {
-        repoRuntimeId: input.repoRuntimeId,
-        target: { kind: 'branch', repoRoot: input.repoRoot, branchName: input.branchName },
-      })
-      return result
+      try {
+        await deps.workspacePaneTabs.retireTarget(userId, {
+          repoRuntimeId: input.repoRuntimeId,
+          target: { kind: 'branch', repoRoot: input.repoRoot, branchName: input.branchName },
+        })
+        return result
+      } catch (error) {
+        return {
+          ok: false,
+          message: error instanceof Error ? error.message : String(error),
+          repositoryStateChanged: true,
+        }
+      }
     },
   }
 }

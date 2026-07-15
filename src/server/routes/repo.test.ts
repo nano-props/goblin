@@ -1041,7 +1041,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
           repoRuntimeId: 'repo-runtime-test',
           branch: 'feature/remove',
           worktreePath: '/tmp/repo-remove',
-          alsoDeleteBranch: false,
+          deleteBranch: false,
         }),
       }),
     )
@@ -1062,9 +1062,9 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       {
         branch: 'feature/remove',
         worktreePath: '/tmp/repo-remove',
-        alsoDeleteBranch: false,
+        deleteBranch: false,
         forceDeleteBranch: undefined,
-        alsoDeleteUpstream: undefined,
+        deleteUpstream: undefined,
       },
       {
         beforeRemove: expect.any(Function),

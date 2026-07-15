@@ -5,14 +5,14 @@ export type RepoBranchAction =
   | { kind: 'pull'; branch: string; worktreePath?: string }
   | { kind: 'push'; branch: string }
   | { kind: 'createWorktree'; input: CreateWorktreeInput; worktreeBootstrap: WorktreeBootstrapDecision }
-  | { kind: 'deleteBranch'; branch: string; force?: boolean; alsoDeleteUpstream?: boolean }
+  | { kind: 'deleteBranch'; branch: string; force?: boolean; deleteUpstream?: boolean }
   | {
       kind: 'removeWorktree'
       branch: string
       worktreePath: string
-      alsoDeleteBranch: boolean
+      deleteBranch: boolean
       forceDeleteBranch?: boolean
-      alsoDeleteUpstream?: boolean
+      deleteUpstream?: boolean
     }
 
 export type RepoBranchActionKind = RepoBranchAction['kind']

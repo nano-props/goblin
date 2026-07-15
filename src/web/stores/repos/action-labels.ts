@@ -40,7 +40,7 @@ export function repoEventActionSuccessLabel(action: RepoEventAction | undefined)
       return { labelKey: 'action.create-worktree-created-title' }
     case 'removeWorktree':
       return {
-        labelKey: action.alsoDeleteBranch
+        labelKey: action.deleteBranch
           ? 'action.remove-worktree-removed-with-branch-title'
           : 'action.remove-worktree-removed-title',
       }

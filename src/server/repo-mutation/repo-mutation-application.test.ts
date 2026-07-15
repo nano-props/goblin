@@ -29,4 +29,24 @@ describe('repo mutation application', () => {
     ).resolves.toEqual({ ok: false, message: 'failed' })
     expect(retireTarget).toHaveBeenCalledTimes(1)
   })
+
+  test('reports the committed repository change when branch retirement fails', async () => {
+    const retireTarget = vi.fn(async () => {
+      throw new Error('pane persistence failed')
+    })
+    const application = createRepoMutationApplication({ workspacePaneTabs: { retireTarget } })
+
+    await expect(
+      application.deleteBranch('user-a', {
+        repoRoot: '/repo',
+        repoRuntimeId: 'runtime-a',
+        branchName: 'feature/deleted',
+        deleteBranch: async () => ({ ok: true, message: 'deleted' }),
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      message: 'pane persistence failed',
+      repositoryStateChanged: true,
+    })
+  })
 })

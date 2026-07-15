@@ -12,12 +12,10 @@ export function deleteBranchNeedsForceConfirm(result: ExecResult, force: boolean
 
 export function removeWorktreeNeedsForceConfirm(
   result: ExecResult,
-  alsoDeleteBranch: boolean,
+  deleteBranch: boolean,
   forceDeleteBranch: boolean,
 ): boolean {
-  return (
-    !result.ok && result.message === 'error.cannot-remove-unpushed-worktree' && alsoDeleteBranch && !forceDeleteBranch
-  )
+  return !result.ok && result.message === 'error.cannot-remove-unpushed-worktree' && deleteBranch && !forceDeleteBranch
 }
 
 export async function dispatchRepoBranchAction(

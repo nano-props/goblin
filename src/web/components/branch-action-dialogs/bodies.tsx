@@ -99,8 +99,8 @@ interface RemoveWorktreeConfirmBodyProps {
   removeAlsoUpstream: boolean
   onRemoveAlsoDeletesChange: (checked: boolean) => void
   onRemoveAlsoUpstreamChange: (checked: boolean) => void
-  alsoDeleteBranchLabel: string
-  alsoDeleteUpstreamLabel: string
+  deleteBranchLabel: string
+  deleteUpstreamLabel: string
 }
 
 export function RemoveWorktreeConfirmBody({
@@ -115,8 +115,8 @@ export function RemoveWorktreeConfirmBody({
   removeAlsoUpstream,
   onRemoveAlsoDeletesChange,
   onRemoveAlsoUpstreamChange,
-  alsoDeleteBranchLabel,
-  alsoDeleteUpstreamLabel,
+  deleteBranchLabel,
+  deleteUpstreamLabel,
 }: RemoveWorktreeConfirmBodyProps) {
   return (
     <ConfirmStack>
@@ -134,7 +134,7 @@ export function RemoveWorktreeConfirmBody({
             destructive
             title={removeConfirmProtected ? protectedHint : undefined}
           >
-            {alsoDeleteBranchLabel}
+            {deleteBranchLabel}
           </ConfirmCheckbox>
           <IndentedValue value={branchName} />
         </ConfirmSection>
@@ -146,7 +146,7 @@ export function RemoveWorktreeConfirmBody({
         {removeAlsoDeletes && hasUpstream && !removeConfirmProtected && tracking && (
           <ConfirmSection>
             <ConfirmCheckbox checked={removeAlsoUpstream} onCheckedChange={onRemoveAlsoUpstreamChange} destructive>
-              {alsoDeleteUpstreamLabel}
+              {deleteUpstreamLabel}
             </ConfirmCheckbox>
             <IndentedValue value={tracking} />
           </ConfirmSection>
@@ -166,7 +166,7 @@ interface ForceRemoveWorktreeConfirmBodyProps {
   tracking?: string
   removeAlsoUpstream: boolean
   onRemoveAlsoUpstreamChange: (checked: boolean) => void
-  alsoDeleteUpstreamLabel: string
+  deleteUpstreamLabel: string
 }
 
 export function ForceRemoveWorktreeConfirmBody({
@@ -179,7 +179,7 @@ export function ForceRemoveWorktreeConfirmBody({
   tracking,
   removeAlsoUpstream,
   onRemoveAlsoUpstreamChange,
-  alsoDeleteUpstreamLabel,
+  deleteUpstreamLabel,
 }: ForceRemoveWorktreeConfirmBodyProps) {
   return (
     <ConfirmStack>
@@ -195,7 +195,7 @@ export function ForceRemoveWorktreeConfirmBody({
       {hasUpstream && tracking && (
         <ConfirmSection>
           <ConfirmCheckbox checked={removeAlsoUpstream} onCheckedChange={onRemoveAlsoUpstreamChange} destructive>
-            {alsoDeleteUpstreamLabel}
+            {deleteUpstreamLabel}
           </ConfirmCheckbox>
           <IndentedValue value={tracking} />
         </ConfirmSection>

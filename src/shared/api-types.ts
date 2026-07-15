@@ -421,16 +421,16 @@ export interface AppIpcHandlers {
       repoRuntimeId: string
       branch: string
       force?: boolean
-      alsoDeleteUpstream?: boolean
+      deleteUpstream?: boolean
     }) => Promise<ExecResult>
     removeWorktree: (input: {
       cwd: string
       repoRuntimeId: string
       branch: string
       worktreePath: string
-      alsoDeleteBranch: boolean
+      deleteBranch: boolean
       forceDeleteBranch?: boolean
-      alsoDeleteUpstream?: boolean
+      deleteUpstream?: boolean
     }) => Promise<ExecResult>
     createWorktree: (input: CreateWorktreeIpcInput) => Promise<ExecResult>
     worktreeBootstrapPreview: (input: { cwd: string; repoRuntimeId: string }) => Promise<WorktreeBootstrapPreviewResult>

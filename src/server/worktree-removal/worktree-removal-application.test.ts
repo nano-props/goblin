@@ -24,7 +24,7 @@ const target = {
   repoRuntimeId: 'repo-runtime-test',
   worktreePath: '/repo/worktree',
   branchName: 'feature/worktree',
-  alsoDeleteBranch: false,
+  deleteBranch: false,
 }
 
 describe('WorktreeRemovalApplication', () => {
@@ -71,7 +71,7 @@ describe('WorktreeRemovalApplication', () => {
       repoRuntimeId: target.repoRuntimeId,
       worktreePath: '/srv/repo-linked',
       branchName: target.branchName,
-      alsoDeleteBranch: false,
+      deleteBranch: false,
       async remove(_capability, lifecycle) {
         const prepared = await lifecycle.beforeRemove()
         if (!prepared.ok) return prepared
@@ -267,7 +267,7 @@ describe('WorktreeRemovalApplication', () => {
     await expect(
       application.removeWorktree('user-a', {
         ...target,
-        alsoDeleteBranch: true,
+        deleteBranch: true,
         async remove(_capability, lifecycle) {
           const prepared = await lifecycle.beforeRemove()
           if (!prepared.ok) return prepared
@@ -281,6 +281,31 @@ describe('WorktreeRemovalApplication', () => {
     expect(retireTarget).toHaveBeenCalledWith('user-a', {
       repoRuntimeId: target.repoRuntimeId,
       target: { kind: 'branch', repoRoot: target.repoRoot, branchName: target.branchName },
+    })
+  })
+
+  test('reports the committed repository change when branch retirement fails after worktree removal', async () => {
+    const retireTarget = vi.fn(async () => {
+      throw new Error('pane persistence failed')
+    })
+    const application = createApplication({ retireTarget })
+
+    await expect(
+      application.removeWorktree('user-a', {
+        ...target,
+        deleteBranch: true,
+        async remove(_capability, lifecycle) {
+          const prepared = await lifecycle.beforeRemove()
+          if (!prepared.ok) return prepared
+          const finalized = await lifecycle.afterWorktreeRemoved()
+          if (!finalized.ok) return finalized
+          return { ok: true, message: 'removed' }
+        },
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      message: 'pane persistence failed',
+      repositoryStateChanged: true,
     })
   })
 

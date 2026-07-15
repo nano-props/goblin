@@ -137,11 +137,10 @@ export interface ExecResult {
   ok: boolean
   message: string
   /**
-   * True when an operation returned a failure after it had already changed
-   * repository state. Clients should refresh even if they usually skip
-   * refresh-on-error for the action.
+   * True when the operation changed repository state. In particular, callers
+   * must refresh when a later step fails after an irreversible mutation.
    */
-  repoChanged?: boolean
+  repositoryStateChanged?: boolean
   worktreeBootstrap?: WorktreeBootstrapSummary
 }
 

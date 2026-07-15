@@ -45,7 +45,7 @@ export class WorktreeRemovalApplication {
       repoRuntimeId: string
       worktreePath: string
       branchName: string
-      alsoDeleteBranch: boolean
+      deleteBranch: boolean
       signal?: AbortSignal
       remove(
         capability: PhysicalWorktreeCapability,
@@ -133,11 +133,20 @@ export class WorktreeRemovalApplication {
         input.signal,
       )
       if (!result.admitted) return { ok: false, message: 'error.worktree-removal-in-progress' }
-      if (result.value.ok && input.alsoDeleteBranch) {
-        await this.deps.workspacePaneTabs.retireTarget(userId, {
-          repoRuntimeId: input.repoRuntimeId,
-          target: { kind: 'branch', repoRoot: input.repoRoot, branchName: input.branchName },
-        })
+      if (result.value.ok && input.deleteBranch) {
+        try {
+          await this.deps.workspacePaneTabs.retireTarget(userId, {
+            repoRuntimeId: input.repoRuntimeId,
+            target: { kind: 'branch', repoRoot: input.repoRoot, branchName: input.branchName },
+          })
+        } catch (error) {
+          failRemoteRuntimeIfNeeded(userId, error)
+          return {
+            ok: false,
+            message: abortMessage(error),
+            repositoryStateChanged: true,
+          }
+        }
       }
       return result.value
     } catch (error) {

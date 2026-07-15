@@ -202,7 +202,7 @@ describe('remote git helpers', () => {
 
     const result = await deleteRemoteBranch(TARGET, {
       branch: 'feature/test',
-      alsoDeleteUpstream: true,
+      deleteUpstream: true,
       run: run as any,
     })
 
@@ -247,11 +247,11 @@ describe('remote git helpers', () => {
 
     const result = await deleteRemoteBranch(TARGET, {
       branch: 'feature/test',
-      alsoDeleteUpstream: true,
+      deleteUpstream: true,
       run: run as any,
     })
 
-    expect(result).toEqual({ ok: false, message: 'remote rejected delete', repoChanged: true })
+    expect(result).toEqual({ ok: false, message: 'remote rejected delete', repositoryStateChanged: true })
   })
 
   test('removeRemoteWorktree allows deleting branch when merged into current HEAD without upstream', async () => {
@@ -309,7 +309,7 @@ describe('remote git helpers', () => {
       afterRemoveFailed: async () => {},
       branch: 'feature/test',
       worktreePath: '/srv/repo-feature',
-      alsoDeleteBranch: true,
+      deleteBranch: true,
       run: run as any,
     })
 
@@ -360,7 +360,7 @@ describe('remote git helpers', () => {
       afterRemoveFailed: async () => {},
       branch: 'feature/test',
       worktreePath: '/srv/./repo-feature/',
-      alsoDeleteBranch: false,
+      deleteBranch: false,
       run: run as any,
     })
 
@@ -385,7 +385,7 @@ describe('remote git helpers', () => {
       afterRemoveFailed: async () => {},
       branch: 'feature/test',
       worktreePath: 'repo-feature',
-      alsoDeleteBranch: false,
+      deleteBranch: false,
       run: run as any,
     })
 
@@ -407,7 +407,7 @@ describe('remote git helpers', () => {
       afterRemoveFailed: async () => {},
       branch: 'main',
       worktreePath: '/srv/./repo/',
-      alsoDeleteBranch: false,
+      deleteBranch: false,
       run: run as any,
     })
 
@@ -472,8 +472,8 @@ describe('remote git helpers', () => {
       afterRemoveFailed: async () => {},
       branch: 'feature/test',
       worktreePath: '/srv/repo-feature',
-      alsoDeleteBranch: true,
-      alsoDeleteUpstream: true,
+      deleteBranch: true,
+      deleteUpstream: true,
       run: run as any,
     })
 
@@ -498,7 +498,7 @@ describe('remote git helpers', () => {
       afterRemoveFailed: async () => {},
       branch: 'feature/test;echo bad',
       worktreePath: '/srv/repo-feature',
-      alsoDeleteBranch: true,
+      deleteBranch: true,
       run: run as any,
     })
 
@@ -566,7 +566,7 @@ describe('remote git helpers', () => {
       afterRemoveFailed: async () => {},
       branch: 'feature/test',
       worktreePath: '/srv/repo-feature',
-      alsoDeleteBranch: true,
+      deleteBranch: true,
       run: run as any,
     })
 

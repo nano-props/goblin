@@ -184,7 +184,7 @@ export function createRepoRoutes(options: {
       () => trashRepositoryFile(cwd, worktreePath, path, c.req.raw.signal, { repoRuntimeId }),
       'trash-file',
     )
-    if (result.ok || result.repoChanged === true) {
+    if (result.ok || result.repositoryStateChanged === true) {
       publishRepoQueryInvalidation({ repoId: cwd, query: 'repo-snapshot' })
     }
     return c.json(result)
@@ -264,7 +264,7 @@ export function createRepoRoutes(options: {
     )
   })
   app.post('/delete-branch', async (c) => {
-    const { cwd, repoRuntimeId, branch, force, alsoDeleteUpstream } = await parseHttpBody(
+    const { cwd, repoRuntimeId, branch, force, deleteUpstream } = await parseHttpBody(
       REPO_PROCEDURE_SCHEMAS.deleteBranch,
       c,
     )
@@ -279,7 +279,7 @@ export function createRepoRoutes(options: {
             repoRuntimeId,
             branchName: branch,
             deleteBranch: async () =>
-              await deleteRepoBranch(cwd, branch, { force, alsoDeleteUpstream }, c.req.raw.signal, { repoRuntimeId }),
+              await deleteRepoBranch(cwd, branch, { force, deleteUpstream }, c.req.raw.signal, { repoRuntimeId }),
           })
         },
         'delete-branch',
@@ -287,7 +287,7 @@ export function createRepoRoutes(options: {
     )
   })
   app.post('/remove-worktree', async (c) => {
-    const { cwd, repoRuntimeId, branch, worktreePath, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream } =
+    const { cwd, repoRuntimeId, branch, worktreePath, deleteBranch, forceDeleteBranch, deleteUpstream } =
       await parseHttpBody(REPO_PROCEDURE_SCHEMAS.removeWorktree, c)
     const userId = userIdFromContext(c)
     if (!userId) throw new Error('error.unauthorized')
@@ -299,7 +299,7 @@ export function createRepoRoutes(options: {
             repoRuntimeId,
             worktreePath,
             branchName: branch,
-            alsoDeleteBranch,
+            deleteBranch,
             signal: c.req.raw.signal,
             remove: async (
               physicalWorktreeCapability: PhysicalWorktreeCapability,
@@ -308,7 +308,7 @@ export function createRepoRoutes(options: {
             ) =>
               await removeCapturedRepoWorktree(
                 cwd,
-                { branch, worktreePath, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream },
+                { branch, worktreePath, deleteBranch, forceDeleteBranch, deleteUpstream },
                 lifecycle,
                 physicalWorktreeCapability,
                 signal,

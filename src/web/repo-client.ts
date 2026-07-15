@@ -30,11 +30,14 @@ export async function probeRepo(cwd: string, signal?: AbortSignal): Promise<Prob
   return await postServerJson('/api/repo/probe', { cwd }, { signal })
 }
 
-export async function cloneRepository(input: {
-  url: string
-  parentPath: string
-  directoryName: string
-}, options?: { signal?: AbortSignal }): Promise<CloneRepoResult> {
+export async function cloneRepository(
+  input: {
+    url: string
+    parentPath: string
+    directoryName: string
+  },
+  options?: { signal?: AbortSignal },
+): Promise<CloneRepoResult> {
   try {
     return await postServerJson('/api/repo/clone', input, {
       signal: options?.signal,
@@ -64,7 +67,11 @@ export async function getRepoLog(
   throw new Error(log.message)
 }
 
-export async function getRepoRemoteBranches(cwd: string, repoRuntimeId: string, signal?: AbortSignal): Promise<string[]> {
+export async function getRepoRemoteBranches(
+  cwd: string,
+  repoRuntimeId: string,
+  signal?: AbortSignal,
+): Promise<string[]> {
   return await postServerJson('/api/repo/remote-branches', { cwd, repoRuntimeId }, { signal })
 }
 
@@ -103,10 +110,14 @@ export async function fetchRepo(
   repoRuntimeId: string,
   signal?: AbortSignal,
 ): Promise<{ ok: boolean; message: string }> {
-  return await postServerJson('/api/repo/fetch', { cwd, repoRuntimeId }, {
-    signal,
-    timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
-  })
+  return await postServerJson(
+    '/api/repo/fetch',
+    { cwd, repoRuntimeId },
+    {
+      signal,
+      timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
+    },
+  )
 }
 
 export async function pullRepoBranch(
@@ -129,10 +140,14 @@ export async function pushRepoBranch(
   branch: string,
   signal?: AbortSignal,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/push', { cwd, repoRuntimeId, branch }, {
-    signal,
-    timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
-  })
+  return await postServerJson(
+    '/api/repo/push',
+    { cwd, repoRuntimeId, branch },
+    {
+      signal,
+      timeoutMs: REPO_REQUEST_TIMEOUT_MS.gitNetwork,
+    },
+  )
 }
 
 export async function createRepoWorktree(
@@ -161,12 +176,12 @@ export async function deleteRepoBranch(
   cwd: string,
   repoRuntimeId: string,
   branch: string,
-  options?: { force?: boolean; alsoDeleteUpstream?: boolean },
+  options?: { force?: boolean; deleteUpstream?: boolean },
   signal?: AbortSignal,
 ): Promise<ExecResult> {
   return await postServerJson(
     '/api/repo/delete-branch',
-    { cwd, repoRuntimeId, branch, force: options?.force, alsoDeleteUpstream: options?.alsoDeleteUpstream },
+    { cwd, repoRuntimeId, branch, force: options?.force, deleteUpstream: options?.deleteUpstream },
     { signal, timeoutMs: REPO_REQUEST_TIMEOUT_MS.branchMutation },
   )
 }
@@ -177,16 +192,20 @@ export async function removeRepoWorktree(
   options: {
     branch: string
     worktreePath: string
-    alsoDeleteBranch: boolean
+    deleteBranch: boolean
     forceDeleteBranch?: boolean
-    alsoDeleteUpstream?: boolean
+    deleteUpstream?: boolean
   },
   signal?: AbortSignal,
 ): Promise<ExecResult> {
-  return await postServerJson('/api/repo/remove-worktree', { cwd, repoRuntimeId, ...options }, {
-    signal,
-    timeoutMs: REPO_REQUEST_TIMEOUT_MS.removeWorktree,
-  })
+  return await postServerJson(
+    '/api/repo/remove-worktree',
+    { cwd, repoRuntimeId, ...options },
+    {
+      signal,
+      timeoutMs: REPO_REQUEST_TIMEOUT_MS.removeWorktree,
+    },
+  )
 }
 
 export async function getRepoPatch(
@@ -203,11 +222,14 @@ export async function getRepoPatch(
 }
 
 export async function openRepoUrl(cwd: string, repoRuntimeId: string, target: RepoUrlTarget): Promise<ExecResult> {
-  const result = await postServerJson<{ cwd: string; repoRuntimeId: string; target: RepoUrlTarget }, ExecResult>('/api/repo/open-url', {
-    cwd,
-    repoRuntimeId,
-    target,
-  })
+  const result = await postServerJson<{ cwd: string; repoRuntimeId: string; target: RepoUrlTarget }, ExecResult>(
+    '/api/repo/open-url',
+    {
+      cwd,
+      repoRuntimeId,
+      target,
+    },
+  )
   if (!result.ok || !result.message) return result
   const opened = await openExternalUrl(result.message)
   return opened.ok ? { ok: true, message: '' } : opened
@@ -248,13 +270,18 @@ export async function openRepoRuntime(repoRoot: string): Promise<string> {
 }
 
 export async function openRepoRuntimeForInput(repoInput: string): Promise<RepoRuntimeOpenResult> {
-  return await postServerJson<{ repoInput: string; clientId: string }, RepoRuntimeOpenResult>('/api/repo/runtime-open', {
-    repoInput,
-    clientId: readOrCreateWebTerminalClientId(),
-  })
+  return await postServerJson<{ repoInput: string; clientId: string }, RepoRuntimeOpenResult>(
+    '/api/repo/runtime-open',
+    {
+      repoInput,
+      clientId: readOrCreateWebTerminalClientId(),
+    },
+  )
 }
 
-export async function reconcileRepoRuntimeMemberships(repoRoots: string[]): Promise<RepoRuntimeMembershipReconcileResult> {
+export async function reconcileRepoRuntimeMemberships(
+  repoRoots: string[],
+): Promise<RepoRuntimeMembershipReconcileResult> {
   return await postServerJson('/api/repo/runtime-reconcile', {
     clientId: readOrCreateWebTerminalClientId(),
     repoRoots,
@@ -265,14 +292,11 @@ export async function closeRepoRuntime(repoRoot: string, repoRuntimeId: string):
   const result = await postServerJson<
     { repoRoot: string; repoRuntimeId: string; clientId: string },
     { ok: boolean; released: boolean; runtimeClosed: boolean }
-  >(
-    '/api/repo/runtime-close',
-    {
-      repoRoot,
-      repoRuntimeId,
-      clientId: readOrCreateWebTerminalClientId(),
-    },
-  )
+  >('/api/repo/runtime-close', {
+    repoRoot,
+    repoRuntimeId,
+    clientId: readOrCreateWebTerminalClientId(),
+  })
   return result.released
 }
 

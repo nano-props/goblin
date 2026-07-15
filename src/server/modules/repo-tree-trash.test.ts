@@ -40,7 +40,7 @@ beforeEach(() => {
     { path: '/tmp/repo-feature', branch: 'feature', isBare: false, isPrimary: false },
   ])
   mocks.lstat.mockResolvedValue({ isDirectory: () => false })
-  mocks.movePathToTrash.mockResolvedValue({ ok: true, message: 'ok', repoChanged: true })
+  mocks.movePathToTrash.mockResolvedValue({ ok: true, message: 'ok', repositoryStateChanged: true })
   mocks.remoteRuntimeAwareGitRunner.mockReturnValue(async () => ({ ok: true, stdout: '', stderr: '', code: 0 }))
 })
 
@@ -48,7 +48,7 @@ describe('repo-tree trash write layer', () => {
   test('moves a local worktree file to the system trash', async () => {
     const result = await trashRepositoryFile('/tmp/repo', '/tmp/repo-feature', 'src/index.ts')
 
-    expect(result).toEqual({ ok: true, message: 'ok', repoChanged: true })
+    expect(result).toEqual({ ok: true, message: 'ok', repositoryStateChanged: true })
     expect(mocks.getWorktrees).toHaveBeenCalledWith('/tmp/repo', { includeStatus: false, signal: undefined })
     expect(mocks.lstat).toHaveBeenCalledWith('/tmp/repo-feature/src/index.ts')
     expect(mocks.movePathToTrash).toHaveBeenCalledWith('/tmp/repo-feature/src/index.ts', undefined)
@@ -83,11 +83,11 @@ describe('repo-tree trash write layer', () => {
       port: 22,
     }
     mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
-    mocks.trashRemoteFile.mockResolvedValueOnce({ ok: true, message: 'ok', repoChanged: true })
+    mocks.trashRemoteFile.mockResolvedValueOnce({ ok: true, message: 'ok', repositoryStateChanged: true })
 
     const result = await trashRepositoryFile(repoId, '/srv/repo-feature', 'README.md')
 
-    expect(result).toEqual({ ok: true, message: 'ok', repoChanged: true })
+    expect(result).toEqual({ ok: true, message: 'ok', repositoryStateChanged: true })
     expect(mocks.trashRemoteFile).toHaveBeenCalledWith(target, '/srv/repo-feature', 'README.md', { signal: undefined })
     expect(mocks.getWorktrees).not.toHaveBeenCalled()
   })
@@ -107,12 +107,14 @@ describe('repo-tree trash write layer', () => {
     const run = async () => ({ ok: true as const, stdout: '', stderr: '', code: 0 })
     mocks.resolveRemoteRepoTarget.mockResolvedValueOnce(target)
     mocks.remoteRuntimeAwareGitRunner.mockReturnValueOnce(run)
-    mocks.trashRemoteFile.mockResolvedValueOnce({ ok: true, message: 'ok', repoChanged: true })
+    mocks.trashRemoteFile.mockResolvedValueOnce({ ok: true, message: 'ok', repositoryStateChanged: true })
 
-    await expect(trashRepositoryFile(repoId, '/srv/repo-feature', 'README.md', undefined, { repoRuntimeId })).resolves.toEqual({
+    await expect(
+      trashRepositoryFile(repoId, '/srv/repo-feature', 'README.md', undefined, { repoRuntimeId }),
+    ).resolves.toEqual({
       ok: true,
       message: 'ok',
-      repoChanged: true,
+      repositoryStateChanged: true,
     })
 
     expect(mocks.resolveRemoteRepoTarget).toHaveBeenCalledWith(repoId, { repoRuntimeId })

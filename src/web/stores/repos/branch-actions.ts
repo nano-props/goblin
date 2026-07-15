@@ -108,7 +108,7 @@ function branchActionEventAction(action: RepoBranchAction): RepoEventAction {
         kind: action.kind,
         branch: action.branch,
         worktreePath: action.worktreePath,
-        alsoDeleteBranch: action.alsoDeleteBranch,
+        deleteBranch: action.deleteBranch,
       }
   }
   const exhaustive: never = action
@@ -178,7 +178,7 @@ function shouldSuppressBranchActionResultMessage(result: ExecResult, options?: R
 }
 
 function shouldSkipBranchActionRefresh(result: ExecResult, options?: RunBranchActionOptions): boolean {
-  if (!result.ok && result.repoChanged) return false
+  if (!result.ok && result.repositoryStateChanged) return false
   if (shouldSuppressBranchActionResultMessage(result, options)) return true
   if (!result.ok && result.message === 'error.network-op-in-progress') return true
   if (!result.ok && result.message === BRANCH_ACTION_WAIT_TIMEOUT_MESSAGE) return true
@@ -187,7 +187,7 @@ function shouldSkipBranchActionRefresh(result: ExecResult, options?: RunBranchAc
 
 function shouldRefreshBranchActionProjection(result: ExecResult, options?: RunBranchActionOptions): boolean {
   if (shouldSkipBranchActionRefresh(result, options)) return false
-  return result.ok || result.repoChanged || options?.refreshOnError !== false
+  return result.ok || result.repositoryStateChanged || options?.refreshOnError !== false
 }
 
 function requiresProjectionRefreshBeforeCompletion(action: RepoBranchAction, result: ExecResult): boolean {
@@ -234,7 +234,7 @@ function runBranchActionIpc(
         repoId,
         repoRuntimeId,
         action.branch,
-        { force: action.force, alsoDeleteUpstream: action.alsoDeleteUpstream },
+        { force: action.force, deleteUpstream: action.deleteUpstream },
         signal,
       )
     case 'removeWorktree':
@@ -244,9 +244,9 @@ function runBranchActionIpc(
         {
           branch: action.branch,
           worktreePath: action.worktreePath,
-          alsoDeleteBranch: action.alsoDeleteBranch,
+          deleteBranch: action.deleteBranch,
           forceDeleteBranch: action.forceDeleteBranch,
-          alsoDeleteUpstream: action.alsoDeleteUpstream,
+          deleteUpstream: action.deleteUpstream,
         },
         signal,
       )

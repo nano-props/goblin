@@ -256,8 +256,8 @@ describe('repo-client', () => {
     const request = removeRepoWorktree('/tmp/repo', 'repo-runtime-test', {
       branch: 'feature/remove',
       worktreePath: '/tmp/repo-feature-remove',
-      alsoDeleteBranch: true,
-      alsoDeleteUpstream: true,
+      deleteBranch: true,
+      deleteUpstream: true,
     })
     const assertion = expect(request).rejects.toThrow('error.request-timeout')
 

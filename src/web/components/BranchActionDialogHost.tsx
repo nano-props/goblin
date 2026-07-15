@@ -190,7 +190,7 @@ export function BranchActionDialogHost({ currentRepoId, currentBranchName }: Pro
               repo: liveContext.repo,
               branchName: deleteConfirmView.entry!.payload,
               force: false,
-              alsoDeleteUpstream: deleteConfirmView.displayCheckboxes.deleteAlsoUpstream,
+              deleteUpstream: deleteConfirmView.displayCheckboxes.deleteAlsoUpstream,
             })
           }
           return undefined
@@ -233,7 +233,7 @@ export function BranchActionDialogHost({ currentRepoId, currentBranchName }: Pro
               repo: liveContext.repo,
               branchName: forceDeleteConfirmView.entry!.payload,
               force: true,
-              alsoDeleteUpstream: forceDeleteConfirmView.displayCheckboxes.deleteAlsoUpstream,
+              deleteUpstream: forceDeleteConfirmView.displayCheckboxes.deleteAlsoUpstream,
             })
           }
           return undefined
@@ -267,8 +267,8 @@ export function BranchActionDialogHost({ currentRepoId, currentBranchName }: Pro
               onRemoveAlsoUpstreamChange={(value) =>
                 setRemoveAlsoUpstream(removeConfirmView.entry!.repoId, removeConfirmView.entry!.branchName, value)
               }
-              alsoDeleteBranchLabel={t('action.confirm-remove-worktree-also-delete-branch')}
-              alsoDeleteUpstreamLabel={t('action.confirm-delete-branch-also-delete-upstream')}
+              deleteBranchLabel={t('action.confirm-remove-worktree-also-delete-branch')}
+              deleteUpstreamLabel={t('action.confirm-delete-branch-also-delete-upstream')}
             />
           ) : (
             ''
@@ -287,9 +287,9 @@ export function BranchActionDialogHost({ currentRepoId, currentBranchName }: Pro
           return dispatchRemoveWorktree({
             repo: liveContext.repo,
             target: removeConfirmView.entry!.payload,
-            alsoDeleteBranch: removeConfirmView.displayCheckboxes.removeAlsoDeletes,
+            deleteBranch: removeConfirmView.displayCheckboxes.removeAlsoDeletes,
             forceDeleteBranch: false,
-            alsoDeleteUpstream: removeConfirmView.displayCheckboxes.removeAlsoUpstream,
+            deleteUpstream: removeConfirmView.displayCheckboxes.removeAlsoUpstream,
           })
         }}
       />
@@ -321,7 +321,7 @@ export function BranchActionDialogHost({ currentRepoId, currentBranchName }: Pro
                   value,
                 )
               }
-              alsoDeleteUpstreamLabel={t('action.confirm-delete-branch-also-delete-upstream')}
+              deleteUpstreamLabel={t('action.confirm-delete-branch-also-delete-upstream')}
             />
           ) : (
             ''
@@ -340,9 +340,9 @@ export function BranchActionDialogHost({ currentRepoId, currentBranchName }: Pro
           return dispatchRemoveWorktree({
             repo: liveContext.repo,
             target: forceRemoveConfirmView.entry!.payload,
-            alsoDeleteBranch: true,
+            deleteBranch: true,
             forceDeleteBranch: true,
-            alsoDeleteUpstream: forceRemoveConfirmView.displayCheckboxes.removeAlsoUpstream,
+            deleteUpstream: forceRemoveConfirmView.displayCheckboxes.removeAlsoUpstream,
           })
         }}
       />

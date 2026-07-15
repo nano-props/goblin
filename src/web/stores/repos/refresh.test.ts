@@ -61,7 +61,10 @@ function repoCurrentBranch(): string | null {
   return repo ? (readRepoBranchQueryProjection(repo)?.currentBranch ?? null) : null
 }
 
-function cachedRepoProjection(repoRuntimeId: string, branchName: string | null = null): RepoRuntimeProjection | undefined {
+function cachedRepoProjection(
+  repoRuntimeId: string,
+  branchName: string | null = null,
+): RepoRuntimeProjection | undefined {
   return primaryWindowQueryClient.getQueryData<RepoRuntimeProjection>(
     repoProjectionQueryKey(REPO_ID, repoRuntimeId, branchName, 'full'),
   )
@@ -81,17 +84,23 @@ function createWorktreeAction(): TestCreateWorktreeAction {
 describe('remote fetch timestamps', () => {
   test('repo read-model projection refresh treats query projection branches as existing data while loading', async () => {
     const repoRuntimeId = seedRepo([])
-    seedRepoReadModelQueryData({ id: REPO_ID, repoRuntimeId: repoRuntimeId }, {
-      branches: [branch('feature/query')],
-      currentBranch: 'feature/query',
-    })
+    seedRepoReadModelQueryData(
+      { id: REPO_ID, repoRuntimeId: repoRuntimeId },
+      {
+        branches: [branch('feature/query')],
+        currentBranch: 'feature/query',
+      },
+    )
     let resolveSnapshot!: (value: { branches: ReturnType<typeof branch>[]; current: string }) => void
     ipcHandlers['repo.projection'] = () =>
       new Promise((resolve) => {
         resolveSnapshot = (snapshot) => resolve(repoProjection(snapshot))
       })
 
-    const work = requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, { repoRuntimeId, scope: 'repo-read-model' })
+    const work = requestRepoRuntimeProjectionRefresh(refreshStoreAccess, REPO_ID, {
+      repoRuntimeId,
+      scope: 'repo-read-model',
+    })
     await vi.waitFor(() => {
       expect(resolveSnapshot).toEqual(expect.any(Function))
     })
@@ -350,7 +359,7 @@ describe('remote fetch timestamps', () => {
     ipcHandlers['repo.createWorktree'] = async () => ({
       ok: false,
       message: 'Worktree bootstrap failed: setup failed',
-      repoChanged: true,
+      repositoryStateChanged: true,
     })
     ipcHandlers['repo.projection'] = async () => {
       snapshotCount += 1
@@ -364,7 +373,7 @@ describe('remote fetch timestamps', () => {
     expect(result).toEqual({
       ok: false,
       message: 'Worktree bootstrap failed: setup failed',
-      repoChanged: true,
+      repositoryStateChanged: true,
     })
     expect(snapshotCount).toBe(1)
     expect(repoBranchNames()).toEqual(['main', 'feature/a'])
@@ -455,7 +464,7 @@ describe('remote fetch timestamps', () => {
         kind: 'removeWorktree',
         branch: 'feature/a',
         worktreePath: '/tmp/worktree-a',
-        alsoDeleteBranch: false,
+        deleteBranch: false,
         forceDeleteBranch: false,
       },
       { repoRuntimeId },

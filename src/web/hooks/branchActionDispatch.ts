@@ -48,18 +48,18 @@ export function dispatchDeleteBranch({
   repo,
   branchName,
   force,
-  alsoDeleteUpstream,
+  deleteUpstream,
 }: BranchActionDispatchContext & {
   branchName: string
   force: boolean
-  alsoDeleteUpstream: boolean
+  deleteUpstream: boolean
 }): Promise<ExecResult | null> {
   const actionRepo = repoForBranchActionDispatch(repo)
   if (!actionRepo) return Promise.resolve(recordRepoDataUnavailable(repo))
   return dispatchRepoBranchAction(
     actionRepo.id,
     actionRepo.repoRuntimeId,
-    { kind: 'deleteBranch', branch: branchName, force, alsoDeleteUpstream },
+    { kind: 'deleteBranch', branch: branchName, force, deleteUpstream },
     useReposStore.getState().runBranchAction,
     {
       deferResultMessages: force ? [] : ['error.branch-not-fully-merged'],
@@ -85,14 +85,14 @@ export function dispatchDeleteBranch({
 export async function dispatchRemoveWorktree({
   repo,
   target,
-  alsoDeleteBranch,
+  deleteBranch,
   forceDeleteBranch,
-  alsoDeleteUpstream,
+  deleteUpstream,
 }: BranchActionDispatchContext & {
   target: RemoveWorktreeDialogPayload
-  alsoDeleteBranch: boolean
+  deleteBranch: boolean
   forceDeleteBranch: boolean
-  alsoDeleteUpstream: boolean
+  deleteUpstream: boolean
 }): Promise<ExecResult | null> {
   const actionRepo = repoForBranchActionDispatch(repo)
   if (!actionRepo) return recordRepoDataUnavailable(repo)
@@ -103,15 +103,15 @@ export async function dispatchRemoveWorktree({
       kind: 'removeWorktree',
       branch: target.branch,
       worktreePath: target.path,
-      alsoDeleteBranch,
+      deleteBranch,
       forceDeleteBranch,
-      alsoDeleteUpstream,
+      deleteUpstream,
     },
     useReposStore.getState().runBranchAction,
     {
-      deferResultMessages: alsoDeleteBranch && !forceDeleteBranch ? ['error.cannot-remove-unpushed-worktree'] : [],
+      deferResultMessages: deleteBranch && !forceDeleteBranch ? ['error.cannot-remove-unpushed-worktree'] : [],
       handleResult: (result) => {
-        if (removeWorktreeNeedsForceConfirm(result, alsoDeleteBranch, forceDeleteBranch)) {
+        if (removeWorktreeNeedsForceConfirm(result, deleteBranch, forceDeleteBranch)) {
           useBranchActionDialogsStore.getState().openForceRemoveWorktreeConfirm({
             repoId: actionRepo.id,
             branchName: target.branch,

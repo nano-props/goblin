@@ -46,9 +46,9 @@ describe('branch action dispatch', () => {
       dispatchRemoveWorktree({
         repo: repoPresentationFromQueryForTest(repo),
         target: { branch: 'feature/worktree', path: WORKTREE_PATH },
-        alsoDeleteBranch: false,
+        deleteBranch: false,
         forceDeleteBranch: false,
-        alsoDeleteUpstream: false,
+        deleteUpstream: false,
       }),
     ).resolves.toEqual({ ok: true, message: 'ok' })
 
@@ -58,9 +58,9 @@ describe('branch action dispatch', () => {
         kind: 'removeWorktree',
         branch: 'feature/worktree',
         worktreePath: WORKTREE_PATH,
-        alsoDeleteBranch: false,
+        deleteBranch: false,
         forceDeleteBranch: false,
-        alsoDeleteUpstream: false,
+        deleteUpstream: false,
       },
       {
         repoRuntimeId: repo.repoRuntimeId,
@@ -84,13 +84,12 @@ describe('branch action dispatch', () => {
       dispatchRemoveWorktree({
         repo: repoPresentationFromQueryForTest(repo),
         target: { branch: 'feature/worktree', path: WORKTREE_PATH },
-        alsoDeleteBranch: false,
+        deleteBranch: false,
         forceDeleteBranch: false,
-        alsoDeleteUpstream: false,
+        deleteUpstream: false,
       }),
     ).resolves.toEqual({ ok: true, message: 'ok' })
 
     expect(runBranchAction).toHaveBeenCalled()
   })
-
 })
