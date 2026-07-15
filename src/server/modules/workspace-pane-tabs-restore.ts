@@ -1,5 +1,5 @@
 import type { ProjectedRestoredWorkspaceRepoRuntime, ServerWorkspaceState } from '#/shared/api-types.ts'
-import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
+import { repoSessionEntryId, sameRepoSessionEntry, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import {
@@ -33,7 +33,7 @@ export async function validateOrRepairWorkspacePaneTabs(
   let workspace = initialWorkspace
   for (let conflicts = 0; ; conflicts += 1) {
     const currentEntry = workspaceRepoEntry(workspace, repo.repoRoot)
-    if (!currentEntry || !sameWorkspaceRepoEntry(currentEntry, expectedRepoEntry)) {
+    if (!sameRepoSessionEntry(currentEntry, expectedRepoEntry)) {
       return { kind: 'membership-conflict', latestWorkspace: workspace }
     }
     const repoWorkspace = workspaceForRepoTabs(workspace, repo.repoRoot)
@@ -164,15 +164,4 @@ function workspaceForRepoTabs(workspace: ServerWorkspaceState, repoRoot: string)
     openRepoEntries: workspace.openRepoEntries,
     workspacePaneTabsByTargetByRepo: { [repoRoot]: workspace.workspacePaneTabsByTargetByRepo[repoRoot] ?? {} },
   }
-}
-
-export function sameWorkspaceRepoEntry(a: RepoSessionEntry, b: RepoSessionEntry): boolean {
-  if (a.kind !== b.kind || a.id !== b.id) return false
-  if (a.kind === 'local' || b.kind === 'local') return true
-  return (
-    a.ref.id === b.ref.id &&
-    a.ref.alias === b.ref.alias &&
-    a.ref.remotePath === b.ref.remotePath &&
-    a.ref.displayName === b.ref.displayName
-  )
 }

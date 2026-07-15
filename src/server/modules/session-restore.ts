@@ -10,6 +10,7 @@ import {
 } from '#/shared/api-types.ts'
 import {
   repoSessionEntryId,
+  sameRepoSessionEntry,
   type RemoteRepoSessionEntry,
   type RemoteRepoTarget,
   type RepoSessionEntry,
@@ -27,7 +28,6 @@ import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/worksp
 import { abortableWorkspaceRestore, workspaceRepoDisplayName } from '#/server/modules/workspace-restore-utils.ts'
 import {
   initializeWorkspacePaneTabsWithMembershipGuard,
-  sameWorkspaceRepoEntry,
   validateOrRepairWorkspacePaneTabs,
 } from '#/server/modules/workspace-pane-tabs-restore.ts'
 
@@ -197,7 +197,7 @@ function reconcileOpenedRepoMemberships(
   const expectedByRoot = new Map(entries.map((entry) => [repoSessionEntryId(entry), entry]))
   for (const [repoRoot, opened] of openedByRoot) {
     const expected = expectedByRoot.get(repoRoot)
-    if (expected && sameWorkspaceRepoEntry(opened.entry, expected)) continue
+    if (sameRepoSessionEntry(opened.entry, expected)) continue
     releaseWorkspaceRepoRuntime(input, opened.lease)
     openedByRoot.delete(repoRoot)
   }

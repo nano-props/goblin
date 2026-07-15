@@ -22,6 +22,20 @@ export type LocalRepoSessionEntry = { kind: 'local'; id: string }
 export type RemoteRepoSessionEntry = { kind: 'remote'; id: string; ref: RemoteRepoRef }
 export type RepoSessionEntry = LocalRepoSessionEntry | RemoteRepoSessionEntry
 
+export function sameRepoSessionEntry(
+  a: RepoSessionEntry | null | undefined,
+  b: RepoSessionEntry | null | undefined,
+): boolean {
+  if (!a || !b || a.kind !== b.kind || a.id !== b.id) return false
+  if (a.kind === 'local' || b.kind === 'local') return true
+  return (
+    a.ref.id === b.ref.id &&
+    a.ref.alias === b.ref.alias &&
+    a.ref.remotePath === b.ref.remotePath &&
+    a.ref.displayName === b.ref.displayName
+  )
+}
+
 export interface SshConfigHost {
   alias: string
   hostName?: string

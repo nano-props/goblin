@@ -12,7 +12,7 @@ import {
   writeUserSettingsJson,
 } from '#/server/modules/settings-persistence.ts'
 import type { LangPref, ServerWorkspaceState, UserSettings, ThemePref } from '#/shared/api-types.ts'
-import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
+import { repoSessionEntryId, sameRepoSessionEntry, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { recordWithoutKey } from '#/shared/record.ts'
 import {
   isKnownWorkspaceExternalAppItemId,
@@ -516,7 +516,7 @@ export async function confirmServerWorkspaceRepoEntry(
     )
     return unchangedUserSettings(
       data,
-      current && sameRepoEntry(current, expected)
+      sameRepoSessionEntry(current, expected)
         ? { matched: true, workspace: cloneWorkspace(data.workspace) }
         : { matched: false, latestWorkspace: cloneWorkspace(data.workspace) },
     )
@@ -524,18 +524,7 @@ export async function confirmServerWorkspaceRepoEntry(
 }
 
 function sameRepoEntries(a: RepoSessionEntry[], b: RepoSessionEntry[]): boolean {
-  return a.length === b.length && a.every((entry, index) => sameRepoEntry(entry, b[index]))
-}
-
-function sameRepoEntry(a: RepoSessionEntry, b: RepoSessionEntry | undefined): boolean {
-  if (!b || a.kind !== b.kind || a.id !== b.id) return false
-  if (a.kind === 'local' || b.kind === 'local') return true
-  return (
-    a.ref.id === b.ref.id &&
-    a.ref.alias === b.ref.alias &&
-    a.ref.remotePath === b.ref.remotePath &&
-    a.ref.displayName === b.ref.displayName
-  )
+  return a.length === b.length && a.every((entry, index) => sameRepoSessionEntry(entry, b[index]))
 }
 
 export async function clearServerWorkspaceTabsIfUnchanged(input: {
@@ -550,7 +539,7 @@ export async function clearServerWorkspaceTabsIfUnchanged(input: {
     const currentTabsByTarget = data.workspace.workspacePaneTabsByTargetByRepo[input.repoRoot] ?? {}
     if (
       !currentRepoEntry ||
-      !sameRepoEntry(currentRepoEntry, input.expectedRepoEntry) ||
+      !sameRepoSessionEntry(currentRepoEntry, input.expectedRepoEntry) ||
       !sameServerWorkspaceTabsForRepo(input.repoRoot, currentTabsByTarget, input.expectedTabsByTarget)
     ) {
       return unchangedUserSettings(data, { cleared: false as const, latestWorkspace: cloneWorkspace(data.workspace) })
@@ -579,7 +568,7 @@ export async function confirmServerWorkspaceTabsUnchanged(input: {
     const currentTabsByTarget = data.workspace.workspacePaneTabsByTargetByRepo[input.repoRoot] ?? {}
     const matched =
       !!currentRepoEntry &&
-      sameRepoEntry(currentRepoEntry, input.expectedRepoEntry) &&
+      sameRepoSessionEntry(currentRepoEntry, input.expectedRepoEntry) &&
       sameServerWorkspaceTabsForRepo(input.repoRoot, currentTabsByTarget, input.expectedTabsByTarget)
     return unchangedUserSettings(
       data,

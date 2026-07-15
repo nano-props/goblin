@@ -50,6 +50,7 @@ import {
   parseRemoteRepoId,
   remoteRepoConnectionTarget,
   remoteRepoSessionEntry,
+  sameRepoSessionEntry,
   type RemoteRepoTarget,
   type RepoSessionEntry,
 } from '#/shared/remote-repo.ts'
@@ -576,18 +577,6 @@ function sessionProjectionStateForResolvedRepo(resolvedRepo: ResolvedRepo): Repo
   return resolvedRepo.session?.projectionState ?? 'projected'
 }
 
-function sameSessionEntry(a: RepoSessionEntry | null, b: RepoSessionEntry): boolean {
-  if (!a) return false
-  if (a.kind !== b.kind || a.id !== b.id) return false
-  if (a.kind === 'local' || b.kind === 'local') return true
-  return (
-    a.ref.alias === b.ref.alias &&
-    a.ref.remotePath === b.ref.remotePath &&
-    a.ref.displayName === b.ref.displayName &&
-    a.ref.id === b.ref.id
-  )
-}
-
 /** Upsert a repo by id, centralising the "if it exists, mutate; if
  *  not, create + insert" pattern shared by addResolvedRepo,
  *  addUnavailableRepo, and insertPlaceholderRepo.
@@ -656,7 +645,7 @@ export function addResolvedRepo(
       const sessionProjectionState = sessionProjectionStateForResolvedRepo(resolvedRepo)
       const sessionChanged =
         existing.session.projectionState !== sessionProjectionState ||
-        !sameSessionEntry(existing.session.entry, sessionEntry)
+        !sameRepoSessionEntry(existing.session.entry, sessionEntry)
       if (!resolvedRepo.target) {
         if (!runtimeChanged && !nameChanged && !sessionChanged) return null
         return {
