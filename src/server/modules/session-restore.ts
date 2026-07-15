@@ -213,7 +213,15 @@ async function openWorkspaceRepo(
   const probe = await probeRepo(entry.id)
   if (!probe.ok || !probe.root) {
     const lease = acquireRepoRuntimeLease(input.userId, entry.id, input.clientId)
-    return { kind: 'opened', opened: localRepoStub(entry.id, null, lease) }
+    return {
+      kind: 'opened',
+      opened: stubWorkspaceRepo({
+        entry,
+        repoRoot: entry.id,
+        name: workspaceRepoDisplayName(entry.id),
+        lease,
+      }),
+    }
   }
   if (probe.root !== entry.id) return { kind: 'invalid' }
   const repoRoot = probe.root
@@ -222,7 +230,15 @@ async function openWorkspaceRepo(
       // Stub path: validated lease only. No projection read or pane-tab restore.
       // Persisted local entries must already be canonical; this branch refuses to
       // migrate non-canonical paths and lets workspace repair clean them.
-      return { kind: 'opened', opened: localRepoStub(repoRoot, probe.name, lease) }
+      return {
+        kind: 'opened',
+        opened: stubWorkspaceRepo({
+          entry: { kind: 'local', id: repoRoot },
+          repoRoot,
+          name: probe.name ?? workspaceRepoDisplayName(repoRoot),
+          lease,
+        }),
+      }
     }
     const projection = await readRepoProjection(repoRoot, {
       repoRuntimeId: lease.repoRuntimeId,
@@ -230,18 +246,25 @@ async function openWorkspaceRepo(
       mode: 'full',
     })
     if (!projection.snapshot) {
-      return { kind: 'opened', opened: localRepoStub(repoRoot, probe.name, lease) }
+      return {
+        kind: 'opened',
+        opened: stubWorkspaceRepo({
+          entry: { kind: 'local', id: repoRoot },
+          repoRoot,
+          name: probe.name ?? workspaceRepoDisplayName(repoRoot),
+          lease,
+        }),
+      }
     }
     return {
       kind: 'opened',
-      opened: {
+      opened: projectedWorkspaceRepo({
         entry: { kind: 'local', id: repoRoot },
         repoRoot,
-        repoRuntimeId: lease.repoRuntimeId,
         name: probe.name ?? workspaceRepoDisplayName(repoRoot),
         projection,
         lease,
-      },
+      }),
     }
   })
 }
@@ -254,7 +277,10 @@ async function openRemoteWorkspaceRepo(
   return await withAcquiredWorkspaceRepoLease(input, entry.id, async (lease) => {
     if (!options.active) {
       // Stub path for remote repos: still need a name but no lifecycle / projection.
-      return { kind: 'opened', opened: remoteRepoStub(entry, entry.ref.displayName, lease) }
+      return {
+        kind: 'opened',
+        opened: stubWorkspaceRepo({ entry, repoRoot: entry.id, name: entry.ref.displayName, lease }),
+      }
     }
     const lifecycle = await abortableWorkspaceRestore(
       runRemoteLifecycleWrite({
@@ -269,7 +295,7 @@ async function openRemoteWorkspaceRepo(
       if (lifecycle.kind === 'settled') {
         return {
           kind: 'opened',
-          opened: remoteRepoStub(entry, lifecycle.name, lease),
+          opened: stubWorkspaceRepo({ entry, repoRoot: entry.id, name: lifecycle.name, lease }),
         }
       }
       throw new Error('workspace repo runtime was superseded during restore')
@@ -282,20 +308,25 @@ async function openRemoteWorkspaceRepo(
     if (!projection.snapshot) {
       return {
         kind: 'opened',
-        opened: remoteRepoStub(entry, lifecycle.name, lease, lifecycle.lifecycle.target),
+        opened: stubWorkspaceRepo({
+          entry,
+          repoRoot: entry.id,
+          name: lifecycle.name,
+          target: lifecycle.lifecycle.target,
+          lease,
+        }),
       }
     }
     return {
       kind: 'opened',
-      opened: {
+      opened: projectedWorkspaceRepo({
         entry,
         repoRoot: entry.id,
-        repoRuntimeId: lease.repoRuntimeId,
         name: lifecycle.name,
         target: lifecycle.lifecycle.target,
         projection,
         lease,
-      },
+      }),
     }
   })
 }
@@ -314,35 +345,28 @@ async function withAcquiredWorkspaceRepoLease<T>(
   }
 }
 
-function localRepoStub(
-  repoRoot: string,
-  name: string | null | undefined,
-  lease: RepoRuntimeMembershipLeaseEntry,
-): OpenedWorkspaceRepo {
+interface OpenedWorkspaceRepoInput {
+  entry: RepoSessionEntry
+  repoRoot: string
+  name: string
+  target?: RemoteRepoTarget
+  lease: RepoRuntimeMembershipLeaseEntry
+}
+
+function stubWorkspaceRepo(input: OpenedWorkspaceRepoInput): OpenedWorkspaceRepo {
   return {
-    entry: { kind: 'local', id: repoRoot },
-    repoRoot,
-    repoRuntimeId: lease.repoRuntimeId,
-    name: name ?? workspaceRepoDisplayName(repoRoot),
+    ...input,
+    repoRuntimeId: input.lease.repoRuntimeId,
     projection: null,
-    lease,
   }
 }
 
-function remoteRepoStub(
-  entry: RemoteRepoSessionEntry,
-  name: string,
-  lease: RepoRuntimeMembershipLeaseEntry,
-  target?: RemoteRepoTarget,
+function projectedWorkspaceRepo(
+  input: OpenedWorkspaceRepoInput & { projection: RepoRuntimeProjection },
 ): OpenedWorkspaceRepo {
   return {
-    entry,
-    repoRoot: entry.id,
-    repoRuntimeId: lease.repoRuntimeId,
-    name,
-    ...(target ? { target } : {}),
-    projection: null,
-    lease,
+    ...input,
+    repoRuntimeId: input.lease.repoRuntimeId,
   }
 }
 
