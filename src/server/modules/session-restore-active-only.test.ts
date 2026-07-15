@@ -13,8 +13,6 @@ const mocks = vi.hoisted(() => ({
   getServerWorkspaceState: vi.fn(),
   compareAndReplaceServerWorkspaceRepos: vi.fn(),
   confirmServerWorkspaceRepoEntry: vi.fn(),
-  confirmServerWorkspaceTabsUnchanged: vi.fn(),
-  clearServerWorkspaceTabsIfUnchanged: vi.fn(),
   probeRepo: vi.fn(),
   readRepoProjection: vi.fn(),
   runRemoteLifecycleWrite: vi.fn(),
@@ -30,8 +28,6 @@ vi.mock('#/server/modules/settings-source.ts', () => ({
   getServerWorkspaceState: mocks.getServerWorkspaceState,
   compareAndReplaceServerWorkspaceRepos: mocks.compareAndReplaceServerWorkspaceRepos,
   confirmServerWorkspaceRepoEntry: mocks.confirmServerWorkspaceRepoEntry,
-  confirmServerWorkspaceTabsUnchanged: mocks.confirmServerWorkspaceTabsUnchanged,
-  clearServerWorkspaceTabsIfUnchanged: mocks.clearServerWorkspaceTabsIfUnchanged,
 }))
 
 vi.mock('#/server/modules/repo-read-paths.ts', () => ({
@@ -61,20 +57,12 @@ describe('restoreServerWorkspace — active-only restore', () => {
       requested: { branch: null, pullRequestMode: 'full' },
       loadedAt: 1,
     }))
-    mocks.clearServerWorkspaceTabsIfUnchanged.mockResolvedValue({
-      cleared: true,
-      workspace: defaultServerWorkspaceState(),
-    })
     mocks.compareAndReplaceServerWorkspaceRepos.mockImplementation(
       async (_expected: RepoSessionEntry[], replacement: RepoSessionEntry[]) => {
         const workspace = await mocks.getServerWorkspaceState.mock.results.at(-1)?.value
         return { matched: true, workspace: { ...workspace, openRepoEntries: replacement } }
       },
     )
-    mocks.confirmServerWorkspaceTabsUnchanged.mockImplementation(async () => ({
-      matched: true,
-      workspace: await mocks.getServerWorkspaceState.mock.results.at(-1)?.value,
-    }))
   })
 
   test('non-active repos are validated stubs — no projection read, projection: null', async () => {
@@ -87,7 +75,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
+      restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] }, repaired: false })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -179,7 +167,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     )
   })
 
-  test('converges when workspace membership changes during pane initialization', async () => {
+  test('converges when workspace membership changes during pane projection', async () => {
     const repoA = { kind: 'local' as const, id: '/repo-a' }
     const repoB = { kind: 'local' as const, id: '/repo-b' }
     const initial = { ...defaultServerWorkspaceState(), openRepoEntries: [repoA] }
@@ -187,9 +175,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     mocks.getServerWorkspaceState.mockResolvedValue(initial)
     mocks.compareAndReplaceServerWorkspaceRepos
       .mockResolvedValueOnce({ matched: true, workspace: initial })
-      .mockResolvedValueOnce({ matched: true, workspace: initial })
       .mockResolvedValueOnce({ matched: false, latestWorkspace: latest })
-      .mockResolvedValueOnce({ matched: true, workspace: latest })
       .mockResolvedValueOnce({ matched: true, workspace: latest })
       .mockResolvedValueOnce({ matched: true, workspace: latest })
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
@@ -238,7 +224,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
+      restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 5, entries: [] }, repaired: false })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -275,7 +261,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       name: 'repo',
     }))
     const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
+      restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] }, repaired: false })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -293,7 +279,6 @@ describe('restoreServerWorkspace — active-only restore', () => {
     expect(result.runtime.repos).toHaveLength(1)
     expect(result.runtime.repos[0]).toMatchObject({ repoRoot: '/repo-active' })
     expect(mocks.readRepoProjection).toHaveBeenCalledTimes(1)
-    expect(mocks.clearServerWorkspaceTabsIfUnchanged).not.toHaveBeenCalled()
   })
 
   test('non-active remote repos use their display name without opening remote lifecycle', async () => {
@@ -313,7 +298,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
+      restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] }, repaired: false })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -356,7 +341,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
+      restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] }, repaired: false })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -370,6 +355,5 @@ describe('restoreServerWorkspace — active-only restore', () => {
     })
 
     expect(result.status).toBe('restored')
-    expect(mocks.clearServerWorkspaceTabsIfUnchanged).not.toHaveBeenCalled()
   })
 })

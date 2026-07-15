@@ -1,6 +1,6 @@
 import type { ExecResult } from '#/shared/git-types.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
-import type { PhysicalWorktreeCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
 export interface ServerWorktreeRemovalHost {
   removeWorktree(
@@ -13,7 +13,7 @@ export interface ServerWorktreeRemovalHost {
       deleteBranch: boolean
       signal?: AbortSignal
       remove(
-        capability: PhysicalWorktreeCapability,
+        capability: PhysicalWorktreeExecutionCapability,
         lifecycle: RepoWorktreeRemovalLifecycle,
         signal: AbortSignal,
       ): Promise<ExecResult>

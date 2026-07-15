@@ -9,6 +9,7 @@ import { isSafeBranchName } from '#/shared/refnames.ts'
 import {
   readUserSettingsJson,
   resetUserSettingsPersistenceForTests,
+  SettingsPersistenceWriteError,
   writeUserSettingsJson,
 } from '#/server/modules/settings-persistence.ts'
 import type { LangPref, ServerWorkspaceState, UserSettings, ThemePref } from '#/shared/api-types.ts'
@@ -36,6 +37,18 @@ import {
   type WorkspacePaneTabsTargetIdentity,
 } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
+import {
+  normalizeWorkspacePaneDurableLayout,
+  workspacePaneDurableLayoutsEqual,
+  type WorkspacePaneLayoutRepositoryCasInput,
+  type WorkspacePaneLayoutRepository,
+  type WorkspacePaneLayoutRepositoryAcceptedOutcome,
+  type WorkspacePaneLayoutRepositoryCasOutcome,
+} from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
+import type {
+  WorkspacePaneLayoutRestoreTransaction,
+  WorkspacePaneLayoutRestoreTransactionOutcome,
+} from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
 import { normalizeGlobalShortcut } from '#/shared/accelerator.ts'
 import { isColorTheme, type ColorTheme } from '#/shared/color-theme.ts'
 import {
@@ -66,11 +79,14 @@ interface UserSettingsData {
 
 export type UserSettingsPatch = Partial<UserSettings>
 
-let cachedFetchIntervalSec = DEFAULT_FETCH_INTERVAL_SEC
 let settingsData: UserSettingsData | null = null
 let settingsLoadPromise: Promise<UserSettingsData> | null = null
 let settingsMutationPromise: Promise<void> = Promise.resolve()
 const listeners = new Set<FetchIntervalListener>()
+
+function notifyFetchIntervalListeners(sec: number): void {
+  for (const listener of listeners) listener(sec)
+}
 
 function normalizeFetchInterval(value: unknown): number {
   return typeof value === 'number' && Number.isFinite(value)
@@ -300,7 +316,6 @@ async function loadUserSettings(): Promise<UserSettingsData> {
       await writeUserSettingsFile(data)
     }
     settingsData = data
-    cachedFetchIntervalSec = data.fetchIntervalSec
     return data
   })().catch((err) => {
     settingsLoadPromise = null
@@ -368,8 +383,7 @@ function updateRepoSettingsEntry(
 }
 
 export async function getServerFetchIntervalSec(): Promise<number> {
-  await loadUserSettings()
-  return cachedFetchIntervalSec
+  return (await loadUserSettings()).fetchIntervalSec
 }
 
 export async function getUserSettings(): Promise<UserSettings> {
@@ -389,12 +403,7 @@ export async function setServerFetchIntervalSec(sec: number): Promise<number> {
       next: changed ? { ...data, fetchIntervalSec: next } : data,
       result: next,
       changed,
-      afterCommit: () => {
-        if (cachedFetchIntervalSec !== next) {
-          cachedFetchIntervalSec = next
-          for (const listener of listeners) listener(next)
-        }
-      },
+      afterCommit: changed ? () => notifyFetchIntervalListeners(next) : undefined,
     }
   })
 }
@@ -406,6 +415,7 @@ export async function updateUserSettings(patch: UserSettingsPatch): Promise<User
     const nextColorTheme = patch.colorTheme === undefined ? data.colorTheme : normalizeColorTheme(patch.colorTheme)
     const nextFetchIntervalSec =
       patch.fetchIntervalSec === undefined ? data.fetchIntervalSec : normalizeFetchInterval(patch.fetchIntervalSec)
+    const fetchIntervalChanged = data.fetchIntervalSec !== nextFetchIntervalSec
     const nextTerminalNotificationsEnabled =
       patch.terminalNotificationsEnabled === undefined
         ? data.terminalNotificationsEnabled
@@ -445,12 +455,7 @@ export async function updateUserSettings(patch: UserSettingsPatch): Promise<User
       next: nextData,
       result: userSettingsFromData(nextData),
       changed,
-      afterCommit: () => {
-        if (cachedFetchIntervalSec !== nextFetchIntervalSec) {
-          cachedFetchIntervalSec = nextFetchIntervalSec
-          for (const listener of listeners) listener(nextFetchIntervalSec)
-        }
-      },
+      afterCommit: fetchIntervalChanged ? () => notifyFetchIntervalListeners(nextFetchIntervalSec) : undefined,
     }
   })
 }
@@ -484,9 +489,6 @@ export async function removeServerWorkspaceRepo(repoRoot: string): Promise<Serve
 
 export type ServerWorkspaceMatchOutcome =
   { matched: true; workspace: ServerWorkspaceState } | { matched: false; latestWorkspace: ServerWorkspaceState }
-
-export type ServerWorkspaceClearOutcome =
-  { cleared: true; workspace: ServerWorkspaceState } | { cleared: false; latestWorkspace: ServerWorkspaceState }
 
 export async function compareAndReplaceServerWorkspaceRepos(
   expected: RepoSessionEntry[],
@@ -527,85 +529,97 @@ function sameRepoEntries(a: RepoSessionEntry[], b: RepoSessionEntry[]): boolean 
   return a.length === b.length && a.every((entry, index) => sameRepoSessionEntry(entry, b[index]))
 }
 
-export async function clearServerWorkspaceTabsIfUnchanged(input: {
-  repoRoot: string
-  expectedRepoEntry: RepoSessionEntry
-  expectedTabsByTarget: Record<string, WorkspacePaneTabEntry[]>
-}): Promise<ServerWorkspaceClearOutcome> {
-  return await mutateUserSettings<ServerWorkspaceClearOutcome>(async (data) => {
-    const currentRepoEntry = data.workspace.openRepoEntries.find(
-      (entry) => repoSessionEntryId(entry) === input.repoRoot,
-    )
-    const currentTabsByTarget = data.workspace.workspacePaneTabsByTargetByRepo[input.repoRoot] ?? {}
-    if (
-      !currentRepoEntry ||
-      !sameRepoSessionEntry(currentRepoEntry, input.expectedRepoEntry) ||
-      !sameServerWorkspaceTabsForRepo(input.repoRoot, currentTabsByTarget, input.expectedTabsByTarget)
-    ) {
-      return unchangedUserSettings(data, { cleared: false as const, latestWorkspace: cloneWorkspace(data.workspace) })
-    }
-    const workspacePaneTabsByTargetByRepo = recordWithoutKey(
-      data.workspace.workspacePaneTabsByTargetByRepo,
-      input.repoRoot,
-    )
-    const workspace = { ...data.workspace, workspacePaneTabsByTargetByRepo }
-    return {
-      next: { ...data, workspace },
-      result: { cleared: true as const, workspace: cloneWorkspace(workspace) },
-    }
-  })
+function workspacePaneLayoutFromWorkspace(workspace: ServerWorkspaceState, repoRoot: string): WorkspacePaneDurableLayout {
+  const entries: WorkspacePaneDurableLayout['entries'] = []
+  for (const [targetKey, tabs] of Object.entries(workspace.workspacePaneTabsByTargetByRepo[repoRoot] ?? {})) {
+    const target = parseWorkspacePaneTabsTargetIdentityKey(targetKey)
+    if (!target || target.repoRoot !== repoRoot) continue
+    entries.push(target.kind === 'branch'
+      ? { repoRoot, branchName: target.branchName, worktreePath: null, tabs }
+      : { repoRoot, branchName: '', worktreePath: target.worktreePath, tabs })
+  }
+  return normalizeWorkspacePaneDurableLayout(repoRoot, { entries })
 }
 
-export async function confirmServerWorkspaceTabsUnchanged(input: {
-  repoRoot: string
-  expectedRepoEntry: RepoSessionEntry
-  expectedTabsByTarget: Record<string, WorkspacePaneTabEntry[]>
-}): Promise<ServerWorkspaceMatchOutcome> {
-  return await mutateUserSettings<ServerWorkspaceMatchOutcome>(async (data) => {
-    const currentRepoEntry = data.workspace.openRepoEntries.find(
-      (entry) => repoSessionEntryId(entry) === input.repoRoot,
-    )
-    const currentTabsByTarget = data.workspace.workspacePaneTabsByTargetByRepo[input.repoRoot] ?? {}
-    const matched =
-      !!currentRepoEntry &&
-      sameRepoSessionEntry(currentRepoEntry, input.expectedRepoEntry) &&
-      sameServerWorkspaceTabsForRepo(input.repoRoot, currentTabsByTarget, input.expectedTabsByTarget)
-    return unchangedUserSettings(
-      data,
-      matched
-        ? { matched: true, workspace: cloneWorkspace(data.workspace) }
-        : { matched: false, latestWorkspace: cloneWorkspace(data.workspace) },
-    )
-  })
+export const serverWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository = {
+  async load(repoRoot) {
+    const workspace = (await loadUserSettings()).workspace
+    return { layout: workspacePaneLayoutFromWorkspace(workspace, repoRoot) }
+  },
+
+  async compareAndSwap(input) {
+    return await compareAndSwapWorkspacePaneLayout(input)
+  },
 }
 
-function sameServerWorkspaceTabsForRepo(
-  repoRoot: string,
-  a: Record<string, WorkspacePaneTabEntry[]>,
-  b: Record<string, WorkspacePaneTabEntry[]>,
-): boolean {
-  const normalize = (tabsByTarget: Record<string, WorkspacePaneTabEntry[]>) =>
-    normalizeWorkspacePaneTabsByTargetByRepo({ [repoRoot]: tabsByTarget })[repoRoot] ?? {}
-  return JSON.stringify(normalize(a)) === JSON.stringify(normalize(b))
-}
-
-export async function recordServerWorkspacePaneLayout(
-  repoRoot: string,
-  layout: WorkspacePaneDurableLayout,
-): Promise<ServerWorkspaceState> {
-  return await mutateUserSettings(async (data) => {
-    const byTarget = Object.fromEntries(
-      layout.entries.map((entry) => [workspacePaneTabsTargetIdentityKey(entry), entry.tabs]),
-    )
-    const workspace = normalizeWorkspace({
-      ...data.workspace,
-      workspacePaneTabsByTargetByRepo: {
-        ...data.workspace.workspacePaneTabsByTargetByRepo,
-        [repoRoot]: byTarget,
-      },
+export const serverWorkspacePaneLayoutRestoreTransaction: WorkspacePaneLayoutRestoreTransaction = {
+  async validateMembershipAndLoad(input) {
+    return await mutateUserSettings<WorkspacePaneLayoutRestoreTransactionOutcome>(async (data) => {
+      const currentLayout = workspacePaneLayoutFromWorkspace(data.workspace, input.repoRoot)
+      const snapshot = { layout: currentLayout }
+      const currentRepoEntry = data.workspace.openRepoEntries.find(
+        (entry) => repoSessionEntryId(entry) === input.repoRoot,
+      )
+      if (!sameRepoSessionEntry(currentRepoEntry, input.expectedRepoEntry)) {
+        return unchangedUserSettings(data, { kind: 'membership-conflict', snapshot })
+      }
+      return unchangedUserSettings(data, { kind: 'accepted' as const, snapshot })
     })
-    return { next: { ...data, workspace }, result: cloneWorkspace(workspace) }
-  })
+  },
+}
+
+async function compareAndSwapWorkspacePaneLayout(
+  input: WorkspacePaneLayoutRepositoryCasInput,
+): Promise<WorkspacePaneLayoutRepositoryCasOutcome> {
+  return await mutateWorkspacePaneSettings<WorkspacePaneLayoutRepositoryCasOutcome>(async (data) => {
+    const currentLayout = workspacePaneLayoutFromWorkspace(data.workspace, input.repoRoot)
+    const snapshot = { layout: currentLayout }
+    if (!workspacePaneDurableLayoutsEqual(input.repoRoot, currentLayout, input.expected)) {
+      return unchangedUserSettings(data, { kind: 'conflict', snapshot })
+    }
+    return workspacePaneLayoutMutation(data, input.repoRoot, currentLayout, input.replacement)
+  }, (error) => ({ kind: 'write-failure', error }))
+}
+
+async function mutateWorkspacePaneSettings<T>(
+  mutation: (data: UserSettingsData) => Promise<UserSettingsMutation<T>> | UserSettingsMutation<T>,
+  onWriteFailure: (error: SettingsPersistenceWriteError, current: UserSettingsData) => T,
+): Promise<T> {
+  let writeBase: UserSettingsData | null = null
+  try {
+    return await mutateUserSettings(async (data) => {
+      const plan = await mutation(data)
+      if (plan.changed !== false) writeBase = data
+      return plan
+    })
+  } catch (error) {
+    if (!(error instanceof SettingsPersistenceWriteError) || !writeBase) throw error
+    return onWriteFailure(error, writeBase)
+  }
+}
+
+function workspacePaneLayoutMutation(
+  data: UserSettingsData,
+  repoRoot: string,
+  currentLayout: WorkspacePaneDurableLayout,
+  requestedLayout: WorkspacePaneDurableLayout,
+): UserSettingsMutation<WorkspacePaneLayoutRepositoryAcceptedOutcome> {
+  const snapshot = { layout: currentLayout }
+  const replacement = normalizeWorkspacePaneDurableLayout(repoRoot, requestedLayout)
+  if (workspacePaneDurableLayoutsEqual(repoRoot, currentLayout, replacement)) {
+    return unchangedUserSettings(data, { kind: 'accepted', snapshot, changed: false })
+  }
+  const byTarget = Object.fromEntries(
+    replacement.entries.map((entry) => [workspacePaneTabsTargetIdentityKey(entry), entry.tabs]),
+  )
+  const workspacePaneTabsByTargetByRepo = Object.keys(byTarget).length === 0
+    ? recordWithoutKey(data.workspace.workspacePaneTabsByTargetByRepo, repoRoot)
+    : { ...data.workspace.workspacePaneTabsByTargetByRepo, [repoRoot]: byTarget }
+  const workspace = normalizeWorkspace({ ...data.workspace, workspacePaneTabsByTargetByRepo })
+  return {
+    next: { ...data, workspace },
+    result: { kind: 'accepted', snapshot: { layout: workspacePaneLayoutFromWorkspace(workspace, repoRoot) }, changed: true },
+  }
 }
 
 export async function getServerRecentRepos(): Promise<RepoSessionEntry[]> {
@@ -777,6 +791,5 @@ export function resetServerSettingsSourceForTests(): void {
   settingsLoadPromise = null
   settingsMutationPromise = Promise.resolve()
   listeners.clear()
-  cachedFetchIntervalSec = DEFAULT_FETCH_INTERVAL_SEC
   resetUserSettingsPersistenceForTests()
 }

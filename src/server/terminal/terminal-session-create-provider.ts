@@ -1,7 +1,7 @@
 import type { TerminalCreateInput, TerminalCreateResult } from '#/shared/terminal-types.ts'
 import {
-  assertPhysicalWorktreeCapability,
-  type PhysicalWorktreeCapability,
+  assertPhysicalWorktreeExecutionCapability,
+  type PhysicalWorktreeExecutionCapability,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import type {
   PhysicalWorktreeOperationCoordinator,
@@ -9,7 +9,7 @@ import type {
 } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 
 export interface TerminalCreateAdmission {
-  physicalWorktreeCapability: PhysicalWorktreeCapability
+  physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
   permit: PhysicalWorktreeOperationPermit
 }
 
@@ -27,7 +27,7 @@ interface TerminalSessionAdmittedCreateService {
     clientId: string,
     userId: string,
     input: TerminalCreateInput,
-    physicalWorktreeCapability: PhysicalWorktreeCapability,
+    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     signal: AbortSignal,
   ): Promise<TerminalCreateResult>
 }
@@ -38,7 +38,7 @@ export function createTerminalSessionCreateProvider(deps: {
 }): ServerTerminalCreateProvider {
   return {
     async createAdmitted(clientId, userId, input, admission) {
-      assertPhysicalWorktreeCapability(admission.physicalWorktreeCapability, {
+      assertPhysicalWorktreeExecutionCapability(admission.physicalWorktreeCapability, {
         userId,
         repoRoot: input.repoRoot,
         repoRuntimeId: input.repoRuntimeId,

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
-import { testPhysicalWorktreeCapability } from '#/server/test-utils/physical-worktree-identity.ts'
+import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { createRepoRoutes } from '#/server/routes/repo.ts'
 import { clearRepoRuntimesForUser } from '#/server/modules/repo-runtimes.ts'
 import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
@@ -90,7 +90,7 @@ function createTestRepoRoutes(
   worktreeRemovalApplication: Parameters<typeof createRepoRoutes>[0]['worktreeRemovalApplication'] = {
     async removeWorktree(_userId, input) {
       return await input.remove(
-        testPhysicalWorktreeCapability('/repo/worktree'),
+        testPhysicalWorktreeExecutionCapability('/repo/worktree'),
         {
           beforeRemove: async () => ({ ok: true, message: '' }),
           afterWorktreeRemoved: async () => ({ ok: true, message: '' }),
@@ -1017,7 +1017,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       removeWorktree: vi.fn(
         async (_userId, input) =>
           await input.remove(
-            testPhysicalWorktreeCapability('/tmp/repo-remove'),
+            testPhysicalWorktreeExecutionCapability('/tmp/repo-remove'),
             {
               beforeRemove,
               afterWorktreeRemoved: async () => ({ ok: true, message: '' }),

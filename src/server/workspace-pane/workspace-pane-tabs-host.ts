@@ -1,23 +1,31 @@
 import type {
-  WorkspacePaneTabsEntry,
   WorkspacePaneTabsListInput,
   WorkspacePaneTabsReplaceInput,
   WorkspacePaneTabsSnapshot,
   WorkspacePaneTabsUpdateInput,
 } from '#/shared/workspace-pane-tabs.ts'
-import type { WorkspacePaneTabsTargetIdentity } from '#/shared/workspace-pane-tabs-target.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 
 type MaybePromise<T> = T | Promise<T>
 
-export interface WorkspacePaneTabsInitializeInput extends WorkspacePaneTabsListInput {
-  entries: WorkspacePaneTabsEntry[]
+export interface WorkspacePaneTabsMembershipConflict {
+  kind: 'membership-conflict'
 }
 
+export interface WorkspacePaneTabsRestored {
+  kind: 'restored'
+  snapshot: WorkspacePaneTabsSnapshot
+  repaired: boolean
+}
+
+export type WorkspacePaneTabsRestoreResult = WorkspacePaneTabsRestored | WorkspacePaneTabsMembershipConflict
+
 export interface ServerWorkspacePaneTabsHost {
-  initializeTabs(
+  restoreTabs(
     userId: string,
-    input: WorkspacePaneTabsInitializeInput,
-  ): MaybePromise<WorkspacePaneTabsSnapshot>
+    input: WorkspacePaneTabsListInput & { targets: WorkspacePaneTabsTarget[]; expectedRepoEntry: RepoSessionEntry },
+  ): MaybePromise<WorkspacePaneTabsRestoreResult>
   listWorkspaceTabs(
     clientId: string,
     userId: string,
@@ -32,12 +40,5 @@ export interface ServerWorkspacePaneTabsHost {
     clientId: string,
     userId: string,
     input: WorkspacePaneTabsUpdateInput,
-  ): MaybePromise<WorkspacePaneTabsSnapshot>
-}
-
-export interface ServerWorkspacePaneTargetLifecycleHost {
-  retireTarget(
-    userId: string,
-    input: { repoRuntimeId: string; target: WorkspacePaneTabsTargetIdentity },
   ): MaybePromise<WorkspacePaneTabsSnapshot>
 }

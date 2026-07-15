@@ -21,7 +21,7 @@ import type {
 import { terminalSessionRuntimeScope, terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
 import { serverLogger } from '#/server/logger.ts'
 import type {
-  PhysicalWorktreeCapability,
+  PhysicalWorktreeExecutionCapability,
   PhysicalWorktreeIdentityResolver,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import type { ServerTerminalCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
@@ -70,7 +70,7 @@ export class WorkspacePaneRuntimeApplication {
     if (!this.deps.isCurrentRepoRuntime(userId, input.request.repoRoot, input.request.repoRuntimeId)) {
       return runtimeFailure(input.runtimeType, 'error.repo-runtime-stale')
     }
-    let physicalCapability: PhysicalWorktreeCapability
+    let physicalCapability: PhysicalWorktreeExecutionCapability
     try {
       physicalCapability = await this.capturePhysicalWorktree(userId, input.request, worktreePath)
     } catch (error) {
@@ -100,7 +100,7 @@ export class WorkspacePaneRuntimeApplication {
     const target = normalizedRuntimeTarget(input.target)
     const scope = terminalSessionRuntimeScope(target.repoRoot, target.repoRuntimeId)
     if (!this.isCurrentTarget(userId, target)) return runtimeFailure(input.runtimeType, 'error.repo-runtime-stale')
-    let physicalCapability: PhysicalWorktreeCapability
+    let physicalCapability: PhysicalWorktreeExecutionCapability
     try {
       physicalCapability = await this.capturePhysicalWorktree(userId, target, target.worktreePath)
     } catch (error) {
@@ -129,7 +129,7 @@ export class WorkspacePaneRuntimeApplication {
     input: TerminalWorkspacePaneRuntimeOpenInput,
     scope: string,
     requestedWorktreePath: string,
-    physicalWorktreeCapability: PhysicalWorktreeCapability,
+    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     permit: PhysicalWorktreeOperationPermit,
   ): Promise<WorkspacePaneRuntimeOpenResult> {
     const runtime = await this.deps.terminal.createAdmitted(clientId, userId, input.request, {
@@ -138,25 +138,21 @@ export class WorkspacePaneRuntimeApplication {
     })
     if (!runtime.ok) return { ok: false, runtimeType: 'terminal', message: runtime.message }
 
-    const staleFailure = runtimeFailure('terminal', 'error.repo-runtime-stale')
     const worktreePath = requestedWorktreePath
-    let workspacePaneTabs: WorkspacePaneTabsSnapshot | typeof staleFailure
+    let paneCommit
     try {
-      workspacePaneTabs = await this.deps.workspaceTabsCoordinator.ensureRuntimeTabForSession({
+      paneCommit = await this.deps.workspaceTabsCoordinator.ensureRuntimeTabForSession({
         userId,
         repoRoot: input.request.repoRoot,
         scope,
-        branchName: input.request.branch,
         worktreePath,
         runtimeType: 'terminal',
         sessionId: runtime.terminalSessionId,
         insertAfterIdentity: input.insertAfterIdentity,
         permit,
         physicalWorktreeCapability,
-        guardBeforeWrite: () =>
-          this.deps.isCurrentRepoRuntime(userId, input.request.repoRoot, input.request.repoRuntimeId)
-            ? null
-            : staleFailure,
+        isRuntimeCurrent: () =>
+          this.deps.isCurrentRepoRuntime(userId, input.request.repoRoot, input.request.repoRuntimeId),
       })
     } catch (error) {
       const recovery = await this.recoverIncompleteTerminalOpen(
@@ -175,7 +171,7 @@ export class WorkspacePaneRuntimeApplication {
       )
       return runtimeFailure('terminal', 'error.unavailable')
     }
-    if (!isWorkspacePaneTabsSnapshot(workspacePaneTabs)) {
+    if (paneCommit.kind === 'runtime-stale') {
       const recovery = await this.recoverIncompleteTerminalOpen(
         clientId,
         userId,
@@ -192,9 +188,10 @@ export class WorkspacePaneRuntimeApplication {
           'failed to recover rejected terminal open application command',
         )
       }
-      return workspacePaneTabs
+      return runtimeFailure('terminal', 'error.repo-runtime-stale')
     }
 
+    const workspacePaneTabs = paneCommit.snapshot
     this.deps.broadcastWorkspaceTabsChanged(userId, input.request.repoRoot)
     return {
       ok: true,
@@ -211,7 +208,7 @@ export class WorkspacePaneRuntimeApplication {
     runtime: Extract<TerminalCreateResult, { ok: true }>,
     scope: string,
     worktreePath: string,
-    physicalWorktreeCapability: PhysicalWorktreeCapability,
+    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     permit: PhysicalWorktreeOperationPermit,
   ): Promise<{ closeError: unknown; reconcileError: unknown }> {
     let closeError: unknown = null
@@ -248,7 +245,7 @@ export class WorkspacePaneRuntimeApplication {
     target: NormalizedRuntimeTarget,
     terminalSessionId: string,
     scope: string,
-    physicalWorktreeCapability: PhysicalWorktreeCapability,
+    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     permit: PhysicalWorktreeOperationPermit,
   ): Promise<WorkspacePaneRuntimeCloseResult> {
     const sessions = await this.listTerminalSessions(userId, scope)
@@ -284,7 +281,7 @@ export class WorkspacePaneRuntimeApplication {
     userId: string,
     target: NormalizedRuntimeTarget,
     scope: string,
-    physicalWorktreeCapability: PhysicalWorktreeCapability,
+    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     permit: PhysicalWorktreeOperationPermit,
   ): Promise<WorkspacePaneTabsSnapshot> {
     const snapshot = await this.deps.workspaceTabsCoordinator.reconcileWorktreeAdmitted({
@@ -307,7 +304,7 @@ export class WorkspacePaneRuntimeApplication {
     userId: string,
     target: { repoRoot: string; repoRuntimeId: string },
     worktreePath: string,
-  ): Promise<PhysicalWorktreeCapability> {
+  ): Promise<PhysicalWorktreeExecutionCapability> {
     return await this.deps.physicalWorktrees.capture({
       userId,
       repoRoot: target.repoRoot,
@@ -330,10 +327,6 @@ function normalizedRuntimeTarget(target: WorkspacePaneRuntimeCommandTarget): Nor
 
 function runtimeFailure<TType extends 'terminal'>(runtimeType: TType, message: string) {
   return { ok: false as const, runtimeType, message }
-}
-
-function isWorkspacePaneTabsSnapshot(value: unknown): value is WorkspacePaneTabsSnapshot {
-  return Boolean(value && typeof value === 'object' && 'revision' in value && 'entries' in value)
 }
 
 export function createWorkspacePaneRuntimeApplication(

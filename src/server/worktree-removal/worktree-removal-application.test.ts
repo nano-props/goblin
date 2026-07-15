@@ -3,14 +3,13 @@ import { createWorktreeRemovalApplication } from '#/server/worktree-removal/work
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { normalizeRemoteRepoId } from '#/shared/remote-repo.ts'
 import {
-  testPhysicalWorktreeCapability,
+  testPhysicalWorktreeExecutionCapability,
   testPhysicalWorktreeIdentity,
   testPhysicalWorktrees,
-  issueTestPhysicalWorktreeCapability,
+  issueTestPhysicalWorktreeExecutionCapability,
 } from '#/server/test-utils/physical-worktree-identity.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
-import type { ServerWorkspacePaneTargetLifecycleHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
 
 const failRemoteRuntimeIfNeededMock = vi.hoisted(() => vi.fn())
@@ -31,7 +30,7 @@ describe('WorktreeRemovalApplication', () => {
   test('gates one physical worktree across users and repo runtime ids until removal settles', async () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const physicalIdentity = testPhysicalWorktreeIdentity(target.worktreePath)
-    const physicalCapability = issueTestPhysicalWorktreeCapability({ identity: physicalIdentity })
+    const physicalCapability = issueTestPhysicalWorktreeExecutionCapability({ identity: physicalIdentity })
     const finish = deferred<void>()
     const application = createApplication({
       operations,
@@ -60,7 +59,7 @@ describe('WorktreeRemovalApplication', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const finish = deferred<void>()
     const physicalIdentity = remoteIdentity('0123456789abcdef0123456789abcdef', '/srv/repo-linked')
-    const physicalCapability = issueTestPhysicalWorktreeCapability({ identity: physicalIdentity })
+    const physicalCapability = issueTestPhysicalWorktreeExecutionCapability({ identity: physicalIdentity })
     const application = createApplication({
       operations,
       physicalWorktrees: { capture: async () => physicalCapability },
@@ -95,11 +94,11 @@ describe('WorktreeRemovalApplication', () => {
 
   test('reconciles every affected user scope after Git removal fails', async () => {
     const affectedScopes = [
-      { userId: 'user-a', repoRoot: '/repo', scope: '/repo\0runtime-a' },
-      { userId: 'user-b', repoRoot: '/repo', scope: '/repo\0runtime-b' },
+      { userId: 'user-a', repoRoot: '/repo', scope: '/repo\0runtime-a', worktreePath: '/repo/worktree' },
+      { userId: 'user-b', repoRoot: '/repo', scope: '/repo\0runtime-b', worktreePath: '/repo/worktree' },
     ]
     const reconcilePhysicalWorktreeAfterRemovalFailure = vi.fn(async () => {})
-    const retireTarget = vi.fn(async () => ({ revision: 0, entries: [] }))
+    const retireTarget = vi.fn(async () => {})
     const broadcastWorkspaceTabsChanged = vi.fn()
     const application = createApplication({
       terminalScopes: affectedScopes,
@@ -136,7 +135,7 @@ describe('WorktreeRemovalApplication', () => {
 
   test('leaves runtime resources untouched when repository validation rejects removal', async () => {
     const closeSessionsForPhysicalWorktree = vi.fn(async () => [])
-    const retireTarget = vi.fn(async () => ({ revision: 0, entries: [] }))
+    const retireTarget = vi.fn(async () => {})
     const application = createApplication({ closeSessionsForPhysicalWorktree, retireTarget })
 
     await expect(
@@ -175,7 +174,7 @@ describe('WorktreeRemovalApplication', () => {
   test('runtime close cancels an admitted removal before the destructive mutation settles', async () => {
     const runtime = new AbortController()
     const entered = Promise.withResolvers<void>()
-    const capability = issueTestPhysicalWorktreeCapability({
+    const capability = issueTestPhysicalWorktreeExecutionCapability({
       identity: testPhysicalWorktreeIdentity(target.worktreePath),
       runtimeSignal: runtime.signal,
     })
@@ -198,7 +197,7 @@ describe('WorktreeRemovalApplication', () => {
   test('runtime close cancels a queued removal before its task starts', async () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const runtime = new AbortController()
-    const capability = issueTestPhysicalWorktreeCapability({
+    const capability = issueTestPhysicalWorktreeExecutionCapability({
       identity: testPhysicalWorktreeIdentity(target.worktreePath),
       runtimeSignal: runtime.signal,
     })
@@ -243,7 +242,7 @@ describe('WorktreeRemovalApplication', () => {
       reason: 'unreachable',
       message: 'connection refused',
     })
-    const capability = issueTestPhysicalWorktreeCapability({
+    const capability = issueTestPhysicalWorktreeExecutionCapability({
       identity: testPhysicalWorktreeIdentity(target.worktreePath),
       validateExecution: async () => {
         throw failure
@@ -260,8 +259,8 @@ describe('WorktreeRemovalApplication', () => {
     expect(failRemoteRuntimeIfNeededMock).toHaveBeenCalledWith('user-a', failure)
   })
 
-  test('retires the branch target after worktree and branch removal both succeed', async () => {
-    const retireTarget = vi.fn(async () => ({ revision: 1, entries: [] }))
+  test('does not retire pane layout after worktree and branch removal', async () => {
+    const retireTarget = vi.fn(async () => {})
     const application = createApplication({ retireTarget })
 
     await expect(
@@ -278,13 +277,10 @@ describe('WorktreeRemovalApplication', () => {
       }),
     ).resolves.toEqual({ ok: true, message: 'removed' })
 
-    expect(retireTarget).toHaveBeenCalledWith('user-a', {
-      repoRuntimeId: target.repoRuntimeId,
-      target: { kind: 'branch', repoRoot: target.repoRoot, branchName: target.branchName },
-    })
+    expect(retireTarget).not.toHaveBeenCalled()
   })
 
-  test('reports the committed repository change when branch retirement fails after worktree removal', async () => {
+  test('does not expose a second persistence failure after worktree removal', async () => {
     const retireTarget = vi.fn(async () => {
       throw new Error('pane persistence failed')
     })
@@ -302,15 +298,11 @@ describe('WorktreeRemovalApplication', () => {
           return { ok: true, message: 'removed' }
         },
       }),
-    ).resolves.toEqual({
-      ok: false,
-      message: 'pane persistence failed',
-      repositoryStateChanged: true,
-    })
+    ).resolves.toEqual({ ok: true, message: 'removed' })
   })
 
-  test('retires each repository target that references one removed physical worktree', async () => {
-    const retireTarget = vi.fn(async () => ({ revision: 1, entries: [] }))
+  test('does not retire durable layout from a removed physical generation', async () => {
+    const retireTarget = vi.fn(async () => {})
     const physicalWorktreeTargets = [
       {
         userId: 'user-a',
@@ -326,7 +318,13 @@ describe('WorktreeRemovalApplication', () => {
       },
     ]
     const broadcastSessionsChanged = vi.fn()
-    const application = createApplication({ retireTarget, physicalWorktreeTargets, broadcastSessionsChanged })
+    const broadcastWorkspaceTabsChanged = vi.fn()
+    const application = createApplication({
+      retireTarget,
+      physicalWorktreeTargets,
+      broadcastSessionsChanged,
+      broadcastWorkspaceTabsChanged,
+    })
 
     await expect(
       application.removeWorktree('user-a', {
@@ -339,17 +337,11 @@ describe('WorktreeRemovalApplication', () => {
       }),
     ).resolves.toEqual({ ok: true, message: '' })
 
-    expect(retireTarget).toHaveBeenCalledTimes(2)
-    expect(retireTarget).toHaveBeenNthCalledWith(1, 'user-a', {
-      repoRuntimeId: 'runtime-a',
-      target: { kind: 'worktree', repoRoot: '/repo', worktreePath: '/repo/worktree' },
-    })
-    expect(retireTarget).toHaveBeenNthCalledWith(2, 'user-a', {
-      repoRuntimeId: 'runtime-b',
-      target: { kind: 'worktree', repoRoot: '/linked-repo', worktreePath: '/linked/worktree' },
-    })
+    expect(retireTarget).not.toHaveBeenCalled()
     expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', '/repo')
     expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', '/linked-repo')
+    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', '/repo')
+    expect(broadcastWorkspaceTabsChanged).toHaveBeenCalledWith('user-a', '/linked-repo')
   })
 })
 
@@ -365,8 +357,9 @@ function createApplication(
       identity: PhysicalWorktreeIdentity,
     ) => Promise<Array<{ userId: string; repoRoot: string; scope: string }>>
     reconcilePhysicalWorktreeAfterRemovalFailure?: () => Promise<void>
-    retireTarget?: ServerWorkspacePaneTargetLifecycleHost['retireTarget']
+    retireTarget?: (...args: never[]) => Promise<void>
     physicalWorktreeTargets?: ReturnType<WorkspacePaneTabsCoordinator['physicalWorktreeTargets']>
+    clearPhysicalWorktreeIndex?: WorkspacePaneTabsCoordinator['clearPhysicalWorktreeIndex']
     broadcastWorkspaceTabsChanged?: (userId: string, repoRoot: string) => void
     broadcastSessionsChanged?: (userId: string, repoRoot: string) => void
   } = {},
@@ -386,11 +379,9 @@ function createApplication(
     },
     workspaceTabs: {
       physicalWorktreeTargets: () => options.physicalWorktreeTargets ?? [],
+      clearPhysicalWorktreeIndex: options.clearPhysicalWorktreeIndex ?? (async () => {}),
       reconcilePhysicalWorktreeAfterRemovalFailure:
         options.reconcilePhysicalWorktreeAfterRemovalFailure ?? (async () => {}),
-    },
-    workspacePaneTabs: {
-      retireTarget: options.retireTarget ?? (async () => ({ revision: 0, entries: [] })),
     },
     isCurrentRepoRuntime: () => true,
     broadcastSessionsChanged: options.broadcastSessionsChanged ?? (() => {}),

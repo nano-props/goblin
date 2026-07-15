@@ -2,9 +2,9 @@ import { describe, expect, test, vi } from 'vitest'
 import { createRepoMutationApplication } from '#/server/repo-mutation/repo-mutation-application.ts'
 
 describe('repo mutation application', () => {
-  test('retires a branch target only after branch deletion succeeds', async () => {
-    const retireTarget = vi.fn(async () => ({ revision: 1, entries: [] }))
-    const application = createRepoMutationApplication({ workspacePaneTabs: { retireTarget } })
+  test('does not retire pane layout after branch deletion', async () => {
+    const retireTarget = vi.fn(async () => {})
+    const application = createRepoMutationApplication()
 
     await expect(
       application.deleteBranch('user-a', {
@@ -14,10 +14,7 @@ describe('repo mutation application', () => {
         deleteBranch: async () => ({ ok: true, message: 'deleted' }),
       }),
     ).resolves.toEqual({ ok: true, message: 'deleted' })
-    expect(retireTarget).toHaveBeenCalledWith('user-a', {
-      repoRuntimeId: 'runtime-a',
-      target: { kind: 'branch', repoRoot: '/repo', branchName: 'feature/retired' },
-    })
+    expect(retireTarget).not.toHaveBeenCalled()
 
     await expect(
       application.deleteBranch('user-a', {
@@ -27,14 +24,14 @@ describe('repo mutation application', () => {
         deleteBranch: async () => ({ ok: false, message: 'failed' }),
       }),
     ).resolves.toEqual({ ok: false, message: 'failed' })
-    expect(retireTarget).toHaveBeenCalledTimes(1)
+    expect(retireTarget).not.toHaveBeenCalled()
   })
 
-  test('reports the committed repository change when branch retirement fails', async () => {
+  test('does not expose a second persistence failure after branch deletion', async () => {
     const retireTarget = vi.fn(async () => {
       throw new Error('pane persistence failed')
     })
-    const application = createRepoMutationApplication({ workspacePaneTabs: { retireTarget } })
+    const application = createRepoMutationApplication()
 
     await expect(
       application.deleteBranch('user-a', {
@@ -43,10 +40,6 @@ describe('repo mutation application', () => {
         branchName: 'feature/deleted',
         deleteBranch: async () => ({ ok: true, message: 'deleted' }),
       }),
-    ).resolves.toEqual({
-      ok: false,
-      message: 'pane persistence failed',
-      repositoryStateChanged: true,
-    })
+    ).resolves.toEqual({ ok: true, message: 'deleted' })
   })
 })

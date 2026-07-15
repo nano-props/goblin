@@ -16,7 +16,6 @@ export interface WorkspacePaneTabsActionDependencies {
   sessionService: WorkspacePaneTabsActionService
   isValidClientId(value: unknown): value is string
   isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
-  broadcastWorkspaceTabsChanged(userId: string, repoRoot: string): void
 }
 
 export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDependencies) {
@@ -32,9 +31,7 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       if (!isValidRepoLocator(input?.repoRoot)) return emptyWorkspacePaneTabsSnapshot()
       if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return emptyWorkspacePaneTabsSnapshot()
       assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
-      const tabs = await sessionService.replaceTabs(userId, input)
-      deps.broadcastWorkspaceTabsChanged(userId, input.repoRoot)
-      return tabs
+      return await sessionService.replaceTabs(userId, input)
     },
 
     async updateTabs(
@@ -46,9 +43,7 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       if (!isValidRepoLocator(input?.repoRoot)) return emptyWorkspacePaneTabsSnapshot()
       if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return emptyWorkspacePaneTabsSnapshot()
       assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
-      const tabs = await sessionService.updateTabs(userId, input)
-      deps.broadcastWorkspaceTabsChanged(userId, input.repoRoot)
-      return tabs
+      return await sessionService.updateTabs(userId, input)
     },
 
     async listWorkspaceTabs(

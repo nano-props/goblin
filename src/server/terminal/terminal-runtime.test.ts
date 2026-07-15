@@ -13,6 +13,8 @@ import { getWorktrees } from '#/system/git/worktrees.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
+import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import { HEARTBEAT_DEADLINE_MS, HEARTBEAT_INTERVAL_MS } from '#/server/terminal/terminal-realtime-broker.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { ServerWorkspacePaneRuntimeHost } from '#/server/workspace-pane/workspace-pane-runtime-host.ts'
@@ -197,10 +199,32 @@ const createTerminalApplications = new WeakMap<
   ServerWorkspacePaneRuntimeHost
 >()
 const activeRuntimeShutdowns = new Set<() => void>()
+let testWorkspacePaneLayout: WorkspacePaneDurableLayout = { entries: [] }
+const testWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository = {
+  async load() {
+    return { layout: structuredClone(testWorkspacePaneLayout) }
+  },
+  async compareAndSwap(input) {
+    if (JSON.stringify(testWorkspacePaneLayout) !== JSON.stringify(input.expected)) {
+      return { kind: 'conflict', snapshot: { layout: structuredClone(testWorkspacePaneLayout) } }
+    }
+    const changed = JSON.stringify(testWorkspacePaneLayout) !== JSON.stringify(input.replacement)
+    testWorkspacePaneLayout = structuredClone(input.replacement)
+    return { kind: 'accepted', changed, snapshot: { layout: structuredClone(testWorkspacePaneLayout) } }
+  },
+}
 
 function buildRuntime(): RuntimeHandle {
   const runtime = createServerTerminalRuntime({
     ptySupervisor: createInProcessPtySupervisor(),
+    workspacePaneLayoutRepository: testWorkspacePaneLayoutRepository,
+    workspacePaneTargetProjection: {
+      captureTargets: async (_userId, repoRoot) => [{
+        repoRoot,
+        branchName: 'feature',
+        worktreePath: repoRoot.startsWith('ssh-config://') ? '/srv/repo' : '/repo-linked',
+      }],
+    },
   })
   REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_a')
   SSH_REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, 'ssh-config://prod/srv/repo', 'client_a')
@@ -223,6 +247,7 @@ beforeEach(() => {
   vi.useRealTimers()
   mockPtys.length = 0
   mockDataToEmitOnRegistration = null
+  testWorkspacePaneLayout = { entries: [] }
   vi.clearAllMocks()
   clearRepoRuntimesForUser(USER_1)
   clearRepoRuntimesForUser(USER_2)
@@ -256,10 +281,11 @@ async function requestWorkspacePaneTabs(
   action: string,
   input: unknown,
   requestId: string,
+  identity: { clientId: string; userId: string } = { clientId: 'client_a', userId: USER_1 },
 ): Promise<unknown> {
   host.handleRealtimeMessage(
-    'client_a',
-    USER_1,
+    identity.clientId,
+    identity.userId,
     socket as Parameters<ServerTerminalHost['handleRealtimeMessage']>[2],
     JSON.stringify({
       type: 'request',
@@ -789,16 +815,7 @@ describe('server terminal runtime', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         'req_list_after_exit',
       ),
-    ).resolves.toMatchObject({
-      entries: [
-        {
-          repoRoot: REPO_ROOT,
-          branchName: 'feature',
-          worktreePath: '/repo-linked',
-          tabs: [expect.objectContaining({ type: 'status' })],
-        },
-      ],
-    })
+    ).resolves.toMatchObject({ entries: [] })
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
@@ -847,16 +864,7 @@ describe('server terminal runtime', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
         'req_list_after_prune',
       ),
-    ).resolves.toMatchObject({
-      entries: [
-        {
-          repoRoot: REPO_ROOT,
-          branchName: 'feature',
-          worktreePath: '/repo-linked',
-          tabs: [expect.objectContaining({ type: 'status' })],
-        },
-      ],
-    })
+    ).resolves.toMatchObject({ entries: [] })
 
     host.unregisterSocket('client_a', USER_1, socket)
     shutdown()
@@ -954,6 +962,59 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
+  test('broadcasts an accepted durable pane layout change to every active user projection', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socketA = { send: vi.fn(), close: vi.fn() }
+    const socketB = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_a', USER_1, socketA)
+    host.registerSocket('client_b', USER_2, socketB)
+
+    await requestWorkspacePaneTabs(
+      host,
+      socketA,
+      WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      'req_list_user_a',
+    )
+    await requestWorkspacePaneTabs(
+      host,
+      socketB,
+      WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+      { repoRoot: REPO_ROOT, repoRuntimeId: USER_2_REPO_RUNTIME_ID },
+      'req_list_user_b',
+      { clientId: 'client_b', userId: USER_2 },
+    )
+    socketA.send.mockClear()
+    socketB.send.mockClear()
+
+    await requestWorkspacePaneTabs(
+      host,
+      socketA,
+      WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
+      {
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: REPO_RUNTIME_ID,
+        branchName: 'feature',
+        worktreePath: '/repo-linked',
+        operation: { type: 'open-static', tabType: 'history' },
+      },
+      'req_update_user_a',
+    )
+
+    await vi.waitFor(() => {
+      expect(sentSocketMessages(socketA).some(
+        (message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
+      )).toBe(true)
+      expect(sentSocketMessages(socketB).some(
+        (message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
+      )).toBe(true)
+    })
+
+    host.unregisterSocket('client_a', USER_1, socketA)
+    host.unregisterSocket('client_b', USER_2, socketB)
+    shutdown()
+  })
+
   test('unregisters a buffered socket when raw send fails during broadcast', async () => {
     const { host, shutdown, isClientOnline } = buildRuntime()
     const socket = { send: vi.fn(), close: vi.fn() }
@@ -1034,7 +1095,7 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('repo runtime close makes old terminal sessions and workspace tabs unreachable to the reopened runtime', async () => {
+  test('repo runtime close drops runtime state while preserving durable layout for the reopened epoch', async () => {
     const { host, shutdown } = buildRuntime()
     const first = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,
@@ -1096,7 +1157,16 @@ describe('server terminal runtime', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: nextRepoRuntimeId },
         'req_list_after_repo_reopen',
       ),
-    ).resolves.toMatchObject({ entries: [] })
+    ).resolves.toMatchObject({
+      entries: [{
+        branchName: 'feature',
+        worktreePath: '/repo-linked',
+        tabs: [
+          { type: 'status', tabId: 'workspace-pane:status' },
+          { type: 'history', tabId: 'workspace-pane:history' },
+        ],
+      }],
+    })
 
     const second = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,
@@ -1524,7 +1594,7 @@ describe('server terminal runtime', () => {
       },
       workspacePaneTabs: {
         revision: expect.any(Number),
-        entries: [{ tabs: [{ type: 'status', tabId: 'workspace-pane:status' }] }],
+        entries: [],
       },
     })
     await expect(

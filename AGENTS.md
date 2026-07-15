@@ -20,6 +20,16 @@ The project runs in Node.js strip-only mode (no `tsc` emit). Do not use these un
 - Use the project's `ScrollArea` (`src/web/components/ui/scroll-area.tsx`) for any scrollable region by default. Only fall back to native `overflow` when there's a concrete reason (e.g. terminal scrollbars need native browser behavior).
 - Hover-revealed action triggers (row action menus) must also stay visible in compact UI and while their popover is open. Collapse the show-conditions into one boolean and use `cn(base, visible && '…', !visible && '…')` — see `docs/ui-conventions.md`.
 
+## Root-cause and data-boundary fixes
+
+- Trace defects to the authoritative data source, violated invariant, and atomic read/write boundary before changing application behavior.
+- Prefer fixes at the earliest responsible data boundary: validate or normalize during decoding, enforce persistence invariants in repositories and transactions, and derive state from one authoritative projection.
+- Do not patch data-model defects with application-layer synchronization, extra coordinators, fallback state, compensating guards, casts, or broad `try/catch`. Add application-layer coordination only for a genuine admission, lifecycle, authorization, or safety boundary, and make that boundary explicit in code and tests.
+- Give each object the minimum capability and state required by its owner. Do not move or cache a second authority when the correct model is an explicit read-only input or a narrower capability.
+- Treat growing result unions, generic failure plumbing, optional policy flags, and structural type probing as signs that domain concepts or transaction boundaries may still be conflated. Split the concepts or fix the boundary before extending the type protocol.
+- Model reconciliation from the complete authoritative before/after data set. Cleanup and recovery must not reconstruct authority from paths, handles, sessions, or other data that may already be deleted or stale.
+- A green test suite confirms behavior, not ownership. Review new synchronization, guards, queues, and caches by asking which missing invariant they compensate for and whether that invariant belongs at a lower data boundary.
+
 ## Git and safety
 
 - Read-only git commands may run concurrently.

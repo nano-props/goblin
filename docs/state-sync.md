@@ -57,7 +57,7 @@ Notes:
 - Runtime-coherent repo actions should prefer orchestration entrypoints plus focused helper modules for projection/state transitions and sync pipelines.
 - Settings truth lives on the server; clients read it through query snapshots or specialized runtime projections.
 - Settings writes belong in `src/web/settings-actions.ts`. `src/web/settings-client.ts` is the transport boundary, not a UI mutation API. UI stores may keep local projections such as theme/i18n state, but their server write-through path should use settings actions so the settings query cache stays coherent.
-- Workspace pane tabs truth lives in the server workspace-pane runtime. Every list or mutation returns a complete `WorkspacePaneTabsSnapshot { revision, entries }` for the repo-runtime scope. React Query accepts a snapshot only when its server revision is at least the cached revision. Canonical reorder is intentionally not optimistic; it waits for the server snapshot instead of mixing rollback tokens into the canonical cache.
+- Workspace pane facts have one owner each: the layout repository owns durable static layout, the repo projection owns target validity and branch metadata, the epoch overlay owns runtime placement/index/revision facts, the aggregate owns the canonical projection clock, and runtime providers own live membership. Every list or mutation returns their pure canonical `WorkspacePaneTabsSnapshot { revision, entries }` projection for the repo-runtime epoch. React Query accepts a snapshot only when its server revision is at least the cached revision. Canonical reorder is intentionally not optimistic; it waits for the server snapshot instead of mixing rollback tokens into the canonical cache.
 - Runtime-coherent state may use server-published invalidation plus targeted refetch or realtime streaming. It must not use client polling as the mechanism that discovers server-owned changes.
 - For runtime correctness boundaries, prefer server-owned fast fail over client guards. A mutation that no longer matches the live runtime should be rejected by the server, not locally guessed away by the client.
 - Do not introduce client-only async tokens or focus guards to suppress late navigation after a write completes. Model the operation as a server/projection-owned pending state, reject competing user operations at their entry point, and then project the server result.
@@ -121,8 +121,9 @@ Notes:
 - Do not add a whole-session client -> server write. Each side persists only the state it owns.
 - Explicit workspace pane layout commands persist their durable static layout
   before committing the canonical runtime projection.
-- Restore repairs invalid durable pane-layout targets with a repo-local compare-and-clear operation. It must not rebuild
-  the whole workspace or overwrite tabs that changed after validation.
+- Restore repairs invalid durable pane-layout targets in one membership-aware settings transaction. The transaction
+  filters its current layout by authoritative target keys, so it neither partially commits nor overwrites tabs planned
+  from an earlier read.
 - Workspace pane target preference distinguishes three states: no target (`null` render selection), uninitialized target (use `INITIAL_WORKSPACE_PANE_TAB`), and explicit empty pane (`preferredWorkspacePaneTabByTarget[targetKey] === null`). Do not use `status` as a fallback for route misses, projection misses, or bare branch URLs.
 - URL-backed workspace pane routes are the visible-pane source of truth. Client preference and selected runtime-session state are restorable projection supplements, not command authorities. Internal workspace-pane commands must decide their target route and write the matching preference/selection supplement through the navigation action that accepted the route.
 - Route effects may sync an externally arrived URL (manual address entry, browser Back/Forward, restore) into preference/selection so the restorable projection stays coherent. Command correctness must not depend on those effects running after the route changes.

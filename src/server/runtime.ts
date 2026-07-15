@@ -6,10 +6,7 @@ import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-i
 import { WorkerBackedPtySupervisor } from '#/server/terminal/pty-supervisor-worker.ts'
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
-import type {
-  ServerWorkspacePaneTabsHost,
-  ServerWorkspacePaneTargetLifecycleHost,
-} from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 
 interface ServerRuntimeBaseOptions extends Omit<
   ServerAppOptions,
@@ -31,7 +28,7 @@ interface ServerRuntimeBaseOptions extends Omit<
 
 interface ServerRuntimeInjectedHosts {
   appRealtimeHost: ServerAppRealtimeHost
-  workspacePaneTabsHost: ServerWorkspacePaneTabsHost & ServerWorkspacePaneTargetLifecycleHost
+  workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   worktreeRemovalApplication: ServerWorktreeRemovalHost
 }
 

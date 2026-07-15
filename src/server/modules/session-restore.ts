@@ -27,8 +27,7 @@ import { compareAndReplaceServerWorkspaceRepos, getServerWorkspaceState } from '
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { abortableWorkspaceRestore, workspaceRepoDisplayName } from '#/server/modules/workspace-restore-utils.ts'
 import {
-  initializeWorkspacePaneTabsWithMembershipGuard,
-  validateOrRepairWorkspacePaneTabs,
+  projectWorkspacePaneTabsWithMembershipGuard,
 } from '#/server/modules/workspace-pane-tabs-restore.ts'
 
 export interface RestoreServerWorkspaceInput {
@@ -150,40 +149,29 @@ async function restoreServerWorkspaceSnapshot(
   // Only the active repo's tabs are validated and restored at startup.
   // Non-active repos carry `projection: null` and are restored lazily.
   const openedActive = opened.filter(isOpenedProjectedRepo)
-  const validatedWorkspace = openedActive[0]
-    ? await validateOrRepairWorkspacePaneTabs(membership.workspace, openedActive[0], openedActive[0].entry)
-    : { kind: 'validated' as const, workspace: membership.workspace, repaired: false }
-  if (validatedWorkspace.kind === 'membership-conflict') {
-    return {
-      kind: 'membership-conflict',
-      latestWorkspace: validatedWorkspace.latestWorkspace,
-      repaired: repoRestoreFailed,
-    }
-  }
-
   const expectedMembership = membership.workspace.openRepoEntries
-  const initializedTabs = await initializeWorkspacePaneTabsWithMembershipGuard({
+  const projectedTabs = await projectWorkspacePaneTabsWithMembershipGuard({
     restoreInput: input,
-    workspace: validatedWorkspace.workspace,
     repos: openedActive,
     confirmMembership: async () => await compareAndReplaceServerWorkspaceRepos(expectedMembership, expectedMembership),
+    membershipPolicy: 'confirm-after-restore',
   })
-  if (!initializedTabs.matched) {
+  if (!projectedTabs.matched) {
     return {
       kind: 'membership-conflict',
-      latestWorkspace: initializedTabs.latestWorkspace,
-      repaired: repoRestoreFailed || validatedWorkspace.repaired,
+      latestWorkspace: projectedTabs.latestWorkspace,
+      repaired: repoRestoreFailed,
     }
   }
   return {
     kind: 'restored',
     value: {
-      status: repoRestoreFailed || validatedWorkspace.repaired ? 'repaired' : 'restored',
+      status: repoRestoreFailed || projectedTabs.repaired ? 'repaired' : 'restored',
       openRepoEntries: opened.map((repo) => repo.entry),
       runtime: runtimeSnapshotFromOpened(
         opened,
         activeRepoRootForOpened(input.activeRepoRoot, opened),
-        initializedTabs.snapshots,
+        projectedTabs.snapshots,
       ),
     },
   }

@@ -53,10 +53,22 @@ The ownership split is:
   action/event names and their validation.
 - `src/shared/workspace-pane-runtime.ts` owns the application protocol for
   opening a provider runtime and its canonical tab as one server result.
-- `src/server/workspace-pane/*` owns server-side tab runtime state,
-  layout-intent writes, pure live-session projection, realtime invalidation,
-  and the cross-provider runtime-open application operation. Provider snapshots
-  are the sole live-membership authority; list never writes derived membership.
+- `WorkspacePaneLayoutRepository` is the sole durable static-layout representation.
+- `WorkspacePaneEpochOverlay` owns only runtime placement constraints, physical
+  reverse indexes, active repo projections, and its overlay revision.
+- `WorkspacePaneLayoutAggregate` owns the canonical epoch projection clock,
+  derived from durable layout, target projection, overlay revision, and provider revisions.
+- The repo projection owns current target validity and worktree branch metadata.
+  Commands capture it as an explicit read-only projection input; the pane
+  aggregate does not cache or mutate a second target catalog.
+- `src/server/workspace-pane/*` owns aggregate layout commands, pure projection,
+  realtime invalidation, and the cross-provider runtime-open operation. Provider
+  snapshots are the sole live-membership authority; list and restore never copy
+  or write derived membership.
+- The aggregate owns the `repoRoot` layout queue. Restore uses a separate
+  settings transaction port that checks durable workspace membership and
+  filters invalid target keys from the transaction's current layout in one
+  atomic settings write.
 - `src/web/workspace-pane/*` owns client query/cache projection and mutation
   orchestration for server-owned tab state.
 - `src/web/workspace-pane/tab-providers.ts` owns per-tab-type
@@ -81,8 +93,13 @@ Runtime creation follows three responsibility layers:
    runtime/tab writes, while explicit server operation permits let mutations
    admitted earlier finish in queue order. After repository validation it awaits provider
    quiescence, runs the Git removal past a non-cancelable commit point, then
-   finalizes canonical tabs. A Git failure reconciles runtime tabs while
-   preserving the worktree's static projection.
+   clears the removed physical identity from every affected epoch index. It
+   does not use an old physical generation to authorize durable retirement;
+   invalid rows stay suppressed by the repo projection and are removed by the
+   next membership-aware atomic repair. Branch retirement remains a direct
+   aggregate command. A Git failure reconciles runtime tabs while preserving
+   the worktree's static projection. Git success followed by finalize failure
+   is reported as a committed repository change and remains idempotently retryable.
    Provider commands return the exact target lifecycle effect plus the
    canonical tabs snapshot produced by that command. Full terminal collections
    are query snapshots with their own terminal projection revision; clients

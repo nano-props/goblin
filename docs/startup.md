@@ -31,12 +31,12 @@ The primary window boot path has two separate concerns: public shell hydration a
 
 5. Lazy repo promotion
    - Owner: `useRestoreRepoTabsOnView` and server `restoreRepoTabsForRepo`.
-   - When navigation reaches a stub, the server projects that repo and restores tabs from the current server-owned `ServerWorkspaceState`.
+   - When navigation reaches a stub, the server projects that repo and asks the pane aggregate for a canonical snapshot.
    - The client sends only the repo root and server-issued runtime identity. The server reads the canonical repo entry from current durable membership; client stub data is never command authority.
-   - Promotion validates both the requesting client's runtime lease and durable membership before initializing pane runtime state.
+   - Promotion validates both the requesting client's runtime lease and durable membership, atomically filters invalid durable targets from the settings transaction's current layout, and then performs a pure projection. It never initializes or copies layout into epoch state.
    - Availability failures leave the stub and membership intact so a later navigation can retry.
-   - If the current repo projection proves persisted pane-tab targets invalid, the server clears only that repo's
-     unchanged tab state before initializing the runtime scope. Concurrent tab writes win the repo-local comparison.
+   - If the current repo projection proves persisted pane-tab targets invalid, the aggregate suppresses those targets from the response and repairs them in the same membership-aware settings transaction. The repair plans from transaction-current data, so concurrent valid tab writes are preserved.
+   - The membership-aware restore transaction is lazy promotion's successful durable-membership linearization point. A conflict reloads current membership and retries only after an ABA-style reauthorization. Startup separately retains a final full ordered-membership convergence because its response contains the complete membership and lease set.
 
 6. Workspace shell side effects
    - Owner: `AuthenticatedWorkspaceShell` and `AuthenticatedWorkspaceSideEffects`.

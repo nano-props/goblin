@@ -1,13 +1,13 @@
 // @vitest-environment node
 
 import path from 'node:path'
-import { testPhysicalWorktreeCapability } from '#/server/test-utils/physical-worktree-identity.ts'
+import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import {
   createTerminalSessionEnsurer,
   type TerminalSessionEnsureContext,
 } from '#/server/terminal/terminal-session-ensurer.ts'
-import { issueTestPhysicalWorktreeCapability } from '#/server/test-utils/physical-worktree-identity.ts'
+import { issueTestPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
 import { getWorktrees } from '#/system/git/worktrees.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
@@ -51,8 +51,8 @@ function ensureContext(context: Omit<TerminalSessionEnsureContext, 'signal'>): T
   return { ...context, signal: new AbortController().signal }
 }
 
-function remotePhysicalWorktreeCapability() {
-  return issueTestPhysicalWorktreeCapability({
+function remotePhysicalWorktreeExecutionCapability() {
+  return issueTestPhysicalWorktreeExecutionCapability({
     identity: {
       kind: 'remote',
       executionNamespaceId: '0123456789abcdef0123456789abcdef',
@@ -112,7 +112,7 @@ describe('terminal session ensurer', () => {
       cols: 100,
       rows: 40,
       scopedWorktreePath: path.resolve(WORKTREE_PATH),
-      physicalWorktreeCapability: testPhysicalWorktreeCapability(WORKTREE_PATH),
+      physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
       action: 'created',
     })
     const result = await ensurer.ensure(
@@ -146,7 +146,7 @@ describe('terminal session ensurer', () => {
       branch: BRANCH_NAME,
       terminalSessionId: 'term-locallocallocallocal1',
       worktreePath: path.resolve(WORKTREE_PATH),
-      physicalWorktreeCapability: testPhysicalWorktreeCapability(WORKTREE_PATH),
+      physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
       cwd: path.resolve(WORKTREE_PATH),
       cols: 100,
       rows: 40,
@@ -180,7 +180,7 @@ describe('terminal session ensurer', () => {
         cols: 120,
         rows: 32,
         scopedWorktreePath: REMOTE_WORKTREE_PATH,
-        physicalWorktreeCapability: remotePhysicalWorktreeCapability(),
+        physicalWorktreeCapability: remotePhysicalWorktreeExecutionCapability(),
         action: 'reused',
       }),
     )
@@ -204,7 +204,7 @@ describe('terminal session ensurer', () => {
         branch: BRANCH_NAME,
         terminalSessionId: 'term-remoteremoteremote001',
         worktreePath: REMOTE_WORKTREE_PATH,
-        physicalWorktreeCapability: remotePhysicalWorktreeCapability(),
+        physicalWorktreeCapability: remotePhysicalWorktreeExecutionCapability(),
         cwd: process.cwd(),
         cols: 120,
         rows: 32,
@@ -242,7 +242,7 @@ describe('terminal session ensurer', () => {
           cols: 80,
           rows: 24,
           scopedWorktreePath: REMOTE_WORKTREE_PATH,
-          physicalWorktreeCapability: remotePhysicalWorktreeCapability(),
+          physicalWorktreeCapability: remotePhysicalWorktreeExecutionCapability(),
           action: 'created',
         }),
       ),

@@ -105,6 +105,9 @@ Realtime recovery:
 - Only explicit open and close commands may mutate durable workspace membership.
 - Restore and lazy promotion may compare durable membership, but never recreate
   a client-provided membership declaration.
+- Closing a repo runtime clears provider sessions and the matching pane epoch
+  overlay/index/clock only. It never deletes durable pane layout; a new epoch
+  immediately projects the repository layout without restore-time copying.
 - Do not let the client mint or validate `repoRuntimeId` locally.
 - Server routes that mutate repo-scoped runtime resources should validate the
   server-owned `repoRuntimeId` when the operation targets runtime state.

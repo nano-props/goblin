@@ -5,7 +5,7 @@ import type {
   TerminalSessionEnsureResult,
 } from '#/server/terminal/terminal-session-ensurer.ts'
 import type { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
-import type { PhysicalWorktreeCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
 type TerminalSessionCreateCoordinator = ReturnType<typeof createTerminalSessionCreateCoordinator>
 type TerminalCreateFailure = Extract<TerminalCreateResult, { ok: false }>
@@ -16,7 +16,7 @@ interface TerminalSessionCreatorOptions {
     clientId: string,
     userId: string,
     input: TerminalSessionEnsureInput,
-    physicalWorktreeCapability: PhysicalWorktreeCapability,
+    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     signal: AbortSignal,
   ): Promise<TerminalSessionEnsureResult>
   isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
@@ -39,7 +39,7 @@ class TerminalSessionCreator {
     terminalClientId: string
     userId: string
     request: TerminalCreateInput
-    physicalWorktreeCapability: PhysicalWorktreeCapability
+    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
     signal: AbortSignal
   }): Promise<TerminalCreateResult> {
     const signal = input.signal

@@ -81,7 +81,7 @@ export function createTerminalRuntimeActions(deps: TerminalRuntimeActionDependen
         return { ok: false, message: 'error.invalid-arguments' }
       }
       const session = manager.getSessionSummaryForUser(userId, terminalRuntimeSessionId)
-      const physicalWorktreeCapability = manager.getPhysicalWorktreeCapabilityForUser(userId, terminalRuntimeSessionId)
+      const physicalWorktreeCapability = manager.getPhysicalWorktreeExecutionCapabilityForUser(userId, terminalRuntimeSessionId)
       if (!physicalWorktreeCapability) return { ok: false, message: 'error.invalid-worktree-capability' }
       const terminalClientId = input.clientId ?? clientId
       const operation = await worktreeOperations.runOperation(physicalWorktreeCapability, async (_permit, context) =>

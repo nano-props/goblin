@@ -8,7 +8,6 @@ import {
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type {
-  WorkspacePaneTabsEntry,
   WorkspacePaneTabsSnapshot,
   WorkspacePaneTabsUpdateInput,
 } from '#/shared/workspace-pane-tabs.ts'
@@ -21,6 +20,9 @@ import {
   type WorkspacePaneRuntimeTabsProvider,
 } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import type { WorkspacePaneTabsTargetIdentity } from '#/shared/workspace-pane-tabs-target.ts'
+import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
+import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { WorkspacePaneTabsRestoreResult } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
 import {
   createTerminalSessionEnsurer,
@@ -31,7 +33,7 @@ import {
 } from '#/server/terminal/terminal-session-ensurer.ts'
 import { createTerminalSessionPruner } from '#/server/terminal/terminal-session-pruner.ts'
 import { createTerminalSessionCreator } from '#/server/terminal/terminal-session-creator.ts'
-import type { PhysicalWorktreeCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
 interface TerminalSessionServiceManager extends TerminalSessionEnsureManager {
   listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
@@ -87,7 +89,7 @@ class TerminalSessionService {
     clientId: string,
     userId: string,
     input: TerminalSessionEnsureInput,
-    physicalWorktreeCapability: PhysicalWorktreeCapability,
+    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     signal: AbortSignal,
   ): Promise<TerminalSessionEnsureResult> {
     if (!this.options.isValidClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -129,7 +131,7 @@ class TerminalSessionService {
     clientId: string,
     userId: string,
     input: TerminalCreateInput,
-    physicalWorktreeCapability: PhysicalWorktreeCapability,
+    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     signal: AbortSignal,
   ): Promise<TerminalCreateResult> {
     if (!this.options.isValidClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -165,7 +167,7 @@ class TerminalSessionService {
     const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
     const worktreePath =
       input.worktreePath === null ? null : terminalSessionWorktreePath(input.repoRoot, input.worktreePath)
-    return await this.workspaceTabsCoordinator.replaceTabs({
+    const result = await this.workspaceTabsCoordinator.replaceTabs({
       userId,
       repoRoot: input.repoRoot,
       scope,
@@ -174,31 +176,39 @@ class TerminalSessionService {
       tabs: input.tabs,
       assertCurrent: () => this.assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId),
     })
+    this.broadcastDurableLayoutChange(input.repoRoot, result.affectedUserIds)
+    return result.snapshot
   }
 
-  async initializeTabs(
+  async restoreTabs(
     userId: string,
-    input: { repoRoot: string; repoRuntimeId: string; entries: WorkspacePaneTabsEntry[] },
-  ): Promise<WorkspacePaneTabsSnapshot> {
-    if (!isValidRepoLocator(input.repoRoot)) return emptyWorkspacePaneTabsSnapshot()
-    for (const entry of input.entries) {
-      if (entry.repoRoot !== input.repoRoot) return emptyWorkspacePaneTabsSnapshot()
-      if (!isValidBranch(entry.branchName)) return emptyWorkspacePaneTabsSnapshot()
-      if (entry.worktreePath !== null && !isValidCwd(entry.worktreePath)) return emptyWorkspacePaneTabsSnapshot()
+    input: {
+      repoRoot: string
+      repoRuntimeId: string
+      targets: WorkspacePaneTabsTarget[]
+      expectedRepoEntry: RepoSessionEntry
+    },
+  ): Promise<WorkspacePaneTabsRestoreResult> {
+    if (!isValidRepoLocator(input.repoRoot)) {
+      return { kind: 'restored', snapshot: emptyWorkspacePaneTabsSnapshot(), repaired: false }
     }
     const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
-    return await this.workspaceTabsCoordinator.initializeScope({
+    const result = await this.workspaceTabsCoordinator.restoreScope({
       userId,
       repoRoot: input.repoRoot,
       scope,
-      entries: input.entries.map((entry) => ({
-        branchName: entry.branchName,
-        worktreePath:
-          entry.worktreePath === null ? null : terminalSessionWorktreePath(input.repoRoot, entry.worktreePath),
-        tabs: entry.tabs,
+      targets: input.targets.map((target) => ({
+        ...target,
+        worktreePath: target.worktreePath === null
+          ? null
+          : terminalSessionWorktreePath(input.repoRoot, target.worktreePath),
       })),
+      expectedRepoEntry: input.expectedRepoEntry,
       assertCurrent: () => this.assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId),
     })
+    if (result.kind === 'membership-conflict') return result
+    this.broadcastDurableLayoutChange(input.repoRoot, result.affectedUserIds)
+    return { kind: 'restored', snapshot: result.snapshot, repaired: false }
   }
 
   async updateTabs(userId: string, input: WorkspacePaneTabsUpdateInput): Promise<WorkspacePaneTabsSnapshot> {
@@ -209,7 +219,7 @@ class TerminalSessionService {
     const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
     const worktreePath =
       input.worktreePath === null ? null : terminalSessionWorktreePath(input.repoRoot, input.worktreePath)
-    return await this.workspaceTabsCoordinator.updateTabs({
+    const result = await this.workspaceTabsCoordinator.updateTabs({
       userId,
       repoRoot: input.repoRoot,
       scope,
@@ -218,25 +228,8 @@ class TerminalSessionService {
       operation: input.operation,
       assertCurrent: () => this.assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId),
     })
-  }
-
-  async retireTarget(
-    userId: string,
-    input: { repoRuntimeId: string; target: WorkspacePaneTabsTargetIdentity },
-  ): Promise<WorkspacePaneTabsSnapshot> {
-    const { repoRoot } = input.target
-    const validTarget =
-      input.target.kind === 'branch' ? isValidBranch(input.target.branchName) : isValidCwd(input.target.worktreePath)
-    if (!isValidRepoLocator(repoRoot) || !validTarget) {
-      throw new Error('invalid workspace pane target')
-    }
-    const scope = terminalSessionRuntimeScope(repoRoot, input.repoRuntimeId)
-    return await this.workspaceTabsCoordinator.retireTarget({
-      userId,
-      scope,
-      target: input.target,
-      assertCurrent: () => this.assertCurrentRepoRuntime(userId, repoRoot, input.repoRuntimeId),
-    })
+    this.broadcastDurableLayoutChange(input.repoRoot, result.affectedUserIds)
+    return result.snapshot
   }
 
   async reconcileTerminalTabsForSession(userId: string, session: TerminalSessionSummary): Promise<void> {
@@ -289,6 +282,12 @@ class TerminalSessionService {
 
   private assertCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): void {
     if (!this.isCurrentRepoRuntime(userId, repoRoot, repoRuntimeId)) throw new Error('error.repo-runtime-stale')
+  }
+
+  private broadcastDurableLayoutChange(repoRoot: string, affectedUserIds: readonly string[]): void {
+    for (const affectedUserId of affectedUserIds) {
+      this.options.broadcastWorkspaceTabsChanged(affectedUserId, repoRoot)
+    }
   }
 
   private async rejectStaleCreateIfNeeded(

@@ -15,8 +15,13 @@ import {
   createTerminalSessionService,
   terminalWorkspacePaneRuntimeTabsProvider,
 } from '#/server/terminal/terminal-session-service.ts'
-import { createWorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
-import { createWorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
+import {
+  createWorkspacePaneTabsCoordinator,
+  type WorkspacePaneTargetProjectionProvider,
+} from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
+import { WorkspacePaneLayoutAggregate } from '#/server/workspace-pane/workspace-pane-layout-aggregate.ts'
+import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
+import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
 import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { createTerminalRuntimeCoordinator } from '#/server/terminal/terminal-runtime-coordinator.ts'
@@ -28,11 +33,11 @@ import { createWorkspacePaneRuntimeApplication } from '#/server/workspace-pane/w
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { createWorkspacePaneRuntimeRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-runtime-realtime.ts'
 import type { ServerWorkspacePaneRuntimeHost } from '#/server/workspace-pane/workspace-pane-runtime-host.ts'
-import type {
-  ServerWorkspacePaneTabsHost,
-  ServerWorkspacePaneTargetLifecycleHost,
-} from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
-import { recordServerWorkspacePaneLayout } from '#/server/modules/settings-source.ts'
+import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import {
+  serverWorkspacePaneLayoutRepository,
+  serverWorkspacePaneLayoutRestoreTransaction,
+} from '#/server/modules/settings-source.ts'
 import { isValidTerminalClientId, isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import {
   TerminalSessionManager,
@@ -49,6 +54,7 @@ import { createAppRealtimeHost } from '#/server/realtime/app-realtime-runtime.ts
 import { createWorktreeRemovalApplication } from '#/server/worktree-removal/worktree-removal-application.ts'
 import { createPhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
+import { getRepoSnapshot } from '#/server/modules/repo-read-paths.ts'
 
 // Intentionally long TTL: we want terminals to survive as long as possible in
 // the background so users can leave builds or long-running tasks unattended.
@@ -63,15 +69,33 @@ const TERMINAL_DETACHED_TTL_MS = 24 * 60 * 60 * 1000
 const REPO_RUNTIME_MEMBERSHIP_TTL_MS = 24 * 60 * 60 * 1000
 const terminalRuntimeLogger = serverLogger.child({ module: 'terminal-runtime' })
 
+const serverWorkspacePaneTargetProjection: WorkspacePaneTargetProjectionProvider = {
+  async captureTargets(_userId, repoRoot, scope) {
+    const separator = scope.lastIndexOf('\0')
+    if (separator < 0 || separator === scope.length - 1) throw new Error('invalid workspace pane runtime scope')
+    const snapshot = await getRepoSnapshot(repoRoot, {
+      repoRuntimeId: scope.slice(separator + 1),
+    })
+    return (snapshot?.branches ?? []).map((branch) => ({
+      repoRoot,
+      branchName: branch.name,
+      worktreePath: branch.worktree?.path ?? null,
+    }))
+  },
+}
+
 export interface ServerTerminalRuntimeOptions {
   ptySupervisor: PtySupervisor
   gCommand?: GoblinTerminalCommandRuntime
+  workspacePaneLayoutRepository?: WorkspacePaneLayoutRepository
+  workspacePaneLayoutRestoreTransaction?: WorkspacePaneLayoutRestoreTransaction
+  workspacePaneTargetProjection?: WorkspacePaneTargetProjectionProvider
 }
 
 export interface ServerTerminalRuntime {
   host: ServerTerminalHost
   workspacePaneRuntimeHost: ServerWorkspacePaneRuntimeHost
-  workspacePaneTabsHost: ServerWorkspacePaneTabsHost & ServerWorkspacePaneTargetLifecycleHost
+  workspacePaneTabsHost: ServerWorkspacePaneTabsHost
   workspacePaneRuntimeApplication: ReturnType<typeof createWorkspacePaneRuntimeApplication>
   worktreeRemovalApplication: ReturnType<typeof createWorktreeRemovalApplication>
   shutdown(): void
@@ -79,12 +103,23 @@ export interface ServerTerminalRuntime {
 
 export function createServerTerminalRuntime(options: ServerTerminalRuntimeOptions): ServerTerminalRuntime {
   const { ptySupervisor } = options
-  const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+  const workspacePaneLayout = new WorkspacePaneLayoutAggregate({
+    repository: options.workspacePaneLayoutRepository ?? serverWorkspacePaneLayoutRepository,
+    restoreTransaction: options.workspacePaneLayoutRestoreTransaction ?? serverWorkspacePaneLayoutRestoreTransaction,
+  })
   const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
   const physicalWorktrees = createPhysicalWorktreeIdentityResolver()
   const terminalSessionOrder = {
     terminalSessionIds(input) {
-      return workspaceTabs.runtimeSessionIds(input, 'terminal')
+      const separator = input.scope.lastIndexOf('\0')
+      if (separator < 1) return []
+      return workspacePaneLayout.runtimeSessionIds({
+        userId: input.userId,
+        repoRoot: input.scope.slice(0, separator),
+        repoRuntimeId: input.scope.slice(separator + 1),
+        worktreePath: input.worktreePath,
+        type: 'terminal',
+      })
     },
   } satisfies TerminalSessionOrderProjection<string>
 
@@ -125,11 +160,11 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     (userId, clientId) => broker.isClientOnline(userId, clientId),
   )
   const workspaceTabsCoordinator = createWorkspacePaneTabsCoordinator({
-    workspaceTabs,
     runtimeProviders: [terminalWorkspacePaneRuntimeTabsProvider(manager)],
     worktreeOperations,
     physicalWorktrees,
-    persistLayout: recordServerWorkspacePaneLayout,
+    layoutAggregate: workspacePaneLayout,
+    targetProjection: options.workspacePaneTargetProjection ?? serverWorkspacePaneTargetProjection,
   })
   const coordinator = createTerminalRuntimeCoordinator({
     manager,
@@ -189,19 +224,11 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     isCurrentRepoRuntime,
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
   })
-  const workspacePaneTargetLifecycle: ServerWorkspacePaneTargetLifecycleHost = {
-    async retireTarget(userId, input) {
-      const snapshot = await sessionService.retireTarget(userId, input)
-      broadcastRepoWorkspaceTabsChanged(userId, input.target.repoRoot)
-      return snapshot
-    },
-  }
   const worktreeRemovalApplication = createWorktreeRemovalApplication({
     worktreeOperations,
     physicalWorktrees,
     terminalWorktree: manager,
     workspaceTabs: workspaceTabsCoordinator,
-    workspacePaneTabs: workspacePaneTargetLifecycle,
     isCurrentRepoRuntime,
     broadcastSessionsChanged: broadcastRepoSessionsChanged,
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
@@ -218,11 +245,10 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     sessionService,
     isValidClientId: isValidTerminalClientId,
     isCurrentRepoRuntime: isCurrentRepoRuntime,
-    broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
   })
-  const workspacePaneTabsHost: ServerWorkspacePaneTabsHost & ServerWorkspacePaneTargetLifecycleHost = {
-    async initializeTabs(userId, input) {
-      return await sessionService.initializeTabs(userId, input)
+  const workspacePaneTabsHost: ServerWorkspacePaneTabsHost = {
+    async restoreTabs(userId, input) {
+      return await sessionService.restoreTabs(userId, input)
     },
     async listWorkspaceTabs(clientId, userId, input) {
       return await workspacePaneTabsActions.listWorkspaceTabs(clientId, userId, input)
@@ -233,7 +259,6 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     async updateTabs(clientId, userId, input) {
       return await workspacePaneTabsActions.updateTabs(clientId, userId, input)
     },
-    retireTarget: workspacePaneTargetLifecycle.retireTarget,
   }
 
   const terminalActionHost: ServerTerminalActionHost = {

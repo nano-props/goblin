@@ -9,8 +9,7 @@ import { isCurrentRepoRuntimeMembership } from '#/server/modules/repo-runtimes.t
 import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
 import { confirmServerWorkspaceRepoEntry, getServerWorkspaceState } from '#/server/modules/settings-source.ts'
 import {
-  initializeWorkspacePaneTabsWithMembershipGuard,
-  validateOrRepairWorkspacePaneTabs,
+  projectWorkspacePaneTabsWithMembershipGuard,
   workspaceRepoEntry,
 } from '#/server/modules/workspace-pane-tabs-restore.ts'
 import { abortableWorkspaceRestore, workspaceRepoDisplayName } from '#/server/modules/workspace-restore-utils.ts'
@@ -35,19 +34,15 @@ export async function restoreRepoTabsForRepo(input: RestoreRepoTabsInput): Promi
   const repo = await projectWorkspaceRepo(input, entry)
   if (!repo) throw new IpcError({ code: 'BAD_REQUEST', message: 'error.failed-read-repo' })
 
-  const membership = await confirmServerWorkspaceRepoEntry(entry)
-  if (!membership.matched) throw repoNotInWorkspace()
-  const validatedWorkspace = await validateOrRepairWorkspacePaneTabs(membership.workspace, repo, entry)
-  if (validatedWorkspace.kind === 'membership-conflict') throw repoNotInWorkspace()
-  const initializedTabs = await initializeWorkspacePaneTabsWithMembershipGuard({
+  const projectedTabs = await projectWorkspacePaneTabsWithMembershipGuard({
     restoreInput: input,
-    workspace: validatedWorkspace.workspace,
     repos: [repo],
     confirmMembership: async () => await confirmServerWorkspaceRepoEntry(entry),
+    membershipPolicy: 'transaction-authoritative',
     assertCurrent: () => assertCurrentRepoRuntimeMembership(input),
   })
-  if (!initializedTabs.matched) throw repoNotInWorkspace()
-  return { repo, snapshot: initializedTabs.snapshots[0]?.snapshot ?? null }
+  if (!projectedTabs.matched) throw repoNotInWorkspace()
+  return { repo, snapshot: projectedTabs.snapshots[0]?.snapshot ?? null }
 }
 
 async function projectWorkspaceRepo(
