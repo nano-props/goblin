@@ -69,7 +69,7 @@ export type WorkspacePaneRuntimeTabCommitResult =
   | { kind: 'committed'; snapshot: WorkspacePaneTabsSnapshot }
   | { kind: 'runtime-stale' }
 
-interface WorkspacePaneTabsCoordinatorOptions {
+export interface WorkspacePaneTabsCoordinatorOptions {
   runtimeProviders: readonly WorkspacePaneRuntimeTabsProvider[]
   worktreeOperations: PhysicalWorktreeOperationCoordinator
   physicalWorktrees: Pick<PhysicalWorktreeIdentityResolver, 'capture'>
@@ -90,14 +90,13 @@ export class WorkspacePaneTabsCoordinator {
     this.physicalWorktrees = options.physicalWorktrees
     this.layoutAggregate = options.layoutAggregate
     this.targetProjection = options.targetProjection
-    providerRevisionMapForCoordinator(this.runtimeProviders)
+    assertUniqueRuntimeProviderTypes(this.runtimeProviders)
   }
 
   async ensureRuntimeTabForSession(input: {
     userId: string
     repoRoot: string
     scope: string
-    branchName: string
     worktreePath: string
     runtimeType: WorkspacePaneRuntimeTabType
     sessionId: string
@@ -641,7 +640,7 @@ function scopeFromAggregate(scope: { repoRoot: string; repoRuntimeId: string }):
   return `${scope.repoRoot}\0${scope.repoRuntimeId}`
 }
 
-function providerRevisionMapForCoordinator(providers: readonly WorkspacePaneRuntimeTabsProvider[]): void {
+function assertUniqueRuntimeProviderTypes(providers: readonly WorkspacePaneRuntimeTabsProvider[]): void {
   const types = new Set<WorkspacePaneRuntimeTabType>()
   for (const provider of providers) {
     if (types.has(provider.type)) throw new Error('error.workspace-tabs-provider-type-duplicate')

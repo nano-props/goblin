@@ -73,7 +73,6 @@ describe('WorkspacePaneRuntimeApplication', () => {
         userId: 'user-test',
         repoRoot: '/repo',
         scope: '/repo\0repo-runtime-test',
-        branchName: 'main',
         worktreePath: '/repo/worktree',
         runtimeType: 'terminal',
         sessionId: runtime.terminalSessionId,

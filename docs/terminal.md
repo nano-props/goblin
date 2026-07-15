@@ -199,11 +199,12 @@ until the session recovery and canonical tabs snapshot share a stable revision,
 and the client rejects both together when that revision is older than its
 current projection.
 
-The canonical workspace-tabs revision covers both stored layout changes and
-provider live-membership changes. Each provider supplies an atomic scope
-snapshot with its own revision; the tabs coordinator combines those revisions
-with the layout revision into one monotonic scope clock. A target-only provider
-snapshot must never be returned as a full-scope tabs snapshot.
+The aggregate-owned canonical workspace-tabs revision covers durable layout,
+the authoritative repo target projection, epoch overlay revision, and provider
+live membership. Each provider supplies an atomic scope snapshot with its own
+revision; `WorkspacePaneLayoutAggregate` combines all four dependency classes
+into one monotonic epoch clock. A target-only provider snapshot must never be
+returned as a full-scope tabs snapshot.
 
 ### Terminal create and Workspace Pane navigation
 

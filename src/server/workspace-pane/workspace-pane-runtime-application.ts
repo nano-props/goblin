@@ -145,7 +145,6 @@ export class WorkspacePaneRuntimeApplication {
         userId,
         repoRoot: input.request.repoRoot,
         scope,
-        branchName: input.request.branch,
         worktreePath,
         runtimeType: 'terminal',
         sessionId: runtime.terminalSessionId,

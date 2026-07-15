@@ -191,11 +191,6 @@ export class WorktreeRemovalApplication {
     }
   }
 
-  private broadcastSessions(scopes: readonly { userId: string; repoRoot: string }[]): void {
-    const targets = new Map(scopes.map(({ userId, repoRoot }) => [`${userId}\0${repoRoot}`, { userId, repoRoot }]))
-    for (const { userId, repoRoot } of targets.values()) this.deps.broadcastSessionsChanged(userId, repoRoot)
-  }
-
   private async reconcileAfterFailure(
     repoRoot: string,
     worktreePath: string,
