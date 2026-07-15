@@ -563,7 +563,7 @@ export const serverWorkspacePaneLayoutRestoreTransaction: WorkspacePaneLayoutRes
       if (!sameRepoSessionEntry(currentRepoEntry, input.expectedRepoEntry)) {
         return unchangedUserSettings(data, { kind: 'membership-conflict', snapshot })
       }
-      return unchangedUserSettings(data, { kind: 'accepted' as const, snapshot, changed: false })
+      return unchangedUserSettings(data, { kind: 'accepted' as const, snapshot })
     })
   },
 }

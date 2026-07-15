@@ -95,7 +95,7 @@ export interface WorkspacePaneLayoutOperation {
   update(input: WorkspacePaneLayoutUpdateInput): Promise<WorkspacePaneLayoutCommitResult>
   snapshot(input: WorkspacePaneLayoutSnapshotInput): Promise<WorkspacePaneTabsSnapshot>
   projectEntriesForAdmission(input: WorkspacePaneLayoutSnapshotInput): Promise<WorkspacePaneTabsSnapshot['entries']>
-  validateRepairAndSnapshot(input: WorkspacePaneLayoutValidationInput): Promise<WorkspacePaneLayoutValidationResult>
+  validateMembershipAndSnapshot(input: WorkspacePaneLayoutValidationInput): Promise<WorkspacePaneLayoutValidationResult>
   commitRuntimeTarget(input: WorkspacePaneEpochScope & {
     target: WorkspacePaneTabsTargetIdentity
     lease: PhysicalWorktreeAdmissionLease
@@ -142,7 +142,7 @@ export class WorkspacePaneLayoutAggregate {
         update: async (input) => await this.update(input),
         snapshot: async (input) => await this.snapshot(input),
         projectEntriesForAdmission: async (input) => await this.projectEntriesForAdmission(input),
-        validateRepairAndSnapshot: async (input) => await this.validateRepairAndSnapshot(input),
+        validateMembershipAndSnapshot: async (input) => await this.validateMembershipAndSnapshot(input),
         commitRuntimeTarget: (input) => this.commitRuntimeTarget(input),
         closeEpoch: (scope) => this.closeEpoch(scope),
         commitProjectionTargets: (input) => this.commitProjectionTargets(input),
@@ -182,15 +182,13 @@ export class WorkspacePaneLayoutAggregate {
     return this.projectEntries(scope, layout, validTargets, providerSnapshots)
   }
 
-  private async validateRepairAndSnapshot(
+  private async validateMembershipAndSnapshot(
     input: WorkspacePaneLayoutValidationInput,
   ): Promise<WorkspacePaneLayoutValidationResult> {
-    const validKeys = new Set(input.validTargets.map(workspacePaneTabsTargetIdentityKey))
     input.assertCurrent?.()
     const outcome = await this.restoreTransaction.validateMembershipAndLoad({
         repoRoot: input.repoRoot,
         expectedRepoEntry: input.expectedRepoEntry,
-        projectedTargetKeys: [...validKeys],
       })
     if (outcome.kind === 'membership-conflict') return { kind: 'membership-conflict' }
     input.assertCurrent?.()

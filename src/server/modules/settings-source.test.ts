@@ -287,9 +287,8 @@ test('workspace pane layout repository loads and applies normalized CAS outcomes
   })
   await expect(mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndLoad({
     repoRoot: '/repo-a',
-    projectedTargetKeys: [workspacePaneTabsTargetIdentityKey(historyTarget)],
     expectedRepoEntry: repoEntry,
-  })).resolves.toMatchObject({ kind: 'accepted', changed: false, snapshot: { layout: history } })
+  })).resolves.toMatchObject({ kind: 'accepted', snapshot: { layout: history } })
   await expect(mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
     repoRoot: '/repo-a',
     expected: history,
@@ -304,7 +303,6 @@ test('workspace pane layout repository loads and applies normalized CAS outcomes
   await mod.removeServerWorkspaceRepo('/repo-a')
   await expect(mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndLoad({
     repoRoot: '/repo-a',
-    projectedTargetKeys: [],
     expectedRepoEntry: repoEntry,
   })).resolves.toMatchObject({ kind: 'membership-conflict', snapshot: { layout: history } })
 })
@@ -365,8 +363,7 @@ test('workspace pane restore does not write or classify persistence failures', a
   await expect(mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndLoad({
     repoRoot: '/repo-a',
     expectedRepoEntry: repoEntry,
-    projectedTargetKeys: [],
-  })).resolves.toMatchObject({ kind: 'accepted', snapshot: { layout: staleLayout }, changed: false })
+  })).resolves.toMatchObject({ kind: 'accepted', snapshot: { layout: staleLayout } })
 })
 
 test('updates repo-level worktree bootstrap trust by repo id', async () => {

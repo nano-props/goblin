@@ -215,16 +215,9 @@ describe('workspace pane layout aggregate', () => {
     const repairs: string[][] = []
     const restoreTransaction: WorkspacePaneLayoutRestoreTransaction = {
       async validateMembershipAndLoad(input) {
-        repairs.push([...input.projectedTargetKeys])
+        repairs.push([])
         const current = await repository.load(input.repoRoot)
-        const outcome = await repository.compareAndSwap({
-          repoRoot: input.repoRoot,
-          expected: current.layout,
-          replacement: { entries: current.layout.entries.filter((entry) =>
-            input.projectedTargetKeys.includes(workspacePaneTabsTargetIdentityKey(entry))) },
-        })
-        if (outcome.kind !== 'accepted') throw new Error('test repair transaction failed')
-        return outcome
+        return { kind: 'accepted' as const, snapshot: current }
       },
     }
     const aggregate = aggregateFor(repository, restoreTransaction)
@@ -238,7 +231,7 @@ describe('workspace pane layout aggregate', () => {
     })
 
     expect(repairs).toHaveLength(1)
-    expect(repository.layout).toEqual({ entries: [valid] })
+    expect(repository.layout).toEqual({ entries: [valid, invalidA, invalidB] })
   })
 
   test('does not report a durable change when restore validation is a no-op', async () => {
@@ -569,5 +562,5 @@ async function readSnapshot(
 
 async function validate(aggregate: WorkspacePaneLayoutAggregate, input: WorkspacePaneLayoutValidationInput) {
   return await aggregate.runExclusive(input.repoRoot, async (operation) =>
-    await operation.validateRepairAndSnapshot(input))
+    await operation.validateMembershipAndSnapshot(input))
 }

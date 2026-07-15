@@ -24,6 +24,11 @@ export interface PhysicalWorktreeOperationContext {
   readonly signal: AbortSignal
 }
 
+export interface PhysicalWorktreeAdmissionBatch {
+  readonly capabilities: readonly PhysicalWorktreeExecutionCapability[]
+  readonly leases: readonly PhysicalWorktreeAdmissionLease[]
+}
+
 /** Serializes runtime mutations and removal admission by physical worktree identity. */
 export class PhysicalWorktreeOperationCoordinator {
   private readonly queues = new Map<string, PQueue>()
@@ -96,6 +101,46 @@ export class PhysicalWorktreeOperationCoordinator {
         return await task()
       }, signal),
     }
+  }
+
+  /** Acquire each stable physical identity once, while validating the newest capability available for it. */
+  async runAdmissionBatch<T>(
+    batch: PhysicalWorktreeAdmissionBatch,
+    task: () => Promise<T>,
+    externalSignal?: AbortSignal,
+  ): Promise<{ admitted: true; value: T } | { admitted: false }> {
+    const capabilitiesByKey = new Map<string, PhysicalWorktreeExecutionCapability>()
+    for (const capability of batch.capabilities) {
+      capabilitiesByKey.set(physicalWorktreeOperationKey(capability), capability)
+    }
+    const leasesByKey = new Map<string, PhysicalWorktreeAdmissionLease>()
+    for (const lease of batch.leases) {
+      const key = physicalWorktreeOperationKey(lease)
+      if (!leasesByKey.has(key)) leasesByKey.set(key, lease)
+    }
+    const keys = [...new Set([...capabilitiesByKey.keys(), ...leasesByKey.keys()])].sort()
+    if (keys.some((key) => this.removalAdmissions.has(key))) return { admitted: false }
+    const acquire = async (index: number): Promise<T> => {
+      const key = keys[index]
+      if (!key) return await task()
+      const capability = capabilitiesByKey.get(key)
+      const lease = capability ? physicalWorktreeAdmissionLease(capability) : leasesByKey.get(key)
+      if (!lease) throw new Error('error.invalid-worktree-admission-lease')
+      const signal = combinedSignal(physicalWorktreeAdmissionLeaseSignal(lease), externalSignal)
+      return await this.runByKey(key, async () => {
+        signal.throwIfAborted()
+        if (capability) await validatePhysicalWorktreeExecution(capability, signal)
+        return await acquire(index + 1)
+      }, signal)
+    }
+    const firstCapability = keys.length > 0 ? capabilitiesByKey.get(keys[0]) : undefined
+    const firstLease = firstCapability
+      ? physicalWorktreeAdmissionLease(firstCapability)
+      : (keys.length > 0 ? leasesByKey.get(keys[0])! : null)
+    if (firstLease) {
+      combinedSignal(physicalWorktreeAdmissionLeaseSignal(firstLease), externalSignal).throwIfAborted()
+    }
+    return { admitted: true, value: await acquire(0) }
   }
 
   async runRemoval<T>(

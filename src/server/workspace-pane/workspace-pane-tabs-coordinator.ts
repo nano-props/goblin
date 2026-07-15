@@ -222,7 +222,7 @@ export class WorkspacePaneTabsCoordinator {
           input.assertCurrent()
           const providers = await this.runtimeProviderSnapshotsForScope(input.userId, input.scope)
           input.assertCurrent()
-          return await layout.validateRepairAndSnapshot({
+          return await layout.validateMembershipAndSnapshot({
             ...scope,
             validTargets: input.targets,
             physicalTargets: capturedWorktrees.map(({ target, capability }) => ({
@@ -557,17 +557,13 @@ export class WorkspacePaneTabsCoordinator {
   private async runWithPhysicalWorktrees<T>(
     lockTargets: readonly PhysicalWorktreeAdmissionLease[],
     validatedCapabilities: ReadonlyMap<string, PhysicalWorktreeExecutionCapability>,
-    index: number,
+    _index: number,
     task: () => Promise<T>,
   ): Promise<T> {
-    const lockTarget = lockTargets[index]
-    if (!lockTarget) return await task()
-    const next = async () => await this.runWithPhysicalWorktrees(lockTargets, validatedCapabilities, index + 1, task)
-    const key = physicalWorktreeAdmissionLeaseKey(lockTarget)
-    const validatedCapability = validatedCapabilities.get(key)
-    const result = validatedCapability
-      ? await this.worktreeOperations.runOperation(validatedCapability, async () => await next())
-      : await this.worktreeOperations.runIndexReconciliation(lockTarget, next)
+    const result = await this.worktreeOperations.runAdmissionBatch({
+      leases: lockTargets,
+      capabilities: [...validatedCapabilities.values()],
+    }, task)
     if (!result.admitted) throw new Error('error.worktree-removal-in-progress')
     return result.value
   }
