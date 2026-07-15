@@ -281,13 +281,20 @@ export class TerminalSession {
           return
         }
         return terminalClient.write({ terminalRuntimeSessionId, data }).then((result) => {
-          if (result.status !== 'accepted') {
-            this.writeFailureReporter.report({ terminalRuntimeSessionId, failure: { kind: 'result', result } })
-          }
+          if (this.disposed || this.runtime.currentTerminalRuntimeSessionId() !== terminalRuntimeSessionId) return
+          if (result.status !== 'accepted')
+            this.writeFailureReporter.report({
+              terminalRuntimeSessionId,
+              failure: { kind: 'result', result },
+            })
         })
       })
       .catch((err) => {
-        this.writeFailureReporter.report({ terminalRuntimeSessionId, failure: { kind: 'error', error: err } })
+        if (this.disposed || this.runtime.currentTerminalRuntimeSessionId() !== terminalRuntimeSessionId) return
+        this.writeFailureReporter.report({
+          terminalRuntimeSessionId,
+          failure: { kind: 'error', error: err },
+        })
       })
   }
 

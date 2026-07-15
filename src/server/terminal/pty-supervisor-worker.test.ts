@@ -45,7 +45,13 @@ async function spawnSession(supervisor: WorkerBackedPtySupervisor, worker: FakeW
 
 function buildSupervisor(
   worker: FakeWorker,
-  options: { now?: () => number; setTimer?: typeof setTimeout; clearTimer?: typeof clearTimeout } = {},
+  options: {
+    now?: () => number
+    setTimer?: typeof setTimeout
+    clearTimer?: typeof clearTimeout
+    writeAckTimeoutMs?: number
+    maxPendingWriteBytes?: number
+  } = {},
 ) {
   return new WorkerBackedPtySupervisor({
     workerEntry: '/tmp/pty-worker.js',
@@ -53,6 +59,8 @@ function buildSupervisor(
     now: options.now,
     setTimer: options.setTimer as never,
     clearTimer: options.clearTimer as never,
+    writeAckTimeoutMs: options.writeAckTimeoutMs,
+    maxPendingWriteBytes: options.maxPendingWriteBytes,
   })
 }
 
@@ -420,11 +428,67 @@ describe('WorkerBackedPtySupervisor', () => {
     })
     const handle = await spawnSession(supervisor, worker)
     const write = supervisor.write(handle, 'input')
+    const request = worker.sent.at(-1) as { requestId: string }
 
     await vi.advanceTimersByTimeAsync(25)
 
     await expect(write).resolves.toEqual({ status: 'indeterminate' })
+    expect(supervisor.getDiagnostics().pendingRequests).toBe(1)
+    worker.emit('message', {
+      type: 'pty-write-result',
+      requestId: request.requestId,
+      status: 'accepted',
+    } satisfies PtyWorkerMessage)
     expect(supervisor.getDiagnostics().pendingRequests).toBe(0)
+  })
+
+  test('bounds pending write bytes and releases the budget after acknowledgement', async () => {
+    const supervisor = buildSupervisor(worker, { maxPendingWriteBytes: 5 })
+    const handle = await spawnSession(supervisor, worker)
+    const first = supervisor.write(handle, '你')
+    const firstRequest = worker.sent.at(-1) as { requestId: string }
+
+    await expect(supervisor.write(handle, '好好')).resolves.toEqual({ status: 'rejected' })
+    expect(worker.sent).toHaveLength(2)
+
+    worker.emit('message', {
+      type: 'pty-write-result',
+      requestId: firstRequest.requestId,
+      status: 'accepted',
+    } satisfies PtyWorkerMessage)
+    await expect(first).resolves.toEqual({ status: 'accepted' })
+
+    const afterAck = supervisor.write(handle, '好')
+    const afterAckRequest = worker.sent.at(-1) as { requestId: string }
+    worker.emit('message', {
+      type: 'pty-write-result',
+      requestId: afterAckRequest.requestId,
+      status: 'accepted',
+    } satisfies PtyWorkerMessage)
+    await expect(afterAck).resolves.toEqual({ status: 'accepted' })
+  })
+
+  test('retains transport byte reservations after caller timeout until a late acknowledgement', async () => {
+    vi.useFakeTimers()
+    const supervisor = buildSupervisor(worker, { maxPendingWriteBytes: 5, writeAckTimeoutMs: 25 })
+    const handle = await spawnSession(supervisor, worker)
+    const first = supervisor.write(handle, '12345')
+
+    await vi.advanceTimersByTimeAsync(25)
+    await expect(first).resolves.toEqual({ status: 'indeterminate' })
+
+    await expect(supervisor.write(handle, '1')).resolves.toEqual({ status: 'rejected' })
+    const firstRequest = worker.sent.at(-1) as { requestId: string }
+    worker.emit('message', {
+      type: 'pty-write-result',
+      requestId: firstRequest.requestId,
+      status: 'accepted',
+    } satisfies PtyWorkerMessage)
+
+    const afterAck = supervisor.write(handle, '12345')
+    expect(worker.sent.at(-1)).toMatchObject({ type: 'pty-write', data: '12345' })
+    supervisor.shutdown()
+    await expect(afterAck).resolves.toEqual({ status: 'indeterminate' })
   })
 
   test('killAndWait resolves only after the worker confirms PTY exit', async () => {

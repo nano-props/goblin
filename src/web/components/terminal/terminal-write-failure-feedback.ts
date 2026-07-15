@@ -28,7 +28,7 @@ export function createTerminalWriteFailureReporter(): TerminalWriteFailureReport
 
       terminalLog.warn('write failed for session', { terminalRuntimeSessionId, failure, outageId })
       const messageKey = terminalWriteFailureKey(failure)
-      toast.warning(t(messageKey))
+      toast.warning(t(messageKey), { id: `terminal-write-failure:${messageKey}` })
     },
   }
 }

@@ -35,14 +35,19 @@ describe('terminal write failure feedback', () => {
       outageId: 4,
     })
 
-    reporter.report({ terminalRuntimeSessionId: 'pty_session_first_123456', failure: { kind: 'error', error: first } })
+    reporter.report({
+      terminalRuntimeSessionId: 'pty_session_first_123456',
+      failure: { kind: 'error', error: first },
+    })
     reporter.report({
       terminalRuntimeSessionId: 'pty_session_second_123456',
       failure: { kind: 'error', error: repeated },
     })
 
     expect(mocks.warning).toHaveBeenCalledTimes(1)
-    expect(mocks.warning).toHaveBeenCalledWith('terminal.write-delivery-uncertain')
+    expect(mocks.warning).toHaveBeenCalledWith('terminal.write-delivery-uncertain', {
+      id: 'terminal-write-failure:terminal.write-delivery-uncertain',
+    })
   })
 
   test('reports a later outage independently and distinguishes definite rejection', () => {
@@ -75,9 +80,9 @@ describe('terminal write failure feedback', () => {
     })
 
     expect(mocks.warning.mock.calls).toEqual([
-      ['terminal.write-not-sent'],
-      ['terminal.write-not-sent'],
-      ['terminal.write-blocked-rejected'],
+      ['terminal.write-not-sent', { id: 'terminal-write-failure:terminal.write-not-sent' }],
+      ['terminal.write-not-sent', { id: 'terminal-write-failure:terminal.write-not-sent' }],
+      ['terminal.write-blocked-rejected', { id: 'terminal-write-failure:terminal.write-blocked-rejected' }],
     ])
   })
 
@@ -159,7 +164,9 @@ describe('terminal write failure feedback', () => {
 
     expect(socket.readyState).toBe(wsMock.CLOSED)
     expect(mocks.warning).toHaveBeenCalledTimes(1)
-    expect(mocks.warning).toHaveBeenCalledWith('terminal.write-delivery-uncertain')
+    expect(mocks.warning).toHaveBeenCalledWith('terminal.write-delivery-uncertain', {
+      id: 'terminal-write-failure:terminal.write-delivery-uncertain',
+    })
   })
 
   test('reports an in-flight uncertain write before later not-sent writes from the same outage', async () => {
@@ -202,6 +209,42 @@ describe('terminal write failure feedback', () => {
     await Promise.all([inFlight, notSent])
 
     expect(mocks.warning).toHaveBeenCalledTimes(1)
-    expect(mocks.warning).toHaveBeenCalledWith('terminal.write-delivery-uncertain')
+    expect(mocks.warning).toHaveBeenCalledWith('terminal.write-delivery-uncertain', {
+      id: 'terminal-write-failure:terminal.write-delivery-uncertain',
+    })
+  })
+
+  test('uses a stable semantic toast identity for repeated PTY result failures', () => {
+    const reporter = createTerminalWriteFailureReporter()
+    const reportRejected = () =>
+      reporter.report({
+        terminalRuntimeSessionId: 'pty_session_first_123456',
+        failure: { kind: 'result', result: { status: 'rejected' } },
+      })
+
+    reportRejected()
+    reportRejected()
+    expect(mocks.warning).toHaveBeenCalledTimes(2)
+    expect(mocks.warning).toHaveBeenLastCalledWith('terminal.write-blocked-rejected', {
+      id: 'terminal-write-failure:terminal.write-blocked-rejected',
+    })
+  })
+
+  test('uses one stable toast identity for PTY failures across durable sessions', () => {
+    const reporter = createTerminalWriteFailureReporter()
+    for (const terminalSessionId of ['term-first', 'term-second']) {
+      reporter.report({
+        terminalRuntimeSessionId: `pty_${terminalSessionId}`,
+        failure: { kind: 'result', result: { status: 'indeterminate' } },
+      })
+    }
+
+    expect(mocks.warning).toHaveBeenCalledTimes(2)
+    expect(mocks.warning).toHaveBeenNthCalledWith(1, 'terminal.write-delivery-uncertain', {
+      id: 'terminal-write-failure:terminal.write-delivery-uncertain',
+    })
+    expect(mocks.warning).toHaveBeenNthCalledWith(2, 'terminal.write-delivery-uncertain', {
+      id: 'terminal-write-failure:terminal.write-delivery-uncertain',
+    })
   })
 })
