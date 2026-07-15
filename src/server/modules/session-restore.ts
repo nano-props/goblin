@@ -16,12 +16,7 @@ import {
   type RemoteRepoTarget,
   type RepoSessionEntry,
 } from '#/shared/remote-repo.ts'
-import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
-import {
-  parseWorkspacePaneTabsTargetIdentityKey,
-  type WorkspacePaneTabsTarget,
-} from '#/shared/workspace-pane-tabs-target.ts'
 import { probeRepo, readRepoProjection } from '#/server/modules/repo-read-paths.ts'
 import {
   acquireRepoRuntimeLease,
@@ -31,13 +26,17 @@ import {
 } from '#/server/modules/repo-runtimes.ts'
 import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
 import {
-  clearServerWorkspaceTabsIfUnchanged,
   compareAndReplaceServerWorkspaceRepos,
   confirmServerWorkspaceRepoEntry,
-  confirmServerWorkspaceTabsUnchanged,
   getServerWorkspaceState,
 } from '#/server/modules/settings-source.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import {
+  initializeWorkspacePaneTabsWithMembershipGuard,
+  sameWorkspaceRepoEntry,
+  validateOrRepairWorkspacePaneTabs,
+  workspaceRepoEntry,
+} from '#/server/modules/workspace-pane-tabs-restore.ts'
 
 export interface RestoreServerWorkspaceInput {
   userId: string
@@ -70,14 +69,6 @@ type OpenedProjectedWorkspaceRepo = ProjectedRestoredWorkspaceRepoRuntime & {
   lease: RepoRuntimeMembershipLeaseEntry
 }
 
-interface WorkspacePaneTabsRestoreReplacement {
-  repoRoot: string
-  repoRuntimeId: string
-  target: WorkspacePaneTabsTarget
-  tabs: WorkspacePaneTabEntry[]
-}
-
-const MAX_WORKSPACE_REPAIR_CONFLICT_RETRIES = 3
 const MAX_WORKSPACE_MEMBERSHIP_CONFLICT_RETRIES = 3
 const restoreQueues = new Map<string, PQueue>()
 
@@ -228,17 +219,6 @@ function reconcileOpenedRepoMemberships(
     releaseWorkspaceRepoRuntime(input, opened.lease)
     openedByRoot.delete(repoRoot)
   }
-}
-
-function sameWorkspaceRepoEntry(a: RepoSessionEntry, b: RepoSessionEntry): boolean {
-  if (a.kind !== b.kind || a.id !== b.id) return false
-  if (a.kind === 'local' || b.kind === 'local') return true
-  return (
-    a.ref.id === b.ref.id &&
-    a.ref.alias === b.ref.alias &&
-    a.ref.remotePath === b.ref.remotePath &&
-    a.ref.displayName === b.ref.displayName
-  )
 }
 
 async function openWorkspaceRepo(
@@ -399,24 +379,6 @@ async function abortable<T>(promise: Promise<T>, signal?: AbortSignal): Promise<
   }
 }
 
-function validateWorkspacePaneTabs(
-  workspace: ServerWorkspaceState,
-  opened: ProjectedRestoredWorkspaceRepoRuntime[],
-): WorkspaceTabsValidationResult {
-  const openedByRoot = openedRepoByRoot(opened)
-  for (const [repoRoot, tabsByTarget] of Object.entries(workspace.workspacePaneTabsByTargetByRepo)) {
-    const repo = openedByRoot.get(repoRoot)
-    // Stub leases (non-active repos at cold start) carry `projection: null`
-    // and their tabs will be restored lazily. Defer validation to the lazy
-    // path; do not force workspace repair.
-    if (!repo) continue
-    for (const targetKey of Object.keys(tabsByTarget)) {
-      if (!targetForWorkspaceKey(repo, targetKey)) return { ok: false }
-    }
-  }
-  return { ok: true }
-}
-
 /**
  * Restore pane tabs for a single repo on demand (lazy restore from
  * `useRestoreRepoTabsOnView` when the user navigates to a stub repo).
@@ -461,61 +423,6 @@ export async function restoreRepoTabsForRepo(input: RestoreRepoTabsInput): Promi
   return {
     repo,
     snapshot: initializedTabs.snapshots[0]?.snapshot ?? null,
-  }
-}
-
-async function validateOrRepairWorkspacePaneTabs(
-  initialWorkspace: ServerWorkspaceState,
-  repo: ProjectedRestoredWorkspaceRepoRuntime,
-  expectedRepoEntry: RepoSessionEntry,
-): Promise<
-  | { kind: 'validated'; workspace: ServerWorkspaceState; repaired: boolean }
-  | { kind: 'membership-conflict'; latestWorkspace: ServerWorkspaceState }
-> {
-  let workspace = initialWorkspace
-  for (let conflicts = 0; ; conflicts += 1) {
-    const currentEntry = workspaceRepoEntry(workspace, repo.repoRoot)
-    if (!currentEntry || !sameWorkspaceRepoEntry(currentEntry, expectedRepoEntry)) {
-      return { kind: 'membership-conflict', latestWorkspace: workspace }
-    }
-    const repoWorkspace = workspaceForRepoTabs(workspace, repo.repoRoot)
-    const expectedTabsByTarget = repoWorkspace.workspacePaneTabsByTargetByRepo[repo.repoRoot] ?? {}
-    if (validateWorkspacePaneTabs(repoWorkspace, [repo]).ok) {
-      const confirmed = await confirmServerWorkspaceTabsUnchanged({
-        repoRoot: repo.repoRoot,
-        expectedRepoEntry,
-        expectedTabsByTarget,
-      })
-      if (confirmed.matched) return { kind: 'validated', workspace: confirmed.workspace, repaired: false }
-      if (conflicts >= MAX_WORKSPACE_REPAIR_CONFLICT_RETRIES) {
-        throw new Error('workspace tabs validation was superseded too many times')
-      }
-      workspace = confirmed.latestWorkspace
-      continue
-    }
-    const cleared = await clearServerWorkspaceTabsIfUnchanged({
-      repoRoot: repo.repoRoot,
-      expectedRepoEntry,
-      expectedTabsByTarget,
-    })
-    if (cleared.cleared) return { kind: 'validated', workspace: cleared.workspace, repaired: true }
-    if (conflicts >= MAX_WORKSPACE_REPAIR_CONFLICT_RETRIES) {
-      throw new Error('workspace tabs repair was superseded too many times')
-    }
-    workspace = cleared.latestWorkspace
-  }
-}
-
-function workspaceRepoEntry(workspace: ServerWorkspaceState, repoRoot: string): RepoSessionEntry | null {
-  return workspace.openRepoEntries.find((entry) => repoSessionEntryId(entry) === repoRoot) ?? null
-}
-
-function workspaceForRepoTabs(workspace: ServerWorkspaceState, repoRoot: string): ServerWorkspaceState {
-  return {
-    openRepoEntries: workspace.openRepoEntries,
-    workspacePaneTabsByTargetByRepo: {
-      [repoRoot]: workspace.workspacePaneTabsByTargetByRepo[repoRoot] ?? {},
-    },
   }
 }
 
@@ -580,100 +487,6 @@ function assertCurrentRepoRuntimeMembership(input: RestoreRepoTabsInput): void {
 
 function isOpenedProjectedRepo(repo: OpenedWorkspaceRepo): repo is OpenedProjectedWorkspaceRepo {
   return isProjectedRestoredWorkspaceRepo(repo)
-}
-
-type WorkspaceMembershipConfirmation =
-  { matched: true; workspace: ServerWorkspaceState } | { matched: false; latestWorkspace: ServerWorkspaceState }
-
-async function initializeWorkspacePaneTabsWithMembershipGuard(input: {
-  restoreInput: RestoreServerWorkspaceInput
-  workspace: ServerWorkspaceState
-  repos: ProjectedRestoredWorkspaceRepoRuntime[]
-  confirmMembership: () => Promise<WorkspaceMembershipConfirmation>
-  assertCurrent?: () => void
-}): Promise<
-  | {
-      matched: true
-      snapshots: Array<{ repoRoot: string; repoRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>
-    }
-  | { matched: false; latestWorkspace: ServerWorkspaceState }
-> {
-  const confirmed = await input.confirmMembership()
-  if (!confirmed.matched) return confirmed
-  const stableWorkspace = {
-    ...input.workspace,
-    openRepoEntries: confirmed.workspace.openRepoEntries,
-  }
-  input.restoreInput.signal?.throwIfAborted()
-  const snapshots = await restoreWorkspacePaneTabsForRepos(input.restoreInput, stableWorkspace, input.repos)
-  input.assertCurrent?.()
-  input.restoreInput.signal?.throwIfAborted()
-  const committed = await input.confirmMembership()
-  if (!committed.matched) return committed
-  return { matched: true, snapshots }
-}
-
-async function restoreWorkspacePaneTabsForRepos(
-  input: RestoreServerWorkspaceInput,
-  workspace: ServerWorkspaceState,
-  opened: ProjectedRestoredWorkspaceRepoRuntime[],
-): Promise<Array<{ repoRoot: string; repoRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>> {
-  if (opened.length === 0) return []
-  const replacements = workspacePaneTabRestoreReplacements(workspace, opened)
-  input.signal?.throwIfAborted()
-  const snapshots = []
-  for (const repo of opened) {
-    input.signal?.throwIfAborted()
-    const snapshot = await input.workspacePaneTabsHost.initializeTabs(input.userId, {
-      repoRoot: repo.repoRoot,
-      repoRuntimeId: repo.repoRuntimeId,
-      entries: replacements
-        .filter((replacement) => replacement.repoRoot === repo.repoRoot)
-        .map((replacement) => ({
-          repoRoot: replacement.repoRoot,
-          branchName: replacement.target.branchName,
-          worktreePath: replacement.target.worktreePath,
-          tabs: replacement.tabs,
-        })),
-    })
-    snapshots.push({ repoRoot: repo.repoRoot, repoRuntimeId: repo.repoRuntimeId, snapshot })
-  }
-  return snapshots
-}
-
-function workspacePaneTabRestoreReplacements(
-  workspace: ServerWorkspaceState,
-  opened: ProjectedRestoredWorkspaceRepoRuntime[],
-): WorkspacePaneTabsRestoreReplacement[] {
-  const openedByRoot = openedRepoByRoot(opened)
-  const replacements: WorkspacePaneTabsRestoreReplacement[] = []
-  for (const [repoRoot, tabsByTarget] of Object.entries(workspace.workspacePaneTabsByTargetByRepo)) {
-    const repo = openedByRoot.get(repoRoot)
-    if (!repo) continue
-    for (const [targetKey, tabs] of Object.entries(tabsByTarget)) {
-      const target = targetForWorkspaceKey(repo, targetKey)
-      if (!target) continue
-      replacements.push({ repoRoot: repo.repoRoot, repoRuntimeId: repo.repoRuntimeId, target, tabs })
-    }
-  }
-  return replacements
-}
-
-function targetForWorkspaceKey(
-  repo: ProjectedRestoredWorkspaceRepoRuntime,
-  targetKey: string,
-): WorkspacePaneTabsTarget | null {
-  if (!repo.projection.snapshot) return null
-  const target = parseWorkspacePaneTabsTargetIdentityKey(targetKey)
-  if (!target || target.repoRoot !== repo.repoRoot) return null
-  const branches = repo.projection.snapshot.branches
-  if (target.kind === 'branch') {
-    return branches.some((branch) => branch.name === target.branchName)
-      ? { repoRoot: repo.repoRoot, branchName: target.branchName, worktreePath: null }
-      : null
-  }
-  const branch = branches.find((candidate) => candidate.worktree?.path === target.worktreePath)
-  return branch ? { repoRoot: repo.repoRoot, branchName: branch.name, worktreePath: target.worktreePath } : null
 }
 
 function activeRepoRootForOpened(
