@@ -283,7 +283,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     signal?: AbortSignal,
   ): Promise<TerminalPtySpawnResult> {
     // Failure handling stays with the caller:
-    // - create failures remove the just-created session from manager maps;
+    // - create failures retire operation-owned resources without Directory publication;
     // - restart failures keep the session addressable for a later retry.
     let spawn: AbortablePtySpawn
     try {

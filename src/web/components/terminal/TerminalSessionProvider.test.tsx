@@ -1159,7 +1159,7 @@ describe('TerminalSessionProvider', () => {
     }
   })
 
-  test('updates reused terminal descriptors when the branch changes on the same worktree', async () => {
+  test('keeps server catalog target facts when the client repo branch changes', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch('feature/worktree', { worktree: { path: WORKTREE_PATH } })],
@@ -1204,11 +1204,9 @@ describe('TerminalSessionProvider', () => {
         await Promise.resolve()
       })
 
-      await vi.waitFor(() => {
-        expect(
-          readTerminalSessionCommandBridge()?.terminalWorktreeSnapshot(terminalWorktreeKey).selectedDescriptor?.branch,
-        ).toBe('feature/renamed')
-      })
+      expect(
+        readTerminalSessionCommandBridge()?.terminalWorktreeSnapshot(terminalWorktreeKey).selectedDescriptor?.branch,
+      ).toBe('feature/worktree')
 
       await act(async () => {
         notifyBell.mockClear()
@@ -1225,7 +1223,7 @@ describe('TerminalSessionProvider', () => {
 
       expect(notifyBell).toHaveBeenLastCalledWith({
         title: 'goblin-terminal-provider-repo',
-        body: 'feature/renamed\n~/Developer/goblin — npm run dev',
+        body: 'feature/worktree\n~/Developer/goblin — npm run dev',
         terminalSessionId: 'term-111111111111111111111',
         terminalWorktreeKey,
         repoRoot: REPO_ID,

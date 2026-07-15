@@ -656,8 +656,12 @@ export class TerminalSessionManager<TUser extends string | number> {
   }
 
   private async snapshotAttachResult(session: TerminalSessionView<TUser>): Promise<TerminalRestartResult> {
+    const generation = session.terminalRuntimeGeneration
     const snap = await replaySnapshot(session.render)
     if (!snap) return { ok: false, message: 'error.unavailable' }
+    if (session.terminalRuntimeGeneration !== generation || session.ptyBinding.generation() !== generation) {
+      return { ok: false, message: 'error.unavailable' }
+    }
     return {
       ok: true,
       frame: 'snapshot',
