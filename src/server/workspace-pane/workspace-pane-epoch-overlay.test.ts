@@ -7,7 +7,11 @@ import {
   providerRevisionMap,
   runtimePlacementHints,
 } from '#/server/workspace-pane/workspace-pane-epoch-overlay.ts'
-import { testPhysicalWorktreeIdentity } from '#/server/test-utils/physical-worktree-identity.ts'
+import {
+  testPhysicalWorktreeExecutionCapability,
+  testPhysicalWorktreeIdentity,
+} from '#/server/test-utils/physical-worktree-identity.ts'
+import { physicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import {
   workspacePaneRuntimeTabEntry,
   workspacePaneStaticTabEntry,
@@ -64,8 +68,10 @@ describe('workspace pane epoch overlay', () => {
   test('indexes physical targets and active epochs with epoch-bounded cleanup', () => {
     const overlay = new WorkspacePaneEpochOverlay()
     const identity = testPhysicalWorktreeIdentity('/repo/worktree')
-    overlay.registerPhysicalTarget({ ...scope, target, identity })
-    overlay.registerPhysicalTarget({ ...scope, userId: 'user-b', target, identity })
+    const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree')
+    const lease = physicalWorktreeAdmissionLease(capability)
+    overlay.registerPhysicalTarget({ ...scope, target, lease })
+    overlay.registerPhysicalTarget({ ...scope, userId: 'user-b', target, lease })
 
     expect(overlay.activeEpochs('/repo')).toHaveLength(2)
     expect(overlay.physicalTargets(identity)).toHaveLength(2)
@@ -77,9 +83,11 @@ describe('workspace pane epoch overlay', () => {
   test('reconciles invalid target metadata, placement, and physical indexes with the validated catalog', () => {
     const overlay = new WorkspacePaneEpochOverlay()
     const identity = testPhysicalWorktreeIdentity('/repo/worktree')
+    const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree')
+    const lease = physicalWorktreeAdmissionLease(capability)
     const terminal = workspacePaneRuntimeTabEntry('terminal', 'term-invalidinvalidinvalid1')
     overlay.recordMixedOrder({ ...scope, target, tabs: [terminal] })
-    overlay.registerPhysicalTarget({ ...scope, target, identity })
+    overlay.registerPhysicalTarget({ ...scope, target, lease })
 
     overlay.retainTargets(scope, new Set())
 

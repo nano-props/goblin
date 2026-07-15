@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
-import { testPhysicalWorktreeCapability } from '#/server/test-utils/physical-worktree-identity.ts'
+import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 
 describe('terminal session create provider', () => {
   test('rejects an active permit issued for a different physical worktree', async () => {
@@ -11,12 +11,12 @@ describe('terminal session create provider', () => {
       sessionService: { createAdmitted },
       worktreeOperations,
     })
-    const expectedIdentity = testPhysicalWorktreeCapability('/repo/expected', {
+    const expectedIdentity = testPhysicalWorktreeExecutionCapability('/repo/expected', {
       userId: 'user-test',
       repoRoot: '/repo',
       repoRuntimeId: 'repo-runtime-test',
     })
-    const wrongIdentity = testPhysicalWorktreeCapability('/repo/wrong')
+    const wrongIdentity = testPhysicalWorktreeExecutionCapability('/repo/wrong')
 
     await worktreeOperations.runOperation(wrongIdentity, async (permit) => {
       await expect(

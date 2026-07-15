@@ -37,7 +37,7 @@ import type { PtySupervisor } from '#/server/terminal/pty-supervisor.ts'
 import {
   physicalWorktreeIdentityKey,
 } from '#/server/worktree-removal/physical-worktree-identity.ts'
-import type { PhysicalWorktreeCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import type { TerminalSessionEnsureAttachResult } from '#/server/terminal/terminal-session-ensurer.ts'
 
 const MAX_TERMINAL_WRITE_CHARS = 1024 * 1024
@@ -61,7 +61,7 @@ export interface TerminalEnsureSessionInput<TUser extends string | number> {
   branch: string
   terminalSessionId: string
   worktreePath: string
-  physicalWorktreeCapability: PhysicalWorktreeCapability
+  physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
   cwd: string
   cols: number
   rows: number
@@ -80,7 +80,7 @@ interface TerminalSessionView<TUser extends string | number> extends TerminalPty
   branch: string
   terminalSessionId: string
   worktreePath: string
-  physicalWorktreeCapability: PhysicalWorktreeCapability
+  physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
   ptyBinding: TerminalPtyBinding<TerminalSessionView<TUser>>
   attachments: Map<string, TerminalClientControllerState>
   controllerClientId: string | null
@@ -430,15 +430,15 @@ export class TerminalSessionManager<TUser extends string | number> {
     this.clearProjectionRevision(userId, scope)
   }
 
-  getPhysicalWorktreeCapabilityForUser(
+  getPhysicalWorktreeExecutionCapabilityForUser(
     userId: TUser,
     terminalRuntimeSessionId: string,
-  ): PhysicalWorktreeCapability | null {
+  ): PhysicalWorktreeExecutionCapability | null {
     return this.getSession(userId, terminalRuntimeSessionId)?.physicalWorktreeCapability ?? null
   }
 
   async closeSessionsForPhysicalWorktree(
-    capability: PhysicalWorktreeCapability,
+    capability: PhysicalWorktreeExecutionCapability,
   ): Promise<TerminalPhysicalWorktreeQuiescenceResult<TUser>> {
     const targetKey = physicalWorktreeIdentityKey(capability.identity)
     const affected = new Map<string, TerminalPhysicalWorktreeScope<TUser>>()

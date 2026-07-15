@@ -3,10 +3,10 @@ import { createWorktreeRemovalApplication } from '#/server/worktree-removal/work
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { normalizeRemoteRepoId } from '#/shared/remote-repo.ts'
 import {
-  testPhysicalWorktreeCapability,
+  testPhysicalWorktreeExecutionCapability,
   testPhysicalWorktreeIdentity,
   testPhysicalWorktrees,
-  issueTestPhysicalWorktreeCapability,
+  issueTestPhysicalWorktreeExecutionCapability,
 } from '#/server/test-utils/physical-worktree-identity.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
@@ -31,7 +31,7 @@ describe('WorktreeRemovalApplication', () => {
   test('gates one physical worktree across users and repo runtime ids until removal settles', async () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const physicalIdentity = testPhysicalWorktreeIdentity(target.worktreePath)
-    const physicalCapability = issueTestPhysicalWorktreeCapability({ identity: physicalIdentity })
+    const physicalCapability = issueTestPhysicalWorktreeExecutionCapability({ identity: physicalIdentity })
     const finish = deferred<void>()
     const application = createApplication({
       operations,
@@ -60,7 +60,7 @@ describe('WorktreeRemovalApplication', () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const finish = deferred<void>()
     const physicalIdentity = remoteIdentity('0123456789abcdef0123456789abcdef', '/srv/repo-linked')
-    const physicalCapability = issueTestPhysicalWorktreeCapability({ identity: physicalIdentity })
+    const physicalCapability = issueTestPhysicalWorktreeExecutionCapability({ identity: physicalIdentity })
     const application = createApplication({
       operations,
       physicalWorktrees: { capture: async () => physicalCapability },
@@ -175,7 +175,7 @@ describe('WorktreeRemovalApplication', () => {
   test('runtime close cancels an admitted removal before the destructive mutation settles', async () => {
     const runtime = new AbortController()
     const entered = Promise.withResolvers<void>()
-    const capability = issueTestPhysicalWorktreeCapability({
+    const capability = issueTestPhysicalWorktreeExecutionCapability({
       identity: testPhysicalWorktreeIdentity(target.worktreePath),
       runtimeSignal: runtime.signal,
     })
@@ -198,7 +198,7 @@ describe('WorktreeRemovalApplication', () => {
   test('runtime close cancels a queued removal before its task starts', async () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const runtime = new AbortController()
-    const capability = issueTestPhysicalWorktreeCapability({
+    const capability = issueTestPhysicalWorktreeExecutionCapability({
       identity: testPhysicalWorktreeIdentity(target.worktreePath),
       runtimeSignal: runtime.signal,
     })
@@ -243,7 +243,7 @@ describe('WorktreeRemovalApplication', () => {
       reason: 'unreachable',
       message: 'connection refused',
     })
-    const capability = issueTestPhysicalWorktreeCapability({
+    const capability = issueTestPhysicalWorktreeExecutionCapability({
       identity: testPhysicalWorktreeIdentity(target.worktreePath),
       validateExecution: async () => {
         throw failure

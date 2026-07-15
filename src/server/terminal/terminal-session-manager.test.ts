@@ -12,7 +12,7 @@ import {
   type TerminalEventSink,
 } from '#/server/terminal/terminal-session-manager.ts'
 import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-scope.ts'
-import { testPhysicalWorktreeCapability } from '#/server/test-utils/physical-worktree-identity.ts'
+import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 
 const USER_ID = 'user_terminal_session_manager'
 const CLIENT_ID = 'client_terminal_session_manager'
@@ -152,7 +152,7 @@ function ensureSession(
 ): Promise<TerminalSessionEnsureAttachResult> {
   return manager['ensureSession']({
     ...input,
-    physicalWorktreeCapability: testPhysicalWorktreeCapability(input.worktreePath),
+    physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(input.worktreePath),
   })
 }
 
@@ -411,7 +411,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const created = await pending
     if (!created.ok) throw new Error(created.message)
 
-    const quiescence = manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeCapability(WORKTREE_PATH))
+    const quiescence = manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH))
     const directClose = manager.closeSessionForUser(USER_ID, created.terminalRuntimeSessionId)
     await Promise.resolve()
     expect(killAndWait).toHaveBeenCalledOnce()
@@ -463,7 +463,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     const created = await pending
     if (!created.ok) throw new Error(created.message)
 
-    await expect(manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeCapability(physicalWorktreePath))).resolves.toEqual({
+    await expect(manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(physicalWorktreePath))).resolves.toEqual({
       ok: true,
       scopes: [{ userId: USER_ID, repoRoot: linkedRepoRoot, scope }],
     })
@@ -495,7 +495,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     })
 
     let quiesced = false
-    const quiescence = manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeCapability(WORKTREE_PATH)).then((result) => {
+    const quiescence = manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH)).then((result) => {
       quiesced = true
       return result
     })
@@ -533,7 +533,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     supervisor.spawns.shift()?.(ptySpawnSuccess('pty_quiescence_123456'))
     await pending
 
-    await expect(manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeCapability(WORKTREE_PATH))).resolves.toEqual({
+    await expect(manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH))).resolves.toEqual({
       ok: false,
       scopes: [{ userId: USER_ID, repoRoot, scope }],
       message: 'PTY close timed out',
@@ -543,7 +543,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     ])
 
     killAndWait.mockResolvedValueOnce(undefined)
-    await expect(manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeCapability(WORKTREE_PATH))).resolves.toEqual({
+    await expect(manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH))).resolves.toEqual({
       ok: true,
       scopes: [{ userId: USER_ID, repoRoot, scope }],
     })
@@ -579,7 +579,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     await expect(pendingCreate).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
 
     let quiesced = false
-    const quiescence = manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeCapability(WORKTREE_PATH)).then((value) => {
+    const quiescence = manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH)).then((value) => {
       quiesced = true
       return value
     })
@@ -627,7 +627,7 @@ describe('TerminalSessionManager physical worktree quiescence', () => {
     expect(killAndWait).toHaveBeenCalledOnce()
     await Promise.resolve()
 
-    await expect(manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeCapability(WORKTREE_PATH))).resolves.toEqual({
+    await expect(manager.closeSessionsForPhysicalWorktree(testPhysicalWorktreeExecutionCapability(WORKTREE_PATH))).resolves.toEqual({
       ok: true,
       scopes: [{ userId: USER_ID, repoRoot, scope }],
     })

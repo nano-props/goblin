@@ -12,6 +12,7 @@ import {
   physicalWorktreeIdentityKey,
   type PhysicalWorktreeIdentity,
 } from '#/server/worktree-removal/physical-worktree-identity.ts'
+import type { PhysicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
 export interface WorkspacePaneEpochScope {
   userId: string
@@ -31,7 +32,7 @@ export interface WorkspacePaneEpochTargetRef extends WorkspacePaneEpochScope {
 interface EpochState {
   overlayRevision: number
   placementsByTarget: Map<string, WorkspacePaneRuntimePlacementHint[]>
-  physicalKeysByTarget: Map<string, string>
+  physicalLeasesByTarget: Map<string, PhysicalWorktreeAdmissionLease>
 }
 
 export class WorkspacePaneEpochOverlay {
@@ -60,14 +61,15 @@ export class WorkspacePaneEpochOverlay {
     return state?.placementsByTarget.get(workspacePaneTabsTargetIdentityKeyFromIdentity(input.target))?.map(cloneHint) ?? []
   }
 
-  registerPhysicalTarget(input: WorkspacePaneEpochTargetRef & { identity: PhysicalWorktreeIdentity }): void {
+  registerPhysicalTarget(input: WorkspacePaneEpochTargetRef & { lease: PhysicalWorktreeAdmissionLease }): void {
     const state = this.state(input)
     const targetKey = workspacePaneTabsTargetIdentityKeyFromIdentity(input.target)
-    const physicalKey = physicalWorktreeIdentityKey(input.identity)
-    const previous = state.physicalKeysByTarget.get(targetKey)
+    const physicalKey = physicalWorktreeIdentityKey(input.lease.identity)
+    const previousLease = state.physicalLeasesByTarget.get(targetKey)
+    const previous = previousLease ? physicalWorktreeIdentityKey(previousLease.identity) : null
     if (previous === physicalKey) return
     if (previous) this.removePhysicalTarget(previous, input, targetKey)
-    state.physicalKeysByTarget.set(targetKey, physicalKey)
+    state.physicalLeasesByTarget.set(targetKey, input.lease)
     const refs = this.targetsByPhysicalKey.get(physicalKey) ?? new Map<string, WorkspacePaneEpochTargetRef>()
     refs.set(epochTargetKey(input, targetKey), cloneTargetRef(input))
     this.targetsByPhysicalKey.set(physicalKey, refs)
@@ -78,7 +80,7 @@ export class WorkspacePaneEpochOverlay {
     let derivedStateChanged = false
     const currentTargetKeys = new Set([
       ...state.placementsByTarget.keys(),
-      ...state.physicalKeysByTarget.keys(),
+      ...state.physicalLeasesByTarget.keys(),
     ])
     for (const key of currentTargetKeys) {
       if (targetKeys.has(key)) continue
@@ -90,6 +92,12 @@ export class WorkspacePaneEpochOverlay {
 
   physicalTargets(identity: PhysicalWorktreeIdentity): WorkspacePaneEpochTargetRef[] {
     return Array.from(this.targetsByPhysicalKey.get(physicalWorktreeIdentityKey(identity))?.values() ?? []).map(cloneTargetRef)
+  }
+
+  indexedAdmissionLeases(scope: WorkspacePaneEpochScope): PhysicalWorktreeAdmissionLease[] {
+    const state = this.epochs.get(epochKey(scope))
+    if (!state) return []
+    return [...state.physicalLeasesByTarget.values()]
   }
 
   activeEpochs(repoRoot: string): WorkspacePaneEpochScope[] {
@@ -123,8 +131,8 @@ export class WorkspacePaneEpochOverlay {
     const key = epochKey(scope)
     const state = this.epochs.get(key)
     if (!state) return
-    for (const [targetKey, physicalKey] of state.physicalKeysByTarget) {
-      this.removePhysicalTarget(physicalKey, scope, targetKey)
+    for (const [targetKey, lease] of state.physicalLeasesByTarget) {
+      this.removePhysicalTarget(physicalWorktreeIdentityKey(lease.identity), scope, targetKey)
     }
     this.epochs.delete(key)
     const active = this.epochsByRepoRoot.get(scope.repoRoot)
@@ -137,13 +145,14 @@ export class WorkspacePaneEpochOverlay {
     const affected: WorkspacePaneEpochScope[] = []
     for (const [key, state] of this.epochs) {
       const placementChanged = state.placementsByTarget.delete(targetKey)
-      const physicalKey = state.physicalKeysByTarget.get(targetKey)
-      if (physicalKey) {
+      const lease = state.physicalLeasesByTarget.get(targetKey)
+      if (lease) {
+        const physicalKey = physicalWorktreeIdentityKey(lease.identity)
         const scope = scopeFromEpochKey(key)
         this.removePhysicalTarget(physicalKey, scope, targetKey)
-        state.physicalKeysByTarget.delete(targetKey)
+        state.physicalLeasesByTarget.delete(targetKey)
       }
-      if (!placementChanged && !physicalKey) continue
+      if (!placementChanged && !lease) continue
       state.overlayRevision += 1
       affected.push(scopeFromEpochKey(key))
     }
@@ -157,7 +166,7 @@ export class WorkspacePaneEpochOverlay {
       state = {
         overlayRevision: 0,
         placementsByTarget: new Map(),
-        physicalKeysByTarget: new Map(),
+        physicalLeasesByTarget: new Map(),
       }
       this.epochs.set(key, state)
       const active = this.epochsByRepoRoot.get(scope.repoRoot) ?? new Map<string, WorkspacePaneEpochScope>()
@@ -179,12 +188,13 @@ export class WorkspacePaneEpochOverlay {
 
   private removeTargetFromState(scope: WorkspacePaneEpochScope, state: EpochState, targetKey: string): boolean {
     const placementChanged = state.placementsByTarget.delete(targetKey)
-    const physicalKey = state.physicalKeysByTarget.get(targetKey)
-    if (physicalKey) {
+    const lease = state.physicalLeasesByTarget.get(targetKey)
+    if (lease) {
+      const physicalKey = physicalWorktreeIdentityKey(lease.identity)
       this.removePhysicalTarget(physicalKey, scope, targetKey)
-      state.physicalKeysByTarget.delete(targetKey)
+      state.physicalLeasesByTarget.delete(targetKey)
     }
-    return placementChanged || physicalKey !== undefined
+    return placementChanged || lease !== undefined
   }
 }
 

@@ -4,11 +4,17 @@ import {
   type PhysicalWorktreeIdentity,
 } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import {
-  physicalWorktreeCapabilityLease,
-  type PhysicalWorktreeCapability,
+  physicalWorktreeAdmissionLease,
+  physicalWorktreeAdmissionLeaseSignal,
+  validatePhysicalWorktreeExecution,
+  type PhysicalWorktreeAdmissionLease,
+  type PhysicalWorktreeExecutionCapability,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
-export type PhysicalWorktreeAdmissionTarget = PhysicalWorktreeCapability | PhysicalWorktreeIdentity
+export type PhysicalWorktreeAdmissionTarget =
+  | PhysicalWorktreeAdmissionLease
+  | PhysicalWorktreeExecutionCapability
+  | PhysicalWorktreeIdentity
 
 export interface PhysicalWorktreeOperationPermit {
   readonly operationId: number
@@ -24,7 +30,7 @@ export class PhysicalWorktreeOperationCoordinator {
   private readonly removalAdmissions = new Set<string>()
   private readonly permitContexts = new WeakMap<
     PhysicalWorktreeOperationPermit,
-    { capability: PhysicalWorktreeCapability; key: string; context: PhysicalWorktreeOperationContext }
+    { capability: PhysicalWorktreeExecutionCapability; key: string; context: PhysicalWorktreeOperationContext }
   >()
   private readonly activePermits = new WeakSet<PhysicalWorktreeOperationPermit>()
   private nextOperationId = 1
@@ -34,7 +40,7 @@ export class PhysicalWorktreeOperationCoordinator {
   }
 
   assertPermit(
-    capability: PhysicalWorktreeCapability,
+    capability: PhysicalWorktreeExecutionCapability,
     permit: PhysicalWorktreeOperationPermit,
   ): PhysicalWorktreeOperationContext {
     const entry = this.permitContexts.get(permit)
@@ -45,12 +51,12 @@ export class PhysicalWorktreeOperationCoordinator {
   }
 
   async runOperation<T>(
-    capability: PhysicalWorktreeCapability,
+    capability: PhysicalWorktreeExecutionCapability,
     task: (permit: PhysicalWorktreeOperationPermit, context: PhysicalWorktreeOperationContext) => Promise<T>,
     externalSignal?: AbortSignal,
   ): Promise<{ admitted: true; value: T } | { admitted: false }> {
-    const lease = physicalWorktreeCapabilityLease(capability)
-    const signal = combinedSignal(lease.runtimeSignal, externalSignal)
+    const admissionLease = physicalWorktreeAdmissionLease(capability)
+    const signal = combinedSignal(physicalWorktreeAdmissionLeaseSignal(admissionLease), externalSignal)
     signal.throwIfAborted()
     const key = physicalWorktreeOperationKey(capability)
     if (this.removalAdmissions.has(key)) return { admitted: false }
@@ -62,7 +68,7 @@ export class PhysicalWorktreeOperationCoordinator {
         value: await this.runByKey(
           key,
           async () => {
-            await lease.validateExecution(signal)
+            await validatePhysicalWorktreeExecution(capability, signal)
             signal.throwIfAborted()
             return await task(permit, context)
           },
@@ -74,13 +80,31 @@ export class PhysicalWorktreeOperationCoordinator {
     }
   }
 
+  async runIndexReconciliation<T>(
+    lease: PhysicalWorktreeAdmissionLease,
+    task: () => Promise<T>,
+    externalSignal?: AbortSignal,
+  ): Promise<{ admitted: true; value: T } | { admitted: false }> {
+    const signal = combinedSignal(physicalWorktreeAdmissionLeaseSignal(lease), externalSignal)
+    signal.throwIfAborted()
+    const key = physicalWorktreeOperationKey(lease)
+    if (this.removalAdmissions.has(key)) return { admitted: false }
+    return {
+      admitted: true,
+      value: await this.runByKey(key, async () => {
+        signal.throwIfAborted()
+        return await task()
+      }, signal),
+    }
+  }
+
   async runRemoval<T>(
-    capability: PhysicalWorktreeCapability,
+    capability: PhysicalWorktreeExecutionCapability,
     task: (context: PhysicalWorktreeOperationContext, permit: PhysicalWorktreeOperationPermit) => Promise<T>,
     externalSignal?: AbortSignal,
   ): Promise<{ admitted: true; value: T } | { admitted: false }> {
-    const lease = physicalWorktreeCapabilityLease(capability)
-    const signal = combinedSignal(lease.runtimeSignal, externalSignal)
+    const admissionLease = physicalWorktreeAdmissionLease(capability)
+    const signal = combinedSignal(physicalWorktreeAdmissionLeaseSignal(admissionLease), externalSignal)
     signal.throwIfAborted()
     const key = physicalWorktreeOperationKey(capability)
     if (this.removalAdmissions.has(key)) return { admitted: false }
@@ -93,7 +117,7 @@ export class PhysicalWorktreeOperationCoordinator {
         value: await this.runByKey(
           key,
           async () => {
-            await lease.validateExecution(signal)
+            await validatePhysicalWorktreeExecution(capability, signal)
             signal.throwIfAborted()
             return await task(context, permit)
           },
@@ -128,7 +152,7 @@ export class PhysicalWorktreeOperationCoordinator {
   }
 
   private createPermit(
-    capability: PhysicalWorktreeCapability,
+    capability: PhysicalWorktreeExecutionCapability,
     key: string,
     context: PhysicalWorktreeOperationContext,
   ): PhysicalWorktreeOperationPermit {

@@ -6,7 +6,7 @@ import { createTerminalSessionCreator } from '#/server/terminal/terminal-session
 import { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
 import type { TerminalCreateInput, TerminalSessionSummary } from '#/shared/terminal-types.ts'
 import type { TerminalSessionEnsureResult } from '#/server/terminal/terminal-session-ensurer.ts'
-import { testPhysicalWorktreeCapability } from '#/server/test-utils/physical-worktree-identity.ts'
+import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 
 const USER_ID = 'user_terminal_creator'
 const CLIENT_ID = 'client_terminal_creator'
@@ -45,7 +45,7 @@ describe('terminal session creator', () => {
       terminalClientId: TERMINAL_CLIENT_ID,
       userId: USER_ID,
       request: createRequest(),
-      physicalWorktreeCapability: testPhysicalWorktreeCapability(WORKTREE_PATH),
+      physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
       signal: new AbortController().signal,
     })
 
@@ -58,7 +58,7 @@ describe('terminal session creator', () => {
         clientId: TERMINAL_CLIENT_ID,
         terminalSessionId: 'term-createdcreatedcreated',
       }),
-      testPhysicalWorktreeCapability(WORKTREE_PATH),
+      testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
       expect.any(AbortSignal),
     )
     expect(result).toMatchObject({
@@ -94,7 +94,7 @@ describe('terminal session creator', () => {
         terminalClientId: TERMINAL_CLIENT_ID,
         userId: USER_ID,
         request: createRequest(),
-        physicalWorktreeCapability: testPhysicalWorktreeCapability(WORKTREE_PATH),
+        physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
         signal: new AbortController().signal,
       }),
     ).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })
@@ -127,7 +127,7 @@ describe('terminal session creator', () => {
         terminalClientId: TERMINAL_CLIENT_ID,
         userId: USER_ID,
         request: createRequest(),
-        physicalWorktreeCapability: testPhysicalWorktreeCapability(WORKTREE_PATH),
+        physicalWorktreeCapability: testPhysicalWorktreeExecutionCapability(WORKTREE_PATH),
         signal: new AbortController().signal,
       }),
     ).resolves.toEqual({ ok: false, message: 'error.repo-runtime-stale' })

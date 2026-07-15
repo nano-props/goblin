@@ -20,7 +20,8 @@ import {
   workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
-import { testPhysicalWorktreeIdentity } from '#/server/test-utils/physical-worktree-identity.ts'
+import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
+import { physicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
 const scope = { userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a' }
 const target = { branchName: 'feature/worktree', worktreePath: '/repo/worktree' }
@@ -41,7 +42,7 @@ describe('workspace pane layout aggregate', () => {
       ...target,
       tabs: [workspacePaneStaticTabEntry('status'), terminal, workspacePaneStaticTabEntry('history')],
       validTargets: [{ repoRoot: '/repo', ...target }],
-      physicalWorktreeIdentity: testPhysicalWorktreeIdentity(target.worktreePath),
+      physicalWorktreeLease: physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath)),
       providerSnapshots: providers,
     })
     const snapshot = await readSnapshot(aggregate, scope, [{ repoRoot: '/repo', ...target }], providers)
@@ -85,7 +86,7 @@ describe('workspace pane layout aggregate', () => {
       ...target,
       operation: { type: 'open-static', tabType: 'history' },
       validTargets: [{ repoRoot: '/repo', ...target }],
-      physicalWorktreeIdentity: testPhysicalWorktreeIdentity(target.worktreePath),
+      physicalWorktreeLease: physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath)),
       providerSnapshots: [],
     })
 
@@ -110,7 +111,7 @@ describe('workspace pane layout aggregate', () => {
       ...target,
       tabs: [workspacePaneStaticTabEntry('history')],
       validTargets: [{ repoRoot: '/repo', ...target }],
-      physicalWorktreeIdentity: testPhysicalWorktreeIdentity(target.worktreePath),
+      physicalWorktreeLease: physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath)),
       providerSnapshots: [],
     })).rejects.toThrow('error.workspace-tabs-layout-conflict')
     expect(repository.compareAndSwap).toHaveBeenCalledOnce()
@@ -128,8 +129,8 @@ describe('workspace pane layout aggregate', () => {
       ...scope,
       ...target,
       tabs: [terminal, workspacePaneStaticTabEntry('status')],
-      validTargets: [],
-      physicalWorktreeIdentity: testPhysicalWorktreeIdentity(target.worktreePath),
+      validTargets: [{ repoRoot: '/repo', ...target }],
+      physicalWorktreeLease: physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath)),
       providerSnapshots: providers,
     })).rejects.toThrow('disk full')
     await expect(readSnapshot(aggregate, scope, [], providers)).resolves.toMatchObject({
@@ -287,6 +288,20 @@ describe('workspace pane layout aggregate', () => {
     expect(repository.layout).toEqual({ entries: [] })
   })
 
+  test('does not let provider membership authorize a durable target mutation', async () => {
+    const repository = memoryRepository()
+    const aggregate = aggregateFor(repository)
+
+    await expect(update(aggregate, {
+      ...scope,
+      ...target,
+      operation: { type: 'open-static', tabType: 'history' },
+      validTargets: [],
+      providerSnapshots: providers,
+      physicalWorktreeLease: physicalWorktreeAdmissionLease(testPhysicalWorktreeExecutionCapability(target.worktreePath)),
+    })).rejects.toThrow('error.workspace-tabs-target-invalid')
+  })
+
   test('suppresses invalid targets when repair persistence fails', async () => {
     const repository = memoryRepository({ entries: [{
       repoRoot: '/repo', branchName: 'deleted', worktreePath: null, tabs: [workspacePaneStaticTabEntry('status')],
@@ -311,6 +326,35 @@ describe('workspace pane layout aggregate', () => {
     })
     expect(repository.layout.entries).toHaveLength(1)
     await expect(readSnapshot(aggregate, scope, [], [])).resolves.toMatchObject({ entries: [] })
+  })
+
+  test('keeps invalid durable tabs suppressed when only a live provider still references the target', async () => {
+    const repository = memoryRepository({ entries: [{
+      repoRoot: '/repo', ...target, tabs: [workspacePaneStaticTabEntry('history')],
+    }] })
+    repository.compareAndSwap = vi.fn(async () => ({
+      kind: 'write-failure' as const,
+      error: new Error('disk full'),
+    }))
+    const aggregate = aggregateFor(repository)
+
+    const result = await validate(aggregate, {
+      ...scope,
+      validTargets: [],
+      physicalTargets: [],
+      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      providerSnapshots: providers,
+    })
+
+    expect(result).toMatchObject({
+      kind: 'validated',
+      snapshot: {
+        entries: [{
+          worktreePath: target.worktreePath,
+          tabs: [workspacePaneStaticTabEntry('status'), terminal],
+        }],
+      },
+    })
   })
 
   test('checks membership before committing restore epoch metadata even when no repair is needed', async () => {

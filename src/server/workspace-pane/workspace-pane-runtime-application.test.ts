@@ -8,8 +8,8 @@ import {
   type PhysicalWorktreeOperationPermit,
 } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import {
-  issueTestPhysicalWorktreeCapability,
-  testPhysicalWorktreeCapability,
+  issueTestPhysicalWorktreeExecutionCapability,
+  testPhysicalWorktreeExecutionCapability,
   testPhysicalWorktreeIdentity,
   testPhysicalWorktrees,
 } from '#/server/test-utils/physical-worktree-identity.ts'
@@ -36,7 +36,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
   test('returns the provider result and canonical tabs as one application outcome', async () => {
     const runtime = terminalCreateSuccess()
     const create = vi.fn(async () => runtime)
-    const physicalWorktreeCapability = testPhysicalWorktreeCapability(request.worktreePath)
+    const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability(request.worktreePath)
     const capture = vi.fn(async () => physicalWorktreeCapability)
     const workspacePaneTabs = snapshot([
       { type: 'status', tabId: 'workspace-pane:status' },
@@ -156,7 +156,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       reason: 'unreachable',
       message: 'connection refused',
     })
-    const capability = issueTestPhysicalWorktreeCapability({
+    const capability = issueTestPhysicalWorktreeExecutionCapability({
       identity: testPhysicalWorktreeIdentity(request.worktreePath),
       validateExecution: async () => { throw failure },
     })
@@ -468,7 +468,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminal: { createAdmitted: create, close },
       workspaceTabsCoordinator: {
         ensureRuntimeTabForSession: async (input: {
-          physicalWorktreeCapability: ReturnType<typeof testPhysicalWorktreeCapability>
+          physicalWorktreeCapability: ReturnType<typeof testPhysicalWorktreeExecutionCapability>
           permit: PhysicalWorktreeOperationPermit
         }) => {
           worktreeOperations.assertPermit(input.physicalWorktreeCapability, input.permit)
@@ -484,7 +484,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
     })
 
     const open = application.open('client-test', 'user-test', { runtimeType: 'terminal', request })
-    const physicalWorktreeCapability = testPhysicalWorktreeCapability(request.worktreePath)
+    const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability(request.worktreePath)
     await vi.waitFor(() => expect(create).toHaveBeenCalledOnce())
     const removal = worktreeOperations.runRemoval(physicalWorktreeCapability, async () => ({
       ok: false,
@@ -503,7 +503,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
 
   test('does not call the terminal provider while physical removal is admitted', async () => {
     const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
-    const physicalWorktreeCapability = testPhysicalWorktreeCapability(request.worktreePath)
+    const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability(request.worktreePath)
     const removalGate = deferred<void>()
     const removal = worktreeOperations.runRemoval(physicalWorktreeCapability, async () => await removalGate.promise)
     const createAdmitted = vi.fn(async () => terminalCreateSuccess())

@@ -10,7 +10,7 @@ import type {
 } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { serverLogger } from '#/server/logger.ts'
 import type {
-  PhysicalWorktreeCapability,
+  PhysicalWorktreeExecutionCapability,
   PhysicalWorktreeIdentityResolver,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { failRemoteRuntimeIfNeeded } from '#/server/modules/remote-runtime-failure-settlement.ts'
@@ -49,7 +49,7 @@ export class WorktreeRemovalApplication {
       deleteBranch: boolean
       signal?: AbortSignal
       remove(
-        capability: PhysicalWorktreeCapability,
+        capability: PhysicalWorktreeExecutionCapability,
         lifecycle: RepoWorktreeRemovalLifecycle,
         signal: AbortSignal,
       ): Promise<ExecResult>
@@ -57,7 +57,7 @@ export class WorktreeRemovalApplication {
   ): Promise<ExecResult> {
     if (!this.isCurrentRuntime(userId, input)) return { ok: false, message: 'error.repo-runtime-stale' }
     const worktreePath = terminalSessionWorktreePath(input.repoRoot, input.worktreePath)
-    let physicalCapability: PhysicalWorktreeCapability
+    let physicalCapability: PhysicalWorktreeExecutionCapability
     try {
       physicalCapability = await this.deps.physicalWorktrees.capture({
         userId,
@@ -178,7 +178,7 @@ export class WorktreeRemovalApplication {
   private async quiesce(
     repoRoot: string,
     worktreePath: string,
-    physicalWorktreeCapability: PhysicalWorktreeCapability,
+    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
   ): Promise<
     | {
         ok: true
@@ -217,7 +217,7 @@ export class WorktreeRemovalApplication {
   private async reconcileAfterFailure(
     repoRoot: string,
     worktreePath: string,
-    physicalWorktreeCapability: PhysicalWorktreeCapability,
+    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     permit: PhysicalWorktreeOperationPermit,
     scopes: readonly { userId: string; repoRoot: string; scope: string }[],
   ): Promise<void> {

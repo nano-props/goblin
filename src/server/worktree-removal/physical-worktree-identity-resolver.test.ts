@@ -4,7 +4,7 @@ import { normalizeRemoteRepoId } from '#/shared/remote-repo.ts'
 import type { RepoRuntimeClosedEvent } from '#/server/modules/repo-runtimes.ts'
 import {
   PhysicalWorktreeIdentityResolver,
-  validatePhysicalWorktreeCapabilityExecution,
+  validatePhysicalWorktreeExecution,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
 const LOCAL_INPUT = {
@@ -84,7 +84,7 @@ describe('PhysicalWorktreeIdentityResolver', () => {
 
     marker = { deviceId: LOCAL_MARKER.deviceId, inode: '21' }
 
-    await expect(validatePhysicalWorktreeCapabilityExecution(capability, undefined)).rejects.toThrow(
+    await expect(validatePhysicalWorktreeExecution(capability, undefined)).rejects.toThrow(
       'error.repo-runtime-stale',
     )
     resolver.dispose()

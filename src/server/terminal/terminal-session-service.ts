@@ -33,7 +33,7 @@ import {
 } from '#/server/terminal/terminal-session-ensurer.ts'
 import { createTerminalSessionPruner } from '#/server/terminal/terminal-session-pruner.ts'
 import { createTerminalSessionCreator } from '#/server/terminal/terminal-session-creator.ts'
-import type { PhysicalWorktreeCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
 interface TerminalSessionServiceManager extends TerminalSessionEnsureManager {
   listSessionsForUser(userId: string, scope: string): Promise<TerminalSessionSummary[]>
@@ -89,7 +89,7 @@ class TerminalSessionService {
     clientId: string,
     userId: string,
     input: TerminalSessionEnsureInput,
-    physicalWorktreeCapability: PhysicalWorktreeCapability,
+    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     signal: AbortSignal,
   ): Promise<TerminalSessionEnsureResult> {
     if (!this.options.isValidClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }
@@ -131,7 +131,7 @@ class TerminalSessionService {
     clientId: string,
     userId: string,
     input: TerminalCreateInput,
-    physicalWorktreeCapability: PhysicalWorktreeCapability,
+    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     signal: AbortSignal,
   ): Promise<TerminalCreateResult> {
     if (!this.options.isValidClientId(clientId)) return { ok: false, message: 'error.invalid-arguments' }

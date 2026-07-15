@@ -55,7 +55,9 @@ The ownership split is:
   opening a provider runtime and its canonical tab as one server result.
 - `WorkspacePaneLayoutRepository` is the sole durable static-layout representation.
 - `WorkspacePaneEpochOverlay` owns only runtime placement constraints, physical
-  reverse indexes, active repo projections, and epoch clocks.
+  reverse indexes, active repo projections, and its overlay revision.
+- `WorkspacePaneLayoutAggregate` owns the canonical epoch projection clock,
+  derived from durable layout, target projection, overlay revision, and provider revisions.
 - The repo projection owns current target validity and worktree branch metadata.
   Commands capture it as an explicit read-only projection input; the pane
   aggregate does not cache or mutate a second target catalog.

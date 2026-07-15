@@ -32,6 +32,7 @@ import {
 import type { WorkspacePaneRuntimeTabsProviderSnapshot } from '#/server/workspace-pane/workspace-pane-runtime-tabs-projection.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
+import type { PhysicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
 
 const MAX_LAYOUT_CAS_RETRIES = 3
@@ -58,8 +59,8 @@ export interface WorkspacePaneLayoutCommitResult {
 }
 
 type WorkspacePaneLayoutMutationTarget =
-  | { branchName: string; worktreePath: null; physicalWorktreeIdentity?: never }
-  | { branchName: string; worktreePath: string; physicalWorktreeIdentity: PhysicalWorktreeIdentity }
+  | { branchName: string; worktreePath: null; physicalWorktreeLease?: never }
+  | { branchName: string; worktreePath: string; physicalWorktreeLease: PhysicalWorktreeAdmissionLease }
 
 export type WorkspacePaneLayoutReplaceInput = WorkspacePaneEpochScope & WorkspacePaneLayoutMutationTarget & {
   tabs: readonly WorkspacePaneTabEntry[]
@@ -89,7 +90,7 @@ export interface WorkspacePaneLayoutSnapshotInput {
 
 export type WorkspacePaneLayoutValidationInput = WorkspacePaneEpochScope & {
   validTargets: readonly WorkspacePaneTabsTarget[]
-  physicalTargets: readonly { target: WorkspacePaneTabsTargetIdentity; identity: PhysicalWorktreeIdentity }[]
+  physicalTargets: readonly { target: WorkspacePaneTabsTargetIdentity; lease: PhysicalWorktreeAdmissionLease }[]
   expectedRepoEntry: RepoSessionEntry
   providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
   assertCurrent?: () => void
@@ -104,10 +105,15 @@ export interface WorkspacePaneLayoutOperation {
   validateRepairAndSnapshot(input: WorkspacePaneLayoutValidationInput): Promise<WorkspacePaneLayoutValidationResult>
   commitRuntimeTarget(input: WorkspacePaneEpochScope & {
     target: WorkspacePaneTabsTargetIdentity
-    identity: PhysicalWorktreeIdentity
+    lease: PhysicalWorktreeAdmissionLease
     tabs: readonly WorkspacePaneTabEntry[]
   }): void
   closeEpoch(scope: WorkspacePaneEpochScope): void
+  commitProjectionTargets(input: WorkspacePaneEpochScope & {
+    targets: readonly WorkspacePaneTabsTarget[]
+    physicalTargets: readonly { target: WorkspacePaneTabsTargetIdentity; lease: PhysicalWorktreeAdmissionLease }[]
+  }): void
+  indexedAdmissionLeases(scope: WorkspacePaneEpochScope): PhysicalWorktreeAdmissionLease[]
 }
 
 export class WorkspacePaneLayoutAggregate {
@@ -146,6 +152,8 @@ export class WorkspacePaneLayoutAggregate {
         validateRepairAndSnapshot: async (input) => await this.validateRepairAndSnapshot(input),
         commitRuntimeTarget: (input) => this.commitRuntimeTarget(input),
         closeEpoch: (scope) => this.closeEpoch(scope),
+        commitProjectionTargets: (input) => this.commitProjectionTargets(input),
+        indexedAdmissionLeases: (scope) => this.overlay.indexedAdmissionLeases(scope),
       }))
     } finally {
       void queue.onIdle().then(() => {
@@ -217,7 +225,11 @@ export class WorkspacePaneLayoutAggregate {
       })
     if (outcome.kind === 'membership-conflict') return { kind: 'membership-conflict' }
     input.assertCurrent?.()
-    const overlayChanged = this.commitValidatedPhysicalTargets(input)
+    const overlayChanged = this.commitProjectionTargets({
+      ...input,
+      targets: input.validTargets,
+      physicalTargets: input.physicalTargets,
+    })
     const durableLayoutChanged = outcome.kind === 'accepted' && outcome.changed
     return {
       kind: 'validated',
@@ -239,7 +251,7 @@ export class WorkspacePaneLayoutAggregate {
 
   private commitRuntimeTarget(input: WorkspacePaneEpochScope & {
     target: WorkspacePaneTabsTargetIdentity
-    identity: PhysicalWorktreeIdentity
+    lease: PhysicalWorktreeAdmissionLease
     tabs: readonly WorkspacePaneTabEntry[]
   }): void {
     this.overlay.registerPhysicalTarget(input)
@@ -273,7 +285,7 @@ export class WorkspacePaneLayoutAggregate {
     for (let conflicts = 0; ; conflicts += 1) {
       input.assertCurrent?.()
       const current = await this.repository.load(input.repoRoot)
-      const target = resolveMutationTarget(input, input.validTargets, input.providerSnapshots)
+      const target = resolveMutationTarget(input, input.validTargets)
       if (!target) throw new Error('error.workspace-tabs-target-invalid')
       const currentTabs = canonicalTabsForTarget({ ...input, ...target }, current.layout, this.overlay, input.providerSnapshots)
       const mixedTabs = applyIntent(currentTabs)
@@ -297,8 +309,8 @@ export class WorkspacePaneLayoutAggregate {
       if (outcome.kind !== 'accepted') throw new Error('error.workspace-tabs-layout-conflict')
       const targetIdentityValue = targetIdentity(target)
       const placementChanged = this.overlay.recordMixedOrder({ ...input, target: targetIdentityValue, tabs: mixedTabs })
-      if (input.physicalWorktreeIdentity) {
-        this.overlay.registerPhysicalTarget({ ...input, target: targetIdentityValue, identity: input.physicalWorktreeIdentity })
+      if (input.physicalWorktreeLease) {
+        this.overlay.registerPhysicalTarget({ ...input, target: targetIdentityValue, lease: input.physicalWorktreeLease })
       }
       return this.commitResult(
         input,
@@ -358,11 +370,11 @@ export class WorkspacePaneLayoutAggregate {
     return next.revision
   }
 
-  private commitValidatedPhysicalTargets(input: WorkspacePaneEpochScope & {
-    validTargets: readonly WorkspacePaneTabsTarget[]
-    physicalTargets: readonly { target: WorkspacePaneTabsTargetIdentity; identity: PhysicalWorktreeIdentity }[]
+  private commitProjectionTargets(input: WorkspacePaneEpochScope & {
+    targets: readonly WorkspacePaneTabsTarget[]
+    physicalTargets: readonly { target: WorkspacePaneTabsTargetIdentity; lease: PhysicalWorktreeAdmissionLease }[]
   }): boolean {
-    const next = targetMap(input.validTargets)
+    const next = targetMap(input.targets)
     const overlayChanged = this.overlay.retainTargets(input, new Set(next.keys()))
     for (const physical of input.physicalTargets) {
       this.overlay.registerPhysicalTarget({ ...input, ...physical })
@@ -419,8 +431,7 @@ function projectCanonicalEntries(
   const liveTargets = providerTargets(scope, providers)
   layout = {
     entries: layout.entries.filter((entry) =>
-      validatedTargets.has(workspacePaneTabsTargetIdentityKey(entry)) ||
-      liveTargets.has(workspacePaneTabsTargetIdentityKey(entry)),
+      validatedTargets.has(workspacePaneTabsTargetIdentityKey(entry)),
     ),
   }
   const targets = new Map<string, WorkspacePaneTabsTarget>()
@@ -458,10 +469,9 @@ function targetMap(targets: readonly WorkspacePaneTabsTarget[]): Map<string, Wor
 function resolveMutationTarget(
   scope: WorkspacePaneEpochScope & WorkspacePaneTabsTarget,
   validTargets: readonly WorkspacePaneTabsTarget[],
-  providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
 ): WorkspacePaneTabsTarget | null {
   const targetKey = workspacePaneTabsTargetIdentityKey(scope)
-  return providerTargets(scope, providers).get(targetKey) ?? targetMap(validTargets).get(targetKey) ?? null
+  return targetMap(validTargets).get(targetKey) ?? null
 }
 
 function canonicalTabsForTarget(

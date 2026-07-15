@@ -21,7 +21,7 @@ import type {
 import { terminalSessionRuntimeScope, terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
 import { serverLogger } from '#/server/logger.ts'
 import type {
-  PhysicalWorktreeCapability,
+  PhysicalWorktreeExecutionCapability,
   PhysicalWorktreeIdentityResolver,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import type { ServerTerminalCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
@@ -70,7 +70,7 @@ export class WorkspacePaneRuntimeApplication {
     if (!this.deps.isCurrentRepoRuntime(userId, input.request.repoRoot, input.request.repoRuntimeId)) {
       return runtimeFailure(input.runtimeType, 'error.repo-runtime-stale')
     }
-    let physicalCapability: PhysicalWorktreeCapability
+    let physicalCapability: PhysicalWorktreeExecutionCapability
     try {
       physicalCapability = await this.capturePhysicalWorktree(userId, input.request, worktreePath)
     } catch (error) {
@@ -100,7 +100,7 @@ export class WorkspacePaneRuntimeApplication {
     const target = normalizedRuntimeTarget(input.target)
     const scope = terminalSessionRuntimeScope(target.repoRoot, target.repoRuntimeId)
     if (!this.isCurrentTarget(userId, target)) return runtimeFailure(input.runtimeType, 'error.repo-runtime-stale')
-    let physicalCapability: PhysicalWorktreeCapability
+    let physicalCapability: PhysicalWorktreeExecutionCapability
     try {
       physicalCapability = await this.capturePhysicalWorktree(userId, target, target.worktreePath)
     } catch (error) {
@@ -129,7 +129,7 @@ export class WorkspacePaneRuntimeApplication {
     input: TerminalWorkspacePaneRuntimeOpenInput,
     scope: string,
     requestedWorktreePath: string,
-    physicalWorktreeCapability: PhysicalWorktreeCapability,
+    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     permit: PhysicalWorktreeOperationPermit,
   ): Promise<WorkspacePaneRuntimeOpenResult> {
     const runtime = await this.deps.terminal.createAdmitted(clientId, userId, input.request, {
@@ -209,7 +209,7 @@ export class WorkspacePaneRuntimeApplication {
     runtime: Extract<TerminalCreateResult, { ok: true }>,
     scope: string,
     worktreePath: string,
-    physicalWorktreeCapability: PhysicalWorktreeCapability,
+    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     permit: PhysicalWorktreeOperationPermit,
   ): Promise<{ closeError: unknown; reconcileError: unknown }> {
     let closeError: unknown = null
@@ -246,7 +246,7 @@ export class WorkspacePaneRuntimeApplication {
     target: NormalizedRuntimeTarget,
     terminalSessionId: string,
     scope: string,
-    physicalWorktreeCapability: PhysicalWorktreeCapability,
+    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     permit: PhysicalWorktreeOperationPermit,
   ): Promise<WorkspacePaneRuntimeCloseResult> {
     const sessions = await this.listTerminalSessions(userId, scope)
@@ -282,7 +282,7 @@ export class WorkspacePaneRuntimeApplication {
     userId: string,
     target: NormalizedRuntimeTarget,
     scope: string,
-    physicalWorktreeCapability: PhysicalWorktreeCapability,
+    physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     permit: PhysicalWorktreeOperationPermit,
   ): Promise<WorkspacePaneTabsSnapshot> {
     const snapshot = await this.deps.workspaceTabsCoordinator.reconcileWorktreeAdmitted({
@@ -305,7 +305,7 @@ export class WorkspacePaneRuntimeApplication {
     userId: string,
     target: { repoRoot: string; repoRuntimeId: string },
     worktreePath: string,
-  ): Promise<PhysicalWorktreeCapability> {
+  ): Promise<PhysicalWorktreeExecutionCapability> {
     return await this.deps.physicalWorktrees.capture({
       userId,
       repoRoot: target.repoRoot,

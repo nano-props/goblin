@@ -3,11 +3,11 @@ import { createTerminalSessionEnsurer } from '#/server/terminal/terminal-session
 import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import {
-  physicalWorktreeCapabilityExecution,
-  type PhysicalWorktreeCapability,
+  physicalWorktreeExecutionBinding,
+  type PhysicalWorktreeExecutionCapability,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import {
-  issueTestPhysicalWorktreeCapability,
+  issueTestPhysicalWorktreeExecutionCapability,
   testPhysicalWorktreeIdentity,
 } from '#/server/test-utils/physical-worktree-identity.ts'
 
@@ -20,7 +20,7 @@ describe('physical worktree capability boundaries', () => {
     const capability = remoteCapability(target)
     target.host = 'host-b.test'
 
-    const execution = physicalWorktreeCapabilityExecution(capability)
+    const execution = physicalWorktreeExecutionBinding(capability)
     expect(execution).toMatchObject({
       kind: 'remote',
       canonicalWorktreePath: REMOTE_PATH,
@@ -65,7 +65,7 @@ describe('physical worktree capability boundaries', () => {
 
   test('rejects a structurally forged capability even with an active matching permit', async () => {
     const identity = testPhysicalWorktreeIdentity('/repo/worktree')
-    const forged = Object.freeze({ identity }) as PhysicalWorktreeCapability
+    const forged = Object.freeze({ identity }) as PhysicalWorktreeExecutionCapability
     const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
     const createAdmitted = vi.fn()
     const provider = createTerminalSessionCreateProvider({
@@ -80,8 +80,8 @@ describe('physical worktree capability boundaries', () => {
   })
 })
 
-function remoteCapability(target: ReturnType<typeof remoteTarget>): PhysicalWorktreeCapability {
-  return issueTestPhysicalWorktreeCapability({
+function remoteCapability(target: ReturnType<typeof remoteTarget>): PhysicalWorktreeExecutionCapability {
+  return issueTestPhysicalWorktreeExecutionCapability({
     identity: {
       kind: 'remote',
       executionNamespaceId: '0123456789abcdef0123456789abcdef',

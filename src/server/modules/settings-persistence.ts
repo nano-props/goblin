@@ -10,7 +10,8 @@ export class SettingsPersistenceWriteError extends Error {
   readonly cause: unknown
 
   constructor(cause: unknown) {
-    super('failed to persist settings')
+    const detail = cause instanceof Error ? cause.message : String(cause)
+    super(`failed to persist settings: ${detail}`)
     this.name = 'SettingsPersistenceWriteError'
     this.cause = cause
   }

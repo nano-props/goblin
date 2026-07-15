@@ -219,11 +219,11 @@ function buildRuntime(): RuntimeHandle {
     ptySupervisor: createInProcessPtySupervisor(),
     workspacePaneLayoutRepository: testWorkspacePaneLayoutRepository,
     workspacePaneTargetProjection: {
-      captureTargets: async () => testWorkspacePaneLayout.entries.map(({ repoRoot, branchName, worktreePath }) => ({
+      captureTargets: async (_userId, repoRoot) => [{
         repoRoot,
-        branchName,
-        worktreePath,
-      })),
+        branchName: 'feature',
+        worktreePath: repoRoot.startsWith('ssh-config://') ? '/srv/repo' : '/repo-linked',
+      }],
     },
   })
   REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_a')
@@ -281,10 +281,11 @@ async function requestWorkspacePaneTabs(
   action: string,
   input: unknown,
   requestId: string,
+  identity: { clientId: string; userId: string } = { clientId: 'client_a', userId: USER_1 },
 ): Promise<unknown> {
   host.handleRealtimeMessage(
-    'client_a',
-    USER_1,
+    identity.clientId,
+    identity.userId,
     socket as Parameters<ServerTerminalHost['handleRealtimeMessage']>[2],
     JSON.stringify({
       type: 'request',
@@ -958,6 +959,59 @@ describe('server terminal runtime', () => {
     })
 
     host.unregisterSocket('client_a', USER_1, socket)
+    shutdown()
+  })
+
+  test('broadcasts an accepted durable pane layout change to every active user projection', async () => {
+    const { host, shutdown } = buildRuntime()
+    const socketA = { send: vi.fn(), close: vi.fn() }
+    const socketB = { send: vi.fn(), close: vi.fn() }
+    host.registerSocket('client_a', USER_1, socketA)
+    host.registerSocket('client_b', USER_2, socketB)
+
+    await requestWorkspacePaneTabs(
+      host,
+      socketA,
+      WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+      { repoRoot: REPO_ROOT, repoRuntimeId: REPO_RUNTIME_ID },
+      'req_list_user_a',
+    )
+    await requestWorkspacePaneTabs(
+      host,
+      socketB,
+      WORKSPACE_PANE_TABS_SOCKET_ACTIONS.list,
+      { repoRoot: REPO_ROOT, repoRuntimeId: USER_2_REPO_RUNTIME_ID },
+      'req_list_user_b',
+      { clientId: 'client_b', userId: USER_2 },
+    )
+    socketA.send.mockClear()
+    socketB.send.mockClear()
+
+    await requestWorkspacePaneTabs(
+      host,
+      socketA,
+      WORKSPACE_PANE_TABS_SOCKET_ACTIONS.update,
+      {
+        repoRoot: REPO_ROOT,
+        repoRuntimeId: REPO_RUNTIME_ID,
+        branchName: 'feature',
+        worktreePath: '/repo-linked',
+        operation: { type: 'open-static', tabType: 'history' },
+      },
+      'req_update_user_a',
+    )
+
+    await vi.waitFor(() => {
+      expect(sentSocketMessages(socketA).some(
+        (message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
+      )).toBe(true)
+      expect(sentSocketMessages(socketB).some(
+        (message) => message.type === WORKSPACE_PANE_TABS_REALTIME_EVENTS.changed,
+      )).toBe(true)
+    })
+
+    host.unregisterSocket('client_a', USER_1, socketA)
+    host.unregisterSocket('client_b', USER_2, socketB)
     shutdown()
   })
 

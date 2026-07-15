@@ -5,7 +5,7 @@ import { acquireRepoRuntime, clearRepoRuntimesForUser } from '#/server/modules/r
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
-import { testPhysicalWorktreeCapability } from '#/server/test-utils/physical-worktree-identity.ts'
+import { testPhysicalWorktreeExecutionCapability } from '#/server/test-utils/physical-worktree-identity.ts'
 
 const CLIENT_ID = 'client_terminal_actions'
 // Identity is userId-keyed under method 2: the runtime derives
@@ -24,14 +24,14 @@ function makeActions(
     closeSessionForUser: (userId: string, terminalRuntimeSessionId: string) => boolean | Promise<boolean>
     getSlotScope?: (userId: string, terminalRuntimeSessionId: string) => string | undefined
     isValidTerminalClientId?: (value: unknown) => value is string
-    physicalWorktreeCapability?: ReturnType<typeof testPhysicalWorktreeCapability>
+    physicalWorktreeCapability?: ReturnType<typeof testPhysicalWorktreeExecutionCapability>
     worktreeOperations?: ReturnType<typeof createPhysicalWorktreeOperationCoordinator>
     broadcasts?: ReturnType<typeof vi.fn>
   } = { closeSessionForUser: () => false },
 ) {
   const broadcasts = options.broadcasts ?? vi.fn()
   const physicalWorktreeCapability =
-    options.physicalWorktreeCapability ?? testPhysicalWorktreeCapability(REPO_ROOT)
+    options.physicalWorktreeCapability ?? testPhysicalWorktreeExecutionCapability(REPO_ROOT)
   const worktreeOperations = options.worktreeOperations ?? createPhysicalWorktreeOperationCoordinator()
   const manager = {
     getSessionSummaryForUser: vi.fn((userId: string, terminalRuntimeSessionId: string) =>
@@ -59,7 +59,7 @@ function makeActions(
       async (userId: string, terminalRuntimeSessionId: string) =>
         await options.closeSessionForUser(userId, terminalRuntimeSessionId),
     ),
-    getPhysicalWorktreeCapabilityForUser: vi.fn(() => physicalWorktreeCapability),
+    getPhysicalWorktreeExecutionCapabilityForUser: vi.fn(() => physicalWorktreeCapability),
     // The other manager methods are unused by `close`, but the
     // `TerminalSessionManager` type is required by the deps
     // interface. Stub them with `vi.fn()` so TypeScript stays happy.
@@ -130,7 +130,7 @@ describe('terminal-runtime-actions close broadcast', () => {
 
     const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
     const provider = createTerminalSessionCreateProvider({ sessionService, worktreeOperations })
-    const physicalWorktreeCapability = testPhysicalWorktreeCapability('/repo', {
+    const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability('/repo', {
       userId: USER_ID,
       repoRoot: '/repo',
       repoRuntimeId: REPO_RUNTIME_ID,
@@ -158,7 +158,7 @@ describe('terminal-runtime-actions close broadcast', () => {
 
     const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
     const provider = createTerminalSessionCreateProvider({ sessionService, worktreeOperations })
-    const physicalWorktreeCapability = testPhysicalWorktreeCapability('/repo', {
+    const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability('/repo', {
       userId: USER_ID,
       repoRoot: '/repo',
       repoRuntimeId: REPO_RUNTIME_ID,
@@ -188,7 +188,7 @@ describe('terminal-runtime-actions close broadcast', () => {
 
     const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
     const provider = createTerminalSessionCreateProvider({ sessionService, worktreeOperations })
-    const physicalWorktreeCapability = testPhysicalWorktreeCapability('/repo', {
+    const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability('/repo', {
       userId: USER_ID,
       repoRoot: '',
       repoRuntimeId: 'repo-runtime-stale',
@@ -446,7 +446,7 @@ describe('terminal-runtime-actions clientId gate', () => {
   })
 
   test('restart cannot spawn a replacement PTY while physical worktree removal is admitted', async () => {
-    const physicalWorktreeCapability = testPhysicalWorktreeCapability(REPO_ROOT)
+    const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability(REPO_ROOT)
     const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
     const { actions, manager } = makeActions({
       closeSessionForUser: () => false,
@@ -475,7 +475,7 @@ describe('terminal-runtime-actions clientId gate', () => {
   })
 
   test('removal waits for an admitted restart operation to settle', async () => {
-    const physicalWorktreeCapability = testPhysicalWorktreeCapability(REPO_ROOT)
+    const physicalWorktreeCapability = testPhysicalWorktreeExecutionCapability(REPO_ROOT)
     const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
     const { actions, manager } = makeActions({
       closeSessionForUser: () => false,

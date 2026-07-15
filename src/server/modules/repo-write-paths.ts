@@ -14,7 +14,7 @@ import {
   runWithRepoSource,
   type RepoMutationResult,
 } from '#/server/modules/repo-source.ts'
-import type { PhysicalWorktreeCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import {
   abortRepoWriteNetworkOperation,
   enqueueRepoWriteOperation,
@@ -473,7 +473,7 @@ export async function removeCapturedRepoWorktree(
     deleteUpstream?: boolean
   },
   lifecycle: RepoWorktreeRemovalLifecycle,
-  physicalWorktreeCapability: PhysicalWorktreeCapability,
+  physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
   signal?: AbortSignal,
   options: { repoRuntimeId?: string } = {},
 ): Promise<ExecResult> {
@@ -491,7 +491,7 @@ async function removeRepoWorktreeWithBinding(
   },
   lifecycle: RepoWorktreeRemovalLifecycle,
   signal: AbortSignal | undefined,
-  physicalWorktreeCapability: PhysicalWorktreeCapability | null,
+  physicalWorktreeCapability: PhysicalWorktreeExecutionCapability | null,
   options: { repoRuntimeId?: string } = {},
 ): Promise<ExecResult> {
   return await runRepoServerWriteOperation({

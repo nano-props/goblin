@@ -7,7 +7,8 @@ import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-p
 import { createWorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import {
-  testPhysicalWorktreeCapability,
+  issueTestPhysicalWorktreeExecutionCapability,
+  testPhysicalWorktreeExecutionCapability,
   testPhysicalWorktreeIdentity,
   testPhysicalWorktrees,
 } from '#/server/test-utils/physical-worktree-identity.ts'
@@ -153,7 +154,7 @@ describe('workspace pane tabs coordinator queues', () => {
 
   test('does not validate or index restore targets while physical removal is admitted', async () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
-    const capability = testPhysicalWorktreeCapability('/repo/worktree', {
+    const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a',
     })
     let releaseRemoval!: () => void
@@ -212,7 +213,7 @@ describe('workspace pane tabs coordinator queues', () => {
 
   test('holds physical admission through the final provider sample and snapshot', async () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
-    const capability = testPhysicalWorktreeCapability('/repo/worktree', {
+    const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {
       userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a',
     })
     let releaseFinalSample!: () => void
@@ -259,10 +260,10 @@ describe('workspace pane tabs coordinator queues', () => {
 
   test('retries admission when the authoritative provider sample adds a physical worktree', async () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
-    const capabilityA = testPhysicalWorktreeCapability('/repo/worktree-a', {
+    const capabilityA = testPhysicalWorktreeExecutionCapability('/repo/worktree-a', {
       userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a',
     })
-    const capabilityC = testPhysicalWorktreeCapability('/repo/worktree-c', {
+    const capabilityC = testPhysicalWorktreeExecutionCapability('/repo/worktree-c', {
       userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a',
     })
     let releaseStableSample!: () => void
@@ -310,9 +311,181 @@ describe('workspace pane tabs coordinator queues', () => {
     await expect(list).resolves.toMatchObject({
       entries: [{ worktreePath: '/repo/worktree-a' }, { worktreePath: '/repo/worktree-c' }],
     })
+    expect(coordinator.physicalWorktreeTargets(capabilityC.identity)).toEqual([{
+      userId: 'user-a',
+      scope: '/repo\0runtime-a',
+      repoRuntimeId: 'runtime-a',
+      target: { kind: 'worktree', repoRoot: '/repo', worktreePath: '/repo/worktree-c' },
+    }])
     await removal
     expect(removalStarted).toBe(true)
     expect(captureCount).toBe(3)
+  })
+
+  test('holds the old physical permit while removing a stale projection index', async () => {
+    const operations = createPhysicalWorktreeOperationCoordinator()
+    let live = true
+    let executionExists = true
+    const capability = issueTestPhysicalWorktreeExecutionCapability({
+      identity: testPhysicalWorktreeIdentity('/repo/worktree-x'),
+      userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a', worktreePath: '/repo/worktree-x',
+      validateExecution: async () => {
+        if (!executionExists) throw new Error('ENOENT')
+      },
+    })
+    let revision = 0
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      layoutAggregate: aggregateFor(memoryRepository()),
+      runtimeProviders: [{
+        type: 'terminal',
+        async captureSnapshotForUser() {
+          revision += 1
+          return {
+            revision,
+            liveSessions: live
+              ? [{ sessionId: 'term-worktreexxxxxxxxx1', branch: 'x', worktreePath: '/repo/worktree-x' }]
+              : [],
+          }
+        },
+      }],
+      worktreeOperations: operations,
+      physicalWorktrees: {
+        capture: vi.fn(async () => {
+          if (!live) throw new Error('worktree path no longer exists')
+          return capability
+        }),
+      },
+      targetProjection: testTargetProjection([]),
+    })
+    const input = { userId: 'user-a', repoRoot: '/repo', scope: '/repo\0runtime-a', assertCurrent: () => {} }
+    await coordinator.listWorkspaceTabs(input)
+    expect(coordinator.physicalWorktreeTargets(capability.identity)).toHaveLength(1)
+
+    live = false
+    let releaseRemoval!: () => void
+    const removalGate = new Promise<void>((resolve) => { releaseRemoval = resolve })
+    const removal = operations.runRemoval(capability, async () => await removalGate)
+    await vi.waitFor(() => expect(operations.isRemovalAdmitted(capability)).toBe(true))
+
+    await expect(coordinator.listWorkspaceTabs(input)).rejects.toThrow('error.worktree-removal-in-progress')
+    expect(coordinator.physicalWorktreeTargets(capability.identity)).toHaveLength(1)
+
+    releaseRemoval()
+    await removal
+    executionExists = false
+    await expect(coordinator.listWorkspaceTabs(input)).resolves.toMatchObject({ entries: [] })
+    expect(coordinator.physicalWorktreeTargets(capability.identity)).toEqual([])
+  })
+
+  test('restore holds an indexed stale target permit before removing its physical ref', async () => {
+    const operations = createPhysicalWorktreeOperationCoordinator()
+    let live = true
+    let executionExists = true
+    const capability = issueTestPhysicalWorktreeExecutionCapability({
+      identity: testPhysicalWorktreeIdentity('/repo/worktree-x'),
+      userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a', worktreePath: '/repo/worktree-x',
+      validateExecution: async () => {
+        if (!executionExists) throw new Error('ENOENT')
+      },
+    })
+    let revision = 0
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      layoutAggregate: aggregateFor(memoryRepository()),
+      runtimeProviders: [{
+        type: 'terminal',
+        async captureSnapshotForUser() {
+          revision += 1
+          return {
+            revision,
+            liveSessions: live
+              ? [{ sessionId: 'term-worktreexxxxxxxxx1', branch: 'x', worktreePath: '/repo/worktree-x' }]
+              : [],
+          }
+        },
+      }],
+      worktreeOperations: operations,
+      physicalWorktrees: {
+        capture: vi.fn(async () => {
+          if (!live) throw new Error('worktree path no longer exists')
+          return capability
+        }),
+      },
+      targetProjection: testTargetProjection([]),
+    })
+    const listInput = { userId: 'user-a', repoRoot: '/repo', scope: '/repo\0runtime-a', assertCurrent: () => {} }
+    await coordinator.listWorkspaceTabs(listInput)
+
+    live = false
+    let releaseRemoval!: () => void
+    const removalGate = new Promise<void>((resolve) => { releaseRemoval = resolve })
+    const removal = operations.runRemoval(capability, async () => await removalGate)
+    await vi.waitFor(() => expect(operations.isRemovalAdmitted(capability)).toBe(true))
+    const restore = coordinator.restoreScope({
+      ...listInput,
+      targets: [],
+      expectedRepoEntry: { kind: 'local', id: '/repo' },
+    })
+    await expect(restore).rejects.toThrow('error.worktree-removal-in-progress')
+    expect(coordinator.physicalWorktreeTargets(capability.identity)).toHaveLength(1)
+
+    releaseRemoval()
+    await removal
+    executionExists = false
+    await expect(coordinator.restoreScope({
+      ...listInput,
+      targets: [],
+      expectedRepoEntry: { kind: 'local', id: '/repo' },
+    })).resolves.toMatchObject({ kind: 'validated' })
+    expect(coordinator.physicalWorktreeTargets(capability.identity)).toEqual([])
+  })
+
+  test('strictly validates the current capability when an indexed alias has the same identity', async () => {
+    const identity = testPhysicalWorktreeIdentity('/repo/worktree-x')
+    let oldValid = true
+    let currentValidationCount = 0
+    const oldCapability = issueTestPhysicalWorktreeExecutionCapability({
+      identity,
+      worktreePath: '/repo/worktree-x',
+      validateExecution: async () => {
+        if (!oldValid) throw new Error('stale physical generation')
+      },
+    })
+    const currentCapability = issueTestPhysicalWorktreeExecutionCapability({
+      identity,
+      worktreePath: '/repo/worktree-alias',
+      validateExecution: async () => { currentValidationCount += 1 },
+    })
+    let useCurrentCapability = false
+    let revision = 0
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      layoutAggregate: aggregateFor(memoryRepository()),
+      runtimeProviders: [{
+        type: 'terminal',
+        async captureSnapshotForUser() {
+          revision += 1
+          return {
+            revision,
+            liveSessions: [{
+              sessionId: 'term-worktreexxxxxxxxx1', branch: 'x', worktreePath: '/repo/worktree-alias',
+            }],
+          }
+        },
+      }],
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: {
+        capture: async () => useCurrentCapability ? currentCapability : oldCapability,
+      },
+      targetProjection: testTargetProjection([]),
+    })
+    const input = { userId: 'user-a', repoRoot: '/repo', scope: '/repo\0runtime-a', assertCurrent: () => {} }
+    await coordinator.listWorkspaceTabs(input)
+
+    oldValid = false
+    useCurrentCapability = true
+    await expect(coordinator.listWorkspaceTabs(input)).resolves.toMatchObject({
+      entries: [{ worktreePath: '/repo/worktree-alias' }],
+    })
+    expect(currentValidationCount).toBeGreaterThan(0)
   })
 })
 

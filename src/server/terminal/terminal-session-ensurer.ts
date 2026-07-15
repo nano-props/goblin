@@ -12,8 +12,8 @@ import {
   type GoblinTerminalCommandRuntime,
 } from '#/server/terminal/g-command.ts'
 import {
-  physicalWorktreeCapabilityExecution,
-  type PhysicalWorktreeCapability,
+  physicalWorktreeExecutionBinding,
+  type PhysicalWorktreeExecutionCapability,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
 export interface TerminalSessionEnsureInput {
@@ -61,7 +61,7 @@ export interface TerminalSessionEnsureManagerInput {
   branch: string
   terminalSessionId: string
   worktreePath: string
-  physicalWorktreeCapability: PhysicalWorktreeCapability
+  physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
   cwd: string
   cols: number
   rows: number
@@ -88,7 +88,7 @@ export interface TerminalSessionEnsureContext {
   cols: number
   rows: number
   scopedWorktreePath: string
-  physicalWorktreeCapability: PhysicalWorktreeCapability
+  physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
   action: TerminalCreateAction
   signal: AbortSignal
 }
@@ -114,7 +114,7 @@ class TerminalSessionEnsurer {
     input: TerminalSessionEnsureInput,
     context: TerminalSessionEnsureContext,
   ): Promise<TerminalSessionEnsureResult> {
-    const execution = physicalWorktreeCapabilityExecution(context.physicalWorktreeCapability)
+    const execution = physicalWorktreeExecutionBinding(context.physicalWorktreeCapability)
     if (execution.kind !== 'remote') return { ok: false, message: 'error.invalid-worktree-capability' }
     const invocation = buildRemoteTerminalInvocation(
       execution.target,
@@ -152,7 +152,7 @@ class TerminalSessionEnsurer {
     input: TerminalSessionEnsureInput,
     context: TerminalSessionEnsureContext,
   ): Promise<TerminalSessionEnsureResult> {
-    const execution = physicalWorktreeCapabilityExecution(context.physicalWorktreeCapability)
+    const execution = physicalWorktreeExecutionBinding(context.physicalWorktreeCapability)
     if (execution.kind !== 'local') return { ok: false, message: 'error.invalid-worktree-capability' }
     const repoRoot = input.repoRoot
     const worktreePath = execution.canonicalWorktreePath

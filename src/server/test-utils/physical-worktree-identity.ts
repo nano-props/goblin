@@ -1,7 +1,7 @@
 import path from 'node:path'
 import {
   PhysicalWorktreeIdentityResolver,
-  type PhysicalWorktreeCapability,
+  type PhysicalWorktreeExecutionCapability,
   type PhysicalWorktreeExecutionBinding,
   type ResolvePhysicalWorktreeIdentityInput,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
@@ -25,7 +25,7 @@ class TestPhysicalWorktreeIdentityResolver extends PhysicalWorktreeIdentityResol
     execution?: PhysicalWorktreeExecutionBinding
     runtimeSignal?: AbortSignal
     validateExecution?(signal: AbortSignal): Promise<void>
-  }): PhysicalWorktreeCapability {
+  }): PhysicalWorktreeExecutionCapability {
     const endpoint = input.worktreePath ?? input.identity.endpoint
     return this.issueCapability({
       identity: input.identity,
@@ -46,20 +46,20 @@ class TestPhysicalWorktreeIdentityResolver extends PhysicalWorktreeIdentityResol
 
 const testPhysicalWorktreeIdentityResolver = new TestPhysicalWorktreeIdentityResolver()
 
-export function issueTestPhysicalWorktreeCapability(
+export function issueTestPhysicalWorktreeExecutionCapability(
   input: Parameters<TestPhysicalWorktreeIdentityResolver['issue']>[0],
-): PhysicalWorktreeCapability {
+): PhysicalWorktreeExecutionCapability {
   return testPhysicalWorktreeIdentityResolver.issue(input)
 }
 
-export function testPhysicalWorktreeCapability(
+export function testPhysicalWorktreeExecutionCapability(
   endpoint: string,
   input: Partial<
     Pick<ResolvePhysicalWorktreeIdentityInput, 'userId' | 'repoRoot' | 'repoRuntimeId' | 'worktreePath'>
   > = {},
-): PhysicalWorktreeCapability {
+): PhysicalWorktreeExecutionCapability {
   const worktreePath = input.worktreePath ?? endpoint
-  return issueTestPhysicalWorktreeCapability({
+  return issueTestPhysicalWorktreeExecutionCapability({
     identity: testPhysicalWorktreeIdentity(endpoint),
     userId: input.userId,
     repoRoot: input.repoRoot,
@@ -69,7 +69,7 @@ export function testPhysicalWorktreeCapability(
 }
 
 export const testPhysicalWorktrees = {
-  async capture(input: ResolvePhysicalWorktreeIdentityInput): Promise<PhysicalWorktreeCapability> {
-    return testPhysicalWorktreeCapability(input.worktreePath, input)
+  async capture(input: ResolvePhysicalWorktreeIdentityInput): Promise<PhysicalWorktreeExecutionCapability> {
+    return testPhysicalWorktreeExecutionCapability(input.worktreePath, input)
   },
 }

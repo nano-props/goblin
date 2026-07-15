@@ -44,7 +44,7 @@ import { settleRemoteRuntimeFailure } from '#/server/modules/remote-runtime-fail
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
 import type { ServerRepoMutationHost } from '#/server/repo-mutation/repo-mutation-host.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
-import type { PhysicalWorktreeCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import type { PhysicalWorktreeExecutionCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 
@@ -302,7 +302,7 @@ export function createRepoRoutes(options: {
             deleteBranch,
             signal: c.req.raw.signal,
             remove: async (
-              physicalWorktreeCapability: PhysicalWorktreeCapability,
+              physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
               lifecycle: RepoWorktreeRemovalLifecycle,
               signal: AbortSignal,
             ) =>
