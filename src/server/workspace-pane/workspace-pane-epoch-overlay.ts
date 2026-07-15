@@ -5,7 +5,10 @@ import {
   type WorkspacePaneTabEntry,
 } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsTargetIdentity } from '#/shared/workspace-pane-tabs-target.ts'
-import { workspacePaneTabsTargetIdentityKeyFromIdentity } from '#/shared/workspace-pane-tabs-target.ts'
+import {
+  parseWorkspacePaneTabsTargetIdentityKey,
+  workspacePaneTabsTargetIdentityKeyFromIdentity,
+} from '#/shared/workspace-pane-tabs-target.ts'
 import {
   physicalWorktreeIdentityKey,
   type PhysicalWorktreeIdentity,
@@ -30,6 +33,7 @@ interface EpochState {
   overlayRevision: number
   placementsByTarget: Map<string, WorkspacePaneRuntimePlacementHint[]>
   physicalKeysByTarget: Map<string, string>
+  branchNamesByTarget: Map<string, string>
 }
 
 export class WorkspacePaneEpochOverlay {
@@ -67,12 +71,47 @@ export class WorkspacePaneEpochOverlay {
     this.targetsByPhysicalKey.set(physicalKey, refs)
   }
 
+  registerTargetMetadata(input: WorkspacePaneEpochTargetRef & { branchName: string }): void {
+    const state = this.state(input)
+    state.branchNamesByTarget.set(workspacePaneTabsTargetIdentityKeyFromIdentity(input.target), input.branchName)
+  }
+
+  targetBranchName(input: WorkspacePaneEpochTargetRef): string | null {
+    return this.epochs.get(epochKey(input))?.branchNamesByTarget.get(
+      workspacePaneTabsTargetIdentityKeyFromIdentity(input.target),
+    ) ?? null
+  }
+
+  epochTargets(scope: WorkspacePaneEpochScope): Array<{ target: WorkspacePaneTabsTargetIdentity; branchName: string }> {
+    const state = this.epochs.get(epochKey(scope))
+    if (!state) return []
+    return Array.from(state.branchNamesByTarget.entries()).flatMap(([key, branchName]) => {
+      const target = parseWorkspacePaneTabsTargetIdentityKey(key)
+      return target ? [{ target, branchName }] : []
+    })
+  }
+
   physicalTargets(identity: PhysicalWorktreeIdentity): WorkspacePaneEpochTargetRef[] {
     return Array.from(this.targetsByPhysicalKey.get(physicalWorktreeIdentityKey(identity))?.values() ?? []).map(cloneTargetRef)
   }
 
   activeEpochs(repoRoot: string): WorkspacePaneEpochScope[] {
     return Array.from(this.epochsByRepoRoot.get(repoRoot)?.values() ?? []).map((scope) => ({ ...scope }))
+  }
+
+  epochsForUser(userId: string): WorkspacePaneEpochScope[] {
+    return Array.from(this.epochsByRepoRoot.values()).flatMap((epochs) =>
+      Array.from(epochs.values()).filter((scope) => scope.userId === userId).map((scope) => ({ ...scope })),
+    )
+  }
+
+  runtimeSessionIds(input: WorkspacePaneEpochScope & { worktreePath: string; type: WorkspacePaneRuntimeTabType }): string[] {
+    const target = { kind: 'worktree' as const, repoRoot: input.repoRoot, worktreePath: input.worktreePath }
+    const prefix = `${input.type}:`
+    return this.placementHints({ ...input, target })
+      .map((hint) => hint.identity)
+      .filter((identity) => identity.startsWith(prefix))
+      .map((identity) => identity.slice(prefix.length))
   }
 
   revision(scope: WorkspacePaneEpochScope): number {
@@ -96,7 +135,12 @@ export class WorkspacePaneEpochOverlay {
     const key = epochKey(scope)
     let state = this.epochs.get(key)
     if (!state) {
-      state = { overlayRevision: 0, placementsByTarget: new Map(), physicalKeysByTarget: new Map() }
+      state = {
+        overlayRevision: 0,
+        placementsByTarget: new Map(),
+        physicalKeysByTarget: new Map(),
+        branchNamesByTarget: new Map(),
+      }
       this.epochs.set(key, state)
       const active = this.epochsByRepoRoot.get(scope.repoRoot) ?? new Map<string, WorkspacePaneEpochScope>()
       active.set(key, { ...scope })

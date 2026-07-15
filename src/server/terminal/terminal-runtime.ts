@@ -17,6 +17,8 @@ import {
 } from '#/server/terminal/terminal-session-service.ts'
 import { createWorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import { createWorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
+import { WorkspacePaneLayoutAggregate } from '#/server/workspace-pane/workspace-pane-layout-aggregate.ts'
+import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import type { RealtimeBroker } from '#/server/realtime/realtime-broker.ts'
 import { createTerminalRuntimeActions } from '#/server/terminal/terminal-runtime-actions.ts'
 import { createTerminalRuntimeCoordinator } from '#/server/terminal/terminal-runtime-coordinator.ts'
@@ -32,7 +34,10 @@ import type {
   ServerWorkspacePaneTabsHost,
   ServerWorkspacePaneTargetLifecycleHost,
 } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
-import { recordServerWorkspacePaneLayout } from '#/server/modules/settings-source.ts'
+import {
+  recordServerWorkspacePaneLayout,
+  serverWorkspacePaneLayoutRepository,
+} from '#/server/modules/settings-source.ts'
 import { isValidTerminalClientId, isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import {
   TerminalSessionManager,
@@ -66,6 +71,7 @@ const terminalRuntimeLogger = serverLogger.child({ module: 'terminal-runtime' })
 export interface ServerTerminalRuntimeOptions {
   ptySupervisor: PtySupervisor
   gCommand?: GoblinTerminalCommandRuntime
+  workspacePaneLayoutRepository?: WorkspacePaneLayoutRepository
 }
 
 export interface ServerTerminalRuntime {
@@ -80,11 +86,22 @@ export interface ServerTerminalRuntime {
 export function createServerTerminalRuntime(options: ServerTerminalRuntimeOptions): ServerTerminalRuntime {
   const { ptySupervisor } = options
   const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
+  const workspacePaneLayout = new WorkspacePaneLayoutAggregate({
+    repository: options.workspacePaneLayoutRepository ?? serverWorkspacePaneLayoutRepository,
+  })
   const worktreeOperations = createPhysicalWorktreeOperationCoordinator()
   const physicalWorktrees = createPhysicalWorktreeIdentityResolver()
   const terminalSessionOrder = {
     terminalSessionIds(input) {
-      return workspaceTabs.runtimeSessionIds(input, 'terminal')
+      const separator = input.scope.lastIndexOf('\0')
+      if (separator < 1) return []
+      return workspacePaneLayout.overlay.runtimeSessionIds({
+        userId: input.userId,
+        repoRoot: input.scope.slice(0, separator),
+        repoRuntimeId: input.scope.slice(separator + 1),
+        worktreePath: input.worktreePath,
+        type: 'terminal',
+      })
     },
   } satisfies TerminalSessionOrderProjection<string>
 
@@ -130,6 +147,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     worktreeOperations,
     physicalWorktrees,
     persistLayout: recordServerWorkspacePaneLayout,
+    layoutAggregate: workspacePaneLayout,
   })
   const coordinator = createTerminalRuntimeCoordinator({
     manager,

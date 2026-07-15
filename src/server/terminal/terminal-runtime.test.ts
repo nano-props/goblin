@@ -13,6 +13,8 @@ import { getWorktrees } from '#/system/git/worktrees.ts'
 import { resolveRemoteTarget } from '#/system/ssh/config.ts'
 import { createInProcessPtySupervisor } from '#/server/terminal/pty-supervisor-inprocess.ts'
 import { createServerTerminalRuntime } from '#/server/terminal/terminal-runtime.ts'
+import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import { HEARTBEAT_DEADLINE_MS, HEARTBEAT_INTERVAL_MS } from '#/server/terminal/terminal-realtime-broker.ts'
 import type { ServerTerminalHost } from '#/server/terminal/terminal-host.ts'
 import type { ServerWorkspacePaneRuntimeHost } from '#/server/workspace-pane/workspace-pane-runtime-host.ts'
@@ -197,10 +199,25 @@ const createTerminalApplications = new WeakMap<
   ServerWorkspacePaneRuntimeHost
 >()
 const activeRuntimeShutdowns = new Set<() => void>()
+let testWorkspacePaneLayout: WorkspacePaneDurableLayout = { entries: [] }
+const testWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository = {
+  async load() {
+    return { layout: structuredClone(testWorkspacePaneLayout) }
+  },
+  async compareAndSwap(input) {
+    if (JSON.stringify(testWorkspacePaneLayout) !== JSON.stringify(input.expected)) {
+      return { kind: 'conflict', snapshot: { layout: structuredClone(testWorkspacePaneLayout) } }
+    }
+    const changed = JSON.stringify(testWorkspacePaneLayout) !== JSON.stringify(input.replacement)
+    testWorkspacePaneLayout = structuredClone(input.replacement)
+    return { kind: 'accepted', changed, snapshot: { layout: structuredClone(testWorkspacePaneLayout) } }
+  },
+}
 
 function buildRuntime(): RuntimeHandle {
   const runtime = createServerTerminalRuntime({
     ptySupervisor: createInProcessPtySupervisor(),
+    workspacePaneLayoutRepository: testWorkspacePaneLayoutRepository,
   })
   REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_a')
   SSH_REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, 'ssh-config://prod/srv/repo', 'client_a')
@@ -223,6 +240,7 @@ beforeEach(() => {
   vi.useRealTimers()
   mockPtys.length = 0
   mockDataToEmitOnRegistration = null
+  testWorkspacePaneLayout = { entries: [] }
   vi.clearAllMocks()
   clearRepoRuntimesForUser(USER_1)
   clearRepoRuntimesForUser(USER_2)
@@ -1034,7 +1052,7 @@ describe('server terminal runtime', () => {
     shutdown()
   })
 
-  test('repo runtime close makes old terminal sessions and workspace tabs unreachable to the reopened runtime', async () => {
+  test('repo runtime close drops runtime state while preserving durable layout for the reopened epoch', async () => {
     const { host, shutdown } = buildRuntime()
     const first = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,
@@ -1096,7 +1114,16 @@ describe('server terminal runtime', () => {
         { repoRoot: REPO_ROOT, repoRuntimeId: nextRepoRuntimeId },
         'req_list_after_repo_reopen',
       ),
-    ).resolves.toMatchObject({ entries: [] })
+    ).resolves.toMatchObject({
+      entries: [{
+        branchName: 'feature',
+        worktreePath: '/repo-linked',
+        tabs: [
+          { type: 'status', tabId: 'workspace-pane:status' },
+          { type: 'history', tabId: 'workspace-pane:history' },
+        ],
+      }],
+    })
 
     const second = await createAdmittedTerminal(host, 'client_a', USER_1, {
       repoRoot: REPO_ROOT,

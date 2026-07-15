@@ -1,0 +1,149 @@
+// @vitest-environment node
+
+import { describe, expect, test, vi } from 'vitest'
+import { WorkspacePaneLayoutAggregate } from '#/server/workspace-pane/workspace-pane-layout-aggregate.ts'
+import type {
+  WorkspacePaneLayoutRepository,
+  WorkspacePaneLayoutRepositoryCasInput,
+} from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
+import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
+import {
+  workspacePaneRuntimeTabEntry,
+  workspacePaneStaticTabEntry,
+  workspacePaneTabEntryIdentity,
+} from '#/shared/workspace-pane.ts'
+
+const scope = { userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a' }
+const target = { branchName: 'feature/worktree', worktreePath: '/repo/worktree' }
+const terminal = workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')
+const providers = [{
+  type: 'terminal' as const,
+  revision: 1,
+  liveSessions: [{ sessionId: 'term-livelivelivelivelive1', branch: target.branchName, worktreePath: target.worktreePath }],
+}]
+
+describe('workspace pane layout aggregate', () => {
+  test('splits a mixed command into durable static layout and epoch placement', async () => {
+    const repository = memoryRepository()
+    const aggregate = new WorkspacePaneLayoutAggregate({ repository })
+
+    const snapshot = await aggregate.replace({
+      ...scope,
+      ...target,
+      tabs: [workspacePaneStaticTabEntry('status'), terminal, workspacePaneStaticTabEntry('history')],
+      providerSnapshots: providers,
+    })
+
+    expect(repository.layout).toEqual({ entries: [{
+      repoRoot: '/repo',
+      ...target,
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')],
+    }] })
+    expect(snapshot.entries[0]?.tabs).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      terminal,
+      workspacePaneStaticTabEntry('history'),
+    ])
+  })
+
+  test('re-reads and replans the original update intent after a CAS conflict', async () => {
+    const repository = memoryRepository({ entries: [{
+      repoRoot: '/repo',
+      ...target,
+      tabs: [workspacePaneStaticTabEntry('status')],
+    }] })
+    const originalCas = repository.compareAndSwap
+    let first = true
+    repository.compareAndSwap = vi.fn(async (input) => {
+      if (first) {
+        first = false
+        repository.layout = { entries: [{
+          repoRoot: '/repo',
+          ...target,
+          tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('files')],
+        }] }
+        return { kind: 'conflict' as const, snapshot: { layout: repository.layout } }
+      }
+      return await originalCas(input)
+    })
+    const aggregate = new WorkspacePaneLayoutAggregate({ repository })
+
+    await aggregate.update({
+      ...scope,
+      ...target,
+      operation: { type: 'open-static', tabType: 'history' },
+      providerSnapshots: [],
+    })
+
+    expect(repository.layout.entries[0]?.tabs).toEqual([
+      workspacePaneStaticTabEntry('status'),
+      workspacePaneStaticTabEntry('files'),
+      workspacePaneStaticTabEntry('history'),
+    ])
+    expect(repository.compareAndSwap).toHaveBeenCalledTimes(2)
+  })
+
+  test('commits no overlay or revision when persistence fails', async () => {
+    const repository = memoryRepository()
+    repository.compareAndSwap = vi.fn(async () => { throw new Error('disk full') })
+    const aggregate = new WorkspacePaneLayoutAggregate({ repository })
+
+    await expect(aggregate.replace({
+      ...scope,
+      ...target,
+      tabs: [workspacePaneStaticTabEntry('status'), terminal],
+      providerSnapshots: providers,
+    })).rejects.toThrow('disk full')
+    expect(aggregate.overlay.revision(scope)).toBe(0)
+    expect(aggregate.overlay.placementHints({
+      ...scope,
+      target: { kind: 'worktree', repoRoot: '/repo', worktreePath: target.worktreePath },
+    })).toEqual([])
+  })
+
+  test('uses one monotonic clock across durable, overlay, and provider dependencies', async () => {
+    const repository = memoryRepository()
+    const aggregate = new WorkspacePaneLayoutAggregate({ repository })
+    const first = await aggregate.snapshot(scope, [])
+    const unchanged = await aggregate.snapshot(scope, [])
+    repository.layout = { entries: [{ repoRoot: '/repo', ...target, tabs: [] }] }
+    const durable = await aggregate.snapshot(scope, [])
+    const provider = await aggregate.snapshot(scope, providers)
+
+    expect([first.revision, unchanged.revision, durable.revision, provider.revision]).toEqual([0, 0, 1, 2])
+    expect(provider.entries[0]?.tabs.map(workspacePaneTabEntryIdentity)).toEqual([
+      workspacePaneTabEntryIdentity(terminal),
+    ])
+  })
+})
+
+interface MemoryRepository extends WorkspacePaneLayoutRepository {
+  layout: WorkspacePaneDurableLayout
+  compareAndSwap(input: WorkspacePaneLayoutRepositoryCasInput): Promise<
+    Awaited<ReturnType<WorkspacePaneLayoutRepository['compareAndSwap']>>
+  >
+}
+
+function memoryRepository(initial: WorkspacePaneDurableLayout = { entries: [] }): MemoryRepository {
+  let layout = initial
+  const repository: MemoryRepository = {
+    get layout() {
+      return layout
+    },
+    set layout(value) {
+      layout = value
+    },
+    async load() {
+      return { layout: structuredClone(layout) }
+    },
+    async compareAndSwap(input) {
+      if (JSON.stringify(layout) !== JSON.stringify(input.expected)) {
+        return { kind: 'conflict', snapshot: { layout: structuredClone(layout) } }
+      }
+      const changed = JSON.stringify(layout) !== JSON.stringify(input.replacement)
+      layout = structuredClone(input.replacement)
+      return { kind: 'accepted', changed, snapshot: { layout: structuredClone(layout) } }
+    },
+  }
+  return repository
+}
