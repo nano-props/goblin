@@ -20,6 +20,7 @@ import {
 } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import {
   physicalWorktreeAdmissionLease,
+  physicalWorktreeAdmissionLeaseKey,
   type PhysicalWorktreeAdmissionLease,
   type PhysicalWorktreeExecutionCapability,
   type PhysicalWorktreeIdentityResolver,
@@ -210,10 +211,10 @@ export class WorkspacePaneTabsCoordinator {
             ...layout.indexedAdmissionLeases(scope),
           ])
           const admittedIdentities = new Set(
-            lockTargets.map((target) => physicalWorktreeIdentityKey(target.identity)),
+            lockTargets.map(physicalWorktreeAdmissionLeaseKey),
           )
           if (requiredLockTargets.some(
-            (target) => !admittedIdentities.has(physicalWorktreeIdentityKey(target.identity)),
+            (target) => !admittedIdentities.has(physicalWorktreeAdmissionLeaseKey(target)),
           )) {
             expandedLockTargets = uniqueSortedAdmissionLeases([...lockTargets, ...requiredLockTargets])
             return null
@@ -462,11 +463,12 @@ export class WorkspacePaneTabsCoordinator {
             ...capturedWorktrees.map(({ capability }) => physicalWorktreeAdmissionLease(capability)),
             ...layout.indexedAdmissionLeases(scope),
           ])
-          const admittedIdentities = new Set(lockTargets.map((target) => physicalWorktreeIdentityKey(target.identity)))
+          const admittedIdentities = new Set(lockTargets.map(physicalWorktreeAdmissionLeaseKey))
           const projectedIdentityKeys = new Set(
-            capturedWorktrees.map(({ capability }) => physicalWorktreeIdentityKey(capability.identity)),
+            capturedWorktrees.map(({ capability }) =>
+              physicalWorktreeAdmissionLeaseKey(physicalWorktreeAdmissionLease(capability))),
           )
-          if (currentLockTargets.some((target) => !admittedIdentities.has(physicalWorktreeIdentityKey(target.identity))) ||
+          if (currentLockTargets.some((target) => !admittedIdentities.has(physicalWorktreeAdmissionLeaseKey(target))) ||
             [...projectedIdentityKeys].some((key) => !validatedCapabilities.has(key))) {
             expandedLockTargets = uniqueSortedAdmissionLeases([...lockTargets, ...currentLockTargets])
             expandedValidatedCapabilities = new Map([
@@ -561,7 +563,7 @@ export class WorkspacePaneTabsCoordinator {
     const lockTarget = lockTargets[index]
     if (!lockTarget) return await task()
     const next = async () => await this.runWithPhysicalWorktrees(lockTargets, validatedCapabilities, index + 1, task)
-    const key = physicalWorktreeIdentityKey(lockTarget.identity)
+    const key = physicalWorktreeAdmissionLeaseKey(lockTarget)
     const validatedCapability = validatedCapabilities.get(key)
     const result = validatedCapability
       ? await this.worktreeOperations.runOperation(validatedCapability, async () => await next())
@@ -583,8 +585,9 @@ function uniqueSortedCapabilities(
 ): PhysicalWorktreeExecutionCapability[] {
   return Array.from(new Map(
     [...capabilities]
-      .sort((a, b) => physicalWorktreeIdentityKey(a.identity).localeCompare(physicalWorktreeIdentityKey(b.identity)))
-      .map((capability) => [physicalWorktreeIdentityKey(capability.identity), capability]),
+      .sort((a, b) => physicalWorktreeAdmissionLeaseKey(physicalWorktreeAdmissionLease(a))
+        .localeCompare(physicalWorktreeAdmissionLeaseKey(physicalWorktreeAdmissionLease(b))))
+      .map((capability) => [physicalWorktreeAdmissionLeaseKey(physicalWorktreeAdmissionLease(capability)), capability]),
   ).values())
 }
 
@@ -593,15 +596,18 @@ function uniqueSortedAdmissionLeases(
 ): PhysicalWorktreeAdmissionLease[] {
   return Array.from(new Map(
     [...leases]
-      .sort((a, b) => physicalWorktreeIdentityKey(a.identity).localeCompare(physicalWorktreeIdentityKey(b.identity)))
-      .map((lease) => [physicalWorktreeIdentityKey(lease.identity), lease]),
+      .sort((a, b) => physicalWorktreeAdmissionLeaseKey(a).localeCompare(physicalWorktreeAdmissionLeaseKey(b)))
+      .map((lease) => [physicalWorktreeAdmissionLeaseKey(lease), lease]),
   ).values())
 }
 
 function capabilitiesByIdentity(
   capabilities: readonly PhysicalWorktreeExecutionCapability[],
 ): Map<string, PhysicalWorktreeExecutionCapability> {
-  return new Map(capabilities.map((capability) => [physicalWorktreeIdentityKey(capability.identity), capability]))
+  return new Map(capabilities.map((capability) => [
+    physicalWorktreeAdmissionLeaseKey(physicalWorktreeAdmissionLease(capability)),
+    capability,
+  ]))
 }
 
 function isWorkspacePaneWorktreeTarget(target: WorkspacePaneTabsTarget): target is WorkspacePaneWorktreeTarget {
