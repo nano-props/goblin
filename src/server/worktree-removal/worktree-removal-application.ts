@@ -100,7 +100,7 @@ export class WorktreeRemovalApplication {
                   // Reverse-index refs only identify stale runtime scopes. They
                   // cannot authorize durable retirement: a stable target may
                   // already be rebound to a new physical generation.
-                  await this.deps.workspaceTabs.clearPhysicalWorktreeIndex(physicalCapability.identity)
+                  await this.deps.workspaceTabs.clearPhysicalWorktreeIndex(physicalCapability)
                   this.broadcast(affectedScopes)
                   return { ok: true, message: '' }
                 } catch (error) {
@@ -154,7 +154,7 @@ export class WorktreeRemovalApplication {
         message: string
       }
   > {
-    const targets = this.deps.workspaceTabs.physicalWorktreeTargets(physicalWorktreeCapability.identity)
+    const targets = this.deps.workspaceTabs.physicalWorktreeTargets(physicalWorktreeCapability)
     const terminal = await this.deps.terminalWorktree.closeSessionsForPhysicalWorktree(physicalWorktreeCapability)
     const scopes = uniqueScopes([
       ...terminal.scopes,

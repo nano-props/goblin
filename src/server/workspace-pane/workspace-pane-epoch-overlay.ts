@@ -12,7 +12,10 @@ import {
   physicalWorktreeIdentityKey,
   type PhysicalWorktreeIdentity,
 } from '#/server/worktree-removal/physical-worktree-identity.ts'
-import type { PhysicalWorktreeAdmissionLease } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
+import {
+  physicalWorktreeAdmissionLeaseKey,
+  type PhysicalWorktreeAdmissionLease,
+} from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 
 export interface WorkspacePaneEpochScope {
   userId: string
@@ -64,9 +67,9 @@ export class WorkspacePaneEpochOverlay {
   registerPhysicalTarget(input: WorkspacePaneEpochTargetRef & { lease: PhysicalWorktreeAdmissionLease }): void {
     const state = this.state(input)
     const targetKey = workspacePaneTabsTargetIdentityKeyFromIdentity(input.target)
-    const physicalKey = physicalWorktreeIdentityKey(input.lease.identity)
+    const physicalKey = physicalWorktreeAdmissionLeaseKey(input.lease)
     const previousLease = state.physicalLeasesByTarget.get(targetKey)
-    const previous = previousLease ? physicalWorktreeIdentityKey(previousLease.identity) : null
+    const previous = previousLease ? physicalWorktreeAdmissionLeaseKey(previousLease) : null
     if (previous === physicalKey) return
     if (previous) this.removePhysicalTarget(previous, input, targetKey)
     state.physicalLeasesByTarget.set(targetKey, input.lease)
@@ -90,12 +93,19 @@ export class WorkspacePaneEpochOverlay {
     return derivedStateChanged
   }
 
-  physicalTargets(identity: PhysicalWorktreeIdentity): WorkspacePaneEpochTargetRef[] {
-    return Array.from(this.targetsByPhysicalKey.get(physicalWorktreeIdentityKey(identity))?.values() ?? []).map(cloneTargetRef)
+  physicalTargets(target: PhysicalWorktreeAdmissionLease | PhysicalWorktreeIdentity): WorkspacePaneEpochTargetRef[] {
+    if ('identity' in target) {
+      return Array.from(this.targetsByPhysicalKey.get(physicalWorktreeAdmissionLeaseKey(target))?.values() ?? [])
+        .map(cloneTargetRef)
+    }
+    const prefix = `${physicalWorktreeIdentityKey(target)}\0`
+    return Array.from(this.targetsByPhysicalKey)
+      .filter(([key]) => key.startsWith(prefix))
+      .flatMap(([, refs]) => Array.from(refs.values()).map(cloneTargetRef))
   }
 
-  clearPhysicalIdentity(repoRoot: string, identity: PhysicalWorktreeIdentity): WorkspacePaneEpochScope[] {
-    const physicalKey = physicalWorktreeIdentityKey(identity)
+  clearPhysicalIdentity(repoRoot: string, removedLease: PhysicalWorktreeAdmissionLease): WorkspacePaneEpochScope[] {
+    const physicalKey = physicalWorktreeAdmissionLeaseKey(removedLease)
     const refs = [...(this.targetsByPhysicalKey.get(physicalKey)?.values() ?? [])]
     const affected: WorkspacePaneEpochScope[] = []
     for (const ref of refs) {
@@ -104,7 +114,7 @@ export class WorkspacePaneEpochOverlay {
       const state = this.epochs.get(epochKey(scope))
       const targetKey = workspacePaneTabsTargetIdentityKeyFromIdentity(ref.target)
       const lease = state?.physicalLeasesByTarget.get(targetKey)
-      if (!state || !lease || physicalWorktreeIdentityKey(lease.identity) !== physicalKey) continue
+      if (!state || !lease || physicalWorktreeAdmissionLeaseKey(lease) !== physicalKey) continue
       state.physicalLeasesByTarget.delete(targetKey)
       this.removePhysicalTarget(physicalKey, scope, targetKey)
       state.overlayRevision += 1
@@ -151,7 +161,7 @@ export class WorkspacePaneEpochOverlay {
     const state = this.epochs.get(key)
     if (!state) return
     for (const [targetKey, lease] of state.physicalLeasesByTarget) {
-      this.removePhysicalTarget(physicalWorktreeIdentityKey(lease.identity), scope, targetKey)
+      this.removePhysicalTarget(physicalWorktreeAdmissionLeaseKey(lease), scope, targetKey)
     }
     this.epochs.delete(key)
     const active = this.epochsByRepoRoot.get(scope.repoRoot)
@@ -190,7 +200,7 @@ export class WorkspacePaneEpochOverlay {
     const placementChanged = state.placementsByTarget.delete(targetKey)
     const lease = state.physicalLeasesByTarget.get(targetKey)
     if (lease) {
-      const physicalKey = physicalWorktreeIdentityKey(lease.identity)
+      const physicalKey = physicalWorktreeAdmissionLeaseKey(lease)
       this.removePhysicalTarget(physicalKey, scope, targetKey)
       state.physicalLeasesByTarget.delete(targetKey)
     }

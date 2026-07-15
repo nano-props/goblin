@@ -8,6 +8,7 @@ import {
   runtimePlacementHints,
 } from '#/server/workspace-pane/workspace-pane-epoch-overlay.ts'
 import {
+  issueTestPhysicalWorktreeExecutionCapability,
   testPhysicalWorktreeExecutionCapability,
   testPhysicalWorktreeIdentity,
 } from '#/server/test-utils/physical-worktree-identity.ts'
@@ -107,9 +108,35 @@ describe('workspace pane epoch overlay', () => {
     overlay.registerPhysicalTarget({ ...scope, target, lease })
     overlay.registerPhysicalTarget({ ...linkedScope, target: linkedTarget, lease })
 
-    expect(overlay.clearPhysicalIdentity('/repo', identity)).toEqual([scope])
+    expect(overlay.clearPhysicalIdentity('/repo', lease)).toEqual([scope])
     expect(overlay.physicalTargets(identity)).toEqual([{ ...linkedScope, target: linkedTarget, lease }])
     expect(overlay.placementHints({ ...scope, target })).toHaveLength(1)
+  })
+
+  test('does not clear a rebound generation at the same physical identity', () => {
+    const overlay = new WorkspacePaneEpochOverlay()
+    const identity = testPhysicalWorktreeIdentity('/repo/worktree')
+    const first = physicalWorktreeAdmissionLease(issueTestPhysicalWorktreeExecutionCapability({
+      identity,
+      execution: {
+        kind: 'local',
+        canonicalWorktreePath: identity.endpoint,
+        endpointMarker: { deviceId: '1', inode: '1' },
+      },
+    }))
+    const rebound = physicalWorktreeAdmissionLease(issueTestPhysicalWorktreeExecutionCapability({
+      identity,
+      execution: {
+        kind: 'local',
+        canonicalWorktreePath: identity.endpoint,
+        endpointMarker: { deviceId: '1', inode: '2' },
+      },
+    }))
+    overlay.registerPhysicalTarget({ ...scope, target, lease: first })
+    overlay.registerPhysicalTarget({ ...scope, target, lease: rebound })
+
+    expect(overlay.clearPhysicalIdentity('/repo', first)).toEqual([])
+    expect(overlay.physicalTargets(rebound)).toEqual([{ ...scope, target, lease: rebound }])
   })
 
   test('rejects duplicate provider types and keys revisions by type', () => {

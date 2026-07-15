@@ -352,8 +352,9 @@ export class WorkspacePaneTabsCoordinator {
     await this.closeScope(input)
   }
 
-  physicalWorktreeTargets(identity: PhysicalWorktreeIdentity) {
-    return this.layoutAggregate.physicalTargets(identity).map((ref) => ({
+  physicalWorktreeTargets(target: PhysicalWorktreeExecutionCapability | PhysicalWorktreeIdentity) {
+    const indexTarget = 'identity' in target ? physicalWorktreeAdmissionLease(target) : target
+    return this.layoutAggregate.physicalTargets(indexTarget).map((ref) => ({
       userId: ref.userId,
       scope: scopeFromAggregate(ref),
       target: ref.target,
@@ -361,11 +362,12 @@ export class WorkspacePaneTabsCoordinator {
     }))
   }
 
-  async clearPhysicalWorktreeIndex(identity: PhysicalWorktreeIdentity): Promise<void> {
-    const repoRoots = new Set(this.physicalWorktreeTargets(identity).map((ref) => ref.target.repoRoot))
+  async clearPhysicalWorktreeIndex(capability: PhysicalWorktreeExecutionCapability): Promise<void> {
+    const lease = physicalWorktreeAdmissionLease(capability)
+    const repoRoots = new Set(this.physicalWorktreeTargets(capability).map((ref) => ref.target.repoRoot))
     await Promise.all([...repoRoots].map(async (repoRoot) =>
       await this.runWorkspaceTabsRepoOperation(repoRoot, (layout) => {
-        layout.clearPhysicalIdentity(repoRoot, identity)
+        layout.clearPhysicalIdentity(repoRoot, lease)
       })))
   }
 

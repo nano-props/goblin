@@ -36,6 +36,7 @@ declare const physicalWorktreeAdmissionLeaseBrand: unique symbol
 
 export interface PhysicalWorktreeAdmissionLease {
   readonly identity: PhysicalWorktreeIdentity
+  readonly generationKey: string
   readonly [physicalWorktreeAdmissionLeaseBrand]: true
 }
 
@@ -416,6 +417,10 @@ export function physicalWorktreeAdmissionLeaseSignal(lease: PhysicalWorktreeAdmi
   return signal
 }
 
+export function physicalWorktreeAdmissionLeaseKey(lease: PhysicalWorktreeAdmissionLease): string {
+  return `${physicalWorktreeIdentityKey(lease.identity)}\0${lease.generationKey}`
+}
+
 export function assertPhysicalWorktreeExecutionCapability(
   capability: PhysicalWorktreeExecutionCapability,
   input: ResolvePhysicalWorktreeIdentityInput,
@@ -437,7 +442,10 @@ function issuePhysicalWorktreeExecutionCapability(
   state: Omit<PhysicalWorktreeExecutionCapabilityState, 'admissionLease'> & { runtimeSignal: AbortSignal },
 ): PhysicalWorktreeExecutionCapability {
   const frozenIdentity = Object.freeze({ ...identity }) as PhysicalWorktreeIdentity
-  const admissionLease = Object.freeze({ identity: frozenIdentity }) as PhysicalWorktreeAdmissionLease
+  const admissionLease = Object.freeze({
+    identity: frozenIdentity,
+    generationKey: executionGenerationKey(state.execution),
+  }) as PhysicalWorktreeAdmissionLease
   const capability = Object.freeze({ identity: frozenIdentity }) as PhysicalWorktreeExecutionCapability
   const execution =
     state.execution.kind === 'local'
@@ -532,6 +540,11 @@ async function nativeStat(input: string): Promise<PhysicalWorktreeEndpointMarker
 
 function endpointMarkerKey(marker: PhysicalWorktreeEndpointMarker): string {
   return `${marker.deviceId}\0${marker.inode}`
+}
+
+function executionGenerationKey(execution: PhysicalWorktreeExecutionBinding): string {
+  const marker = endpointMarkerKey(execution.endpointMarker)
+  return execution.kind === 'local' ? marker : `${execution.configFingerprint}\0${marker}`
 }
 
 function validEndpointMarkerPart(value: string): boolean {

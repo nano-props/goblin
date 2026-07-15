@@ -107,7 +107,7 @@ export interface WorkspacePaneLayoutOperation {
     physicalTargets: readonly { target: WorkspacePaneTabsTargetIdentity; lease: PhysicalWorktreeAdmissionLease }[]
   }): void
   indexedAdmissionLeases(scope: WorkspacePaneEpochScope): PhysicalWorktreeAdmissionLease[]
-  clearPhysicalIdentity(repoRoot: string, identity: PhysicalWorktreeIdentity): WorkspacePaneEpochScope[]
+  clearPhysicalIdentity(repoRoot: string, lease: PhysicalWorktreeAdmissionLease): WorkspacePaneEpochScope[]
 }
 
 export class WorkspacePaneLayoutAggregate {
@@ -227,8 +227,8 @@ export class WorkspacePaneLayoutAggregate {
     this.overlay.recordMixedOrder(input)
   }
 
-  physicalTargets(identity: PhysicalWorktreeIdentity) {
-    return this.overlay.physicalTargets(identity)
+  physicalTargets(target: PhysicalWorktreeAdmissionLease | PhysicalWorktreeIdentity) {
+    return this.overlay.physicalTargets(target)
   }
 
   activeEpochs(repoRoot: string): WorkspacePaneEpochScope[] {
