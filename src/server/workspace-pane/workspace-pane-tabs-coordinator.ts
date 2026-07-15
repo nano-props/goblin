@@ -376,15 +376,15 @@ export class WorkspacePaneTabsCoordinator {
     worktreePath: string
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability
     permit: PhysicalWorktreeOperationPermit
-    scopes: readonly { userId: string; scope: string }[]
+    scopes: readonly { userId: string; repoRoot: string; scope: string; worktreePath: string }[]
   }): Promise<void> {
     await Promise.all(
-      input.scopes.map(async ({ userId, scope }) => {
+      input.scopes.map(async ({ userId, repoRoot, scope, worktreePath }) => {
         await this.reconcileWorktreeAdmitted({
           userId,
-          repoRoot: input.repoRoot,
+          repoRoot,
           scope,
-          worktreePath: input.worktreePath,
+          worktreePath,
           physicalWorktreeCapability: input.physicalWorktreeCapability,
           permit: input.permit,
         })

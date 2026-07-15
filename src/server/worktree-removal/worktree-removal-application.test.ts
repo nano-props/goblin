@@ -94,8 +94,8 @@ describe('WorktreeRemovalApplication', () => {
 
   test('reconciles every affected user scope after Git removal fails', async () => {
     const affectedScopes = [
-      { userId: 'user-a', repoRoot: '/repo', scope: '/repo\0runtime-a' },
-      { userId: 'user-b', repoRoot: '/repo', scope: '/repo\0runtime-b' },
+      { userId: 'user-a', repoRoot: '/repo', scope: '/repo\0runtime-a', worktreePath: '/repo/worktree' },
+      { userId: 'user-b', repoRoot: '/repo', scope: '/repo\0runtime-b', worktreePath: '/repo/worktree' },
     ]
     const reconcilePhysicalWorktreeAfterRemovalFailure = vi.fn(async () => {})
     const retireTarget = vi.fn(async () => {})

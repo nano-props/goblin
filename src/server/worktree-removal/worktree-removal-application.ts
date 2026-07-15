@@ -72,7 +72,7 @@ export class WorktreeRemovalApplication {
         async ({ signal }, permit) => {
           if (!this.isCurrentRuntime(userId, input)) return { ok: false, message: 'error.repo-runtime-stale' }
           signal.throwIfAborted()
-          let affectedScopes: Array<{ userId: string; repoRoot: string; scope: string }> = []
+          let affectedScopes: Array<{ userId: string; repoRoot: string; scope: string; worktreePath: string }> = []
           return await input.remove(
             physicalCapability,
             {
@@ -146,19 +146,24 @@ export class WorktreeRemovalApplication {
   ): Promise<
     | {
         ok: true
-        scopes: Array<{ userId: string; repoRoot: string; scope: string }>
+        scopes: Array<{ userId: string; repoRoot: string; scope: string; worktreePath: string }>
       }
     | {
         ok: false
-        scopes: Array<{ userId: string; repoRoot: string; scope: string }>
+        scopes: Array<{ userId: string; repoRoot: string; scope: string; worktreePath: string }>
         message: string
       }
   > {
     const targets = this.deps.workspaceTabs.physicalWorktreeTargets(physicalWorktreeCapability)
     const terminal = await this.deps.terminalWorktree.closeSessionsForPhysicalWorktree(physicalWorktreeCapability)
     const scopes = uniqueScopes([
-      ...terminal.scopes,
-      ...targets.map(({ userId, scope, target }) => ({ userId, repoRoot: target.repoRoot, scope })),
+      ...terminal.scopes.map((item) => ({ ...item, worktreePath })),
+      ...targets.map(({ userId, scope, target }) => ({
+        userId,
+        repoRoot: target.repoRoot,
+        scope,
+        worktreePath: target.kind === 'worktree' ? target.worktreePath : worktreePath,
+      })),
     ])
     return terminal.ok ? { ok: true, scopes } : { ok: false, scopes, message: terminal.message }
   }
@@ -176,7 +181,7 @@ export class WorktreeRemovalApplication {
     worktreePath: string,
     physicalWorktreeCapability: PhysicalWorktreeExecutionCapability,
     permit: PhysicalWorktreeOperationPermit,
-    scopes: readonly { userId: string; repoRoot: string; scope: string }[],
+    scopes: readonly { userId: string; repoRoot: string; scope: string; worktreePath: string }[],
   ): Promise<void> {
     try {
       await this.deps.workspaceTabs.reconcilePhysicalWorktreeAfterRemovalFailure({
@@ -205,7 +210,10 @@ export function createWorktreeRemovalApplication(
 }
 
 function uniqueScopes(
-  scopes: readonly { userId: string; repoRoot: string; scope: string }[],
-): Array<{ userId: string; repoRoot: string; scope: string }> {
-  return Array.from(new Map(scopes.map((scope) => [`${scope.userId}\0${scope.scope}`, scope])).values())
+  scopes: readonly { userId: string; repoRoot: string; scope: string; worktreePath: string }[],
+): Array<{ userId: string; repoRoot: string; scope: string; worktreePath: string }> {
+  return Array.from(new Map(scopes.map((item) => [
+    `${item.userId}\0${item.scope}\0${item.repoRoot}\0${item.worktreePath}`,
+    item,
+  ])).values())
 }
