@@ -96,28 +96,28 @@ export class PhysicalWorktreeOperationCoordinator {
     const normalized = normalizeAdmissionRecords(records)
     const keys = normalized.map(({ key }) => key)
     if (!this.reserveBatch(keys)) return { admitted: false }
-    const selectedLeases = normalized.map((record) => {
-      if (record.currentCapability) return physicalWorktreeAdmissionLease(record.currentCapability)
-      return record.indexedLeases.find((candidate) => !physicalWorktreeAdmissionLeaseSignal(candidate).aborted) ??
-        record.indexedLeases[0]
-    })
-    const batchSignals = selectedLeases.map((lease) => {
-      if (!lease) throw new Error('error.invalid-worktree-admission-record')
-      return physicalWorktreeAdmissionLeaseSignal(lease)
-    })
-    if (externalSignal) batchSignals.push(externalSignal)
-    const batchSignal = AbortSignal.any(batchSignals)
-    const acquire = async (index: number): Promise<T> => {
-      const record = normalized[index]
-      if (!record) return await task()
-      const { key, currentCapability: capability } = record
-      return await this.runByKey(key, async () => {
-        batchSignal.throwIfAborted()
-        if (capability) await validatePhysicalWorktreeExecution(capability, batchSignal)
-        return await acquire(index + 1)
-      }, batchSignal)
-    }
     try {
+      const selectedLeases = normalized.map((record) => {
+        if (record.currentCapability) return physicalWorktreeAdmissionLease(record.currentCapability)
+        return record.indexedLeases.find((candidate) => !physicalWorktreeAdmissionLeaseSignal(candidate).aborted) ??
+          record.indexedLeases[0]
+      })
+      const batchSignals = selectedLeases.map((lease) => {
+        if (!lease) throw new Error('error.invalid-worktree-admission-record')
+        return physicalWorktreeAdmissionLeaseSignal(lease)
+      })
+      if (externalSignal) batchSignals.push(externalSignal)
+      const batchSignal = AbortSignal.any(batchSignals)
+      const acquire = async (index: number): Promise<T> => {
+        const record = normalized[index]
+        if (!record) return await task()
+        const { key, currentCapability: capability } = record
+        return await this.runByKey(key, async () => {
+          batchSignal.throwIfAborted()
+          if (capability) await validatePhysicalWorktreeExecution(capability, batchSignal)
+          return await acquire(index + 1)
+        }, batchSignal)
+      }
       batchSignal.throwIfAborted()
       return { admitted: true, value: await acquire(0) }
     } finally {
@@ -224,6 +224,9 @@ function normalizeAdmissionRecords(records: readonly PhysicalWorktreeAdmissionRe
       throw new Error('error.invalid-worktree-admission-record')
     }
     if (record.indexedLeases.some((lease) => physicalWorktreeOperationKey(lease) !== key)) {
+      throw new Error('error.invalid-worktree-admission-record')
+    }
+    if (!record.currentCapability && record.indexedLeases.length === 0) {
       throw new Error('error.invalid-worktree-admission-record')
     }
     byKey.set(key, { ...record, key })

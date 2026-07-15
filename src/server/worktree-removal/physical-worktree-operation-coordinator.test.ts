@@ -65,6 +65,16 @@ describe('physical worktree operation coordinator', () => {
       .rejects.toThrow('error.duplicate-worktree-admission-record')
   })
 
+  test('rejects an empty record before reserving its identity', async () => {
+    const identity = testPhysicalWorktreeIdentity('/repo/worktree')
+    const coordinator = createPhysicalWorktreeOperationCoordinator()
+    await expect(coordinator.runAdmissionBatch([{
+      identity, currentCapability: null, indexedLeases: [],
+    }], async () => undefined)).rejects.toThrow('error.invalid-worktree-admission-record')
+    const capability = issueTestPhysicalWorktreeExecutionCapability({ identity })
+    await expect(coordinator.runRemoval(capability, async () => 'removed')).resolves.toMatchObject({ admitted: true })
+  })
+
   test('uses a live indexed lease when another indexed generation is already aborted', async () => {
     const identity = testPhysicalWorktreeIdentity('/repo/worktree')
     const aborted = new AbortController()
