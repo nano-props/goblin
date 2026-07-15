@@ -15,7 +15,7 @@ import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/worksp
 
 const MAX_WORKSPACE_REPAIR_CONFLICT_RETRIES = 3
 
-export interface WorkspacePaneTabsRestoreInput {
+interface WorkspacePaneTabsRestoreInput {
   userId: string
   clientId: string
   workspacePaneTabsHost: ServerWorkspacePaneTabsHost

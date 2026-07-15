@@ -16,7 +16,7 @@ import {
 import { abortableWorkspaceRestore, workspaceRepoDisplayName } from '#/server/modules/workspace-restore-utils.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 
-export interface RestoreRepoTabsInput {
+interface RestoreRepoTabsInput {
   userId: string
   clientId: string
   repoRoot: string
