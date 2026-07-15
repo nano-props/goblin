@@ -63,7 +63,6 @@ export class WorktreeRemovalApplication {
         repoRoot: input.repoRoot,
         repoRuntimeId: input.repoRuntimeId,
         worktreePath,
-        refresh: true,
       })
     } catch (error) {
       failRemoteRuntimeIfNeeded(userId, error)
@@ -165,12 +164,10 @@ export class WorktreeRemovalApplication {
     | {
         ok: true
         scopes: Array<{ userId: string; repoRoot: string; scope: string }>
-        targets: ReturnType<WorkspacePaneTabsCoordinator['physicalWorktreeTargets']>
       }
     | {
         ok: false
         scopes: Array<{ userId: string; repoRoot: string; scope: string }>
-        targets: ReturnType<WorkspacePaneTabsCoordinator['physicalWorktreeTargets']>
         message: string
       }
   > {
@@ -180,7 +177,7 @@ export class WorktreeRemovalApplication {
       ...terminal.scopes,
       ...targets.map(({ userId, scope, target }) => ({ userId, repoRoot: target.repoRoot, scope })),
     ])
-    return terminal.ok ? { ok: true, scopes, targets } : { ok: false, scopes, targets, message: terminal.message }
+    return terminal.ok ? { ok: true, scopes } : { ok: false, scopes, message: terminal.message }
   }
 
   private broadcast(scopes: readonly { userId: string; repoRoot: string }[]): void {

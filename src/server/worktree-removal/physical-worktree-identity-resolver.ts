@@ -28,8 +28,6 @@ export interface ResolvePhysicalWorktreeIdentityInput {
   repoRoot: string
   repoRuntimeId: string
   worktreePath: string
-  /** Retained for call-site intent; every resolution is fresh. */
-  refresh?: boolean
   signal?: AbortSignal
 }
 

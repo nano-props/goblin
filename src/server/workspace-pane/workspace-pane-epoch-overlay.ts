@@ -271,10 +271,6 @@ export function providerRevisionMap(
   return revisions
 }
 
-export function runtimeIdentity(type: WorkspacePaneRuntimeTabType, sessionId: string): string {
-  return `${type}:${sessionId}`
-}
-
 function epochKey(scope: WorkspacePaneEpochScope): string {
   return `${scope.userId}\0${scope.repoRoot}\0${scope.repoRuntimeId}`
 }
