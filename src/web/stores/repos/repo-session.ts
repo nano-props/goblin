@@ -1,4 +1,9 @@
-import type { RestoredWorkspaceRepoRuntime, WorkspaceRuntimeRestoreSnapshot } from '#/shared/api-types.ts'
+import {
+  isProjectedRestoredWorkspaceRepo,
+  type RepoWorkspaceTabsRestoreResult,
+  type RestoredWorkspaceRepoRuntime,
+  type WorkspaceRuntimeRestoreSnapshot,
+} from '#/shared/api-types.ts'
 import type { RepoSessionHydrationOptions, ReposGet, ReposSet, ReposStore } from '#/web/stores/repos/types.ts'
 import {
   addResolvedRepo,
@@ -10,19 +15,32 @@ import { updateRepoRuntimeCache } from '#/web/repo-runtime-query.ts'
 import { seedRepoProjectionQueryData } from '#/web/repo-data-query.ts'
 import { acceptRepoProjectionReadModel } from '#/web/stores/repos/projection-read-model-effects.ts'
 import { writeWorkspacePaneTabsSnapshotQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { workspacePaneTabsByTargetFromQueryData } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
+import { readRepoBranchQueryProjection } from '#/web/repo-branch-read-model.ts'
+import { restoredPreferredWorkspacePaneTabByTarget } from '#/web/session-persistence-state.ts'
+import { recordWithoutKey } from '#/shared/record.ts'
 
 interface InitialRepoRefresh {
   id: string
   repoRuntimeId: string
 }
 
-type RestorableWorkspaceLifecycleActions = Pick<ReposStore, 'hydrateRestoredWorkspaceRuntime'>
+type RestorableWorkspaceLifecycleActions = Pick<
+  ReposStore,
+  'hydrateRestoredWorkspaceRuntime' | 'promoteRestoredWorkspaceRepo'
+>
 
 function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet): RestorableWorkspaceLifecycleActions {
   return {
-    async hydrateRestoredWorkspaceRuntime(runtime: WorkspaceRuntimeRestoreSnapshot, options?: RepoSessionHydrationOptions) {
+    async hydrateRestoredWorkspaceRuntime(
+      runtime: WorkspaceRuntimeRestoreSnapshot,
+      options?: RepoSessionHydrationOptions,
+    ) {
       const { signal } = options ?? {}
       if (signal?.aborted) return
+      if (options && 'restoredSession' in options) {
+        set({ restoredSessionBaseline: options.restoredSession ?? null })
+      }
       const rankById = new Map<string, number>()
       runtime.repos.forEach((repo, index) => {
         if (!rankById.has(repo.repoRoot)) rankById.set(repo.repoRoot, index)
@@ -44,9 +62,20 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
       for (const restoredRepo of runtime.repos) {
         seedRepoProjectionQueryData(restoredRepo.repoRoot, restoredRepo.repoRuntimeId, restoredRepo.projection)
         set((s) => {
-          const { repos, order } = addResolvedRepo(s, resolvedRepoFromRestoredRuntime(restoredRepo), restoredRepo.repoRuntimeId, rankById)
+          const { repos, order } = addResolvedRepo(
+            s,
+            resolvedRepoFromRestoredRuntime(restoredRepo),
+            restoredRepo.repoRuntimeId,
+            rankById,
+          )
           const repo = repos[restoredRepo.repoRoot]
-          if (repo) initialRefreshes.push({ id: repo.id, repoRuntimeId: repo.repoRuntimeId })
+          // Stub leases (projection: null) skip the post-hydration projection
+          // refresh — that's the entire point of the active-only restore. The
+          // lazy `useRestoreRepoTabsOnView` hook fires the first refresh when
+          // the user navigates to a stub repo.
+          if (repo && isProjectedRestoredWorkspaceRepo(restoredRepo)) {
+            initialRefreshes.push({ id: repo.id, repoRuntimeId: repo.repoRuntimeId })
+          }
           const nextRestoredRepoId = restoredRepoIdAfterWorkspaceHydration(
             s.restoredRepoId,
             repos,
@@ -60,9 +89,21 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         acceptRepoProjectionReadModel(
           set,
           get,
-          { repoRoot: restoredRepo.repoRoot, repoRuntimeId: restoredRepo.repoRuntimeId, projection: restoredRepo.projection },
+          {
+            repoRoot: restoredRepo.repoRoot,
+            repoRuntimeId: restoredRepo.repoRuntimeId,
+            projection: restoredRepo.projection,
+          },
           { scope: 'repo-read-model' },
         )
+        if (isProjectedRestoredWorkspaceRepo(restoredRepo)) {
+          applyRestoredPreferredWorkspacePaneTabs(
+            set,
+            get,
+            restoredRepo.repoRoot,
+            tabsSnapshotForRepo(runtime, restoredRepo.repoRoot),
+          )
+        }
       }
       if (signal?.aborted) return
       set((s) => {
@@ -74,7 +115,93 @@ function createRestorableWorkspaceLifecycleActions(set: ReposSet, get: ReposGet)
         refreshInitialRepoState(set, get, initialRefresh)
       }
     },
+
+    promoteRestoredWorkspaceRepo(result: RepoWorkspaceTabsRestoreResult): boolean {
+      const restoredRepo = result.repo
+      let promoted = false
+      set((s) => {
+        const current = s.repos[restoredRepo.repoRoot]
+        if (
+          !current ||
+          current.repoRuntimeId !== restoredRepo.repoRuntimeId ||
+          current.session.projectionState !== 'stub'
+        ) {
+          return s
+        }
+        const { repos } = addResolvedRepo(s, resolvedRepoForStubPromotion(restoredRepo), restoredRepo.repoRuntimeId)
+        promoted = true
+        return repos === s.repos ? s : { repos }
+      })
+      if (!promoted) return false
+
+      seedRepoProjectionQueryData(restoredRepo.repoRoot, restoredRepo.repoRuntimeId, restoredRepo.projection)
+      writeWorkspacePaneTabsSnapshotQueryData(restoredRepo.repoRoot, restoredRepo.repoRuntimeId, result.snapshot)
+      acceptRepoProjectionReadModel(
+        set,
+        get,
+        {
+          repoRoot: restoredRepo.repoRoot,
+          repoRuntimeId: restoredRepo.repoRuntimeId,
+          projection: restoredRepo.projection,
+        },
+        { scope: 'repo-read-model' },
+      )
+      applyRestoredPreferredWorkspacePaneTabs(set, get, restoredRepo.repoRoot, result.snapshot)
+      return true
+    },
   }
+}
+
+function tabsSnapshotForRepo(runtime: WorkspaceRuntimeRestoreSnapshot, repoRoot: string) {
+  return runtime.workspacePaneTabs.find((entry) => entry.repoRoot === repoRoot)?.snapshot ?? null
+}
+
+function applyRestoredPreferredWorkspacePaneTabs(
+  set: ReposSet,
+  get: ReposGet,
+  repoRoot: string,
+  snapshot: RepoWorkspaceTabsRestoreResult['snapshot'],
+): void {
+  const state = get()
+  const repo = state.repos[repoRoot]
+  const branches = repo ? readRepoBranchQueryProjection(repo)?.branches : null
+  const restoredPreferred = state.restoredSessionBaseline?.preferredWorkspacePaneTabByTargetByRepo[repoRoot]
+  if (!repo || !branches || !restoredPreferred) return
+  const preferredWorkspacePaneTabByTarget = restoredPreferredWorkspacePaneTabByTarget(
+    repoRoot,
+    { branches },
+    restoredPreferred,
+    snapshot ? workspacePaneTabsByTargetFromQueryData(snapshot) : {},
+  )
+  set((current) => {
+    const currentRepo = current.repos[repoRoot]
+    if (!currentRepo || currentRepo.repoRuntimeId !== repo.repoRuntimeId) return current
+    const baseline = current.restoredSessionBaseline
+    return {
+      repos: {
+        ...current.repos,
+        [repoRoot]: {
+          ...currentRepo,
+          ui: {
+            ...currentRepo.ui,
+            preferredWorkspacePaneTabByTarget: {
+              ...preferredWorkspacePaneTabByTarget,
+              ...currentRepo.ui.preferredWorkspacePaneTabByTarget,
+            },
+          },
+        },
+      },
+      restoredSessionBaseline: baseline
+        ? {
+            ...baseline,
+            preferredWorkspacePaneTabByTargetByRepo: recordWithoutKey(
+              baseline.preferredWorkspacePaneTabByTargetByRepo,
+              repoRoot,
+            ),
+          }
+        : null,
+    }
+  })
 }
 
 export function createRepoSessionActions(set: ReposSet, get: ReposGet) {
@@ -89,5 +216,20 @@ function resolvedRepoFromRestoredRuntime(restored: RestoredWorkspaceRepoRuntime)
     id: restored.repoRoot,
     name: restored.name,
     ...(restored.target ? { target: restored.target } : {}),
+    session: {
+      entry: restored.entry,
+      projectionState: isProjectedRestoredWorkspaceRepo(restored) ? ('projected' as const) : ('stub' as const),
+    },
+  }
+}
+
+function resolvedRepoForStubPromotion(restored: RepoWorkspaceTabsRestoreResult['repo']) {
+  return {
+    id: restored.repoRoot,
+    name: restored.name,
+    session: {
+      entry: restored.entry,
+      projectionState: 'projected' as const,
+    },
   }
 }

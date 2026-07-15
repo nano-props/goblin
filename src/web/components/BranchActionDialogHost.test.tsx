@@ -374,7 +374,7 @@ describe('BranchActionDialogHost', () => {
       repo: { id: string }
       branchName: string
       force: boolean
-      alsoDeleteUpstream: boolean
+      deleteUpstream: boolean
     }
     // The dispatch must target repo B and the dialog's branch — NOT
     // the host's active (repoA, feature/host).
@@ -401,7 +401,7 @@ describe('BranchActionDialogHost', () => {
       confirmButton!.click()
     })
 
-    expect(dispatch.dispatchDeleteBranch).toHaveBeenCalledWith(expect.objectContaining({ alsoDeleteUpstream: true }))
+    expect(dispatch.dispatchDeleteBranch).toHaveBeenCalledWith(expect.objectContaining({ deleteUpstream: true }))
   })
 
   test('integration: clicking Confirm on a force-promoted dialog dispatches with force: true', async () => {
@@ -492,7 +492,7 @@ describe('BranchActionDialogHost', () => {
     expect(dispatch.dispatchRemoveWorktree).toHaveBeenCalledWith(
       expect.objectContaining({
         forceDeleteBranch: true,
-        alsoDeleteBranch: true,
+        deleteBranch: true,
       }),
     )
   })
@@ -518,7 +518,7 @@ describe('BranchActionDialogHost', () => {
     expect(useBranchActionDialogsStore.getState().deleteConfirm).toBeNull()
   })
 
-  test('integration: remove-worktree dialog forwards alsoDeleteBranch and alsoDeleteUpstream to dispatchRemoveWorktree', async () => {
+  test('integration: remove-worktree dialog forwards deleteBranch and deleteUpstream to dispatchRemoveWorktree', async () => {
     const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
     const { repo, branch } = setupRepo()
     act(() => {
@@ -540,8 +540,8 @@ describe('BranchActionDialogHost', () => {
 
     expect(dispatch.dispatchRemoveWorktree).toHaveBeenCalledWith(
       expect.objectContaining({
-        alsoDeleteBranch: true,
-        alsoDeleteUpstream: true,
+        deleteBranch: true,
+        deleteUpstream: true,
         forceDeleteBranch: false,
       }),
     )
@@ -552,7 +552,7 @@ describe('BranchActionDialogHost', () => {
     // deleteConfirm, toggle deleteAlsoUpstream=true, force-promote
     // (openForceDeleteConfirm), click Confirm on the force dialog,
     // and assert the dispatch receives both `force: true` and the
-    // user's original `alsoDeleteUpstream: true` choice — i.e.
+    // user's original `deleteUpstream: true` choice — i.e.
     // force-promote must NOT reset the checkbox state.
     const dispatch = await import('#/web/hooks/branchActionDispatch.ts')
     const { repo, branch } = setupRepo()
@@ -584,7 +584,7 @@ describe('BranchActionDialogHost', () => {
     expect(dispatch.dispatchDeleteBranch).toHaveBeenCalledWith(
       expect.objectContaining({
         force: true,
-        alsoDeleteUpstream: true,
+        deleteUpstream: true,
       }),
     )
   })

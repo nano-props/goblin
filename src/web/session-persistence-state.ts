@@ -1,6 +1,5 @@
 import {
   isWorkspacePaneStaticTabType,
-  isWorkspacePaneRuntimeTabEntry,
   isWorkspacePaneSessionTabType,
   type WorkspacePaneSessionTabType,
   type WorkspacePaneTabEntry,
@@ -10,7 +9,6 @@ import {
 import { parseWorkspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import {
   defaultWorkspacePaneTabs,
-  normalizeWorkspacePaneTabs,
   workspacePaneStaticTabsFromEntries,
 } from '#/web/workspace-pane/workspace-pane-tabs.ts'
 
@@ -49,7 +47,11 @@ export function persistedPreferredWorkspacePaneTabByTargetByRepoForSession(
       if (tab !== null && !isWorkspacePaneSessionTabType(tab)) continue
       if (tab !== null && target.kind === 'branch' && workspacePaneTabRequiresWorktree(tab)) continue
       const targetTabs = workspacePaneTabsByTargetByRepo[id]?.[targetKey] ?? defaultWorkspacePaneTabs()
-      if (tab !== null && isWorkspacePaneStaticTabType(tab) && !workspacePaneStaticTabsFromEntries(targetTabs).includes(tab))
+      if (
+        tab !== null &&
+        isWorkspacePaneStaticTabType(tab) &&
+        !workspacePaneStaticTabsFromEntries(targetTabs).includes(tab)
+      )
         continue
       byTarget[targetKey] = tab
     }
@@ -58,27 +60,25 @@ export function persistedPreferredWorkspacePaneTabByTargetByRepoForSession(
   return byRepo
 }
 
-export function persistedWorkspacePaneTabsByTargetByRepoForSession(
-  repos: Record<string, WorkspaceSessionRepoProjection | undefined>,
-  order: string[],
-  workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>,
-): Record<string, Record<string, WorkspacePaneTabEntry[]>> {
-  const byRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>> = {}
-  for (const id of order) {
-    const repo = repos[id]
-    if (!repo) continue
-    const byTarget: Record<string, WorkspacePaneTabEntry[]> = {}
-    for (const [targetKey, tabs] of Object.entries(workspacePaneTabsByTargetByRepo[id] ?? {})) {
-      const target = workspacePaneTabsTargetKeyBelongsToRepo(targetKey, id, repo)
-      if (!target) continue
-      byTarget[targetKey] = normalizeWorkspacePaneTabs(
-        tabs.filter((tab) => !isWorkspacePaneRuntimeTabEntry(tab)),
-        { hasWorktree: target.kind === 'worktree' },
-      )
-    }
-    if (Object.keys(byTarget).length > 0) byRepo[id] = byTarget
-  }
-  return byRepo
+export function restoredPreferredWorkspacePaneTabByTarget(
+  repoRoot: string,
+  repo: WorkspaceSessionRepoProjection,
+  preferredByTarget: Record<string, WorkspacePaneSessionTabType | null> | undefined,
+  workspacePaneTabsByTarget: Record<string, WorkspacePaneTabEntry[]>,
+): Record<string, WorkspacePaneSessionTabType | null> {
+  if (!preferredByTarget) return {}
+  return (
+    persistedPreferredWorkspacePaneTabByTargetByRepoForSession(
+      {
+        [repoRoot]: {
+          ...repo,
+          ui: { preferredWorkspacePaneTabByTarget: preferredByTarget },
+        },
+      },
+      [repoRoot],
+      { [repoRoot]: workspacePaneTabsByTarget },
+    )[repoRoot] ?? {}
+  )
 }
 
 function workspacePaneTabsTargetKeyBelongsToRepo(

@@ -1,4 +1,4 @@
-import type { FiletreeSessionViewState, WorkspaceSessionState } from '#/shared/api-types.ts'
+import type { ClientWorkspaceState, FiletreeSessionViewState } from '#/shared/api-types.ts'
 import {
   filetreeInteractionScopeKey,
   parseFiletreeInteractionScopeKey,
@@ -14,9 +14,9 @@ export function persistedFiletreeViewStateByWorktreeByRepoForSession(
   interactionByScope: Readonly<Record<string, FiletreeInteractionSnapshot>>,
   repos: Record<string, RepoWorktreeProjection | undefined>,
   order: readonly string[],
-): NonNullable<WorkspaceSessionState['filetreeViewStateByWorktreeByRepo']> {
+): ClientWorkspaceState['filetreeViewStateByWorktreeByRepo'] {
   const openRepoIds = new Set(order)
-  const byRepo: NonNullable<WorkspaceSessionState['filetreeViewStateByWorktreeByRepo']> = {}
+  const byRepo: ClientWorkspaceState['filetreeViewStateByWorktreeByRepo'] = {}
   for (const [scopeKey, snapshot] of Object.entries(interactionByScope)) {
     const scope = parseFiletreeInteractionScopeKey(scopeKey)
     if (!scope || !openRepoIds.has(scope.repoId)) continue
@@ -31,7 +31,7 @@ export function persistedFiletreeViewStateByWorktreeByRepoForSession(
 }
 
 export function restoreFiletreeViewStateFromSession(
-  filetreeViewStateByWorktreeByRepo: WorkspaceSessionState['filetreeViewStateByWorktreeByRepo'],
+  filetreeViewStateByWorktreeByRepo: ClientWorkspaceState['filetreeViewStateByWorktreeByRepo'],
 ): void {
   useFiletreeInteractionStore
     .getState()
@@ -39,7 +39,7 @@ export function restoreFiletreeViewStateFromSession(
 }
 
 function interactionByScopeFromSessionViewState(
-  filetreeViewStateByWorktreeByRepo: WorkspaceSessionState['filetreeViewStateByWorktreeByRepo'],
+  filetreeViewStateByWorktreeByRepo: ClientWorkspaceState['filetreeViewStateByWorktreeByRepo'],
 ): Record<string, FiletreeInteractionSnapshot> {
   const interactionByScope: Record<string, FiletreeInteractionSnapshot> = {}
   for (const [repoId, byWorktree] of Object.entries(filetreeViewStateByWorktreeByRepo)) {

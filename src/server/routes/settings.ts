@@ -1,8 +1,8 @@
 import { getServerExternalAppsSnapshot } from '#/server/modules/external-apps.ts'
 import { getServerGitHubCliState } from '#/server/modules/github-cli.ts'
 import { getSettingsSnapshot } from '#/server/modules/settings-snapshot.ts'
-import { getUserSettings } from '#/server/modules/settings-source.ts'
-import { restoreServerWorkspaceSession } from '#/server/modules/session-restore.ts'
+import { addServerWorkspaceRepo, getUserSettings, removeServerWorkspaceRepo } from '#/server/modules/settings-source.ts'
+import { restoreRepoTabsForRepo, restoreServerWorkspace } from '#/server/modules/session-restore.ts'
 import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import {
@@ -11,7 +11,6 @@ import {
   handleAddRecentRepo,
   handleClearRecentRepos,
   handleSetRepoWorkspaceExternalAppRecent,
-  handleSetSession,
   handleUpdateUserSettings,
 } from '#/server/modules/settings-write-paths.ts'
 import { getLanUrls, isLanAddress } from '#/shared/lan-addresses.ts'
@@ -68,15 +67,46 @@ export function createSettingsRoutes(options: {
     const { registered } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.globalShortcutState, c)
     return c.json(handleSetGlobalShortcutRegistered({ registered }, settingsState))
   })
-  app.post('/session', async (c) => {
-    const { session } = await parseHttpBody(SETTINGS_PATCH_SCHEMAS.session, c)
-    return c.json(await handleSetSession({ session }))
-  })
-  app.post('/session/restore', async (c) => {
+  app.post('/workspace/restore', async (c) => {
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
-    const { clientId } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.sessionRestore, c)
-    return c.json(await restoreServerWorkspaceSession({ userId, clientId, workspacePaneTabsHost, signal: c.req.raw.signal }))
+    const { clientId, activeRepoRoot } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.workspaceRestore, c)
+    return c.json(
+      await restoreServerWorkspace({
+        userId,
+        clientId,
+        activeRepoRoot: activeRepoRoot ?? null,
+        workspacePaneTabsHost,
+        signal: c.req.raw.signal,
+      }),
+    )
+  })
+  app.post('/workspace/repos/add', async (c) => {
+    const userId = userIdFromContext(c)
+    if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
+    const { entry } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.workspaceRepoAdd, c)
+    return c.json(await addServerWorkspaceRepo(entry))
+  })
+  app.post('/workspace/repos/remove', async (c) => {
+    const userId = userIdFromContext(c)
+    if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
+    const { repoRoot } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.workspaceRepoRemove, c)
+    return c.json(await removeServerWorkspaceRepo(repoRoot))
+  })
+  app.post('/workspace/restore-repo-tabs', async (c) => {
+    const userId = userIdFromContext(c)
+    if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
+    const { clientId, repoRoot, repoRuntimeId } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.restoreRepoTabs, c)
+    return c.json(
+      await restoreRepoTabsForRepo({
+        userId,
+        clientId,
+        repoRoot,
+        repoRuntimeId,
+        workspacePaneTabsHost,
+        signal: c.req.raw.signal,
+      }),
+    )
   })
   app.post('/recent-repos/add', async (c) => {
     const { repo } = await parseHttpBody(SETTINGS_PROCEDURE_SCHEMAS.recentReposAdd, c)

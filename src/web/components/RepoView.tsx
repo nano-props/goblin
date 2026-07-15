@@ -11,8 +11,10 @@ import {
 } from '#/web/components/Skeleton.tsx'
 import { RepoWorkspacePane } from '#/web/components/Layout.tsx'
 import { useRepoToasts } from '#/web/hooks/useRepoToasts.tsx'
+import { useRestoreRepoTabsOnView } from '#/web/hooks/useRestoreRepoTabsOnView.ts'
 import { getRepoWorkspacePresentation } from '#/web/components/repo-workspace/model.ts'
 import { UnavailableRepoView } from '#/web/components/UnavailableRepoView.tsx'
+import { RepoProjectionFailureView } from '#/web/components/RepoProjectionFailureView.tsx'
 import { useResponsiveUiMode } from '#/web/hooks/useResponsiveUiMode.tsx'
 import { WORKSPACE_PANE_TRANSITION_MS } from '#/web/components/workspace-motion.ts'
 import { useRetainedValueDuringExit } from '#/web/hooks/useRetainedValueDuringExit.ts'
@@ -75,6 +77,7 @@ export function RepoView({
   const setWorkspacePaneSize = useReposStore((s) => s.setWorkspacePaneSize)
   const repo = useReposStore((s) => s.repos[repoId])
   useRepoToasts(repoId)
+  const projectionRestore = useRestoreRepoTabsOnView({ repoId: repo ? repoId : null })
 
   const routeBranchName = routeView?.kind === 'branch' ? routeView.branchName : null
 
@@ -178,7 +181,36 @@ export function RepoView({
     )
   }
 
-  if (view.initialLoading) {
+  if (repo.session.projectionState === 'stub' && projectionRestore.state.phase === 'failed') {
+    const failure = (
+      <RepoProjectionFailureView
+        repo={repo}
+        message={projectionRestore.state.message}
+        onRetry={projectionRestore.retry}
+      />
+    )
+    return (
+      <RepoLayoutWorkspaceShell
+        repoId={repoId}
+        compact={compact}
+        zenMode={view.zenMode}
+        repoWorkspaceActive={repoWorkspaceActive}
+        workspacePaneSize={view.workspacePaneSize}
+        onWorkspacePaneSizeChange={setWorkspacePaneSize}
+        sidebarPane={renderSidebarPane(compact ? failure : undefined)}
+        zenRevealSidebarPane={renderSidebarPane(undefined, 'none')}
+        repoWorkspacePane={
+          <RepoWorkspacePane>
+            <WorkspaceChrome trafficLightOffset={workspaceTrafficLightOffset} />
+            {failure}
+          </RepoWorkspacePane>
+        }
+        singlePaneActivePane={compact ? 'navigator' : singlePane}
+      />
+    )
+  }
+
+  if (repo.session.projectionState === 'stub' || view.initialLoading) {
     return (
       <RepoLayoutWorkspaceShell
         repoId={repoId}

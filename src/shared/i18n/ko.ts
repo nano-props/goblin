@@ -757,4 +757,6 @@ export const ko: Record<DictKey, string> = {
   'auth.gate.signing-in': '로그인 중…',
   'auth.gate.error-empty': '접근 토큰을 입력하세요',
   'auth.gate.error-failed': '로그인 실패',
+  'lazy-restore.failed': '저장소를 열 수 없습니다',
+  'workspace-restore.failed': '작업 공간을 복원할 수 없습니다',
 }

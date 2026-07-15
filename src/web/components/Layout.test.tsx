@@ -13,6 +13,7 @@ import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticate
 
 const restoringWorkspaceState: AuthenticatedAppBootstrapState = { status: 'restoring-workspace' }
 const readyState: AuthenticatedAppBootstrapState = { status: 'ready' }
+const failedState: AuthenticatedAppBootstrapState = { status: 'failed', message: 'restore failed' }
 const layoutRouterMock = vi.hoisted(() => ({
   pathname: '/settings/general',
   href: '/settings/general',
@@ -44,7 +45,7 @@ vi.mock('#/web/hooks/usePublicAppBootstrap.ts', () => ({
 }))
 
 vi.mock('#/web/hooks/useAuthenticatedAppBootstrap.ts', () => ({
-  useAuthenticatedAppBootstrap: () => ({ status: 'ready' }),
+  useAuthenticatedAppBootstrap: () => ({ state: { status: 'ready' }, retry: vi.fn() }),
 }))
 
 vi.mock('#/web/hooks/useSettingsWriteErrorToast.ts', () => ({
@@ -236,6 +237,7 @@ describe('authenticatedAppShellMode', () => {
     expect(authenticatedAppShellMode('/', restoringWorkspaceState)).toBe('workspace-restore')
     expect(authenticatedAppShellMode('/repo/repo/dashboard', restoringWorkspaceState)).toBe('workspace-restore')
     expect(authenticatedAppShellMode('/repo/repo/dashboard', readyState)).toBe('workspace-ready')
+    expect(authenticatedAppShellMode('/repo/repo/dashboard', failedState)).toBe('workspace-failed')
   })
 })
 

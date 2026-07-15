@@ -103,7 +103,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
     [refreshWorkspacePaneTabsForScope, terminalProjection],
   )
 
-  useEffect(() => () => scopeRegistry.dispose(), [scopeRegistry])
+  useEffect(() => () => scopeRegistry.disposeScopes(), [scopeRegistry])
 
   useEffect(() => {
     const onVisibilityChange = () => {

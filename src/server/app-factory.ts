@@ -19,11 +19,15 @@ import { createRepoRoutes } from '#/server/routes/repo.ts'
 import { createRepoViewRoutes } from '#/server/routes/repo-view.ts'
 import { createSettingsRoutes } from '#/server/routes/settings.ts'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
-import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import type {
+  ServerWorkspacePaneTabsHost,
+  ServerWorkspacePaneTargetLifecycleHost,
+} from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import { getServerI18nSnapshot } from '#/server/modules/i18n.ts'
 import { MAX_PASTE_BATCH_BYTES } from '#/shared/clipboard-paste.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
+import { createRepoMutationApplication } from '#/server/repo-mutation/repo-mutation-application.ts'
 
 export interface ServerAppOptions {
   version: string
@@ -36,7 +40,7 @@ export interface ServerAppOptions {
    */
   accessToken: string
   appRealtimeHost: ServerAppRealtimeHost
-  workspacePaneTabsHost: ServerWorkspacePaneTabsHost
+  workspacePaneTabsHost: ServerWorkspacePaneTabsHost & ServerWorkspacePaneTargetLifecycleHost
   worktreeRemovalApplication: ServerWorktreeRemovalHost
   /**
    * The actual host the server is listening on. Used by the CORS
@@ -223,7 +227,13 @@ export function createApp(options: ServerAppOptions): Hono {
   // (home directory path + platform identifier).
   app.route('/api/host', createHostRoutes())
   app.route('/api/remote', createRemoteRoutes())
-  app.route('/api/repo', createRepoRoutes({ worktreeRemovalApplication: options.worktreeRemovalApplication }))
+  app.route(
+    '/api/repo',
+    createRepoRoutes({
+      worktreeRemovalApplication: options.worktreeRemovalApplication,
+      repoMutationApplication: createRepoMutationApplication({ workspacePaneTabs: options.workspacePaneTabsHost }),
+    }),
+  )
   app.route('/api/repo', createRepoViewRoutes())
   app.route('/api/clipboard', createClipboardRoutes())
   app.route('/ws', createRealtimeRoutes({ accessToken: options.accessToken, appRealtimeHost: options.appRealtimeHost }))

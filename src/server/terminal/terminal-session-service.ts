@@ -7,7 +7,11 @@ import {
   type TerminalSessionsSnapshot,
 } from '#/shared/terminal-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
-import type { WorkspacePaneTabsSnapshot, WorkspacePaneTabsUpdateInput } from '#/shared/workspace-pane-tabs.ts'
+import type {
+  WorkspacePaneTabsEntry,
+  WorkspacePaneTabsSnapshot,
+  WorkspacePaneTabsUpdateInput,
+} from '#/shared/workspace-pane-tabs.ts'
 import { isValidTerminalClientId, isValidTerminalSize } from '#/shared/terminal-validators.ts'
 import { createTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import { terminalSessionRuntimeScope, terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
@@ -16,6 +20,7 @@ import {
   type WorkspacePaneTabsCoordinator,
   type WorkspacePaneRuntimeTabsProvider,
 } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
+import type { WorkspacePaneTabsTargetIdentity } from '#/shared/workspace-pane-tabs-target.ts'
 import { createTerminalSessionCreateCoordinator } from '#/server/terminal/terminal-session-create-coordinator.ts'
 import {
   createTerminalSessionEnsurer,
@@ -171,6 +176,31 @@ class TerminalSessionService {
     })
   }
 
+  async initializeTabs(
+    userId: string,
+    input: { repoRoot: string; repoRuntimeId: string; entries: WorkspacePaneTabsEntry[] },
+  ): Promise<WorkspacePaneTabsSnapshot> {
+    if (!isValidRepoLocator(input.repoRoot)) return emptyWorkspacePaneTabsSnapshot()
+    for (const entry of input.entries) {
+      if (entry.repoRoot !== input.repoRoot) return emptyWorkspacePaneTabsSnapshot()
+      if (!isValidBranch(entry.branchName)) return emptyWorkspacePaneTabsSnapshot()
+      if (entry.worktreePath !== null && !isValidCwd(entry.worktreePath)) return emptyWorkspacePaneTabsSnapshot()
+    }
+    const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
+    return await this.workspaceTabsCoordinator.initializeScope({
+      userId,
+      repoRoot: input.repoRoot,
+      scope,
+      entries: input.entries.map((entry) => ({
+        branchName: entry.branchName,
+        worktreePath:
+          entry.worktreePath === null ? null : terminalSessionWorktreePath(input.repoRoot, entry.worktreePath),
+        tabs: entry.tabs,
+      })),
+      assertCurrent: () => this.assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId),
+    })
+  }
+
   async updateTabs(userId: string, input: WorkspacePaneTabsUpdateInput): Promise<WorkspacePaneTabsSnapshot> {
     if (!isValidRepoLocator(input.repoRoot)) return emptyWorkspacePaneTabsSnapshot()
     if (!isValidBranch(input.branchName)) return emptyWorkspacePaneTabsSnapshot()
@@ -187,6 +217,25 @@ class TerminalSessionService {
       worktreePath,
       operation: input.operation,
       assertCurrent: () => this.assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId),
+    })
+  }
+
+  async retireTarget(
+    userId: string,
+    input: { repoRuntimeId: string; target: WorkspacePaneTabsTargetIdentity },
+  ): Promise<WorkspacePaneTabsSnapshot> {
+    const { repoRoot } = input.target
+    const validTarget =
+      input.target.kind === 'branch' ? isValidBranch(input.target.branchName) : isValidCwd(input.target.worktreePath)
+    if (!isValidRepoLocator(repoRoot) || !validTarget) {
+      throw new Error('invalid workspace pane target')
+    }
+    const scope = terminalSessionRuntimeScope(repoRoot, input.repoRuntimeId)
+    return await this.workspaceTabsCoordinator.retireTarget({
+      userId,
+      scope,
+      target: input.target,
+      assertCurrent: () => this.assertCurrentRepoRuntime(userId, repoRoot, input.repoRuntimeId),
     })
   }
 

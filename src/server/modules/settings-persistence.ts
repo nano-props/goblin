@@ -34,11 +34,13 @@ export async function readUserSettingsJson(): Promise<unknown | null> {
     const raw = await readFile(file, 'utf-8')
     return JSON.parse(raw)
   } catch (err) {
-    if (err instanceof SyntaxError) await quarantineCorruptSettingsFile(file, err)
-    else if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
-      serverNodeLog.warn({ err, file }, 'failed to read settings file')
+    if (err instanceof SyntaxError) {
+      await quarantineCorruptSettingsFile(file, err)
+      return null
     }
-    return null
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null
+    serverNodeLog.warn({ err, file }, 'failed to read settings file')
+    throw err
   }
 }
 

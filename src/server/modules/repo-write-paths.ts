@@ -110,7 +110,7 @@ function publishRepoSnapshotInvalidation(cwd: string): void {
 
 async function publishSnapshotInvalidationAfterMutation(cwd: string, result: RepoMutationResult): Promise<ExecResult> {
   const affectedRepoIds = result.affectedRepoIds ?? []
-  if (!result.ok && !result.repoChanged && affectedRepoIds.length === 0) return execResultOnly(result)
+  if (!result.ok && !result.repositoryStateChanged && affectedRepoIds.length === 0) return execResultOnly(result)
   publishRepoSnapshotInvalidations(cwd, affectedRepoIds)
   return execResultOnly(result)
 }
@@ -307,10 +307,20 @@ export async function pullRepoBranch(
   signal?: AbortSignal,
   options: { repoRuntimeId?: string } = {},
 ): Promise<ExecResult> {
-  const source = await resolveRepoSource(cwd, options.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined)
-  return await runUserNetworkMutation(cwd, signal, 'pull', { branch, worktreePath }, async (mergedSignal) => {
-    return await source.pull(branch, worktreePath, mergedSignal)
-  }, options)
+  const source = await resolveRepoSource(
+    cwd,
+    options.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined,
+  )
+  return await runUserNetworkMutation(
+    cwd,
+    signal,
+    'pull',
+    { branch, worktreePath },
+    async (mergedSignal) => {
+      return await source.pull(branch, worktreePath, mergedSignal)
+    },
+    options,
+  )
 }
 
 export async function pushRepoBranch(
@@ -319,10 +329,20 @@ export async function pushRepoBranch(
   signal?: AbortSignal,
   options: { repoRuntimeId?: string } = {},
 ): Promise<ExecResult> {
-  const source = await resolveRepoSource(cwd, options.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined)
-  return await runUserNetworkMutation(cwd, signal, 'push', { branch }, async (mergedSignal) => {
-    return await source.push(branch, mergedSignal)
-  }, options)
+  const source = await resolveRepoSource(
+    cwd,
+    options.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined,
+  )
+  return await runUserNetworkMutation(
+    cwd,
+    signal,
+    'push',
+    { branch },
+    async (mergedSignal) => {
+      return await source.push(branch, mergedSignal)
+    },
+    options,
+  )
 }
 
 export async function createRepoWorktree(
@@ -347,13 +367,21 @@ export async function createRepoWorktree(
     target: { branch: createWorktreeTargetBranch(normalized), worktreePath: normalized.worktreePath },
     signal,
     task: async () => {
-      return await runWithRepoSource(cwd, async (source) => {
-        const result = await source.createWorktree(normalized, signal, {
-          worktreeBootstrap,
-        })
-        const trustSyncedResult = await syncWorktreeBootstrapTrustAfterSuccessfulRun(repoId, worktreeBootstrap, result)
-        return await publishSnapshotInvalidationAfterMutation(cwd, trustSyncedResult)
-      }, options?.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined)
+      return await runWithRepoSource(
+        cwd,
+        async (source) => {
+          const result = await source.createWorktree(normalized, signal, {
+            worktreeBootstrap,
+          })
+          const trustSyncedResult = await syncWorktreeBootstrapTrustAfterSuccessfulRun(
+            repoId,
+            worktreeBootstrap,
+            result,
+          )
+          return await publishSnapshotInvalidationAfterMutation(cwd, trustSyncedResult)
+        },
+        options?.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined,
+      )
     },
   })
 }
@@ -379,7 +407,7 @@ async function syncWorktreeBootstrapTrustAfterSuccessfulRun(
     }
     return result
   } catch {
-    return { ...result, ok: false, message: 'error.settings-write-title', repoChanged: true }
+    return { ...result, ok: false, message: 'error.settings-write-title', repositoryStateChanged: true }
   }
 }
 
@@ -398,7 +426,7 @@ export async function getRepoRemoteBranches(
 export async function deleteRepoBranch(
   cwd: string,
   branch: string,
-  options?: { force?: boolean; alsoDeleteUpstream?: boolean },
+  options?: { force?: boolean; deleteUpstream?: boolean },
   signal?: AbortSignal,
   runtime?: { repoRuntimeId?: string },
 ): Promise<ExecResult> {
@@ -409,9 +437,13 @@ export async function deleteRepoBranch(
     target: { branch },
     signal,
     task: async () => {
-      return await runWithRepoSource(cwd, async (source) => {
-        return await publishSnapshotInvalidationAfterMutation(cwd, await source.deleteBranch(branch, options, signal))
-      }, runtime?.repoRuntimeId ? { repoRuntimeId: runtime.repoRuntimeId } : undefined)
+      return await runWithRepoSource(
+        cwd,
+        async (source) => {
+          return await publishSnapshotInvalidationAfterMutation(cwd, await source.deleteBranch(branch, options, signal))
+        },
+        runtime?.repoRuntimeId ? { repoRuntimeId: runtime.repoRuntimeId } : undefined,
+      )
     },
   })
 }
@@ -421,9 +453,9 @@ export async function removeRepoWorktree(
   input: {
     branch: string
     worktreePath: string
-    alsoDeleteBranch: boolean
+    deleteBranch: boolean
     forceDeleteBranch?: boolean
-    alsoDeleteUpstream?: boolean
+    deleteUpstream?: boolean
   },
   lifecycle: RepoWorktreeRemovalLifecycle,
   signal?: AbortSignal,
@@ -436,9 +468,9 @@ export async function removeCapturedRepoWorktree(
   input: {
     branch: string
     worktreePath: string
-    alsoDeleteBranch: boolean
+    deleteBranch: boolean
     forceDeleteBranch?: boolean
-    alsoDeleteUpstream?: boolean
+    deleteUpstream?: boolean
   },
   lifecycle: RepoWorktreeRemovalLifecycle,
   physicalWorktreeCapability: PhysicalWorktreeCapability,
@@ -453,9 +485,9 @@ async function removeRepoWorktreeWithBinding(
   input: {
     branch: string
     worktreePath: string
-    alsoDeleteBranch: boolean
+    deleteBranch: boolean
     forceDeleteBranch?: boolean
-    alsoDeleteUpstream?: boolean
+    deleteUpstream?: boolean
   },
   lifecycle: RepoWorktreeRemovalLifecycle,
   signal: AbortSignal | undefined,
@@ -478,11 +510,15 @@ async function removeRepoWorktreeWithBinding(
               options.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined,
             )
         : async <T>(task: Parameters<typeof runWithRepoSource<T>>[1]) =>
-            await runWithRepoSource(cwd, task, options.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined)
+            await runWithRepoSource(
+              cwd,
+              task,
+              options.repoRuntimeId ? { repoRuntimeId: options.repoRuntimeId } : undefined,
+            )
       return await runWithSource(async (source) => {
         const mutation = await source.removeWorktree(input, signal, lifecycle)
         const result = await publishSnapshotInvalidationAfterMutation(cwd, mutation)
-        if (!mutation.ok && !mutation.repoChanged) return result
+        if (!mutation.ok && !mutation.repositoryStateChanged) return result
         try {
           const changed = await pruneServerRepoSettingsForRemovedWorktree({
             repoId: cwd,
@@ -497,7 +533,7 @@ async function removeRepoWorktreeWithBinding(
             )
             return result
           }
-          return { ...result, ok: false, message: 'error.settings-write-title', repoChanged: true }
+          return { ...result, ok: false, message: 'error.settings-write-title', repositoryStateChanged: true }
         }
         return result
       })
@@ -526,7 +562,8 @@ export async function openRepoTerminal(
   signal?: AbortSignal,
   options: { repoRuntimeId?: string } = {},
 ): Promise<ExecResult> {
-  if (isRemoteRepoId(repoId)) return await openServerRemoteTerminal({ repoId, worktreePath, app, repoRuntimeId: options.repoRuntimeId }, signal)
+  if (isRemoteRepoId(repoId))
+    return await openServerRemoteTerminal({ repoId, worktreePath, app, repoRuntimeId: options.repoRuntimeId }, signal)
   return await openInPreferredTerminal(worktreePath, app)
 }
 
@@ -537,7 +574,8 @@ export async function openRepoEditor(
   signal?: AbortSignal,
   options: { repoRuntimeId?: string } = {},
 ): Promise<ExecResult> {
-  if (isRemoteRepoId(repoId)) return await openServerRemoteEditor({ repoId, worktreePath, app, repoRuntimeId: options.repoRuntimeId }, signal)
+  if (isRemoteRepoId(repoId))
+    return await openServerRemoteEditor({ repoId, worktreePath, app, repoRuntimeId: options.repoRuntimeId }, signal)
   return await openInPreferredEditor(worktreePath, app)
 }
 

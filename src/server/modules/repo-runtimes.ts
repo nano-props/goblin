@@ -103,7 +103,11 @@ export function acquireRepoRuntimeLease(
   return lease
 }
 
-function acquireRepoRuntimeMembership(userId: string, repoRoot: string, clientId: string): RepoRuntimeMembershipLeaseEntry {
+function acquireRepoRuntimeMembership(
+  userId: string,
+  repoRoot: string,
+  clientId: string,
+): RepoRuntimeMembershipLeaseEntry {
   if (!repoRoot) throw new Error('repo runtime open requires repoRoot')
   if (!clientId) throw new Error('repo runtime acquire requires clientId')
   const state = repoRuntimeState(userId, repoRoot)
@@ -263,6 +267,16 @@ export function isCurrentRepoRuntime(userId: string, repoRoot: string, repoRunti
   return repoRuntimesByUser.get(userId)?.get(repoRoot)?.currentRepoRuntimeId === repoRuntimeId
 }
 
+export function isCurrentRepoRuntimeMembership(
+  userId: string,
+  repoRoot: string,
+  repoRuntimeId: string,
+  clientId: string,
+): boolean {
+  const state = repoRuntimesByUser.get(userId)?.get(repoRoot)
+  return state?.currentRepoRuntimeId === repoRuntimeId && state.members.has(clientId)
+}
+
 export function failRepoRemoteLifecycle(input: {
   userId: string
   repoRoot: string
@@ -303,7 +317,7 @@ export async function runRepoRemoteLifecycle(
   if (mode === 'ensure') {
     const joined = await joinRepoRemoteLifecycleAttempt(state, repoRuntimeId)
     if (joined) return joined
-    if (state.remoteLifecycle.kind === 'ready' || state.remoteLifecycle.kind === 'failed') {
+    if (state.remoteLifecycle.kind === 'ready') {
       return settledRepoRemoteLifecycleResult(state, repoRoot)
     }
   }

@@ -1,12 +1,11 @@
 import type { StoreApi } from 'zustand'
-import type {
-  BranchSnapshotInfo,
-  BrowserRemoteProvider,
-  ExecResult,
-  GitRemoteInfo,
-} from '#/web/types.ts'
+import type { BranchSnapshotInfo, BrowserRemoteProvider, ExecResult, GitRemoteInfo } from '#/web/types.ts'
 import type { RemoteRepoConnectionLifecycle, RepoSessionEntry } from '#/shared/remote-repo.ts'
-import type { WorkspaceRuntimeRestoreSnapshot, WorkspaceSessionState } from '#/shared/api-types.ts'
+import type {
+  ClientWorkspaceState,
+  RepoWorkspaceTabsRestoreResult,
+  WorkspaceRuntimeRestoreSnapshot,
+} from '#/shared/api-types.ts'
 import type { WorkspacePaneTabType } from '#/shared/workspace-pane.ts'
 import type { RepoBranchAction, RunBranchActionOptions } from '#/web/stores/repos/branch-action-types.ts'
 import type { RepoOperationsState } from '#/web/stores/repos/operations.ts'
@@ -22,7 +21,7 @@ export type RepoEventAction =
   | { kind: 'push'; branch: string }
   | { kind: 'createWorktree'; branch: string; worktreePath: string }
   | { kind: 'deleteBranch'; branch: string }
-  | { kind: 'removeWorktree'; branch: string; worktreePath: string; alsoDeleteBranch: boolean }
+  | { kind: 'removeWorktree'; branch: string; worktreePath: string; deleteBranch: boolean }
 
 export interface RepoResultEventOptions {
   action?: RepoEventAction
@@ -42,6 +41,8 @@ export interface OpenRepoPostOpenError {
 
 export type OpenRepoResult =
   { ok: true; id: string; postOpenEffects?: Promise<OpenRepoPostOpenError[]> } | { ok: false; message: string }
+
+export type CloseRepoResult = { ok: true } | { ok: false; message: string }
 
 export interface RepoWorktreeState {
   path: string
@@ -94,6 +95,17 @@ export interface RepoRemoteState {
   fetchError: string | null
 }
 
+export type RepoSessionProjectionState = 'projected' | 'stub'
+
+export interface RepoSessionState {
+  /** Canonical session entry for the workspace shell. Remote stubs only know a
+   *  ref, not a resolved target, so the entry must be preserved directly. */
+  entry: RepoSessionEntry | null
+  /** Whether target-scoped session state is client-owned yet. Stub repos keep
+   *  the server baseline until the repo is projected on view. */
+  projectionState: RepoSessionProjectionState
+}
+
 type RepoAvailabilityState = { phase: 'available' } | { phase: 'unavailable'; reason: string; checkedAt: number }
 
 export interface RepoSnapshotCacheEntry {
@@ -116,6 +128,7 @@ export interface RepoState {
   operations: RepoOperationsState
   ui: RepoUiState
   projection: RepoProjectionMeta
+  session: RepoSessionState
   remote: RepoRemoteState
   availability: RepoAvailabilityState
   events: RepoEvent[]
@@ -132,20 +145,20 @@ interface RepoSnapshotCacheState {
 }
 
 export interface RestorableWorkspaceState {
-  /** Client workspace UI state that is serialized into WorkspaceSessionState for
+  /** Client workspace UI state that is serialized into ClientWorkspaceState for
    *  next-launch restore. This is restorable state, not runtime-coherent
    *  shared state. */
-  /** Open repository order restored from WorkspaceSessionState.openRepoEntries. */
+  /** Open repository order restored from the server workspace. */
   order: string[]
   /**
-   * Session repo restored from WorkspaceSessionState.restoredRepoId.
+   * Session repo restored from ClientWorkspaceState.restoredRepoId.
    * The route owns the current repo.
    */
   restoredRepoId: string | null
-  /** Large-screen Zen Mode restored from WorkspaceSessionState. Compact UI is stronger and always shows one pane at a time. */
+  /** Large-screen Zen Mode restored from ClientWorkspaceState. Compact UI is stronger and always shows one pane at a time. */
   zenMode: boolean
   workspacePaneSize: number
-  /** Per worktree terminal selection restored from WorkspaceSessionState.selectedTerminalSessionIdByTerminalWorktree. */
+  /** Per worktree terminal selection restored from ClientWorkspaceState.selectedTerminalSessionIdByTerminalWorktree. */
   selectedTerminalSessionIdByTerminalWorktree: Record<string, string>
 }
 
@@ -181,23 +194,26 @@ export interface WorkspaceNavigationHistoryTraversal {
 
 export interface RepoSessionHydrationOptions {
   signal?: AbortSignal
+  restoredSession?: ClientWorkspaceState
 }
 
 interface LocalWorkspaceState {
   /** Client-only workspace UI state that should never be serialized into
-   *  WorkspaceSessionState or treated as restorable workspace state. */
+   *  ClientWorkspaceState or treated as restorable workspace state. */
   /** Workspace membership restore flag. True once boot session entries have
    *  produced the placeholder repo set (or proved there are no repos), so the
    *  workspace shell can render without overwriting the saved session with an
    *  empty one before restore. Repo content hydration may still be running. */
   workspaceMembershipReady: boolean
   /** Persistence gate — true only after all boot-restored state that can
-   *  affect WorkspaceSessionState has converged back into the client store. */
+   *  affect ClientWorkspaceState has converged back into the client store. */
   sessionPersistenceReady: boolean
   /** Boot restore failure that blocks session persistence. UI can render, but
    *  persisted workspace state must not be overwritten until the restore issue
    *  is resolved by a successful boot. */
   sessionRestoreError: string | null
+  /** Client-owned state from boot restore, retained while repos remain stubs. */
+  restoredSessionBaseline: ClientWorkspaceState | null
   /** Chrome-tab-style "opener" tracking, covering every workspace pane tab
    *  (static and terminal): maps a tab's identity (see
    *  `workspacePaneTabEntryIdentity`) to the identity of the tab that was
@@ -225,15 +241,12 @@ interface LocalWorkspaceActions {
     entry: WorkspaceNavigationHistoryEntry,
     options?: { replace?: boolean; browserHistoryTraversal?: 'back' | 'forward' },
   ) => void
-  peekWorkspaceNavigation: (
-    repoId: string,
-    direction: 'back' | 'forward',
-  ) => WorkspaceNavigationHistoryTraversal | null
+  peekWorkspaceNavigation: (repoId: string, direction: 'back' | 'forward') => WorkspaceNavigationHistoryTraversal | null
   commitWorkspaceNavigation: (traversal: WorkspaceNavigationHistoryTraversal) => boolean
 }
 
 interface RestorableWorkspaceActions {
-  applySessionLayoutState: (layout: Pick<WorkspaceSessionState, 'zenMode' | 'workspacePaneSize'>) => void
+  applySessionLayoutState: (layout: Pick<ClientWorkspaceState, 'zenMode' | 'workspacePaneSize'>) => void
   applySessionSelectedTerminalState: (selectedTerminalSessionIdByTerminalWorktree: Record<string, string>) => void
   setZenMode: (enabled: boolean) => void
   toggleZenMode: () => void
@@ -246,7 +259,7 @@ interface RuntimeCoherentRepoProjectionActions {
   /** Ensure a repo belongs to the open workspace set without implying
    *  anything about the current active selection. */
   ensureWorkspaceOpen: (path: string | RepoSessionEntry) => Promise<OpenRepoResult>
-  closeRepo: (id: string) => void
+  closeRepo: (id: string) => Promise<CloseRepoResult>
   /**
    * Re-probe a remote repo's lifecycle. The single user-facing
    * entry point for "retry" (and the only path the
@@ -268,6 +281,7 @@ interface RuntimeCoherentRepoProjectionActions {
     runtime: WorkspaceRuntimeRestoreSnapshot,
     options?: RepoSessionHydrationOptions,
   ) => Promise<void>
+  promoteRestoredWorkspaceRepo: (result: RepoWorkspaceTabsRestoreResult) => boolean
   /** Clear the fetchFailed flag — called by manual fetch success and
    *  by an explicit refresh, so a stale badge doesn't follow the user
    *  around forever. */

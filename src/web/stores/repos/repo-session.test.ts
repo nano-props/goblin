@@ -48,6 +48,97 @@ describe('repo lifecycle', () => {
     ])
   })
 
+  test('ensureWorkspaceOpen rolls back a newly opened runtime when shared membership persistence fails', async () => {
+    installGoblin({
+      'settings.addWorkspaceRepo': () => {
+        throw new Error('workspace write failed')
+      },
+    })
+
+    await expect(useReposStore.getState().ensureWorkspaceOpen(REPO_A)).resolves.toEqual({
+      ok: false,
+      message: 'error.failed-read-repo',
+    })
+    expect(useReposStore.getState().repos[REPO_A]).toBeUndefined()
+    expect(useReposStore.getState().order).not.toContain(REPO_A)
+  })
+
+  test('closeRepo keeps local state when shared membership persistence fails', async () => {
+    installGoblin({
+      'settings.removeWorkspaceRepo': () => {
+        throw new Error('workspace write failed')
+      },
+    })
+    await expect(useReposStore.getState().ensureWorkspaceOpen(REPO_A)).resolves.toMatchObject({ ok: true })
+    const repoRuntimeId = useReposStore.getState().repos[REPO_A]!.repoRuntimeId
+
+    await expect(useReposStore.getState().closeRepo(REPO_A)).resolves.toEqual({
+      ok: false,
+      message: 'error.failed-read-repo',
+    })
+
+    expect(useReposStore.getState().repos[REPO_A]?.repoRuntimeId).toBe(repoRuntimeId)
+    expect(useReposStore.getState().order).toContain(REPO_A)
+  })
+
+  test('serializes close after an in-flight open for the same repo', async () => {
+    const releaseAdd = Promise.withResolvers<void>()
+    const workspaceRepos: string[] = []
+    const removeWorkspaceRepo = vi.fn(({ repoRoot }: { repoRoot: string }) => {
+      const index = workspaceRepos.indexOf(repoRoot)
+      if (index !== -1) workspaceRepos.splice(index, 1)
+      return { openRepoEntries: [], workspacePaneTabsByTargetByRepo: {} }
+    })
+    installGoblin({
+      'settings.addWorkspaceRepo': async ({ entry }: { entry: { id: string } }) => {
+        await releaseAdd.promise
+        workspaceRepos.push(entry.id)
+        return { openRepoEntries: [], workspacePaneTabsByTargetByRepo: {} }
+      },
+      'settings.removeWorkspaceRepo': removeWorkspaceRepo,
+    })
+
+    const opening = useReposStore.getState().ensureWorkspaceOpen(REPO_A)
+    await vi.waitFor(() => expect(useReposStore.getState().repos[REPO_A]).toBeUndefined())
+    const closing = useReposStore.getState().closeRepo(REPO_A)
+    expect(removeWorkspaceRepo).not.toHaveBeenCalled()
+    releaseAdd.resolve()
+
+    await expect(opening).resolves.toMatchObject({ ok: true, id: REPO_A })
+    await expect(closing).resolves.toEqual({ ok: true })
+    expect(workspaceRepos).toEqual([])
+    expect(useReposStore.getState().repos[REPO_A]).toBeUndefined()
+  })
+
+  test('serializes reopen after an in-flight close for the same repo', async () => {
+    const releaseRemove = Promise.withResolvers<void>()
+    let blockRemove = false
+    const workspaceRepos: string[] = []
+    installGoblin({
+      'settings.addWorkspaceRepo': ({ entry }: { entry: { id: string } }) => {
+        if (!workspaceRepos.includes(entry.id)) workspaceRepos.push(entry.id)
+        return { openRepoEntries: [], workspacePaneTabsByTargetByRepo: {} }
+      },
+      'settings.removeWorkspaceRepo': async ({ repoRoot }: { repoRoot: string }) => {
+        if (blockRemove) await releaseRemove.promise
+        const index = workspaceRepos.indexOf(repoRoot)
+        if (index !== -1) workspaceRepos.splice(index, 1)
+        return { openRepoEntries: [], workspacePaneTabsByTargetByRepo: {} }
+      },
+    })
+    await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
+    blockRemove = true
+
+    const closing = useReposStore.getState().closeRepo(REPO_A)
+    const reopening = useReposStore.getState().ensureWorkspaceOpen(REPO_A)
+    releaseRemove.resolve()
+
+    await expect(closing).resolves.toEqual({ ok: true })
+    await expect(reopening).resolves.toMatchObject({ ok: true, id: REPO_A })
+    expect(workspaceRepos).toEqual([REPO_A])
+    expect(useReposStore.getState().repos[REPO_A]).toBeDefined()
+  })
+
   test('ensureWorkspaceOpen reports recent-history write failures without rolling back the opened repo', async () => {
     installGoblin({
       'settings.addRecentRepo': () => {
@@ -147,7 +238,7 @@ describe('repo lifecycle', () => {
       expect(snapshotResolvers).toHaveLength(1)
     })
     const firstToken = useReposStore.getState().repos[REPO_A]?.repoRuntimeId
-    useReposStore.getState().closeRepo(REPO_A)
+    await useReposStore.getState().closeRepo(REPO_A)
     const second = await useReposStore.getState().ensureWorkspaceOpen(REPO_A)
     if (second.ok) useReposStore.setState({ restoredRepoId: second.id })
     const secondToken = useReposStore.getState().repos[REPO_A]?.repoRuntimeId
@@ -180,7 +271,7 @@ describe('repo lifecycle', () => {
     expect(result).toMatchObject({ ok: true, id: REPO_A })
     const repoRuntimeId = useReposStore.getState().repos[REPO_A]!.repoRuntimeId
 
-    useReposStore.getState().closeRepo(REPO_A)
+    await useReposStore.getState().closeRepo(REPO_A)
     await vi.waitFor(() => {
       const cached = primaryWindowQueryClient.getQueryData<RepoRuntimesSnapshot>( repoRuntimesQueryKey())
       expect(cached?.runtimes).not.toContainEqual({ repoRoot: REPO_A, repoRuntimeId })
@@ -227,12 +318,12 @@ describe('repo lifecycle', () => {
     expect(calls.recent).toEqual([remoteRepoSessionEntry(target!)])
   })
 
-  test('ensureWorkspaceOpen returns a failure when the remote command transport fails', async () => {
+  test('keeps a remote workspace open when lifecycle transport is temporarily unavailable', async () => {
     const target = normalizeRemoteTarget({
       alias: 'example', host: 'example.com', user: 'developer', port: 22, remotePath: '/srv/repo',
     })
     expect(target).not.toBeNull()
-    installGoblin({
+    const calls = installGoblin({
       'remote.lifecycle': () => {
         throw new Error('offline')
       },
@@ -240,7 +331,37 @@ describe('repo lifecycle', () => {
 
     await expect(
       useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(target!)),
-    ).resolves.toEqual({ ok: false, message: 'error.failed-read-repo' })
+    ).resolves.toMatchObject({ ok: true, id: target!.id })
+    expect(calls.workspaceRepos).toEqual([remoteRepoSessionEntry(target!)])
+    expect(useReposStore.getState().repos[target!.id]).toBeDefined()
+  })
+
+  test('does not resurrect a remote repo closed during lifecycle probing', async () => {
+    const target = normalizeRemoteTarget({
+      alias: 'example', host: 'example.com', user: 'developer', port: 22, remotePath: '/srv/repo',
+    })
+    expect(target).not.toBeNull()
+    const lifecycle = Promise.withResolvers<{
+      kind: 'settled'
+      repoId: string
+      name: string
+      lifecycle: { kind: 'ready'; attemptId: number; target: NonNullable<typeof target> }
+    }>()
+    const calls = installGoblin({ 'remote.lifecycle': () => lifecycle.promise })
+
+    const opening = useReposStore.getState().ensureWorkspaceOpen(remoteRepoSessionEntry(target!))
+    await vi.waitFor(() => expect(calls.workspaceRepos).toEqual([remoteRepoSessionEntry(target!)]))
+    await expect(useReposStore.getState().closeRepo(target!.id)).resolves.toEqual({ ok: true })
+    lifecycle.resolve({
+      kind: 'settled',
+      repoId: target!.id,
+      name: target!.displayName,
+      lifecycle: { kind: 'ready', attemptId: 1, target: target! },
+    })
+
+    await expect(opening).resolves.toEqual({ ok: false, message: 'error.failed-read-repo' })
+    expect(calls.workspaceRepos).toEqual([])
+    expect(useReposStore.getState().repos[target!.id]).toBeUndefined()
   })
 
   test('retryRemoteRepoConnection returns a failure when the command transport fails', async () => {
@@ -354,7 +475,7 @@ describe('repo lifecycle', () => {
     })
   })
 
-  test('closeRepo clears recorded tab openers scoped to that repo, but leaves other repos untouched', () => {
+  test('closeRepo clears recorded tab openers scoped to that repo, but leaves other repos untouched', async () => {
     // seedRepoWithReadModelForTest replaces the whole `repos` map, so seed both repos
     // before merging them back together into one multi-repo store state.
     const repoA = seedRepoWithReadModelForTest({
@@ -387,7 +508,7 @@ describe('repo lifecycle', () => {
         'workspace-pane:status',
       )
 
-    useReposStore.getState().closeRepo(REPO_A)
+    await useReposStore.getState().closeRepo(REPO_A)
 
     const openers = useReposStore.getState().tabOpenerIdentityByScope
     expect(openers[tabOpenerScopeKey({ repoRoot: REPO_A, branchName: 'feature/a', worktreePath: null })]).toBeUndefined()
@@ -398,7 +519,7 @@ describe('repo lifecycle', () => {
     ).toBe('workspace-pane:status')
   })
 
-  test('closeRepo clears workspace navigation history scoped to that repo', () => {
+  test('closeRepo clears workspace navigation history scoped to that repo', async () => {
     const repoA = seedRepoWithReadModelForTest({
       id: REPO_A,
       branches: [createRepoBranch('feature/a')],
@@ -420,7 +541,7 @@ describe('repo lifecycle', () => {
       route: { kind: 'newWorktree', returnTo: '/repo/repo-b/dashboard' },
     })
 
-    useReposStore.getState().closeRepo(REPO_A)
+    await useReposStore.getState().closeRepo(REPO_A)
 
     const history = useReposStore.getState().navigationHistoryByRepo
     expect(history[REPO_A]).toBeUndefined()

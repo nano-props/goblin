@@ -14,7 +14,7 @@ import type {
   RepoUrlTarget,
   WorktreeStatus,
 } from '#/shared/git-types.ts'
-import type { WorkspacePaneSessionTabType, WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
+import type { WorkspacePaneSessionTabType, WorkspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
 import type {
@@ -79,9 +79,14 @@ export interface ThemeState {
   colorTheme: ColorTheme
 }
 
-export interface WorkspaceSessionState {
-  /** Repo entries that were open, in switcher order. */
+export interface ServerWorkspaceState {
+  /** User-level repository membership, in picker order. */
   openRepoEntries: RepoSessionEntry[]
+  /** Per-repo, per-target workspace pane layout that survives a server restart. */
+  workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneStaticTabEntry[]>>
+}
+
+export interface ClientWorkspaceState {
   /** Repo id restored when opening `/` — null when no repos were open. */
   restoredRepoId: string | null
   zenMode: boolean
@@ -89,11 +94,11 @@ export interface WorkspaceSessionState {
   selectedTerminalSessionIdByTerminalWorktree: Record<string, string>
   /** Per-repo, per-target workspace pane tab preference that session restore can make renderable. */
   preferredWorkspacePaneTabByTargetByRepo: Record<string, Record<string, WorkspacePaneSessionTabType | null>>
-  /** Per-repo, per-target mixed workspace pane tab list. Empty arrays are meaningful. */
-  workspacePaneTabsByTargetByRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>>
   /** Per-repo, per-worktree file tree view state. */
   filetreeViewStateByWorktreeByRepo: Record<string, Record<string, FiletreeSessionViewState>>
 }
+
+export type NativeClientWorkspaceReadResult = { kind: 'missing' } | { kind: 'loaded'; state: unknown }
 
 export interface FiletreeSessionViewState {
   selectedKeys: string[]
@@ -125,13 +130,30 @@ export interface RepoRuntimeMembershipReconcileResult {
   runtimes: RepoRuntimeEntry[]
 }
 
-export interface RestoredWorkspaceRepoRuntime {
+interface RestoredWorkspaceRepoRuntimeBase {
   entry: RepoSessionEntry
   repoRoot: string
   repoRuntimeId: string
   name: string
   target?: RemoteRepoTarget
+}
+
+export interface ProjectedRestoredWorkspaceRepoRuntime extends RestoredWorkspaceRepoRuntimeBase {
   projection: RepoRuntimeProjection
+}
+
+export interface StubRestoredWorkspaceRepoRuntime extends RestoredWorkspaceRepoRuntimeBase {
+  // Stub leases have a validated runtime identity but no projection. They are
+  // projected lazily when the user navigates to the repo.
+  projection: null
+}
+
+export type RestoredWorkspaceRepoRuntime = ProjectedRestoredWorkspaceRepoRuntime | StubRestoredWorkspaceRepoRuntime
+
+export function isProjectedRestoredWorkspaceRepo(
+  repo: RestoredWorkspaceRepoRuntime,
+): repo is ProjectedRestoredWorkspaceRepoRuntime {
+  return repo.projection !== null
 }
 
 export interface WorkspaceRuntimeRestoreSnapshot {
@@ -140,19 +162,22 @@ export interface WorkspaceRuntimeRestoreSnapshot {
   restoredRepoId: string | null
 }
 
-export interface WorkspaceSessionRestoreResult {
-  status: 'restored' | 'rebuilt'
-  session: WorkspaceSessionState
+export interface WorkspaceRestoreResult {
+  status: 'restored' | 'repaired'
+  openRepoEntries: RepoSessionEntry[]
   runtime: WorkspaceRuntimeRestoreSnapshot
+}
+
+export interface RepoWorkspaceTabsRestoreResult {
+  repo: ProjectedRestoredWorkspaceRepoRuntime
+  snapshot: WorkspacePaneTabsSnapshot | null
 }
 
 export interface RepoSettingsState {
   repoSettings: RepoSettingsEntry[]
 }
 
-export interface SettingsSnapshot extends RuntimeSettingsSnapshot, RuntimeRecentReposState, RepoSettingsState {
-  session: WorkspaceSessionState
-}
+export interface SettingsSnapshot extends RuntimeSettingsSnapshot, RuntimeRecentReposState, RepoSettingsState {}
 
 export interface GlobalShortcutState {
   accelerator: string
@@ -254,8 +279,7 @@ export interface ProbeResult {
 }
 
 export type RepoRuntimeOpenResult =
-  | { ok: true; repo: { id: string; name: string }; repoRuntimeId: string }
-  | { ok: false; input: string; reason: string }
+  { ok: true; repo: { id: string; name: string }; repoRuntimeId: string } | { ok: false; input: string; reason: string }
 export type RepoRuntimeOpenResponse = { ok: true; repoRuntimeId: string } | RepoRuntimeOpenResult
 
 export interface CloneRepoResult extends ExecResult {
@@ -269,21 +293,10 @@ export interface PullRequestEntry {
 
 export type RepoServerOperationPhase = 'queued' | 'running' | 'cancelling' | 'done' | 'failed'
 export type RepoServerOperationKind =
-  | 'fetch'
-  | 'clone'
-  | 'pull'
-  | 'push'
-  | 'create-worktree'
-  | 'delete-branch'
-  | 'remove-worktree'
-  | 'network'
+  'fetch' | 'clone' | 'pull' | 'push' | 'create-worktree' | 'delete-branch' | 'remove-worktree' | 'network'
 export type RepoServerOperationSource = NetworkOpKind | 'system'
 export type RepoOperationCancellationReason =
-  | 'caller-abort'
-  | 'user-cancel'
-  | 'request-watchdog-timeout'
-  | 'git-timeout'
-  | 'network-op-superseded'
+  'caller-abort' | 'user-cancel' | 'request-watchdog-timeout' | 'git-timeout' | 'network-op-superseded'
 export type RepoOperationFailureReason = RepoOperationCancellationReason
 
 export interface RepoServerOperationTarget {
@@ -371,43 +384,53 @@ export type IpcEvent =
 export interface AppIpcHandlers {
   repo: {
     probe: (input: { cwd: string }) => Promise<ProbeResult>
-    runtimeOpen: (input: ({ repoRoot: string } | { repoInput: string }) & { clientId: string }) => Promise<RepoRuntimeOpenResponse>
-    runtimeReconcile: (input: { clientId: string; repoRoots: string[] }) => Promise<RepoRuntimeMembershipReconcileResult>
+    runtimeOpen: (
+      input: ({ repoRoot: string } | { repoInput: string }) & { clientId: string },
+    ) => Promise<RepoRuntimeOpenResponse>
+    runtimeReconcile: (input: {
+      clientId: string
+      repoRoots: string[]
+    }) => Promise<RepoRuntimeMembershipReconcileResult>
     runtimeList: () => Promise<RepoRuntimesSnapshot>
     runtimeClose: (input: { repoRoot: string; repoRuntimeId: string; clientId: string }) => Promise<{
       ok: boolean
       released: boolean
       runtimeClosed: boolean
     }>
-    clone: (input: {
-      url: string
-      parentPath: string
-      directoryName: string
-    }) => Promise<CloneRepoResult>
+    clone: (input: { url: string; parentPath: string; directoryName: string }) => Promise<CloneRepoResult>
     projection: (input: {
       cwd: string
       repoRuntimeId: string
       branch?: string
       mode?: PullRequestFetchMode
     }) => Promise<RepoRuntimeProjection>
-    operations: (input: { cwd?: string; repoRuntimeId?: string; includeSettled?: boolean }) => Promise<RepoOperationsSnapshot>
+    operations: (input: {
+      cwd?: string
+      repoRuntimeId?: string
+      includeSettled?: boolean
+    }) => Promise<RepoOperationsSnapshot>
     patch: (input: { cwd: string; repoRuntimeId: string; worktreePath: string }) => Promise<ExecResult>
-    trashFile: (input: { cwd: string; repoRuntimeId: string; worktreePath: string; path: string }) => Promise<ExecResult>
+    trashFile: (input: {
+      cwd: string
+      repoRuntimeId: string
+      worktreePath: string
+      path: string
+    }) => Promise<ExecResult>
     deleteBranch: (input: {
       cwd: string
       repoRuntimeId: string
       branch: string
       force?: boolean
-      alsoDeleteUpstream?: boolean
+      deleteUpstream?: boolean
     }) => Promise<ExecResult>
     removeWorktree: (input: {
       cwd: string
       repoRuntimeId: string
       branch: string
       worktreePath: string
-      alsoDeleteBranch: boolean
+      deleteBranch: boolean
       forceDeleteBranch?: boolean
-      alsoDeleteUpstream?: boolean
+      deleteUpstream?: boolean
     }) => Promise<ExecResult>
     createWorktree: (input: CreateWorktreeIpcInput) => Promise<ExecResult>
     worktreeBootstrapPreview: (input: { cwd: string; repoRuntimeId: string }) => Promise<WorktreeBootstrapPreviewResult>
@@ -417,8 +440,18 @@ export interface AppIpcHandlers {
     fetch: (input: { cwd: string; repoRuntimeId: string }) => Promise<ExecResult>
     abort: (input: { cwd: string }) => Promise<boolean>
     openUrl: (input: { cwd: string; repoRuntimeId: string; target: RepoUrlTarget }) => Promise<ExecResult>
-    openTerminal: (input: { repoId: string; repoRuntimeId: string; worktreePath: string; app: TerminalApp }) => Promise<ExecResult>
-    openEditor: (input: { repoId: string; repoRuntimeId: string; worktreePath: string; app: EditorApp }) => Promise<ExecResult>
+    openTerminal: (input: {
+      repoId: string
+      repoRuntimeId: string
+      worktreePath: string
+      app: TerminalApp
+    }) => Promise<ExecResult>
+    openEditor: (input: {
+      repoId: string
+      repoRuntimeId: string
+      worktreePath: string
+      app: EditorApp
+    }) => Promise<ExecResult>
     openRemote: (input: { cwd: string; branch?: string }) => Promise<ExecResult>
   }
   remote: {
@@ -439,7 +472,6 @@ export interface AppIpcHandlers {
     setShortcutsDisabled: (input: { disabled: boolean }) => Promise<void>
     setGlobalShortcutDisabled: (input: { disabled: boolean }) => Promise<void>
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
-    saveSession: (input: { session: WorkspaceSessionState }) => Promise<void>
     applyNativeHostProjection: (input: NativeHostProjection) => Promise<void>
     addRecentRepo: (input: { repo: RepoSessionEntry }) => Promise<RepoSessionEntry[]>
     clearRecentRepos: () => Promise<void>
@@ -459,6 +491,10 @@ export interface AppIpcHandlers {
 }
 
 export interface NativeHostIpcHandlers {
+  clientWorkspace: {
+    read: () => Promise<NativeClientWorkspaceReadResult>
+    write: (input: ClientWorkspaceState) => Promise<void>
+  }
   settings: {
     setGlobalShortcut: (input: { accelerator: string }) => Promise<GlobalShortcutState>
     applyNativeHostProjection: (input: NativeHostProjection) => Promise<void>
@@ -545,14 +581,16 @@ function createValidatedNamespace<THandlers extends Record<string, (...args: nev
   return procedures
 }
 
-export interface AppRouter {
-  createCaller: () => {
-    settings: {
-      [K in keyof NativeHostIpcHandlers['settings']]: (
-        input: unknown,
-      ) => Promise<Awaited<ReturnType<NativeHostIpcHandlers['settings'][K]>>>
-    }
+type AppRouterCaller = {
+  [NS in keyof NativeHostIpcHandlers]: {
+    [K in keyof NativeHostIpcHandlers[NS]]: NativeHostIpcHandlers[NS][K] extends (...args: never[]) => infer TOutput
+      ? (input: unknown) => Promise<Awaited<TOutput>>
+      : never
   }
+}
+
+export interface AppRouter {
+  createCaller: () => AppRouterCaller
 }
 
 type NativeHostIpcProcedureSchemas = {
@@ -561,8 +599,12 @@ type NativeHostIpcProcedureSchemas = {
 
 export function createAppRouter(handlers: NativeHostIpcHandlers, schemas: NativeHostIpcProcedureSchemas): AppRouter {
   return {
-    createCaller: () => ({
-      settings: createValidatedNamespace(handlers.settings, schemas.settings),
-    }),
+    createCaller: () => {
+      const caller: Record<string, unknown> = {}
+      for (const namespace of Object.keys(schemas) as Array<keyof NativeHostIpcHandlers>) {
+        caller[namespace] = createValidatedNamespace(handlers[namespace], schemas[namespace])
+      }
+      return caller as AppRouterCaller
+    },
   }
 }

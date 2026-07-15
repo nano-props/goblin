@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ClientBootstrapSnapshot } from '#/shared/bootstrap.ts'
 import { ELECTRON_CLIENT_CAPABILITIES, CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
+import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import { setClientBridgeForTests } from '#/web/client-bridge.ts'
 import { mockFetch } from '#/test-utils/fetch-mock.ts'
 
@@ -142,6 +143,73 @@ describe('settings-client', () => {
     controller.abort(new Error('cancelled'))
     expect(requestSignal?.aborted).toBe(true)
     await assertion
+  })
+
+  test('posts the active repo root when restoring the workspace session', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const workspace = defaultServerWorkspaceState()
+    const fetchMock = mockFetch(async () => ({
+      ok: true,
+      json: async () => ({
+        status: 'restored',
+        openRepoEntries: [],
+        workspace,
+        runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
+      }),
+    }))
+
+    const { restoreServerWorkspace } = await import('#/web/settings-client.ts')
+    await expect(
+      restoreServerWorkspace('client_test000000000000', { activeRepoRoot: '/tmp/routed-repo' }),
+    ).resolves.toEqual({
+      status: 'restored',
+      openRepoEntries: [],
+      workspace,
+      runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
+    })
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(String(init.body))).toEqual({
+      clientId: 'client_test000000000000',
+      activeRepoRoot: '/tmp/routed-repo',
+    })
+  })
+
+  test('posts repo root and runtime id when lazily restoring repo tabs', async () => {
+    installWebBootstrap(webBootstrap({ initialServer: { url: 'http://127.0.0.1:32100/', accessToken: 'secret' } }))
+    const restored = {
+      repo: {
+        entry: { kind: 'local' as const, id: '/tmp/routed-repo' },
+        repoRoot: '/tmp/routed-repo',
+        repoRuntimeId: 'repo_runtime_test',
+        name: 'routed-repo',
+        projection: {
+          snapshot: { current: 'main', branches: [] },
+          status: [],
+          pullRequests: null,
+          operations: { operations: [], loadedAt: 0 },
+          requested: { branch: null, pullRequestMode: 'full' as const },
+          loadedAt: 1,
+        },
+      },
+      snapshot: null,
+    }
+    const fetchMock = mockFetch(async () => ({
+      ok: true,
+      json: async () => restored,
+    }))
+
+    const { restoreRepoWorkspaceTabs } = await import('#/web/settings-client.ts')
+    await expect(
+      restoreRepoWorkspaceTabs('client_test000000000000', '/tmp/routed-repo', 'repo_runtime_test'),
+    ).resolves.toEqual(restored)
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(String(init.body))).toEqual({
+      clientId: 'client_test000000000000',
+      repoRoot: '/tmp/routed-repo',
+      repoRuntimeId: 'repo_runtime_test',
+    })
   })
 
   test('sets the global shortcut through the native bridge even when the embedded server is available', async () => {

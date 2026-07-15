@@ -25,12 +25,14 @@ import { broadcastWorkspacePaneTabsChanged } from '#/server/workspace-pane/works
 import { createTerminalRealtimeHandlers } from '#/server/terminal/terminal-runtime-realtime.ts'
 import { createWorkspacePaneTabsRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-tabs-runtime-realtime.ts'
 import { createWorkspacePaneRuntimeApplication } from '#/server/workspace-pane/workspace-pane-runtime-application.ts'
-import {
-  createPhysicalWorktreeOperationCoordinator,
-} from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
+import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import { createWorkspacePaneRuntimeRealtimeHandlers } from '#/server/workspace-pane/workspace-pane-runtime-realtime.ts'
 import type { ServerWorkspacePaneRuntimeHost } from '#/server/workspace-pane/workspace-pane-runtime-host.ts'
-import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import type {
+  ServerWorkspacePaneTabsHost,
+  ServerWorkspacePaneTargetLifecycleHost,
+} from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import { recordServerWorkspacePaneLayout } from '#/server/modules/settings-source.ts'
 import { isValidTerminalClientId, isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import {
   TerminalSessionManager,
@@ -46,9 +48,7 @@ import { terminalSessionRuntimeScope } from '#/server/terminal/terminal-session-
 import { createAppRealtimeHost } from '#/server/realtime/app-realtime-runtime.ts'
 import { createWorktreeRemovalApplication } from '#/server/worktree-removal/worktree-removal-application.ts'
 import { createPhysicalWorktreeIdentityResolver } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
-import {
-  createTerminalSessionCreateProvider,
-} from '#/server/terminal/terminal-session-create-provider.ts'
+import { createTerminalSessionCreateProvider } from '#/server/terminal/terminal-session-create-provider.ts'
 
 // Intentionally long TTL: we want terminals to survive as long as possible in
 // the background so users can leave builds or long-running tasks unattended.
@@ -71,7 +71,7 @@ export interface ServerTerminalRuntimeOptions {
 export interface ServerTerminalRuntime {
   host: ServerTerminalHost
   workspacePaneRuntimeHost: ServerWorkspacePaneRuntimeHost
-  workspacePaneTabsHost: ServerWorkspacePaneTabsHost
+  workspacePaneTabsHost: ServerWorkspacePaneTabsHost & ServerWorkspacePaneTargetLifecycleHost
   workspacePaneRuntimeApplication: ReturnType<typeof createWorkspacePaneRuntimeApplication>
   worktreeRemovalApplication: ReturnType<typeof createWorktreeRemovalApplication>
   shutdown(): void
@@ -129,6 +129,7 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     runtimeProviders: [terminalWorkspacePaneRuntimeTabsProvider(manager)],
     worktreeOperations,
     physicalWorktrees,
+    persistLayout: recordServerWorkspacePaneLayout,
   })
   const coordinator = createTerminalRuntimeCoordinator({
     manager,
@@ -188,11 +189,19 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     isCurrentRepoRuntime,
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
   })
+  const workspacePaneTargetLifecycle: ServerWorkspacePaneTargetLifecycleHost = {
+    async retireTarget(userId, input) {
+      const snapshot = await sessionService.retireTarget(userId, input)
+      broadcastRepoWorkspaceTabsChanged(userId, input.target.repoRoot)
+      return snapshot
+    },
+  }
   const worktreeRemovalApplication = createWorktreeRemovalApplication({
     worktreeOperations,
     physicalWorktrees,
     terminalWorktree: manager,
     workspaceTabs: workspaceTabsCoordinator,
+    workspacePaneTabs: workspacePaneTargetLifecycle,
     isCurrentRepoRuntime,
     broadcastSessionsChanged: broadcastRepoSessionsChanged,
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
@@ -211,19 +220,20 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     isCurrentRepoRuntime: isCurrentRepoRuntime,
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
   })
-  const workspacePaneTabsHost: ServerWorkspacePaneTabsHost = {
+  const workspacePaneTabsHost: ServerWorkspacePaneTabsHost & ServerWorkspacePaneTargetLifecycleHost = {
+    async initializeTabs(userId, input) {
+      return await sessionService.initializeTabs(userId, input)
+    },
     async listWorkspaceTabs(clientId, userId, input) {
       return await workspacePaneTabsActions.listWorkspaceTabs(clientId, userId, input)
     },
     async replaceTabs(clientId, userId, input) {
       return await workspacePaneTabsActions.replaceTabs(clientId, userId, input)
     },
-    async replaceTabsBatch(clientId, userId, input) {
-      return await workspacePaneTabsActions.replaceTabsBatch(clientId, userId, input)
-    },
     async updateTabs(clientId, userId, input) {
       return await workspacePaneTabsActions.updateTabs(clientId, userId, input)
     },
+    retireTarget: workspacePaneTargetLifecycle.retireTarget,
   }
 
   const terminalActionHost: ServerTerminalActionHost = {

@@ -114,6 +114,7 @@ export interface TerminalEventSink<TUser extends string | number> {
 
 export interface TerminalPhysicalWorktreeScope<TUser extends string | number> {
   userId: TUser
+  repoRoot: string
   scope: string
 }
 
@@ -445,7 +446,7 @@ export class TerminalSessionManager<TUser extends string | number> {
       const sessionKey = physicalWorktreeIdentityKey(session.physicalWorktreeCapability.identity)
       if (sessionKey !== targetKey) continue
       const key = `${String(session.userId)}\0${session.scope}`
-      affected.set(key, { userId: session.userId, scope: session.scope })
+      affected.set(key, { userId: session.userId, repoRoot: session.repoRoot, scope: session.scope })
       const closed = await this.closeSession(session.id, 'scope')
       if (!closed && this.sessionsByTerminalRuntimeSessionId.get(session.id) === session) {
         return {

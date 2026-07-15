@@ -4,13 +4,12 @@ import {
   clearServerRecentRepos,
   setServerFetchIntervalSec,
   setServerRepoWorkspaceExternalAppRecent,
-  setServerSessionState,
   updateUserSettings,
 } from '#/server/modules/settings-source.ts'
 import type { NativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 import { resolveI18nSnapshot } from '#/shared/i18n/snapshot.ts'
 import { toSafeSessionRepoEntry } from '#/shared/input-validation.ts'
-import type { RepoSettingsState, WorkspaceSessionState, UserSettingsUpdateResponse } from '#/shared/api-types.ts'
+import type { RepoSettingsState, UserSettingsUpdateResponse } from '#/shared/api-types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import { repoSessionEntryId } from '#/shared/remote-repo.ts'
 import { settingsInvalidationScopesForPrefsPatch } from '#/shared/server-invalidation.ts'
@@ -32,9 +31,6 @@ export interface UpdateUserSettingsInput {
 }
 export interface SetGlobalShortcutRegisteredInput {
   registered: boolean
-}
-export interface SetSessionInput {
-  session: WorkspaceSessionState
 }
 export interface AddRecentRepoInput {
   repo: RepoSessionEntry
@@ -74,11 +70,6 @@ export function handleSetGlobalShortcutRegistered(
   const registered = (state.globalShortcutRegistered = input.registered)
   publishSettingsInvalidation(['settings-snapshot'])
   return { ok: true, registered }
-}
-
-export async function handleSetSession(input: SetSessionInput): Promise<{ ok: true; session: WorkspaceSessionState }> {
-  const session = await setServerSessionState(input.session)
-  return { ok: true, session }
 }
 
 export async function handleAddRecentRepo(

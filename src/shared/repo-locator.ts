@@ -1,17 +1,30 @@
 import { tildifyPath } from '#/shared/paths.ts'
+import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import type { RemoteRepoRef, RemoteRepoTarget, RepoSessionEntry } from '#/shared/remote-repo.ts'
 
 export type RemoteRepoRefLocatorInput = Pick<RemoteRepoRef, 'alias' | 'remotePath'>
 export type RemoteRepoTargetLocatorInput = Pick<RemoteRepoTarget, 'host' | 'user' | 'remotePath'>
 export type RemoteWorktreeLocatorInput = Pick<RemoteRepoTarget, 'host' | 'user'>
 
-/**
- * User-facing repository locator.
- *
- * Local repos render as tildified paths. Concrete remote targets render
- * with connection identity, while persisted remote refs render with the
- * SSH alias because they do not carry host/user fields.
- */
+export const MAX_REPO_LOCATOR_LENGTH = 4096
+
+export function toSafeCanonicalRepoLocator(value: unknown): string | null {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.length > MAX_REPO_LOCATOR_LENGTH ||
+    value.includes('\0')
+  ) {
+    return null
+  }
+  if (isRemoteRepoId(value)) return value
+  return isAbsoluteLocalRepoPath(value) ? value : null
+}
+
+function isAbsoluteLocalRepoPath(value: string): boolean {
+  return value.startsWith('/') || /^[A-Za-z]:[\\/]/.test(value) || value.startsWith('\\\\')
+}
+
 export function formatRepoLocator(
   repoId: string,
   home: string,

@@ -18,6 +18,8 @@ const listSshConfigHostsMock = vi.hoisted(() => vi.fn())
 const resolveRemoteTargetMock = vi.hoisted(() => vi.fn())
 const resolveTrackedRemoteTargetMock = vi.hoisted(() => vi.fn())
 const runRemoteCommandMock = vi.hoisted(() => vi.fn())
+const readNativeClientWorkspaceStateMock = vi.hoisted(() => vi.fn())
+const writeNativeClientWorkspaceStateMock = vi.hoisted(() => vi.fn())
 const getEmbeddedServerRuntimeMock = vi.hoisted(() =>
   vi.fn<() => { url: string; accessToken: string } | null>(() => null),
 )
@@ -180,6 +182,11 @@ vi.mock('#/main/settings-server-client.ts', () => ({
   updateUserSettings: vi.fn(async (patch: Record<string, unknown>) => ({ ...userSettings(), ...patch })),
 }))
 
+vi.mock('#/main/client-workspace-state.ts', () => ({
+  readNativeClientWorkspaceState: readNativeClientWorkspaceStateMock,
+  writeNativeClientWorkspaceState: writeNativeClientWorkspaceStateMock,
+}))
+
 vi.mock('#/system/github-cli.ts', () => ({
   probeGitHubCli: vi.fn(async (_signal?: AbortSignal, hosts?: string[]) => ({
     available: true,
@@ -268,6 +275,8 @@ describe('main repo ipc cancellation', () => {
     )
     resolveTrackedRemoteTargetMock.mockImplementation(async (target: any) => ({ target }))
     runRemoteCommandMock.mockResolvedValue({ ok: true, stdout: '/home/alice', stderr: '' })
+    readNativeClientWorkspaceStateMock.mockResolvedValue({ kind: 'missing' })
+    writeNativeClientWorkspaceStateMock.mockResolvedValue(undefined)
     vi.mocked(isGitRepo).mockResolvedValue(true)
     vi.mocked(getCurrentBranch).mockResolvedValue('main')
     vi.mocked(getWorktrees).mockResolvedValue([{ path: '/repo', branch: 'main', isBare: false, isPrimary: true }])
@@ -301,6 +310,25 @@ describe('main repo ipc cancellation', () => {
       ok: false,
       error: { name: 'IpcError', code: 'FORBIDDEN', message: 'Untrusted IPC sender' },
     })
+  })
+
+  test('routes native client workspace reads and writes', async () => {
+    const workspace = {
+      restoredRepoId: '/repo',
+      zenMode: false,
+      workspacePaneSize: 50,
+      selectedTerminalSessionIdByTerminalWorktree: {},
+      preferredWorkspacePaneTabByTargetByRepo: {},
+      filetreeViewStateByWorktreeByRepo: {},
+    }
+    readNativeClientWorkspaceStateMock.mockResolvedValue({ kind: 'loaded', state: workspace })
+
+    await expect(invokeIpc('clientWorkspace.read')).resolves.toEqual({
+      ok: true,
+      data: { kind: 'loaded', state: workspace },
+    })
+    await expect(invokeIpc('clientWorkspace.write', workspace)).resolves.toEqual({ ok: true, data: undefined })
+    expect(writeNativeClientWorkspaceStateMock).toHaveBeenCalledWith(workspace)
   })
 
   test('rejects IPC calls without a sender frame', async () => {

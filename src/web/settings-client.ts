@@ -9,9 +9,9 @@ import type {
   LangPref,
   LanInfo,
   RepoSettingsState,
+  RepoWorkspaceTabsRestoreResult,
   RuntimeRecentReposState,
-  WorkspaceSessionState,
-  WorkspaceSessionRestoreResult,
+  WorkspaceRestoreResult,
   UserSettings,
   UserSettingsUpdateResponse,
   SettingsSnapshot,
@@ -19,6 +19,7 @@ import type {
   ThemeState,
 } from '#/shared/api-types.ts'
 import type { ColorTheme } from '#/shared/color-theme.ts'
+import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import {
   nativeSettingsProjectionStateFromSettings,
   pickNativeSettingsProjectionPatch,
@@ -26,7 +27,6 @@ import {
 import { runtimeSettingsSnapshotFromSettingsSnapshot } from '#/shared/settings-snapshot.ts'
 
 type RecentReposUpdateResponse = { ok: boolean; addedRepo?: RepoSessionEntry | null } & RuntimeRecentReposState
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 
 export async function getSettingsSnapshot(options?: { signal?: AbortSignal }): Promise<SettingsSnapshot> {
   return await fetchServerJson<SettingsSnapshot>('/api/settings', { signal: options?.signal })
@@ -150,22 +150,39 @@ export async function setRecentWorkspaceExternalApp(input: {
   >('/api/settings/repo-external-app-recent', input)
 }
 
-export async function saveSession(
-  session: WorkspaceSessionState,
-  options?: { keepalive?: boolean },
-): Promise<WorkspaceSessionState> {
-  const result = await postServerJson<
-    { session: WorkspaceSessionState },
-    { ok: boolean; session: WorkspaceSessionState }
-  >('/api/settings/session', { session }, { keepalive: options?.keepalive })
-  return result.session
+export async function restoreServerWorkspace(
+  clientId: string,
+  options?: { activeRepoRoot?: string | null; signal?: AbortSignal },
+): Promise<WorkspaceRestoreResult> {
+  return await postServerJson(
+    '/api/settings/workspace/restore',
+    {
+      clientId,
+      ...(options && 'activeRepoRoot' in options ? { activeRepoRoot: options.activeRepoRoot } : {}),
+    },
+    { signal: options?.signal },
+  )
 }
 
-export async function restoreWorkspaceSession(
+export async function addWorkspaceRepo(entry: RepoSessionEntry): Promise<void> {
+  await postServerJson('/api/settings/workspace/repos/add', { entry })
+}
+
+export async function removeWorkspaceRepo(repoRoot: string): Promise<void> {
+  await postServerJson('/api/settings/workspace/repos/remove', { repoRoot })
+}
+
+export async function restoreRepoWorkspaceTabs(
   clientId: string,
+  repoRoot: string,
+  repoRuntimeId: string,
   options?: { signal?: AbortSignal },
-): Promise<WorkspaceSessionRestoreResult> {
-  return await postServerJson('/api/settings/session/restore', { clientId }, { signal: options?.signal })
+): Promise<RepoWorkspaceTabsRestoreResult> {
+  return await postServerJson(
+    '/api/settings/workspace/restore-repo-tabs',
+    { clientId, repoRoot, repoRuntimeId },
+    { signal: options?.signal },
+  )
 }
 
 export async function setSettingsFetchInterval(sec: number): Promise<number> {

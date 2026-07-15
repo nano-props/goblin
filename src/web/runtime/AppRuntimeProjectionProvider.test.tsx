@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from '@testing-library/react'
+import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { CLIENT_BRIDGE_VERSION } from '#/shared/bootstrap.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
@@ -132,6 +133,21 @@ describe('AppRuntimeProjectionProvider', () => {
         window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: false }))
       })
       expect(kickReconnectMock).not.toHaveBeenCalled()
+    } finally {
+      result.unmount()
+    }
+  })
+
+  test('keeps its projection registry usable across StrictMode effect replay', async () => {
+    seedCurrentRepo()
+    const result = renderInJsdom(
+      <StrictMode>
+        <RuntimeProbe currentRepoId={REPO_ID} />
+      </StrictMode>,
+    )
+    try {
+      await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalled())
+      expect(document.body.textContent).toContain('probe')
     } finally {
       result.unmount()
     }
@@ -409,7 +425,7 @@ describe('AppRuntimeProjectionProvider', () => {
     try {
       await vi.waitFor(() => expect(recoverSessionsMock).toHaveBeenCalledTimes(1))
 
-      useReposStore.getState().closeRepo(REPO_ID)
+      await useReposStore.getState().closeRepo(REPO_ID)
       seedRepoWithReadModelForTest({
         id: REPO_ID,
         repoRuntimeId: 'repo-runtime-reopened',

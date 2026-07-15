@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { MAX_REPO_LOCATOR_LENGTH } from '#/shared/repo-locator.ts'
 import { isSafeBranchName } from '#/shared/refnames.ts'
 import {
   isRemoteRepoId,
@@ -8,7 +9,7 @@ import {
   type RepoSessionEntry,
 } from '#/shared/remote-repo.ts'
 
-export const MAX_IPC_PATH_LENGTH = 4096
+export const MAX_IPC_PATH_LENGTH = MAX_REPO_LOCATOR_LENGTH
 export const MAX_IPC_BRANCH_LENGTH = 1024
 
 export function isValidAbsolutePath(value: unknown): value is string {

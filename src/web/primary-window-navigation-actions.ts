@@ -2,7 +2,7 @@ import type { WorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { SettingsPage } from '#/shared/settings-pages.ts'
 import type { RepoBranchWorkspacePaneRouteTarget } from '#/web/App.tsx'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
-import type { WorkspaceNavigationHistoryTraversal } from '#/web/stores/repos/types.ts'
+import type { CloseRepoResult, WorkspaceNavigationHistoryTraversal } from '#/web/stores/repos/types.ts'
 import {
   restoreWorkspaceNavigationEntry,
   workspaceNavigationHistoryRestoreBlocked,
@@ -31,7 +31,7 @@ export interface PrimaryWindowPresentationNavigationOptions {
 
 export interface PrimaryWindowNavigationActions {
   activateRepo: (repoId: string) => void
-  closeRepo: (repoId: string) => void
+  closeRepo: (repoId: string) => Promise<CloseRepoResult>
   cycleRepo: (direction: 1 | -1) => void
   selectRepoBranch: (repoId: string, branch: string, options?: { replace?: boolean }) => boolean
   showRepoBranchEmptyWorkspacePane: (repoId: string, branch: string, options?: { replace?: boolean }) => boolean
@@ -66,7 +66,7 @@ export interface PrimaryWindowNavigationActions {
 interface CreatePrimaryWindowNavigationActionsOptions {
   currentRepoId: string | null
   order: string[]
-  closeRepo: (repoId: string) => void
+  closeRepo: (repoId: string) => Promise<CloseRepoResult>
   peekWorkspaceNavigation: (repoId: string, direction: 'back' | 'forward') => WorkspaceNavigationHistoryTraversal | null
   commitWorkspaceNavigation: (traversal: WorkspaceNavigationHistoryTraversal) => boolean
   routeNavigation: PrimaryWindowRouteNavigation
@@ -88,16 +88,17 @@ export function createPrimaryWindowNavigationActions({
       const presentationToken = beginPrimaryWindowPresentation()
       restoreRepoPresentationOrOpenDashboard(repoId, routeNavigation, presentationToken, { onBlocked: 'stay' })
     },
-    closeRepo(repoId) {
+    async closeRepo(repoId) {
       const nextRepoId = repoId === currentRepoId ? nextNavigationRepoIdAfterClose(order, repoId) : null
       const presentationToken = repoId === currentRepoId ? beginPrimaryWindowPresentation() : null
-      closeRepo(repoId)
-      if (repoId !== currentRepoId) return
+      const result = await closeRepo(repoId)
+      if (!result.ok || repoId !== currentRepoId) return result
       if (nextRepoId)
         restoreRepoPresentationOrOpenDashboard(nextRepoId, routeNavigation, presentationToken!, {
           onBlocked: 'dashboard',
         })
       else routeNavigation.openHome({ presentationToken: presentationToken! })
+      return result
     },
     cycleRepo(direction) {
       const repoId = nextNavigationRepoId(order, currentRepoId, direction)

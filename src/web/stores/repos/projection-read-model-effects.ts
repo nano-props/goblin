@@ -11,7 +11,7 @@ import type { ReposGet, ReposSet } from '#/web/stores/repos/types.ts'
 interface AcceptedRepoProjectionReadModel {
   repoRoot: string
   repoRuntimeId: string
-  projection: RepoRuntimeProjection
+  projection: RepoRuntimeProjection | null
 }
 
 type AcceptRepoProjectionReadModelScope = 'query-cache' | 'repo-read-model' | 'visible-status'
@@ -30,7 +30,7 @@ interface CoreRepoProjectionAcceptanceSignature {
 
 const acceptedCoreRepoProjectionSignaturesByKey = new Map<string, CoreRepoProjectionAcceptanceSignature>()
 
-function acceptedProjectionKey(input: AcceptedRepoProjectionReadModel): string {
+function acceptedProjectionKey(input: AcceptedRepoProjectionReadModel & { projection: RepoRuntimeProjection }): string {
   return [
     input.repoRoot,
     input.repoRuntimeId,
@@ -66,7 +66,7 @@ function sameCoreProjectionAcceptanceSignature(
   )
 }
 
-function markCoreProjectionAccepted(input: AcceptedRepoProjectionReadModel): boolean {
+function markCoreProjectionAccepted(input: AcceptedRepoProjectionReadModel & { projection: RepoRuntimeProjection }): boolean {
   const key = acceptedProjectionKey(input)
   const signature = coreProjectionAcceptanceSignature(input.projection)
   const previous = acceptedCoreRepoProjectionSignaturesByKey.get(key)
@@ -86,6 +86,9 @@ export function acceptRepoProjectionReadModel(
   options: AcceptRepoProjectionReadModelOptions,
 ): void {
   const { repoRoot, repoRuntimeId, projection } = input
+  // Stub leases (non-active repos at cold start) carry `null`. Nothing to
+  // accept — the lazy restore will fill the projection on navigation.
+  if (!projection) return
   if (!authoritativeProjection(projection)) return
   const coreProjection = projection.requested.branch === null && projection.requested.pullRequestMode === 'full'
   const acceptCoreReadModel = options.scope === 'repo-read-model' && coreProjection
@@ -100,7 +103,7 @@ export function acceptRepoProjectionReadModel(
     })
   }
   if (!acceptCoreReadModel) return
-  if (!markCoreProjectionAccepted(input)) return
+  if (!markCoreProjectionAccepted({ repoRoot, repoRuntimeId, projection })) return
 
   if (!projection.snapshot) {
     updateIfFresh(set, repoRoot, repoRuntimeId, (repo) => {

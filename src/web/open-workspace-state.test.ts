@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { normalizeRemoteTarget } from '#/shared/remote-repo.ts'
+import { normalizeRemoteTarget, remoteRepoSessionEntry } from '#/shared/remote-repo.ts'
 import {
   restoredRepoIdAfterWorkspaceHydration,
   nextRestoredRepoIdAfterWorkspaceClose,
@@ -41,6 +41,31 @@ describe('persistedOpenWorkspaceEntries', () => {
         },
       },
     ])
+  })
+
+  test('uses the preserved session entry for a remote restore stub without a target', () => {
+    const target = normalizeRemoteTarget({
+      alias: 'example',
+      host: 'example.com',
+      user: 'alice',
+      port: 22,
+      remotePath: '/srv/repo',
+      displayName: 'example:repo',
+    })
+    expect(target).not.toBeNull()
+    const entry = remoteRepoSessionEntry(target!)
+
+    expect(
+      persistedOpenWorkspaceEntries([target!.id], {
+        [target!.id]: {
+          id: target!.id,
+          session: { entry },
+          remote: {
+            lifecycle: null,
+          },
+        },
+      }),
+    ).toEqual([entry])
   })
 })
 

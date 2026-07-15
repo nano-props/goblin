@@ -115,9 +115,10 @@ export function workspacePaneTabsForTargetFromQueryData(
 export function writeWorkspacePaneTabsSnapshotQueryData(
   repoRoot: string,
   repoRuntimeId: string,
-  snapshot: WorkspacePaneTabsSnapshot,
+  snapshot: WorkspacePaneTabsSnapshot | null,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): boolean {
+  if (!snapshot) return false
   let accepted = false
   queryClient.setQueryData<WorkspacePaneTabsQueryData>(
     workspacePaneTabsQueryKey(repoRoot, repoRuntimeId),

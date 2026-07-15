@@ -18,20 +18,25 @@ The primary window boot path has two separate concerns: public shell hydration a
 3. Authenticated workspace restore
    - Owner: `useAuthenticatedAppBootstrap`.
    - A single restore run owns the settings snapshot, non-critical authenticated hydration, workspace session restore, timeout, and cleanup cancellation.
-   - The hook exposes an explicit shell state: `{ status: 'restoring-workspace' }` or `{ status: 'ready' }`.
-   - The run returns an explicit outcome: `completed` or `cancelled`. Only `completed` may transition the authenticated shell to `{ status: 'ready' }`.
+   - The hook exposes an explicit shell state: `restoring-workspace`, `ready`, or `failed`. Failed state carries a message and the hook exposes an explicit retry command.
+   - The run returns an explicit outcome: `completed`, `cancelled`, or `failed`. Only `completed` may transition the authenticated shell to `ready`.
    - Cleanup cancellation is not a restore failure. Timeouts and actual restore errors are failures and must leave enough state for the UI to render without opening persistence.
 
 4. Workspace membership restore
-   - Owner: `hydrateRepoSession` in the repos store.
+   - Owner: server `restoreServerWorkspace` and client `hydrateRestoredWorkspaceRuntime`.
+   - The server incrementally converges acquired leases against the latest durable membership. Concurrent membership changes retain unchanged leases, release removed entries, and open added entries before the result is committed.
+   - The server validates repo identity, eagerly projects the routed repo, and returns other or temporarily unavailable repos as stub leases.
    - Produces the restored repo membership and placeholder repos. `workspaceMembershipReady` means membership has settled; repo content may still be loading.
    - If the restore signal is aborted, this stage must return without flipping `workspaceMembershipReady`.
 
-5. Server-owned workspace tab restore
-   - Owner: `restoreServerWorkspacePaneTabsFromSession`.
-   - Imports persisted workspace pane tabs into the server runtime after repo membership exists.
-   - Accepts an optional `AbortSignal`. It can skip work before commits start and report `cancelled` after commits settle; it does not currently interrupt an already-started terminal mutation.
-   - After this stage succeeds, `sessionPersistenceReady` may open.
+5. Lazy repo promotion
+   - Owner: `useRestoreRepoTabsOnView` and server `restoreRepoTabsForRepo`.
+   - When navigation reaches a stub, the server projects that repo and restores tabs from the current server-owned `ServerWorkspaceState`.
+   - The client sends only the repo root and server-issued runtime identity. The server reads the canonical repo entry from current durable membership; client stub data is never command authority.
+   - Promotion validates both the requesting client's runtime lease and durable membership before initializing pane runtime state.
+   - Availability failures leave the stub and membership intact so a later navigation can retry.
+   - If the current repo projection proves persisted pane-tab targets invalid, the server clears only that repo's
+     unchanged tab state before initializing the runtime scope. Concurrent tab writes win the repo-local comparison.
 
 6. Workspace shell side effects
    - Owner: `AuthenticatedWorkspaceShell` and `AuthenticatedWorkspaceSideEffects`.
@@ -43,7 +48,7 @@ The primary window boot path has two separate concerns: public shell hydration a
 The repos store keeps low-level fields because different UI surfaces need different boundaries:
 
 - `workspaceMembershipReady`: restored repo membership has settled.
-- `sessionPersistenceReady`: all boot-restored state that can affect session persistence has converged back into client-observable state.
+- `sessionPersistenceReady`: server workspace restore and client-local workspace hydrate have both converged.
 - `sessionRestoreError`: restore failed in a way that must block persistence.
 
 Code that needs the combined state should use `workspaceRestoreStatusFromStore` or `workspaceSessionPersistenceOpenFromStore` from `src/web/stores/repos/selector-state.ts` instead of recombining booleans at call sites.
@@ -53,14 +58,20 @@ Code that needs the combined state should use `workspaceRestoreStatusFromStore` 
 - Repo routes derive `RepoRouteView` directly from the URL before store hydration.
 - A routed repo may be missing from the repo store while workspace membership is restoring. Render restore skeletons until `workspaceMembershipReady` is true.
 - After membership is ready, a routed repo missing from the store is a not-found state, not an empty placeholder.
-- Session persistence should prefer the routed repo id over `restoredRepoId` so deep links are not overwritten by stale boot state.
+- Client workspace persistence should prefer the routed repo id over `restoredRepoId`.
 
 ## Persistence Rules
 
-- Session persistence is client-to-settings only. Boot restore owns initial settings-to-client hydration.
-- Do not persist until `workspaceSessionPersistenceOpenFromStore` is true.
-- Restore failures must block persistence so the saved session is not overwritten with a partial or empty workspace.
-- High-frequency runtime state should stay debounced; coarse workspace structure changes may save immediately.
+- Explicit workspace-tab layout commands persist restart-durable static layout
+  in `ServerWorkspaceState`; live runtime tabs remain projection-only.
+- The client persists only `ClientWorkspaceState`: in native `userData` for
+  Electron, and in local storage for Web.
+- The server reads the shared `ServerWorkspaceState.openRepoEntries` membership at boot;
+  the server returns canonical entries and runtime identities.
+- Do not compose client and server workspace persistence into a whole-session payload.
+- Do not persist client workspace state until `workspaceSessionPersistenceOpenFromStore` is true.
+- High-frequency client state may be debounced; page lifecycle events initiate
+  a final client-local flush.
 
 ## Adding Startup Work
 
@@ -68,8 +79,9 @@ When adding startup behavior, choose one stage and document why it belongs there
 
 - Public, unauthenticated work goes in public bootstrap.
 - Authenticated but non-blocking work can run as an optional task in authenticated bootstrap and must log but not block workspace restore.
-- Work that affects repo membership belongs in `hydrateRepoSession`.
-- Work that affects persisted workspace session must complete before `sessionPersistenceReady` opens.
+- Boot membership work belongs in server restore and client workspace hydration;
+  live membership changes belong in explicit open/close commands.
+- Work that affects boot composition must complete before `sessionPersistenceReady` opens.
 - Work that needs hydrated repo data but is not part of restore belongs in workspace shell side effects.
 
 Every async startup task needs a cleanup story: cancellation must not commit success, unblock persistence, or set React state after unmount.

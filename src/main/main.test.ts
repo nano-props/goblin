@@ -303,7 +303,6 @@ describe('native host startup lifecycle', () => {
       ...snapshot,
       globalShortcutDisabled: true,
       globalShortcut: 'Alt+K',
-      session: snapshot.session,
     })
 
     await import('#/main/main.ts')

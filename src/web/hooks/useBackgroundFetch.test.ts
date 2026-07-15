@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { backgroundSyncRepoIdsFromStore } from '#/web/hooks/useBackgroundFetch.ts'
 import type { RepoState } from '#/web/stores/repos/types.ts'
+import { emptyRepo } from '#/web/stores/repos/repo-state-factory.ts'
 
 describe('backgroundSyncRepoIdsFromStore', () => {
   test('keeps the visible remotely backed repo registered while local refresh data loads are busy', () => {
@@ -53,83 +54,16 @@ function createRepo(input: {
   remote: { hasRemotes: boolean; hasGitHubRemote: boolean }
   availability: RepoState['availability']
 }): RepoState {
+  const repo = emptyRepo(input.id, 'repo', 'repo-runtime-test')
   return {
-    id: input.id,
-    name: 'repo',
-    repoRuntimeId: 'repo-runtime-test',
-    dataLoads: {
-      repoReadModel: { phase: 'idle', loadedAt: null, stale: false, error: null },
-      visibleStatus: { phase: 'idle', loadedAt: null, stale: false, error: null },
-      fetch: { phase: 'idle', loadedAt: null, stale: false, error: null },
-    },
-    operations: {
-      fetch: {
-        operationId: 0,
-        phase: 'idle',
-        reason: null,
-        target: null,
-        startedAt: null,
-        settledAt: null,
-        error: null,
-      },
-      manualRefresh: {
-        operationId: 0,
-        phase: 'idle',
-        reason: null,
-        target: null,
-        startedAt: null,
-        settledAt: null,
-        error: null,
-      },
-      repoReadModel: {
-        operationId: 0,
-        phase: 'idle',
-        reason: null,
-        target: null,
-        startedAt: null,
-        settledAt: null,
-        error: null,
-      },
-      visibleStatus: {
-        operationId: 0,
-        phase: 'idle',
-        reason: null,
-        target: null,
-        startedAt: null,
-        settledAt: null,
-        error: null,
-      },
-      branchAction: {
-        operationId: 0,
-        phase: 'idle',
-        reason: null,
-        target: null,
-        startedAt: null,
-        settledAt: null,
-        error: null,
-      },
-    },
-    ui: {
-      currentBranchName: null,
-      branchViewMode: 'all',
-      workspacePaneTabsByBranch: {},
-      preferredWorkspacePaneTabByTarget: {},
-    },
-    projection: { source: 'fresh', savedAt: null },
+    ...repo,
     remote: {
-      lifecycle: null,
-      lifecycleAttemptId: null,
-      remotes: [],
-      remoteDetails: [],
+      ...repo.remote,
       hasRemotes: input.remote.hasRemotes,
       hasBrowserRemote: input.remote.hasGitHubRemote,
       browserRemoteProvider: input.remote.hasGitHubRemote ? 'github' : undefined,
-      remoteProviders: {},
       hasGitHubRemote: input.remote.hasGitHubRemote,
-      fetchFailed: false,
-      fetchError: null,
     },
     availability: input.availability,
-    events: [],
-  } as RepoState
+  }
 }

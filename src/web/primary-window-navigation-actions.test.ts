@@ -493,8 +493,8 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(navigation.openRepoDashboard).toHaveBeenCalledWith('/tmp/repo-c', presentationOptions())
   })
 
-  test('closes the repo through the store action without navigation when it is not current', () => {
-    const closeRepo = vi.fn()
+  test('closes the repo through the store action without navigation when it is not current', async () => {
+    const closeRepo = vi.fn(async () => ({ ok: true as const }))
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
       currentRepoId: '/tmp/repo-a',
@@ -503,14 +503,14 @@ describe('createPrimaryWindowNavigationActions', () => {
       routeNavigation: navigation,
     })
 
-    actions.closeRepo('/tmp/repo-b')
+    await actions.closeRepo('/tmp/repo-b')
 
     expect(closeRepo).toHaveBeenCalledWith('/tmp/repo-b')
     expect(navigation.openRepoDashboard).not.toHaveBeenCalled()
   })
 
-  test('closes the current repo and navigates to the next repo dashboard without history', () => {
-    const closeRepo = vi.fn()
+  test('closes the current repo and navigates to the next repo dashboard without history', async () => {
+    const closeRepo = vi.fn(async () => ({ ok: true as const }))
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
       currentRepoId: '/tmp/repo-b',
@@ -519,17 +519,17 @@ describe('createPrimaryWindowNavigationActions', () => {
       routeNavigation: navigation,
     })
 
-    actions.closeRepo('/tmp/repo-b')
+    await actions.closeRepo('/tmp/repo-b')
 
     expect(closeRepo).toHaveBeenCalledWith('/tmp/repo-b')
     expect(navigation.openRepoDashboard).toHaveBeenCalledWith('/tmp/repo-c', presentationOptions())
   })
 
-  test('closes the current repo and restores the next repo workspace history entry', () => {
+  test('closes the current repo and restores the next repo workspace history entry', async () => {
     useReposStore
       .getState()
       .recordWorkspaceNavigation(branchHistoryEntry('/tmp/repo-c', 'feature/remembered', 'history'))
-    const closeRepo = vi.fn()
+    const closeRepo = vi.fn(async () => ({ ok: true as const }))
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
       currentRepoId: '/tmp/repo-b',
@@ -538,7 +538,7 @@ describe('createPrimaryWindowNavigationActions', () => {
       routeNavigation: navigation,
     })
 
-    actions.closeRepo('/tmp/repo-b')
+    await actions.closeRepo('/tmp/repo-b')
 
     expect(closeRepo).toHaveBeenCalledWith('/tmp/repo-b')
     expect(navigation.openRepoBranchTab).toHaveBeenCalledWith(
@@ -549,7 +549,7 @@ describe('createPrimaryWindowNavigationActions', () => {
     )
   })
 
-  test('closes the current repo into the next repo dashboard when its history restore is blocked', () => {
+  test('closes the current repo into the next repo dashboard when its history restore is blocked', async () => {
     seedRepoWithReadModelForTest({
       id: REPO_ID,
       branches: [createRepoBranch(BRANCH_NAME, { worktree: { path: WORKTREE_PATH } })],
@@ -563,7 +563,7 @@ describe('createPrimaryWindowNavigationActions', () => {
       createTerminal: vi.fn(async () => 'term-111111111111111111111'),
       selectTerminal: vi.fn(),
     })
-    const closeRepo = vi.fn()
+    const closeRepo = vi.fn(async () => ({ ok: true as const }))
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
       currentRepoId: '/tmp/repo-a',
@@ -572,7 +572,7 @@ describe('createPrimaryWindowNavigationActions', () => {
       routeNavigation: navigation,
     })
 
-    actions.closeRepo('/tmp/repo-a')
+    await actions.closeRepo('/tmp/repo-a')
 
     expect(closeRepo).toHaveBeenCalledWith('/tmp/repo-a')
     expect(navigation.openRepoBranchTab).not.toHaveBeenCalled()
@@ -580,21 +580,38 @@ describe('createPrimaryWindowNavigationActions', () => {
     expect(useReposStore.getState().navigationHistoryByRepo[REPO_ID]?.current).toEqual(entry)
   })
 
-  test('closes the final current repo and navigates home', () => {
+  test('closes the final current repo and navigates home', async () => {
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
       currentRepoId: '/tmp/repo-a',
       order: ['/tmp/repo-a'],
-      closeRepo: vi.fn(),
+      closeRepo: vi.fn(async () => ({ ok: true as const })),
       routeNavigation: navigation,
     })
 
-    actions.closeRepo('/tmp/repo-a')
+    await actions.closeRepo('/tmp/repo-a')
 
     expect(navigation.openHome).toHaveBeenCalled()
   })
 
-  test('opens create worktree for the current repo', () => {
+  test('keeps the current route when the shared workspace close fails', async () => {
+    const navigation = routeNavigation()
+    const actions = createPrimaryWindowNavigationActions({
+      currentRepoId: '/tmp/repo-a',
+      order: ['/tmp/repo-a', '/tmp/repo-b'],
+      closeRepo: vi.fn(async () => ({ ok: false as const, message: 'error.failed-read-repo' })),
+      routeNavigation: navigation,
+    })
+
+    await expect(actions.closeRepo('/tmp/repo-a')).resolves.toEqual({
+      ok: false,
+      message: 'error.failed-read-repo',
+    })
+    expect(navigation.openRepoDashboard).not.toHaveBeenCalled()
+    expect(navigation.openHome).not.toHaveBeenCalled()
+  })
+
+  test('opens create worktree for the current repo', async () => {
     const navigation = routeNavigation()
     const actions = createPrimaryWindowNavigationActions({
       currentRepoId: '/tmp/repo-a',

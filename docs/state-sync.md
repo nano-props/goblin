@@ -91,23 +91,38 @@ Notes:
 
 Representative examples:
 
-- saved session state
-- workspace layout and pane sizes
-- active repo and open repo set for next launch
+- server-owned open-repo membership/order and durable static workspace-pane layout
+- client-local workspace state (active repo, route, layout, selection, and filetree view)
 - `repoSnapshotCache` for warm restore
 - boot-only `useSessionRestoreStore`
 
 Notes:
 
-- `RestorableWorkspaceState` names the workspace fields that serialize into `WorkspaceSessionState`.
+- `ServerWorkspaceState` contains shared open-repo membership/order and
+  restart-durable static pane layout. Explicit server layout commands persist it.
+- `ClientWorkspaceState` is persisted in stable native `userData` storage for
+  Electron and browser local storage for Web. Native storage must not depend
+  on the embedded server's dynamically allocated origin.
+- At boot, the server reads `openRepoEntries` from its workspace state. Later
+  membership changes use fine-grained server open/close commands, not a client
+  whole-workspace snapshot.
+- Lazy repo promotion sends only the repo root and server-issued runtime id.
+  The server resolves the canonical entry and durable pane layout from current
+  workspace membership. Do not carry membership or server layout in a client
+  restore intent or baseline write-back.
+- Boot keeps `ClientWorkspaceState` and `ServerWorkspaceState` separate. The client never constructs or writes a combined session snapshot.
 - `repoSnapshotCache` names the warm-start repo cache slice.
 - `RepoSnapshotCacheEntry` is the stored snapshot shape inside that cache.
 - Restorable helpers should focus on boot restore and persistence boundaries, not on live runtime convergence.
 - `repoSnapshotCache` is a startup affordance, not a runtime authority. Persist it from query-projected repo data when available; use it to paint placeholders during boot, then converge through normal server/query refresh.
-- `hydrateSession` belongs to the restorable boot path, while `ensureWorkspaceOpen` and `closeRepo` belong to runtime repo lifecycle.
+- `hydrateRestoredWorkspaceRuntime` belongs to the restorable boot path, while
+  `ensureWorkspaceOpen` and `closeRepo` belong to runtime repo lifecycle.
 - Restorable state is not runtime-coherent shared state.
-- Session writes are client -> persistence only after boot restore; they do not publish runtime invalidation.
-- Workspace pane tabs in saved session state are boot-only import data. After restore, runtime tab changes flow server -> React Query -> later persistence; saved session data must not become a live tab authority.
+- Do not add a whole-session client -> server write. Each side persists only the state it owns.
+- Explicit workspace pane layout commands persist their durable static layout
+  before committing the canonical runtime projection.
+- Restore repairs invalid durable pane-layout targets with a repo-local compare-and-clear operation. It must not rebuild
+  the whole workspace or overwrite tabs that changed after validation.
 - Workspace pane target preference distinguishes three states: no target (`null` render selection), uninitialized target (use `INITIAL_WORKSPACE_PANE_TAB`), and explicit empty pane (`preferredWorkspacePaneTabByTarget[targetKey] === null`). Do not use `status` as a fallback for route misses, projection misses, or bare branch URLs.
 - URL-backed workspace pane routes are the visible-pane source of truth. Client preference and selected runtime-session state are restorable projection supplements, not command authorities. Internal workspace-pane commands must decide their target route and write the matching preference/selection supplement through the navigation action that accepted the route.
 - Route effects may sync an externally arrived URL (manual address entry, browser Back/Forward, restore) into preference/selection so the restorable projection stays coherent. Command correctness must not depend on those effects running after the route changes.

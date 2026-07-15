@@ -42,9 +42,11 @@ import { IpcError, type RepoLogResponse } from '#/shared/api-types.ts'
 import { isRemoteRepoRuntimeFailure } from '#/server/modules/remote-runtime-failure.ts'
 import { settleRemoteRuntimeFailure } from '#/server/modules/remote-runtime-failure-settlement.ts'
 import type { ServerWorktreeRemovalHost } from '#/server/worktree-removal/worktree-removal-host.ts'
+import type { ServerRepoMutationHost } from '#/server/repo-mutation/repo-mutation-host.ts'
 import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktree-removal-lifecycle.ts'
 import type { PhysicalWorktreeCapability } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
+import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 
 // Soft-fail envelope returned by `jsonOr` for every repo action that
 // doesn't have a more specific success shape. Keep this in one place
@@ -52,7 +54,10 @@ import { DEFAULT_REPOSITORY_LOG_COUNT } from '#/shared/git-types.ts'
 // human-readable i18n key, `err.ok === false` is the branch.
 const READ_REPO_ERROR = { ok: false as const, message: 'error.failed-read-repo' }
 
-export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWorktreeRemovalHost }) {
+export function createRepoRoutes(options: {
+  worktreeRemovalApplication: ServerWorktreeRemovalHost
+  repoMutationApplication: ServerRepoMutationHost
+}) {
   const app = createRouteApp()
   async function jsonOr<T>(run: () => Promise<T>, fallback: T, label: string) {
     try {
@@ -179,7 +184,7 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
       () => trashRepositoryFile(cwd, worktreePath, path, c.req.raw.signal, { repoRuntimeId }),
       'trash-file',
     )
-    if (result.ok || result.repoChanged === true) {
+    if (result.ok || result.repositoryStateChanged === true) {
       publishRepoQueryInvalidation({ repoId: cwd, query: 'repo-snapshot' })
     }
     return c.json(result)
@@ -259,7 +264,7 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
     )
   })
   app.post('/delete-branch', async (c) => {
-    const { cwd, repoRuntimeId, branch, force, alsoDeleteUpstream } = await parseHttpBody(
+    const { cwd, repoRuntimeId, branch, force, deleteUpstream } = await parseHttpBody(
       REPO_PROCEDURE_SCHEMAS.deleteBranch,
       c,
     )
@@ -268,13 +273,21 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
     return c.json(
       await runtimeReadJsonOrThrow(
         userId,
-        () => deleteRepoBranch(cwd, branch, { force, alsoDeleteUpstream }, c.req.raw.signal, { repoRuntimeId }),
+        async () => {
+          return await options.repoMutationApplication.deleteBranch(userId, {
+            repoRoot: cwd,
+            repoRuntimeId,
+            branchName: branch,
+            deleteBranch: async () =>
+              await deleteRepoBranch(cwd, branch, { force, deleteUpstream }, c.req.raw.signal, { repoRuntimeId }),
+          })
+        },
         'delete-branch',
       ),
     )
   })
   app.post('/remove-worktree', async (c) => {
-    const { cwd, repoRuntimeId, branch, worktreePath, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream } =
+    const { cwd, repoRuntimeId, branch, worktreePath, deleteBranch, forceDeleteBranch, deleteUpstream } =
       await parseHttpBody(REPO_PROCEDURE_SCHEMAS.removeWorktree, c)
     const userId = userIdFromContext(c)
     if (!userId) throw new Error('error.unauthorized')
@@ -285,6 +298,8 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
             repoRoot: cwd,
             repoRuntimeId,
             worktreePath,
+            branchName: branch,
+            deleteBranch,
             signal: c.req.raw.signal,
             remove: async (
               physicalWorktreeCapability: PhysicalWorktreeCapability,
@@ -293,7 +308,7 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
             ) =>
               await removeCapturedRepoWorktree(
                 cwd,
-                { branch, worktreePath, alsoDeleteBranch, forceDeleteBranch, alsoDeleteUpstream },
+                { branch, worktreePath, deleteBranch, forceDeleteBranch, deleteUpstream },
                 lifecycle,
                 physicalWorktreeCapability,
                 signal,
@@ -372,13 +387,15 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
         })
       }
       const repo = { id: probe.root, name: probe.name ?? probe.root.split('/').filter(Boolean).at(-1) ?? probe.root }
+      const repoRuntimeId = acquireRepoRuntime(userId, repo.id, input.clientId)
       return c.json({
         ok: true as const,
         repo,
-        repoRuntimeId: acquireRepoRuntime(userId, repo.id, input.clientId),
+        repoRuntimeId,
       })
     }
-    return c.json({ ok: true as const, repoRuntimeId: acquireRepoRuntime(userId, input.repoRoot, input.clientId) })
+    const repoRuntimeId = acquireRepoRuntime(userId, input.repoRoot, input.clientId)
+    return c.json({ ok: true as const, repoRuntimeId })
   })
   app.post('/runtime-list', async (c) => {
     const userId = userIdFromContext(c)
@@ -390,13 +407,15 @@ export function createRepoRoutes(options: { worktreeRemovalApplication: ServerWo
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
     const { clientId, repoRoots } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.runtimeReconcile, c)
-    return c.json({ runtimes: replaceRepoRuntimeMembershipsForClient(userId, clientId, repoRoots) })
+    const runtimes = replaceRepoRuntimeMembershipsForClient(userId, clientId, repoRoots)
+    return c.json({ runtimes })
   })
   app.post('/runtime-close', async (c) => {
     const userId = userIdFromContext(c)
     if (!userId) return c.json({ ok: false as const, message: 'Unauthorized' }, 401)
     const { repoRoot, repoRuntimeId, clientId } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.runtimeClose, c)
-    return c.json({ ok: true as const, ...releaseRepoRuntime(userId, repoRoot, repoRuntimeId, clientId) })
+    const result = releaseRepoRuntime(userId, repoRoot, repoRuntimeId, clientId)
+    return c.json({ ok: true as const, ...result })
   })
   app.post('/abort', async (c) => {
     const { cwd } = await parseHttpBody(REPO_PROCEDURE_SCHEMAS.abort, c)

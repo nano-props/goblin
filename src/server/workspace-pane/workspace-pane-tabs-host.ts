@@ -1,14 +1,23 @@
 import type {
-  WorkspacePaneTabsBatchReplaceInput,
+  WorkspacePaneTabsEntry,
   WorkspacePaneTabsListInput,
   WorkspacePaneTabsReplaceInput,
   WorkspacePaneTabsSnapshot,
   WorkspacePaneTabsUpdateInput,
 } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneTabsTargetIdentity } from '#/shared/workspace-pane-tabs-target.ts'
 
 type MaybePromise<T> = T | Promise<T>
 
+export interface WorkspacePaneTabsInitializeInput extends WorkspacePaneTabsListInput {
+  entries: WorkspacePaneTabsEntry[]
+}
+
 export interface ServerWorkspacePaneTabsHost {
+  initializeTabs(
+    userId: string,
+    input: WorkspacePaneTabsInitializeInput,
+  ): MaybePromise<WorkspacePaneTabsSnapshot>
   listWorkspaceTabs(
     clientId: string,
     userId: string,
@@ -19,14 +28,16 @@ export interface ServerWorkspacePaneTabsHost {
     userId: string,
     input: WorkspacePaneTabsReplaceInput,
   ): MaybePromise<WorkspacePaneTabsSnapshot>
-  replaceTabsBatch?(
-    clientId: string,
-    userId: string,
-    input: WorkspacePaneTabsBatchReplaceInput,
-  ): MaybePromise<Array<{ repoRoot: string; repoRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>>
   updateTabs(
     clientId: string,
     userId: string,
     input: WorkspacePaneTabsUpdateInput,
+  ): MaybePromise<WorkspacePaneTabsSnapshot>
+}
+
+export interface ServerWorkspacePaneTargetLifecycleHost {
+  retireTarget(
+    userId: string,
+    input: { repoRuntimeId: string; target: WorkspacePaneTabsTargetIdentity },
   ): MaybePromise<WorkspacePaneTabsSnapshot>
 }

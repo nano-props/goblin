@@ -1016,7 +1016,7 @@ describe('repo mutation invalidation publishing', () => {
       },
     )
 
-    expect(result).toEqual({ ok: false, message: 'error.settings-write-title', repoChanged: true })
+    expect(result).toEqual({ ok: false, message: 'error.settings-write-title', repositoryStateChanged: true })
     expect(mocks.untrustServerRepoWorktreeBootstrapConfig).toHaveBeenCalledWith({ repoId: '/tmp/repo', configHash })
     expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
   })
@@ -1199,7 +1199,7 @@ describe('repo mutation invalidation publishing', () => {
       {
         branch: 'feature/b',
         worktreePath: '/tmp/repo-worktree',
-        alsoDeleteBranch: false,
+        deleteBranch: false,
       },
       successfulRemovalLifecycle,
     )
@@ -1270,7 +1270,7 @@ describe('repo mutation invalidation publishing', () => {
       {
         branch: 'feature/b',
         worktreePath: '/tmp/repo-linked',
-        alsoDeleteBranch: false,
+        deleteBranch: false,
       },
       successfulRemovalLifecycle,
     )
@@ -1351,7 +1351,7 @@ describe('repo mutation invalidation publishing', () => {
       },
     )
 
-    expect(result).toEqual({ ok: false, message: 'error.settings-write-title', repoChanged: true })
+    expect(result).toEqual({ ok: false, message: 'error.settings-write-title', repositoryStateChanged: true })
     expect(mocks.createWorktree).toHaveBeenCalled()
     expect(mocks.bootstrapWorktreeAfterCreate).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', {
       signal: undefined,
@@ -1467,7 +1467,7 @@ describe('repo mutation invalidation publishing', () => {
     expect(result).toEqual({
       ok: false,
       message: 'Worktree bootstrap failed: destination already exists: .env.local',
-      repoChanged: true,
+      repositoryStateChanged: true,
     })
     expect(mocks.bootstrapWorktreeAfterCreate).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', {
       signal: undefined,
@@ -1517,7 +1517,7 @@ describe('repo mutation invalidation publishing', () => {
     expect(result).toEqual({
       ok: false,
       message: 'Worktree bootstrap failed: destination already exists: .env.local',
-      repoChanged: true,
+      repositoryStateChanged: true,
     })
     expect(mocks.publishRepoQueryInvalidation).toHaveBeenCalledWith({
       repoId,
@@ -1556,7 +1556,7 @@ describe('repo mutation invalidation publishing', () => {
     expect(result).toEqual({
       ok: false,
       message: 'Worktree bootstrap failed: destination already exists: .env.local',
-      repoChanged: true,
+      repositoryStateChanged: true,
     })
     expect(mocks.trustServerRepoWorktreeBootstrapConfig).not.toHaveBeenCalled()
     expect(mocks.untrustServerRepoWorktreeBootstrapConfig).not.toHaveBeenCalled()
@@ -1615,17 +1615,17 @@ describe('repo mutation invalidation publishing', () => {
     mocks.deleteRemoteBranch.mockResolvedValueOnce({
       ok: false,
       message: 'remote rejected delete',
-      repoChanged: true,
+      repositoryStateChanged: true,
     })
     const { deleteRepoBranch } = await import('#/server/modules/repo-write-paths.ts')
 
-    const result = await deleteRepoBranch(repoId, 'feature/a', { alsoDeleteUpstream: true })
+    const result = await deleteRepoBranch(repoId, 'feature/a', { deleteUpstream: true })
 
-    expect(result).toEqual({ ok: false, message: 'remote rejected delete', repoChanged: true })
+    expect(result).toEqual({ ok: false, message: 'remote rejected delete', repositoryStateChanged: true })
     expect(mocks.deleteRemoteBranch).toHaveBeenCalledWith(expect.objectContaining({ remotePath: '/srv/repo' }), {
       branch: 'feature/a',
       force: undefined,
-      alsoDeleteUpstream: true,
+      deleteUpstream: true,
       signal: undefined,
     })
     expectRepoSnapshotInvalidations(
@@ -1738,7 +1738,7 @@ describe('repo mutation invalidation publishing', () => {
       {
         branch: 'feature/a',
         worktreePath: '/tmp/repo-worktree',
-        alsoDeleteBranch: false,
+        deleteBranch: false,
       },
       { ...successfulRemovalLifecycle, beforeRemove, afterWorktreeRemoved },
     )
@@ -1791,7 +1791,7 @@ describe('repo mutation invalidation publishing', () => {
         {
           branch: 'feature/a',
           worktreePath: '/tmp/repo-worktree',
-          alsoDeleteBranch: false,
+          deleteBranch: false,
         },
         { ...successfulRemovalLifecycle, afterRemoveFailed, afterWorktreeRemoved },
       ),
@@ -1821,7 +1821,7 @@ describe('repo mutation invalidation publishing', () => {
       {
         branch: 'feature/a',
         worktreePath: '/tmp/repo-worktree',
-        alsoDeleteBranch: false,
+        deleteBranch: false,
       },
       {
         ...successfulRemovalLifecycle,
@@ -1829,7 +1829,7 @@ describe('repo mutation invalidation publishing', () => {
       },
     )
 
-    expect(result).toEqual({ ok: false, message: 'tabs finalize failed', repoChanged: true })
+    expect(result).toEqual({ ok: false, message: 'tabs finalize failed', repositoryStateChanged: true })
     expect(mocks.pruneServerRepoSettingsForRemovedWorktree).toHaveBeenCalledWith({
       repoId: '/tmp/repo',
       worktreePath: '/tmp/repo-worktree',
@@ -1855,7 +1855,7 @@ describe('repo mutation invalidation publishing', () => {
       {
         branch: 'feature/a',
         worktreePath: '/tmp/repo-worktree',
-        alsoDeleteBranch: true,
+        deleteBranch: true,
       },
       successfulRemovalLifecycle,
     )
@@ -1894,12 +1894,12 @@ describe('repo mutation invalidation publishing', () => {
       {
         branch: 'feature/a',
         worktreePath: '/tmp/repo-worktree',
-        alsoDeleteBranch: true,
+        deleteBranch: true,
       },
       successfulRemovalLifecycle,
     )
 
-    expect(result).toEqual({ ok: false, message: 'fatal: delete failed', repoChanged: true })
+    expect(result).toEqual({ ok: false, message: 'fatal: delete failed', repositoryStateChanged: true })
     expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', undefined)
     expect(mocks.pruneServerRepoSettingsForRemovedWorktree).toHaveBeenCalledWith({
       repoId: '/tmp/repo',
@@ -1937,7 +1937,7 @@ describe('repo mutation invalidation publishing', () => {
       {
         branch: 'feature/a',
         worktreePath: '/tmp/repo-linked',
-        alsoDeleteBranch: true,
+        deleteBranch: true,
       },
       successfulRemovalLifecycle,
     )
@@ -1984,7 +1984,7 @@ describe('repo mutation invalidation publishing', () => {
       {
         branch: 'feature/a',
         worktreePath: '/tmp/repo-worktree',
-        alsoDeleteBranch: false,
+        deleteBranch: false,
       },
       successfulRemovalLifecycle,
     )
@@ -2017,12 +2017,12 @@ describe('repo mutation invalidation publishing', () => {
       {
         branch: 'feature/a',
         worktreePath: '/tmp/repo-worktree',
-        alsoDeleteBranch: false,
+        deleteBranch: false,
       },
       successfulRemovalLifecycle,
     )
 
-    expect(result).toEqual({ ok: false, message: 'error.settings-write-title', repoChanged: true })
+    expect(result).toEqual({ ok: false, message: 'error.settings-write-title', repositoryStateChanged: true })
     expect(mocks.removeWorktree).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo-worktree', undefined)
     expect(mocks.publishSettingsInvalidation).not.toHaveBeenCalled()
   })
@@ -2049,7 +2049,7 @@ describe('repo mutation invalidation publishing', () => {
       {
         branch: 'feature/a',
         worktreePath: '/tmp/repo-worktree',
-        alsoDeleteBranch: true,
+        deleteBranch: true,
       },
       { ...successfulRemovalLifecycle, beforeRemove },
     )
@@ -2080,7 +2080,7 @@ describe('repo mutation invalidation publishing', () => {
       {
         branch: 'feature/a',
         worktreePath: '/tmp/repo-worktree',
-        alsoDeleteBranch: false,
+        deleteBranch: false,
       },
       successfulRemovalLifecycle,
     )
@@ -2101,7 +2101,7 @@ describe('repo mutation invalidation publishing', () => {
       {
         branch: 'feature/a',
         worktreePath: '/tmp/repo-worktree',
-        alsoDeleteBranch: false,
+        deleteBranch: false,
       },
       successfulRemovalLifecycle,
     )

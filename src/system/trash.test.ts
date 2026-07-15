@@ -22,7 +22,7 @@ describe('movePathToTrash', () => {
     await expect(movePathToTrash('/tmp/file.txt', signal)).resolves.toEqual({
       ok: true,
       message: 'ok',
-      repoChanged: true,
+      repositoryStateChanged: true,
     })
 
     expect(mocks.execa).toHaveBeenCalledWith(

@@ -525,9 +525,13 @@ export function setRepoProjectionQueryData(
 export function seedRepoProjectionQueryData(
   repoRoot: string,
   repoRuntimeId: string,
-  projection: RepoRuntimeProjection,
+  projection: RepoRuntimeProjection | null,
   queryClient: QueryClient = primaryWindowQueryClient,
 ): void {
+  // Stub leases (non-active repos at cold start) carry `projection: null`.
+  // Nothing to seed — the lazy restore will fill the cache when the user
+  // navigates to the repo.
+  if (!projection) return
   // Cache/session restore seed data is a UI placeholder, not an authoritative
   // server read, so do not seed the active operations cache here.
   queryClient.setQueryData(

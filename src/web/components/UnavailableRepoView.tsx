@@ -1,4 +1,5 @@
 import { AlertCircle, RefreshCw, Shield, X } from 'lucide-react'
+import { toast } from 'sonner'
 import { isRemoteRepoId } from '#/shared/remote-repo.ts'
 import { Button } from '#/web/components/ui/button.tsx'
 import { EmptyState } from '#/web/components/Layout.tsx'
@@ -41,6 +42,11 @@ export function UnavailableRepoView({ repo }: Props) {
   const bodyKey = unavailableBodyKey(isRemote, reason)
   const canOpenSshSettings = isRemote && shouldOfferSshSettings(reason)
 
+  async function handleClose() {
+    const result = await navigation.closeRepo(repo.id)
+    if (!result.ok) toast.error(t(result.message))
+  }
+
   return (
     <section className="flex min-w-0 flex-1 flex-col">
       <EmptyState
@@ -82,7 +88,7 @@ export function UnavailableRepoView({ repo }: Props) {
                   {t('repo-picker.open-remote-open-ssh-settings')}
                 </Button>
               )}
-              <Button type="button" variant="ghost" onClick={() => navigation.closeRepo(repo.id)}>
+              <Button type="button" variant="ghost" onClick={() => void handleClose()}>
                 <X />
                 {t('repo-unavailable.close')}
               </Button>

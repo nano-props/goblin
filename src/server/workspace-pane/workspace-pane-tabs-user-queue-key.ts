@@ -5,5 +5,9 @@
  * all writes for that scope must share one queue.
  */
 export function workspacePaneTabsUserScopeQueueKey(userId: string | number, scope: string): string {
-  return `${String(userId)}\0scope\0${scope}`
+  return `${workspacePaneTabsUserQueuePrefixKey(userId)}${scope}`
+}
+
+export function workspacePaneTabsUserQueuePrefixKey(userId: string | number): string {
+  return `${String(userId)}\0scope\0`
 }

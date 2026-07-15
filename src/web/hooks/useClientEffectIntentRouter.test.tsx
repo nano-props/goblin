@@ -2,6 +2,7 @@
 
 import { act, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { toast } from 'sonner'
 import { renderInJsdom } from '#/test-utils/render.tsx'
 import { useClientEffectIntentRouter } from '#/web/hooks/useClientEffectIntentRouter.ts'
 import type { PrimaryWindowNavigationActions } from '#/web/primary-window-navigation.tsx'
@@ -34,8 +35,11 @@ import type { RepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { useTerminalProjectionHydrationStore } from '#/web/stores/terminal-projection-hydration.ts'
 import { workspacePaneTabTargetForBranch } from '#/web/workspace-pane/workspace-pane-tab-target.ts'
 
+vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
+
 const appDataClientMocks = vi.hoisted(() => ({
   clearRecentRepoHistory: vi.fn(async () => {}),
+  removeRepoFromWorkspace: vi.fn(async () => {}),
 }))
 
 vi.mock('#/web/settings-actions.ts', async () => {
@@ -43,6 +47,7 @@ vi.mock('#/web/settings-actions.ts', async () => {
   return {
     ...actual,
     clearRecentRepoHistory: appDataClientMocks.clearRecentRepoHistory,
+    removeRepoFromWorkspace: appDataClientMocks.removeRepoFromWorkspace,
   }
 })
 
@@ -70,6 +75,7 @@ beforeEach(() => {
   showRepoBranchWorkspacePaneTabSpy.mockClear()
   showRepoBranchTerminalSessionSpy.mockClear()
   appDataClientMocks.clearRecentRepoHistory.mockClear()
+  appDataClientMocks.removeRepoFromWorkspace.mockClear()
   consumeExternalOpenPathsSpy.mockReset()
   consumeExternalOpenPathsSpy.mockResolvedValue([])
   overlayOpen = false
@@ -83,9 +89,9 @@ beforeEach(() => {
     activateRepo: (repoId) => {
       activateRepoSpy(repoId)
     },
-    closeRepo: (repoId) => {
+    closeRepo: async (repoId) => {
       closeRepoSpy(repoId)
-      useReposStore.getState().closeRepo(repoId)
+      return await useReposStore.getState().closeRepo(repoId)
     },
     cycleRepo: () => {},
     selectRepoBranch: () => true,
@@ -276,6 +282,26 @@ describe('useClientEffectIntentRouter', () => {
 
     expect(closeRepoSpy).toHaveBeenCalledWith(repo.id)
     expect(useReposStore.getState().repos[repo.id]).toBeUndefined()
+  })
+
+  test('close-repo menu action reports shared membership write failures', async () => {
+    const repo = seedRepoWithReadModelForTest({
+      id: '/tmp/repo',
+      currentBranch: 'main',
+      currentBranchName: 'main',
+      branchSnapshots: [createBranchSnapshot('main', { isCurrent: true, worktree: { path: '/tmp/repo-worktree' } })],
+    })
+    currentRepoId = repo.id
+    appDataClientMocks.removeRepoFromWorkspace.mockRejectedValueOnce(new Error('workspace write failed'))
+    await renderHookHost()
+
+    await act(async () => {
+      for (const listener of intentListeners) listener({ type: 'close-repo-requested' })
+      await Promise.resolve()
+    })
+
+    expect(useReposStore.getState().repos[repo.id]).toBeDefined()
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('error.failed-read-repo'))
   })
 
   test('zen mode menu action toggles the zen mode state', async () => {

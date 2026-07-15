@@ -1348,7 +1348,7 @@ function terminalEntry(id: string) {
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
   const navigation: PrimaryWindowNavigationActions = {
     activateRepo: () => {},
-    closeRepo: () => {},
+    closeRepo: async () => ({ ok: true }),
     cycleRepo: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,

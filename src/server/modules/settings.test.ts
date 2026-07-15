@@ -1,17 +1,14 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { defaultWorkspaceSessionState } from '#/shared/settings-defaults.ts'
 import { createNativeShortcutRegistrationState } from '#/server/modules/native-shortcut-registration.ts'
 
 const mocks = vi.hoisted(() => ({
   getUserSettings: vi.fn(),
-  getServerSessionState: vi.fn(),
   getServerRecentRepos: vi.fn(),
   getServerRepoSettings: vi.fn(),
 }))
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getUserSettings: mocks.getUserSettings,
-  getServerSessionState: mocks.getServerSessionState,
   getServerRecentRepos: mocks.getServerRecentRepos,
   getServerRepoSettings: mocks.getServerRepoSettings,
 }))
@@ -34,7 +31,6 @@ describe('server settings snapshot runtime state', () => {
       globalShortcut: 'Alt+G',
       lanEnabled: false,
     })
-    mocks.getServerSessionState.mockResolvedValue(defaultWorkspaceSessionState())
     mocks.getServerRecentRepos.mockResolvedValue([])
     mocks.getServerRepoSettings.mockResolvedValue([])
 

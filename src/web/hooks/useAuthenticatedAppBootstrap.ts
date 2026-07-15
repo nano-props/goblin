@@ -1,14 +1,17 @@
 // Authenticated bootstrap primes query state from the server transport before
 // feature stores start reading it.
-import { useEffect, useRef, useState } from 'react'
-import type { SettingsSnapshot, WorkspaceSessionState } from '#/shared/api-types.ts'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type {
+  ClientWorkspaceState,
+  SettingsSnapshot,
+} from '#/shared/api-types.ts'
 import { normalizeWorkspaceSessionLayoutState } from '#/shared/workspace-layout.ts'
 import { bootstrapLog } from '#/web/logger.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { restoreFiletreeViewStateFromSession } from '#/web/filetree-session-state.ts'
 import { restoreRestorableWorkspaceStateFromSession } from '#/web/restorable-workspace-state.ts'
 import { getExternalAppsSnapshot, getSettingsSnapshot } from '#/web/settings-client.ts'
-import { restorePersistedWorkspaceSession } from '#/web/settings-actions.ts'
+import { restoreWorkspaceAtBoot } from '#/web/settings-actions.ts'
 import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
 import { useHostInfoStore } from '#/web/stores/host-info.ts'
 import { useI18nStore } from '#/web/stores/i18n.ts'
@@ -16,8 +19,18 @@ import { useReposStore } from '#/web/stores/repos/store.ts'
 import { useThemeStore } from '#/web/stores/theme.ts'
 import { createTimeoutAbortController } from '#/web/lib/abort.ts'
 import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
+import { readClientWorkspaceState } from '#/web/client-workspace-state.ts'
+import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 
-export type AuthenticatedAppBootstrapState = { status: 'restoring-workspace' } | { status: 'ready' }
+export type AuthenticatedAppBootstrapState =
+  | { status: 'restoring-workspace' }
+  | { status: 'ready' }
+  | { status: 'failed'; message: string }
+
+export interface AuthenticatedAppBootstrapResult {
+  state: AuthenticatedAppBootstrapState
+  retry: () => void
+}
 
 const RESTORING_WORKSPACE_BOOTSTRAP_STATE: AuthenticatedAppBootstrapState = { status: 'restoring-workspace' }
 const READY_BOOTSTRAP_STATE: AuthenticatedAppBootstrapState = { status: 'ready' }
@@ -29,26 +42,44 @@ interface AuthenticatedWorkspaceRestoreRun {
   cancel: () => void
 }
 
-type WorkspaceRestoreOutcome = { status: 'completed' } | { status: 'cancelled' }
+type WorkspaceRestoreOutcome =
+  | { status: 'completed' }
+  | { status: 'cancelled' }
+  | { status: 'failed'; message: string }
 
-export function useAuthenticatedAppBootstrap(): AuthenticatedAppBootstrapState {
+export function useAuthenticatedAppBootstrap(options?: {
+  activeRepoRoot?: string | null
+}): AuthenticatedAppBootstrapResult {
+  const activeRepoRootRef = useRef(options?.activeRepoRoot ?? null)
   const restoreRunRef = useRef<AuthenticatedWorkspaceRestoreRun | null>(null)
+  const [attempt, setAttempt] = useState(0)
   const [state, setState] = useState<AuthenticatedAppBootstrapState>(RESTORING_WORKSPACE_BOOTSTRAP_STATE)
 
   useEffect(() => {
     if (restoreRunRef.current) return
-    const run = startAuthenticatedWorkspaceRestoreRun(() => setState(READY_BOOTSTRAP_STATE))
+    setState(RESTORING_WORKSPACE_BOOTSTRAP_STATE)
+    const run = startAuthenticatedWorkspaceRestoreRun((outcome) => {
+      if (outcome.status === 'completed') {
+        setState(READY_BOOTSTRAP_STATE)
+      } else if (outcome.status === 'failed') {
+        setState({ status: 'failed', message: outcome.message })
+      }
+    }, activeRepoRootRef.current)
     restoreRunRef.current = run
     return () => {
       run.cancel()
       if (restoreRunRef.current === run) restoreRunRef.current = null
     }
-  }, [])
+  }, [attempt])
 
-  return state
+  const retry = useCallback(() => setAttempt((value) => value + 1), [])
+  return { state, retry }
 }
 
-function startAuthenticatedWorkspaceRestoreRun(onReady: () => void): AuthenticatedWorkspaceRestoreRun {
+function startAuthenticatedWorkspaceRestoreRun(
+  onSettled: (outcome: WorkspaceRestoreOutcome) => void,
+  activeRepoRoot: string | null,
+): AuthenticatedWorkspaceRestoreRun {
   let cancelled = false
   const timeout = createTimeoutAbortController(
     AUTHENTICATED_WORKSPACE_RESTORE_TIMEOUT_MS,
@@ -62,9 +93,9 @@ function startAuthenticatedWorkspaceRestoreRun(onReady: () => void): Authenticat
     if (!timeout.signal.aborted) bootstrapLog.warn('external apps priming failed', { err })
   })
   void hydrateNonCriticalAuthenticatedState(settingsSnapshot, timeout.signal)
-  void restoreBootSession(settingsSnapshot, timeout.signal).then((outcome) => {
+  void restoreBootSession(settingsSnapshot, timeout.signal, activeRepoRoot).then((outcome) => {
     timeout.dispose()
-    if (!cancelled && outcome.status === 'completed') onReady()
+    if (!cancelled && outcome.status !== 'cancelled') onSettled(outcome)
   })
   return {
     cancel: () => {
@@ -95,40 +126,57 @@ async function hydrateNonCriticalAuthenticatedState(
 async function restoreBootSession(
   settingsSnapshot: Promise<SettingsSnapshot>,
   signal: AbortSignal,
+  activeRepoRoot: string | null,
 ): Promise<WorkspaceRestoreOutcome> {
   try {
     useReposStore.setState({ sessionPersistenceReady: false, sessionRestoreError: null })
+    const presentation = await readClientWorkspaceState()
     const snapshot = await abortable(settingsSnapshot, signal)
     primaryWindowQueryClient.setQueryData(settingsSnapshotQueryKey(), snapshot)
     if (signal.aborted) throw abortReason(signal)
     const restored = await abortable(
-      restorePersistedWorkspaceSession(readOrCreateWebTerminalClientId(), { signal }),
-      signal,
-    )
-    if (restored.status === 'rebuilt') bootstrapLog.warn('invalid persisted session rebuilt by server')
-    applyRestoredWorkspaceSession(restored.session)
-    await abortable(
-      useReposStore.getState().hydrateRestoredWorkspaceRuntime(restored.runtime, {
+      restoreWorkspaceAtBoot(readOrCreateWebTerminalClientId(), {
+        activeRepoRoot: activeRepoRoot ?? presentation.restoredRepoId,
         signal,
       }),
       signal,
     )
+    if (restored.status === 'repaired') {
+      bootstrapLog.warn('workspace restore dropped invalid or unavailable state')
+    }
+    const session = composeRestoredWorkspaceSession(
+      restored.openRepoEntries,
+      presentation,
+      restored.runtime.restoredRepoId,
+    )
+    applyRestoredWorkspaceSession(session)
+    await abortable(
+      useReposStore.getState().hydrateRestoredWorkspaceRuntime(restored.runtime, {
+        signal,
+        restoredSession: session,
+      }),
+      signal,
+    )
     if (signal.aborted) throw abortReason(signal)
-    useReposStore.setState({ sessionPersistenceReady: true, sessionRestoreError: null })
+    useReposStore.setState({
+      sessionPersistenceReady: true,
+      sessionRestoreError: null,
+    })
     return { status: 'completed' }
   } catch (err) {
     if (signal.reason === AUTHENTICATED_WORKSPACE_RESTORE_CANCELLED && isAbortReason(err, signal)) {
       return { status: 'cancelled' }
     }
     bootstrapLog.warn('session restore failed', { err })
-    blockSessionPersistenceAfterRestoreFailure(restoreFailureMessage(err))
-    return { status: 'completed' }
+    const message = restoreFailureMessage(err)
+    blockSessionPersistenceAfterRestoreFailure(message)
+    return { status: 'failed', message }
   }
 }
 
-function applyRestoredWorkspaceSession(session: WorkspaceSessionState): void {
+function applyRestoredWorkspaceSession(session: ClientWorkspaceState): void {
   // Apply layout prefs before repo probing finishes so the first
-  // restored paint uses the saved geometry. useSessionPersistence
+  // restored paint uses the saved geometry. Client workspace persistence
   // still waits for workspaceMembershipReady, so this cannot overwrite the
   // persisted session with a partially hydrated one.
   const normalizedLayout = normalizeWorkspaceSessionLayoutState(session)
@@ -155,10 +203,25 @@ async function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T
 
 function blockSessionPersistenceAfterRestoreFailure(message: string): void {
   useReposStore.setState({
-    workspaceMembershipReady: true,
+    workspaceMembershipReady: false,
     sessionPersistenceReady: false,
     sessionRestoreError: message,
   })
+}
+
+function composeRestoredWorkspaceSession(
+  openRepoEntries: RepoSessionEntry[],
+  presentation: ClientWorkspaceState,
+  serverRestoredRepoId: string | null,
+): ClientWorkspaceState {
+  const openRepoIds = new Set(openRepoEntries.map(repoSessionEntryId))
+  return {
+    ...presentation,
+    restoredRepoId:
+      presentation.restoredRepoId && openRepoIds.has(presentation.restoredRepoId)
+        ? presentation.restoredRepoId
+        : serverRestoredRepoId,
+  }
 }
 
 function restoreFailureMessage(err: unknown): string {
@@ -187,7 +250,7 @@ async function runOptionalBootstrapTask(label: string, task: () => Promise<void>
  * Prime external-apps query cache from the authenticated endpoint so settings
  * pages render with persisted values on first paint instead of flashing the
  * defaults. Settings snapshot cache is populated by restoreBootSession, which
- * also owns server-rebuilt session reconciliation.
+ * also owns server-repaired session reconciliation.
  */
 async function primeExternalAppsQueryCache(signal: AbortSignal): Promise<void> {
   try {

@@ -526,7 +526,7 @@ describe('OpenRemoteRepositoryDialog', () => {
 function navigationWith(overrides: Partial<PrimaryWindowNavigationActions>): PrimaryWindowNavigationActions {
   return {
     activateRepo: () => {},
-    closeRepo: () => {},
+    closeRepo: async () => ({ ok: true }),
     cycleRepo: () => {},
     selectRepoBranch: () => true,
     showRepoBranchEmptyWorkspacePane: () => true,

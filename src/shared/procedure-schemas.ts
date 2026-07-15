@@ -14,7 +14,6 @@ import {
   RemotePathSuggestionsInputSchema,
   RemoteTargetSchema,
 } from '#/shared/api-types.ts'
-import { WORKSPACE_PANE_RUNTIME_TAB_TYPES, WORKSPACE_PANE_STATIC_TAB_IDS } from '#/shared/workspace-pane.ts'
 import { NativeHostProjectionSchema } from '#/shared/native-host-projection.ts'
 import { RepoTreePrefixSchema } from '#/shared/repo-tree-schema.ts'
 import { GIT_HASH_RE } from '#/shared/git-types.ts'
@@ -105,16 +104,16 @@ export const REPO_PROCEDURE_SCHEMAS = {
     repoRuntimeId: RepoRuntimeIdSchema,
     branch: v.string(),
     force: v.optional(v.boolean()),
-    alsoDeleteUpstream: v.optional(v.boolean()),
+    deleteUpstream: v.optional(v.boolean()),
   }),
   removeWorktree: v.object({
     cwd: v.string(),
     repoRuntimeId: RepoRuntimeIdSchema,
     branch: v.string(),
     worktreePath: v.string(),
-    alsoDeleteBranch: v.boolean(),
+    deleteBranch: v.boolean(),
     forceDeleteBranch: v.optional(v.boolean()),
-    alsoDeleteUpstream: v.optional(v.boolean()),
+    deleteUpstream: v.optional(v.boolean()),
   }),
   openUrl: v.object({ cwd: v.string(), repoRuntimeId: RepoRuntimeIdSchema, target: RepoUrlTargetSchema }),
   openTerminal: v.object({
@@ -204,23 +203,12 @@ export const REMOTE_PROCEDURE_SCHEMAS = {
 // `#/server/modules/settings-write-paths.ts` — the route layer
 // validates with these, then passes the parsed object directly to the
 // module layer.
-const WorkspacePaneStaticTabEntrySchema = v.variant('type', [
-  v.object({ type: v.literal('status'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.status) }),
-  v.object({ type: v.literal('changes'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.changes) }),
-  v.object({ type: v.literal('history'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.history) }),
-  v.object({ type: v.literal('files'), tabId: v.literal(WORKSPACE_PANE_STATIC_TAB_IDS.files) }),
-])
-const WorkspacePaneRuntimeTabEntrySchema = v.object({
-  type: v.picklist(WORKSPACE_PANE_RUNTIME_TAB_TYPES),
-  runtimeSessionId: v.pipe(v.string(), v.minLength(1)),
-})
 const FiletreeSessionViewStateSchema = v.object({
   selectedKeys: v.array(v.string()),
   expandedKeys: v.array(v.string()),
   topVisibleRowIndex: v.number(),
 })
-const WorkspaceSessionStateSchema = v.object({
-  openRepoEntries: v.array(RepoSessionEntrySchema),
+const ClientWorkspaceStateSchema = v.object({
   restoredRepoId: v.nullable(v.string()),
   zenMode: v.boolean(),
   workspacePaneSize: v.number(),
@@ -228,10 +216,6 @@ const WorkspaceSessionStateSchema = v.object({
   preferredWorkspacePaneTabByTargetByRepo: v.record(
     v.string(),
     v.record(v.string(), v.nullable(v.picklist(['status', 'changes', 'history', 'files', 'terminal']))),
-  ),
-  workspacePaneTabsByTargetByRepo: v.record(
-    v.string(),
-    v.record(v.string(), v.array(v.union([WorkspacePaneStaticTabEntrySchema, WorkspacePaneRuntimeTabEntrySchema]))),
   ),
   filetreeViewStateByWorktreeByRepo: v.record(v.string(), v.record(v.string(), FiletreeSessionViewStateSchema)),
 })
@@ -257,7 +241,19 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
     itemId: v.pipe(v.string(), v.minLength(1), v.maxLength(64)),
   }),
   githubCli: GITHUB_CLI_REFRESH_SCHEMA,
-  sessionRestore: v.object({ clientId: ClientIdSchema }),
+  workspaceRestore: v.object({
+    clientId: ClientIdSchema,
+    activeRepoRoot: v.optional(v.nullable(RepoRootSchema)),
+  }),
+  workspaceRepoAdd: v.object({ entry: RepoSessionEntrySchema }),
+  workspaceRepoRemove: v.object({ repoRoot: RepoRootSchema }),
+  // Lazy per-repo restore endpoint — fires when the user navigates to a
+  // non-active repo that was hydrated as a stub at cold start.
+  restoreRepoTabs: v.object({
+    clientId: ClientIdSchema,
+    repoRoot: RepoRootSchema,
+    repoRuntimeId: v.pipe(v.string(), v.regex(OPAQUE_ID_RE)),
+  }),
 } as const
 
 // `prefs` accepts a permissive patch — the underlying
@@ -266,12 +262,15 @@ export const SETTINGS_PROCEDURE_SCHEMAS = {
 // object at the perimeter.
 export const SETTINGS_PATCH_SCHEMAS = {
   prefs: v.object({ prefs: v.record(v.string(), v.unknown()) }),
-  session: v.object({ session: WorkspaceSessionStateSchema }),
 } as const
 
 // Native host IPC procedures — Electron-only operations that bypass
 // the HTTP server entirely. Handlers live in `main/native-host-ipc-router.ts`.
 export const NATIVE_HOST_IPC_PROCEDURE_SCHEMAS = {
+  clientWorkspace: {
+    read: v.undefined(),
+    write: ClientWorkspaceStateSchema,
+  },
   settings: {
     setGlobalShortcut: v.object({ accelerator: v.string() }),
     applyNativeHostProjection: NativeHostProjectionSchema,

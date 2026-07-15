@@ -100,13 +100,20 @@ function createTestRepoRoutes(
       )
     },
   },
+  repoMutationApplication: Parameters<typeof createRepoRoutes>[0]['repoMutationApplication'] = {
+    deleteBranch: async (_userId, input) => await input.deleteBranch(),
+  },
 ) {
   return createRepoRoutes({
     worktreeRemovalApplication,
+    repoMutationApplication,
   })
 }
 
-async function openTestRepoRuntime(app: ReturnType<typeof createTestRepoRoutes>, repoRoot = '/tmp/repo'): Promise<string> {
+async function openTestRepoRuntime(
+  app: ReturnType<typeof createTestRepoRoutes>,
+  repoRoot = '/tmp/repo',
+): Promise<string> {
   const response = await app.request(
     new Request('http://localhost/runtime-open', {
       method: 'POST',
@@ -502,11 +509,10 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       }),
     )
     expect(response.status).toBe(200)
-    expect(mocks.getRepoPatch).toHaveBeenCalledWith(
-      '/tmp/repo',
-      '/tmp/repo/.worktrees/feature',
-      { signal: expect.any(AbortSignal), repoRuntimeId },
-    )
+    expect(mocks.getRepoPatch).toHaveBeenCalledWith('/tmp/repo', '/tmp/repo/.worktrees/feature', {
+      signal: expect.any(AbortSignal),
+      repoRuntimeId,
+    })
   })
 
   test('hard-fails when repo log reading fails', async () => {
@@ -744,7 +750,12 @@ describe('repo routes — POST body validation (read endpoints)', () => {
       new Request('http://localhost/tree', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, worktreePath: '/tmp/repo/.worktrees/feature', prefix: 'src' }),
+        body: JSON.stringify({
+          cwd: '/tmp/repo',
+          repoRuntimeId,
+          worktreePath: '/tmp/repo/.worktrees/feature',
+          prefix: 'src',
+        }),
       }),
     )
     expect(response.status).toBe(200)
@@ -1030,7 +1041,7 @@ describe('repo routes — POST body validation (action endpoints)', () => {
           repoRuntimeId: 'repo-runtime-test',
           branch: 'feature/remove',
           worktreePath: '/tmp/repo-remove',
-          alsoDeleteBranch: false,
+          deleteBranch: false,
         }),
       }),
     )
@@ -1051,9 +1062,9 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       {
         branch: 'feature/remove',
         worktreePath: '/tmp/repo-remove',
-        alsoDeleteBranch: false,
+        deleteBranch: false,
         forceDeleteBranch: undefined,
-        alsoDeleteUpstream: undefined,
+        deleteUpstream: undefined,
       },
       {
         beforeRemove: expect.any(Function),
@@ -1090,6 +1101,35 @@ describe('repo routes — POST body validation (action endpoints)', () => {
       expect.any(AbortSignal),
       { repoRuntimeId },
     )
+  })
+
+  test('delegates branch deletion to the repo mutation application', async () => {
+    const deleteBranch = vi.fn(async (_userId, input) => await input.deleteBranch())
+    const app = createTestRepoRoutes(undefined, { deleteBranch })
+    const repoRuntimeId = await openTestRepoRuntime(app)
+    mocks.deleteRepoBranch.mockResolvedValueOnce({ ok: true, message: 'ok' })
+
+    const response = await app.request('/delete-branch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, branch: 'feature/retired' }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(deleteBranch).toHaveBeenCalledWith('user-test', {
+      repoRoot: '/tmp/repo',
+      repoRuntimeId,
+      branchName: 'feature/retired',
+      deleteBranch: expect.any(Function),
+    })
+
+    mocks.deleteRepoBranch.mockResolvedValueOnce({ ok: false, message: 'delete failed' })
+    await app.request('/delete-branch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ cwd: '/tmp/repo', repoRuntimeId, branch: 'feature/kept' }),
+    })
+    expect(deleteBranch).toHaveBeenCalledTimes(2)
   })
 
   test('forwards external workspace app open routes', async () => {

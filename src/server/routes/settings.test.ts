@@ -13,9 +13,11 @@ const mocks = vi.hoisted(() => ({
   handleSetGlobalShortcutRegistered: vi.fn(),
   handleAddRecentRepo: vi.fn(),
   handleClearRecentRepos: vi.fn(),
-  handleSetSession: vi.fn(),
   handleUpdateUserSettings: vi.fn(),
-  restoreServerWorkspaceSession: vi.fn(),
+  restoreServerWorkspace: vi.fn(),
+  restoreRepoTabsForRepo: vi.fn(),
+  addServerWorkspaceRepo: vi.fn(),
+  removeServerWorkspaceRepo: vi.fn(),
 }))
 
 vi.mock('#/server/modules/external-apps.ts', () => ({
@@ -32,6 +34,8 @@ vi.mock('#/server/modules/settings-snapshot.ts', () => ({
 
 vi.mock('#/server/modules/settings-source.ts', () => ({
   getUserSettings: mocks.getUserSettings,
+  addServerWorkspaceRepo: mocks.addServerWorkspaceRepo,
+  removeServerWorkspaceRepo: mocks.removeServerWorkspaceRepo,
 }))
 
 vi.mock('#/server/modules/settings-write-paths.ts', () => ({
@@ -39,15 +43,16 @@ vi.mock('#/server/modules/settings-write-paths.ts', () => ({
   handleSetGlobalShortcutRegistered: mocks.handleSetGlobalShortcutRegistered,
   handleAddRecentRepo: mocks.handleAddRecentRepo,
   handleClearRecentRepos: mocks.handleClearRecentRepos,
-  handleSetSession: mocks.handleSetSession,
   handleUpdateUserSettings: mocks.handleUpdateUserSettings,
 }))
 
 vi.mock('#/server/modules/session-restore.ts', () => ({
-  restoreServerWorkspaceSession: mocks.restoreServerWorkspaceSession,
+  restoreServerWorkspace: mocks.restoreServerWorkspace,
+  restoreRepoTabsForRepo: mocks.restoreRepoTabsForRepo,
 }))
 
 const workspacePaneTabsHostStub = {
+  initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
   listWorkspaceTabs: vi.fn(),
   replaceTabs: vi.fn(),
   updateTabs: vi.fn(),
@@ -96,52 +101,13 @@ describe('settings routes', () => {
     )
   })
 
-  test('delegates session writes to the settings command handler layer', async () => {
-    const session = {
-      openRepoEntries: [],
-      restoredRepoId: null,
-      zenMode: true,
-      workspacePaneSize: 50,
-      selectedTerminalSessionIdByTerminalWorktree: {},
-      preferredWorkspacePaneTabByTargetByRepo: {},
-      workspacePaneTabsByTargetByRepo: {},
-      filetreeViewStateByWorktreeByRepo: {},
-    } as const
-    mocks.handleSetSession.mockResolvedValue({ ok: true, session })
-
-    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
-    const app = createSettingsRoutes(settingsRouteOptions())
-    const response = await app.request(
-      new Request('http://127.0.0.1:32100/session', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ session }),
-      }),
-    )
-
-    await expect(response.json()).resolves.toEqual({
-      ok: true,
-      session,
-    })
-    expect(mocks.handleSetSession).toHaveBeenCalledWith({ session })
-  })
-
   test('delegates session restore to the server restore coordinator', async () => {
     const restored = {
       status: 'restored' as const,
-      session: {
-        openRepoEntries: [],
-        restoredRepoId: null,
-        zenMode: false,
-        workspacePaneSize: 45,
-        selectedTerminalSessionIdByTerminalWorktree: {},
-        preferredWorkspacePaneTabByTargetByRepo: {},
-        workspacePaneTabsByTargetByRepo: {},
-        filetreeViewStateByWorktreeByRepo: {},
-      },
+      openRepoEntries: [],
       runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
     }
-    mocks.restoreServerWorkspaceSession.mockResolvedValue(restored)
+    mocks.restoreServerWorkspace.mockResolvedValue(restored)
     const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
     const app = new Hono<{ Variables: { userId: string } }>()
     app.use('*', async (c, next) => {
@@ -151,17 +117,103 @@ describe('settings routes', () => {
     app.route('/', createSettingsRoutes(settingsRouteOptions()))
 
     const response = await app.request(
-      new Request('http://127.0.0.1:32100/session/restore', {
+      new Request('http://127.0.0.1:32100/workspace/restore', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ clientId: 'client_test000000000000' }),
+        body: JSON.stringify({
+          clientId: 'client_test000000000000',
+          activeRepoRoot: '/repo-active',
+        }),
       }),
     )
 
     await expect(response.json()).resolves.toEqual(restored)
-    expect(mocks.restoreServerWorkspaceSession).toHaveBeenCalledWith({
+    expect(mocks.restoreServerWorkspace).toHaveBeenCalledWith({
       userId: 'user-test',
       clientId: 'client_test000000000000',
+      activeRepoRoot: '/repo-active',
+      workspacePaneTabsHost: workspacePaneTabsHostStub,
+      signal: expect.any(AbortSignal),
+    })
+  })
+
+  test('delegates authenticated workspace membership commands', async () => {
+    const workspace = {
+      openRepoEntries: [{ kind: 'local' as const, id: '/repo-a' }],
+      workspacePaneTabsByTargetByRepo: {},
+    }
+    mocks.addServerWorkspaceRepo.mockResolvedValue(workspace)
+    mocks.removeServerWorkspaceRepo.mockResolvedValue({ ...workspace, openRepoEntries: [] })
+    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
+    const app = new Hono<{ Variables: { userId: string } }>()
+    app.use('*', async (c, next) => {
+      c.set('userId', 'user-test')
+      await next()
+    })
+    app.route('/', createSettingsRoutes(settingsRouteOptions()))
+
+    const addResponse = await app.request('/workspace/repos/add', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ entry: { kind: 'local', id: '/repo-a' } }),
+    })
+    const removeResponse = await app.request('/workspace/repos/remove', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ repoRoot: '/repo-a' }),
+    })
+
+    await expect(addResponse.json()).resolves.toEqual(workspace)
+    await expect(removeResponse.json()).resolves.toEqual({ ...workspace, openRepoEntries: [] })
+    expect(mocks.addServerWorkspaceRepo).toHaveBeenCalledWith({ kind: 'local', id: '/repo-a' })
+    expect(mocks.removeServerWorkspaceRepo).toHaveBeenCalledWith('/repo-a')
+  })
+
+  test('delegates lazy repo tab restore to the server restore coordinator', async () => {
+    const restored = {
+      repo: {
+        entry: { kind: 'local' as const, id: '/repo-active' },
+        repoRoot: '/repo-active',
+        repoRuntimeId: 'repo_runtime_test',
+        name: 'repo-active',
+        projection: {
+          snapshot: { current: 'main', branches: [] },
+          status: [],
+          pullRequests: null,
+          operations: { operations: [], loadedAt: 0 },
+          requested: { branch: null, pullRequestMode: 'full' as const },
+          loadedAt: 1,
+        },
+      },
+      snapshot: null,
+    }
+    mocks.restoreRepoTabsForRepo.mockResolvedValue(restored)
+    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
+    const app = new Hono<{ Variables: { userId: string } }>()
+    app.use('*', async (c, next) => {
+      c.set('userId', 'user-test')
+      await next()
+    })
+    app.route('/', createSettingsRoutes(settingsRouteOptions()))
+
+    const response = await app.request(
+      new Request('http://127.0.0.1:32100/workspace/restore-repo-tabs', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          clientId: 'client_test000000000000',
+          repoRoot: '/repo-active',
+          repoRuntimeId: 'repo_runtime_test',
+        }),
+      }),
+    )
+
+    await expect(response.json()).resolves.toEqual(restored)
+    expect(mocks.restoreRepoTabsForRepo).toHaveBeenCalledWith({
+      userId: 'user-test',
+      clientId: 'client_test000000000000',
+      repoRoot: '/repo-active',
+      repoRuntimeId: 'repo_runtime_test',
       workspacePaneTabsHost: workspacePaneTabsHostStub,
       signal: expect.any(AbortSignal),
     })
@@ -172,7 +224,7 @@ describe('settings routes', () => {
     const app = createSettingsRoutes(settingsRouteOptions())
 
     const response = await app.request(
-      new Request('http://127.0.0.1:32100/session/restore', {
+      new Request('http://127.0.0.1:32100/workspace/restore', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ clientId: 'client_test000000000000' }),
@@ -181,7 +233,7 @@ describe('settings routes', () => {
 
     expect(response.status).toBe(401)
     await expect(response.json()).resolves.toEqual({ ok: false, message: 'Unauthorized' })
-    expect(mocks.restoreServerWorkspaceSession).not.toHaveBeenCalled()
+    expect(mocks.restoreServerWorkspace).not.toHaveBeenCalled()
   })
 
   test('rejects session restore when client id is invalid', async () => {
@@ -194,7 +246,7 @@ describe('settings routes', () => {
     app.route('/', createSettingsRoutes(settingsRouteOptions()))
 
     const response = await app.request(
-      new Request('http://127.0.0.1:32100/session/restore', {
+      new Request('http://127.0.0.1:32100/workspace/restore', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({}),
@@ -204,46 +256,7 @@ describe('settings routes', () => {
     expect(response.status).toBe(400)
     const json = (await response.json()) as { code: string }
     expect(json.code).toBe('BAD_REQUEST')
-    expect(mocks.restoreServerWorkspaceSession).not.toHaveBeenCalled()
-  })
-
-  test('accepts a session state with files in preferred tab and mixed tab list picklist', async () => {
-    const targetKey = workspacePaneTabsTargetIdentityKey({
-      repoRoot: '/tmp/repo',
-      branchName: 'feature/worktree',
-      worktreePath: '/tmp/repo-worktree',
-    })
-    const session = {
-      openRepoEntries: [],
-      restoredRepoId: null,
-      zenMode: true,
-      workspacePaneSize: 50,
-      selectedTerminalSessionIdByTerminalWorktree: {},
-      preferredWorkspacePaneTabByTargetByRepo: { '/tmp/repo': { [targetKey]: 'files' } },
-      workspacePaneTabsByTargetByRepo: {
-        '/tmp/repo': {
-          [targetKey]: [
-            { type: 'status', tabId: 'workspace-pane:status' },
-            { type: 'files', tabId: 'workspace-pane:files' },
-          ],
-        },
-      },
-      filetreeViewStateByWorktreeByRepo: {},
-    } as const
-    mocks.handleSetSession.mockResolvedValue({ ok: true, session })
-
-    const { createSettingsRoutes } = await import('#/server/routes/settings.ts')
-    const app = createSettingsRoutes(settingsRouteOptions())
-    const response = await app.request(
-      new Request('http://127.0.0.1:32100/session', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ session }),
-      }),
-    )
-
-    expect(response.status).toBe(200)
-    expect(mocks.handleSetSession).toHaveBeenCalledWith({ session })
+    expect(mocks.restoreServerWorkspace).not.toHaveBeenCalled()
   })
 
   test('delegates recent-repo writes to the settings command handler layer', async () => {

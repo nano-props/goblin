@@ -1,10 +1,8 @@
-import type { WorkspaceSessionState } from '#/shared/api-types.ts'
+import type { ClientWorkspaceState } from '#/shared/api-types.ts'
 import type { WorkspacePaneTabEntry } from '#/shared/workspace-pane.ts'
 import type { RestorableWorkspaceState, ReposStore } from '#/web/stores/repos/types.ts'
-import { persistedOpenWorkspaceEntries } from '#/web/open-workspace-state.ts'
 import {
   persistedRestoredRepoIdForSession,
-  persistedWorkspacePaneTabsByTargetByRepoForSession,
   persistedSelectedTerminalSessionIdByTerminalWorktreeForSession,
   persistedPreferredWorkspacePaneTabByTargetByRepoForSession,
 } from '#/web/session-persistence-state.ts'
@@ -31,20 +29,19 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
   repos: ReposStore['repos']
   restorableWorkspaceState: RestorableWorkspaceState
   filetreeInteractionByScope?: Readonly<Record<string, FiletreeInteractionSnapshot>>
-}): WorkspaceSessionState {
+  restoredSessionBaseline?: ClientWorkspaceState | null
+}): ClientWorkspaceState {
   const { repos, restorableWorkspaceState } = input
   // Workspace membership is shell state: it must remain restorable even
   // while repo data queries are unavailable. Target-scoped state below
   // is different; it references branch/worktree identities and is only
   // persisted for repos whose branch read model can validate those targets.
-  const shellRepos = workspaceSessionRepoShells(repos, restorableWorkspaceState.order)
   const projectedRepos = workspaceSessionRepoProjections(repos, restorableWorkspaceState.order)
   const workspacePaneTabsByTargetByRepo = workspacePaneTabsByTargetByRepoFromQueryCache(
     repos,
     restorableWorkspaceState.order,
   )
-  return {
-    openRepoEntries: persistedOpenWorkspaceEntries(restorableWorkspaceState.order, shellRepos),
+  const session: ClientWorkspaceState = {
     restoredRepoId: persistedRestoredRepoIdForSession(restorableWorkspaceState.restoredRepoId),
     zenMode: restorableWorkspaceState.zenMode,
     workspacePaneSize: restorableWorkspaceState.workspacePaneSize,
@@ -57,17 +54,13 @@ export function workspaceSessionStateFromRestorableWorkspaceState(input: {
       restorableWorkspaceState.order,
       workspacePaneTabsByTargetByRepo,
     ),
-    workspacePaneTabsByTargetByRepo: persistedWorkspacePaneTabsByTargetByRepoForSession(
-      projectedRepos,
-      restorableWorkspaceState.order,
-      workspacePaneTabsByTargetByRepo,
-    ),
     filetreeViewStateByWorktreeByRepo: persistedFiletreeViewStateByWorktreeByRepoForSession(
       input.filetreeInteractionByScope ?? {},
       projectedRepos,
       restorableWorkspaceState.order,
     ),
   }
+  return sessionWithStubBaseline(session, input.restoredSessionBaseline, repos, restorableWorkspaceState.order)
 }
 
 function workspaceSessionRepoProjections(
@@ -78,6 +71,7 @@ function workspaceSessionRepoProjections(
   for (const id of order) {
     const repo = repos[id]
     if (!repo) continue
+    if (repo.session.projectionState === 'stub') continue
     const branchModel = readRepoBranchQueryProjection(repo)
     if (!branchModel) continue
     projectedRepos[id] = {
@@ -92,27 +86,15 @@ function workspaceSessionRepoProjections(
   return projectedRepos
 }
 
-function workspaceSessionRepoShells(
-  repos: ReposStore['repos'],
-  order: readonly string[],
-): Record<string, Pick<ReposStore['repos'][string], 'id' | 'remote'> | undefined> {
-  const shells: Record<string, Pick<ReposStore['repos'][string], 'id' | 'remote'> | undefined> = {}
-  for (const id of order) {
-    const repo = repos[id]
-    if (!repo) continue
-    shells[id] = { id: repo.id, remote: repo.remote }
-  }
-  return shells
-}
-
 function workspacePaneTabsByTargetByRepoFromQueryCache(
-  repos: Record<string, Pick<ReposStore['repos'][string], 'repoRuntimeId'> | undefined>,
+  repos: Record<string, Pick<ReposStore['repos'][string], 'repoRuntimeId' | 'session'> | undefined>,
   order: readonly string[],
 ): Record<string, Record<string, WorkspacePaneTabEntry[]>> {
   const byRepo: Record<string, Record<string, WorkspacePaneTabEntry[]>> = {}
   for (const id of order) {
     const repo = repos[id]
     if (!repo) continue
+    if (repo.session.projectionState === 'stub') continue
     const data = primaryWindowQueryClient.getQueryData<WorkspacePaneTabsQueryData>(
       workspacePaneTabsQueryKey(id, repo.repoRuntimeId),
     )
@@ -123,19 +105,83 @@ function workspacePaneTabsByTargetByRepoFromQueryCache(
   return byRepo
 }
 
-/** Restores only the restorable workspace UI projection from WorkspaceSessionState.
- *  It intentionally does not establish a live binding back to WorkspaceSessionState;
- *  subsequent updates flow through useSessionPersistence. */
+function sessionWithStubBaseline(
+  session: ClientWorkspaceState,
+  baseline: ClientWorkspaceState | null | undefined,
+  repos: ReposStore['repos'],
+  order: readonly string[],
+): ClientWorkspaceState {
+  if (!baseline) return session
+  const stubRepoIds = new Set(order.filter((id) => repos[id]?.session.projectionState === 'stub'))
+  if (stubRepoIds.size === 0) return session
+  return {
+    ...session,
+    selectedTerminalSessionIdByTerminalWorktree: mergeBaselineSelectedTerminals(
+      session.selectedTerminalSessionIdByTerminalWorktree,
+      baseline.selectedTerminalSessionIdByTerminalWorktree,
+      stubRepoIds,
+    ),
+    preferredWorkspacePaneTabByTargetByRepo: mergeBaselineRepoMap(
+      session.preferredWorkspacePaneTabByTargetByRepo,
+      baseline.preferredWorkspacePaneTabByTargetByRepo,
+      stubRepoIds,
+    ),
+    filetreeViewStateByWorktreeByRepo: mergeBaselineRepoMap(
+      session.filetreeViewStateByWorktreeByRepo,
+      baseline.filetreeViewStateByWorktreeByRepo,
+      stubRepoIds,
+    ),
+  }
+}
+
+function mergeBaselineRepoMap<T>(
+  current: Record<string, T>,
+  baseline: Record<string, T>,
+  stubRepoIds: ReadonlySet<string>,
+): Record<string, T> {
+  let merged = current
+  for (const repoId of stubRepoIds) {
+    const value = baseline[repoId]
+    if (value === undefined) continue
+    if (merged === current) merged = { ...current }
+    merged[repoId] = value
+  }
+  return merged
+}
+
+function mergeBaselineSelectedTerminals(
+  current: Record<string, string>,
+  baseline: Record<string, string>,
+  stubRepoIds: ReadonlySet<string>,
+): Record<string, string> {
+  let merged = current
+  for (const [terminalWorktreeKey, terminalSessionId] of Object.entries(baseline)) {
+    const repoId = repoIdFromTerminalWorktreeKey(terminalWorktreeKey)
+    if (!repoId || !stubRepoIds.has(repoId)) continue
+    if (merged === current) merged = { ...current }
+    merged[terminalWorktreeKey] = terminalSessionId
+  }
+  return merged
+}
+
+function repoIdFromTerminalWorktreeKey(key: string): string | null {
+  const index = key.indexOf('\0')
+  if (index <= 0) return null
+  return key.slice(0, index)
+}
+
+/** Restores only the restorable workspace UI projection from ClientWorkspaceState.
+ *  It intentionally does not establish a live binding back to ClientWorkspaceState;
+ *  subsequent local updates flow through useClientWorkspacePersistence. */
 interface RestoredWorkspaceStateFromSession extends Pick<
   RestorableWorkspaceState,
   'restoredRepoId' | 'zenMode' | 'workspacePaneSize' | 'selectedTerminalSessionIdByTerminalWorktree'
 > {
-  preferredWorkspacePaneTabByTargetByRepo: WorkspaceSessionState['preferredWorkspacePaneTabByTargetByRepo']
-  workspacePaneTabsByTargetByRepo: WorkspaceSessionState['workspacePaneTabsByTargetByRepo']
+  preferredWorkspacePaneTabByTargetByRepo: ClientWorkspaceState['preferredWorkspacePaneTabByTargetByRepo']
 }
 
 export function restoreRestorableWorkspaceStateFromSession(
-  session: WorkspaceSessionState,
+  session: ClientWorkspaceState,
   restoredRepoId: string | null = session.restoredRepoId,
 ): RestoredWorkspaceStateFromSession {
   return {
@@ -144,6 +190,5 @@ export function restoreRestorableWorkspaceStateFromSession(
     workspacePaneSize: session.workspacePaneSize,
     selectedTerminalSessionIdByTerminalWorktree: session.selectedTerminalSessionIdByTerminalWorktree,
     preferredWorkspacePaneTabByTargetByRepo: session.preferredWorkspacePaneTabByTargetByRepo,
-    workspacePaneTabsByTargetByRepo: session.workspacePaneTabsByTargetByRepo,
   }
 }
