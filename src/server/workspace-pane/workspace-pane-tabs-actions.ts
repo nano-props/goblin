@@ -17,6 +17,7 @@ export interface WorkspacePaneTabsActionDependencies {
   isValidClientId(value: unknown): value is string
   isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
   broadcastWorkspaceTabsChanged(userId: string, repoRoot: string): void
+  affectedUsersForRepo(repoRoot: string): string[]
 }
 
 export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDependencies) {
@@ -33,7 +34,7 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return emptyWorkspacePaneTabsSnapshot()
       assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
       const tabs = await sessionService.replaceTabs(userId, input)
-      deps.broadcastWorkspaceTabsChanged(userId, input.repoRoot)
+      broadcastDurableLayoutChanged(userId, input.repoRoot)
       return tabs
     },
 
@@ -47,7 +48,7 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return emptyWorkspacePaneTabsSnapshot()
       assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
       const tabs = await sessionService.updateTabs(userId, input)
-      deps.broadcastWorkspaceTabsChanged(userId, input.repoRoot)
+      broadcastDurableLayoutChanged(userId, input.repoRoot)
       return tabs
     },
 
@@ -67,6 +68,11 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
     if (!deps.isCurrentRepoRuntime(userId, repoRoot, repoRuntimeId)) {
       throw new Error('error.repo-runtime-stale')
     }
+  }
+
+  function broadcastDurableLayoutChanged(userId: string, repoRoot: string): void {
+    const users = new Set([userId, ...deps.affectedUsersForRepo(repoRoot)])
+    for (const affectedUserId of users) deps.broadcastWorkspaceTabsChanged(affectedUserId, repoRoot)
   }
 }
 

@@ -6,9 +6,25 @@ import path from 'node:path'
 import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
 import { WORKSPACE_PANE_STATIC_TAB_IDS, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
+import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
+import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 
 let tmp: string | null = null
 let previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+
+async function writeWorkspacePaneLayout(
+  source: { serverWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository },
+  repoRoot: string,
+  replacement: WorkspacePaneDurableLayout,
+): Promise<void> {
+  const current = await source.serverWorkspacePaneLayoutRepository.load(repoRoot)
+  const outcome = await source.serverWorkspacePaneLayoutRepository.compareAndSwap({
+    repoRoot,
+    expected: current.layout,
+    replacement,
+  })
+  if (outcome.kind !== 'accepted') throw new Error('test workspace pane layout CAS failed')
+}
 
 afterEach(async () => {
   const mod = await import('#/server/modules/settings-source.ts')
@@ -68,7 +84,7 @@ test('persists updates and notifies subscribers from the server settings store',
     globalShortcut: 'CommandOrControl+Alt+G',
     lanEnabled: false,
   })
-  await mod.recordServerWorkspacePaneLayout('/repo-b', {
+  await writeWorkspacePaneLayout(mod, '/repo-b', {
     entries: [{ repoRoot: '/repo-b', branchName: 'main', worktreePath: null, tabs: [] }],
   })
   await mod.addServerRecentRepo({ kind: 'local', id: '/repo-b' })
@@ -217,7 +233,7 @@ test('persists durable tabs independently of runtime membership', async () => {
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
   const mod = await import('#/server/modules/settings-source.ts')
-  await mod.recordServerWorkspacePaneLayout('/repo-a', {
+  await writeWorkspacePaneLayout(mod, '/repo-a', {
     entries: [
       {
         repoRoot: '/repo-a',
@@ -241,89 +257,6 @@ test('persists durable tabs independently of runtime membership', async () => {
       '/repo-a': { [branchTargetKey('/repo-a', 'main')]: [workspacePaneStaticTabEntry('history')] },
     },
   })
-})
-
-test('clears unchanged repo tabs without affecting another repo', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
-  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
-  process.env.GOBLIN_SERVER_DATA_DIR = tmp
-  const mod = await import('#/server/modules/settings-source.ts')
-  const repoATabs = [workspacePaneStaticTabEntry('history')]
-  const repoBTabs = [workspacePaneStaticTabEntry('status')]
-  await mod.addServerWorkspaceRepo({ kind: 'local', id: '/repo-a' })
-  await mod.recordServerWorkspacePaneLayout('/repo-a', {
-    entries: [{ repoRoot: '/repo-a', branchName: 'main', worktreePath: null, tabs: repoATabs }],
-  })
-  await mod.recordServerWorkspacePaneLayout('/repo-b', {
-    entries: [{ repoRoot: '/repo-b', branchName: 'main', worktreePath: null, tabs: repoBTabs }],
-  })
-
-  await expect(
-    mod.clearServerWorkspaceTabsIfUnchanged({
-      repoRoot: '/repo-a',
-      expectedRepoEntry: { kind: 'local', id: '/repo-a' },
-      expectedTabsByTarget: { [branchTargetKey('/repo-a', 'main')]: repoATabs },
-    }),
-  ).resolves.toMatchObject({
-    cleared: true,
-    workspace: {
-      workspacePaneTabsByTargetByRepo: {
-        '/repo-b': { [branchTargetKey('/repo-b', 'main')]: repoBTabs },
-      },
-    },
-  })
-})
-
-test('does not clear repo tabs after that repo changed', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
-  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
-  process.env.GOBLIN_SERVER_DATA_DIR = tmp
-  const mod = await import('#/server/modules/settings-source.ts')
-  const currentTabs = [workspacePaneStaticTabEntry('history')]
-  await mod.addServerWorkspaceRepo({ kind: 'local', id: '/repo-a' })
-  await mod.recordServerWorkspacePaneLayout('/repo-a', {
-    entries: [{ repoRoot: '/repo-a', branchName: 'main', worktreePath: null, tabs: currentTabs }],
-  })
-
-  await expect(
-    mod.clearServerWorkspaceTabsIfUnchanged({
-      repoRoot: '/repo-a',
-      expectedRepoEntry: { kind: 'local', id: '/repo-a' },
-      expectedTabsByTarget: {
-        [branchTargetKey('/repo-a', 'main')]: [workspacePaneStaticTabEntry('status')],
-      },
-    }),
-  ).resolves.toMatchObject({
-    cleared: false,
-    latestWorkspace: {
-      workspacePaneTabsByTargetByRepo: {
-        '/repo-a': { [branchTargetKey('/repo-a', 'main')]: currentTabs },
-      },
-    },
-  })
-})
-
-test('does not clear repo tabs after workspace membership is removed', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
-  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
-  process.env.GOBLIN_SERVER_DATA_DIR = tmp
-  const mod = await import('#/server/modules/settings-source.ts')
-  const entry = { kind: 'local' as const, id: '/repo-a' }
-  const tabs = [workspacePaneStaticTabEntry('history')]
-  await mod.addServerWorkspaceRepo(entry)
-  await mod.recordServerWorkspacePaneLayout('/repo-a', {
-    entries: [{ repoRoot: '/repo-a', branchName: 'main', worktreePath: null, tabs }],
-  })
-  await mod.removeServerWorkspaceRepo('/repo-a')
-
-  await expect(
-    mod.clearServerWorkspaceTabsIfUnchanged({
-      repoRoot: '/repo-a',
-      expectedRepoEntry: entry,
-      expectedTabsByTarget: { [branchTargetKey('/repo-a', 'main')]: tabs },
-    }),
-  ).resolves.toMatchObject({ cleared: false, latestWorkspace: { openRepoEntries: [] } })
-  expect((await mod.getServerWorkspaceState()).workspacePaneTabsByTargetByRepo['/repo-a']).toBeDefined()
 })
 
 test('workspace pane layout repository loads and applies normalized CAS outcomes', async () => {
@@ -368,37 +301,6 @@ test('workspace pane layout repository loads and applies normalized CAS outcomes
     replacement: empty,
     expectedRepoEntry: repoEntry,
   })).resolves.toMatchObject({ kind: 'membership-conflict', snapshot: { layout: history } })
-})
-
-test('confirms repo tabs only while membership and layout are unchanged', async () => {
-  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
-  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
-  process.env.GOBLIN_SERVER_DATA_DIR = tmp
-  const mod = await import('#/server/modules/settings-source.ts')
-  const entry = { kind: 'local' as const, id: '/repo-a' }
-  const tabs = [workspacePaneStaticTabEntry('history')]
-  const expectedTabsByTarget = { [branchTargetKey('/repo-a', 'main')]: tabs }
-  await mod.addServerWorkspaceRepo(entry)
-  await mod.recordServerWorkspacePaneLayout('/repo-a', {
-    entries: [{ repoRoot: '/repo-a', branchName: 'main', worktreePath: null, tabs }],
-  })
-
-  await expect(
-    mod.confirmServerWorkspaceTabsUnchanged({
-      repoRoot: '/repo-a',
-      expectedRepoEntry: entry,
-      expectedTabsByTarget,
-    }),
-  ).resolves.toMatchObject({ matched: true })
-
-  await mod.removeServerWorkspaceRepo('/repo-a')
-  await expect(
-    mod.confirmServerWorkspaceTabsUnchanged({
-      repoRoot: '/repo-a',
-      expectedRepoEntry: entry,
-      expectedTabsByTarget,
-    }),
-  ).resolves.toMatchObject({ matched: false, latestWorkspace: { openRepoEntries: [] } })
 })
 
 test('updates repo-level worktree bootstrap trust by repo id', async () => {
@@ -493,7 +395,7 @@ test('normalizes workspace pane tab list in server sessions', async () => {
   const worktreeTargetKeyValue = worktreeTargetKey('/repo-b', 'feature/worktree', '/tmp/repo-b-worktree')
   const emptyTargetKey = branchTargetKey('/repo-b', 'empty')
   const invalidTargetKey = branchTargetKey('/repo-b', 'invalid')
-  await mod.recordServerWorkspacePaneLayout('/repo-b', {
+  await writeWorkspacePaneLayout(mod, '/repo-b', {
     entries: [
       {
         repoRoot: '/repo-b',

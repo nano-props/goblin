@@ -50,6 +50,7 @@ function makeActions(
       isValidClientId,
       isCurrentRepoRuntime: isCurrentRepoRuntime,
       broadcastWorkspaceTabsChanged: broadcasts as unknown as (userId: string, repoRoot: string) => void,
+      affectedUsersForRepo: () => [],
     }),
     broadcasts,
     sessionService,

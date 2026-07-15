@@ -15,7 +15,6 @@ import {
   createTerminalSessionService,
   terminalWorkspacePaneRuntimeTabsProvider,
 } from '#/server/terminal/terminal-session-service.ts'
-import { createWorkspacePaneTabsRuntime } from '#/server/workspace-pane/workspace-pane-tabs-runtime.ts'
 import { createWorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { WorkspacePaneLayoutAggregate } from '#/server/workspace-pane/workspace-pane-layout-aggregate.ts'
 import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
@@ -34,10 +33,7 @@ import type {
   ServerWorkspacePaneTabsHost,
   ServerWorkspacePaneTargetLifecycleHost,
 } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
-import {
-  recordServerWorkspacePaneLayout,
-  serverWorkspacePaneLayoutRepository,
-} from '#/server/modules/settings-source.ts'
+import { serverWorkspacePaneLayoutRepository } from '#/server/modules/settings-source.ts'
 import { isValidTerminalClientId, isValidTerminalSessionId } from '#/server/terminal/terminal-session-ids.ts'
 import {
   TerminalSessionManager,
@@ -85,7 +81,6 @@ export interface ServerTerminalRuntime {
 
 export function createServerTerminalRuntime(options: ServerTerminalRuntimeOptions): ServerTerminalRuntime {
   const { ptySupervisor } = options
-  const workspaceTabs = createWorkspacePaneTabsRuntime<string>()
   const workspacePaneLayout = new WorkspacePaneLayoutAggregate({
     repository: options.workspacePaneLayoutRepository ?? serverWorkspacePaneLayoutRepository,
   })
@@ -142,11 +137,9 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     (userId, clientId) => broker.isClientOnline(userId, clientId),
   )
   const workspaceTabsCoordinator = createWorkspacePaneTabsCoordinator({
-    workspaceTabs,
     runtimeProviders: [terminalWorkspacePaneRuntimeTabsProvider(manager)],
     worktreeOperations,
     physicalWorktrees,
-    persistLayout: recordServerWorkspacePaneLayout,
     layoutAggregate: workspacePaneLayout,
   })
   const coordinator = createTerminalRuntimeCoordinator({
@@ -237,6 +230,9 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
     isValidClientId: isValidTerminalClientId,
     isCurrentRepoRuntime: isCurrentRepoRuntime,
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,
+    affectedUsersForRepo(repoRoot) {
+      return workspacePaneLayout.overlay.activeEpochs(repoRoot).map((scope) => scope.userId)
+    },
   })
   const workspacePaneTabsHost: ServerWorkspacePaneTabsHost & ServerWorkspacePaneTargetLifecycleHost = {
     async restoreTabs(userId, input) {

@@ -9,7 +9,7 @@ import { isCurrentRepoRuntimeMembership } from '#/server/modules/repo-runtimes.t
 import { runRemoteLifecycleWrite } from '#/server/modules/remote-lifecycle-write-paths.ts'
 import { confirmServerWorkspaceRepoEntry, getServerWorkspaceState } from '#/server/modules/settings-source.ts'
 import {
-  initializeWorkspacePaneTabsWithMembershipGuard,
+  projectWorkspacePaneTabsWithMembershipGuard,
   workspaceRepoEntry,
 } from '#/server/modules/workspace-pane-tabs-restore.ts'
 import { abortableWorkspaceRestore, workspaceRepoDisplayName } from '#/server/modules/workspace-restore-utils.ts'
@@ -36,7 +36,7 @@ export async function restoreRepoTabsForRepo(input: RestoreRepoTabsInput): Promi
 
   const membership = await confirmServerWorkspaceRepoEntry(entry)
   if (!membership.matched) throw repoNotInWorkspace()
-  const initializedTabs = await initializeWorkspacePaneTabsWithMembershipGuard({
+  const initializedTabs = await projectWorkspacePaneTabsWithMembershipGuard({
     restoreInput: input,
     workspace: membership.workspace,
     repos: [repo],

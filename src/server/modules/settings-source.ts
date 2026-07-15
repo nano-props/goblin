@@ -491,9 +491,6 @@ export async function removeServerWorkspaceRepo(repoRoot: string): Promise<Serve
 export type ServerWorkspaceMatchOutcome =
   { matched: true; workspace: ServerWorkspaceState } | { matched: false; latestWorkspace: ServerWorkspaceState }
 
-export type ServerWorkspaceClearOutcome =
-  { cleared: true; workspace: ServerWorkspaceState } | { cleared: false; latestWorkspace: ServerWorkspaceState }
-
 export async function compareAndReplaceServerWorkspaceRepos(
   expected: RepoSessionEntry[],
   replacement: RepoSessionEntry[],
@@ -531,87 +528,6 @@ export async function confirmServerWorkspaceRepoEntry(
 
 function sameRepoEntries(a: RepoSessionEntry[], b: RepoSessionEntry[]): boolean {
   return a.length === b.length && a.every((entry, index) => sameRepoSessionEntry(entry, b[index]))
-}
-
-export async function clearServerWorkspaceTabsIfUnchanged(input: {
-  repoRoot: string
-  expectedRepoEntry: RepoSessionEntry
-  expectedTabsByTarget: Record<string, WorkspacePaneTabEntry[]>
-}): Promise<ServerWorkspaceClearOutcome> {
-  return await mutateUserSettings<ServerWorkspaceClearOutcome>(async (data) => {
-    const currentRepoEntry = data.workspace.openRepoEntries.find(
-      (entry) => repoSessionEntryId(entry) === input.repoRoot,
-    )
-    const currentTabsByTarget = data.workspace.workspacePaneTabsByTargetByRepo[input.repoRoot] ?? {}
-    if (
-      !currentRepoEntry ||
-      !sameRepoSessionEntry(currentRepoEntry, input.expectedRepoEntry) ||
-      !sameServerWorkspaceTabsForRepo(input.repoRoot, currentTabsByTarget, input.expectedTabsByTarget)
-    ) {
-      return unchangedUserSettings(data, { cleared: false as const, latestWorkspace: cloneWorkspace(data.workspace) })
-    }
-    const workspacePaneTabsByTargetByRepo = recordWithoutKey(
-      data.workspace.workspacePaneTabsByTargetByRepo,
-      input.repoRoot,
-    )
-    const workspace = { ...data.workspace, workspacePaneTabsByTargetByRepo }
-    return {
-      next: { ...data, workspace },
-      result: { cleared: true as const, workspace: cloneWorkspace(workspace) },
-    }
-  })
-}
-
-export async function confirmServerWorkspaceTabsUnchanged(input: {
-  repoRoot: string
-  expectedRepoEntry: RepoSessionEntry
-  expectedTabsByTarget: Record<string, WorkspacePaneTabEntry[]>
-}): Promise<ServerWorkspaceMatchOutcome> {
-  return await mutateUserSettings<ServerWorkspaceMatchOutcome>(async (data) => {
-    const currentRepoEntry = data.workspace.openRepoEntries.find(
-      (entry) => repoSessionEntryId(entry) === input.repoRoot,
-    )
-    const currentTabsByTarget = data.workspace.workspacePaneTabsByTargetByRepo[input.repoRoot] ?? {}
-    const matched =
-      !!currentRepoEntry &&
-      sameRepoSessionEntry(currentRepoEntry, input.expectedRepoEntry) &&
-      sameServerWorkspaceTabsForRepo(input.repoRoot, currentTabsByTarget, input.expectedTabsByTarget)
-    return unchangedUserSettings(
-      data,
-      matched
-        ? { matched: true, workspace: cloneWorkspace(data.workspace) }
-        : { matched: false, latestWorkspace: cloneWorkspace(data.workspace) },
-    )
-  })
-}
-
-function sameServerWorkspaceTabsForRepo(
-  repoRoot: string,
-  a: Record<string, WorkspacePaneTabEntry[]>,
-  b: Record<string, WorkspacePaneTabEntry[]>,
-): boolean {
-  const normalize = (tabsByTarget: Record<string, WorkspacePaneTabEntry[]>) =>
-    normalizeWorkspacePaneTabsByTargetByRepo({ [repoRoot]: tabsByTarget })[repoRoot] ?? {}
-  return JSON.stringify(normalize(a)) === JSON.stringify(normalize(b))
-}
-
-export async function recordServerWorkspacePaneLayout(
-  repoRoot: string,
-  layout: WorkspacePaneDurableLayout,
-): Promise<ServerWorkspaceState> {
-  return await mutateUserSettings(async (data) => {
-    const byTarget = Object.fromEntries(
-      layout.entries.map((entry) => [workspacePaneTabsTargetIdentityKey(entry), entry.tabs]),
-    )
-    const workspace = normalizeWorkspace({
-      ...data.workspace,
-      workspacePaneTabsByTargetByRepo: {
-        ...data.workspace.workspacePaneTabsByTargetByRepo,
-        [repoRoot]: byTarget,
-      },
-    })
-    return { next: { ...data, workspace }, result: cloneWorkspace(workspace) }
-  })
 }
 
 function workspacePaneLayoutFromWorkspace(workspace: ServerWorkspaceState, repoRoot: string): WorkspacePaneDurableLayout {

@@ -27,7 +27,7 @@ import { compareAndReplaceServerWorkspaceRepos, getServerWorkspaceState } from '
 import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { abortableWorkspaceRestore, workspaceRepoDisplayName } from '#/server/modules/workspace-restore-utils.ts'
 import {
-  initializeWorkspacePaneTabsWithMembershipGuard,
+  projectWorkspacePaneTabsWithMembershipGuard,
 } from '#/server/modules/workspace-pane-tabs-restore.ts'
 
 export interface RestoreServerWorkspaceInput {
@@ -150,7 +150,7 @@ async function restoreServerWorkspaceSnapshot(
   // Non-active repos carry `projection: null` and are restored lazily.
   const openedActive = opened.filter(isOpenedProjectedRepo)
   const expectedMembership = membership.workspace.openRepoEntries
-  const initializedTabs = await initializeWorkspacePaneTabsWithMembershipGuard({
+  const initializedTabs = await projectWorkspacePaneTabsWithMembershipGuard({
     restoreInput: input,
     workspace: membership.workspace,
     repos: openedActive,
