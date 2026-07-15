@@ -10,7 +10,6 @@ import {
 } from '#/server/test-utils/physical-worktree-identity.ts'
 import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
-import type { ServerWorkspacePaneTargetLifecycleHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import { RemoteRepoRuntimeFailureError } from '#/server/modules/remote-runtime-failure.ts'
 
 const failRemoteRuntimeIfNeededMock = vi.hoisted(() => vi.fn())
@@ -260,7 +259,7 @@ describe('WorktreeRemovalApplication', () => {
     expect(failRemoteRuntimeIfNeededMock).toHaveBeenCalledWith('user-a', failure)
   })
 
-  test('retires the branch target after worktree and branch removal both succeed', async () => {
+  test('does not retire pane layout after worktree and branch removal', async () => {
     const retireTarget = vi.fn(async () => {})
     const application = createApplication({ retireTarget })
 
@@ -278,13 +277,10 @@ describe('WorktreeRemovalApplication', () => {
       }),
     ).resolves.toEqual({ ok: true, message: 'removed' })
 
-    expect(retireTarget).toHaveBeenCalledWith('user-a', {
-      repoRuntimeId: target.repoRuntimeId,
-      target: { kind: 'branch', repoRoot: target.repoRoot, branchName: target.branchName },
-    })
+    expect(retireTarget).not.toHaveBeenCalled()
   })
 
-  test('reports the committed repository change when branch retirement fails after worktree removal', async () => {
+  test('does not expose a second persistence failure after worktree removal', async () => {
     const retireTarget = vi.fn(async () => {
       throw new Error('pane persistence failed')
     })
@@ -302,11 +298,7 @@ describe('WorktreeRemovalApplication', () => {
           return { ok: true, message: 'removed' }
         },
       }),
-    ).resolves.toEqual({
-      ok: false,
-      message: 'pane persistence failed',
-      repositoryStateChanged: true,
-    })
+    ).resolves.toEqual({ ok: true, message: 'removed' })
   })
 
   test('does not retire durable layout from a removed physical generation', async () => {
@@ -365,7 +357,7 @@ function createApplication(
       identity: PhysicalWorktreeIdentity,
     ) => Promise<Array<{ userId: string; repoRoot: string; scope: string }>>
     reconcilePhysicalWorktreeAfterRemovalFailure?: () => Promise<void>
-    retireTarget?: ServerWorkspacePaneTargetLifecycleHost['retireTarget']
+    retireTarget?: (...args: never[]) => Promise<void>
     physicalWorktreeTargets?: ReturnType<WorkspacePaneTabsCoordinator['physicalWorktreeTargets']>
     clearPhysicalWorktreeIndex?: WorkspacePaneTabsCoordinator['clearPhysicalWorktreeIndex']
     broadcastWorkspaceTabsChanged?: (userId: string, repoRoot: string) => void
@@ -390,9 +382,6 @@ function createApplication(
       clearPhysicalWorktreeIndex: options.clearPhysicalWorktreeIndex ?? (async () => {}),
       reconcilePhysicalWorktreeAfterRemovalFailure:
         options.reconcilePhysicalWorktreeAfterRemovalFailure ?? (async () => {}),
-    },
-    workspacePaneTabs: {
-      retireTarget: options.retireTarget ?? (async () => {}),
     },
     isCurrentRepoRuntime: () => true,
     broadcastSessionsChanged: options.broadcastSessionsChanged ?? (() => {}),

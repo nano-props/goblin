@@ -186,7 +186,7 @@ describe('workspace pane layout aggregate', () => {
     await expect(readSnapshot(aggregate, scope, [], [])).resolves.toMatchObject({ entries: [] })
   })
 
-  test('repairs invalid targets locally while preserving valid siblings', async () => {
+  test('does not durably repair targets from an unversioned projection', async () => {
     const valid = { repoRoot: '/repo', branchName: 'main', worktreePath: null, tabs: [workspacePaneStaticTabEntry('history')] }
     const invalid = { repoRoot: '/repo', branchName: 'deleted', worktreePath: null, tabs: [workspacePaneStaticTabEntry('status')] }
     const repository = memoryRepository({ entries: [valid, invalid] })
@@ -200,10 +200,9 @@ describe('workspace pane layout aggregate', () => {
       providerSnapshots: [],
     })
 
-    expect(repository.layout).toEqual({ entries: [valid] })
+    expect(repository.layout).toEqual({ entries: [valid, invalid] })
     expect(result).toMatchObject({
       kind: 'validated',
-      repaired: true,
       snapshot: { entries: [valid] },
     })
   })
@@ -303,7 +302,7 @@ describe('workspace pane layout aggregate', () => {
     })).rejects.toThrow('error.workspace-tabs-target-invalid')
   })
 
-  test('suppresses invalid targets when repair persistence fails', async () => {
+  test('does not treat persistence failure as repair authority', async () => {
     const repository = memoryRepository({ entries: [{
       repoRoot: '/repo', branchName: 'deleted', worktreePath: null, tabs: [workspacePaneStaticTabEntry('status')],
     }] })
@@ -323,7 +322,6 @@ describe('workspace pane layout aggregate', () => {
 
     expect(result).toMatchObject({
       kind: 'validated',
-      repaired: true,
       snapshot: { entries: [] },
     })
     expect(repository.layout.entries).toHaveLength(1)
@@ -527,15 +525,7 @@ function aggregateFor(
   restoreTransaction: WorkspacePaneLayoutRestoreTransaction = {
     async validateMembershipAndRepair(input) {
       const current = await repository.load(input.repoRoot)
-      const outcome = await repository.compareAndSwap({
-        repoRoot: input.repoRoot,
-        expected: current.layout,
-        replacement: { entries: current.layout.entries.filter((entry) =>
-          input.validTargetKeys.includes(workspacePaneTabsTargetIdentityKey(entry))) },
-      })
-      if (outcome.kind === 'write-failure') return { ...outcome, snapshot: current }
-      if (outcome.kind !== 'accepted') throw new Error('test repair transaction failed')
-      return outcome
+      return { kind: 'accepted' as const, changed: false, snapshot: current }
     },
   },
 ): WorkspacePaneLayoutAggregate {

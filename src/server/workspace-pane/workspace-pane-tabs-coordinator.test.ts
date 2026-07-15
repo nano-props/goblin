@@ -187,30 +187,6 @@ describe('workspace pane tabs coordinator queues', () => {
     await removal
   })
 
-  test('does not reactivate a closed epoch while retiring durable layout', async () => {
-    const repository = memoryRepository({ entries: [{
-      repoRoot: '/repo', branchName: 'main', worktreePath: null, tabs: [workspacePaneStaticTabEntry('history')],
-    }] })
-    const aggregate = aggregateFor(repository)
-    const coordinator = createWorkspacePaneTabsCoordinator({
-      layoutAggregate: aggregate,
-      runtimeProviders: [],
-      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
-      physicalWorktrees: testPhysicalWorktrees,
-      targetProjection: testTargetProjection([{ repoRoot: '/repo', branchName: 'main', worktreePath: null }]),
-    })
-    await coordinator.snapshot({ userId: 'user-a', repoRoot: '/repo', scope: '/repo\0runtime-a' })
-    await coordinator.closeScope({ userId: 'user-a', scope: '/repo\0runtime-a' })
-
-    await coordinator.retireTarget({
-      userId: 'user-a',
-      scope: '/repo\0runtime-a',
-      target: { kind: 'branch', repoRoot: '/repo', branchName: 'main' },
-    })
-
-    expect(aggregate.activeEpochs('/repo')).toEqual([])
-  })
-
   test('holds physical admission through the final provider sample and snapshot', async () => {
     const operations = createPhysicalWorktreeOperationCoordinator()
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree', {

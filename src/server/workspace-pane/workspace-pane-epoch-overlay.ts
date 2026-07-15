@@ -159,25 +159,6 @@ export class WorkspacePaneEpochOverlay {
     if (active?.size === 0) this.epochsByRepoRoot.delete(scope.repoRoot)
   }
 
-  retireTarget(target: WorkspacePaneTabsTargetIdentity): WorkspacePaneEpochScope[] {
-    const targetKey = workspacePaneTabsTargetIdentityKeyFromIdentity(target)
-    const affected: WorkspacePaneEpochScope[] = []
-    for (const [key, state] of this.epochs) {
-      const placementChanged = state.placementsByTarget.delete(targetKey)
-      const lease = state.physicalLeasesByTarget.get(targetKey)
-      if (lease) {
-        const physicalKey = physicalWorktreeIdentityKey(lease.identity)
-        const scope = scopeFromEpochKey(key)
-        this.removePhysicalTarget(physicalKey, scope, targetKey)
-        state.physicalLeasesByTarget.delete(targetKey)
-      }
-      if (!placementChanged && !lease) continue
-      state.overlayRevision += 1
-      affected.push(scopeFromEpochKey(key))
-    }
-    return affected
-  }
-
   private state(scope: WorkspacePaneEpochScope): EpochState {
     const key = epochKey(scope)
     let state = this.epochs.get(key)

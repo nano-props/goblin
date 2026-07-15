@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import type { ServerAppRealtimeHost } from '#/server/realtime/app-realtime-host.ts'
-import type {
-  ServerWorkspacePaneTabsHost,
-  ServerWorkspacePaneTargetLifecycleHost,
-} from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
+import type { ServerWorkspacePaneTabsHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 
 const mocks = vi.hoisted(() => ({
   createApp: vi.fn(() => ({ fetch: vi.fn() })),
@@ -40,13 +37,12 @@ vi.mock('#/server/terminal/terminal-runtime.ts', () => ({
   createServerTerminalRuntime: mocks.createServerTerminalRuntime,
 }))
 
-function makeWorkspacePaneTabsHost(): ServerWorkspacePaneTabsHost & ServerWorkspacePaneTargetLifecycleHost {
+function makeWorkspacePaneTabsHost(): ServerWorkspacePaneTabsHost {
   return {
     restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] }, repaired: false })),
     listWorkspaceTabs: vi.fn(),
     replaceTabs: vi.fn(),
     updateTabs: vi.fn(),
-    retireTarget: vi.fn(),
   }
 }
 

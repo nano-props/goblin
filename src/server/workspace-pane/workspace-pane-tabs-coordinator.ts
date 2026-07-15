@@ -369,20 +369,6 @@ export class WorkspacePaneTabsCoordinator {
       })))
   }
 
-  async retireTarget(input: {
-    userId: string
-    scope: string
-    target: WorkspacePaneTabsTargetIdentity
-    assertCurrent?: () => void
-  }): Promise<WorkspacePaneLayoutCommitResult> {
-    return await this.runWorkspaceTabsRepoOperation(input.target.repoRoot, async (layout) =>
-      await layout.retire({
-        ...aggregateScope(input.userId, input.target.repoRoot, input.scope),
-        target: input.target,
-        assertCurrent: input.assertCurrent,
-      }))
-  }
-
   async reconcilePhysicalWorktreeAfterRemovalFailure(input: {
     repoRoot: string
     worktreePath: string

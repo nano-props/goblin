@@ -350,7 +350,7 @@ test('workspace pane layout repository classifies settings write failures at the
   })).resolves.toMatchObject({ kind: 'write-failure', error: { name: 'SettingsPersistenceWriteError' } })
 })
 
-test('workspace pane repair write failure reports the pre-write durable snapshot', async () => {
+test('workspace pane restore does not write or classify persistence failures', async () => {
   tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
   previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
   process.env.GOBLIN_SERVER_DATA_DIR = tmp
@@ -362,18 +362,11 @@ test('workspace pane repair write failure reports the pre-write durable snapshot
   await mod.addServerWorkspaceRepo(repoEntry)
   await writeWorkspacePaneLayout(mod, '/repo-a', staleLayout)
   const settingsFile = path.join(tmp, 'user-settings.json')
-  rmSync(settingsFile)
-  await mkdir(settingsFile)
-
   await expect(mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndRepair({
     repoRoot: '/repo-a',
     expectedRepoEntry: repoEntry,
     validTargetKeys: [],
-  })).resolves.toMatchObject({
-    kind: 'write-failure',
-    error: { name: 'SettingsPersistenceWriteError' },
-    snapshot: { layout: staleLayout },
-  })
+  })).resolves.toMatchObject({ kind: 'accepted', snapshot: { layout: staleLayout }, changed: false })
 })
 
 test('updates repo-level worktree bootstrap trust by repo id', async () => {

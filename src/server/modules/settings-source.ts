@@ -554,7 +554,7 @@ export const serverWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository 
 
 export const serverWorkspacePaneLayoutRestoreTransaction: WorkspacePaneLayoutRestoreTransaction = {
   async validateMembershipAndRepair(input) {
-    return await mutateWorkspacePaneSettings<WorkspacePaneLayoutRestoreTransactionOutcome>(async (data) => {
+    return await mutateUserSettings<WorkspacePaneLayoutRestoreTransactionOutcome>(async (data) => {
       const currentLayout = workspacePaneLayoutFromWorkspace(data.workspace, input.repoRoot)
       const snapshot = { layout: currentLayout }
       const currentRepoEntry = data.workspace.openRepoEntries.find(
@@ -563,17 +563,8 @@ export const serverWorkspacePaneLayoutRestoreTransaction: WorkspacePaneLayoutRes
       if (!sameRepoSessionEntry(currentRepoEntry, input.expectedRepoEntry)) {
         return unchangedUserSettings(data, { kind: 'membership-conflict', snapshot })
       }
-      const validTargetKeys = new Set(input.validTargetKeys)
-      const replacement = {
-        entries: currentLayout.entries.filter((entry) =>
-          validTargetKeys.has(workspacePaneTabsTargetIdentityKey(entry))),
-      }
-      return workspacePaneLayoutMutation(data, input.repoRoot, currentLayout, replacement)
-    }, (error, current) => ({
-      kind: 'write-failure',
-      error,
-      snapshot: { layout: workspacePaneLayoutFromWorkspace(current.workspace, input.repoRoot) },
-    }))
+      return unchangedUserSettings(data, { kind: 'accepted' as const, snapshot, changed: false })
+    })
   },
 }
 

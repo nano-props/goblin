@@ -208,7 +208,7 @@ class TerminalSessionService {
     })
     if (result.kind === 'membership-conflict') return result
     this.broadcastDurableLayoutChange(input.repoRoot, result.affectedUserIds)
-    return { kind: 'restored', snapshot: result.snapshot, repaired: result.repaired }
+    return { kind: 'restored', snapshot: result.snapshot, repaired: false }
   }
 
   async updateTabs(userId: string, input: WorkspacePaneTabsUpdateInput): Promise<WorkspacePaneTabsSnapshot> {
@@ -230,25 +230,6 @@ class TerminalSessionService {
     })
     this.broadcastDurableLayoutChange(input.repoRoot, result.affectedUserIds)
     return result.snapshot
-  }
-
-  async retireTarget(
-    userId: string,
-    input: { repoRuntimeId: string; target: WorkspacePaneTabsTargetIdentity },
-  ): Promise<void> {
-    const { repoRoot } = input.target
-    const validTarget =
-      input.target.kind === 'branch' ? isValidBranch(input.target.branchName) : isValidCwd(input.target.worktreePath)
-    if (!isValidRepoLocator(repoRoot) || !validTarget) {
-      throw new Error('invalid workspace pane target')
-    }
-    const scope = terminalSessionRuntimeScope(repoRoot, input.repoRuntimeId)
-    const result = await this.workspaceTabsCoordinator.retireTarget({
-      userId,
-      scope,
-      target: input.target,
-    })
-    this.broadcastDurableLayoutChange(repoRoot, result.affectedUserIds)
   }
 
   async reconcileTerminalTabsForSession(userId: string, session: TerminalSessionSummary): Promise<void> {

@@ -14,7 +14,6 @@ import type {
 } from '#/shared/workspace-pane-tabs.ts'
 import {
   workspacePaneTabsTargetIdentityKey,
-  workspacePaneTabsTargetIdentityKeyFromIdentity,
   type WorkspacePaneTabsTarget,
   type WorkspacePaneTabsTargetIdentity,
 } from '#/shared/workspace-pane-tabs-target.ts'
@@ -51,7 +50,6 @@ export type WorkspacePaneLayoutValidationResult =
       kind: 'validated'
       snapshot: WorkspacePaneTabsSnapshot
       affectedUserIds: string[]
-      repaired: boolean
     }
   | { kind: 'membership-conflict' }
 
@@ -77,11 +75,6 @@ export type WorkspacePaneLayoutUpdateInput = WorkspacePaneEpochScope & Workspace
   assertCurrent?: () => void
 }
 
-export type WorkspacePaneLayoutRetireInput = WorkspacePaneEpochScope & {
-  target: WorkspacePaneTabsTargetIdentity
-  assertCurrent?: () => void
-}
-
 export interface WorkspacePaneLayoutSnapshotInput {
   scope: WorkspacePaneEpochScope
   validTargets: readonly WorkspacePaneTabsTarget[]
@@ -100,7 +93,6 @@ export type WorkspacePaneLayoutValidationInput = WorkspacePaneEpochScope & {
 export interface WorkspacePaneLayoutOperation {
   replace(input: WorkspacePaneLayoutReplaceInput): Promise<WorkspacePaneLayoutCommitResult>
   update(input: WorkspacePaneLayoutUpdateInput): Promise<WorkspacePaneLayoutCommitResult>
-  retire(input: WorkspacePaneLayoutRetireInput): Promise<WorkspacePaneLayoutCommitResult>
   snapshot(input: WorkspacePaneLayoutSnapshotInput): Promise<WorkspacePaneTabsSnapshot>
   projectEntriesForAdmission(input: WorkspacePaneLayoutSnapshotInput): Promise<WorkspacePaneTabsSnapshot['entries']>
   validateRepairAndSnapshot(input: WorkspacePaneLayoutValidationInput): Promise<WorkspacePaneLayoutValidationResult>
@@ -148,7 +140,6 @@ export class WorkspacePaneLayoutAggregate {
       return await queue.add(() => task({
         replace: async (input) => await this.replace(input),
         update: async (input) => await this.update(input),
-        retire: async (input) => await this.retire(input),
         snapshot: async (input) => await this.snapshot(input),
         projectEntriesForAdmission: async (input) => await this.projectEntriesForAdmission(input),
         validateRepairAndSnapshot: async (input) => await this.validateRepairAndSnapshot(input),
@@ -174,30 +165,6 @@ export class WorkspacePaneLayoutAggregate {
     return await this.mutate(input, (current) => workspacePaneTabsWithUpdateOperation(current, input.operation), {
       retryConflicts: true,
     })
-  }
-
-  private async retire(input: WorkspacePaneLayoutRetireInput): Promise<WorkspacePaneLayoutCommitResult> {
-    for (let conflicts = 0; ; conflicts += 1) {
-      input.assertCurrent?.()
-      const current = await this.repository.load(input.repoRoot)
-      input.assertCurrent?.()
-      const targetKey = workspacePaneTabsTargetIdentityKeyFromIdentity(input.target)
-      const replacement = {
-        entries: current.layout.entries.filter((entry) => workspacePaneTabsTargetIdentityKey(entry) !== targetKey),
-      }
-      const outcome = await this.repository.compareAndSwap({
-        repoRoot: input.repoRoot,
-        expected: current.layout,
-        replacement,
-      })
-      if (outcome.kind === 'write-failure') throw outcome.error
-      if (outcome.kind === 'conflict' && conflicts < MAX_LAYOUT_CAS_RETRIES) continue
-      if (outcome.kind !== 'accepted') throw new Error('error.workspace-tabs-layout-conflict')
-      const affectedScopes = this.overlay.retireTarget(input.target)
-      return this.commitResult(input, outcome.changed, [
-        ...affectedScopes.map((scope) => scope.userId),
-      ])
-    }
   }
 
   private async snapshot(input: WorkspacePaneLayoutSnapshotInput): Promise<WorkspacePaneTabsSnapshot> {
@@ -233,10 +200,6 @@ export class WorkspacePaneLayoutAggregate {
       targets: input.validTargets,
       physicalTargets: input.physicalTargets,
     })
-    const durableLayoutChanged = outcome.kind === 'accepted' && outcome.changed
-    const invalidLayoutSuppressed = outcome.kind === 'write-failure' && outcome.snapshot.layout.entries.some((entry) =>
-      !validKeys.has(workspacePaneTabsTargetIdentityKey(entry)),
-    )
     return {
       kind: 'validated',
       snapshot: await this.snapshot({
@@ -245,8 +208,7 @@ export class WorkspacePaneLayoutAggregate {
         providerSnapshots: input.providerSnapshots,
         knownLayout: outcome.snapshot.layout,
       }),
-      affectedUserIds: this.affectedUserIds(input, durableLayoutChanged, overlayChanged ? [input.userId] : []),
-      repaired: durableLayoutChanged || invalidLayoutSuppressed,
+      affectedUserIds: this.affectedUserIds(input, false, overlayChanged ? [input.userId] : []),
     }
   }
 

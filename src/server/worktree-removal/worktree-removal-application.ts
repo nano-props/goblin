@@ -3,7 +3,6 @@ import type { RepoWorktreeRemovalLifecycle } from '#/server/modules/repo-worktre
 import type { TerminalSessionManager } from '#/server/terminal/terminal-session-manager.ts'
 import { terminalSessionWorktreePath } from '#/server/terminal/terminal-session-scope.ts'
 import type { WorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
-import type { ServerWorkspacePaneTargetLifecycleHost } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 import type {
   PhysicalWorktreeOperationCoordinator,
   PhysicalWorktreeOperationPermit,
@@ -25,7 +24,6 @@ interface WorktreeRemovalApplicationDependencies {
     WorkspacePaneTabsCoordinator,
     'physicalWorktreeTargets' | 'reconcilePhysicalWorktreeAfterRemovalFailure' | 'clearPhysicalWorktreeIndex'
   >
-  workspacePaneTabs: ServerWorkspacePaneTargetLifecycleHost
   isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
   broadcastSessionsChanged(userId: string, repoRoot: string): void
   broadcastWorkspaceTabsChanged(userId: string, repoRoot: string): void
@@ -130,21 +128,6 @@ export class WorktreeRemovalApplication {
         input.signal,
       )
       if (!result.admitted) return { ok: false, message: 'error.worktree-removal-in-progress' }
-      if (result.value.ok && input.deleteBranch) {
-        try {
-          await this.deps.workspacePaneTabs.retireTarget(userId, {
-            repoRuntimeId: input.repoRuntimeId,
-            target: { kind: 'branch', repoRoot: input.repoRoot, branchName: input.branchName },
-          })
-        } catch (error) {
-          failRemoteRuntimeIfNeeded(userId, error)
-          return {
-            ok: false,
-            message: abortMessage(error),
-            repositoryStateChanged: true,
-          }
-        }
-      }
       return result.value
     } catch (error) {
       failRemoteRuntimeIfNeeded(userId, error)

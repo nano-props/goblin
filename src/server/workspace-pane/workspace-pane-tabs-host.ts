@@ -4,7 +4,6 @@ import type {
   WorkspacePaneTabsSnapshot,
   WorkspacePaneTabsUpdateInput,
 } from '#/shared/workspace-pane-tabs.ts'
-import type { WorkspacePaneTabsTargetIdentity } from '#/shared/workspace-pane-tabs-target.ts'
 import type { WorkspacePaneTabsTarget } from '#/shared/workspace-pane-tabs-target.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 
@@ -42,11 +41,4 @@ export interface ServerWorkspacePaneTabsHost {
     userId: string,
     input: WorkspacePaneTabsUpdateInput,
   ): MaybePromise<WorkspacePaneTabsSnapshot>
-}
-
-export interface ServerWorkspacePaneTargetLifecycleHost {
-  retireTarget(
-    userId: string,
-    input: { repoRuntimeId: string; target: WorkspacePaneTabsTargetIdentity },
-  ): MaybePromise<void>
 }
