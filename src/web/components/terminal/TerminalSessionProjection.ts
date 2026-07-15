@@ -1017,6 +1017,13 @@ export class TerminalSessionProjection {
     this.sessions.get(terminalSessionId)?.restart()
   }
 
+  resynchronizeConnectedViews = (repoRoot: string, repoRuntimeId: string): void => {
+    for (const session of this.sessions.values()) {
+      if (session.descriptor.repoRoot !== repoRoot || session.descriptor.repoRuntimeId !== repoRuntimeId) continue
+      session.resynchronizeConnectedView()
+    }
+  }
+
   focusTerminal = (terminalSessionId: string): void => {
     this.sessions.get(terminalSessionId)?.focus()
   }

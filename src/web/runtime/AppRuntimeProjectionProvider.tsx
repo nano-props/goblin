@@ -57,7 +57,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
   }, [])
 
   const recoverTerminalSessionsFromServer = useCallback(
-    (scope: RuntimeProjectionScope): void => {
+    (scope: RuntimeProjectionScope, options: { resynchronizeConnectedViews?: boolean } = {}): void => {
       scope.runLatest(
         TERMINAL_RECOVERY_LANE,
         async () => ({
@@ -82,6 +82,9 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
             terminalHydrationSnapshotMap(recovery.snapshots),
           )
           if (!reconciled) return
+          if (options.resynchronizeConnectedViews) {
+            terminalProjection.resynchronizeConnectedViews(scope.target.repoRoot, scope.target.repoRuntimeId)
+          }
           useTerminalProjectionHydrationStore
             .getState()
             .markProjectionReady(scope.target.repoRoot, scope.target.repoRuntimeId)
@@ -176,7 +179,7 @@ export function AppRuntimeProjectionProvider({ children, currentRepoId }: AppRun
                   .getState()
                   .beginProjectionHydration(target.repoRoot, target.repoRuntimeId)
               })
-              recoverTerminalSessionsFromServer(scope)
+              recoverTerminalSessionsFromServer(scope, { resynchronizeConnectedViews: true })
               refreshWorkspacePaneTabsForScope(scope)
             }
           })

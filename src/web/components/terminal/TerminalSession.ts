@@ -164,6 +164,12 @@ export class TerminalSession {
     return (phase === 'opening' || phase === 'open') && this.runtime.clientRole() === 'unowned'
   }
 
+  resynchronizeConnectedView(): void {
+    if (this.disposed || !this.view.isConnected() || !this.view.currentTerminal()) return
+    this.destroyActiveView()
+    this.start()
+  }
+
   detach(host: HTMLElement): void {
     this.clearTerminalFocusIfOwned()
     if (this.view.detach(host) && this.destroyActiveView()) this.notify('metadata')
