@@ -12,9 +12,11 @@ class FakeWorker extends EventEmitter {
   sent: unknown[] = []
   killed = false
   sendResult = true
+  sendError: Error | null = null
   pid = 4242
 
   send(message: unknown): boolean {
+    if (this.sendError) throw this.sendError
     this.sent.push(message)
     return this.sendResult
   }
@@ -26,9 +28,30 @@ class FakeWorker extends EventEmitter {
   disconnect(): void {}
 }
 
+async function spawnSession(supervisor: WorkerBackedPtySupervisor, worker: FakeWorker, ptySessionId = 'pty_abc') {
+  const spawn = supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
+  const request = worker.sent.at(-1) as { type: string; requestId: string }
+  worker.emit('message', {
+    type: 'pty-spawn-result',
+    requestId: request.requestId,
+    ok: true,
+    ptySessionId,
+    processName: 'zsh',
+  } satisfies PtyWorkerMessage)
+  const result = await spawn
+  if (!result.ok) throw new Error(result.message)
+  return result.handle
+}
+
 function buildSupervisor(
   worker: FakeWorker,
-  options: { now?: () => number; setTimer?: typeof setTimeout; clearTimer?: typeof clearTimeout } = {},
+  options: {
+    now?: () => number
+    setTimer?: typeof setTimeout
+    clearTimer?: typeof clearTimeout
+    writeAckTimeoutMs?: number
+    maxPendingWriteBytes?: number
+  } = {},
 ) {
   return new WorkerBackedPtySupervisor({
     workerEntry: '/tmp/pty-worker.js',
@@ -36,6 +59,8 @@ function buildSupervisor(
     now: options.now,
     setTimer: options.setTimer as never,
     clearTimer: options.clearTimer as never,
+    writeAckTimeoutMs: options.writeAckTimeoutMs,
+    maxPendingWriteBytes: options.maxPendingWriteBytes,
   })
 }
 
@@ -323,20 +348,147 @@ describe('WorkerBackedPtySupervisor', () => {
     expect(worker.killed).toBe(false)
   })
 
-  test('write/resize/kill translate to the matching IPC messages', () => {
+  test('write resolves only after the worker acknowledges the PTY call', async () => {
     const supervisor = buildSupervisor(worker)
-    // Force a spawn so the supervisor is initialized
-    void supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
-    const handle = { ptySessionId: 'pty_abc' }
-    supervisor.write(handle, 'ls\n')
+    const spawn = supervisor.spawn({ cwd: '/repo', cols: 80, rows: 24 })
+    const spawnRequest = worker.sent[0] as { type: string; requestId: string }
+    worker.emit('message', {
+      type: 'pty-spawn-result',
+      requestId: spawnRequest.requestId,
+      ok: true,
+      ptySessionId: 'pty_abc',
+      processName: 'zsh',
+    } satisfies PtyWorkerMessage)
+    const spawned = await spawn
+    if (!spawned.ok) throw new Error(spawned.message)
+    const handle = spawned.handle
+
+    const write = supervisor.write(handle, 'ls\n')
+    const writeRequest = worker.sent.at(-1) as { type: string; requestId: string }
     supervisor.resize(handle, 100, 30)
     supervisor.kill(handle)
 
     expect(worker.sent.slice(1)).toEqual([
-      { type: 'pty-write', ptySessionId: 'pty_abc', data: 'ls\n' },
+      { type: 'pty-write', requestId: writeRequest.requestId, ptySessionId: 'pty_abc', data: 'ls\n' },
       { type: 'pty-resize', ptySessionId: 'pty_abc', cols: 100, rows: 30 },
       { type: 'pty-kill', ptySessionId: 'pty_abc' },
     ])
+    worker.emit('message', {
+      type: 'pty-write-result',
+      requestId: writeRequest.requestId,
+      status: 'accepted',
+    } satisfies PtyWorkerMessage)
+    await expect(write).resolves.toEqual({ status: 'accepted' })
+  })
+
+  test('settles a pending write as indeterminate when the worker exits', async () => {
+    const supervisor = buildSupervisor(worker)
+    const handle = await spawnSession(supervisor, worker)
+    const write = supervisor.write(handle, 'input')
+
+    worker.emit('exit', 1, null)
+
+    await expect(write).resolves.toEqual({ status: 'indeterminate' })
+    expect(supervisor.getDiagnostics().pendingRequests).toBe(0)
+  })
+
+  test('settles a pending write immediately when its PTY exits before acknowledgement', async () => {
+    vi.useFakeTimers()
+    const supervisor = buildSupervisor(worker)
+    const handle = await spawnSession(supervisor, worker)
+    const write = supervisor.write(handle, 'input')
+
+    worker.emit('message', {
+      type: 'pty-exit',
+      ptySessionId: handle.ptySessionId,
+      code: 0,
+      signal: null,
+    } satisfies PtyWorkerMessage)
+
+    await expect(write).resolves.toEqual({ status: 'indeterminate' })
+    expect(supervisor.getDiagnostics().pendingRequests).toBe(0)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  test('rejects a write when IPC send throws before acceptance', async () => {
+    const supervisor = buildSupervisor(worker)
+    const handle = await spawnSession(supervisor, worker)
+    worker.sendError = new Error('channel closed')
+
+    await expect(supervisor.write(handle, 'input')).resolves.toEqual({ status: 'rejected' })
+    expect(supervisor.getDiagnostics().pendingRequests).toBe(0)
+  })
+
+  test('settles an unacknowledged write as indeterminate after the bounded timeout', async () => {
+    vi.useFakeTimers()
+    const supervisor = new WorkerBackedPtySupervisor({
+      workerEntry: '/tmp/pty-worker.js',
+      spawnWorker: () => worker as never,
+      writeAckTimeoutMs: 25,
+    })
+    const handle = await spawnSession(supervisor, worker)
+    const write = supervisor.write(handle, 'input')
+    const request = worker.sent.at(-1) as { requestId: string }
+
+    await vi.advanceTimersByTimeAsync(25)
+
+    await expect(write).resolves.toEqual({ status: 'indeterminate' })
+    expect(supervisor.getDiagnostics().pendingRequests).toBe(1)
+    worker.emit('message', {
+      type: 'pty-write-result',
+      requestId: request.requestId,
+      status: 'accepted',
+    } satisfies PtyWorkerMessage)
+    expect(supervisor.getDiagnostics().pendingRequests).toBe(0)
+  })
+
+  test('bounds pending write bytes and releases the budget after acknowledgement', async () => {
+    const supervisor = buildSupervisor(worker, { maxPendingWriteBytes: 5 })
+    const handle = await spawnSession(supervisor, worker)
+    const first = supervisor.write(handle, '你')
+    const firstRequest = worker.sent.at(-1) as { requestId: string }
+
+    await expect(supervisor.write(handle, '好好')).resolves.toEqual({ status: 'rejected' })
+    expect(worker.sent).toHaveLength(2)
+
+    worker.emit('message', {
+      type: 'pty-write-result',
+      requestId: firstRequest.requestId,
+      status: 'accepted',
+    } satisfies PtyWorkerMessage)
+    await expect(first).resolves.toEqual({ status: 'accepted' })
+
+    const afterAck = supervisor.write(handle, '好')
+    const afterAckRequest = worker.sent.at(-1) as { requestId: string }
+    worker.emit('message', {
+      type: 'pty-write-result',
+      requestId: afterAckRequest.requestId,
+      status: 'accepted',
+    } satisfies PtyWorkerMessage)
+    await expect(afterAck).resolves.toEqual({ status: 'accepted' })
+  })
+
+  test('retains transport byte reservations after caller timeout until a late acknowledgement', async () => {
+    vi.useFakeTimers()
+    const supervisor = buildSupervisor(worker, { maxPendingWriteBytes: 5, writeAckTimeoutMs: 25 })
+    const handle = await spawnSession(supervisor, worker)
+    const first = supervisor.write(handle, '12345')
+
+    await vi.advanceTimersByTimeAsync(25)
+    await expect(first).resolves.toEqual({ status: 'indeterminate' })
+
+    await expect(supervisor.write(handle, '1')).resolves.toEqual({ status: 'rejected' })
+    const firstRequest = worker.sent.at(-1) as { requestId: string }
+    worker.emit('message', {
+      type: 'pty-write-result',
+      requestId: firstRequest.requestId,
+      status: 'accepted',
+    } satisfies PtyWorkerMessage)
+
+    const afterAck = supervisor.write(handle, '12345')
+    expect(worker.sent.at(-1)).toMatchObject({ type: 'pty-write', data: '12345' })
+    supervisor.shutdown()
+    await expect(afterAck).resolves.toEqual({ status: 'indeterminate' })
   })
 
   test('killAndWait resolves only after the worker confirms PTY exit', async () => {

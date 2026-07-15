@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { createClientRealtimeSocketConnection } from '#/web/realtime/client-realtime-socket-connection.ts'
+import {
+  ClientRealtimeRequestError,
+  createClientRealtimeSocketConnection,
+} from '#/web/realtime/client-realtime-socket-connection.ts'
 import { installWebSocketMock, type WebSocketMockHandle } from '#/web/test-utils/websocket-mock.ts'
 
 interface TestInputs {
@@ -111,6 +114,63 @@ describe('client realtime socket connection', () => {
     vi.advanceTimersByTime(300)
 
     expect(wsMock.instances).toHaveLength(1)
+  })
+
+  test('classifies a disconnected in-flight request as indeterminate', async () => {
+    const connection = createTestConnection({ onRealtimeMessage: vi.fn(), hasRealtimeSubscribers: () => true })
+    const promise = connection.request('echo', { value: 'hello' })
+    const socket = wsMock.instances[0]
+    socket?.emitOpen()
+    await Promise.resolve()
+
+    socket?.emitError()
+
+    await expect(promise).rejects.toMatchObject({
+      name: 'ClientRealtimeRequestError',
+      kind: 'disconnected',
+      delivery: 'indeterminate',
+      outageId: 1,
+    } satisfies Partial<ClientRealtimeRequestError>)
+  })
+
+  test('classifies a synchronous send failure as not sent', async () => {
+    const connection = createTestConnection({ onRealtimeMessage: vi.fn(), hasRealtimeSubscribers: () => true })
+    connection.openForRealtime()
+    const socket = wsMock.instances[0]
+    socket?.emitOpen()
+    if (!socket) throw new Error('missing socket')
+    socket.send = () => {
+      throw new Error('send failed')
+    }
+
+    await expect(connection.request('echo', { value: 'hello' })).rejects.toMatchObject({
+      name: 'ClientRealtimeRequestError',
+      kind: 'send-failed',
+      delivery: 'not-sent',
+      outageId: 1,
+    } satisfies Partial<ClientRealtimeRequestError>)
+  })
+
+  test('keeps one outage id across reconnect attempts and advances it after recovery', async () => {
+    vi.useFakeTimers()
+    const connection = createTestConnection({ onRealtimeMessage: vi.fn(), hasRealtimeSubscribers: () => true })
+    connection.openForRealtime()
+    wsMock.instances[0]?.emitOpen()
+    wsMock.instances[0]?.emitError()
+    await vi.advanceTimersByTimeAsync(300)
+    expect(wsMock.instances).toHaveLength(2)
+
+    const duringOutage = connection.request('echo', { value: 'during' })
+    wsMock.instances[1]?.close()
+    await expect(duringOutage).rejects.toMatchObject({ outageId: 1, delivery: 'not-sent' })
+
+    await vi.advanceTimersByTimeAsync(300)
+    expect(wsMock.instances).toHaveLength(3)
+    wsMock.instances[2]?.emitOpen()
+    wsMock.instances[2]?.emitError()
+    const nextOutage = connection.request('echo', { value: 'after' })
+    wsMock.instances[3]?.close()
+    await expect(nextOutage).rejects.toMatchObject({ outageId: 2 })
   })
 
   test('does not replace a connecting socket while a request is waiting for it to open', async () => {

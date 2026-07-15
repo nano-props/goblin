@@ -175,13 +175,43 @@ describe('PtyWorkerRuntime', () => {
     )?.ptySessionId
     expect(ptySessionId).toBeDefined()
     if (!ptySessionId) return
-    runtime.handleMessage({ type: 'pty-write', ptySessionId, data: 'ls\n' })
+    runtime.handleMessage({ type: 'pty-write', requestId: 'write_1', ptySessionId, data: 'ls\n' })
     runtime.handleMessage({ type: 'pty-resize', ptySessionId, cols: 100, rows: 30 })
     runtime.handleMessage({ type: 'pty-kill', ptySessionId })
 
     expect(pty.write).toHaveBeenCalledWith('ls\n')
+    expect(emitted).toContainEqual({ type: 'pty-write-result', requestId: 'write_1', status: 'accepted' })
     expect(pty.resize).toHaveBeenCalledWith(100, 30)
     expect(pty.kill).toHaveBeenCalledTimes(1)
+  })
+
+  test('rejects a write for an unknown PTY', () => {
+    const { runtime, emitted } = buildRuntime()
+
+    runtime.handleMessage({ type: 'pty-write', requestId: 'write_missing', ptySessionId: 'pty_missing', data: 'x' })
+
+    expect(emitted).toEqual([{ type: 'pty-write-result', requestId: 'write_missing', status: 'rejected' }])
+  })
+
+  test('marks a throwing PTY write as indeterminate', () => {
+    const { runtime, emitted } = buildRuntime()
+    runtime.handleMessage({ type: 'pty-spawn', requestId: 'spawn_1', input: { cwd: '/repo', cols: 80, rows: 24 } })
+    const pty = mockPtys[0]
+    if (!pty) throw new Error('missing PTY')
+    const spawn = emitted.find((message) => message.type === 'pty-spawn-result' && message.ok)
+    if (!spawn || spawn.type !== 'pty-spawn-result' || !spawn.ok) throw new Error('missing spawn result')
+    pty.write.mockImplementationOnce(() => {
+      throw new Error('write failed')
+    })
+
+    runtime.handleMessage({
+      type: 'pty-write',
+      requestId: 'write_1',
+      ptySessionId: spawn.ptySessionId,
+      data: 'x',
+    })
+
+    expect(emitted).toContainEqual({ type: 'pty-write-result', requestId: 'write_1', status: 'indeterminate' })
   })
 
   test('emits pty-data and pty-exit for live sessions', () => {

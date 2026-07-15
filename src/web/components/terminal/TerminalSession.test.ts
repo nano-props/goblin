@@ -19,6 +19,7 @@ import type {
   TerminalTakeoverResult,
   TerminalTakeoverInput,
   TerminalWriteInput,
+  TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
 
 const xtermMocks = vi.hoisted(() => {
@@ -436,7 +437,7 @@ class MockFontFaceSet {
 const terminalCalls = {
   attach: vi.fn<(input: TerminalAttachInput) => Promise<TerminalAttachResult>>(),
   restart: vi.fn<(input: TerminalRestartInput) => Promise<TerminalAttachResult>>(),
-  write: vi.fn<(input: TerminalWriteInput) => Promise<TerminalMutationResult>>(),
+  write: vi.fn<(input: TerminalWriteInput) => Promise<TerminalWriteResult>>(),
   resize: vi.fn<(input: TerminalResizeInput) => Promise<TerminalMutationResult>>(),
   takeover: vi.fn<(input: TerminalTakeoverInput) => Promise<TerminalTakeoverResult>>(),
   close: vi.fn<(input: TerminalSessionInput) => Promise<TerminalMutationResult>>(),
@@ -539,7 +540,7 @@ beforeEach(() => {
       terminal: {
         attach: terminalCalls.attach.mockResolvedValue(attachResult('pty_session_1_aaaaaaaaa')),
         restart: terminalCalls.restart.mockResolvedValue(attachResult('pty_session_2_aaaaaaaaa')),
-        write: terminalCalls.write.mockResolvedValue(true),
+        write: terminalCalls.write.mockResolvedValue({ status: 'accepted' }),
         resize: terminalCalls.resize.mockResolvedValue(true),
         takeover: terminalCalls.takeover.mockResolvedValue(takeoverResult('pty_session_1_aaaaaaaaa')),
         close: terminalCalls.close.mockResolvedValue(true),
@@ -588,7 +589,7 @@ beforeEach(() => {
     terminal: () => ({
       attach: terminalCalls.attach.mockResolvedValue(attachResult('pty_session_1_aaaaaaaaa')),
       restart: terminalCalls.restart.mockResolvedValue(attachResult('pty_session_2_aaaaaaaaa')),
-      write: terminalCalls.write.mockResolvedValue(true),
+      write: terminalCalls.write.mockResolvedValue({ status: 'accepted' }),
       resize: terminalCalls.resize.mockResolvedValue(true),
       takeover: terminalCalls.takeover.mockResolvedValue(takeoverResult('pty_session_1_aaaaaaaaa')),
       close: terminalCalls.close.mockResolvedValue(true),
@@ -1155,6 +1156,26 @@ describe('TerminalSession', () => {
       data: 'input',
     })
     expect(session.snapshot().phase).toBe('open')
+  })
+
+  test('reports a resolved terminal write rejection', async () => {
+    terminalCalls.write.mockResolvedValueOnce({ status: 'rejected' })
+    const report = vi.fn()
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const session = new TerminalSession(descriptor, vi.fn(), undefined, { report })
+    hydrateManagedSession(session)
+    session.attach(host)
+    await flushTerminalStart()
+    await flushUntil(() => session.snapshot().phase === 'open')
+
+    xtermMocks.terminals[0]!.emitData('input')
+    await flushTerminalStart()
+
+    expect(report).toHaveBeenCalledWith({
+      terminalRuntimeSessionId: 'pty_session_1_aaaaaaaaa',
+      failure: { kind: 'result', result: { status: 'rejected' } },
+    })
   })
 
   test('batches rapid user input into a single ordered write', async () => {

@@ -19,10 +19,14 @@ import { normalizePtyWorkerMessage, type PtyWorkerMessage } from '#/server/termi
 import type { PtySupervisorDiagnostics, PtySupervisorFailureDiagnostics } from '#/server/terminal/terminal-host.ts'
 import { createOpaqueId } from '#/shared/opaque-id.ts'
 import { resolvePtyWorkerEntry } from '#/server/terminal/pty-worker-entry.ts'
+import type { TerminalWriteResult } from '#/shared/terminal-types.ts'
 
 const STABLE_WORKER_UPTIME_MS = 15_000
 const MIN_RESTART_BACKOFF_MS = 250
 const MAX_RESTART_BACKOFF_MS = 5_000
+const DEFAULT_WRITE_ACK_TIMEOUT_MS = 5_000
+const MAX_PENDING_WRITE_ACKS = 1_024
+const DEFAULT_MAX_PENDING_WRITE_BYTES = 8 * 1024 * 1024
 const ptyWorkerLogger = serverLogger.child({ module: 'pty-supervisor-worker' })
 
 type WorkerTimerHandle = ReturnType<typeof setTimeout> | number
@@ -32,6 +36,13 @@ interface PendingSpawn {
   input: PtySpawnInput
   retryCount: number
   resolve(value: PtySpawnResult): void
+}
+
+interface PendingWrite {
+  ptySessionId: string
+  byteLength: number
+  resolve: ((value: TerminalWriteResult) => void) | null
+  timeout: ReturnType<typeof setTimeout>
 }
 
 interface SessionListeners {
@@ -50,6 +61,8 @@ export interface WorkerBackedPtySupervisorOptions {
   now?: () => number
   setTimer?: (callback: () => void, delayMs: number) => WorkerTimerHandle
   clearTimer?: (timer: WorkerTimerHandle) => void
+  writeAckTimeoutMs?: number
+  maxPendingWriteBytes?: number
 }
 
 export class WorkerBackedPtySupervisor implements PtySupervisor {
@@ -58,6 +71,8 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
   private worker: TerminalWorkerChildProcess | null = null
   private workerStartedAt = 0
   private readonly pendingSpawns = new Map<string, PendingSpawn>()
+  private readonly pendingWrites = new Map<string, PendingWrite>()
+  private pendingWriteBytes = 0
   private readonly sessions = new Map<string, { processName: string; listeners: SessionListeners }>()
   private restartAttempts = 0
   private restartTimer: WorkerTimerHandle | null = null
@@ -80,16 +95,33 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     })
   }
 
-  // Fire-and-forget writes. `ensureWorker()` returns the live worker;
-  // if the worker just died and we haven't seen the 'exit' event yet
-  // the send is a no-op. That race window is microsecond-wide; the
-  // next 'exit' will fan out the failure to listeners, and a missed
-  // keystroke is preferable to a thrown caller exception.
-  write(handle: PtyHandle, data: string): void {
-    if (this.shuttingDown) return
+  async write(handle: PtyHandle, data: string): Promise<TerminalWriteResult> {
+    if (this.shuttingDown || !this.sessions.has(handle.ptySessionId)) return { status: 'rejected' }
+    if (this.pendingWrites.size >= MAX_PENDING_WRITE_ACKS) return { status: 'rejected' }
+    const byteLength = Buffer.byteLength(data, 'utf8')
+    if (this.pendingWriteBytes + byteLength > (this.options.maxPendingWriteBytes ?? DEFAULT_MAX_PENDING_WRITE_BYTES)) {
+      return { status: 'rejected' }
+    }
     const worker = this.worker
-    if (!worker) return
-    worker.send({ type: 'pty-write', ptySessionId: handle.ptySessionId, data })
+    if (!worker) return { status: 'rejected' }
+    const requestId = createRequestId()
+    return await new Promise<TerminalWriteResult>((resolve) => {
+      const timeout = setTimeout(() => {
+        const pending = this.pendingWrites.get(requestId)
+        if (!pending?.resolve) return
+        const resolvePending = pending.resolve
+        pending.resolve = null
+        resolvePending({ status: 'indeterminate' })
+      }, this.options.writeAckTimeoutMs ?? DEFAULT_WRITE_ACK_TIMEOUT_MS)
+      this.pendingWrites.set(requestId, { ptySessionId: handle.ptySessionId, byteLength, resolve, timeout })
+      this.pendingWriteBytes += byteLength
+      try {
+        // `false` signals IPC backpressure, not rejection. The worker result is authoritative.
+        worker.send({ type: 'pty-write', requestId, ptySessionId: handle.ptySessionId, data })
+      } catch {
+        this.settlePendingWrite(requestId, { status: 'rejected' })
+      }
+    })
   }
 
   resize(handle: PtyHandle, cols: number, rows: number): void {
@@ -165,7 +197,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
       workerPid: this.worker?.pid ?? null,
       workerStartedAt: this.worker ? this.workerStartedAt : null,
       workerUptimeMs: this.worker ? Math.max(0, this.now() - this.workerStartedAt) : null,
-      pendingRequests: this.pendingSpawns.size,
+      pendingRequests: this.pendingSpawns.size + this.pendingWrites.size,
       restartAttempts: this.restartAttempts,
       restartScheduled: this.restartTimer !== null,
       shuttingDown: this.shuttingDown,
@@ -187,6 +219,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
       pending.resolve({ ok: false, message: 'PTY worker stopped' })
     }
     this.pendingSpawns.clear()
+    this.settlePendingWrites({ status: 'indeterminate' })
     // Drop all listener state — the runtime that owns us has already
     // called ptySupervisor.shutdown and is closing its own sessions.
     this.sessions.clear()
@@ -249,6 +282,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
         )
       }
       this.failPendingSpawns('PTY worker exited')
+      this.settlePendingWrites({ status: 'indeterminate' })
       this.failSessionListenersOnWorkerExit()
       if (!this.shuttingDown && hadSessions) this.scheduleRestart()
     })
@@ -259,6 +293,7 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
       this.worker = null
       const hadSessions = this.sessions.size > 0
       this.failPendingSpawns(error instanceof Error ? error : new Error(String(error)))
+      this.settlePendingWrites({ status: 'indeterminate' })
       this.failSessionListenersOnWorkerExit()
       if (!this.shuttingDown && hadSessions) this.scheduleRestart()
     })
@@ -267,6 +302,11 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
   }
 
   private handleWorkerMessage(message: PtyWorkerMessage): void {
+    if (message.type === 'pty-write-result') {
+      if (!this.settlePendingWrite(message.requestId, { status: message.status })) return
+      this.lastSuccessfulResponseAt = this.now()
+      return
+    }
     if (message.type === 'pty-spawn-result') {
       const pending = this.pendingSpawns.get(message.requestId)
       if (!pending) return
@@ -299,9 +339,31 @@ export class WorkerBackedPtySupervisor implements PtySupervisor {
     if (message.type === 'pty-exit') {
       const session = this.sessions.get(message.ptySessionId)
       if (!session) return
+      this.settlePendingWritesForPty(message.ptySessionId, { status: 'indeterminate' })
       for (const listener of Array.from(session.listeners.exit)) listener(message.code, message.signal)
       this.sessions.delete(message.ptySessionId)
     }
+  }
+
+  private settlePendingWritesForPty(ptySessionId: string, result: TerminalWriteResult): void {
+    for (const [requestId, pending] of this.pendingWrites) {
+      if (pending.ptySessionId !== ptySessionId) continue
+      this.settlePendingWrite(requestId, result)
+    }
+  }
+
+  private settlePendingWrites(result: TerminalWriteResult): void {
+    for (const requestId of Array.from(this.pendingWrites.keys())) this.settlePendingWrite(requestId, result)
+  }
+
+  private settlePendingWrite(requestId: string, result: TerminalWriteResult): boolean {
+    const pending = this.pendingWrites.get(requestId)
+    if (!pending) return false
+    this.pendingWrites.delete(requestId)
+    this.pendingWriteBytes -= pending.byteLength
+    clearTimeout(pending.timeout)
+    pending.resolve?.(result)
+    return true
   }
 
   private failPendingSpawns(error: Error | string): void {

@@ -372,6 +372,9 @@ export const ko: Record<DictKey, string> = {
   'terminal.takeover-failed-generic': '터미널 제어 가져오기에 실패했습니다.',
   'terminal.takeover-session-gone': '더 이상 사용할 수 없는 터미널입니다.',
   'terminal.write-blocked-reconnecting': '재연결 중입니다. 잠시 후 다시 시도하세요.',
+  'terminal.write-not-sent': '연결할 수 없어 입력을 보내지 못했습니다. 잠시 후 다시 시도하세요.',
+  'terminal.write-delivery-uncertain':
+    '연결이 끊어졌습니다. 최근 입력이 전달되지 않았을 수 있으니 확인 후 다시 시도하세요.',
   'terminal.write-blocked-session-gone': '더 이상 사용할 수 없는 터미널입니다.',
   'terminal.write-blocked-rejected': '터미널이 요청을 거부했습니다.',
   'terminal.write-blocked-client-unavailable': '터미널 클라이언트를 사용할 수 없습니다.',

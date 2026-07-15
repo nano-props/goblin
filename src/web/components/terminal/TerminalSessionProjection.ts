@@ -59,6 +59,7 @@ import type { TerminalCreateAdmissionResult } from '#/web/components/terminal/te
 import { writeCanonicalWorkspacePaneTabsSnapshot } from '#/web/workspace-pane/workspace-pane-tabs-commit.ts'
 import { refreshWorkspacePaneTabs } from '#/web/workspace-pane/workspace-pane-tabs-query.ts'
 import { FutureExitLedger } from '#/web/components/terminal/future-exit-ledger.ts'
+import { createTerminalWriteFailureReporter } from '#/web/components/terminal/terminal-write-failure-feedback.ts'
 
 const EMPTY_TERMINAL_SNAPSHOT: TerminalSnapshot = {
   phase: 'opening',
@@ -152,6 +153,7 @@ function retiredTerminalRepoEpochKeys(previous: TerminalRepoIndex, next: Termina
 }
 
 export class TerminalSessionProjection {
+  private readonly writeFailureReporter = createTerminalWriteFailureReporter()
   private readonly onSelectedWorktreeChange: (terminalWorktreeKey: string, terminalSessionId: string | null) => void
   private repoIndex: TerminalRepoIndex = {}
   private readonly sessions = new Map<string, TerminalSession>()
@@ -1526,6 +1528,7 @@ export class TerminalSessionProjection {
           terminalRuntimeSessionId,
           terminalWorktreeKey: session.descriptor.terminalWorktreeKey,
         }),
+      this.writeFailureReporter,
     )
     this.sessions.set(descriptor.terminalSessionId, session)
     this.syncTerminalRuntimeSessionIdIndex(descriptor.terminalSessionId, session.currentRuntimeBinding())

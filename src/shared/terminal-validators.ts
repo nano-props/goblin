@@ -191,6 +191,11 @@ const TerminalTakeoverResultSchema = v.variant('ok', [
   }),
 ])
 const TerminalMutationResultSchema = v.boolean()
+const TerminalWriteResultSchema = v.variant('status', [
+  v.object({ status: v.literal('accepted') }),
+  v.object({ status: v.literal('rejected') }),
+  v.object({ status: v.literal('indeterminate') }),
+])
 const TerminalPruneResultSchema = v.object({
   pruned: v.number(),
   remaining: v.number(),
@@ -464,6 +469,7 @@ function normalizeTerminalSocketResponsePayload(action: TerminalSocketRequestAct
     case 'restart':
       return normalizeWithSchema(TerminalAttachResultSchema, payload)
     case 'write':
+      return normalizeWithSchema(TerminalWriteResultSchema, payload)
     case 'resize':
     case 'close':
       return normalizeWithSchema(TerminalMutationResultSchema, payload)

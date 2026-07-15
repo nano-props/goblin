@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { terminalCreateErrorKey } from '#/web/components/terminal/terminal-create-feedback.ts'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
 
 describe('terminalCreateErrorKey', () => {
   test.each([
@@ -18,6 +19,22 @@ describe('terminalCreateErrorKey', () => {
     [new Error('host is inside a display:none subtree'), 'error.terminal-host-not-measurable'],
     [new Error('boom'), 'error.terminal-create-failed'],
   ])('maps %s to %s', (error, expectedKey) => {
+    expect(terminalCreateErrorKey(error)).toBe(expectedKey)
+  })
+
+  test.each([
+    ['open-timeout', 'not-sent', 'error.terminal-connection-timeout'],
+    ['timeout', 'indeterminate', 'error.terminal-create-timeout'],
+    ['send-failed', 'not-sent', 'error.terminal-connection-unavailable'],
+    ['disconnected', 'indeterminate', 'error.terminal-connection-unavailable'],
+    ['app-quitting', 'indeterminate', 'error.terminal-create-failed'],
+  ] as const)('maps structured %s failures without inspecting message text', (kind, delivery, expectedKey) => {
+    const error = new ClientRealtimeRequestError('arbitrary transport detail', {
+      kind,
+      delivery,
+      outageId: kind === 'app-quitting' ? null : 1,
+    })
+
     expect(terminalCreateErrorKey(error)).toBe(expectedKey)
   })
 })

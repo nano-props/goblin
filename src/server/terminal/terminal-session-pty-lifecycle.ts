@@ -4,6 +4,7 @@ import {
   type TerminalOutputEvent,
   type TerminalSessionPhase,
   type TerminalTitleEvent,
+  type TerminalWriteResult,
 } from '#/shared/terminal-types.ts'
 import { isShellProcessName } from '#/shared/terminal-process-name.ts'
 import { serverLogger } from '#/server/logger.ts'
@@ -44,6 +45,16 @@ interface RetiringPtyOwnership {
   attempt: Promise<void> | null
 }
 
+interface PendingInputWrite {
+  data: string
+  resolve(result: TerminalWriteResult): void
+}
+
+interface InFlightInputBatch {
+  writes: PendingInputWrite[]
+  settled: boolean
+}
+
 export interface TerminalPtySpawnResult {
   generation: number
   result: TerminalPtySpawnOutcome
@@ -74,10 +85,7 @@ export interface TerminalPtyBindingEvents<TSession extends TerminalPtySessionSta
     event: Omit<TerminalBellRealtimeEvent, 'terminalSessionId' | 'repoRoot' | 'worktreePath'>,
   ): void
   emitTitle(session: TSession, event: Omit<TerminalTitleEvent, 'terminalSessionId' | 'repoRoot' | 'worktreePath'>): void
-  emitExit(
-    session: TSession,
-    event: Omit<TerminalExitEvent, 'terminalSessionId' | 'repoRoot' | 'repoRuntimeId'>,
-  ): void
+  emitExit(session: TSession, event: Omit<TerminalExitEvent, 'terminalSessionId' | 'repoRoot' | 'repoRuntimeId'>): void
   closeSession(terminalRuntimeSessionId: string): void
 }
 
@@ -86,7 +94,8 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
   private readonly events: TerminalPtyBindingEvents<TSession>
   private handle: PtyHandle | null = null
   private readonly disposables: Array<{ dispose(): void }> = []
-  private inputQueue: string[] = []
+  private inputQueue: PendingInputWrite[] = []
+  private readonly inFlightInputBatches = new Set<InFlightInputBatch>()
   private inputFlushScheduled = false
   private spawnGeneration = 0
   private pendingSpawn: Promise<TerminalPtySpawnResult> | null = null
@@ -249,11 +258,12 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     }
   }
 
-  write(session: TSession, data: string): boolean {
-    if (!this.handle) return false
-    this.inputQueue.push(data)
-    this.scheduleInputFlush(session)
-    return true
+  write(session: TSession, data: string): Promise<TerminalWriteResult> {
+    if (!this.handle) return Promise.resolve({ status: 'rejected' })
+    return new Promise<TerminalWriteResult>((resolve) => {
+      this.inputQueue.push({ data, resolve })
+      this.scheduleInputFlush(session)
+    })
   }
 
   private async resolveSpawn(
@@ -266,15 +276,20 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     // - restart failures keep the session addressable for a later retry.
     let spawn: AbortablePtySpawn
     try {
-      spawn = abortablePtySpawn(this.supervisor, {
-        command: session.command,
-        args: session.args,
-        startupShellCommand: session.startupShellCommand,
-        cwd: session.cwd,
-        cols: session.cols,
-        rows: session.rows,
-        env: session.env,
-      }, signal, async (handle) => await this.killStalePtyHandle(handle))
+      spawn = abortablePtySpawn(
+        this.supervisor,
+        {
+          command: session.command,
+          args: session.args,
+          startupShellCommand: session.startupShellCommand,
+          cwd: session.cwd,
+          cols: session.cols,
+          rows: session.rows,
+          env: session.env,
+        },
+        signal,
+        async (handle) => await this.killStalePtyHandle(handle),
+      )
     } catch (err) {
       const message = err instanceof Error ? err.message : 'error.unknown'
       return this.isCurrentSpawn(session, generation)
@@ -344,7 +359,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
             lastBroadcastTitle = null
             this.events.emitTitle(session, {
               terminalRuntimeSessionId: session.id,
-            terminalRuntimeGeneration: generation,
+              terminalRuntimeGeneration: generation,
               canonicalTitle: null,
             })
           }
@@ -358,7 +373,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
               lastBroadcastTitle = eventCanonicalTitle
               this.events.emitTitle(session, {
                 terminalRuntimeSessionId: session.id,
-            terminalRuntimeGeneration: generation,
+                terminalRuntimeGeneration: generation,
                 canonicalTitle: eventCanonicalTitle,
               })
             }
@@ -433,7 +448,11 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     this.disposeListeners(session.id)
     if (this.handle) this.retainRetiringHandle(this.handle)
     this.handle = null
-    this.inputQueue = []
+    this.settleQueuedInput({ status: 'rejected' })
+    for (const batch of Array.from(this.inFlightInputBatches)) {
+      this.settleInputBatch(batch, { status: 'indeterminate' })
+      this.inFlightInputBatches.delete(batch)
+    }
     this.inputFlushScheduled = false
   }
 
@@ -470,10 +489,7 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
       if (retiring.attempt === attempt) retiring.attempt = null
       throw error
     }
-    if (
-      this.retiringHandles.get(retiring.handle.ptySessionId) === retiring &&
-      retiring.attempt === attempt
-    ) {
+    if (this.retiringHandles.get(retiring.handle.ptySessionId) === retiring && retiring.attempt === attempt) {
       this.retiringHandles.delete(retiring.handle.ptySessionId)
     }
   }
@@ -493,18 +509,40 @@ export class TerminalPtyBinding<TSession extends TerminalPtySessionState> {
     this.inputFlushScheduled = true
     queueMicrotask(() => {
       this.inputFlushScheduled = false
-      this.drainInputQueue(session)
+      void this.drainInputQueue(session)
     })
   }
 
-  private drainInputQueue(session: TSession): void {
-    if (this.inputQueue.length === 0 || !this.handle) return
-    const batch = this.inputQueue.splice(0).join('')
-    try {
-      this.supervisor.write(this.handle, batch)
-    } catch (err) {
-      ptyLifecycleLogger.warn({ terminalRuntimeSessionId: session.id, err, bytes: batch.length }, 'failed to write PTY')
+  private async drainInputQueue(session: TSession): Promise<void> {
+    if (this.inputQueue.length === 0) return
+    const writes = this.inputQueue.splice(0)
+    const handle = this.handle
+    if (!handle) {
+      for (const write of writes) write.resolve({ status: 'rejected' })
+      return
     }
+    const batch: InFlightInputBatch = { writes, settled: false }
+    this.inFlightInputBatches.add(batch)
+    const data = writes.map((write) => write.data).join('')
+    try {
+      const result = await this.supervisor.write(handle, data)
+      this.settleInputBatch(batch, result)
+    } catch (err) {
+      ptyLifecycleLogger.warn({ terminalRuntimeSessionId: session.id, err, bytes: data.length }, 'failed to write PTY')
+      this.settleInputBatch(batch, { status: 'indeterminate' })
+    } finally {
+      this.inFlightInputBatches.delete(batch)
+    }
+  }
+
+  private settleQueuedInput(result: TerminalWriteResult): void {
+    for (const write of this.inputQueue.splice(0)) write.resolve(result)
+  }
+
+  private settleInputBatch(batch: InFlightInputBatch, result: TerminalWriteResult): void {
+    if (batch.settled) return
+    batch.settled = true
+    for (const write of batch.writes) write.resolve(result)
   }
 }
 

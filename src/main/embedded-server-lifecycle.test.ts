@@ -125,6 +125,7 @@ describe('embedded server port selection', () => {
 
 describe('embedded server process lifecycle', () => {
   test('fails the native host when a ready server exits unexpectedly', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {})
     const child = createServerChild()
     mocks.spawn.mockReturnValue(child)
     mockFetch(() => ({ ok: true }))
@@ -133,6 +134,7 @@ describe('embedded server process lifecycle', () => {
     child.stderr.write('Error: test server failure\n')
     child.emitExit(1, null)
 
+    expect(errorLog).toHaveBeenCalledWith('[server] Error: test server failure')
     expect(getEmbeddedServerRuntime()).toBeNull()
     expect(mocks.showErrorBox).toHaveBeenCalledWith('Goblin server stopped', expect.stringContaining('exit code 1'))
     expect(mocks.showErrorBox).toHaveBeenCalledWith(
@@ -156,6 +158,7 @@ describe('embedded server process lifecycle', () => {
   })
 
   test('reports startup failure without entering the ready-server fatal boundary', async () => {
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {})
     const child = createServerChild()
     mocks.spawn.mockReturnValue(child)
     mockFetch(() => ({ ok: false }))
@@ -166,6 +169,7 @@ describe('embedded server process lifecycle', () => {
     child.emitExit(1, null)
 
     await expect(starting).rejects.toThrow('Embedded server exited before becoming ready (exit code 1)')
+    expect(errorLog).toHaveBeenCalledWith('[server] Error: startup failed')
     expect(mocks.showErrorBox).not.toHaveBeenCalled()
     expect(mocks.appExit).not.toHaveBeenCalled()
   })

@@ -376,7 +376,7 @@ describe('terminal-runtime-actions clientId gate', () => {
   test('write / resize / takeover / restart / attach all fall back to outer clientId when input omits it', async () => {
     const { actions, manager } = makeActions({ closeSessionForUser: () => false })
 
-    actions.write(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID, data: 'x' } as never)
+    await actions.write(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID, data: 'x' } as never)
     actions.resize(CLIENT_ID, USER_ID, { terminalRuntimeSessionId: RUNTIME_SESSION_ID, cols: 80, rows: 24 } as never)
     actions.takeover(CLIENT_ID, USER_ID, {
       terminalRuntimeSessionId: RUNTIME_SESSION_ID,

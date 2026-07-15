@@ -267,6 +267,13 @@ export interface TerminalSessionsRecoveryResult {
 
 export type TerminalMutationResult = boolean
 
+/**
+ * Result of handing terminal input to the currently bound PTY runtime.
+ * `accepted` means the runtime write call returned normally; it does not
+ * claim that the shell consumed or executed the input.
+ */
+export type TerminalWriteResult = { status: 'accepted' } | { status: 'rejected' } | { status: 'indeterminate' }
+
 // All realtime events below are addressed by both `terminalRuntimeSessionId` and
 // `terminalSessionId`. See the "Identity model" naming-boundary note in
 // `docs/terminal.md`: `terminalRuntimeSessionId` is only a server runtime lookup id
