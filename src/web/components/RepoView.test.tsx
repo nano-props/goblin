@@ -248,6 +248,7 @@ beforeEach(() => {
   })
   branchNavigatorMocks.activate.mockImplementation(() => {})
   restoreRepoTabsMocks.useRestoreRepoTabsOnView.mockClear()
+  restoreRepoTabsMocks.useRestoreRepoTabsOnView.mockReturnValue({ state: { phase: 'idle' }, retry: vi.fn() })
 })
 
 afterEach(() => {
@@ -315,6 +316,28 @@ describe('RepoView workspace navigation', () => {
     expect(branchNavigator(container)).toBeNull()
     expect(repoWorkspace(container)).toBeNull()
     expect(restoreRepoTabsMocks.useRestoreRepoTabsOnView).toHaveBeenCalledWith({ repoId: REPO_ID })
+  })
+
+  test('replaces the stub skeleton with a stable promotion failure view', () => {
+    restoreRepoTabsMocks.useRestoreRepoTabsOnView.mockReturnValue({
+      state: { phase: 'failed', message: 'server request failed' },
+      retry: vi.fn(),
+    })
+    useReposStore.setState((state) => ({
+      repos: {
+        ...state.repos,
+        [REPO_ID]: {
+          ...state.repos[REPO_ID]!,
+          session: { ...state.repos[REPO_ID]!.session, projectionState: 'stub' },
+        },
+      },
+    }))
+
+    const { container } = render(branchRepoView())
+
+    expect(container.querySelector('[data-testid="repo-workspace-skeleton"]')).toBeNull()
+    expect(container.textContent).toContain('server request failed')
+    expect(container.textContent).toContain('lazy-restore.failed')
   })
 
   test('large-screen branch activation keeps the Branch Navigator visible', () => {

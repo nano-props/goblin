@@ -1,9 +1,12 @@
 import { createContext, useContext, useMemo, type ReactNode } from 'react'
+import { AlertTriangle, RefreshCw } from 'lucide-react'
 import { Outlet, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import { useShallow } from 'zustand/react/shallow'
 import { ErrorBoundary } from '#/web/components/ErrorBoundary.tsx'
 import { CenteredLoadingStatus } from '#/web/components/CenteredLoadingStatus.tsx'
+import { EmptyState } from '#/web/components/Layout.tsx'
+import { Button } from '#/web/components/ui/button.tsx'
 import { TerminalSessionProvider } from '#/web/components/terminal/TerminalSessionProvider.tsx'
 import { AppRuntimeProjectionProvider } from '#/web/runtime/AppRuntimeProjectionProvider.tsx'
 import { TokenGate } from '#/web/components/TokenGate.tsx'
@@ -35,6 +38,7 @@ import {
 } from '#/web/primary-window-navigation.tsx'
 import { LayoutOverlayActions } from '#/web/layout-overlay-actions-context.ts'
 import { useReposStore } from '#/web/stores/repos/store.ts'
+import { useT } from '#/web/stores/i18n.ts'
 import { primaryWindowNavigationStoreActionsFromStore } from '#/web/stores/repos/selector-actions.ts'
 import { branchNameFromSlug, repoIdFromSlug } from '#/web/repo-route-slugs.ts'
 import { returnToFromHref, usePrimaryWindowRouteActions } from '#/web/primary-window-route-navigation.ts'
@@ -43,16 +47,20 @@ import {
   useWorkspaceNavigationHistory,
 } from '#/web/workspace-navigation-history.ts'
 import type { WorkspaceNavigationRouteContext } from '#/web/workspace-navigation-history.ts'
-import type { AuthenticatedAppBootstrapState } from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
+import type {
+  AuthenticatedAppBootstrapResult,
+  AuthenticatedAppBootstrapState,
+} from '#/web/hooks/useAuthenticatedAppBootstrap.ts'
 import type { ParsedRepoBranchWorkspacePaneRoute } from '#/web/App.tsx'
 import { isWorkspacePaneStaticTabType } from '#/shared/workspace-pane.ts'
 import type { PrimaryWindowRouteNavigation } from '#/web/primary-window-route-navigation.ts'
 
-const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapState>({
-  status: 'restoring-workspace',
+const AuthenticatedWorkspaceRestoreContext = createContext<AuthenticatedAppBootstrapResult>({
+  state: { status: 'restoring-workspace' },
+  retry: () => {},
 })
 
-export type AuthenticatedAppShellMode = 'settings' | 'workspace-restore' | 'workspace-ready'
+export type AuthenticatedAppShellMode = 'settings' | 'workspace-restore' | 'workspace-failed' | 'workspace-ready'
 
 export function primaryWindowLayoutRouteCallbacks(
   routeActions: Pick<PrimaryWindowRouteNavigation, 'openSettings' | 'openHome'>,
@@ -68,7 +76,8 @@ export function authenticatedAppShellMode(
   bootstrapState: AuthenticatedAppBootstrapState,
 ): AuthenticatedAppShellMode {
   if (pathname.startsWith('/settings')) return 'settings'
-  return bootstrapState.status === 'restoring-workspace' ? 'workspace-restore' : 'workspace-ready'
+  if (bootstrapState.status === 'restoring-workspace') return 'workspace-restore'
+  return bootstrapState.status === 'failed' ? 'workspace-failed' : 'workspace-ready'
 }
 
 export function Layout() {
@@ -89,17 +98,20 @@ function AuthenticatedAppShell() {
   const routeMatches = useRouterState({ select: (s) => s.matches })
   const activeRepoSlug = repoRouteContextFromMatches(routeMatches)?.repoSlug ?? null
   const activeRepoRoot = activeRepoSlug ? repoIdFromSlug(activeRepoSlug) : null
-  const bootstrapState = useAuthenticatedAppBootstrap({ activeRepoRoot })
+  const bootstrap = useAuthenticatedAppBootstrap({ activeRepoRoot })
+  const bootstrapState = bootstrap.state
   const location = useRouterState({ select: (s) => s.location })
   const shellMode = authenticatedAppShellMode(location.pathname, bootstrapState)
 
   return (
-    <AuthenticatedWorkspaceRestoreContext value={bootstrapState}>
+    <AuthenticatedWorkspaceRestoreContext value={bootstrap}>
       <TerminalSessionProvider>
         {shellMode === 'settings' ? (
           <AuthenticatedSettingsShell />
         ) : shellMode === 'workspace-restore' ? (
           <WorkspaceSessionRestorePlaceholder />
+        ) : shellMode === 'workspace-failed' && bootstrapState.status === 'failed' ? (
+          <WorkspaceSessionRestoreError state={bootstrapState} retry={bootstrap.retry} />
         ) : (
           <AuthenticatedWorkspaceShell />
         )}
@@ -210,13 +222,44 @@ function AuthenticatedWorkspaceShell() {
 }
 
 export function WorkspaceSessionRestoreGate({ children }: { children: ReactNode }) {
-  const bootstrapState = useContext(AuthenticatedWorkspaceRestoreContext)
+  const bootstrap = useContext(AuthenticatedWorkspaceRestoreContext)
+  const bootstrapState = bootstrap.state
   if (bootstrapState.status === 'restoring-workspace') return <WorkspaceSessionRestorePlaceholder />
+  if (bootstrapState.status === 'failed') {
+    return <WorkspaceSessionRestoreError state={bootstrapState} retry={bootstrap.retry} />
+  }
   return <>{children}</>
 }
 
 function WorkspaceSessionRestorePlaceholder() {
   return <CenteredLoadingStatus label="Restoring workspace" />
+}
+
+function WorkspaceSessionRestoreError({
+  state,
+  retry,
+}: {
+  state: Extract<AuthenticatedAppBootstrapState, { status: 'failed' }>
+  retry: () => void
+}) {
+  const t = useT()
+  return (
+    <div className="flex h-full items-center justify-center p-8">
+      <EmptyState
+        icon={<AlertTriangle size={18} />}
+        title={t('workspace-restore.failed')}
+        body={
+          <div className="space-y-3">
+            <div className="break-words">{state.message}</div>
+            <Button type="button" variant="outline" onClick={retry}>
+              <RefreshCw />
+              {t('error.try-again')}
+            </Button>
+          </div>
+        }
+      />
+    </div>
+  )
 }
 
 interface RepoRouteContext {

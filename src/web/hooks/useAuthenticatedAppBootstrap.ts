@@ -1,6 +1,6 @@
 // Authenticated bootstrap primes query state from the server transport before
 // feature stores start reading it.
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type {
   ClientWorkspaceState,
   SettingsSnapshot,
@@ -22,7 +22,15 @@ import { readOrCreateWebTerminalClientId } from '#/web/client-terminal-id.ts'
 import { readClientWorkspaceState } from '#/web/client-workspace-state.ts'
 import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 
-export type AuthenticatedAppBootstrapState = { status: 'restoring-workspace' } | { status: 'ready' }
+export type AuthenticatedAppBootstrapState =
+  | { status: 'restoring-workspace' }
+  | { status: 'ready' }
+  | { status: 'failed'; message: string }
+
+export interface AuthenticatedAppBootstrapResult {
+  state: AuthenticatedAppBootstrapState
+  retry: () => void
+}
 
 const RESTORING_WORKSPACE_BOOTSTRAP_STATE: AuthenticatedAppBootstrapState = { status: 'restoring-workspace' }
 const READY_BOOTSTRAP_STATE: AuthenticatedAppBootstrapState = { status: 'ready' }
@@ -34,30 +42,42 @@ interface AuthenticatedWorkspaceRestoreRun {
   cancel: () => void
 }
 
-type WorkspaceRestoreOutcome = { status: 'completed' } | { status: 'cancelled' }
+type WorkspaceRestoreOutcome =
+  | { status: 'completed' }
+  | { status: 'cancelled' }
+  | { status: 'failed'; message: string }
 
 export function useAuthenticatedAppBootstrap(options?: {
   activeRepoRoot?: string | null
-}): AuthenticatedAppBootstrapState {
+}): AuthenticatedAppBootstrapResult {
   const activeRepoRootRef = useRef(options?.activeRepoRoot ?? null)
   const restoreRunRef = useRef<AuthenticatedWorkspaceRestoreRun | null>(null)
+  const [attempt, setAttempt] = useState(0)
   const [state, setState] = useState<AuthenticatedAppBootstrapState>(RESTORING_WORKSPACE_BOOTSTRAP_STATE)
 
   useEffect(() => {
     if (restoreRunRef.current) return
-    const run = startAuthenticatedWorkspaceRestoreRun(() => setState(READY_BOOTSTRAP_STATE), activeRepoRootRef.current)
+    setState(RESTORING_WORKSPACE_BOOTSTRAP_STATE)
+    const run = startAuthenticatedWorkspaceRestoreRun((outcome) => {
+      if (outcome.status === 'completed') {
+        setState(READY_BOOTSTRAP_STATE)
+      } else if (outcome.status === 'failed') {
+        setState({ status: 'failed', message: outcome.message })
+      }
+    }, activeRepoRootRef.current)
     restoreRunRef.current = run
     return () => {
       run.cancel()
       if (restoreRunRef.current === run) restoreRunRef.current = null
     }
-  }, [])
+  }, [attempt])
 
-  return state
+  const retry = useCallback(() => setAttempt((value) => value + 1), [])
+  return { state, retry }
 }
 
 function startAuthenticatedWorkspaceRestoreRun(
-  onReady: () => void,
+  onSettled: (outcome: WorkspaceRestoreOutcome) => void,
   activeRepoRoot: string | null,
 ): AuthenticatedWorkspaceRestoreRun {
   let cancelled = false
@@ -75,7 +95,7 @@ function startAuthenticatedWorkspaceRestoreRun(
   void hydrateNonCriticalAuthenticatedState(settingsSnapshot, timeout.signal)
   void restoreBootSession(settingsSnapshot, timeout.signal, activeRepoRoot).then((outcome) => {
     timeout.dispose()
-    if (!cancelled && outcome.status === 'completed') onReady()
+    if (!cancelled && outcome.status !== 'cancelled') onSettled(outcome)
   })
   return {
     cancel: () => {
@@ -148,8 +168,9 @@ async function restoreBootSession(
       return { status: 'cancelled' }
     }
     bootstrapLog.warn('session restore failed', { err })
-    blockSessionPersistenceAfterRestoreFailure(restoreFailureMessage(err))
-    return { status: 'completed' }
+    const message = restoreFailureMessage(err)
+    blockSessionPersistenceAfterRestoreFailure(message)
+    return { status: 'failed', message }
   }
 }
 
@@ -182,7 +203,7 @@ async function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T
 
 function blockSessionPersistenceAfterRestoreFailure(message: string): void {
   useReposStore.setState({
-    workspaceMembershipReady: true,
+    workspaceMembershipReady: false,
     sessionPersistenceReady: false,
     sessionRestoreError: message,
   })

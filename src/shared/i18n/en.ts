@@ -772,6 +772,7 @@ export const en = {
   'auth.gate.error-empty': 'Enter your access token',
   'auth.gate.error-failed': 'Login failed',
   'lazy-restore.failed': 'Could not open repository',
+  'workspace-restore.failed': 'Could not restore workspace',
 } as const
 
 export type DictKey = keyof typeof en

@@ -237,9 +237,10 @@ describe('app bootstrap hooks', () => {
 
     renderInJsdom(<Harness />)
     await vi.waitFor(() => {
-      expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
+      expect(useReposStore.getState().sessionRestoreError).toBe('server session restore failed')
     })
 
+    expect(useReposStore.getState().workspaceMembershipReady).toBe(false)
     expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
     expect(useReposStore.getState().sessionRestoreError).toBe('server session restore failed')
     expect(hydrateRestoredRuntime).not.toHaveBeenCalled()
@@ -326,25 +327,42 @@ describe('app bootstrap hooks', () => {
 
     renderInJsdom(<Harness />)
     await vi.waitFor(() => {
-      expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
+      expect(useReposStore.getState().sessionRestoreError).toBe('session repo restore failed')
     })
 
-    expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
+    expect(useReposStore.getState().workspaceMembershipReady).toBe(false)
     expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
     expect(useReposStore.getState().sessionRestoreError).toBe('session repo restore failed')
   })
 
-  test('blocks persistence but releases workspace skeleton when boot session restore fails', async () => {
+  test('blocks persistence and enters an explicit failed state when boot session restore fails', async () => {
     mockedGetSettingsSnapshot.mockRejectedValue(new Error('settings unavailable'))
 
     renderInJsdom(<Harness />)
     await vi.waitFor(() => {
-      expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
+      expect(useReposStore.getState().sessionRestoreError).toBe('settings unavailable')
     })
 
-    expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
+    expect(useReposStore.getState().workspaceMembershipReady).toBe(false)
     expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
     expect(useReposStore.getState().sessionRestoreError).toBe('settings unavailable')
+  })
+
+  test('retries the complete bootstrap workflow after an explicit failure', async () => {
+    mockedGetSettingsSnapshot
+      .mockRejectedValueOnce(new Error('settings unavailable'))
+      .mockResolvedValueOnce(defaultSettingsSnapshot())
+
+    const result = renderInJsdom(<Harness />)
+    await vi.waitFor(() => expect(result.container.textContent).toBe('settings unavailable'))
+
+    result.container.querySelector('button')?.click()
+
+    await vi.waitFor(() => expect(result.container.textContent).toBe('ready'))
+    expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(2)
+    expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
+    expect(useReposStore.getState().sessionPersistenceReady).toBe(true)
+    expect(useReposStore.getState().sessionRestoreError).toBeNull()
   })
 
   test('times out authenticated workspace restore when settings hangs', async () => {
@@ -361,7 +379,7 @@ describe('app bootstrap hooks', () => {
     await flushMicrotasks(3)
 
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledWith({ signal: expect.any(AbortSignal) })
-    expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
+    expect(useReposStore.getState().workspaceMembershipReady).toBe(false)
     expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
     expect(useReposStore.getState().sessionRestoreError).toBe('authenticated workspace restore timed out after 30000ms')
   })
@@ -380,7 +398,7 @@ describe('app bootstrap hooks', () => {
     await vi.advanceTimersByTimeAsync(30_000)
     await flushMicrotasks(3)
 
-    expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
+    expect(useReposStore.getState().workspaceMembershipReady).toBe(false)
     expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
     expect(useReposStore.getState().sessionRestoreError).toBe('authenticated workspace restore timed out after 30000ms')
   })
@@ -414,7 +432,7 @@ describe('app bootstrap hooks', () => {
     await vi.advanceTimersByTimeAsync(30_000)
     await flushMicrotasks(3)
 
-    expect(useReposStore.getState().workspaceMembershipReady).toBe(true)
+    expect(useReposStore.getState().workspaceMembershipReady).toBe(false)
     expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
     expect(useReposStore.getState().sessionRestoreError).toBe('authenticated workspace restore timed out after 30000ms')
   })
@@ -495,8 +513,12 @@ describe('app bootstrap hooks', () => {
 })
 
 function Harness({ activeRepoRoot = null }: { activeRepoRoot?: string | null }) {
-  useAuthenticatedAppBootstrap({ activeRepoRoot })
-  return null
+  const bootstrap = useAuthenticatedAppBootstrap({ activeRepoRoot })
+  return bootstrap.state.status === 'failed' ? (
+    <button onClick={bootstrap.retry}>{bootstrap.state.message}</button>
+  ) : (
+    <div>{bootstrap.state.status}</div>
+  )
 }
 
 function PublicHarness() {

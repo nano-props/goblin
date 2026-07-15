@@ -8,7 +8,6 @@ import { useRestoreRepoTabsOnView } from '#/web/hooks/useRestoreRepoTabsOnView.t
 const mocks = vi.hoisted(() => ({
   restoreRepoTabsOnView: vi.fn(),
   promoteRestoredWorkspaceRepo: vi.fn(),
-  toastError: vi.fn(),
   storeState: {
     repos: {},
     restoredSessionBaseline: null,
@@ -28,30 +27,21 @@ vi.mock('#/web/client-terminal-id.ts', () => ({
   readOrCreateWebTerminalClientId: () => 'test-client-id',
 }))
 
-vi.mock('sonner', () => ({
-  toast: {
-    error: mocks.toastError,
-    success: vi.fn(),
-  },
-}))
-
-vi.mock('#/web/stores/i18n.ts', () => ({
-  translate: (key: string) => {
-    if (key === 'lazy-restore.failed') return 'Could not open repository'
-    return key
-  },
-}))
-
 vi.mock('#/web/stores/repos/store.ts', async (importActual) => {
   const actual = await importActual<typeof import('#/web/stores/repos/store.ts')>()
   return {
     ...actual,
     useReposStore: Object.assign(
       vi.fn((selector?: (state: typeof mocks.storeState) => unknown) => {
-        return selector ? selector(mocks.storeState) : mocks.storeState
+        const state = {
+          ...mocks.storeState,
+        }
+        return selector ? selector(state) : state
       }),
       {
-        getState: () => mocks.storeState,
+        getState: () => ({
+          ...mocks.storeState,
+        }),
       },
     ),
   }
@@ -77,15 +67,14 @@ function stubRepo(
 
 describe('useRestoreRepoTabsOnView', () => {
   afterEach(() => {
+    vi.restoreAllMocks()
     mocks.restoreRepoTabsOnView.mockReset()
     mocks.promoteRestoredWorkspaceRepo.mockReset()
-    mocks.toastError.mockReset()
     mocks.storeState = {
       repos: {},
       restoredSessionBaseline: null,
       promoteRestoredWorkspaceRepo: mocks.promoteRestoredWorkspaceRepo,
     }
-    vi.restoreAllMocks()
   })
 
   test('does nothing when repoId is null', async () => {
@@ -159,7 +148,6 @@ describe('useRestoreRepoTabsOnView', () => {
       repo: { repoRoot: '/r/a', repoRuntimeId: 'rta' },
       snapshot: { tabs: [{ key: 'status' }] },
     })
-    expect(mocks.toastError).not.toHaveBeenCalled()
   })
 
   test('on success with null snapshot, hydrates with empty workspacePaneTabs', async () => {
@@ -214,13 +202,13 @@ describe('useRestoreRepoTabsOnView', () => {
       await Promise.resolve()
     })
 
-    expect(mocks.promoteRestoredWorkspaceRepo).not.toHaveBeenCalled()
+    expect(mocks.promoteRestoredWorkspaceRepo).toHaveBeenCalledTimes(1)
   })
 
-  test('on failure, emits a toast and does not hydrate', async () => {
+  test('on failure, exposes a stable view-local failure and does not hydrate', async () => {
     function Host() {
-      useRestoreRepoTabsOnView({ repoId: 'repo-a' })
-      return null
+      const restore = useRestoreRepoTabsOnView({ repoId: 'repo-a' })
+      return <div>{restore.state.phase === 'failed' ? restore.state.message : restore.state.phase}</div>
     }
     mocks.storeState = {
       repos: { 'repo-a': stubRepo('repo-a', 'rta') },
@@ -228,33 +216,30 @@ describe('useRestoreRepoTabsOnView', () => {
     }
     mocks.restoreRepoTabsOnView.mockRejectedValue(new Error('disk gone'))
 
-    renderInJsdom(<Host />)
-    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledTimes(1))
+    const host = renderInJsdom(<Host />)
+    await waitFor(() => expect(host.container.textContent).toBe('disk gone'))
     expect(mocks.promoteRestoredWorkspaceRepo).not.toHaveBeenCalled()
-    expect(mocks.toastError).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({ description: 'disk gone' }),
-    )
   })
 
-  test('allows a later mount to retry after a failure', async () => {
+  test('allows an explicit retry after a failure', async () => {
     function Host() {
-      useRestoreRepoTabsOnView({ repoId: 'repo-retry' })
-      return null
+      const restore = useRestoreRepoTabsOnView({ repoId: 'repo-retry' })
+      return <button onClick={restore.retry}>{restore.state.phase === 'failed' ? restore.state.message : 'retry'}</button>
     }
     mocks.storeState = {
       repos: { 'repo-retry': stubRepo('repo-retry', 'rtr') },
       promoteRestoredWorkspaceRepo: mocks.promoteRestoredWorkspaceRepo,
     }
-    mocks.restoreRepoTabsOnView.mockRejectedValue(new Error('boom'))
+    mocks.restoreRepoTabsOnView
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce({ repo: { repoRoot: 'repo-retry', repoRuntimeId: 'rtr' }, snapshot: null })
 
-    const first = renderInJsdom(<Host />)
-    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledTimes(1))
-    first.unmount()
-
-    const second = renderInJsdom(<Host />)
+    const host = renderInJsdom(<Host />)
+    await waitFor(() => expect(host.container.textContent).toBe('boom'))
+    await waitFor(() => expect(mocks.restoreRepoTabsOnView).toHaveBeenCalledTimes(1))
+    host.container.querySelector('button')?.click()
     await waitFor(() => expect(mocks.restoreRepoTabsOnView).toHaveBeenCalledTimes(2))
-    second.unmount()
+    host.unmount()
   })
 
   test('concurrent mounts dedupe via the in-flight Map', async () => {
@@ -284,7 +269,7 @@ describe('useRestoreRepoTabsOnView', () => {
 
     await act(async () => {
       resolveFetch?.({ repo: { repoRoot: '/r/d', repoRuntimeId: 'rtd' }, snapshot: null })
-      await waitFor(() => expect(mocks.promoteRestoredWorkspaceRepo).toHaveBeenCalledTimes(1))
+      await waitFor(() => expect(mocks.promoteRestoredWorkspaceRepo).toHaveBeenCalledTimes(2))
     })
     hostA.unmount()
     hostB.unmount()

@@ -736,4 +736,5 @@ export const zh: Record<DictKey, string> = {
   'auth.gate.error-empty': '请输入访问令牌',
   'auth.gate.error-failed': '登录失败',
   'lazy-restore.failed': '无法打开仓库',
+  'workspace-restore.failed': '无法恢复工作区',
 }
