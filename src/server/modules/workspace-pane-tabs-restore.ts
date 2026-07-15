@@ -23,6 +23,7 @@ export async function projectWorkspacePaneTabsWithMembershipGuard(input: {
   | {
       matched: true
       snapshots: Array<{ repoRoot: string; repoRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>
+      repaired: boolean
     }
   | { matched: false; latestWorkspace: ServerWorkspaceState }
 > {
