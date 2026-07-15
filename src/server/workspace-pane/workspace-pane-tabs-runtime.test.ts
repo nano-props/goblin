@@ -7,6 +7,19 @@ import { testPhysicalWorktreeIdentity } from '#/server/test-utils/physical-workt
 import { workspacePaneRuntimeTabEntry, workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 
 describe('workspace pane tabs runtime storage', () => {
+  test('distinguishes a missing target default from an explicitly empty target', () => {
+    const runtime = createWorkspacePaneTabsRuntime<string>()
+
+    expect(runtime.tabs(target())).toEqual([workspacePaneStaticTabEntry('status')])
+
+    commitReplace(runtime, { ...target(), tabs: [] })
+
+    expect(runtime.tabs(target())).toEqual([])
+    expect(runtime.tabsForScope({ userId: 'user-a', scope: '/repo' })).toEqual([
+      { branchName: 'feature/worktree', worktreePath: '/repo-linked', tabs: [] },
+    ])
+  })
+
   test('keeps mutation plans side-effect free until commit', () => {
     const runtime = createWorkspacePaneTabsRuntime<string>()
     const plan = runtime.planReplace({ ...target(), tabs: [workspacePaneStaticTabEntry('history')] })

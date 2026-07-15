@@ -12,6 +12,54 @@ const WORKTREE_PATH = '/repo/worktree'
 const BRANCH_NAME = 'feature/worktree'
 
 describe('workspace pane runtime tabs projection', () => {
+  test('synthesizes status only for a provider-only target, not an explicit empty target', () => {
+    const providerSnapshots = [{
+      type: 'terminal' as const,
+      revision: 1,
+      liveSessions: [{ sessionId: 'term-livelivelivelivelive1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH }],
+    }]
+
+    expect(projectCanonicalWorkspacePaneTabs({ entries: [], providerSnapshots })).toEqual([{
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      tabs: [workspacePaneStaticTabEntry('status'), workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')],
+    }])
+    expect(projectCanonicalWorkspacePaneTabs({
+      entries: [{ branchName: BRANCH_NAME, worktreePath: WORKTREE_PATH, tabs: [] }],
+      providerSnapshots,
+    })).toEqual([{
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      tabs: [workspacePaneRuntimeTabEntry('terminal', 'term-livelivelivelivelive1')],
+    }])
+  })
+
+  test('preserves mixed gaps while dropping a missing runtime session', () => {
+    const first = workspacePaneRuntimeTabEntry('terminal', 'term-firstfirstfirstfirstfi1')
+    const missing = workspacePaneRuntimeTabEntry('terminal', 'term-missingmissingmissing1')
+    const last = workspacePaneRuntimeTabEntry('terminal', 'term-lastlastlastlastlast1')
+
+    expect(projectCanonicalWorkspacePaneTabs({
+      entries: [{
+        branchName: BRANCH_NAME,
+        worktreePath: WORKTREE_PATH,
+        tabs: [first, workspacePaneStaticTabEntry('status'), missing, workspacePaneStaticTabEntry('history'), last],
+      }],
+      providerSnapshots: [{
+        type: 'terminal',
+        revision: 2,
+        liveSessions: [
+          { sessionId: 'term-firstfirstfirstfirstfi1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+          { sessionId: 'term-lastlastlastlastlast1', branch: BRANCH_NAME, worktreePath: WORKTREE_PATH },
+        ],
+      }],
+    })).toEqual([{
+      branchName: BRANCH_NAME,
+      worktreePath: WORKTREE_PATH,
+      tabs: [first, workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history'), last],
+    }])
+  })
+
   test('projects a full scope without mutating layout input', () => {
     const entries = [{
       branchName: BRANCH_NAME,
