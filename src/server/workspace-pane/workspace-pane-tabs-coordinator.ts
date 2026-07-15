@@ -366,7 +366,7 @@ export class WorkspacePaneTabsCoordinator {
     const repoRoots = new Set(this.physicalWorktreeTargets(identity).map((ref) => ref.target.repoRoot))
     await Promise.all([...repoRoots].map(async (repoRoot) =>
       await this.runWorkspaceTabsRepoOperation(repoRoot, (layout) => {
-        layout.clearPhysicalIdentity(identity)
+        layout.clearPhysicalIdentity(repoRoot, identity)
       })))
   }
 
@@ -382,21 +382,6 @@ export class WorkspacePaneTabsCoordinator {
         target: input.target,
         assertCurrent: input.assertCurrent,
       }))
-  }
-
-  async retireTargetIfInvalid(input: {
-    userId: string
-    scope: string
-    target: WorkspacePaneTabsTargetIdentity
-  }): Promise<void> {
-    await this.runWorkspaceTabsRepoOperation(input.target.repoRoot, async (layout) => {
-      const validTargets = await this.targetProjection.captureTargets(input.userId, input.target.repoRoot, input.scope)
-      await layout.retire({
-        ...aggregateScope(input.userId, input.target.repoRoot, input.scope),
-        target: input.target,
-        validTargets,
-      })
-    })
   }
 
   async reconcilePhysicalWorktreeAfterRemovalFailure(input: {

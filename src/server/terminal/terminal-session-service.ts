@@ -251,15 +251,6 @@ class TerminalSessionService {
     this.broadcastDurableLayoutChange(repoRoot, result.affectedUserIds)
   }
 
-  async retireTargetIfInvalid(
-    userId: string,
-    input: { repoRuntimeId: string; target: WorkspacePaneTabsTargetIdentity },
-  ): Promise<void> {
-    const { repoRoot } = input.target
-    const scope = terminalSessionRuntimeScope(repoRoot, input.repoRuntimeId)
-    await this.workspaceTabsCoordinator.retireTargetIfInvalid({ userId, scope, target: input.target })
-  }
-
   async reconcileTerminalTabsForSession(userId: string, session: TerminalSessionSummary): Promise<void> {
     const scope = terminalSessionRuntimeScope(session.repoRoot, session.repoRuntimeId)
     await this.workspaceTabsCoordinator.reconcileWorktree({

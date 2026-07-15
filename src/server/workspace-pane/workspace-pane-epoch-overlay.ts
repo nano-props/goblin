@@ -94,11 +94,12 @@ export class WorkspacePaneEpochOverlay {
     return Array.from(this.targetsByPhysicalKey.get(physicalWorktreeIdentityKey(identity))?.values() ?? []).map(cloneTargetRef)
   }
 
-  clearPhysicalIdentity(identity: PhysicalWorktreeIdentity): WorkspacePaneEpochScope[] {
+  clearPhysicalIdentity(repoRoot: string, identity: PhysicalWorktreeIdentity): WorkspacePaneEpochScope[] {
     const physicalKey = physicalWorktreeIdentityKey(identity)
     const refs = [...(this.targetsByPhysicalKey.get(physicalKey)?.values() ?? [])]
     const affected: WorkspacePaneEpochScope[] = []
     for (const ref of refs) {
+      if (ref.repoRoot !== repoRoot) continue
       const scope = scopeFromEpochKey(epochKey(ref))
       const state = this.epochs.get(epochKey(scope))
       const targetKey = workspacePaneTabsTargetIdentityKeyFromIdentity(ref.target)

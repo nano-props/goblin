@@ -10,7 +10,6 @@
 // to the route layer.
 
 import type { AppRealtimeMessage } from '#/shared/app-realtime-socket.ts'
-import type { WorkspacePaneTabsTargetIdentity } from '#/shared/workspace-pane-tabs-target.ts'
 import { serverLogger } from '#/server/logger.ts'
 import {
   createTerminalSessionService,
@@ -233,18 +232,12 @@ export function createServerTerminalRuntime(options: ServerTerminalRuntimeOption
       return await sessionService.retireTarget(userId, input)
     },
   }
-  const worktreeRemovalWorkspacePaneLifecycle = {
-    ...workspacePaneTargetLifecycle,
-    async retireTargetIfInvalid(userId: string, input: { repoRuntimeId: string; target: WorkspacePaneTabsTargetIdentity }) {
-      return await sessionService.retireTargetIfInvalid(userId, input)
-    },
-  }
   const worktreeRemovalApplication = createWorktreeRemovalApplication({
     worktreeOperations,
     physicalWorktrees,
     terminalWorktree: manager,
     workspaceTabs: workspaceTabsCoordinator,
-    workspacePaneTabs: worktreeRemovalWorkspacePaneLifecycle,
+    workspacePaneTabs: workspacePaneTargetLifecycle,
     isCurrentRepoRuntime,
     broadcastSessionsChanged: broadcastRepoSessionsChanged,
     broadcastWorkspaceTabsChanged: broadcastRepoWorkspaceTabsChanged,

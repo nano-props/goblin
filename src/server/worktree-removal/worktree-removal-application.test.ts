@@ -309,7 +309,7 @@ describe('WorktreeRemovalApplication', () => {
     })
   })
 
-  test('retires only the requested target after current validity is checked', async () => {
+  test('does not retire durable layout from a removed physical generation', async () => {
     const retireTarget = vi.fn(async () => {})
     const physicalWorktreeTargets = [
       {
@@ -339,11 +339,7 @@ describe('WorktreeRemovalApplication', () => {
       }),
     ).resolves.toEqual({ ok: true, message: '' })
 
-    expect(retireTarget).toHaveBeenCalledTimes(1)
-    expect(retireTarget).toHaveBeenNthCalledWith(1, 'user-a', {
-      repoRuntimeId: 'repo-runtime-test',
-      target: { kind: 'worktree', repoRoot: '/repo', worktreePath: '/repo/worktree' },
-    })
+    expect(retireTarget).not.toHaveBeenCalled()
     expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', '/repo')
     expect(broadcastSessionsChanged).toHaveBeenCalledWith('user-a', '/linked-repo')
   })
@@ -362,7 +358,6 @@ function createApplication(
     ) => Promise<Array<{ userId: string; repoRoot: string; scope: string }>>
     reconcilePhysicalWorktreeAfterRemovalFailure?: () => Promise<void>
     retireTarget?: ServerWorkspacePaneTargetLifecycleHost['retireTarget']
-    retireTargetIfInvalid?: ServerWorkspacePaneTargetLifecycleHost['retireTarget']
     physicalWorktreeTargets?: ReturnType<WorkspacePaneTabsCoordinator['physicalWorktreeTargets']>
     clearPhysicalWorktreeIndex?: WorkspacePaneTabsCoordinator['clearPhysicalWorktreeIndex']
     broadcastWorkspaceTabsChanged?: (userId: string, repoRoot: string) => void
@@ -390,7 +385,6 @@ function createApplication(
     },
     workspacePaneTabs: {
       retireTarget: options.retireTarget ?? (async () => {}),
-      retireTargetIfInvalid: async (...args) => await (options.retireTargetIfInvalid ?? options.retireTarget ?? (async () => {}))(...args),
     },
     isCurrentRepoRuntime: () => true,
     broadcastSessionsChanged: options.broadcastSessionsChanged ?? (() => {}),

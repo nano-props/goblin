@@ -93,10 +93,13 @@ Runtime creation follows three responsibility layers:
    runtime/tab writes, while explicit server operation permits let mutations
    admitted earlier finish in queue order. After repository validation it awaits provider
    quiescence, runs the Git removal past a non-cancelable commit point, then
-   retires durable targets once and clears every affected epoch overlay. A Git
-   failure reconciles runtime tabs while preserving the worktree's static
-   projection. Git success followed by layout-finalize failure is reported as
-   a committed repository change and remains idempotently retryable.
+   clears the removed physical identity from every affected epoch index. It
+   does not use an old physical generation to authorize durable retirement;
+   invalid rows stay suppressed by the repo projection and are removed by the
+   next membership-aware atomic repair. Branch retirement remains a direct
+   aggregate command. A Git failure reconciles runtime tabs while preserving
+   the worktree's static projection. Git success followed by finalize failure
+   is reported as a committed repository change and remains idempotently retryable.
    Provider commands return the exact target lifecycle effect plus the
    canonical tabs snapshot produced by that command. Full terminal collections
    are query snapshots with their own terminal projection revision; clients

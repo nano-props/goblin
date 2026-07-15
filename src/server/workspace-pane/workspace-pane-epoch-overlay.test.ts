@@ -101,11 +101,14 @@ describe('workspace pane epoch overlay', () => {
     const capability = testPhysicalWorktreeExecutionCapability('/repo/worktree')
     const lease = physicalWorktreeAdmissionLease(capability)
     const terminal = workspacePaneRuntimeTabEntry('terminal', 'term-stalephysicalidentity1')
+    const linkedScope = { userId: 'user-a', repoRoot: '/linked', repoRuntimeId: 'runtime-linked' }
+    const linkedTarget = { kind: 'worktree' as const, repoRoot: '/linked', worktreePath: '/linked/worktree' }
     overlay.recordMixedOrder({ ...scope, target, tabs: [terminal] })
     overlay.registerPhysicalTarget({ ...scope, target, lease })
+    overlay.registerPhysicalTarget({ ...linkedScope, target: linkedTarget, lease })
 
-    expect(overlay.clearPhysicalIdentity(identity)).toEqual([scope])
-    expect(overlay.physicalTargets(identity)).toEqual([])
+    expect(overlay.clearPhysicalIdentity('/repo', identity)).toEqual([scope])
+    expect(overlay.physicalTargets(identity)).toEqual([{ ...linkedScope, target: linkedTarget, lease }])
     expect(overlay.placementHints({ ...scope, target })).toHaveLength(1)
   })
 

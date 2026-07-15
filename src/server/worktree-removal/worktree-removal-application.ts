@@ -14,7 +14,6 @@ import type {
   PhysicalWorktreeIdentityResolver,
 } from '#/server/worktree-removal/physical-worktree-identity-resolver.ts'
 import { failRemoteRuntimeIfNeeded } from '#/server/modules/remote-runtime-failure-settlement.ts'
-import type { WorkspacePaneTabsTargetIdentity } from '#/shared/workspace-pane-tabs-target.ts'
 
 const worktreeRemovalLogger = serverLogger.child({ module: 'worktree-removal-application' })
 
@@ -26,12 +25,7 @@ interface WorktreeRemovalApplicationDependencies {
     WorkspacePaneTabsCoordinator,
     'physicalWorktreeTargets' | 'reconcilePhysicalWorktreeAfterRemovalFailure' | 'clearPhysicalWorktreeIndex'
   >
-  workspacePaneTabs: Pick<ServerWorkspacePaneTargetLifecycleHost, 'retireTarget'> & {
-    retireTargetIfInvalid(
-      userId: string,
-      input: { repoRuntimeId: string; target: WorkspacePaneTabsTargetIdentity },
-    ): Promise<void>
-  }
+  workspacePaneTabs: ServerWorkspacePaneTargetLifecycleHost
   isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
   broadcastSessionsChanged(userId: string, repoRoot: string): void
   broadcastWorkspaceTabsChanged(userId: string, repoRoot: string): void
@@ -106,18 +100,9 @@ export class WorktreeRemovalApplication {
               afterWorktreeRemoved: async () => {
                 try {
                   this.deps.worktreeOperations.assertPermit(physicalCapability, permit)
-                  const requestedTarget = {
-                    userId,
-                    repoRuntimeId: input.repoRuntimeId,
-                    target: { kind: 'worktree' as const, repoRoot: input.repoRoot, worktreePath },
-                  }
                   // Reverse-index refs only identify stale runtime scopes. They
                   // cannot authorize durable retirement: a stable target may
                   // already be rebound to a new physical generation.
-                  await this.deps.workspacePaneTabs.retireTargetIfInvalid(userId, {
-                    repoRuntimeId: input.repoRuntimeId,
-                    target: requestedTarget.target,
-                  })
                   await this.deps.workspaceTabs.clearPhysicalWorktreeIndex(physicalCapability.identity)
                   this.broadcastSessions(affectedScopes)
                   return { ok: true, message: '' }
