@@ -56,10 +56,17 @@ The ownership split is:
 - `WorkspacePaneLayoutRepository` is the sole durable static-layout representation.
 - `WorkspacePaneEpochOverlay` owns only runtime placement constraints, physical
   reverse indexes, active repo projections, and epoch clocks.
+- The repo projection owns current target validity and worktree branch metadata.
+  Commands capture it as an explicit read-only projection input; the pane
+  aggregate does not cache or mutate a second target catalog.
 - `src/server/workspace-pane/*` owns aggregate layout commands, pure projection,
   realtime invalidation, and the cross-provider runtime-open operation. Provider
   snapshots are the sole live-membership authority; list and restore never copy
   or write derived membership.
+- The aggregate owns the `repoRoot` layout queue. Restore uses a separate
+  settings transaction port that checks durable workspace membership and
+  filters invalid target keys from the transaction's current layout in one
+  atomic settings write.
 - `src/web/workspace-pane/*` owns client query/cache projection and mutation
   orchestration for server-owned tab state.
 - `src/web/workspace-pane/tab-providers.ts` owns per-tab-type

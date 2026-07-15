@@ -13,7 +13,6 @@ import {
   workspacePaneStaticTabEntry,
   workspacePaneTabEntryIdentity,
 } from '#/shared/workspace-pane.ts'
-import { workspacePaneTabsTargetIdentityKeyFromIdentity } from '#/shared/workspace-pane-tabs-target.ts'
 
 const scope = { userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a' }
 const target = { kind: 'worktree' as const, repoRoot: '/repo', worktreePath: '/repo/worktree' }
@@ -79,16 +78,13 @@ describe('workspace pane epoch overlay', () => {
     const overlay = new WorkspacePaneEpochOverlay()
     const identity = testPhysicalWorktreeIdentity('/repo/worktree')
     const terminal = workspacePaneRuntimeTabEntry('terminal', 'term-invalidinvalidinvalid1')
-    overlay.registerTargetMetadata({ ...scope, target, branchName: 'deleted' })
     overlay.recordMixedOrder({ ...scope, target, tabs: [terminal] })
     overlay.registerPhysicalTarget({ ...scope, target, identity })
 
-    overlay.commitValidatedTargets(scope, [])
+    overlay.retainTargets(scope, new Set())
 
-    expect(overlay.epochTargets(scope)).toEqual([])
     expect(overlay.placementHints({ ...scope, target })).toEqual([])
     expect(overlay.physicalTargets(identity)).toEqual([])
-    expect(overlay.isDurableTargetVisible(scope, workspacePaneTabsTargetIdentityKeyFromIdentity(target))).toBe(false)
   })
 
   test('rejects duplicate provider types and keys revisions by type', () => {

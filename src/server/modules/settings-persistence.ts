@@ -6,6 +6,16 @@ import { serverNodeLog } from '#/node/logger.ts'
 
 const USER_SETTINGS_FILE = 'user-settings.json'
 
+export class SettingsPersistenceWriteError extends Error {
+  readonly cause: unknown
+
+  constructor(cause: unknown) {
+    super('failed to persist settings')
+    this.name = 'SettingsPersistenceWriteError'
+    this.cause = cause
+  }
+}
+
 let writeQueue: Promise<void> = Promise.resolve()
 let corruptFileCounter = 0
 
@@ -50,8 +60,12 @@ export async function writeUserSettingsJson(data: unknown): Promise<void> {
   writeQueue = writeQueue
     .catch(() => {})
     .then(async () => {
-      await mkdir(path.dirname(file), { recursive: true })
-      await writeFileAtomic(file, payload, { encoding: 'utf-8' })
+      try {
+        await mkdir(path.dirname(file), { recursive: true })
+        await writeFileAtomic(file, payload, { encoding: 'utf-8' })
+      } catch (error) {
+        throw new SettingsPersistenceWriteError(error)
+      }
     })
   return await writeQueue
 }

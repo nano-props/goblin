@@ -6,6 +6,7 @@ Normative rules for workspace-pane commands, queues, routing, and tests.
 
 - `WorkspacePaneLayoutRepository`: the only restart-durable static target and tab order.
 - `WorkspacePaneEpochOverlay`: runtime placement constraints, physical reverse indexes, active repo projections, and epoch clocks.
+- Repo projection: valid target identities and current worktree branch metadata. The aggregate keeps only an epoch-bounded validated projection.
 - Runtime providers: the only live runtime-session membership authority.
 - Server aggregate: layout commands, target repair/retirement, and deterministic canonical projection.
 - Router: visible repo, branch, and pane route.
@@ -17,7 +18,7 @@ Never mirror router currentness or infer server runtime validity from client tim
 Canonical tabs are a one-way projection:
 
 ```text
-durable static layout + epoch placement/index state + provider snapshots
+durable static layout + authoritative repo target projection + epoch placement/index state + provider snapshots
 -> versioned WorkspacePaneTabsSnapshot
 -> React Query projection
 ```
@@ -35,9 +36,9 @@ physical worktree permit
 -> settings mutation queue inside the repository adapter
 ```
 
-The repository CAS commits before overlay/revision state. A conflict re-reads current layout and re-plans the original intent. Persistence failure commits no overlay. Provider snapshots are sampled again after persistence before returning the canonical snapshot.
+The aggregate owns the `repoRoot` queue. The repository CAS commits before overlay/revision state. A conflict re-reads current layout and re-plans the original intent. Persistence failure commits no overlay. A restore write failure may still commit its already-authorized validated target projection so invalid persisted targets stay filtered. Provider snapshots are sampled again after persistence before returning the canonical snapshot.
 
-Target repair and retirement use the same aggregate boundary. Repair removes only invalid targets and preserves valid siblings. Physical removal retires each stable repo/target once, then clears every affected live overlay. Git success followed by layout persistence failure reports `repositoryStateChanged: true`; physical deletion is never described as rolled back.
+Target repair and retirement use the same aggregate boundary. Repair validates membership and filters invalid target keys from the settings transaction's current layout in one atomic write, preserving valid siblings without partial commits. Physical removal retires each stable repo/target once, then clears every affected live overlay. Git success followed by layout persistence failure reports `repositoryStateChanged: true`; physical deletion is never described as rolled back.
 
 ## Commands
 

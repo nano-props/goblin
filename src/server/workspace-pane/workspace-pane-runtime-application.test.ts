@@ -42,7 +42,7 @@ describe('WorkspacePaneRuntimeApplication', () => {
       { type: 'status', tabId: 'workspace-pane:status' },
       { type: 'terminal', runtimeSessionId: runtime.terminalSessionId },
     ])
-    const ensureRuntimeTabForSession = vi.fn(async () => workspacePaneTabs)
+    const ensureRuntimeTabForSession = vi.fn(async () => ({ kind: 'committed' as const, snapshot: workspacePaneTabs }))
     const broadcastWorkspaceTabsChanged = vi.fn()
     const application = createWorkspacePaneRuntimeApplication({
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
@@ -194,9 +194,10 @@ describe('WorkspacePaneRuntimeApplication', () => {
       const close = vi.fn(() => true)
       const reconcileWorktree = vi.fn(async () => snapshot([]))
       const stale = { ok: false as const, runtimeType: 'terminal' as const, message: 'error.repo-runtime-stale' }
-      const ensureRuntimeTabForSession = vi.fn(async (input: { guardBeforeWrite?: () => typeof stale | null }) => {
-        return input.guardBeforeWrite?.() ?? []
-      })
+      const ensureRuntimeTabForSession = vi.fn(async (input: { isRuntimeCurrent: () => boolean }) =>
+        input.isRuntimeCurrent()
+          ? { kind: 'committed' as const, snapshot: snapshot([]) }
+          : { kind: 'runtime-stale' as const })
       const broadcastWorkspaceTabsChanged = vi.fn()
       const providerResult = deferred<Extract<TerminalCreateResult, { ok: true }>>()
       let current = true
@@ -261,8 +262,10 @@ describe('WorkspacePaneRuntimeApplication', () => {
       terminalWorktree: { listSessionsForUser: async () => [] },
       terminal: { createAdmitted: create, close },
       workspaceTabsCoordinator: {
-        ensureRuntimeTabForSession: async (input: { guardBeforeWrite?: () => typeof stale | null }) =>
-          input.guardBeforeWrite?.() ?? snapshot([]),
+        ensureRuntimeTabForSession: async (input: { isRuntimeCurrent: () => boolean }) =>
+          input.isRuntimeCurrent()
+            ? { kind: 'committed' as const, snapshot: snapshot([]) }
+            : { kind: 'runtime-stale' as const },
         reconcileWorktreeAdmitted: reconcileWorktree,
       } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'>,
       isCurrentRepoRuntime: () => current,
@@ -423,8 +426,10 @@ describe('WorkspacePaneRuntimeApplication', () => {
         close: () => true,
       },
       workspaceTabsCoordinator: {
-        ensureRuntimeTabForSession: async () =>
-          snapshot([{ type: 'terminal', runtimeSessionId: session.terminalSessionId }]),
+        ensureRuntimeTabForSession: async () => ({
+          kind: 'committed' as const,
+          snapshot: snapshot([{ type: 'terminal', runtimeSessionId: session.terminalSessionId }]),
+        }),
         reconcileWorktreeAdmitted: async () => snapshot([]),
       } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'>,
       isCurrentRepoRuntime: () => true,
@@ -467,7 +472,10 @@ describe('WorkspacePaneRuntimeApplication', () => {
           permit: PhysicalWorktreeOperationPermit
         }) => {
           worktreeOperations.assertPermit(input.physicalWorktreeCapability, input.permit)
-          return snapshot([{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }])
+          return {
+            kind: 'committed' as const,
+            snapshot: snapshot([{ type: 'terminal', runtimeSessionId: 'term-111111111111111111111' }]),
+          }
         },
         reconcileWorktreeAdmitted: vi.fn(),
       } as unknown as Pick<WorkspacePaneTabsCoordinator, 'ensureRuntimeTabForSession' | 'reconcileWorktreeAdmitted'>,

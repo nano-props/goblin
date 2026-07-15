@@ -99,7 +99,7 @@ describe('WorktreeRemovalApplication', () => {
       { userId: 'user-b', repoRoot: '/repo', scope: '/repo\0runtime-b' },
     ]
     const reconcilePhysicalWorktreeAfterRemovalFailure = vi.fn(async () => {})
-    const retireTarget = vi.fn(async () => ({ revision: 0, entries: [] }))
+    const retireTarget = vi.fn(async () => {})
     const broadcastWorkspaceTabsChanged = vi.fn()
     const application = createApplication({
       terminalScopes: affectedScopes,
@@ -136,7 +136,7 @@ describe('WorktreeRemovalApplication', () => {
 
   test('leaves runtime resources untouched when repository validation rejects removal', async () => {
     const closeSessionsForPhysicalWorktree = vi.fn(async () => [])
-    const retireTarget = vi.fn(async () => ({ revision: 0, entries: [] }))
+    const retireTarget = vi.fn(async () => {})
     const application = createApplication({ closeSessionsForPhysicalWorktree, retireTarget })
 
     await expect(
@@ -261,7 +261,7 @@ describe('WorktreeRemovalApplication', () => {
   })
 
   test('retires the branch target after worktree and branch removal both succeed', async () => {
-    const retireTarget = vi.fn(async () => ({ revision: 1, entries: [] }))
+    const retireTarget = vi.fn(async () => {})
     const application = createApplication({ retireTarget })
 
     await expect(
@@ -310,7 +310,7 @@ describe('WorktreeRemovalApplication', () => {
   })
 
   test('retires each repository target that references one removed physical worktree', async () => {
-    const retireTarget = vi.fn(async () => ({ revision: 1, entries: [] }))
+    const retireTarget = vi.fn(async () => {})
     const physicalWorktreeTargets = [
       {
         userId: 'user-a',
@@ -390,7 +390,7 @@ function createApplication(
         options.reconcilePhysicalWorktreeAfterRemovalFailure ?? (async () => {}),
     },
     workspacePaneTabs: {
-      retireTarget: options.retireTarget ?? (async () => ({ revision: 0, entries: [] })),
+      retireTarget: options.retireTarget ?? (async () => {}),
     },
     isCurrentRepoRuntime: () => true,
     broadcastSessionsChanged: options.broadcastSessionsChanged ?? (() => {}),

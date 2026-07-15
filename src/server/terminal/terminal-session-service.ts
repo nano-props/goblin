@@ -167,7 +167,7 @@ class TerminalSessionService {
     const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
     const worktreePath =
       input.worktreePath === null ? null : terminalSessionWorktreePath(input.repoRoot, input.worktreePath)
-    return await this.workspaceTabsCoordinator.replaceTabs({
+    const result = await this.workspaceTabsCoordinator.replaceTabs({
       userId,
       repoRoot: input.repoRoot,
       scope,
@@ -176,6 +176,8 @@ class TerminalSessionService {
       tabs: input.tabs,
       assertCurrent: () => this.assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId),
     })
+    this.broadcastDurableLayoutChange(input.repoRoot, result.affectedUserIds)
+    return result.snapshot
   }
 
   async restoreTabs(
@@ -187,7 +189,9 @@ class TerminalSessionService {
       expectedRepoEntry: RepoSessionEntry
     },
   ): Promise<WorkspacePaneTabsRestoreResult> {
-    if (!isValidRepoLocator(input.repoRoot)) return emptyWorkspacePaneTabsSnapshot()
+    if (!isValidRepoLocator(input.repoRoot)) {
+      return { kind: 'restored', snapshot: emptyWorkspacePaneTabsSnapshot() }
+    }
     const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
     const result = await this.workspaceTabsCoordinator.restoreScope({
       userId,
@@ -203,12 +207,8 @@ class TerminalSessionService {
       assertCurrent: () => this.assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId),
     })
     if (result.kind === 'membership-conflict') return result
-    if (result.durableLayoutChanged) {
-      for (const affectedUserId of this.workspaceTabsCoordinator.activeUsersForRepo(input.repoRoot)) {
-        this.options.broadcastWorkspaceTabsChanged(affectedUserId, input.repoRoot)
-      }
-    }
-    return result.snapshot
+    this.broadcastDurableLayoutChange(input.repoRoot, result.affectedUserIds)
+    return { kind: 'restored', snapshot: result.snapshot }
   }
 
   async updateTabs(userId: string, input: WorkspacePaneTabsUpdateInput): Promise<WorkspacePaneTabsSnapshot> {
@@ -219,7 +219,7 @@ class TerminalSessionService {
     const scope = terminalSessionRuntimeScope(input.repoRoot, input.repoRuntimeId)
     const worktreePath =
       input.worktreePath === null ? null : terminalSessionWorktreePath(input.repoRoot, input.worktreePath)
-    return await this.workspaceTabsCoordinator.updateTabs({
+    const result = await this.workspaceTabsCoordinator.updateTabs({
       userId,
       repoRoot: input.repoRoot,
       scope,
@@ -228,12 +228,14 @@ class TerminalSessionService {
       operation: input.operation,
       assertCurrent: () => this.assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId),
     })
+    this.broadcastDurableLayoutChange(input.repoRoot, result.affectedUserIds)
+    return result.snapshot
   }
 
   async retireTarget(
     userId: string,
     input: { repoRuntimeId: string; target: WorkspacePaneTabsTargetIdentity },
-  ): Promise<WorkspacePaneTabsSnapshot> {
+  ): Promise<void> {
     const { repoRoot } = input.target
     const validTarget =
       input.target.kind === 'branch' ? isValidBranch(input.target.branchName) : isValidCwd(input.target.worktreePath)
@@ -241,11 +243,12 @@ class TerminalSessionService {
       throw new Error('invalid workspace pane target')
     }
     const scope = terminalSessionRuntimeScope(repoRoot, input.repoRuntimeId)
-    return await this.workspaceTabsCoordinator.retireTarget({
+    const result = await this.workspaceTabsCoordinator.retireTarget({
       userId,
       scope,
       target: input.target,
     })
+    this.broadcastDurableLayoutChange(repoRoot, result.affectedUserIds)
   }
 
   async reconcileTerminalTabsForSession(userId: string, session: TerminalSessionSummary): Promise<void> {
@@ -298,6 +301,12 @@ class TerminalSessionService {
 
   private assertCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): void {
     if (!this.isCurrentRepoRuntime(userId, repoRoot, repoRuntimeId)) throw new Error('error.repo-runtime-stale')
+  }
+
+  private broadcastDurableLayoutChange(repoRoot: string, affectedUserIds: readonly string[]): void {
+    for (const affectedUserId of affectedUserIds) {
+      this.options.broadcastWorkspaceTabsChanged(affectedUserId, repoRoot)
+    }
   }
 
   private async rejectStaleCreateIfNeeded(

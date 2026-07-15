@@ -3,7 +3,7 @@ import { createRepoMutationApplication } from '#/server/repo-mutation/repo-mutat
 
 describe('repo mutation application', () => {
   test('retires a branch target only after branch deletion succeeds', async () => {
-    const retireTarget = vi.fn(async () => ({ revision: 1, entries: [] }))
+    const retireTarget = vi.fn(async () => {})
     const application = createRepoMutationApplication({ workspacePaneTabs: { retireTarget } })
 
     await expect(

@@ -9,6 +9,7 @@ import { isSafeBranchName } from '#/shared/refnames.ts'
 import {
   readUserSettingsJson,
   resetUserSettingsPersistenceForTests,
+  SettingsPersistenceWriteError,
   writeUserSettingsJson,
 } from '#/server/modules/settings-persistence.ts'
 import type { LangPref, ServerWorkspaceState, UserSettings, ThemePref } from '#/shared/api-types.ts'
@@ -39,9 +40,15 @@ import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts
 import {
   normalizeWorkspacePaneDurableLayout,
   workspacePaneDurableLayoutsEqual,
+  type WorkspacePaneLayoutRepositoryCasInput,
   type WorkspacePaneLayoutRepository,
+  type WorkspacePaneLayoutRepositoryAcceptedOutcome,
   type WorkspacePaneLayoutRepositoryCasOutcome,
 } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
+import type {
+  WorkspacePaneLayoutRestoreTransaction,
+  WorkspacePaneLayoutRestoreTransactionOutcome,
+} from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
 import { normalizeGlobalShortcut } from '#/shared/accelerator.ts'
 import { isColorTheme, type ColorTheme } from '#/shared/color-theme.ts'
 import {
@@ -549,42 +556,87 @@ export const serverWorkspacePaneLayoutRepository: WorkspacePaneLayoutRepository 
   },
 
   async compareAndSwap(input) {
-    try {
-      return await mutateUserSettings<WorkspacePaneLayoutRepositoryCasOutcome>(async (data) => {
-        const currentLayout = workspacePaneLayoutFromWorkspace(data.workspace, input.repoRoot)
-        const snapshot = { layout: currentLayout }
-        if (input.expectedRepoEntry) {
-          const currentRepoEntry = data.workspace.openRepoEntries.find(
-            (entry) => repoSessionEntryId(entry) === input.repoRoot,
-          )
-          if (!sameRepoSessionEntry(currentRepoEntry, input.expectedRepoEntry)) {
-            return unchangedUserSettings(data, { kind: 'membership-conflict', snapshot })
-          }
-        }
-        if (!workspacePaneDurableLayoutsEqual(input.repoRoot, currentLayout, input.expected)) {
-          return unchangedUserSettings(data, { kind: 'conflict', snapshot })
-        }
-        const replacement = normalizeWorkspacePaneDurableLayout(input.repoRoot, input.replacement)
-        if (workspacePaneDurableLayoutsEqual(input.repoRoot, currentLayout, replacement)) {
-          return unchangedUserSettings(data, { kind: 'accepted', snapshot, changed: false })
-        }
-        const byTarget = Object.fromEntries(
-          replacement.entries.map((entry) => [workspacePaneTabsTargetIdentityKey(entry), entry.tabs]),
-        )
-        const workspacePaneTabsByTargetByRepo = Object.keys(byTarget).length === 0
-          ? recordWithoutKey(data.workspace.workspacePaneTabsByTargetByRepo, input.repoRoot)
-          : { ...data.workspace.workspacePaneTabsByTargetByRepo, [input.repoRoot]: byTarget }
-        const workspace = normalizeWorkspace({ ...data.workspace, workspacePaneTabsByTargetByRepo })
-        const committed = { layout: workspacePaneLayoutFromWorkspace(workspace, input.repoRoot) }
-        return {
-          next: { ...data, workspace },
-          result: { kind: 'accepted', snapshot: committed, changed: true },
-        }
-      })
-    } catch (error) {
-      return { kind: 'failure', error }
-    }
+    return await compareAndSwapWorkspacePaneLayout(input)
   },
+}
+
+export const serverWorkspacePaneLayoutRestoreTransaction: WorkspacePaneLayoutRestoreTransaction = {
+  async validateMembershipAndRepair(input) {
+    return await mutateWorkspacePaneSettings<WorkspacePaneLayoutRestoreTransactionOutcome>(async (data) => {
+      const currentLayout = workspacePaneLayoutFromWorkspace(data.workspace, input.repoRoot)
+      const snapshot = { layout: currentLayout }
+      const currentRepoEntry = data.workspace.openRepoEntries.find(
+        (entry) => repoSessionEntryId(entry) === input.repoRoot,
+      )
+      if (!sameRepoSessionEntry(currentRepoEntry, input.expectedRepoEntry)) {
+        return unchangedUserSettings(data, { kind: 'membership-conflict', snapshot })
+      }
+      const validTargetKeys = new Set(input.validTargetKeys)
+      const replacement = {
+        entries: currentLayout.entries.filter((entry) =>
+          validTargetKeys.has(workspacePaneTabsTargetIdentityKey(entry))),
+      }
+      return workspacePaneLayoutMutation(data, input.repoRoot, currentLayout, replacement)
+    }, (error, current) => ({
+      kind: 'write-failure',
+      error,
+      snapshot: { layout: workspacePaneLayoutFromWorkspace(current.workspace, input.repoRoot) },
+    }))
+  },
+}
+
+async function compareAndSwapWorkspacePaneLayout(
+  input: WorkspacePaneLayoutRepositoryCasInput,
+): Promise<WorkspacePaneLayoutRepositoryCasOutcome> {
+  return await mutateWorkspacePaneSettings<WorkspacePaneLayoutRepositoryCasOutcome>(async (data) => {
+    const currentLayout = workspacePaneLayoutFromWorkspace(data.workspace, input.repoRoot)
+    const snapshot = { layout: currentLayout }
+    if (!workspacePaneDurableLayoutsEqual(input.repoRoot, currentLayout, input.expected)) {
+      return unchangedUserSettings(data, { kind: 'conflict', snapshot })
+    }
+    return workspacePaneLayoutMutation(data, input.repoRoot, currentLayout, input.replacement)
+  }, (error) => ({ kind: 'write-failure', error }))
+}
+
+async function mutateWorkspacePaneSettings<T>(
+  mutation: (data: UserSettingsData) => Promise<UserSettingsMutation<T>> | UserSettingsMutation<T>,
+  onWriteFailure: (error: SettingsPersistenceWriteError, current: UserSettingsData) => T,
+): Promise<T> {
+  let writeBase: UserSettingsData | null = null
+  try {
+    return await mutateUserSettings(async (data) => {
+      const plan = await mutation(data)
+      if (plan.changed !== false) writeBase = data
+      return plan
+    })
+  } catch (error) {
+    if (!(error instanceof SettingsPersistenceWriteError) || !writeBase) throw error
+    return onWriteFailure(error, writeBase)
+  }
+}
+
+function workspacePaneLayoutMutation(
+  data: UserSettingsData,
+  repoRoot: string,
+  currentLayout: WorkspacePaneDurableLayout,
+  requestedLayout: WorkspacePaneDurableLayout,
+): UserSettingsMutation<WorkspacePaneLayoutRepositoryAcceptedOutcome> {
+  const snapshot = { layout: currentLayout }
+  const replacement = normalizeWorkspacePaneDurableLayout(repoRoot, requestedLayout)
+  if (workspacePaneDurableLayoutsEqual(repoRoot, currentLayout, replacement)) {
+    return unchangedUserSettings(data, { kind: 'accepted', snapshot, changed: false })
+  }
+  const byTarget = Object.fromEntries(
+    replacement.entries.map((entry) => [workspacePaneTabsTargetIdentityKey(entry), entry.tabs]),
+  )
+  const workspacePaneTabsByTargetByRepo = Object.keys(byTarget).length === 0
+    ? recordWithoutKey(data.workspace.workspacePaneTabsByTargetByRepo, repoRoot)
+    : { ...data.workspace.workspacePaneTabsByTargetByRepo, [repoRoot]: byTarget }
+  const workspace = normalizeWorkspace({ ...data.workspace, workspacePaneTabsByTargetByRepo })
+  return {
+    next: { ...data, workspace },
+    result: { kind: 'accepted', snapshot: { layout: workspacePaneLayoutFromWorkspace(workspace, repoRoot) }, changed: true },
+  }
 }
 
 export async function getServerRecentRepos(): Promise<RepoSessionEntry[]> {

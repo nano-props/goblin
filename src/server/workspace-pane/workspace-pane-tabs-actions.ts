@@ -16,8 +16,6 @@ export interface WorkspacePaneTabsActionDependencies {
   sessionService: WorkspacePaneTabsActionService
   isValidClientId(value: unknown): value is string
   isCurrentRepoRuntime(userId: string, repoRoot: string, repoRuntimeId: string): boolean
-  broadcastWorkspaceTabsChanged(userId: string, repoRoot: string): void
-  affectedUsersForRepo(repoRoot: string): string[]
 }
 
 export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDependencies) {
@@ -33,9 +31,7 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       if (!isValidRepoLocator(input?.repoRoot)) return emptyWorkspacePaneTabsSnapshot()
       if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return emptyWorkspacePaneTabsSnapshot()
       assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
-      const tabs = await sessionService.replaceTabs(userId, input)
-      broadcastDurableLayoutChanged(userId, input.repoRoot)
-      return tabs
+      return await sessionService.replaceTabs(userId, input)
     },
 
     async updateTabs(
@@ -47,9 +43,7 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
       if (!isValidRepoLocator(input?.repoRoot)) return emptyWorkspacePaneTabsSnapshot()
       if (input?.worktreePath !== null && !isValidCwd(input?.worktreePath)) return emptyWorkspacePaneTabsSnapshot()
       assertCurrentRepoRuntime(userId, input.repoRoot, input.repoRuntimeId)
-      const tabs = await sessionService.updateTabs(userId, input)
-      broadcastDurableLayoutChanged(userId, input.repoRoot)
-      return tabs
+      return await sessionService.updateTabs(userId, input)
     },
 
     async listWorkspaceTabs(
@@ -68,11 +62,6 @@ export function createWorkspacePaneTabsActions(deps: WorkspacePaneTabsActionDepe
     if (!deps.isCurrentRepoRuntime(userId, repoRoot, repoRuntimeId)) {
       throw new Error('error.repo-runtime-stale')
     }
-  }
-
-  function broadcastDurableLayoutChanged(userId: string, repoRoot: string): void {
-    const users = new Set([userId, ...deps.affectedUsersForRepo(repoRoot)])
-    for (const affectedUserId of users) deps.broadcastWorkspaceTabsChanged(affectedUserId, repoRoot)
   }
 }
 

@@ -1,9 +1,11 @@
+import PQueue from 'p-queue'
 import {
   isWorkspacePaneRuntimeTabEntry,
   workspacePaneRuntimeTabEntry,
   workspacePaneStaticTabEntry,
   type WorkspacePaneStaticTabEntry,
   type WorkspacePaneTabEntry,
+  type WorkspacePaneRuntimeTabType,
 } from '#/shared/workspace-pane.ts'
 import type {
   WorkspacePaneDurableLayout,
@@ -29,54 +31,141 @@ import {
 } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
 import type { WorkspacePaneRuntimeTabsProviderSnapshot } from '#/server/workspace-pane/workspace-pane-runtime-tabs-projection.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import type { PhysicalWorktreeIdentity } from '#/server/worktree-removal/physical-worktree-identity.ts'
+import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
 
 const MAX_LAYOUT_CAS_RETRIES = 3
 
 interface CanonicalClockState {
   layoutToken: string
   overlayRevision: number
+  targetProjectionToken: string
   providerRevisions: Map<string, number>
   entriesToken: string
   revision: number
 }
 
 export type WorkspacePaneLayoutValidationResult =
-  | { kind: 'validated'; snapshot: WorkspacePaneTabsSnapshot; durableLayoutChanged: boolean }
+  | {
+      kind: 'validated'
+      snapshot: WorkspacePaneTabsSnapshot
+      affectedUserIds: string[]
+    }
   | { kind: 'membership-conflict' }
+
+export interface WorkspacePaneLayoutCommitResult {
+  affectedUserIds: string[]
+}
+
+type WorkspacePaneLayoutMutationTarget =
+  | { branchName: string; worktreePath: null; physicalWorktreeIdentity?: never }
+  | { branchName: string; worktreePath: string; physicalWorktreeIdentity: PhysicalWorktreeIdentity }
+
+export type WorkspacePaneLayoutReplaceInput = WorkspacePaneEpochScope & WorkspacePaneLayoutMutationTarget & {
+  tabs: readonly WorkspacePaneTabEntry[]
+  validTargets: readonly WorkspacePaneTabsTarget[]
+  providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
+  assertCurrent?: () => void
+}
+
+export type WorkspacePaneLayoutUpdateInput = WorkspacePaneEpochScope & WorkspacePaneLayoutMutationTarget & {
+  operation: WorkspacePaneTabsUpdateOperation
+  validTargets: readonly WorkspacePaneTabsTarget[]
+  providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
+  assertCurrent?: () => void
+}
+
+export type WorkspacePaneLayoutRetireInput = WorkspacePaneEpochScope & {
+  target: WorkspacePaneTabsTargetIdentity
+  assertCurrent?: () => void
+}
+
+export interface WorkspacePaneLayoutSnapshotInput {
+  scope: WorkspacePaneEpochScope
+  validTargets: readonly WorkspacePaneTabsTarget[]
+  providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
+  knownLayout?: WorkspacePaneDurableLayout
+}
+
+export type WorkspacePaneLayoutValidationInput = WorkspacePaneEpochScope & {
+  validTargets: readonly WorkspacePaneTabsTarget[]
+  physicalTargets: readonly { target: WorkspacePaneTabsTargetIdentity; identity: PhysicalWorktreeIdentity }[]
+  expectedRepoEntry: RepoSessionEntry
+  providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
+  assertCurrent?: () => void
+}
+
+export interface WorkspacePaneLayoutOperation {
+  replace(input: WorkspacePaneLayoutReplaceInput): Promise<WorkspacePaneLayoutCommitResult>
+  update(input: WorkspacePaneLayoutUpdateInput): Promise<WorkspacePaneLayoutCommitResult>
+  retire(input: WorkspacePaneLayoutRetireInput): Promise<WorkspacePaneLayoutCommitResult>
+  snapshot(input: WorkspacePaneLayoutSnapshotInput): Promise<WorkspacePaneTabsSnapshot>
+  projectEntriesForAdmission(input: WorkspacePaneLayoutSnapshotInput): Promise<WorkspacePaneTabsSnapshot['entries']>
+  validateRepairAndSnapshot(input: WorkspacePaneLayoutValidationInput): Promise<WorkspacePaneLayoutValidationResult>
+  commitRuntimeTarget(input: WorkspacePaneEpochScope & {
+    target: WorkspacePaneTabsTargetIdentity
+    identity: PhysicalWorktreeIdentity
+    tabs: readonly WorkspacePaneTabEntry[]
+  }): void
+  closeEpoch(scope: WorkspacePaneEpochScope): void
+}
 
 export class WorkspacePaneLayoutAggregate {
   private readonly repository: WorkspacePaneLayoutRepository
-  readonly overlay: WorkspacePaneEpochOverlay
+  private readonly restoreTransaction: WorkspacePaneLayoutRestoreTransaction
+  private readonly overlay: WorkspacePaneEpochOverlay
   private readonly clocks = new Map<string, CanonicalClockState>()
+  private readonly operationQueuesByRepoRoot = new Map<string, PQueue>()
 
-  constructor(options: { repository: WorkspacePaneLayoutRepository; overlay?: WorkspacePaneEpochOverlay }) {
+  constructor(options: {
+    repository: WorkspacePaneLayoutRepository
+    restoreTransaction: WorkspacePaneLayoutRestoreTransaction
+    overlay?: WorkspacePaneEpochOverlay
+  }) {
     this.repository = options.repository
+    this.restoreTransaction = options.restoreTransaction
     this.overlay = options.overlay ?? new WorkspacePaneEpochOverlay()
   }
 
-  async replace(input: WorkspacePaneEpochScope & WorkspacePaneTabsTarget & {
-    tabs: readonly WorkspacePaneTabEntry[]
-    providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
-    assertCurrent?: () => void
-  }): Promise<WorkspacePaneTabsSnapshot> {
+  async runExclusive<T>(
+    repoRoot: string,
+    task: (operation: WorkspacePaneLayoutOperation) => Promise<T> | T,
+  ): Promise<T> {
+    let queue = this.operationQueuesByRepoRoot.get(repoRoot)
+    if (!queue) {
+      queue = new PQueue({ concurrency: 1 })
+      this.operationQueuesByRepoRoot.set(repoRoot, queue)
+    }
+    try {
+      return await queue.add(() => task({
+        replace: async (input) => await this.replace(input),
+        update: async (input) => await this.update(input),
+        retire: async (input) => await this.retire(input),
+        snapshot: async (input) => await this.snapshot(input),
+        projectEntriesForAdmission: async (input) => await this.projectEntriesForAdmission(input),
+        validateRepairAndSnapshot: async (input) => await this.validateRepairAndSnapshot(input),
+        commitRuntimeTarget: (input) => this.commitRuntimeTarget(input),
+        closeEpoch: (scope) => this.closeEpoch(scope),
+      }))
+    } finally {
+      void queue.onIdle().then(() => {
+        if (this.operationQueuesByRepoRoot.get(repoRoot) !== queue) return
+        if (queue.size === 0 && queue.pending === 0) this.operationQueuesByRepoRoot.delete(repoRoot)
+      })
+    }
+  }
+
+  private async replace(input: WorkspacePaneLayoutReplaceInput): Promise<WorkspacePaneLayoutCommitResult> {
     return await this.mutate(input, () => [...input.tabs], { retryConflicts: false })
   }
 
-  async update(input: WorkspacePaneEpochScope & WorkspacePaneTabsTarget & {
-    operation: WorkspacePaneTabsUpdateOperation
-    providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
-    assertCurrent?: () => void
-  }): Promise<WorkspacePaneTabsSnapshot> {
+  private async update(input: WorkspacePaneLayoutUpdateInput): Promise<WorkspacePaneLayoutCommitResult> {
     return await this.mutate(input, (current) => workspacePaneTabsWithUpdateOperation(current, input.operation), {
       retryConflicts: true,
     })
   }
 
-  async retire(input: WorkspacePaneEpochScope & {
-    target: WorkspacePaneTabsTargetIdentity
-    providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
-    assertCurrent?: () => void
-  }): Promise<WorkspacePaneTabsSnapshot> {
+  private async retire(input: WorkspacePaneLayoutRetireInput): Promise<WorkspacePaneLayoutCommitResult> {
     for (let conflicts = 0; ; conflicts += 1) {
       input.assertCurrent?.()
       const current = await this.repository.load(input.repoRoot)
@@ -90,92 +179,107 @@ export class WorkspacePaneLayoutAggregate {
         expected: current.layout,
         replacement,
       })
-      if (outcome.kind === 'failure') throw outcome.error
+      if (outcome.kind === 'write-failure') throw outcome.error
       if (outcome.kind === 'conflict' && conflicts < MAX_LAYOUT_CAS_RETRIES) continue
       if (outcome.kind !== 'accepted') throw new Error('error.workspace-tabs-layout-conflict')
-      this.overlay.retireTarget(input.target)
-      return await this.snapshot(input, input.providerSnapshots, outcome.snapshot.layout)
+      const affectedScopes = this.overlay.retireTarget(input.target)
+      return this.commitResult(input, outcome.changed, [
+        ...affectedScopes.map((scope) => scope.userId),
+      ])
     }
   }
 
-  async snapshot(
-    scope: WorkspacePaneEpochScope,
-    providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
-    knownLayout?: WorkspacePaneDurableLayout,
-  ): Promise<WorkspacePaneTabsSnapshot> {
+  private async snapshot(input: WorkspacePaneLayoutSnapshotInput): Promise<WorkspacePaneTabsSnapshot> {
+    const { scope, validTargets, providerSnapshots, knownLayout } = input
     this.overlay.activate(scope)
     const layout = knownLayout ?? (await this.repository.load(scope.repoRoot)).layout
-    const entries = projectCanonicalEntries(scope, layout, this.overlay, providerSnapshots)
-    return { revision: this.revision(scope, layout, providerSnapshots, entries), entries }
+    const entries = this.projectEntries(scope, layout, validTargets, providerSnapshots)
+    return { revision: this.revision(scope, layout, validTargets, providerSnapshots, entries), entries }
   }
 
-  async validateRepairAndSnapshot(input: WorkspacePaneEpochScope & {
-    validTargets: readonly WorkspacePaneTabsTarget[]
-    expectedRepoEntry: RepoSessionEntry
-    providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
-    assertCurrent?: () => void
-  }): Promise<WorkspacePaneLayoutValidationResult> {
+  private async projectEntriesForAdmission(
+    input: WorkspacePaneLayoutSnapshotInput,
+  ): Promise<WorkspacePaneTabsSnapshot['entries']> {
+    const { scope, validTargets, providerSnapshots } = input
+    const layout = (await this.repository.load(scope.repoRoot)).layout
+    return this.projectEntries(scope, layout, validTargets, providerSnapshots)
+  }
+
+  private async validateRepairAndSnapshot(
+    input: WorkspacePaneLayoutValidationInput,
+  ): Promise<WorkspacePaneLayoutValidationResult> {
     const validKeys = new Set(input.validTargets.map(workspacePaneTabsTargetIdentityKey))
-    for (let conflicts = 0; ; conflicts += 1) {
-      input.assertCurrent?.()
-      const current = await this.repository.load(input.repoRoot)
-      const filtered = {
-        entries: current.layout.entries.filter((entry) => validKeys.has(workspacePaneTabsTargetIdentityKey(entry))),
-      }
-      const outcome = await this.repository.compareAndSwap({
+    input.assertCurrent?.()
+    const outcome = await this.restoreTransaction.validateMembershipAndRepair({
         repoRoot: input.repoRoot,
-        expected: current.layout,
-        replacement: filtered,
         expectedRepoEntry: input.expectedRepoEntry,
+        validTargetKeys: [...validKeys],
       })
-      if (outcome.kind === 'failure') {
-        this.commitValidatedTargetCatalog(input)
-        return {
-          kind: 'validated',
-          snapshot: await this.snapshot(input, input.providerSnapshots, current.layout),
-          durableLayoutChanged: false,
-        }
-      }
-      if (outcome.kind === 'conflict' && conflicts < MAX_LAYOUT_CAS_RETRIES) continue
-      if (outcome.kind === 'membership-conflict') return { kind: 'membership-conflict' }
-      if (outcome.kind !== 'accepted') {
-        this.commitValidatedTargetCatalog(input)
-        return {
-          kind: 'validated',
-          snapshot: await this.snapshot(input, input.providerSnapshots, current.layout),
-          durableLayoutChanged: false,
-        }
-      }
-      this.commitValidatedTargetCatalog(input)
-      return {
-        kind: 'validated',
-        snapshot: await this.snapshot(input, input.providerSnapshots, outcome.snapshot.layout),
-        durableLayoutChanged: outcome.changed,
-      }
+    if (outcome.kind === 'membership-conflict') return { kind: 'membership-conflict' }
+    input.assertCurrent?.()
+    const overlayChanged = this.commitValidatedPhysicalTargets(input)
+    const durableLayoutChanged = outcome.kind === 'accepted' && outcome.changed
+    return {
+      kind: 'validated',
+      snapshot: await this.snapshot({
+        scope: input,
+        validTargets: input.validTargets,
+        providerSnapshots: input.providerSnapshots,
+        knownLayout: outcome.snapshot.layout,
+      }),
+      affectedUserIds: this.affectedUserIds(input, durableLayoutChanged, overlayChanged ? [input.userId] : []),
     }
   }
 
-  closeEpoch(scope: WorkspacePaneEpochScope): void {
+  private closeEpoch(scope: WorkspacePaneEpochScope): void {
     this.overlay.closeEpoch(scope)
-    this.clocks.delete(epochKey(scope))
+    const key = epochKey(scope)
+    this.clocks.delete(key)
+  }
+
+  private commitRuntimeTarget(input: WorkspacePaneEpochScope & {
+    target: WorkspacePaneTabsTargetIdentity
+    identity: PhysicalWorktreeIdentity
+    tabs: readonly WorkspacePaneTabEntry[]
+  }): void {
+    this.overlay.registerPhysicalTarget(input)
+    this.overlay.recordMixedOrder(input)
+  }
+
+  physicalTargets(identity: PhysicalWorktreeIdentity) {
+    return this.overlay.physicalTargets(identity)
+  }
+
+  activeEpochs(repoRoot: string): WorkspacePaneEpochScope[] {
+    return this.overlay.activeEpochs(repoRoot)
+  }
+
+  epochsForUser(userId: string): WorkspacePaneEpochScope[] {
+    return this.overlay.epochsForUser(userId)
+  }
+
+  runtimeSessionIds(input: WorkspacePaneEpochScope & {
+    worktreePath: string
+    type: WorkspacePaneRuntimeTabType
+  }): string[] {
+    return this.overlay.runtimeSessionIds(input)
   }
 
   private async mutate(
-    input: WorkspacePaneEpochScope & WorkspacePaneTabsTarget & {
-      providerSnapshots: readonly WorkspacePaneRuntimeTabsProviderSnapshot[]
-      assertCurrent?: () => void
-    },
+    input: WorkspacePaneLayoutReplaceInput | WorkspacePaneLayoutUpdateInput,
     applyIntent: (current: WorkspacePaneTabEntry[]) => WorkspacePaneTabEntry[],
     policy: { retryConflicts: boolean },
-  ): Promise<WorkspacePaneTabsSnapshot> {
+  ): Promise<WorkspacePaneLayoutCommitResult> {
     for (let conflicts = 0; ; conflicts += 1) {
       input.assertCurrent?.()
       const current = await this.repository.load(input.repoRoot)
-      const currentTabs = canonicalTabsForTarget(input, current.layout, this.overlay, input.providerSnapshots)
+      const target = resolveMutationTarget(input, input.validTargets, input.providerSnapshots)
+      if (!target) throw new Error('error.workspace-tabs-target-invalid')
+      const currentTabs = canonicalTabsForTarget({ ...input, ...target }, current.layout, this.overlay, input.providerSnapshots)
       const mixedTabs = applyIntent(currentTabs)
       const staticTabs = mixedTabs.filter((tab): tab is WorkspacePaneStaticTabEntry => !isWorkspacePaneRuntimeTabEntry(tab))
-      const targetKey = workspacePaneTabsTargetIdentityKey(input)
-      const entry = { ...input, tabs: staticTabs }
+      const targetKey = workspacePaneTabsTargetIdentityKey(target)
+      const entry = { ...target, tabs: staticTabs }
       const replacement = normalizeWorkspacePaneDurableLayout(input.repoRoot, {
         entries: [
           ...current.layout.entries.filter((candidate) => workspacePaneTabsTargetIdentityKey(candidate) !== targetKey),
@@ -188,19 +292,26 @@ export class WorkspacePaneLayoutAggregate {
         expected: current.layout,
         replacement,
       })
-      if (outcome.kind === 'failure') throw outcome.error
+      if (outcome.kind === 'write-failure') throw outcome.error
       if (outcome.kind === 'conflict' && policy.retryConflicts && conflicts < MAX_LAYOUT_CAS_RETRIES) continue
       if (outcome.kind !== 'accepted') throw new Error('error.workspace-tabs-layout-conflict')
-      const target = targetIdentity(input)
-      this.overlay.admitValidatedTarget({ ...input, target, branchName: input.branchName })
-      this.overlay.recordMixedOrder({ ...input, target, tabs: mixedTabs })
-      return await this.snapshot(input, input.providerSnapshots, outcome.snapshot.layout)
+      const targetIdentityValue = targetIdentity(target)
+      const placementChanged = this.overlay.recordMixedOrder({ ...input, target: targetIdentityValue, tabs: mixedTabs })
+      if (input.physicalWorktreeIdentity) {
+        this.overlay.registerPhysicalTarget({ ...input, target: targetIdentityValue, identity: input.physicalWorktreeIdentity })
+      }
+      return this.commitResult(
+        input,
+        outcome.changed,
+        placementChanged ? [input.userId] : [],
+      )
     }
   }
 
   private revision(
     scope: WorkspacePaneEpochScope,
     layout: WorkspacePaneDurableLayout,
+    validTargets: readonly WorkspacePaneTabsTarget[],
     providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
     entries: WorkspacePaneTabsSnapshot['entries'],
   ): number {
@@ -208,10 +319,18 @@ export class WorkspacePaneLayoutAggregate {
     const layoutToken = JSON.stringify(normalizeWorkspacePaneDurableLayout(scope.repoRoot, layout))
     const providerRevisions = new Map(providerRevisionMap(providers))
     const overlayRevision = this.overlay.revision(scope)
+    const targetProjectionToken = JSON.stringify([...targetMap(validTargets)])
     const entriesToken = JSON.stringify(entries)
     const current = this.clocks.get(key)
     if (!current) {
-      this.clocks.set(key, { layoutToken, overlayRevision, providerRevisions, entriesToken, revision: 0 })
+      this.clocks.set(key, {
+        layoutToken,
+        overlayRevision,
+        targetProjectionToken,
+        providerRevisions,
+        entriesToken,
+        revision: 0,
+      })
       return 0
     }
     for (const [type, revision] of providerRevisions) {
@@ -221,23 +340,72 @@ export class WorkspacePaneLayoutAggregate {
     }
     const dependenciesChanged = current.layoutToken !== layoutToken ||
       current.overlayRevision !== overlayRevision ||
+      current.targetProjectionToken !== targetProjectionToken ||
       !mapsEqual(current.providerRevisions, providerRevisions)
     if (!dependenciesChanged) {
       if (current.entriesToken !== entriesToken) throw new Error('error.workspace-tabs-provider-snapshot-inconsistent')
       return current.revision
     }
-    const next = { layoutToken, overlayRevision, providerRevisions, entriesToken, revision: current.revision + 1 }
+    const next = {
+      layoutToken,
+      overlayRevision,
+      targetProjectionToken,
+      providerRevisions,
+      entriesToken,
+      revision: current.revision + 1,
+    }
     this.clocks.set(key, next)
     return next.revision
   }
 
-  private commitValidatedTargetCatalog(input: WorkspacePaneEpochScope & {
+  private commitValidatedPhysicalTargets(input: WorkspacePaneEpochScope & {
     validTargets: readonly WorkspacePaneTabsTarget[]
-  }): void {
-    this.overlay.commitValidatedTargets(input, input.validTargets.map((target) => ({
-      target: targetIdentity(target),
-      branchName: target.branchName,
-    })))
+    physicalTargets: readonly { target: WorkspacePaneTabsTargetIdentity; identity: PhysicalWorktreeIdentity }[]
+  }): boolean {
+    const next = targetMap(input.validTargets)
+    const overlayChanged = this.overlay.retainTargets(input, new Set(next.keys()))
+    for (const physical of input.physicalTargets) {
+      this.overlay.registerPhysicalTarget({ ...input, ...physical })
+    }
+    return overlayChanged
+  }
+
+  private projectEntries(
+    scope: WorkspacePaneEpochScope,
+    layout: WorkspacePaneDurableLayout,
+    validTargets: readonly WorkspacePaneTabsTarget[],
+    providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
+  ): WorkspacePaneTabsSnapshot['entries'] {
+    return projectCanonicalEntries(
+      scope,
+      layout,
+      this.overlay,
+      targetMap(validTargets),
+      providers,
+    )
+  }
+
+  private commitResult(
+    scope: WorkspacePaneEpochScope,
+    durableLayoutChanged: boolean,
+    localAffectedUserIds: readonly string[] = [],
+  ): WorkspacePaneLayoutCommitResult {
+    return {
+      affectedUserIds: this.affectedUserIds(scope, durableLayoutChanged, localAffectedUserIds),
+    }
+  }
+
+  private affectedUserIds(
+    scope: WorkspacePaneEpochScope,
+    durableLayoutChanged: boolean,
+    localAffectedUserIds: readonly string[] = [],
+  ): string[] {
+    const affected = new Set(localAffectedUserIds)
+    if (durableLayoutChanged) {
+      affected.add(scope.userId)
+      for (const active of this.overlay.activeEpochs(scope.repoRoot)) affected.add(active.userId)
+    }
+    return [...affected]
   }
 }
 
@@ -245,29 +413,55 @@ function projectCanonicalEntries(
   scope: WorkspacePaneEpochScope,
   layout: WorkspacePaneDurableLayout,
   overlay: WorkspacePaneEpochOverlay,
+  validatedTargets: ReadonlyMap<string, WorkspacePaneTabsTarget>,
   providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
 ): WorkspacePaneTabsSnapshot['entries'] {
+  const liveTargets = providerTargets(scope, providers)
   layout = {
     entries: layout.entries.filter((entry) =>
-      overlay.isDurableTargetVisible(scope, workspacePaneTabsTargetIdentityKey(entry)),
+      validatedTargets.has(workspacePaneTabsTargetIdentityKey(entry)) ||
+      liveTargets.has(workspacePaneTabsTargetIdentityKey(entry)),
     ),
   }
   const targets = new Map<string, WorkspacePaneTabsTarget>()
-  for (const entry of layout.entries) targets.set(workspacePaneTabsTargetIdentityKey(entry), entry)
+  for (const entry of layout.entries) {
+    const key = workspacePaneTabsTargetIdentityKey(entry)
+    targets.set(key, validatedTargets.get(key) ?? entry)
+  }
+  for (const [key, target] of liveTargets) targets.set(key, target)
+  return Array.from(targets.values()).map((target) => {
+    const tabs = canonicalTabsForTarget({ ...scope, ...target }, layout, overlay, providers)
+    return { repoRoot: scope.repoRoot, branchName: target.branchName, worktreePath: target.worktreePath, tabs }
+  })
+}
+
+function providerTargets(
+  scope: Pick<WorkspacePaneEpochScope, 'repoRoot'>,
+  providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
+): Map<string, WorkspacePaneTabsTarget> {
+  const targets = new Map<string, WorkspacePaneTabsTarget>()
   for (const provider of providers) {
     for (const session of provider.liveSessions) {
       const target = { repoRoot: scope.repoRoot, branchName: session.branch, worktreePath: session.worktreePath }
       targets.set(workspacePaneTabsTargetIdentityKey(target), target)
     }
   }
-  return Array.from(targets.values()).map((target) => {
-    const tabs = canonicalTabsForTarget({ ...scope, ...target }, layout, overlay, providers)
-    const identity = targetIdentity(target)
-    const branchName = target.worktreePath === null
-      ? target.branchName
-      : overlay.targetBranchName({ ...scope, target: identity }) ?? target.branchName
-    return { repoRoot: scope.repoRoot, branchName, worktreePath: target.worktreePath, tabs }
-  })
+  return targets
+}
+
+function targetMap(targets: readonly WorkspacePaneTabsTarget[]): Map<string, WorkspacePaneTabsTarget> {
+  return new Map(targets
+    .map((target) => [workspacePaneTabsTargetIdentityKey(target), { ...target }] as const)
+    .sort(([a], [b]) => a.localeCompare(b)))
+}
+
+function resolveMutationTarget(
+  scope: WorkspacePaneEpochScope & WorkspacePaneTabsTarget,
+  validTargets: readonly WorkspacePaneTabsTarget[],
+  providers: readonly WorkspacePaneRuntimeTabsProviderSnapshot[],
+): WorkspacePaneTabsTarget | null {
+  const targetKey = workspacePaneTabsTargetIdentityKey(scope)
+  return providerTargets(scope, providers).get(targetKey) ?? targetMap(validTargets).get(targetKey) ?? null
 }
 
 function canonicalTabsForTarget(

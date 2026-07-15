@@ -1,4 +1,3 @@
-import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
 import {
   isWorkspacePaneRuntimeTabEntry,
   workspacePaneTabEntryIdentity,
@@ -16,17 +15,24 @@ export interface WorkspacePaneLayoutRepositorySnapshot {
   layout: WorkspacePaneDurableLayout
 }
 
-export type WorkspacePaneLayoutRepositoryCasOutcome =
-  | { kind: 'accepted'; snapshot: WorkspacePaneLayoutRepositorySnapshot; changed: boolean }
+export interface WorkspacePaneLayoutRepositoryAcceptedOutcome {
+  kind: 'accepted'
+  snapshot: WorkspacePaneLayoutRepositorySnapshot
+  changed: boolean
+}
+
+export type WorkspacePaneLayoutRepositoryCasStateOutcome =
+  | WorkspacePaneLayoutRepositoryAcceptedOutcome
   | { kind: 'conflict'; snapshot: WorkspacePaneLayoutRepositorySnapshot }
-  | { kind: 'membership-conflict'; snapshot: WorkspacePaneLayoutRepositorySnapshot }
-  | { kind: 'failure'; error: unknown }
+
+export type WorkspacePaneLayoutRepositoryCasOutcome =
+  | WorkspacePaneLayoutRepositoryCasStateOutcome
+  | { kind: 'write-failure'; error: unknown }
 
 export interface WorkspacePaneLayoutRepositoryCasInput {
   repoRoot: string
   expected: WorkspacePaneDurableLayout
   replacement: WorkspacePaneDurableLayout
-  expectedRepoEntry?: RepoSessionEntry
 }
 
 export interface WorkspacePaneLayoutRepository {

@@ -150,16 +150,16 @@ async function restoreServerWorkspaceSnapshot(
   // Non-active repos carry `projection: null` and are restored lazily.
   const openedActive = opened.filter(isOpenedProjectedRepo)
   const expectedMembership = membership.workspace.openRepoEntries
-  const initializedTabs = await projectWorkspacePaneTabsWithMembershipGuard({
+  const projectedTabs = await projectWorkspacePaneTabsWithMembershipGuard({
     restoreInput: input,
-    workspace: membership.workspace,
     repos: openedActive,
     confirmMembership: async () => await compareAndReplaceServerWorkspaceRepos(expectedMembership, expectedMembership),
+    membershipPolicy: 'confirm-after-restore',
   })
-  if (!initializedTabs.matched) {
+  if (!projectedTabs.matched) {
     return {
       kind: 'membership-conflict',
-      latestWorkspace: initializedTabs.latestWorkspace,
+      latestWorkspace: projectedTabs.latestWorkspace,
       repaired: repoRestoreFailed,
     }
   }
@@ -171,7 +171,7 @@ async function restoreServerWorkspaceSnapshot(
       runtime: runtimeSnapshotFromOpened(
         opened,
         activeRepoRootForOpened(input.activeRepoRoot, opened),
-        initializedTabs.snapshots,
+        projectedTabs.snapshots,
       ),
     },
   }

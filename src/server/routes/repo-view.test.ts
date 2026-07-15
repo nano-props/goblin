@@ -24,7 +24,7 @@ function makeAppRealtimeHost(): ServerAppRealtimeHost {
 }
 
 const workspacePaneTabsHost = {
-  restoreTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
+  restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] } })),
   listWorkspaceTabs: vi.fn(),
   replaceTabs: vi.fn(),
   updateTabs: vi.fn(),

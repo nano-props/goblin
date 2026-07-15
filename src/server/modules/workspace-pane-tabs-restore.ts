@@ -4,7 +4,6 @@ import type { WorkspacePaneTabsSnapshot } from '#/shared/workspace-pane-tabs.ts'
 import type { ServerWorkspaceMatchOutcome } from '#/server/modules/settings-source.ts'
 import type {
   ServerWorkspacePaneTabsHost,
-  WorkspacePaneTabsRestoreResult,
 } from '#/server/workspace-pane/workspace-pane-tabs-host.ts'
 
 interface WorkspacePaneTabsRestoreInput {
@@ -16,9 +15,9 @@ interface WorkspacePaneTabsRestoreInput {
 
 export async function projectWorkspacePaneTabsWithMembershipGuard(input: {
   restoreInput: WorkspacePaneTabsRestoreInput
-  workspace: ServerWorkspaceState
   repos: ProjectedRestoredWorkspaceRepoRuntime[]
   confirmMembership: () => Promise<ServerWorkspaceMatchOutcome>
+  membershipPolicy: 'transaction-authoritative' | 'confirm-after-restore'
   assertCurrent?: () => void
 }): Promise<
   | {
@@ -27,16 +26,16 @@ export async function projectWorkspacePaneTabsWithMembershipGuard(input: {
     }
   | { matched: false; latestWorkspace: ServerWorkspaceState }
 > {
-  const confirmed = await input.confirmMembership()
-  if (!confirmed.matched) return confirmed
   input.restoreInput.signal?.throwIfAborted()
   for (;;) {
     const restored = await restoreWorkspacePaneTabsForRepos(input.restoreInput, input.repos)
     if (restored.kind === 'restored') {
       input.assertCurrent?.()
       input.restoreInput.signal?.throwIfAborted()
-      const committed = await input.confirmMembership()
-      if (!committed.matched) return committed
+      if (input.membershipPolicy === 'confirm-after-restore') {
+        const committed = await input.confirmMembership()
+        if (!committed.matched) return committed
+      }
       return { matched: true, snapshots: restored.snapshots }
     }
     const latest = await input.confirmMembership()
@@ -62,16 +61,10 @@ async function restoreWorkspacePaneTabsForRepos(
       expectedRepoEntry: repo.entry,
       targets,
     })
-    if (isMembershipConflict(result)) return result
-    snapshots.push({ repoRoot: repo.repoRoot, repoRuntimeId: repo.repoRuntimeId, snapshot: result })
+    if (result.kind === 'membership-conflict') return result
+    snapshots.push({ repoRoot: repo.repoRoot, repoRuntimeId: repo.repoRuntimeId, snapshot: result.snapshot })
   }
   return { kind: 'restored' as const, snapshots }
-}
-
-function isMembershipConflict(
-  result: WorkspacePaneTabsRestoreResult,
-): result is Extract<WorkspacePaneTabsRestoreResult, { kind: 'membership-conflict' }> {
-  return 'kind' in result && result.kind === 'membership-conflict'
 }
 
 export function workspaceRepoEntry(workspace: ServerWorkspaceState, repoRoot: string) {

@@ -274,15 +274,21 @@ test('workspace pane layout repository loads and applies normalized CAS outcomes
       tabs: [workspacePaneStaticTabEntry('history')],
     }],
   }
+  const historyTarget = history.entries[0]
+  if (!historyTarget) throw new Error('test layout target missing')
   await mod.addServerWorkspaceRepo(repoEntry)
 
   await expect(mod.serverWorkspacePaneLayoutRepository.load('/repo-a')).resolves.toEqual({ layout: empty })
-  await expect(mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
+  await mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
     repoRoot: '/repo-a',
     expected: empty,
     replacement: history,
+  })
+  await expect(mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndRepair({
+    repoRoot: '/repo-a',
+    validTargetKeys: [workspacePaneTabsTargetIdentityKey(historyTarget)],
     expectedRepoEntry: repoEntry,
-  })).resolves.toMatchObject({ kind: 'accepted', changed: true, snapshot: { layout: history } })
+  })).resolves.toMatchObject({ kind: 'accepted', changed: false, snapshot: { layout: history } })
   await expect(mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
     repoRoot: '/repo-a',
     expected: history,
@@ -295,12 +301,78 @@ test('workspace pane layout repository loads and applies normalized CAS outcomes
   })).resolves.toMatchObject({ kind: 'conflict', snapshot: { layout: history } })
 
   await mod.removeServerWorkspaceRepo('/repo-a')
-  await expect(mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
+  await expect(mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndRepair({
     repoRoot: '/repo-a',
-    expected: history,
-    replacement: empty,
+    validTargetKeys: [],
     expectedRepoEntry: repoEntry,
   })).resolves.toMatchObject({ kind: 'membership-conflict', snapshot: { layout: history } })
+})
+
+test('workspace pane layout repository does not disguise programming errors as persistence failures', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  const mod = await import('#/server/modules/settings-source.ts')
+  const programmingError = new Error('invalid repository callback state')
+  const replacement = Object.defineProperty({}, 'entries', {
+    get() {
+      throw programmingError
+    },
+  }) as WorkspacePaneDurableLayout
+
+  await expect(mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
+    repoRoot: '/repo-a',
+    expected: { entries: [] },
+    replacement,
+  })).rejects.toBe(programmingError)
+})
+
+test('workspace pane layout repository classifies settings write failures at the persistence boundary', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  const mod = await import('#/server/modules/settings-source.ts')
+  await mod.serverWorkspacePaneLayoutRepository.load('/repo-a')
+  const settingsFile = path.join(tmp, 'user-settings.json')
+  rmSync(settingsFile)
+  await mkdir(settingsFile)
+
+  await expect(mod.serverWorkspacePaneLayoutRepository.compareAndSwap({
+    repoRoot: '/repo-a',
+    expected: { entries: [] },
+    replacement: { entries: [{
+      repoRoot: '/repo-a',
+      branchName: 'main',
+      worktreePath: null,
+      tabs: [workspacePaneStaticTabEntry('history')],
+    }] },
+  })).resolves.toMatchObject({ kind: 'write-failure', error: { name: 'SettingsPersistenceWriteError' } })
+})
+
+test('workspace pane repair write failure reports the pre-write durable snapshot', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  const mod = await import('#/server/modules/settings-source.ts')
+  const repoEntry = { kind: 'local' as const, id: '/repo-a' }
+  const staleLayout = { entries: [{
+    repoRoot: '/repo-a', branchName: 'deleted', worktreePath: null, tabs: [workspacePaneStaticTabEntry('history')],
+  }] }
+  await mod.addServerWorkspaceRepo(repoEntry)
+  await writeWorkspacePaneLayout(mod, '/repo-a', staleLayout)
+  const settingsFile = path.join(tmp, 'user-settings.json')
+  rmSync(settingsFile)
+  await mkdir(settingsFile)
+
+  await expect(mod.serverWorkspacePaneLayoutRestoreTransaction.validateMembershipAndRepair({
+    repoRoot: '/repo-a',
+    expectedRepoEntry: repoEntry,
+    validTargetKeys: [],
+  })).resolves.toMatchObject({
+    kind: 'write-failure',
+    error: { name: 'SettingsPersistenceWriteError' },
+    snapshot: { layout: staleLayout },
+  })
 })
 
 test('updates repo-level worktree bootstrap trust by repo id', async () => {

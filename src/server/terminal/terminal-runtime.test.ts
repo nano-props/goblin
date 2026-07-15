@@ -218,6 +218,13 @@ function buildRuntime(): RuntimeHandle {
   const runtime = createServerTerminalRuntime({
     ptySupervisor: createInProcessPtySupervisor(),
     workspacePaneLayoutRepository: testWorkspacePaneLayoutRepository,
+    workspacePaneTargetProjection: {
+      captureTargets: async () => testWorkspacePaneLayout.entries.map(({ repoRoot, branchName, worktreePath }) => ({
+        repoRoot,
+        branchName,
+        worktreePath,
+      })),
+    },
   })
   REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, REPO_ROOT, 'client_a')
   SSH_REPO_RUNTIME_ID = acquireRepoRuntime(USER_1, 'ssh-config://prod/srv/repo', 'client_a')

@@ -75,7 +75,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
+      restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] } })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -175,9 +175,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     mocks.getServerWorkspaceState.mockResolvedValue(initial)
     mocks.compareAndReplaceServerWorkspaceRepos
       .mockResolvedValueOnce({ matched: true, workspace: initial })
-      .mockResolvedValueOnce({ matched: true, workspace: initial })
       .mockResolvedValueOnce({ matched: false, latestWorkspace: latest })
-      .mockResolvedValueOnce({ matched: true, workspace: latest })
       .mockResolvedValueOnce({ matched: true, workspace: latest })
       .mockResolvedValueOnce({ matched: true, workspace: latest })
     const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
@@ -226,7 +224,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({ revision: 5, entries: [] })),
+      restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 5, entries: [] } })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -263,7 +261,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       name: 'repo',
     }))
     const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
+      restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] } })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -300,7 +298,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
+      restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] } })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),
@@ -343,7 +341,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     const workspacePaneTabsHost = {
-      restoreTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
+      restoreTabs: vi.fn(async () => ({ kind: 'restored' as const, snapshot: { revision: 0, entries: [] } })),
       listWorkspaceTabs: vi.fn(),
       replaceTabs: vi.fn(async () => ({ revision: 1, entries: [] })),
       updateTabs: vi.fn(),

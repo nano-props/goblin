@@ -3,25 +3,31 @@
 import { describe, expect, test, vi } from 'vitest'
 import { WorkspacePaneLayoutAggregate } from '#/server/workspace-pane/workspace-pane-layout-aggregate.ts'
 import type { WorkspacePaneLayoutRepository } from '#/server/workspace-pane/workspace-pane-layout-repository.ts'
+import type { WorkspacePaneLayoutRestoreTransaction } from '#/server/workspace-pane/workspace-pane-layout-restore-transaction.ts'
 import { createWorkspacePaneTabsCoordinator } from '#/server/workspace-pane/workspace-pane-tabs-coordinator.ts'
 import { createPhysicalWorktreeOperationCoordinator } from '#/server/worktree-removal/physical-worktree-operation-coordinator.ts'
 import {
+  testPhysicalWorktreeCapability,
   testPhysicalWorktreeIdentity,
   testPhysicalWorktrees,
 } from '#/server/test-utils/physical-worktree-identity.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import type { WorkspacePaneDurableLayout } from '#/shared/workspace-pane-tabs.ts'
+import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 
 describe('workspace pane tabs coordinator queues', () => {
   test('serializes repository reads with a later durable command', async () => {
-    let layout: WorkspacePaneDurableLayout = { entries: [] }
+    let layout: WorkspacePaneDurableLayout = { entries: [{
+      repoRoot: '/repo', branchName: 'main', worktreePath: null, tabs: [workspacePaneStaticTabEntry('status')],
+    }] }
     let releaseFirstLoad!: () => void
     const firstLoad = new Promise<void>((resolve) => { releaseFirstLoad = resolve })
     let loadCount = 0
+    let blockLoad = false
     const repository: WorkspacePaneLayoutRepository = {
       async load() {
         loadCount += 1
-        if (loadCount === 1) await firstLoad
+        if (blockLoad && loadCount === 1) await firstLoad
         return { layout: structuredClone(layout) }
       },
       async compareAndSwap(input) {
@@ -32,11 +38,22 @@ describe('workspace pane tabs coordinator queues', () => {
         return { kind: 'accepted', changed: true, snapshot: { layout: structuredClone(layout) } }
       },
     }
+    const aggregate = aggregateFor(repository)
+    await aggregate.runExclusive('/repo', async (operation) => await operation.validateRepairAndSnapshot({
+      userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a',
+      validTargets: [{ repoRoot: '/repo', branchName: 'main', worktreePath: null }],
+      physicalTargets: [],
+      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      providerSnapshots: [],
+    }))
+    loadCount = 0
+    blockLoad = true
     const coordinator = createWorkspacePaneTabsCoordinator({
-      layoutAggregate: new WorkspacePaneLayoutAggregate({ repository }),
+      layoutAggregate: aggregate,
       runtimeProviders: [],
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
+      targetProjection: testTargetProjection([{ repoRoot: '/repo', branchName: 'main', worktreePath: null }]),
     })
     const input = {
       userId: 'user-a',
@@ -63,17 +80,20 @@ describe('workspace pane tabs coordinator queues', () => {
       entries: [{ tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')] }],
     })
     await expect(update).resolves.toMatchObject({
-      entries: [{ tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')] }],
+      snapshot: {
+        entries: [{ tabs: [workspacePaneStaticTabEntry('status'), workspacePaneStaticTabEntry('history')] }],
+      },
     })
   })
 
   test('registers restored worktree targets in the physical reverse index', async () => {
     const repository = memoryRepository()
     const coordinator = createWorkspacePaneTabsCoordinator({
-      layoutAggregate: new WorkspacePaneLayoutAggregate({ repository }),
+      layoutAggregate: aggregateFor(repository),
       runtimeProviders: [],
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
+      targetProjection: testTargetProjection([]),
     })
 
     await coordinator.restoreScope({
@@ -99,15 +119,23 @@ describe('workspace pane tabs coordinator queues', () => {
         return { layout: { entries: [] } }
       },
       async compareAndSwap() {
-        return { kind: 'membership-conflict', snapshot: { layout: { entries: [] } } }
+        return { kind: 'accepted', changed: false, snapshot: { layout: { entries: [] } } }
       },
     }
-    const aggregate = new WorkspacePaneLayoutAggregate({ repository })
+    const aggregate = new WorkspacePaneLayoutAggregate({
+      repository,
+      restoreTransaction: {
+        async validateMembershipAndRepair() {
+          return { kind: 'membership-conflict', snapshot: { layout: { entries: [] } } }
+        },
+      },
+    })
     const coordinator = createWorkspacePaneTabsCoordinator({
       layoutAggregate: aggregate,
       runtimeProviders: [],
       worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
       physicalWorktrees: testPhysicalWorktrees,
+      targetProjection: testTargetProjection([]),
     })
 
     await expect(coordinator.restoreScope({
@@ -119,14 +147,177 @@ describe('workspace pane tabs coordinator queues', () => {
       assertCurrent: () => {},
     })).resolves.toEqual({ kind: 'membership-conflict' })
 
-    expect(aggregate.overlay.activeEpochs('/repo')).toEqual([])
-    expect(aggregate.overlay.epochTargets({ userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a' })).toEqual([])
+    expect(aggregate.activeEpochs('/repo')).toEqual([])
     expect(coordinator.physicalWorktreeTargets(testPhysicalWorktreeIdentity('/repo/worktree'))).toEqual([])
+  })
+
+  test('does not validate or index restore targets while physical removal is admitted', async () => {
+    const operations = createPhysicalWorktreeOperationCoordinator()
+    const capability = testPhysicalWorktreeCapability('/repo/worktree', {
+      userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a',
+    })
+    let releaseRemoval!: () => void
+    const removalGate = new Promise<void>((resolve) => { releaseRemoval = resolve })
+    const removal = operations.runRemoval(capability, async () => {
+      await removalGate
+    })
+    await vi.waitFor(() => expect(operations.isRemovalAdmitted(capability)).toBe(true))
+    const aggregate = aggregateFor(memoryRepository())
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      layoutAggregate: aggregate,
+      runtimeProviders: [],
+      worktreeOperations: operations,
+      physicalWorktrees: { capture: async () => capability },
+      targetProjection: testTargetProjection([]),
+    })
+
+    await expect(coordinator.restoreScope({
+      userId: 'user-a',
+      repoRoot: '/repo',
+      scope: '/repo\0runtime-a',
+      targets: [{ repoRoot: '/repo', branchName: 'main', worktreePath: '/repo/worktree' }],
+      expectedRepoEntry: { kind: 'local', id: '/repo' },
+      assertCurrent: () => {},
+    })).rejects.toThrow('error.worktree-removal-in-progress')
+    expect(aggregate.activeEpochs('/repo')).toEqual([])
+    expect(coordinator.physicalWorktreeTargets(capability.identity)).toEqual([])
+
+    releaseRemoval()
+    await removal
+  })
+
+  test('does not reactivate a closed epoch while retiring durable layout', async () => {
+    const repository = memoryRepository({ entries: [{
+      repoRoot: '/repo', branchName: 'main', worktreePath: null, tabs: [workspacePaneStaticTabEntry('history')],
+    }] })
+    const aggregate = aggregateFor(repository)
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      layoutAggregate: aggregate,
+      runtimeProviders: [],
+      worktreeOperations: createPhysicalWorktreeOperationCoordinator(),
+      physicalWorktrees: testPhysicalWorktrees,
+      targetProjection: testTargetProjection([{ repoRoot: '/repo', branchName: 'main', worktreePath: null }]),
+    })
+    await coordinator.snapshot({ userId: 'user-a', repoRoot: '/repo', scope: '/repo\0runtime-a' })
+    await coordinator.closeScope({ userId: 'user-a', scope: '/repo\0runtime-a' })
+
+    await coordinator.retireTarget({
+      userId: 'user-a',
+      scope: '/repo\0runtime-a',
+      target: { kind: 'branch', repoRoot: '/repo', branchName: 'main' },
+    })
+
+    expect(aggregate.activeEpochs('/repo')).toEqual([])
+  })
+
+  test('holds physical admission through the final provider sample and snapshot', async () => {
+    const operations = createPhysicalWorktreeOperationCoordinator()
+    const capability = testPhysicalWorktreeCapability('/repo/worktree', {
+      userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a',
+    })
+    let releaseFinalSample!: () => void
+    const finalSampleGate = new Promise<void>((resolve) => { releaseFinalSample = resolve })
+    let captureCount = 0
+    let finalSampleStarted = false
+    const aggregate = aggregateFor(memoryRepository())
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      layoutAggregate: aggregate,
+      runtimeProviders: [{
+        type: 'terminal',
+        async captureSnapshotForUser() {
+          captureCount += 1
+          if (captureCount === 2) {
+            finalSampleStarted = true
+            await finalSampleGate
+          }
+          return {
+            revision: captureCount,
+            liveSessions: [{ sessionId: 'term-physicalphysicalphy1', branch: 'main', worktreePath: '/repo/worktree' }],
+          }
+        },
+      }],
+      worktreeOperations: operations,
+      physicalWorktrees: { capture: async () => capability },
+      targetProjection: testTargetProjection([]),
+    })
+    const list = coordinator.listWorkspaceTabs({
+      userId: 'user-a', repoRoot: '/repo', scope: '/repo\0runtime-a', assertCurrent: () => {},
+    })
+    await vi.waitFor(() => expect(finalSampleStarted).toBe(true))
+    let removalTaskStarted = false
+    const removal = operations.runRemoval(capability, async () => {
+      removalTaskStarted = true
+    })
+    await Promise.resolve()
+    expect(removalTaskStarted).toBe(false)
+
+    releaseFinalSample()
+    await expect(list).resolves.toMatchObject({ entries: [{ worktreePath: '/repo/worktree' }] })
+    await expect(removal).resolves.toMatchObject({ admitted: true })
+    expect(removalTaskStarted).toBe(true)
+  })
+
+  test('retries admission when the authoritative provider sample adds a physical worktree', async () => {
+    const operations = createPhysicalWorktreeOperationCoordinator()
+    const capabilityA = testPhysicalWorktreeCapability('/repo/worktree-a', {
+      userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a',
+    })
+    const capabilityC = testPhysicalWorktreeCapability('/repo/worktree-c', {
+      userId: 'user-a', repoRoot: '/repo', repoRuntimeId: 'runtime-a',
+    })
+    let releaseStableSample!: () => void
+    const stableSampleGate = new Promise<void>((resolve) => { releaseStableSample = resolve })
+    let captureCount = 0
+    let stableSampleStarted = false
+    const coordinator = createWorkspacePaneTabsCoordinator({
+      layoutAggregate: aggregateFor(memoryRepository()),
+      runtimeProviders: [{
+        type: 'terminal',
+        async captureSnapshotForUser() {
+          captureCount += 1
+          if (captureCount === 3) {
+            stableSampleStarted = true
+            await stableSampleGate
+          }
+          return {
+            revision: captureCount,
+            liveSessions: [
+              { sessionId: 'term-worktreeaaaaaaaaa1', branch: 'a', worktreePath: '/repo/worktree-a' },
+              ...(captureCount >= 2
+                ? [{ sessionId: 'term-worktreeccccccccc1', branch: 'c', worktreePath: '/repo/worktree-c' }]
+                : []),
+            ],
+          }
+        },
+      }],
+      worktreeOperations: operations,
+      physicalWorktrees: {
+        capture: async ({ worktreePath }) => worktreePath === '/repo/worktree-a' ? capabilityA : capabilityC,
+      },
+      targetProjection: testTargetProjection([]),
+    })
+
+    const list = coordinator.listWorkspaceTabs({
+      userId: 'user-a', repoRoot: '/repo', scope: '/repo\0runtime-a', assertCurrent: () => {},
+    })
+    await vi.waitFor(() => expect(stableSampleStarted).toBe(true))
+    let removalStarted = false
+    const removal = operations.runRemoval(capabilityC, async () => { removalStarted = true })
+    await Promise.resolve()
+    expect(removalStarted).toBe(false)
+
+    releaseStableSample()
+    await expect(list).resolves.toMatchObject({
+      entries: [{ worktreePath: '/repo/worktree-a' }, { worktreePath: '/repo/worktree-c' }],
+    })
+    await removal
+    expect(removalStarted).toBe(true)
+    expect(captureCount).toBe(3)
   })
 })
 
-function memoryRepository(): WorkspacePaneLayoutRepository {
-  let layout: WorkspacePaneDurableLayout = { entries: [] }
+function memoryRepository(initial: WorkspacePaneDurableLayout = { entries: [] }): WorkspacePaneLayoutRepository {
+  let layout: WorkspacePaneDurableLayout = initial
   return {
     async load() {
       return { layout: structuredClone(layout) }
@@ -137,4 +328,30 @@ function memoryRepository(): WorkspacePaneLayoutRepository {
       return { kind: 'accepted', changed, snapshot: { layout: structuredClone(layout) } }
     },
   }
+}
+
+function aggregateFor(
+  repository: WorkspacePaneLayoutRepository,
+  restoreTransaction: WorkspacePaneLayoutRestoreTransaction = {
+    async validateMembershipAndRepair(input) {
+      const current = await repository.load(input.repoRoot)
+      const outcome = await repository.compareAndSwap({
+        repoRoot: input.repoRoot,
+        expected: current.layout,
+        replacement: { entries: current.layout.entries.filter((entry) =>
+          input.validTargetKeys.includes(workspacePaneTabsTargetIdentityKey(entry))) },
+      })
+      if (outcome.kind === 'write-failure') return { ...outcome, snapshot: current }
+      if (outcome.kind !== 'accepted') throw new Error('test repair transaction failed')
+      return outcome
+    },
+  },
+): WorkspacePaneLayoutAggregate {
+  return new WorkspacePaneLayoutAggregate({ repository, restoreTransaction })
+}
+
+function testTargetProjection(
+  targets: readonly { repoRoot: string; branchName: string; worktreePath: string | null }[],
+) {
+  return { captureTargets: async () => targets }
 }
