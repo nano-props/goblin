@@ -91,6 +91,17 @@ publishes the resulting canonical geometry.
 
 ## Target server session shape
 
+`TerminalDirectory` is the sole live membership authority. It owns runtime and
+durable identity indexes, immutable target facts, physical-worktree capability,
+scope membership, and a membership-only catalog clock. Pending creation is not
+Directory state. Runtime objects continue to own mutable controller, lifecycle,
+title, process, geometry, generation, and render state.
+
+Workspace runtime tabs are a pure projection of static layout, ordered epoch
+overlay hints, and Directory membership. Closing durably retires the PTY before
+removing Directory membership; the hidden placement hint is reclaimed later
+with its Workspace target or epoch.
+
 At a high level, the server-side session model should evolve toward:
 
 - session identity and scope

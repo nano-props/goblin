@@ -15,7 +15,6 @@ import type {
   TerminalSessionsSnapshot,
   TerminalTitleEvent,
 } from '#/shared/terminal-types.ts'
-import { branchForTerminalWorktree } from '#/web/components/terminal/terminal-repo-index.ts'
 import {
   projectCreateResultForClient,
   projectServerTerminalSession,
@@ -242,7 +241,6 @@ export class TerminalSessionProjection {
     }
     this.repoIndex = repoIndex
     this.pruneSessionsMissingFromRepoIndex()
-    this.syncDescriptorsFromRepoIndex()
   }
 
   /**
@@ -1464,21 +1462,6 @@ export class TerminalSessionProjection {
     const terminalWorktreeKey = formatTerminalWorktreeKey(base.repoRoot, base.worktreePath)
     if (!session || session.descriptor.terminalWorktreeKey !== terminalWorktreeKey) return
     this.removeSession(terminalSessionId, { dispose: true, closeSession: false, preserveFutureExits })
-  }
-
-  private syncDescriptorsFromRepoIndex(): void {
-    const changedWorktrees = new Set<string>()
-    for (const session of this.sessions.values()) {
-      const branch = branchForTerminalWorktree(
-        this.repoIndex,
-        session.descriptor.repoRoot,
-        session.descriptor.worktreePath,
-      )
-      if (!branch || branch === session.descriptor.branch) continue
-      session.updateDescriptor({ ...session.descriptor, branch })
-      changedWorktrees.add(session.descriptor.terminalWorktreeKey)
-    }
-    for (const terminalWorktreeKey of changedWorktrees) this.notifyWorktree(terminalWorktreeKey)
   }
 
   private pruneSessionsMissingFromRepoIndex(): void {
