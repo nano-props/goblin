@@ -107,7 +107,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       {
         repoRoot: '/repo-active',
         repoRuntimeId: 'runtime-_repo_active',
-        snapshot: { revision: 0, entries: [] }, repaired: false,
+        snapshot: { revision: 0, entries: [] },
       },
     ])
   })
