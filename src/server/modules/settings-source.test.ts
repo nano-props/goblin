@@ -1,6 +1,6 @@
 import { afterEach, expect, test, vi } from 'vitest'
 import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs'
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
@@ -127,6 +127,17 @@ test('quarantines corrupt settings JSON before rebuilding defaults', async () =>
     fetchIntervalSec: 120,
   })
   expect(readdirSync(tmp).some((name) => name.startsWith('user-settings.json.corrupt-'))).toBe(true)
+})
+
+test('fails fast when the settings file cannot be read', async () => {
+  tmp = mkdtempSync(path.join(os.tmpdir(), 'goblin-server-settings-'))
+  previousDataDir = process.env.GOBLIN_SERVER_DATA_DIR
+  process.env.GOBLIN_SERVER_DATA_DIR = tmp
+  await mkdir(path.join(tmp, 'user-settings.json'))
+
+  const mod = await import('#/server/modules/settings-source.ts')
+  await expect(mod.getServerWorkspaceState()).rejects.toMatchObject({ code: 'EISDIR' })
+  expect(readdirSync(tmp)).toEqual(['user-settings.json'])
 })
 
 test('serializes concurrent settings mutations without dropping updates', async () => {
