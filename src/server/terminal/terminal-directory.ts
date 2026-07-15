@@ -1,0 +1,77 @@
+export interface TerminalDirectoryEntry<TUser extends string | number> {
+  id: string
+  userId: TUser
+  scope: string
+  terminalSessionId: string
+}
+
+export class TerminalDirectory<
+  TUser extends string | number,
+  TEntry extends TerminalDirectoryEntry<TUser>,
+> {
+  private readonly entriesByRuntimeId = new Map<string, TEntry>()
+  private readonly runtimeIdByUserSession = new Map<string, string>()
+  private readonly catalogRevisionByScope = new Map<string, number>()
+
+  publish(entry: TEntry): boolean {
+    if (this.entriesByRuntimeId.has(entry.id)) return false
+    const durableKey = this.userSessionKey(entry.userId, entry.terminalSessionId)
+    if (this.runtimeIdByUserSession.has(durableKey)) return false
+    this.entriesByRuntimeId.set(entry.id, entry)
+    this.runtimeIdByUserSession.set(durableKey, entry.id)
+    this.advanceCatalogRevision(entry.userId, entry.scope)
+    return true
+  }
+
+  get(runtimeId: string): TEntry | undefined {
+    return this.entriesByRuntimeId.get(runtimeId)
+  }
+
+  getByDurableId(userId: TUser, terminalSessionId: string): TEntry | undefined {
+    const runtimeId = this.runtimeIdByUserSession.get(this.userSessionKey(userId, terminalSessionId))
+    return runtimeId ? this.entriesByRuntimeId.get(runtimeId) : undefined
+  }
+
+  remove(entry: TEntry): boolean {
+    if (this.entriesByRuntimeId.get(entry.id) !== entry) return false
+    this.entriesByRuntimeId.delete(entry.id)
+    const durableKey = this.userSessionKey(entry.userId, entry.terminalSessionId)
+    if (this.runtimeIdByUserSession.get(durableKey) === entry.id) this.runtimeIdByUserSession.delete(durableKey)
+    this.advanceCatalogRevision(entry.userId, entry.scope)
+    return true
+  }
+
+  entries(): IterableIterator<TEntry> {
+    return this.entriesByRuntimeId.values()
+  }
+
+  entriesForScope(userId: TUser, scope: string): TEntry[] {
+    return Array.from(this.entriesByRuntimeId.values()).filter(
+      (entry) => entry.userId === userId && entry.scope === scope,
+    )
+  }
+
+  catalogRevision(userId: TUser, scope: string): number {
+    return this.catalogRevisionByScope.get(this.scopeKey(userId, scope)) ?? 0
+  }
+
+  releaseScope(userId: TUser, scope: string): void {
+    if (this.entriesForScope(userId, scope).length > 0) {
+      throw new Error('cannot release terminal catalog revision with live sessions')
+    }
+    this.catalogRevisionByScope.delete(this.scopeKey(userId, scope))
+  }
+
+  private advanceCatalogRevision(userId: TUser, scope: string): void {
+    const key = this.scopeKey(userId, scope)
+    this.catalogRevisionByScope.set(key, (this.catalogRevisionByScope.get(key) ?? 0) + 1)
+  }
+
+  private userSessionKey(userId: TUser, terminalSessionId: string): string {
+    return `${String(userId)}\0${terminalSessionId}`
+  }
+
+  private scopeKey(userId: TUser, scope: string): string {
+    return `${String(userId)}\0${scope}`
+  }
+}
