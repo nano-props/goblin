@@ -161,4 +161,47 @@ describe('terminal write failure feedback', () => {
     expect(mocks.warning).toHaveBeenCalledTimes(1)
     expect(mocks.warning).toHaveBeenCalledWith('terminal.write-delivery-uncertain')
   })
+
+  test('reports an in-flight uncertain write before later not-sent writes from the same outage', async () => {
+    let requestSequence = 0
+    const connection = createClientRealtimeSocketConnection<
+      { write: { data: string } },
+      { write: { status: 'accepted' } },
+      { type: 'pong'; requestId: string },
+      never
+    >({
+      resolveConnection: () => ({ url: 'ws://example.test/ws/app', clientId: 'client_test' }),
+      hasRealtimeSubscribers: () => true,
+      onRealtimeMessage: () => {},
+      parseServerMessage: (data) => JSON.parse(String(data)) as { type: 'pong'; requestId: string },
+      encodeClientMessage: JSON.stringify,
+      createRequestId: () => `request_${++requestSequence}`,
+      errorPrefix: 'App realtime',
+    })
+    connection.openForRealtime()
+    const firstSocket = wsMock.instances[0]
+    if (!firstSocket) throw new Error('missing socket')
+    firstSocket.emitOpen()
+    const reporter = createTerminalWriteFailureReporter()
+    const inFlight = connection.request('write', { data: 'a' }).catch((error: unknown) => {
+      reporter.report({
+        terminalRuntimeSessionId: 'pty_session_first_123456',
+        failure: { kind: 'error', error },
+      })
+    })
+    await Promise.resolve()
+
+    firstSocket.emitError()
+    const notSent = connection.request('write', { data: 'b' }).catch((error: unknown) => {
+      reporter.report({
+        terminalRuntimeSessionId: 'pty_session_second_123456',
+        failure: { kind: 'error', error },
+      })
+    })
+    wsMock.instances[1]?.close()
+    await Promise.all([inFlight, notSent])
+
+    expect(mocks.warning).toHaveBeenCalledTimes(1)
+    expect(mocks.warning).toHaveBeenCalledWith('terminal.write-delivery-uncertain')
+  })
 })

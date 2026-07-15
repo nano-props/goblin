@@ -40,7 +40,13 @@ type RealtimePongMessage = { type: 'pong'; requestId: string }
 type SocketDemandIntent = 'open-now' | 'reconnect' | 'idle'
 
 export type ClientRealtimeRequestFailureKind =
-  'unavailable' | 'open-failed' | 'send-failed' | 'disconnected' | 'timeout' | 'app-quitting'
+  | 'unavailable'
+  | 'open-timeout'
+  | 'open-failed'
+  | 'send-failed'
+  | 'disconnected'
+  | 'timeout'
+  | 'app-quitting'
 
 export class ClientRealtimeRequestError extends Error {
   readonly kind: ClientRealtimeRequestFailureKind
@@ -448,7 +454,7 @@ export function createClientRealtimeSocketConnection<
         settle(() => {
           if (socketLifecycle.active() === current)
             socketLifecycle.disconnect(`${socketLabel} open timed out`, currentSocket)
-          reject(openSocketError(`${socketLabel} open timed out`))
+          reject(openSocketError(`${socketLabel} open timed out`, 'open-timeout'))
         })
       }, REALTIME_SOCKET_OPEN_TIMEOUT_MS)
       const settle = (fn: () => void) => {
@@ -488,9 +494,12 @@ export function createClientRealtimeSocketConnection<
     })
   }
 
-  function openSocketError(message: string): ClientRealtimeRequestError {
+  function openSocketError(
+    message: string,
+    kind: Extract<ClientRealtimeRequestFailureKind, 'open-timeout' | 'open-failed'> = 'open-failed',
+  ): ClientRealtimeRequestError {
     return new ClientRealtimeRequestError(message, {
-      kind: 'open-failed',
+      kind,
       delivery: 'not-sent',
       outageId: beginOutage(),
     })

@@ -1,10 +1,12 @@
 import { toast } from 'sonner'
+import { ClientRealtimeRequestError } from '#/web/realtime/client-realtime-socket-connection.ts'
 
 export type TerminalCreateTranslator = (key: string) => string
 
 const SERVER_ERROR_KEY_PATTERN = /^error\.[a-z0-9.-]+$/
 
 export function terminalCreateErrorKey(error: unknown): string {
+  if (error instanceof ClientRealtimeRequestError) return terminalCreateRealtimeErrorKey(error)
   const message = terminalCreateErrorMessage(error)
   if (SERVER_ERROR_KEY_PATTERN.test(message)) return message
   if (message === 'Terminal socket open timed out' || message === 'App realtime socket open timed out') {
@@ -16,6 +18,13 @@ export function terminalCreateErrorKey(error: unknown): string {
   if (isTerminalConnectionFailure(message)) return 'error.terminal-connection-unavailable'
   if (isTerminalHostGeometryFailure(message)) return 'error.terminal-host-not-measurable'
   return 'error.terminal-create-failed'
+}
+
+function terminalCreateRealtimeErrorKey(error: ClientRealtimeRequestError): string {
+  if (error.kind === 'open-timeout') return 'error.terminal-connection-timeout'
+  if (error.kind === 'timeout') return 'error.terminal-create-timeout'
+  if (error.kind === 'app-quitting') return 'error.terminal-create-failed'
+  return 'error.terminal-connection-unavailable'
 }
 
 export function showTerminalCreateErrorToast(error: unknown, t: TerminalCreateTranslator): string {
