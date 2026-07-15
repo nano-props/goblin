@@ -4,6 +4,7 @@ import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ServerWorkspaceState } from '#/shared/api-types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
 
 const mocks = vi.hoisted(() => ({
   acquireRepoRuntimeLease: vi.fn(),
@@ -133,12 +134,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       .mockResolvedValueOnce({ matched: false, latestWorkspace: latest })
       .mockResolvedValueOnce({ matched: true, workspace: latest })
       .mockResolvedValueOnce({ matched: true, workspace: latest })
-    const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
@@ -164,12 +160,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       .mockResolvedValueOnce({ matched: false, latestWorkspace: latest })
       .mockResolvedValueOnce({ matched: true, workspace: latest })
       .mockResolvedValueOnce({ matched: true, workspace: latest })
-    const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
@@ -201,12 +192,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       .mockResolvedValueOnce({ matched: true, workspace: latest })
       .mockResolvedValueOnce({ matched: true, workspace: latest })
       .mockResolvedValueOnce({ matched: true, workspace: latest })
-    const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
@@ -227,12 +213,7 @@ describe('restoreServerWorkspace — active-only restore', () => {
       matched: false,
       latestWorkspace: workspace,
     })
-    const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     await expect(

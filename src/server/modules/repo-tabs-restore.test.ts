@@ -4,6 +4,7 @@ import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ServerWorkspaceState } from '#/shared/api-types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
 
 const mocks = vi.hoisted(() => ({
   acquireRepoRuntimeLease: vi.fn(),
@@ -179,12 +180,7 @@ describe('restoreRepoTabsForRepo', () => {
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
     mocks.isCurrentRepoRuntimeMembership.mockReturnValue(false)
-    const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     await expect(
@@ -205,12 +201,7 @@ describe('restoreRepoTabsForRepo', () => {
       openRepoEntries: [{ kind: 'local', id: '/other' }],
     }
     mocks.getServerWorkspaceState.mockResolvedValue(workspace)
-    const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     await expect(
@@ -234,12 +225,7 @@ describe('restoreRepoTabsForRepo', () => {
       matched: false,
       latestWorkspace: defaultServerWorkspaceState(),
     })
-    const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     await expect(
@@ -262,12 +248,7 @@ describe('restoreRepoTabsForRepo', () => {
       .mockResolvedValueOnce({ matched: true, workspace })
       .mockResolvedValueOnce({ matched: true, workspace })
       .mockResolvedValueOnce({ matched: false, latestWorkspace: defaultServerWorkspaceState() })
-    const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     await expect(
@@ -301,12 +282,7 @@ describe('restoreRepoTabsForRepo', () => {
       cleared: false,
       latestWorkspace: defaultServerWorkspaceState(),
     })
-    const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     await expect(
@@ -327,12 +303,7 @@ describe('restoreRepoTabsForRepo', () => {
       openRepoEntries: [{ kind: 'local', id: '/repo' }],
     })
     mocks.readRepoProjection.mockResolvedValue({ snapshot: null })
-    const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     await expect(
@@ -363,12 +334,7 @@ describe('restoreRepoTabsForRepo', () => {
       lifecycle: { kind: 'failed', reason: 'unreachable' },
       name: 'repo',
     })
-    const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     await expect(
@@ -394,12 +360,7 @@ describe('restoreRepoTabsForRepo', () => {
       .mockReturnValueOnce(true)
       .mockReturnValueOnce(true)
       .mockReturnValueOnce(false)
-    const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     await expect(

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { defaultServerWorkspaceState } from '#/shared/settings-defaults.ts'
+import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
 import {
   acquireRepoRuntimeLease,
   clearRepoRuntimesForUser,
@@ -59,12 +60,7 @@ describe('session restore runtime ownership', () => {
   test('preserves the existing stub membership when lazy projection fails', async () => {
     const lease = acquireRepoRuntimeLease(USER_ID, REPO_ROOT, CLIENT_ID)
     expect(isCurrentRepoRuntimeMembership(USER_ID, REPO_ROOT, lease.repoRuntimeId, CLIENT_ID)).toBe(true)
-    const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreRepoTabsForRepo } = await import('#/server/modules/repo-workspace-tabs-restore.ts')
     await expect(

@@ -4,6 +4,7 @@ import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
 import { workspacePaneTabsTargetIdentityKey } from '#/shared/workspace-pane-tabs-target.ts'
 import type { ServerWorkspaceState } from '#/shared/api-types.ts'
 import type { RepoSessionEntry } from '#/shared/remote-repo.ts'
+import { createTestWorkspacePaneTabsHost } from '#/server/test-utils/workspace-pane-tabs-host.ts'
 
 const mocks = vi.hoisted(() => ({
   acquireRepoRuntimeLease: vi.fn(),
@@ -241,12 +242,7 @@ describe('restoreServerWorkspace', () => {
       openRepoEntries: [entry],
     })
     mocks.probeRepo.mockResolvedValue({ ok: false, message: 'error.path-permission-denied' })
-    const workspacePaneTabsHost = {
-      initializeTabs: vi.fn(async () => ({ revision: 0, entries: [] })),
-      listWorkspaceTabs: vi.fn(),
-      replaceTabs: vi.fn(),
-      updateTabs: vi.fn(),
-    }
+    const workspacePaneTabsHost = createTestWorkspacePaneTabsHost()
 
     const { restoreServerWorkspace } = await import('#/server/modules/session-restore.ts')
     const result = await restoreServerWorkspace({
