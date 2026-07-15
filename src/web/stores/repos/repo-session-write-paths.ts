@@ -436,19 +436,19 @@ function removeRepoFromSessionState(s: ReposStore, id: string): Partial<ReposSto
   }
   const order = s.order.filter((x) => x !== id)
   const restoredRepoId = nextRestoredRepoIdAfterWorkspaceClose(s.order, s.restoredRepoId, id)
-  const restoredSessionBaseline = s.restoredSessionBaseline
+  const restoredClientWorkspaceBaseline = s.restoredClientWorkspaceBaseline
     ? {
-        ...s.restoredSessionBaseline,
+        ...s.restoredClientWorkspaceBaseline,
         preferredWorkspacePaneTabByTargetByRepo: recordWithoutKey(
-          s.restoredSessionBaseline.preferredWorkspacePaneTabByTargetByRepo,
+          s.restoredClientWorkspaceBaseline.preferredWorkspacePaneTabByTargetByRepo,
           id,
         ),
         filetreeViewStateByWorktreeByRepo: recordWithoutKey(
-          s.restoredSessionBaseline.filetreeViewStateByWorktreeByRepo,
+          s.restoredClientWorkspaceBaseline.filetreeViewStateByWorktreeByRepo,
           id,
         ),
         selectedTerminalSessionIdByTerminalWorktree: Object.fromEntries(
-          Object.entries(s.restoredSessionBaseline.selectedTerminalSessionIdByTerminalWorktree).filter(
+          Object.entries(s.restoredClientWorkspaceBaseline.selectedTerminalSessionIdByTerminalWorktree).filter(
             ([key]) => !key.startsWith(`${id}\0`),
           ),
         ),
@@ -461,7 +461,7 @@ function removeRepoFromSessionState(s: ReposStore, id: string): Partial<ReposSto
     navigationHistoryByRepo,
     order,
     restoredRepoId,
-    restoredSessionBaseline,
+    restoredClientWorkspaceBaseline,
   }
 }
 

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test } from 'vitest'
 import { localRepoSessionEntry } from '#/shared/remote-repo.ts'
 import {
-  restoreRestorableWorkspaceStateFromSession,
-  workspaceSessionStateFromRestorableWorkspaceState,
+  restoreRestorableWorkspaceStateFromClientWorkspace,
+  clientWorkspaceStateFromRestorableWorkspaceState,
 } from '#/web/restorable-workspace-state.ts'
 import { createRepoBranch, resetReposStore, seedRepoWithReadModelForTest } from '#/web/test-utils/bridge.ts'
 import { workspacePaneStaticTabEntry } from '#/shared/workspace-pane.ts'
@@ -27,7 +27,7 @@ describe('restorable-workspace-state', () => {
     })
 
     expect(
-      workspaceSessionStateFromRestorableWorkspaceState({
+      clientWorkspaceStateFromRestorableWorkspaceState({
         repos: { [repo.id]: repo },
         restorableWorkspaceState: {
           order: [repo.id],
@@ -55,7 +55,7 @@ describe('restorable-workspace-state', () => {
     const repo = emptyRepo('/tmp/repo-without-query-model', 'repo-without-query-model', 'repo-runtime-without-query')
 
     expect(
-      workspaceSessionStateFromRestorableWorkspaceState({
+      clientWorkspaceStateFromRestorableWorkspaceState({
         repos: { [repo.id]: repo },
         restorableWorkspaceState: {
           order: [repo.id],
@@ -94,7 +94,7 @@ describe('restorable-workspace-state', () => {
     }
 
     expect(
-      workspaceSessionStateFromRestorableWorkspaceState({
+      clientWorkspaceStateFromRestorableWorkspaceState({
         repos: { [activeRepo.id]: activeRepo, [stubRepo.id]: stubRepo },
         restorableWorkspaceState: {
           order: [activeRepo.id, stubRepo.id],
@@ -106,7 +106,7 @@ describe('restorable-workspace-state', () => {
             '/tmp/repo-b\0/tmp/stub-worktree': 'term-stub00000000000000',
           },
         },
-        restoredSessionBaseline: {
+        restoredClientWorkspaceBaseline: {
           restoredRepoId: activeRepo.id,
           zenMode: false,
           workspacePaneSize: 55,
@@ -164,7 +164,7 @@ describe('restorable-workspace-state', () => {
     })
 
     expect(
-      workspaceSessionStateFromRestorableWorkspaceState({
+      clientWorkspaceStateFromRestorableWorkspaceState({
         repos: { [repo.id]: repo },
         restorableWorkspaceState: {
           order: [repo.id],
@@ -192,7 +192,7 @@ describe('restorable-workspace-state', () => {
     })
 
     expect(
-      workspaceSessionStateFromRestorableWorkspaceState({
+      clientWorkspaceStateFromRestorableWorkspaceState({
         repos: { [repo.id]: repo },
         restorableWorkspaceState: {
           order: [repo.id],
@@ -220,7 +220,7 @@ describe('restorable-workspace-state', () => {
     })
 
     expect(
-      workspaceSessionStateFromRestorableWorkspaceState({
+      clientWorkspaceStateFromRestorableWorkspaceState({
         repos: { [repo.id]: repo },
         restorableWorkspaceState: {
           order: [repo.id],
@@ -237,7 +237,7 @@ describe('restorable-workspace-state', () => {
 
   test('restores restorable workspace state from ClientWorkspaceState', () => {
     expect(
-      restoreRestorableWorkspaceStateFromSession({
+      restoreRestorableWorkspaceStateFromClientWorkspace({
         restoredRepoId: '/tmp/repo',
         zenMode: false,
         workspacePaneSize: 40,
@@ -271,7 +271,7 @@ describe('restorable-workspace-state', () => {
     })
 
     expect(
-      workspaceSessionStateFromRestorableWorkspaceState({
+      clientWorkspaceStateFromRestorableWorkspaceState({
         repos: { [repo.id]: repo },
         restorableWorkspaceState: {
           order: [repo.id],
@@ -298,7 +298,7 @@ describe('restorable-workspace-state', () => {
       },
     })
 
-    const sessionState = workspaceSessionStateFromRestorableWorkspaceState({
+    const sessionState = clientWorkspaceStateFromRestorableWorkspaceState({
       repos: { [repo.id]: repo },
       restorableWorkspaceState: {
         order: [repo.id],
@@ -308,7 +308,7 @@ describe('restorable-workspace-state', () => {
         selectedTerminalSessionIdByTerminalWorktree: {},
       },
     })
-    const restored = restoreRestorableWorkspaceStateFromSession(sessionState)
+    const restored = restoreRestorableWorkspaceStateFromClientWorkspace(sessionState)
     expect(restored.preferredWorkspacePaneTabByTargetByRepo).toEqual({
       '/tmp/repo': { [targetKey]: 'files' },
     })
@@ -322,7 +322,7 @@ describe('restorable-workspace-state', () => {
     })
 
     expect(
-      workspaceSessionStateFromRestorableWorkspaceState({
+      clientWorkspaceStateFromRestorableWorkspaceState({
         repos: { [repo.id]: repo },
         restorableWorkspaceState: {
           order: [repo.id],

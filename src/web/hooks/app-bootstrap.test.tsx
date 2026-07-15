@@ -50,7 +50,7 @@ vi.mock('#/web/client-workspace-state.ts', () => ({
 
 const mockedGetExternalAppsSnapshot = vi.mocked(getExternalAppsSnapshot)
 const mockedGetSettingsSnapshot = vi.mocked(getSettingsSnapshot)
-const mockedRestorePersistedWorkspaceSession = vi.mocked(restoreWorkspaceAtBoot)
+const mockedRestoreWorkspaceAtBoot = vi.mocked(restoreWorkspaceAtBoot)
 const mockedReadClientWorkspaceState = vi.mocked(readClientWorkspaceState)
 
 beforeEach(() => {
@@ -64,7 +64,7 @@ beforeEach(() => {
   mockedGetSettingsSnapshot.mockReset()
   const settings = defaultSettingsSnapshot()
   mockedGetSettingsSnapshot.mockResolvedValue(settings)
-  mockedRestorePersistedWorkspaceSession.mockReset()
+  mockedRestoreWorkspaceAtBoot.mockReset()
   mockServerRestore(defaultWorkspaceRestoreFixture())
 })
 
@@ -147,7 +147,7 @@ describe('app bootstrap hooks', () => {
       restoredRuntimeForWorkspace(session.serverWorkspace, session.clientWorkspace.restoredRepoId),
       {
         signal: expect.any(AbortSignal),
-        restoredSession: session.clientWorkspace,
+        restoredClientWorkspace: session.clientWorkspace,
       },
     )
     expect(hydrateTheme).toHaveBeenCalledWith(settings)
@@ -162,7 +162,7 @@ describe('app bootstrap hooks', () => {
     renderInJsdom(<Harness activeRepoRoot="/tmp/routed-repo" />)
 
     await vi.waitFor(() => {
-      expect(mockedRestorePersistedWorkspaceSession).toHaveBeenCalledWith(
+      expect(mockedRestoreWorkspaceAtBoot).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
           activeRepoRoot: '/tmp/routed-repo',
@@ -204,7 +204,7 @@ describe('app bootstrap hooks', () => {
       restoredRuntimeForWorkspace(session.serverWorkspace, session.clientWorkspace.restoredRepoId),
       {
         signal: expect.any(AbortSignal),
-        restoredSession: session.clientWorkspace,
+        restoredClientWorkspace: session.clientWorkspace,
       },
     )
     expect(useReposStore.getState().workspacePaneSize).toBe(55)
@@ -212,7 +212,7 @@ describe('app bootstrap hooks', () => {
     expect(mockedGetSettingsSnapshot).toHaveBeenCalledTimes(1)
   })
 
-  test('blocks persistence when server session restore fails', async () => {
+  test('blocks persistence when server workspace restore fails', async () => {
     const session = workspaceRestoreFixture(
       {
         openRepoEntries: [{ kind: 'local' as const, id: '/tmp/repo' }],
@@ -227,7 +227,7 @@ describe('app bootstrap hooks', () => {
       },
     )
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
-    mockedRestorePersistedWorkspaceSession.mockRejectedValue(new Error('server session restore failed'))
+    mockedRestoreWorkspaceAtBoot.mockRejectedValue(new Error('server workspace restore failed'))
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
@@ -237,12 +237,12 @@ describe('app bootstrap hooks', () => {
 
     renderInJsdom(<Harness />)
     await vi.waitFor(() => {
-      expect(useReposStore.getState().sessionRestoreError).toBe('server session restore failed')
+      expect(useReposStore.getState().sessionRestoreError).toBe('server workspace restore failed')
     })
 
     expect(useReposStore.getState().workspaceMembershipReady).toBe(false)
     expect(useReposStore.getState().sessionPersistenceReady).toBe(false)
-    expect(useReposStore.getState().sessionRestoreError).toBe('server session restore failed')
+    expect(useReposStore.getState().sessionRestoreError).toBe('server workspace restore failed')
     expect(hydrateRestoredRuntime).not.toHaveBeenCalled()
   })
 
@@ -269,7 +269,7 @@ describe('app bootstrap hooks', () => {
       preferredWorkspacePaneTabByTargetByRepo: {},
     })
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
-    mockedRestorePersistedWorkspaceSession.mockResolvedValue({
+    mockedRestoreWorkspaceAtBoot.mockResolvedValue({
       status: 'repaired',
       openRepoEntries: rebuiltSession.serverWorkspace.openRepoEntries,
       runtime: restoredRuntimeForWorkspace(
@@ -294,7 +294,7 @@ describe('app bootstrap hooks', () => {
       restoredRuntimeForWorkspace(rebuiltSession.serverWorkspace, rebuiltSession.clientWorkspace.restoredRepoId),
       {
         signal: expect.any(AbortSignal),
-        restoredSession: rebuiltSession.clientWorkspace,
+        restoredClientWorkspace: rebuiltSession.clientWorkspace,
       },
     )
     expect(primaryWindowQueryClient.getQueryData(settingsSnapshotQueryKey())).not.toHaveProperty('session')
@@ -383,14 +383,14 @@ describe('app bootstrap hooks', () => {
     expect(useReposStore.getState().sessionRestoreError).toBe('authenticated workspace restore timed out after 30000ms')
   })
 
-  test('reports timeout when server session restore does not return after abort', async () => {
+  test('reports timeout when server workspace restore does not return after abort', async () => {
     vi.useFakeTimers()
     mockedGetSettingsSnapshot.mockResolvedValue(defaultSettingsSnapshot())
     vi.spyOn(useThemeStore.getState(), 'hydrateFromSettingsSnapshot').mockResolvedValue(undefined)
     vi.spyOn(useI18nStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useHostInfoStore.getState(), 'hydrate').mockResolvedValue(undefined)
     vi.spyOn(useReposStore.getState(), 'hydrateRestoredWorkspaceRuntime').mockResolvedValue(undefined)
-    mockedRestorePersistedWorkspaceSession.mockImplementation(() => new Promise(() => {}))
+    mockedRestoreWorkspaceAtBoot.mockImplementation(() => new Promise(() => {}))
 
     renderInJsdom(<Harness />)
     await flushMicrotasks(3)
@@ -549,7 +549,7 @@ function workspaceRestoreFixture(
 
 function mockServerRestore(fixture: WorkspaceRestoreFixture): void {
   const { serverWorkspace, clientWorkspace } = fixture
-  mockedRestorePersistedWorkspaceSession.mockResolvedValue({
+  mockedRestoreWorkspaceAtBoot.mockResolvedValue({
     status: 'restored',
     openRepoEntries: serverWorkspace.openRepoEntries,
     runtime: restoredRuntimeForWorkspace(serverWorkspace, clientWorkspace.restoredRepoId),

@@ -1,15 +1,12 @@
 // Authenticated bootstrap primes query state from the server transport before
 // feature stores start reading it.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type {
-  ClientWorkspaceState,
-  SettingsSnapshot,
-} from '#/shared/api-types.ts'
+import type { ClientWorkspaceState, SettingsSnapshot } from '#/shared/api-types.ts'
 import { normalizeWorkspaceSessionLayoutState } from '#/shared/workspace-layout.ts'
 import { bootstrapLog } from '#/web/logger.ts'
 import { primaryWindowQueryClient } from '#/web/primary-window-queries.ts'
 import { restoreFiletreeViewStateFromSession } from '#/web/filetree-session-state.ts'
-import { restoreRestorableWorkspaceStateFromSession } from '#/web/restorable-workspace-state.ts'
+import { restoreRestorableWorkspaceStateFromClientWorkspace } from '#/web/restorable-workspace-state.ts'
 import { getExternalAppsSnapshot, getSettingsSnapshot } from '#/web/settings-client.ts'
 import { restoreWorkspaceAtBoot } from '#/web/settings-actions.ts'
 import { externalAppsQueryKey, settingsSnapshotQueryKey } from '#/web/settings-query-cache.ts'
@@ -23,9 +20,7 @@ import { readClientWorkspaceState } from '#/web/client-workspace-state.ts'
 import { repoSessionEntryId, type RepoSessionEntry } from '#/shared/remote-repo.ts'
 
 export type AuthenticatedAppBootstrapState =
-  | { status: 'restoring-workspace' }
-  | { status: 'ready' }
-  | { status: 'failed'; message: string }
+  { status: 'restoring-workspace' } | { status: 'ready' } | { status: 'failed'; message: string }
 
 export interface AuthenticatedAppBootstrapResult {
   state: AuthenticatedAppBootstrapState
@@ -42,10 +37,7 @@ interface AuthenticatedWorkspaceRestoreRun {
   cancel: () => void
 }
 
-type WorkspaceRestoreOutcome =
-  | { status: 'completed' }
-  | { status: 'cancelled' }
-  | { status: 'failed'; message: string }
+type WorkspaceRestoreOutcome = { status: 'completed' } | { status: 'cancelled' } | { status: 'failed'; message: string }
 
 export function useAuthenticatedAppBootstrap(options?: {
   activeRepoRoot?: string | null
@@ -144,16 +136,16 @@ async function restoreBootSession(
     if (restored.status === 'repaired') {
       bootstrapLog.warn('workspace restore dropped invalid or unavailable state')
     }
-    const session = composeRestoredWorkspaceSession(
+    const clientWorkspace = composeRestoredClientWorkspace(
       restored.openRepoEntries,
       presentation,
       restored.runtime.restoredRepoId,
     )
-    applyRestoredWorkspaceSession(session)
+    applyRestoredClientWorkspace(clientWorkspace)
     await abortable(
       useReposStore.getState().hydrateRestoredWorkspaceRuntime(restored.runtime, {
         signal,
-        restoredSession: session,
+        restoredClientWorkspace: clientWorkspace,
       }),
       signal,
     )
@@ -167,22 +159,22 @@ async function restoreBootSession(
     if (signal.reason === AUTHENTICATED_WORKSPACE_RESTORE_CANCELLED && isAbortReason(err, signal)) {
       return { status: 'cancelled' }
     }
-    bootstrapLog.warn('session restore failed', { err })
+    bootstrapLog.warn('workspace restore failed', { err })
     const message = restoreFailureMessage(err)
     blockSessionPersistenceAfterRestoreFailure(message)
     return { status: 'failed', message }
   }
 }
 
-function applyRestoredWorkspaceSession(session: ClientWorkspaceState): void {
+function applyRestoredClientWorkspace(clientWorkspace: ClientWorkspaceState): void {
   // Apply layout prefs before repo probing finishes so the first
   // restored paint uses the saved geometry. Client workspace persistence
   // still waits for workspaceMembershipReady, so this cannot overwrite the
-  // persisted session with a partially hydrated one.
-  const normalizedLayout = normalizeWorkspaceSessionLayoutState(session)
-  const restoredWorkspaceState = restoreRestorableWorkspaceStateFromSession(session)
+  // persisted client workspace with a partially hydrated one.
+  const normalizedLayout = normalizeWorkspaceSessionLayoutState(clientWorkspace)
+  const restoredWorkspaceState = restoreRestorableWorkspaceStateFromClientWorkspace(clientWorkspace)
   const { applySessionLayoutState, applySessionSelectedTerminalState } = useReposStore.getState()
-  restoreFiletreeViewStateFromSession(session.filetreeViewStateByWorktreeByRepo)
+  restoreFiletreeViewStateFromSession(clientWorkspace.filetreeViewStateByWorktreeByRepo)
   applySessionLayoutState(normalizedLayout)
   applySessionSelectedTerminalState(restoredWorkspaceState.selectedTerminalSessionIdByTerminalWorktree)
 }
@@ -209,7 +201,7 @@ function blockSessionPersistenceAfterRestoreFailure(message: string): void {
   })
 }
 
-function composeRestoredWorkspaceSession(
+function composeRestoredClientWorkspace(
   openRepoEntries: RepoSessionEntry[],
   presentation: ClientWorkspaceState,
   serverRestoredRepoId: string | null,
@@ -225,7 +217,7 @@ function composeRestoredWorkspaceSession(
 }
 
 function restoreFailureMessage(err: unknown): string {
-  return err instanceof Error ? err.message : 'session restore failed'
+  return err instanceof Error ? err.message : 'workspace restore failed'
 }
 
 function abortReason(signal: AbortSignal): unknown {
