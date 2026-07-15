@@ -169,7 +169,6 @@ export class WorkspacePaneLayoutAggregate {
 
   private async snapshot(input: WorkspacePaneLayoutSnapshotInput): Promise<WorkspacePaneTabsSnapshot> {
     const { scope, validTargets, providerSnapshots, knownLayout } = input
-    this.overlay.activate(scope)
     const layout = knownLayout ?? (await this.repository.load(scope.repoRoot)).layout
     const entries = this.projectEntries(scope, layout, validTargets, providerSnapshots)
     return { revision: this.revision(scope, layout, validTargets, providerSnapshots, entries), entries }

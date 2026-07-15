@@ -485,7 +485,7 @@ describe('workspace pane layout aggregate', () => {
       providerSnapshots: [],
     })
 
-    expect(result).toEqual({ affectedUserIds: ['user-a', 'user-b'] })
+    expect(result).toEqual({ affectedUserIds: ['user-a'] })
   })
 })
 
