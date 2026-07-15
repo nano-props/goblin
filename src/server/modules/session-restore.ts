@@ -188,33 +188,17 @@ async function restoreServerWorkspaceSnapshot(
     }
   }
 
-  const confirmed = await compareAndReplaceServerWorkspaceRepos(
-    membership.workspace.openRepoEntries,
-    membership.workspace.openRepoEntries,
-  )
-  if (!confirmed.matched) {
+  const expectedMembership = membership.workspace.openRepoEntries
+  const initializedTabs = await initializeWorkspacePaneTabsWithMembershipGuard({
+    restoreInput: input,
+    workspace: validatedWorkspace.workspace,
+    repos: openedActive,
+    confirmMembership: async () => await compareAndReplaceServerWorkspaceRepos(expectedMembership, expectedMembership),
+  })
+  if (!initializedTabs.matched) {
     return {
       kind: 'membership-conflict',
-      latestWorkspace: confirmed.latestWorkspace,
-      repaired: repoRestoreFailed || validatedWorkspace.repaired,
-    }
-  }
-
-  const stableWorkspace = {
-    ...validatedWorkspace.workspace,
-    openRepoEntries: confirmed.workspace.openRepoEntries,
-  }
-  input.signal?.throwIfAborted()
-  const workspacePaneTabs = await restoreWorkspacePaneTabsForRepos(input, stableWorkspace, openedActive)
-  input.signal?.throwIfAborted()
-  const committedMembership = await compareAndReplaceServerWorkspaceRepos(
-    stableWorkspace.openRepoEntries,
-    stableWorkspace.openRepoEntries,
-  )
-  if (!committedMembership.matched) {
-    return {
-      kind: 'membership-conflict',
-      latestWorkspace: committedMembership.latestWorkspace,
+      latestWorkspace: initializedTabs.latestWorkspace,
       repaired: repoRestoreFailed || validatedWorkspace.repaired,
     }
   }
@@ -226,7 +210,7 @@ async function restoreServerWorkspaceSnapshot(
       runtime: runtimeSnapshotFromOpened(
         opened,
         activeRepoRootForOpened(input.activeRepoRoot, opened),
-        workspacePaneTabs,
+        initializedTabs.snapshots,
       ),
     },
   }
@@ -459,27 +443,24 @@ export async function restoreRepoTabsForRepo(input: RestoreRepoTabsInput): Promi
   if (validatedWorkspace.kind === 'membership-conflict') {
     throw new IpcError({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
   }
-  const confirmed = await confirmServerWorkspaceRepoEntry(entry)
-  if (!confirmed.matched) throw new IpcError({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
-
-  const snapshots = await restoreWorkspacePaneTabsForRepos(
-    {
+  const initializedTabs = await initializeWorkspacePaneTabsWithMembershipGuard({
+    restoreInput: {
       userId: input.userId,
       clientId: input.clientId,
       workspacePaneTabsHost: input.workspacePaneTabsHost,
       signal: input.signal,
     },
-    validatedWorkspace.workspace,
-    [repo],
-  )
-  assertCurrentRepoRuntimeMembership(input)
-  const committedMembership = await confirmServerWorkspaceRepoEntry(entry)
-  if (!committedMembership.matched) {
+    workspace: validatedWorkspace.workspace,
+    repos: [repo],
+    confirmMembership: async () => await confirmServerWorkspaceRepoEntry(entry),
+    assertCurrent: () => assertCurrentRepoRuntimeMembership(input),
+  })
+  if (!initializedTabs.matched) {
     throw new IpcError({ code: 'NOT_FOUND', message: 'error.repo-not-in-session' })
   }
   return {
     repo,
-    snapshot: snapshots[0]?.snapshot ?? null,
+    snapshot: initializedTabs.snapshots[0]?.snapshot ?? null,
   }
 }
 
@@ -599,6 +580,37 @@ function assertCurrentRepoRuntimeMembership(input: RestoreRepoTabsInput): void {
 
 function isOpenedProjectedRepo(repo: OpenedWorkspaceRepo): repo is OpenedProjectedWorkspaceRepo {
   return isProjectedRestoredWorkspaceRepo(repo)
+}
+
+type WorkspaceMembershipConfirmation =
+  { matched: true; workspace: ServerWorkspaceState } | { matched: false; latestWorkspace: ServerWorkspaceState }
+
+async function initializeWorkspacePaneTabsWithMembershipGuard(input: {
+  restoreInput: RestoreServerWorkspaceInput
+  workspace: ServerWorkspaceState
+  repos: ProjectedRestoredWorkspaceRepoRuntime[]
+  confirmMembership: () => Promise<WorkspaceMembershipConfirmation>
+  assertCurrent?: () => void
+}): Promise<
+  | {
+      matched: true
+      snapshots: Array<{ repoRoot: string; repoRuntimeId: string; snapshot: WorkspacePaneTabsSnapshot }>
+    }
+  | { matched: false; latestWorkspace: ServerWorkspaceState }
+> {
+  const confirmed = await input.confirmMembership()
+  if (!confirmed.matched) return confirmed
+  const stableWorkspace = {
+    ...input.workspace,
+    openRepoEntries: confirmed.workspace.openRepoEntries,
+  }
+  input.restoreInput.signal?.throwIfAborted()
+  const snapshots = await restoreWorkspacePaneTabsForRepos(input.restoreInput, stableWorkspace, input.repos)
+  input.assertCurrent?.()
+  input.restoreInput.signal?.throwIfAborted()
+  const committed = await input.confirmMembership()
+  if (!committed.matched) return committed
+  return { matched: true, snapshots }
 }
 
 async function restoreWorkspacePaneTabsForRepos(
