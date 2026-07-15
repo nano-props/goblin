@@ -53,7 +53,6 @@ export interface RestoreServerWorkspaceInput {
 export interface RestoredServerWorkspace {
   status: 'restored' | 'repaired'
   openRepoEntries: RepoSessionEntry[]
-  workspace: ServerWorkspaceState
   runtime: WorkspaceRuntimeRestoreSnapshot
 }
 
@@ -231,7 +230,6 @@ async function restoreServerWorkspaceSnapshot(
     value: {
       status: repoRestoreFailed || validatedWorkspace.repaired ? 'repaired' : 'restored',
       openRepoEntries: opened.map((repo) => repo.entry),
-      workspace: stableWorkspace,
       runtime: runtimeSnapshotFromOpened(
         opened,
         activeRepoRootForOpened(input.activeRepoRoot, opened),

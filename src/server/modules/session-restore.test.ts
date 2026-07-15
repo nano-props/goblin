@@ -164,7 +164,6 @@ describe('restoreServerWorkspace', () => {
     })
 
     expect(result.status).toBe('repaired')
-    expect(result.workspace).toEqual(defaultServerWorkspaceState())
     expect(result.openRepoEntries).toEqual([])
     expect(result.runtime.repos).toEqual([])
     expect(mocks.clearServerWorkspaceTabsIfUnchanged).not.toHaveBeenCalled()
@@ -235,7 +234,6 @@ describe('restoreServerWorkspace', () => {
     })
 
     expect(result.status).toBe('restored')
-    expect(result.workspace).toEqual(serverWorkspaceFromSession(session))
     expect(result.openRepoEntries).toEqual(session.openRepoEntries)
     expect(result.runtime.repos).toEqual([
       expect.objectContaining({ repoRoot: '/repo', repoRuntimeId: 'repo-runtime-test', projection: null }),
@@ -303,7 +301,6 @@ describe('restoreServerWorkspace', () => {
     })
 
     expect(result.status).toBe('restored')
-    expect(result.workspace).toEqual(serverWorkspaceFromSession(session))
     expect(result.openRepoEntries).toEqual(session.openRepoEntries)
     expect(result.runtime.repos).toEqual([expect.not.objectContaining({ target: expect.anything() })])
     expect(result.runtime.repos[0]).toMatchObject({
@@ -523,7 +520,7 @@ describe('restoreServerWorkspace', () => {
       workspacePaneTabsHost,
     })
 
-    expect(result).toMatchObject({ status: 'restored', workspace: serverWorkspaceFromSession(currentSession) })
+    expect(result.status).toBe('restored')
     expect(mocks.clearServerWorkspaceTabsIfUnchanged).toHaveBeenCalledTimes(1)
     expect(mocks.clearServerWorkspaceTabsIfUnchanged).toHaveBeenCalledWith({
       repoRoot: '/repo',
@@ -802,7 +799,6 @@ describe('restoreServerWorkspace — active-only restore', () => {
     })
 
     expect(result.status).toBe('repaired')
-    expect(result.workspace.openRepoEntries).toEqual([{ kind: 'local', id: '/repo-active' }])
     expect(result.openRepoEntries).toEqual([{ kind: 'local', id: '/repo-active' }])
     expect(result.runtime.repos).toHaveLength(1)
     expect(result.runtime.repos[0]).toMatchObject({ repoRoot: '/repo-active' })

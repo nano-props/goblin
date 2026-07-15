@@ -105,10 +105,6 @@ describe('settings routes', () => {
     const restored = {
       status: 'restored' as const,
       openRepoEntries: [],
-      workspace: {
-        openRepoEntries: [],
-        workspacePaneTabsByTargetByRepo: {},
-      },
       runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
     }
     mocks.restoreServerWorkspace.mockResolvedValue(restored)

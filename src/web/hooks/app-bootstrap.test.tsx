@@ -272,7 +272,6 @@ describe('app bootstrap hooks', () => {
     mockedRestorePersistedWorkspaceSession.mockResolvedValue({
       status: 'repaired',
       openRepoEntries: rebuiltSession.serverWorkspace.openRepoEntries,
-      workspace: rebuiltSession.serverWorkspace,
       runtime: restoredRuntimeForWorkspace(
         rebuiltSession.serverWorkspace,
         rebuiltSession.clientWorkspace.restoredRepoId,
@@ -553,7 +552,6 @@ function mockServerRestore(fixture: WorkspaceRestoreFixture): void {
   mockedRestorePersistedWorkspaceSession.mockResolvedValue({
     status: 'restored',
     openRepoEntries: serverWorkspace.openRepoEntries,
-    workspace: serverWorkspace,
     runtime: restoredRuntimeForWorkspace(serverWorkspace, clientWorkspace.restoredRepoId),
   })
   mockClientPresentation(clientWorkspace)

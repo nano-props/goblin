@@ -42,7 +42,6 @@ const appDataClientMocks = vi.hoisted(() => ({
   restoreServerWorkspace: vi.fn<RestoreServerWorkspaceMock>(async () => ({
     status: 'restored' as const,
     openRepoEntries: [],
-    workspace: defaultServerWorkspaceState(),
     runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
   })),
   restoreRepoWorkspaceTabs: vi.fn(async () => ({
@@ -121,7 +120,6 @@ describe('settings actions', () => {
     appDataClientMocks.restoreServerWorkspace.mockResolvedValue({
       status: 'restored',
       openRepoEntries: [],
-      workspace: defaultServerWorkspaceState(),
       runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: null },
     })
     appDataClientMocks.restoreRepoWorkspaceTabs.mockReset()
@@ -198,10 +196,6 @@ describe('settings actions', () => {
     appDataClientMocks.restoreServerWorkspace.mockResolvedValue({
       status: 'repaired',
       openRepoEntries: session.openRepoEntries,
-      workspace: {
-        openRepoEntries: session.openRepoEntries,
-        workspacePaneTabsByTargetByRepo: session.workspacePaneTabsByTargetByRepo,
-      },
       runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: session.restoredRepoId },
     })
     const { restoreWorkspaceAtBoot } = await import('#/web/settings-actions.ts')
@@ -211,10 +205,6 @@ describe('settings actions', () => {
     expect(result).toEqual({
       status: 'repaired',
       openRepoEntries: session.openRepoEntries,
-      workspace: {
-        openRepoEntries: session.openRepoEntries,
-        workspacePaneTabsByTargetByRepo: session.workspacePaneTabsByTargetByRepo,
-      },
       runtime: { repos: [], workspacePaneTabs: [], restoredRepoId: session.restoredRepoId },
     })
     expect(appDataClientMocks.restoreServerWorkspace).toHaveBeenCalledWith('client_test000000000000', undefined)
